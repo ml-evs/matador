@@ -2,6 +2,9 @@
 
 def castep2py(seed):
 
+    import datetime
+    import pymongo as pm
+    
     castep = dict()
     
     # read .castep file
@@ -46,6 +49,7 @@ def castep2py(seed):
                 if 'x------' in flines[line_no+i]:
                     atoms= True
                 i += 1
+            castep['num_atoms'] = len(castep['atomic_types'])
         elif 'Mass of species in AMU' in line:
             i = 1
             atomic_masses = list()
@@ -65,6 +69,15 @@ def castep2py(seed):
                 else:
                     castep['species_pot'][flines[line_no+i].split()[0].strip()] = flines[line_no+i].split()[1].strip()
                     i += 1
+        elif 'Final energy, E' in line:
+            castep['total_energy'] = float(line.split('=')[1].split()[0])
+            castep['total_energy_per_atom'] = castep['total_energy'] / castep['num_atoms']
+        elif 'Final free energy' in line:
+            castep['free_energy'] = float(line.split('=')[1].split()[0])
+            castep['free_energy_per_atom'] = castep['free_energy'] / castep['num_atoms']
+
+    if 'external_pressure' not in castep:
+        castep['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0], [0.0]]
 
     # generate mass-ordered chemical composition string
     castep['composition'] = ''
@@ -90,10 +103,13 @@ def castep2py(seed):
     if castep['task'] == 'geometry optimization':
         final = False
         for line_no, line in enumerate(flines):
-            if 'WARNING - Geometry optimization failed to converge' in line:
+            if 'Geometry optimization failed to converge' in line:
+                print 'failure triggered'
                 castep['optimised'] = False
-            if 'Final Configuration' in line:
+            elif 'Final Configuration' in line:
                 final = True
+                if 'optimised' not in castep:
+                    castep['optimised'] = True
             if final:
                 if 'Real Lattice' in line:
                     castep['lattice_cart'] = list()
@@ -104,18 +120,17 @@ def castep2py(seed):
                         else:
                             castep['lattice_cart'].append((map(float, (flines[line_no+i].split()[0:3]))))
                         i += 1
-                elif 'Lattice parameters' in line :
+                elif 'Lattice parameters' in line:
                     castep['lattice_abc'] = list()
                     i = 1
-                    if 'Current cell volume' in flines[line_no+i]:
-                        break
-                    else:
-                        castep['lattice_abc'].append([flines[line_no+i].split('=')[1].strip().split(' ')[0], 
-                                                     flines[line_no+i+1].split('=')[1].strip().split(' ')[0],
-                                                     flines[line_no+i+2].split('=')[2].strip().split(' ')[0]])
-                        castep['lattice_abc'].append([flines[line_no+i].split('=')[-1],
-                                                     flines[line_no+i+1].split('=')[-1],
-                                                     flines[line_no+i+2].split('=')[-1]])
+                    castep['lattice_abc'].append(map(float, [flines[line_no+i].split('=')[1].strip().split(' ')[0], 
+                                                             flines[line_no+i+1].split('=')[1].strip().split(' ')[0],
+                                                             flines[line_no+i+2].split('=')[1].strip().split(' ')[0]]))
+                    castep['lattice_abc'].append(map(float, [flines[line_no+i].split('=')[-1].strip(),
+                                                             flines[line_no+i+1].split('=')[-1].strip(),
+                                                             flines[line_no+i+2].split('=')[-1].strip()]))
+                elif 'Current cell volume' in line:
+                    castep['cell_volume'] = float(line.split('=')[1].split()[0].strip())
                 elif 'Cell Contents' in line :
                     castep['positions_frac'] = list()
                     i = 1
@@ -157,26 +172,31 @@ def castep2py(seed):
                             castep['pressure_on_cell'] = float(flines[line_no+i].split()[-2])
                         i += 1
                 elif 'Final Enthalpy' in line:
-                    castep['final_enthalpy'] = float(line.split('=')[-1].split()[0])
+                    castep['enthalpy'] = float(line.split('=')[-1].split()[0])
+                    castep['enthalpy_per_atom'] = float(line.split('=')[-1].split()[0])/castep['num_atoms']
                 elif 'Final bulk modulus' in line:
-                    castep['final_bulk_modulus'] = float(line.split('=')[-1].split()[0])
+                    castep['bulk_modulus'] = float(line.split('=')[-1].split()[0])
 
     # computing metadata, i.e. parallelism, time, memory, version
     for line in flines:
         if 'Release CASTEP version' in line:
             castep['castep_version'] = line.split()[-2]
+        elif 'Run started:' in line:
+            from time import strptime
+            year = line.split()[5]
+            month = str(strptime(line.split()[4], '%b').tm_mon)
+            day = line.split()[3]
+            castep['date'] = day+'-'+month+'-'+year
         elif 'Total time' in line:
             castep['total_time_hrs'] = float(line.split()[-2])/3600
         elif 'Peak Memory Use' in line:
             castep['peak_mem_MB'] = int(float(line.split()[-2])/1000)
-    print castep['castep_version']
-    
-    import pymongo as pm
     client = pm.MongoClient()
     db = client.crystals
-    lcmo = db.lcmo
-    struct_id = lcmo.insert_one(castep).inserted_id
+    pressure = db.pressure
+    struct_id = pressure.insert_one(castep).inserted_id
     
-
 if __name__ == '__main__':
-    castep2py('La2CoMnO6CollCode195072')
+    from sys import argv
+    filename = argv[1]
+    castep2py(filename)
