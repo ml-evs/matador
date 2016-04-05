@@ -1,7 +1,8 @@
-#!/usr/local/bin/python
+#!/usr/bin/python
 # coding: utf-8
 from __future__ import print_function
 from collections import defaultdict
+import json
 
 class Spatula:
     ''' The Spatula class implements methods to scrape folders 
@@ -17,34 +18,67 @@ class Spatula:
 
     def __init__(self):
         self.init = True
+        self.import_count = 0
 
-    def dict2db(self):
+    def dict2db(self, struct):
         ''' Insert completed Python dictionary into chosen
         database.
         '''
+        import pymongo as pm
+        client = pm.MongoClient()
+        db = client.crystals
+        pressure = db.pressure
+        struct_id = pressure.insert_one(struct).inserted_id
+        print('Inserted', struct_id)
+        return 1
 
     def files2db(self, file_lists, push2db=False):
         ''' Take all files found by scan and appropriately create dicts
         holding all available data; optionally push to database.
         '''
+        print('###### RUNNING IMPORTER ######')
         for root in file_lists:
+            airss, cell, param, dir = 4*[False]
+            print(root)
+            if file_lists[root]['res_count'] > 0:
+                if file_lists[root]['castep_count'] < file_lists[root]['res_count']:
+                    airss = True
             if airss:
-                cell = cell2dict(root)
-                param = param2dict(root)
+                if file_lists[root]['cell_count'] == 1:
+                    cell_dict = self.cell2dict(root + '/' + file_lists[root]['cell'][0])
+                    cell = True
+                elif file_lists[root]['cell_count'] > 1:
+                    print('Multiple cell files found!')
+                if file_lists[root]['param_count'] == 1:
+                    param_dict = self.param2dict(root + '/' + file_lists[root]['param'][0])
+                    param = True
+                elif file_lists[root]['param_count'] > 1:
+                    print('Multiple param files found!')
+                if(file_lists[root]['cell_count'] == 0 or \
+                    file_lists[root]['param_count'] == 0):
+                    print('Will try to get data from dir names')
+                    dir_dict = self.dir2dict(root)
+                    if 'source' not in dir_dict:
+                        print('No information found in dirname', root)
+                    else:
+                        dir = True
+                # combine cell and param dicts for folder
                 if cell and param:
-                    input = dict_combine(cell, param)
-                elif not cell and not param:
-                    input = cell if not param or param if not cell
-                if not cell or param:
-                    res2dict(root, input, dir)
-                res_list = res2dict(root, cell, param)
-                dir = dir2dict(root)
-                res_list = res2dict(root, dir)
-                for res in res_list:
-                    dict2db(res)
-            else:
-                for files in root:
-                    dict2db(castep2dict(root, tags))
+                    input_dict = cell_dict.copy()
+                    input_dict.update(param_dict)
+                else:
+                    if dir:
+                        input_dict = dir_dict.copy()
+                        if cell:
+                            input_dict.update(cell_dict)
+                        elif param:
+                            input_dict.update(param_dict)
+                # create res dicts and combine them with input_dict
+                for ind, file in enumerate(file_list[root]['res']):
+                    res_dict = self.res2dict(root + '/' + file)
+                    final_struct = input_dict.copy()
+                    final_struct.update(res_dict)
+                # print(json.dumps(final_struct,indent=2))
 
         return
      
@@ -53,10 +87,10 @@ class Spatula:
         CASTEP/AIRSS input/output files.
         '''
         from os import walk, getcwd
-        ResCount, CellCount, CastepCount, ParamCount, RootCount = 5*[0]
+        ResCount, CellCount, CastepCount, ParamCount = 4*[0]
         file_lists = dict()
         if topdir == '.':
-            topdir_string = getcwd()
+            topdir_string = getcwd().split('/')[-1]
         else: 
             topdir_string = topdir
         print('Scanning', topdir_string, 'for CASTEP/AIRSS output files... ',
@@ -67,21 +101,20 @@ class Spatula:
             file_lists[root]['cell_count'] = 0
             file_lists[root]['param_count'] = 0
             file_lists[root]['castep_count'] = 0
-            RootCount += 1
             for file in files:
-                if '.res' in file:
+                if file.endswith('.res'):
                     file_lists[root]['res'].append(file)
                     file_lists[root]['res_count'] += 1
                     ResCount += 1
-                elif '.castep' in file:
+                elif file.endswith('.castep'):
                     file_lists[root]['castep'].append(file)
                     file_lists[root]['castep_count'] += 1
                     CastepCount += 1
-                elif '.cell' in file:
+                elif file.endswith('.cell'):
                     file_lists[root]['cell'].append(file)
                     file_lists[root]['cell_count'] += 1
                     CellCount += 1
-                elif '.param' in file:
+                elif file.endswith('.param'):
                     file_lists[root]['param'].append(file)
                     file_lists[root]['param_count'] += 1
                     ParamCount += 1
@@ -91,23 +124,6 @@ class Spatula:
         print(prefix, CastepCount, '\t.castep files')
         print(prefix, CellCount, '\t.cell files')
         print(prefix, ParamCount, '\t.param files\n')
-        print(getcwd().split('/')[-1])
-        print(' │')
-        for ind, root in enumerate(file_lists):
-            if (file_lists[root]['res_count'] == 0 and \
-                    file_lists[root]['castep_count'] == 0):
-                continue
-            elif file_lists[root]['res_count'] > 0: 
-                if (file_lists[root]['cell_count'] == 1 and \
-                      file_lists[root]['castep_count'] < file_lists[root]['res_count']):
-                    print(' ├──', root[2:], '\n │\t\t└────> AIRSS results.', end='')
-                elif (file_lists[root]['param_count'] == 0 or \
-                        file_lists[root]['cell_count'] == 0):
-                    print(' ├──', root[2:], '\n │\t\t└────> AIRSS results missing',
-                            '.cell or .param file.', end='')
-            if(ind!=RootCount):
-                print('\n │')
-        self.files2db(file_lists)
         return file_lists
 
     ######################## FILE SCRAPER FUNCTIONS ########################
@@ -120,9 +136,12 @@ class Spatula:
         # use defaultdict to allow for easy appending
         res = defaultdict(list)
         # read .res file into array
+        if seed.endswith('.res'):
+            seed = seed.replace('.res', '')
         with open(seed+'.res', 'r') as f:
             flines = f.readlines()
         # add .res to source 
+        print(seed + '.res')
         res['source'].append(seed+'.res')
         # alias special lines in res file
         for line in flines:
@@ -157,13 +176,62 @@ class Spatula:
         to be merged with another dict from a .param or .res file.
         '''
         cell = defaultdict(list)
+        if seed.endswith('.cell'):
+            seed = seed.replace('.cell', '')
+        with open(seed+'.cell', 'r') as f:
+            flines = f.readlines()
+        # add cell file to source
+        cell['source'].append(seed+'.cell')
+        for line_no, line in enumerate(flines):
+            if line.startswith('#'):
+                continue
+            elif '%block species_pot' in line.lower():
+                cell['species_pot'] = dict()
+                i = 1
+                while 'endblock' not in flines[line_no+i].lower():
+                    cell['species_pot'][flines[line_no+i].split()[0]] = flines[line_no+i].split()[1].split('/')[-1]
+                    i += 1
+            elif '%block external_pressure' in line.lower():
+                cell['external_pressure'] = list()
+                cell['external_pressure'].append(map(float, flines[line_no+1].split()))
+                cell['external_pressure'].append(map(float, flines[line_no+2].split()))
+                cell['external_pressure'].append(map(float, flines[line_no+3].split()))
+            elif 'mp_spacing' in line.lower():
+                cell['kpoints_mp_spacing'] = line.split()[-1]
+            elif 'mp_grid' in line.lower():
+                cell['kpoints_mp_grid'] = map(int, line.split()[-3:])
         return cell
 
     def param2dict(self, seed):
         ''' Extract available information from .param file; probably
         to be merged with other dicts from other files.
         '''
-        param = defaultdict(lsit)
+        param = defaultdict(list)
+        if seed.endswith('.param'):
+            seed = seed.replace('.param', '')
+        with open(seed+'.param', 'r') as f:
+            flines = f.readlines()
+        param['source'].append(seed+'.param')
+        for line in flines:
+            line = line.lower()
+            if line.startswith('#'):
+                continue
+            else:
+                # exclude some useless info
+                scrub_list = ['checkpoint', 'write_bib', 'mix_history_length',
+                              'fix_occupancy', 'page_wvfns', 'num_dump_cycles',
+                              'backup_interval', 'geom_max_iter', 'fixed_npw',
+                              'write_cell_structure', 'bs_write_eigenvalues',
+                              'calculate_stress', 'opt_strategy']
+                if [rubbish for rubbish in scrub_list if rubbish in line]:
+                    continue
+                else:
+                    if ':' in line:
+                        param[line.split(':')[0].strip()] = line.split(':')[-1].strip()
+                    elif '=' in line:
+                        param[line.split('=')[0].strip()] = line.split('=')[-1].strip()
+                    else:
+                        param[line.split()[0].strip()] = line.split('')[-1].strip()
         return param
 
     def dir2dict(self, seed):
@@ -171,6 +239,17 @@ class Spatula:
         if no param file has been found. 
         '''
         dir_dict = defaultdict(list)
+        if seed == '.':
+            seed = getcwd().split('/')[-1]
+        dir_as_list = seed.split('-')
+        if len(dir_as_list) != 7:
+            return dict()
+        dir_dict['source'].append(seed)
+        dir_dict['energy_cut_off'] = dir_as_list[1]
+        dir_dict['kpoints_mp_spacing'] = dir_as_list[2]
+        dir_dict['xc_functional'] = dir_as_list[-2]
+        dir_dict['task'] = dir_as_list[-1]
+        print(json.dumps(dir_dict,indent=2))
         return dir_dict
 
     def castep2dict(self, seed):
@@ -180,6 +259,8 @@ class Spatula:
         # use defaultdict to allow for easy appending
         castep = defaultdict(list)
         # read .castep file
+        if seed.endswith('.castep'):
+            seed = seed.replace('.castep', '')
         with open(seed+'.castep', 'r') as f:
             flines = f.readlines()
         # set source tag to castep file 
@@ -295,7 +376,7 @@ class Spatula:
                     elif 'Lattice parameters' in line:
                         castep['lattice_abc'] = list()
                         i = 1
-                        castep['lattice_abc'].append(map(float, [flines[line_no+i:line_no+i+2].split('=')[1].strip().split(' ')[0], 
+                        castep['lattice_abc'].append(map(float, [flines[line_no+i].split('=')[1].strip().split(' ')[0], 
                                                                  flines[line_no+i+1].split('=')[1].strip().split(' ')[0],
                                                                  flines[line_no+i+2].split('=')[1].strip().split(' ')[0]]))
                         castep['lattice_abc'].append(map(float, [flines[line_no+i].split('=')[-1].strip(),
@@ -347,8 +428,10 @@ class Spatula:
                         castep['enthalpy'] = float(line.split('=')[-1].split()[0])
                         castep['enthalpy_per_atom'] = float(line.split('=')[-1].split()[0])/castep['num_atoms']
                     elif 'Final bulk modulus' in line:
-                        castep['bulk_modulus'] = float(line.split('=')[-1].split()[0])
-    
+                        try:
+                            castep['bulk_modulus'] = float(line.split('=')[-1].split()[0])
+                        except:
+                            continue 
         # computing metadata, i.e. parallelism, time, memory, version
         for line in flines:
             if 'Release CASTEP version' in line:
@@ -363,7 +446,7 @@ class Spatula:
                 castep['total_time_hrs'] = float(line.split()[-2])/3600
             elif 'Peak Memory Use' in line:
                 castep['peak_mem_MB'] = int(float(line.split()[-2])/1000)
-
+            
         return castep
     
 
@@ -372,7 +455,13 @@ if __name__ == '__main__':
     import argparse
     filename = argv[1]
     importer = Spatula()
-    importer.scan_dir(filename)
-    # importer.res2dict(filename)
-
-    # castep2dict(filename)
+    file_list = importer.scan_dir(filename)
+    # print(json.dumps(file_list,indent=2))
+    importer.files2db(file_list)
+    # importer.cell2dict(filename)
+    # importer.param2dict(filename)
+    # for root in file_list:
+        # for castep in file_list[root]['castep']:
+            # struct = importer.castep2dict(root + '/' + castep)
+            # importer.import_count += importer.dict2db(struct)
+    # print('Successfully imported', importer.import_count, 'structures.')
