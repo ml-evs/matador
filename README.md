@@ -1,5 +1,4 @@
-TO-DO
-#####
+## TO-DO
 
 - Detect number of fields in .res header to smartly grab results
 - Authentication with the database
