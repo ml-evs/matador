@@ -2,6 +2,11 @@
 # coding: utf-8
 from __future__ import print_function
 from collections import defaultdict
+from os import walk, getcwd
+from time import strptime
+from sys import argv
+import argparse
+import pymongo as pm
 import json
 
 class Spatula:
@@ -24,7 +29,6 @@ class Spatula:
         ''' Insert completed Python dictionary into chosen
         database.
         '''
-        import pymongo as pm
         client = pm.MongoClient()
         db = client.crystals
         pressure = db.pressure
@@ -38,8 +42,12 @@ class Spatula:
         '''
         print('###### RUNNING IMPORTER ######')
         for root in file_lists:
+            if root=='.':
+                root_str = getcwd().split('/')[-1]
+            else:
+                root_str = root
+            print('Dictifying', root_str, '...')
             airss, cell, param, dir = 4*[False]
-            print(root)
             if file_lists[root]['res_count'] > 0:
                 if file_lists[root]['castep_count'] < file_lists[root]['res_count']:
                     airss = True
@@ -78,6 +86,10 @@ class Spatula:
                     res_dict = self.res2dict(root + '/' + file)
                     final_struct = input_dict.copy()
                     final_struct.update(res_dict)
+            else:
+                for ind, file in enumerate(file_list[root]['castep']):
+                    final_struct = self.castep2dict(root + '/' + file)
+                    print(final_struct['max_force_on_atom'], final_struct['optimised'])
                 # print(json.dumps(final_struct,indent=2))
 
         return
@@ -86,7 +98,6 @@ class Spatula:
         ''' Scans folder topdir recursively, returning list of 
         CASTEP/AIRSS input/output files.
         '''
-        from os import walk, getcwd
         ResCount, CellCount, CastepCount, ParamCount = 4*[0]
         file_lists = dict()
         if topdir == '.':
@@ -95,7 +106,7 @@ class Spatula:
             topdir_string = topdir
         print('Scanning', topdir_string, 'for CASTEP/AIRSS output files... ',
               end='')
-        for root, dirs, files in walk(topdir, followlinks=True):
+        for root, dirs, files in walk(topdir, followlinks=True, topdown=True):
             file_lists[root] = defaultdict(list)
             file_lists[root]['res_count'] = 0
             file_lists[root]['cell_count'] = 0
@@ -249,7 +260,7 @@ class Spatula:
         dir_dict['kpoints_mp_spacing'] = dir_as_list[2]
         dir_dict['xc_functional'] = dir_as_list[-2]
         dir_dict['task'] = dir_as_list[-1]
-        print(json.dumps(dir_dict,indent=2))
+        # print(json.dumps(dir_dict,indent=2))
         return dir_dict
 
     def castep2dict(self, seed):
@@ -409,7 +420,7 @@ class Spatula:
                                     break
                                 else:
                                     force_on_atom = 0
-                                    for j in range(1):
+                                    for j in range(3):
                                         force_on_atom += float(flines[line_no+i].split()[3+j])**2
                                     if force_on_atom > max_force:
                                         max_force = force_on_atom
@@ -437,7 +448,6 @@ class Spatula:
             if 'Release CASTEP version' in line:
                 castep['castep_version'] = line.split()[-2]
             elif 'Run started:' in line:
-                from time import strptime
                 year = line.split()[5]
                 month = str(strptime(line.split()[4], '%b').tm_mon)
                 day = line.split()[3]
@@ -451,8 +461,6 @@ class Spatula:
     
 
 if __name__ == '__main__':
-    from sys import argv
-    import argparse
     filename = argv[1]
     importer = Spatula()
     file_list = importer.scan_dir(filename)
