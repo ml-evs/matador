@@ -3,12 +3,12 @@
      - Detect number of fields in .res header to smartly grab results, e.g. how to figure out which data is missing in .res file
      - Consistently pull out correct data from directory name, e.g.               
          ```
-         #!bash
+         $
          Ge+Te/190-0.07-1.75-1.75-PBE-00PBE 
          ```
          vs
          ```
-         #!bash
+         $
          Li+S/LiS-500-0.05-1.75-1.75-PBE-GO
          ```
 - Authentication with the database
