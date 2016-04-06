@@ -5,9 +5,12 @@
          ```
          #!bash
          Ge+Te/190-0.07-1.75-1.75-PBE-00PBE 
+         ```
+         vs
+         ```
+         #!bash
          Li+S/LiS-500-0.05-1.75-1.75-PBE-GO
          ```
-e.g. Ge+Te/190-0.07-1.75-1.75-PBE-00PBE 
 - Authentication with the database
 - Provenance of structures (try to scrape CRSID from ssh)
 - Automated tags conveying reliability and manual custom tags (e.g. 'me388 - miniproj 1')
