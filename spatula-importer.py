@@ -132,9 +132,12 @@ class Spatula:
                     file_lists[root]['castep_count'] += 1
                     CastepCount += 1
                 elif file.endswith('.cell'):
-                    file_lists[root]['cell'].append(file)
-                    file_lists[root]['cell_count'] += 1
-                    CellCount += 1
+                    if file.endswith('-out.cell'):
+                        continue
+                    else:
+                        file_lists[root]['cell'].append(file)
+                        file_lists[root]['cell_count'] += 1
+                        CellCount += 1
                 elif file.endswith('.param'):
                     file_lists[root]['param'].append(file)
                     file_lists[root]['param_count'] += 1
@@ -214,7 +217,10 @@ class Spatula:
                 cell['species_pot'] = dict()
                 i = 1
                 while 'endblock' not in flines[line_no+i].lower():
-                    cell['species_pot'][flines[line_no+i].split()[0]] = flines[line_no+i].split()[1].split('/')[-1]
+                    try:
+                        cell['species_pot'][flines[line_no+i].split()[0]] = flines[line_no+i].split()[1]
+                    except:
+                        pass
                     i += 1
             elif '%block external_pressure' in line.lower():
                 cell['external_pressure'] = list()
