@@ -21,19 +21,23 @@ class Spatula:
         * airss.pl / pyAIRSS .res output
     '''
 
-    def __init__(self):
+    def __init__(self, dryrun=False, debug=False):
         self.init = True
         self.import_count = 0
+        self.logfile = open('spatula.log', 'w')
+        self.dryrun = dryrun
+        self.debug = debug
+        self.client = pm.MongoClient()
+        self.db = self.client.crystals
+        self.repo = self.db.repo
 
     def dict2db(self, struct):
         ''' Insert completed Python dictionary into chosen
         database.
         '''
-        client = pm.MongoClient()
-        db = client.crystals
-        pressure = db.pressure
-        struct_id = pressure.insert_one(struct).inserted_id
-        print('Inserted', struct_id)
+        struct_id = self.repo.insert_one(struct).inserted_id
+        if self.debug:
+            print('Inserted', struct_id)
         return 1
 
     def files2db(self, file_lists, push2db=False):
@@ -41,6 +45,7 @@ class Spatula:
         holding all available data; optionally push to database.
         '''
         print('\n###### RUNNING IMPORTER ######\n')
+        multi = False
         for root in file_lists:
             if root=='.':
                 root_str = getcwd().split('/')[-1]
@@ -56,12 +61,17 @@ class Spatula:
                     param_dict = self.param2dict(root + '/' + file_lists[root]['param'][0])
                     param = True
                 elif file_lists[root]['param_count'] > 1:
-                    print('Multiple param files found!')
+                    if self.dryrun:
+                        print('Multiple param files found!')
+                    multi = True
                 if file_lists[root]['cell_count'] == 1:
                     cell_dict = self.cell2dict(root + '/' + file_lists[root]['cell'][0])
                     cell = True
                 elif file_lists[root]['cell_count'] > 1:
-                    print('Multiple cell files found - searching for param file with same name...')
+                    multi = True
+                    if self.dryrun:
+                        print('Multiple cell files found - searching for param file with same name...')
+                if multi:
                     for param_name in file_lists[root]['param']:
                         for cell_name in file_lists[root]['cell']:
                             if param_name.split('.')[0] in cell_name:
@@ -71,37 +81,46 @@ class Spatula:
                                 param = True
                                 print('Found matching cell and param files:', param_name)
                                 break
-                # if(file_lists[root]['cell_count'] == 0 or \
-                    # file_lists[root]['param_count'] == 0):
-                    # print('Will try to get data from dir names')
-                    # dir_dict = self.dir2dict(root)
-                    # if 'source' in dir_dict:
-                        # dir = True
+                if(file_lists[root]['cell_count'] == 0 or \
+                    file_lists[root]['param_count'] == 0):
+                    dir_dict = self.dir2dict(root)
+                    if 'source' in dir_dict:
+                        dir = True
                 # combine cell and param dicts for folder
                 input_dict = dict()
                 if cell and param:
                     input_dict = cell_dict.copy()
                     input_dict.update(param_dict)
+                    input_dict['source'] = cell_dict['source'] + param_dict['source']
                 else:
                     if dir:
                         input_dict = dir_dict.copy()
                         if cell:
                             input_dict.update(cell_dict)
+                            input_dict['source'] = cell_dict['source'] + dir_dict['source']
                         elif param:
                             input_dict.update(param_dict)
+                            input_dict['source'] = param_dict['source'] + dir_dict['source']
                 # create res dicts and combine them with input_dict
                 for ind, file in enumerate(file_list[root]['res']):
                     res_dict = self.res2dict(root + '/' + file)
                     if res_dict != False:
                         final_struct = input_dict.copy()
-                        final_struct.update(res_dict)   
+                        final_struct.update(res_dict)
+                        try:
+                            final_struct['source'] = res_dict['source'] + input_dict['source']
+                        except:
+                            pass
+                        if not self.dryrun:
+                            self.import_count += self.dict2db(final_struct)
             else:
                 for ind, file in enumerate(file_list[root]['castep']):
                     castep_dict = self.castep2dict(root + '/' + file)
                     if castep_dict != False:
                         final_struct = castep_dict
+                        if not self.dryrun:
+                            self.import_count += self.dict2db(final_struct)
                 # print(json.dumps(final_struct,indent=2))
-
         return
      
     def scan_dir(self, topdir):
@@ -143,7 +162,7 @@ class Spatula:
                     file_lists[root]['param_count'] += 1
                     ParamCount += 1
         print('done!\n')
-        prefix = '\t'
+        prefix = '\t\t'
         print(prefix, ResCount, '\t.res files')
         print(prefix, CastepCount, '\t.castep files')
         print(prefix, CellCount, '\t.cell files')
@@ -154,8 +173,7 @@ class Spatula:
 
     def res2dict(self, seed):
         ''' Extract available information from .res file; preferably
-        used in conjunction with cell or param file, else dict will 
-        include an 'incomplete' tag.
+        used in conjunction with cell or param file.
         '''
         # use defaultdict to allow for easy appending
         res = defaultdict(list)
@@ -171,6 +189,8 @@ class Spatula:
             for line in flines:
                 if 'TITL' in line:
                     titl = line.split()
+                    if len(titl) != 12:
+                        raise RuntimeError
                 elif 'CELL' in line:
                     cell = line.split()
             res['pressure'] = float(titl[2])
@@ -191,12 +211,12 @@ class Spatula:
                         res['positions_frac'].append(map(float, cursor[2:5]))
                         i += 1
         except Exception as oopsy:
-            print(oopsy)
-            print('Error in .res file', seed+ '.res, skipping...')
+            if self.dryrun:
+                print(oopsy)
+                print('Error in .res file', seed+ '.res, skipping...')
+            self.logfile.write(seed+'.res\t\t'+str(oopsy)+'\n')
             return False
         # need to calculate res['lattice_cart'] and res['positions_cart'] 
-        # tag document as incomplete, hopefully to be added to by other routines
-        res['tags'].append('incomplete')
         return res
 
     def cell2dict(self, seed):
@@ -243,28 +263,32 @@ class Spatula:
         with open(seed+'.param', 'r') as f:
             flines = f.readlines()
         param['source'].append(seed+'.param')
-        for line in flines:
-            line = line.lower()
-            # skip blank lines and comments
-            if line.startswith('#') or len(line.strip())==0:
-                continue
-            else:
-                # exclude some useless info
-                scrub_list = ['checkpoint', 'write_bib', 'mix_history_length',
-                              'fix_occupancy', 'page_wvfns', 'num_dump_cycles',
-                              'backup_interval', 'geom_max_iter', 'fixed_npw',
-                              'write_cell_structure', 'bs_write_eigenvalues',
-                              'calculate_stress', 'opt_strategy']
-                if [rubbish for rubbish in scrub_list if rubbish in line]:
+        try:
+            for line in flines:
+                line = line.lower()
+                # skip blank lines and comments
+                if line.startswith('#') or len(line.strip())==0:
                     continue
-                # read all other parameters in
                 else:
-                    if ':' in line:
-                        param[line.split(':')[0].strip()] = line.split(':')[-1].strip()
-                    elif '=' in line:
-                        param[line.split('=')[0].strip()] = line.split('=')[-1].strip()
+                    # exclude some useless info
+                    scrub_list = ['checkpoint', 'write_bib', 'mix_history_length',
+                                  'fix_occupancy', 'page_wvfns', 'num_dump_cycles',
+                                  'backup_interval', 'geom_max_iter', 'fixed_npw',
+                                  'write_cell_structure', 'bs_write_eigenvalues',
+                                  'calculate_stress', 'opt_strategy', 'max_scf_cycles']
+                    splitters = [':', '=', ' ']
+                    if [rubbish for rubbish in scrub_list if rubbish in line]:
+                        continue
+                    # read all other parameters in
                     else:
-                        param[line.split()[0].strip()] = line.split()[-1].strip()
+                        if [splitter for splitter in splitters if splitter in line]: 
+                            param[line.split(splitter)[0].strip()] = line.split(':')[-1].strip()
+                            if 'cut_off_energy' in line:
+                                param['cut_off_energy'] = int(param['cut_off_energy'].replace('ev','').strip())
+        except Exception as oopsy:
+            if self.dryrun:
+                print(oopsy)
+                print('Error in', seed+'.param, skipping...')
         return param
 
     def dir2dict(self, seed):
@@ -276,23 +300,41 @@ class Spatula:
         if seed == '.':
             seed = getcwd().split('/')[-1]
         dirs_as_list = seed.split('/')
-        for dir in dirs_as_list:
-            if dir=='.':
-                dir = getcwd().split('/')[-1]
-            if len(dir.split('-')) > 3:
-                dir_dict['energy_cut_off'] = dir[1]
-                dir_dict['kpoints_mp_spacing'] = dir[2]
-                dir_dict['xc_functional'] = dir[5]
-                dir_dict['task'] = dir[6]
-                info = True 
-            elif 'GPa' in dir:
-                dir_dict['external_pressure'] = dir.split('_')[0]
-                info = True 
-        if info:
-            dir_dict['source'].append(seed)
-        else:
-            print('No information found in dirname', seed)
-        # print(json.dumps(dir_dict,indent=2))
+        task_list = ['GO', 'NMR', 'OPTICS'] 
+        try:
+            for dir in dirs_as_list:
+                if dir=='.':
+                    dir = getcwd().split('/')[-1]
+                if len(dir.split('-')) > 3:
+                    if dir[0].isalpha():
+                        offset = 1
+                    else:
+                        offset = 0
+                    dir_dict['cut_off_energy'] = float(dir.split('-')[offset])
+                    dir_dict['kpoints_mp_spacing'] = float(dir.split('-')[offset+1])
+                    dir_dict['xc_functional'] = dir.split('-')[offset+4]
+                    if [task for task in task_list if task in dir.split('-')[offset+5]]:
+                        dir_dict['task'] = dir.split('-')[offset+5]
+                    else:
+                        dir_dict['species_pot'] = dir.split('-')[offset+5]
+
+                    info = True 
+                elif 'GPa' in dir:
+                    dir_dict['external_pressure'].append([float(dir.split('_')[0]), 0.0, 0.0])
+                    dir_dict['external_pressure'].append([float(dir.split('_')[0]), 0.0])
+                    dir_dict['external_pressure'].append([float(dir.split('_')[0])])
+                    info = True 
+            if info:
+                dir_dict['source'].append(seed)
+            else:
+                print('No information found in dirname', seed)
+        except Exception as oopsy:
+            if self.dryrun:
+                print(oopsy)
+                print('Error wrangling dir name', seed)
+            self.logfile.write(seed + '\t\t' + str(oopsy))
+        if self.debug:
+            print(json.dumps(dir_dict,indent=2))
         return dir_dict
 
     def castep2dict(self, seed):
@@ -503,22 +545,18 @@ class Spatula:
                 elif 'Peak Memory Use' in line:
                     castep['peak_mem_MB'] = int(float(line.split()[-2])/1000)
         except Exception as oopsy:
-            print(oopsy)
-            print('Error in .castep file', seed+'.castep, skipping...')
+            if self.dryrun:
+                print(oopsy)
+                print('Error in .castep file', seed+'.castep, skipping...')
+            self.logfile.write(seed+'.castep \t\t' + str(oopsy)+'\n')
             return False
         return castep
 
 
 if __name__ == '__main__':
     filename = argv[1]
-    importer = Spatula()
+    importer = Spatula(dryrun=False, debug=False)
     file_list = importer.scan_dir(filename)
-    # print(json.dumps(file_list,indent=2))
     importer.files2db(file_list)
-    # importer.cell2dict(filename)
-    # importer.param2dict(filename)
-    # for root in file_list:
-        # for castep in file_list[root]['castep']:
-            # struct = importer.castep2dict(root + '/' + castep)
-            # importer.import_count += importer.dict2db(struct)
-    # print('Successfully imported', importer.import_count, 'structures.')
+    if not importer.dryrun:
+        print('Successfully imported', importer.import_count, 'structures.')
