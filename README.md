@@ -16,6 +16,7 @@
          ```
 
 - Authentication with the database
+- Composition/stoichiometry as a field
 - Provenance of structures (try to scrape CRSID from ssh)
 - Automated tags conveying reliability and manual custom tags (e.g. 'me388 - miniproj 1')
 - DB query functionality which mimics cryan at some level; fryan.py
