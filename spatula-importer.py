@@ -27,9 +27,10 @@ class Spatula:
         self.logfile = open('spatula.log', 'w')
         self.dryrun = dryrun
         self.debug = debug
-        self.client = pm.MongoClient()
-        self.db = self.client.crystals
-        self.repo = self.db.repo
+        if not self.dryrun:
+            self.client = pm.MongoClient()
+            self.db = self.client.crystals
+            self.repo = self.db.repo
 
     def dict2db(self, struct):
         ''' Insert completed Python dictionary into chosen
@@ -190,7 +191,7 @@ class Spatula:
                 if 'TITL' in line:
                     titl = line.split()
                     if len(titl) != 12:
-                        raise RuntimeError
+                        raise RuntimeError('res file header missing some data')
                 elif 'CELL' in line:
                     cell = line.split()
             res['pressure'] = float(titl[2])
@@ -386,12 +387,12 @@ class Spatula:
                     castep['external_pressure'] = list()
                     castep['external_pressure'].append(map(float, flines[line_no+1].split()))
                     castep['external_pressure'].append(map(float, flines[line_no+2].split()))
-                    castep['external_pressure'].append(map(float, flines[line_no+3].split()))
-                elif 'atom types' not in castep and 'Cell Contents' in line:
-                    castep['atom_types'] = list()
-                    i = 1
-                    atoms = False
-                    while True:
+                    castep['external_pressure'].append(map(float, flines[line_no+3].split())) 
+                elif 'atom types' not in castep and 'Cell Contents' in line: 
+                    castep['atom_types'] = list() 
+                    i = 1 
+                    atoms = False 
+                    while True: 
                         if atoms:
                             if 'xxxxxxxxx' in flines[line_no+i]:
                                 atoms = False
