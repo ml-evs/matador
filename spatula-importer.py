@@ -21,16 +21,32 @@ class Spatula:
         * airss.pl / pyAIRSS .res output
     '''
 
-    def __init__(self, dryrun=False, debug=False):
+    def __init__(self, dryrun=False, debug=False, verbosity=0, tags=None):
         self.init = True
         self.import_count = 0
         self.logfile = open('spatula.log', 'w')
         self.dryrun = dryrun
-        self.debug = debug
+        self.debug = debug 
+        self.verbosity = verbosity 
+        self.tag_dict = dict()
+        self.tag_dict['tags'] = tags
         if not self.dryrun:
             self.client = pm.MongoClient()
             self.db = self.client.crystals
             self.repo = self.db.repo
+        # scan directory on init
+        self.file_lists = self.scan_dir()
+        # convert to dict and db if required
+        self.files2db(self.file_lists)
+        if not self.dryrun:
+            print('Successfully imported', self.import_count, 'structures!')
+        else:
+            print('Dryrun complete!')
+        self.logfile.close()
+        self.logfile = open('spatula.log', 'r')
+        print('There are/is', sum(1 for line in self.logfile), 
+              'error(s) to view in spatala.log')
+        self.logfile.close()
 
     def dict2db(self, struct):
         ''' Insert completed Python dictionary into chosen
@@ -41,7 +57,7 @@ class Spatula:
             print('Inserted', struct_id)
         return 1
 
-    def files2db(self, file_lists, push2db=False):
+    def files2db(self, file_lists):
         ''' Take all files found by scan and appropriately create dicts
         holding all available data; optionally push to database.
         '''
@@ -52,7 +68,8 @@ class Spatula:
                 root_str = getcwd().split('/')[-1]
             else:
                 root_str = root
-            print('Dictifying', root_str, '...')
+            if self.verbosity > 0:
+                print('Dictifying', root_str, '...')
             airss, cell, param, dir = 4*[False]
             if file_lists[root]['res_count'] > 0:
                 if file_lists[root]['castep_count'] < file_lists[root]['res_count']:
@@ -103,7 +120,7 @@ class Spatula:
                             input_dict.update(param_dict)
                             input_dict['source'] = param_dict['source'] + dir_dict['source']
                 # create res dicts and combine them with input_dict
-                for ind, file in enumerate(file_list[root]['res']):
+                for ind, file in enumerate(file_lists[root]['res']):
                     res_dict = self.res2dict(root + '/' + file)
                     if res_dict != False:
                         final_struct = input_dict.copy()
@@ -113,27 +130,30 @@ class Spatula:
                         except:
                             pass
                         if not self.dryrun:
+                            final_struct.update(self.tag_dict)
                             self.import_count += self.dict2db(final_struct)
             else:
-                for ind, file in enumerate(file_list[root]['castep']):
+                for ind, file in enumerate(file_lists[root]['castep']):
                     castep_dict = self.castep2dict(root + '/' + file)
                     if castep_dict != False:
                         final_struct = castep_dict
                         if not self.dryrun:
+                            final_struct.update(self.tag_dict)
                             self.import_count += self.dict2db(final_struct)
-                # print(json.dumps(final_struct,indent=2))
         return
      
-    def scan_dir(self, topdir):
+    def scan_dir(self):
         ''' Scans folder topdir recursively, returning list of 
         CASTEP/AIRSS input/output files.
         '''
         ResCount, CellCount, CastepCount, ParamCount = 4*[0]
         file_lists = dict()
-        if topdir == '.':
-            topdir_string = getcwd().split('/')[-1]
-        else: 
-            topdir_string = topdir
+        topdir = '.'
+        topdir_string = getcwd().split('/')[-1]
+        # if topdir == '.':
+            # topdir_string = getcwd().split('/')[-1]
+        # else: 
+            # topdir_string = topdir
         print('Scanning', topdir_string, 'for CASTEP/AIRSS output files... ',
               end='')
         for root, dirs, files in walk(topdir, followlinks=True, topdown=True):
@@ -212,11 +232,13 @@ class Spatula:
                         res['positions_frac'].append(map(float, cursor[2:5]))
                         i += 1
         except Exception as oopsy:
-            if self.dryrun:
+            if self.verbosity > 0:
                 print(oopsy)
                 print('Error in .res file', seed+ '.res, skipping...')
             self.logfile.write(seed+'.res\t\t'+str(oopsy)+'\n')
             return False
+        if self.verbosity > 4:
+            print(json.dumps(res, indent=2))
         # need to calculate res['lattice_cart'] and res['positions_cart'] 
         return res
 
@@ -229,29 +251,38 @@ class Spatula:
             seed = seed.replace('.cell', '')
         with open(seed+'.cell', 'r') as f:
             flines = f.readlines()
-        # add cell file to source
-        cell['source'].append(seed+'.cell')
-        for line_no, line in enumerate(flines):
-            if line.startswith('#'):
-                continue
-            elif '%block species_pot' in line.lower():
-                cell['species_pot'] = dict()
-                i = 1
-                while 'endblock' not in flines[line_no+i].lower():
-                    try:
-                        cell['species_pot'][flines[line_no+i].split()[0]] = flines[line_no+i].split()[1]
-                    except:
-                        pass
-                    i += 1
-            elif '%block external_pressure' in line.lower():
-                cell['external_pressure'] = list()
-                cell['external_pressure'].append(map(float, flines[line_no+1].split()))
-                cell['external_pressure'].append(map(float, flines[line_no+2].split()))
-                cell['external_pressure'].append(map(float, flines[line_no+3].split()))
-            elif 'mp_spacing' in line.lower():
-                cell['kpoints_mp_spacing'] = line.split()[-1]
-            elif 'mp_grid' in line.lower():
-                cell['kpoints_mp_grid'] = map(int, line.split()[-3:])
+        try:
+            # add cell file to source
+            cell['source'].append(seed+'.cell')
+            for line_no, line in enumerate(flines):
+                if line.startswith('#'):
+                    continue
+                elif '%block species_pot' in line.lower():
+                    cell['species_pot'] = dict()
+                    i = 1
+                    while 'endblock' not in flines[line_no+i].lower():
+                        try:
+                            cell['species_pot'][flines[line_no+i].split()[0]] = flines[line_no+i].split()[1]
+                        except:
+                            pass
+                        i += 1
+                elif '%block external_pressure' in line.lower():
+                    cell['external_pressure'] = list()
+                    cell['external_pressure'].append(map(float, flines[line_no+1].split()))
+                    cell['external_pressure'].append(map(float, flines[line_no+2].split()))
+                    cell['external_pressure'].append(map(float, flines[line_no+3].split()))
+                elif 'mp_spacing' in line.lower():
+                    cell['kpoints_mp_spacing'] = line.split()[-1]
+                elif 'mp_grid' in line.lower():
+                    cell['kpoints_mp_grid'] = map(int, line.split()[-3:])
+        except Exception as oopsy:
+            if self.verbosity > 0:
+                print(oopsy)
+                print('Error in', seed +'.cell, skipping...')
+            self.logfile.write(seed + '\t\t' + str(oopsy))
+            return False
+        if self.debug:
+            print(json.dumps(cell,indent=2))
         return cell
 
     def param2dict(self, seed):
@@ -287,9 +318,13 @@ class Spatula:
                             if 'cut_off_energy' in line:
                                 param['cut_off_energy'] = int(param['cut_off_energy'].replace('ev','').strip())
         except Exception as oopsy:
-            if self.dryrun:
+            if self.verbosity > 0:
                 print(oopsy)
                 print('Error in', seed+'.param, skipping...')
+            self.logfile.write(seed + '\t\t' + str(oopsy))
+            return False
+        if self.debug:
+            print(json.dumps(param,indent=2))
         return param
 
     def dir2dict(self, seed):
@@ -313,7 +348,7 @@ class Spatula:
                         offset = 0
                     dir_dict['cut_off_energy'] = float(dir.split('-')[offset])
                     dir_dict['kpoints_mp_spacing'] = float(dir.split('-')[offset+1])
-                    dir_dict['xc_functional'] = dir.split('-')[offset+4]
+                    dir_dict['xc_functional'] = dir.split('-')[offset+4].upper()
                     if [task for task in task_list if task in dir.split('-')[offset+5]]:
                         dir_dict['task'] = dir.split('-')[offset+5]
                     else:
@@ -330,7 +365,7 @@ class Spatula:
             else:
                 print('No information found in dirname', seed)
         except Exception as oopsy:
-            if self.dryrun:
+            if self.verbosity > 0:
                 print(oopsy)
                 print('Error wrangling dir name', seed)
             self.logfile.write(seed + '\t\t' + str(oopsy))
@@ -551,13 +586,22 @@ class Spatula:
                 print('Error in .castep file', seed+'.castep, skipping...')
             self.logfile.write(seed+'.castep \t\t' + str(oopsy)+'\n')
             return False
+        if self.debug:
+            print(json.dumps(castep,indent=2))
         return castep
 
 
 if __name__ == '__main__':
-    filename = argv[1]
-    importer = Spatula(dryrun=False, debug=False)
-    file_list = importer.scan_dir(filename)
-    importer.files2db(file_list)
-    if not importer.dryrun:
-        print('Successfully imported', importer.import_count, 'structures.')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-d', '--dryrun', action='store_true',
+                        help='run the importer without connecting to the database')
+    parser.add_argument('-v', '--verbosity', action='count',
+                        help='enable verbose output')
+    parser.add_argument('--debug', action='store_true' ,
+                        help='enable debug output to print every dict')
+    parser.add_argument('--tags', '-t', nargs='+', type=str)
+    args = parser.parse_args()
+    importer = Spatula(dryrun=args.dryrun, 
+                       debug=args.debug,
+                       verbosity=args.verbosity,
+                       tags=args.tags)
