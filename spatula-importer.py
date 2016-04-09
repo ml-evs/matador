@@ -44,8 +44,13 @@ class Spatula:
             print('Dryrun complete!')
         self.logfile.close()
         self.logfile = open('spatula.log', 'r')
-        print('There are/is', sum(1 for line in self.logfile), 
-              'error(s) to view in spatala.log')
+        errors = sum(1 for line in self.logfile)
+        if errors == 1:
+            print('There is', errors, 'error to view in spatala.log')
+        elif errors == 0:
+            print('There were no errors.')
+        elif errors > 1:
+            print('There are', errors, 'errors to view in spatala.log')
         self.logfile.close()
 
     def dict2db(self, struct):
@@ -97,7 +102,8 @@ class Spatula:
                                 cell_dict = self.cell2dict(root + '/' + cell_name)
                                 cell = True 
                                 param = True
-                                print('Found matching cell and param files:', param_name)
+                                if self.verbosity > 0:
+                                    print('Found matching cell and param files:', param_name)
                                 break
                 if(file_lists[root]['cell_count'] == 0 or \
                     file_lists[root]['param_count'] == 0):
@@ -231,6 +237,21 @@ class Spatula:
                         res['atom_types'].append(cursor[0])
                         res['positions_frac'].append(map(float, cursor[2:5]))
                         i += 1
+            # calculate stoichiometry
+            res['stoichiometry'] = defaultdict(float)
+            for atom in res['atom_types']:
+                if atom not in res['stoichiometry']:
+                    res['stoichiometry'][atom] = 0
+                res['stoichiometry'][atom] += 1
+            min = 2000
+            for atom in res['atom_types']:
+                if res['stoichiometry'][atom] < min:
+                    min = res['stoichiometry'][atom]
+            # convert stoichiometry to tuple for fryan
+            temp_stoich = []
+            for key, value in res['stoichiometry'].iteritems():
+                temp_stoich.append([key, value/min])
+            res['stoichiometry'] = temp_stoich
         except Exception as oopsy:
             if self.verbosity > 0:
                 print(oopsy)
@@ -363,7 +384,8 @@ class Spatula:
             if info:
                 dir_dict['source'].append(seed)
             else:
-                print('No information found in dirname', seed)
+                if self.verbosity > 0:
+                    print('No information found in dirname', seed)
         except Exception as oopsy:
             if self.verbosity > 0:
                 print(oopsy)
@@ -425,6 +447,7 @@ class Spatula:
                     castep['external_pressure'].append(map(float, flines[line_no+3].split())) 
                 elif 'atom types' not in castep and 'Cell Contents' in line: 
                     castep['atom_types'] = list() 
+                    castep['stoichiometry'] = defaultdict(float)
                     i = 1 
                     atoms = False 
                     while True: 
@@ -438,6 +461,20 @@ class Spatula:
                             atoms= True
                         i += 1
                     castep['num_atoms'] = len(castep['atom_types'])
+                    # 
+                    min = 2000
+                    for atom in castep['atom_types']:
+                        if atom not in castep['stoichiometry']:
+                            castep['stoichiometry'][atom] = 0
+                        castep['stoichiometry'][atom] += 1
+                    for atom in castep['atom_types']:
+                        if castep['stoichiometry'][atom] < min:
+                            min = castep['stoichiometry'][atom]
+                    # convert stoichiometry to tuple for fryan
+                    temp_stoich = []
+                    for key, value in castep['stoichiometry'].iteritems():
+                        temp_stoich.append([key, value/min])
+                    castep['stoichiometry'] = temp_stoich
                 elif 'Mass of species in AMU' in line:
                     i = 1
                     atomic_masses = list()
