@@ -634,9 +634,10 @@ if __name__ == '__main__':
                         help='run the importer without connecting to the database')
     parser.add_argument('-v', '--verbosity', action='count',
                         help='enable verbose output')
+    parser.add_argument('-t', '--tags', nargs='+', type=str,
+                        help='set user tags, e.g. nanotube, project name')
     parser.add_argument('--debug', action='store_true' ,
                         help='enable debug output to print every dict')
-    parser.add_argument('--tags', '-t', nargs='+', type=str)
     args = parser.parse_args()
     importer = Spatula(dryrun=args.dryrun, 
                        debug=args.debug,

@@ -18,10 +18,15 @@ class DBQuery:
         client = pm.MongoClient()
         self.repo = client.crystals.repo
         self.args = args
-        print(args)
+        if 'top' in args:
+            self.top = args.top
+        else:
+            self.top = 10
+
         if 'stoichiometry' in args:
             cursor = self.query_stoichiometry()
-        self.display_results(cursor)
+        if cursor.count() != 0:
+            self.display_results(cursor)
         # for doc in cursor:
             # print(json.dumps(doc, indent=2))
 
@@ -36,8 +41,10 @@ class DBQuery:
                     + str(doc['pressure']) +                      '\t\t' \
                     + str(doc['cell_volume']) +                   '\t\t' \
                     + str(doc['enthalpy_per_atom']-gs_enthalpy) + '\t\t' \
-                    + doc['space_group'] +                        '\t\t' \
-                    + str((doc['stoichiometry'])))
+                    + doc['space_group'] +                        '\t\t')
+            for item in doc['stoichiometry']:
+                for subitem in item:
+                    struct_string[-1] += str(subitem)
             if ind == 0:
                 gs_enthalpy = doc['enthalpy_per_atom']
         print(header_string)
@@ -55,7 +62,6 @@ class DBQuery:
             fraction.append(float(stoich[i+1]))
         fraction = np.asarray(fraction)
         fraction /= np.min(fraction)
-        print(zip(elements,fraction))
         # pyMongo doesn't like generators... could patch pyMongo?
         # cursor = self.repo.find({'stoichiometry.'+[element for element in elements]: {'$exists' : True}})
         if len(elements) == 1:
@@ -78,16 +84,22 @@ class DBQuery:
                                         {'stoichiometry' : {'$in' : [[elements[2], fraction[2]]]}},
                                         {'stoichiometry' : {'$in' : [[elements[3], fraction[3]]]}}
                                     ]})
-        print(cursor.count())
+        print(cursor.count(), 'structures found at desired stoichiometry.')
         cursor.sort('enthalpy_per_atom', pm.ASCENDING)
-        return cursor[0:10]
+        if cursor.count() < self.top:
+            return cursor
+        else:
+            return cursor[:self.top]
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-s', '--stoichiometry', nargs='+', type=str)
+    parser.add_argument('-s', '--stoichiometry', nargs='+', type=str,
+                        help='choose a stoichiometry, e.g. Ge 1 Te 1')
+    parser.add_argument('-t', '--top', type=int,
+            help='number of structures to show (DEFAULT: 10)')
     args = parser.parse_args()
     
-    query = DBQuery(stoichiometry=args.stoichiometry)
+    query = DBQuery(stoichiometry=args.stoichiometry, top=args.top)
 
 
 
