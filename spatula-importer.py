@@ -7,6 +7,7 @@ from time import strptime
 from sys import argv
 import argparse
 import pymongo as pm
+import random
 import json
 
 class Spatula:
@@ -25,6 +26,10 @@ class Spatula:
         self.init = True
         self.import_count = 0
         self.logfile = open('spatula.log', 'w')
+        wordfile = open('/home/matthew/crysdb-bacon/words', 'r')
+        self.wlines = wordfile.readlines()
+        self.num_words = len(self.wlines)
+        wordfile.close()
         self.dryrun = dryrun
         self.debug = debug 
         self.verbosity = verbosity 
@@ -57,6 +62,9 @@ class Spatula:
         ''' Insert completed Python dictionary into chosen
         database.
         '''
+        plain_text_id = [self.wlines[random.randint(0,self.num_words-1)].strip(),
+                         self.wlines[random.randint(0,self.num_words-1)].strip()]
+        struct['text_id'] = plain_text_id
         struct_id = self.repo.insert_one(struct).inserted_id
         if self.debug:
             print('Inserted', struct_id)
@@ -636,7 +644,7 @@ if __name__ == '__main__':
                         help='enable verbose output')
     parser.add_argument('-t', '--tags', nargs='+', type=str,
                         help='set user tags, e.g. nanotube, project name')
-    parser.add_argument('--debug', action='store_true' ,
+    parser.add_argument('--debug', action='store_true',
                         help='enable debug output to print every dict')
     args = parser.parse_args()
     importer = Spatula(dryrun=args.dryrun, 
