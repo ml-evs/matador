@@ -513,26 +513,6 @@ class Spatula:
             # write zero pressure if not found in file
             if 'external_pressure' not in castep:
                 castep['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0], [0.0]]
-            # generate atomic mass-ordered chemical composition string
-            castep['composition'] = ''
-            count = list()
-            for ind, species in enumerate(atomic_masses):
-                count_tmp = 0
-                for atom in castep['atom_types']:
-                    if species[1]==atom:
-                        count_tmp += 1
-                count.append(count_tmp)
-            reducible = True
-            for num in count:
-                if num % min(count) != 0:
-                    reducible = False
-            min_count = min(count)
-            if reducible:
-                count = [num/min_count for num in count]
-            for ind, species in enumerate(atomic_masses):
-                castep['composition'] += species[1]
-                if count[ind] != 1: 
-                    castep['composition'] += str(count[ind])
             # task specific options
             if castep['task'] == 'geometry optimization':
                 final = False
