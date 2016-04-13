@@ -120,6 +120,7 @@ class DBQuery:
                 print(detail_string[ind])
             if self.source:
                 print(source_string[ind])
+        print(len(header_string)*'─')
         
     def query_stoichiometry(self):
         ''' Query DB for particular stoichiometry. '''
