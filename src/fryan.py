@@ -25,6 +25,7 @@ class DBQuery:
         self.top = self.args.get('top') if self.args.get('top') != None else 10
         self.details = self.args.get('details')
         self.source = self.args.get('source')
+        self.partial = self.args.get('partial_formula')
         # benchmark enthalpy to display (set by calc_match)
         self.gs_enthalpy = 0.0
         if self.args.get('pressure') != None:
@@ -144,26 +145,60 @@ class DBQuery:
         fraction /= np.min(fraction)
         # pyMongo doesn't like generators... could patch pyMongo?
         # cursor = self.repo.find({'stoichiometry.'+[element for element in elements]: {'$exists' : True}})
-        if len(elements) == 1:
-            cursor = self.repo.find({'stoichiometry' : {'$in' : [[elements[0], fraction[0]]]}})
-        elif len(elements) == 2:
-            cursor = self.repo.find({ '$and': [ 
-                                        {'stoichiometry' : {'$in' : [[elements[0], fraction[0]]]}},
-                                        {'stoichiometry' : {'$in' : [[elements[1], fraction[1]]]}}
-                                    ]})
-        elif len(elements) == 3:
-            cursor = self.repo.find({ '$and': [ 
-                                        {'stoichiometry' : {'$in' : [[elements[0], fraction[0]]]}},
-                                        {'stoichiometry' : {'$in' : [[elements[1], fraction[1]]]}},
-                                        {'stoichiometry' : {'$in' : [[elements[2], fraction[2]]]}}
-                                    ]})
-        elif len(elements) == 4:
-            cursor = self.repo.find({ '$and': [ 
-                                        {'stoichiometry' : {'$in' : [[elements[0], fraction[0]]]}},
-                                        {'stoichiometry' : {'$in' : [[elements[1], fraction[1]]]}},
-                                        {'stoichiometry' : {'$in' : [[elements[2], fraction[2]]]}},
-                                        {'stoichiometry' : {'$in' : [[elements[3], fraction[3]]]}}
-                                    ]})
+        if self.partial:
+            if len(elements) == 1:
+                cursor = self.repo.find({'stoichiometry' : {'$in' : [[elements[0], fraction[0]]]}})
+            elif len(elements) == 2:
+                cursor = self.repo.find({ '$and': [ 
+                                            {'stoichiometry' : {'$in' : [[elements[0], fraction[0]]]}},
+                                            {'stoichiometry' : {'$in' : [[elements[1], fraction[1]]]}}
+                                        ]})
+            elif len(elements) == 3:
+                cursor = self.repo.find({ '$and': [ 
+                                            {'stoichiometry' : {'$in' : [[elements[0], fraction[0]]]}},
+                                            {'stoichiometry' : {'$in' : [[elements[1], fraction[1]]]}},
+                                            {'stoichiometry' : {'$in' : [[elements[2], fraction[2]]]}}
+                                        ]})
+            elif len(elements) == 4:
+                cursor = self.repo.find({ '$and': [ 
+                                            {'stoichiometry' : {'$in' : [[elements[0], fraction[0]]]}},
+                                            {'stoichiometry' : {'$in' : [[elements[1], fraction[1]]]}},
+                                            {'stoichiometry' : {'$in' : [[elements[2], fraction[2]]]}},
+                                            {'stoichiometry' : {'$in' : [[elements[3], fraction[3]]]}}
+                                        ]})
+        else:
+            if len(elements) == 1:
+                cursor = self.repo.find({'stoichiometry' : [[elements[0], fraction[0]]]})
+            elif len(elements) == 2:
+                cursor = self.repo.find({ '$and': [ 
+                                            {'stoichiometry' : {'$in' : [[elements[0], fraction[0]]]}},
+                                            {'stoichiometry' : {'$in' : [[elements[1], fraction[1]]]}},
+                                            {'stoichiometry' : {'$size' : 2}}
+                                        ]})
+            elif len(elements) == 3:
+                cursor = self.repo.find({ '$and': [ 
+                                            {'stoichiometry' : {'$in' : [[elements[0], fraction[0]]]}},
+                                            {'stoichiometry' : {'$in' : [[elements[1], fraction[1]]]}},
+                                            {'stoichiometry' : {'$in' : [[elements[2], fraction[2]]]}},
+                                            {'stoichiometry' : {'$size' : 3}}
+                                        ]})
+            elif len(elements) == 4:
+                cursor = self.repo.find({ '$and': [ 
+                                            {'stoichiometry' : {'$in' : [[elements[0], fraction[0]]]}},
+                                            {'stoichiometry' : {'$in' : [[elements[1], fraction[1]]]}},
+                                            {'stoichiometry' : {'$in' : [[elements[2], fraction[2]]]}},
+                                            {'stoichiometry' : {'$in' : [[elements[3], fraction[3]]]}},
+                                            {'stoichiometry' : {'$size' : 4}}
+                                        ]})
+            elif len(elements) == 5:
+                cursor = self.repo.find({ '$and': [ 
+                                            {'stoichiometry' : {'$in' : [[elements[0], fraction[0]]]}},
+                                            {'stoichiometry' : {'$in' : [[elements[1], fraction[1]]]}},
+                                            {'stoichiometry' : {'$in' : [[elements[2], fraction[2]]]}},
+                                            {'stoichiometry' : {'$in' : [[elements[3], fraction[3]]]}},
+                                            {'stoichiometry' : {'$in' : [[elements[4], fraction[4]]]}},
+                                            {'stoichiometry' : {'$size' : 5}}
+                                        ]})
         cursor.sort('enthalpy_per_atom', pm.ASCENDING)
         print(cursor.count(), 'structures found with the desired stoichiometry.')
         
@@ -186,26 +221,63 @@ class DBQuery:
             return EmptyCursor()
         # pyMongo doesn't like generators... could patch pyMongo?
         # cursor = self.repo.find({'stoichiometry.'+[element for element in elements]: {'$exists' : True}})
-        if len(elements) == 1:
-            cursor = self.repo.find({'atom_types' : {'$in' : [elements[0]]}})
-        elif len(elements) == 2:
-            cursor = self.repo.find({ '$and': [ 
-                                        {'atom_types' : {'$in' : [elements[0]]}},
-                                        {'atom_types' : {'$in' : [elements[1]]}}
-                                    ]})
-        elif len(elements) == 3:
-            cursor = self.repo.find({ '$and': [ 
-                                        {'atom_types' : {'$in' : [elements[0]]}},
-                                        {'atom_types' : {'$in' : [elements[1]]}},
-                                        {'atom_types' : {'$in' : [elements[2]]}}
-                                    ]})
-        elif len(elements) == 4:
-            cursor = self.repo.find({ '$and': [ 
-                                        {'atom_types' : {'$in' : [elements[0]]}},
-                                        {'atom_types' : {'$in' : [elements[1]]}},
-                                        {'atom_types' : {'$in' : [elements[2]]}},
-                                        {'atom_types' : {'$in' : [elements[3]]}}
-                                    ]})
+        if self.partial:
+            if len(elements) == 1:
+                cursor = self.repo.find({'atom_types' : {'$in' : [elements[0]]}})
+            elif len(elements) == 2:
+                cursor = self.repo.find({ '$and': [ 
+                                            {'atom_types' : {'$in' : [elements[0]]}},
+                                            {'atom_types' : {'$in' : [elements[1]]}}
+                                        ]})
+            elif len(elements) == 3:
+                cursor = self.repo.find({ '$and': [ 
+                                            {'atom_types' : {'$in' : [elements[0]]}},
+                                            {'atom_types' : {'$in' : [elements[1]]}},
+                                            {'atom_types' : {'$in' : [elements[2]]}}
+                                        ]})
+            elif len(elements) == 4:
+                cursor = self.repo.find({ '$and': [ 
+                                            {'atom_types' : {'$in' : [elements[0]]}},
+                                            {'atom_types' : {'$in' : [elements[1]]}},
+                                            {'atom_types' : {'$in' : [elements[2]]}},
+                                            {'atom_types' : {'$in' : [elements[3]]}}
+                                        ]})
+        else:
+            if len(elements) == 1:
+                cursor = self.repo.find({ '$and': [
+                                            {'atom_types' : {'$in' : [elements[0]]}},
+                                            {'stoichiometry' : {'$size' : 1}}
+                                        ]})
+            elif len(elements) == 2:
+                cursor = self.repo.find({ '$and': [ 
+                                            {'atom_types' : {'$in' : [elements[0]]}},
+                                            {'atom_types' : {'$in' : [elements[1]]}},
+                                            {'stoichiometry' : {'$size' : 2}}
+                                        ]})
+            elif len(elements) == 3:
+                cursor = self.repo.find({ '$and': [ 
+                                            {'atom_types' : {'$in' : [elements[0]]}},
+                                            {'atom_types' : {'$in' : [elements[1]]}},
+                                            {'atom_types' : {'$in' : [elements[2]]}},
+                                            {'stoichiometry' : {'$size' : 3}}
+                                        ]})
+            elif len(elements) == 4:
+                cursor = self.repo.find({ '$and': [ 
+                                            {'atom_types' : {'$in' : [elements[0]]}},
+                                            {'atom_types' : {'$in' : [elements[1]]}},
+                                            {'atom_types' : {'$in' : [elements[2]]}},
+                                            {'atom_types' : {'$in' : [elements[3]]}},
+                                            {'stoichiometry' : {'$size' : 4}}
+                                        ]})
+            elif len(elements) == 5:
+                cursor = self.repo.find({ '$and': [ 
+                                            {'atom_types' : {'$in' : [elements[0]]}},
+                                            {'atom_types' : {'$in' : [elements[1]]}},
+                                            {'atom_types' : {'$in' : [elements[2]]}},
+                                            {'atom_types' : {'$in' : [elements[3]]}},
+                                            {'atom_types' : {'$in' : [elements[4]]}},
+                                            {'stoichiometry' : {'$size' : 5}}
+                                        ]})
         cursor.sort('enthalpy_per_atom', pm.ASCENDING)
         print(cursor.count(), 'structures found with desired composition')
 
@@ -270,6 +342,10 @@ if __name__ == '__main__':
             help='print filenames from which structures were wrangled')
     parser.add_argument('-ac', '--calc-match', action='store_true',
             help='display calculations of the same accuracy as specified id')
+    parser.add_argument('-pf', '--partial-formula', action='store_true',
+            help=('stoichiometry/composition queries will include other unspecified species,' +
+            'e.g. search for Ge2Te3 will also return Ge2Te3Si or Ge4Te6Fe2, and search for Li will' +
+            ' include any structure containing Li, not just pure Li.'))
     args = parser.parse_args()
     if args.calc_match and args.id == None:
         exit('--calc-match requires -i or --id')
@@ -281,4 +357,5 @@ if __name__ == '__main__':
                     pressure=args.pressure,
                     source=args.source,
                     calc_match=args.calc_match,
+                    partial_formula=args.partial_formula,
                     main=True)
