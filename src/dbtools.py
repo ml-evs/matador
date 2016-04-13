@@ -24,7 +24,10 @@ if __name__ == '__main__':
     args = parser.parse_args() 
     if args.drop != None:
         print(args.drop)
-        db[str(args.drop)].dropIndexes()
+        try:
+            db[str(args.drop)].dropIndexes()
+        except:
+            pass
         db[str(args.drop)].drop()
         print('dropped', str(args.drop))
     dbstats()
