@@ -19,7 +19,9 @@ class DBQuery:
         self.client = pm.MongoClient()
         self.repo = self.client.crystals.repo
         self.args = kwargs
-        # self.args = args
+        for arg in self.args:
+            if type(self.args[arg]) == str:
+                self.args[arg] = self.args[arg].split() 
         self.top = self.args.get('top') if self.args.get('top') != None else 10
         self.details = self.args.get('details')
         self.source = self.args.get('source')
@@ -37,14 +39,14 @@ class DBQuery:
             self.display_results(cursor, details=True)
             cursor = self.repo.find({'text_id': self.args.get('id')})
             if self.args.get('calc_match'):
-                cursor = self.query_calc('cursor')
+                cursor = self.query_calc(cursor)
                 if self.args.get('composition') != None or self.args.get('stoichiometry') != None:
                     self.repo = self.temp_collection(cursor)
         if self.args.get('stoichiometry') != None:
             cursor = self.query_stoichiometry()
         elif self.args.get('composition') != None:
             cursor = self.query_composition()
-        else:
+        elif self.args.get('id') == None:
             cursor = self.repo.find().sort('enthalpy_per_atom', pm.ASCENDING)
         # drop any temporary collection
         try:
@@ -52,7 +54,7 @@ class DBQuery:
         except:
             pass
         if self.args.get('main'):
-            if cursor.count() != 0:
+            if cursor.count() > 1:
                 if cursor.count() > self.top:
                     self.display_results(cursor[:self.top], details=self.details)
                 else:
@@ -96,7 +98,7 @@ class DBQuery:
                 detail_string.append(12 * ' ' + u"└───────────── ")
                 if 'spin_polarized' in doc:
                     if doc['spin_polarized']:
-                        detail_string[-1] += 'S'
+                        detail_string[-1] += 'S-'
                 detail_string[-1] += doc['xc_functional']
                 detail_string[-1] += ', ' + "{:4.2f}".format(doc['cut_off_energy']) + ' eV'
                 try:
@@ -278,5 +280,5 @@ if __name__ == '__main__':
                     details=args.details,
                     pressure=args.pressure,
                     source=args.source,
-                    match_calc=args.calc_match,
+                    calc_match=args.calc_match,
                     main=True)
