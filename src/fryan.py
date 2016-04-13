@@ -50,10 +50,6 @@ class DBQuery:
         elif self.args.get('id') == None:
             cursor = self.repo.find().sort('enthalpy_per_atom', pm.ASCENDING)
         # drop any temporary collection
-        try:
-            self.temp.drop()
-        except:
-            pass
         if self.args.get('main'):
             if cursor.count() > 1:
                 if cursor.count() > self.top:
@@ -62,6 +58,15 @@ class DBQuery:
                     self.display_results(cursor, details=self.details)
         else:
             self.cursor = cursor
+    
+    def __del__(self):
+        ''' Clean up any temporary databases on garbage 
+        collection of DBQuery object.
+        '''
+        try:
+            self.temp.drop()
+        except:
+            pass
 
     def display_results(self, cursor, details=False):
         ''' Print query results in a cryan-like fashion. '''
@@ -96,7 +101,11 @@ class DBQuery:
             if ind == 0 and self.gs_enthalpy == 0:
                 self.gs_enthalpy = doc['enthalpy_per_atom']
             if details:
-                detail_string.append(12 * ' ' + u"└───────────── ")
+                if self.source:
+                    # detail_string.append(11 * ' ' + u"├╌╌╌╌╌╌╌╌╌╌╌╌╌╌ ")
+                    detail_string.append(11 * ' ' + u"├╌╌╌╌╌╌╌╌╌╌╌╌╌╌ ")
+                else:
+                    detail_string.append(11 * ' ' + u"└───────────────── ")
                 if 'spin_polarized' in doc:
                     if doc['spin_polarized']:
                         detail_string[-1] += 'S-'
@@ -110,10 +119,18 @@ class DBQuery:
                     detail_string[-1] += ', ' + doc['kpoints_mp_spacing'] + ' 1/A'
                 except:
                     pass
+                detail_string[-1] += ' ' + (len(header_string)-len(detail_string[-1])-1)*u"╌"
             if self.source:
-                source_string.append('')
-                for file in doc['source']:
-                    source_string[-1] += 18*' ' + u"└───────────── "+ file[2:] + '\n'
+                source_string.append(11*' ' + u"└──────────────┬──")
+                for num, file in enumerate(doc['source']):
+                    if num == len(doc['source'])-1:
+                        source_string[-1] += (len(u"└───────────── ")+11)*' ' + u'└──'
+                    elif num != 0:
+                        source_string[-1] += (len(u"└───────────── ")+11)*' ' + u'├──'
+                    # elif num == 0:
+                    source_string[-1] += ' ' + file[2:] 
+                    if num != len(doc['source'])-1:
+                        source_string[-1] += '\n'
         print(len(header_string)*'─')
         print(header_string)
         print(len(header_string)*'─')
@@ -279,7 +296,7 @@ class DBQuery:
                                             {'stoichiometry' : {'$size' : 5}}
                                         ]})
         cursor.sort('enthalpy_per_atom', pm.ASCENDING)
-        print(cursor.count(), 'structures found with desired composition')
+        print(cursor.count(), 'structures found with desired composition.')
 
         return cursor
 
