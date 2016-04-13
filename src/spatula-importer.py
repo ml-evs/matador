@@ -5,7 +5,6 @@ from collections import defaultdict
 from os import walk, getcwd
 from time import strptime
 from sys import argv
-import fryan
 import argparse
 import pymongo as pm
 import random
@@ -27,7 +26,7 @@ class Spatula:
         self.init = True
         self.import_count = 0
         self.logfile = open('spatula.log', 'w')
-        wordfile = open('/home/matthew/crysdb-bacon/words', 'r')
+        wordfile = open('/home/matthew/crysdb-bacon/src/words', 'r')
         self.wlines = wordfile.readlines()
         self.num_words = len(self.wlines)
         wordfile.close()
@@ -343,6 +342,7 @@ class Spatula:
                                   'backup_interval', 'geom_max_iter', 'fixed_npw',
                                   'write_cell_structure', 'bs_write_eigenvalues',
                                   'calculate_stress', 'opt_strategy', 'max_scf_cycles']
+                    false_str = ['False', 'false', '0']
                     splitters = [':', '=', ' ']
                     if [rubbish for rubbish in scrub_list if rubbish in line]:
                         continue
@@ -350,6 +350,11 @@ class Spatula:
                     else:
                         if [splitter for splitter in splitters if splitter in line]: 
                             param[line.split(splitter)[0].strip()] = line.split(':')[-1].strip()
+                            if 'spin_polarized' in line:
+                                if [false for false in false_str if false in param['spin_polarized']]:
+                                    param['spin_polarized'] = False
+                                else:
+                                    param['spin_polarized'] = True
                             if 'cut_off_energy' in line:
                                 param['cut_off_energy'] = int(param['cut_off_energy'].replace('ev','').strip())
                             if 'xc_functional' in line:
