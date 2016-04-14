@@ -6,6 +6,7 @@ import numpy as np
 import argparse
 import bson.json_util as json
 import re
+from ast import literal_eval
 
 class DBQuery:
     ''' Class that implements queries to MongoDB
@@ -17,6 +18,7 @@ class DBQuery:
         arguments.
         '''
         self.client = pm.MongoClient()
+        self.db = self.client.crystals
         self.repo = self.client.crystals.repo
         self.args = kwargs
         for arg in self.args:
@@ -28,6 +30,8 @@ class DBQuery:
         self.partial = self.args.get('partial_formula')
         # benchmark enthalpy to display (set by calc_match)
         self.gs_enthalpy = 0.0
+        if self.args.get('dbstats') != None:
+            self.dbstats()
         if self.args.get('pressure') != None:
             cursor = self.repo.find(
                     {
@@ -320,6 +324,13 @@ class DBQuery:
             print(cursor_match.count(), 'structures found with parameters above.')
             return cursor_match
 
+    def dbstats(self):
+        ''' Print some useful stats about the database. ''' 
+        db_stats_dict = literal_eval(json.dumps(self.db.command('collstats', self.repo.name),indent=2))
+        print('Database collection', self.db.name + '.' + self.repo.name, 'contains', db_stats_dict['count'],
+              'structures at', "{:.1f}".format(db_stats_dict['avgObjSize']/1024), 'kB each, totalling', 
+              "{:.1f}".format(db_stats_dict['storageSize']/(1024**2)), 'MB when padding is included.')
+
     def temp_collection(self, cursor):
         ''' Create temporary collection
         for successive filtering. 
@@ -366,6 +377,8 @@ if __name__ == '__main__':
             help=('stoichiometry/composition queries will include other unspecified species,' +
             'e.g. search for Ge2Te3 will also return Ge2Te3Si or Ge4Te6Fe2, and search for Li will' +
             ' include any structure containing Li, not just pure Li.'))
+    parser.add_argument('--dbstats', action='store_true',
+            help=('print some stats about the database that is being queried'))
     args = parser.parse_args()
     if args.calc_match and args.id == None:
         exit('--calc-match requires -i or --id')
@@ -378,4 +391,5 @@ if __name__ == '__main__':
                     source=args.source,
                     calc_match=args.calc_match,
                     partial_formula=args.partial_formula,
+                    dbstats=args.dbstats,
                     main=True)
