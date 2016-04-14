@@ -30,7 +30,7 @@ class DBQuery:
         self.partial = self.args.get('partial_formula')
         # benchmark enthalpy to display (set by calc_match)
         self.gs_enthalpy = 0.0
-        if self.args.get('dbstats') != None:
+        if self.args.get('dbstats') != True:
             self.dbstats()
         if self.args.get('pressure') != None:
             cursor = self.repo.find(
