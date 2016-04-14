@@ -26,7 +26,7 @@ class Spatula:
         self.init = True
         self.import_count = 0
         self.logfile = open('spatula.log', 'w')
-        wordfile = open('/home/matthew/crysdb-bacon/src/words', 'r')
+        wordfile = open('/u/fs1/me388/crysdb-bacon/src/words', 'r')
         self.wlines = wordfile.readlines()
         self.num_words = len(self.wlines)
         wordfile.close()
