@@ -6,7 +6,6 @@ import numpy as np
 import argparse
 import bson.json_util as json
 import re
-from ast import literal_eval
 
 class DBQuery:
     ''' Class that implements queries to MongoDB
@@ -30,7 +29,7 @@ class DBQuery:
         self.partial = self.args.get('partial_formula')
         # benchmark enthalpy to display (set by calc_match)
         self.gs_enthalpy = 0.0
-        if self.args.get('dbstats') != True:
+        if self.args.get('dbstats'):
             self.dbstats()
         if self.args.get('pressure') != None:
             cursor = self.repo.find(
@@ -51,8 +50,10 @@ class DBQuery:
             cursor = self.query_stoichiometry()
         elif self.args.get('composition') != None:
             cursor = self.query_composition()
-        elif self.args.get('id') == None:
+        elif self.args.get('id') == None and self.args.get('dbstats') == False:
             cursor = self.repo.find().sort('enthalpy_per_atom', pm.ASCENDING)
+        else:
+            cursor = EmptyCursor()
         # drop any temporary collection
         if self.args.get('main'):
             if cursor.count() > 1:
@@ -326,7 +327,7 @@ class DBQuery:
 
     def dbstats(self):
         ''' Print some useful stats about the database. ''' 
-        db_stats_dict = literal_eval(json.dumps(self.db.command('collstats', self.repo.name),indent=2))
+        db_stats_dict = self.db.command('collstats', self.repo.name)
         print('Database collection', self.db.name + '.' + self.repo.name, 'contains', db_stats_dict['count'],
               'structures at', "{:.1f}".format(db_stats_dict['avgObjSize']/1024), 'kB each, totalling', 
               "{:.1f}".format(db_stats_dict['storageSize']/(1024**2)), 'MB when padding is included.')
