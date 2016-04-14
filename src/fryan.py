@@ -346,7 +346,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Query MongoDB structure database.',
             epilog='Written by Matthew Evans (2016). Based on the cryan concept by Chris Pickard.')
     group = parser.add_argument_group()
-    group.add_argument('-s', '--stoichiometry', nargs='+', type=str,
+    group.add_argument('-f', '--formula', nargs='+', type=str,
         help='choose a stoichiometry, e.g. Ge 1 Te 1 Si 3, or GeTeSi3')
     group.add_argument('-c', '--composition', nargs='+', type=str,
         help='find all structures containing the given elements, e.g. GeTeSi.')
@@ -369,7 +369,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     if args.calc_match and args.id == None:
         exit('--calc-match requires -i or --id')
-    query = DBQuery(stoichiometry=args.stoichiometry,
+    query = DBQuery(stoichiometry=args.formula,
                     composition=args.composition,
                     id=args.id,
                     top=args.top,
