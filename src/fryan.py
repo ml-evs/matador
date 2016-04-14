@@ -73,6 +73,7 @@ class DBQuery:
         struct_string = []
         detail_string = []
         source_string = []
+        last_formula = ''
         gs_enthalpy = 0
         header_string = "{:^24}".format('ID')
         header_string += "{:^12}".format('Pressure')
@@ -90,6 +91,8 @@ class DBQuery:
                         atom_per_fu += 1
                     if subitem != 1:
                         sub_string += str(subitem)
+            if last_formula != sub_string:
+                self.gs_enthalpy = 0
             struct_string.append(
                     "{:^24}".format(doc['text_id'][0]+' '+doc['text_id'][1])
                     + "{:^ 12.3f}".format(doc['pressure'])
@@ -98,11 +101,11 @@ class DBQuery:
                     + "{:^12}".format(doc['space_group']))
             struct_string[-1] += "{:^10}".format(sub_string)
             struct_string[-1] += "{:^8}".format(doc['num_atoms']/atom_per_fu)
-            if ind == 0 and self.gs_enthalpy == 0:
+            if last_formula != sub_string:
                 self.gs_enthalpy = doc['enthalpy_per_atom']
+            last_formula = sub_string
             if details:
                 if self.source:
-                    # detail_string.append(11 * ' ' + u"├╌╌╌╌╌╌╌╌╌╌╌╌╌╌ ")
                     detail_string.append(11 * ' ' + u"├╌╌╌╌╌╌╌╌╌╌╌╌╌╌ ")
                 else:
                     detail_string.append(11 * ' ' + u"└───────────────── ")
