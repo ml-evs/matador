@@ -89,6 +89,15 @@ class DBQuery:
         header_string += "{:^8}".format('# fu')
         for ind, doc in enumerate(cursor):
             sub_string = ''
+            if 'phase' in doc:
+                if 'alpha' in doc['phase']:
+                    sub_string += 'α-'
+                elif 'beta' in doc['phase']:
+                    sub_string += 'β-'
+                elif 'gamma' in doc['phase']:
+                    sub_string += 'γ-'
+                elif 'theta' in doc['phase']:
+                    sub_string += 'θ-'
             atom_per_fu = 0
             for item in doc['stoichiometry']:
                 for item_ind, subitem in enumerate(item):
