@@ -26,10 +26,20 @@ class Spatula:
         self.init = True
         self.import_count = 0
         self.logfile = open('spatula.log', 'w')
-        wordfile = open('/u/fs1/me388/crysdb-bacon/src/words', 'r')
+        try:
+            # wordfile = open('/home/matthew/crysdb-bacon/src/new_words', 'r')
+            # nounfile = open('/home/matthew/crysdb-bacon/src/nouns', 'r')
+            wordfile = open('/u/fs1/me388/crysdb-bacon/src/new_words', 'r')
+            nounfile = open('/u/fs1/me388/crysdb-bacon/src/nouns', 'r')
+        except Exception as oopsy:
+            exit(oopsy)
         self.wlines = wordfile.readlines()
         self.num_words = len(self.wlines)
+        self.nlines = nounfile.readlines()
+        self.num_nouns = len(self.nlines)
+        print(self.num_words, self.num_nouns)
         wordfile.close()
+        nounfile.close()
         self.dryrun = dryrun
         self.debug = debug 
         self.verbosity = verbosity 
@@ -43,7 +53,6 @@ class Spatula:
         self.file_lists = self.scan_dir()
         # convert to dict and db if required
         self.files2db(self.file_lists)
-
         if not self.dryrun:
             print('Successfully imported', self.import_count, 'structures!')
             # index by enthalpy for faster/larger queries
@@ -66,7 +75,7 @@ class Spatula:
         database.
         '''
         plain_text_id = [self.wlines[random.randint(0,self.num_words-1)].strip(),
-                         self.wlines[random.randint(0,self.num_words-1)].strip()]
+                         self.nlines[random.randint(0,self.num_nouns-1)].strip()]
         struct['text_id'] = plain_text_id
         struct_id = self.repo.insert_one(struct).inserted_id
         if self.debug:
@@ -116,17 +125,20 @@ class Spatula:
                                 if self.verbosity > 0:
                                     print('Found matching cell and param files:', param_name)
                                 break
-                if(file_lists[root]['cell_count'] == 0 or \
-                    file_lists[root]['param_count'] == 0):
-                    dir_dict = self.dir2dict(root)
-                    if 'source' in dir_dict:
-                        dir = True
+                # always try to scrape dir 
+                dir_dict = self.dir2dict(root)
+                if 'source' in dir_dict:
+                    dir = True
                 # combine cell and param dicts for folder
                 input_dict = dict()
+                if dir:
+                    input_dict = dir_dict.copy()
                 if cell and param:
-                    input_dict = cell_dict.copy()
+                    input_dict.update(cell_dict)
                     input_dict.update(param_dict)
                     input_dict['source'] = cell_dict['source'] + param_dict['source']
+                    if dir:
+                        input_dict['source'] = input_dict['source'] + dir_dict['source']
                 else:
                     if dir:
                         input_dict = dir_dict.copy()
@@ -379,6 +391,7 @@ class Spatula:
             seed = getcwd().split('/')[-1]
         dirs_as_list = seed.split('/')
         task_list = ['GO', 'NMR', 'OPTICS'] 
+        phase_list = ['alpha', 'beta', 'gamma', 'theta']
         try:
             for dir in dirs_as_list:
                 if dir=='.':
@@ -398,13 +411,15 @@ class Spatula:
                         dir_dict['task'] = dir.split('-')[offset+5]
                     else:
                         dir_dict['species_pot'] = dir.split('-')[offset+5]
-
                     info = True 
                 elif 'GPa' in dir:
                     dir_dict['external_pressure'].append([float(dir.split('_')[0]), 0.0, 0.0])
                     dir_dict['external_pressure'].append([float(dir.split('_')[0]), 0.0])
                     dir_dict['external_pressure'].append([float(dir.split('_')[0])])
                     info = True 
+                elif [phase for phase in phase_list if phase in dir]:
+                    dir_dict['phase'] = phase
+                    info = True
             if 'external_pressure' not in dir_dict:
                 dir_dict['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0], [0.0]]
             if info:
