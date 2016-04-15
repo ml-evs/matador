@@ -149,6 +149,11 @@ class DBQuery:
                 except:
                     pass
                 try:
+                    for species in doc['species_pot']:
+                        detail_string[-1] += ', ' + doc['species_pot'][species]
+                except:
+                    pass
+                try:
                     detail_string[-1] += ', ICSD-CollCode' + doc['icsd']
                 except:
                     pass
