@@ -138,8 +138,14 @@ class DBQuery:
                 if 'spin_polarized' in doc:
                     if doc['spin_polarized']:
                         detail_string[-1] += 'S-'
-                detail_string[-1] += doc['xc_functional']
-                detail_string[-1] += ', ' + "{:4.2f}".format(doc['cut_off_energy']) + ' eV'
+                try:
+                    detail_string[-1] += doc['xc_functional']
+                except:
+                    detail_string[-1] += 'functional unknown for' + doc['source'][0]
+                try:
+                    detail_string[-1] += ', ' + "{:4.2f}".format(doc['cut_off_energy']) + ' eV'
+                except:
+                    detail_string[-1] += 'cutoff unknown'
                 try:
                     detail_string[-1] += ', ' + "{:4.2f}".format(doc['external_pressure'][0][0]) + ' GPa'
                 except: 
