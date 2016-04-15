@@ -23,8 +23,10 @@ class Spatula:
     '''
 
     def __init__(self, dryrun=False, debug=False, verbosity=0, tags=None):
+        ''' Set up arguments and initialise DB client. '''
         self.init = True
         self.import_count = 0
+        # I/O files 
         self.logfile = open('spatula.log', 'w')
         try:
             # wordfile = open('/home/matthew/crysdb-bacon/src/new_words', 'r')
@@ -55,7 +57,15 @@ class Spatula:
         if not self.dryrun:
             print('Successfully imported', self.import_count, 'structures!')
             # index by enthalpy for faster/larger queries
-            self.repo.create_index([('enthalpy_per_atom', pm.ASCENDING)])
+            indexed = False
+            for index in self.repo.list_indexes():
+                if 'enthalpy_per_atom' in index['name']:
+                    print('Index found, rebuilding...')
+                    self.repo.reindex()
+                    indexed = True
+            if indexed == False:
+                print('Building enthalpy index...')
+                self.repo.create_index([('enthalpy_per_atom', pm.ASCENDING)])
         else:
             print('Dryrun complete!')
         self.logfile.close()
@@ -71,11 +81,13 @@ class Spatula:
 
     def dict2db(self, struct):
         ''' Insert completed Python dictionary into chosen
-        database.
+        database, with generated text_id.
         '''
         plain_text_id = [self.wlines[random.randint(0,self.num_words-1)].strip(),
                          self.nlines[random.randint(0,self.num_nouns-1)].strip()]
         struct['text_id'] = plain_text_id
+        if 'tags' in self.tag_dict:
+            struct['tags'] = self.tag_dict['tags']
         struct_id = self.repo.insert_one(struct).inserted_id
         if self.debug:
             print('Inserted', struct_id)
@@ -97,7 +109,8 @@ class Spatula:
             airss, cell, param, dir = 4*[False]
             if file_lists[root]['res_count'] > 0:
                 if file_lists[root]['castep_count'] < file_lists[root]['res_count']:
-                    airss = True
+                    if file_lists[root]['cell_count'] <= file_lists[root]['res_count']:
+                        airss = True
             if airss:
                 if file_lists[root]['param_count'] == 1:
                     param_dict = self.param2dict(root + '/' + file_lists[root]['param'][0])
@@ -178,10 +191,6 @@ class Spatula:
         file_lists = dict()
         topdir = '.'
         topdir_string = getcwd().split('/')[-1]
-        # if topdir == '.':
-            # topdir_string = getcwd().split('/')[-1]
-        # else: 
-            # topdir_string = topdir
         print('Scanning', topdir_string, 'for CASTEP/AIRSS output files... ',
               end='')
         for root, dirs, files in walk(topdir, followlinks=True, topdown=True):
@@ -233,6 +242,8 @@ class Spatula:
             flines = f.readlines()
         # add .res to source 
         res['source'].append(seed+'.res')
+        if 'CollCode' in seed:
+            res['icsd'] = seed.split('CollCode')[-1] 
         # alias special lines in res file
         try:
             for line in flines:
@@ -457,12 +468,12 @@ class Spatula:
         # set source tag to castep file 
         castep['source'].append(seed+'.castep')
         if 'CollCode' in seed:
-            castep['icsd_ref'] = seed.split('CollCode')[-1] 
+            castep['icsd'] = seed.split('CollCode')[-1] 
         try:
             # wrangle castep file for basic parameters
             for line_no, line in enumerate(flines):
                 if 'task' not in castep and 'type of calculation' in line:
-                    castep['task'] = line.split(':')[-1].strip()
+                    castep['task'] = line.split(':')[-1].strip().replace(" ", "")
                 elif 'xc_functional' not in castep and 'functional' in line:
                     # convert from .castep file xc_functional to param style
                     xc_string = line.split(':')[-1].strip()
@@ -487,7 +498,7 @@ class Spatula:
                 elif 'kpoints_calculated' not in castep and 'Number of kpoints used' in line:
                     castep['kpoints_calculated'] = int(line.split('=')[-1])
                 elif 'space_group' not in castep and 'Space group of crystal' in line:
-                    castep['space_group'] = line.split(':')[-1].split(',')[0].strip()
+                    castep['space_group'] = line.split(':')[-1].split(',')[0].strip().replace(" ", "")
                 elif 'external_pressure' not in castep and 'External pressure/stress' in line:
                     castep['external_pressure'] = list()
                     castep['external_pressure'].append(map(float, flines[line_no+1].split()))
@@ -525,17 +536,6 @@ class Spatula:
                     for key, value in castep['stoichiometry'].iteritems():
                         temp_stoich.append([key, value/min])
                     castep['stoichiometry'] = temp_stoich
-                elif 'Mass of species in AMU' in line:
-                    i = 1
-                    atomic_masses = list()
-                    while True:
-                        if len(flines[line_no+i].strip())==0:
-                            break
-                        else:
-                            atomic_masses.append([float(flines[line_no+i].split()[1]),
-                                                        flines[line_no+i].split()[0]])
-                        i += 1
-                    atomic_masses.sort(reverse=True)
                 elif 'species_pot' not in castep and 'Files used for pseudopotentials' in line:
                     castep['species_pot'] = dict()
                     i = 1
@@ -543,7 +543,7 @@ class Spatula:
                         if len(flines[line_no+i].strip())==0:
                             break
                         else:
-                            castep['species_pot'][flines[line_no+i].split()[0].strip()] = flines[line_no+i].split()[1].strip()
+                            castep['species_pot'][flines[line_no+i].split()[0].strip()] = flines[line_no+i].split()[1].split('/')[-1]
                             i += 1
                 # don't check if final_energy exists, as this will update for each GO step
                 elif 'Final energy, E' in line:
@@ -556,15 +556,16 @@ class Spatula:
             if 'external_pressure' not in castep:
                 castep['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0], [0.0]]
             # task specific options
-            if castep['task'] == 'geometryoptimization':
+            if castep['task'] != 'geometryoptimization' and castep['task'] != 'geometry optimization':
+                raise RuntimeError('CASTEP file does not contain GO calculation', castep['task'])
+            else:
                 final = False
                 for line_no, line in enumerate(flines):
                     if 'Geometry optimization failed to converge' in line:
                         castep['optimised'] = False
+                        raise RuntimeError('CASTEP GO failed to converge.') 
                     elif 'Final Configuration' in line:
                         final = True
-                        if 'optimised' not in castep:
-                            castep['optimised'] = True
                     if final:
                         if 'Real Lattice' in line:
                             castep['lattice_cart'] = list()
@@ -634,8 +635,6 @@ class Spatula:
                                 castep['bulk_modulus'] = float(line.split('=')[-1].split()[0])
                             except:
                                 continue 
-            else:
-                raise RuntimeError('.castep file does not contain geometry optimization calculation')
             # computing metadata, i.e. parallelism, time, memory, version
             for line in flines:
                 if 'Release CASTEP version' in line:
@@ -649,6 +648,12 @@ class Spatula:
                     castep['total_time_hrs'] = float(line.split()[-2])/3600
                 elif 'Peak Memory Use' in line:
                     castep['peak_mem_MB'] = int(float(line.split()[-2])/1000)
+            if 'enthalpy' not in castep:
+                raise RuntimeError('Could not find enthalpy')
+            if 'pressure' not in castep:
+                raise RuntimeError('Could not find pressure')
+            if 'space_group' not in castep:
+                castep['space_group'] = 'xxx'
         except Exception as oopsy:
             if self.dryrun:
                 print(oopsy)
