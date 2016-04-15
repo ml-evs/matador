@@ -37,7 +37,6 @@ class Spatula:
         self.num_words = len(self.wlines)
         self.nlines = nounfile.readlines()
         self.num_nouns = len(self.nlines)
-        print(self.num_words, self.num_nouns)
         wordfile.close()
         nounfile.close()
         self.dryrun = dryrun
@@ -392,6 +391,7 @@ class Spatula:
         dirs_as_list = seed.split('/')
         task_list = ['GO', 'NMR', 'OPTICS'] 
         phase_list = ['alpha', 'beta', 'gamma', 'theta']
+        defect_list = ['vacancy', 'interstitial']
         try:
             for dir in dirs_as_list:
                 if dir=='.':
@@ -417,9 +417,16 @@ class Spatula:
                     dir_dict['external_pressure'].append([float(dir.split('_')[0]), 0.0])
                     dir_dict['external_pressure'].append([float(dir.split('_')[0])])
                     info = True 
-                elif [phase for phase in phase_list if phase in dir]:
-                    dir_dict['phase'] = phase
-                    info = True
+                if [phase for phase in phase_list if phase in dir]:
+                    for phase in phase_list:
+                        if phase in dir:
+                            dir_dict['phase'] = phase
+                            info = True
+                if [defect for defect in defect_list if defect in dir]:
+                    for defect in defect_list:
+                        if defect in dir:
+                            dir_dict['defect'] = defect
+                            info = True
             if 'external_pressure' not in dir_dict:
                 dir_dict['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0], [0.0]]
             if info:
