@@ -27,6 +27,8 @@ class DBQuery:
         self.details = self.args.get('details')
         self.source = self.args.get('source')
         self.partial = self.args.get('partial_formula')
+        self.summary = self.args.get('summary')
+        self.tags = self.args.get('tags')
         # benchmark enthalpy to display (set by calc_match)
         self.gs_enthalpy = 0.0
         if self.args.get('dbstats'):
@@ -50,6 +52,8 @@ class DBQuery:
             cursor = self.query_stoichiometry()
         elif self.args.get('composition') != None:
             cursor = self.query_composition()
+        elif self.args.get('tags') != None:
+            cursor = self.query_tags()
         elif self.args.get('id') == None and self.args.get('dbstats') == False:
             cursor = self.repo.find().sort('enthalpy_per_atom', pm.ASCENDING)
         else:
@@ -57,7 +61,9 @@ class DBQuery:
         # drop any temporary collection
         if self.args.get('main'):
             if cursor.count() > 1:
-                if cursor.count() > self.top:
+                if self.summary:
+                    self.display_results(cursor, details=self.details)
+                elif cursor.count() > self.top:
                     self.display_results(cursor[:self.top], details=self.details)
                 else:
                     self.display_results(cursor, details=self.details)
@@ -78,6 +84,8 @@ class DBQuery:
         struct_string = []
         detail_string = []
         source_string = []
+        summary_string = []
+        formula_string = []
         last_formula = ''
         gs_enthalpy = 0
         header_string = "{:^24}".format('ID')
@@ -88,41 +96,45 @@ class DBQuery:
         header_string += "{:^10}".format('Formula')
         header_string += "{:^8}".format('# fu')
         for ind, doc in enumerate(cursor):
-            sub_string = ''
+            formula_substring = ''
             if 'phase' in doc:
                 if 'alpha' in doc['phase']:
-                    sub_string += 'α-'
+                    formula_substring += 'α-'
                 elif 'beta' in doc['phase']:
-                    sub_string += 'β-'
+                    formula_substring += 'β-'
                 elif 'gamma' in doc['phase']:
-                    sub_string += 'γ-'
+                    formula_substring += 'γ-'
                 elif 'theta' in doc['phase']:
-                    sub_string += 'θ-'
+                    formula_substring += 'θ-'
             atom_per_fu = 0
             for item in doc['stoichiometry']:
                 for item_ind, subitem in enumerate(item):
                     if item_ind == 0:
                         atom_per_fu += 1
                     if subitem != 1:
-                        sub_string += str(subitem)
-            if last_formula != sub_string:
+                        formula_substring += str(subitem)
+            if last_formula != formula_substring:
                 self.gs_enthalpy = 0
+            formula_string.append(formula_substring)
             struct_string.append(
                     "{:^24}".format(doc['text_id'][0]+' '+doc['text_id'][1])
                     + "{:^ 12.3f}".format(doc['pressure'])
                     + "{:^12.3f}".format(atom_per_fu * doc['cell_volume'] / doc['num_atoms'])
-                    + "{:^18.5f}".format(doc['enthalpy_per_atom'] - self.gs_enthalpy)
-                    + "{:^12}".format(doc['space_group']))
-            struct_string[-1] += "{:^10}".format(sub_string)
+                    + "{:^18.5f}".format(doc['enthalpy_per_atom'] - self.gs_enthalpy))
+            try:
+                struct_string[-1] += "{:^12}".format(doc['space_group'])
+            except:
+                struct_string[-1] += "{:^12}".format('xxx')
+            struct_string[-1] += "{:^10}".format(formula_substring)
             struct_string[-1] += "{:^8}".format(doc['num_atoms']/atom_per_fu)
-            if last_formula != sub_string:
+            if last_formula != formula_substring:
                 self.gs_enthalpy = doc['enthalpy_per_atom']
-            last_formula = sub_string
+            last_formula = formula_substring
             if details:
                 if self.source:
                     detail_string.append(11 * ' ' + u"├╌╌╌╌╌╌╌╌╌╌╌╌╌╌ ")
                 else:
-                    detail_string.append(11 * ' ' + u"└───────────────── ")
+                    detail_string.append(11 * ' ' + u"└╌╌╌╌╌╌╌╌╌╌╌╌╌╌ ")
                 if 'spin_polarized' in doc:
                     if doc['spin_polarized']:
                         detail_string[-1] += 'S-'
@@ -134,6 +146,15 @@ class DBQuery:
                     pass
                 try:
                     detail_string[-1] += ', ' + doc['kpoints_mp_spacing'] + ' 1/A'
+                except:
+                    pass
+                try:
+                    detail_string[-1] += ', ICSD-CollCode' + doc['icsd']
+                except:
+                    pass
+                try:
+                    for tag in doc['tags']:
+                        detail_string[-1] += ', ' + tag
                 except:
                     pass
                 detail_string[-1] += ' ' + (len(header_string)-len(detail_string[-1])-1)*u"╌"
@@ -151,12 +172,27 @@ class DBQuery:
         print(len(header_string)*'─')
         print(header_string)
         print(len(header_string)*'─')
-        for ind, string in enumerate(struct_string):
-            print(string)
-            if details:
-                print(detail_string[ind])
-            if self.source:
-                print(source_string[ind])
+        if self.summary:
+            current_formula = ''
+            count = 0
+            for ind, string in enumerate(formula_string):
+                if count > self.top:
+                    break
+                if string != current_formula and string not in formula_string[:ind]:
+                    count += 1
+                    print(struct_string[ind])
+                    if details:
+                        print(detail_string[ind])
+                    if self.source:
+                        print(source_string[ind])
+                    current_formula = string
+        else:
+            for ind, string in enumerate(struct_string):
+                print(string)
+                if details:
+                    print(detail_string[ind])
+                if self.source:
+                    print(source_string[ind])
         print(len(header_string)*'─')
         
     def query_stoichiometry(self):
@@ -244,18 +280,28 @@ class DBQuery:
         '''
         elements = self.args.get('composition')
         # if there's only one string, try split it by caps
+        chem_pot = False
         if len(elements) == 1:
             elements = [elem for elem in re.split(r'([A-Z][a-z]*)', elements[0]) if elem]
+            if elements[0] == '1':
+                chem_pot = True
         try:
-            for elem in elements:
-                if bool(re.search(r'\d', elem)):
-                    raise RuntimeError('Composition string cannot contain a number.')
+            if chem_pot == False:
+                for elem in elements:
+                    if bool(re.search(r'\d', elem)):
+                        raise RuntimeError('Composition string cannot contain a number other than 1.')
         except Exception as oops:
             print(oops)
             return EmptyCursor()
         # pyMongo doesn't like generators... could patch pyMongo?
         # cursor = self.repo.find({'stoichiometry.'+[element for element in elements]: {'$exists' : True}})
         if self.partial:
+            try:
+                if chem_pot:
+                    raise RuntimeError('Composition of 1 not compatible with partial formula.')
+            except Exception as oops:
+                print(oops)
+                return EmptyCursor()
             if len(elements) == 1:
                 cursor = self.repo.find({'atom_types' : {'$in' : [elements[0]]}})
             elif len(elements) == 2:
@@ -278,7 +324,10 @@ class DBQuery:
                                         ]})
         else:
             if len(elements) == 1:
-                cursor = self.repo.find({ '$and': [
+                if chem_pot == True:
+                    cursor = self.repo.find({'stoichiometry' : {'$size' : 1}})
+                else:
+                    cursor = self.repo.find({ '$and': [
                                             {'atom_types' : {'$in' : [elements[0]]}},
                                             {'stoichiometry' : {'$size' : 1}}
                                         ]})
@@ -333,6 +382,31 @@ class DBQuery:
             cursor_match.sort('enthalpy_per_atom', pm.ASCENDING)
             print(cursor_match.count(), 'structures found with parameters above.')
             return cursor_match
+    
+    def query_tags(self):
+        ''' Find all structures matching given tags. '''
+        if len(self.tags) == 1:
+            cursor = self.repo.find({'tags' : {'$in' : [self.tags[0]]}
+                                    })
+        elif len(self.tags) == 2:
+            cursor = self.repo.find({ '$and': [
+                                        {'tags' : {'$in' : self.tags[0]}},
+                                        {'tags' : {'$in' : self.tags[1]}}
+                                    ]})
+        elif len(self.tags) == 3:
+            cursor = self.repo.find({ '$and': [
+                                        {'tags' : {'$in' : self.tags[0]}},
+                                        {'tags' : {'$in' : self.tags[1]}},
+                                        {'tags' : {'$in' : self.tags[2]}}
+                                    ]})
+        elif len(self.tags) > 3:
+            print('Too many tags, no structures found.')
+            return EmptyCursor()
+        else:
+            print('No structures found with tags', self.tags)
+            return EmptyCursor()
+        cursor.sort('enthalpy_per_atom', pm.ASCENDING)
+        return cursor
 
     def dbstats(self):
         ''' Print some useful stats about the database. ''' 
@@ -371,6 +445,8 @@ if __name__ == '__main__':
         help='choose a stoichiometry, e.g. Ge 1 Te 1 Si 3, or GeTeSi3')
     group.add_argument('-c', '--composition', nargs='+', type=str,
         help='find all structures containing the given elements, e.g. GeTeSi.')
+    parser.add_argument('-s', '--summary', action='store_true',
+            help='show only the ground state for each formula (i.e. phase+stoichiometry)')
     group.add_argument('-i', '--id', type=str, nargs='+',
             help='specify a particular structure by its text_id')
     parser.add_argument('-t', '--top', type=int,
@@ -389,11 +465,14 @@ if __name__ == '__main__':
             ' include any structure containing Li, not just pure Li.'))
     parser.add_argument('--dbstats', action='store_true',
             help=('print some stats about the database that is being queried'))
+    parser.add_argument('--tags', nargs='+', type=str,
+            help=('search for up to 3 manual tags at once'))
     args = parser.parse_args()
     if args.calc_match and args.id == None:
         exit('--calc-match requires -i or --id')
     query = DBQuery(stoichiometry=args.formula,
                     composition=args.composition,
+                    summary=args.summary,
                     id=args.id,
                     top=args.top,
                     details=args.details,
@@ -402,4 +481,5 @@ if __name__ == '__main__':
                     calc_match=args.calc_match,
                     partial_formula=args.partial_formula,
                     dbstats=args.dbstats,
+                    tags=args.tags,
                     main=True)
