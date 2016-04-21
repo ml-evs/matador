@@ -5,6 +5,7 @@ from collections import defaultdict
 from os import walk, getcwd
 from time import strptime
 from sys import argv
+from fractions import gcd
 import argparse
 import pymongo as pm
 import random
@@ -276,14 +277,19 @@ class Spatula:
                 if atom not in res['stoichiometry']:
                     res['stoichiometry'][atom] = 0
                 res['stoichiometry'][atom] += 1
-            min = 2000
+            gcd_val = 0
             for atom in res['atom_types']:
-                if res['stoichiometry'][atom] < min:
-                    min = res['stoichiometry'][atom]
+                if gcd_val == 0:
+                    gcd_val = res['stoichiometry'][atom]
+                else:
+                    gcd_val = gcd(res['stoichiometry'][atom], gcd_val)
             # convert stoichiometry to tuple for fryan
             temp_stoich = []
             for key, value in res['stoichiometry'].iteritems():
-                temp_stoich.append([key, value/min])
+                if float(value)/gcd_val % 1 != 0:
+                    temp_stoich.append([key, float(value)/gcd_val])
+                else:
+                    temp_stoich.append([key, value/gcd_val])
             res['stoichiometry'] = temp_stoich
         except Exception as oopsy:
             if self.verbosity > 0:
