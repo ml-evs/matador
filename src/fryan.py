@@ -110,9 +110,11 @@ class DBQuery:
             for item in doc['stoichiometry']:
                 for item_ind, subitem in enumerate(item):
                     if item_ind == 0:
-                        atom_per_fu += 1
-                    if subitem != 1:
                         formula_substring += str(subitem)
+                    if item_ind == 1:
+                        if subitem != 1:
+                            formula_substring += str(subitem)
+                        atom_per_fu += subitem
             if last_formula != formula_substring:
                 self.gs_enthalpy = 0
             formula_string.append(formula_substring)
@@ -126,6 +128,7 @@ class DBQuery:
             except:
                 struct_string[-1] += "{:^12}".format('xxx')
             struct_string[-1] += "{:^10}".format(formula_substring)
+            print(doc['num_atoms'], atom_per_fu)
             struct_string[-1] += "{:^8}".format(doc['num_atoms']/atom_per_fu)
             if last_formula != formula_substring:
                 self.gs_enthalpy = doc['enthalpy_per_atom']
