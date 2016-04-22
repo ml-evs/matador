@@ -2,7 +2,8 @@
 # coding: utf-8
 from __future__ import print_function
 from collections import defaultdict
-from os import walk, getcwd
+from os import walk, getcwd, stat
+from pwd import getpwuid
 from time import strptime
 from sys import argv
 from fractions import gcd
@@ -243,6 +244,8 @@ class Spatula:
             flines = f.readlines()
         # add .res to source 
         res['source'].append(seed+'.res')
+        # grab file owner username
+        res['user'] = getpwuid(stat(seed+'.castep').st_uid).pw_name
         if 'CollCode' in seed:
             res['icsd'] = seed.split('CollCode')[-1] 
         # alias special lines in res file
@@ -473,6 +476,8 @@ class Spatula:
             flines = f.readlines()
         # set source tag to castep file 
         castep['source'].append(seed+'.castep')
+        # grab file owner
+        castep['user'] = getpwuid(stat(seed+'.castep').st_uid).pw_name
         if 'CollCode' in seed:
             castep['icsd'] = seed.split('CollCode')[-1] 
         try:
