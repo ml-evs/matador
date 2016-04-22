@@ -128,7 +128,6 @@ class DBQuery:
             except:
                 struct_string[-1] += "{:^12}".format('xxx')
             struct_string[-1] += "{:^10}".format(formula_substring)
-            print(doc['num_atoms'], atom_per_fu)
             struct_string[-1] += "{:^8}".format(doc['num_atoms']/atom_per_fu)
             if last_formula != formula_substring:
                 self.gs_enthalpy = doc['enthalpy_per_atom']
