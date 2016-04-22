@@ -56,8 +56,8 @@ class DBQuery:
             cursor = self.query_tags()
         elif self.args.get('id') == None and self.args.get('dbstats') == False:
             cursor = self.repo.find().sort('enthalpy_per_atom', pm.ASCENDING)
-        else:
-            cursor = EmptyCursor()
+        # else:
+            # cursor = EmptyCursor()
         # drop any temporary collection
         if self.args.get('main'):
             if cursor.count() > 1:
