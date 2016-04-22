@@ -431,6 +431,46 @@ class DBQuery:
         print('Database collection', self.db.name + '.' + self.repo.name, 'contains', db_stats_dict['count'],
               'structures at', "{:.1f}".format(db_stats_dict['avgObjSize']/1024), 'kB each, totalling', 
               "{:.1f}".format(db_stats_dict['storageSize']/(1024**2)), 'MB when padding is included.')
+        cursor = self.repo.find()
+        comp_list = dict()
+        for doc in cursor:
+            temp = ''
+            for ind, elem in enumerate(doc['stoichiometry']):
+                temp += str(elem[0])
+                if ind != len(doc['stoichiometry'])-1:
+                    temp += '+'
+            if temp not in comp_list:
+                comp_list[temp] = 0
+            comp_list[temp] += 1
+        keys = list(comp_list.keys())
+        vals = list(comp_list.values())
+        comp_list = zip(keys, vals)
+        comp_list.sort(key = lambda t:t[1], reverse=True)
+        small_list = []
+        small_count = 0
+        first_ind = 1000
+        cutoff = 300
+        for ind, comp in enumerate(comp_list):
+            if comp[1] < cutoff:
+                if ind < first_ind:
+                    first_ind = ind
+                small_list.append(comp[0])
+                small_count += comp[1]
+        comp_list = comp_list[:first_ind] 
+        comp_list.append(['others < ' + str(cutoff), small_count])
+        comp_list.sort(key = lambda t:t[1], reverse=True)
+        from ascii_graph import Pyasciigraph
+        from ascii_graph.colors import Gre, Blu, Yel, Red
+        from ascii_graph.colordata import hcolor
+        graph = Pyasciigraph(line_length=40, multivalue=False)
+        thresholds = {500: Gre, 2500: Blu, 5000: Red,}
+        data = hcolor(comp_list, thresholds)
+        for line in graph.graph(label=None, data=data):
+           print(line) 
+        print('where others', end=': ')
+        for small in small_list:
+            print(small, end=', ')
+        print('\n')
 
     def temp_collection(self, cursor):
         ''' Create temporary collection
