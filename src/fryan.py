@@ -291,16 +291,16 @@ class DBQuery:
         '''
         elements = self.args.get('composition')
         # if there's only one string, try split it by caps
-        chem_pot = False
+        numeracy = False
         if len(elements) == 1:
             elements = [elem for elem in re.split(r'([A-Z][a-z]*)', elements[0]) if elem]
-            if elements[0] == '1':
-                chem_pot = True
+            if elements[0].isdigit():
+                numeracy = True
         try:
-            if chem_pot == False:
+            if numeracy == False:
                 for elem in elements:
                     if bool(re.search(r'\d', elem)):
-                        raise RuntimeError('Composition string cannot contain a number other than 1.')
+                        raise RuntimeError('Composition string must be a list of elements of a single number.')
         except Exception as oops:
             print(oops)
             return EmptyCursor()
@@ -308,8 +308,8 @@ class DBQuery:
         # cursor = self.repo.find({'stoichiometry.'+[element for element in elements]: {'$exists' : True}})
         if self.partial:
             try:
-                if chem_pot:
-                    raise RuntimeError('Composition of 1 not compatible with partial formula.')
+                if numeracy:
+                    raise RuntimeError('Number of elements not compatible with partial formula.')
             except Exception as oops:
                 print(oops)
                 return EmptyCursor()
@@ -334,11 +334,10 @@ class DBQuery:
                                             {'atom_types' : {'$in' : [elements[3]]}}
                                         ]})
         else:
-            if len(elements) == 1:
-                if chem_pot == True:
-                    cursor = self.repo.find({'stoichiometry' : {'$size' : 1}})
-                else:
-                    cursor = self.repo.find({ '$and': [
+            if numeracy == True:
+                cursor = self.repo.find({'stoichiometry' : {'$size' : int(elements[0])}})
+            elif len(elements) == 1:
+                cursor = self.repo.find({ '$and': [
                                             {'atom_types' : {'$in' : [elements[0]]}},
                                             {'stoichiometry' : {'$size' : 1}}
                                         ]})
@@ -496,7 +495,8 @@ if __name__ == '__main__':
     group.add_argument('-f', '--formula', nargs='+', type=str,
         help='choose a stoichiometry, e.g. Ge 1 Te 1 Si 3, or GeTeSi3')
     group.add_argument('-c', '--composition', nargs='+', type=str,
-        help='find all structures containing the given elements, e.g. GeTeSi.')
+        help=('find all structures containing the given elements, e.g. GeTeSi, or find' +
+        'the number of structures with n elements, e.g. 1, 2, 3'))
     parser.add_argument('-s', '--summary', action='store_true',
             help='show only the ground state for each formula (i.e. phase+stoichiometry)')
     group.add_argument('-i', '--id', type=str, nargs='+',
