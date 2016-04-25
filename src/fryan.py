@@ -164,8 +164,11 @@ class DBQuery:
                 if 'icsd' in doc:
                     detail_string[-1] += ', ICSD-CollCode' + doc['icsd']
                 if 'tags' in doc:
-                    for tag in doc['tags']:
-                        detail_string[-1] += ', ' + tag
+                    try:
+                        for tag in doc['tags']:
+                            detail_string[-1] += ', ' + tag
+                    except:
+                        pass
                 if 'user' in doc:
                     detail_string[-1] += doc['user']
                 detail_string[-1] += ' ' + (len(header_string)-len(detail_string[-1])-1)*u"╌"
