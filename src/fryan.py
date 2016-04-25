@@ -146,36 +146,28 @@ class DBQuery:
                         detail_string[-1] += 'S-'
                 if 'sedc_scheme' in doc:
                     detail_string[-1] += doc['sedc_scheme'].upper()+'+'
-                try:
+                if 'xc_functional' in doc:
                     detail_string[-1] += doc['xc_functional']
-                except:
+                else:
                     detail_string[-1] += 'functional unknown for' + doc['source'][0]
-                try:
+                if 'cut_off_energy' in doc:
                     detail_string[-1] += ', ' + "{:4.2f}".format(doc['cut_off_energy']) + ' eV'
-                except:
+                else:
                     detail_string[-1] += 'cutoff unknown'
-                try:
+                if 'external_pressure' in doc:
                     detail_string[-1] += ', ' + "{:4.2f}".format(doc['external_pressure'][0][0]) + ' GPa'
-                except: 
-                    pass
-                try:
+                if 'kpoints_mp_spacing' in doc:
                     detail_string[-1] += ', ' + doc['kpoints_mp_spacing'] + ' 1/A'
-                except:
-                    pass
-                try:
+                if 'species_pot' in doc:
                     for species in doc['species_pot']:
                         detail_string[-1] += ', ' + doc['species_pot'][species]
-                except:
-                    pass
-                try:
+                if 'icsd' in doc:
                     detail_string[-1] += ', ICSD-CollCode' + doc['icsd']
-                except:
-                    pass
-                try:
+                if 'tags' in doc:
                     for tag in doc['tags']:
                         detail_string[-1] += ', ' + tag
-                except:
-                    pass
+                if 'user' in doc:
+                    detail_string[-1] += doc['user']
                 detail_string[-1] += ' ' + (len(header_string)-len(detail_string[-1])-1)*u"╌"
             if self.source:
                 source_string.append(11*' ' + u"└──────────────┬──")
@@ -299,16 +291,16 @@ class DBQuery:
         '''
         elements = self.args.get('composition')
         # if there's only one string, try split it by caps
-        chem_pot = False
+        numeracy = False
         if len(elements) == 1:
             elements = [elem for elem in re.split(r'([A-Z][a-z]*)', elements[0]) if elem]
-            if elements[0] == '1':
-                chem_pot = True
+            if elements[0].isdigit():
+                numeracy = True
         try:
-            if chem_pot == False:
+            if numeracy == False:
                 for elem in elements:
                     if bool(re.search(r'\d', elem)):
-                        raise RuntimeError('Composition string cannot contain a number other than 1.')
+                        raise RuntimeError('Composition string must be a list of elements of a single number.')
         except Exception as oops:
             print(oops)
             return EmptyCursor()
@@ -316,8 +308,8 @@ class DBQuery:
         # cursor = self.repo.find({'stoichiometry.'+[element for element in elements]: {'$exists' : True}})
         if self.partial:
             try:
-                if chem_pot:
-                    raise RuntimeError('Composition of 1 not compatible with partial formula.')
+                if numeracy:
+                    raise RuntimeError('Number of elements not compatible with partial formula.')
             except Exception as oops:
                 print(oops)
                 return EmptyCursor()
@@ -342,11 +334,10 @@ class DBQuery:
                                             {'atom_types' : {'$in' : [elements[3]]}}
                                         ]})
         else:
-            if len(elements) == 1:
-                if chem_pot == True:
-                    cursor = self.repo.find({'stoichiometry' : {'$size' : 1}})
-                else:
-                    cursor = self.repo.find({ '$and': [
+            if numeracy == True:
+                cursor = self.repo.find({'stoichiometry' : {'$size' : int(elements[0])}})
+            elif len(elements) == 1:
+                cursor = self.repo.find({ '$and': [
                                             {'atom_types' : {'$in' : [elements[0]]}},
                                             {'stoichiometry' : {'$size' : 1}}
                                         ]})
@@ -451,7 +442,7 @@ class DBQuery:
         small_list = []
         small_count = 0
         first_ind = 1000
-        cutoff = 300
+        cutoff = 200
         for ind, comp in enumerate(comp_list):
             if comp[1] < cutoff:
                 if ind < first_ind:
@@ -464,8 +455,9 @@ class DBQuery:
         from ascii_graph import Pyasciigraph
         from ascii_graph.colors import Gre, Blu, Yel, Red
         from ascii_graph.colordata import hcolor
-        graph = Pyasciigraph(line_length=40, multivalue=False)
-        thresholds = {500: Gre, 2500: Blu, 5000: Red,}
+        graph = Pyasciigraph(line_length=80, multivalue=False)
+        db_stats_dict['count']
+        thresholds = {int(db_stats_dict['count']/40): Gre, int(db_stats_dict['count']/10): Blu, int(db_stats_dict['count']/4): Red,}
         data = hcolor(comp_list, thresholds)
         for line in graph.graph(label=None, data=data):
            print(line) 
@@ -503,7 +495,8 @@ if __name__ == '__main__':
     group.add_argument('-f', '--formula', nargs='+', type=str,
         help='choose a stoichiometry, e.g. Ge 1 Te 1 Si 3, or GeTeSi3')
     group.add_argument('-c', '--composition', nargs='+', type=str,
-        help='find all structures containing the given elements, e.g. GeTeSi.')
+        help=('find all structures containing the given elements, e.g. GeTeSi, or find' +
+        'the number of structures with n elements, e.g. 1, 2, 3'))
     parser.add_argument('-s', '--summary', action='store_true',
             help='show only the ground state for each formula (i.e. phase+stoichiometry)')
     group.add_argument('-i', '--id', type=str, nargs='+',
