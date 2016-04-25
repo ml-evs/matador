@@ -7,6 +7,7 @@ from pwd import getpwuid
 from time import strptime
 from sys import argv
 from fractions import gcd
+from math import pi, log10
 import argparse
 import pymongo as pm
 import random
@@ -31,10 +32,10 @@ class Spatula:
         # I/O files 
         self.logfile = open('spatula.log', 'w')
         try:
-            # wordfile = open('/home/matthew/crysdb-bacon/src/new_words', 'r')
-            # nounfile = open('/home/matthew/crysdb-bacon/src/nouns', 'r')
-            wordfile = open('/u/fs1/me388/crysdb-bacon/src/new_words', 'r')
-            nounfile = open('/u/fs1/me388/crysdb-bacon/src/nouns', 'r')
+            wordfile = open('/home/matthew/crysdb-bacon/src/new_words', 'r')
+            nounfile = open('/home/matthew/crysdb-bacon/src/nouns', 'r')
+            # wordfile = open('/u/fs1/me388/crysdb-bacon/src/new_words', 'r')
+            # nounfile = open('/u/fs1/me388/crysdb-bacon/src/nouns', 'r')
         except Exception as oopsy:
             exit(oopsy)
         self.wlines = wordfile.readlines()
@@ -168,6 +169,17 @@ class Spatula:
                     if res_dict != False:
                         final_struct = input_dict.copy()
                         final_struct.update(res_dict)
+                        # calculate kpoint spacing if not found
+                        recip_abc = 3*[0]
+                        for j in range(3):
+                            recip_abc[j] = 2 * pi / float(final_struct['lattice_abc'][0][j])
+                            if 'kpoints_mp_spacing' not in final_struct:
+                                if 'kpoints_mp_grid' in final_struct:
+                                    max_spacing = 0
+                                    for j in range(3):
+                                        spacing = recip_abc[j]/(2 * pi * final_struct['kpoints_mp_grid'][j])
+                                        max_spacing = spacing if spacing > max_spacing else max_spacing
+                                        final_struct['kpoints_mp_spacing'] = round(max_spacing + 0.5*10**(round(log10(max_spacing)-1)), 2)
                         try:
                             final_struct['source'] = res_dict['source'] + input_dict['source']
                         except:
@@ -601,6 +613,16 @@ class Spatula:
                             castep['lattice_abc'].append(map(float, [flines[line_no+i].split('=')[-1].strip(),
                                                                      flines[line_no+i+1].split('=')[-1].strip(),
                                                                      flines[line_no+i+2].split('=')[-1].strip()]))
+                            recip_abc = 3*[0]
+                            for j in range(3):
+                                recip_abc[j] = 2 * pi / float(castep['lattice_abc'][0][j])
+                            if 'kpoints_mp_grid' in castep:
+                                max_spacing = 0
+                                for j in range(3):
+                                    spacing = recip_abc[j]/(2 * pi * castep['kpoints_mp_grid'][j])
+                                    max_spacing = spacing if spacing > max_spacing else max_spacing
+                                castep['kpoints_mp_spacing'] = round(max_spacing + 0.5*10**(round(log10(max_spacing)-1)), 2)
+                        
                         elif 'Current cell volume' in line:
                             castep['cell_volume'] = float(line.split('=')[1].split()[0].strip())
                         elif 'Cell Contents' in line :
