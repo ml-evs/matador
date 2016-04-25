@@ -206,7 +206,7 @@ class Spatula:
                     file_lists[root]['res'].append(file)
                     file_lists[root]['res_count'] += 1
                     ResCount += 1
-                elif file.endswith('.castep'):
+                elif file.endswith('.castep') or file.endswith('.history'):
                     file_lists[root]['castep'].append(file)
                     file_lists[root]['castep_count'] += 1
                     CastepCount += 1
@@ -245,7 +245,12 @@ class Spatula:
         # add .res to source 
         res['source'].append(seed+'.res')
         # grab file owner username
-        res['user'] = getpwuid(stat(seed+'.castep').st_uid).pw_name
+        try:
+            res['user'] = getpwuid(stat(seed+'.res').st_uid).pw_name
+        except:
+            if self.debug:
+                print(seed+'.res has no owner.')
+            res['user'] == 'xxx'
         if 'CollCode' in seed:
             res['icsd'] = seed.split('CollCode')[-1] 
         # alias special lines in res file
@@ -325,7 +330,7 @@ class Spatula:
                     i = 1
                     while 'endblock' not in flines[line_no+i].lower():
                         try:
-                            cell['species_pot'][flines[line_no+i].split()[0]] = flines[line_no+i].split()[1]
+                            cell['species_pot'][flines[line_no+i].split()[0]] = flines[line_no+i].split()[1].split('/')[-1]
                         except:
                             pass
                         i += 1
@@ -470,16 +475,14 @@ class Spatula:
         # use defaultdict to allow for easy appending
         castep = defaultdict(list)
         # read .castep file
-        if seed.endswith('.castep'):
-            seed = seed.replace('.castep', '')
-        with open(seed+'.castep', 'r') as f:
+        with open(seed, 'r') as f:
             flines = f.readlines()
         # set source tag to castep file 
-        castep['source'].append(seed+'.castep')
+        castep['source'].append(seed)
         # grab file owner
-        castep['user'] = getpwuid(stat(seed+'.castep').st_uid).pw_name
+        castep['user'] = getpwuid(stat(seed).st_uid).pw_name
         if 'CollCode' in seed:
-            castep['icsd'] = seed.split('CollCode')[-1] 
+            castep['icsd'] = seed.split('CollCode')[-1].replace('.castep', '').replace('.history', '')
         try:
             # wrangle castep file for basic parameters
             for line_no, line in enumerate(flines):
@@ -506,6 +509,9 @@ class Spatula:
                     castep['finite_basis_corr'] = line.split(':')[-1].strip()
                 elif 'kpoints_mp_grid' not in castep and 'MP grid size for SCF' in line:
                     castep['kpoints_mp_grid'] = map(int, list(line.split('is')[-1].split()))
+                elif 'sedc_apply' not in castep and 'DFT+D: Semi-empirical dispersion correction    : on' in line:
+                    castep['sedc_apply'] = True
+                    castep['sedc_scheme'] = flines[line_no+1].split(':')[1].split()[0] 
                 elif 'kpoints_calculated' not in castep and 'Number of kpoints used' in line:
                     castep['kpoints_calculated'] = int(line.split('=')[-1])
                 elif 'space_group' not in castep and 'Space group of crystal' in line:
@@ -571,11 +577,10 @@ class Spatula:
                 raise RuntimeError('CASTEP file does not contain GO calculation', castep['task'])
             else:
                 final = False
+                castep['optimised'] = False
                 for line_no, line in enumerate(flines):
-                    if 'Geometry optimization failed to converge' in line:
-                        castep['optimised'] = False
-                        raise RuntimeError('CASTEP GO failed to converge.') 
-                    elif 'Final Configuration' in line:
+                    if 'Geometry optimization completed successfully' in line:
+                        castep['optimised'] = True
                         final = True
                     if final:
                         if 'Real Lattice' in line:
@@ -659,6 +664,9 @@ class Spatula:
                     castep['total_time_hrs'] = float(line.split()[-2])/3600
                 elif 'Peak Memory Use' in line:
                     castep['peak_mem_MB'] = int(float(line.split()[-2])/1000)
+            # check that any optimized results were saved and raise errors if not
+            if castep['optimised'] == False:
+                raise RuntimeError('CASTEP GO failed to converge.') 
             if 'enthalpy' not in castep:
                 raise RuntimeError('Could not find enthalpy')
             if 'pressure' not in castep:
@@ -668,8 +676,8 @@ class Spatula:
         except Exception as oopsy:
             if self.dryrun:
                 print(oopsy)
-                print('Error in .castep file', seed+'.castep, skipping...')
-            self.logfile.write(seed+'.castep \t\t' + str(oopsy)+'\n')
+                print('Error in .castep file', seed, 'skipping...')
+            self.logfile.write(seed+ '\t\t' + str(oopsy)+'\n')
             return False
         if self.debug:
             print(json.dumps(castep,indent=2))
