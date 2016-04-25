@@ -170,7 +170,7 @@ class DBQuery:
                     except:
                         pass
                 if 'user' in doc:
-                    detail_string[-1] += doc['user']
+                    detail_string[-1] += ', ' + doc['user']
                 detail_string[-1] += ' ' + (len(header_string)-len(detail_string[-1])-1)*u"╌"
             if self.source:
                 source_string.append(11*' ' + u"└──────────────┬──")
