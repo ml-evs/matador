@@ -87,6 +87,7 @@ class DBQuery:
         ''' Print query results in a cryan-like fashion. '''
         struct_string = []
         detail_string = []
+        detail_substring = []
         source_string = []
         summary_string = []
         formula_string = []
@@ -137,10 +138,11 @@ class DBQuery:
                 self.gs_enthalpy = doc['enthalpy_per_atom']
             last_formula = formula_substring
             if details:
+                detail_string.append(11 * ' ' + u"├╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌ ")
                 if self.source:
-                    detail_string.append(11 * ' ' + u"├╌╌╌╌╌╌╌╌╌╌╌╌╌╌ ")
+                    detail_substring.append(11 * ' ' + u"├╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌ ")
                 else:
-                    detail_string.append(11 * ' ' + u"└╌╌╌╌╌╌╌╌╌╌╌╌╌╌ ")
+                    detail_substring.append(11 * ' ' + u"└╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌ ")
                 if 'spin_polarized' in doc:
                     if doc['spin_polarized']:
                         detail_string[-1] += 'S-'
@@ -160,25 +162,26 @@ class DBQuery:
                     detail_string[-1] += ', ' + doc['kpoints_mp_spacing'] + ' 1/A'
                 if 'species_pot' in doc:
                     for species in doc['species_pot']:
-                        detail_string[-1] += ', ' + doc['species_pot'][species]
+                        detail_substring[-1] += doc['species_pot'][species] + ', '
                 if 'icsd' in doc:
-                    detail_string[-1] += ', ICSD-CollCode' + doc['icsd']
+                    detail_substring[-1] += 'ICSD-CollCode' + doc['icsd'] + ', '
                 if 'tags' in doc:
                     try:
                         for tag in doc['tags']:
-                            detail_string[-1] += ', ' + tag
+                            detail_substring[-1] += ', ' + tag
                     except:
                         pass
                 if 'user' in doc:
-                    detail_string[-1] += ', ' + doc['user']
+                    detail_substring[-1] += doc['user']
                 detail_string[-1] += ' ' + (len(header_string)-len(detail_string[-1])-1)*u"╌"
+                detail_substring[-1] += ' ' + (len(header_string)-len(detail_substring[-1])-1)*u"╌"
             if self.source:
-                source_string.append(11*' ' + u"└──────────────┬──")
+                source_string.append(11*' ' + u"└───────────────┬──")
                 for num, file in enumerate(doc['source']):
                     if num == len(doc['source'])-1:
-                        source_string[-1] += (len(u"└───────────── ")+11)*' ' + u'└──'
+                        source_string[-1] += (len(u"└────────────── ")+11)*' ' + u'└──'
                     elif num != 0:
-                        source_string[-1] += (len(u"└───────────── ")+11)*' ' + u'├──'
+                        source_string[-1] += (len(u"└────────────── ")+11)*' ' + u'├──'
                     # elif num == 0:
                     source_string[-1] += ' ' + file[2:] 
                     if num != len(doc['source'])-1:
@@ -197,6 +200,7 @@ class DBQuery:
                     print(struct_string[ind])
                     if details:
                         print(detail_string[ind])
+                        print(detail_substring[ind])
                     if self.source:
                         print(source_string[ind])
                     current_formula = string
@@ -205,9 +209,11 @@ class DBQuery:
                 print(string)
                 if details:
                     print(detail_string[ind])
+                    print(detail_substring[ind])
                 if self.source:
                     print(source_string[ind])
-        print(len(header_string)*'─')
+                if details or self.source:
+                    print(len(header_string)*'─')
         
     def query_stoichiometry(self):
         ''' Query DB for particular stoichiometry. '''
