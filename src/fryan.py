@@ -144,6 +144,8 @@ class DBQuery:
                 if 'spin_polarized' in doc:
                     if doc['spin_polarized']:
                         detail_string[-1] += 'S-'
+                if 'sedc_scheme' in doc:
+                    detail_string[-1] += doc['sedc_scheme'].upper()+'+'
                 try:
                     detail_string[-1] += doc['xc_functional']
                 except:
