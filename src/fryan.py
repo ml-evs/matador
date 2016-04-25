@@ -146,36 +146,28 @@ class DBQuery:
                         detail_string[-1] += 'S-'
                 if 'sedc_scheme' in doc:
                     detail_string[-1] += doc['sedc_scheme'].upper()+'+'
-                try:
+                if 'xc_functional' in doc:
                     detail_string[-1] += doc['xc_functional']
-                except:
+                else:
                     detail_string[-1] += 'functional unknown for' + doc['source'][0]
-                try:
+                if 'cut_off_energy' in doc:
                     detail_string[-1] += ', ' + "{:4.2f}".format(doc['cut_off_energy']) + ' eV'
-                except:
+                else:
                     detail_string[-1] += 'cutoff unknown'
-                try:
+                if 'external_pressure' in doc:
                     detail_string[-1] += ', ' + "{:4.2f}".format(doc['external_pressure'][0][0]) + ' GPa'
-                except: 
-                    pass
-                try:
+                if 'kpoints_mp_spacing' in doc:
                     detail_string[-1] += ', ' + doc['kpoints_mp_spacing'] + ' 1/A'
-                except:
-                    pass
-                try:
+                if 'species_pot' in doc:
                     for species in doc['species_pot']:
                         detail_string[-1] += ', ' + doc['species_pot'][species]
-                except:
-                    pass
-                try:
+                if 'icsd' in doc:
                     detail_string[-1] += ', ICSD-CollCode' + doc['icsd']
-                except:
-                    pass
-                try:
+                if 'tags' in doc:
                     for tag in doc['tags']:
                         detail_string[-1] += ', ' + tag
-                except:
-                    pass
+                if 'user' in doc:
+                    detail_string[-1] += doc['user']
                 detail_string[-1] += ' ' + (len(header_string)-len(detail_string[-1])-1)*u"╌"
             if self.source:
                 source_string.append(11*' ' + u"└──────────────┬──")
@@ -451,7 +443,7 @@ class DBQuery:
         small_list = []
         small_count = 0
         first_ind = 1000
-        cutoff = 300
+        cutoff = 200
         for ind, comp in enumerate(comp_list):
             if comp[1] < cutoff:
                 if ind < first_ind:
@@ -464,8 +456,9 @@ class DBQuery:
         from ascii_graph import Pyasciigraph
         from ascii_graph.colors import Gre, Blu, Yel, Red
         from ascii_graph.colordata import hcolor
-        graph = Pyasciigraph(line_length=40, multivalue=False)
-        thresholds = {500: Gre, 2500: Blu, 5000: Red,}
+        graph = Pyasciigraph(line_length=80, multivalue=False)
+        db_stats_dict['count']
+        thresholds = {int(db_stats_dict['count']/40): Gre, int(db_stats_dict['count']/10): Blu, int(db_stats_dict['count']/4): Red,}
         data = hcolor(comp_list, thresholds)
         for line in graph.graph(label=None, data=data):
            print(line) 
