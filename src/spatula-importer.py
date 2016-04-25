@@ -336,9 +336,9 @@ class Spatula:
                         i += 1
                 elif '%block external_pressure' in line.lower():
                     cell['external_pressure'] = list()
-                    cell['external_pressure'].append(map(float, flines[line_no+1].split()))
-                    cell['external_pressure'].append(map(float, flines[line_no+2].split()))
-                    cell['external_pressure'].append(map(float, flines[line_no+3].split()))
+                    for j in range(3):
+                       flines[line_no+j+1] = flines[line_no+j+1].replace(',', '')
+                       cell['external_pressure'].append(map(float, flines[line_no+j+1].split()))
                 elif 'mp_spacing' in line.lower():
                     cell['kpoints_mp_spacing'] = line.split()[-1]
                 elif 'mp_grid' in line.lower():
@@ -360,16 +360,17 @@ class Spatula:
         to be merged with other dicts from other files.
         '''
         param = defaultdict(list)
+        print(seed)
         if seed.endswith('.param'):
             seed = seed.replace('.param', '')
         with open(seed+'.param', 'r') as f:
             flines = f.readlines()
         param['source'].append(seed+'.param')
         try:
-            for line in flines:
+            for line_no, line in enumerate(flines):
                 line = line.lower()
                 # skip blank lines and comments
-                if line.startswith('#') or len(line.strip())==0:
+                if line.startswith(('#', '!')) or len(line.strip())==0:
                     continue
                 else:
                     # exclude some useless info
@@ -426,9 +427,12 @@ class Spatula:
                         offset = 1
                     else:
                         offset = 0
-                    dir_dict['cut_off_energy'] = float(dir.split('-')[offset])
-                    dir_dict['kpoints_mp_spacing'] = float(dir.split('-')[offset+1])
-                    dir_dict['xc_functional'] = dir.split('-')[offset+4].upper()
+                    try:
+                        dir_dict['cut_off_energy'] = float(dir.split('-')[offset])
+                        dir_dict['kpoints_mp_spacing'] = float(dir.split('-')[offset+1])
+                        dir_dict['xc_functional'] = dir.split('-')[offset+4].upper()
+                    except:
+                        pass
                     if dir_dict['xc_functional'][0] == 'S':
                         dir_dict['xc_functional'] = dir_dict['xc_functional'][1:]
                         dir_dict['spin_polarized'] = True
@@ -438,10 +442,13 @@ class Spatula:
                         dir_dict['species_pot'] = dir.split('-')[offset+5]
                     info = True 
                 elif 'GPa' in dir:
-                    dir_dict['external_pressure'].append([float(dir.split('_')[0]), 0.0, 0.0])
-                    dir_dict['external_pressure'].append([float(dir.split('_')[0]), 0.0])
-                    dir_dict['external_pressure'].append([float(dir.split('_')[0])])
-                    info = True 
+                    try:
+                        dir_dict['external_pressure'].append([float(dir.split('_')[0]), 0.0, 0.0])
+                        dir_dict['external_pressure'].append([float(dir.split('_')[0]), 0.0])
+                        dir_dict['external_pressure'].append([float(dir.split('_')[0])])
+                        info = True 
+                    except:
+                        pass
                 if [phase for phase in phase_list if phase in dir]:
                     for phase in phase_list:
                         if phase in dir:
