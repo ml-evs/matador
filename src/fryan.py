@@ -159,7 +159,7 @@ class DBQuery:
                 if 'external_pressure' in doc:
                     detail_string[-1] += ', ' + "{:4.2f}".format(doc['external_pressure'][0][0]) + ' GPa'
                 if 'kpoints_mp_spacing' in doc:
-                    detail_string[-1] += ', ' + doc['kpoints_mp_spacing'] + ' 1/A'
+                    detail_string[-1] += ', ' + str(doc['kpoints_mp_spacing']) + ' 1/A'
                 if 'species_pot' in doc:
                     for species in doc['species_pot']:
                         detail_substring[-1] += doc['species_pot'][species] + ', '
@@ -168,7 +168,7 @@ class DBQuery:
                 if 'tags' in doc:
                     try:
                         for tag in doc['tags']:
-                            detail_substring[-1] += ', ' + tag
+                            detail_substring[-1] += tag + ', '
                     except:
                         pass
                 if 'user' in doc:
