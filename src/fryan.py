@@ -4,6 +4,9 @@ from __future__ import print_function
 import pymongo as pm
 import numpy as np
 import argparse
+from sys import argv
+from os import makedirs
+from os.path import exists
 import bson.json_util as json
 import re
 
@@ -29,6 +32,13 @@ class DBQuery:
         self.partial = self.args.get('partial_formula')
         self.summary = self.args.get('summary')
         self.tags = self.args.get('tags')
+        self.cell = self.args.get('cell')
+        self.res = self.args.get('res')
+        # grab all args as string for file dumps
+        if self.args.get('sysargs'):
+            self.sysargs = ''.join((str(a)+'_' for a in self.args.get('sysargs')))
+            self.sysargs = self.sysargs.replace('-','')
+            self.sysargs = 'query-' + self.sysargs
         # benchmark enthalpy to display (set by calc_match)
         self.gs_enthalpy = 0.0
         if self.args.get('dbstats'):
@@ -62,7 +72,12 @@ class DBQuery:
                     cursor = EmptyCursor()
             except:
                 cursor = EmptyCursor()
-        # drop any temporary collection
+        # clone cursor for further use after printing
+        self.cursor = cursor.clone()
+        # write query to res or cell with param files
+        if self.cell or self.res:
+            self.query2files(self.cursor, self.res, self.cell)
+        # if called as script, always print results
         if self.args.get('main'):
             if cursor.count() > 1:
                 if self.summary:
@@ -71,9 +86,7 @@ class DBQuery:
                     self.display_results(cursor[:self.top], details=self.details)
                 else:
                     self.display_results(cursor, details=self.details)
-        else:
-            self.cursor = cursor
-    
+
     def __del__(self):
         ''' Clean up any temporary databases on garbage 
         collection of DBQuery object.
@@ -82,6 +95,123 @@ class DBQuery:
             self.temp.drop()
         except:
             pass
+
+    def query2files(self, cursor, res=False, cell=False, swaps=None):
+        ''' Write .res or .cell files for all docs in query,
+        including a .param file for each. Eventually handle
+        swaps from one element to another from CLI.
+        '''
+        if cursor.count() > 1000:
+            write = raw_input('This operation will write ' + str(cursor.count()) + ' files,' \
+                    + ' are you sure you want to do this? [y/n] ')
+            if write == 'y' or write == 'Y':
+                write = True
+            else:
+                write = False
+                return
+        else:
+            write = True
+        name = self.sysargs
+        dir = False
+        dir_counter = 0
+        while not dir:
+            if dir_counter != 0:
+                directory = name + str(dir_counter)
+            else:
+                directory = name
+            if not exists(directory):
+                makedirs(directory)
+                dir = True
+            else:
+                dir_counter += 1
+        path = directory + '/' + name
+        for ind, doc in enumerate(cursor):
+            # write either cell, res or both
+            if cell:
+                self.doc2cell(doc, str(ind), path)
+            if res:
+                self.doc2res(doc, str(ind), path)
+            # always write param for each doc
+            self.doc2param(doc, str(ind), path)
+
+    def doc2param(self, doc, counter, path):
+        ''' Write basic .param file from single doc. '''
+        param_list = ['task', 'cut_off_energy', 'norman', 'xc_functional',
+                'finite_basis_corr', 'spin_polarized']
+        try:
+            with open(path+counter+'.param', 'w') as f:
+                for param in [param for param in param_list if param in doc]:
+                    f.write("{0:20}: {1}\n".format(param, doc[param]))
+        except Exception as oops:
+            print('Writing param file failed for ', doc['text_id'])
+            print(oops)
+
+    def doc2cell(self, doc, counter, path):
+        ''' Write .cell file for single doc. '''
+        try:
+            with open(path+counter+'.cell', 'w') as f:
+                f.write('%BLOCK LATTICE_ABC\n')
+                for vec in doc['lattice_abc']:
+                    for coeff in vec:
+                        f.write(str(coeff) + ' ')
+                    f.write('\n')
+                f.write('%ENDBLOCK LATTICE_ABC\n\n')
+                f.write('%BLOCK POSITIONS_FRAC\n')
+                for ind, atom in enumerate(zip(doc['atom_types'], doc['positions_frac'])):
+                    f.write("{0:8s} {1[0]: 15f} {1[1]: 15f} {1[2]: 15f}   1.0\n".format(atom[0], \
+                            atom[1]))
+                f.write('%ENDBLOCK POSITIONS_FRAC\n\n')
+                try:
+                    f.write('kpoints_mp_spacing : ' + str(doc['kpoints_mp_spacing']))
+                except:
+                    pass
+        except Exception as oops:
+            print('Writing cell file failed for ', doc['text_id'])
+            print(oops)
+
+    def doc2res(self, doc, counter, path):
+        ''' Write .res file for single doc. '''
+        try:
+            with open(path+counter+'.res', 'w') as f:
+                f.write('TITL ')
+                f.write(path.split('/')[-1] + counter + ' ')
+                f.write(str(doc['pressure']) + ' ')
+                f.write(str(doc['cell_volume']) + ' ')
+                f.write(str(doc['enthalpy']) + ' ')
+                f.write('0 0 ')             # spin
+                f.write(str(doc['num_atoms']) + ' ')
+                try:
+                    f.write('(' + str(doc['space_group']) + ')' + ' ')
+                except:
+                    f.write('xxx ')
+                f.write('n - 1')
+                f.write('\n')
+                f.write('CELL ')
+                f.write('1.0 ')
+                for vec in doc['lattice_abc']:
+                    for coeff in vec:
+                        f.write(str(coeff) + ' ')
+                f.write('\n')
+                f.write('LATT -1\n')
+                f.write('SFAC \t')
+                for elem in doc['stoichiometry']:
+                    f.write(str(elem[0]) + ' ')
+                f.write('\n')
+                atom_labels = []
+                i = 0
+                j = 1
+                while i < len(doc['atom_types']):
+                    num = doc['atom_types'].count(doc['atom_types'][i])
+                    atom_labels.extend(num*[j])
+                    i += num
+                    j += 1
+                for ind, atom in enumerate(zip(doc['atom_types'], atom_labels, doc['positions_frac'])):
+                    f.write("{0:8s}{1:3d}{2[0]: 15f} {2[1]: 15f} {2[2]: 15f}   1.0\n".format(atom[0], \
+                            atom[1], atom[2]))
+                f.write('END')
+        except Exception as oops:
+            print('Writing cell file failed for ', doc['text_id'])
+            print(oops)
 
     def display_results(self, cursor, details=False):
         ''' Print query results in a cryan-like fashion. '''
@@ -291,7 +421,6 @@ class DBQuery:
                                         ]})
         cursor.sort('enthalpy_per_atom', pm.ASCENDING)
         print(cursor.count(), 'structures found with the desired stoichiometry.')
-        
         return cursor
     
     def query_composition(self):
@@ -382,7 +511,6 @@ class DBQuery:
                                         ]})
         cursor.sort('enthalpy_per_atom', pm.ASCENDING)
         print(cursor.count(), 'structures found with desired composition.')
-
         return cursor
 
     def query_calc(self, cursor):
@@ -496,6 +624,8 @@ class EmptyCursor:
     ''' Empty cursor class for failures. '''
     def count(self):
         return 0 
+    def clone(self):
+        return EmptyCursor()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Query MongoDB structure database.',
@@ -528,19 +658,15 @@ if __name__ == '__main__':
             help=('print some stats about the database that is being queried'))
     parser.add_argument('--tags', nargs='+', type=str,
             help=('search for up to 3 manual tags at once'))
+    parser.add_argument('--cell', action='store_true',
+            help='export query to .cell files in folder name from query string')
+    parser.add_argument('--res', action='store_true',
+            help='export query to .res files in folder name from query string')
     args = parser.parse_args()
     if args.calc_match and args.id == None:
         exit('--calc-match requires -i or --id')
-    query = DBQuery(stoichiometry=args.formula,
-                    composition=args.composition,
-                    summary=args.summary,
-                    id=args.id,
-                    top=args.top,
-                    details=args.details,
-                    pressure=args.pressure,
-                    source=args.source,
-                    calc_match=args.calc_match,
-                    partial_formula=args.partial_formula,
-                    dbstats=args.dbstats,
-                    tags=args.tags,
-                    main=True)
+    query = DBQuery(stoichiometry=args.formula, composition=args.composition,
+                    summary=args.summary, id=args.id, top=args.top, details=args.details,
+                    pressure=args.pressure, source=args.source, calc_match=args.calc_match,
+                    partial_formula=args.partial_formula, dbstats=args.dbstats,
+                    tags=args.tags, res=args.res, cell=args.cell, main=True, sysargs=argv[1:])
