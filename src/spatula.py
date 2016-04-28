@@ -8,6 +8,7 @@ from time import strptime
 from sys import argv
 from fractions import gcd
 from math import pi, log10
+import gzip
 import argparse
 import pymongo as pm
 import random
@@ -218,7 +219,7 @@ class Spatula:
                     file_lists[root]['res'].append(file)
                     file_lists[root]['res_count'] += 1
                     ResCount += 1
-                elif file.endswith('.castep') or file.endswith('.history'):
+                elif file.endswith('.castep') or file.endswith('.history') or file.endswith('.history.gz'):
                     file_lists[root]['castep'].append(file)
                     file_lists[root]['castep_count'] += 1
                     CastepCount += 1
@@ -319,7 +320,6 @@ class Spatula:
             return False
         if self.verbosity > 4:
             print(json.dumps(res, indent=2))
-        # need to calculate res['lattice_cart'] and res['positions_cart'] 
         return res
 
     def cell2dict(self, seed):
@@ -372,7 +372,6 @@ class Spatula:
         to be merged with other dicts from other files.
         '''
         param = defaultdict(list)
-        print(seed)
         if seed.endswith('.param'):
             seed = seed.replace('.param', '')
         with open(seed+'.param', 'r') as f:
@@ -493,15 +492,20 @@ class Spatula:
         '''
         # use defaultdict to allow for easy appending
         castep = defaultdict(list)
-        # read .castep file
-        with open(seed, 'r') as f:
-            flines = f.readlines()
+        # read .castep, .history or .history.gz file
+        if '.gz' in seed:
+            with gzip.open(seed, 'r') as f:
+                flines = f.readlines()
+        else:
+            with open(seed, 'r') as f:
+                flines = f.readlines()
+
         # set source tag to castep file 
         castep['source'].append(seed)
         # grab file owner
         castep['user'] = getpwuid(stat(seed).st_uid).pw_name
         if 'CollCode' in seed:
-            castep['icsd'] = seed.split('CollCode')[-1].replace('.castep', '').replace('.history', '')
+            castep['icsd'] = seed.split('CollCode')[-1].replace('.castep', '').replace('.history', '').replace('.gz', '')
         try:
             # wrangle castep file for basic parameters
             for line_no, line in enumerate(flines):
@@ -545,6 +549,7 @@ class Spatula:
                 elif 'atom types' not in castep and 'Cell Contents' in line: 
                     castep['atom_types'] = list() 
                     castep['stoichiometry'] = defaultdict(float)
+                    castep['positions_frac'] = list()
                     i = 1 
                     atoms = False 
                     while True: 
@@ -554,6 +559,7 @@ class Spatula:
                                 break
                             else:
                                 castep['atom_types'].append(flines[line_no+i].split()[1])
+                                castep['positions_frac'].append((map(float, (flines[line_no+i].split()[3:6]))))
                         if 'x------' in flines[line_no+i]:
                             atoms= True
                         i += 1
@@ -658,7 +664,7 @@ class Spatula:
                                     else:
                                         force_on_atom = 0
                                         for j in range(3):
-                                            force_on_atom += float(flines[line_no+i].split()[3+j])**2
+                                            force_on_atom += float(flines[line_no+i].replace('(cons\'d)', '').split()[3+j])**2
                                         if force_on_atom > max_force:
                                             max_force = force_on_atom
                                 elif 'x' in flines[line_no+i]:
@@ -698,8 +704,10 @@ class Spatula:
                 raise RuntimeError('CASTEP GO failed to converge.') 
             if 'enthalpy' not in castep:
                 raise RuntimeError('Could not find enthalpy')
+            if 'positions_frac' not in castep:
+                raise RuntimeError('Could not find positions')
             if 'pressure' not in castep:
-                raise RuntimeError('Could not find pressure')
+                castep['pressure'] = 'xxx'
             if 'space_group' not in castep:
                 castep['space_group'] = 'xxx'
         except Exception as oopsy:
