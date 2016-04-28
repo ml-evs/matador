@@ -236,10 +236,10 @@ class Spatula:
                     ParamCount += 1
         print('done!\n')
         prefix = '\t\t'
-        print(prefix, ResCount, '\t.res files')
-        print(prefix, CastepCount, '\t.castep files')
-        print(prefix, CellCount, '\t.cell files')
-        print(prefix, ParamCount, '\t.param files\n')
+        print(prefix, "{:d}".format(ResCount), '\t\t.res files')
+        print(prefix, CastepCount, '\t\t.castep, .history or .history.gz files')
+        print(prefix, CellCount, '\t\t.cell files')
+        print(prefix, ParamCount, '\t\t.param files\n')
         return file_lists
 
     ######################## FILE SCRAPER FUNCTIONS ########################
@@ -594,6 +594,27 @@ class Spatula:
                 elif 'Final free energy' in line:
                     castep['free_energy'] = float(line.split('=')[1].split()[0])
                     castep['free_energy_per_atom'] = castep['free_energy'] / castep['num_atoms']
+                elif 'Lattice parameters' in line:
+                    castep['lattice_abc'] = list()
+                    i = 1
+                    castep['lattice_abc'].append(map(float, [flines[line_no+i].split('=')[1].strip().split(' ')[0], 
+                                                             flines[line_no+i+1].split('=')[1].strip().split(' ')[0],
+                                                             flines[line_no+i+2].split('=')[1].strip().split(' ')[0]]))
+                    castep['lattice_abc'].append(map(float, [flines[line_no+i].split('=')[-1].strip(),
+                                                             flines[line_no+i+1].split('=')[-1].strip(),
+                                                             flines[line_no+i+2].split('=')[-1].strip()]))
+                    recip_abc = 3*[0]
+                    for j in range(3):
+                        recip_abc[j] = 2 * pi / float(castep['lattice_abc'][0][j])
+                    if 'kpoints_mp_grid' in castep:
+                        max_spacing = 0
+                        for j in range(3):
+                            spacing = recip_abc[j]/(2 * pi * castep['kpoints_mp_grid'][j])
+                            max_spacing = spacing if spacing > max_spacing else max_spacing
+                        castep['kpoints_mp_spacing'] = round(max_spacing + 0.5*10**(round(log10(max_spacing)-1)), 2)
+                
+                elif 'Current cell volume' in line:
+                    castep['cell_volume'] = float(line.split('=')[1].split()[0].strip())
             # write zero pressure if not found in file
             if 'external_pressure' not in castep:
                 castep['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0], [0.0]]
@@ -708,6 +729,8 @@ class Spatula:
                 raise RuntimeError('Could not find positions')
             if 'pressure' not in castep:
                 castep['pressure'] = 'xxx'
+            if 'cell_volume' not in castep:
+                castep['cell_volume'] = 'xxx'
             if 'space_group' not in castep:
                 castep['space_group'] = 'xxx'
         except Exception as oopsy:

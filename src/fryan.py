@@ -266,13 +266,22 @@ class DBQuery:
                             formula_substring += str(subitem)
                         atom_per_fu += subitem
             if last_formula != formula_substring:
-                self.gs_enthalpy = 0
+                self.gs_enthalpy = 0.0
             formula_string.append(formula_substring)
             struct_string.append(
-                    "{:^24}".format(doc['text_id'][0]+' '+doc['text_id'][1])
-                    + "{:^ 12.3f}".format(doc['pressure'])
-                    + "{:^12.3f}".format(atom_per_fu * doc['cell_volume'] / doc['num_atoms'])
-                    + "{:^18.5f}".format(doc['enthalpy_per_atom'] - self.gs_enthalpy))
+                    "{:^24}".format(doc['text_id'][0]+' '+doc['text_id'][1]))
+            try:
+                struct_string[-1] += "{:^ 12.3f}".format(doc['pressure'])
+            except: 
+                struct_string[-1] += "{:^12}".format(doc['pressure'])
+            try:
+                struct_string[-1] += "{:^12.3f}".format(atom_per_fu * doc['cell_volume'] / doc['num_atoms'])
+            except:
+                struct_string[-1] += "{:^12}".format('xxx')
+            try:
+                struct_string[-1] += "{:^18.5f}".format(doc['enthalpy_per_atom'] - self.gs_enthalpy)
+            except:
+                struct_string[-1] += "{:^18}".format('xxx')
             try:
                 struct_string[-1] += "{:^12}".format(doc['space_group'])
             except:
