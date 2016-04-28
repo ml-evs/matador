@@ -96,6 +96,21 @@ class DBQuery:
         except:
             pass
 
+    def swaps(self, doc, counter, **kwargs):
+        ''' Take a db document as input and perform atomic swaps. '''
+        pairs = kwargs.get('pairs')
+        swap_doc = doc.copy()
+        swap_atoms = doc['atom_types'].copy()
+        for swap_no in range(pairs):
+            valid = False
+            while not valid:    
+                swap = np.random.randint(0, len(swap_atoms)-1, size=2)
+                if swap[0] != swap[1] and swap_atoms[swap[0]] != swap_atoms[swap[1]]:
+                        valid = True
+            swap_atoms[swap[1]], swap_atoms[swap[0]] = swap_atoms[swap[0]], swap_atoms[swap[1]]
+        self.doc2cell(swap_doc, str(counter), doc['text_id'][0]+doc['text_id'][1]+'swaps')
+
+
     def query2files(self, cursor, res=False, cell=False, swaps=None):
         ''' Write .res or .cell files for all docs in query,
         including a .param file for each. Eventually handle
@@ -291,8 +306,11 @@ class DBQuery:
                 if 'kpoints_mp_spacing' in doc:
                     detail_string[-1] += ', ' + str(doc['kpoints_mp_spacing']) + ' 1/A'
                 if 'species_pot' in doc:
-                    for species in doc['species_pot']:
-                        detail_substring[-1] += doc['species_pot'][species] + ', '
+                    try:
+                        for species in doc['species_pot']:
+                            detail_substring[-1] += doc['species_pot'][species] + ', '
+                    except:
+                        pass
                 if 'icsd' in doc:
                     detail_substring[-1] += 'ICSD-CollCode' + doc['icsd'] + ', '
                 if 'tags' in doc:
