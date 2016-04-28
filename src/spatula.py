@@ -26,7 +26,7 @@ class Spatula:
         * airss.pl / pyAIRSS .res output
     '''
 
-    def __init__(self, dryrun=False, debug=False, verbosity=0, tags=None):
+    def __init__(self, dryrun=False, debug=False, verbosity=0, tags=None, scratch=False):
         ''' Set up arguments and initialise DB client. '''
         self.init = True
         self.import_count = 0
@@ -48,12 +48,16 @@ class Spatula:
         self.dryrun = dryrun
         self.debug = debug 
         self.verbosity = verbosity 
+        self.scratch = scratch
         self.tag_dict = dict()
         self.tag_dict['tags'] = tags
         if not self.dryrun:
             self.client = pm.MongoClient()
             self.db = self.client.crystals
-            self.repo = self.db.repo
+            if self.scratch:
+                self.repo = self.db.scratch
+            else:
+                self.repo = self.db.repo
         # scan directory on init
         self.file_lists = self.scan_dir()
         # convert to dict and db if required
@@ -755,8 +759,11 @@ if __name__ == '__main__':
                         help='set user tags, e.g. nanotube, project name')
     parser.add_argument('--debug', action='store_true',
                         help='enable debug output to print every dict')
+    parser.add_argument('-s', '--scratch', action='store_true',
+                        help='import to junk collection called scratch')
     args = parser.parse_args()
     importer = Spatula(dryrun=args.dryrun, 
                        debug=args.debug,
                        verbosity=args.verbosity,
-                       tags=args.tags)
+                       tags=args.tags,
+                       scratch=args.scratch)

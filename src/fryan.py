@@ -19,13 +19,19 @@ class DBQuery:
         ''' Initialise the query with command line
         arguments.
         '''
-        self.client = pm.MongoClient()
-        self.db = self.client.crystals
-        self.repo = self.client.crystals.repo
+        # read args
         self.args = kwargs
         for arg in self.args:
             if type(self.args[arg]) == str:
                 self.args[arg] = self.args[arg].split() 
+        # connect to MongoDB
+        self.client = pm.MongoClient()
+        self.db = self.client.crystals
+        self.scratch = self.args.get('scratch')
+        if self.args.get('scratch'):
+            self.repo = self.client.crystals.scratch
+        else:
+            self.repo = self.client.crystals.repo
         self.top = self.args.get('top') if self.args.get('top') != None else 10
         self.details = self.args.get('details')
         self.source = self.args.get('source')
@@ -712,6 +718,8 @@ if __name__ == '__main__':
             help=('print some stats about the database that is being queried'))
     parser.add_argument('--tags', nargs='+', type=str,
             help=('search for up to 3 manual tags at once'))
+    parser.add_argument('--scratch', action='store_true',
+            help=('query local scratch database'))
     parser.add_argument('--cell', action='store_true',
             help='export query to .cell files in folder name from query string')
     parser.add_argument('--res', action='store_true',
@@ -722,5 +730,5 @@ if __name__ == '__main__':
     query = DBQuery(stoichiometry=args.formula, composition=args.composition,
                     summary=args.summary, id=args.id, top=args.top, details=args.details,
                     pressure=args.pressure, source=args.source, calc_match=args.calc_match,
-                    partial_formula=args.partial_formula, dbstats=args.dbstats,
+                    partial_formula=args.partial_formula, dbstats=args.dbstats, scratch=args.scratch,
                     tags=args.tags, res=args.res, cell=args.cell, main=True, sysargs=argv[1:])
