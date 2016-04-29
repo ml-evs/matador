@@ -70,7 +70,7 @@ class DBQuery:
             cursor = self.query_composition()
         elif self.args.get('tags') != None:
             cursor = self.query_tags()
-        elif self.args.get('id') == None and self.args.get('dbstats') == False:
+        elif self.args.get('id') == None and not self.args.get('dbstats'):
             cursor = self.repo.find().sort('enthalpy_per_atom', pm.ASCENDING)
         else:
             try:
@@ -82,14 +82,14 @@ class DBQuery:
         self.cursor = cursor.clone()
         # write query to res or cell with param files
         if self.cell or self.res:
-            if cursor.count() > 1:
+            if cursor.count() >= 1:
                 if self.args.get('top') != None:
                     self.query2files(self.cursor[:self.top], self.res, self.cell, top=True)
                 else:
                     self.query2files(self.cursor, self.res, self.cell)
         # if called as script, always print results
         if self.args.get('main'):
-            if cursor.count() > 1:
+            if cursor.count() >= 1:
                 if self.summary:
                     self.display_results(cursor, details=self.details)
                 elif cursor.count() > self.top:
@@ -109,8 +109,9 @@ class DBQuery:
     def swaps(self, doc, counter, **kwargs):
         ''' Take a db document as input and perform atomic swaps. '''
         pairs = kwargs.get('pairs')
+        # somehow messes up next doc [fixme]
         swap_doc = doc.copy()
-        swap_atoms = doc['atom_types'].copy()
+        swap_atoms = swap_doc['atom_types']
         for swap_no in range(pairs):
             valid = False
             while not valid:    
