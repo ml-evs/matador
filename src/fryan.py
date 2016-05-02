@@ -14,14 +14,14 @@ import bson.json_util as json
 import re
 
 class DBQuery:
-    ''' Class that implements queries to MongoDB
+    """ Class that implements queries to MongoDB
     structure database.
-    '''
-
+    """
+    
     def __init__(self, **kwargs):
-        ''' Initialise the query with command line
-        arguments.
-        '''
+        """ Initialise the query with command line
+        arguments and return results.
+        """
         # read args
         self.args = kwargs
         for arg in self.args:
@@ -42,12 +42,14 @@ class DBQuery:
         self.summary = self.args.get('summary')
         self.tags = self.args.get('tags')
         self.cell = self.args.get('cell')
+        self.hull = self.args.get('hull')
         self.res = self.args.get('res')
         # grab all args as string for file dumps
         if self.args.get('sysargs'):
             self.sysargs = ''.join((str(a)+'_' for a in self.args.get('sysargs')))
             self.sysargs = self.sysargs.replace('-','')
             self.sysargs = 'query-' + self.sysargs
+        """ PERFORM QUERY """
         # benchmark enthalpy to display (set by calc_match)
         self.gs_enthalpy = 0.0
         if self.args.get('dbstats'):
@@ -83,6 +85,11 @@ class DBQuery:
                 cursor = EmptyCursor()
         # clone cursor for further use after printing
         self.cursor = cursor.clone()
+        """ QUERY POST-PROCESSING """
+        # try to generate convex hull
+        if self.hull:
+            print('Attempting to generate convex hull...')
+            self.binary_hull()
         # write query to res or cell with param files
         if self.cell or self.res:
             if cursor.count() >= 1:
@@ -99,16 +106,16 @@ class DBQuery:
                     self.display_results(cursor, details=self.details)
 
     def __del__(self):
-        ''' Clean up any temporary databases on garbage 
+        """ Clean up any temporary databases on garbage 
         collection of DBQuery object.
-        '''
+        """
         try:
             self.temp.drop()
         except:
             pass
 
     def swaps(self, doc, pairs=1, template_param=None):
-        ''' Take a db document as input and perform atomic swaps. '''
+        """ Take a db document as input and perform atomic swaps. """
         for source in doc['source']:
             if '.castep' or '.res' in source:
                 name = source.split('/')[-1].split('.')[0]
@@ -127,9 +134,9 @@ class DBQuery:
         self.doc2param(swapDoc, name+'-'+hash, template_param)
 
     def generate_hash(self, hashLen=6):
-        ''' Quick hash generator, based on implementation in 
+        """ Quick hash generator, based on implementation in 
         PyAIRSS by J. Wynn. 
-        '''
+        """
         hashChars = hashChars = [str(x) for x in range(0,10)]+[x for x in string.ascii_lowercase]
         hash = ''
         for i in range(hashLen):
@@ -137,10 +144,10 @@ class DBQuery:
         return hash
 
     def query2files(self, cursor, res=False, cell=False, top=False):
-        ''' Write .res or .cell files for all docs in query,
+        """ Write .res or .cell files for all docs in query,
         including a .param file for each. Eventually handle
         swaps from one element to another from CLI.
-        '''
+        """
         if cursor.count() > 1000 and top == False:
             write = raw_input('This operation will write ' + str(cursor.count()) + ' structures,' \
                     + ' are you sure you want to do this? [y/n] ')
@@ -185,10 +192,11 @@ class DBQuery:
             self.doc2param(doc, path)
 
     def doc2param(self, doc, path, template=None):
-        ''' Write basic .param file from single doc. '''
+        """ Write basic .param file from single doc. """
         paramList = ['task', 'cut_off_energy', 'xc_functional',
                 'finite_basis_corr', 'spin_polarized']
         seedDict = dict()
+        paramDict = dict()
         for param in [param for param in paramList if param in doc]:
             seedDict[param] = doc[param]
         if template != None:
@@ -198,7 +206,6 @@ class DBQuery:
                     raise RuntimeError('Failed to open template.')
             except Exception as oops:
                 print(oops)
-                paramDict = dict()
         paramDict.update(seedDict)
         try:
             if isfile(path+'.param'):
@@ -215,11 +222,13 @@ class DBQuery:
                     if param != 'source':
                         f.write("{0:20}: {1}\n".format(param, paramDict[param]))
         except Exception as oops:
-            newDir = ''.join(path.split('/')[:-1])
-            makedirs(newDir)
+            if not exists(''.join(path.split('/')[:-1])):
+                newDir = ''.join(path.split('/')[:-1])
+                makedirs(newDir)
+                self.doc2param(doc, path, template=template)
 
     def doc2cell(self, doc, path):
-        ''' Write .cell file for single doc. '''
+        """ Write .cell file for single doc. """
         try:
             if isfile(path+'.cell'):
                 raise RuntimeError('File already exists, skipping...')
@@ -253,19 +262,20 @@ class DBQuery:
                     f.write(elem + '\t' + doc['species_pot'][elem] + '\n')
                 f.write('%ENDBLOCK SPECIES_POT')
         except Exception as oops:
-            newDir = ''.join(path.split('/')[:-1])
-            makedirs(newDir)
-            self.doc2cell(doc, path)
+            if not exists(''.join(path.split('/')[:-1])):
+                newDir = ''.join(path.split('/')[:-1])
+                makedirs(newDir)
+                self.doc2cell(doc, path)
 
-    def doc2res(self, doc, counter, path):
-        ''' Write .res file for single doc. '''
+    def doc2res(self, doc, path):
+        """ Write .res file for single doc. """
         try:
             if isfile(path+'.res'):
-                path += '-' + str(counter)
+                raise RuntimeError('File already exists, skipping...')
             with open(path+'.res', 'w') as f:
                 f.write('# Res file generated by fryan.py (Matthew Evans 2016)\n\n')
                 f.write('TITL ')
-                f.write(path.split('/')[-1] + counter + ' ')
+                f.write(path.split('/')[-1] + ' ')
                 f.write(str(doc['pressure']) + ' ')
                 f.write(str(doc['cell_volume']) + ' ')
                 f.write(str(doc['enthalpy']) + ' ')
@@ -274,19 +284,19 @@ class DBQuery:
                 try:
                     f.write('(' + str(doc['space_group']) + ')' + ' ')
                 except:
-                    f.write('xxx ')
+                    f.write('(P1) ')
                 f.write('n - 1')
                 f.write('\n')
                 f.write('CELL ')
                 f.write('1.0 ')
                 for vec in doc['lattice_abc']:
                     for coeff in vec:
-                        f.write(str(coeff) + ' ')
+                        f.write(' ' + str(coeff))
                 f.write('\n')
                 f.write('LATT -1\n')
                 f.write('SFAC \t')
                 for elem in doc['stoichiometry']:
-                    f.write(str(elem[0]) + ' ')
+                    f.write(' ' + str(elem[0]))
                 f.write('\n')
                 atom_labels = []
                 i = 0
@@ -300,12 +310,14 @@ class DBQuery:
                     f.write("{0:8s}{1:3d}{2[0]: 15f} {2[1]: 15f} {2[2]: 15f}   1.0\n".format(atom[0], \
                             atom[1], atom[2]))
                 f.write('END')
+                # very important newline for compatibliy with cryan
+                f.write('\n')
         except Exception as oops:
             print('Writing cell file failed for ', doc['text_id'])
             print(oops)
 
     def display_results(self, cursor, details=False):
-        ''' Print query results in a cryan-like fashion. '''
+        """ Print query results in a cryan-like fashion. """
         struct_string = []
         detail_string = []
         detail_substring = []
@@ -449,7 +461,7 @@ class DBQuery:
                     print(len(header_string)*'─')
         
     def query_stoichiometry(self):
-        ''' Query DB for particular stoichiometry. '''
+        """ Query DB for particular stoichiometry. """
         # alias stoichiometry
         stoich = self.args.get('stoichiometry')
         # if there's only one string, try split it by caps
@@ -527,9 +539,9 @@ class DBQuery:
         return cursor
     
     def query_composition(self):
-        ''' Query DB for all structures containing 
+        """ Query DB for all structures containing 
         all the elements taken as input.
-        '''
+        """
         elements = self.args.get('composition')
         # if there's only one string, try split it by caps
         numeracy = False
@@ -617,8 +629,8 @@ class DBQuery:
         return cursor
 
     def query_calc(self, cursor):
-        ''' Find all structures with matching
-        accuracy to specified structure. '''
+        """ Find all structures with matching
+        accuracy to specified structure. """
         doc = cursor[0]
         self.gs_enthalpy = doc['enthalpy_per_atom']
         if cursor.count() != 1:
@@ -634,7 +646,7 @@ class DBQuery:
             return cursor_match
     
     def query_tags(self):
-        ''' Find all structures matching given tags. '''
+        """ Find all structures matching given tags. """
         if len(self.tags) == 1:
             cursor = self.repo.find({'tags' : {'$in' : [self.tags[0]]}
                                     })
@@ -658,8 +670,72 @@ class DBQuery:
         cursor.sort('enthalpy_per_atom', pm.ASCENDING)
         return cursor
 
+    def binary_hull(self):
+        """ Create a convex hull for two elements. """
+        import matplotlib.pyplot as plt
+        from scipy.spatial import ConvexHull
+        elements = self.args.get('composition')
+        elements = [elem for elem in re.split(r'([A-Z][a-z]*)', elements[0]) if elem]
+        if len(elements) != 2:
+            print('Cannot create binary hull for more than 2 elements.')
+            return
+        # try to get decent chemical potentials:
+        # this relies on all of the first composition query
+        # having the same parameters; need to think about this
+        mu = np.array([0.0, 0.0])
+        for ind, elem in enumerate(elements):
+            match = None
+            print('Scanning for suitable', elem, 'chemical potential...')
+            self.args['composition'] = [elem]
+            mu_cursor = self.query_composition()
+            if mu_cursor.count() > 0:
+                for doc in mu_cursor:
+                    # temporary fix to pspot from dir issue
+                    if type(doc['species_pot']) != dict or elem not in doc['species_pot'] or not '.usp' in doc['species_pot'][elem]:
+                        continue
+                    else:
+                        print(doc['species_pot'][elem], 'vs', self.cursor[0]['species_pot'][elem])
+                        if doc['species_pot'][elem] == self.cursor[0]['species_pot'][elem]:
+                            print('\t', doc['external_pressure'][0][0], 'vs', self.cursor[0]['external_pressure'][0][0])
+                            if doc['external_pressure'][0] == self.cursor[0]['external_pressure'][0]:
+                                print('\t\t', doc['xc_functional'], 'vs', self.cursor[0]['xc_functional'])
+                                if doc['xc_functional'] == self.cursor[0]['xc_functional']:
+                                    print('\t\t\t', doc['cut_off_energy'], 'vs', self.cursor[0]['cut_off_energy'])
+                                    if doc['cut_off_energy'] >= self.cursor[0]['cut_off_energy']:
+                                        match = doc
+                                        print('Match found!')
+                                        break
+                if match != None:
+                    mu[ind] = float(match['enthalpy_per_atom'])
+                    print('Using', match['source'], 'as chem pot for', elem)
+                else:
+                    print('No possible chem pots found for', elem, '.')
+                    return
+            else:
+                print('No possible chem pots found for', elem, '.')
+                return
+        formation = np.zeros((self.cursor.count()))
+        stoich = np.zeros((self.cursor.count()))
+        for ind, doc in enumerate(self.cursor):
+            atoms_per_fu = doc['stoichiometry'][0][1] + doc['stoichiometry'][1][1]
+            formation[ind] = (doc['enthalpy_per_atom'] - (mu[0]*doc['stoichiometry'][0][1] + mu[1]*doc['stoichiometry'][1][1]) / atoms_per_fu)
+            stoich[ind] = doc['stoichiometry'][1][1]/float(atoms_per_fu)
+        formation = np.append(formation, [0.0, 0.0])
+        stoich = np.append(stoich, [0.0, 1.0])
+        points = np.vstack((stoich, formation)).T
+        hull = ConvexHull(points)
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        ax.scatter(points[:,0], points[:,1])
+        ax.plot(points[hull.vertices, 0], points[hull.vertices,1], 'r--', lw=2)
+        ax.scatter(points[hull.vertices, 0], points[hull.vertices, 1], c='g', zorder=1000)
+        ax.set_xlim(-0.05,1.05)
+        ax.set_ylim(1.2*np.min(formation), 0.05)
+        plt.show()
+
+
     def dbstats(self):
-        ''' Print some useful stats about the database. ''' 
+        """ Print some useful stats about the database. """ 
         db_stats_dict = self.db.command('collstats', self.repo.name)
         print('Database collection', self.db.name + '.' + self.repo.name, 'contains', db_stats_dict['count'],
               'structures at', "{:.1f}".format(db_stats_dict['avgObjSize']/1024), 'kB each, totalling', 
@@ -707,9 +783,9 @@ class DBQuery:
         print('\n')
 
     def temp_collection(self, cursor):
-        ''' Create temporary collection
+        """ Create temporary collection
         for successive filtering. 
-        '''
+        """
         # check temp doesn't already exist; drop if it does
         try:
             self.client.crystals.temp.drop()
@@ -724,7 +800,7 @@ class DBQuery:
         return self.temp
 
 class EmptyCursor:
-    ''' Empty cursor class for failures. '''
+    """ Empty cursor class for failures. """
     def count(self):
         return 0 
     def clone(self):
@@ -761,6 +837,8 @@ if __name__ == '__main__':
             help=('print some stats about the database that is being queried'))
     parser.add_argument('--tags', nargs='+', type=str,
             help=('search for up to 3 manual tags at once'))
+    parser.add_argument('--hull', action='store_true',
+            help=('create a convex hull for 2 elements (to be extended to 3, 4 soon)'))
     parser.add_argument('--scratch', action='store_true',
             help=('query local scratch database'))
     parser.add_argument('--cell', action='store_true',
@@ -770,8 +848,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
     if args.calc_match and args.id == None:
         exit('--calc-match requires -i or --id')
+    if args.hull == True and args.composition == None:
+        exit('--hull requires --composition')
     query = DBQuery(stoichiometry=args.formula, composition=args.composition,
                     summary=args.summary, id=args.id, top=args.top, details=args.details,
                     pressure=args.pressure, source=args.source, calc_match=args.calc_match,
                     partial_formula=args.partial_formula, dbstats=args.dbstats, scratch=args.scratch,
-                    tags=args.tags, res=args.res, cell=args.cell, main=True, sysargs=argv[1:])
+                    hull=args.hull, tags=args.tags, res=args.res, cell=args.cell, main=True, sysargs=argv[1:])

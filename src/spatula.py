@@ -15,7 +15,7 @@ import random
 import json
 
 class Spatula:
-    ''' The Spatula class implements methods to scrape folders 
+    """ The Spatula class implements methods to scrape folders 
     and individual files for crystal structures and create a 
     MongoDB document for each. 
 
@@ -24,10 +24,10 @@ class Spatula:
         * CASTEP output
         * CASTEP .param, .cell input
         * airss.pl / pyAIRSS .res output
-    '''
+    """
 
     def __init__(self, dryrun=False, debug=False, verbosity=0, tags=None, scratch=False):
-        ''' Set up arguments and initialise DB client. '''
+        """ Set up arguments and initialise DB client. """
         self.init = True
         self.import_count = 0
         # I/O files 
@@ -88,9 +88,9 @@ class Spatula:
         self.logfile.close()
 
     def dict2db(self, struct):
-        ''' Insert completed Python dictionary into chosen
+        """ Insert completed Python dictionary into chosen
         database, with generated text_id.
-        '''
+        """
         plain_text_id = [self.wlines[random.randint(0,self.num_words-1)].strip(),
                          self.nlines[random.randint(0,self.num_nouns-1)].strip()]
         struct['text_id'] = plain_text_id
@@ -102,9 +102,9 @@ class Spatula:
         return 1
 
     def files2db(self, file_lists):
-        ''' Take all files found by scan and appropriately create dicts
+        """ Take all files found by scan and appropriately create dicts
         holding all available data; optionally push to database.
-        '''
+        """
         print('\n###### RUNNING IMPORTER ######\n')
         multi = False
         for root in file_lists:
@@ -216,9 +216,9 @@ class Spatula:
         return
      
     def scan_dir(self):
-        ''' Scans folder topdir recursively, returning list of 
+        """ Scans folder topdir recursively, returning list of 
         CASTEP/AIRSS input/output files.
-        '''
+        """
         ResCount, CellCount, CastepCount, ParamCount = 4*[0]
         file_lists = dict()
         topdir = '.'
@@ -262,9 +262,9 @@ class Spatula:
     ######################## FILE SCRAPER FUNCTIONS ########################
 
 def res2dict(seed, **kwargs):
-    ''' Extract available information from .res file; preferably
+    """ Extract available information from .res file; preferably
     used in conjunction with cell or param file.
-    '''
+    """
     # use defaultdict to allow for easy appending
     res = defaultdict(list)
     # read .res file into array
@@ -339,9 +339,9 @@ def res2dict(seed, **kwargs):
     return res, True
 
 def cell2dict(seed, **kwargs):
-    ''' Extract available information from .cell file; probably
+    """ Extract available information from .cell file; probably
     to be merged with another dict from a .param or .res file.
-    '''
+    """
     cell = defaultdict(list)
     if seed.endswith('.cell'):
         seed = seed.replace('.cell', '')
@@ -383,9 +383,9 @@ def cell2dict(seed, **kwargs):
     return cell, True
 
 def param2dict(seed, **kwargs):
-    ''' Extract available information from .param file; probably
+    """ Extract available information from .param file; probably
     to be merged with other dicts from other files.
-    '''
+    """
     param = defaultdict(list)
     if seed.endswith('.param'):
         seed = seed.replace('.param', '')
@@ -432,9 +432,9 @@ def param2dict(seed, **kwargs):
     return param, True
 
 def dir2dict(seed, **kwargs):
-    ''' Try to extract information from directory name; last hope
+    """ Try to extract information from directory name; last hope
     if no param file has been found. 
-    '''
+    """
     dir_dict = defaultdict(list)
     info = False
     if seed == '.':
@@ -464,6 +464,7 @@ def dir2dict(seed, **kwargs):
                 if [task for task in task_list if task in dir.split('-')[offset+5]]:
                     dir_dict['task'] = dir.split('-')[offset+5]
                 else:
+                    # this is broken; need to fix for certain cases
                     dir_dict['species_pot'] = dir.split('-')[offset+5]
                 info = True 
             elif 'GPa' in dir:
@@ -501,9 +502,9 @@ def dir2dict(seed, **kwargs):
     return dir_dict, True
 
 def castep2dict(seed, **kwargs):
-    ''' From seed filename, create dict of the most relevant
+    """ From seed filename, create dict of the most relevant
     information about a calculation.
-    '''
+    """
     # use defaultdict to allow for easy appending
     castep = defaultdict(list)
     # read .castep, .history or .history.gz file
