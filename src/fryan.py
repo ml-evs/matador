@@ -677,7 +677,7 @@ class DBQuery:
             from mpldatacursor import datacursor
         except Exception as oops:
             print('Packages missing; please check dependencies.')
-            print(oopsy)
+            print(oops)
         elements = self.args.get('composition')
         elements = [elem for elem in re.split(r'([A-Z][a-z]*)', elements[0]) if elem]
         if len(elements) != 2:
@@ -698,33 +698,44 @@ class DBQuery:
                     if type(doc['species_pot']) != dict or elem not in doc['species_pot'] or not '.usp' in doc['species_pot'][elem]:
                         continue
                     else:
-                        print(doc['species_pot'][elem], 'vs', self.cursor[0]['species_pot'][elem])
+                        print('\n', doc['species_pot'][elem], 'vs', self.cursor[0]['species_pot'][elem], end='')
                         if doc['species_pot'][elem] == self.cursor[0]['species_pot'][elem]:
-                            print('\t', doc['external_pressure'][0][0], 'vs', self.cursor[0]['external_pressure'][0][0])
+                            print(' ✓')
+                            print('\n\t', doc['external_pressure'][0][0], 'GPa vs', self.cursor[0]['external_pressure'][0][0], 'GPa', end='')
                             if doc['external_pressure'][0] == self.cursor[0]['external_pressure'][0]:
-                                print('\t\t', doc['xc_functional'], 'vs', self.cursor[0]['xc_functional'])
+                                print(' ✓')
+                                print('\n\t\t', doc['xc_functional'], 'vs', self.cursor[0]['xc_functional'], end='')
                                 if doc['xc_functional'] == self.cursor[0]['xc_functional']:
-                                    print('\t\t\t', doc['cut_off_energy'], 'vs', self.cursor[0]['cut_off_energy'])
+                                    print(' ✓')
+                                    print('\n\t\t\t', doc['cut_off_energy'], 'eV vs', self.cursor[0]['cut_off_energy'], 'eV', end='')
                                     if doc['cut_off_energy'] >= self.cursor[0]['cut_off_energy']:
+                                        print(' ✓')
+                                        print(60*'─')
                                         match[ind] = doc
                                         print('Match found!')
                                         break
                 if match[ind] != None:
                     mu[ind] = float(match[ind]['enthalpy_per_atom'])
-                    print(float(match[ind]['enthalpy_per_atom']))
-                    print('Using', match[ind]['source'], 'as chem pot for', elem, 'with id', match[ind]['text_id'])
+                    print('Using', ''.join([match[ind]['text_id'][0], ' ', match[ind]['text_id'][1]]), 'as chem pot for', elem)
+                    print(60*'─')
                 else:
                     print('No possible chem pots found for', elem, '.')
                     return
             else:
                 print('No possible chem pots found for', elem, '.')
                 return
+        print('Plotting hull...')
         formation = np.zeros((self.cursor.count()))
         stoich = np.zeros((self.cursor.count()))
         info = []
         for ind, doc in enumerate(self.cursor):
-            atoms_per_fu = doc['stoichiometry'][0][1] + doc['stoichiometry'][1][1]
-            formation[ind] = (doc['enthalpy_per_atom'] - (mu[0]*doc['stoichiometry'][0][1] + mu[1]*doc['stoichiometry'][1][1]) / atoms_per_fu)
+            atoms_per_fu = doc['stoichiometry'][0][1] + doc['stoichiometry'][1][1]  
+            # this is probably better done by spatula; then can plot hull for given chem pot
+            formation[ind] = doc['enthalpy_per_atom']
+            for mu in match:
+                for j in range(len(doc['stoichiometry'])):
+                    if mu['stoichiometry'][0][0] == doc['stoichiometry'][j][0]:
+                        formation[ind] -= mu['enthalpy_per_atom']*doc['stoichiometry'][j][1] / atoms_per_fu
             stoich[ind] = doc['stoichiometry'][1][1]/float(atoms_per_fu)
             info.append("{0:^24}\n{1:5s}\n{2:2f} eV\n{3:^10}\n{4:^24}".format(doc['text_id'][0]+' '+doc['text_id'][1], doc['space_group'], formation[ind], doc['stoichiometry'], doc['source'][0].split('/')[-1]))
         formation = np.append(formation, [0.0, 0.0])
