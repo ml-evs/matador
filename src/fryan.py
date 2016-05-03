@@ -728,6 +728,7 @@ class DBQuery:
         formation = np.zeros((self.cursor.count()))
         stoich = np.zeros((self.cursor.count()))
         info = []
+        one_minus_x_elem = ''
         for ind, doc in enumerate(self.cursor):
             atoms_per_fu = doc['stoichiometry'][0][1] + doc['stoichiometry'][1][1]  
             # this is probably better done by spatula; then can plot hull for given chem pot
@@ -737,6 +738,10 @@ class DBQuery:
                     if mu['stoichiometry'][0][0] == doc['stoichiometry'][j][0]:
                         formation[ind] -= mu['enthalpy_per_atom']*doc['stoichiometry'][j][1] / atoms_per_fu
             stoich[ind] = doc['stoichiometry'][1][1]/float(atoms_per_fu)
+            if one_minus_x_elem != doc['stoichiometry'][1][0] and len(one_minus_x_elem) != 0:
+                print('A problem has occurred...')
+            one_minus_x_elem = doc['stoichiometry'][1][0]
+            x_elem = doc['stoichiometry'][0][0]
             info.append("{0:^24}\n{1:5s}\n{2:2f} eV\n{3:^10}\n{4:^24}".format(doc['text_id'][0]+' '+doc['text_id'][1], doc['space_group'], formation[ind], doc['stoichiometry'], doc['source'][0].split('/')[-1]))
         formation = np.append(formation, [0.0, 0.0])
         ind = len(formation)-3
@@ -754,13 +759,16 @@ class DBQuery:
         from new import FollowDotCursor
         ax = fig.add_subplot(111)
         for ind in range(len(points)):
-            ax.scatter(points[ind,0], points[ind,1],s=100, lw=1, alpha=0.6, label=info[ind])
+            ax.scatter(points[ind,0], points[ind,1], s=50, lw=1, alpha=0.6, label=info[ind], zorder=100)
         for ind in hull.vertices:
-            ax.scatter(points[ind, 0], points[ind, 1], c='g', marker='o', zorder=1000, s=100, lw=1, alpha=0.6, label=info[ind])
+            ax.scatter(points[ind, 0], points[ind, 1], c='r', marker='*', zorder=1000, s=250, lw=1, alpha=1, label=info[ind])
         ax.set_xlim(-0.05,1.05)
-        datacursor(formatter='{label}'.format)
-        ax.plot(points[hull.vertices, 0], points[hull.vertices,1], 'r--', lw=2)
+        datacursor(formatter='{label}'.format, draggable=True)
+        ax.plot(points[hull.vertices, 0], points[hull.vertices,1], 'k--', lw=1, alpha=0.6, zorder=1)
         ax.set_ylim(np.min(formation)-0.1, 0.1)
+        ax.set_title('$\mathrm{'+str(x_elem)+'_x'+str(one_minus_x_elem)+'_{1-x}}$')
+        ax.set_xlabel('$x$')
+        ax.set_ylabel('formation enthalpy per atom (eV)')
         # cursor = FollowDotCursor(ax, points[:,0], points[:,1], info, tolerance=20)
         # fig.canvas.mpl_connect('motion_notify_events', onpick)
         plt.show()
