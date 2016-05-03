@@ -7,7 +7,7 @@ import numpy as np
 import argparse
 import string
 from sys import argv
-from os import makedirs, system
+from os import makedirs, system, uname
 from os.path import exists, isfile, expanduser
 from copy import deepcopy
 import bson.json_util as json
@@ -28,7 +28,12 @@ class DBQuery:
             if type(self.args[arg]) == str:
                 self.args[arg] = self.args[arg].split() 
         # connect to MongoDB
-        self.client = pm.MongoClient('node1')
+        local = uname()[1]
+        if local == 'cluster2':
+            remote = 'node1'
+        else:
+            remote = None
+        self.client = pm.MongoClient(remote)
         self.db = self.client.crystals
         self.scratch = self.args.get('scratch')
         if self.args.get('scratch'):
