@@ -671,8 +671,13 @@ class DBQuery:
 
     def binary_hull(self):
         """ Create a convex hull for two elements. """
-        import matplotlib.pyplot as plt
-        from scipy.spatial import ConvexHull
+        try:
+            import matplotlib.pyplot as plt
+            from scipy.spatial import ConvexHull
+            from mpldatacursor import datacursor
+        except Exception as oops:
+            print('Packages missing; please check dependencies.')
+            print(oopsy)
         elements = self.args.get('composition')
         elements = [elem for elem in re.split(r'([A-Z][a-z]*)', elements[0]) if elem]
         if len(elements) != 2:
@@ -682,8 +687,8 @@ class DBQuery:
         # this relies on all of the first composition query
         # having the same parameters; need to think about this
         mu = np.array([0.0, 0.0])
+        match = [None, None]
         for ind, elem in enumerate(elements):
-            match = None
             print('Scanning for suitable', elem, 'chemical potential...')
             self.args['composition'] = [elem]
             mu_cursor = self.query_composition()
@@ -701,12 +706,13 @@ class DBQuery:
                                 if doc['xc_functional'] == self.cursor[0]['xc_functional']:
                                     print('\t\t\t', doc['cut_off_energy'], 'vs', self.cursor[0]['cut_off_energy'])
                                     if doc['cut_off_energy'] >= self.cursor[0]['cut_off_energy']:
-                                        match = doc
+                                        match[ind] = doc
                                         print('Match found!')
                                         break
-                if match != None:
-                    mu[ind] = float(match['enthalpy_per_atom'])
-                    print('Using', match['source'], 'as chem pot for', elem)
+                if match[ind] != None:
+                    mu[ind] = float(match[ind]['enthalpy_per_atom'])
+                    print(float(match[ind]['enthalpy_per_atom']))
+                    print('Using', match[ind]['source'], 'as chem pot for', elem, 'with id', match[ind]['text_id'])
                 else:
                     print('No possible chem pots found for', elem, '.')
                     return
@@ -715,21 +721,37 @@ class DBQuery:
                 return
         formation = np.zeros((self.cursor.count()))
         stoich = np.zeros((self.cursor.count()))
+        info = []
         for ind, doc in enumerate(self.cursor):
             atoms_per_fu = doc['stoichiometry'][0][1] + doc['stoichiometry'][1][1]
             formation[ind] = (doc['enthalpy_per_atom'] - (mu[0]*doc['stoichiometry'][0][1] + mu[1]*doc['stoichiometry'][1][1]) / atoms_per_fu)
             stoich[ind] = doc['stoichiometry'][1][1]/float(atoms_per_fu)
+            info.append("{0:^24}\n{1:5s}\n{2:2f} eV\n{3:^10}\n{4:^24}".format(doc['text_id'][0]+' '+doc['text_id'][1], doc['space_group'], formation[ind], doc['stoichiometry'], doc['source'][0].split('/')[-1]))
         formation = np.append(formation, [0.0, 0.0])
+        ind = len(formation)-3
+        for doc in match:
+            info.append("{0:^24}\n{1:5s}\n{2:2f} eV\n{3:^10}\n{4:^24}".format(doc['text_id'][0]+' '+doc['text_id'][1], doc['space_group'], formation[ind], doc['stoichiometry'], doc['source'][0].split('/')[-1]))
+            ind += 1 
         stoich = np.append(stoich, [0.0, 1.0])
         points = np.vstack((stoich, formation)).T
         hull = ConvexHull(points)
         fig = plt.figure()
+        def onpick(event):
+            ind = event.ind
+            for i in ind:
+                print(info[i])
+        from new import FollowDotCursor
         ax = fig.add_subplot(111)
-        ax.scatter(points[:,0], points[:,1])
-        ax.plot(points[hull.vertices, 0], points[hull.vertices,1], 'r--', lw=2)
-        ax.scatter(points[hull.vertices, 0], points[hull.vertices, 1], c='g', zorder=1000)
+        for ind in range(len(points)):
+            ax.scatter(points[ind,0], points[ind,1],s=100, lw=1, alpha=0.6, label=info[ind])
+        for ind in hull.vertices:
+            ax.scatter(points[ind, 0], points[ind, 1], c='g', marker='o', zorder=1000, s=100, lw=1, alpha=0.6, label=info[ind])
         ax.set_xlim(-0.05,1.05)
-        ax.set_ylim(1.2*np.min(formation), 0.05)
+        datacursor(formatter='{label}'.format)
+        ax.plot(points[hull.vertices, 0], points[hull.vertices,1], 'r--', lw=2)
+        ax.set_ylim(np.min(formation)-0.1, 0.1)
+        # cursor = FollowDotCursor(ax, points[:,0], points[:,1], info, tolerance=20)
+        # fig.canvas.mpl_connect('motion_notify_events', onpick)
         plt.show()
 
 
