@@ -2,7 +2,7 @@
 # coding: utf-8
 from __future__ import print_function
 from collections import defaultdict
-from os import walk, getcwd, stat
+from os import walk, getcwd, stat, uname
 from pwd import getpwuid
 from time import strptime
 from sys import argv
@@ -33,10 +33,10 @@ class Spatula:
         # I/O files 
         self.logfile = open('spatula.log', 'w')
         try:
-            wordfile = open('/home/matthew/crysdb-bacon/src/new_words', 'r')
-            nounfile = open('/home/matthew/crysdb-bacon/src/nouns', 'r')
-            # wordfile = open('/u/fs1/me388/crysdb-bacon/src/new_words', 'r')
-            # nounfile = open('/u/fs1/me388/crysdb-bacon/src/nouns', 'r')
+            # wordfile = open('/home/matthew/crysdb-bacon/src/new_words', 'r')
+            # nounfile = open('/home/matthew/crysdb-bacon/src/nouns', 'r')
+            wordfile = open('/u/fs1/me388/crysdb-bacon/src/new_words', 'r')
+            nounfile = open('/u/fs1/me388/crysdb-bacon/src/nouns', 'r')
         except Exception as oopsy:
             exit(oopsy)
         self.wlines = wordfile.readlines()
@@ -52,7 +52,12 @@ class Spatula:
         self.tag_dict = dict()
         self.tag_dict['tags'] = tags
         if not self.dryrun:
-            self.client = pm.MongoClient()
+            local = uname()[1]
+            if local == 'cluster2':
+                remote = 'node1'
+            else:
+                remote = None
+            self.client = pm.MongoClient(remote)
             self.db = self.client.crystals
             if self.scratch:
                 self.repo = self.db.scratch
@@ -205,7 +210,7 @@ class Spatula:
                             self.import_count += self.dict2db(final_struct)
             else:
                 for ind, file in enumerate(file_lists[root]['castep']):
-                    castep_dict, success = castep2dict(root + '/' + file)
+                    castep_dict, success = castep2dict(root + '/' + file, debug=self.debug)
                     if not success:
                         self.logfile.write(castep_dict)
                     else:
@@ -592,6 +597,17 @@ def castep2dict(seed, **kwargs):
                 for key, value in castep['stoichiometry'].iteritems():
                     temp_stoich.append([key, value/min])
                 castep['stoichiometry'] = temp_stoich
+            elif 'species_pot' not in castep and 'Pseudopotential Report' in line:
+                castep['species_pot'] = dict()
+                i = 0
+                while i+line_no < len(flines)-3:
+                    if 'Pseudopotential Report' in flines[line_no+i]:
+                        i += 2
+                        elem = flines[line_no+i].split(':')[1].split()[0]
+                    elif 'Partial core correction' in flines[line_no+i]:
+                        i += 2
+                        castep['species_pot'][elem] = flines[line_no+i].split('"')[1]
+                    i += 1
             elif 'species_pot' not in castep and 'Files used for pseudopotentials' in line:
                 castep['species_pot'] = dict()
                 i = 1
@@ -600,6 +616,8 @@ def castep2dict(seed, **kwargs):
                         break
                     else:
                         castep['species_pot'][flines[line_no+i].split()[0].strip()] = flines[line_no+i].split()[1].split('/')[-1]
+                        if castep['species_pot'][flines[line_no+i].split()[0].strip()] == 'Pseudopotential':
+                            castep['species_pot'][flines[line_no+i].split()[0].strip()] = flines[line_no+i].split()[0].strip()+'_OTF.usp'
                         i += 1
             # don't check if final_energy exists, as this will update for each GO step
             elif 'Final energy, E' in line:
