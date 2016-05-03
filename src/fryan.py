@@ -28,7 +28,7 @@ class DBQuery:
             if type(self.args[arg]) == str:
                 self.args[arg] = self.args[arg].split() 
         # connect to MongoDB
-        self.client = pm.MongoClient()
+        self.client = pm.MongoClient('node1')
         self.db = self.client.crystals
         self.scratch = self.args.get('scratch')
         if self.args.get('scratch'):
@@ -756,7 +756,6 @@ class DBQuery:
             ind = event.ind
             for i in ind:
                 print(info[i])
-        from new import FollowDotCursor
         ax = fig.add_subplot(111)
         for ind in range(len(points)):
             ax.scatter(points[ind,0], points[ind,1], s=50, lw=1, alpha=0.6, label=info[ind], zorder=100)
@@ -769,10 +768,7 @@ class DBQuery:
         ax.set_title('$\mathrm{'+str(x_elem)+'_x'+str(one_minus_x_elem)+'_{1-x}}$')
         ax.set_xlabel('$x$')
         ax.set_ylabel('formation enthalpy per atom (eV)')
-        # cursor = FollowDotCursor(ax, points[:,0], points[:,1], info, tolerance=20)
-        # fig.canvas.mpl_connect('motion_notify_events', onpick)
         plt.show()
-
 
     def dbstats(self):
         """ Print some useful stats about the database. """ 
