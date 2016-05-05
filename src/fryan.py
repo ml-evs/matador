@@ -47,8 +47,10 @@ class DBQuery:
         self.summary = self.args.get('summary')
         self.tags = self.args.get('tags')
         self.cell = self.args.get('cell')
-        self.hull = self.args.get('hull')
         self.res = self.args.get('res')
+        self.hull = self.args.get('hull')
+        self.dis = self.args.get('dis')
+        print(self.dis)
         # grab all args as string for file dumps
         if self.args.get('sysargs'):
             self.sysargs = ''.join((str(a)+'_' for a in self.args.get('sysargs')))
@@ -94,7 +96,7 @@ class DBQuery:
         # try to generate convex hull
         if self.hull:
             print('Attempting to generate convex hull...')
-            self.binary_hull()
+            self.binary_hull(dis=self.dis)
         # write query to res or cell with param files
         if self.cell or self.res:
             if cursor.count() >= 1:
@@ -674,7 +676,7 @@ class DBQuery:
         cursor.sort('enthalpy_per_atom', pm.ASCENDING)
         return cursor
 
-    def binary_hull(self):
+    def binary_hull(self, dis=False):
         """ Create a convex hull for two elements. """
         try:
             import matplotlib.pyplot as plt
@@ -732,6 +734,8 @@ class DBQuery:
         print('Plotting hull...')
         formation = np.zeros((self.cursor.count()))
         stoich = np.zeros((self.cursor.count()))
+        if dis:
+            disorder = np.zeros((self.cursor.count()))
         info = []
         one_minus_x_elem = ''
         for ind, doc in enumerate(self.cursor):
@@ -748,6 +752,8 @@ class DBQuery:
             one_minus_x_elem = doc['stoichiometry'][1][0]
             x_elem = doc['stoichiometry'][0][0]
             info.append("{0:^24}\n{1:5s}\n{2:2f} eV\n{3:^10}\n{4:^24}".format(doc['text_id'][0]+' '+doc['text_id'][1], doc['space_group'], formation[ind], doc['stoichiometry'], doc['source'][0].split('/')[-1]))
+            if dis:
+                disorder[ind] = self.disorder_hull(doc)
         formation = np.append(formation, [0.0, 0.0])
         ind = len(formation)-3
         for doc in match:
@@ -757,23 +763,65 @@ class DBQuery:
         points = np.vstack((stoich, formation)).T
         hull = ConvexHull(points)
         fig = plt.figure()
-        def onpick(event):
-            ind = event.ind
-            for i in ind:
-                print(info[i])
         ax = fig.add_subplot(111)
-        for ind in range(len(points)):
+        for ind in range(len(points)-2):
             ax.scatter(points[ind,0], points[ind,1], s=50, lw=1, alpha=0.6, label=info[ind], zorder=100)
+            if dis:
+                ax.plot([points[ind,0]-disorder[ind], points[ind,0]+disorder[ind]], [points[ind,1], points[ind,1]],
+                        c='b', alpha=0.5, lw=0.5)
         for ind in hull.vertices:
             ax.scatter(points[ind, 0], points[ind, 1], c='r', marker='*', zorder=1000, s=250, lw=1, alpha=1, label=info[ind])
         ax.set_xlim(-0.05,1.05)
-        datacursor(formatter='{label}'.format, draggable=True)
+        if not dis:
+            datacursor(formatter='{label}'.format, draggable=True)
         ax.plot(points[hull.vertices, 0], points[hull.vertices,1], 'k--', lw=1, alpha=0.6, zorder=1)
         ax.set_ylim(np.min(formation)-0.1, 0.1)
         ax.set_title('$\mathrm{'+str(x_elem)+'_x'+str(one_minus_x_elem)+'_{1-x}}$')
         ax.set_xlabel('$x$')
         ax.set_ylabel('formation enthalpy per atom (eV)')
         plt.show()
+        plt.savefig('test.png')
+
+    def disorder_hull(self, doc):
+        """ Broaden points on phase diagram by 
+        a measure of local stoichiometry.
+        """
+        num_atoms = doc['num_atoms']
+        lat_cart  = doc['lattice_cart']
+        disps = np.zeros((num_atoms, num_atoms-1))
+        atoms = np.empty((num_atoms, num_atoms-1), dtype=str)
+        for i in range(num_atoms):
+            jindex = 0
+            for j in range(num_atoms):
+                temp_disp = np.zeros((3))
+                real_disp = np.zeros((3))
+                if i != j:
+                    atoms[i, jindex] = doc['atom_types'][j]
+                    for k in range(3):
+                        temp_disp[k] = (doc['positions_frac'][j][k] - doc['positions_frac'][i][k])
+                        if temp_disp[k] > 0.5:
+                            temp_disp[k] -= 1
+                        elif temp_disp[k] < -0.5:
+                            temp_disp[k] += 1
+                    for k in range(3):
+                        for q in range(3):
+                            real_disp[q] += temp_disp[k]*lat_cart[k][q]
+                    for k in range(3):
+                        disps[i,jindex] += real_disp[k]**2
+                    jindex += 1
+        disps = np.sqrt(disps)
+        nn_atoms = []
+        for i in range(len(atoms)):
+            nn_atoms.append(atoms[i][np.where(disps[i] < 3)])
+        count = np.zeros((2), dtype=float)
+        for i in range(len(nn_atoms)):
+            same_elem = doc['atom_types'][i][0]
+            for j in range(len(nn_atoms[i])):
+                if nn_atoms[i][j] == same_elem:
+                    count[0] += 1.0
+                else:
+                    count[1] += 1.0
+        return count[0] / (4*(count[1]+count[0]))
 
     def dbstats(self):
         """ Print some useful stats about the database. """ 
@@ -880,6 +928,8 @@ if __name__ == '__main__':
             help=('search for up to 3 manual tags at once'))
     parser.add_argument('--hull', action='store_true',
             help=('create a convex hull for 2 elements (to be extended to 3, 4 soon)'))
+    parser.add_argument('--dis', action='store_true',
+            help='smear hull with local stoichiometry')
     parser.add_argument('--scratch', action='store_true',
             help=('query local scratch database'))
     parser.add_argument('--cell', action='store_true',
@@ -891,8 +941,10 @@ if __name__ == '__main__':
         exit('--calc-match requires -i or --id')
     if args.hull == True and args.composition == None:
         exit('--hull requires --composition')
+    if args.dis == True and args.hull != True:
+        exit('--dis requires --hull')
     query = DBQuery(stoichiometry=args.formula, composition=args.composition,
                     summary=args.summary, id=args.id, top=args.top, details=args.details,
                     pressure=args.pressure, source=args.source, calc_match=args.calc_match,
-                    partial_formula=args.partial_formula, dbstats=args.dbstats, scratch=args.scratch,
-                    hull=args.hull, tags=args.tags, res=args.res, cell=args.cell, main=True, sysargs=argv[1:])
+                    partial_formula=args.partial_formula, dbstats=args.dbstats, scratch=args.scratch, tags=args.tags,
+                    hull=args.hull, dis=args.dis, res=args.res, cell=args.cell, main=True, sysargs=argv[1:])
