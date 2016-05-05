@@ -33,10 +33,10 @@ class Spatula:
         # I/O files 
         self.logfile = open('spatula.log', 'w')
         try:
-            # wordfile = open('/home/matthew/crysdb-bacon/src/new_words', 'r')
-            # nounfile = open('/home/matthew/crysdb-bacon/src/nouns', 'r')
-            wordfile = open('/u/fs1/me388/crysdb-bacon/src/new_words', 'r')
-            nounfile = open('/u/fs1/me388/crysdb-bacon/src/nouns', 'r')
+            wordfile = open('/home/matthew/src/crysdb-bacon/src/new_words', 'r')
+            nounfile = open('/home/matthew/src/crysdb-bacon/src/nouns', 'r')
+            # wordfile = open('/u/fs1/me388/crysdb-bacon/src/new_words', 'r')
+            # nounfile = open('/u/fs1/me388/crysdb-bacon/src/nouns', 'r')
         except Exception as oopsy:
             exit(oopsy)
         self.wlines = wordfile.readlines()
