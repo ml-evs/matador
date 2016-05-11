@@ -1,12 +1,18 @@
 #!/usr/bin/python
 from __future__ import print_function
 import pymongo as pm
+from os import uname
 import argparse
 import bson.json_util as json
 
 def dbstats():
 
-    client = pm.MongoClient()
+    local = uname()[1]
+    if local == 'cluster2':
+        remote = 'node1'
+    else:
+        remote = None
+    client = pm.MongoClient(remote)
     db = client.crystals
     repo = db.repo
     print(json.dumps(db.command('dbstats'),indent=2))
