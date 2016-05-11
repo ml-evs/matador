@@ -1,23 +1,29 @@
 #!/usr/bin/python
 # coding: utf-8
 from __future__ import print_function
-import matplotlib.pyplot as plt
-from fryan import *
+# import related crysdb functionality
+# from fryan import DBQuery
+# import external libraries
 from scipy.spatial import ConvexHull
 from mpldatacursor import datacursor
+import matplotlib.pyplot as plt
+import re
+import numpy as np
 
-scipy_ConvexHull = ConvexHull
+class FryanConvexHull():
+    """
+    Implements a Convex Hull for formation energies
+    from a fryan DBQuery.
+    """
+    def __init__(self, query):
+        """ Accept query from fryan as argument. """
+        self.query = query
+        self.binary_hull()
 
-class ConvexHull:
-    """ Implements a Convex Hull for formation energies. """
-
-def binary_hull(self, dis=False):
+    def binary_hull(self, dis=False):
         """ Create a convex hull for two elements. """
-        try:
-        except Exception as oops:
-            print('Packages missing; please check dependencies.')
-            print(oops)
-        elements = self.args.get('composition')
+        query = self.query
+        elements = query.args.get('composition')
         elements = [elem for elem in re.split(r'([A-Z][a-z]*)', elements[0]) if elem]
         if len(elements) != 2:
             print('Cannot create binary hull for more than 2 elements.')
@@ -29,25 +35,25 @@ def binary_hull(self, dis=False):
         match = [None, None]
         for ind, elem in enumerate(elements):
             print('Scanning for suitable', elem, 'chemical potential...')
-            self.args['composition'] = [elem]
-            mu_cursor = self.query_composition()
+            query.args['composition'] = [elem]
+            mu_cursor = query.query_composition()
             if mu_cursor.count() > 0:
                 for doc in mu_cursor:
                     # temporary fix to pspot from dir issue
                     if type(doc['species_pot']) != dict or elem not in doc['species_pot'] or not '.usp' in doc['species_pot'][elem]:
                         continue
                     else:
-                        print('\n', doc['species_pot'][elem], 'vs', self.cursor[0]['species_pot'][elem], end='')
-                        if doc['species_pot'][elem] == self.cursor[0]['species_pot'][elem]:
+                        print('\n', doc['species_pot'][elem], 'vs', query.cursor[0]['species_pot'][elem], end='')
+                        if doc['species_pot'][elem] == query.cursor[0]['species_pot'][elem]:
                             print(' ✓')
-                            print('\n\t', doc['external_pressure'][0][0], 'GPa vs', self.cursor[0]['external_pressure'][0][0], 'GPa', end='')
-                            if doc['external_pressure'][0] == self.cursor[0]['external_pressure'][0]:
+                            print('\n\t', doc['external_pressure'][0][0], 'GPa vs', query.cursor[0]['external_pressure'][0][0], 'GPa', end='')
+                            if doc['external_pressure'][0] == query.cursor[0]['external_pressure'][0]:
                                 print(' ✓')
-                                print('\n\t\t', doc['xc_functional'], 'vs', self.cursor[0]['xc_functional'], end='')
-                                if doc['xc_functional'] == self.cursor[0]['xc_functional']:
+                                print('\n\t\t', doc['xc_functional'], 'vs', query.cursor[0]['xc_functional'], end='')
+                                if doc['xc_functional'] == query.cursor[0]['xc_functional']:
                                     print(' ✓')
-                                    print('\n\t\t\t', doc['cut_off_energy'], 'eV vs', self.cursor[0]['cut_off_energy'], 'eV', end='')
-                                    if doc['cut_off_energy'] >= self.cursor[0]['cut_off_energy']:
+                                    print('\n\t\t\t', doc['cut_off_energy'], 'eV vs', query.cursor[0]['cut_off_energy'], 'eV', end='')
+                                    if doc['cut_off_energy'] >= query.cursor[0]['cut_off_energy']:
                                         print(' ✓')
                                         print(60*'─')
                                         match[ind] = doc
@@ -64,13 +70,12 @@ def binary_hull(self, dis=False):
                 print('No possible chem pots found for', elem, '.')
                 return
         print('Plotting hull...')
-        formation = np.zeros((self.cursor.count()))
-        stoich = np.zeros((self.cursor.count()))
-        if dis:
-            disorder = np.zeros((self.cursor.count()))
+        formation = np.zeros((query.cursor.count()))
+        stoich = np.zeros((query.cursor.count()))
+        disorder = np.zeros((query.cursor.count()))
         info = []
         one_minus_x_elem = ''
-        for ind, doc in enumerate(self.cursor):
+        for ind, doc in enumerate(query.cursor):
             atoms_per_fu = doc['stoichiometry'][0][1] + doc['stoichiometry'][1][1]  
             # this is probably better done by spatula; then can plot hull for given chem pot
             formation[ind] = doc['enthalpy_per_atom']
@@ -117,69 +122,69 @@ def binary_hull(self, dis=False):
         ax.set_ylabel('formation enthalpy per atom (eV)')
         plt.show()
         return points, disorder, hull, fig
-
-    def disorder_hull(self, doc):
-        """ Broaden points on phase diagram by 
-        a measure of local stoichiometry.
-        """
-        num_atoms = doc['num_atoms']
-        lat_cart  = doc['lattice_cart']
-        disps = np.zeros((num_atoms, num_atoms-1))
-        atoms = np.empty((num_atoms, num_atoms-1), dtype=str)
-        for i in range(num_atoms):
-            jindex = 0
-            for j in range(num_atoms):
-                temp_disp = np.zeros((3))
-                real_disp = np.zeros((3))
-                if i != j:
-                    atoms[i, jindex] = doc['atom_types'][j]
-                    for k in range(3):
-                        temp_disp[k] = (doc['positions_frac'][j][k] - doc['positions_frac'][i][k])
-                        if temp_disp[k] > 0.5:
-                            temp_disp[k] -= 1
-                        elif temp_disp[k] < -0.5:
-                            temp_disp[k] += 1
-                    for k in range(3):
-                        for q in range(3):
-                            real_disp[q] += temp_disp[k]*lat_cart[k][q]
-                    for k in range(3):
-                        disps[i,jindex] += real_disp[k]**2
-                    jindex += 1
-        disps = np.sqrt(disps)
+    
+def disorder_hull(doc):
+    """ Broaden points on phase diagram by 
+    a measure of local stoichiometry.
+    """
+    num_atoms = doc['num_atoms']
+    lat_cart  = doc['lattice_cart']
+    disps = np.zeros((num_atoms, num_atoms-1))
+    atoms = np.empty((num_atoms, num_atoms-1), dtype=str)
+    for i in range(num_atoms):
+        jindex = 0
+        for j in range(num_atoms):
+            temp_disp = np.zeros((3))
+            real_disp = np.zeros((3))
+            if i != j:
+                atoms[i, jindex] = doc['atom_types'][j]
+                for k in range(3):
+                    temp_disp[k] = (doc['positions_frac'][j][k] - doc['positions_frac'][i][k])
+                    if temp_disp[k] > 0.5:
+                        temp_disp[k] -= 1
+                    elif temp_disp[k] < -0.5:
+                        temp_disp[k] += 1
+                for k in range(3):
+                    for q in range(3):
+                        real_disp[q] += temp_disp[k]*lat_cart[k][q]
+                for k in range(3):
+                    disps[i,jindex] += real_disp[k]**2
+                jindex += 1
+    disps = np.sqrt(disps)
+    
+    def warren_cowley(atoms, disps):
+        nn_atoms = []
+        for i in range(len(atoms)):
+            nn_atoms.append(atoms[i][np.where(disps[i] < 3)])
+        count = np.zeros((2), dtype=float)
+        for i in range(len(nn_atoms)):
+            same_elem = doc['atom_types'][i][0]
+            for j in range(len(nn_atoms[i])):
+                if nn_atoms[i][j] == same_elem:
+                    count[0] += 1.0
+                    count[1] += 1.0
+                else:
+                    count[0] -= 1.0
+                    count[1] += 1.0
+        return count[0] / (4*(count[1]))
+    
+    def bond_disorder(atoms, disps):
+        nn_atoms = []
+        for i in range(len(atoms)):
+            nn_atoms.append(atoms[i][np.where(disps[i] < 3)])
+        count = np.zeros((2), dtype=float)
+        for i in range(len(nn_atoms)):
+            same_elem = doc['atom_types'][i][0]
+            for j in range(len(nn_atoms[i])):
+                if nn_atoms[i][j] == same_elem:
+                    count[0] += 1.0
+                else:
+                    count[1] += 1.0
         
-        def warren_cowley(atoms, disps):
-            nn_atoms = []
-            for i in range(len(atoms)):
-                nn_atoms.append(atoms[i][np.where(disps[i] < 3)])
-            count = np.zeros((2), dtype=float)
-            for i in range(len(nn_atoms)):
-                same_elem = doc['atom_types'][i][0]
-                for j in range(len(nn_atoms[i])):
-                    if nn_atoms[i][j] == same_elem:
-                        count[0] += 1.0
-                        count[1] += 1.0
-                    else:
-                        count[0] -= 1.0
-                        count[1] += 1.0
-            return count[0] / (4*(count[1]))
-        
-        def bond_disorder(atoms, disps):
-            nn_atoms = []
-            for i in range(len(atoms)):
-                nn_atoms.append(atoms[i][np.where(disps[i] < 3)])
-            count = np.zeros((2), dtype=float)
-            for i in range(len(nn_atoms)):
-                same_elem = doc['atom_types'][i][0]
-                for j in range(len(nn_atoms[i])):
-                    if nn_atoms[i][j] == same_elem:
-                        count[0] += 1.0
-                    else:
-                        count[1] += 1.0
-            
-            return count[0] / (4*(count[1]+count[0]))
-        
-        warren = False
-        if warren:
-            return warren_cowley(atoms, disps), warren
-        else:
-            return bond_disorder(atoms, disps), warren
+        return count[0] / (4*(count[1]+count[0]))
+    
+    warren = False
+    if warren:
+        return warren_cowley(atoms, disps), warren
+    else:
+        return bond_disorder(atoms, disps), warren
