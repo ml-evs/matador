@@ -184,12 +184,15 @@ class Spatula:
                             input_dict['source'] = param_dict['source'] + dir_dict['source']
                 # create res dicts and combine them with input_dict
                 for ind, file in enumerate(file_lists[root]['res']):
-                    res_dict, success = res2dict(root + '/' + file)
+                    if root + '/' + file.replace('.res', '.castep') in file_lists[root]['castep']:
+                        struct_dict, success = castep2dict(root + '/' + file, debug=self.debug)
+                    else:
+                        struct_dict, success = res2dict(root + '/' + file)
                     if not success:
-                        self.logfile.write(res_dict)
+                        self.logfile.write(struct_dict)
                     else:
                         final_struct = input_dict.copy()
-                        final_struct.update(res_dict)
+                        final_struct.update(struct_dict)
                         # calculate kpoint spacing if not found
                         recip_abc = 3*[0]
                         for j in range(3):
@@ -202,7 +205,7 @@ class Spatula:
                                         max_spacing = spacing if spacing > max_spacing else max_spacing
                                         final_struct['kpoints_mp_spacing'] = round(max_spacing + 0.5*10**(round(log10(max_spacing)-1)), 2)
                         try:
-                            final_struct['source'] = res_dict['source'] + input_dict['source']
+                            final_struct['source'] = struct_dict['source'] + input_dict['source']
                         except:
                             pass
                         if not self.dryrun:
@@ -263,8 +266,6 @@ class Spatula:
         print(prefix, CellCount, '\t\t.cell files')
         print(prefix, ParamCount, '\t\t.param files\n')
         return file_lists
-
-    ######################## FILE SCRAPER FUNCTIONS ########################
 
 def res2dict(seed, **kwargs):
     """ Extract available information from .res file; preferably
