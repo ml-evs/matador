@@ -33,10 +33,10 @@ class Spatula:
         # I/O files 
         self.logfile = open('spatula.log', 'w')
         try:
-            wordfile = open('/home/matthew/src/crysdb-bacon/src/new_words', 'r')
-            nounfile = open('/home/matthew/src/crysdb-bacon/src/nouns', 'r')
-            # wordfile = open('/u/fs1/me388/crysdb-bacon/src/new_words', 'r')
-            # nounfile = open('/u/fs1/me388/crysdb-bacon/src/nouns', 'r')
+            # wordfile = open('/home/matthew/src/crysdb-bacon/src/new_words', 'r')
+            # nounfile = open('/home/matthew/src/crysdb-bacon/src/nouns', 'r')
+            wordfile = open('/u/fs1/me388/crysdb-bacon/src/new_words', 'r')
+            nounfile = open('/u/fs1/me388/crysdb-bacon/src/nouns', 'r')
         except Exception as oopsy:
             exit(oopsy)
         self.wlines = wordfile.readlines()
@@ -184,8 +184,8 @@ class Spatula:
                             input_dict['source'] = param_dict['source'] + dir_dict['source']
                 # create res dicts and combine them with input_dict
                 for ind, file in enumerate(file_lists[root]['res']):
-                    if root + '/' + file.replace('.res', '.castep') in file_lists[root]['castep']:
-                        struct_dict, success = castep2dict(root + '/' + file, debug=self.debug)
+                    if file.replace('.res', '.castep') in file_lists[root]['castep']:
+                        struct_dict, success = castep2dict(root + '/' + file.replace('.res', '.castep'), debug=self.debug)
                     else:
                         struct_dict, success = res2dict(root + '/' + file)
                     if not success:
