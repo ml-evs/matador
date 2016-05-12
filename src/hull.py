@@ -39,26 +39,30 @@ class FryanConvexHull():
             mu_cursor = query.query_composition()
             if mu_cursor.count() > 0:
                 for doc in mu_cursor:
-                    # temporary fix to pspot from dir issue
-                    if type(doc['species_pot']) != dict or elem not in doc['species_pot'] or not '.usp' in doc['species_pot'][elem]:
-                        continue
-                    else:
-                        print('\n', doc['species_pot'][elem], 'vs', query.cursor[0]['species_pot'][elem], end='')
-                        if doc['species_pot'][elem] == query.cursor[0]['species_pot'][elem]:
-                            print(' ✓')
-                            print('\n\t', doc['external_pressure'][0][0], 'GPa vs', query.cursor[0]['external_pressure'][0][0], 'GPa', end='')
-                            if doc['external_pressure'][0] == query.cursor[0]['external_pressure'][0]:
+                    try:
+                        # temporary fix to pspot from dir issue
+                        if type(doc['species_pot']) != dict or elem not in doc['species_pot'] or not '.usp' in doc['species_pot'][elem]:
+                            continue
+                        else:
+                            print('\n', doc['species_pot'][elem], 'vs', query.cursor[0]['species_pot'][elem], end='')
+                            if doc['species_pot'][elem] == query.cursor[0]['species_pot'][elem]:
                                 print(' ✓')
-                                print('\n\t\t', doc['xc_functional'], 'vs', query.cursor[0]['xc_functional'], end='')
-                                if doc['xc_functional'] == query.cursor[0]['xc_functional']:
+                                print('\n\t', doc['external_pressure'][0][0], 'GPa vs', query.cursor[0]['external_pressure'][0][0], 'GPa', end='')
+                                if doc['external_pressure'][0] == query.cursor[0]['external_pressure'][0]:
                                     print(' ✓')
-                                    print('\n\t\t\t', doc['cut_off_energy'], 'eV vs', query.cursor[0]['cut_off_energy'], 'eV', end='')
-                                    if doc['cut_off_energy'] >= query.cursor[0]['cut_off_energy']:
+                                    print('\n\t\t', doc['xc_functional'], 'vs', query.cursor[0]['xc_functional'], end='')
+                                    if doc['xc_functional'] == query.cursor[0]['xc_functional']:
                                         print(' ✓')
-                                        print(60*'─')
-                                        match[ind] = doc
-                                        print('Match found!')
-                                        break
+                                        print('\n\t\t\t', doc['cut_off_energy'], 'eV vs', query.cursor[0]['cut_off_energy'], 'eV', end='')
+                                        if doc['cut_off_energy'] >= query.cursor[0]['cut_off_energy']:
+                                            print(' ✓')
+                                            print(60*'─')
+                                            match[ind] = doc
+                                            print('Match found!')
+                                            break
+                    except Exception as oops:
+                        print(oops)
+                        continue
                 if match[ind] != None:
                     mu[ind] = float(match[ind]['enthalpy_per_atom'])
                     print('Using', ''.join([match[ind]['text_id'][0], ' ', match[ind]['text_id'][1]]), 'as chem pot for', elem)
