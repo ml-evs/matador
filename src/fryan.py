@@ -52,6 +52,7 @@ class DBQuery:
         else:
             self.top = self.args.get('top') if self.args.get('top') != None else 10
         self.tags = self.args.get('tags')
+        self.user = str(self.args.get('user')[0])
         self.cell = self.args.get('cell')
         self.res = self.args.get('res')
         self.hull = self.args.get('hull')
@@ -85,6 +86,8 @@ class DBQuery:
             cursor = self.query_composition()
         elif self.args.get('tags') != None:
             cursor = self.query_tags()
+        elif self.args.get('user') != None:
+            cursor = self.query_user()
         elif self.args.get('id') == None and not self.args.get('dbstats'):
             cursor = self.repo.find().sort('enthalpy_per_atom', pm.ASCENDING)
         else:
@@ -685,6 +688,16 @@ class DBQuery:
         cursor.sort('enthalpy_per_atom', pm.ASCENDING)
         return cursor
 
+    def query_user(self):
+        """ Find all structures matching given tags. """
+        cursor = self.repo.find({'user' : self.user})
+        if cursor.count() < 1:
+            print('No structures found with user', self.user)
+            return EmptyCursor()
+        else:
+            cursor.sort('enthalpy_per_atom', pm.ASCENDING)
+            return cursor
+
     def dbstats(self):
         """ Print some useful stats about the database. """ 
         db_stats_dict = self.db.command('collstats', self.repo.name)
@@ -786,6 +799,8 @@ if __name__ == '__main__':
             ' include any structure containing Li, not just pure Li.'))
     parser.add_argument('--dbstats', action='store_true',
             help=('print some stats about the database that is being queried'))
+    parser.add_argument('--user', nargs=1, type=str,
+            help=('search for a CRSid (or other user tag) to find a particular user\'s structures'))
     parser.add_argument('--tags', nargs='+', type=str,
             help=('search for up to 3 manual tags at once'))
     parser.add_argument('--hull', action='store_true',
@@ -808,5 +823,6 @@ if __name__ == '__main__':
     query = DBQuery(stoichiometry=args.formula, composition=args.composition,
                     summary=args.summary, id=args.id, top=args.top, details=args.details,
                     pressure=args.pressure, source=args.source, calc_match=args.calc_match,
-                    partial_formula=args.partial_formula, dbstats=args.dbstats, scratch=args.scratch, tags=args.tags,
-                    hull=args.hull, dis=args.dis, res=args.res, cell=args.cell, main=True, sysargs=argv[1:])
+                    partial_formula=args.partial_formula, dbstats=args.dbstats, scratch=args.scratch, 
+                    tags=args.tags, user=args.user, hull=args.hull, dis=args.dis, res=args.res,
+                    cell=args.cell, main=True, sysargs=argv[1:])
