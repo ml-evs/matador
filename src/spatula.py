@@ -2,7 +2,8 @@
 # coding: utf-8
 from __future__ import print_function
 from collections import defaultdict
-from os import walk, getcwd, stat, uname
+from os import walk, getcwd, stat, uname, chdir
+from os.path import realpath, dirname
 from pwd import getpwuid
 from time import strptime
 from sys import argv
@@ -10,7 +11,9 @@ from fractions import gcd
 from math import pi, log10
 import gzip
 import argparse
+import subprocess
 import pymongo as pm
+import datetime
 import random
 import json
 
@@ -33,10 +36,10 @@ class Spatula:
         # I/O files 
         self.logfile = open('spatula.log', 'w')
         try:
-            # wordfile = open('/home/matthew/src/crysdb-bacon/src/new_words', 'r')
-            # nounfile = open('/home/matthew/src/crysdb-bacon/src/nouns', 'r')
-            wordfile = open('/u/fs1/me388/crysdb-bacon/src/new_words', 'r')
-            nounfile = open('/u/fs1/me388/crysdb-bacon/src/nouns', 'r')
+            wordfile = open('/home/matthew/src/crysdb-bacon/src/new_words', 'r')
+            nounfile = open('/home/matthew/src/crysdb-bacon/src/nouns', 'r')
+            # wordfile = open('/u/fs1/me388/crysdb-bacon/src/new_words', 'r')
+            # nounfile = open('/u/fs1/me388/crysdb-bacon/src/nouns', 'r')
         except Exception as oopsy:
             exit(oopsy)
         self.wlines = wordfile.readlines()
@@ -63,6 +66,12 @@ class Spatula:
                 self.repo = self.db.scratch
             else:
                 self.repo = self.db.repo
+            # either drop and recreate or create spatula report collection
+            try:
+                self.db.spatula.drop()
+            except:
+                pass
+            self.report = self.db.spatula
         # scan directory on init
         self.file_lists = self.scan_dir()
         # convert to dict and db if required
@@ -91,6 +100,22 @@ class Spatula:
         elif errors > 1:
             print('There are', errors, 'errors to view in spatala.log')
         self.logfile.close()
+        # construct dictionary in spatula_report collection to hold info
+        report_dict = dict()
+        report_dict['last_modified'] = datetime.datetime.utcnow().replace(microsecond=0)
+        report_dict['num_success'] = self.import_count
+        report_dict['num_errors'] = errors
+        try:
+            cwd = getcwd()
+            chdir(dirname(realpath(__file__)))
+            report_dict['version'] = subprocess.check_output(["git", "describe", "--tags"]).strip()
+            report_dict['git_hash'] = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"]).strip()
+            chdir(cwd)
+        except:
+            print('Failed to get CVS info.')
+            report_dict['version'] = 'unknown'
+            report_dict['git_hash'] = 'unknown'
+        report_id = self.report.insert_one(report_dict)
 
     def dict2db(self, struct):
         """ Insert completed Python dictionary into chosen
