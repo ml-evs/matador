@@ -43,6 +43,9 @@ class DBQuery:
             self.repo = self.client.crystals.scratch
         else:
             self.repo = self.client.crystals.repo
+        # print last spatula report
+        self.report = self.client.crystals.spatula
+        self.print_report()
         self.details = self.args.get('details')
         self.source = self.args.get('source')
         self.partial = self.args.get('partial_formula')
@@ -52,7 +55,8 @@ class DBQuery:
         else:
             self.top = self.args.get('top') if self.args.get('top') != None else 10
         self.tags = self.args.get('tags')
-        self.user = str(self.args.get('user')[0])
+        if self.args.get('user') != None:
+            self.user = str(self.args.get('user')[0])
         self.cell = self.args.get('cell')
         self.res = self.args.get('res')
         self.hull = self.args.get('hull')
@@ -101,7 +105,6 @@ class DBQuery:
         """ QUERY POST-PROCESSING """
         # try to generate convex hull
         if self.hull:
-            print('Attempting to generate convex hull...')
             FryanConvexHull(self)
         # write query to res or cell with param files
         if self.cell or self.res:
@@ -697,6 +700,13 @@ class DBQuery:
         else:
             cursor.sort('enthalpy_per_atom', pm.ASCENDING)
             return cursor
+
+    def print_report(self):
+        """ Print spatula report on current database. """
+        report = self.report.find_one()
+        print('Database last modified on', report['last_modified'], 'with spatula', report['version'], 
+              'changeset (' + report['git_hash'] + ').')
+        print(report['num_success'], 'structures were imported succesfully, with', report['num_errors'], 'errors.')
 
     def dbstats(self):
         """ Print some useful stats about the database. """ 
