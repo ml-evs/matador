@@ -605,7 +605,7 @@ def castep2dict(seed, **kwargs):
                     if 'Pseudopotential Report' in flines[line_no+i]:
                         i += 2
                         elem = flines[line_no+i].split(':')[1].split()[0]
-                    elif 'Partial core correction' in flines[line_no+i]:
+                    elif 'core correction' in flines[line_no+i]:
                         i += 2
                         castep['species_pot'][elem] = flines[line_no+i].split('"')[1]
                     i += 1
