@@ -115,7 +115,8 @@ class Spatula:
             print('Failed to get CVS info.')
             report_dict['version'] = 'unknown'
             report_dict['git_hash'] = 'unknown'
-        report_id = self.report.insert_one(report_dict)
+        if not self.dryrun:
+            report_id = self.report.insert_one(report_dict) 
 
     def dict2db(self, struct):
         """ Insert completed Python dictionary into chosen
