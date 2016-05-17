@@ -114,6 +114,7 @@ class DBQuery:
                 else:
                     self.query2files(self.cursor, self.res, self.cell)
         # if called as script, always print results
+        print(cursor.count(), 'results found for query.')
         if self.args.get('main'):
             if cursor.count() >= 1:
                 if cursor.count() > self.top:
@@ -709,8 +710,7 @@ class DBQuery:
         report = self.report.find_one()
         print('Database last modified on', report['last_modified'], 'with spatula', report['version'], 
               'changeset (' + report['git_hash'] + ').')
-        print(report['num_success'], 'structures were imported succesfully, with', report['num_errors'], 'errors.')
-
+    
     def dbstats(self):
         """ Print some useful stats about the database. """ 
         db_stats_dict = self.db.command('collstats', self.repo.name)

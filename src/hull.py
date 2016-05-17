@@ -120,7 +120,7 @@ class FryanConvexHull():
         if not dis:
             datacursor(formatter='{label}'.format, draggable=False)
         ax.plot(points[hull.vertices[:-1], 0], points[hull.vertices[:-1], 1], 'k--', lw=1, alpha=0.6, zorder=1)
-        ax.set_ylim(-0.01, 0.05)
+        ax.set_ylim(np.min(points[:,1]), 0.2)
         ax.set_title('$\mathrm{'+str(x_elem)+'_x'+str(one_minus_x_elem)+'_{1-x}}$')
         ax.set_xlabel('$x$')
         ax.set_ylabel('formation enthalpy per atom (eV)')
