@@ -316,8 +316,11 @@ class DBQuery:
                 f.write('\n')
                 f.write('LATT -1\n')
                 f.write('SFAC \t')
-                for elem in doc['stoichiometry']:
-                    f.write(' ' + str(elem[0]))
+                written_atoms = []
+                for elem in doc['atom_types']:
+                    if elem not in written_atoms:
+                        f.write(' ' + str(elem))
+                        written_atoms.append(str(elem))
                 f.write('\n')
                 atom_labels = []
                 i = 0
