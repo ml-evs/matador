@@ -9,13 +9,13 @@ from time import strptime
 from sys import argv
 from fractions import gcd
 from math import pi, log10
+import pymongo as pm
+import bson.json_util as json
 import gzip
 import argparse
 import subprocess
-import pymongo as pm
 import datetime
 import random
-import json
 
 class Spatula:
     """ The Spatula class implements methods to scrape folders 
@@ -590,7 +590,7 @@ def castep2dict(seed, **kwargs):
                 castep['external_pressure'].append(map(float, flines[line_no+1].split()))
                 castep['external_pressure'].append(map(float, flines[line_no+2].split()))
                 castep['external_pressure'].append(map(float, flines[line_no+3].split())) 
-            elif 'spin_polarized' not in castep and 'Treating system as spin-polarized' in line:
+            elif 'spin_polarized' not in castep and 'treating system as spin-polarized' in line:
                 castep['spin_polarized'] = True
             elif 'atom types' not in castep and 'Cell Contents' in line: 
                 castep['atom_types'] = list() 
@@ -754,10 +754,51 @@ def castep2dict(seed, **kwargs):
                         castep['max_force_on_atom'] = pow(max_force, 0.5)
                     elif 'Stress Tensor' in line:
                         i = 1
-                        while True and i < 20:
-                            if 'Pressure' in flines[line_no+i]:
+                        while i < 20:
+                            if 'Cartesian components' in flines[line_no+i]:
+                                castep['stress'] = []
+                                for j in range(3):
+                                    castep['stress'].append((map(float, (flines[line_no+i+j+4].split()[2:5]))))
+                            elif 'Pressure' in flines[line_no+i]:
                                 castep['pressure'] = float(flines[line_no+i].split()[-2])
+                                break
                             i += 1
+                    elif 'Atomic Populations (Mulliken)' in line:
+                        castep['mulliken_charges'] = []
+                        castep['mulliken_spins'] = []
+                        castep['mulliken_net_spin'] = 0.0
+                        castep['mulliken_abs_spin'] = 0.0
+                        i = 0
+                        while i < len(castep['atom_types']):
+                            if castep['spin_polarized'] != True:
+                                castep['mulliken_charges'].append(float(flines[line_no+i+4].split()[-1]))
+                            else:
+                                castep['mulliken_charges'].append(float(flines[line_no+i+4].split()[-2]))
+                                castep['mulliken_spins'].append(float(flines[line_no+i+4].split()[-1]))
+                                castep['mulliken_net_spin'] += castep['mulliken_spins'][-1]
+                                castep['mulliken_abs_spin'] += abs(castep['mulliken_spins'][-1])
+                            i += 1
+                    elif 'Bond' and 'Population' in line.split():
+                        castep['bonds'] = []
+                        i = 2
+                        while True:
+                            split = flines[line_no+i].split()
+                            split[1] = int(split[1])-1
+                            split[4] = int(split[4])-1
+                            # convert element-wise atom labels to 
+                            # appropriate index of atom_types
+                            for q in range(len(castep['atom_types'])):
+                                if castep['atom_types'][q] == split[0]:
+                                    split[1] += q
+                                    break
+                            for q in range(len(castep['atom_types'])):
+                                if castep['atom_types'][q] == split[3]:
+                                    split[4] += q
+                                    break
+                            castep['bonds'].append([[split[1], split[4]], float(split[5]), float(split[6])])
+                            i += 1 
+                            if '===' in flines[line_no+i]:
+                                break
                     elif 'Final Enthalpy' in line:
                         castep['enthalpy'] = float(line.split('=')[-1].split()[0])
                         castep['enthalpy_per_atom'] = float(line.split('=')[-1].split()[0])/castep['num_atoms']
@@ -798,7 +839,7 @@ def castep2dict(seed, **kwargs):
             print('Error in .castep file', seed, 'skipping...')
         return seed+ '\t\t' + str(oopsy)+'\n', False
     if kwargs.get('debug'):
-        print(json.dumps(castep,indent=2))
+        print(json.dumps(castep,indent=2, ensure_ascii=False))
     return castep, True
 
 
