@@ -13,8 +13,8 @@ from sys import argv
 from os import makedirs, system, uname
 from os.path import exists, isfile, expanduser
 from copy import deepcopy
+from bson.son import SON
 import bson.json_util as json
-import bson
 import re
 
 class DBQuery:
@@ -546,8 +546,7 @@ class DBQuery:
             size_dict['stoichiometry'] = dict()
             size_dict['stoichiometry']['$size'] = len(elements)
             query_dict['$and'].append(size_dict)
-        query_son = bson.son.SON(query_dict)
-        cursor = self.repo.find(query_son)
+        cursor = self.repo.find(SON(query_dict))
         cursor.sort('enthalpy_per_atom', pm.ASCENDING)
         return cursor
     
@@ -566,15 +565,11 @@ class DBQuery:
             if numeracy == False:
                 for elem in elements:
                     if bool(re.search(r'\d', elem)):
-                        raise RuntimeError('Composition string must be a list of elements of a single number.')
-        except Exception as oops:
-            print(oops)
-            return EmptyCursor()
-        try:
-            if numeracy:
+                        raise RuntimeError('Composition string must be a list of elements or a single number.')
+            elif numeracy:
                 if self.partial:
                     raise RuntimeError('Number of elements not compatible with partial formula.')
-        except Exception as oopsy:
+        except Exception as oops:
             print(oops)
             return EmptyCursor()
         query_dict = dict()
@@ -588,10 +583,13 @@ class DBQuery:
         if not self.partial:
             size_dict = dict()
             size_dict['stoichiometry'] = dict()
-            size_dict['stoichiometry']['$size'] = len(elements)
+            if numeracy:
+                num = int(elements[0])
+            else:
+                num = len(elements)
+            size_dict['stoichiometry']['$size'] = num
             query_dict['$and'].append(size_dict)
-        query_son = bson.son.SON(query_dict)
-        cursor = self.repo.find(query_son)
+        cursor = self.repo.find(SON(query_dict))
         cursor.sort('enthalpy_per_atom', pm.ASCENDING)
         return cursor
 
