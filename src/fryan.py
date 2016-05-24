@@ -39,7 +39,6 @@ class DBQuery:
             remote = None
         self.client = pm.MongoClient(remote)
         self.db = self.client.crystals
-        self.scratch = self.args.get('scratch')
         if self.args.get('scratch'):
             self.repo = self.client.crystals.scratch
         else:
@@ -47,22 +46,10 @@ class DBQuery:
         # print last spatula report
         self.report = self.client.crystals.spatula
         self.print_report()
-        self.details = self.args.get('details')
-        self.source = self.args.get('source')
-        self.partial = self.args.get('partial_formula')
-        self.summary = self.args.get('summary')
-        if self.summary:
+        if self.args.get('summary'):
             self.top = self.db.command('collstats', self.repo.name)['count']
         else:
             self.top = self.args.get('top') if self.args.get('top') != None else 10
-        self.tags = self.args.get('tags')
-        if self.args.get('user') != None:
-            self.user = str(self.args.get('user')[0])
-        self.cell = self.args.get('cell')
-        self.write_pressure = self.args.get('write_pressure')
-        self.res = self.args.get('res')
-        self.hull = self.args.get('hull')
-        self.dis = self.args.get('dis')
         # grab all args as string for file dumps
         if self.args.get('sysargs'):
             self.sysargs = ''
@@ -77,60 +64,60 @@ class DBQuery:
             self.sysargs = self.sysargs.replace('---','-')
             self.sysargs = self.sysargs.replace('--','-')
         """ PERFORM QUERY """
+        self.cursor = EmptyCursor()
+        # initalize query_dict to '$and' all queries
+        self.query_dict = dict()
+        self.query_dict['$and'] = []
         # benchmark enthalpy to display (set by calc_match)
         self.gs_enthalpy = 0.0
         if self.args.get('dbstats'):
             self.dbstats()
-        if self.args.get('pressure') != None:
-            cursor = self.repo.find(
-                    {
-                    'external_pressure': {'$in': [[self.args.get('pressure')]]}
-                    }
-                    )
-            self.repo = self.temp_collection(cursor)
         if self.args.get('id') != None:
-            cursor = self.repo.find({'text_id': self.args.get('id')})
-            if self.args.get('calc_match'):
-                cursor = self.query_calc(cursor)
-                if self.args.get('composition') != None or self.args.get('stoichiometry') != None:
-                    self.repo = self.temp_collection(cursor)
+            self.cursor = self.repo.find({'text_id': self.args.get('id')})
+            if self.cursor.count() < 1:
+                exit('Could not find a match for', self.args.get('id'))
+            # if self.args.get('calc_match'):
+                # cursor = self.query_calc(cursor)
+                # if self.args.get('composition') != None or self.args.get('stoichiometry') != None:
+                    # self.repo = self.temp_collection(cursor)
         if self.args.get('stoichiometry') != None:
-            cursor = self.query_stoichiometry()
-        elif self.args.get('composition') != None:
-            cursor = self.query_composition()
-        elif self.args.get('tags') != None:
-            cursor = self.query_tags()
-        elif self.args.get('user') != None:
-            cursor = self.query_user()
-        elif self.args.get('id') == None and not self.args.get('dbstats'):
-            cursor = self.repo.find().sort('enthalpy_per_atom', pm.ASCENDING)
-        else:
-            try:
-                if cursor.count() <= 0:
-                    cursor = EmptyCursor()
-            except:
-                cursor = EmptyCursor()
+            self.query_dict['$and'].append(self.query_stoichiometry())
+        if self.args.get('pressure') != None:
+            self.query_dict['$and'].append(self.query_pressure())
+        if self.args.get('composition') != None:
+            self.query_dict['$and'].append(self.query_composition())
+        if self.args.get('tags') != None:
+            self.query_dict['$and'].append(self.query_tags())
+        if self.args.get('user') != None:
+            self.query_dict['$and'].append(self.query_user())
+        if (len(self.query_dict['$and']) == 0 and
+            self.args.get('id') == None and
+            not self.args.get('dbstats')):
+            self.cursor = self.repo.find().sort('enthalpy_per_atom', pm.ASCENDING)
         # clone cursor for further use after printing
-        self.cursor = cursor.clone()
+        if self.cursor.count() < 1:
+            self.cursor = self.repo.find(SON(self.query_dict))
+        cursor = self.cursor
+        # self.cursor = cursor.clone()
         """ QUERY POST-PROCESSING """
         # try to generate convex hull
-        if self.hull:
+        if self.args.get('hull'):
             FryanConvexHull(self)
         # write query to res or cell with param files
-        if self.cell or self.res:
-            if cursor.count() >= 1:
+        if self.args.get('cell') or self.args.get('res'):
+            if self.cursor.count() >= 1:
                 if self.args.get('top') != None:
-                    self.query2files(self.cursor[:self.top], self.res, self.cell, top=True, pressure=self.write_pressure)
+                    self.query2files(cursor[:self.top], self.args.get('res'), self.args.get('cell'), top=True, pressure=self.args.get('write_pressure'))
                 else:
-                    self.query2files(self.cursor, self.res, self.cell, pressure=self.write_pressure)
+                    self.query2files(cursor, self.args.get('res'), self.args.get('cell'), pressure=self.args.get('write_pressure'))
         # if called as script, always print results
-        print(cursor.count(), 'results found for query.')
+        print(self.cursor.count(), 'results found for query.')
         if self.args.get('main'):
-            if cursor.count() >= 1:
-                if cursor.count() > self.top:
-                    self.display_results(cursor[:self.top], details=self.details)
+            if self.cursor.count() >= 1:
+                if self.cursor.count() > self.top:
+                    self.display_results(cursor[:self.top], details=self.args.get('details'))
                 else:
-                    self.display_results(cursor, details=self.details)
+                    self.display_results(cursor, details=self.args.get('details'))
 
     def __del__(self):
         """ Clean up any temporary databases on garbage 
@@ -437,7 +424,7 @@ class DBQuery:
             last_formula = formula_substring
             if details:
                 detail_string.append(11 * ' ' + u"├╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌ ")
-                if self.source:
+                if self.args.get('source'):
                     detail_substring.append(11 * ' ' + u"├╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌ ")
                 else:
                     detail_substring.append(11 * ' ' + u"└╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌ ")
@@ -476,7 +463,7 @@ class DBQuery:
                     detail_substring[-1] += doc['user']
                 detail_string[-1] += ' ' + (len(header_string)-len(detail_string[-1])-1)*u"╌"
                 detail_substring[-1] += ' ' + (len(header_string)-len(detail_substring[-1])-1)*u"╌"
-            if self.source:
+            if self.args.get('source'):
                 source_string.append(11*' ' + u"└───────────────┬──")
                 for num, file in enumerate(doc['source']):
                     if num == len(doc['source'])-1:
@@ -490,7 +477,7 @@ class DBQuery:
         print(len(header_string)*'─')
         print(header_string)
         print(len(header_string)*'─')
-        if self.summary:
+        if self.args.get('summary'):
             current_formula = ''
             count = 0
             for ind, string in enumerate(formula_string):
@@ -502,7 +489,7 @@ class DBQuery:
                     if details:
                         print(detail_string[ind])
                         print(detail_substring[ind])
-                    if self.source:
+                    if self.args.get('source'):
                         print(source_string[ind])
                     current_formula = string
         else:
@@ -511,9 +498,9 @@ class DBQuery:
                 if details:
                     print(detail_string[ind])
                     print(detail_substring[ind])
-                if self.source:
+                if self.args.get('source'):
                     print(source_string[ind])
-                if details or self.source:
+                if details or self.args.get('source'):
                     print(len(header_string)*'─')
         
     def query_stoichiometry(self):
@@ -541,14 +528,12 @@ class DBQuery:
             stoich_dict['stoichiometry'] = dict()
             stoich_dict['stoichiometry']['$in'] = [[elem, fraction[ind]]]
             query_dict['$and'].append(stoich_dict)
-        if not self.partial:
+        if not self.args.get('partial_formula'):
             size_dict = dict()
             size_dict['stoichiometry'] = dict()
             size_dict['stoichiometry']['$size'] = len(elements)
             query_dict['$and'].append(size_dict)
-        cursor = self.repo.find(SON(query_dict))
-        cursor.sort('enthalpy_per_atom', pm.ASCENDING)
-        return cursor
+        return query_dict
     
     def query_composition(self):
         """ Query DB for all structures containing 
@@ -567,7 +552,7 @@ class DBQuery:
                     if bool(re.search(r'\d', elem)):
                         raise RuntimeError('Composition string must be a list of elements or a single number.')
             elif numeracy:
-                if self.partial:
+                if self.args.get('partial_formula'):
                     raise RuntimeError('Number of elements not compatible with partial formula.')
         except Exception as oops:
             print(oops)
@@ -580,7 +565,7 @@ class DBQuery:
                 types_dict['atom_types'] = dict()
                 types_dict['atom_types']['$in'] = [elem]
                 query_dict['$and'].append(types_dict)
-        if not self.partial:
+        if not self.args.get('partial_formula'):
             size_dict = dict()
             size_dict['stoichiometry'] = dict()
             if numeracy:
@@ -589,13 +574,56 @@ class DBQuery:
                 num = len(elements)
             size_dict['stoichiometry']['$size'] = num
             query_dict['$and'].append(size_dict)
-        cursor = self.repo.find(SON(query_dict))
-        cursor.sort('enthalpy_per_atom', pm.ASCENDING)
-        return cursor
+        return query_dict
+ 
+    def query_tags(self):
+        """ Find all structures matching given tags. """
+        query_dict = dict()
+        query_dict['$and'] = []
+        for tag in self.args.get('tags'):
+            temp_dict = dict()
+            temp_dict['tags'] = dict()
+            temp_dict['tags']['$in'] = tag
+            query_dict['$and'].append(temp_dict)
+        return query_dict
 
+    def query_user(self):
+        """ Find all structures matching given tags. """
+        query_dict = dict()
+        query_dict['$and'] = []
+        query_dict['$and'].append(dict())
+        query_dict['$and'][-1]['$or'] = []
+        for user in self.args.get('user'):
+            query_dict['$and'][-1]['$or'].append([dict('user', user)])
+        return query_dict
+
+    def query_pressure(self):
+        """ Query pressure, either by an exact match on external_pressure
+        or an approximate match on the pressure on the cell, with tolerance
+        of either 0.05 GPa or 10%.
+        """
+        input_pressure = self.args.get('pressure')
+        print(input_pressure, 'GPa')
+        approx_pressure = [0.9*input_pressure-0.05, 1.1*input_pressure+0.05]
+        query_dict = dict()
+        query_dict['$and'] = []
+        temp_dict = dict()
+        temp_dict['external_pressure'] = dict()
+        temp_dict['external_pressure']['$in'] = [[input_pressure]]
+        query_dict['$and'].append(temp_dict)
+        temp_dict = dict()
+        temp_dict['pressure'] = dict()
+        temp_dict['pressure']['$lt'] = approx_pressure[1]
+        query_dict['$and'].append(temp_dict)
+        temp_dict['pressure'] = dict()
+        temp_dict['pressure']['$gt'] = approx_pressure[0]
+        query_dict['$and'].append(temp_dict)
+        return query_dict
+ 
     def query_calc(self, cursor):
         """ Find all structures with matching
-        accuracy to specified structure. """
+        accuracy to specified structure.
+        """
         doc = cursor[0]
         self.gs_enthalpy = doc['enthalpy_per_atom']
         if cursor.count() != 1:
@@ -610,41 +638,6 @@ class DBQuery:
             cursor_match.sort('enthalpy_per_atom', pm.ASCENDING)
             print(cursor_match.count(), 'structures found with parameters above.')
             return cursor_match
-    
-    def query_tags(self):
-        """ Find all structures matching given tags. """
-        if len(self.tags) == 1:
-            cursor = self.repo.find({'tags' : {'$in' : [self.tags[0]]}
-                                    })
-        elif len(self.tags) == 2:
-            cursor = self.repo.find({ '$and': [
-                                        {'tags' : {'$in' : self.tags[0]}},
-                                        {'tags' : {'$in' : self.tags[1]}}
-                                    ]})
-        elif len(self.tags) == 3:
-            cursor = self.repo.find({ '$and': [
-                                        {'tags' : {'$in' : self.tags[0]}},
-                                        {'tags' : {'$in' : self.tags[1]}},
-                                        {'tags' : {'$in' : self.tags[2]}}
-                                    ]})
-        elif len(self.tags) > 3:
-            print('Too many tags, no structures found.')
-            return EmptyCursor()
-        else:
-            print('No structures found with tags', self.tags)
-            return EmptyCursor()
-        cursor.sort('enthalpy_per_atom', pm.ASCENDING)
-        return cursor
-
-    def query_user(self):
-        """ Find all structures matching given tags. """
-        cursor = self.repo.find({'user' : self.user})
-        if cursor.count() < 1:
-            print('No structures found with user', self.user)
-            return EmptyCursor()
-        else:
-            cursor.sort('enthalpy_per_atom', pm.ASCENDING)
-            return cursor
 
     def print_report(self):
         """ Print spatula report on current database. """
@@ -701,7 +694,7 @@ class DBQuery:
         print('where others', end=': ')
         for small in small_list:
             print(small, end=', ')
-        print('\n')
+        print('\n') 
 
     def temp_collection(self, cursor):
         """ Create temporary collection
@@ -730,16 +723,16 @@ class EmptyCursor:
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Query MongoDB structure database.',
             epilog='Written by Matthew Evans (2016). Based on the cryan concept by Chris Pickard.')
-    group = parser.add_argument_group()
+    group = parser.add_mutually_exclusive_group()
     group.add_argument('-f', '--formula', nargs='+', type=str,
         help='choose a stoichiometry, e.g. Ge 1 Te 1 Si 3, or GeTeSi3')
     group.add_argument('-c', '--composition', nargs='+', type=str,
         help=('find all structures containing the given elements, e.g. GeTeSi, or find' +
         'the number of structures with n elements, e.g. 1, 2, 3'))
-    parser.add_argument('-s', '--summary', action='store_true',
-            help='show only the ground state for each formula (i.e. phase+stoichiometry)')
     group.add_argument('-i', '--id', type=str, nargs='+',
             help='specify a particular structure by its text_id')
+    parser.add_argument('-s', '--summary', action='store_true',
+            help='show only the ground state for each formula (i.e. phase+stoichiometry)')
     parser.add_argument('-t', '--top', type=int,
             help='number of structures to show (DEFAULT: 10)')
     parser.add_argument('-d', '--details', action='store_true',
