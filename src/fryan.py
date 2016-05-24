@@ -9,6 +9,7 @@ import pymongo as pm
 import numpy as np
 import argparse
 import string
+import sys
 from sys import argv
 from os import makedirs, system, uname
 from os.path import exists, isfile, expanduser
@@ -75,11 +76,11 @@ class DBQuery:
         if self.args.get('id') != None:
             self.cursor = self.repo.find({'text_id': self.args.get('id')})
             if self.cursor.count() < 1:
-                exit('Could not find a match for', self.args.get('id'))
-            # if self.args.get('calc_match'):
-                # cursor = self.query_calc(cursor)
-                # if self.args.get('composition') != None or self.args.get('stoichiometry') != None:
-                    # self.repo = self.temp_collection(cursor)
+                exit('Could not find a match.')
+            if self.args.get('calc_match'):
+                # to avoid deep recursion, and since this is always called first
+                # don't append, just set
+                self.query_dict['$and'] = self.query_calc(self.cursor)
         if self.args.get('stoichiometry') != None:
             self.query_dict['$and'].append(self.query_stoichiometry())
         if self.args.get('pressure') != None:
@@ -95,8 +96,8 @@ class DBQuery:
             not self.args.get('dbstats')):
             self.cursor = self.repo.find().sort('enthalpy_per_atom', pm.ASCENDING)
         # clone cursor for further use after printing
-        if self.cursor.count() < 1:
-            self.cursor = self.repo.find(SON(self.query_dict))
+        if self.cursor.count() < 1 or self.args.get('calc_match'):
+            self.cursor = self.repo.find(SON(self.query_dict)).sort('enthalpy_per_atom', pm.ASCENDING)
         cursor = self.cursor
         # self.cursor = cursor.clone()
         """ QUERY POST-PROCESSING """
@@ -626,18 +627,25 @@ class DBQuery:
         """
         doc = cursor[0]
         self.gs_enthalpy = doc['enthalpy_per_atom']
-        if cursor.count() != 1:
-            return cursor
-        else:
-            cursor_match = self.repo.find({ '$and': [
-                                        {'xc_functional' : doc['xc_functional']},
-                                        {'cut_off_energy': doc['cut_off_energy']},
-                                        {'external_pressure': doc['external_pressure']},
-                                        {'species_pot': doc['species_pot']}
-                                    ]})
-            cursor_match.sort('enthalpy_per_atom', pm.ASCENDING)
-            print(cursor_match.count(), 'structures found with parameters above.')
-            return cursor_match
+        query_dict = []
+        # query_dict['$and'] = []
+        temp_dict = dict()
+        temp_dict['xc_functional'] = doc['xc_functional']
+        query_dict.append(temp_dict)
+        temp_dict = dict()
+        temp_dict['cut_off_energy'] = doc['cut_off_energy']
+        # temp_dict['cut_off_energy'] = dict()
+        # temp_dict['cut_off_energy']['$gqe'] = doc['cut_off_energy']
+        query_dict.append(temp_dict)
+        # query_dict[-1]['cut_off_energy'] = temp_dict
+        temp_dict = dict()
+        temp_dict['species_pot'] = doc['species_pot']
+        query_dict.append(temp_dict)
+        # temp_dict = dict()
+        # temp_dict['$lte'] = doc['kpoints_mp_spacing']
+        # query_dict.append(temp_dict)
+        # query_dict[-1]['kpoints_mp_spacing'] = temp_dict
+        return query_dict
 
     def print_report(self):
         """ Print spatula report on current database. """
@@ -723,7 +731,7 @@ class EmptyCursor:
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Query MongoDB structure database.',
             epilog='Written by Matthew Evans (2016). Based on the cryan concept by Chris Pickard.')
-    group = parser.add_mutually_exclusive_group()
+    group = parser.add_argument_group()
     group.add_argument('-f', '--formula', nargs='+', type=str,
         help='choose a stoichiometry, e.g. Ge 1 Te 1 Si 3, or GeTeSi3')
     group.add_argument('-c', '--composition', nargs='+', type=str,
