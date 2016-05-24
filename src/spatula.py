@@ -36,10 +36,10 @@ class Spatula:
         # I/O files 
         self.logfile = open('spatula.log', 'w')
         try:
-            # wordfile = open('/home/matthew/src/crysdb-bacon/src/new_words', 'r')
-            # nounfile = open('/home/matthew/src/crysdb-bacon/src/nouns', 'r')
-            wordfile = open('/u/fs1/me388/crysdb-bacon/src/new_words', 'r')
-            nounfile = open('/u/fs1/me388/crysdb-bacon/src/nouns', 'r')
+            wordfile = open('/home/matthew/src/crysdb-bacon/src/new_words', 'r')
+            nounfile = open('/home/matthew/src/crysdb-bacon/src/nouns', 'r')
+            # wordfile = open('/u/fs1/me388/crysdb-bacon/src/new_words', 'r')
+            # nounfile = open('/u/fs1/me388/crysdb-bacon/src/nouns', 'r')
         except Exception as oopsy:
             exit(oopsy)
         self.wlines = wordfile.readlines()
@@ -80,14 +80,18 @@ class Spatula:
             print('Successfully imported', self.import_count, 'structures!')
             # index by enthalpy for faster/larger queries
             indexed = False
-            for index in self.repo.list_indexes():
-                if 'enthalpy_per_atom' in index['name']:
-                    print('Index found, rebuilding...')
-                    self.repo.reindex()
-                    indexed = True
-            if indexed == False:
-                print('Building enthalpy index...')
+            count = -1
+            for entry in self.repo.list_indexes():
+                count += 1
+            if count > 0:
+                print('Index found, rebuilding...')
+                self.repo.reindex()
+                indexed = True
+            else:
+                print('Building index...')
                 self.repo.create_index([('enthalpy_per_atom', pm.ASCENDING)])
+                self.repo.create_index([('stoichiometry', pm.ASCENDING)])
+                print('Done!')
         else:
             print('Dryrun complete!')
         self.logfile.close()
