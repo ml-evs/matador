@@ -107,20 +107,28 @@ class FryanConvexHull():
         ax = fig.add_subplot(111)
         for ind in range(len(points)-2):
             ax.scatter(points[ind,0], points[ind,1], s=50, lw=1, alpha=0.6, label=info[ind], zorder=100)
-            if dis and warren:
-                ax.plot([points[ind,0]-disorder[ind], points[ind,0]], [points[ind,1], points[ind,1]],
-                        c='g', alpha=0.5, lw=0.5)
-            if dis and not warren:
-                ax.plot([points[ind,0]-disorder[ind], points[ind,0]+disorder[ind]], [points[ind,1], points[ind,1]],
-                        c='m', alpha=0.5, lw=0.5)
-        for ind in hull.vertices:
-            if points[ind, 1] <= 0.0:
-                ax.scatter(points[ind, 0], points[ind, 1], c='r', marker='*', zorder=1000, s=250, lw=1, alpha=1, label=info[ind])
+            # if dis and warren:
+                # ax.plot([points[ind,0]-disorder[ind], points[ind,0]], [points[ind,1], points[ind,1]],
+                        # c='g', alpha=0.5, lw=0.5)
+            # if dis and not warren:
+                # ax.plot([points[ind,0]-disorder[ind], points[ind,0]+disorder[ind]], [points[ind,1], points[ind,1]],
+                        # c='m', alpha=0.5, lw=0.5)
+        for ind in range(len(hull.vertices)):
+            if points[hull.vertices[ind], 1] <= 0:
+                ax.scatter(points[hull.vertices[ind], 0], points[hull.vertices[ind], 1], 
+                           c='r', marker='*', zorder=1000, s=250, lw=1, alpha=1, label=info[ind])
+        for ind in range(len(hull.vertices)-1):
+            if points[hull.vertices[ind+1], 1] <= 0:
+                ax.plot([points[hull.vertices[ind], 0], points[hull.vertices[ind+1], 0]], 
+                        [points[hull.vertices[ind], 1], points[hull.vertices[ind+1], 1]],
+                        'k--', lw=1, alpha=0.6, zorder=1)
         ax.set_xlim(-0.05, 1.05)
         if not dis:
             datacursor(formatter='{label}'.format, draggable=False)
-        ax.plot(points[hull.vertices[:-1], 0], points[hull.vertices[:-1], 1], 'k--', lw=1, alpha=0.6, zorder=1)
-        ax.set_ylim(np.min(points[:,1]), 0.2)
+        # for i in range(len(hull.vertices)):
+            # if points[hull.vertices[i], 1] <= 0:
+        ax.set_ylim(-0.1 if np.min(points[:,1]) < 0 else np.min(points[:,1])-0.1,
+                    1 if np.max(points[:,1])>1 else np.max(points[:,1])+0.1)
         ax.set_title('$\mathrm{'+str(x_elem)+'_x'+str(one_minus_x_elem)+'_{1-x}}$')
         ax.set_xlabel('$x$')
         ax.set_ylabel('formation enthalpy per atom (eV)')
