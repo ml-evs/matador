@@ -3,13 +3,14 @@
 from __future__ import print_function
 from collections import defaultdict
 from os import walk, getcwd, stat, uname, chdir
-from os.path import realpath, dirname
+from os.path import realpath, dirname, isfile
 from pwd import getpwuid
 from time import strptime
 from sys import argv
 from fractions import gcd
 from math import pi, log10
 import pymongo as pm
+import glob
 import bson.json_util as json
 import gzip
 import argparse
@@ -36,10 +37,8 @@ class Spatula:
         # I/O files 
         self.logfile = open('spatula.log', 'w')
         try:
-            wordfile = open('/home/matthew/src/crysdb-bacon/src/new_words', 'r')
-            nounfile = open('/home/matthew/src/crysdb-bacon/src/nouns', 'r')
-            # wordfile = open('/u/fs1/me388/crysdb-bacon/src/new_words', 'r')
-            # nounfile = open('/u/fs1/me388/crysdb-bacon/src/nouns', 'r')
+            wordfile = open(dirname(realpath(__file__)) + '/new_words', 'r')
+            nounfile = open(dirname(realpath(__file__)) + '/nouns', 'r')
         except Exception as oopsy:
             exit(oopsy)
         self.wlines = wordfile.readlines()
@@ -124,13 +123,34 @@ class Spatula:
 
     def dict2db(self, struct):
         """ Insert completed Python dictionary into chosen
-        database, with generated text_id.
+        database, with generated text_id. Add quality factor
+        for any missing data.
         """
         plain_text_id = [self.wlines[random.randint(0,self.num_words-1)].strip(),
                          self.nlines[random.randint(0,self.num_nouns-1)].strip()]
         struct['text_id'] = plain_text_id
         if 'tags' in self.tag_dict:
             struct['tags'] = self.tag_dict['tags']
+        struct['quality'] = 5
+        # remove a point for a missing space_group
+        if struct['space_group'] == 'xxx':
+            struct['quality'] -= 1
+        if struct['pressure'] == 'xxx':
+            struct['quality'] -= 1
+        # if no pspot info at all, score = 0
+        if 'species_pot' not in struct:
+            struct['quality'] = 0
+        else:
+            for elem in struct['stoichiometry']:
+                # remove all points for a missing pseudo
+                if elem[0] not in struct['species_pot']:
+                    struct['quality'] = 0
+                    break
+                else:
+                    # print(struct['species_pot'])
+                    # remove a point for a generic OTF pspot
+                    if 'OTF' in struct['species_pot'][elem[0]].upper():
+                        struct['quality'] -= 1
         struct_id = self.repo.insert_one(struct).inserted_id
         if self.debug:
             print('Inserted', struct_id)
@@ -140,9 +160,13 @@ class Spatula:
         """ Take all files found by scan and appropriately create dicts
         holding all available data; optionally push to database.
         """
-        print('\n###### RUNNING IMPORTER ######\n')
+        print('\n{:^52}'.format('###### RUNNING IMPORTER ######') + '\n')
         multi = False
-        for root in file_lists:
+        width = 70
+        div = int(len(file_lists)/width)
+        print('['+50*'.'+']', end='\r')
+        for root_ind, root in enumerate(file_lists):
+            print('['+int(root_ind/div)*'x'+(width-int(root_ind/div))*'.'+']', end='\r')
             if root=='.':
                 root_str = getcwd().split('/')[-1]
             else:
@@ -161,7 +185,7 @@ class Spatula:
                     if not success:
                         self.logfile.write(cell_dict)
                 elif file_lists[root]['param_count'] > 1:
-                    if self.dryrun:
+                    if self.verbosity > 5:
                         print('Multiple param files found!')
                     multi = True
                 if file_lists[root]['cell_count'] == 1:
@@ -171,7 +195,7 @@ class Spatula:
                         self.logfile.write(cell_dict)
                 elif file_lists[root]['cell_count'] > 1:
                     multi = True
-                    if self.dryrun:
+                    if self.verbosity > 5:
                         print('Multiple cell files found - searching for param file with same name...')
                 if multi:
                     for param_name in file_lists[root]['param']:
@@ -251,6 +275,8 @@ class Spatula:
                         if not self.dryrun:
                             final_struct.update(self.tag_dict)
                             self.import_count += self.dict2db(final_struct)
+        # end progress bar
+        print('\n')
         return
      
     def scan_dir(self):
@@ -291,10 +317,10 @@ class Spatula:
                     ParamCount += 1
         print('done!\n')
         prefix = '\t\t'
-        print(prefix, "{:d}".format(ResCount), '\t\t.res files')
-        print(prefix, CastepCount, '\t\t.castep, .history or .history.gz files')
-        print(prefix, CellCount, '\t\t.cell files')
-        print(prefix, ParamCount, '\t\t.param files\n')
+        print(prefix, "{:8d}".format(ResCount), '\t\t.res files')
+        print(prefix, "{:8d}".format(CastepCount), '\t\t.castep, .history or .history.gz files')
+        print(prefix, "{:8d}".format(CellCount), '\t\t.cell files')
+        print(prefix, "{:8d}".format(ParamCount), '\t\t.param files\n')
         return file_lists
 
 def res2dict(seed, **kwargs):
@@ -414,6 +440,34 @@ def cell2dict(seed, **kwargs):
             print(oopsy)
             print('Error in', seed +'.cell, skipping...')
         return seed + '\t\t' + str(oopsy), False
+    try:
+        for species in cell['species_pot']:
+            if 'OTF' in cell['species_pot'][species].upper():
+                pspot_seed = ''
+                for dir in seed.split('/')[:-1]:
+                    pspot_seed += dir + '/' 
+                # glob for all .usp files with format species_*OTF.usp
+                pspot_seed += species + '_*OTF.usp'
+                for globbed in glob.glob(pspot_seed):
+                    if isfile(globbed):
+                        with open(globbed, 'r') as f:    
+                            flines = f.readlines()
+                            for line_no, line in enumerate(flines):
+                                if 'Pseudopotential Report' in line:
+                                    i = 0
+                                    while i+line_no < len(flines)-3:
+                                        if 'Pseudopotential Report' in flines[line_no+i]:
+                                            i += 2
+                                            elem = flines[line_no+i].split(':')[1].split()[0]
+                                        elif 'core correction' in flines[line_no+i]:
+                                            i += 2
+                                            cell['species_pot'][elem] = flines[line_no+i].split('"')[1]
+                                        i += 1
+    except Exception as oopsy:
+        if kwargs.get('verbosity') > 0:
+            print(oopsy)
+            print('Error in', seed +'.cell, skipping...')
+        return seed + '\t\t' + str(oopsy), False
     if kwargs.get('debug'):
         print(json.dumps(cell,indent=2))
     return cell, True
@@ -499,9 +553,9 @@ def dir2dict(seed, **kwargs):
                     dir_dict['spin_polarized'] = True
                 if [task for task in task_list if task in dir.split('-')[offset+5]]:
                     dir_dict['task'] = dir.split('-')[offset+5]
-                else:
+                # else:
                     # this is broken; need to fix for certain cases
-                    dir_dict['species_pot'] = dir.split('-')[offset+5]
+                    # dir_dict['species_pot'] = dir.split('-')[offset+5]
                 info = True 
             elif 'GPa' in dir:
                 try:
@@ -657,27 +711,6 @@ def castep2dict(seed, **kwargs):
             elif 'Final free energy' in line:
                 castep['free_energy'] = float(line.split('=')[1].split()[0])
                 castep['free_energy_per_atom'] = castep['free_energy'] / castep['num_atoms']
-            elif 'Lattice parameters' in line:
-                castep['lattice_abc'] = list()
-                i = 1
-                castep['lattice_abc'].append(map(float, [flines[line_no+i].split('=')[1].strip().split(' ')[0], 
-                                                         flines[line_no+i+1].split('=')[1].strip().split(' ')[0],
-                                                         flines[line_no+i+2].split('=')[1].strip().split(' ')[0]]))
-                castep['lattice_abc'].append(map(float, [flines[line_no+i].split('=')[-1].strip(),
-                                                         flines[line_no+i+1].split('=')[-1].strip(),
-                                                         flines[line_no+i+2].split('=')[-1].strip()]))
-                recip_abc = 3*[0]
-                for j in range(3):
-                    recip_abc[j] = 2 * pi / float(castep['lattice_abc'][0][j])
-                if 'kpoints_mp_grid' in castep:
-                    max_spacing = 0
-                    for j in range(3):
-                        spacing = recip_abc[j]/(2 * pi * castep['kpoints_mp_grid'][j])
-                        max_spacing = spacing if spacing > max_spacing else max_spacing
-                    castep['kpoints_mp_spacing'] = round(max_spacing + 0.5*10**(round(log10(max_spacing)-1)), 2)
-            
-            elif 'Current cell volume' in line:
-                castep['cell_volume'] = float(line.split('=')[1].split()[0].strip())
         # write zero pressure if not found in file
         if 'external_pressure' not in castep:
             castep['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0], [0.0]]
@@ -686,30 +719,36 @@ def castep2dict(seed, **kwargs):
             raise RuntimeError('CASTEP file does not contain GO calculation', castep['task'])
         else:
             final = False
+            finish_line = 0
             castep['optimised'] = False
             for line_no, line in enumerate(flines):
                 if 'Geometry optimization completed successfully' in line:
+                    for line_next in range(line_no+1, len(flines)):
+                        if 'Geometry optimization completed successfully' in flines[line_next]:
+                            finish_line = line_next
                     castep['optimised'] = True
                     final = True
-                if final:
+            if final:
+                final_flines = flines[finish_line+1:]
+                for line_no, line in enumerate(final_flines):
                     if 'Real Lattice' in line:
                         castep['lattice_cart'] = list()
                         i = 1
                         while True:
-                            if len(flines[line_no+i].strip()) == 0:
+                            if len(final_flines[line_no+i].strip()) == 0:
                                 break
                             else:
-                                castep['lattice_cart'].append((map(float, (flines[line_no+i].split()[0:3]))))
+                                castep['lattice_cart'].append((map(float, (final_flines[line_no+i].split()[0:3]))))
                             i += 1
                     elif 'Lattice parameters' in line:
                         castep['lattice_abc'] = list()
                         i = 1
-                        castep['lattice_abc'].append(map(float, [flines[line_no+i].split('=')[1].strip().split(' ')[0], 
-                                                                 flines[line_no+i+1].split('=')[1].strip().split(' ')[0],
-                                                                 flines[line_no+i+2].split('=')[1].strip().split(' ')[0]]))
-                        castep['lattice_abc'].append(map(float, [flines[line_no+i].split('=')[-1].strip(),
-                                                                 flines[line_no+i+1].split('=')[-1].strip(),
-                                                                 flines[line_no+i+2].split('=')[-1].strip()]))
+                        castep['lattice_abc'].append(map(float, [final_flines[line_no+i].split('=')[1].strip().split(' ')[0], 
+                                                                 final_flines[line_no+i+1].split('=')[1].strip().split(' ')[0],
+                                                                 final_flines[line_no+i+2].split('=')[1].strip().split(' ')[0]]))
+                        castep['lattice_abc'].append(map(float, [final_flines[line_no+i].split('=')[-1].strip(),
+                                                                 final_flines[line_no+i+1].split('=')[-1].strip(),
+                                                                 final_flines[line_no+i+2].split('=')[-1].strip()]))
                         recip_abc = 3*[0]
                         for j in range(3):
                             recip_abc[j] = 2 * pi / float(castep['lattice_abc'][0][j])
@@ -719,7 +758,6 @@ def castep2dict(seed, **kwargs):
                                 spacing = recip_abc[j]/(2 * pi * castep['kpoints_mp_grid'][j])
                                 max_spacing = spacing if spacing > max_spacing else max_spacing
                             castep['kpoints_mp_spacing'] = round(max_spacing + 0.5*10**(round(log10(max_spacing)-1)), 2)
-                    
                     elif 'Current cell volume' in line:
                         castep['cell_volume'] = float(line.split('=')[1].split()[0].strip())
                     elif 'Cell Contents' in line :
@@ -728,12 +766,12 @@ def castep2dict(seed, **kwargs):
                         atoms = False
                         while True:
                             if atoms:
-                                if 'xxxxxxxxx' in flines[line_no+i]:
+                                if 'xxxxxxxxx' in final_flines[line_no+i]:
                                     atoms = False
                                     break
                                 else:
-                                    castep['positions_frac'].append((map(float, (flines[line_no+i].split()[3:6]))))
-                            if 'x------' in flines[line_no+i]:
+                                    castep['positions_frac'].append((map(float, (final_flines[line_no+i].split()[3:6]))))
+                            if 'x------' in final_flines[line_no+i]:
                                 atoms = True
                             i += 1
                     elif 'Forces' in line:
@@ -742,16 +780,16 @@ def castep2dict(seed, **kwargs):
                         forces = False
                         while True:
                             if forces:
-                                if '*' in flines[line_no+i].split()[1]:
+                                if '*' in final_flines[line_no+i].split()[1]:
                                     forces = False
                                     break
                                 else:
                                     force_on_atom = 0
                                     for j in range(3):
-                                        force_on_atom += float(flines[line_no+i].replace('(cons\'d)', '').split()[3+j])**2
+                                        force_on_atom += float(final_flines[line_no+i].replace('(cons\'d)', '').split()[3+j])**2
                                     if force_on_atom > max_force:
                                         max_force = force_on_atom
-                            elif 'x' in flines[line_no+i]:
+                            elif 'x' in final_flines[line_no+i]:
                                 i += 1                      # skip next blank line
                                 forces = True
                             i += 1
@@ -759,50 +797,55 @@ def castep2dict(seed, **kwargs):
                     elif 'Stress Tensor' in line:
                         i = 1
                         while i < 20:
-                            if 'Cartesian components' in flines[line_no+i]:
+                            if 'Cartesian components' in final_flines[line_no+i]:
                                 castep['stress'] = []
                                 for j in range(3):
-                                    castep['stress'].append((map(float, (flines[line_no+i+j+4].split()[2:5]))))
-                            elif 'Pressure' in flines[line_no+i]:
-                                castep['pressure'] = float(flines[line_no+i].split()[-2])
+                                    castep['stress'].append((map(float, (final_flines[line_no+i+j+4].split()[2:5]))))
+                            elif 'Pressure' in final_flines[line_no+i]:
+                                castep['pressure'] = float(final_flines[line_no+i].split()[-2])
                                 break
                             i += 1
                     elif 'Atomic Populations (Mulliken)' in line:
+                        if castep['spin_polarized']:
+                            castep['mulliken_spins'] = []
+                            castep['mulliken_net_spin'] = 0.0
+                            castep['mulliken_abs_spin'] = 0.0
                         castep['mulliken_charges'] = []
                         castep['mulliken_spins'] = []
-                        castep['mulliken_net_spin'] = 0.0
-                        castep['mulliken_abs_spin'] = 0.0
                         i = 0
                         while i < len(castep['atom_types']):
-                            if castep['spin_polarized'] != True:
-                                castep['mulliken_charges'].append(float(flines[line_no+i+4].split()[-1]))
-                            else:
-                                castep['mulliken_charges'].append(float(flines[line_no+i+4].split()[-2]))
-                                castep['mulliken_spins'].append(float(flines[line_no+i+4].split()[-1]))
+                            if castep['spin_polarized']:
+                                castep['mulliken_charges'].append(float(final_flines[line_no+i+4].split()[-2]))
+                                castep['mulliken_spins'].append(float(final_flines[line_no+i+4].split()[-1]))
                                 castep['mulliken_net_spin'] += castep['mulliken_spins'][-1]
                                 castep['mulliken_abs_spin'] += abs(castep['mulliken_spins'][-1])
+                            else:
+                                castep['mulliken_charges'].append(float(final_flines[line_no+i+4].split()[-1]))
                             i += 1
                     elif 'Bond' and 'Population' in line.split():
-                        castep['bonds'] = []
-                        i = 2
-                        while True:
-                            split = flines[line_no+i].split()
-                            split[1] = int(split[1])-1
-                            split[4] = int(split[4])-1
-                            # convert element-wise atom labels to 
-                            # appropriate index of atom_types
-                            for q in range(len(castep['atom_types'])):
-                                if castep['atom_types'][q] == split[0]:
-                                    split[1] += q
+                        try:
+                            castep['bonds'] = []
+                            i = 2
+                            while True:
+                                split = final_flines[line_no+i].split()
+                                split[1] = int(split[1])-1
+                                split[4] = int(split[4])-1
+                                # convert element-wise atom labels to 
+                                # appropriate index of atom_types
+                                for q in range(len(castep['atom_types'])):
+                                    if castep['atom_types'][q] == split[0]:
+                                        split[1] += q
+                                        break
+                                for q in range(len(castep['atom_types'])):
+                                    if castep['atom_types'][q] == split[3]:
+                                        split[4] += q
+                                        break
+                                castep['bonds'].append([[split[1], split[4]], float(split[5]), float(split[6])])
+                                i += 1 
+                                if '===' in final_flines[line_no+i]:
                                     break
-                            for q in range(len(castep['atom_types'])):
-                                if castep['atom_types'][q] == split[3]:
-                                    split[4] += q
-                                    break
-                            castep['bonds'].append([[split[1], split[4]], float(split[5]), float(split[6])])
-                            i += 1 
-                            if '===' in flines[line_no+i]:
-                                break
+                        except:
+                            pass
                     elif 'Final Enthalpy' in line:
                         castep['enthalpy'] = float(line.split('=')[-1].split()[0])
                         castep['enthalpy_per_atom'] = float(line.split('=')[-1].split()[0])/castep['num_atoms']
@@ -823,7 +866,7 @@ def castep2dict(seed, **kwargs):
             elif 'Total time' in line:
                 castep['total_time_hrs'] = float(line.split()[-2])/3600
             elif 'Peak Memory Use' in line:
-                castep['peak_mem_MB'] = int(float(line.split()[-2])/1000)
+                castep['peak_mem_MB'] = int(float(line.split()[-2])/1024)
         # check that any optimized results were saved and raise errors if not
         if castep['optimised'] == False:
             raise RuntimeError('CASTEP GO failed to converge.') 
@@ -845,7 +888,6 @@ def castep2dict(seed, **kwargs):
     if kwargs.get('debug'):
         print(json.dumps(castep,indent=2, ensure_ascii=False))
     return castep, True
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Import CASTEP/AIRSS results into MongoDB database.',
