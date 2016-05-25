@@ -3,7 +3,7 @@
 from __future__ import print_function
 # import related crysdb functionality
 from spatula import param2dict
-from hull import FryanConvexHull
+# from hull import FryanConvexHull
 # import external libraries
 import pymongo as pm
 import numpy as np
@@ -103,7 +103,8 @@ class DBQuery:
         """ QUERY POST-PROCESSING """
         # try to generate convex hull
         if self.args.get('hull'):
-            FryanConvexHull(self)
+            print('')
+            # FryanConvexHull(self)
         # write query to res or cell with param files
         if self.args.get('cell') or self.args.get('res'):
             if self.cursor.count() >= 1:
@@ -112,7 +113,7 @@ class DBQuery:
                 else:
                     self.query2files(cursor, self.args.get('res'), self.args.get('cell'), pressure=self.args.get('write_pressure'))
         # if called as script, always print results
-        print(self.cursor.count(), 'results found for query.')
+        # print(self.cursor.count(), 'results found for query.')
         if self.args.get('main'):
             if self.cursor.count() >= 1:
                 if self.cursor.count() > self.top:
@@ -584,7 +585,7 @@ class DBQuery:
         for tag in self.args.get('tags'):
             temp_dict = dict()
             temp_dict['tags'] = dict()
-            temp_dict['tags']['$in'] = tag
+            temp_dict['tags']['$in'] = [tag]
             query_dict['$and'].append(temp_dict)
         return query_dict
 
