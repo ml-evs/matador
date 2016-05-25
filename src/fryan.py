@@ -72,6 +72,7 @@ class DBQuery:
         self.gs_enthalpy = 0.0
         if self.args.get('dbstats'):
             self.dbstats()
+            exit()
         if self.args.get('id') != None:
             self.cursor = self.repo.find({'text_id': self.args.get('id')})
             if self.cursor.count() < 1:
