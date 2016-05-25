@@ -3,7 +3,6 @@
 from __future__ import print_function
 # import related crysdb functionality
 from spatula import param2dict
-# from hull import FryanConvexHull
 # import external libraries
 import pymongo as pm
 import numpy as np
@@ -78,9 +77,13 @@ class DBQuery:
             if self.cursor.count() < 1:
                 exit('Could not find a match.')
             if self.args.get('calc_match'):
+                # save special copy of calc_dict for hulls
+                self.calc_dict = dict()
+                self.calc_dict['$and'] = []
                 # to avoid deep recursion, and since this is always called first
                 # don't append, just set
                 self.query_dict['$and'] = self.query_calc(self.cursor)
+                self.calc_dict['$and'] = list(self.query_dict['$and'])
         if self.args.get('stoichiometry') != None:
             self.query_dict['$and'].append(self.query_stoichiometry())
         if self.args.get('pressure') != None:
@@ -97,14 +100,12 @@ class DBQuery:
             self.cursor = self.repo.find().sort('enthalpy_per_atom', pm.ASCENDING)
         # clone cursor for further use after printing
         if self.cursor.count() < 1 or self.args.get('calc_match'):
+            if self.args.get('details'):
+                print(self.query_dict)
             self.cursor = self.repo.find(SON(self.query_dict)).sort('enthalpy_per_atom', pm.ASCENDING)
-        cursor = self.cursor
+        cursor = self.cursor.clone()
         # self.cursor = cursor.clone()
         """ QUERY POST-PROCESSING """
-        # try to generate convex hull
-        if self.args.get('hull'):
-            print('')
-            # FryanConvexHull(self)
         # write query to res or cell with param files
         if self.args.get('cell') or self.args.get('res'):
             if self.cursor.count() >= 1:
@@ -113,7 +114,7 @@ class DBQuery:
                 else:
                     self.query2files(cursor, self.args.get('res'), self.args.get('cell'), pressure=self.args.get('write_pressure'))
         # if called as script, always print results
-        # print(self.cursor.count(), 'results found for query.')
+        print(self.cursor.count(), 'results found for query.')
         if self.args.get('main'):
             if self.cursor.count() >= 1:
                 if self.cursor.count() > self.top:
@@ -225,7 +226,6 @@ class DBQuery:
                     raise RuntimeError('Failed to open template.')
             except Exception as oops:
                 print(oops)
-        # paramDict.update(seedDict)
         try:
             if isfile(path+'.param'):
                 print('File name already exists, generating hash...')
@@ -537,11 +537,14 @@ class DBQuery:
             query_dict['$and'].append(size_dict)
         return query_dict
     
-    def query_composition(self):
+    def query_composition(self, custom_elem=None):
         """ Query DB for all structures containing 
         all the elements taken as input.
         """
-        elements = self.args.get('composition')
+        if custom_elem == None:
+            elements = self.args.get('composition')
+        else:
+            elements = custom_elem
         # if there's only one string, try split it by caps
         numeracy = False
         if len(elements) == 1:
@@ -637,14 +640,18 @@ class DBQuery:
         temp_dict['cut_off_energy'] = doc['cut_off_energy']
         # temp_dict['cut_off_energy'] = dict()
         # temp_dict['cut_off_energy']['$gqe'] = doc['cut_off_energy']
-        query_dict.append(temp_dict)
         # query_dict[-1]['cut_off_energy'] = temp_dict
+        query_dict.append(temp_dict)
         temp_dict = dict()
         temp_dict['species_pot'] = doc['species_pot']
         query_dict.append(temp_dict)
-        # temp_dict = dict()
-        # temp_dict['$lte'] = doc['kpoints_mp_spacing']
-        # query_dict.append(temp_dict)
+        # for species in doc['species_pot']:
+            # temp_dict = dict()
+            # temp_dict['species_pot'] = dict()
+            # temp_dict['$in'] = doc['species_pot'][species]
+        temp_dict = dict()
+        temp_dict['kpoints_mp_spacing'] = doc['kpoints_mp_spacing']
+        query_dict.append(temp_dict)
         # query_dict[-1]['kpoints_mp_spacing'] = temp_dict
         return query_dict
 
@@ -790,3 +797,7 @@ if __name__ == '__main__':
                     partial_formula=args.partial_formula, dbstats=args.dbstats, scratch=args.scratch, 
                     tags=args.tags, user=args.user, hull=args.hull, dis=args.dis, res=args.res,
                     cell=args.cell, write_pressure=args.write_pressure, main=True, sysargs=argv[1:])
+    # generate hull outside query object
+    if args.hull:
+        from hull import FryanConvexHull
+        FryanConvexHull(query)
