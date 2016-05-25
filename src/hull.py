@@ -9,6 +9,10 @@ from mpldatacursor import datacursor
 from bson.son import SON
 import pymongo as pm
 import matplotlib.pyplot as plt
+try:
+    plt.style.use('bmh')
+except:
+    pass
 import re
 import numpy as np
 
@@ -34,7 +38,7 @@ class FryanConvexHull():
         # try to get decent chemical potentials:
         # this relies on all of the first composition query
         # having the same parameters; need to think about this
-        mu = np.array([0.0, 0.0])
+        mu_enthalpy = np.zeros((2))
         match = [None, None]
         query_dict = []
         for ind, elem in enumerate(elements):
@@ -49,7 +53,7 @@ class FryanConvexHull():
                     match[ind] = doc
                     break
             if match[ind] != None:
-                mu[ind] = float(match[ind]['enthalpy_per_atom'])
+                mu_enthalpy[ind] = float(match[ind]['enthalpy_per_atom'])
                 print('Using', ''.join([match[ind]['text_id'][0], ' ', match[ind]['text_id'][1]]), 'as chem pot for', elem)
                 print(60*'─')
             else:
@@ -83,40 +87,73 @@ class FryanConvexHull():
             info.append("{0:^24}\n{1:5s}\n{2:2f} eV\n{3:^10}\n{4:^24}".format(doc['text_id'][0]+' '+doc['text_id'][1], doc['space_group'], formation[ind], doc['stoichiometry'], doc['source'][0].split('/')[-1]))
             ind += 1 
         stoich = np.append(stoich, [0.0, 1.0])
-        points = np.vstack((stoich, formation)).T
-        hull = ConvexHull(points)
-        fig = plt.figure()
+        structures = np.vstack((stoich, formation)).T
+        hull = ConvexHull(structures)
+        fig = plt.figure(facecolor='w')
         ax = fig.add_subplot(111)
-        for ind in range(len(points)-2):
-            ax.scatter(points[ind,0], points[ind,1], s=50, lw=1, alpha=0.6, label=info[ind], zorder=100)
-            if dis and warren:
-                ax.plot([points[ind,0]-disorder[ind], points[ind,0]], [points[ind,1], points[ind,1]],
-                        c='g', alpha=0.5, lw=0.5)
-            if dis and not warren:
-                ax.plot([points[ind,0]-disorder[ind], points[ind,0]+disorder[ind]], [points[ind,1], points[ind,1]],
-                        c='m', alpha=0.5, lw=0.5)
+        plt.draw()
+        colours = plt.cm.plasma(np.linspace(0, 1, 100))
+        for ind in range(len(structures)-2):
+            ax.scatter(structures[ind,0], structures[ind,1], s=50, lw=1, alpha=1, c=colours[int(100*structures[ind,0])], edgecolor='k', label=info[ind], zorder=100)
+            # if dis and warren:
+                # ax.plot([structures[ind,0]-disorder[ind], structures[ind,0]], [structures[ind,1], structures[ind,1]],
+                        # c='g', alpha=0.5, lw=0.5)
+            # if dis and not warren:
+                # ax.plot([structures[ind,0]-disorder[ind], structures[ind,0]+disorder[ind]], [structures[ind,1], structures[ind,1]],
+                        # c='m', alpha=0.5, lw=0.5)
+        stable_energy = []
+        stable_comp = []
         for ind in range(len(hull.vertices)):
-            if points[hull.vertices[ind], 1] <= 0:
-                ax.scatter(points[hull.vertices[ind], 0], points[hull.vertices[ind], 1], 
-                           c='r', marker='*', zorder=1000, s=250, lw=1, alpha=1, label=info[ind])
+            if structures[hull.vertices[ind], 1] <= 0:
+                stable_energy.append(structures[hull.vertices[ind], 1])
+                stable_comp.append(structures[hull.vertices[ind], 0])
+                ax.scatter(structures[hull.vertices[ind], 0], structures[hull.vertices[ind], 1], 
+                           c='r', marker='*', zorder=1000, edgecolor='k', s=250, lw=1, alpha=1, label=info[ind])
         for ind in range(len(hull.vertices)-1):
-            if points[hull.vertices[ind+1], 1] <= 0 and points[hull.vertices[ind], 1] <= 0:
-                ax.plot([points[hull.vertices[ind], 0], points[hull.vertices[ind+1], 0]], 
-                        [points[hull.vertices[ind], 1], points[hull.vertices[ind+1], 1]],
-                        'k--', lw=1, alpha=0.6, zorder=1)
+            if structures[hull.vertices[ind+1], 1] <= 0 and structures[hull.vertices[ind], 1] <= 0:
+                ax.plot([structures[hull.vertices[ind], 0], structures[hull.vertices[ind+1], 0]], 
+                        [structures[hull.vertices[ind], 1], structures[hull.vertices[ind+1], 1]],
+                        'k--', lw=2, alpha=1, zorder=1)
+        stable_energy =  np.asarray(stable_energy)
+        stable_comp =  np.asarray(stable_comp)
         ax.set_xlim(-0.05, 1.05)
         if not dis:
-            datacursor(formatter='{label}'.format, draggable=False)
-        ax.set_ylim(-0.1 if np.min(points[hull.vertices,1]) > 0 else np.min(points[hull.vertices,1])-0.1,
-                    0.5 if np.max(points[hull.vertices,1]) > 1 else np.max(points[hull.vertices,1])+0.1)
+            datacursor(formatter='{label}'.format, draggable=False, bbox=dict(fc='white'),
+                    arrowprops=dict(arrowstyle='simple', alpha=0.8))
+        ax.set_ylim(-0.1 if np.min(structures[hull.vertices,1]) > 0 else np.min(structures[hull.vertices,1])-0.1,
+                    0.5 if np.max(structures[hull.vertices,1]) > 1 else np.max(structures[hull.vertices,1])+0.1)
         ax.set_title('$\mathrm{'+str(x_elem)+'_x'+str(one_minus_x_elem)+'_{1-x}}$')
         ax.set_xlabel('$x$')
         ax.set_ylabel('formation enthalpy per atom (eV)')
+        if query.args.get('voltage'):
+            print('Generating voltage curve...')
+            print(mu_enthalpy)
+            self.voltage_curve(stable_energy, stable_comp, mu_enthalpy)# info[stable_list])
         plt.show()
-        return points, disorder, hull, fig
+        return structures, disorder, hull, mu, info, fig
     
+    def voltage_curve(self, stable_energy, stable_comp, mu_enthalpy):
+        """ Take convex hull and plot voltage curves. """
+        voltages = np.zeros((len(stable_comp)))
+        for i in range(len(voltages)-1):
+            voltages[i] = stable_energy[i+1] - stable_energy[i]
+            voltages[i] /= stable_comp[i+1] - stable_comp[i]
+            voltages[i] -= mu_enthalpy[1]
+            i += 1
+        voltages[-1] = voltages[-2]
+        fig = plt.figure(facecolor='w')
+        ax  = fig.add_subplot(111)
+        # datacursor(formatter='{label}'.format, draggable=False, bbox=dict(fc='white'),
+            # arrowprops=dict(arrowstyle='simple', alpha=0.8))
+        for i in range(len(voltages)-1):
+            # ax.plot([1-stable_comp[i], 1-stable_comp[i]], [voltages[i], voltages[i]])
+            # ax.plot([1-stable_comp[i], 1-stable_comp[i+1]], [voltages[i], voltages[i+1]])
+            ax.scatter(1-stable_comp[i], voltages[i], s=100)#,# label=info[i])
+            ax.scatter(1-stable_comp[i], voltages[i+1], s=100)#,# label=info[i])
+        plt.show()
+
 def disorder_hull(doc):
-    """ Broaden points on phase diagram by 
+    """ Broaden structures on phase diagram by 
     a measure of local stoichiometry.
     """
     num_atoms = doc['num_atoms']
