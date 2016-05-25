@@ -133,10 +133,10 @@ class Spatula:
             struct['tags'] = self.tag_dict['tags']
         struct['quality'] = 5
         # remove a point for a missing space_group
-        if struct['space_group'] == 'xxx':
-            struct['quality'] -= 1
-        if struct['pressure'] == 'xxx':
-            struct['quality'] -= 1
+        # if struct['space_group'] == 'xxx':
+            # struct['quality'] -= 1
+        # if struct['pressure'] == 'xxx':
+            # struct['quality'] -= 1
         # if no pspot info at all, score = 0
         if 'species_pot' not in struct:
             struct['quality'] = 0

@@ -93,8 +93,10 @@ class DBQuery:
             self.query_dict['$and'].append(self.query_composition())
         if self.args.get('tags') != None:
             self.query_dict['$and'].append(self.query_tags())
-        if self.args.get('user') != None:
-            self.query_dict['$and'].append(self.query_user())
+        if not self.args.get('ignore_warnings'):
+            self.query_dict['$and'].append(self.query_quality())
+        # if self.args.get('user') != None:
+            # self.query_dict['$and'].append(self.query_user())
         if (len(self.query_dict['$and']) == 0 and
             self.args.get('id') == None and
             not self.args.get('dbstats')):
@@ -104,6 +106,23 @@ class DBQuery:
             if self.args.get('details'):
                 print(self.query_dict)
             self.cursor = self.repo.find(SON(self.query_dict)).sort('enthalpy_per_atom', pm.ASCENDING)
+            # building hull from just comp, find best structure to calc_match
+            if self.args.get('hull'):
+                test_cursor = []
+                test_cursor_count = []
+                test_query_dict = []
+                for i in range(10):
+                    id_cursor = self.repo.find({'text_id': self.cursor[i]['text_id']})
+                    self.query_dict['$and'] = self.query_calc(id_cursor)
+                    self.calc_dict = dict()
+                    self.calc_dict['$and'] = list(self.query_dict['$and'])
+                    self.query_dict['$and'].append(self.query_composition())
+                    test_query_dict.append(self.query_dict)
+                    test_cursor.append(self.repo.find(SON(test_query_dict[-1])).sort('enthalpy_per_atom', pm.ASCENDING))
+                    test_cursor_count.append(test_cursor[-1].count())
+                    # print(self.cursor[i]['text_id'])
+                    # print(test_cursor_count[-1])
+                self.cursor = test_cursor[np.argmax(np.asarray(test_cursor_count))]
         cursor = self.cursor.clone()
         # self.cursor = cursor.clone()
         """ QUERY POST-PROCESSING """
@@ -593,15 +612,23 @@ class DBQuery:
             query_dict['$and'].append(temp_dict)
         return query_dict
 
-    def query_user(self):
-        """ Find all structures matching given tags. """
+    def query_quality(self):
+        """ Find all structures with non-zero quality. """
         query_dict = dict()
-        query_dict['$and'] = []
-        query_dict['$and'].append(dict())
-        query_dict['$and'][-1]['$or'] = []
-        for user in self.args.get('user'):
-            query_dict['$and'][-1]['$or'].append([dict('user', user)])
+        query_dict['quality'] = dict()
+        query_dict['quality']['$gt'] = 0
         return query_dict
+
+    """ disabled for time being, not very useful """
+    # def query_user(self):
+        # """ Find all structures matching given tags. """
+        # query_dict = dict()
+        # query_dict['$and'] = []
+        # query_dict['$and'].append(dict())
+        # query_dict['$and'][-1]['$or'] = []
+        # for user in self.args.get('user'):
+            # query_dict['$and'][-1]['$or'].append([dict('user', user)])
+        # return query_dict
 
     def query_pressure(self):
         """ Query pressure, either by an exact match on external_pressure
@@ -633,27 +660,27 @@ class DBQuery:
         doc = cursor[0]
         self.gs_enthalpy = doc['enthalpy_per_atom']
         query_dict = []
-        # query_dict['$and'] = []
         temp_dict = dict()
         temp_dict['xc_functional'] = doc['xc_functional']
         query_dict.append(temp_dict)
-        temp_dict = dict()
-        temp_dict['cut_off_energy'] = doc['cut_off_energy']
-        # temp_dict['cut_off_energy'] = dict()
-        # temp_dict['cut_off_energy']['$gqe'] = doc['cut_off_energy']
-        # query_dict[-1]['cut_off_energy'] = temp_dict
-        query_dict.append(temp_dict)
+        if self.args.get('strict'):
+            temp_dict = dict()
+            temp_dict['kpoints_mp_spacing'] = doc['kpoints_mp_spacing']
+            query_dict.append(temp_dict)
+            query_dict.append(dict())
+            query_dict[-1]['cut_off_energy'] = doc['cut_off_energy']
+        else:
+            temp_dict = dict()
+            query_dict.append(dict())
+            temp_dict['$gte'] = doc['cut_off_energy']
+            query_dict[-1]['cut_off_energy'] = temp_dict
+            temp_dict = dict()
+            query_dict.append(dict())
+            temp_dict['$lte'] = doc['kpoints_mp_spacing']
+            query_dict[-1]['kpoints_mp_spacing'] = temp_dict
         temp_dict = dict()
         temp_dict['species_pot'] = doc['species_pot']
         query_dict.append(temp_dict)
-        # for species in doc['species_pot']:
-            # temp_dict = dict()
-            # temp_dict['species_pot'] = dict()
-            # temp_dict['$in'] = doc['species_pot'][species]
-        temp_dict = dict()
-        temp_dict['kpoints_mp_spacing'] = doc['kpoints_mp_spacing']
-        query_dict.append(temp_dict)
-        # query_dict[-1]['kpoints_mp_spacing'] = temp_dict
         return query_dict
 
     def print_report(self):
@@ -772,6 +799,10 @@ if __name__ == '__main__':
             help=('search for up to 3 manual tags at once'))
     parser.add_argument('--hull', action='store_true',
             help=('create a convex hull for 2 elements (to be extended to 3, 4 soon)'))
+    parser.add_argument('--strict', action='store_true',
+            help=('strictly matches with calc_match, useful for hulls where convergence is rough'))
+    parser.add_argument('--ignore_warnings', action='store_true',
+            help=('includes possibly bad structures'))
     parser.add_argument('--dis', action='store_true',
             help='smear hull with local stoichiometry')
     parser.add_argument('--scratch', action='store_true',
@@ -794,7 +825,8 @@ if __name__ == '__main__':
         exit('--write_pressure requires cell')
     query = DBQuery(stoichiometry=args.formula, composition=args.composition,
                     summary=args.summary, id=args.id, top=args.top, details=args.details,
-                    pressure=args.pressure, source=args.source, calc_match=args.calc_match,
+                    pressure=args.pressure, source=args.source, calc_match=args.calc_match, 
+                    strict=args.strict, ignore_warnings=args.ignore_warnings,
                     partial_formula=args.partial_formula, dbstats=args.dbstats, scratch=args.scratch, 
                     tags=args.tags, user=args.user, hull=args.hull, dis=args.dis, res=args.res,
                     cell=args.cell, write_pressure=args.write_pressure, main=True, sysargs=argv[1:])
