@@ -6,6 +6,8 @@ from __future__ import print_function
 # import external libraries
 from scipy.spatial import ConvexHull
 from mpldatacursor import datacursor
+from bson.son import SON
+import pymongo as pm
 import matplotlib.pyplot as plt
 import re
 import numpy as np
@@ -26,50 +28,30 @@ class FryanConvexHull():
         elements = query.args.get('composition')
         elements = [elem for elem in re.split(r'([A-Z][a-z]*)', elements[0]) if elem]
         if len(elements) != 2:
-            print('Cannot create binary hull for more than 2 elements.')
+            print('Cannot create binary hull for more or less than 2 elements.')
             return
+        cursor = self.query.cursor.clone()
         # try to get decent chemical potentials:
         # this relies on all of the first composition query
         # having the same parameters; need to think about this
         mu = np.array([0.0, 0.0])
         match = [None, None]
+        query_dict = []
         for ind, elem in enumerate(elements):
             print('Scanning for suitable', elem, 'chemical potential...')
-            query.args['composition'] = [elem]
-            mu_cursor = query.query_composition()
-            if mu_cursor.count() > 0:
-                for doc in mu_cursor:
-                    try:
-                        # temporary fix to pspot from dir issue
-                        if type(doc['species_pot']) != dict or elem not in doc['species_pot'] or not '.usp' in doc['species_pot'][elem]:
-                            continue
-                        else:
-                            print('\n', doc['species_pot'][elem], 'vs', query.cursor[0]['species_pot'][elem], end='')
-                            if doc['species_pot'][elem] == query.cursor[0]['species_pot'][elem]:
-                                print(' ✓')
-                                print('\n\t', doc['external_pressure'][0][0], 'GPa vs', query.cursor[0]['external_pressure'][0][0], 'GPa', end='')
-                                if doc['external_pressure'][0] == query.cursor[0]['external_pressure'][0]:
-                                    print(' ✓')
-                                    print('\n\t\t', doc['xc_functional'], 'vs', query.cursor[0]['xc_functional'], end='')
-                                    if doc['xc_functional'] == query.cursor[0]['xc_functional']:
-                                        print(' ✓')
-                                        print('\n\t\t\t', doc['cut_off_energy'], 'eV vs', query.cursor[0]['cut_off_energy'], 'eV', end='')
-                                        if doc['cut_off_energy'] >= query.cursor[0]['cut_off_energy']:
-                                            print(' ✓')
-                                            print(60*'─')
-                                            match[ind] = doc
-                                            print('Match found!')
-                                            break
-                    except Exception as oops:
-                        print(oops)
-                        continue
-                if match[ind] != None:
-                    mu[ind] = float(match[ind]['enthalpy_per_atom'])
-                    print('Using', ''.join([match[ind]['text_id'][0], ' ', match[ind]['text_id'][1]]), 'as chem pot for', elem)
-                    print(60*'─')
-                else:
-                    print('No possible chem pots found for', elem, '.')
-                    return
+            self.query.args['composition'] = [elem]
+            query_dict.append(dict())
+            query_dict[-1]['$and'] = list(self.query.calc_dict['$and'])
+            query_dict[-1]['$and'].append(self.query.query_composition(custom_elem=[elem]))
+            mu_cursor = self.query.repo.find(SON(query_dict[-1])).sort('enthalpy_per_atom', pm.ASCENDING)
+            for doc_ind, doc in enumerate(mu_cursor):
+                if doc_ind == 0:
+                    match[ind] = doc
+                    break
+            if match[ind] != None:
+                mu[ind] = float(match[ind]['enthalpy_per_atom'])
+                print('Using', ''.join([match[ind]['text_id'][0], ' ', match[ind]['text_id'][1]]), 'as chem pot for', elem)
+                print(60*'─')
             else:
                 print('No possible chem pots found for', elem, '.')
                 return
@@ -107,28 +89,26 @@ class FryanConvexHull():
         ax = fig.add_subplot(111)
         for ind in range(len(points)-2):
             ax.scatter(points[ind,0], points[ind,1], s=50, lw=1, alpha=0.6, label=info[ind], zorder=100)
-            # if dis and warren:
-                # ax.plot([points[ind,0]-disorder[ind], points[ind,0]], [points[ind,1], points[ind,1]],
-                        # c='g', alpha=0.5, lw=0.5)
-            # if dis and not warren:
-                # ax.plot([points[ind,0]-disorder[ind], points[ind,0]+disorder[ind]], [points[ind,1], points[ind,1]],
-                        # c='m', alpha=0.5, lw=0.5)
+            if dis and warren:
+                ax.plot([points[ind,0]-disorder[ind], points[ind,0]], [points[ind,1], points[ind,1]],
+                        c='g', alpha=0.5, lw=0.5)
+            if dis and not warren:
+                ax.plot([points[ind,0]-disorder[ind], points[ind,0]+disorder[ind]], [points[ind,1], points[ind,1]],
+                        c='m', alpha=0.5, lw=0.5)
         for ind in range(len(hull.vertices)):
             if points[hull.vertices[ind], 1] <= 0:
                 ax.scatter(points[hull.vertices[ind], 0], points[hull.vertices[ind], 1], 
                            c='r', marker='*', zorder=1000, s=250, lw=1, alpha=1, label=info[ind])
         for ind in range(len(hull.vertices)-1):
-            if points[hull.vertices[ind+1], 1] <= 0:
+            if points[hull.vertices[ind+1], 1] <= 0 and points[hull.vertices[ind], 1] <= 0:
                 ax.plot([points[hull.vertices[ind], 0], points[hull.vertices[ind+1], 0]], 
                         [points[hull.vertices[ind], 1], points[hull.vertices[ind+1], 1]],
                         'k--', lw=1, alpha=0.6, zorder=1)
         ax.set_xlim(-0.05, 1.05)
         if not dis:
             datacursor(formatter='{label}'.format, draggable=False)
-        # for i in range(len(hull.vertices)):
-            # if points[hull.vertices[i], 1] <= 0:
-        ax.set_ylim(-0.1 if np.min(points[:,1]) < 0 else np.min(points[:,1])-0.1,
-                    1 if np.max(points[:,1])>1 else np.max(points[:,1])+0.1)
+        ax.set_ylim(-0.1 if np.min(points[hull.vertices,1]) > 0 else np.min(points[hull.vertices,1])-0.1,
+                    0.5 if np.max(points[hull.vertices,1]) > 1 else np.max(points[hull.vertices,1])+0.1)
         ax.set_title('$\mathrm{'+str(x_elem)+'_x'+str(one_minus_x_elem)+'_{1-x}}$')
         ax.set_xlabel('$x$')
         ax.set_ylabel('formation enthalpy per atom (eV)')
