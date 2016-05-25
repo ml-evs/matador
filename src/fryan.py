@@ -108,11 +108,21 @@ class DBQuery:
             self.cursor = self.repo.find(SON(self.query_dict)).sort('enthalpy_per_atom', pm.ASCENDING)
             # building hull from just comp, find best structure to calc_match
             if self.args.get('hull'):
+                print('\nFinding biggest calculation set for hull...\n')
                 test_cursor = []
                 test_cursor_count = []
                 test_query_dict = []
-                for i in range(10):
-                    id_cursor = self.repo.find({'text_id': self.cursor[i]['text_id']})
+                sample = 10
+                rerun = False
+                i = 0
+                while i < sample:
+                    # start with sample/2 lowest enthalpy structures
+                    if i < int(sample/2):
+                        ind = i
+                    # then do some random samples
+                    else:
+                        ind = np.random.randint(5, self.cursor.count()-1)
+                    id_cursor = self.repo.find({'text_id': self.cursor[ind]['text_id']})
                     self.query_dict['$and'] = self.query_calc(id_cursor)
                     self.calc_dict = dict()
                     self.calc_dict['$and'] = list(self.query_dict['$and'])
@@ -120,8 +130,17 @@ class DBQuery:
                     test_query_dict.append(self.query_dict)
                     test_cursor.append(self.repo.find(SON(test_query_dict[-1])).sort('enthalpy_per_atom', pm.ASCENDING))
                     test_cursor_count.append(test_cursor[-1].count())
-                    # print(self.cursor[i]['text_id'])
-                    # print(test_cursor_count[-1])
+                    print("{:^24}".format(self.cursor[ind]['text_id'][0]+' '+self.cursor[ind]['text_id'][1]) + ': matched', test_cursor_count[-1], 'structures.')
+                    # if we have at least 2/3 of the structures, just plot
+                    if test_cursor_count[-1] > 2*int(self.cursor.count()/3):
+                        print('Matched at least 2/3 of total number, composing hull...')
+                        break
+                    if i == (sample-1) and not rerun:
+                        # if less than half the total structures are to be plotted, take 5 more samples
+                        if np.max(np.asarray(test_cursor_count)) < int(self.cursor.count()/2):
+                            i -= 5
+                            rerun = True
+                    i += 1
                 self.cursor = test_cursor[np.argmax(np.asarray(test_cursor_count))]
         cursor = self.cursor.clone()
         # self.cursor = cursor.clone()
@@ -799,6 +818,8 @@ if __name__ == '__main__':
             help=('search for up to 3 manual tags at once'))
     parser.add_argument('--hull', action='store_true',
             help=('create a convex hull for 2 elements (to be extended to 3, 4 soon)'))
+    parser.add_argument('--voltage', action='store_true',
+            help=('create a voltage curve for a convex hull'))
     parser.add_argument('--strict', action='store_true',
             help=('strictly matches with calc_match, useful for hulls where convergence is rough'))
     parser.add_argument('--ignore_warnings', action='store_true',
@@ -826,11 +847,11 @@ if __name__ == '__main__':
     query = DBQuery(stoichiometry=args.formula, composition=args.composition,
                     summary=args.summary, id=args.id, top=args.top, details=args.details,
                     pressure=args.pressure, source=args.source, calc_match=args.calc_match, 
-                    strict=args.strict, ignore_warnings=args.ignore_warnings,
+                    strict=args.strict, ignore_warnings=args.ignore_warnings, voltage=args.voltage,
                     partial_formula=args.partial_formula, dbstats=args.dbstats, scratch=args.scratch, 
                     tags=args.tags, user=args.user, hull=args.hull, dis=args.dis, res=args.res,
                     cell=args.cell, write_pressure=args.write_pressure, main=True, sysargs=argv[1:])
     # generate hull outside query object
-    if args.hull:
+    if args.hull or args.voltage:
         from hull import FryanConvexHull
         FryanConvexHull(query)
