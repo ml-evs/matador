@@ -92,7 +92,10 @@ class FryanConvexHull():
         fig = plt.figure(facecolor='w')
         ax = fig.add_subplot(111)
         plt.draw()
-        colours = plt.cm.plasma(np.linspace(0, 1, 100))
+        try:
+            colours = plt.cm.plasma(np.linspace(0, 1, 100))
+        except:
+            colours = plt.cm.winter(np.linspace(0, 1, 100))
         for ind in range(len(structures)-2):
             ax.scatter(structures[ind,0], structures[ind,1], s=50, lw=1, alpha=1, c=colours[int(100*structures[ind,0])], edgecolor='k', label=info[ind], zorder=100)
             # if dis and warren:
