@@ -257,7 +257,7 @@ class Spatula:
                                     for j in range(3):
                                         spacing = recip_abc[j]/(2 * pi * final_struct['kpoints_mp_grid'][j])
                                         max_spacing = spacing if spacing > max_spacing else max_spacing
-                                        final_struct['kpoints_mp_spacing'] = round(max_spacing + 0.5*10**(round(log10(max_spacing)-1)), 2)
+                                        final_struct['kpoints_mp_spacing'] = float(round(max_spacing + 0.5*10**(round(log10(max_spacing)-1)), 2))
                         try:
                             final_struct['source'] = struct_dict['source'] + input_dict['source']
                         except:
@@ -430,7 +430,7 @@ def cell2dict(seed, **kwargs):
                    flines[line_no+j+1] = flines[line_no+j+1].replace(',', '')
                    cell['external_pressure'].append(map(float, flines[line_no+j+1].split()))
             elif 'mp_spacing' in line.lower():
-                cell['kpoints_mp_spacing'] = line.split()[-1]
+                cell['kpoints_mp_spacing'] = float(line.split()[-1])
             elif 'mp_grid' in line.lower():
                 cell['kpoints_mp_grid'] = map(int, line.split()[-3:])
         if 'external_pressure' not in cell:
@@ -509,7 +509,7 @@ def param2dict(seed, **kwargs):
                             else:
                                 param['spin_polarized'] = True
                         if 'cut_off_energy' in line:
-                            param['cut_off_energy'] = int(param['cut_off_energy'].replace('ev','').strip())
+                            param['cut_off_energy'] = float(param['cut_off_energy'].replace('ev','').strip())
                         if 'xc_functional' in line:
                             param['xc_functional'] = param['xc_functional'].upper() 
     except Exception as oopsy:
@@ -757,7 +757,7 @@ def castep2dict(seed, **kwargs):
                             for j in range(3):
                                 spacing = recip_abc[j]/(2 * pi * castep['kpoints_mp_grid'][j])
                                 max_spacing = spacing if spacing > max_spacing else max_spacing
-                            castep['kpoints_mp_spacing'] = round(max_spacing + 0.5*10**(round(log10(max_spacing)-1)), 2)
+                            castep['kpoints_mp_spacing'] = float(round(max_spacing + 0.5*10**(round(log10(max_spacing)-1)), 2))
                     elif 'Current cell volume' in line:
                         castep['cell_volume'] = float(line.split('=')[1].split()[0].strip())
                     elif 'Cell Contents' in line :
