@@ -682,24 +682,35 @@ class DBQuery:
         temp_dict = dict()
         temp_dict['xc_functional'] = doc['xc_functional']
         query_dict.append(temp_dict)
-        if self.args.get('strict'):
+        if self.args.get('loose'):
+            temp_dict = dict()
+            query_dict.append(dict())
+            temp_dict['$gte'] = float(doc['cut_off_energy'])
+            query_dict[-1]['cut_off_energy'] = temp_dict
+            temp_dict = dict()
+            query_dict.append(dict())
+            temp_dict['$lte'] = float(doc['kpoints_mp_spacing'])
+            query_dict[-1]['kpoints_mp_spacing'] = temp_dict
+        else:
             temp_dict = dict()
             temp_dict['kpoints_mp_spacing'] = doc['kpoints_mp_spacing']
             query_dict.append(temp_dict)
             query_dict.append(dict())
             query_dict[-1]['cut_off_energy'] = doc['cut_off_energy']
+        if self.args.get('strict'):
+            temp_dict = dict()
+            temp_dict['species_pot'] = doc['species_pot']
+            query_dict.append(temp_dict)
         else:
-            temp_dict = dict()
-            query_dict.append(dict())
-            temp_dict['$gte'] = doc['cut_off_energy']
-            query_dict[-1]['cut_off_energy'] = temp_dict
-            temp_dict = dict()
-            query_dict.append(dict())
-            temp_dict['$lte'] = doc['kpoints_mp_spacing']
-            query_dict[-1]['kpoints_mp_spacing'] = temp_dict
-        temp_dict = dict()
-        temp_dict['species_pot'] = doc['species_pot']
-        query_dict.append(temp_dict)
+            for species in doc['species_pot']:
+                temp_dict = dict()
+                temp_dict['$or'] = []
+                temp_dict['$or'].append(dict())
+                temp_dict['$or'][-1]['species_pot.'+species] = dict()
+                temp_dict['$or'][-1]['species_pot.'+species]['$exists'] = False
+                temp_dict['$or'].append(dict())
+                temp_dict['$or'][-1]['species_pot.'+species] = doc['species_pot'][species]
+                query_dict.append(temp_dict)
         return query_dict
 
     def print_report(self):
@@ -822,6 +833,8 @@ if __name__ == '__main__':
             help=('create a voltage curve for a convex hull'))
     parser.add_argument('--strict', action='store_true',
             help=('strictly matches with calc_match, useful for hulls where convergence is rough'))
+    parser.add_argument('--loose', action='store_true',
+            help=('loosely matches with calc_match, i.e. only matches pspot and xc_functional'))
     parser.add_argument('--ignore_warnings', action='store_true',
             help=('includes possibly bad structures'))
     parser.add_argument('--dis', action='store_true',
@@ -847,7 +860,7 @@ if __name__ == '__main__':
     query = DBQuery(stoichiometry=args.formula, composition=args.composition,
                     summary=args.summary, id=args.id, top=args.top, details=args.details,
                     pressure=args.pressure, source=args.source, calc_match=args.calc_match, 
-                    strict=args.strict, ignore_warnings=args.ignore_warnings, voltage=args.voltage,
+                    strict=args.strict, loose=args.loose, ignore_warnings=args.ignore_warnings, voltage=args.voltage,
                     partial_formula=args.partial_formula, dbstats=args.dbstats, scratch=args.scratch, 
                     tags=args.tags, user=args.user, hull=args.hull, dis=args.dis, res=args.res,
                     cell=args.cell, write_pressure=args.write_pressure, main=True, sysargs=argv[1:])
