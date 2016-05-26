@@ -121,7 +121,7 @@ class Spatula:
         if not self.dryrun:
             report_id = self.report.insert_one(report_dict) 
 
-    def dict2db(self, struct):
+    def struct2db(self, struct):
         """ Insert completed Python dictionary into chosen
         database, with generated text_id. Add quality factor
         for any missing data.
@@ -267,7 +267,7 @@ class Spatula:
                             pass
                         if not self.dryrun:
                             final_struct.update(self.tag_dict)
-                            self.import_count += self.dict2db(final_struct)
+                            self.import_count += self.struct2db(final_struct)
             else:
                 for ind, file in enumerate(file_lists[root]['castep']):
                     castep_dict, success = castep2dict(root + '/' + file, debug=self.debug)
@@ -277,7 +277,23 @@ class Spatula:
                         final_struct = castep_dict
                         if not self.dryrun:
                             final_struct.update(self.tag_dict)
-                            self.import_count += self.dict2db(final_struct)
+                            self.import_count += self.struct2db(final_struct)
+        for ind, file in enumerate(file_lists[root]['synth']):
+                    synth_dict, success = synth2dict(root + '/' + file, debug=self.debug)
+                    if not success:
+                        self.logfile.write(synth_dict)
+                    else:
+                        if not self.dryrun:
+                            synth_dict.update(self.tag_dict)
+                            self.import_count += self.exp2db(synth_dict)
+        for ind, file in enumerate(file_lists[root]['expt']):
+                    expt_dict, success = expt2dict(root + '/' + file, debug=self.debug)
+                    if not success:
+                        self.logfile.write(expt_dict)
+                    else:
+                        if not self.dryrun:
+                            expt_dict.update(self.tag_dict)
+                            self.import_count += self.exp2db(expt_dict)
         # end progress bar
         print('\n')
         return
@@ -287,6 +303,7 @@ class Spatula:
         CASTEP/AIRSS input/output files.
         """
         ResCount, CellCount, CastepCount, ParamCount = 4*[0]
+        SynthCount, ExptCount = 2*[0]
         file_lists = dict()
         topdir = '.'
         topdir_string = getcwd().split('/')[-1]
@@ -298,6 +315,8 @@ class Spatula:
             file_lists[root]['cell_count'] = 0
             file_lists[root]['param_count'] = 0
             file_lists[root]['castep_count'] = 0
+            file_lists[root]['synth_count'] = 0
+            file_lists[root]['expt_count'] = 0
             for file in files:
                 if file.endswith('.res'):
                     file_lists[root]['res'].append(file)
@@ -318,12 +337,22 @@ class Spatula:
                     file_lists[root]['param'].append(file)
                     file_lists[root]['param_count'] += 1
                     ParamCount += 1
+                elif file.endswith('.synth'):
+                    file_lists[root]['synth'].append(file)
+                    file_lists[root]['synth_count'] += 1
+                    SynthCount += 1
+                elif file.endswith('.expt'):
+                    file_lists[root]['expt'].append(file)
+                    file_lists[root]['expt_count'] += 1
+                    ExptCount += 1
         print('done!\n')
         prefix = '\t\t'
         print(prefix, "{:8d}".format(ResCount), '\t\t.res files')
         print(prefix, "{:8d}".format(CastepCount), '\t\t.castep, .history or .history.gz files')
         print(prefix, "{:8d}".format(CellCount), '\t\t.cell files')
-        print(prefix, "{:8d}".format(ParamCount), '\t\t.param files\n')
+        print(prefix, "{:8d}".format(ParamCount), '\t\t.param files')
+        print(prefix, "{:8d}".format(SynthCount), '\t\t.synth files')
+        print(prefix, "{:8d}".format(ExptCount), '\t\t.expt files\n')
         return file_lists
 
 def res2dict(seed, **kwargs):
@@ -485,6 +514,14 @@ def param2dict(seed, **kwargs):
     with open(seed+'.param', 'r') as f:
         flines = f.readlines()
     param['source'].append(seed+'.param')
+    # exclude some useless info
+    scrub_list = ['checkpoint', 'write_bib', 'mix_history_length',
+                  'fix_occupancy', 'page_wvfns', 'num_dump_cycles',
+                  'backup_interval', 'geom_max_iter', 'fixed_npw',
+                  'write_cell_structure', 'bs_write_eigenvalues',
+                  'calculate_stress', 'opt_strategy', 'max_scf_cycles']
+    false_str = ['False', 'false', '0']
+    splitters = [':', '=', ' ']
     try:
         for line_no, line in enumerate(flines):
             line = line.lower()
@@ -492,20 +529,12 @@ def param2dict(seed, **kwargs):
             if line.startswith(('#', '!')) or len(line.strip())==0:
                 continue
             else:
-                # exclude some useless info
-                scrub_list = ['checkpoint', 'write_bib', 'mix_history_length',
-                              'fix_occupancy', 'page_wvfns', 'num_dump_cycles',
-                              'backup_interval', 'geom_max_iter', 'fixed_npw',
-                              'write_cell_structure', 'bs_write_eigenvalues',
-                              'calculate_stress', 'opt_strategy', 'max_scf_cycles']
-                false_str = ['False', 'false', '0']
-                splitters = [':', '=', ' ']
                 if [rubbish for rubbish in scrub_list if rubbish in line]:
                     continue
                 # read all other parameters in
                 else:
                     if [splitter for splitter in splitters if splitter in line]: 
-                        param[line.split(splitter)[0].strip()] = line.split(':')[-1].strip()
+                        param[line.split(splitter)[0].strip()] = line.split(splitter)[-1].strip()
                         if 'spin_polarized' in line:
                             if [false for false in false_str if false in param['spin_polarized']]:
                                 param['spin_polarized'] = False
@@ -891,6 +920,91 @@ def castep2dict(seed, **kwargs):
     if kwargs.get('debug'):
         print(json.dumps(castep,indent=2, ensure_ascii=False))
     return castep, True
+
+def synth2dict(seed, **kwargs):
+    """ Take a .synth file and create a dict
+    suitable for database insertion.
+    """
+    synth = defaultdict(list)
+    splitters = [':', '=', ' ']
+    if seed.endswith('.synth'):
+        seed = seed.replace('.synth', '')
+    with open(seed+'.synth', 'r') as f:
+        flines = f.readlines()
+    synth['source'].append(seed+'.synth')
+    # define splitters
+    splitters = [':', '=', ' ']
+    try:
+        for line_no, line in enumerate(flines):
+            # skip blank lines and comments
+            if line.startswith(('#', '!')) or len(line.strip())==0:
+                continue
+            else:
+                # check if line is split further by semi-colons
+                if ';' in line:
+                    line = line.split(';')
+                # else set all lines to be single item lists so that
+                # we can scrape lines and ;-terminated lines in the same way
+                else:
+                    line = [line]
+                # now look for splitters between tags and data
+                for entry in line:
+                    if [splitter for splitter in splitters if splitter in entry]: 
+                        synth[entry.split(splitter)[0].strip()] = entry.split(splitter)[-1].replace('\n', '')
+    except Exception as oopsy:
+        if kwargs.get('verbosity') > 0:
+            print(oopsy)
+            print('Error in', seed+'.synth, skipping...')
+        return seed + '\t\t' + str(oopsy), False
+    if kwargs.get('debug'):
+        print(json.dumps(synth,indent=2))
+    return synth, True
+
+def expt2dict(seed, **kwargs):
+    """ Take a .expt file and create a dict
+    suitable for database insertion.
+    """
+    expt = defaultdict(list)
+    splitters = [':', '=', ' ']
+    if seed.endswith('.expt'):
+        seed = seed.replace('.expt', '')
+    with open(seed+'.expt', 'r') as f:
+        flines = f.readlines()
+    expt['source'].append(seed+'.expt')
+    # define splitters
+    splitters = [':', '=', ' ']
+    try:
+        for line_no, line in enumerate(flines):
+            # skip blank lines and comments
+            if line.startswith(('#', '!')) or len(line.strip())==0:
+                continue
+            else:
+                # check if line is split further by semi-colons
+                if ';' in line:
+                    line = line.split(';')
+                    for ind, entry in enumerate(line):
+                        line[ind] = line[ind].strip()
+                # else set all lines to be single item lists so that
+                # we can scrape lines and ;-terminated lines in the same way
+                else:
+                    line = [line]
+                # now look for splitters between tags and data
+                for entry in line:
+                    print(entry)
+                    if [splitter for splitter in splitters if splitter in entry]: 
+                        if entry.split(splitter)[0].strip() in expt:
+                            expt[entry.split(splitter)[0].strip()] = [expt[entry.split(splitter)[0].strip()]]
+                            expt[entry.split(splitter)[0].strip()].append(entry.split(splitter)[-1].replace('\n', ''))
+                        else:
+                            expt[entry.split(splitter)[0].strip()] = entry.split(splitter)[-1].replace('\n', '')
+    except Exception as oopsy:
+        if kwargs.get('verbosity') > 0:
+            print(oopsy)
+            print('Error in', seed+'.expt, skipping...')
+        return seed + '\t\t' + str(oopsy), False
+    if kwargs.get('debug'):
+        print(json.dumps(expt,indent=2))
+    return expt, True
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Import CASTEP/AIRSS results into MongoDB database.',
