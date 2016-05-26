@@ -166,7 +166,10 @@ class Spatula:
         div = int(len(file_lists)/width)
         print('['+50*'.'+']', end='\r')
         for root_ind, root in enumerate(file_lists):
-            print('['+int(root_ind/div)*'x'+(width-int(root_ind/div))*'.'+']', end='\r')
+            try:
+                print('['+int(root_ind/div)*'x'+(width-int(root_ind/div))*'.'+']', end='\r')
+            except:
+                pass
             if root=='.':
                 root_str = getcwd().split('/')[-1]
             else:
