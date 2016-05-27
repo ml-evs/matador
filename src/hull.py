@@ -152,7 +152,10 @@ class FryanConvexHull():
             # arrowprops=dict(arrowstyle='simple', alpha=0.8))
         plt.style.use('bmh')
         colour = []
-        colour.append(ax._get_lines.prop_cycler.next()['color'])
+        try:
+            colour.append(ax._get_lines.prop_cycler.next()['color'])
+        except:
+            colour.append('blue')
         # ax.plot([stable_comp[0], stable_comp[0]], [voltages[0], voltages[1]], ls='-.', c=colour[0], lw=2)
         # ax.plot([stable_comp[-2], stable_comp[-2]], [voltages[-1], 0], ls='-.', c=colour[0], lw=2)
         for i in range(1,len(voltages)-1):
