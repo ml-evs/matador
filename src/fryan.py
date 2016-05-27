@@ -108,6 +108,7 @@ class DBQuery:
             self.cursor = self.repo.find(SON(self.query_dict)).sort('enthalpy_per_atom', pm.ASCENDING)
             # building hull from just comp, find best structure to calc_match
             if self.args.get('hull'):
+                self.args['summary'] = True
                 print('\nFinding biggest calculation set for hull...\n')
                 test_cursor = []
                 test_cursor_count = []
@@ -682,6 +683,9 @@ class DBQuery:
         temp_dict = dict()
         temp_dict['xc_functional'] = doc['xc_functional']
         query_dict.append(temp_dict)
+        temp_dict = dict()
+        temp_dict['spin_polarized'] = doc['spin_polarized']
+        query_dict.append(temp_dict)
         if self.args.get('loose'):
             temp_dict = dict()
             query_dict.append(dict())
@@ -697,20 +701,15 @@ class DBQuery:
             query_dict.append(temp_dict)
             query_dict.append(dict())
             query_dict[-1]['cut_off_energy'] = doc['cut_off_energy']
-        if self.args.get('strict'):
+        for species in doc['species_pot']:
             temp_dict = dict()
-            temp_dict['species_pot'] = doc['species_pot']
+            temp_dict['$or'] = []
+            temp_dict['$or'].append(dict())
+            temp_dict['$or'][-1]['species_pot.'+species] = dict()
+            temp_dict['$or'][-1]['species_pot.'+species]['$exists'] = False
+            temp_dict['$or'].append(dict())
+            temp_dict['$or'][-1]['species_pot.'+species] = doc['species_pot'][species]
             query_dict.append(temp_dict)
-        else:
-            for species in doc['species_pot']:
-                temp_dict = dict()
-                temp_dict['$or'] = []
-                temp_dict['$or'].append(dict())
-                temp_dict['$or'][-1]['species_pot.'+species] = dict()
-                temp_dict['$or'][-1]['species_pot.'+species]['$exists'] = False
-                temp_dict['$or'].append(dict())
-                temp_dict['$or'][-1]['species_pot.'+species] = doc['species_pot'][species]
-                query_dict.append(temp_dict)
         return query_dict
 
     def print_report(self):
