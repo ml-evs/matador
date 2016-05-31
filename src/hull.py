@@ -30,7 +30,7 @@ class FryanConvexHull():
         elements = query.args.get('composition')
         elements = [elem for elem in re.split(r'([A-Z][a-z]*)', elements[0]) if elem]
         if len(elements) != 2:
-            print('Cannot create binary hull for more or less than 2 elements.')
+            print('Cannot create binary hull for more or less than 2 elements (yet!).')
             return
         cursor = self.query.cursor.clone()
         # try to get decent chemical potentials:
@@ -57,20 +57,33 @@ class FryanConvexHull():
             else:
                 print('No possible chem pots found for', elem, '.')
                 return
-        print('Plotting hull...')
+        print('Constructing hull...')
+
+
         formation = np.zeros((query.cursor.count()))
         stoich = np.zeros((query.cursor.count()))
         disorder = np.zeros((query.cursor.count()))
+        enthalpy = np.zeros((query.cursor.count()))
         info = []
         x_elem = elements[0]
         one_minus_x_elem = elements[1]
         for ind, doc in enumerate(query.cursor):
             atoms_per_fu = doc['stoichiometry'][0][1] + doc['stoichiometry'][1][1]  
+            num_fu = (doc['enthalpy']/doc['enthalpy_per_atom']) / float(atoms_per_fu)
+            # calculate number of atoms of type B per formula unit 
+            if doc['stoichiometry'][0][0] == one_minus_x_elem:
+                num_b = doc['stoichiometry'][0][1]
+            elif doc['stoichiometry'][1][0] == one_minus_x_elem:
+                num_b = doc['stoichiometry'][1][1]
+            else:
+                exit('Something went wrong!')
+            # get enthalpy per unit B
+            enthalpy[ind] = doc['enthalpy'] / (num_b*num_fu)
             formation[ind] = doc['enthalpy_per_atom']
             for mu in match:
                 for j in range(len(doc['stoichiometry'])):
                     if mu['stoichiometry'][0][0] == doc['stoichiometry'][j][0]:
-                        formation[ind] -= mu['enthalpy_per_atom']*doc['stoichiometry'][j][1] / atoms_per_fu
+                        formation[ind] -= mu['enthalpy_per_atom'] * doc['stoichiometry'][j][1] / atoms_per_fu
             for elem in doc['stoichiometry']:
                 stoich_string = str(doc['stoichiometry'][0][0]) + str(doc['stoichiometry'][0][1]) + str(doc['stoichiometry'][1][0]) + str(doc['stoichiometry'][1][1])
                 if x_elem in elem[0]:
@@ -78,22 +91,27 @@ class FryanConvexHull():
             info.append("{0:^10}\n{1:^24}\n{2:^5s}\n{3:2f} eV".format(stoich_string, doc['text_id'][0]+' '+doc['text_id'][1], doc['space_group'], formation[ind]))
             if dis:
                 disorder[ind], warren = self.disorder_hull(doc)
-        formation = np.append(formation, [0.0, 0.0])
+        formation = np.append([0.0], formation)
+        formation = np.append(formation, [0.0])
+        enthalpy = np.append(mu_enthalpy[1], enthalpy)
+        enthalpy = np.append(enthalpy, mu_enthalpy[0])
         ind = len(formation)-3
         for doc in match:
             stoich_string = str(doc['stoichiometry'][0][0]) + str(doc['stoichiometry'][0][1]) 
             info.append("{0:^10}\n{1:24}\n{2:5s}\n{3:2f} eV".format(stoich_string, doc['text_id'][0]+' '+doc['text_id'][1], doc['space_group'], formation[ind]))
             ind += 1 
-        stoich = np.append(stoich, [0.0, 1.0])
+        stoich = np.append([0.0], stoich)
+        stoich = np.append(stoich, [1.0])
         structures = np.vstack((stoich, formation)).T
         hull = ConvexHull(structures)
-        fig = plt.figure(facecolor='w')
-        ax = fig.add_subplot(111)
-        plt.draw()
         try:
             colours = plt.cm.plasma(np.linspace(0, 1, 100))
         except:
             colours = plt.cm.winter(np.linspace(0, 1, 100))
+        fig = plt.figure(facecolor='w')
+        ax = fig.add_subplot(111)
+        plt.draw()
+        # plot all structures
         scatter = []
         for ind in range(len(structures)-2):
             scatter.append(ax.scatter(structures[ind,0], structures[ind,1], s=35, lw=1, alpha=1, c=colours[int(100*structures[ind,0])], edgecolor='k', label=info[ind], zorder=100))
@@ -105,15 +123,19 @@ class FryanConvexHull():
                         # c='m', alpha=0.5, lw=0.5)
         stable_energy = []
         stable_comp = []
+        stable_enthalpy = []
         for ind in range(len(hull.vertices)):
             if structures[hull.vertices[ind], 1] <= 0:
                 stable_energy.append(structures[hull.vertices[ind], 1])
+                stable_enthalpy.append(enthalpy[hull.vertices[ind]])
                 stable_comp.append(structures[hull.vertices[ind], 0])
                 scatter.append(ax.scatter(structures[hull.vertices[ind], 0], structures[hull.vertices[ind], 1], 
                            c='r', marker='*', zorder=1000, edgecolor='k', s=250, lw=1, alpha=1, label=info[hull.vertices[ind]]))
         stable_energy =  np.asarray(stable_energy)
         stable_comp =  np.asarray(stable_comp)
+        stable_enthalpy =  np.asarray(stable_enthalpy)
         stable_energy = stable_energy[np.argsort(stable_comp)]
+        stable_enthalpy = stable_enthalpy[np.argsort(stable_comp)]
         stable_comp =  stable_comp[np.argsort(stable_comp)]
         for ind in range(len(stable_comp)-1):
                 ax.plot([stable_comp[ind], stable_comp[ind+1]], 
@@ -130,20 +152,26 @@ class FryanConvexHull():
         ax.set_ylabel('formation enthalpy per atom (eV)')
         if query.args.get('voltage'):
             print('Generating voltage curve...')
-            self.voltage_curve(stable_energy, stable_comp, mu_enthalpy, elements)# info[stable_list])
+            self.voltage_curve(stable_enthalpy, stable_comp, mu_enthalpy, elements)# info[stable_list])
         plt.show()
         return structures, disorder, hull, mu, info, fig
     
-    def voltage_curve(self, stable_energy, stable_comp, mu_enthalpy, elements):
+    def voltage_curve(self, stable_enthalpy, stable_comp, mu_enthalpy, elements):
         """ Take convex hull and plot voltage curves. """
-        voltages = np.zeros((len(stable_comp))-1)
-        for i in range(1,len(voltages)):
-            voltages[i] = -(stable_energy[i] - stable_energy[i-1])
-            voltages[i] /= stable_comp[i] - stable_comp[i-1]
-            voltages[i] += mu_enthalpy[0]
-        # voltages /= (188.01/2)
-        # print(voltages)
-        voltages[0] = np.NaN
+        stable_num = []
+        V = []
+        x = []
+        for i in range(len(stable_comp)):
+            stable_num.append(stable_comp[i]/(1-stable_comp[i]))
+        V.append(0)
+        x.append(1e5)
+        for i in range(len(stable_num)-2,0,-1):
+            V.append(-(stable_enthalpy[i] - stable_enthalpy[i-1])
+                    / (stable_num[i] - stable_num[i-1])
+                    + mu_enthalpy[0])
+            x.append(stable_num[i])
+        V.append(V[-1])
+        x.append(0)
         fig = plt.figure(facecolor='w')
         ax  = fig.add_subplot(111)
         # datacursor(formatter='{label}'.format, draggable=False, bbox=dict(fc='white'),
@@ -154,18 +182,15 @@ class FryanConvexHull():
             colour.append(ax._get_lines.prop_cycler.next()['color'])
         except:
             colour.append('blue')
-        # ax.plot([stable_comp[0], stable_comp[0]], [voltages[0], voltages[1]], ls='-.', c=colour[0], lw=2)
-        # ax.plot([stable_comp[-2], stable_comp[-2]], [voltages[-1], 0], ls='-.', c=colour[0], lw=2)
-        for i in range(1,len(voltages)-1):
-            ax.plot([stable_comp[i], stable_comp[i]], [voltages[i], voltages[i+1]], c=colour[0], lw=2)
-        for i in range(1, len(voltages)):
-            ax.plot([stable_comp[i-1], stable_comp[i]], [voltages[i], voltages[i]], c=colour[0], lw=2)
-            ax.scatter(stable_comp[i], voltages[i],
-                       c=colour[0], marker='*', zorder=1000, edgecolor='k', s=250, lw=1, alpha=1)
-        ax.set_xlim(-0.01, 1.01)
+        print(zip(x, V))
+        for i in range(1, len(V)):
+            ax.scatter(x[i], V[i], marker='*', c=colour[0], zorder=1000, edgecolor='k', s=200, lw=1)
+        for i in range(2, len(V)):
+            ax.scatter(x[i], V[i-1], marker='*', c=colour[0], zorder=1000, edgecolor='k', s=200, lw=1)
+            ax.plot([x[i], x[i]], [V[i], V[i-1]], lw=2, c=colour[0])
+            ax.plot([x[i-1], x[i]], [V[i-1], V[i-1]], lw=2, c=colour[0])
         ax.set_ylabel('V')
-        ax.set_title('$\mathrm{'+elements[0]+'_x'+elements[1]+'_{1-x}}$')
+        ax.set_xlim(0)
+        ax.set_title('$\mathrm{'+elements[0]+'_x'+elements[1]+'}$')
         ax.set_xlabel('$x$')
-        ax.set_yticks([])
-        # ax.set_ylim(0,np.max(voltages[1:])*1.5)
         plt.show()
