@@ -91,6 +91,7 @@ class FryanConvexHull():
             info.append("{0:^10}\n{1:^24}\n{2:^5s}\n{3:2f} eV".format(stoich_string, doc['text_id'][0]+' '+doc['text_id'][1], doc['space_group'], formation[ind]))
             if dis:
                 disorder[ind], warren = self.disorder_hull(doc)
+        print(disorder)
         formation = np.append([0.0], formation)
         formation = np.append(formation, [0.0])
         enthalpy = np.append(mu_enthalpy[1], enthalpy)
@@ -115,12 +116,12 @@ class FryanConvexHull():
         scatter = []
         for ind in range(len(structures)-2):
             scatter.append(ax.scatter(structures[ind,0], structures[ind,1], s=35, lw=1, alpha=1, c=colours[int(100*structures[ind,0])], edgecolor='k', label=info[ind], zorder=100))
-            # if dis and warren:
-                # ax.plot([structures[ind,0]-disorder[ind], structures[ind,0]], [structures[ind,1], structures[ind,1]],
-                        # c='g', alpha=0.5, lw=0.5)
-            # if dis and not warren:
-                # ax.plot([structures[ind,0]-disorder[ind], structures[ind,0]+disorder[ind]], [structures[ind,1], structures[ind,1]],
-                        # c='m', alpha=0.5, lw=0.5)
+            if dis and warren:
+                ax.plot([structures[ind,0]-disorder[ind], structures[ind,0]], [structures[ind,1], structures[ind,1]],
+                        c='g', alpha=0.5, lw=0.5)
+            if dis and not warren:
+                ax.plot([structures[ind,0]-disorder[ind], structures[ind,0]+disorder[ind]], [structures[ind,1], structures[ind,1]],
+                        c='m', alpha=0.5, lw=0.5)
         stable_energy = []
         stable_comp = []
         stable_enthalpy = []
