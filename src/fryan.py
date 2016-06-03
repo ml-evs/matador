@@ -856,6 +856,8 @@ if __name__ == '__main__':
         exit('--dis requires --hull')
     if args.write_pressure and args.cell != True:
         exit('--write_pressure requires cell')
+    if args.voltage and not args.hull:
+        args.hull = True
     query = DBQuery(stoichiometry=args.formula, composition=args.composition,
                     summary=args.summary, id=args.id, top=args.top, details=args.details,
                     pressure=args.pressure, source=args.source, calc_match=args.calc_match, 
