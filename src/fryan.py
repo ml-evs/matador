@@ -657,7 +657,10 @@ class DBQuery:
         """
         input_pressure = self.args.get('pressure')
         print(input_pressure, 'GPa')
-        approx_pressure = [0.9*input_pressure-0.05, 1.1*input_pressure+0.05]
+        if input_pressure < 0:
+            approx_pressure = [1.1*input_pressure-0.05, 0.9*input_pressure+0.05]
+        else:
+            approx_pressure = [0.9*input_pressure-0.05, 1.1*input_pressure+0.05]
         query_dict = dict()
         query_dict['$and'] = []
         temp_dict = dict()
