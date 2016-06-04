@@ -7,9 +7,6 @@ def disorder_hull(doc):
     num_atoms = doc['num_atoms']
     # try:  
     lat_cart  = doc['lattice_cart']
-    print('dis')
-    # except:
-        # return 0
     disps = np.zeros((num_atoms, num_atoms-1))
     atoms = np.empty((num_atoms, num_atoms-1), dtype=str)
     for i in range(num_atoms):
@@ -64,8 +61,8 @@ def disorder_hull(doc):
         
         return count[0] / (4*(count[1]+count[0]))
     
-    warren = True
+    warren = False
     if warren:
-        return warren_cowley(atoms, disps), warren
+        return warren_cowley(atoms, disps)
     else:
-        return bond_disorder(atoms, disps), warren
+        return bond_disorder(atoms, disps)
