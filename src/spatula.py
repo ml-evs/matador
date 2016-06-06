@@ -251,17 +251,21 @@ class Spatula:
                     else:
                         final_struct = input_dict.copy()
                         final_struct.update(struct_dict)
-                        # calculate kpoint spacing if not found
-                        recip_abc = 3*[0]
-                        for j in range(3):
-                            recip_abc[j] = 2 * pi / float(final_struct['lattice_abc'][0][j])
-                            if 'kpoints_mp_spacing' not in final_struct:
-                                if 'kpoints_mp_grid' in final_struct:
-                                    max_spacing = 0
-                                    for j in range(3):
-                                        spacing = recip_abc[j]/(2 * pi * final_struct['kpoints_mp_grid'][j])
-                                        max_spacing = spacing if spacing > max_spacing else max_spacing
-                                        final_struct['kpoints_mp_spacing'] = float(round(max_spacing + 0.5*10**(round(log10(max_spacing)-1)), 2))
+                        try:
+                            # calculate kpoint spacing if not found
+                            recip_abc = 3*[0]
+                            for j in range(3):
+                                recip_abc[j] = 2 * pi / float(final_struct['lattice_abc'][0][j])
+                                if 'kpoints_mp_spacing' not in final_struct:
+                                    if 'kpoints_mp_grid' in final_struct:
+                                        max_spacing = 0
+                                        for j in range(3):
+                                            spacing = recip_abc[j]/(2 * pi * final_struct['kpoints_mp_grid'][j])
+                                            max_spacing = spacing if spacing > max_spacing else max_spacing
+                                            final_struct['kpoints_mp_spacing'] = float(round(max_spacing + 0.5*10**(round(log10(max_spacing)-1)), 2))
+                        except Exception as oopsy:
+                            print(oopsy)
+                            pass
                         try:
                             final_struct['source'] = struct_dict['source'] + input_dict['source']
                         except:
