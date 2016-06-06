@@ -41,6 +41,9 @@ def res2dict(seed, **kwargs):
         res['icsd'] = seed.split('CollCode')[-1] 
     # alias special lines in res file
     try:
+        titl = ''
+        cell = ''
+        remark = ''
         for line in flines:
             if 'TITL' in line:
                 titl = line.split()
@@ -48,6 +51,8 @@ def res2dict(seed, **kwargs):
                     raise RuntimeError('res file header missing some data')
             elif 'CELL' in line:
                 cell = line.split()
+            elif 'REM' in line:
+                remark = line.split()
         res['pressure'] = float(titl[2])
         res['cell_volume'] = float(titl[3])
         res['enthalpy'] = float(titl[4])
@@ -65,6 +70,20 @@ def res2dict(seed, **kwargs):
                     res['atom_types'].append(cursor[0])
                     res['positions_frac'].append(map(float, cursor[2:5]))
                     i += 1
+        # deal with implicit encapsulation
+        if len(remark)>0:
+            if 'NTPROPS' in remark:
+                res['cnt_chiral'] = [0, 0]
+                res['encapsulated'] = True
+                for ind, entry in enumerate(remark):
+                    if 'chiralN' in entry:
+                        res['cnt_chiral'][0] = int(remark[ind+1].replace(',',''))
+                    if 'chiralM' in entry:
+                        res['cnt_chiral'][1] = int(remark[ind+1].replace(',',''))
+                    if entry == '\'r\':':
+                        res['cnt_radius'] = float(remark[ind+1].replace(',',''))
+                    if entry == '\'z\':':
+                        res['cnt_length'] = float(remark[ind+1].replace(',','').replace('\n','').replace('}',''))
         # calculate stoichiometry
         res['stoichiometry'] = defaultdict(float)
         for atom in res['atom_types']:
@@ -207,6 +226,8 @@ def param2dict(seed, **kwargs):
                                 param['cut_off_energy'] = float(param['cut_off_energy'].replace('ev','').strip())
                             if 'xc_functional' in line:
                                 param['xc_functional'] = param['xc_functional'].upper() 
+                            if 'perc_extra_bands' in line:
+                                param['perc_extra_bands'] = float(param['perc_extra_bands'])
     except Exception as oopsy:
         if kwargs.get('verbosity') > 0:
             print(oopsy)
