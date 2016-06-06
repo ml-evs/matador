@@ -155,7 +155,6 @@ class Spatula:
                     struct['quality'] = 0
                     break
                 else:
-                    # print(struct['species_pot'])
                     # remove a point for a generic OTF pspot
                     if 'OTF' in struct['species_pot'][elem[0]].upper():
                         struct['quality'] -= 1
