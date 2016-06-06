@@ -87,10 +87,12 @@ class DBQuery:
                 self.calc_dict['$and'] = list(self.query_dict['$and'])
         if self.args.get('stoichiometry') != None:
             self.query_dict['$and'].append(self.query_stoichiometry())
-        if self.args.get('pressure') != None:
-            self.query_dict['$and'].append(self.query_pressure())
         if self.args.get('composition') != None:
             self.query_dict['$and'].append(self.query_composition())
+        if self.args.get('pressure') != None:
+            self.query_dict['$and'].append(self.query_pressure())
+        if self.args.get('encapsulated') == True:
+            self.query_dict['$and'].append(self.query_encap())
         if self.args.get('tags') != None:
             self.query_dict['$and'].append(self.query_tags())
         if not self.args.get('ignore_warnings'):
@@ -431,6 +433,9 @@ class DBQuery:
                         if subitem != 1:
                             formula_substring += str(subitem)
                         atom_per_fu += subitem
+            if 'encapsulated' in doc:
+                # if doc['encapsulated'] == True:
+                formula_substring += '+CNT'
             if last_formula != formula_substring:
                 self.gs_enthalpy = 0.0
             formula_string.append(formula_substring)
@@ -503,6 +508,13 @@ class DBQuery:
                         pass
                 if 'user' in doc:
                     detail_substring[-1] += doc['user']
+                if 'encapsulated' in doc:
+                    try:
+                        detail_string[-1] += ', (n,m)=(' + str(doc['cnt_chiral'][0]) + ',' + str(doc['cnt_chiral'][1]) + ')'
+                        detail_string[-1] += ', r=' + "{:4.2f}".format(doc['cnt_radius']) + ' A'
+                        detail_string[-1] += ', z=' + "{:4.2f}".format(doc['cnt_length']) + ' A'
+                    except:
+                        pass
                 detail_string[-1] += ' ' + (len(header_string)-len(detail_string[-1])-1)*u"╌"
                 detail_substring[-1] += ' ' + (len(header_string)-len(detail_substring[-1])-1)*u"╌"
             if self.args.get('source'):
@@ -675,6 +687,13 @@ class DBQuery:
         temp_dict['pressure']['$gt'] = approx_pressure[0]
         query_dict['$and'].append(temp_dict)
         return query_dict
+    
+    def query_encap(self):
+        """ Query only CNT encapsulated structures. """
+        query_dict = dict()
+        query_dict['encapsulated'] = dict()
+        query_dict['encapsulated']['$exists'] = True
+        return query_dict
  
     def query_calc(self, cursor):
         """ Find all structures with matching
@@ -823,6 +842,8 @@ if __name__ == '__main__':
             help=('stoichiometry/composition queries will include other unspecified species,' +
             'e.g. search for Ge2Te3 will also return Ge2Te3Si or Ge4Te6Fe2, and search for Li will' +
             ' include any structure containing Li, not just pure Li.'))
+    parser.add_argument('--encap', action='store_true',
+            help='query only structures encapsulated in a carbon nanotube.')
     parser.add_argument('--dbstats', action='store_true',
             help=('print some stats about the database that is being queried'))
     parser.add_argument('--user', nargs=1, type=str,
@@ -861,13 +882,29 @@ if __name__ == '__main__':
         exit('--write_pressure requires cell')
     if args.voltage and not args.hull:
         args.hull = True
-    query = DBQuery(stoichiometry=args.formula, composition=args.composition,
-                    summary=args.summary, id=args.id, top=args.top, details=args.details,
-                    pressure=args.pressure, source=args.source, calc_match=args.calc_match, 
-                    strict=args.strict, loose=args.loose, ignore_warnings=args.ignore_warnings, voltage=args.voltage,
-                    partial_formula=args.partial_formula, dbstats=args.dbstats, scratch=args.scratch, 
-                    tags=args.tags, user=args.user, hull=args.hull, dis=args.dis, res=args.res,
-                    cell=args.cell, write_pressure=args.write_pressure, main=True, sysargs=argv[1:])
+    query = DBQuery(stoichiometry=args.formula,
+                    composition=args.composition,
+                    summary=args.summary,
+                    id=args.id, top=args.top,
+                    details=args.details,
+                    pressure=args.pressure,
+                    source=args.source,
+                    calc_match=args.calc_match, 
+                    strict=args.strict,
+                    loose=args.loose,
+                    ignore_warnings=args.ignore_warnings, 
+                    voltage=args.voltage,
+                    partial_formula=args.partial_formula,
+                    dbstats=args.dbstats,
+                    scratch=args.scratch,
+                    encapsulated=args.encap,
+                    tags=args.tags,
+                    user=args.user,hull=args.hull,
+                    dis=args.dis, res=args.res,
+                    cell=args.cell,
+                    write_pressure=args.write_pressure,
+                    main=True,
+                    sysargs=argv[1:])
     # generate hull outside query object
     if args.hull or args.voltage:
         from hull import FryanConvexHull
