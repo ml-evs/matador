@@ -45,7 +45,7 @@ class Spatula:
         # I/O files 
         self.logfile = open('spatula.log', 'w')
         try:
-            wordfile = open(dirname(realpath(__file__)) + '/new_words', 'r')
+            wordfile = open(dirname(realpath(__file__)) + '/words', 'r')
             nounfile = open(dirname(realpath(__file__)) + '/nouns', 'r')
         except Exception as oopsy:
             exit(oopsy)
