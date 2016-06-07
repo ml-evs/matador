@@ -54,6 +54,10 @@ def res2dict(seed, **kwargs):
                 cell = line.split()
             elif 'REM' in line:
                 remark = line.split()
+        if cell == '':
+            raise RuntimeError('missing CELL info')
+        elif titl == '':
+            raise RuntimeError('missing TITL info')
         res['pressure'] = float(titl[2])
         res['cell_volume'] = float(titl[3])
         res['enthalpy'] = float(titl[4])
@@ -66,7 +70,7 @@ def res2dict(seed, **kwargs):
         for line_no, line in enumerate(flines):
             if 'SFAC' in line:
                 i = 1
-                while 'END' not in flines[line_no+i]:
+                while 'END' not in flines[line_no+i] and line_no+i < len(flines):
                     cursor = flines[line_no+i].split()
                     res['atom_types'].append(cursor[0])
                     res['positions_frac'].append(map(float, cursor[2:5]))
