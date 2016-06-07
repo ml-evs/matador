@@ -39,7 +39,6 @@ class Spatula:
         self.import_count = 0
         # I/O files
         self.logfile = open('spatula.log', 'w')
-        chmod('spatula.log', 644)
         try:
             wordfile = open(dirname(realpath(__file__)) + '/words', 'r')
             nounfile = open(dirname(realpath(__file__)) + '/nouns', 'r')
@@ -96,6 +95,8 @@ class Spatula:
         else:
             print('Dryrun complete!')
         self.logfile.close()
+        # set log file to read only
+        chmod('spatula.log', 644)
         self.logfile = open('spatula.log', 'r')
         errors = sum(1 for line in self.logfile)
         if errors == 1:
