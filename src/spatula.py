@@ -14,11 +14,11 @@ import pymongo as pm
 # standard library
 import argparse
 import subprocess
-import datetime
 import random
 from collections import defaultdict
-from os import walk, getcwd, uname, chdir, chmod
-from os.path import realpath, dirname
+import datetime
+from os import walk, getcwd, uname, chdir, chmod, rename
+from os.path import realpath, dirname, getmtime, isfile
 from math import pi, log10
 
 
@@ -38,6 +38,13 @@ class Spatula:
         self.init = True
         self.import_count = 0
         # I/O files
+        if isfile('spatula.log'):
+            mtime = getmtime('spatula.log')
+            mdate = datetime.datetime.fromtimestamp(mtime)
+            mdate = str(mdate).split()[0]
+            mdate = ''.join(mdate.split('-')[i]+'-' for i in [2, 1, 0])
+            mdate = mdate[:-1]
+            rename('spatula.log', 'spatula.log.'+str(mdate).split()[0])
         self.logfile = open('spatula.log', 'w')
         try:
             wordfile = open(dirname(realpath(__file__)) + '/words', 'r')
@@ -96,7 +103,7 @@ class Spatula:
             print('Dryrun complete!')
         self.logfile.close()
         # set log file to read only
-        chmod('spatula.log', 644)
+        chmod('spatula.log', 0644)
         self.logfile = open('spatula.log', 'r')
         errors = sum(1 for line in self.logfile)
         if errors == 1:
@@ -257,11 +264,12 @@ class Spatula:
                                                       (2 * pi * final_struct['kpoints_mp_grid'][j])
                                             max_spacing = (spacing if spacing > max_spacing
                                                            else max_spacing)
+                                        exponent = round(log10(max_spacing) - 1)
                                         final_struct['kpoints_mp_spacing'] = \
-                                            round(max_spacing +
-                                                  0.5 * 10**(round(log10(max_spacing)-1)), 2)
-                        except Exception as oopsy:
-                            print(oopsy)
+                                            round(max_spacing + 0.5 * 10**exponent, 2)
+                        except:
+                            print(struct_dict['source'])
+                            print(input_dict['source'])
                             pass
                         try:
                             final_struct['source'] = struct_dict['source'] + input_dict['source']
