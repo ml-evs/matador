@@ -6,34 +6,29 @@ MongoDB client.
 """
 from __future__ import print_function
 # submodules
-from scrapers.castep_scrapers import *
-from scrapers.experiment_scrapers import *
+from scrapers.castep_scrapers import castep2dict, param2dict, cell2dict
+from scrapers.castep_scrapers import res2dict, dir2dict
+from scrapers.experiment_scrapers import expt2dict, synth2dict
 # external libraries
 import pymongo as pm
-import bson.json_util as json
 # standard library
-import glob
-import gzip
 import argparse
 import subprocess
 import datetime
 import random
 from collections import defaultdict
-from os import walk, getcwd, stat, uname, chdir
-from os.path import realpath, dirname, isfile
-from pwd import getpwuid
-from time import strptime
-from sys import argv
-from fractions import gcd
+from os import walk, getcwd, uname, chdir, chmod
+from os.path import realpath, dirname
 from math import pi, log10
 
+
 class Spatula:
-    """ The Spatula class implements methods to scrape folders 
-    and individual files for crystal structures and create a 
-    MongoDB document for each. 
+    """ The Spatula class implements methods to scrape folders
+    and individual files for crystal structures and create a
+    MongoDB document for each.
 
     Files types that can be read are:
-    
+
         * CASTEP output
         * CASTEP .param, .cell input
         * airss.pl / pyAIRSS .res output
@@ -42,8 +37,9 @@ class Spatula:
         """ Set up arguments and initialise DB client. """
         self.init = True
         self.import_count = 0
-        # I/O files 
+        # I/O files
         self.logfile = open('spatula.log', 'w')
+        chmod('spatula.log', 644)
         try:
             wordfile = open(dirname(realpath(__file__)) + '/words', 'r')
             nounfile = open(dirname(realpath(__file__)) + '/nouns', 'r')
@@ -56,8 +52,8 @@ class Spatula:
         wordfile.close()
         nounfile.close()
         self.dryrun = dryrun
-        self.debug = debug 
-        self.verbosity = verbosity 
+        self.debug = debug
+        self.verbosity = verbosity
         self.scratch = scratch
         self.tag_dict = dict()
         self.tag_dict['tags'] = tags
@@ -86,14 +82,12 @@ class Spatula:
         if not self.dryrun:
             print('Successfully imported', self.import_count, 'structures!')
             # index by enthalpy for faster/larger queries
-            indexed = False
             count = -1
             for entry in self.repo.list_indexes():
                 count += 1
             if count > 0:
                 print('Index found, rebuilding...')
                 self.repo.reindex()
-                indexed = True
             else:
                 print('Building index...')
                 self.repo.create_index([('enthalpy_per_atom', pm.ASCENDING)])
@@ -120,31 +114,27 @@ class Spatula:
             cwd = getcwd()
             chdir(dirname(realpath(__file__)))
             report_dict['version'] = subprocess.check_output(["git", "describe", "--tags"]).strip()
-            report_dict['git_hash'] = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"]).strip()
+            report_dict['git_hash'] = subprocess.check_output(["git", "rev-parse",
+                                                               "--short", "HEAD"]).strip()
             chdir(cwd)
         except:
             print('Failed to get CVS info.')
             report_dict['version'] = 'unknown'
             report_dict['git_hash'] = 'unknown'
         if not self.dryrun:
-            report_id = self.report.insert_one(report_dict) 
+            self.report.insert_one(report_dict)
 
     def struct2db(self, struct):
         """ Insert completed Python dictionary into chosen
         database, with generated text_id. Add quality factor
         for any missing data.
         """
-        plain_text_id = [self.wlines[random.randint(0,self.num_words-1)].strip(),
-                         self.nlines[random.randint(0,self.num_nouns-1)].strip()]
+        plain_text_id = [self.wlines[random.randint(0, self.num_words-1)].strip(),
+                         self.nlines[random.randint(0, self.num_nouns-1)].strip()]
         struct['text_id'] = plain_text_id
         if 'tags' in self.tag_dict:
             struct['tags'] = self.tag_dict['tags']
         struct['quality'] = 5
-        # remove a point for a missing space_group
-        # if struct['space_group'] == 'xxx':
-            # struct['quality'] -= 1
-        # if struct['pressure'] == 'xxx':
-            # struct['quality'] -= 1
         # if no pspot info at all, score = 0
         if 'species_pot' not in struct:
             struct['quality'] = 0
@@ -169,9 +159,8 @@ class Spatula:
         """
         print('\n{:^52}'.format('###### RUNNING IMPORTER ######') + '\n')
         multi = False
-        width = 70
         for root_ind, root in enumerate(file_lists):
-            if root=='.':
+            if root == '.':
                 root_str = getcwd().split('/')[-1]
             else:
                 root_str = root
@@ -200,7 +189,8 @@ class Spatula:
                 elif file_lists[root]['cell_count'] > 1:
                     multi = True
                     if self.verbosity > 5:
-                        print('Multiple cell files found - searching for param file with same name...')
+                        print('Multiple cell files found - ' +
+                              'searching for param file with same name...')
                 if multi:
                     for param_name in file_lists[root]['param']:
                         for cell_name in file_lists[root]['cell']:
@@ -210,13 +200,13 @@ class Spatula:
                                 if not success:
                                     self.logfile.write(param_dict)
                                 cell_dict, success = cell2dict(root + '/' + cell_name)
-                                cell = success 
+                                cell = success
                                 if not success:
                                     self.logfile.write(cell_dict)
                                 if self.verbosity > 0:
                                     print('Found matching cell and param files:', param_name)
                                 break
-                # always try to scrape dir 
+                # always try to scrape dir
                 dir_dict, success = dir2dict(root)
                 if not success:
                     self.logfile.write(dir_dict)
@@ -243,7 +233,9 @@ class Spatula:
                 # create res dicts and combine them with input_dict
                 for ind, file in enumerate(file_lists[root]['res']):
                     if file.replace('.res', '.castep') in file_lists[root]['castep']:
-                        struct_dict, success = castep2dict(root + '/' + file.replace('.res', '.castep'), debug=self.debug)
+                        struct_dict, success = castep2dict(root + '/' +
+                                                           file.replace('.res', '.castep'),
+                                                           debug=self.debug)
                     else:
                         struct_dict, success = res2dict(root + '/' + file)
                     if not success:
@@ -252,7 +244,7 @@ class Spatula:
                         final_struct = input_dict.copy()
                         final_struct.update(struct_dict)
                         try:
-                            # calculate kpoint spacing if not found
+                            # calculate kpoint spacing if not found; only an approximation
                             recip_abc = 3*[0]
                             for j in range(3):
                                 recip_abc[j] = 2 * pi / float(final_struct['lattice_abc'][0][j])
@@ -260,9 +252,13 @@ class Spatula:
                                     if 'kpoints_mp_grid' in final_struct:
                                         max_spacing = 0
                                         for j in range(3):
-                                            spacing = recip_abc[j]/(2 * pi * final_struct['kpoints_mp_grid'][j])
-                                            max_spacing = spacing if spacing > max_spacing else max_spacing
-                                            final_struct['kpoints_mp_spacing'] = float(round(max_spacing + 0.5*10**(round(log10(max_spacing)-1)), 2))
+                                            spacing = recip_abc[j] / \
+                                                      (2 * pi * final_struct['kpoints_mp_grid'][j])
+                                            max_spacing = (spacing if spacing > max_spacing
+                                                           else max_spacing)
+                                        final_struct['kpoints_mp_spacing'] = \
+                                            round(max_spacing +
+                                                  0.5 * 10**(round(log10(max_spacing)-1)), 2)
                         except Exception as oopsy:
                             print(oopsy)
                             pass
@@ -302,9 +298,9 @@ class Spatula:
         # end progress bar
         print('\n')
         return
-     
+
     def scan_dir(self):
-        """ Scans folder topdir recursively, returning list of 
+        """ Scans folder topdir recursively, returning list of
         CASTEP/AIRSS input/output files.
         """
         ResCount, CellCount, CastepCount, ParamCount = 4*[0]
@@ -327,7 +323,9 @@ class Spatula:
                     file_lists[root]['res'].append(file)
                     file_lists[root]['res_count'] += 1
                     ResCount += 1
-                elif file.endswith('.castep') or file.endswith('.history') or file.endswith('.history.gz'):
+                elif (file.endswith('.castep') or
+                      file.endswith('.history') or
+                      file.endswith('.history.gz')):
                     file_lists[root]['castep'].append(file)
                     file_lists[root]['castep_count'] += 1
                     CastepCount += 1
@@ -361,7 +359,8 @@ class Spatula:
         return file_lists
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Import CASTEP/AIRSS results into MongoDB database.',
+    parser = argparse.ArgumentParser(
+            description='Import CASTEP/AIRSS results into MongoDB database.',
             epilog='Written by Matthew Evans (2016)')
     parser.add_argument('-d', '--dryrun', action='store_true',
                         help='run the importer without connecting to the database')
@@ -374,7 +373,7 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--scratch', action='store_true',
                         help='import to junk collection called scratch')
     args = parser.parse_args()
-    importer = Spatula(dryrun=args.dryrun, 
+    importer = Spatula(dryrun=args.dryrun,
                        debug=args.debug,
                        verbosity=args.verbosity,
                        tags=args.tags,
