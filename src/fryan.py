@@ -8,20 +8,18 @@ import pymongo as pm
 import numpy as np
 import argparse
 import string
-import sys
 from sys import argv
 from os import makedirs, system, uname
 from os.path import exists, isfile, expanduser
 from copy import deepcopy
 from bson.son import SON
-import bson.json_util as json
 import re
+
 
 class DBQuery:
     """ Class that implements queries to MongoDB
     structure database.
     """
-    
     def __init__(self, **kwargs):
         """ Initialise the query with command line
         arguments and return results.
@@ -30,7 +28,7 @@ class DBQuery:
         self.args = kwargs
         for arg in self.args:
             if type(self.args[arg]) == str:
-                self.args[arg] = self.args[arg].split() 
+                self.args[arg] = self.args[arg].split()
         # connect to MongoDB
         local = uname()[1]
         if local == 'cluster2':
@@ -49,7 +47,7 @@ class DBQuery:
         if self.args.get('summary'):
             self.top = self.db.command('collstats', self.repo.name)['count']
         else:
-            self.top = self.args.get('top') if self.args.get('top') != None else 10
+            self.top = self.args.get('top') if self.args.get('top') is not None else 10
         # grab all args as string for file dumps
         if self.args.get('sysargs'):
             self.sysargs = ''
@@ -61,8 +59,8 @@ class DBQuery:
                     self.sysargs += arg
                     self.sysargs += '-'
             self.sysargs = 'query-' + self.sysargs
-            self.sysargs = self.sysargs.replace('---','-')
-            self.sysargs = self.sysargs.replace('--','-')
+            self.sysargs = self.sysargs.replace('---', '-')
+            self.sysargs = self.sysargs.replace('--', '-')
         """ PERFORM QUERY """
         self.cursor = EmptyCursor()
         # initalize query_dict to '$and' all queries
@@ -73,7 +71,7 @@ class DBQuery:
         if self.args.get('dbstats'):
             self.dbstats()
             exit()
-        if self.args.get('id') != None:
+        if self.args.get('id') is not None:
             self.cursor = self.repo.find({'text_id': self.args.get('id')})
             if self.cursor.count() < 1:
                 exit('Could not find a match.')
@@ -85,29 +83,30 @@ class DBQuery:
                 # don't append, just set
                 self.query_dict['$and'] = self.query_calc(self.cursor)
                 self.calc_dict['$and'] = list(self.query_dict['$and'])
-        if self.args.get('stoichiometry') != None:
+        if self.args.get('stoichiometry') is not None:
             self.query_dict['$and'].append(self.query_stoichiometry())
-        if self.args.get('composition') != None:
+        if self.args.get('composition') is not None:
             self.query_dict['$and'].append(self.query_composition())
-        if self.args.get('pressure') != None:
+        if self.args.get('pressure') is not None:
             self.query_dict['$and'].append(self.query_pressure())
-        if self.args.get('encapsulated') == True:
+        if self.args.get('encapsulated') is True:
             self.query_dict['$and'].append(self.query_encap())
-        if self.args.get('tags') != None:
+        if self.args.get('tags') is not None:
             self.query_dict['$and'].append(self.query_tags())
         if not self.args.get('ignore_warnings'):
             self.query_dict['$and'].append(self.query_quality())
-        # if self.args.get('user') != None:
+        # if self.args.get('user') is not None:
             # self.query_dict['$and'].append(self.query_user())
-        if (len(self.query_dict['$and']) == 0 and
-            self.args.get('id') == None and
-            not self.args.get('dbstats')):
+        if(len(self.query_dict['$and']) == 0 and
+           self.args.get('id') is None and not
+           self.args.get('dbstats')):
             self.cursor = self.repo.find().sort('enthalpy_per_atom', pm.ASCENDING)
         # clone cursor for further use after printing
         if self.cursor.count() < 1 or self.args.get('calc_match'):
             if self.args.get('details'):
                 print(self.query_dict)
-            self.cursor = self.repo.find(SON(self.query_dict)).sort('enthalpy_per_atom', pm.ASCENDING)
+            self.cursor = self.repo.find(SON(self.query_dict)).sort('enthalpy_per_atom',
+                                                                    pm.ASCENDING)
             # building hull from just comp, find best structure to calc_match
             if self.args.get('hull'):
                 self.args['summary'] = True
@@ -131,15 +130,19 @@ class DBQuery:
                     self.calc_dict['$and'] = list(self.query_dict['$and'])
                     self.query_dict['$and'].append(self.query_composition())
                     test_query_dict.append(self.query_dict)
-                    test_cursor.append(self.repo.find(SON(test_query_dict[-1])).sort('enthalpy_per_atom', pm.ASCENDING))
+                    test_cursor.append(
+                        self.repo.find(SON(test_query_dict[-1])).sort('enthalpy_per_atom',
+                                                                      pm.ASCENDING))
                     test_cursor_count.append(test_cursor[-1].count())
-                    print("{:^24}".format(self.cursor[ind]['text_id'][0]+' '+self.cursor[ind]['text_id'][1]) + ': matched', test_cursor_count[-1], 'structures.')
+                    print("{:^24}".format(self.cursor[ind]['text_id'][0] + ' ' +
+                                          self.cursor[ind]['text_id'][1]) +
+                          ': matched' + test_cursor_count[-1], 'structures.')
                     # if we have at least 2/3 of the structures, just plot
                     if test_cursor_count[-1] > 2*int(self.cursor.count()/3):
                         print('Matched at least 2/3 of total number, composing hull...')
                         break
                     if i == (sample-1) and not rerun:
-                        # if less than half the total structures are to be plotted, take 5 more samples
+                        # if less than half the total structures are to be plotted, rand 5 more
                         if np.max(np.asarray(test_cursor_count)) < int(self.cursor.count()/2):
                             i -= 5
                             rerun = True
@@ -151,10 +154,17 @@ class DBQuery:
         # write query to res or cell with param files
         if self.args.get('cell') or self.args.get('res'):
             if self.cursor.count() >= 1:
-                if self.args.get('top') != None:
-                    self.query2files(cursor[:self.top], self.args.get('res'), self.args.get('cell'), top=True, pressure=self.args.get('write_pressure'))
+                if self.args.get('top') is not None:
+                    self.query2files(cursor[:self.top],
+                                     self.args.get('res'),
+                                     self.args.get('cell'),
+                                     top=True,
+                                     pressure=self.args.get('write_pressure'))
                 else:
-                    self.query2files(cursor, self.args.get('res'), self.args.get('cell'), pressure=self.args.get('write_pressure'))
+                    self.query2files(cursor,
+                                     self.args.get('res'),
+                                     self.args.get('cell'),
+                                     pressure=self.args.get('write_pressure'))
         # if called as script, always print results
         print(self.cursor.count(), 'results found for query.')
         if self.args.get('main'):
@@ -165,7 +175,7 @@ class DBQuery:
                     self.display_results(cursor, details=self.args.get('details'))
 
     def __del__(self):
-        """ Clean up any temporary databases on garbage 
+        """ Clean up any temporary databases on garbage
         collection of DBQuery object.
         """
         try:
@@ -178,29 +188,27 @@ class DBQuery:
         for source in doc['source']:
             if '.castep' or '.res' in source:
                 name = source.split('/')[-1].split('.')[0]
-        name = name + '-' + str(pairs) +'-pair-swaps/' + name
+        name = name + '-' + str(pairs) + '-pair-swaps/' + name
         swapDoc = deepcopy(doc)
         swapAtoms = swapDoc['atom_types']
         for i in range(pairs):
             valid = False
-            while not valid:    
+            while not valid:
                 swap = np.random.randint(0, len(swapAtoms)-1, size=2)
                 if swap[0] != swap[1] and swapAtoms[swap[0]] != swapAtoms[swap[1]]:
                         valid = True
             swapAtoms[swap[1]], swapAtoms[swap[0]] = swapAtoms[swap[0]], swapAtoms[swap[1]]
         swapPos = np.asarray(swapDoc['positions_frac'])
         for i in range(len(swapAtoms)):
-           swapPos[i] += np.random.rand(3) * (0.1 / 7.9)
+            swapPos[i] += np.random.rand(3) * (0.1 / 7.9)
         swapDoc['positions_frac'] = swapPos
         hash = self.generate_hash(8)
         self.doc2cell(swapDoc, name+'-'+hash)
         self.doc2param(swapDoc, name+'-'+hash, template_param)
 
     def generate_hash(self, hashLen=6):
-        """ Quick hash generator, based on implementation in 
-        PyAIRSS by J. Wynn. 
-        """
-        hashChars = hashChars = [str(x) for x in range(0,10)]+[x for x in string.ascii_lowercase]
+        """ Quick hash generator, based on implementation in PyAIRSS by J. Wynn. """
+        hashChars = hashChars = [str(x) for x in range(0, 10)]+[x for x in string.ascii_lowercase]
         hash = ''
         for i in range(hashLen):
             hash += np.random.choice(hashChars)
@@ -211,9 +219,9 @@ class DBQuery:
         including a .param file for each. Eventually handle
         swaps from one element to another from CLI.
         """
-        if cursor.count() > 1000 and top == False:
-            write = raw_input('This operation will write ' + str(cursor.count()) + ' structures,' \
-                    + ' are you sure you want to do this? [y/n] ')
+        if cursor.count() > 1000 and top is False:
+            write = raw_input('This operation will write ' + str(cursor.count()) + ' structures,' +
+                              ' are you sure you want to do this? [y/n] ')
             if write == 'y' or write == 'Y':
                 print('Writing them all.')
                 write = True
@@ -256,12 +264,12 @@ class DBQuery:
     def doc2param(self, doc, path, template=None):
         """ Write basic .param file from single doc. """
         paramList = ['task', 'cut_off_energy', 'xc_functional',
-                'finite_basis_corr', 'spin_polarized']
+                     'finite_basis_corr', 'spin_polarized']
         seedDict = dict()
         paramDict = dict()
         for param in [param for param in paramList if param in doc]:
             seedDict[param] = doc[param]
-        if template != None:
+        if template is not None:
             try:
                 paramDict, success = param2dict(template)
                 if not success:
@@ -303,10 +311,10 @@ class DBQuery:
                 f.write('%ENDBLOCK LATTICE_ABC\n\n')
                 f.write('%BLOCK POSITIONS_FRAC\n')
                 for ind, atom in enumerate(zip(doc['atom_types'], doc['positions_frac'])):
-                    f.write("{0:8s} {1[0]: 15f} {1[1]: 15f} {1[2]: 15f}   1.0\n".format(atom[0], \
+                    f.write("{0:8s} {1[0]: 15f} {1[1]: 15f} {1[2]: 15f}   1.0\n".format(atom[0],
                             atom[1]))
                 f.write('%ENDBLOCK POSITIONS_FRAC\n\n')
-                if pressure != None:
+                if pressure is not None:
                     f.write('%block external_pressure\n'.upper())
                     for pressures in pressure:
                         pressures = str(pressures)
@@ -314,7 +322,7 @@ class DBQuery:
                         f.write(pressure[0] + ' 0 0\n')
                         f.write(pressure[0] + ' 0\n')
                         f.write(pressure[0] + '\n')
-                    elif len(pressure)==6:
+                    elif len(pressure) == 6:
                         f.write(pressure[0] + ' ' + pressure[1] + ' ' + pressure[2] + '\n')
                         f.write(pressure[3] + ' ' + pressure[4] + '\n')
                         f.write(pressure[5] + '\n')
@@ -322,20 +330,21 @@ class DBQuery:
                 if 'kpoints_mp_spacing' in doc:
                     f.write('kpoints_mp_spacing : ' + str(doc['kpoints_mp_spacing']) + '\n')
                 elif 'kpoints_mp_grid' in doc:
-                    f.write('kpoints_mp_grid : ' + str(doc['kpoints_mp_grid'][0]) + ' ' + str(doc['kpoints_mp_grid'][1]) 
-                            + ' ' + str(doc['kpoints_mp_grid'][2]) + '\n')
+                    f.write('kpoints_mp_grid : ' + str(doc['kpoints_mp_grid'][0]) + ' ' +
+                            str(doc['kpoints_mp_grid'][1]) + ' ' +
+                            str(doc['kpoints_mp_grid'][2]) + '\n')
                 f.write('\n%BLOCK SPECIES_POT\n')
                 for elem in doc['species_pot']:
                     if not isfile(''.join(path.split('/')[:-1]) + '/' + doc['species_pot'][elem]):
                             if isfile(expanduser('~/pspot/' + doc['species_pot'][elem])):
-                                system('cp ' + expanduser('~/pspot/') + doc['species_pot'][elem] + \
-                                        ' ' + ''.join(path.split('/')[:-1]))
+                                system('cp ' + expanduser('~/pspot/') + doc['species_pot'][elem] +
+                                       ' ' + ''.join(path.split('/')[:-1]))
                     f.write(elem + '\t' + doc['species_pot'][elem] + '\n')
                 f.write('%ENDBLOCK SPECIES_POT')
         except Exception as oops:
             print('Writing cell file failed for ', doc['text_id'])
             print(oops)
-    
+
     def doc2res(self, doc, path):
         """ Write .res file for single doc. """
         try:
@@ -385,9 +394,9 @@ class DBQuery:
                     atom_labels.extend(num*[j])
                     i += num
                     j += 1
-                for ind, atom in enumerate(zip(doc['atom_types'], atom_labels, doc['positions_frac'])):
-                    f.write("{0:8s}{1:3d}{2[0]: 15f} {2[1]: 15f} {2[2]: 15f}   1.0\n".format(atom[0], \
-                            atom[1], atom[2]))
+                for atom in zip(doc['atom_types'], atom_labels, doc['positions_frac']):
+                    f.write("{0:8s}{1:3d}{2[0]: 15f} {2[1]: 15f} {2[2]: 15f}   1.0\n".format(
+                        atom[0], atom[1], atom[2]))
                 f.write('END')
                 # very important newline for compatibliy with cryan
                 f.write('\n')
@@ -401,14 +410,12 @@ class DBQuery:
         detail_string = []
         detail_substring = []
         source_string = []
-        summary_string = []
         formula_string = []
         last_formula = ''
-        gs_enthalpy = 0
         header_string = "{:^24}".format('ID')
         header_string += "{:^5}".format('!?!')
         header_string += "{:^12}".format('Pressure')
-        header_string += "{:^12}".format('Volume/fu') 
+        header_string += "{:^12}".format('Volume/fu')
         header_string += "{:^18}".format('Enthalpy/atom')
         header_string += "{:^12}".format('Space group')
         header_string += "{:^10}".format('Formula')
@@ -450,14 +457,16 @@ class DBQuery:
                 struct_string[-1] += "{:5}".format(' ')
             try:
                 struct_string[-1] += "{:^ 12.3f}".format(doc['pressure'])
-            except: 
+            except:
                 struct_string[-1] += "{:^12}".format(doc['pressure'])
             try:
-                struct_string[-1] += "{:^12.3f}".format(atom_per_fu * doc['cell_volume'] / doc['num_atoms'])
+                struct_string[-1] += "{:^12.3f}".format(atom_per_fu *
+                                                        doc['cell_volume'] / doc['num_atoms'])
             except:
                 struct_string[-1] += "{:^12}".format('xxx')
             try:
-                struct_string[-1] += "{:^18.5f}".format(doc['enthalpy_per_atom'] - self.gs_enthalpy)
+                struct_string[-1] += "{:^18.5f}".format(doc['enthalpy_per_atom'] -
+                                                        self.gs_enthalpy)
             except:
                 struct_string[-1] += "{:^18}".format('xxx')
             try:
@@ -489,7 +498,9 @@ class DBQuery:
                 else:
                     detail_string[-1] += 'cutoff unknown'
                 if 'external_pressure' in doc:
-                    detail_string[-1] += ', ' + "{:4.2f}".format(doc['external_pressure'][0][0]) + ' GPa'
+                    detail_string[-1] += (', ' +
+                                          "{:4.2f}".format(doc['external_pressure'][0][0]) +
+                                          ' GPa')
                 if 'kpoints_mp_spacing' in doc:
                     detail_string[-1] += ', ' + str(doc['kpoints_mp_spacing']) + ' 1/A'
                 if 'species_pot' in doc:
@@ -510,7 +521,8 @@ class DBQuery:
                     detail_substring[-1] += doc['user']
                 if 'encapsulated' in doc:
                     try:
-                        detail_string[-1] += ', (n,m)=(' + str(doc['cnt_chiral'][0]) + ',' + str(doc['cnt_chiral'][1]) + ')'
+                        detail_string[-1] += (', (n,m)=(' + str(doc['cnt_chiral'][0]) +
+                                              ',' + str(doc['cnt_chiral'][1]) + ')')
                         detail_string[-1] += ', r=' + "{:4.2f}".format(doc['cnt_radius']) + ' A'
                         detail_string[-1] += ', z=' + "{:4.2f}".format(doc['cnt_length']) + ' A'
                     except:
@@ -525,7 +537,7 @@ class DBQuery:
                     elif num != 0:
                         source_string[-1] += (len(u"└────────────── ")+11)*' ' + u'├──'
                     # elif num == 0:
-                    source_string[-1] += ' ' + file[2:] 
+                    source_string[-1] += ' ' + file[2:]
                     if num != len(doc['source'])-1:
                         source_string[-1] += '\n'
         print(len(header_string)*'─')
@@ -534,10 +546,10 @@ class DBQuery:
         if self.args.get('summary'):
             current_formula = ''
             count = 0
-            for ind, string in enumerate(formula_string):
+            for ind, substring in enumerate(formula_string):
                 if count > self.top:
                     break
-                if string != current_formula and string not in formula_string[:ind]:
+                if substring != current_formula and substring not in formula_string[:ind]:
                     count += 1
                     print(struct_string[ind])
                     if details:
@@ -545,9 +557,9 @@ class DBQuery:
                         print(detail_substring[ind])
                     if self.args.get('source'):
                         print(source_string[ind])
-                    current_formula = string
+                    current_formula = substring
         else:
-            for ind, string in enumerate(struct_string):
+            for ind, substring in enumerate(struct_string):
                 print(string)
                 if details:
                     print(detail_string[ind])
@@ -555,8 +567,8 @@ class DBQuery:
                 if self.args.get('source'):
                     print(source_string[ind])
                 if details or self.args.get('source'):
-                    print(len(header_string)*'─')
-        
+                    print(len(header_string) * '─')
+
     def query_stoichiometry(self):
         """ Query DB for particular stoichiometry. """
         # alias stoichiometry
@@ -588,12 +600,12 @@ class DBQuery:
             size_dict['stoichiometry']['$size'] = len(elements)
             query_dict['$and'].append(size_dict)
         return query_dict
-    
+
     def query_composition(self, custom_elem=None):
-        """ Query DB for all structures containing 
+        """ Query DB for all structures containing
         all the elements taken as input.
         """
-        if custom_elem == None:
+        if custom_elem is None:
             elements = self.args.get('composition')
         else:
             elements = custom_elem
@@ -604,10 +616,11 @@ class DBQuery:
             if elements[0].isdigit():
                 numeracy = True
         try:
-            if numeracy == False:
+            if numeracy is False:
                 for elem in elements:
                     if bool(re.search(r'\d', elem)):
-                        raise RuntimeError('Composition string must be a list of elements or a single number.')
+                        raise RuntimeError('Composition string must be a ' +
+                                           'list of elements or a single number.')
             elif numeracy:
                 if self.args.get('partial_formula'):
                     raise RuntimeError('Number of elements not compatible with partial formula.')
@@ -632,7 +645,7 @@ class DBQuery:
             size_dict['stoichiometry']['$size'] = num
             query_dict['$and'].append(size_dict)
         return query_dict
- 
+
     def query_tags(self):
         """ Find all structures matching given tags. """
         query_dict = dict()
@@ -650,17 +663,6 @@ class DBQuery:
         query_dict['quality'] = dict()
         query_dict['quality']['$gt'] = 0
         return query_dict
-
-    """ disabled for time being, not very useful """
-    # def query_user(self):
-        # """ Find all structures matching given tags. """
-        # query_dict = dict()
-        # query_dict['$and'] = []
-        # query_dict['$and'].append(dict())
-        # query_dict['$and'][-1]['$or'] = []
-        # for user in self.args.get('user'):
-            # query_dict['$and'][-1]['$or'].append([dict('user', user)])
-        # return query_dict
 
     def query_pressure(self):
         """ Query pressure, either by an exact match on external_pressure
@@ -687,14 +689,14 @@ class DBQuery:
         temp_dict['pressure']['$gt'] = approx_pressure[0]
         query_dict['$and'].append(temp_dict)
         return query_dict
-    
+
     def query_encap(self):
         """ Query only CNT encapsulated structures. """
         query_dict = dict()
         query_dict['encapsulated'] = dict()
         query_dict['encapsulated']['$exists'] = True
         return query_dict
- 
+
     def query_calc(self, cursor):
         """ Find all structures with matching
         accuracy to specified structure.
@@ -738,17 +740,19 @@ class DBQuery:
         """ Print spatula report on current database. """
         try:
             report = self.report.find_one()
-            print('Database last modified on', report['last_modified'], 'with spatula', report['version'], 
-                  'changeset (' + report['git_hash'] + ').')
+            print('Database last modified on', report['last_modified'], 'with spatula',
+                  report['version'], 'changeset (' + report['git_hash'] + ').')
         except:
             print('Failed to print database report: spatula is probably running!')
-    
+
     def dbstats(self):
-        """ Print some useful stats about the database. """ 
+        """ Print some useful stats about the database. """
         db_stats_dict = self.db.command('collstats', self.repo.name)
-        print('Database collection', self.db.name + '.' + self.repo.name, 'contains', db_stats_dict['count'],
-              'structures at', "{:.1f}".format(db_stats_dict['avgObjSize']/1024), 'kB each, totalling', 
-              "{:.1f}".format(db_stats_dict['storageSize']/(1024**2)), 'MB when padding is included.')
+        print('Database collection', self.db.name + '.' + self.repo.name, 'contains',
+              db_stats_dict['count'], 'structures at',
+              "{:.1f}".format(db_stats_dict['avgObjSize']/1024), 'kB each, totalling',
+              "{:.1f}".format(db_stats_dict['storageSize']/(1024**2)),
+              'MB when padding is included.')
         cursor = self.repo.find()
         comp_list = dict()
         for doc in cursor:
@@ -763,7 +767,7 @@ class DBQuery:
         keys = list(comp_list.keys())
         vals = list(comp_list.values())
         comp_list = zip(keys, vals)
-        comp_list.sort(key = lambda t:t[1], reverse=True)
+        comp_list.sort(key=lambda t: t[1], reverse=True)
         small_list = []
         small_count = 0
         first_ind = 1000
@@ -774,26 +778,32 @@ class DBQuery:
                     first_ind = ind
                 small_list.append(comp[0])
                 small_count += comp[1]
-        comp_list = comp_list[:first_ind] 
+        comp_list = comp_list[:first_ind]
         comp_list.append(['others < ' + str(cutoff), small_count])
-        comp_list.sort(key = lambda t:t[1], reverse=True)
-        from ascii_graph import Pyasciigraph
-        from ascii_graph.colors import Gre, Blu, Yel, Red
-        from ascii_graph.colordata import hcolor
+        comp_list.sort(key=lambda t: t[1], reverse=True)
+        try:
+            from ascii_graph import Pyasciigraph
+            from ascii_graph.colors import Gre, Blu, Red
+            from ascii_graph.colordata import hcolor
+        except:
+            exit('Pyascii graph missing; not printing dbstats.')
         graph = Pyasciigraph(line_length=80, multivalue=False)
-        db_stats_dict['count']
-        thresholds = {int(db_stats_dict['count']/40): Gre, int(db_stats_dict['count']/10): Blu, int(db_stats_dict['count']/4): Red,}
+        thresholds = {
+                        int(db_stats_dict['count']/40): Gre,
+                        int(db_stats_dict['count']/10): Blu,
+                        int(db_stats_dict['count']/4): Red
+                     }
         data = hcolor(comp_list, thresholds)
         for line in graph.graph(label=None, data=data):
-           print(line) 
+            print(line)
         print('where others', end=': ')
         for small in small_list:
             print(small, end=', ')
-        print('\n') 
+        print('\n')
 
     def temp_collection(self, cursor):
         """ Create temporary collection
-        for successive filtering. 
+        for successive filtering.
         """
         # check temp doesn't already exist; drop if it does
         try:
@@ -808,77 +818,80 @@ class DBQuery:
             exit('No structures found.')
         return self.temp
 
+
 class EmptyCursor:
     """ Empty cursor class for failures. """
     def count(self):
-        return 0 
+        return 0
+
     def clone(self):
         return EmptyCursor()
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Query MongoDB structure database.',
+    parser = argparse.ArgumentParser(
+            description='Query MongoDB structure database.',
             epilog='Written by Matthew Evans (2016). Based on the cryan concept by Chris Pickard.')
     group = parser.add_argument_group()
     group.add_argument('-f', '--formula', nargs='+', type=str,
-        help='choose a stoichiometry, e.g. Ge 1 Te 1 Si 3, or GeTeSi3')
+                       help='choose a stoichiometry, e.g. Ge 1 Te 1 Si 3, or GeTeSi3')
     group.add_argument('-c', '--composition', nargs='+', type=str,
-        help=('find all structures containing the given elements, e.g. GeTeSi, or find' +
-        'the number of structures with n elements, e.g. 1, 2, 3'))
+                       help=('find all structures containing the given elements, e.g. GeTeSi, ' +
+                             'or find the number of structures with n elements, e.g. 1, 2, 3'))
     group.add_argument('-i', '--id', type=str, nargs='+',
-            help='specify a particular structure by its text_id')
+                       help='specify a particular structure by its text_id')
     parser.add_argument('-s', '--summary', action='store_true',
-            help='show only the ground state for each formula (i.e. phase+stoichiometry)')
+                        help='show only the ground state for each formula')
     parser.add_argument('-t', '--top', type=int,
-            help='number of structures to show (DEFAULT: 10)')
+                        help='number of structures to show (DEFAULT: 10)')
     parser.add_argument('-d', '--details', action='store_true',
-            help='show as much detail about calculation as possible')
+                        help='show as much detail about calculation as possible')
     parser.add_argument('-p', '--pressure', type=float,
-            help='specify an isotropic external pressure to search for, e.g. 10 (GPa)')
+                        help='specify an isotropic external pressure to search for, e.g. 10 (GPa)')
     parser.add_argument('--source', action='store_true',
-            help='print filenames from which structures were wrangled')
+                        help='print filenames from which structures were wrangled')
     parser.add_argument('-ac', '--calc-match', action='store_true',
-            help='display calculations of the same accuracy as specified id')
+                        help='display calculations of the same accuracy as specified id')
     parser.add_argument('-pf', '--partial-formula', action='store_true',
-            help=('stoichiometry/composition queries will include other unspecified species,' +
-            'e.g. search for Ge2Te3 will also return Ge2Te3Si or Ge4Te6Fe2, and search for Li will' +
-            ' include any structure containing Li, not just pure Li.'))
+                        help=('stoichiometry/composition queries will include other unspecified ' +
+                              'species, e.g. -pf search for Li will query any structure' +
+                              'containing Li, not just pure Li.'))
     parser.add_argument('--encap', action='store_true',
-            help='query only structures encapsulated in a carbon nanotube.')
+                        help='query only structures encapsulated in a carbon nanotube.')
     parser.add_argument('--dbstats', action='store_true',
-            help=('print some stats about the database that is being queried'))
-    parser.add_argument('--user', nargs=1, type=str,
-            help=('search for a CRSid (or other user tag) to find a particular user\'s structures'))
+                        help='print some stats about the database that is being queried')
     parser.add_argument('--tags', nargs='+', type=str,
-            help=('search for up to 3 manual tags at once'))
+                        help=('search for up to 3 manual tags at once'))
     parser.add_argument('--hull', action='store_true',
-            help=('create a convex hull for 2 elements (to be extended to 3, 4 soon)'))
+                        help='create a convex hull for 2 elements (to be extended to 3, 4 soon)')
     parser.add_argument('--voltage', action='store_true',
-            help=('create a voltage curve for a convex hull'))
+                        help='create a voltage curve for a convex hull')
     parser.add_argument('--strict', action='store_true',
-            help=('strictly matches with calc_match, useful for hulls where convergence is rough'))
+                        help=('strictly matches with calc_match,'
+                              'useful for hulls where convergence is rough'))
     parser.add_argument('--loose', action='store_true',
-            help=('loosely matches with calc_match, i.e. only matches pspot and xc_functional'))
+                        help=('loosely matches with calc_match, i.e. only matches' +
+                              'pspot and xc_functional'))
     parser.add_argument('--ignore_warnings', action='store_true',
-            help=('includes possibly bad structures'))
+                        help='includes possibly bad structures')
     parser.add_argument('--dis', action='store_true',
-            help='smear hull with local stoichiometry')
+                        help='smear hull with local stoichiometry')
     parser.add_argument('--scratch', action='store_true',
-            help=('query local scratch database'))
+                        help='query local scratch database')
     parser.add_argument('--cell', action='store_true',
-            help='export query to .cell files in folder name from query string')
+                        help='export query to .cell files in folder name from query string')
     parser.add_argument('--res', action='store_true',
-            help='export query to .res files in folder name from query string')
+                        help='export query to .res files in folder name from query string')
     parser.add_argument('--write_pressure', nargs='+', type=str,
-            help='pressure to add to new cell file, either one float' +  
-            'for isotropic or 6 floats for anisotropic.')
+                        help=('pressure to add to new cell file, either one float' +
+                              'for isotropic or 6 floats for anisotropic.'))
     args = parser.parse_args()
-    if args.calc_match and args.id == None:
+    if args.calc_match and args.id is None:
         exit('--calc-match requires -i or --id')
-    if args.hull == True and args.composition == None:
+    if args.hull and args.composition is None:
         exit('--hull requires --composition')
-    if args.dis == True and args.hull != True:
+    if args.dis and not args.hull:
         exit('--dis requires --hull')
-    if args.write_pressure and args.cell != True:
+    if args.write_pressure and args.cell is not True:
         exit('--write_pressure requires cell')
     if args.voltage and not args.hull:
         args.hull = True
@@ -889,18 +902,20 @@ if __name__ == '__main__':
                     details=args.details,
                     pressure=args.pressure,
                     source=args.source,
-                    calc_match=args.calc_match, 
+                    calc_match=args.calc_match,
                     strict=args.strict,
                     loose=args.loose,
-                    ignore_warnings=args.ignore_warnings, 
+                    ignore_warnings=args.ignore_warnings,
                     voltage=args.voltage,
                     partial_formula=args.partial_formula,
                     dbstats=args.dbstats,
                     scratch=args.scratch,
                     encapsulated=args.encap,
                     tags=args.tags,
-                    user=args.user,hull=args.hull,
-                    dis=args.dis, res=args.res,
+                    user=args.user,
+                    hull=args.hull,
+                    dis=args.dis,
+                    res=args.res,
                     cell=args.cell,
                     write_pressure=args.write_pressure,
                     main=True,
