@@ -9,13 +9,14 @@ import bson.json_util as json
 # standard library
 from collections import defaultdict
 from os import getcwd, stat
-from os.path import realpath, dirname, isfile
+from os.path import isfile
 from time import strptime
 from fractions import gcd
 from math import pi, log10
 from pwd import getpwuid
 import glob
 import gzip
+
 
 def res2dict(seed, **kwargs):
     """ Extract available information from .res file; preferably
@@ -28,7 +29,7 @@ def res2dict(seed, **kwargs):
         seed = seed.replace('.res', '')
     with open(seed+'.res', 'r') as f:
         flines = f.readlines()
-    # add .res to source 
+    # add .res to source
     res['source'].append(seed+'.res')
     # grab file owner username
     try:
@@ -38,7 +39,7 @@ def res2dict(seed, **kwargs):
             print(seed+'.res has no owner.')
         res['user'] == 'xxx'
     if 'CollCode' in seed:
-        res['icsd'] = seed.split('CollCode')[-1] 
+        res['icsd'] = seed.split('CollCode')[-1]
     # alias special lines in res file
     try:
         titl = ''
@@ -71,19 +72,22 @@ def res2dict(seed, **kwargs):
                     res['positions_frac'].append(map(float, cursor[2:5]))
                     i += 1
         # deal with implicit encapsulation
-        if len(remark)>0:
+        if len(remark) > 0:
             if 'NTPROPS' in remark:
                 res['cnt_chiral'] = [0, 0]
                 res['encapsulated'] = True
                 for ind, entry in enumerate(remark):
                     if 'chiralN' in entry:
-                        res['cnt_chiral'][0] = int(remark[ind+1].replace(',',''))
+                        res['cnt_chiral'][0] = int(remark[ind+1].replace(',', ''))
                     if 'chiralM' in entry:
-                        res['cnt_chiral'][1] = int(remark[ind+1].replace(',',''))
+                        res['cnt_chiral'][1] = int(remark[ind+1].replace(',', ''))
                     if entry == '\'r\':':
-                        res['cnt_radius'] = float(remark[ind+1].replace(',',''))
+                        res['cnt_radius'] = float(remark[ind+1].replace(',', ''))
                     if entry == '\'z\':':
-                        res['cnt_length'] = float(remark[ind+1].replace(',','').replace('\n','').replace('}',''))
+                        temp_length = remark[ind+1].replace(',', '')
+                        temp_length = temp_length.replace('\n', '')
+                        temp_length = temp_length.replace('}', '')
+                        res['cnt_length'] = float(temp_length)
         # calculate stoichiometry
         res['stoichiometry'] = defaultdict(float)
         for atom in res['atom_types']:
@@ -107,11 +111,12 @@ def res2dict(seed, **kwargs):
     except Exception as oopsy:
         if kwargs.get('verbosity') > 0:
             print(oopsy)
-            print('Error in .res file', seed+ '.res, skipping...')
+            print('Error in .res file', seed + '.res, skipping...')
         return seed+'.res\t\t'+str(oopsy)+'\n', False
     if kwargs.get('verbosity') > 4:
         print(json.dumps(res, indent=2))
     return res, True
+
 
 def cell2dict(seed, **kwargs):
     """ Extract available information from .cell file; probably
@@ -133,15 +138,16 @@ def cell2dict(seed, **kwargs):
                 i = 1
                 while 'endblock' not in flines[line_no+i].lower():
                     try:
-                        cell['species_pot'][flines[line_no+i].split()[0]] = flines[line_no+i].split()[1].split('/')[-1]
+                        cell['species_pot'][flines[line_no+i].split()[0]] = \
+                                flines[line_no+i].split()[1].split('/')[-1]
                     except:
                         pass
                     i += 1
             elif '%block external_pressure' in line.lower():
                 cell['external_pressure'] = list()
                 for j in range(3):
-                   flines[line_no+j+1] = flines[line_no+j+1].replace(',', '')
-                   cell['external_pressure'].append(map(float, flines[line_no+j+1].split()))
+                    flines[line_no+j+1] = flines[line_no+j+1].replace(',', '')
+                    cell['external_pressure'].append(map(float, flines[line_no+j+1].split()))
             elif 'mp_spacing' in line.lower():
                 cell['kpoints_mp_spacing'] = float(line.split()[-1])
             elif 'mp_grid' in line.lower():
@@ -151,19 +157,19 @@ def cell2dict(seed, **kwargs):
     except Exception as oopsy:
         if kwargs.get('verbosity') > 0:
             print(oopsy)
-            print('Error in', seed +'.cell, skipping...')
+            print('Error in', seed + '.cell, skipping...')
         return seed + '\t\t' + str(oopsy), False
     try:
         for species in cell['species_pot']:
             if 'OTF' in cell['species_pot'][species].upper():
                 pspot_seed = ''
                 for dir in seed.split('/')[:-1]:
-                    pspot_seed += dir + '/' 
+                    pspot_seed += dir + '/'
                 # glob for all .usp files with format species_*OTF.usp
                 pspot_seed += species + '_*OTF.usp'
                 for globbed in glob.glob(pspot_seed):
                     if isfile(globbed):
-                        with open(globbed, 'r') as f:    
+                        with open(globbed, 'r') as f:
                             flines = f.readlines()
                             for line_no, line in enumerate(flines):
                                 if 'Pseudopotential Report' in line:
@@ -174,16 +180,18 @@ def cell2dict(seed, **kwargs):
                                             elem = flines[line_no+i].split(':')[1].split()[0]
                                         elif 'core correction' in flines[line_no+i]:
                                             i += 2
-                                            cell['species_pot'][elem] = flines[line_no+i].split('"')[1]
+                                            cell['species_pot'][elem] = \
+                                                flines[line_no+i].split('"')[1]
                                         i += 1
     except Exception as oopsy:
         if kwargs.get('verbosity') > 0:
             print(oopsy)
-            print('Error in', seed +'.cell, skipping...')
+            print('Error in', seed + '.cell, skipping...')
         return seed + '\t\t' + str(oopsy), False
     if kwargs.get('debug'):
-        print(json.dumps(cell,indent=2))
+        print(json.dumps(cell, indent=2))
     return cell, True
+
 
 def param2dict(seed, **kwargs):
     """ Extract available information from .param file; probably
@@ -207,7 +215,7 @@ def param2dict(seed, **kwargs):
         for line_no, line in enumerate(flines):
             line = line.lower()
             # skip blank lines and comments
-            if line.startswith(('#', '!')) or len(line.strip())==0:
+            if line.startswith(('#', '!')) or len(line.strip()) == 0:
                 continue
             else:
                 if [rubbish for rubbish in scrub_list if rubbish in line]:
@@ -216,16 +224,19 @@ def param2dict(seed, **kwargs):
                 else:
                     for splitter in splitters:
                         if splitter in line:
-                            param[line.split(splitter)[0].strip()] = line.split(splitter)[-1].strip()
+                            param[line.split(splitter)[0].strip()] = \
+                                line.split(splitter)[-1].strip()
                             if 'spin_polarized' in line:
-                                if [false for false in false_str if false in param['spin_polarized']]:
+                                if [false for false in false_str
+                                        if false in param['spin_polarized']]:
                                     param['spin_polarized'] = False
                                 else:
                                     param['spin_polarized'] = True
                             if 'cut_off_energy' in line:
-                                param['cut_off_energy'] = float(param['cut_off_energy'].replace('ev','').strip())
+                                temp_cut_off = param['cut_off_energy'].replace('ev', '').strip()
+                                param['cut_off_energy'] = float(temp_cut_off)
                             if 'xc_functional' in line:
-                                param['xc_functional'] = param['xc_functional'].upper() 
+                                param['xc_functional'] = param['xc_functional'].upper()
                             if 'perc_extra_bands' in line:
                                 param['perc_extra_bands'] = float(param['perc_extra_bands'])
     except Exception as oopsy:
@@ -234,24 +245,25 @@ def param2dict(seed, **kwargs):
             print('Error in', seed+'.param, skipping...')
         return seed + '\t\t' + str(oopsy), False
     if kwargs.get('debug'):
-        print(json.dumps(param,indent=2))
+        print(json.dumps(param, indent=2))
     return param, True
+
 
 def dir2dict(seed, **kwargs):
     """ Try to extract information from directory name; last hope
-    if no param file has been found. 
+    if no param file has been found.
     """
     dir_dict = defaultdict(list)
     info = False
     if seed == '.':
         seed = getcwd().split('/')[-1]
     dirs_as_list = seed.split('/')
-    task_list = ['GO', 'NMR', 'OPTICS'] 
+    task_list = ['GO', 'NMR', 'OPTICS']
     phase_list = ['alpha', 'beta', 'gamma', 'theta']
     defect_list = ['vacancy', 'interstitial']
     try:
         for dir in dirs_as_list:
-            if dir=='.':
+            if dir == '.':
                 dir = getcwd().split('/')[-1]
             if len(dir.split('-')) > 3:
                 if dir[0].isalpha():
@@ -272,13 +284,13 @@ def dir2dict(seed, **kwargs):
                 # else:
                     # this is broken; need to fix for certain cases
                     # dir_dict['species_pot'] = dir.split('-')[offset+5]
-                info = True 
+                info = True
             elif 'GPa' in dir:
                 try:
                     dir_dict['external_pressure'].append([float(dir.split('_')[0]), 0.0, 0.0])
                     dir_dict['external_pressure'].append([float(dir.split('_')[0]), 0.0])
                     dir_dict['external_pressure'].append([float(dir.split('_')[0])])
-                    info = True 
+                    info = True
                 except:
                     pass
             if [phase for phase in phase_list if phase in dir]:
@@ -304,8 +316,9 @@ def dir2dict(seed, **kwargs):
             print('Error wrangling dir name', seed)
         return seed + '\t\t' + str(oopsy), False
     if kwargs.get('debug'):
-        print(json.dumps(dir_dict,indent=2))
+        print(json.dumps(dir_dict, indent=2))
     return dir_dict, True
+
 
 def castep2dict(seed, **kwargs):
     """ From seed filename, create dict of the most relevant
@@ -320,12 +333,13 @@ def castep2dict(seed, **kwargs):
     else:
         with open(seed, 'r') as f:
             flines = f.readlines()
-    # set source tag to castep file 
+    # set source tag to castep file
     castep['source'].append(seed)
     # grab file owner
     castep['user'] = getpwuid(stat(seed).st_uid).pw_name
     if 'CollCode' in seed:
-        castep['icsd'] = seed.split('CollCode')[-1].replace('.castep', '').replace('.history', '').replace('.gz', '')
+        temp_icsd = seed.split('CollCode')[-1].replace('.castep', '').replace('.history', '')
+        castep['icsd'] = temp_icsd
     try:
         # wrangle castep file for basic parameters
         for line_no, line in enumerate(flines):
@@ -340,7 +354,7 @@ def castep2dict(seed, **kwargs):
                     castep['xc_functional'] = 'PBE'
                 elif 'PBE for solids' in xc_string:
                     castep['xc_functional'] = 'PBESol'
-                elif 'hybrid B3LYP' in xc_string: 
+                elif 'hybrid B3LYP' in xc_string:
                     castep['xc_functional'] = 'B3LYP'
                 elif 'hybrid HSE03' in xc_string:
                     castep['xc_functional'] = 'HSE03'
@@ -352,9 +366,10 @@ def castep2dict(seed, **kwargs):
                 castep['finite_basis_corr'] = line.split(':')[-1].strip()
             elif 'kpoints_mp_grid' not in castep and 'MP grid size for SCF' in line:
                 castep['kpoints_mp_grid'] = map(int, list(line.split('is')[-1].split()))
-            elif 'sedc_apply' not in castep and 'DFT+D: Semi-empirical dispersion correction    : on' in line:
+            elif 'sedc_apply' not in castep and \
+                    'DFT+D: Semi-empirical dispersion correction    : on' in line:
                 castep['sedc_apply'] = True
-                castep['sedc_scheme'] = flines[line_no+1].split(':')[1].split()[0] 
+                castep['sedc_scheme'] = flines[line_no+1].split(':')[1].split()[0]
             elif 'kpoints_calculated' not in castep and 'Number of kpoints used' in line:
                 castep['kpoints_calculated'] = int(line.split('=')[-1])
             elif 'space_group' not in castep and 'Space group of crystal' in line:
@@ -363,28 +378,29 @@ def castep2dict(seed, **kwargs):
                 castep['external_pressure'] = list()
                 castep['external_pressure'].append(map(float, flines[line_no+1].split()))
                 castep['external_pressure'].append(map(float, flines[line_no+2].split()))
-                castep['external_pressure'].append(map(float, flines[line_no+3].split())) 
+                castep['external_pressure'].append(map(float, flines[line_no+3].split()))
             elif 'spin_polarized' not in castep and 'treating system as spin-polarized' in line:
                 castep['spin_polarized'] = True
-            elif 'atom types' not in castep and 'Cell Contents' in line: 
-                castep['atom_types'] = list() 
+            elif 'atom types' not in castep and 'Cell Contents' in line:
+                castep['atom_types'] = list()
                 castep['stoichiometry'] = defaultdict(float)
                 castep['positions_frac'] = list()
-                i = 1 
-                atoms = False 
-                while True: 
+                i = 1
+                atoms = False
+                while True:
                     if atoms:
                         if 'xxxxxxxxx' in flines[line_no+i]:
                             atoms = False
                             break
                         else:
                             castep['atom_types'].append(flines[line_no+i].split()[1])
-                            castep['positions_frac'].append((map(float, (flines[line_no+i].split()[3:6]))))
+                            castep['positions_frac'].append((map(float,
+                                                            (flines[line_no+i].split()[3:6]))))
                     if 'x------' in flines[line_no+i]:
-                        atoms= True
+                        atoms = True
                     i += 1
                 castep['num_atoms'] = len(castep['atom_types'])
-                # 
+                #
                 min = 2000
                 for atom in castep['atom_types']:
                     if atom not in castep['stoichiometry']:
@@ -413,12 +429,15 @@ def castep2dict(seed, **kwargs):
                 castep['species_pot'] = dict()
                 i = 1
                 while True:
-                    if len(flines[line_no+i].strip())==0:
+                    if len(flines[line_no+i].strip()) == 0:
                         break
                     else:
-                        castep['species_pot'][flines[line_no+i].split()[0].strip()] = flines[line_no+i].split()[1].split('/')[-1]
-                        if castep['species_pot'][flines[line_no+i].split()[0].strip()] == 'Pseudopotential':
-                            castep['species_pot'][flines[line_no+i].split()[0].strip()] = flines[line_no+i].split()[0].strip()+'_OTF.usp'
+                        castep['species_pot'][flines[line_no+i].split()[0].strip()] = \
+                                flines[line_no+i].split()[1].split('/')[-1]
+                        if(castep['species_pot'][flines[line_no+i].split()[0].strip()] ==
+                                'Pseudopotential'):
+                            castep['species_pot'][flines[line_no+i].split()[0].strip()] = \
+                                    flines[line_no+i].split()[0].strip()+'_OTF.usp'
                         i += 1
             # don't check if final_energy exists, as this will update for each GO step
             elif 'Final energy, E' in line:
@@ -454,17 +473,28 @@ def castep2dict(seed, **kwargs):
                             if len(final_flines[line_no+i].strip()) == 0:
                                 break
                             else:
-                                castep['lattice_cart'].append((map(float, (final_flines[line_no+i].split()[0:3]))))
+                                temp_line = final_flines[line_no+i].split()[0:3]
+                                castep['lattice_cart'].append((map(float, temp_line)))
                             i += 1
                     elif 'Lattice parameters' in line:
                         castep['lattice_abc'] = list()
                         i = 1
-                        castep['lattice_abc'].append(map(float, [final_flines[line_no+i].split('=')[1].strip().split(' ')[0], 
-                                                                 final_flines[line_no+i+1].split('=')[1].strip().split(' ')[0],
-                                                                 final_flines[line_no+i+2].split('=')[1].strip().split(' ')[0]]))
-                        castep['lattice_abc'].append(map(float, [final_flines[line_no+i].split('=')[-1].strip(),
-                                                                 final_flines[line_no+i+1].split('=')[-1].strip(),
-                                                                 final_flines[line_no+i+2].split('=')[-1].strip()]))
+                        castep['lattice_abc'].append(
+                                map(float,
+                                    [
+                                     final_flines[line_no+i].split('=')[1].strip().split(' ')[0],
+                                     final_flines[line_no+i+1].split('=')[1].strip().split(' ')[0],
+                                     final_flines[line_no+i+2].split('=')[1].strip().split(' ')[0]
+                                    ]
+                                    ))
+                        castep['lattice_abc'].append(
+                                map(float,
+                                    [
+                                     final_flines[line_no+i].split('=')[-1].strip(),
+                                     final_flines[line_no+i+1].split('=')[-1].strip(),
+                                     final_flines[line_no+i+2].split('=')[-1].strip()
+                                    ]
+                                    ))
                         recip_abc = 3*[0]
                         for j in range(3):
                             recip_abc[j] = 2 * pi / float(castep['lattice_abc'][0][j])
@@ -473,10 +503,12 @@ def castep2dict(seed, **kwargs):
                             for j in range(3):
                                 spacing = recip_abc[j]/(2 * pi * castep['kpoints_mp_grid'][j])
                                 max_spacing = spacing if spacing > max_spacing else max_spacing
-                            castep['kpoints_mp_spacing'] = float(round(max_spacing + 0.5*10**(round(log10(max_spacing)-1)), 2))
+                            exponent = round(log10(max_spacing) - 1)
+                            temp_spacing = max_spacing + 0.5 * 10 ** exponent
+                            castep['kpoints_mp_spacing'] = float(round(temp_spacing, 2))
                     elif 'Current cell volume' in line:
                         castep['cell_volume'] = float(line.split('=')[1].split()[0].strip())
-                    elif 'Cell Contents' in line :
+                    elif 'Cell Contents' in line:
                         castep['positions_frac'] = list()
                         i = 1
                         atoms = False
@@ -486,7 +518,8 @@ def castep2dict(seed, **kwargs):
                                     atoms = False
                                     break
                                 else:
-                                    castep['positions_frac'].append((map(float, (final_flines[line_no+i].split()[3:6]))))
+                                    temp_frac = final_flines[line_no+i].split()[3:6]
+                                    castep['positions_frac'].append((map(float, temp_frac)))
                             if 'x------' in final_flines[line_no+i]:
                                 atoms = True
                             i += 1
@@ -502,7 +535,8 @@ def castep2dict(seed, **kwargs):
                                 else:
                                     force_on_atom = 0
                                     for j in range(3):
-                                        force_on_atom += float(final_flines[line_no+i].replace('(cons\'d)', '').split()[3+j])**2
+                                        temp = final_flines[line_no+i].replace('(cons\'d)', '')
+                                        force_on_atom += float(temp.split()[3+j])**2
                                     if force_on_atom > max_force:
                                         max_force = force_on_atom
                             elif 'x' in final_flines[line_no+i]:
@@ -516,7 +550,8 @@ def castep2dict(seed, **kwargs):
                             if 'Cartesian components' in final_flines[line_no+i]:
                                 castep['stress'] = []
                                 for j in range(3):
-                                    castep['stress'].append((map(float, (final_flines[line_no+i+j+4].split()[2:5]))))
+                                    castep['stress'].append((map(
+                                        float, (final_flines[line_no+i+j+4].split()[2:5]))))
                             elif 'Pressure' in final_flines[line_no+i]:
                                 castep['pressure'] = float(final_flines[line_no+i].split()[-2])
                                 break
@@ -531,12 +566,15 @@ def castep2dict(seed, **kwargs):
                         i = 0
                         while i < len(castep['atom_types']):
                             if castep['spin_polarized']:
-                                castep['mulliken_charges'].append(float(final_flines[line_no+i+4].split()[-2]))
-                                castep['mulliken_spins'].append(float(final_flines[line_no+i+4].split()[-1]))
+                                castep['mulliken_charges'].append(
+                                        float(final_flines[line_no+i+4].split()[-2]))
+                                castep['mulliken_spins'].append(
+                                        float(final_flines[line_no+i+4].split()[-1]))
                                 castep['mulliken_net_spin'] += castep['mulliken_spins'][-1]
                                 castep['mulliken_abs_spin'] += abs(castep['mulliken_spins'][-1])
                             else:
-                                castep['mulliken_charges'].append(float(final_flines[line_no+i+4].split()[-1]))
+                                castep['mulliken_charges'].append(
+                                        float(final_flines[line_no+i+4].split()[-1]))
                             i += 1
                     elif 'Bond' and 'Population' in line.split():
                         try:
@@ -546,7 +584,7 @@ def castep2dict(seed, **kwargs):
                                 split = final_flines[line_no+i].split()
                                 split[1] = int(split[1])-1
                                 split[4] = int(split[4])-1
-                                # convert element-wise atom labels to 
+                                # convert element-wise atom labels to
                                 # appropriate index of atom_types
                                 for q in range(len(castep['atom_types'])):
                                     if castep['atom_types'][q] == split[0]:
@@ -556,20 +594,22 @@ def castep2dict(seed, **kwargs):
                                     if castep['atom_types'][q] == split[3]:
                                         split[4] += q
                                         break
-                                castep['bonds'].append([[split[1], split[4]], float(split[5]), float(split[6])])
-                                i += 1 
+                                castep['bonds'].append(
+                                        [[split[1], split[4]], float(split[5]), float(split[6])])
+                                i += 1
                                 if '===' in final_flines[line_no+i]:
                                     break
                         except:
                             pass
                     elif 'Final Enthalpy' in line:
                         castep['enthalpy'] = float(line.split('=')[-1].split()[0])
-                        castep['enthalpy_per_atom'] = float(line.split('=')[-1].split()[0])/castep['num_atoms']
+                        castep['enthalpy_per_atom'] = (float(line.split('=')[-1].split()[0]) /
+                                                       castep['num_atoms'])
                     elif 'Final bulk modulus' in line:
                         try:
                             castep['bulk_modulus'] = float(line.split('=')[-1].split()[0])
                         except:
-                            continue 
+                            continue
         # computing metadata, i.e. parallelism, time, memory, version
         for line in flines:
             if 'Release CASTEP version' in line:
@@ -584,8 +624,8 @@ def castep2dict(seed, **kwargs):
             elif 'Peak Memory Use' in line:
                 castep['peak_mem_MB'] = int(float(line.split()[-2])/1024)
         # check that any optimized results were saved and raise errors if not
-        if castep['optimised'] == False:
-            raise RuntimeError('CASTEP GO failed to converge.') 
+        if castep['optimised'] is False:
+            raise RuntimeError('CASTEP GO failed to converge.')
         if 'enthalpy' not in castep:
             raise RuntimeError('Could not find enthalpy')
         if 'positions_frac' not in castep:
@@ -600,7 +640,7 @@ def castep2dict(seed, **kwargs):
         if kwargs.get('dryrun'):
             print(oopsy)
             print('Error in .castep file', seed, 'skipping...')
-        return seed+ '\t\t' + str(oopsy)+'\n', False
+        return seed + '\t\t' + str(oopsy)+'\n', False
     if kwargs.get('debug'):
-        print(json.dumps(castep,indent=2, ensure_ascii=False))
+        print(json.dumps(castep, indent=2, ensure_ascii=False))
     return castep, True
