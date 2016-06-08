@@ -38,14 +38,17 @@ class Spatula:
         self.init = True
         self.import_count = 0
         # I/O files
-        if isfile('spatula.log'):
-            mtime = getmtime('spatula.log')
-            mdate = datetime.datetime.fromtimestamp(mtime)
-            mdate = str(mdate).split()[0]
-            mdate = ''.join(mdate.split('-')[i]+'-' for i in [2, 1, 0])
-            mdate = mdate[:-1]
-            rename('spatula.log', 'spatula.log.'+str(mdate).split()[0])
-        self.logfile = open('spatula.log', 'w')
+        if not dryrun:
+            logfile_name = 'spatula.log'
+            if isfile(logfile_name):
+                mtime = getmtime(logfile_name)
+                mdate = datetime.datetime.fromtimestamp(mtime)
+                mdate = str(mdate).split()[0]
+                mdate = mdate[:-1]
+                rename(logfile_name, logfile_name + '.' + str(mdate).split()[0])
+        else:
+            logfile_name = 'spatula.log.dryrun'
+        self.logfile = open(logfile_name, 'w')
         try:
             wordfile = open(dirname(realpath(__file__)) + '/words', 'r')
             nounfile = open(dirname(realpath(__file__)) + '/nouns', 'r')
@@ -98,13 +101,16 @@ class Spatula:
                 print('Building index...')
                 self.repo.create_index([('enthalpy_per_atom', pm.ASCENDING)])
                 self.repo.create_index([('stoichiometry', pm.ASCENDING)])
+                self.repo.create_index([('cut_off_energy', pm.ASCENDING)])
+                self.repo.create_index([('species_pot', pm.ASCENDING)])
                 print('Done!')
         else:
             print('Dryrun complete!')
         self.logfile.close()
-        # set log file to read only
-        chmod('spatula.log', 0644)
-        self.logfile = open('spatula.log', 'r')
+        if not self.dryrun:
+            # set log file to read only
+            chmod(logfile_name, 0550)
+        self.logfile = open(logfile_name, 'r')
         errors = sum(1 for line in self.logfile)
         if errors == 1:
             print('There is', errors, 'error to view in spatala.log')

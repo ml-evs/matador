@@ -912,7 +912,6 @@ if __name__ == '__main__':
                     scratch=args.scratch,
                     encapsulated=args.encap,
                     tags=args.tags,
-                    user=args.user,
                     hull=args.hull,
                     dis=args.dis,
                     res=args.res,

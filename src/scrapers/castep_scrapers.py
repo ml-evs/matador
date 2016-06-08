@@ -49,7 +49,7 @@ def res2dict(seed, **kwargs):
             if 'TITL' in line:
                 titl = line.split()
                 if len(titl) != 12:
-                    raise RuntimeError('res file header missing some data')
+                    raise RuntimeError('missing TITL info')
             elif 'CELL' in line:
                 cell = line.split()
             elif 'REM' in line:
@@ -455,7 +455,7 @@ def castep2dict(seed, **kwargs):
             castep['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0], [0.0]]
         # task specific options
         if castep['task'] != 'geometryoptimization' and castep['task'] != 'geometry optimization':
-            raise RuntimeError('CASTEP file does not contain GO calculation', castep['task'])
+            raise RuntimeError('CASTEP file does not contain GO calculation')
         else:
             final = False
             finish_line = 0
