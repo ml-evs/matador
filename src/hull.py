@@ -25,7 +25,7 @@ class FryanConvexHull():
         self.query = query
         self.binary_hull()
 
-    def binary_hull(self, dis=False):
+    def binary_hull(self, dis=True):
         """ Create a convex hull for two elements. """
         query = self.query
         # local_cursor = query.cursor.clone()
@@ -65,8 +65,10 @@ class FryanConvexHull():
 
         formation = np.zeros((query.cursor.count()))
         stoich = np.zeros((query.cursor.count()))
-        disorder = np.zeros((query.cursor.count()))
         enthalpy = np.zeros((query.cursor.count()))
+        disorder = np.zeros((query.cursor.count()))
+        if dis:
+            from disorder import disorder_hull
         info = []
         x_elem = elements[0]
         one_minus_x_elem = elements[1]
@@ -101,7 +103,7 @@ class FryanConvexHull():
                                                                       doc['space_group'],
                                                                       formation[ind]))
             if dis:
-                disorder[ind], warren = self.disorder_hull(doc)
+                disorder[ind], warren = disorder_hull(doc)
         formation = np.append([0.0], formation)
         formation = np.append(formation, [0.0])
         enthalpy = np.append(mu_enthalpy[1], enthalpy)
