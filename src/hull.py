@@ -28,6 +28,7 @@ class FryanConvexHull():
     def binary_hull(self, dis=False):
         """ Create a convex hull for two elements. """
         query = self.query
+        # local_cursor = query.cursor.clone()
         elements = query.args.get('composition')
         elements = [elem for elem in re.split(r'([A-Z][a-z]*)', elements[0]) if elem]
         if len(elements) != 2:
@@ -45,6 +46,7 @@ class FryanConvexHull():
             query_dict.append(dict())
             query_dict[-1]['$and'] = list(self.query.calc_dict['$and'])
             query_dict[-1]['$and'].append(self.query.query_composition(custom_elem=[elem]))
+            query_dict[-1]['$and'].append(self.query.query_tags())
             mu_cursor = self.query.repo.find(SON(query_dict[-1])).sort('enthalpy_per_atom',
                                                                        pm.ASCENDING)
             for doc_ind, doc in enumerate(mu_cursor):
@@ -100,7 +102,6 @@ class FryanConvexHull():
                                                                       formation[ind]))
             if dis:
                 disorder[ind], warren = self.disorder_hull(doc)
-        print(disorder)
         formation = np.append([0.0], formation)
         formation = np.append(formation, [0.0])
         enthalpy = np.append(mu_enthalpy[1], enthalpy)
@@ -142,6 +143,7 @@ class FryanConvexHull():
         stable_energy = []
         stable_comp = []
         stable_enthalpy = []
+        hull_docs = []
         for ind in range(len(hull.vertices)):
             if structures[hull.vertices[ind], 1] <= 0:
                 stable_energy.append(structures[hull.vertices[ind], 1])
@@ -151,6 +153,10 @@ class FryanConvexHull():
                                           structures[hull.vertices[ind], 1],
                                           c='r', marker='*', zorder=1000, edgecolor='k',
                                           s=250, lw=1, alpha=1, label=info[hull.vertices[ind]]))
+        # skip last and first as they are chem pots
+        for ind in range(1, len(hull.vertices)-1):
+            query.cursor.rewind()
+            hull_docs.append(query.cursor[int(np.sort(hull.vertices)[ind])])
         stable_energy = np.asarray(stable_energy)
         stable_comp = np.asarray(stable_comp)
         stable_enthalpy = np.asarray(stable_enthalpy)
@@ -177,7 +183,8 @@ class FryanConvexHull():
             print('Generating voltage curve...')
             self.voltage_curve(stable_enthalpy, stable_comp, mu_enthalpy, elements)
         plt.show()
-        return structures, disorder, hull, mu, info, fig
+        self.hull_docs = hull_docs
+        return hull_docs
 
     def voltage_curve(self, stable_enthalpy, stable_comp, mu_enthalpy, elements):
         """ Take convex hull and plot voltage curves. """
@@ -203,7 +210,7 @@ class FryanConvexHull():
             colour.append(ax._get_lines.prop_cycler.next()['color'])
         except:
             colour.append('blue')
-        print(zip(x, V))
+        # print(zip(x, V))
         for i in range(1, len(V)):
             ax.scatter(x[i], V[i],
                        marker='*', c=colour[0], zorder=1000, edgecolor='k', s=200, lw=1)
