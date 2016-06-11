@@ -94,8 +94,6 @@ class OQMDConverter:
                        converged in ('1')")
         success_count = 0
         for row in cursor:
-            if success_count > 100:
-                break
             calc_doc = row
             if calc_doc is None:
                 continue
@@ -145,10 +143,14 @@ class OQMDConverter:
                 print(json.dumps(final_struct, indent=2))
             success_count += 1
             if not self.dryrun:
-                self.oqmd_struct2db(final_struct)
+                self.import_count += self.oqmd_struct2db(final_struct)
         if self.dryrun:
             print('Successfully scraped', success_count, '/',
                   count, 'structures.')
+        if not self.dryrun:
+            print('Successfully imported', self.import_count, '/',
+                  count, 'structures.')
+        return
 
     def oqmd_calculation2dict(self, doc):
         """ Take a calculation from oqmd.calculations and
