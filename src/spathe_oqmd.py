@@ -4,19 +4,23 @@
 You probably don't want to be using this unless you have
 MySQL set up exactly as I do.
 Matthew Evans 2016
+
+TO-DO
+* fix pspots
 """
 from __future__ import print_function
 # external libraries
 import MySQLdb
 import MySQLdb.cursors
 import pymongo as pm
-# import bson.json_util as json
+import bson.json_util as json
 # standard library
 from collections import defaultdict
 from random import randint
 from os.path import dirname, realpath
 import argparse
 import re
+from ast import literal_eval
 
 
 class OQMDConverter:
@@ -47,10 +51,12 @@ class OQMDConverter:
             except Exception as oopsy:
                 exit(oopsy)
         # connect to SQL database as root, with "use oqmd"
+        print('Connecting to OQMD SQL...')
         self.oqmd = MySQLdb.connect(host='localhost',
                                     user='root',
                                     cursorclass=MySQLdb.cursors.DictCursor,
                                     db='oqmd')
+        print('Successfully connected.')
         # if not dryrunning, connect to OQMD or scratch MongoDB
         if not self.dryrun:
             self.client = pm.MongoClient()
@@ -76,35 +82,52 @@ class OQMDConverter:
 
     def sql2db(self):
         # start by scraping all structures marked with 'fine_relax'
-        cursor = self.db.cursor()
-        cursor.execute("select * from calculations where label in ('fine_relax')")
-        while True:
-            calc_doc = cursor.fetchone()
+        cursor = self.oqmd.cursor()
+        cursor.execute("select count(label) from calculations where label in ('fine_relax') and \
+                        converged in ('1')")
+        count = cursor.fetchone()['count(label)']
+        if count == 0:
+            exit('No structures found with that label.')
+        print(count, 'structures found.')
+        # select only converged structures
+        cursor.execute("select * from calculations where label in ('fine_relax') and \
+                       converged in ('1')")
+        success_count = 0
+        for row in cursor:
+            if success_count > 100:
+                break
+            calc_doc = row
             if calc_doc is None:
-                exit('No calculations found with that label.')
-            elif calc_doc['converged'] == 0:
                 continue
             calculation_dict, success = self.oqmd_calculation2dict(calc_doc)
             if not success:
+                if self.debug:
+                    print('Failed to read calculation.')
                 continue
             entry_id = calculation_dict['source']['entry_id']
             sql_query = "select * from structures where label in ('fine_relax') \
-                              and entry_id in ('" + entry_id + "')"
+                              and entry_id in ('" + str(entry_id) + "')"
             cursor.execute(sql_query)
             # should only be one matching; revise at later date
             struct_doc = cursor.fetchone()
             structure_dict, success = self.oqmd_structure2dict(struct_doc)
             if not success:
+                if self.debug:
+                    print('Failed to read structure.')
                 continue
             structure_id = structure_dict['source']['structure_id']
             # grab spacegroup symbol from ID
             spacegroup_id = structure_dict['spacegroup_id']
-            sql_query = "select * from spacegroups where spacegroup_id in \
-                              ('" + spacegroup_id + "')"
+            sql_query = "select * from spacegroups where number in \
+                              ('" + str(spacegroup_id) + "')"
             cursor.execute(sql_query)
-            structure_dict['space_group'] = cursor.fetchone()['hm']
+            space_group = cursor.fetchone()
+            if space_group is None:
+                structure_dict['space_group'] = 'xxx'
+            else:
+                structure_dict['space_group'] = space_group['hm']
             sql_query = "select * from atoms where structure_id in \
-                              ('" + structure_id + "')"
+                              ('" + str(structure_id) + "')"
             cursor.execute(sql_query)
             atom_docs = cursor.fetchall()
             if len(atom_docs) != structure_dict['num_atoms']:
@@ -112,12 +135,20 @@ class OQMDConverter:
                 continue
             atoms_dict, success = self.oqmd_atoms2dict(atom_docs)
             if not success:
+                if self.debug:
+                    print('Failed to read atoms.')
                 continue
             final_struct = calculation_dict.copy()
             final_struct.update(structure_dict)
             final_struct.update(atoms_dict)
+            if self.debug:
+                print(json.dumps(final_struct, indent=2))
+            success_count += 1
             if not self.dryrun:
                 self.oqmd_struct2db(final_struct)
+        if self.dryrun:
+            print('Successfully scraped', success_count, '/',
+                  count, 'structures.')
 
     def oqmd_calculation2dict(self, doc):
         """ Take a calculation from oqmd.calculations and
@@ -130,19 +161,27 @@ class OQMDConverter:
             calculation['source'] = dict()
             calculation['source']['entry_id'] = doc['entry_id']
             calculation['source']['input_id'] = doc['input_id']
-            calculation['stoichiometry'] = [elem for elem in
-                                            re.split(r'([A-Z][a-z]*)',
-                                                     doc['composition_id']) if elem]
+            # convert stoich from string to list to tuple
+            temp_stoich_list = [elem for elem in
+                                re.split(r'([A-Z][a-z]*)',
+                                         doc['composition_id']) if elem]
+            # print(temp_stoich_list)
+            for ind, item in enumerate(temp_stoich_list):
+                if ind % 2 == 0:
+                    # print(temp_stoich_list[ind], temp_stoich_list[ind+1])
+                    calculation['stoichiometry'].append([str(temp_stoich_list[ind]),
+                                                         int(temp_stoich_list[ind+1])])
             # grab energies and pretend they are enthalpies
             calculation['enthalpy'] = float(doc['energy'])
             calculation['enthalpy_per_atom'] = float(doc['energy_pa'])
             # grab settings
-            calculation['cut_off_energy'] = float(doc['encut'])
-            calculation['xc_functional'] = doc['xc'].upper()
-            calculation['elec_energy_tol'] = float(doc['ediff'])
-            if doc['ispin'] == 2:
+            settings = literal_eval(doc['settings'])
+            calculation['cut_off_energy'] = settings['encut']
+            calculation['xc_functional'] = settings['potentials'][0]['xc'].upper()
+            calculation['elec_energy_tol'] = settings['ediff']
+            if settings['ispin'] == 2:
                 calculation['spin_polarized'] = True
-            calculation['species_pot'] = doc['potentials']
+            # calculation['species_pot'] = settings['potentials']
         except Exception as oopsy:
             print(oopsy)
             return dict(), False
@@ -164,7 +203,7 @@ class OQMDConverter:
             structure['lattice_cart'].append([doc['x1'], doc['x2'], doc['x3']])
             structure['lattice_cart'].append([doc['y1'], doc['y2'], doc['y3']])
             structure['lattice_cart'].append([doc['z1'], doc['z2'], doc['z3']])
-            structure['volume'] = doc['volume']
+            structure['cell_volume'] = doc['volume']
         except Exception as oopsy:
             print(oopsy)
             return dict(), False
@@ -179,7 +218,7 @@ class OQMDConverter:
             max_force = 0
             for doc in atom_docs:
                 atoms['atom_types'].append(doc['element_id'])
-                atoms['positions_frac'].append(doc['x'], doc['y'], doc['z'])
+                atoms['positions_frac'].append([doc['x'], doc['y'], doc['z']])
                 force_tmp = doc['fx']**2 + doc['fy']**2 + doc['fz']**2
                 if force_tmp > max_force:
                     max_force = force_tmp
