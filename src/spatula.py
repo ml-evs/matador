@@ -14,7 +14,7 @@ import pymongo as pm
 # standard library
 import argparse
 import subprocess
-import random
+from random import randint
 from collections import defaultdict
 import datetime
 from os import walk, getcwd, uname, chdir, chmod, rename
@@ -46,20 +46,20 @@ class Spatula:
                 mdate = str(mdate).split()[0]
                 mdate = mdate[:-1]
                 rename(logfile_name, logfile_name + '.' + str(mdate).split()[0])
+            try:
+                wordfile = open(dirname(realpath(__file__)) + '/words', 'r')
+                nounfile = open(dirname(realpath(__file__)) + '/nouns', 'r')
+                self.wlines = wordfile.readlines()
+                self.num_words = len(self.wlines)
+                self.nlines = nounfile.readlines()
+                self.num_nouns = len(self.nlines)
+                wordfile.close()
+                nounfile.close()
+            except Exception as oopsy:
+                exit(oopsy)
         else:
             logfile_name = 'spatula.log.dryrun'
         self.logfile = open(logfile_name, 'w')
-        try:
-            wordfile = open(dirname(realpath(__file__)) + '/words', 'r')
-            nounfile = open(dirname(realpath(__file__)) + '/nouns', 'r')
-        except Exception as oopsy:
-            exit(oopsy)
-        self.wlines = wordfile.readlines()
-        self.num_words = len(self.wlines)
-        self.nlines = nounfile.readlines()
-        self.num_nouns = len(self.nlines)
-        wordfile.close()
-        nounfile.close()
         self.dryrun = dryrun
         self.debug = debug
         self.verbosity = verbosity
@@ -143,8 +143,8 @@ class Spatula:
         database, with generated text_id. Add quality factor
         for any missing data.
         """
-        plain_text_id = [self.wlines[random.randint(0, self.num_words-1)].strip(),
-                         self.nlines[random.randint(0, self.num_nouns-1)].strip()]
+        plain_text_id = [self.wlines[randint(0, self.num_words-1)].strip(),
+                         self.nlines[randint(0, self.num_nouns-1)].strip()]
         struct['text_id'] = plain_text_id
         if 'tags' in self.tag_dict:
             struct['tags'] = self.tag_dict['tags']
@@ -310,8 +310,6 @@ class Spatula:
                         if not self.dryrun:
                             expt_dict.update(self.tag_dict)
                             self.import_count += self.exp2db(expt_dict)
-        # end progress bar
-        print('\n')
         return
 
     def scan_dir(self):
