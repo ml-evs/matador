@@ -270,6 +270,11 @@ def param2dict(seed, **kwargs):
                                 param['xc_functional'] = param['xc_functional'].upper()
                             if 'perc_extra_bands' in line:
                                 param['perc_extra_bands'] = float(param['perc_extra_bands'])
+                            if 'geom_force_tol' in line:
+                                param['max_force_on_atom'] = float(param['geom_force_tol'])
+        # if no defined geom_force_tol, use CASTEP default
+        if 'max_force_on_atom' not in param:
+            param['max_force_on_atom'] = 0.05
     except Exception as oopsy:
         if kwargs.get('verbosity') > 0:
             print(oopsy)
