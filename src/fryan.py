@@ -39,6 +39,8 @@ class DBQuery:
         self.db = self.client.crystals
         if self.args.get('scratch'):
             self.repo = self.client.crystals.scratch
+        elif self.args.get('oqmd'):
+            self.repo = self.client.crystals.oqmd
         else:
             self.repo = self.client.crystals.repo
         # print last spatula report
@@ -95,9 +97,7 @@ class DBQuery:
             self.query_dict['$and'].append(self.query_tags())
         if not self.args.get('ignore_warnings'):
             self.query_dict['$and'].append(self.query_quality())
-        # if self.args.get('user') is not None:
-            # self.query_dict['$and'].append(self.query_user())
-        if(len(self.query_dict['$and']) == 0 and
+        if(len(self.query_dict['$and']) <= 1 and
            self.args.get('id') is None and not
            self.args.get('dbstats')):
             self.cursor = self.repo.find().sort('enthalpy_per_atom', pm.ASCENDING)
@@ -876,7 +876,9 @@ if __name__ == '__main__':
     parser.add_argument('--dis', action='store_true',
                         help='smear hull with local stoichiometry')
     parser.add_argument('--scratch', action='store_true',
-                        help='query local scratch database')
+                        help='query local scratch collection')
+    parser.add_argument('--oqmd', action='store_true',
+                        help='query local OQMD collection')
     parser.add_argument('--cell', action='store_true',
                         help='export query to .cell files in folder name from query string')
     parser.add_argument('--res', action='store_true',
@@ -895,6 +897,10 @@ if __name__ == '__main__':
         exit('--write_pressure requires cell')
     if args.voltage and not args.hull:
         args.hull = True
+    if args.oqmd and args.scratch:
+        exit('--oqmd not compatible with --scratch')
+    if args.oqmd and args.res:
+        exit('--oqmd not compatible with --res, use --cell.')
     query = DBQuery(stoichiometry=args.formula,
                     composition=args.composition,
                     summary=args.summary,
@@ -910,6 +916,7 @@ if __name__ == '__main__':
                     partial_formula=args.partial_formula,
                     dbstats=args.dbstats,
                     scratch=args.scratch,
+                    oqmd=args.oqmd,
                     encapsulated=args.encap,
                     tags=args.tags,
                     hull=args.hull,
