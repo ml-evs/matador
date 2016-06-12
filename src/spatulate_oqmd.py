@@ -20,6 +20,7 @@ from random import randint
 from os.path import dirname, realpath
 import argparse
 import re
+from traceback import print_exc
 from ast import literal_eval
 
 
@@ -85,7 +86,7 @@ class OQMDConverter:
         """ Perform SQL query to scrape, and hop around the tables
         to collect all data associated with one structure.
         """
-        # start by scraping all structures marked with 'fine_relax'
+        # start by scraping all converged structures with chosen label
         cursor = self.oqmd.cursor()
         cursor.execute("select count(label) from calculations where label in ('" +
                        self.label + "') and converged in ('1')")
@@ -103,19 +104,15 @@ class OQMDConverter:
                 continue
             calculation_dict, success = self.oqmd_calculation2dict(calc_doc)
             if not success:
-                if self.debug:
-                    print('Failed to read calculation.')
                 continue
             entry_id = calculation_dict['source']['entry_id']
-            sql_query = "select * from structures where label in ('fine_relax') \
-                              and entry_id in ('" + str(entry_id) + "')"
+            sql_query = "select * from structures where label in ('" + \
+                        self.label + "') and entry_id in ('" + str(entry_id) + "')"
             cursor.execute(sql_query)
             # should only be one matching; revise at later date
             struct_doc = cursor.fetchone()
             structure_dict, success = self.oqmd_structure2dict(struct_doc)
             if not success:
-                if self.debug:
-                    print('Failed to read structure.')
                 continue
             structure_id = structure_dict['source']['structure_id']
             # grab spacegroup symbol from ID
@@ -123,11 +120,13 @@ class OQMDConverter:
             sql_query = "select * from spacegroups where number in \
                               ('" + str(spacegroup_id) + "')"
             cursor.execute(sql_query)
-            space_group = cursor.fetchone()
-            if space_group is None:
-                structure_dict['space_group'] = 'xxx'
-            else:
+            try:
+                space_group = cursor.fetchone()
                 structure_dict['space_group'] = space_group['hm']
+            except:
+                structure_dict['space_group'] = 'xxx'
+                if self.debug:
+                    print('Failed to get space group.')
             sql_query = "select * from atoms where structure_id in \
                               ('" + str(structure_id) + "')"
             cursor.execute(sql_query)
@@ -137,8 +136,6 @@ class OQMDConverter:
                 continue
             atoms_dict, success = self.oqmd_atoms2dict(atom_docs)
             if not success:
-                if self.debug:
-                    print('Failed to read atoms.')
                 continue
             final_struct = calculation_dict.copy()
             final_struct.update(structure_dict)
@@ -184,8 +181,11 @@ class OQMDConverter:
             if settings['ispin'] == 2:
                 calculation['spin_polarized'] = True
             # calculation['species_pot'] = settings['potentials']
-        except Exception as oops:
-            print(type(oops), oops)
+        except Exception:
+            if self.debug:
+                print('Scraping calculation failed.')
+                print_exc()
+                print(80*'─')
             return dict(), False
         return calculation, True
 
@@ -206,8 +206,11 @@ class OQMDConverter:
             structure['lattice_cart'].append([doc['y1'], doc['y2'], doc['y3']])
             structure['lattice_cart'].append([doc['z1'], doc['z2'], doc['z3']])
             structure['cell_volume'] = doc['volume']
-        except Exception as oops:
-            print(type(oops), oops)
+        except Exception:
+            if self.debug:
+                print('Scraping structure failed.')
+                print_exc()
+                print(80*'─')
             return dict(), False
         return structure, True
 
@@ -227,8 +230,11 @@ class OQMDConverter:
                 atoms['spins'].append(doc['magmom'])
                 atoms['charges'].append(doc['charge'])
             atoms['max_force_on_atom'] = max_force
-        except Exception as oops:
-            print(type(oops), oops)
+        except Exception:
+            if self.debug:
+                print('Scraping atoms failed.')
+                print_exc()
+                print(80*'─')
             return dict(), False
         return atoms, True
 
