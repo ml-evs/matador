@@ -25,7 +25,7 @@ class FryanConvexHull():
         self.query = query
         self.binary_hull()
 
-    def binary_hull(self, dis=True):
+    def binary_hull(self, dis=False):
         """ Create a convex hull for two elements. """
         query = self.query
         # local_cursor = query.cursor.clone()
@@ -46,7 +46,8 @@ class FryanConvexHull():
             query_dict.append(dict())
             query_dict[-1]['$and'] = list(self.query.calc_dict['$and'])
             query_dict[-1]['$and'].append(self.query.query_composition(custom_elem=[elem]))
-            query_dict[-1]['$and'].append(self.query.query_tags())
+            if self.query.args.get('tags') is not None:
+                query_dict[-1]['$and'].append(self.query.query_tags())
             mu_cursor = self.query.repo.find(SON(query_dict[-1])).sort('enthalpy_per_atom',
                                                                        pm.ASCENDING)
             for doc_ind, doc in enumerate(mu_cursor):
@@ -156,9 +157,13 @@ class FryanConvexHull():
                                           c='r', marker='*', zorder=1000, edgecolor='k',
                                           s=250, lw=1, alpha=1, label=info[hull.vertices[ind]]))
         # skip last and first as they are chem pots
-        for ind in range(1, len(hull.vertices)-1):
-            query.cursor.rewind()
-            hull_docs.append(query.cursor[int(np.sort(hull.vertices)[ind])])
+        try:
+            for ind in range(1, len(hull.vertices)-1):
+                query.cursor.rewind()
+                hull_docs.append(query.cursor[int(np.sort(hull.vertices)[ind])])
+        except:
+            print('Failed to create hull cursor, skipping...')
+            pass
         stable_energy = np.asarray(stable_energy)
         stable_comp = np.asarray(stable_comp)
         stable_enthalpy = np.asarray(stable_enthalpy)
