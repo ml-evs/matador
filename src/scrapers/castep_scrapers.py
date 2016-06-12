@@ -139,11 +139,11 @@ def res2dict(seed, **kwargs):
             else:
                 temp_stoich.append([key, value/gcd_val])
         res['stoichiometry'] = temp_stoich
-    except Exception as oopsy:
+    except Exception as oops:
         if kwargs.get('verbosity') > 0:
-            print(oopsy)
+            print(type(oops), oops)
             print('Error in .res file', seed + '.res, skipping...')
-        return seed+'.res\t\t'+str(oopsy)+'\n', False
+        return seed+'.res\t\t' + type(oops) + ' ' + oops + '\n', False
     if kwargs.get('verbosity') > 4:
         print(json.dumps(res, indent=2))
     return res, True
@@ -185,11 +185,11 @@ def cell2dict(seed, **kwargs):
                 cell['kpoints_mp_grid'] = map(int, line.split()[-3:])
         if 'external_pressure' not in cell:
             cell['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0], [0.0]]
-    except Exception as oopsy:
+    except Exception as oops:
         if kwargs.get('verbosity') > 0:
-            print(oopsy)
+            print(type(oops), oops)
             print('Error in', seed + '.cell, skipping...')
-        return seed + '\t\t' + str(oopsy), False
+        return seed + '\t\t' + type(oops) + ' ' + oops, False
     try:
         for species in cell['species_pot']:
             if 'OTF' in cell['species_pot'][species].upper():
@@ -214,11 +214,11 @@ def cell2dict(seed, **kwargs):
                                             cell['species_pot'][elem] = \
                                                 flines[line_no+i].split('"')[1]
                                         i += 1
-    except Exception as oopsy:
+    except Exception as oops:
         if kwargs.get('verbosity') > 0:
-            print(oopsy)
+            print(type(oops), oops)
             print('Error in', seed + '.cell, skipping...')
-        return seed + '\t\t' + str(oopsy), False
+        return seed + '\t\t' + type(oops) + ' ' + oops, False
     if kwargs.get('debug'):
         print(json.dumps(cell, indent=2))
     return cell, True
@@ -275,11 +275,11 @@ def param2dict(seed, **kwargs):
         # if no defined geom_force_tol, use CASTEP default
         if 'max_force_on_atom' not in param:
             param['max_force_on_atom'] = 0.05
-    except Exception as oopsy:
+    except Exception as oops:
         if kwargs.get('verbosity') > 0:
-            print(oopsy)
+            print(type(oops), oops)
             print('Error in', seed+'.param, skipping...')
-        return seed + '\t\t' + str(oopsy), False
+        return seed + '\t\t' + type(oops) + ' ' + oops, False
     if kwargs.get('debug'):
         print(json.dumps(param, indent=2))
     return param, True
@@ -346,11 +346,11 @@ def dir2dict(seed, **kwargs):
         else:
             if kwargs.get('verbosity') > 0:
                 print('No information found in dirname', seed)
-    except Exception as oopsy:
+    except Exception as oops:
         if kwargs.get('verbosity') > 0:
-            print(oopsy)
+            print(type(oops), oops)
             print('Error wrangling dir name', seed)
-        return seed + '\t\t' + str(oopsy), False
+        return seed + '\t\t' + type(oops) + ' ' + oops, False
     if kwargs.get('debug'):
         print(json.dumps(dir_dict, indent=2))
     return dir_dict, True
@@ -672,11 +672,11 @@ def castep2dict(seed, **kwargs):
             castep['cell_volume'] = 'xxx'
         if 'space_group' not in castep:
             castep['space_group'] = 'xxx'
-    except Exception as oopsy:
+    except Exception as oops:
         if kwargs.get('dryrun'):
-            print(oopsy)
+            print(type(oops), oops)
             print('Error in .castep file', seed, 'skipping...')
-        return seed + '\t\t' + str(oopsy)+'\n', False
+        return seed + '\t\t' + type(oops) + ' ' + oops+'\n', False
     if kwargs.get('debug'):
         print(json.dumps(castep, indent=2, ensure_ascii=False))
     return castep, True
