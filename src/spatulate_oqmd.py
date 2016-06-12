@@ -69,6 +69,10 @@ class OQMDConverter:
                 self.repo = self.db.oqmd
         # scrape structures from SQL database
         self.sql2db()
+        if not self.dryrun:
+            # index new data by enthalpy
+            print('Indexing...')
+            self.repo.create_index([('enthalpy_per_atom', pm.ASCENDING)])
 
     def oqmd_struct2db(self, struct):
         """ Insert completed Python dictionary into chosen
