@@ -219,7 +219,7 @@ def cell2dict(seed, **kwargs):
         if kwargs.get('verbosity') > 0:
             print_exc()
             print('Error in', seed + '.cell, skipping...')
-        return seed + '\t\t' + str(type(oops)) + ' ' + str(oops), False
+        return seed + '.cell\t\t' + str(type(oops)) + ' ' + str(oops), False
     if kwargs.get('debug'):
         print(json.dumps(cell, indent=2))
     return cell, True
@@ -285,7 +285,7 @@ def param2dict(seed, **kwargs):
             print_exc()
             print('Error in', seed+'.param, skipping...')
         print_exc()
-        return seed + '\t\t' + str(type(oops)) + ' ' + str(oops), False
+        return seed + '.param\t\t' + str(type(oops)) + ' ' + str(oops), False
     if kwargs.get('debug'):
         print(json.dumps(param, indent=2))
     return param, True
