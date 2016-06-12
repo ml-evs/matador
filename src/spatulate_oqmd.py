@@ -7,6 +7,7 @@ Matthew Evans 2016
 
 TO-DO
 * fix pspots
+* find k-points
 """
 from __future__ import print_function
 # external libraries
@@ -162,16 +163,14 @@ class OQMDConverter:
             calculation = defaultdict(list)
             # try to get output ID first
             calculation['source'] = dict()
-            calculation['source']['entry_id'] = doc['e3ntry_id']
+            calculation['source']['entry_id'] = doc['entry_id']
             calculation['source']['input_id'] = doc['input_id']
             # convert stoich from string to list to tuple
             temp_stoich_list = [elem for elem in
                                 re.split(r'([A-Z][a-z]*)',
                                          doc['composition_id']) if elem]
-            # print(temp_stoich_list)
             for ind, item in enumerate(temp_stoich_list):
                 if ind % 2 == 0:
-                    # print(temp_stoich_list[ind], temp_stoich_list[ind+1])
                     calculation['stoichiometry'].append([str(temp_stoich_list[ind]),
                                                          int(temp_stoich_list[ind+1])])
             # grab energies and pretend they are enthalpies
