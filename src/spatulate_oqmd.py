@@ -13,7 +13,6 @@ from __future__ import print_function
 import MySQLdb
 import MySQLdb.cursors
 import pymongo as pm
-import bson.json_util as json
 # standard library
 from collections import defaultdict
 from random import randint
@@ -28,7 +27,7 @@ class OQMDConverter:
     a MySQL table of OQMD structures which can be found at:
     http://oqmd.org/static/docs/getting_started.html.
     """
-    def __init__(self, dryrun=False, debug=False, verbosity=0, scratch=False):
+    def __init__(self, dryrun=False, debug=False, verbosity=0, scratch=False, label=None):
         """ Connect to the relevant databases and
         set off the scraper.
         """
@@ -37,6 +36,7 @@ class OQMDConverter:
         self.debug = debug
         self.verbosity = verbosity
         self.scratch = scratch
+        self.label = label
         # set up I/O for text_id
         if not self.dryrun:
             try:
@@ -48,8 +48,8 @@ class OQMDConverter:
                 self.num_nouns = len(self.nlines)
                 wordfile.close()
                 nounfile.close()
-            except Exception as oopsy:
-                exit(oopsy)
+            except Exception as oops:
+                exit(oops)
         # connect to SQL database as root, with "use oqmd"
         print('Connecting to OQMD SQL...')
         self.oqmd = MySQLdb.connect(host='localhost',
@@ -87,14 +87,14 @@ class OQMDConverter:
         # start by scraping all structures marked with 'fine_relax'
         cursor = self.oqmd.cursor()
         cursor.execute("select count(label) from calculations where label in ('" +
-                       self.args.get('label') + "') and converged in ('1')")
+                       self.label + "') and converged in ('1')")
         count = cursor.fetchone()['count(label)']
         if count == 0:
             exit('No structures found with that label.')
-        print(count, 'structures found.')
+        print(count, 'converged structures found.')
         # select only converged structures
-        cursor.execute("select * from calculations where label in ('fine_relax') and \
-                       converged in ('1')")
+        cursor.execute("select * from calculations where label in ('" +
+                       self.label + "') and converged in ('1')")
         success_count = 0
         for row in cursor:
             calc_doc = row
@@ -142,8 +142,6 @@ class OQMDConverter:
             final_struct = calculation_dict.copy()
             final_struct.update(structure_dict)
             final_struct.update(atoms_dict)
-            if self.debug:
-                print(json.dumps(final_struct, indent=2))
             success_count += 1
             if not self.dryrun:
                 self.import_count += self.oqmd_struct2db(final_struct)
@@ -164,7 +162,7 @@ class OQMDConverter:
             calculation = defaultdict(list)
             # try to get output ID first
             calculation['source'] = dict()
-            calculation['source']['entry_id'] = doc['entry_id']
+            calculation['source']['entry_id'] = doc['e3ntry_id']
             calculation['source']['input_id'] = doc['input_id']
             # convert stoich from string to list to tuple
             temp_stoich_list = [elem for elem in
@@ -187,8 +185,8 @@ class OQMDConverter:
             if settings['ispin'] == 2:
                 calculation['spin_polarized'] = True
             # calculation['species_pot'] = settings['potentials']
-        except Exception as oopsy:
-            print(oopsy)
+        except Exception as oops:
+            print(type(oops), oops)
             return dict(), False
         return calculation, True
 
@@ -209,8 +207,8 @@ class OQMDConverter:
             structure['lattice_cart'].append([doc['y1'], doc['y2'], doc['y3']])
             structure['lattice_cart'].append([doc['z1'], doc['z2'], doc['z3']])
             structure['cell_volume'] = doc['volume']
-        except Exception as oopsy:
-            print(oopsy)
+        except Exception as oops:
+            print(type(oops), oops)
             return dict(), False
         return structure, True
 
@@ -230,8 +228,8 @@ class OQMDConverter:
                 atoms['spins'].append(doc['magmom'])
                 atoms['charges'].append(doc['charge'])
             atoms['max_force_on_atom'] = max_force
-        except Exception as oopsy:
-            print(oopsy)
+        except Exception as oops:
+            print(type(oops), oops)
             return dict(), False
         return atoms, True
 
@@ -244,7 +242,8 @@ if __name__ == '__main__':
     parser.add_argument('-v', '--verbosity', action='count',
                         help='enable verbose output')
     parser.add_argument('-l', '--label', type=str,
-                        help='choose which OQMD calculation label to query')
+                        help='choose which OQMD calculation label to query, best options \
+                        are fine_relax or relaxation.')
     parser.add_argument('--debug', action='store_true',
                         help='enable debug output to print every dict')
     parser.add_argument('-s', '--scratch', action='store_true',
