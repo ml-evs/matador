@@ -96,7 +96,7 @@ class DBQuery:
         if self.args.get('tags') is not None:
             self.query_dict['$and'].append(self.query_tags())
         # only query quality when making a hull
-        if not self.args.get('oqmd') or self.args.get('hull'):
+        if not self.args.get('ignore_warnings'):
             self.query_dict['$and'].append(self.query_quality())
         # if no query submitted, find all
         if(len(self.query_dict['$and']) == 0 and (self.args.get('id') is None and not
@@ -663,10 +663,16 @@ class DBQuery:
         return query_dict
 
     def query_quality(self):
-        """ Find all structures with non-zero quality. """
+        """ Find all structures with non-zero or
+        non-existent (e.g. OQMD) quality. """
         query_dict = dict()
-        query_dict['quality'] = dict()
-        query_dict['quality']['$gt'] = 0
+        query_dict['$or'] = []
+        query_dict['$or'].append(dict())
+        query_dict['$or'][-1]['quality'] = dict()
+        query_dict['$or'][-1]['quality']['$gt'] = 0
+        query_dict['$or'].append(dict())
+        query_dict['$or'][-1]['quality'] = dict()
+        query_dict['$or'][-1]['quality']['$exists'] = False
         return query_dict
 
     def query_pressure(self):
