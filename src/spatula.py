@@ -54,8 +54,8 @@ class Spatula:
                 self.num_nouns = len(self.nlines)
                 wordfile.close()
                 nounfile.close()
-            except Exception as oopsy:
-                exit(oopsy)
+            except Exception as oops:
+                exit(type(oops), oops)
         else:
             logfile_name = 'spatula.log.dryrun'
         self.logfile = open(logfile_name, 'w')
