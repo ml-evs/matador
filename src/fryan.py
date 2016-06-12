@@ -95,15 +95,21 @@ class DBQuery:
             self.query_dict['$and'].append(self.query_encap())
         if self.args.get('tags') is not None:
             self.query_dict['$and'].append(self.query_tags())
-        if not self.args.get('ignore_warnings'):
+        # only query quality when making a hull
+        if not self.args.get('oqmd') or self.args.get('hull'):
             self.query_dict['$and'].append(self.query_quality())
-        if(len(self.query_dict['$and']) <= 1 and
-           self.args.get('id') is None and not
-           self.args.get('dbstats')):
+        # if no query submitted, find all
+        if(len(self.query_dict['$and']) == 0 and (self.args.get('id') is None and not
+                                                  self.args.get('dbstats'))):
+            if self.args.get('debug'):
+                print('Empty query, showing all...')
+                print(self.query_dict)
             self.cursor = self.repo.find().sort('enthalpy_per_atom', pm.ASCENDING)
+        # if no special query has been made already, begin executing the query
         if self.cursor.count() < 1 or self.args.get('calc_match'):
             if self.args.get('details'):
                 print(self.query_dict)
+            # execute query
             self.cursor = self.repo.find(SON(self.query_dict)).sort('enthalpy_per_atom',
                                                                     pm.ASCENDING)
             # building hull from just comp, find best structure to calc_match
@@ -883,6 +889,8 @@ if __name__ == '__main__':
                         help='export query to .cell files in folder name from query string')
     parser.add_argument('--res', action='store_true',
                         help='export query to .res files in folder name from query string')
+    parser.add_argument('--debug', action='store_true',
+                        help='print some useful (to me) debug info')
     parser.add_argument('--write_pressure', nargs='+', type=str,
                         help=('pressure to add to new cell file, either one float' +
                               'for isotropic or 6 floats for anisotropic.'))
@@ -924,6 +932,7 @@ if __name__ == '__main__':
                     res=args.res,
                     cell=args.cell,
                     write_pressure=args.write_pressure,
+                    debug=args.debug,
                     main=True,
                     sysargs=argv[1:])
     # generate hull outside query object
