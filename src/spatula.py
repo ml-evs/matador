@@ -44,7 +44,6 @@ class Spatula:
                 mtime = getmtime(logfile_name)
                 mdate = datetime.datetime.fromtimestamp(mtime)
                 mdate = str(mdate).split()[0]
-                mdate = mdate[:-1]
                 rename(logfile_name, logfile_name + '.' + str(mdate).split()[0])
             try:
                 wordfile = open(dirname(realpath(__file__)) + '/words', 'r')
