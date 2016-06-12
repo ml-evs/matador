@@ -81,10 +81,13 @@ class OQMDConverter:
         return 1
 
     def sql2db(self):
+        """ Perform SQL query to scrape, and hop around the tables
+        to collect all data associated with one structure.
+        """
         # start by scraping all structures marked with 'fine_relax'
         cursor = self.oqmd.cursor()
-        cursor.execute("select count(label) from calculations where label in ('fine_relax') and \
-                        converged in ('1')")
+        cursor.execute("select count(label) from calculations where label in ('" +
+                       self.args.get('label') + "') and converged in ('1')")
         count = cursor.fetchone()['count(label)']
         if count == 0:
             exit('No structures found with that label.')
@@ -240,12 +243,17 @@ if __name__ == '__main__':
                         help='run the importer without connecting to the database')
     parser.add_argument('-v', '--verbosity', action='count',
                         help='enable verbose output')
+    parser.add_argument('-l', '--label', type=str,
+                        help='choose which OQMD calculation label to query')
     parser.add_argument('--debug', action='store_true',
                         help='enable debug output to print every dict')
     parser.add_argument('-s', '--scratch', action='store_true',
                         help='import to junk collection called scratch')
     args = parser.parse_args()
+    if args.label is None:
+        exit('Please choose a label to scrape.')
     importer = OQMDConverter(dryrun=args.dryrun,
                              debug=args.debug,
                              verbosity=args.verbosity,
-                             scratch=args.scratch)
+                             scratch=args.scratch,
+                             label=args.label)
