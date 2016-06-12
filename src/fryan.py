@@ -783,7 +783,10 @@ class DBQuery:
         small_list = []
         small_count = 0
         first_ind = 1000
-        cutoff = 200
+        if self.args.get('oqmd'):
+            cutoff = 0
+        else:
+            cutoff = 200
         for ind, comp in enumerate(comp_list):
             if comp[1] < cutoff:
                 if ind < first_ind:
