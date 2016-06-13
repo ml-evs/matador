@@ -223,7 +223,8 @@ class FryanConvexHull():
             for ind in range(len(oqmd_stoich)):
                 scatter.append(ax.scatter(oqmd_stoich[ind], oqmd_formation[ind], s=35, lw=1,
                                alpha=1, c='m', edgecolor='k', marker='D',
-                               label=oqmd_info[ind], zorder=10000))
+                               # label=oqmd_info[ind],
+                               zorder=10000))
         stable_energy = []
         stable_comp = []
         stable_enthalpy = []
