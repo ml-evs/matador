@@ -182,12 +182,35 @@ if __name__ == '__main__':
                                         e.g. LiSi.')
     structure_parser.add_argument('-f', '--formula', type=str, nargs='+',
                                   help='query a particular chemical formula, e.g. GeTeSi3')
+    structure_parser.add_argument('-i', '--id', type=str, nargs='+',
+                                  help='specify a particular structure by its text_id')
+    # define subcommand parsers and their arguments
     stat_parser = subparsers.add_parser('stats',
                                         help='print some stats about the database.',
                                         parents=[global_parser])
     query_parser = subparsers.add_parser('query',
                                          help='query and extract structures from the database',
                                          parents=[global_parser, structure_parser])
+    query_parser.add_argument('-s', '--summary', action='store_true',
+                              help='show only the ground state for each stoichiometry.')
+    query_parser.add_argument('-t', '--top', type=int,
+                              help='number of structures to show (DEFAULT: 10)')
+    query_parser.add_argument('-d', '--details', action='store_true',
+                              help='show as much detail about calculation as possible')
+    query_parser.add_argument('-p', '--pressure', type=float,
+                              help='specify an isotropic external pressure to search for, e.g. 10 (GPa)')
+    query_parser.add_argument('--source', action='store_true',
+                              help='print filenames from which structures were wrangled')
+    query_parser.add_argument('-ac', '--calc-match', action='store_true',
+                              help='display calculations of the same accuracy as specified id')
+    query_parser.add_argument('-pf', '--partial-formula', action='store_true',
+                              help=('stoichiometry/composition queries will include other unspecified ' +
+                              'species, e.g. -pf search for Li will query any structure' +
+                              'containing Li, not just pure Li.'))
+    query_parser.add_argument('--encap', action='store_true',
+                              help='query only structures encapsulated in a carbon nanotube.')
+    query_parser.add_argument('--tags', nargs='+', type=str,
+                              help=('search for up to 3 manual tags at once'))
     hull_parser = subparsers.add_parser('hull',
                                         help='create a convex hull from query results \
                                         (currently limited to binaries)',
@@ -199,35 +222,6 @@ if __name__ == '__main__':
     swaps_parser = subparsers.add_parser('swaps',
                                          help='perform atomic swaps on query results',
                                          parents=[global_parser, structure_parser])
-    # group = parser.add_argument_group()
-    # group.add_argument('-f', '--formula', nargs='+', type=str,
-                       # help='choose a stoichiometry, e.g. Ge 1 Te 1 Si 3, or GeTeSi3')
-    # group.add_argument('-c', '--composition', nargs='+', type=str,
-                       # help=('find all structures containing the given elements, e.g. GeTeSi, ' +
-                             # 'or find the number of structures with n elements, e.g. 1, 2, 3'))
-    # group.add_argument('-i', '--id', type=str, nargs='+',
-                       # help='specify a particular structure by its text_id')
-    # parser.add_argument('-s', '--summary', action='store_true',
-                        # help='show only the ground state for each formula')
-    # parser.add_argument('-t', '--top', type=int,
-                        # help='number of structures to show (DEFAULT: 10)')
-
-    # parser.add_argument('-d', '--details', action='store_true',
-                        # help='show as much detail about calculation as possible')
-    # parser.add_argument('-p', '--pressure', type=float,
-                    # help='specify an isotropic external pressure to search for, e.g. 10 (GPa)')
-    # parser.add_argument('--source', action='store_true',
-                        # help='print filenames from which structures were wrangled')
-    # parser.add_argument('-ac', '--calc-match', action='store_true',
-                        # help='display calculations of the same accuracy as specified id')
-    # parser.add_argument('-pf', '--partial-formula', action='store_true',
-                    # help=('stoichiometry/composition queries will include other unspecified ' +
-                              # 'species, e.g. -pf search for Li will query any structure' +
-                              # 'containing Li, not just pure Li.'))
-    # parser.add_argument('--encap', action='store_true',
-                        # help='query only structures encapsulated in a carbon nanotube.')
-    # parser.add_argument('--tags', nargs='+', type=str,
-                        # help=('search for up to 3 manual tags at once'))
     # parser.add_argument('--strict', action='store_true',
                         # help=('strictly matches with calc_match,'
                               # 'useful for hulls where convergence is rough'))
