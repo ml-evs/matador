@@ -28,7 +28,7 @@ class FryanConvexHull():
     def binary_hull(self, dis=False):
         """ Create a convex hull for two elements. """
         query = self.query
-        # local_cursor = query.cursor.clone()
+        include_oqmd = query.args.get('include_oqmd')
         elements = query.args.get('composition')
         elements = [elem for elem in re.split(r'([A-Z][a-z]*)', elements[0]) if elem]
         if len(elements) != 2:
@@ -37,19 +37,20 @@ class FryanConvexHull():
         # try to get decent chemical potentials:
         # this relies on all of the first composition query
         # having the same parameters; need to think about this
+        # should probably refactor this into a function
         mu_enthalpy = np.zeros((2))
         match = [None, None]
-        query_dict = []
+        query_dict = dict()
+        print(60*'─')
         for ind, elem in enumerate(elements):
             print('Scanning for suitable', elem, 'chemical potential...')
-            self.query.args['composition'] = [elem]
-            query_dict.append(dict())
-            query_dict[-1]['$and'] = list(self.query.calc_dict['$and'])
-            query_dict[-1]['$and'].append(self.query.query_composition(custom_elem=[elem]))
-            if self.query.args.get('tags') is not None:
-                query_dict[-1]['$and'].append(self.query.query_tags())
-            mu_cursor = self.query.repo.find(SON(query_dict[-1])).sort('enthalpy_per_atom',
-                                                                       pm.ASCENDING)
+            query_dict['$and'] = list(query.calc_dict['$and'])
+            query_dict['$and'].append(query.query_composition(custom_elem=[elem]))
+            # if oqmd, only query composition, not parameters
+            if query.args.get('tags') is not None:
+                query_dict['$and'].append(query.query_tags())
+            mu_cursor = query.repo.find(SON(query_dict)).sort('enthalpy_per_atom',
+                                                              pm.ASCENDING)
             for doc_ind, doc in enumerate(mu_cursor):
                 if doc_ind == 0:
                     match[ind] = doc
@@ -62,17 +63,45 @@ class FryanConvexHull():
             else:
                 print('No possible chem pots found for', elem, '.')
                 return
+        # include OQMD structures if desired, first find chem pots
+        if include_oqmd:
+            oqmd_mu_enthalpy = np.zeros((2))
+            oqmd_match = [None, None]
+            oqmd_query_dict = dict()
+            for ind, elem in enumerate(elements):
+                print('Scanning for suitable', elem, 'OQMD chemical potential...')
+                oqmd_query_dict = query.query_composition(custom_elem=[elem])
+                oqmd_mu_cursor = query.oqmd_repo.find(SON(oqmd_query_dict))
+                oqmd_mu_cursor.sort('enthalpy_per_atom', pm.ASCENDING)
+                for doc_ind, doc in enumerate(oqmd_mu_cursor):
+                    if doc_ind == 0:
+                        oqmd_match[ind] = doc
+                        break
+                if oqmd_match[ind] is not None:
+                    oqmd_mu_enthalpy[ind] = float(oqmd_match[ind]['enthalpy_per_atom'])
+                    print('Using', ''.join([oqmd_match[ind]['text_id'][0], ' ',
+                          match[ind]['text_id'][1]]), 'as OQMD chem pot for', elem)
+                    print(60*'─')
+                else:
+                    print('No possible chem pots found for', elem, '.')
+                    return
         print('Constructing hull...')
-
         formation = np.zeros((query.cursor.count()))
         stoich = np.zeros((query.cursor.count()))
         enthalpy = np.zeros((query.cursor.count()))
         disorder = np.zeros((query.cursor.count()))
+        info = []
+        if include_oqmd:
+            oqmd_formation = np.zeros((query.oqmd_cursor.count()))
+            oqmd_stoich = np.zeros((query.oqmd_cursor.count()))
+            oqmd_enthalpy = np.zeros((query.oqmd_cursor.count()))
+            oqmd_info = []
         if dis:
             from disorder import disorder_hull
-        info = []
+        # define hull by order in command-line arguments
         x_elem = elements[0]
         one_minus_x_elem = elements[1]
+        # grab relevant information from query results; also make function?
         for ind, doc in enumerate(query.cursor):
             atoms_per_fu = doc['stoichiometry'][0][1] + doc['stoichiometry'][1][1]
             num_fu = (doc['enthalpy']/doc['enthalpy_per_atom']) / float(atoms_per_fu)
@@ -105,6 +134,7 @@ class FryanConvexHull():
                                                                       formation[ind]))
             if dis:
                 disorder[ind], warren = disorder_hull(doc)
+        # put chem pots in same array as formation for easy hulls
         formation = np.append([0.0], formation)
         formation = np.append(formation, [0.0])
         enthalpy = np.append(mu_enthalpy[1], enthalpy)
@@ -121,6 +151,49 @@ class FryanConvexHull():
         stoich = np.append([0.0], stoich)
         stoich = np.append(stoich, [1.0])
         structures = np.vstack((stoich, formation)).T
+        if include_oqmd:
+            for ind, doc in enumerate(query.oqmd_cursor):
+                oqmd_formation[ind] = doc['enthalpy_per_atom']
+                atoms_per_fu = doc['stoichiometry'][0][1] + doc['stoichiometry'][1][1]
+                num_fu = (doc['enthalpy']/doc['enthalpy_per_atom']) / float(atoms_per_fu)
+                if doc['stoichiometry'][0][0] == one_minus_x_elem:
+                    num_b = doc['stoichiometry'][0][1]
+                elif doc['stoichiometry'][1][0] == one_minus_x_elem:
+                    num_b = doc['stoichiometry'][1][1]
+                else:
+                    exit('Something went wrong!')
+                oqmd_enthalpy[ind] = doc['enthalpy'] / (num_b * num_fu)
+                oqmd_formation[ind] = doc['enthalpy_per_atom']
+                for mu in oqmd_match:
+                    for j in range(len(doc['stoichiometry'])):
+                        if mu['stoichiometry'][0][0] == doc['stoichiometry'][j][0]:
+                            oqmd_formation[ind] -= (mu['enthalpy_per_atom'] *
+                                                    doc['stoichiometry'][j][1] /
+                                                    atoms_per_fu)
+                for elem in doc['stoichiometry']:
+                    stoich_string = (str(doc['stoichiometry'][0][0]) +
+                                     str(doc['stoichiometry'][0][1]) +
+                                     str(doc['stoichiometry'][1][0]) +
+                                     str(doc['stoichiometry'][1][1]))
+                    if x_elem in elem[0]:
+                        oqmd_stoich[ind] = elem[1]/float(atoms_per_fu)
+                oqmd_info.append("{0:^10}\n{1:^24}\n{2:^5s}\n{3:2f} eV".format(
+                    stoich_string, 'OQMD' + ' ' + doc['text_id'][0] + ' ' + doc['text_id'][1],
+                    doc['space_group'], formation[ind]))
+            oqmd_stoich = np.append([0.0], oqmd_stoich)
+            oqmd_stoich = np.append(oqmd_stoich, [1.0])
+            oqmd_formation = np.append([0.0], oqmd_formation)
+            oqmd_formation = np.append(oqmd_formation, [0.0])
+            oqmd_enthalpy = np.append(oqmd_mu_enthalpy[1], oqmd_enthalpy)
+            oqmd_enthalpy = np.append(oqmd_enthalpy, oqmd_mu_enthalpy[0])
+            ind = len(oqmd_formation)-3
+            for doc in match:
+                stoich_string = str(doc['stoichiometry'][0][0]) + str(doc['stoichiometry'][0][1])
+                oqmd_info.append("{0:^10}\n{1:24}\n{2:5s}\n{3:2f} eV".format(
+                    stoich_string, 'OQMD' + ' ' + doc['text_id'][0] + ' ' + doc['text_id'][1],
+                    doc['space_group'], oqmd_formation[ind]))
+                ind += 1
+        # create hull with SciPy routine
         hull = ConvexHull(structures)
         try:
             colours = plt.cm.plasma(np.linspace(0, 1, 100))
@@ -132,9 +205,9 @@ class FryanConvexHull():
         # plot all structures
         scatter = []
         for ind in range(len(structures)-2):
-            scatter.append(ax.scatter(structures[ind, 0], structures[ind, 1], s=35, lw=1, alpha=1,
-                                      c=colours[int(100*structures[ind, 0])], edgecolor='k',
-                                      label=info[ind], zorder=100))
+            scatter.append(ax.scatter(structures[ind, 0], structures[ind, 1], s=35, lw=1,
+                                      alpha=0.8, c=colours[int(100*structures[ind, 0])],
+                                      edgecolor='k', label=info[ind], zorder=100))
             if dis and warren:
                 ax.plot([structures[ind, 0]-disorder[ind], structures[ind, 0]],
                         [structures[ind, 1], structures[ind, 1]],
@@ -143,6 +216,11 @@ class FryanConvexHull():
                 ax.plot([structures[ind, 0]-disorder[ind], structures[ind, 0] + disorder[ind]],
                         [structures[ind, 1], structures[ind, 1]],
                         c='m', alpha=0.5, lw=0.5)
+        if include_oqmd:
+            for ind in range(len(oqmd_stoich)):
+                scatter.append(ax.scatter(oqmd_stoich[ind], oqmd_formation[ind], s=35, lw=1,
+                               alpha=0.8, c='g', edgecolor='k', marker='D',
+                               label=oqmd_info[ind], zorder=10000))
         stable_energy = []
         stable_comp = []
         stable_enthalpy = []
