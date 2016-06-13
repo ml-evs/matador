@@ -300,16 +300,19 @@ class FryanConvexHull():
         V = []
         x = []
         for i in range(len(stable_comp)):
-            stable_num.append(stable_comp[i]/(1-stable_comp[i]))
-        V.append(0)
-        x.append(1e5)
-        for i in range(len(stable_num)-2, 0, -1):
+            if 1-stable_comp[i] == 0:
+                stable_num.append(1e5)
+            else:
+                stable_num.append(stable_comp[i]/(1-stable_comp[i]))
+        # V.append(0)
+        for i in range(len(stable_num)-1, 0, -1):
             V.append(-(stable_enthalpy[i] - stable_enthalpy[i-1]) /
                       (stable_num[i] - stable_num[i-1]) +
                       (mu_enthalpy[0]))
             x.append(stable_num[i])
         V.append(V[-1])
         x.append(0)
+        V[0] = 0
         fig = plt.figure(facecolor='w')
         ax = fig.add_subplot(111)
         plt.style.use('bmh')
@@ -318,17 +321,17 @@ class FryanConvexHull():
             colour.append(ax._get_lines.prop_cycler.next()['color'])
         except:
             colour.append('blue')
-        # print(zip(x, V))
-        for i in range(1, len(V)):
+        for i in range(0, len(V)):
             ax.scatter(x[i], V[i],
                        marker='*', c=colour[0], zorder=1000, edgecolor='k', s=200, lw=1)
-        for i in range(2, len(V)):
+        for i in range(1, len(V)):
             ax.scatter(x[i], V[i-1],
                        marker='*', c=colour[0], zorder=1000, edgecolor='k', s=200, lw=1)
             ax.plot([x[i], x[i]], [V[i], V[i-1]], lw=2, c=colour[0])
             ax.plot([x[i-1], x[i]], [V[i-1], V[i-1]], lw=2, c=colour[0])
         ax.set_ylabel('V')
-        ax.set_xlim(0)
+        ax.set_xlim(0, np.max(np.asarray(x[1:]))+1)
+        # ax.set_ylim(0)
         ax.set_title('$\mathrm{'+elements[0]+'_x'+elements[1]+'}$')
         ax.set_xlabel('$x$')
         plt.show()
