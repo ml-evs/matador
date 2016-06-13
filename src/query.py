@@ -1,5 +1,8 @@
 #!/usr/bin/python
 # coding: utf-8
+""" This file implements all queries to the database,
+including parsing user inputs, displaying results
+and calling other functionality. """
 from __future__ import print_function
 # import related crysdb functionality
 from spatula import param2dict
