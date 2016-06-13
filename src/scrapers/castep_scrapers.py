@@ -266,9 +266,6 @@ def param2dict(seed, **kwargs):
                                     param['spin_polarized'] = True
                             if 'cut_off_energy' in line:
                                 temp_cut_off = (param['cut_off_energy'].replace('ev', '')).strip()
-                                print(list(temp_cut_off))
-                                print(line_no)
-                                print(list(line))
                                 param['cut_off_energy'] = float(temp_cut_off)
                             if 'xc_functional' in line:
                                 param['xc_functional'] = param['xc_functional'].upper()
