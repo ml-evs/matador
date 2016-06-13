@@ -153,6 +153,16 @@ class DBQuery:
                             rerun = True
                     i += 1
                 self.cursor = test_cursor[np.argmax(np.asarray(test_cursor_count))]
+                # if including oqmd, connect to oqmd collection and generate new query
+                if self.args.get('include_oqmd'):
+                    self.oqmd_repo = self.client.crystals.oqmd
+                    self.oqmd_query = dict()
+                    self.oqmd_query['$and'] = []
+                    # query only oqmd, assume all calculations are over-converged:
+                    # this is bad!
+                    self.oqmd_query['$and'].append(self.query_composition())
+                    self.oqmd_cursor = self.oqmd_repo.find(SON(self.oqmd_query))
+                    self.oqmd_cursor.sort('enthalpy_per_atom', pm.ASCENDING)
         # clone cursor for further use after printing
         cursor = self.cursor.clone()
         """ QUERY POST-PROCESSING """
@@ -905,6 +915,8 @@ if __name__ == '__main__':
                         help='query local scratch collection')
     parser.add_argument('--oqmd', action='store_true',
                         help='query local OQMD collection')
+    parser.add_argument('--include_oqmd', action='store_true',
+                        help='include OQMD structures on hull')
     parser.add_argument('--cell', action='store_true',
                         help='export query to .cell files in folder name from query string')
     parser.add_argument('--res', action='store_true',
@@ -929,6 +941,8 @@ if __name__ == '__main__':
         exit('--oqmd not compatible with --scratch')
     if args.oqmd and args.res:
         exit('--oqmd not compatible with --res, use --cell.')
+    if args.include_oqmd and not args.hull:
+        exit('--include_oqmd requires --hull.')
     query = DBQuery(stoichiometry=args.formula,
                     composition=args.composition,
                     summary=args.summary,
@@ -945,6 +959,7 @@ if __name__ == '__main__':
                     dbstats=args.dbstats,
                     scratch=args.scratch,
                     oqmd=args.oqmd,
+                    include_oqmd=args.include_oqmd,
                     encapsulated=args.encap,
                     tags=args.tags,
                     hull=args.hull,
@@ -960,4 +975,7 @@ if __name__ == '__main__':
         from hull import FryanConvexHull
         hull = FryanConvexHull(query)
         print('Structures on hull:')
-        query.display_results(hull.hull_docs)
+        try:
+            query.display_results(hull.hull_docs)
+        except:
+            pass
