@@ -636,9 +636,20 @@ class DBQuery:
         query_dict['$and'] = []
         if not numeracy:
             for ind, elem in enumerate(elements):
-                types_dict = dict()
-                types_dict['atom_types'] = dict()
-                types_dict['atom_types']['$in'] = [elem]
+                # prototype for chemically motivated searches, e.g. transition metals
+                if elem == 'T':
+                    types_dict = dict()
+                    types_dict['$or'] = list()
+                    transition_metals = ['Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn',
+                                         'Y', 'Zr', 'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd',
+                                         'Hf', 'Ta', 'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg']
+                    for metal in transition_metals:
+                        types_dict['$or'].append(dict())
+                        types_dict['$or'][-1]['atom_types'] = metal
+                else:
+                    types_dict = dict()
+                    types_dict['atom_types'] = dict()
+                    types_dict['atom_types']['$in'] = [elem]
                 query_dict['$and'].append(types_dict)
         if not self.args.get('partial_formula'):
             size_dict = dict()
