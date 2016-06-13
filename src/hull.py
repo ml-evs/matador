@@ -186,6 +186,7 @@ class FryanConvexHull():
             oqmd_formation = np.append(oqmd_formation, [0.0])
             oqmd_enthalpy = np.append(oqmd_mu_enthalpy[1], oqmd_enthalpy)
             oqmd_enthalpy = np.append(oqmd_enthalpy, oqmd_mu_enthalpy[0])
+            oqmd_structures = np.vstack((oqmd_stoich, oqmd_formation)).T
             ind = len(oqmd_formation)-3
             for doc in match:
                 stoich_string = str(doc['stoichiometry'][0][0]) + str(doc['stoichiometry'][0][1])
@@ -195,6 +196,8 @@ class FryanConvexHull():
                 ind += 1
         # create hull with SciPy routine
         hull = ConvexHull(structures)
+        if include_oqmd:
+            oqmd_hull = ConvexHull(oqmd_structures)
         try:
             colours = plt.cm.plasma(np.linspace(0, 1, 100))
         except:
@@ -219,7 +222,7 @@ class FryanConvexHull():
         if include_oqmd:
             for ind in range(len(oqmd_stoich)):
                 scatter.append(ax.scatter(oqmd_stoich[ind], oqmd_formation[ind], s=35, lw=1,
-                               alpha=0.8, c='g', edgecolor='k', marker='D',
+                               alpha=1, c='m', edgecolor='k', marker='D',
                                label=oqmd_info[ind], zorder=10000))
         stable_energy = []
         stable_comp = []
@@ -252,6 +255,25 @@ class FryanConvexHull():
                 ax.plot([stable_comp[ind], stable_comp[ind+1]],
                         [stable_energy[ind], stable_energy[ind+1]],
                         'k--', lw=2, alpha=1, zorder=1, label='')
+        if include_oqmd:
+            oqmd_stable_comp = []
+            oqmd_stable_energy = []
+            oqmd_stable_enthalpy = []
+            for ind in range(len(oqmd_hull.vertices)):
+                if oqmd_structures[oqmd_hull.vertices[ind], 1] <= 0:
+                    oqmd_stable_energy.append(oqmd_structures[oqmd_hull.vertices[ind], 1])
+                    oqmd_stable_enthalpy.append(oqmd_enthalpy[oqmd_hull.vertices[ind]])
+                    oqmd_stable_comp.append(oqmd_structures[oqmd_hull.vertices[ind], 0])
+            oqmd_stable_comp = np.asarray(oqmd_stable_comp)
+            oqmd_stable_energy = np.asarray(oqmd_stable_energy)
+            oqmd_stable_enthalpy = np.asarray(oqmd_stable_enthalpy)
+            oqmd_stable_energy = oqmd_stable_energy[np.argsort(oqmd_stable_comp)]
+            oqmd_stable_enthalpy = oqmd_stable_enthalpy[np.argsort(oqmd_stable_comp)]
+            oqmd_stable_comp = oqmd_stable_comp[np.argsort(oqmd_stable_comp)]
+            for ind in range(len(oqmd_stable_comp)-1):
+                ax.plot([oqmd_stable_comp[ind], oqmd_stable_comp[ind+1]],
+                        [oqmd_stable_energy[ind], oqmd_stable_energy[ind+1]],
+                        'm--', lw=2, alpha=1, zorder=0, label='')
         ax.set_xlim(-0.05, 1.05)
         if not dis:
             datacursor(scatter[:], formatter='{label}'.format, draggable=False,
