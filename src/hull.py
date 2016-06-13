@@ -15,7 +15,7 @@ except:
     pass
 
 
-class FryanConvexHull():
+class QueryConvexHull():
     """
     Implements a Convex Hull for formation energies
     from a fryan DBQuery.
