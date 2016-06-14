@@ -351,14 +351,15 @@ class DBQuery:
                     f.write('kpoints_mp_grid : ' + str(doc['kpoints_mp_grid'][0]) + ' ' +
                             str(doc['kpoints_mp_grid'][1]) + ' ' +
                             str(doc['kpoints_mp_grid'][2]) + '\n')
-                f.write('\n%BLOCK SPECIES_POT\n')
-                for elem in doc['species_pot']:
-                    if not isfile(''.join(path.split('/')[:-1]) + '/' + doc['species_pot'][elem]):
-                            if isfile(expanduser('~/pspot/' + doc['species_pot'][elem])):
-                                system('cp ' + expanduser('~/pspot/') + doc['species_pot'][elem] +
-                                       ' ' + ''.join(path.split('/')[:-1]))
-                    f.write(elem + '\t' + doc['species_pot'][elem] + '\n')
-                f.write('%ENDBLOCK SPECIES_POT')
+                if 'species_pot' in doc:
+                    f.write('\n%BLOCK SPECIES_POT\n')
+                    for elem in doc['species_pot']:
+                        if not isfile(''.join(path.split('/')[:-1]) + '/' + doc['species_pot'][elem]):
+                                if isfile(expanduser('~/pspot/' + doc['species_pot'][elem])):
+                                    system('cp ' + expanduser('~/pspot/') + doc['species_pot'][elem] +
+                                           ' ' + ''.join(path.split('/')[:-1]))
+                        f.write(elem + '\t' + doc['species_pot'][elem] + '\n')
+                    f.write('%ENDBLOCK SPECIES_POT')
         except Exception as oops:
             print('Writing cell file failed for ', doc['text_id'])
             print(type(oops), oops)
