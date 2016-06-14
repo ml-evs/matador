@@ -255,6 +255,12 @@ class Spatula:
                     if file.replace('.res', '.castep') in file_lists[root]['castep']:
                         struct_dict, success = castep2dict(file.replace('.res', '.castep'),
                                                            debug=self.debug)
+                    elif file.replace('.res', '.history') in file_lists[root]['castep']:
+                        struct_dict, success = castep2dict(file.replace('.res', '.history'),
+                                                           debug=self.debug)
+                    elif file.replace('.res', '.history.gz') in file_lists[root]['castep']:
+                        struct_dict, success = castep2dict(file.replace('.res', '.history.gz'),
+                                                           debug=self.debug)
                     else:
                         struct_dict, success = res2dict(file)
                     if not success:
