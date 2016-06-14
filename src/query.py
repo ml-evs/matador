@@ -125,13 +125,14 @@ class DBQuery:
                 sample = 10
                 rerun = False
                 i = 0
+                count = self.cursor.count() 
                 while i < sample:
                     # start with sample/2 lowest enthalpy structures
                     if i < int(sample/2):
                         ind = i
                     # then do some random samples
                     else:
-                        ind = np.random.randint(5, self.cursor.count()-1)
+                        ind = np.random.randint(5, count-1)
                     id_cursor = self.repo.find({'text_id': self.cursor[ind]['text_id']})
                     self.query_dict['$and'] = self.query_calc(id_cursor)
                     self.calc_dict = dict()
@@ -146,12 +147,12 @@ class DBQuery:
                                           self.cursor[ind]['text_id'][1]) +
                           ': matched' + str(test_cursor_count[-1]), 'structures.')
                     # if we have at least 2/3 of the structures, just plot
-                    if test_cursor_count[-1] > 2*int(self.cursor.count()/3):
+                    if test_cursor_count[-1] > 2*int(count/3):
                         print('Matched at least 2/3 of total number, composing hull...')
                         break
                     if i == (sample-1) and not rerun:
                         # if less than half the total structures are to be plotted, rand 5 more
-                        if np.max(np.asarray(test_cursor_count)) < int(self.cursor.count()/2):
+                        if np.max(np.asarray(test_cursor_count)) < int(count/2):
                             i -= 5
                             rerun = True
                     i += 1
