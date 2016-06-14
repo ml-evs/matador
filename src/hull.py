@@ -240,13 +240,14 @@ class QueryConvexHull():
                                                c='r', marker='*', zorder=1000, edgecolor='k',
                                                s=250, lw=1, alpha=1,
                                                label=info[hull.vertices[ind]]))
-        for ind in range(len(oqmd_hull.vertices)):
-            if oqmd_structures[oqmd_hull.vertices[ind], 1] <= 0:
-                hull_scatter.append(ax.scatter(oqmd_structures[oqmd_hull.vertices[ind], 0],
-                                               oqmd_structures[oqmd_hull.vertices[ind], 1],
-                                               c='k', marker='*', zorder=999, edgecolor='k',
-                                               s=250, lw=1, alpha=1,
-                                               label=oqmd_info[oqmd_hull.vertices[ind]]))
+        if include_oqmd:
+            for ind in range(len(oqmd_hull.vertices)):
+                if oqmd_structures[oqmd_hull.vertices[ind], 1] <= 0:
+                    hull_scatter.append(ax.scatter(oqmd_structures[oqmd_hull.vertices[ind], 0],
+                                                   oqmd_structures[oqmd_hull.vertices[ind], 1],
+                                                   c='k', marker='*', zorder=999, edgecolor='k',
+                                                   s=250, lw=1, alpha=1,
+                                                   label=oqmd_info[oqmd_hull.vertices[ind]]))
         # skip last and first as they are chem pots
         try:
             for ind in range(1, len(hull.vertices)-1):
