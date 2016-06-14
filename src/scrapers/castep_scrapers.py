@@ -422,7 +422,6 @@ def castep2dict(seed, **kwargs):
                 castep['spin_polarized'] = True
             elif 'atom types' not in castep and 'Cell Contents' in line:
                 castep['atom_types'] = list()
-                castep['stoichiometry'] = defaultdict(float)
                 castep['positions_frac'] = list()
                 i = 1
                 atoms = False
@@ -439,19 +438,24 @@ def castep2dict(seed, **kwargs):
                         atoms = True
                     i += 1
                 castep['num_atoms'] = len(castep['atom_types'])
-                #
-                min = 2000
+                castep['stoichiometry'] = defaultdict(float)
                 for atom in castep['atom_types']:
                     if atom not in castep['stoichiometry']:
                         castep['stoichiometry'][atom] = 0
                     castep['stoichiometry'][atom] += 1
+                gcd_val = 0
                 for atom in castep['atom_types']:
-                    if castep['stoichiometry'][atom] < min:
-                        min = castep['stoichiometry'][atom]
+                    if gcd_val == 0:
+                        gcd_val = castep['stoichiometry'][atom]
+                    else:
+                        gcd_val = gcd(castep['stoichiometry'][atom], gcd_val)
                 # convert stoichiometry to tuple for fryan
                 temp_stoich = []
                 for key, value in castep['stoichiometry'].iteritems():
-                    temp_stoich.append([key, value/min])
+                    if float(value)/gcd_val % 1 != 0:
+                        temp_stoich.append([key, float(value)/gcd_val])
+                    else:
+                        temp_stoich.append([key, value/gcd_val])
                 castep['stoichiometry'] = temp_stoich
             elif 'species_pot' not in castep and 'Pseudopotential Report' in line:
                 castep['species_pot'] = dict()
