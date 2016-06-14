@@ -12,6 +12,8 @@ import string
 from sys import argv
 from os import uname
 from copy import deepcopy
+from query import DBQuery
+from scrapers.spatula import Spatula
 
 
 class Matador:
@@ -35,15 +37,24 @@ class Matador:
         self.db = self.client.crystals
         # choose desired collections
         self.collections = dict()
-        for database in self.args['db']:
-            if database == 'ajm':
-                database = 'repo'
-            self.collections[database] = self.db[database]
+        if 'db' in self.args:
+            for database in self.args['db']:
+                if database == 'ajm':
+                    database = 'repo'
+                self.collections[database] = self.db[database]
+        else:
+            self.collections['repo'] = self.db['repo']
         # print last spatula report
         self.report = self.client.crystals.spatula
         self.print_report()
         if self.args['subcmd'] == 'stats':
             self.stats()
+        if self.args['subcmd'] == 'import':
+            self.importer = Spatula(dryrun=self.args['dryrun'],
+                                    debug=self.args['debug'],
+                                    scratch=self.args['scratch'],
+                                    verbosity=self.args['verbosity'],
+                                    tags=self.args['tags'])
 
     def swaps(self, doc, pairs=1, template_param=None):
         """ Take a db document as input and perform atomic swaps. """
@@ -198,19 +209,33 @@ if __name__ == '__main__':
     query_parser.add_argument('-d', '--details', action='store_true',
                               help='show as much detail about calculation as possible')
     query_parser.add_argument('-p', '--pressure', type=float,
-                              help='specify an isotropic external pressure to search for, e.g. 10 (GPa)')
+                              help='specify an isotropic external pressure to search for \
+                                   , e.g. 10 (GPa)')
     query_parser.add_argument('--source', action='store_true',
                               help='print filenames from which structures were wrangled')
     query_parser.add_argument('-ac', '--calc-match', action='store_true',
                               help='display calculations of the same accuracy as specified id')
     query_parser.add_argument('-pf', '--partial-formula', action='store_true',
-                              help=('stoichiometry/composition queries will include other unspecified ' +
-                              'species, e.g. -pf search for Li will query any structure' +
-                              'containing Li, not just pure Li.'))
+                              help=('stoichiometry/composition queries will include other \
+                                    unspecified species, e.g. -pf search for Li will query \
+                                    any structure containing Li, not just pure Li.'))
     query_parser.add_argument('--encap', action='store_true',
                               help='query only structures encapsulated in a carbon nanotube.')
     query_parser.add_argument('--tags', nargs='+', type=str,
                               help=('search for up to 3 manual tags at once'))
+    import_parser = subparsers.add_parser('import',
+                                          help='import structures into database; does not \
+                                                care about non-unique structures')
+    import_parser.add_argument('-d', '--dryrun', action='store_true',
+                               help='run the importer without connecting to the database')
+    import_parser.add_argument('-v', '--verbosity', action='count',
+                               help='enable verbose output')
+    import_parser.add_argument('-t', '--tags', nargs='+', type=str,
+                               help='set user tags, e.g. nanotube, project name')
+    import_parser.add_argument('--debug', action='store_true',
+                               help='enable debug output to print every dict')
+    import_parser.add_argument('-s', '--scratch', action='store_true',
+                               help='import to scratch collection')
     hull_parser = subparsers.add_parser('hull',
                                         help='create a convex hull from query results \
                                         (currently limited to binaries)',
