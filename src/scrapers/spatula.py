@@ -18,7 +18,7 @@ from random import randint
 from collections import defaultdict
 import datetime
 from os import walk, getcwd, uname, chdir, chmod, rename
-from os.path import realpath, dirname, getmtime, isfile
+from os.path import realpath, abspath, dirname, getmtime, isfile
 from math import pi, log10
 from traceback import print_exc
 
@@ -34,7 +34,7 @@ class Spatula:
         * CASTEP .param, .cell input
         * airss.pl / pyAIRSS .res output
     """
-    def __init__(self, dryrun=False, debug=False, verbosity=0, tags=None, scratch=False):
+    def __init__(self, dryrun=False, debug=False, verbosity=0, tags=None, scratch=False, **kwargs):
         """ Set up arguments and initialise DB client. """
         self.init = True
         self.import_count = 0
@@ -87,6 +87,9 @@ class Spatula:
             self.report = self.db.spatula
         # scan directory on init
         self.file_lists = self.scan_dir()
+        # if import, as opposed to rebuild, scan for duplicates
+        # if self.kwargs['subcmd'] == 'import':
+            # self.file_lists = self.scan_dupes(self.file_lists)
         # convert to dict and db if required
         self.files2db(self.file_lists)
         if not self.dryrun:
@@ -104,6 +107,8 @@ class Spatula:
                 self.repo.create_index([('stoichiometry', pm.ASCENDING)])
                 self.repo.create_index([('cut_off_energy', pm.ASCENDING)])
                 self.repo.create_index([('species_pot', pm.ASCENDING)])
+                # index by source for rebuilds
+                self.repo.create_index([('source', pm.ASCENDING)])
                 print('Done!')
         else:
             print('Dryrun complete!')
@@ -188,7 +193,7 @@ class Spatula:
                         airss = True
             if airss:
                 if file_lists[root]['param_count'] == 1:
-                    param_dict, success = param2dict(root + '/' + file_lists[root]['param'][0])
+                    param_dict, success = param2dict(file_lists[root]['param'][0])
                     param = success
                     if not success:
                         self.logfile.write(param_dict)
@@ -197,7 +202,7 @@ class Spatula:
                         print('Multiple param files found!')
                     multi = True
                 if file_lists[root]['cell_count'] == 1:
-                    cell_dict, success = cell2dict(root + '/' + file_lists[root]['cell'][0])
+                    cell_dict, success = cell2dict(file_lists[root]['cell'][0])
                     cell = success
                     if not success:
                         self.logfile.write(cell_dict)
@@ -210,11 +215,11 @@ class Spatula:
                     for param_name in file_lists[root]['param']:
                         for cell_name in file_lists[root]['cell']:
                             if param_name.split('.')[0] in cell_name:
-                                param_dict, success = param2dict(root + '/' + param_name)
+                                param_dict, success = param2dict(param_name)
                                 param = success
                                 if not success:
                                     self.logfile.write(param_dict)
-                                cell_dict, success = cell2dict(root + '/' + cell_name)
+                                cell_dict, success = cell2dict(cell_name)
                                 cell = success
                                 if not success:
                                     self.logfile.write(cell_dict)
@@ -248,11 +253,10 @@ class Spatula:
                 # create res dicts and combine them with input_dict
                 for ind, file in enumerate(file_lists[root]['res']):
                     if file.replace('.res', '.castep') in file_lists[root]['castep']:
-                        struct_dict, success = castep2dict(root + '/' +
-                                                           file.replace('.res', '.castep'),
+                        struct_dict, success = castep2dict(file.replace('.res', '.castep'),
                                                            debug=self.debug)
                     else:
-                        struct_dict, success = res2dict(root + '/' + file)
+                        struct_dict, success = res2dict(file)
                     if not success:
                         self.logfile.write(struct_dict)
                     else:
@@ -262,18 +266,18 @@ class Spatula:
                             # calculate kpoint spacing if not found; only an approximation
                             recip_abc = 3*[0]
                             for j in range(3):
-                                recip_abc[j] = 2 * pi / float(final_struct['lattice_abc'][0][j])
+                                recip_abc[j] = 2*pi / float(final_struct['lattice_abc'][0][j])
                                 if 'kpoints_mp_spacing' not in final_struct:
                                     if 'kpoints_mp_grid' in final_struct:
                                         max_spacing = 0
                                         for j in range(3):
                                             spacing = recip_abc[j] / \
-                                                      (2 * pi * final_struct['kpoints_mp_grid'][j])
+                                                (2*pi*final_struct['kpoints_mp_grid'][j])
                                             max_spacing = (spacing if spacing > max_spacing
                                                            else max_spacing)
-                                        exponent = round(log10(max_spacing) - 1)
+                                        exponent = round(log10(max_spacing)-1)
                                         final_struct['kpoints_mp_spacing'] = \
-                                            round(max_spacing + 0.5 * 10**exponent, 2)
+                                            round(max_spacing + 0.5*10**exponent, 2)
                         except:
                             print(struct_dict['source'])
                             print(input_dict['source'])
@@ -287,7 +291,7 @@ class Spatula:
                             self.import_count += self.struct2db(final_struct)
             else:
                 for ind, file in enumerate(file_lists[root]['castep']):
-                    castep_dict, success = castep2dict(root + '/' + file, debug=self.debug)
+                    castep_dict, success = castep2dict(file, debug=self.debug)
                     if not success:
                         self.logfile.write(castep_dict)
                     else:
@@ -296,7 +300,7 @@ class Spatula:
                             final_struct.update(self.tag_dict)
                             self.import_count += self.struct2db(final_struct)
         for ind, file in enumerate(file_lists[root]['synth']):
-                    synth_dict, success = synth2dict(root + '/' + file, debug=self.debug)
+                    synth_dict, success = synth2dict(file, debug=self.debug)
                     if not success:
                         self.logfile.write(synth_dict)
                     else:
@@ -304,7 +308,7 @@ class Spatula:
                             synth_dict.update(self.tag_dict)
                             self.import_count += self.exp2db(synth_dict)
         for ind, file in enumerate(file_lists[root]['expt']):
-                    expt_dict, success = expt2dict(root + '/' + file, debug=self.debug)
+                    expt_dict, success = expt2dict(file, debug=self.debug)
                     if not success:
                         self.logfile.write(expt_dict)
                     else:
@@ -325,6 +329,8 @@ class Spatula:
         print('Scanning', topdir_string, 'for CASTEP/AIRSS output files... ',
               end='')
         for root, dirs, files in walk(topdir, followlinks=True, topdown=True):
+            # get absolute path for rebuilds
+            root = abspath(root)
             file_lists[root] = defaultdict(list)
             file_lists[root]['res_count'] = 0
             file_lists[root]['cell_count'] = 0
@@ -333,6 +339,9 @@ class Spatula:
             file_lists[root]['synth_count'] = 0
             file_lists[root]['expt_count'] = 0
             for file in files:
+                file = root + '/' + file
+                if self.verbosity > 0:
+                    print(file)
                 if file.endswith('.res'):
                     file_lists[root]['res'].append(file)
                     file_lists[root]['res_count'] += 1
@@ -372,10 +381,16 @@ class Spatula:
         print(prefix, "{:8d}".format(ExptCount), '\t\t.expt files\n')
         return file_lists
 
+    def scan_dupes(self, file_lists):
+        """ Scan the file_lists made by scan_dir and remove
+        structures already in the database by matching sources.
+        """
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
-            description='Import CASTEP/AIRSS results into MongoDB database.',
-            epilog='Written by Matthew Evans (2016)')
+        description='Import CASTEP/AIRSS results into MongoDB database.',
+        epilog='Written by Matthew Evans (2016)')
     parser.add_argument('-d', '--dryrun', action='store_true',
                         help='run the importer without connecting to the database')
     parser.add_argument('-v', '--verbosity', action='count',
