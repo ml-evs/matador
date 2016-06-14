@@ -20,6 +20,7 @@ import datetime
 from os import walk, getcwd, uname, chdir, chmod, rename
 from os.path import realpath, dirname, getmtime, isfile
 from math import pi, log10
+from traceback import print_exc
 
 
 class Spatula:
@@ -54,8 +55,9 @@ class Spatula:
                 self.num_nouns = len(self.nlines)
                 wordfile.close()
                 nounfile.close()
-            except Exception as oops:
-                exit(type(oops), oops)
+            except Exception:
+                print_exc()
+                exit()
         else:
             logfile_name = 'spatula.log.dryrun'
         self.logfile = open(logfile_name, 'w')
