@@ -176,7 +176,7 @@ class QueryConvexHull():
                                      str(doc['stoichiometry'][1][0]) +
                                      str(doc['stoichiometry'][1][1]))
                     if x_elem in elem[0]:
-                        oqmd_stoich[ind] = elem[1]/float(atoms_per_fu)
+                        oqmd_stoich[ind] = (elem[1])/float(atoms_per_fu)
                 oqmd_info.append("{0:^10}\n{1:^24}\n{2:^5s}\n{3:2f} eV".format(
                     stoich_string, 'OQMD' + ' ' + doc['text_id'][0] + ' ' + doc['text_id'][1],
                     doc['space_group'], formation[ind]))
@@ -207,24 +207,25 @@ class QueryConvexHull():
         plt.draw()
         # plot all structures
         scatter = []
+        hull_scatter = []
         for ind in range(len(structures)-2):
-            scatter.append(ax.scatter(structures[ind, 0], structures[ind, 1], s=35, lw=1,
+            scatter.append(ax.scatter(structures[ind, 0], structures[ind, 1], s=35, lw=0,
                                       alpha=0.8, c=colours[int(100*structures[ind, 0])],
                                       edgecolor='k', label=info[ind], zorder=100))
             if dis and warren:
-                ax.plot([structures[ind, 0]-disorder[ind], structures[ind, 0]],
+                ax.plot([structures[ind, 0]-disorder[ind]/10, structures[ind, 0]],
                         [structures[ind, 1], structures[ind, 1]],
                         c='g', alpha=0.5, lw=0.5)
             if dis and not warren:
-                ax.plot([structures[ind, 0]-disorder[ind], structures[ind, 0] + disorder[ind]],
+                ax.plot([structures[ind, 0]-disorder[ind]/10, structures[ind, 0] + disorder[ind]],
                         [structures[ind, 1], structures[ind, 1]],
                         c='m', alpha=0.5, lw=0.5)
         if include_oqmd:
             for ind in range(len(oqmd_stoich)):
                 scatter.append(ax.scatter(oqmd_stoich[ind], oqmd_formation[ind], s=35, lw=1,
-                               alpha=1, c='m', edgecolor='k', marker='D',
-                               # label=oqmd_info[ind],
-                               zorder=10000))
+                               alpha=1, c='k', edgecolor='k', marker='D',
+                               label=oqmd_info[ind],
+                               zorder=200))
         stable_energy = []
         stable_comp = []
         stable_enthalpy = []
@@ -234,16 +235,25 @@ class QueryConvexHull():
                 stable_energy.append(structures[hull.vertices[ind], 1])
                 stable_enthalpy.append(enthalpy[hull.vertices[ind]])
                 stable_comp.append(structures[hull.vertices[ind], 0])
-                scatter.append(ax.scatter(structures[hull.vertices[ind], 0],
-                                          structures[hull.vertices[ind], 1],
-                                          c='r', marker='*', zorder=1000, edgecolor='k',
-                                          s=250, lw=1, alpha=1, label=info[hull.vertices[ind]]))
+                hull_scatter.append(ax.scatter(structures[hull.vertices[ind], 0],
+                                               structures[hull.vertices[ind], 1],
+                                               c='r', marker='*', zorder=1000, edgecolor='k',
+                                               s=250, lw=1, alpha=1,
+                                               label=info[hull.vertices[ind]]))
+        for ind in range(len(oqmd_hull.vertices)):
+            if oqmd_structures[oqmd_hull.vertices[ind], 1] <= 0:
+                hull_scatter.append(ax.scatter(oqmd_structures[oqmd_hull.vertices[ind], 0],
+                                               oqmd_structures[oqmd_hull.vertices[ind], 1],
+                                               c='k', marker='*', zorder=999, edgecolor='k',
+                                               s=250, lw=1, alpha=1,
+                                               label=oqmd_info[oqmd_hull.vertices[ind]]))
         # skip last and first as they are chem pots
         try:
             for ind in range(1, len(hull.vertices)-1):
                 query.cursor.rewind()
                 hull_docs.append(query.cursor[int(np.sort(hull.vertices)[ind])])
         except:
+            hull_docs = []
             print('Failed to create hull cursor, skipping...')
             pass
         stable_energy = np.asarray(stable_energy)
@@ -279,6 +289,9 @@ class QueryConvexHull():
         if not dis:
             datacursor(scatter[:], formatter='{label}'.format, draggable=False,
                        bbox=dict(fc='yellow'),
+                       arrowprops=dict(arrowstyle='simple', alpha=1))
+            datacursor(hull_scatter[:], formatter='{label}'.format, draggable=False,
+                       bbox=dict(fc='blue'),
                        arrowprops=dict(arrowstyle='simple', alpha=1))
         ax.set_ylim(-0.1 if np.min(structures[hull.vertices, 1]) > 0
                     else np.min(structures[hull.vertices, 1])-0.1,
