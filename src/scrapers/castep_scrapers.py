@@ -171,7 +171,7 @@ def cell2dict(seed, **kwargs):
                 while 'endblock' not in flines[line_no+i].lower():
                     try:
                         cell['species_pot'][flines[line_no+i].split()[0]] = \
-                                flines[line_no+i].split()[1].split('/')[-1]
+                            flines[line_no+i].split()[1].split('/')[-1]
                     except:
                         pass
                     i += 1
@@ -472,11 +472,11 @@ def castep2dict(seed, **kwargs):
                         break
                     else:
                         castep['species_pot'][flines[line_no+i].split()[0].strip()] = \
-                                flines[line_no+i].split()[1].split('/')[-1]
+                            flines[line_no+i].split()[1].split('/')[-1]
                         if(castep['species_pot'][flines[line_no+i].split()[0].strip()] ==
                                 'Pseudopotential'):
                             castep['species_pot'][flines[line_no+i].split()[0].strip()] = \
-                                    flines[line_no+i].split()[0].strip()+'_OTF.usp'
+                                flines[line_no+i].split()[0].strip()+'_OTF.usp'
                         i += 1
             # don't check if final_energy exists, as this will update for each GO step
             elif 'Final energy, E' in line:
@@ -490,7 +490,7 @@ def castep2dict(seed, **kwargs):
             castep['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0], [0.0]]
         # task specific options
         if castep['task'] != 'geometryoptimization' and castep['task'] != 'geometry optimization':
-            raise RuntimeError('CASTEP file does not contain GO calculation')
+            raise DFTError('CASTEP file does not contain GO calculation')
         else:
             final = False
             finish_line = 0
@@ -519,21 +519,21 @@ def castep2dict(seed, **kwargs):
                         castep['lattice_abc'] = list()
                         i = 1
                         castep['lattice_abc'].append(
-                                map(float,
-                                    [
-                                     final_flines[line_no+i].split('=')[1].strip().split(' ')[0],
-                                     final_flines[line_no+i+1].split('=')[1].strip().split(' ')[0],
-                                     final_flines[line_no+i+2].split('=')[1].strip().split(' ')[0]
-                                    ]
-                                    ))
+                            map(float,
+                                [
+                                    final_flines[line_no+i].split('=')[1].strip().split(' ')[0],
+                                    final_flines[line_no+i+1].split('=')[1].strip().split(' ')[0],
+                                    final_flines[line_no+i+2].split('=')[1].strip().split(' ')[0]
+                                ]
+                                ))
                         castep['lattice_abc'].append(
-                                map(float,
-                                    [
-                                     final_flines[line_no+i].split('=')[-1].strip(),
-                                     final_flines[line_no+i+1].split('=')[-1].strip(),
-                                     final_flines[line_no+i+2].split('=')[-1].strip()
-                                    ]
-                                    ))
+                            map(float,
+                                [
+                                    final_flines[line_no+i].split('=')[-1].strip(),
+                                    final_flines[line_no+i+1].split('=')[-1].strip(),
+                                    final_flines[line_no+i+2].split('=')[-1].strip()
+                                ]
+                                ))
                         recip_abc = 3*[0]
                         for j in range(3):
                             recip_abc[j] = 2 * pi / float(castep['lattice_abc'][0][j])
@@ -606,14 +606,14 @@ def castep2dict(seed, **kwargs):
                         while i < len(castep['atom_types']):
                             if castep['spin_polarized']:
                                 castep['mulliken_charges'].append(
-                                        float(final_flines[line_no+i+4].split()[-2]))
+                                    float(final_flines[line_no+i+4].split()[-2]))
                                 castep['mulliken_spins'].append(
-                                        float(final_flines[line_no+i+4].split()[-1]))
+                                    float(final_flines[line_no+i+4].split()[-1]))
                                 castep['mulliken_net_spin'] += castep['mulliken_spins'][-1]
                                 castep['mulliken_abs_spin'] += abs(castep['mulliken_spins'][-1])
                             else:
                                 castep['mulliken_charges'].append(
-                                        float(final_flines[line_no+i+4].split()[-1]))
+                                    float(final_flines[line_no+i+4].split()[-1]))
                             i += 1
                     elif 'Bond' and 'Population' in line.split():
                         try:
@@ -634,7 +634,7 @@ def castep2dict(seed, **kwargs):
                                         split[4] += q
                                         break
                                 castep['bonds'].append(
-                                        [[split[1], split[4]], float(split[5]), float(split[6])])
+                                    [[split[1], split[4]], float(split[5]), float(split[6])])
                                 i += 1
                                 if '===' in final_flines[line_no+i]:
                                     break
@@ -664,11 +664,11 @@ def castep2dict(seed, **kwargs):
                 castep['peak_mem_MB'] = int(float(line.split()[-2])/1024)
         # check that any optimized results were saved and raise errors if not
         if castep['optimised'] is False:
-            raise RuntimeError('CASTEP GO failed to converge.')
+            raise DFTError('CASTEP GO failed to converge.')
         if 'enthalpy' not in castep:
-            raise RuntimeError('Could not find enthalpy')
+            raise DFTError('Could not find enthalpy')
         if 'positions_frac' not in castep:
-            raise RuntimeError('Could not find positions')
+            raise DFTError('Could not find positions')
         if 'pressure' not in castep:
             castep['pressure'] = 'xxx'
         if 'cell_volume' not in castep:
@@ -679,7 +679,21 @@ def castep2dict(seed, **kwargs):
         if kwargs.get('dryrun'):
             print_exc()
             print('Error in .castep file', seed, 'skipping...')
-        return seed + '\t\t' + str(type(oops)) + ' ' + str(oops)+'\n', False
+        if type(oops) == DFTError:
+            return '', False
+        else:
+            return seed + '\t\t' + str(type(oops)) + ' ' + str(oops)+'\n', False
     if kwargs.get('debug'):
         print(json.dumps(castep, indent=2, ensure_ascii=False))
     return castep, True
+
+
+class DFTError(Exception):
+    """ Quick DFT exception class for unconverged or
+    non-useful calculations.
+    """
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
