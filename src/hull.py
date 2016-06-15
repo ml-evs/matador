@@ -213,7 +213,7 @@ class QueryConvexHull():
         scatter = []
         hull_scatter = []
         for ind in range(len(structures)-2):
-            scatter.append(ax.scatter(structures[ind, 0], structures[ind, 1], s=35, lw=0,
+            scatter.append(ax.scatter(structures[ind, 0], structures[ind, 1], s=35, lw=1,
                                       alpha=0.8, c=colours[int(100*structures[ind, 0])],
                                       edgecolor='k', label=info[ind], zorder=100))
             if dis and warren:
