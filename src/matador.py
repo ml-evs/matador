@@ -4,6 +4,10 @@
 including parsing user inputs, displaying results
 and calling other functionality. """
 from __future__ import print_function
+# matador modules
+from query import DBQuery
+from hull import QueryConvexHull
+from scrapers.spatula import Spatula
 # import external libraries
 import pymongo as pm
 import numpy as np
@@ -12,8 +16,6 @@ import string
 from sys import argv
 from os import uname
 from copy import deepcopy
-from query import DBQuery
-from scrapers.spatula import Spatula
 
 
 class Matador:
@@ -37,11 +39,17 @@ class Matador:
         self.db = self.client.crystals
         # choose desired collections
         self.collections = dict()
-        if 'db' in self.args:
+        if self.args['db'] is not None:
             for database in self.args['db']:
-                if database == 'ajm':
+                if database == 'all':
+                    self.collections = dict()
+                    self.collections['ajm'] = self.db['repo']
+                    self.collections['oqmd'] = self.db['oqmd']
+                elif database == 'ajm':
                     database = 'repo'
-                self.collections[database] = self.db[database]
+                    self.collections['ajm'] = self.db['repo']
+                else:
+                    self.collections[database] = self.db[database]
         else:
             self.collections['repo'] = self.db['repo']
         # print last spatula report
@@ -55,6 +63,11 @@ class Matador:
                                     scratch=self.args['scratch'],
                                     verbosity=self.args['verbosity'],
                                     tags=self.args['tags'])
+        if self.args['subcmd'] == 'query':
+            self.query = DBQuery(self.client, self.collections, self.args)
+        if self.args['subcmd'] == 'hull':
+            self.query = DBQuery(self.client, self.collections, self.args)
+            self.hull = QueryConvexHull(self.query)
 
     def swaps(self, doc, pairs=1, template_param=None):
         """ Take a db document as input and perform atomic swaps. """
@@ -183,8 +196,9 @@ if __name__ == '__main__':
     # define parent parser for global arguments
     global_parser = argparse.ArgumentParser(add_help=False)
     # common arguments to all subcommands
-    global_parser.add_argument('--db', choices=['ajm', 'oqmd', 'scratch'],
-                               help='choose which databases to print statistics for',
+    global_parser.add_argument('--db', choices=['ajm', 'oqmd', 'all', 'scratch'],
+                               help='choose which databases to query. \
+                                     NB: "all" does not include scratch',
                                nargs='+')
     # define structure parser for structure query strings
     structure_parser = argparse.ArgumentParser(add_help=False)
@@ -208,6 +222,8 @@ if __name__ == '__main__':
                               help='number of structures to show (DEFAULT: 10)')
     query_parser.add_argument('-d', '--details', action='store_true',
                               help='show as much detail about calculation as possible')
+    query_parser.add_argument('-sg', '--space_group',
+                              help='query a particular space group')
     query_parser.add_argument('-p', '--pressure', type=float,
                               help='specify an isotropic external pressure to search for \
                                    , e.g. 10 (GPa)')

@@ -9,10 +9,8 @@ from scrapers.spatula import param2dict
 # import external libraries
 import pymongo as pm
 import numpy as np
-import argparse
 import string
-from sys import argv
-from os import makedirs, system, uname
+from os import makedirs, system
 from os.path import exists, isfile, expanduser
 from copy import deepcopy
 from bson.son import SON
@@ -23,100 +21,150 @@ class DBQuery:
     """ Class that implements queries to MongoDB
     structure database.
     """
-    def __init__(self, **kwargs):
+    def __init__(self, client, collections, *args):
         """ Initialise the query with command line
         arguments and return results.
         """
         # read args
-        self.args = kwargs
-        for arg in self.args:
-            if type(self.args[arg]) == str:
-                self.args[arg] = self.args[arg].split()
-        # connect to MongoDB
-        local = uname()[1]
-        if local == 'cluster2':
-            remote = 'node1'
-        else:
-            remote = None
-        self.client = pm.MongoClient(remote)
-        self.db = self.client.crystals
-        if self.args.get('scratch'):
-            self.repo = self.client.crystals.scratch
-        elif self.args.get('oqmd'):
-            self.repo = self.client.crystals.oqmd
-        else:
-            self.repo = self.client.crystals.repo
+        self.args = args[0]
+        self.client = client
+        self.db = client.crystals
+        self.collections = collections
+        # print(self.args)
+        # for arg in self.args:
+            # if type(self.args[arg]) == str:
+                # self.args[arg] = self.args[arg].split()
+        # if self.args.get('scratch'):
+            # self.repo = self.client.crystals.scratch
+        # elif self.args.get('oqmd'):
+            # self.repo = self.client.crystals.oqmd
+        # else:
+            # self.repo = self.client.crystals.repo
         # print last spatula report
-        self.report = self.client.crystals.spatula
-        self.print_report()
         if self.args.get('summary'):
-            self.top = self.db.command('collstats', self.repo.name)['count']
+            self.top = -1
         else:
             self.top = self.args.get('top') if self.args.get('top') is not None else 10
-        # grab all args as string for file dumps
-        if self.args.get('sysargs'):
-            self.sysargs = ''
-            for ind, arg in enumerate(self.args.get('sysargs')):
-                if '--write_pressure' in arg:
-                    ind += 1
-                    self.sysargs += self.args.get('sysargs')[ind] + 'GPa'
-                else:
-                    self.sysargs += arg
-                    self.sysargs += '-'
-            self.sysargs = 'query-' + self.sysargs
-            self.sysargs = self.sysargs.replace('---', '-')
-            self.sysargs = self.sysargs.replace('--', '-')
+        # grab all args as string for file dumps; TO-DO: make this better
+        # if self.args.get('sysargs'):
+            # self.sysargs = ''
+            # for ind, arg in enumerate(self.args.get('sysargs')):
+                # if '--write_pressure' in arg:
+                    # ind += 1
+                    # self.sysargs += self.args.get('sysargs')[ind] + 'GPa'
+                # else:
+                    # self.sysargs += arg
+                    # self.sysargs += '-'
+            # self.sysargs = 'query-' + self.sysargs
+            # self.sysargs = self.sysargs.replace('---', '-')
+            # self.sysargs = self.sysargs.replace('--', '-')
         """ PERFORM QUERY """
         self.cursor = EmptyCursor()
         # initalize query_dict to '$and' all queries
         self.query_dict = dict()
         self.query_dict['$and'] = []
+        empty_query = True
         # benchmark enthalpy to display (set by calc_match)
         self.gs_enthalpy = 0.0
-        if self.args.get('dbstats'):
-            self.dbstats()
-            exit()
         if self.args.get('id') is not None:
-            self.cursor = self.repo.find({'text_id': self.args.get('id')})
-            if self.cursor.count() < 1:
-                exit('Could not find a match.')
-            if self.args.get('calc_match'):
+            empty_query = False
+            self.cursor = []
+            for collection in self.collections:
+                temp_cursor = self.collections[collection].find({'text_id': self.args.get('id')})
+                for doc in temp_cursor:
+                    self.cursor.append(doc)
+            if len(self.cursor) < 1:
+                exit('Could not find a match, try widening your search.')
+            elif self.args.get('calc_match'):
                 # save special copy of calc_dict for hulls
                 self.calc_dict = dict()
                 self.calc_dict['$and'] = []
                 # to avoid deep recursion, and since this is always called first
                 # don't append, just set
-                self.query_dict['$and'] = self.query_calc(self.cursor)
+                self.query_dict['$and'] = self.query_calc(self.cursor[0])
                 self.calc_dict['$and'] = list(self.query_dict['$and'])
+                empty_query = False
+            else:
+                self.display_results(self.cursor)
         if self.args.get('stoichiometry') is not None:
             self.query_dict['$and'].append(self.query_stoichiometry())
+            empty_query = False
         if self.args.get('composition') is not None:
             self.query_dict['$and'].append(self.query_composition())
+            empty_query = False
         if self.args.get('pressure') is not None:
             self.query_dict['$and'].append(self.query_pressure())
+            empty_query = False
+        if self.args.get('space_group') is not None:
+            self.query_dict['$and'].append(self.query_space_group())
+            empty_query = False
         if self.args.get('encapsulated') is True:
             self.query_dict['$and'].append(self.query_encap())
+            empty_query = False
         if self.args.get('tags') is not None:
             self.query_dict['$and'].append(self.query_tags())
+            empty_query = False
         # only query quality when making a hull
         if not self.args.get('ignore_warnings'):
             self.query_dict['$and'].append(self.query_quality())
         # if no query submitted, find all
-        if(len(self.query_dict['$and']) == 0 and (self.args.get('id') is None and not
-                                                  self.args.get('dbstats'))):
-            if self.args.get('debug'):
-                print('Empty query, showing all...')
-                print(self.query_dict)
-            self.cursor = self.repo.find().sort('enthalpy_per_atom', pm.ASCENDING)
+        if empty_query:
+            for collection in self.collections:
+                self.repo = self.collections[collection]
+                if self.args.get('debug'):
+                    print('Empty query, showing all...')
+                self.cursor = self.repo.find().sort('enthalpy_per_atom', pm.ASCENDING)
+                if self.top == -1:
+                    self.top = self.cursor.count()
+                self.display_results(self.cursor[:self.top], details=self.args.get('details'))
         # if no special query has been made already, begin executing the query
-        if self.cursor.count() < 1 or self.args.get('calc_match'):
-            if self.args.get('details'):
-                print(self.query_dict)
-            # execute query
-            self.cursor = self.repo.find(SON(self.query_dict)).sort('enthalpy_per_atom',
-                                                                    pm.ASCENDING)
+        if not empty_query or self.args.get('calc_match'):
+            self.cursors = []
+            for collection in self.collections:
+                self.repo = self.collections[collection]
+                if self.args.get('details'):
+                    print(self.query_dict)
+                # execute query
+                self.cursor = self.repo.find(SON(self.query_dict)).sort('enthalpy_per_atom',
+                                                                        pm.ASCENDING)
+                self.cursors.append(self.cursor.clone())
+                cursor_count = self.cursor.count()
+                """ QUERY POST-PROCESSING """
+                # write query to res or cell with param files
+                if self.args.get('cell') or self.args.get('res'):
+                    if cursor_count >= 1:
+                        if self.args.get('top') is not None:
+                            if self.top == -1:
+                                self.top = cursor_count
+                            self.query2files(self.cursor[:self.top],
+                                             self.args.get('res'),
+                                             self.args.get('cell'),
+                                             top=True,
+                                             pressure=self.args.get('write_pressure'))
+                        else:
+                            self.query2files(self.cursor,
+                                             self.args.get('res'),
+                                             self.args.get('cell'),
+                                             pressure=self.args.get('write_pressure'))
+                # if called as script, always print results
+                if self.args.get('id') is None:
+                    print(cursor_count, 'results found for query in', collection+'.')
+                if self.args.get('subcmd') != 'hull':
+                    if cursor_count >= 1:
+                        if self.top == -1:
+                            self.top = cursor_count
+                        if cursor_count > self.top:
+                            self.display_results(self.cursor[:self.top],
+                                                 details=self.args.get('details'))
+                        else:
+                            self.display_results(self.cursor, details=self.args.get('details'))
             # building hull from just comp, find best structure to calc_match
-            if self.args.get('hull'):
+            if self.args.get('subcmd') == 'hull':
+                if 'repo' in self.collections:
+                    self.repo = self.collections['repo']
+                else:
+                    exit('Failed to query database.')
+                print('Creating hull from AJM db structures.')
                 self.args['summary'] = True
                 print('\nFinding biggest calculation set for hull...\n')
                 test_cursor = []
@@ -125,7 +173,7 @@ class DBQuery:
                 sample = 10
                 rerun = False
                 i = 0
-                count = self.cursor.count() 
+                count = self.cursor.count()
                 while i < sample:
                     # start with sample/2 lowest enthalpy structures
                     if i < int(sample/2):
@@ -134,7 +182,7 @@ class DBQuery:
                     else:
                         ind = np.random.randint(5, count-1)
                     id_cursor = self.repo.find({'text_id': self.cursor[ind]['text_id']})
-                    self.query_dict['$and'] = self.query_calc(id_cursor)
+                    self.query_dict['$and'] = self.query_calc(id_cursor[0])
                     self.calc_dict = dict()
                     self.calc_dict['$and'] = list(self.query_dict['$and'])
                     self.query_dict['$and'].append(self.query_composition())
@@ -158,6 +206,7 @@ class DBQuery:
                     i += 1
                 self.cursor = test_cursor[np.argmax(np.asarray(test_cursor_count))]
                 # if including oqmd, connect to oqmd collection and generate new query
+                self.args['include_oqmd'] = True
                 if self.args.get('include_oqmd'):
                     self.oqmd_repo = self.client.crystals.oqmd
                     self.oqmd_query = dict()
@@ -167,31 +216,6 @@ class DBQuery:
                     self.oqmd_query['$and'].append(self.query_composition())
                     self.oqmd_cursor = self.oqmd_repo.find(SON(self.oqmd_query))
                     self.oqmd_cursor.sort('enthalpy_per_atom', pm.ASCENDING)
-        # clone cursor for further use after printing
-        cursor = self.cursor.clone()
-        """ QUERY POST-PROCESSING """
-        # write query to res or cell with param files
-        if self.args.get('cell') or self.args.get('res'):
-            if self.cursor.count() >= 1:
-                if self.args.get('top') is not None:
-                    self.query2files(cursor[:self.top],
-                                     self.args.get('res'),
-                                     self.args.get('cell'),
-                                     top=True,
-                                     pressure=self.args.get('write_pressure'))
-                else:
-                    self.query2files(cursor,
-                                     self.args.get('res'),
-                                     self.args.get('cell'),
-                                     pressure=self.args.get('write_pressure'))
-        # if called as script, always print results
-        print(self.cursor.count(), 'results found for query.')
-        if self.args.get('main') and not self.args.get('hull'):
-            if self.cursor.count() >= 1:
-                if self.cursor.count() > self.top:
-                    self.display_results(cursor[:self.top], details=self.args.get('details'))
-                else:
-                    self.display_results(cursor, details=self.args.get('details'))
 
     def __del__(self):
         """ Clean up any temporary databases on garbage
@@ -461,13 +485,12 @@ class DBQuery:
                             formula_substring += str(subitem)
                         atom_per_fu += subitem
             if 'encapsulated' in doc:
-                # if doc['encapsulated'] == True:
                 formula_substring += '+CNT'
             if last_formula != formula_substring:
                 self.gs_enthalpy = 0.0
             formula_string.append(formula_substring)
             struct_string.append(
-                    "{:^24}".format(doc['text_id'][0]+' '+doc['text_id'][1]))
+                "{:^24}".format(doc['text_id'][0]+' '+doc['text_id'][1]))
             try:
                 if doc['quality'] == 0:
                     struct_string[-1] += "{:^5}".format('!!!')
@@ -677,6 +700,15 @@ class DBQuery:
             query_dict['$and'].append(size_dict)
         return query_dict
 
+    def query_space_group(self):
+        """ Query DB for all structures with given 
+        space gruop.
+        """
+        query_dict = dict()
+        print('Querying', self.args.get('space_group'))
+        query_dict['space_group'] = str(self.args.get('space_group'))
+        return query_dict
+
     def query_tags(self):
         """ Find all structures matching given tags. """
         query_dict = dict()
@@ -734,11 +766,10 @@ class DBQuery:
         query_dict['encapsulated']['$exists'] = True
         return query_dict
 
-    def query_calc(self, cursor):
+    def query_calc(self, doc):
         """ Find all structures with matching
         accuracy to specified structure.
         """
-        doc = cursor[0]
         self.gs_enthalpy = doc['enthalpy_per_atom']
         query_dict = []
         temp_dict = dict()
@@ -753,14 +784,14 @@ class DBQuery:
             query_dict.append(dict())
             temp_dict['$gte'] = float(doc['cut_off_energy'])
             query_dict[-1]['cut_off_energy'] = temp_dict
-            temp_dict = dict()
-            query_dict.append(dict())
-            temp_dict['$lte'] = float(doc['kpoints_mp_spacing'])
-            query_dict[-1]['kpoints_mp_spacing'] = temp_dict
+            # temp_dict = dict()
+            # query_dict.append(dict())
+            # temp_dict['$lte'] = float(doc['kpoints_mp_spacing'])
+            # query_dict[-1]['kpoints_mp_spacing'] = temp_dict
         else:
-            temp_dict = dict()
-            temp_dict['kpoints_mp_spacing'] = doc['kpoints_mp_spacing']
-            query_dict.append(temp_dict)
+            # temp_dict = dict()
+            # temp_dict['kpoints_mp_spacing'] = doc['kpoints_mp_spacing']
+            # query_dict.append(temp_dict)
             query_dict.append(dict())
             query_dict[-1]['cut_off_energy'] = doc['cut_off_energy']
         for species in doc['species_pot']:
@@ -773,74 +804,6 @@ class DBQuery:
             temp_dict['$or'][-1]['species_pot.'+species] = doc['species_pot'][species]
             query_dict.append(temp_dict)
         return query_dict
-
-    def print_report(self):
-        """ Print spatula report on current database. """
-        try:
-            report = self.report.find_one()
-            print('Database last modified on', report['last_modified'], 'with spatula',
-                  report['version'], 'changeset (' + report['git_hash'] + ').')
-        except:
-            print('Failed to print database report: spatula is probably running!')
-
-    def dbstats(self):
-        """ Print some useful stats about the database. """
-        db_stats_dict = self.db.command('collstats', self.repo.name)
-        print('Database collection', self.db.name + '.' + self.repo.name, 'contains',
-              db_stats_dict['count'], 'structures at',
-              "{:.1f}".format(db_stats_dict['avgObjSize']/1024), 'kB each, totalling',
-              "{:.1f}".format(db_stats_dict['storageSize']/(1024**2)),
-              'MB when padding is included.')
-        cursor = self.repo.find()
-        comp_list = dict()
-        for doc in cursor:
-            temp = ''
-            for ind, elem in enumerate(doc['stoichiometry']):
-                temp += str(elem[0])
-                if ind != len(doc['stoichiometry'])-1:
-                    temp += '+'
-            if temp not in comp_list:
-                comp_list[temp] = 0
-            comp_list[temp] += 1
-        keys = list(comp_list.keys())
-        vals = list(comp_list.values())
-        comp_list = zip(keys, vals)
-        comp_list.sort(key=lambda t: t[1], reverse=True)
-        small_list = []
-        small_count = 0
-        first_ind = 1000
-        if self.args.get('oqmd'):
-            cutoff = 0
-        else:
-            cutoff = 200
-        for ind, comp in enumerate(comp_list):
-            if comp[1] < cutoff:
-                if ind < first_ind:
-                    first_ind = ind
-                small_list.append(comp[0])
-                small_count += comp[1]
-        comp_list = comp_list[:first_ind]
-        comp_list.append(['others < ' + str(cutoff), small_count])
-        comp_list.sort(key=lambda t: t[1], reverse=True)
-        try:
-            from ascii_graph import Pyasciigraph
-            from ascii_graph.colors import Gre, Blu, Red
-            from ascii_graph.colordata import hcolor
-        except:
-            exit('Pyascii graph missing; not printing dbstats.')
-        graph = Pyasciigraph(line_length=80, multivalue=False)
-        thresholds = {
-                        int(db_stats_dict['count']/40): Gre,
-                        int(db_stats_dict['count']/10): Blu,
-                        int(db_stats_dict['count']/4): Red
-                     }
-        data = hcolor(comp_list, thresholds)
-        for line in graph.graph(label=None, data=data):
-            print(line)
-        print('where others', end=': ')
-        for small in small_list:
-            print(small, end=', ')
-        print('\n')
 
     def temp_collection(self, cursor):
         """ Create temporary collection
@@ -865,122 +828,29 @@ class EmptyCursor:
     def count(self):
         return 0
 
-    def clone(self):
-        return EmptyCursor()
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(
-            description='Query MongoDB structure database.',
-            epilog='Written by Matthew Evans (2016). Based on the cryan concept by Chris Pickard.')
-    group = parser.add_argument_group()
-    group.add_argument('-f', '--formula', nargs='+', type=str,
-                       help='choose a stoichiometry, e.g. Ge 1 Te 1 Si 3, or GeTeSi3')
-    group.add_argument('-c', '--composition', nargs='+', type=str,
-                       help=('find all structures containing the given elements, e.g. GeTeSi, ' +
-                             'or find the number of structures with n elements, e.g. 1, 2, 3'))
-    group.add_argument('-i', '--id', type=str, nargs='+',
-                       help='specify a particular structure by its text_id')
-    parser.add_argument('-s', '--summary', action='store_true',
-                        help='show only the ground state for each formula')
-    parser.add_argument('-t', '--top', type=int,
-                        help='number of structures to show (DEFAULT: 10)')
-    parser.add_argument('-d', '--details', action='store_true',
-                        help='show as much detail about calculation as possible')
-    parser.add_argument('-p', '--pressure', type=float,
-                        help='specify an isotropic external pressure to search for, e.g. 10 (GPa)')
-    parser.add_argument('--source', action='store_true',
-                        help='print filenames from which structures were wrangled')
-    parser.add_argument('-ac', '--calc-match', action='store_true',
-                        help='display calculations of the same accuracy as specified id')
-    parser.add_argument('-pf', '--partial-formula', action='store_true',
-                        help=('stoichiometry/composition queries will include other unspecified ' +
-                              'species, e.g. -pf search for Li will query any structure' +
-                              'containing Li, not just pure Li.'))
-    parser.add_argument('--encap', action='store_true',
-                        help='query only structures encapsulated in a carbon nanotube.')
-    parser.add_argument('--dbstats', action='store_true',
-                        help='print some stats about the database that is being queried')
-    parser.add_argument('--tags', nargs='+', type=str,
-                        help=('search for up to 3 manual tags at once'))
-    parser.add_argument('--hull', action='store_true',
-                        help='create a convex hull for 2 elements (to be extended to 3, 4 soon)')
-    parser.add_argument('--voltage', action='store_true',
-                        help='create a voltage curve for a convex hull')
-    parser.add_argument('--strict', action='store_true',
-                        help=('strictly matches with calc_match,'
-                              'useful for hulls where convergence is rough'))
-    parser.add_argument('--loose', action='store_true',
-                        help=('loosely matches with calc_match, i.e. only matches' +
-                              'pspot and xc_functional'))
-    parser.add_argument('--ignore_warnings', action='store_true',
-                        help='includes possibly bad structures')
-    parser.add_argument('--dis', action='store_true',
-                        help='smear hull with local stoichiometry')
-    parser.add_argument('--scratch', action='store_true',
-                        help='query local scratch collection')
-    parser.add_argument('--oqmd', action='store_true',
-                        help='query local OQMD collection')
-    parser.add_argument('--include_oqmd', action='store_true',
-                        help='include OQMD structures on hull')
-    parser.add_argument('--cell', action='store_true',
-                        help='export query to .cell files in folder name from query string')
-    parser.add_argument('--res', action='store_true',
-                        help='export query to .res files in folder name from query string')
-    parser.add_argument('--debug', action='store_true',
-                        help='print some useful (to me) debug info')
-    parser.add_argument('--write_pressure', nargs='+', type=str,
-                        help=('pressure to add to new cell file, either one float' +
-                              'for isotropic or 6 floats for anisotropic.'))
-    args = parser.parse_args()
-    if args.calc_match and args.id is None:
-        exit('--calc-match requires -i or --id')
-    if args.hull and args.composition is None:
-        exit('--hull requires --composition')
-    if args.dis and not args.hull:
-        exit('--dis requires --hull')
-    if args.write_pressure and args.cell is not True:
-        exit('--write_pressure requires cell')
-    if args.voltage and not args.hull:
-        args.hull = True
-    if args.oqmd and args.scratch:
-        exit('--oqmd not compatible with --scratch')
-    if args.oqmd and args.res:
-        exit('--oqmd not compatible with --res, use --cell.')
-    if args.include_oqmd and not args.hull:
-        exit('--include_oqmd requires --hull.')
-    query = DBQuery(stoichiometry=args.formula,
-                    composition=args.composition,
-                    summary=args.summary,
-                    id=args.id, top=args.top,
-                    details=args.details,
-                    pressure=args.pressure,
-                    source=args.source,
-                    calc_match=args.calc_match,
-                    strict=args.strict,
-                    loose=args.loose,
-                    ignore_warnings=args.ignore_warnings,
-                    voltage=args.voltage,
-                    partial_formula=args.partial_formula,
-                    dbstats=args.dbstats,
-                    scratch=args.scratch,
-                    oqmd=args.oqmd,
-                    include_oqmd=args.include_oqmd,
-                    encapsulated=args.encap,
-                    tags=args.tags,
-                    hull=args.hull,
-                    dis=args.dis,
-                    res=args.res,
-                    cell=args.cell,
-                    write_pressure=args.write_pressure,
-                    debug=args.debug,
-                    main=True,
-                    sysargs=argv[1:])
-    # generate hull outside query object
-    if args.hull or args.voltage:
-        from hull import QueryConvexHull
-        hull = QueryConvexHull(query)
-        print('Structures on hull:')
-        try:
-            query.display_results(hull.hull_docs)
-        except:
-            pass
+    # args = parser.parse_args()
+    # if args.calc_match and args.id is None:
+        # exit('--calc-match requires -i or --id')
+    # if args.hull and args.composition is None:
+        # exit('--hull requires --composition')
+    # if args.dis and not args.hull:
+        # exit('--dis requires --hull')
+    # if args.write_pressure and args.cell is not True:
+        # exit('--write_pressure requires cell')
+    # if args.voltage and not args.hull:
+        # args.hull = True
+    # if args.oqmd and args.scratch:
+        # exit('--oqmd not compatible with --scratch')
+    # if args.oqmd and args.res:
+        # exit('--oqmd not compatible with --res, use --cell.')
+    # if args.include_oqmd and not args.hull:
+        # exit('--include_oqmd requires --hull.')
+    # # generate hull outside query object
+    # if args.hull or args.voltage:
+        # from hull import QueryConvexHull
+        # hull = QueryConvexHull(query)
+        # print('Structures on hull:')
+        # try:
+            # query.display_results(hull.hull_docs)
+        # except:
+            # pass
