@@ -16,7 +16,7 @@ import string
 import subprocess
 from sys import argv
 from os import uname, chdir, getcwd
-from os.pathj import realpath, dirname
+from os.path import realpath, dirname
 from copy import deepcopy
 
 cwd = getcwd()
