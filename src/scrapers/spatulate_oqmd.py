@@ -10,6 +10,8 @@ TO-DO
 * find k-points
 """
 from __future__ import print_function
+# matador modules
+from cell_utils import cart2abc
 # external libraries
 import MySQLdb
 import MySQLdb.cursors
@@ -209,6 +211,7 @@ class OQMDConverter:
             structure['lattice_cart'].append([doc['x1'], doc['x2'], doc['x3']])
             structure['lattice_cart'].append([doc['y1'], doc['y2'], doc['y3']])
             structure['lattice_cart'].append([doc['z1'], doc['z2'], doc['z3']])
+            structure['lattice_abc'] = cart2abc(structure['lattice_cart'])
             structure['cell_volume'] = doc['volume']
         except Exception:
             if self.debug:
@@ -244,8 +247,8 @@ class OQMDConverter:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
-            description='Import OQMD (http://oqmd.org) structures into MongoDB database.',
-            epilog='Written by Matthew Evans (2016)')
+        description='Import OQMD (http://oqmd.org) structures into MongoDB database.',
+        epilog='Written by Matthew Evans (2016)')
     parser.add_argument('-d', '--dryrun', action='store_true',
                         help='run the importer without connecting to the database')
     parser.add_argument('-v', '--verbosity', action='count',

@@ -4,6 +4,8 @@
 inputs and outputs.
 """
 from __future__ import print_function
+# matador modules
+from cell_utils import abc2cart
 # external libraries
 import bson.json_util as json
 # standard library
@@ -12,7 +14,7 @@ from os import getcwd, stat
 from os.path import isfile
 from time import strptime
 from fractions import gcd
-from math import pi, log10, sin, cos, sqrt
+from math import pi, log10
 from pwd import getpwuid
 from traceback import print_exc
 import glob
@@ -69,32 +71,7 @@ def res2dict(seed, **kwargs):
         res['total_energy_per_atom'] = res['total_energy'] / res['num_atoms']
         res['lattice_abc'] = [map(float, cell[2:5]), map(float, cell[5:8])]
         # calculate lattice_cart from abc
-        res['lattice_cart'] = []
-        a = float(res['lattice_abc'][0][0])
-        b = float(res['lattice_abc'][0][1])
-        c = float(res['lattice_abc'][0][2])
-        alpha = float(res['lattice_abc'][1][0] * pi/180)
-        beta = float(res['lattice_abc'][1][1] * pi/180)
-        gamma = float(res['lattice_abc'][1][2] * pi/180)
-        # vec(a) = (a, 0, 0)
-        res['lattice_cart'].append([a, 0.0, 0.0])
-        # vec(b) = (b cos(gamma), b sin(gamma), 0)
-        bx = b*cos(gamma)
-        by = b*sin(gamma)
-        tol = 1e-12
-        if abs(bx) < tol:
-            bx = 0.0
-        if abs(by) < tol:
-            by = 0.0
-        cx = c*cos(beta)
-        if cx < tol:
-            cx = 0.0
-        cy = c*(cos(alpha)-cos(beta)*cos(gamma))/sin(gamma)
-        if abs(cy) < tol:
-            cy = 0.0
-        cz = sqrt(c**2 - cx**2 - cy**2)
-        res['lattice_cart'].append([bx, by, 0.0])
-        res['lattice_cart'].append([cx, cy, cz])
+        res['lattice_cart'] = abc2cart(res['lattice_abc'])
         for line_no, line in enumerate(flines):
             if 'SFAC' in line:
                 i = 1
@@ -140,6 +117,10 @@ def res2dict(seed, **kwargs):
             else:
                 temp_stoich.append([key, value/gcd_val])
         res['stoichiometry'] = temp_stoich
+        atoms_per_fu = 0
+        for elem in res['stoichiometry']:
+            atoms_per_fu += elem[1]
+        res['num_fu'] = res['num_atoms'] / atoms_per_fu
     except Exception as oops:
         if kwargs.get('verbosity') > 0:
             print_exc()
@@ -457,6 +438,10 @@ def castep2dict(seed, **kwargs):
                     else:
                         temp_stoich.append([key, value/gcd_val])
                 castep['stoichiometry'] = temp_stoich
+                atoms_per_fu = 0
+                for elem in castep['stoichiometry']:
+                    atoms_per_fu += elem[1]
+                castep['num_fu'] = castep['num_atoms'] / atoms_per_fu
             elif 'species_pot' not in castep and 'Pseudopotential Report' in line:
                 castep['species_pot'] = dict()
                 i = 0
