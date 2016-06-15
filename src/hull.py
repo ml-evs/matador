@@ -204,8 +204,10 @@ class QueryConvexHull():
             oqmd_hull = ConvexHull(oqmd_structures)
         try:
             colours = plt.cm.plasma(np.linspace(0, 1, 100))
+            mpl_new_ver = True
         except:
             colours = plt.cm.winter(np.linspace(0, 1, 100))
+            mpl_new_ver = False
         fig = plt.figure(facecolor='w')
         ax = fig.add_subplot(111)
         plt.draw()
@@ -213,7 +215,8 @@ class QueryConvexHull():
         scatter = []
         hull_scatter = []
         for ind in range(len(structures)-2):
-            scatter.append(ax.scatter(structures[ind, 0], structures[ind, 1], s=35, lw=1,
+            lw = 0 if mpl_new_ver else 1
+            scatter.append(ax.scatter(structures[ind, 0], structures[ind, 1], s=35, lw=lw,
                                       alpha=0.8, c=colours[int(100*structures[ind, 0])],
                                       edgecolor='k', label=info[ind], zorder=100))
             if dis and warren:
