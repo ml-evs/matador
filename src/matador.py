@@ -13,18 +13,9 @@ import pymongo as pm
 import numpy as np
 import argparse
 import string
-import subprocess
 from sys import argv
-from os import uname, chdir, getcwd
-from os.path import realpath, dirname
+from os import uname
 from copy import deepcopy
-
-cwd = getcwd()
-chdir(dirname(realpath(__file__)))
-__version__ = subprocess.check_output(["git", "describe", "--tags"]).strip()
-__author__ = "Matthew Evans"
-__maintainer__ = "Matthew Evans"
-__date__ = "Summer 2016"
 
 
 class Matador:
@@ -48,30 +39,27 @@ class Matador:
         self.db = self.client.crystals
         # choose desired collections
         self.collections = dict()
-        if self.args['db'] is not None:
-            for database in self.args['db']:
-                if database == 'all':
-                    self.collections = dict()
-                    self.collections['ajm'] = self.db['repo']
-                    self.collections['oqmd'] = self.db['oqmd']
-                elif database == 'ajm':
-                    database = 'repo'
-                    self.collections['ajm'] = self.db['repo']
-                else:
-                    self.collections[database] = self.db[database]
-        else:
-            self.collections['repo'] = self.db['repo']
+        if self.args['subcmd'] not in ['import', 'rebuild']:
+            if self.args['db'] is not None:
+                for database in self.args['db']:
+                    if database == 'all':
+                        self.collections = dict()
+                        self.collections['ajm'] = self.db['repo']
+                        self.collections['oqmd'] = self.db['oqmd']
+                    elif database == 'ajm':
+                        database = 'repo'
+                        self.collections['ajm'] = self.db['repo']
+                    else:
+                        self.collections[database] = self.db[database]
+            else:
+                self.collections['repo'] = self.db['repo']
         # print last spatula report
         self.report = self.client.crystals.spatula
         self.print_report()
         if self.args['subcmd'] == 'stats':
             self.stats()
-        if self.args['subcmd'] == 'import':
-            self.importer = Spatula(dryrun=self.args['dryrun'],
-                                    debug=self.args['debug'],
-                                    scratch=self.args['scratch'],
-                                    verbosity=self.args['verbosity'],
-                                    tags=self.args['tags'])
+        if self.args['subcmd'] in ['import', 'rebuild']:
+            self.importer = Spatula(self.args)
         if self.args['subcmd'] == 'query':
             self.query = DBQuery(self.client, self.collections, self.args)
         if self.args['subcmd'] == 'hull':
@@ -221,10 +209,23 @@ if __name__ == '__main__':
                                   help='query a particular chemical formula, e.g. GeTeSi3')
     structure_parser.add_argument('-i', '--id', type=str, nargs='+',
                                   help='specify a particular structure by its text_id')
+    structure_parser.add_argument('-ac', '--calc-match', action='store_true',
+                                  help='display calculations of the same accuracy as specified id')
     # define material parser for hull/voltage arguments
     material_parser = argparse.ArgumentParser(add_help=False)
     material_parser.add_argument('--include_oqmd', action='store_true',
                                  help='include OQMD structures on hull and voltage curve.')
+    spatula_parser = argparse.ArgumentParser(add_help=False)
+    spatula_parser.add_argument('-d', '--dryrun', action='store_true',
+                                help='run the importer without connecting to the database')
+    spatula_parser.add_argument('-v', '--verbosity', action='count',
+                                help='enable verbose output')
+    spatula_parser.add_argument('-t', '--tags', nargs='+', type=str,
+                                help='set user tags, e.g. nanotube, project name')
+    spatula_parser.add_argument('--debug', action='store_true',
+                                help='enable debug output to print every dict')
+    spatula_parser.add_argument('-s', '--scratch', action='store_true',
+                                help='import to scratch collection')
     # define subcommand parsers and their arguments
     stat_parser = subparsers.add_parser('stats',
                                         help='print some stats about the database.',
@@ -247,8 +248,6 @@ if __name__ == '__main__':
                                    , e.g. 10 (GPa)')
     query_parser.add_argument('--source', action='store_true',
                               help='print filenames from which structures were wrangled')
-    query_parser.add_argument('-ac', '--calc-match', action='store_true',
-                              help='display calculations of the same accuracy as specified id')
     query_parser.add_argument('-pf', '--partial-formula', action='store_true',
                               help=('stoichiometry/composition queries will include other \
                                     unspecified species, e.g. -pf search for Li will query \
@@ -262,18 +261,11 @@ if __name__ == '__main__':
     query_parser.add_argument('--res', action='store_true',
                               help='export query to .res files in folder name from query string')
     import_parser = subparsers.add_parser('import',
-                                          help='import structures into database; does not \
-                                                care about non-unique structures')
-    import_parser.add_argument('-d', '--dryrun', action='store_true',
-                               help='run the importer without connecting to the database')
-    import_parser.add_argument('-v', '--verbosity', action='count',
-                               help='enable verbose output')
-    import_parser.add_argument('-t', '--tags', nargs='+', type=str,
-                               help='set user tags, e.g. nanotube, project name')
-    import_parser.add_argument('--debug', action='store_true',
-                               help='enable debug output to print every dict')
-    import_parser.add_argument('-s', '--scratch', action='store_true',
-                               help='import to scratch collection')
+                                          help='import new structures in folder into database',
+                                          parents=[spatula_parser])
+    rebuild_parser = subparsers.add_parser('rebuild',
+                                           help='rebuild whole database.',
+                                           parents=[spatula_parser])
     hull_parser = subparsers.add_parser('hull',
                                         help='create a convex hull from query results \
                                         (currently limited to binaries)',
