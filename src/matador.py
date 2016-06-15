@@ -239,6 +239,10 @@ if __name__ == '__main__':
                               help='query only structures encapsulated in a carbon nanotube.')
     query_parser.add_argument('--tags', nargs='+', type=str,
                               help=('search for up to 3 manual tags at once'))
+    query_parser.add_argument('--cell', action='store_true',
+                              help='export query to .cell files in folder name from query string')
+    query_parser.add_argument('--res', action='store_true',
+                              help='export query to .res files in folder name from query string')
     import_parser = subparsers.add_parser('import',
                                           help='import structures into database; does not \
                                                 care about non-unique structures')
