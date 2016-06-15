@@ -12,7 +12,6 @@ from scrapers.experiment_scrapers import expt2dict, synth2dict
 # external libraries
 import pymongo as pm
 # standard library
-import argparse
 import subprocess
 from random import randint
 from collections import defaultdict
@@ -34,9 +33,15 @@ class Spatula:
         * CASTEP .param, .cell input
         * airss.pl / pyAIRSS .res output
     """
-    def __init__(self, dryrun=False, debug=False, verbosity=0, tags=None, scratch=False, **kwargs):
+    def __init__(self, *args):
         """ Set up arguments and initialise DB client. """
+        self.args = args[0]
         self.init = True
+        dryrun = self.args['dryrun']
+        debug = self.args['debug']
+        verbosity = self.args['verbosity']
+        scratch = self.args['scratch']
+        tags = self.args['tags']
         self.import_count = 0
         # I/O files
         if not dryrun:
@@ -67,18 +72,18 @@ class Spatula:
         self.scratch = scratch
         self.tag_dict = dict()
         self.tag_dict['tags'] = tags
+        local = uname()[1]
+        if local == 'cluster2':
+            remote = 'node1'
+        else:
+            remote = None
+        self.client = pm.MongoClient(remote)
+        self.db = self.client.crystals
+        if self.scratch:
+            self.repo = self.db.scratch
+        else:
+            self.repo = self.db.repo
         if not self.dryrun:
-            local = uname()[1]
-            if local == 'cluster2':
-                remote = 'node1'
-            else:
-                remote = None
-            self.client = pm.MongoClient(remote)
-            self.db = self.client.crystals
-            if self.scratch:
-                self.repo = self.db.scratch
-            else:
-                self.repo = self.db.repo
             # either drop and recreate or create spatula report collection
             try:
                 self.db.spatula.drop()
@@ -88,8 +93,8 @@ class Spatula:
         # scan directory on init
         self.file_lists = self.scan_dir()
         # if import, as opposed to rebuild, scan for duplicates
-        # if self.kwargs['subcmd'] == 'import':
-            # self.file_lists = self.scan_dupes(self.file_lists)
+        if self.args['subcmd'] == 'import':
+            self.file_lists = self.scan_dupes(self.file_lists)
         # convert to dict and db if required
         self.files2db(self.file_lists)
         if not self.dryrun:
@@ -125,23 +130,25 @@ class Spatula:
         elif errors > 1:
             print('There are', errors, 'errors to view in spatala.log')
         self.logfile.close()
-        # construct dictionary in spatula_report collection to hold info
-        report_dict = dict()
-        report_dict['last_modified'] = datetime.datetime.utcnow().replace(microsecond=0)
-        report_dict['num_success'] = self.import_count
-        report_dict['num_errors'] = errors
-        try:
-            cwd = getcwd()
-            chdir(dirname(realpath(__file__)))
-            report_dict['version'] = subprocess.check_output(["git", "describe", "--tags"]).strip()
-            report_dict['git_hash'] = subprocess.check_output(["git", "rev-parse",
-                                                               "--short", "HEAD"]).strip()
-            chdir(cwd)
-        except:
-            print('Failed to get CVS info.')
-            report_dict['version'] = 'unknown'
-            report_dict['git_hash'] = 'unknown'
         if not self.dryrun:
+            # construct dictionary in spatula_report collection to hold info
+            report_dict = dict()
+            report_dict['last_modified'] = datetime.datetime.utcnow().replace(microsecond=0)
+            report_dict['num_success'] = self.import_count
+            report_dict['num_errors'] = errors
+            try:
+                cwd = getcwd()
+                chdir(dirname(realpath(__file__)))
+                report_dict['version'] = subprocess.check_output(["git",
+                                                                  "describe", "--tags"]).strip()
+                report_dict['git_hash'] = subprocess.check_output(["git", "rev-parse",
+                                                                   "--short", "HEAD"]).strip()
+                chdir(cwd)
+            except:
+                print('Failed to get CVS info.')
+                report_dict['version'] = 'unknown'
+                report_dict['git_hash'] = 'unknown'
+
             self.report.insert_one(report_dict)
 
     def struct2db(self, struct):
@@ -391,25 +398,29 @@ class Spatula:
         """ Scan the file_lists made by scan_dir and remove
         structures already in the database by matching sources.
         """
+        new_file_lists = file_lists.copy()
+        for root_ind, root in enumerate(new_file_lists):
+            for file_ind, file in enumerate(new_file_lists[root]['castep']):
+                count = self.repo.find({'source': {'$in': [file]}}).count()
+                if count == 1:
+                    res_test = file.replace(file.split('.')[-1], '.res')
+                    if res_test in new_file_lists[root]['res']:
+                        del new_file_lists[root]['res'][new_file_lists[root]['res'].index(res_test)]
+                        new_file_lists[root]['res_count'] -= 1
+                    del new_file_lists[root]['castep'][file_ind]
+                    new_file_lists[root]['castep_count'] -= 1
+                else:
+                    print(count, file, new_file_lists[root][type][file_ind])
+            for file_ind, file in enumerate(new_file_lists[root]['res']):
+                count = self.repo.find({'source': {'$in': [file]}}).count()
+                if count == 1:
+                    del new_file_lists[root]['res'][file_ind]
+                    new_file_lists[root]['res_count'] -= 1
 
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(
-        description='Import CASTEP/AIRSS results into MongoDB database.',
-        epilog='Written by Matthew Evans (2016)')
-    parser.add_argument('-d', '--dryrun', action='store_true',
-                        help='run the importer without connecting to the database')
-    parser.add_argument('-v', '--verbosity', action='count',
-                        help='enable verbose output')
-    parser.add_argument('-t', '--tags', nargs='+', type=str,
-                        help='set user tags, e.g. nanotube, project name')
-    parser.add_argument('--debug', action='store_true',
-                        help='enable debug output to print every dict')
-    parser.add_argument('-s', '--scratch', action='store_true',
-                        help='import to junk collection called scratch')
-    args = parser.parse_args()
-    importer = Spatula(dryrun=args.dryrun,
-                       debug=args.debug,
-                       verbosity=args.verbosity,
-                       tags=args.tags,
-                       scratch=args.scratch)
+        prefix = '\t\t'
+        ResCount = new_file_lists[root]['res_count']
+        CastepCount = new_file_lists[root]['castep_count']
+        print('of which, these will be imported:')
+        print(prefix, "{:8d}".format(ResCount), '\t\t.res files')
+        print(prefix, "{:8d}".format(CastepCount), '\t\t.castep, .history or .history.gz files')
+        return new_file_lists
