@@ -240,6 +240,8 @@ if __name__ == '__main__':
                               help='show as much detail about calculation as possible')
     query_parser.add_argument('-sg', '--space_group',
                               help='query a particular space group')
+    query_parser.add_argument('-z', '--num_fu', type=int,
+                              help='query a calculations with more than n formula units')
     query_parser.add_argument('-p', '--pressure', type=float,
                               help='specify an isotropic external pressure to search for \
                                    , e.g. 10 (GPa)')
