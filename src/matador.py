@@ -13,9 +13,18 @@ import pymongo as pm
 import numpy as np
 import argparse
 import string
+import subprocess
 from sys import argv
-from os import uname
+from os import uname, chdir, getcwd
+from os.pathj import realpath, dirname
 from copy import deepcopy
+
+cwd = getcwd()
+chdir(dirname(realpath(__file__)))
+__version__ = subprocess.check_output(["git", "describe", "--tags"]).strip()
+__author__ = "Matthew Evans"
+__maintainer__ = "Matthew Evans"
+__date__ = "Summer 2016"
 
 
 class Matador:
