@@ -148,7 +148,7 @@ class DBQuery:
                             self.display_results(self.cursor.clone(),
                                                  details=self.args.get('details'))
             # building hull from just comp, find best structure to calc_match
-            if self.args.get('subcmd') == 'hull':
+            if self.args.get('subcmd') == 'hull' or self.args.get('subcmd') == 'voltage':
                 if 'repo' in self.collections:
                     self.repo = self.collections['repo']
                 else:
@@ -195,7 +195,6 @@ class DBQuery:
                     i += 1
                 self.cursor = test_cursor[np.argmax(np.asarray(test_cursor_count))]
                 # if including oqmd, connect to oqmd collection and generate new query
-                self.args['include_oqmd'] = True
                 if self.args.get('include_oqmd'):
                     self.oqmd_repo = self.client.crystals.oqmd
                     self.oqmd_query = dict()

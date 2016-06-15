@@ -1,5 +1,8 @@
 #!/usr/bin/python
 # coding: utf-8
+""" This file implements convex hull functionality
+from database queries.
+"""
 from __future__ import print_function
 from scipy.spatial import ConvexHull
 from mpldatacursor import datacursor
@@ -20,9 +23,10 @@ class QueryConvexHull():
     Implements a Convex Hull for formation energies
     from a fryan DBQuery.
     """
-    def __init__(self, query):
+    def __init__(self, query, *args):
         """ Accept query from fryan as argument. """
         self.query = query
+        self.args = args[0]
         self.binary_hull()
 
     def binary_hull(self, dis=False):
@@ -301,7 +305,7 @@ class QueryConvexHull():
         ax.set_title('$\mathrm{'+str(x_elem)+'_x'+str(one_minus_x_elem)+'_{1-x}}$')
         ax.set_xlabel('$x$')
         ax.set_ylabel('formation enthalpy per atom (eV)')
-        if query.args.get('voltage'):
+        if self.args['subcmd'] == 'voltage':
             print('Generating voltage curve...')
             self.voltage_curve(stable_enthalpy, stable_comp, mu_enthalpy, elements)
         plt.show()

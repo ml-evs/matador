@@ -76,7 +76,10 @@ class Matador:
             self.query = DBQuery(self.client, self.collections, self.args)
         if self.args['subcmd'] == 'hull':
             self.query = DBQuery(self.client, self.collections, self.args)
-            self.hull = QueryConvexHull(self.query)
+            self.hull = QueryConvexHull(self.query, self.args)
+        if self.args['subcmd'] == 'voltage':
+            self.query = DBQuery(self.client, self.collections, self.args)
+            self.hull = QueryConvexHull(self.query, self.args)
 
     def swaps(self, doc, pairs=1, template_param=None):
         """ Take a db document as input and perform atomic swaps. """
@@ -218,6 +221,10 @@ if __name__ == '__main__':
                                   help='query a particular chemical formula, e.g. GeTeSi3')
     structure_parser.add_argument('-i', '--id', type=str, nargs='+',
                                   help='specify a particular structure by its text_id')
+    # define material parser for hull/voltage arguments
+    material_parser = argparse.ArgumentParser(add_help=False)
+    material_parser.add_argument('--include_oqmd', action='store_true',
+                                 help='include OQMD structures on hull and voltage curve.')
     # define subcommand parsers and their arguments
     stat_parser = subparsers.add_parser('stats',
                                         help='print some stats about the database.',
@@ -268,11 +275,13 @@ if __name__ == '__main__':
     hull_parser = subparsers.add_parser('hull',
                                         help='create a convex hull from query results \
                                         (currently limited to binaries)',
-                                        parents=[global_parser, structure_parser])
+                                        parents=[global_parser, structure_parser,
+                                                 material_parser])
     voltage_parser = subparsers.add_parser('voltage',
                                            help='plot a voltage curve from query results \
                                            (currently limited to binaries)',
-                                           parents=[global_parser, structure_parser])
+                                           parents=[global_parser, structure_parser,
+                                                    material_parser])
     swaps_parser = subparsers.add_parser('swaps',
                                          help='perform atomic swaps on query results',
                                          parents=[global_parser, structure_parser])
@@ -286,14 +295,6 @@ if __name__ == '__main__':
                         # help='includes possibly bad structures')
     # parser.add_argument('--dis', action='store_true',
                         # help='smear hull with local stoichiometry')
-    # parser.add_argument('--scratch', action='store_true',
-                        # help='query local scratch collection')
-    # parser.add_argument('--cell', action='store_true',
-                        # help='export query to .cell files in folder name from query string')
-    # parser.add_argument('--res', action='store_true',
-                        # help='export query to .res files in folder name from query string')
-    # parser.add_argument('--debug', action='store_true',
-                        # help='print some useful (to me) debug info')
     # parser.add_argument('--write_pressure', nargs='+', type=str,
                         # help=('pressure to add to new cell file, either one float' +
                               # 'for isotropic or 6 floats for anisotropic.'))
