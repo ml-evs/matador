@@ -265,8 +265,11 @@ class DBQuery:
         else:
             write = True
         name = 'query-'
-        for comp in self.args['composition']:
-            name += comp
+        if self.args['composition'] is not None:
+            for comp in self.args['composition']:
+                name += comp
+        elif self.args['formula'] is not None:
+            name += self.args['formula']
         name += '-' + self.args['db'][0]
         dir = False
         dir_counter = 0
