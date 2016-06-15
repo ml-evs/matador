@@ -47,8 +47,8 @@ class Spatula:
                 mdate = str(mdate).split()[0]
                 rename(logfile_name, logfile_name + '.' + str(mdate).split()[0])
             try:
-                wordfile = open(dirname(realpath(__file__)) + '/words', 'r')
-                nounfile = open(dirname(realpath(__file__)) + '/nouns', 'r')
+                wordfile = open(dirname(realpath(__file__)) + '/scrapers/words', 'r')
+                nounfile = open(dirname(realpath(__file__)) + '/scrapers/nouns', 'r')
                 self.wlines = wordfile.readlines()
                 self.num_words = len(self.wlines)
                 self.nlines = nounfile.readlines()
