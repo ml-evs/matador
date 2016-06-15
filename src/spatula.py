@@ -6,9 +6,9 @@ MongoDB client.
 """
 from __future__ import print_function
 # submodules
-from castep_scrapers import castep2dict, param2dict, cell2dict
-from castep_scrapers import res2dict, dir2dict
-from experiment_scrapers import expt2dict, synth2dict
+from scrapers.castep_scrapers import castep2dict, param2dict, cell2dict
+from scrapers.castep_scrapers import res2dict, dir2dict
+from scrapers.experiment_scrapers import expt2dict, synth2dict
 # external libraries
 import pymongo as pm
 # standard library

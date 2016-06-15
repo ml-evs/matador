@@ -7,7 +7,7 @@ from __future__ import print_function
 # matador modules
 from query import DBQuery
 from hull import QueryConvexHull
-from scrapers.spatula import Spatula
+from spatula import Spatula
 # import external libraries
 import pymongo as pm
 import numpy as np

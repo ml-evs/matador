@@ -5,7 +5,7 @@ including parsing user inputs, displaying results
 and calling other functionality. """
 from __future__ import print_function
 # import related crysdb functionality
-from scrapers.spatula import param2dict
+from spatula import param2dict
 # import external libraries
 import pymongo as pm
 import numpy as np
