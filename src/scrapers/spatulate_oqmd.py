@@ -76,18 +76,6 @@ class OQMDConverter:
             print('Indexing...')
             self.repo.create_index([('enthalpy_per_atom', pm.ASCENDING)])
 
-    def oqmd_struct2db(self, struct):
-        """ Insert completed Python dictionary into chosen
-        database, with generated text_id.
-        """
-        plain_text_id = [self.wlines[randint(0, self.num_words-1)].strip(),
-                         self.nlines[randint(0, self.num_nouns-1)].strip()]
-        struct['text_id'] = plain_text_id
-        struct_id = self.repo.insert_one(struct).inserted_id
-        if self.debug:
-            print('Inserted', struct_id)
-        return 1
-
     def sql2db(self):
         """ Perform SQL query to scrape, and hop around the tables
         to collect all data associated with one structure.
@@ -111,7 +99,7 @@ class OQMDConverter:
             calculation_dict, success = self.oqmd_calculation2dict(calc_doc)
             if not success:
                 continue
-            entry_id = calculation_dict['source']['entry_id']
+            entry_id = calculation_dict['entry_id']
             sql_query = "select * from structures where label in ('" + \
                         self.label + "') and entry_id in ('" + str(entry_id) + "')"
             cursor.execute(sql_query)
@@ -120,7 +108,7 @@ class OQMDConverter:
             structure_dict, success = self.oqmd_structure2dict(struct_doc)
             if not success:
                 continue
-            structure_id = structure_dict['source']['structure_id']
+            structure_id = structure_dict['structure_id']
             # grab spacegroup symbol from ID
             spacegroup_id = structure_dict['spacegroup_id']
             sql_query = "select * from spacegroups where number in \
@@ -146,6 +134,7 @@ class OQMDConverter:
             final_struct = calculation_dict.copy()
             final_struct.update(structure_dict)
             final_struct.update(atoms_dict)
+            final_struct['source'] = ['OQMD', final_struct['entry_id']]
             success_count += 1
             if not self.dryrun:
                 self.import_count += self.oqmd_struct2db(final_struct)
@@ -157,6 +146,18 @@ class OQMDConverter:
                   count, 'structures.')
         return
 
+    def oqmd_struct2db(self, struct):
+        """ Insert completed Python dictionary into chosen
+        database, with generated text_id.
+        """
+        plain_text_id = [self.wlines[randint(0, self.num_words-1)].strip(),
+                         self.nlines[randint(0, self.num_nouns-1)].strip()]
+        struct['text_id'] = plain_text_id
+        struct_id = self.repo.insert_one(struct).inserted_id
+        if self.debug:
+            print('Inserted', struct_id)
+        return 1
+
     def oqmd_calculation2dict(self, doc):
         """ Take a calculation from oqmd.calculations and
         scrape its settings, returning the ID to its structure
@@ -165,17 +166,8 @@ class OQMDConverter:
         try:
             calculation = defaultdict(list)
             # try to get output ID first
-            calculation['source'] = dict()
-            calculation['source']['entry_id'] = doc['entry_id']
-            calculation['source']['input_id'] = doc['input_id']
-            # convert stoich from string to list to tuple
-            temp_stoich_list = [elem for elem in
-                                re.split(r'([A-Z][a-z]*)',
-                                         doc['composition_id']) if elem]
-            for ind, item in enumerate(temp_stoich_list):
-                if ind % 2 == 0:
-                    calculation['stoichiometry'].append([str(temp_stoich_list[ind]),
-                                                         int(temp_stoich_list[ind+1])])
+            calculation['entry_id'] = doc['entry_id']
+            calculation['input_id'] = doc['input_id']
             # grab energies and pretend they are enthalpies
             calculation['enthalpy'] = float(doc['energy'])
             calculation['enthalpy_per_atom'] = float(doc['energy_pa'])
@@ -201,11 +193,21 @@ class OQMDConverter:
         """
         try:
             structure = defaultdict(list)
-            # append ID to source
-            structure['source'] = dict()
-            structure['source']['structure_id'] = doc['id']
+            structure['structure_id'] = doc['id']
             structure['spacegroup_id'] = doc['spacegroup_id']
             structure['num_atoms'] = doc['natoms']
+            # convert stoich from string to list to tuple
+            temp_stoich_list = [elem for elem in
+                                re.split(r'([A-Z][a-z]*)',
+                                         doc['composition_id']) if elem]
+            for ind, item in enumerate(temp_stoich_list):
+                if ind % 2 == 0:
+                    structure['stoichiometry'].append([str(temp_stoich_list[ind]),
+                                                       int(temp_stoich_list[ind+1])])
+            atoms_per_fu = 0
+            for elem in structure['stoichiometry']:
+                atoms_per_fu += elem[1]
+            structure['num_fu'] = structure['num_atoms'] / atoms_per_fu
             # get pressure from -1/3 Tr(stress)
             structure['pressure'] = -(doc['sxx'] + doc['syy'] + doc['szz'])/3.0
             structure['lattice_cart'].append([doc['x1'], doc['x2'], doc['x3']])
