@@ -20,6 +20,7 @@ from os import walk, getcwd, uname, chdir, chmod, rename
 from os.path import realpath, abspath, dirname, getmtime, isfile
 from math import pi, log10
 from traceback import print_exc
+from copy import deepcopy
 
 
 class Spatula:
@@ -398,29 +399,43 @@ class Spatula:
         """ Scan the file_lists made by scan_dir and remove
         structures already in the database by matching sources.
         """
-        new_file_lists = file_lists.copy()
-        for root_ind, root in enumerate(new_file_lists):
-            for file_ind, file in enumerate(new_file_lists[root]['castep']):
+        new_file_lists = deepcopy(file_lists)
+        for root_ind, root in enumerate(file_lists):
+            # per folder delete list
+            # do not import castep or res if seed name in db already
+            castep_delete_list = []
+            res_delete_list = []
+            for file in new_file_lists[root]['castep']:
                 count = self.repo.find({'source': {'$in': [file]}}).count()
                 if count == 1:
-                    res_test = file.replace(file.split('.')[-1], '.res')
+                    castep_delete_list.append(file)
+                    res_test = file.replace(file.split('.')[-1], 'res')
                     if res_test in new_file_lists[root]['res']:
-                        del new_file_lists[root]['res'][new_file_lists[root]['res'].index(res_test)]
+                        res_delete_list.append(res_test)
                         new_file_lists[root]['res_count'] -= 1
-                    del new_file_lists[root]['castep'][file_ind]
                     new_file_lists[root]['castep_count'] -= 1
-                else:
-                    print(count, file, new_file_lists[root][type][file_ind])
+            for file in castep_delete_list:
+                del new_file_lists[root]['castep'][new_file_lists[root]['castep'].index(file)]
+            for file in res_delete_list:
+                del new_file_lists[root]['res'][new_file_lists[root]['res'].index(file)]
+            assert len(new_file_lists[root]['res']) == new_file_lists[root]['res_count'], \
+                'res count does not match'
+            assert len(new_file_lists[root]['castep']) == new_file_lists[root]['castep_count'], \
+                'castep count does not match'
+            # now delete just .res file names if already in db
+            res_delete_list = []
             for file_ind, file in enumerate(new_file_lists[root]['res']):
                 count = self.repo.find({'source': {'$in': [file]}}).count()
                 if count == 1:
-                    del new_file_lists[root]['res'][file_ind]
+                    res_delete_list = []
                     new_file_lists[root]['res_count'] -= 1
-
         prefix = '\t\t'
-        ResCount = new_file_lists[root]['res_count']
-        CastepCount = new_file_lists[root]['castep_count']
-        print('of which, these will be imported:')
+        ResCount = 0
+        CastepCount = 0
+        for root in new_file_lists:
+            ResCount += new_file_lists[root]['res_count']
+            CastepCount += new_file_lists[root]['castep_count']
+        print('of which, these will be imported:\n')
         print(prefix, "{:8d}".format(ResCount), '\t\t.res files')
         print(prefix, "{:8d}".format(CastepCount), '\t\t.castep, .history or .history.gz files')
         return new_file_lists
