@@ -37,18 +37,19 @@ class Spatula:
     def __init__(self, *args):
         """ Set up arguments and initialise DB client. """
         self.args = args[0]
-        self.init = True
-        dryrun = self.args['dryrun']
-        scan = self.args['scan']
-        if scan:
-            dryrun = True
-        debug = self.args['debug']
-        verbosity = self.args['verbosity']
-        scratch = self.args['scratch']
-        tags = self.args['tags']
+        self.dryrun = self.args['dryrun']
+        self.scan = self.args['scan']
+        if self.scan:
+            self.dryrun = True
+        self.debug = self.args['debug']
+        self.verbosity = self.args['verbosity']
+        self.scratch = self.args['scratch']
+        self.tags = self.args['tags']
+        self.tag_dict = dict()
+        self.tag_dict['tags'] = self.tags
         self.import_count = 0
         # I/O files
-        if not dryrun:
+        if not self.dryrun:
             logfile_name = 'spatula.log'
             if isfile(logfile_name):
                 mtime = getmtime(logfile_name)
@@ -67,15 +68,10 @@ class Spatula:
             except Exception:
                 print_exc()
                 exit()
-        else:
+        elif not self.scan:
             logfile_name = 'spatula.log.dryrun'
-        self.logfile = open(logfile_name, 'w')
-        self.dryrun = dryrun
-        self.debug = debug
-        self.verbosity = verbosity
-        self.scratch = scratch
-        self.tag_dict = dict()
-        self.tag_dict['tags'] = tags
+        if not self.scan:
+            self.logfile = open(logfile_name, 'w')
         local = uname()[1]
         if local == 'cluster2':
             remote = 'node1'
@@ -99,8 +95,9 @@ class Spatula:
         # if import, as opposed to rebuild, scan for duplicates and remove from list
         if self.args['subcmd'] == 'import':
             self.file_lists = self.scan_dupes(self.file_lists)
+        self.display_import(self.file_lists)
         # only create dicts if not just scanning
-        if not self.args['scan']:
+        if not self.scan:
             # convert to dict and db if required
             self.files2db(self.file_lists)
         if not self.dryrun and self.import_count > 0:
@@ -124,19 +121,21 @@ class Spatula:
                 print('Done!')
         else:
             print('Dryrun complete!')
-        self.logfile.close()
+        if not self.scan:
+            self.logfile.close()
         if not self.dryrun:
             # set log file to read only
             chmod(logfile_name, 0550)
-        self.logfile = open(logfile_name, 'r')
-        errors = sum(1 for line in self.logfile)
-        if errors == 1:
-            print('There is', errors, 'error to view in spatala.log')
-        elif errors == 0:
-            print('There were no errors.')
-        elif errors > 1:
-            print('There are', errors, 'errors to view in spatala.log')
-        self.logfile.close()
+        if not self.scan:
+            self.logfile = open(logfile_name, 'r')
+            errors = sum(1 for line in self.logfile)
+            if errors == 1:
+                print('There is', errors, 'error to view in spatala.log')
+            elif errors == 0:
+                print('There were no errors.')
+            elif errors > 1:
+                print('There are', errors, 'errors to view in spatala.log')
+            self.logfile.close()
         if not self.dryrun:
             # construct dictionary in spatula_report collection to hold info
             report_dict = dict()
@@ -345,8 +344,6 @@ class Spatula:
         """ Scans folder topdir recursively, returning list of
         CASTEP/AIRSS input/output files.
         """
-        ResCount, CellCount, CastepCount, ParamCount = 4*[0]
-        SynthCount, ExptCount = 2*[0]
         file_lists = dict()
         topdir = '.'
         topdir_string = getcwd().split('/')[-1]
@@ -369,40 +366,26 @@ class Spatula:
                 if file.endswith('.res'):
                     file_lists[root]['res'].append(file)
                     file_lists[root]['res_count'] += 1
-                    ResCount += 1
                 elif (file.endswith('.castep') or
                       file.endswith('.history') or
                       file.endswith('.history.gz')):
                     file_lists[root]['castep'].append(file)
                     file_lists[root]['castep_count'] += 1
-                    CastepCount += 1
                 elif file.endswith('.cell'):
                     if file.endswith('-out.cell'):
                         continue
                     else:
                         file_lists[root]['cell'].append(file)
                         file_lists[root]['cell_count'] += 1
-                        CellCount += 1
                 elif file.endswith('.param'):
                     file_lists[root]['param'].append(file)
                     file_lists[root]['param_count'] += 1
-                    ParamCount += 1
                 elif file.endswith('.synth'):
                     file_lists[root]['synth'].append(file)
                     file_lists[root]['synth_count'] += 1
-                    SynthCount += 1
                 elif file.endswith('.expt'):
                     file_lists[root]['expt'].append(file)
                     file_lists[root]['expt_count'] += 1
-                    ExptCount += 1
-        print('done!\n')
-        prefix = '\t\t'
-        print(prefix, "{:8d}".format(ResCount), '\t\t.res files')
-        print(prefix, "{:8d}".format(CastepCount), '\t\t.castep, .history or .history.gz files')
-        print(prefix, "{:8d}".format(CellCount), '\t\t.cell files')
-        print(prefix, "{:8d}".format(ParamCount), '\t\t.param files')
-        print(prefix, "{:8d}".format(SynthCount), '\t\t.synth files')
-        print(prefix, "{:8d}".format(ExptCount), '\t\t.expt files\n')
         return file_lists
 
     def scan_dupes(self, file_lists):
@@ -417,13 +400,18 @@ class Spatula:
             res_delete_list = []
             for file in new_file_lists[root]['castep']:
                 count = self.repo.find({'source': {'$in': [file]}}).count()
-                if count == 1:
+                if self.debug:
+                    print(count, file)
+                if count >= 1:
                     castep_delete_list.append(file)
                     res_test = file.replace(file.split('.')[-1], 'res')
                     if res_test in new_file_lists[root]['res']:
                         res_delete_list.append(res_test)
                         new_file_lists[root]['res_count'] -= 1
                     new_file_lists[root]['castep_count'] -= 1
+                if count > 1:
+                    if self.debug:
+                        print('Found double in database, this needs to be dealt with manually')
             for file in castep_delete_list:
                 del new_file_lists[root]['castep'][new_file_lists[root]['castep'].index(file)]
             for file in res_delete_list:
@@ -436,18 +424,43 @@ class Spatula:
             res_delete_list = []
             for file_ind, file in enumerate(new_file_lists[root]['res']):
                 count = self.repo.find({'source': {'$in': [file]}}).count()
-                if count == 1:
-                    res_delete_list = []
+                if self.debug:
+                    print(count, file)
+                if count >= 1:
+                    res_delete_list.append(file)
                     new_file_lists[root]['res_count'] -= 1
+                if count > 1:
+                    if self.debug:
+                        print('Found double in database, this needs to be dealt with manually')
+            for file in res_delete_list:
+                del new_file_lists[root]['res'][new_file_lists[root]['res'].index(file)]
+        return new_file_lists
+
+    def display_import(self, file_lists):
+        """ Display number of files to be imported and
+        a breakdown of their types.
+        """
         prefix = '\t\t'
-        ResCount = 0
-        CastepCount = 0
-        for root in new_file_lists:
-            RootResCount = new_file_lists[root]['res_count']
-            RootCastepCount = new_file_lists[root]['castep_count']
-            if RootResCount + RootCastepCount > 0:
-                print(str(RootResCount + RootCastepCount), 'new structures found in', root)
-        print('of which, these will be imported:\n')
+        ResCount, CellCount, CastepCount, ParamCount = 4*[0]
+        SynthCount, ExptCount = 2*[0]
+        print('\n')
+        for root in file_lists:
+            RootResCount = file_lists[root]['res_count']
+            RootCastepCount = file_lists[root]['castep_count']
+            if RootResCount + RootCastepCount > 0 and self.debug:
+                print(str(RootResCount+RootCastepCount), 'new structures found in', root)
+            ResCount += RootResCount
+            CastepCount += RootCastepCount
+            CellCount += file_lists[root]['cell_count']
+            ParamCount += file_lists[root]['param_count']
+            CellCount += file_lists[root]['cell_count']
+            ExptCount += file_lists[root]['expt_count']
+            SynthCount += file_lists[root]['synth_count']
+        print('\n\n')
         print(prefix, "{:8d}".format(ResCount), '\t\t.res files')
         print(prefix, "{:8d}".format(CastepCount), '\t\t.castep, .history or .history.gz files')
-        return new_file_lists
+        print(prefix, "{:8d}".format(CellCount), '\t\t.cell files')
+        print(prefix, "{:8d}".format(ParamCount), '\t\t.param files')
+        print(prefix, "{:8d}".format(SynthCount), '\t\t.synth files')
+        print(prefix, "{:8d}".format(ExptCount), '\t\t.expt files\n')
+        return
