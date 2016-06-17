@@ -74,6 +74,7 @@ class DBQuery:
                 empty_query = False
             else:
                 self.display_results(self.cursor)
+        self.args['stoichiometry'] = self.args.get('formula')
         if self.args.get('stoichiometry') is not None:
             self.query_dict['$and'].append(self.query_stoichiometry())
             empty_query = False
