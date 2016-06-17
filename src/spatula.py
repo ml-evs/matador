@@ -119,7 +119,7 @@ class Spatula:
                 # index by source for rebuilds
                 self.repo.create_index([('source', pm.ASCENDING)])
                 print('Done!')
-        else:
+        elif self.dryrun:
             print('Dryrun complete!')
         if not self.scan:
             self.logfile.close()
