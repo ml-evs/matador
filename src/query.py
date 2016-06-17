@@ -147,55 +147,63 @@ class DBQuery:
                     exit('Hulls and voltage curves require AJM repo structures, exiting...')
                 print('Creating hull from AJM db structures.')
                 self.args['summary'] = True
-                print('\nFinding biggest calculation set for hull...\n')
-                test_cursor = []
+                if self.args.get('biggest'):
+                    print('\nFinding biggest calculation set for hull...\n')
+                else:
+                    print('\nFinding the best calculation set for hull...')
+                test_cursors = []
                 test_cursor_count = []
                 test_query_dict = []
-                sample = 10
-                rerun = False
+                calc_dicts = []
+                cutoff = []
+                sample = 5
+                rand_sample = 5 if self.args.get('biggest') else 2
                 i = 0
                 count = self.cursor.count()
-                while i < sample:
+                while i < sample+rand_sample:
                     # start with sample/2 lowest enthalpy structures
-                    if i < int(sample/2):
+                    if i < int(sample):
                         ind = i
                     # then do some random samples
                     else:
-                        ind = np.random.randint(5, count-1)
+                        ind = np.random.randint(rand_sample, count-1)
                     id_cursor = self.repo.find({'text_id': self.cursor[ind]['text_id']})
+                    self.query_dict = dict()
                     self.query_dict['$and'] = self.query_calc(id_cursor[0])
-                    self.calc_dict = dict()
-                    self.calc_dict['$and'] = list(self.query_dict['$and'])
+                    cutoff.append(id_cursor[0]['cut_off_energy'])
+                    calc_dicts.append(dict())
+                    calc_dicts[-1]['$and'] = list(self.query_dict['$and'])
                     self.query_dict['$and'].append(self.query_composition())
                     test_query_dict.append(self.query_dict)
-                    test_cursor.append(
+                    test_cursors.append(
                         self.repo.find(SON(test_query_dict[-1])).sort('enthalpy_per_atom',
                                                                       pm.ASCENDING))
-                    test_cursor_count.append(test_cursor[-1].count())
+                    test_cursor_count.append(test_cursors[-1].count())
                     print("{:^24}".format(self.cursor[ind]['text_id'][0] + ' ' +
                                           self.cursor[ind]['text_id'][1]) +
                           ': matched ' + str(test_cursor_count[-1]), 'structures.')
-                    # if we have at least 2/3 of the structures, just plot
-                    if test_cursor_count[-1] > 2*int(count/3):
-                        print('Matched at least 2/3 of total number, composing hull...')
-                        break
-                    if i == (sample-1) and not rerun:
-                        # if less than half the total structures are to be plotted, rand 5 more
-                        if np.max(np.asarray(test_cursor_count)) < int(count/2):
-                            i -= 5
-                            rerun = True
+                    if self.args.get('biggest'):
+                        if test_cursor_count[-1] > 2*int(count/3):
+                            print('Matched at least 2/3 of total number, composing hull...')
+                            break
                     i += 1
-                self.cursor = test_cursor[np.argmax(np.asarray(test_cursor_count))]
-                # if including oqmd, connect to oqmd collection and generate new query
-                if self.args.get('include_oqmd'):
-                    self.oqmd_repo = self.client.crystals.oqmd
-                    self.oqmd_query = dict()
-                    self.oqmd_query['$and'] = []
-                    # query only oqmd, assume all calculations are over-converged:
-                    # this is bad!
-                    self.oqmd_query['$and'].append(self.query_composition())
-                    self.oqmd_cursor = self.oqmd_repo.find(SON(self.oqmd_query))
-                    self.oqmd_cursor.sort('enthalpy_per_atom', pm.ASCENDING)
+            if self.args.get('biggest'):
+                choice = np.argmax(np.asarray(test_cursor_count))
+            else:
+                # by default, find highest cutoff hull as first proxy for quality
+                choice = np.argmax(np.asarray(cutoff))
+            self.cursor = test_cursors[choice]
+            self.calc_dict = calc_dicts[choice]
+            # if including oqmd, connect to oqmd collection and generate new query
+            if self.args.get('include_oqmd'):
+                self.oqmd_repo = self.client.crystals.oqmd
+                self.oqmd_query = dict()
+                self.oqmd_query['$and'] = []
+                # query only oqmd, assume all calculations are over-converged:
+                # this is bad!
+                self.oqmd_query['$and'].append(self.query_composition())
+                self.oqmd_cursor = self.oqmd_repo.find(SON(self.oqmd_query))
+                self.oqmd_cursor.sort('enthalpy_per_atom', pm.ASCENDING)
 
     def __del__(self):
         """ Clean up any temporary databases on garbage
@@ -780,14 +788,14 @@ class DBQuery:
             query_dict.append(dict())
             temp_dict['$gte'] = float(doc['cut_off_energy'])
             query_dict[-1]['cut_off_energy'] = temp_dict
-            # temp_dict = dict()
-            # query_dict.append(dict())
-            # temp_dict['$lte'] = float(doc['kpoints_mp_spacing'])
-            # query_dict[-1]['kpoints_mp_spacing'] = temp_dict
+            temp_dict = dict()
+            query_dict.append(dict())
+            temp_dict['$lte'] = float(doc['kpoints_mp_spacing'])
+            query_dict[-1]['kpoints_mp_spacing'] = temp_dict
         else:
-            # temp_dict = dict()
-            # temp_dict['kpoints_mp_spacing'] = doc['kpoints_mp_spacing']
-            # query_dict.append(temp_dict)
+            temp_dict = dict()
+            temp_dict['kpoints_mp_spacing'] = doc['kpoints_mp_spacing']
+            query_dict.append(temp_dict)
             query_dict.append(dict())
             query_dict[-1]['cut_off_energy'] = doc['cut_off_energy']
         for species in doc['species_pot']:

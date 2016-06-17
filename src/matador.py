@@ -273,6 +273,8 @@ if __name__ == '__main__':
                                         (currently limited to binaries)',
                                         parents=[global_parser, structure_parser,
                                                  material_parser])
+    hull_parser.add_argument('--biggest', action='store_true', 
+                             help='create a convex hull of the largest rather than best set of structures')
     voltage_parser = subparsers.add_parser('voltage',
                                            help='plot a voltage curve from query results \
                                            (currently limited to binaries)',
