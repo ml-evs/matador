@@ -30,17 +30,6 @@ class DBQuery:
         self.client = client
         self.db = client.crystals
         self.collections = collections
-        # print(self.args)
-        # for arg in self.args:
-            # if type(self.args[arg]) == str:
-                # self.args[arg] = self.args[arg].split()
-        # if self.args.get('scratch'):
-            # self.repo = self.client.crystals.scratch
-        # elif self.args.get('oqmd'):
-            # self.repo = self.client.crystals.oqmd
-        # else:
-            # self.repo = self.client.crystals.repo
-        # print last spatula report
         if self.args.get('summary'):
             self.top = -1
         else:
@@ -55,7 +44,6 @@ class DBQuery:
         # benchmark enthalpy to display (set by calc_match)
         self.gs_enthalpy = 0.0
         if self.args.get('id') is not None:
-            empty_query = False
             self.cursor = []
             for collection in self.collections:
                 temp_cursor = self.collections[collection].find({'text_id': self.args.get('id')})
@@ -63,7 +51,7 @@ class DBQuery:
                     self.cursor.append(doc)
             if len(self.cursor) < 1:
                 exit('Could not find a match, try widening your search.')
-            else:
+            elif len(self.cursor) == 1:
                 self.display_results(self.cursor)
             if self.args.get('calc_match'):
                 # save special copy of calc_dict for hulls
@@ -74,6 +62,7 @@ class DBQuery:
                 self.query_dict['$and'] = self.query_calc(self.cursor[0])
                 self.calc_dict['$and'] = list(self.query_dict['$and'])
                 empty_query = False
+        # create alias for formula for backwards-compatibility
         self.args['stoichiometry'] = self.args.get('formula')
         if self.args.get('stoichiometry') is not None:
             self.query_dict['$and'].append(self.query_stoichiometry())
@@ -101,16 +90,17 @@ class DBQuery:
             self.query_dict['$and'].append(self.query_quality())
         # if no query submitted, find all
         if empty_query:
-            for collection in self.collections:
-                self.repo = self.collections[collection]
-                if self.args.get('debug'):
-                    print('Empty query, showing all...')
-                self.cursor = self.repo.find().sort('enthalpy_per_atom', pm.ASCENDING)
-                if self.top == -1:
-                    self.top = self.cursor.count()
-                self.display_results(self.cursor[:self.top], details=self.args.get('details'))
+            if self.args.get('id') is None:
+                for collection in self.collections:
+                    self.repo = self.collections[collection]
+                    if self.args.get('debug'):
+                        print('Empty query, showing all...')
+                    self.cursor = self.repo.find().sort('enthalpy_per_atom', pm.ASCENDING)
+                    if self.top == -1:
+                        self.top = self.cursor.count()
+                    self.display_results(self.cursor[:self.top])
         # if no special query has been made already, begin executing the query
-        if not empty_query or self.args.get('calc_match'):
+        if not empty_query:
             self.cursors = []
             for collection in self.collections:
                 self.repo = self.collections[collection]
@@ -146,11 +136,9 @@ class DBQuery:
                         if self.top == -1:
                             self.top = cursor_count
                         if cursor_count > self.top:
-                            self.display_results(self.cursor.clone()[:self.top],
-                                                 details=self.args.get('details'))
+                            self.display_results(self.cursor.clone()[:self.top])
                         else:
-                            self.display_results(self.cursor.clone(),
-                                                 details=self.args.get('details'))
+                            self.display_results(self.cursor.clone())
             # building hull from just comp, find best structure to calc_match
             if self.args.get('subcmd') == 'hull' or self.args.get('subcmd') == 'voltage':
                 if 'repo' in self.collections:
@@ -186,7 +174,7 @@ class DBQuery:
                     test_cursor_count.append(test_cursor[-1].count())
                     print("{:^24}".format(self.cursor[ind]['text_id'][0] + ' ' +
                                           self.cursor[ind]['text_id'][1]) +
-                          ': matched' + str(test_cursor_count[-1]), 'structures.')
+                          ': matched ' + str(test_cursor_count[-1]), 'structures.')
                     # if we have at least 2/3 of the structures, just plot
                     if test_cursor_count[-1] > 2*int(count/3):
                         print('Matched at least 2/3 of total number, composing hull...')
@@ -448,8 +436,9 @@ class DBQuery:
             print('Writing res file failed for ', doc['text_id'])
             print(type(oops), oops)
 
-    def display_results(self, cursor, details=False):
+    def display_results(self, cursor):
         """ Print query results in a cryan-like fashion. """
+        details = self.args.get('details')
         struct_string = []
         detail_string = []
         detail_substring = []
