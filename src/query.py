@@ -503,8 +503,7 @@ class DBQuery:
             except:
                 struct_string[-1] += "{:^12}".format(doc['pressure'])
             try:
-                struct_string[-1] += "{:^12.3f}".format(atom_per_fu *
-                                                        doc['cell_volume'] / doc['num_atoms'])
+                struct_string[-1] += "{:^12.3f}".format(doc['cell_volume']/doc['num_fu'])
             except:
                 struct_string[-1] += "{:^12}".format('xxx')
             try:
@@ -517,7 +516,7 @@ class DBQuery:
             except:
                 struct_string[-1] += "{:^12}".format('xxx')
             struct_string[-1] += "{:^10}".format(formula_substring)
-            struct_string[-1] += "{:^8}".format(doc['num_atoms']/atom_per_fu)
+            struct_string[-1] += "{:^8}".format(doc['num_fu'])
             if last_formula != formula_substring:
                 self.gs_enthalpy = doc['enthalpy_per_atom']
             last_formula = formula_substring
@@ -535,7 +534,7 @@ class DBQuery:
                 if 'xc_functional' in doc:
                     detail_string[-1] += doc['xc_functional']
                 else:
-                    detail_string[-1] += 'functional unknown for' + doc['source'][0]
+                    detail_string[-1] += 'xc-functional unknown!'
                 if 'cut_off_energy' in doc:
                     detail_string[-1] += ', ' + "{:4.2f}".format(doc['cut_off_energy']) + ' eV'
                 else:
@@ -545,7 +544,7 @@ class DBQuery:
                                           "{:4.2f}".format(doc['external_pressure'][0][0]) +
                                           ' GPa')
                 if 'kpoints_mp_spacing' in doc:
-                    detail_string[-1] += ', ' + str(doc['kpoints_mp_spacing']) + ' 1/A'
+                    detail_string[-1] += ', ~' + str(doc['kpoints_mp_spacing']) + ' 1/A'
                 if 'species_pot' in doc:
                     try:
                         for species in doc['species_pot']:
@@ -580,7 +579,7 @@ class DBQuery:
                     elif num != 0:
                         source_string[-1] += (len(u"└────────────── ")+11)*' ' + u'├──'
                     # elif num == 0:
-                    source_string[-1] += ' ' + file[2:]
+                    source_string[-1] += ' ' + file.split('structure_repository')[-1]
                     if num != len(doc['source'])-1:
                         source_string[-1] += '\n'
         print(len(header_string)*'─')
