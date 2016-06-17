@@ -2,14 +2,7 @@
 ```
 #!bash
 
-fryan --help
-```
-
-
-```
-#!bash
-
-spatula --help
+matador --help
 ```
 
 
