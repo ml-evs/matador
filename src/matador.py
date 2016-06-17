@@ -224,8 +224,10 @@ if __name__ == '__main__':
                                 help='set user tags, e.g. nanotube, project name')
     spatula_parser.add_argument('--debug', action='store_true',
                                 help='enable debug output to print every dict')
-    spatula_parser.add_argument('-s', '--scratch', action='store_true',
+    spatula_parser.add_argument('--scratch', action='store_true',
                                 help='import to scratch collection')
+    spatula_parser.add_argument('-s', '--scan', action='store_true',
+                                help='only scan the database for new structures, do not dictify')
     # define subcommand parsers and their arguments
     stat_parser = subparsers.add_parser('stats',
                                         help='print some stats about the database.',

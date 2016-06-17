@@ -93,18 +93,21 @@ class Spatula:
             self.report = self.db.spatula
         # scan directory on init
         self.file_lists = self.scan_dir()
-        # if import, as opposed to rebuild, scan for duplicates
+        # if import, as opposed to rebuild, scan for duplicates and remove from list
         if self.args['subcmd'] == 'import':
             self.file_lists = self.scan_dupes(self.file_lists)
-        # convert to dict and db if required
-        self.files2db(self.file_lists)
-        if not self.dryrun:
+        # only create dicts if not just scanning
+        if not self.args['scan']:
+            # convert to dict and db if required
+            self.files2db(self.file_lists)
+        if not self.dryrun and self.import_count > 0:
             print('Successfully imported', self.import_count, 'structures!')
             # index by enthalpy for faster/larger queries
-            count = -1
+            count = 0
             for entry in self.repo.list_indexes():
                 count += 1
-            if count > 0:
+            # ignore default id index
+            if count > 1:
                 print('Index found, rebuilding...')
                 self.repo.reindex()
             else:
@@ -149,7 +152,6 @@ class Spatula:
                 print('Failed to get CVS info.')
                 report_dict['version'] = 'unknown'
                 report_dict['git_hash'] = 'unknown'
-
             self.report.insert_one(report_dict)
 
     def struct2db(self, struct):
@@ -157,28 +159,33 @@ class Spatula:
         database, with generated text_id. Add quality factor
         for any missing data.
         """
-        plain_text_id = [self.wlines[randint(0, self.num_words-1)].strip(),
-                         self.nlines[randint(0, self.num_nouns-1)].strip()]
-        struct['text_id'] = plain_text_id
-        if 'tags' in self.tag_dict:
-            struct['tags'] = self.tag_dict['tags']
-        struct['quality'] = 5
-        # if no pspot info at all, score = 0
-        if 'species_pot' not in struct:
-            struct['quality'] = 0
-        else:
-            for elem in struct['stoichiometry']:
-                # remove all points for a missing pseudo
-                if elem[0] not in struct['species_pot']:
-                    struct['quality'] = 0
-                    break
-                else:
-                    # remove a point for a generic OTF pspot
-                    if 'OTF' in struct['species_pot'][elem[0]].upper():
-                        struct['quality'] -= 1
-        struct_id = self.repo.insert_one(struct).inserted_id
-        if self.debug:
-            print('Inserted', struct_id)
+        try:
+            plain_text_id = [self.wlines[randint(0, self.num_words-1)].strip(),
+                             self.nlines[randint(0, self.num_nouns-1)].strip()]
+            struct['text_id'] = plain_text_id
+            if 'tags' in self.tag_dict:
+                struct['tags'] = self.tag_dict['tags']
+            struct['quality'] = 5
+            # if no pspot info at all, score = 0
+            if 'species_pot' not in struct:
+                struct['quality'] = 0
+            else:
+                for elem in struct['stoichiometry']:
+                    # remove all points for a missing pseudo
+                    if elem[0] not in struct['species_pot']:
+                        struct['quality'] = 0
+                        break
+                    else:
+                        # remove a point for a generic OTF pspot
+                        if 'OTF' in struct['species_pot'][elem[0]].upper():
+                            struct['quality'] -= 1
+            struct_id = self.repo.insert_one(struct).inserted_id
+            if self.debug:
+                print('Inserted', struct_id)
+        except:
+            # this shouldn't fail, but if it does, fail loudly but cleanly
+            print_exc()
+            return 0
         return 1
 
     def files2db(self, file_lists):
@@ -435,6 +442,8 @@ class Spatula:
         for root in new_file_lists:
             ResCount += new_file_lists[root]['res_count']
             CastepCount += new_file_lists[root]['castep_count']
+            if new_file_lists[root]['res_count'] > 0 or new_file_lists[root]['castep_count'] > 0:
+                print('New structures found in', root)
         print('of which, these will be imported:\n')
         print(prefix, "{:8d}".format(ResCount), '\t\t.res files')
         print(prefix, "{:8d}".format(CastepCount), '\t\t.castep, .history or .history.gz files')
