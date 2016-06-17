@@ -202,14 +202,14 @@ class QueryConvexHull():
         hull = ConvexHull(structures)
         if include_oqmd:
             oqmd_hull = ConvexHull(oqmd_structures)
+        fig = plt.figure(facecolor='w')
+        ax = fig.add_subplot(111)
         try:
             colours = plt.cm.plasma(np.linspace(0, 1, 100))
             mpl_new_ver = True
         except:
-            colours = plt.cm.winter(np.linspace(0, 1, 100))
+            colours = 100*['#7D3C98']
             mpl_new_ver = False
-        fig = plt.figure(facecolor='w')
-        ax = fig.add_subplot(111)
         plt.draw()
         # plot all structures
         scatter = []
@@ -226,11 +226,11 @@ class QueryConvexHull():
             if dis and not warren:
                 ax.plot([structures[ind, 0]-disorder[ind]/10, structures[ind, 0] + disorder[ind]],
                         [structures[ind, 1], structures[ind, 1]],
-                        c='m', alpha=0.5, lw=0.5)
+                        c='#28B453', alpha=0.5, lw=0.5)
         if include_oqmd:
             for ind in range(len(oqmd_stoich)):
                 scatter.append(ax.scatter(oqmd_stoich[ind], oqmd_formation[ind], s=35, lw=1,
-                               alpha=1, c='k', edgecolor='k', marker='D',
+                               alpha=1, c='#28B453', edgecolor='k', marker='D',
                                label=oqmd_info[ind],
                                zorder=200))
         stable_energy = []
@@ -244,7 +244,7 @@ class QueryConvexHull():
                 stable_comp.append(structures[hull.vertices[ind], 0])
                 hull_scatter.append(ax.scatter(structures[hull.vertices[ind], 0],
                                                structures[hull.vertices[ind], 1],
-                                               c='r', marker='*', zorder=1000, edgecolor='k',
+                                               c='#7D3C98', marker='*', zorder=99999, edgecolor='k',
                                                s=250, lw=1, alpha=1,
                                                label=info[hull.vertices[ind]]))
         if include_oqmd:
@@ -252,7 +252,7 @@ class QueryConvexHull():
                 if oqmd_structures[oqmd_hull.vertices[ind], 1] <= 0:
                     hull_scatter.append(ax.scatter(oqmd_structures[oqmd_hull.vertices[ind], 0],
                                                    oqmd_structures[oqmd_hull.vertices[ind], 1],
-                                                   c='k', marker='*', zorder=999, edgecolor='k',
+                                                   c='#28B463', marker='*', zorder=10000, edgecolor='k',
                                                    s=250, lw=1, alpha=1,
                                                    label=oqmd_info[oqmd_hull.vertices[ind]]))
         # skip last and first as they are chem pots
@@ -273,7 +273,7 @@ class QueryConvexHull():
         for ind in range(len(stable_comp)-1):
                 ax.plot([stable_comp[ind], stable_comp[ind+1]],
                         [stable_energy[ind], stable_energy[ind+1]],
-                        'k--', lw=2, alpha=1, zorder=1, label='')
+                        '#9B59B6', lw=2, alpha=1, zorder=1000, label='')
         if include_oqmd:
             oqmd_stable_comp = []
             oqmd_stable_energy = []
@@ -292,7 +292,7 @@ class QueryConvexHull():
             for ind in range(len(oqmd_stable_comp)-1):
                 ax.plot([oqmd_stable_comp[ind], oqmd_stable_comp[ind+1]],
                         [oqmd_stable_energy[ind], oqmd_stable_energy[ind+1]],
-                        'm--', lw=2, alpha=1, zorder=0, label='')
+                        '#28B463', lw=2, alpha=1, zorder=900, label='')
         ax.set_xlim(-0.05, 1.05)
         if not dis:
             datacursor(scatter[:], formatter='{label}'.format, draggable=False,
