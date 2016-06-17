@@ -63,7 +63,9 @@ class DBQuery:
                     self.cursor.append(doc)
             if len(self.cursor) < 1:
                 exit('Could not find a match, try widening your search.')
-            elif self.args.get('calc_match'):
+            else:
+                self.display_results(self.cursor)
+            if self.args.get('calc_match'):
                 # save special copy of calc_dict for hulls
                 self.calc_dict = dict()
                 self.calc_dict['$and'] = []
@@ -72,8 +74,6 @@ class DBQuery:
                 self.query_dict['$and'] = self.query_calc(self.cursor[0])
                 self.calc_dict['$and'] = list(self.query_dict['$and'])
                 empty_query = False
-            else:
-                self.display_results(self.cursor)
         self.args['stoichiometry'] = self.args.get('formula')
         if self.args.get('stoichiometry') is not None:
             self.query_dict['$and'].append(self.query_stoichiometry())
