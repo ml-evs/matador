@@ -39,6 +39,9 @@ class Spatula:
         self.args = args[0]
         self.init = True
         dryrun = self.args['dryrun']
+        scan = self.args['scan']
+        if scan:
+            dryrun = True
         debug = self.args['debug']
         verbosity = self.args['verbosity']
         scratch = self.args['scratch']
