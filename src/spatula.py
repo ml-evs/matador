@@ -443,10 +443,10 @@ class Spatula:
         ResCount = 0
         CastepCount = 0
         for root in new_file_lists:
-            ResCount += new_file_lists[root]['res_count']
-            CastepCount += new_file_lists[root]['castep_count']
-            if new_file_lists[root]['res_count'] > 0 or new_file_lists[root]['castep_count'] > 0:
-                print('New structures found in', root)
+            RootResCount = new_file_lists[root]['res_count']
+            RootCastepCount = new_file_lists[root]['castep_count']
+            if RootResCount + RootCastepCount > 0:
+                print(str(RootResCount + RootCastepCount), 'new structures found in', root)
         print('of which, these will be imported:\n')
         print(prefix, "{:8d}".format(ResCount), '\t\t.res files')
         print(prefix, "{:8d}".format(CastepCount), '\t\t.castep, .history or .history.gz files')
