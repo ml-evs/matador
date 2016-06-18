@@ -187,13 +187,13 @@ class DBQuery:
                             print('Matched at least 2/3 of total number, composing hull...')
                             break
                     i += 1
-            if self.args.get('biggest'):
-                choice = np.argmax(np.asarray(test_cursor_count))
-            else:
-                # by default, find highest cutoff hull as first proxy for quality
-                choice = np.argmax(np.asarray(cutoff))
-            self.cursor = test_cursors[choice]
-            self.calc_dict = calc_dicts[choice]
+                if self.args.get('biggest'):
+                    choice = np.argmax(np.asarray(test_cursor_count))
+                else:
+                    # by default, find highest cutoff hull as first proxy for quality
+                    choice = np.argmax(np.asarray(cutoff))
+                self.cursor = test_cursors[choice]
+                self.calc_dict = calc_dicts[choice]
             # if including oqmd, connect to oqmd collection and generate new query
             if self.args.get('include_oqmd'):
                 self.oqmd_repo = self.client.crystals.oqmd
@@ -513,7 +513,10 @@ class DBQuery:
             except:
                 struct_string[-1] += "{:^12}".format('xxx')
             struct_string[-1] += "{:^10}".format(formula_substring)
-            struct_string[-1] += "{:^8}".format(doc['num_fu'])
+            try:
+                struct_string[-1] += "{:^8}".format(doc['num_fu'])
+            except:
+                struct_string[-1] += "{:^8}".format('xxx')
             if last_formula != formula_substring:
                 self.gs_enthalpy = doc['enthalpy_per_atom']
             last_formula = formula_substring
