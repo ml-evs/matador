@@ -7,6 +7,7 @@ from __future__ import print_function
 from scipy.spatial import ConvexHull
 from mpldatacursor import datacursor
 from bson.son import SON
+from copy import deepcopy
 import pymongo as pm
 import matplotlib.pyplot as plt
 import re
@@ -26,6 +27,7 @@ class QueryConvexHull():
     def __init__(self, query, *args):
         """ Accept query from fryan as argument. """
         self.query = query
+        self.cursor = deepcopy(query.cursor)
         self.args = args[0]
         self.binary_hull()
 
@@ -90,15 +92,20 @@ class QueryConvexHull():
                     print('No possible chem pots found for', elem, '.')
                     return
         print('Constructing hull...')
-        formation = np.zeros((query.cursor.count()))
-        stoich = np.zeros((query.cursor.count()))
-        enthalpy = np.zeros((query.cursor.count()))
-        disorder = np.zeros((query.cursor.count()))
+        num_structures = query.cursor.count()
+        formation = np.zeros((num_structures))
+        hull_dist = np.zeros((num_structures))
+        stoich = np.zeros((num_structures))
+        enthalpy = np.zeros((num_structures))
+        disorder = np.zeros((num_structures))
+        source_ind = np.zeros((num_structures))
         info = []
+        source_list = []
         if include_oqmd:
-            oqmd_formation = np.zeros((query.oqmd_cursor.count()))
-            oqmd_stoich = np.zeros((query.oqmd_cursor.count()))
-            oqmd_enthalpy = np.zeros((query.oqmd_cursor.count()))
+            oqmd_num_structures = query.oqmd_cursor.count()
+            oqmd_formation = np.zeros((oqmd_num_structures))
+            oqmd_stoich = np.zeros((oqmd_num_structures))
+            oqmd_enthalpy = np.zeros((oqmd_num_structures))
             oqmd_info = []
         if dis:
             from disorder import disorder_hull
@@ -119,6 +126,12 @@ class QueryConvexHull():
             # get enthalpy per unit B
             enthalpy[ind] = doc['enthalpy'] / (num_b*num_fu)
             formation[ind] = doc['enthalpy_per_atom']
+            source_dir = ''.join(doc['source'][0].split('/')[:-1])
+            if source_dir in source_list:
+                source_ind[ind] = source_list.index(source_dir)
+            else:
+                source_list.append(source_dir)
+                source_ind[ind] = source_list.index(source_dir)
             for mu in match:
                 for j in range(len(doc['stoichiometry'])):
                     if mu['stoichiometry'][0][0] == doc['stoichiometry'][j][0]:
@@ -207,6 +220,8 @@ class QueryConvexHull():
         try:
             colours = plt.cm.plasma(np.linspace(0, 1, 100))
             mpl_new_ver = True
+            # brewer2mpl -> len(source_list)
+            colours = len(source_list) * ['#7D3C98']
         except:
             colours = 100*['#7D3C98']
             mpl_new_ver = False
@@ -217,7 +232,7 @@ class QueryConvexHull():
         for ind in range(len(structures)-2):
             lw = 0 if mpl_new_ver else 1
             scatter.append(ax.scatter(structures[ind, 0], structures[ind, 1], s=35, lw=lw,
-                                      alpha=0.8, c=colours[int(100*structures[ind, 0])],
+                                      alpha=0.8, c=colours[source_ind[ind]],
                                       edgecolor='k', label=info[ind], zorder=100))
             if dis and warren:
                 ax.plot([structures[ind, 0]-disorder[ind]/10, structures[ind, 0]],
@@ -244,7 +259,7 @@ class QueryConvexHull():
                 stable_comp.append(structures[hull.vertices[ind], 0])
                 hull_scatter.append(ax.scatter(structures[hull.vertices[ind], 0],
                                                structures[hull.vertices[ind], 1],
-                                               c='#7D3C98', marker='*', zorder=99999, edgecolor='k',
+                                               c=colours[source_ind[hull.vertices[ind]]], marker='*', zorder=99999, edgecolor='k',
                                                s=250, lw=1, alpha=1,
                                                label=info[hull.vertices[ind]]))
         if include_oqmd:
@@ -259,7 +274,7 @@ class QueryConvexHull():
         try:
             for ind in range(1, len(hull.vertices)-1):
                 query.cursor.rewind()
-                hull_docs.append(query.cursor[int(np.sort(hull.vertices)[ind])])
+                hull_docs.append(self.cursor[int(np.sort(hull.vertices)[ind])])
         except:
             hull_docs = []
             print('Failed to create hull cursor, skipping...')
