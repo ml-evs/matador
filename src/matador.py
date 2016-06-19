@@ -7,7 +7,7 @@ from __future__ import print_function
 # matador modules
 from query import DBQuery
 from hull import QueryConvexHull
-from swaps import AtomicSwaps
+from polish import Polisher
 from spatula import Spatula
 # import external libraries
 import pymongo as pm
@@ -64,9 +64,12 @@ class Matador:
             self.query = DBQuery(self.client, self.collections, self.args)
             if self.args['hull_dist'] is not None:
                 self.hull = QueryConvexHull(self.query, self.args)
-                self.swaps = AtomicSwaps(self.hull.convex_cursor)
+                self.swaps = Polisher(self.hull.convex_cursor, self.args)
             else:
-                self.swaps = AtomicSwaps(self.query.cursor, self.args)
+                self.swaps = Polisher(self.query.cursor, self.args)
+        if self.args['subcmd'] == 'polish':
+            self.query = DBQuery(self.client, self.collections, self.args)
+            self.polish = Polisher(self.query.cursor, self.args)
         if self.args['subcmd'] == 'hull':
             self.query = DBQuery(self.client, self.collections, self.args)
             self.hull = QueryConvexHull(self.query, self.args)
@@ -220,6 +223,13 @@ if __name__ == '__main__':
                                 help='import to scratch collection')
     spatula_parser.add_argument('-s', '--scan', action='store_true',
                                 help='only scan the database for new structures, do not dictify')
+    # define parser for output of new files for swaps/polishes
+    collection_parser = argparse.ArgumentParser(add_help=False)
+    collection_parser.add_argument('--to', type='str',
+                                   help='the text_id of a structure with the desired parameters') 
+    collection_parser.add_argument('--with', type='str',
+                                   help='the seedname (must be within pwd) of cell and param files'
+                                         + 'to use for polishing/swaps')
     # define subcommand parsers and their arguments
     stat_parser = subparsers.add_parser('stats',
                                         help='print some stats about the database.',
@@ -253,6 +263,8 @@ if __name__ == '__main__':
     hull_parser.add_argument('--biggest', action='store_true',
                              help='create a convex hull of the largest rather than best \
                                    set of structures')
+    hull_parser.add_argument('--dist_to_hull', type=float,
+                             help='return only structures within a certain distance from hull')
     voltage_parser = subparsers.add_parser('voltage',
                                            help='plot a voltage curve from query results \
                                            (currently limited to binaries)',
@@ -260,7 +272,26 @@ if __name__ == '__main__':
                                                     material_parser])
     swaps_parser = subparsers.add_parser('swaps',
                                          help='perform atomic swaps on query results',
-                                         parents=[global_parser, structure_parser])
+                                         parents=[global_parser, collection_parser,
+                                                  structure_parser])
+    polish_parser = subparsers.add_parser('polish',
+                                          help='re-relax a series of structures with \
+                                          new parameters.',
+                                          parents=[global_parser, collection_parser,
+                                                   structure_parser])
+    compute_parser = subparsers.add_parser('compute',
+                                           help='run all CASTEP calculations inside \
+                                                 the current pwd, taking care to \
+                                                 restart geometry optimizations often enough \
+                                                 to maintain k-point spacing')
+    compute_parser.add_argument('-n', '--num_cores', type=int,
+                                help='number of cores per job')
+    compute_parser.add_argument('-t', '--num_threads', type=int,
+                                help='number of concurrent jobs')
+    # compute_parser.add_argument('-N', '--max_num_nodes', type=int,
+            # help='EXPERIMENTAL: maximum number of computers to infest: requires \
+                                      # rbusy to find free computers and a shared \
+                                      # file system across all nodes.')
     # parser.add_argument('--strict', action='store_true',
                         # help=('strictly matches with calc_match,'
                               # 'useful for hulls where convergence is rough'))
