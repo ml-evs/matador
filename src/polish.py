@@ -23,8 +23,36 @@ class Polisher:
         self.args = args[0]
         self.cursor = cursor
         # parse new parameters
-        if self.args.get('to') is not None:
-            self.template_structure = query.template_structure
+        self.cell, self.param = self.get_accuracy()
+        if self.args['subcmd'] == 'swaps':
+            # to-do parse swap command line
+            self.parse_swaps()
+            swap_cursor = []
+            for doc in self.cursor:
+                swap_cursor.append(self.atomic_swaps(doc))
+            self.cursor = swap_cursor
+        polish_cursor = []
+        for doc in self.cursor:
+            polish_cursor.append(self.change_accuracy(doc))
+        self.cursor = polish_cursor
+        query2files(self.cursor)
+
+    def get_accuracy(self):
+        """ Read the correct key-value pairs
+        either from the template file or template
+        structure, and set some useful defaults.
+        """
+        self.final_param = dict()
+        self.final_cell = dict()
+        # set some decent defaults
+        default_parameters = dict()
+        default_parameters['task'] = 'GeometryOptimization'
+        # to maintain kpoints_mp_spacing
+        default_parameters['geom_max_iter'] = 3
+        default_parameters['finite_basis_corr'] = 0
+        default_parameters['write_bib'] = False
+        default_parameters['geom_method'] = 'lbfgs'
+        default_parameters['page_wvfns'] = 0
         if self.args.get('with') is not None:
             self.template_seedname = self.args.get('with')
             try:
@@ -39,31 +67,44 @@ class Polisher:
             except Exception:
                 print_exc()
                 exit()
-        if self.args['subcmd'] == 'swaps':
-            # to-do parse swap command line
-            self.parse_swaps()
-            swap_cursor = []
-            for doc in self.cursor:
-                swap_cursor.append(self.atomic_swaps(doc, self.args))
-            self.cursor = swap_cursor
-        polish_cursor = []
-        for doc in self.cursor:
-            polish_cursor.append(self.change_accuracy(doc, self.args))
-        self.cursor = polish_cursor
-        query2files(self.cursor)
+        elif self.args.get('to') is not None:
+            self.template_structure = query.template_structure
+            self.param_dict = dict()
+            param_list = ['cut_off_energy', 'xc_functional',
+                          'spin_polarized']
+            cell_list = ['kpoints_mp_spacing', 'species_pot',
+                         'external_pressure']
+            for param in [param for param in param_list if param in doc]:
+                param_dict[param] = doc[param]
+            for cell in [cell for cell in cell_list if cell in doc]:
+                cell_dict[cell] = doc[cell]
+        final_param = param_dict.update(default_parameters)
+        final_cell = final_cell.update(cell_dict)
+        return final_cell, final_param
 
-    def change_accuracy(self):
+
+    def change_accuracy(self, doc):
         """ Augment a document to have the desired
         parameters for polishing.
         """
+        doc = doc.update(self.cell)
+        doc = doc.update(self.param)
+        return doc
     
     def parse_swaps(self):
         """ Parse command line options into valid
         atomic species swaps.
+        e.g. --swap Li,As |--> ['Li', 'As']
         """
-
+        self.swap_pairs = []
+        # read in pairs of atoms, check they are valid
         
-    def atomic_swaps(self):
+    def atomic_swaps(self, doc):
         """ Swap atomic species according to parsed
         options.
         """
+        for ind, atom in enumerate(doc['atom_types']):
+            for swap_pair in self.swap_pairs:
+                if atom == swap_pair[0]:
+                    doc['atom_types'][ind] = swap_pair[1]
+        return doc
