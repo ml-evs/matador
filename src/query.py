@@ -6,6 +6,7 @@ and calling other functionality. """
 from __future__ import print_function
 # import related crysdb functionality
 from spatula import param2dict
+from export import *
 # import external libraries
 import pymongo as pm
 import numpy as np
@@ -121,13 +122,13 @@ class DBQuery:
                         if self.args.get('top') is not None:
                             if self.top == -1:
                                 self.top = cursor_count
-                            self.query2files(self.cursor[:self.top],
+                            query2files(self.cursor[:self.top],
                                              self.args.get('res'),
                                              self.args.get('cell'),
                                              top=True,
                                              pressure=self.args.get('write_pressure'))
                         else:
-                            self.query2files(self.cursor,
+                            query2files(self.cursor,
                                              self.args.get('res'),
                                              self.args.get('cell'),
                                              pressure=self.args.get('write_pressure'))
@@ -216,236 +217,6 @@ class DBQuery:
             self.temp.drop()
         except:
             pass
-
-    def swaps(self, doc, pairs=1, template_param=None):
-        """ Take a db document as input and perform atomic swaps. """
-        for source in doc['source']:
-            if '.castep' or '.res' in source:
-                name = source.split('/')[-1].split('.')[0]
-        name = name + '-' + str(pairs) + '-pair-swaps/' + name
-        swapDoc = deepcopy(doc)
-        swapAtoms = swapDoc['atom_types']
-        for i in range(pairs):
-            valid = False
-            while not valid:
-                swap = np.random.randint(0, len(swapAtoms)-1, size=2)
-                if swap[0] != swap[1] and swapAtoms[swap[0]] != swapAtoms[swap[1]]:
-                        valid = True
-            swapAtoms[swap[1]], swapAtoms[swap[0]] = swapAtoms[swap[0]], swapAtoms[swap[1]]
-        swapPos = np.asarray(swapDoc['positions_frac'])
-        for i in range(len(swapAtoms)):
-            swapPos[i] += np.random.rand(3) * (0.1 / 7.9)
-        swapDoc['positions_frac'] = swapPos
-        hash = self.generate_hash(8)
-        self.doc2cell(swapDoc, name+'-'+hash)
-        self.doc2param(swapDoc, name+'-'+hash, template_param)
-
-    def generate_hash(self, hashLen=6):
-        """ Quick hash generator, based on implementation in PyAIRSS by J. Wynn. """
-        hashChars = hashChars = [str(x) for x in range(0, 10)]+[x for x in string.ascii_lowercase]
-        hash = ''
-        for i in range(hashLen):
-            hash += np.random.choice(hashChars)
-        return hash
-
-    def query2files(self, cursor, res=False, cell=False, top=False, pressure=None):
-        """ Write .res or .cell files for all docs in query,
-        including a .param file for each. Eventually handle
-        swaps from one element to another from CLI.
-        """
-        if cursor.count() > 1000 and top is False:
-            write = raw_input('This operation will write ' + str(cursor.count()) + ' structures,' +
-                              ' are you sure you want to do this? [y/n] ')
-            if write == 'y' or write == 'Y':
-                print('Writing them all.')
-                write = True
-            else:
-                write = False
-                return
-        else:
-            write = True
-        name = 'query-'
-        if self.args['composition'] is not None:
-            for comp in self.args['composition']:
-                name += comp
-        elif self.args['formula'] is not None:
-            name += self.args['formula']
-        name += '-' + self.args['db'][0]
-        dir = False
-        dir_counter = 0
-        while not dir:
-            if dir_counter != 0:
-                directory = name + str(dir_counter)
-            else:
-                directory = name
-            if not exists(directory):
-                makedirs(directory)
-                dir = True
-            else:
-                dir_counter += 1
-        for ind, doc in enumerate(cursor):
-            path = directory + '/'
-            # write either cell, res or both
-            for source in doc['source']:
-                if '.res' in source:
-                    name = source.split('/')[-1].split('.')[0]
-                elif '.castep' in source:
-                    name = source.split('/')[-1].split('.')[0]
-                elif '.history' in source:
-                    name = source.split('/')[-1].split('.')[0]
-            path += name
-            # always write param for each doc; also handles dirs
-            self.doc2param(doc, path)
-            if cell:
-                self.doc2cell(doc, path, pressure)
-            if res:
-                self.doc2res(doc, path)
-
-    def doc2param(self, doc, path, template=None):
-        """ Write basic .param file from single doc. """
-        paramList = ['task', 'cut_off_energy', 'xc_functional',
-                     'finite_basis_corr', 'spin_polarized']
-        seedDict = dict()
-        paramDict = dict()
-        for param in [param for param in paramList if param in doc]:
-            seedDict[param] = doc[param]
-        if template is not None:
-            try:
-                paramDict, success = param2dict(template)
-                if not success:
-                    raise RuntimeError('Failed to open template.')
-            except Exception as oops:
-                print(type(oops), oops)
-        try:
-            if isfile(path+'.param'):
-                print('File name already exists, generating hash...')
-                path += '-' + self.generate_hash()
-        except Exception as oops:
-            print('Writing param file failed for ', doc['text_id'])
-            print(type(oops), oops)
-        try:
-            with open(path+'.param', 'w') as f:
-                f.write('# Param file generated by matador (Matthew Evans 2016)\n')
-                for param in paramDict:
-                    if param != 'source' and param != 'spin_polarized':
-                        f.write("{0:20}: {1}\n".format(param, paramDict[param]))
-        except Exception as oops:
-            if not exists(''.join(path.split('/')[:-1])):
-                newDir = ''.join(path.split('/')[:-1])
-                makedirs(newDir)
-                self.doc2param(doc, path, template=template)
-
-    def doc2cell(self, doc, path, pressure=None):
-        """ Write .cell file for single doc. """
-        try:
-            if isfile(path+'.cell'):
-                print('File name already exists, generating hash...')
-                path += '-' + self.generate_hash()
-            with open(path+'.cell', 'w') as f:
-                f.write('# Cell file generated by matador (Matthew Evans 2016)\n\n')
-                f.write('# enthalpy_per_atom = ' +
-                        '{: 10f} eV\n\n'.format(doc['enthalpy_per_atom']))
-                f.write('%BLOCK LATTICE_CART\n')
-                for vec in doc['lattice_cart']:
-                    for coeff in vec:
-                        f.write(str(coeff) + ' ')
-                    f.write('\n')
-                f.write('%ENDBLOCK LATTICE_CART\n\n')
-                f.write('%BLOCK POSITIONS_FRAC\n')
-                for ind, atom in enumerate(zip(doc['atom_types'], doc['positions_frac'])):
-                    f.write("{0:8s} {1[0]: 15f} {1[1]: 15f} {1[2]: 15f}   1.0\n".format(atom[0],
-                            atom[1]))
-                f.write('%ENDBLOCK POSITIONS_FRAC\n\n')
-                if pressure is not None:
-                    f.write('%block external_pressure\n'.upper())
-                    for pressures in pressure:
-                        pressures = str(pressures)
-                    if len(pressure) == 1:
-                        f.write(pressure[0] + ' 0 0\n')
-                        f.write(pressure[0] + ' 0\n')
-                        f.write(pressure[0] + '\n')
-                    elif len(pressure) == 6:
-                        f.write(pressure[0] + ' ' + pressure[1] + ' ' + pressure[2] + '\n')
-                        f.write(pressure[3] + ' ' + pressure[4] + '\n')
-                        f.write(pressure[5] + '\n')
-                    f.write('%endblock external_pressure\n'.upper())
-                if 'kpoints_mp_spacing' in doc:
-                    f.write('kpoints_mp_spacing : ' + str(doc['kpoints_mp_spacing']) + '\n')
-                elif 'kpoints_mp_grid' in doc:
-                    f.write('kpoints_mp_grid : ' + str(doc['kpoints_mp_grid'][0]) + ' ' +
-                            str(doc['kpoints_mp_grid'][1]) + ' ' +
-                            str(doc['kpoints_mp_grid'][2]) + '\n')
-                if 'species_pot' in doc:
-                    f.write('\n%BLOCK SPECIES_POT\n')
-                    for elem in doc['species_pot']:
-                        if not isfile(''.join(path.split('/')[:-1])+'/'+doc['species_pot'][elem]):
-                            if isfile(expanduser('~/pspot/' + doc['species_pot'][elem])):
-                                system('cp ' + expanduser('~/pspot/') + doc['species_pot'][elem] +
-                                       ' ' + ''.join(path.split('/')[:-1]))
-                        f.write(elem + '\t' + doc['species_pot'][elem] + '\n')
-                    f.write('%ENDBLOCK SPECIES_POT')
-        except Exception as oops:
-            print('Writing cell file failed for ', doc['text_id'])
-            print(type(oops), oops)
-
-    def doc2res(self, doc, path):
-        """ Write .res file for single doc. """
-        try:
-            if isfile(path+'.res'):
-                print('File name already exists, generating hash...')
-                path += '-' + self.generate_hash()
-            with open(path+'.res', 'w') as f:
-                # f.write('# Res file generated by matador (Matthew Evans 2016)\n\n')
-                f.write('TITL ')
-                f.write(path.split('/')[-1] + ' ')
-                if type(doc['pressure']) == str:
-                    f.write('0.00 ')
-                else:
-                    f.write(str(doc['pressure']) + ' ')
-                f.write(str(doc['cell_volume']) + ' ')
-                f.write(str(doc['enthalpy']) + ' ')
-                f.write('0 0 ')             # spin
-                f.write(str(doc['num_atoms']) + ' ')
-                try:
-                    if 'x' in doc['space_group']:
-                        f.write('(P1) ')
-                    else:
-                        f.write('(' + str(doc['space_group']) + ')' + ' ')
-                except:
-                    f.write('(P1) ')
-                f.write('n - 1')
-                f.write('\n')
-                f.write('CELL ')
-                f.write('1.0 ')
-                for vec in doc['lattice_abc']:
-                    for coeff in vec:
-                        f.write(' ' + str(coeff))
-                f.write('\n')
-                f.write('LATT -1\n')
-                f.write('SFAC \t')
-                written_atoms = []
-                for elem in doc['atom_types']:
-                    if elem not in written_atoms:
-                        f.write(' ' + str(elem))
-                        written_atoms.append(str(elem))
-                f.write('\n')
-                atom_labels = []
-                i = 0
-                j = 1
-                while i < len(doc['atom_types']):
-                    num = doc['atom_types'].count(doc['atom_types'][i])
-                    atom_labels.extend(num*[j])
-                    i += num
-                    j += 1
-                for atom in zip(doc['atom_types'], atom_labels, doc['positions_frac']):
-                    f.write("{0:8s}{1:3d}{2[0]: 15f} {2[1]: 15f} {2[2]: 15f}   1.0\n".format(
-                        atom[0], atom[1], atom[2]))
-                f.write('END')
-                # very important newline for compatibliy with cryan
-                f.write('\n')
-        except Exception as oops:
-            print('Writing res file failed for ', doc['text_id'])
-            print(type(oops), oops)
 
     def display_results(self, cursor):
         """ Print query results in a cryan-like fashion. """
