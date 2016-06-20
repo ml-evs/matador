@@ -98,7 +98,7 @@ class QueryConvexHull():
         stoich = np.zeros((num_structures))
         enthalpy = np.zeros((num_structures))
         disorder = np.zeros((num_structures))
-        source_ind = np.zeros((num_structures))
+        source_ind = np.zeros((num_structures+2),dtype=int)
         info = []
         source_list = []
         if include_oqmd:
