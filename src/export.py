@@ -18,8 +18,9 @@ def query2files(cursor, *args):
     cell = args.get('cell')
     param = args.get('param')
     res = args.get('res')
+    prefix = (args.get('prefix') + '_') if args.get('prefix') is not None else ''
     pressure = args.get('write_pressure')
-    if cursor.count() > 10000:
+    if len(cursor) > 10000:
         write = raw_input('This operation will write ' + str(cursor.count()) + ' structures,' +
                           ' are you sure you want to do this? [y/n] ')
         if write == 'y' or write == 'Y':
@@ -39,6 +40,10 @@ def query2files(cursor, *args):
         dirname += args['formula']
     if args['db'] is not None:
         dirname += '-' + args['db'][0]
+    if args.get('swap') is not None:
+        for swap in args['swap']:
+            dirname += '-' + swap
+    dirname = dirname.replace('--', '-')
     dir = False
     dir_counter = 0
     while not dir:
@@ -52,19 +57,20 @@ def query2files(cursor, *args):
         else:
             dir_counter += 1
     for ind, doc in enumerate(cursor):
+        name = prefix
         path = directory + '/'
         # write either cell, res or both
         for source in doc['source']:
             source = str(source)
             if '.res' in source:
-                name = source.split('/')[-1].split('.')[0]
+                name += source.split('/')[-1].split('.')[0]
             elif '.castep' in source:
-                name = source.split('/')[-1].split('.')[0]
+                name += source.split('/')[-1].split('.')[0]
             elif '.history' in source:
-                name = source.split('/')[-1].split('.')[0]
+                name += source.split('/')[-1].split('.')[0]
             elif 'OQMD' in source:
                 # grab OQMD entry_id
-                name = source.split(' ')[-1]
+                name += 'OQMD_' + source.split(' ')[-1]
         path += name
         # always write param for each doc; also handles dirs
         if param:
