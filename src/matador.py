@@ -69,6 +69,7 @@ class Matador:
                 self.swaps = Polisher(self.query.cursor, self.args)
         if self.args['subcmd'] == 'polish':
             self.query = DBQuery(self.client, self.collections, self.args)
+            print(self.args)
             self.polish = Polisher(self.query.cursor, self.args)
         if self.args['subcmd'] == 'hull':
             self.query = DBQuery(self.client, self.collections, self.args)
@@ -249,6 +250,9 @@ if __name__ == '__main__':
                               help='export query to .cell files in folder name from query string')
     query_parser.add_argument('--res', action='store_true',
                               help='export query to .res files in folder name from query string')
+    query_parser.add_argument('--prefix', type=str,
+                              help='add a prefix to all file names to write out (auto-appended \
+                              with an underscore')
     import_parser = subparsers.add_parser('import',
                                           help='import new structures in folder into database',
                                           parents=[spatula_parser])
@@ -274,6 +278,12 @@ if __name__ == '__main__':
                                          help='perform atomic swaps on query results',
                                          parents=[global_parser, collection_parser,
                                                   structure_parser])
+    swaps_parser.add_argument('-s', '--swap', type=str, nargs='+',
+                              help='swap all atoms in structures from a query from the first n-1 species to the nth, \
+                                    e.g. --swaps N P As will swap all N, P atoms for As')
+    swaps_parser.add_argument('-ef', '--hull_dist', nargs='+',
+                              help='swap all atoms in structures from a query from the first n-1 species to the nth, \
+                                    e.g. --swaps N P As will swap all N, P atoms for As')
     polish_parser = subparsers.add_parser('polish',
                                           help='re-relax a series of structures with \
                                           new parameters.',
