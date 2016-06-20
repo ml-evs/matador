@@ -1,26 +1,27 @@
 #!/usr/bin/python
 # coding: utf-8
-""" This file implements the creation of 
+""" This file implements the creation of
 new input files from a query and a desired
 level of accuracy.
 """
 from __future__ import print_function
 from scrapers.castep_scrapers import cell2dict
 from scrapers.castep_scrapers import param2dict
-from query import query2files
+from export import query2files
 from traceback import print_exc
 
 
 class Polisher:
-    """ This class handles the creation of 
+    """ This class handles the creation of
     input files from database queries that have
     a new level of accuracy.
     """
-    def __init__(self, cursor, *args):
+    def __init__(self, cursor, template_structure=None, *args):
         """ Initialise class with query cursor
         and arguments.
         """
         self.args = args[0]
+        self.template_structure = template_structure
         self.cursor = cursor
         # parse new parameters
         self.cell, self.param = self.get_accuracy()
@@ -42,8 +43,8 @@ class Polisher:
         either from the template file or template
         structure, and set some useful defaults.
         """
-        self.final_param = dict()
-        self.final_cell = dict()
+        final_param = dict()
+        final_cell = dict()
         # set some decent defaults
         default_parameters = dict()
         default_parameters['task'] = 'GeometryOptimization'
@@ -56,19 +57,19 @@ class Polisher:
         if self.args.get('with') is not None:
             self.template_seedname = self.args.get('with')
             try:
-               cell_dict, cell_success = cell2dict(self.template_seedname) 
-               param_dict, param_success = param2dict(self.template_seedname) 
-               if not cell_sucess:
-                   if not param_success:
-                       raise RuntimeError('Failed to read cell and param file.')
+                cell_dict, cell_success = cell2dict(self.template_seedname)
+                param_dict, param_success = param2dict(self.template_seedname)
+                if not cell_success:
+                    if not param_success:
+                        raise RuntimeError('Failed to read cell and param file.')
                     raise RuntimeError('Failed to read cell file.')
-               if not param_sucess:
-                   raise RuntimeError('Failed to read param file.')
+                if not param_success:
+                    raise RuntimeError('Failed to read param file.')
             except Exception:
                 print_exc()
                 exit()
         elif self.args.get('to') is not None:
-            self.template_structure = query.template_structure
+            doc = self.template_structure
             self.param_dict = dict()
             param_list = ['cut_off_energy', 'xc_functional',
                           'spin_polarized']
@@ -82,7 +83,6 @@ class Polisher:
         final_cell = final_cell.update(cell_dict)
         return final_cell, final_param
 
-
     def change_accuracy(self, doc):
         """ Augment a document to have the desired
         parameters for polishing.
@@ -90,7 +90,7 @@ class Polisher:
         doc = doc.update(self.cell)
         doc = doc.update(self.param)
         return doc
-    
+
     def parse_swaps(self):
         """ Parse command line options into valid
         atomic species swaps.
@@ -98,7 +98,7 @@ class Polisher:
         """
         self.swap_pairs = []
         # read in pairs of atoms, check they are valid
-        
+
     def atomic_swaps(self, doc):
         """ Swap atomic species according to parsed
         options.
