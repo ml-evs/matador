@@ -6,16 +6,20 @@ can create a file from a db document.
 from __future__ import print_function
 import string
 import numpy as np
-from os.path import exists, makedirs, isfile, expanduser
-from os import system
+from os.path import exists, isfile, expanduser
+from os import system, makedirs
 
 
-def query2files(cursor, res=False, cell=False, top=False, param=False, pressure=None, *args):
+def query2files(cursor, *args):
     """ Write either .res or .cell + .param files
     for all documents in a cursor.
     """
     args = args[0]
-    if cursor.count() > 10000 and top is False:
+    cell = args.get('cell')
+    param = args.get('param')
+    res = args.get('res')
+    pressure = args.get('write_pressure')
+    if cursor.count() > 10000:
         write = raw_input('This operation will write ' + str(cursor.count()) + ' structures,' +
                           ' are you sure you want to do this? [y/n] ')
         if write == 'y' or write == 'Y':
@@ -27,7 +31,7 @@ def query2files(cursor, res=False, cell=False, top=False, param=False, pressure=
     else:
         write = True
     # handle new file and directory names
-    dirname = args.get['subcmd'] + '-'
+    dirname = args['subcmd'] + '-'
     if args['composition'] is not None:
         for comp in args['composition']:
             dirname += comp
