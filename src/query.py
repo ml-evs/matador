@@ -147,6 +147,8 @@ class DBQuery:
                 rand_sample = 5 if self.args.get('biggest') else 2
                 i = 0
                 count = self.cursor.count()
+                if count <= 0:
+                    exit('No structures found for hull.')
                 while i < sample+rand_sample:
                     # start with sample/2 lowest enthalpy structures
                     if i < int(sample):
