@@ -225,11 +225,11 @@ if __name__ == '__main__':
                                 help='only scan the database for new structures, do not dictify')
     # define parser for output of new files for swaps/polishes
     collection_parser = argparse.ArgumentParser(add_help=False)
-    collection_parser.add_argument('--to', type='str',
-                                   help='the text_id of a structure with the desired parameters') 
-    collection_parser.add_argument('--with', type='str',
-                                   help='the seedname (must be within pwd) of cell and param files'
-                                         + 'to use for polishing/swaps')
+    collection_parser.add_argument('--to', type=str,
+                                   help='the text_id of a structure with the desired parameters')
+    collection_parser.add_argument('--with', type=str,
+                                   help=('the seedname (must be within pwd) of cell and param ' +
+                                         'files to use for polishing/swaps'))
     # define subcommand parsers and their arguments
     stat_parser = subparsers.add_parser('stats',
                                         help='print some stats about the database.',
