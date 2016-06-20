@@ -5,15 +5,10 @@ including parsing user inputs, displaying results
 and calling other functionality. """
 from __future__ import print_function
 # import related crysdb functionality
-from spatula import param2dict
-from export import *
+from export import query2files
 # import external libraries
 import pymongo as pm
 import numpy as np
-import string
-from os import makedirs, system
-from os.path import exists, isfile, expanduser
-from copy import deepcopy
 from bson.son import SON
 import re
 
@@ -119,19 +114,7 @@ class DBQuery:
                 # write query to res or cell with param files
                 if self.args.get('cell') or self.args.get('res'):
                     if cursor_count >= 1:
-                        if self.args.get('top') is not None:
-                            if self.top == -1:
-                                self.top = cursor_count
-                            query2files(self.cursor[:self.top],
-                                             self.args.get('res'),
-                                             self.args.get('cell'),
-                                             top=True,
-                                             pressure=self.args.get('write_pressure'))
-                        else:
-                            query2files(self.cursor,
-                                             self.args.get('res'),
-                                             self.args.get('cell'),
-                                             pressure=self.args.get('write_pressure'))
+                        query2files(self.cursor, self.args)
                 # if called as script, always print results
                 if self.args.get('id') is None:
                     print(cursor_count, 'results found for query in', collection+'.')
