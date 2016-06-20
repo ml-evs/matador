@@ -115,7 +115,7 @@ class QueryConvexHull():
         # grab relevant information from query results; also make function?
         for ind, doc in enumerate(query.cursor):
             atoms_per_fu = doc['stoichiometry'][0][1] + doc['stoichiometry'][1][1]
-            num_fu = (doc['enthalpy']/doc['enthalpy_per_atom']) / float(atoms_per_fu)
+            num_fu = doc['num_fu']
             # calculate number of atoms of type B per formula unit
             if doc['stoichiometry'][0][0] == one_minus_x_elem:
                 num_b = doc['stoichiometry'][0][1]
