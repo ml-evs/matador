@@ -18,7 +18,6 @@ def query2files(cursor, *args):
     cell = args.get('cell')
     param = args.get('param')
     res = args.get('res')
-    print(args)
     prefix = (args.get('prefix') + '_') if args.get('prefix') is not None else ''
     pressure = args.get('write_pressure')
     if len(cursor) > 10000:
