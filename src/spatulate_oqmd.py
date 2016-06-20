@@ -134,7 +134,7 @@ class OQMDConverter:
             final_struct = calculation_dict.copy()
             final_struct.update(structure_dict)
             final_struct.update(atoms_dict)
-            final_struct['source'] = ['OQMD', final_struct['entry_id']]
+            final_struct['source'] = ['OQMD ' + str(final_struct['entry_id'])]
             success_count += 1
             if not self.dryrun:
                 self.import_count += self.oqmd_struct2db(final_struct)
