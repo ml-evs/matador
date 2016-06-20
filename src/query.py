@@ -284,12 +284,15 @@ class DBQuery:
             path = directory + '/'
             # write either cell, res or both
             for source in doc['source']:
+                source = str(source)
                 if '.res' in source:
                     name = source.split('/')[-1].split('.')[0]
                 elif '.castep' in source:
                     name = source.split('/')[-1].split('.')[0]
                 elif '.history' in source:
                     name = source.split('/')[-1].split('.')[0]
+                else:
+                    name = 'OQMD_' + str(source)
             path += name
             # always write param for each doc; also handles dirs
             self.doc2param(doc, path)
