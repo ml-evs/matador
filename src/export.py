@@ -18,6 +18,7 @@ def query2files(cursor, *args):
     cell = args.get('cell')
     param = args.get('param')
     res = args.get('res')
+    print(args)
     prefix = (args.get('prefix') + '_') if args.get('prefix') is not None else ''
     pressure = args.get('write_pressure')
     if len(cursor) > 10000:
@@ -43,6 +44,8 @@ def query2files(cursor, *args):
     if args.get('swap') is not None:
         for swap in args['swap']:
             dirname += '-' + swap
+    if args.get('id') is not None:
+        dirname += '-' + args.get('id')[0] + '_' + args.get('id')[1]
     dirname = dirname.replace('--', '-')
     dir = False
     dir_counter = 0
