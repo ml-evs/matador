@@ -7,15 +7,13 @@ from __future__ import print_function
 # matador modules
 from query import DBQuery
 from hull import QueryConvexHull
+from swaps import AtomicSwaps
 from spatula import Spatula
 # import external libraries
 import pymongo as pm
-import numpy as np
 import argparse
-import string
 from sys import argv
 from os import uname
-from copy import deepcopy
 
 
 class Matador:
@@ -62,43 +60,19 @@ class Matador:
             self.importer = Spatula(self.args)
         if self.args['subcmd'] == 'query':
             self.query = DBQuery(self.client, self.collections, self.args)
+        if self.args['subcmd'] == 'swaps':
+            self.query = DBQuery(self.client, self.collections, self.args)
+            if self.args['hull_dist'] is not None:
+                self.hull = QueryConvexHull(self.query, self.args)
+                self.swaps = AtomicSwaps(self.hull.convex_cursor)
+            else:
+                self.swaps = AtomicSwaps(self.query.cursor, self.args)
         if self.args['subcmd'] == 'hull':
             self.query = DBQuery(self.client, self.collections, self.args)
             self.hull = QueryConvexHull(self.query, self.args)
         if self.args['subcmd'] == 'voltage':
             self.query = DBQuery(self.client, self.collections, self.args)
             self.hull = QueryConvexHull(self.query, self.args)
-
-    def swaps(self, doc, pairs=1, template_param=None):
-        """ Take a db document as input and perform atomic swaps. """
-        for source in doc['source']:
-            if '.castep' or '.res' in source:
-                name = source.split('/')[-1].split('.')[0]
-        name = name + '-' + str(pairs) + '-pair-swaps/' + name
-        swapDoc = deepcopy(doc)
-        swapAtoms = swapDoc['atom_types']
-        for i in range(pairs):
-            valid = False
-            while not valid:
-                swap = np.random.randint(0, len(swapAtoms) - 1, size=2)
-                if swap[0] != swap[1] and swapAtoms[swap[0]] != swapAtoms[swap[1]]:
-                        valid = True
-            swapAtoms[swap[1]], swapAtoms[swap[0]] = swapAtoms[swap[0]], swapAtoms[swap[1]]
-        swapPos = np.asarray(swapDoc['positions_frac'])
-        for i in range(len(swapAtoms)):
-            swapPos[i] += np.random.rand(3) * (0.1 / 7.9)
-        swapDoc['positions_frac'] = swapPos
-        hash = self.generate_hash(8)
-        self.doc2cell(swapDoc, name + '-' + hash)
-        self.doc2param(swapDoc, name + '-' + hash, template_param)
-
-    def generate_hash(self, hashLen=6):
-        """ Quick hash generator, based on implementation in PyAIRSS by J. Wynn. """
-        hashChars = [str(x) for x in range(0, 10)] + [x for x in string.ascii_lowercase]
-        hash = ''
-        for i in range(hashLen):
-            hash += np.random.choice(hashChars)
-        return hash
 
     def print_report(self):
         """ Print spatula report on current database. """
@@ -205,12 +179,30 @@ if __name__ == '__main__':
     structure_parser.add_argument('-c', '--composition', type=str, nargs='+',
                                   help='find all structures containing exclusively the given elements, \
                                         e.g. LiSi.')
+    structure_parser.add_argument('-n', '--num_species', type=int, nargs='+',
+                                  help='find all structures containing a certain \
+                                        number of species.')
     structure_parser.add_argument('-f', '--formula', type=str, nargs='+',
                                   help='query a particular chemical formula, e.g. GeTeSi3')
     structure_parser.add_argument('-i', '--id', type=str, nargs='+',
                                   help='specify a particular structure by its text_id')
     structure_parser.add_argument('-ac', '--calc-match', action='store_true',
                                   help='display calculations of the same accuracy as specified id')
+    structure_parser.add_argument('-z', '--num_fu', type=int,
+                                  help='query a calculations with more than n formula units')
+    structure_parser.add_argument('-sg', '--space_group',
+                                  help='query a particular space group')
+    structure_parser.add_argument('-p', '--pressure', type=float,
+                                  help='specify an isotropic external pressure to search for \
+                                        , e.g. 10 (GPa)')
+    structure_parser.add_argument('-pf', '--partial-formula', action='store_true',
+                                  help='stoichiometry/composition queries will include other \
+                                        unspecified species, e.g. -pf search for Li will query \
+                                        any structure containing Li, not just pure Li.')
+    structure_parser.add_argument('--tags', nargs='+', type=str,
+                                  help=('search for up to 3 manual tags at once'))
+    structure_parser.add_argument('--encap', action='store_true',
+                                  help='query only structures encapsulated in a carbon nanotube.')
     # define material parser for hull/voltage arguments
     material_parser = argparse.ArgumentParser(add_help=False)
     material_parser.add_argument('--include_oqmd', action='store_true',
@@ -241,23 +233,8 @@ if __name__ == '__main__':
                               help='number of structures to show (DEFAULT: 10)')
     query_parser.add_argument('-d', '--details', action='store_true',
                               help='show as much detail about calculation as possible')
-    query_parser.add_argument('-sg', '--space_group',
-                              help='query a particular space group')
-    query_parser.add_argument('-z', '--num_fu', type=int,
-                              help='query a calculations with more than n formula units')
-    query_parser.add_argument('-p', '--pressure', type=float,
-                              help='specify an isotropic external pressure to search for \
-                                   , e.g. 10 (GPa)')
     query_parser.add_argument('--source', action='store_true',
                               help='print filenames from which structures were wrangled')
-    query_parser.add_argument('-pf', '--partial-formula', action='store_true',
-                              help=('stoichiometry/composition queries will include other \
-                                    unspecified species, e.g. -pf search for Li will query \
-                                    any structure containing Li, not just pure Li.'))
-    query_parser.add_argument('--encap', action='store_true',
-                              help='query only structures encapsulated in a carbon nanotube.')
-    query_parser.add_argument('--tags', nargs='+', type=str,
-                              help=('search for up to 3 manual tags at once'))
     query_parser.add_argument('--cell', action='store_true',
                               help='export query to .cell files in folder name from query string')
     query_parser.add_argument('--res', action='store_true',
@@ -273,8 +250,9 @@ if __name__ == '__main__':
                                         (currently limited to binaries)',
                                         parents=[global_parser, structure_parser,
                                                  material_parser])
-    hull_parser.add_argument('--biggest', action='store_true', 
-                             help='create a convex hull of the largest rather than best set of structures')
+    hull_parser.add_argument('--biggest', action='store_true',
+                             help='create a convex hull of the largest rather than best \
+                                   set of structures')
     voltage_parser = subparsers.add_parser('voltage',
                                            help='plot a voltage curve from query results \
                                            (currently limited to binaries)',

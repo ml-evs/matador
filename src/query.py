@@ -70,6 +70,9 @@ class DBQuery:
         if self.args.get('composition') is not None:
             self.query_dict['$and'].append(self.query_composition())
             empty_query = False
+        if self.args.get('num_species') is not None:
+            self.query_dict['$and'].append(self.query_num_species())
+            empty_query = False
         if self.args.get('pressure') is not None:
             self.query_dict['$and'].append(self.query_pressure())
             empty_query = False
@@ -648,58 +651,66 @@ class DBQuery:
 
     def query_composition(self, custom_elem=None):
         """ Query DB for all structures containing
-        all the elements taken as input.
+        all the elements taken as input. Passing this
+        function a number is a deprecated feature, replaced
+        by query_num_species.
         """
         if custom_elem is None:
             elements = self.args.get('composition')
         else:
             elements = custom_elem
         # if there's only one string, try split it by caps
-        numeracy = False
-        if len(elements) == 1:
-            elements = [elem for elem in re.split(r'([A-Z][a-z]*)', elements[0]) if elem]
-            if elements[0].isdigit():
-                numeracy = True
         try:
-            if numeracy is False:
+            if len(elements) == 1:
+                elements = [elem for elem in re.split(r'([A-Z][a-z]*)', elements[0]) if elem]
+                if elements[0].isdigit():
+                    raise RuntimeError('Composition string must be a ' +
+                                       'list of elements, use --num_species.')
                 for elem in elements:
                     if bool(re.search(r'\d', elem)):
                         raise RuntimeError('Composition string must be a ' +
                                            'list of elements or a single number.')
-            elif numeracy:
-                if self.args.get('partial_formula'):
-                    raise RuntimeError('Number of elements not compatible with partial formula.')
         except Exception as oops:
             print(type(oops), oops)
             return EmptyCursor()
         query_dict = dict()
         query_dict['$and'] = []
-        if not numeracy:
-            for ind, elem in enumerate(elements):
-                # prototype for chemically motivated searches, e.g. transition metals
-                if elem == 'T':
-                    types_dict = dict()
-                    types_dict['$or'] = list()
-                    transition_metals = ['Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn',
-                                         'Y', 'Zr', 'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd',
-                                         'Hf', 'Ta', 'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg']
-                    for metal in transition_metals:
-                        types_dict['$or'].append(dict())
-                        types_dict['$or'][-1]['atom_types'] = metal
-                else:
-                    types_dict = dict()
-                    types_dict['atom_types'] = dict()
-                    types_dict['atom_types']['$in'] = [elem]
-                query_dict['$and'].append(types_dict)
+        for ind, elem in enumerate(elements):
+            # prototype for chemically motivated searches, e.g. transition metals
+            if elem == 'T':
+                types_dict = dict()
+                types_dict['$or'] = list()
+                transition_metals = ['Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn',
+                                     'Y', 'Zr', 'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd',
+                                     'Hf', 'Ta', 'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg']
+                for metal in transition_metals:
+                    types_dict['$or'].append(dict())
+                    types_dict['$or'][-1]['atom_types'] = metal
+            else:
+                types_dict = dict()
+                types_dict['atom_types'] = dict()
+                types_dict['atom_types']['$in'] = [elem]
+            query_dict['$and'].append(types_dict)
         if not self.args.get('partial_formula'):
             size_dict = dict()
             size_dict['stoichiometry'] = dict()
-            if numeracy:
-                num = int(elements[0])
-            else:
-                num = len(elements)
+            num = len(elements)
             size_dict['stoichiometry']['$size'] = num
             query_dict['$and'].append(size_dict)
+        return query_dict
+
+    def query_num_species(self):
+        """ Query database for all structures with a
+        given number of elements, e.g. binaries, ternaries etc.
+        """
+        num = self.args.get('num_species')
+        if len(num) != 1:
+            exit('--num_species takes a single integer')
+        else:
+            num = num[0]
+        query_dict = dict()
+        query_dict['stoichiometry'] = dict()
+        query_dict['stoichiometry']['$size'] = num
         return query_dict
 
     def query_space_group(self):

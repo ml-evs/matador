@@ -1,5 +1,7 @@
 #!/usr/bin/python
 import numpy as np
+import string
+from copy import deepcopy
 
 
 def disorder_hull(doc, warren=True):
@@ -68,3 +70,36 @@ def disorder_hull(doc, warren=True):
         return warren_cowley(atoms, disps), warren
     else:
         return bond_disorder(atoms, disps), warren
+
+
+def disorder_swaps(self, doc, pairs=1, template_param=None):
+    """ Take a db document as input and perform atomic swaps. """
+    for source in doc['source']:
+        if '.castep' or '.res' in source:
+            name = source.split('/')[-1].split('.')[0]
+    name = name + '-' + str(pairs) + '-pair-swaps/' + name
+    swapDoc = deepcopy(doc)
+    swapAtoms = swapDoc['atom_types']
+    for i in range(pairs):
+        valid = False
+        while not valid:
+            swap = np.random.randint(0, len(swapAtoms) - 1, size=2)
+            if swap[0] != swap[1] and swapAtoms[swap[0]] != swapAtoms[swap[1]]:
+                    valid = True
+        swapAtoms[swap[1]], swapAtoms[swap[0]] = swapAtoms[swap[0]], swapAtoms[swap[1]]
+    swapPos = np.asarray(swapDoc['positions_frac'])
+    for i in range(len(swapAtoms)):
+        swapPos[i] += np.random.rand(3) * (0.1 / 7.9)
+    swapDoc['positions_frac'] = swapPos
+    hash = self.generate_hash(8)
+    self.doc2cell(swapDoc, name + '-' + hash)
+    self.doc2param(swapDoc, name + '-' + hash, template_param)
+
+
+def generate_hash(self, hashLen=6):
+    """ Quick hash generator, based on implementation in PyAIRSS by J. Wynn. """
+    hashChars = [str(x) for x in range(0, 10)] + [x for x in string.ascii_lowercase]
+    hash = ''
+    for i in range(hashLen):
+        hash += np.random.choice(hashChars)
+    return hash
