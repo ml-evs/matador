@@ -48,6 +48,8 @@ class DBQuery:
             if len(self.cursor) < 1:
                 exit('Could not find a match, try widening your search.')
             elif len(self.cursor) == 1:
+                if self.args.get('cell') or self.args.get('res'):
+                    query2files(self.cursor, self.args)
                 self.display_results(self.cursor)
             if self.args.get('calc_match'):
                 # save special copy of calc_dict for hulls
