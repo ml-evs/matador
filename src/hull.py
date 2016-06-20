@@ -98,7 +98,7 @@ class QueryConvexHull():
         stoich = np.zeros((num_structures))
         enthalpy = np.zeros((num_structures))
         disorder = np.zeros((num_structures))
-        source_ind = np.zeros((num_structures+2),dtype=int)
+        source_ind = np.zeros((num_structures+2), dtype=int)
         info = []
         source_list = []
         if include_oqmd:
@@ -259,7 +259,8 @@ class QueryConvexHull():
                 stable_comp.append(structures[hull.vertices[ind], 0])
                 hull_scatter.append(ax.scatter(structures[hull.vertices[ind], 0],
                                                structures[hull.vertices[ind], 1],
-                                               c=colours[source_ind[hull.vertices[ind]]], marker='*', zorder=99999, edgecolor='k',
+                                               c=colours[source_ind[hull.vertices[ind]]],
+                                               marker='*', zorder=99999, edgecolor='k',
                                                s=250, lw=1, alpha=1,
                                                label=info[hull.vertices[ind]]))
         if include_oqmd:
@@ -267,7 +268,8 @@ class QueryConvexHull():
                 if oqmd_structures[oqmd_hull.vertices[ind], 1] <= 0:
                     hull_scatter.append(ax.scatter(oqmd_structures[oqmd_hull.vertices[ind], 0],
                                                    oqmd_structures[oqmd_hull.vertices[ind], 1],
-                                                   c='#28B463', marker='*', zorder=10000, edgecolor='k',
+                                                   c='#28B463', marker='*', zorder=10000,
+                                                   edgecolor='k',
                                                    s=250, lw=1, alpha=1,
                                                    label=oqmd_info[oqmd_hull.vertices[ind]]))
         # skip last and first as they are chem pots
