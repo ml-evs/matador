@@ -33,11 +33,16 @@ class Polisher:
         # parse new parameters
         self.cell_dict, self.param_dict = self.get_accuracy()
         if self.args['subcmd'] == 'swaps':
+            self.swap_counter = 0
             self.parse_swaps()
             swap_cursor = []
             for doc in self.cursor[:]:
-                swap_cursor.append(self.atomic_swaps(doc))
+                doc, counter = self.atomic_swaps(doc)
+                self.swap_counter += counter
+                if counter == 1:
+                    swap_cursor.append(doc)
             self.cursor = swap_cursor
+            print('Performed swaps on', self.swap_counter, 'structures.')
         polish_cursor = []
         for doc in self.cursor[:]:
             polish_cursor.append(self.change_accuracy(doc))
@@ -156,8 +161,13 @@ class Polisher:
         """ Swap atomic species according to parsed
         options.
         """
+        swapped = False
         for ind, atom in enumerate(doc['atom_types']):
             for swap_pair in self.swap_pairs:
                 if atom == swap_pair[0]:
                     doc['atom_types'][ind] = swap_pair[1]
-        return doc
+                    swapped = True
+        if swapped:
+            return doc, 1
+        else:
+            return doc, 0
