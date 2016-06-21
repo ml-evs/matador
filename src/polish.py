@@ -47,9 +47,9 @@ class Polisher:
         for doc in self.cursor[:]:
             polish_cursor.append(self.change_accuracy(doc))
         self.cursor = polish_cursor
-        self.args['cell'] = True
-        self.args['param'] = True
-        self.args['res'] = False
+        self.args['cell'] = False
+        self.args['param'] = False
+        self.args['res'] = True
         query2files(self.cursor, self.args)
 
     def get_accuracy(self):
