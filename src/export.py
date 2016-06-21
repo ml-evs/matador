@@ -21,7 +21,7 @@ def query2files(cursor, *args):
     prefix = (args.get('prefix') + '_') if args.get('prefix') is not None else ''
     pressure = args.get('write_pressure')
     if len(cursor) > 10000:
-        write = raw_input('This operation will write ' + str(cursor.count()) + ' structures,' +
+        write = raw_input('This operation will write ' + str(len(cursor)) + ' structures' +
                           ' are you sure you want to do this? [y/n] ')
         if write == 'y' or write == 'Y':
             print('Writing them all.')
