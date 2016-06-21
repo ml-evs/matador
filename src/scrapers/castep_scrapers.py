@@ -206,9 +206,13 @@ def cell2dict(seed, **kwargs):
     return cell, True
 
 
-def param2dict(seed, **kwargs):
+def param2dict(seed, db=True, **kwargs):
     """ Extract available information from .param file; probably
     to be merged with other dicts from other files.
+
+    seed  : filename with or without file extension
+    db    : if True, only scrape relevant info, otherwise scrape all
+
     """
     param = defaultdict(list)
     if seed.endswith('.param'):
@@ -231,8 +235,9 @@ def param2dict(seed, **kwargs):
             if line.startswith(('#', '!')) or len(line.strip()) == 0:
                 continue
             else:
-                if [rubbish for rubbish in scrub_list if rubbish in line]:
-                    continue
+                if db:
+                    if [rubbish for rubbish in scrub_list if rubbish in line]:
+                        continue
                 # read all other parameters in
                 else:
                     for splitter in splitters:
