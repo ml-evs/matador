@@ -100,6 +100,8 @@ class Spatula:
         if not self.scan:
             # convert to dict and db if required
             self.files2db(self.file_lists)
+        if self.import_count == 0:
+            print('No new structures imported!')
         if not self.dryrun and self.import_count > 0:
             print('Successfully imported', self.import_count, 'structures!')
             # index by enthalpy for faster/larger queries
