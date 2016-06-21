@@ -161,7 +161,8 @@ class Polisher:
                     group = atom.strip(']').strip('[')
                     atoms = self.periodic_table[group]
                     for group_atom in atoms:
-                        self.swap_pairs.append([group_atom, new_atom])
+                        if group_atom != new_atom:
+                            self.swap_pairs.append([group_atom, new_atom])
                 else:
                     self.swap_pairs.append([atom, new_atom])
         for pair in self.swap_pairs:
