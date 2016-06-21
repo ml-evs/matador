@@ -35,6 +35,7 @@ class ResRun:
         """
         # analyse parallel allocation
         self.args = kwargs
+        self.debug = self.args.get('debug')
         self.all_cores = mp.cpu_count()
         if self.args.get('nprocesses') is not None:
             self.nprocesses = self.args['nprocesses']
@@ -82,7 +83,7 @@ class ResRun:
         self.cell_dict, cell_success = cell2dict(cell_seed)
         if not cell_success:
             print('Failed to parse cell file')
-        self.param_dict, param_success = param2dict(param_seed)
+        self.param_dict, param_success = param2dict(param_seed, db=False)
         if not param_success:
             print('Failed to parse cell file')
         success = False
@@ -141,35 +142,28 @@ class ResRun:
                 with open(paths['jobs_fname'], 'a') as job_file:
                     job_file.write(res+'\n')
                 # create full relaxer object for creation and running of job
-                success = FullRelaxer(paths=self.paths,
-                                      ncores=self.ncores,
-                                      res=res,
-                                      param_dict=self.param_dict,
-                                      cell_dict=self.cell_dict)
-                if not success:
-                    continue
-                # print('mpirun -n 8 castep', res)
-                # if isfile('bad_castep/' + res):
-                    # print('DUPLICATE!')
-                    # sleep(5)
-                # with open('bad_castep/' + res, 'a'):
-                    # pass
-            # else:
-                # print('Found job', res, 'in job file, skipping...')
+                print('Starting', res)
+                FullRelaxer(paths=self.paths,
+                            ncores=self.ncores,
+                            res=res,
+                            param_dict=self.param_dict,
+                            cell_dict=self.cell_dict,
+                            debug=self.debug)
+                print('Completed', res)
         return
 
 
 class FullRelaxer:
     """ Turn res file name into "full relax" CASTEP job.
     """
-    def __init__(self, paths, ncores, res, param_dict, cell_dict):
+    def __init__(self, paths, ncores, res, param_dict, cell_dict, debug):
         """ Make the files to run the calculation and handle
         the calling of CASTEP itself.
         """
         self.paths = paths
         self.ncores = ncores
         self.executable = 'castep'
-        self.debug = False
+        self.debug = debug
         res_dict, success = res2dict(res)
         if not success:
             return False
@@ -178,12 +172,14 @@ class FullRelaxer:
         calc_doc.update(cell_dict)
         calc_doc.update(param_dict)
         doc2cell(calc_doc, seed, hash_dupe=False, copy_pspots=False)
-        doc2param(calc_doc, seed, hash_dupe=False, db=False)
+        doc2param(calc_doc, seed, hash_dupe=False)
         if self.debug:
             print(json.dumps(calc_doc, indent=2))
+        print('Running castep...')
         process = self.castep(seed)
-        while True:
-            process.communicate()
+        process.communicate()
+        print('CASTEP finished...')
+        return
 
     def castep(self, seed):
         """ Calls CASTEP on desired seed with desired number of cores. """
@@ -208,6 +204,8 @@ if __name__ == '__main__':
                         help='number of cores CASTEP per job [DEFAULT=cpu_count/nprocesses]')
     parser.add_argument('-np', '--nprocesses', type=int,
                         help='number of concurrent calculations [DEFAULT=1]')
+    parser.add_argument('-d', '--debug', action='store_true',
+                        help='debug output')
     args = parser.parse_args()
-    runner = ResRun(ncores=args.ncores, nprocesses=args.nprocesses)
+    runner = ResRun(ncores=args.ncores, nprocesses=args.nprocesses, debug=args.debug)
     runner.spawn()
