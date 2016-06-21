@@ -36,6 +36,14 @@ class DBQuery:
         self.periodic_table['II'] = ['Be', 'Mg', 'Ca', 'Sr', 'Ba', 'Ra']
         self.periodic_table['III'] = ['B', 'Al', 'Ga', 'In', 'Ti']
         self.periodic_table['IV'] = ['C', 'Si', 'Ge', 'Sn', 'Pb']
+        self.periodic_table['V'] = ['N', 'P', 'As', 'Sb', 'Bi']
+        self.periodic_table['VI'] = ['O', 'S', 'Se', 'Te', 'Po']
+        self.periodic_table['VII'] = ['F', 'Cl', 'Br', 'I', 'At']
+        self.periodic_table['Tran'] = ['Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn',
+                                       'Y', 'Zr', 'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd',
+                                       'Hf', 'Ta', 'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg']
+        self.periodic_table['Lan'] = ['La', 'Ce', 'Pr', 'Nd', 'Pm', 'Sm', 'Eu', 'Gd', 'Tb',
+                                      'Dy', 'Ho', 'Er', 'Tm', 'Yb', 'Lu']
         """ PERFORM QUERY """
         self.cursor = EmptyCursor()
         # initalize query_dict to '$and' all queries
@@ -456,16 +464,7 @@ class DBQuery:
         query_dict['$and'] = []
         for ind, elem in enumerate(elements):
             # prototype for chemically motivated searches, e.g. transition metals
-            if elem == 'T':
-                types_dict = dict()
-                types_dict['$or'] = list()
-                transition_metals = ['Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn',
-                                     'Y', 'Zr', 'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd',
-                                     'Hf', 'Ta', 'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg']
-                for metal in transition_metals:
-                    types_dict['$or'].append(dict())
-                    types_dict['$or'][-1]['atom_types'] = metal
-            elif '[' in elem or ']' in elem:
+            if '[' in elem or ']' in elem:
                 types_dict = dict()
                 types_dict['$or'] = list()
                 elem = elem.strip('[').strip(']')

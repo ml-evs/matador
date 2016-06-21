@@ -28,6 +28,14 @@ class Polisher:
         self.periodic_table['II'] = ['Be', 'Mg', 'Ca', 'Sr', 'Ba', 'Ra']
         self.periodic_table['III'] = ['B', 'Al', 'Ga', 'In', 'Ti']
         self.periodic_table['IV'] = ['C', 'Si', 'Ge', 'Sn', 'Pb']
+        self.periodic_table['V'] = ['N', 'P', 'As', 'Sb', 'Bi']
+        self.periodic_table['VI'] = ['O', 'S', 'Se', 'Te', 'Po']
+        self.periodic_table['VII'] = ['F', 'Cl', 'Br', 'I', 'At']
+        self.periodic_table['Tran'] = ['Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn',
+                                       'Y', 'Zr', 'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd',
+                                       'Hf', 'Ta', 'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg']
+        self.periodic_table['Lan'] = ['La', 'Ce', 'Pr', 'Nd', 'Pm', 'Sm', 'Eu', 'Gd', 'Tb',
+                                      'Dy', 'Ho', 'Er', 'Tm', 'Yb', 'Lu']
         self.template_structure = None
         self.cursor = cursor.clone()
         # parse new parameters
