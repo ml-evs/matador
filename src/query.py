@@ -44,6 +44,8 @@ class DBQuery:
                                        'Hf', 'Ta', 'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg']
         self.periodic_table['Lan'] = ['La', 'Ce', 'Pr', 'Nd', 'Pm', 'Sm', 'Eu', 'Gd', 'Tb',
                                       'Dy', 'Ho', 'Er', 'Tm', 'Yb', 'Lu']
+        self.periodic_table['Act'] = ['Ac', 'Th', 'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk',
+                                      'Cf', 'Es', 'Fm', 'Md', 'No', 'Lr']
         """ PERFORM QUERY """
         self.cursor = EmptyCursor()
         # initalize query_dict to '$and' all queries
