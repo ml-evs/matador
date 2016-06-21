@@ -30,7 +30,12 @@ class DBQuery:
             self.top = -1
         else:
             self.top = self.args.get('top') if self.args.get('top') is not None else 10
-        # grab all args as string for file dumps; TO-DO: make this better
+        # define some periodic table macros
+        self.periodic_table = dict()
+        self.periodic_table['I'] = ['Li', 'Na', 'K', 'Rb', 'Cs', 'Fr']
+        self.periodic_table['II'] = ['Be', 'Mg', 'Ca', 'Sr', 'Ba', 'Ra']
+        self.periodic_table['III'] = ['B', 'Al', 'Ga', 'In', 'Ti']
+        self.periodic_table['IV'] = ['C', 'Si', 'Ge', 'Sn', 'Pb']
         """ PERFORM QUERY """
         self.cursor = EmptyCursor()
         # initalize query_dict to '$and' all queries
@@ -421,6 +426,25 @@ class DBQuery:
                 if elements[0].isdigit():
                     raise RuntimeError('Composition string must be a ' +
                                        'list of elements, use --num_species.')
+                while '[' in elements:
+                    tmp_elements = list(elements)
+                    for ind, tmp in enumerate(tmp_elements):
+                        if tmp == '[':
+                            while tmp_elements[ind+1] != ']':
+                                tmp_elements[ind] += tmp_elements[ind+1]
+                                del tmp_elements[ind+1]
+                            tmp_elements[ind] += ']'
+                    try:
+                        tmp_elements.remove(']')
+                    except:
+                        pass
+                    try:
+                        tmp_elements.remove('')
+                    except:
+                        pass
+                    elements = tmp_elements
+                    for i in range(len(elements)):
+                        elements = elements[i].split('][')
                 for elem in elements:
                     if bool(re.search(r'\d', elem)):
                         raise RuntimeError('Composition string must be a ' +
@@ -441,6 +465,13 @@ class DBQuery:
                 for metal in transition_metals:
                     types_dict['$or'].append(dict())
                     types_dict['$or'][-1]['atom_types'] = metal
+            elif '[' in elem or ']' in elem:
+                types_dict = dict()
+                types_dict['$or'] = list()
+                elem = elem.strip('[').strip(']')
+                for group_elem in self.periodic_table[elem]:
+                    types_dict['$or'].append(dict())
+                    types_dict['$or'][-1]['atom_types'] = group_elem
             else:
                 types_dict = dict()
                 types_dict['atom_types'] = dict()
