@@ -182,7 +182,8 @@ if __name__ == '__main__':
     structure_parser = argparse.ArgumentParser(add_help=False)
     structure_parser.add_argument('-c', '--composition', type=str, nargs='+',
                                   help='find all structures containing exclusively the given elements, \
-                                        e.g. LiSi.')
+                                        e.g. LiSi. Macros defined for groups [I]-[VII], [Tran] \
+                                        [Lan] and [Act], used with square brackets.')
     structure_parser.add_argument('-n', '--num_species', type=int, nargs='+',
                                   help='find all structures containing a certain \
                                         number of species.')
@@ -279,11 +280,12 @@ if __name__ == '__main__':
                                          parents=[global_parser, collection_parser,
                                                   structure_parser])
     swaps_parser.add_argument('-s', '--swap', type=str, nargs='+',
-                              help='swap all atoms in structures from a query from the first n-1 species to the nth, \
-                                    e.g. --swaps N P As will swap all N, P atoms for As')
-    swaps_parser.add_argument('-ef', '--hull_dist', nargs='+',
-                              help='swap all atoms in structures from a query from the first n-1 species to the nth, \
-                                    e.g. --swaps N P As will swap all N, P atoms for As')
+                              help='swap all atoms in structures from a query from the first n-1 \
+                                    species to the nth, e.g. --swaps N P As will swap all N, P \
+                                    atoms for As. Uses the same macros  as --composition.')
+    # swaps_parser.add_argument('-ef', '--hull_dist', nargs='+',
+                              # help='swap all atoms in structures from a query from the first n-1 species to the nth, \
+                                    # e.g. --swaps N P As will swap all N, P atoms for As')
     polish_parser = subparsers.add_parser('polish',
                                           help='re-relax a series of structures with \
                                           new parameters.',
