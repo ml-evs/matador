@@ -283,9 +283,9 @@ if __name__ == '__main__':
                               help='swap all atoms in structures from a query from the first n-1 \
                                     species to the nth, e.g. --swaps N P As will swap all N, P \
                                     atoms for As. Uses the same macros  as --composition.')
-    # swaps_parser.add_argument('-ef', '--hull_dist', nargs='+',
-                              # help='swap all atoms in structures from a query from the first n-1 species to the nth, \
-                                    # e.g. --swaps N P As will swap all N, P atoms for As')
+    swaps_parser.add_argument('-ef', '--hull_dist', nargs='+',
+                              help='swap all atoms in structures from a query from the first n-1 species to the nth, \
+                                    e.g. --swaps N P As will swap all N, P atoms for As')
     polish_parser = subparsers.add_parser('polish',
                                           help='re-relax a series of structures with \
                                           new parameters.',
