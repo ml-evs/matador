@@ -254,6 +254,8 @@ if __name__ == '__main__':
     query_parser.add_argument('--prefix', type=str,
                               help='add a prefix to all file names to write out (auto-appended \
                               with an underscore')
+    query_parser.add_argument('--ignore_warnings', action='store_true',
+                        help='includes possibly bad structures')
     import_parser = subparsers.add_parser('import',
                                           help='import new structures in folder into database',
                                           parents=[spatula_parser])
@@ -265,7 +267,7 @@ if __name__ == '__main__':
                                         (currently limited to binaries)',
                                         parents=[global_parser, structure_parser,
                                                  material_parser])
-    hull_parser.add_argument('--biggest', action='store_true',
+    structure_parser.add_argument('--biggest', action='store_true',
                              help='create a convex hull of the largest rather than best \
                                    set of structures')
     hull_parser.add_argument('--dist_to_hull', type=float,
@@ -310,8 +312,6 @@ if __name__ == '__main__':
     # parser.add_argument('--loose', action='store_true',
                         # help=('loosely matches with calc_match, i.e. only matches' +
                               # 'pspot and xc_functional'))
-    # parser.add_argument('--ignore_warnings', action='store_true',
-                        # help='includes possibly bad structures')
     # parser.add_argument('--dis', action='store_true',
                         # help='smear hull with local stoichiometry')
     # parser.add_argument('--write_pressure', nargs='+', type=str,
