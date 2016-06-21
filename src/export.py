@@ -97,7 +97,10 @@ def doc2param(doc, path, hash_dupe=True, *args):
         param_list = ['task', 'cut_off_energy', 'xc_functional', 'write_cell_structure',
                       'finite_basis_corr', 'spin_polarized', 'smearing_width',
                       'write_bib', 'finite_basis_corr', 'calculate_stress',
-                      'page_wvfns', 'geom_method', 'geom_max_iter']
+                      'page_wvfns', 'geom_method', 'geom_max_iter', 'write_checkpoint',
+                      'fix_occupancy', 'metals_method', 'max_scf_cycles', 'cut_off_energy',
+                      'opt_strategy', 'page_wvfns', 'num_dump_cycles', 'bs_write_eigenvalues',
+                      'backup_interval', 'fixed_npw']
         param_dict = dict()
         for param in [param for param in param_list if param in doc]:
             param_dict[param] = doc[param]
