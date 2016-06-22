@@ -20,17 +20,21 @@ def query2files(cursor, *args):
     res = args.get('res')
     prefix = (args.get('prefix') + '_') if args.get('prefix') is not None else ''
     pressure = args.get('write_pressure')
-    if len(cursor) > 10000:
-        write = raw_input('This operation will write ' + str(len(cursor)) + ' structures' +
-                          ' are you sure you want to do this? [y/n] ')
-        if write == 'y' or write == 'Y':
-            print('Writing them all.')
-            write = True
+    try:
+        if len(cursor) > 10000:
+            write = raw_input('This operation will write ' + str(len(cursor)) + ' structures' +
+                              ' are you sure you want to do this? [y/n] ')
+            if write == 'y' or write == 'Y':
+                print('Writing them all.')
+                write = True
+            else:
+                write = False
+                return
         else:
-            write = False
-            return
-    else:
+            write = True
+    except:
         write = True
+        pass
     # handle new file and directory names
     dirname = args['subcmd'] + '-'
     if args['composition'] is not None:
