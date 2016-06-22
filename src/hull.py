@@ -316,7 +316,7 @@ class QueryConvexHull():
                        bbox=dict(fc='yellow'),
                        arrowprops=dict(arrowstyle='simple', alpha=1))
             datacursor(hull_scatter[:], formatter='{label}'.format, draggable=False,
-                       bbox=dict(fc='blue'),
+                       bbox=dict(fc='white'),
                        arrowprops=dict(arrowstyle='simple', alpha=1))
         ax.set_ylim(-0.1 if np.min(structures[hull.vertices, 1]) > 0
                     else np.min(structures[hull.vertices, 1])-0.1,
