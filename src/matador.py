@@ -64,7 +64,7 @@ class Matador:
             self.query = DBQuery(self.client, self.collections, self.args)
             if self.args['hull_cutoff'] is not None:
                 self.hull = QueryConvexHull(self.query, self.args)
-                self.swaps = Polisher(self.hull.convex_cursor, self.args)
+                self.swaps = Polisher(self.hull.hull_cursor, self.args)
             else:
                 self.swaps = Polisher(self.query.cursor, self.args)
         if self.args['subcmd'] == 'polish':
@@ -217,6 +217,8 @@ if __name__ == '__main__':
                                  help='include OQMD structures on hull and voltage curve.')
     material_parser.add_argument('-hc', '--hull_cutoff', type=float,
                                  help='return only structures within a certain distance from hull')
+    material_parser.add_argument('--biggest', action='store_true',
+                                 help='try to use the largest subset of structures to create a hull')
     spatula_parser = argparse.ArgumentParser(add_help=False)
     spatula_parser.add_argument('-d', '--dryrun', action='store_true',
                                 help='run the importer without connecting to the database')
