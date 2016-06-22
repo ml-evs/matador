@@ -199,7 +199,7 @@ if __name__ == '__main__':
                      restarted after 3 geom_opt steps by default, or otherwise by \
                      value of geom_max_iter in the param file.',
         epilog='Written by Matthew Evans (2016), based primarily on run.pl and run2.pl \
-                by Chris Pickard and PyAIRSS CastepRunner by Jamie Wynn.')
+                by Chris Pickard and Andrew Morris and PyAIRSS CastepRunner by Jamie Wynn.')
     parser.add_argument('-nc', '--ncores', type=int,
                         help='number of cores CASTEP per job [DEFAULT=cpu_count/nprocesses]')
     parser.add_argument('-np', '--nprocesses', type=int,
