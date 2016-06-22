@@ -144,7 +144,7 @@ class DBQuery:
                         else:
                             self.display_results(self.cursor.clone())
             # building hull from just comp, find best structure to calc_match
-            if self.args.get('subcmd') == 'hull' or self.args.get('subcmd') == 'voltage':
+            if self.args.get('subcmd') == 'hull' or self.args.get('subcmd') == 'voltage' or self.args.get('hull_cutoff') is not None:
                 if 'repo' in self.collections:
                     self.repo = self.collections['repo']
                 else:
@@ -580,6 +580,9 @@ class DBQuery:
         """
         self.gs_enthalpy = doc['enthalpy_per_atom']
         query_dict = []
+        # if missing xc, return dict that will have no matches
+        if 'xc_functional' not in doc:
+            return dict(('xc_functional', 'missing'))
         temp_dict = dict()
         temp_dict['xc_functional'] = doc['xc_functional']
         query_dict.append(temp_dict)
