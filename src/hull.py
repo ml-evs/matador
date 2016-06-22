@@ -255,7 +255,7 @@ class QueryConvexHull():
         hull_energy = []
         hull_comp = []
         hull_enthalpy = []
-        hull_docs = []
+        hull_cursor = []
         for ind in range(len(hull.vertices)):
             if structures[hull.vertices[ind], 1] <= 0:
                 hull_energy.append(structures[hull.vertices[ind], 1])
@@ -305,11 +305,12 @@ class QueryConvexHull():
                     stable_energy.append(structures[ind, 1])
                     stable_enthalpy.append(enthalpy[ind])
                     stable_comp.append(structures[ind, 0])
-        # create hull_docs to pass to other modules
+        # create hull_cursor to pass to other modules
         # skip last and first as they are chem pots
         for ind in range(1, len(hull_dist)-1):
             if hull_dist[ind] <= self.hull_cutoff:
-                hull_docs.append(self.cursor[ind])
+                # take ind-1 to ignore first chem pot
+                hull_cursor.append(self.cursor[ind-1])
 
         stable_energy = np.asarray(stable_energy)
         stable_comp = np.asarray(stable_comp)
@@ -359,8 +360,8 @@ class QueryConvexHull():
             print('Generating voltage curve...')
             self.voltage_curve(stable_enthalpy, stable_comp, mu_enthalpy, elements)
         plt.show()
-        self.hull_docs = hull_docs
-        return hull_docs
+        self.hull_cursor = hull_cursor
+        return hull_cursor
 
     def voltage_curve(self, stable_enthalpy, stable_comp, mu_enthalpy, elements):
         """ Take convex hull and plot voltage curves. """
