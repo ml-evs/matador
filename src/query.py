@@ -585,21 +585,22 @@ class DBQuery:
         query_dict.append(temp_dict)
         temp_dict = dict()
         if 'spin_polarized' in doc:
-            temp_dict['spin_polarized'] = doc['spin_polarized']
-            query_dict.append(temp_dict)
+            if doc['spin_polarized'] != []:
+                temp_dict['spin_polarized'] = doc['spin_polarized']
+                query_dict.append(temp_dict)
         if self.args.get('loose'):
             temp_dict = dict()
             query_dict.append(dict())
             temp_dict['$gte'] = float(doc['cut_off_energy'])
             query_dict[-1]['cut_off_energy'] = temp_dict
-            temp_dict = dict()
-            query_dict.append(dict())
-            temp_dict['$lte'] = float(doc['kpoints_mp_spacing'])
-            query_dict[-1]['kpoints_mp_spacing'] = temp_dict
+            # temp_dict = dict()
+            # query_dict.append(dict())
+            # temp_dict['$lte'] = float(doc['kpoints_mp_spacing'])
+            # query_dict[-1]['kpoints_mp_spacing'] = temp_dict
         else:
-            temp_dict = dict()
-            temp_dict['kpoints_mp_spacing'] = doc['kpoints_mp_spacing']
-            query_dict.append(temp_dict)
+            # temp_dict = dict()
+            # temp_dict['kpoints_mp_spacing'] = doc['kpoints_mp_spacing']
+            # query_dict.append(temp_dict)
             query_dict.append(dict())
             query_dict[-1]['cut_off_energy'] = doc['cut_off_energy']
         for species in doc['species_pot']:
