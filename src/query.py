@@ -598,9 +598,9 @@ class DBQuery:
             # temp_dict['$lte'] = float(doc['kpoints_mp_spacing'])
             # query_dict[-1]['kpoints_mp_spacing'] = temp_dict
         else:
-            # temp_dict = dict()
-            # temp_dict['kpoints_mp_spacing'] = doc['kpoints_mp_spacing']
-            # query_dict.append(temp_dict)
+            temp_dict = dict()
+            temp_dict['kpoints_mp_spacing'] = doc['kpoints_mp_spacing']
+            query_dict.append(temp_dict)
             query_dict.append(dict())
             query_dict[-1]['cut_off_energy'] = doc['cut_off_energy']
         for species in doc['species_pot']:

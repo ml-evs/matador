@@ -62,7 +62,7 @@ class Matador:
             self.query = DBQuery(self.client, self.collections, self.args)
         if self.args['subcmd'] == 'swaps':
             self.query = DBQuery(self.client, self.collections, self.args)
-            if self.args['hull_dist'] is not None:
+            if self.args['hull_cutoff'] is not None:
                 self.hull = QueryConvexHull(self.query, self.args)
                 self.swaps = Polisher(self.hull.convex_cursor, self.args)
             else:
