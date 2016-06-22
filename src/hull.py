@@ -277,6 +277,12 @@ class QueryConvexHull():
                                                    s=250, lw=1, alpha=1,
                                                    label=oqmd_info[oqmd_hull.vertices[ind]]))
         # calculate distance to hull of all structures
+        hull_energy = np.asarray(hull_energy)
+        hull_enthalpy = np.asarray(hull_energy)
+        hull_comp = np.asarray(hull_comp)
+        hull_energy = hull_energy[np.argsort(hull_comp)]
+        hull_enthalpy = hull_enthalpy[np.argsort(hull_comp)]
+        hull_comp = hull_comp[np.argsort(hull_comp)]
         for ind in range(len(structures)):
             # get the index of the next stoich on the hull from the current structure
             i = bisect_left(hull_comp, structures[ind, 0])
@@ -305,12 +311,6 @@ class QueryConvexHull():
             if hull_dist[ind] <= self.hull_cutoff:
                 hull_docs.append(self.cursor[ind])
 
-        hull_energy = np.asarray(hull_energy)
-        hull_enthalpy = np.asarray(hull_energy)
-        hull_comp = np.asarray(hull_comp)
-        hull_energy = hull_energy[np.argsort(hull_comp)]
-        hull_enthalpy = hull_enthalpy[np.argsort(hull_comp)]
-        hull_comp = hull_comp[np.argsort(hull_comp)]
         stable_energy = np.asarray(stable_energy)
         stable_comp = np.asarray(stable_comp)
         stable_enthalpy = np.asarray(stable_enthalpy)
