@@ -208,9 +208,6 @@ if __name__ == '__main__':
                                   help=('search for up to 3 manual tags at once'))
     structure_parser.add_argument('--encap', action='store_true',
                                   help='query only structures encapsulated in a carbon nanotube.')
-    structure_parser.add_argument('--biggest', action='store_true',
-                                  help='create a convex hull of the largest rather than best \
-                                        set of structures')
     structure_parser.add_argument('--loose', action='store_true',
                                   help='loosely matches with calc_match, i.e. only matches \
                                         pspot and xc_functional')
@@ -218,6 +215,8 @@ if __name__ == '__main__':
     material_parser = argparse.ArgumentParser(add_help=False)
     material_parser.add_argument('--include_oqmd', action='store_true',
                                  help='include OQMD structures on hull and voltage curve.')
+    material_parser.add_argument('-hc', '--hull_cutoff', type=float,
+                                 help='return only structures within a certain distance from hull')
     spatula_parser = argparse.ArgumentParser(add_help=False)
     spatula_parser.add_argument('-d', '--dryrun', action='store_true',
                                 help='run the importer without connecting to the database')
@@ -261,7 +260,7 @@ if __name__ == '__main__':
                               help='add a prefix to all file names to write out (auto-appended \
                               with an underscore')
     query_parser.add_argument('--ignore_warnings', action='store_true',
-                        help='includes possibly bad structures')
+                              help='includes possibly bad structures')
     import_parser = subparsers.add_parser('import',
                                           help='import new structures in folder into database',
                                           parents=[spatula_parser])
@@ -273,8 +272,6 @@ if __name__ == '__main__':
                                         (currently limited to binaries)',
                                         parents=[global_parser, structure_parser,
                                                  material_parser])
-    hull_parser.add_argument('--dist_to_hull', type=float,
-                             help='return only structures within a certain distance from hull')
     voltage_parser = subparsers.add_parser('voltage',
                                            help='plot a voltage curve from query results \
                                            (currently limited to binaries)',
@@ -283,36 +280,19 @@ if __name__ == '__main__':
     swaps_parser = subparsers.add_parser('swaps',
                                          help='perform atomic swaps on query results',
                                          parents=[global_parser, collection_parser,
-                                                  structure_parser])
+                                                  structure_parser, material_parser])
     swaps_parser.add_argument('-s', '--swap', type=str, nargs='+',
                               help='swap all atoms in structures from a query from the first n-1 \
                                     species to the nth, e.g. --swaps N P As will swap all N, P \
                                     atoms for As. Uses the same macros  as --composition.')
-    swaps_parser.add_argument('-ef', '--hull_dist', nargs='+',
-                              help='swap all atoms in structures from a query from the first n-1 species to the nth, \
-                                    e.g. --swaps N P As will swap all N, P atoms for As')
     polish_parser = subparsers.add_parser('polish',
                                           help='re-relax a series of structures with \
                                           new parameters.',
                                           parents=[global_parser, collection_parser,
                                                    structure_parser])
-    compute_parser = subparsers.add_parser('compute',
-                                           help='run all CASTEP calculations inside \
-                                                 the current pwd, taking care to \
-                                                 restart geometry optimizations often enough \
-                                                 to maintain k-point spacing')
-    compute_parser.add_argument('-n', '--num_cores', type=int,
-                                help='number of cores per job')
-    compute_parser.add_argument('-t', '--num_threads', type=int,
-                                help='number of concurrent jobs')
-    # compute_parser.add_argument('-N', '--max_num_nodes', type=int,
-            # help='EXPERIMENTAL: maximum number of computers to infest: requires \
-                                      # rbusy to find free computers and a shared \
-                                      # file system across all nodes.')
     # parser.add_argument('--strict', action='store_true',
                         # help=('strictly matches with calc_match,'
                               # 'useful for hulls where convergence is rough'))
-    # parser.add_argument('--loose', action='store_true',
     # parser.add_argument('--dis', action='store_true',
                         # help='smear hull with local stoichiometry')
     # parser.add_argument('--write_pressure', nargs='+', type=str,

@@ -7,7 +7,7 @@ from __future__ import print_function
 from scipy.spatial import ConvexHull
 from mpldatacursor import datacursor
 from bson.son import SON
-from copy import deepcopy
+from bisect import bisect_left
 import pymongo as pm
 import matplotlib.pyplot as plt
 import re
@@ -27,8 +27,12 @@ class QueryConvexHull():
     def __init__(self, query, *args):
         """ Accept query from fryan as argument. """
         self.query = query
-        self.cursor = deepcopy(query.cursor)
+        self.cursor = list(query.cursor)
         self.args = args[0]
+        if self.args.get('hull_cutoff') is not None:
+            self.hull_cutoff = float(self.args['hull_cutoff'])
+        else:
+            self.hull_cutoff = 0.0
         self.binary_hull()
 
     def binary_hull(self, dis=False):
@@ -92,13 +96,13 @@ class QueryConvexHull():
                     print('No possible chem pots found for', elem, '.')
                     return
         print('Constructing hull...')
-        num_structures = query.cursor.count()
+        num_structures = len(self.cursor)
         formation = np.zeros((num_structures))
-        hull_dist = np.zeros((num_structures))
         stoich = np.zeros((num_structures))
         enthalpy = np.zeros((num_structures))
         disorder = np.zeros((num_structures))
         source_ind = np.zeros((num_structures+2), dtype=int)
+        hull_dist = np.zeros((num_structures+2))
         info = []
         source_list = []
         if include_oqmd:
@@ -113,7 +117,7 @@ class QueryConvexHull():
         x_elem = elements[0]
         one_minus_x_elem = elements[1]
         # grab relevant information from query results; also make function?
-        for ind, doc in enumerate(query.cursor):
+        for ind, doc in enumerate(self.cursor):
             atoms_per_fu = doc['stoichiometry'][0][1] + doc['stoichiometry'][1][1]
             num_fu = doc['num_fu']
             # calculate number of atoms of type B per formula unit
@@ -248,15 +252,15 @@ class QueryConvexHull():
                                alpha=1, c='#28B453', edgecolor='k', marker='D',
                                label=oqmd_info[ind],
                                zorder=200))
-        stable_energy = []
-        stable_comp = []
-        stable_enthalpy = []
+        hull_energy = []
+        hull_comp = []
+        hull_enthalpy = []
         hull_docs = []
         for ind in range(len(hull.vertices)):
             if structures[hull.vertices[ind], 1] <= 0:
-                stable_energy.append(structures[hull.vertices[ind], 1])
-                stable_enthalpy.append(enthalpy[hull.vertices[ind]])
-                stable_comp.append(structures[hull.vertices[ind], 0])
+                hull_energy.append(structures[hull.vertices[ind], 1])
+                hull_enthalpy.append(enthalpy[hull.vertices[ind]])
+                hull_comp.append(structures[hull.vertices[ind], 0])
                 hull_scatter.append(ax.scatter(structures[hull.vertices[ind], 0],
                                                structures[hull.vertices[ind], 1],
                                                c=colours[source_ind[hull.vertices[ind]]],
@@ -272,24 +276,50 @@ class QueryConvexHull():
                                                    edgecolor='k',
                                                    s=250, lw=1, alpha=1,
                                                    label=oqmd_info[oqmd_hull.vertices[ind]]))
+        # calculate distance to hull of all structures
+        for ind in range(len(structures)):
+            # get the index of the next stoich on the hull from the current structure
+            i = bisect_left(hull_comp, structures[ind, 0])
+            energy_pair = (hull_energy[i-1], hull_energy[i])
+            comp_pair = (hull_comp[i-1], hull_comp[i])
+            # calculate equation of line between the two
+            gradient = (energy_pair[1] - energy_pair[0]) / (comp_pair[1] - comp_pair[0])
+            intercept = ((energy_pair[1] + energy_pair[0]) -
+                         gradient * (comp_pair[1] + comp_pair[0])) / 2
+            # calculate hull_dist
+            hull_dist[ind] = structures[ind, 1] - (gradient * structures[ind, 0] + intercept)
+        # if below cutoff, include in arg to voltage curve
+        stable_energy = list(hull_energy)
+        stable_enthalpy = list(hull_enthalpy)
+        stable_comp = list(hull_comp)
+        for ind in range(len(structures)):
+            if hull_dist[ind] <= self.hull_cutoff:
+                # get lowest enthalpy at particular comp
+                if structures[ind, 0] not in stable_comp:
+                    stable_energy.append(structures[ind, 1])
+                    stable_enthalpy.append(enthalpy[ind])
+                    stable_comp.append(structures[ind, 0])
+        # create hull_docs to pass to other modules
         # skip last and first as they are chem pots
-        try:
-            for ind in range(1, len(hull.vertices)-1):
-                query.cursor.rewind()
-                hull_docs.append(self.cursor[int(np.sort(hull.vertices)[ind])])
-        except:
-            hull_docs = []
-            print('Failed to create hull cursor, skipping...')
-            pass
+        for ind in range(1, len(hull_dist)-1):
+            if hull_dist[ind] <= self.hull_cutoff:
+                hull_docs.append(self.cursor[ind])
+
+        hull_energy = np.asarray(hull_energy)
+        hull_enthalpy = np.asarray(hull_energy)
+        hull_comp = np.asarray(hull_comp)
+        hull_energy = hull_energy[np.argsort(hull_comp)]
+        hull_enthalpy = hull_enthalpy[np.argsort(hull_comp)]
+        hull_comp = hull_comp[np.argsort(hull_comp)]
         stable_energy = np.asarray(stable_energy)
         stable_comp = np.asarray(stable_comp)
         stable_enthalpy = np.asarray(stable_enthalpy)
         stable_energy = stable_energy[np.argsort(stable_comp)]
         stable_enthalpy = stable_enthalpy[np.argsort(stable_comp)]
         stable_comp = stable_comp[np.argsort(stable_comp)]
-        for ind in range(len(stable_comp)-1):
-                ax.plot([stable_comp[ind], stable_comp[ind+1]],
-                        [stable_energy[ind], stable_energy[ind+1]],
+        for ind in range(len(hull_comp)-1):
+                ax.plot([hull_comp[ind], hull_comp[ind+1]],
+                        [hull_energy[ind], hull_energy[ind+1]],
                         '#9B59B6', lw=2, alpha=1, zorder=1000, label='')
         if include_oqmd:
             oqmd_stable_comp = []
