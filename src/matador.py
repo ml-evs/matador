@@ -208,6 +208,12 @@ if __name__ == '__main__':
                                   help=('search for up to 3 manual tags at once'))
     structure_parser.add_argument('--encap', action='store_true',
                                   help='query only structures encapsulated in a carbon nanotube.')
+    structure_parser.add_argument('--biggest', action='store_true',
+                                  help='create a convex hull of the largest rather than best \
+                                        set of structures')
+    structure_parser.add_argument('--loose', action='store_true',
+                                  help='loosely matches with calc_match, i.e. only matches \
+                                        pspot and xc_functional')
     # define material parser for hull/voltage arguments
     material_parser = argparse.ArgumentParser(add_help=False)
     material_parser.add_argument('--include_oqmd', action='store_true',
@@ -267,9 +273,6 @@ if __name__ == '__main__':
                                         (currently limited to binaries)',
                                         parents=[global_parser, structure_parser,
                                                  material_parser])
-    structure_parser.add_argument('--biggest', action='store_true',
-                             help='create a convex hull of the largest rather than best \
-                                   set of structures')
     hull_parser.add_argument('--dist_to_hull', type=float,
                              help='return only structures within a certain distance from hull')
     voltage_parser = subparsers.add_parser('voltage',
@@ -310,8 +313,6 @@ if __name__ == '__main__':
                         # help=('strictly matches with calc_match,'
                               # 'useful for hulls where convergence is rough'))
     # parser.add_argument('--loose', action='store_true',
-                        # help=('loosely matches with calc_match, i.e. only matches' +
-                              # 'pspot and xc_functional'))
     # parser.add_argument('--dis', action='store_true',
                         # help='smear hull with local stoichiometry')
     # parser.add_argument('--write_pressure', nargs='+', type=str,
