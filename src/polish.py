@@ -145,14 +145,10 @@ class Polisher:
                         tmp_list[ind] += tmp_list[ind+1]
                         del tmp_list[ind+1]
                     tmp_list[ind] += ']'
-            try:
+            while ']' in tmp_list:
                 tmp_list.remove(']')
-            except:
-                pass
-            try:
+            while '' in tmp_list:
                 tmp_list.remove('')
-            except:
-                pass
             new_atom = tmp_list[-1]
             for atom in tmp_list:
                 if atom == new_atom or atom == '':
