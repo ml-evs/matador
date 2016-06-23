@@ -239,6 +239,9 @@ if __name__ == '__main__':
     collection_parser.add_argument('--with', type=str,
                                    help=('the seedname (must be within pwd) of cell and param ' +
                                          'files to use for polishing/swaps'))
+    collection_parser.add_argument('--prefix', type=str,
+                              help='add a prefix to all file names to write out (auto-appended \
+                              with an underscore')
     # define subcommand parsers and their arguments
     stat_parser = subparsers.add_parser('stats',
                                         help='print some stats about the database.',
@@ -258,9 +261,6 @@ if __name__ == '__main__':
                               help='export query to .cell files in folder name from query string')
     query_parser.add_argument('--res', action='store_true',
                               help='export query to .res files in folder name from query string')
-    query_parser.add_argument('--prefix', type=str,
-                              help='add a prefix to all file names to write out (auto-appended \
-                              with an underscore')
     query_parser.add_argument('--ignore_warnings', action='store_true',
                               help='includes possibly bad structures')
     import_parser = subparsers.add_parser('import',
