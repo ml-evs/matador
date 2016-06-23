@@ -4,8 +4,7 @@
 including parsing user inputs, displaying results
 and calling other functionality. """
 from __future__ import print_function
-# matador modules
-from query import DBQuery
+# matador modules from query import DBQuery
 from hull import QueryConvexHull
 from polish import Polisher
 from spatula import Spatula
@@ -228,8 +227,6 @@ if __name__ == '__main__':
                                 help='set user tags, e.g. nanotube, project name')
     spatula_parser.add_argument('--debug', action='store_true',
                                 help='enable debug output to print every dict')
-    spatula_parser.add_argument('--scratch', action='store_true',
-                                help='import to scratch collection')
     spatula_parser.add_argument('-s', '--scan', action='store_true',
                                 help='only scan the database for new structures, do not dictify')
     # define parser for output of new files for swaps/polishes

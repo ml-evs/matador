@@ -79,10 +79,13 @@ class Spatula:
             remote = None
         self.client = pm.MongoClient(remote)
         self.db = self.client.crystals
-        if self.scratch:
-            self.repo = self.db.scratch
-        else:
+        if self.args['db'] is None:
             self.repo = self.db.repo
+        elif self.args['db'] is not None:
+            if 'oqmd' in self.args['db']:
+                exit('Cannot import directly to oqmd repo')
+            else:
+                self.repo = self.db[self.args.get('db')]
         if not self.dryrun:
             # either drop and recreate or create spatula report collection
             try:
