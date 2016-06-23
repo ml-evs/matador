@@ -132,10 +132,10 @@ class QueryConvexHull():
             formation[ind] = doc['enthalpy_per_atom']
             source_dir = ''.join(doc['source'][0].split('/')[:-1])
             if source_dir in source_list:
-                source_ind[ind] = source_list.index(source_dir)
+                source_ind[ind] = source_list.index(source_dir) + 1
             else:
                 source_list.append(source_dir)
-                source_ind[ind] = source_list.index(source_dir)
+                source_ind[ind] = source_list.index(source_dir) + 1
             for mu in match:
                 for j in range(len(doc['stoichiometry'])):
                     if mu['stoichiometry'][0][0] == doc['stoichiometry'][j][0]:
@@ -215,43 +215,12 @@ class QueryConvexHull():
                     stoich_string, 'OQMD' + ' ' + doc['text_id'][0] + ' ' + doc['text_id'][1],
                     doc['space_group'], oqmd_formation[ind]))
                 ind += 1
+
         # create hull with SciPy routine
         hull = ConvexHull(structures)
         if include_oqmd:
             oqmd_hull = ConvexHull(oqmd_structures)
-        fig = plt.figure(facecolor='w')
-        ax = fig.add_subplot(111)
-        try:
-            colours = plt.cm.plasma(np.linspace(0, 1, 100))
-            mpl_new_ver = True
-            # brewer2mpl -> len(source_list)
-            colours = len(source_list) * ['#7D3C98']
-        except:
-            colours = 100*['#7D3C98']
-            mpl_new_ver = False
-        plt.draw()
-        # plot all structures
-        scatter = []
-        hull_scatter = []
-        for ind in range(len(structures)-2):
-            lw = 0 if mpl_new_ver else 1
-            scatter.append(ax.scatter(structures[ind, 0], structures[ind, 1], s=35, lw=lw,
-                                      alpha=0.8, c=colours[source_ind[ind]],
-                                      edgecolor='k', label=info[ind], zorder=100))
-            if dis and warren:
-                ax.plot([structures[ind, 0]-disorder[ind]/10, structures[ind, 0]],
-                        [structures[ind, 1], structures[ind, 1]],
-                        c='g', alpha=0.5, lw=0.5)
-            if dis and not warren:
-                ax.plot([structures[ind, 0]-disorder[ind]/10, structures[ind, 0] + disorder[ind]],
-                        [structures[ind, 1], structures[ind, 1]],
-                        c='#28B453', alpha=0.5, lw=0.5)
-        if include_oqmd:
-            for ind in range(len(oqmd_stoich)):
-                scatter.append(ax.scatter(oqmd_stoich[ind], oqmd_formation[ind], s=35, lw=1,
-                               alpha=1, c='#28B453', edgecolor='k', marker='D',
-                               label=oqmd_info[ind],
-                               zorder=200))
+        
         hull_energy = []
         hull_comp = []
         hull_enthalpy = []
@@ -261,21 +230,6 @@ class QueryConvexHull():
                 hull_energy.append(structures[hull.vertices[ind], 1])
                 hull_enthalpy.append(enthalpy[hull.vertices[ind]])
                 hull_comp.append(structures[hull.vertices[ind], 0])
-                hull_scatter.append(ax.scatter(structures[hull.vertices[ind], 0],
-                                               structures[hull.vertices[ind], 1],
-                                               c=colours[source_ind[hull.vertices[ind]]],
-                                               marker='*', zorder=99999, edgecolor='k',
-                                               s=250, lw=1, alpha=1,
-                                               label=info[hull.vertices[ind]]))
-        if include_oqmd:
-            for ind in range(len(oqmd_hull.vertices)):
-                if oqmd_structures[oqmd_hull.vertices[ind], 1] <= 0:
-                    hull_scatter.append(ax.scatter(oqmd_structures[oqmd_hull.vertices[ind], 0],
-                                                   oqmd_structures[oqmd_hull.vertices[ind], 1],
-                                                   c='#28B463', marker='*', zorder=10000,
-                                                   edgecolor='k',
-                                                   s=250, lw=1, alpha=1,
-                                                   label=oqmd_info[oqmd_hull.vertices[ind]]))
         # calculate distance to hull of all structures
         hull_energy = np.asarray(hull_energy)
         hull_enthalpy = np.asarray(hull_energy)
@@ -294,12 +248,15 @@ class QueryConvexHull():
                          gradient * (comp_pair[1] + comp_pair[0])) / 2
             # calculate hull_dist
             hull_dist[ind] = structures[ind, 1] - (gradient * structures[ind, 0] + intercept)
+        
         # if below cutoff, include in arg to voltage curve
         stable_energy = list(hull_energy)
         stable_enthalpy = list(hull_enthalpy)
         stable_comp = list(hull_comp)
         for ind in range(len(structures)):
             if hull_dist[ind] <= self.hull_cutoff:
+                # recolour if under cutoff
+                source_ind[ind] = 0
                 # get lowest enthalpy at particular comp
                 if structures[ind, 0] not in stable_comp:
                     stable_energy.append(structures[ind, 1])
@@ -311,17 +268,7 @@ class QueryConvexHull():
             if hull_dist[ind] <= self.hull_cutoff:
                 # take ind-1 to ignore first chem pot
                 hull_cursor.append(self.cursor[ind-1])
-
-        stable_energy = np.asarray(stable_energy)
-        stable_comp = np.asarray(stable_comp)
-        stable_enthalpy = np.asarray(stable_enthalpy)
-        stable_energy = stable_energy[np.argsort(stable_comp)]
-        stable_enthalpy = stable_enthalpy[np.argsort(stable_comp)]
-        stable_comp = stable_comp[np.argsort(stable_comp)]
-        for ind in range(len(hull_comp)-1):
-                ax.plot([hull_comp[ind], hull_comp[ind+1]],
-                        [hull_energy[ind], hull_energy[ind+1]],
-                        '#9B59B6', lw=2, alpha=1, zorder=1000, label='')
+        
         if include_oqmd:
             oqmd_stable_comp = []
             oqmd_stable_energy = []
@@ -337,14 +284,92 @@ class QueryConvexHull():
             oqmd_stable_energy = oqmd_stable_energy[np.argsort(oqmd_stable_comp)]
             oqmd_stable_enthalpy = oqmd_stable_enthalpy[np.argsort(oqmd_stable_comp)]
             oqmd_stable_comp = oqmd_stable_comp[np.argsort(oqmd_stable_comp)]
+        
+        
+        stable_energy = np.asarray(stable_energy)
+        stable_comp = np.asarray(stable_comp)
+        stable_enthalpy = np.asarray(stable_enthalpy)
+        stable_energy = stable_energy[np.argsort(stable_comp)]
+        stable_enthalpy = stable_enthalpy[np.argsort(stable_comp)]
+        stable_comp = stable_comp[np.argsort(stable_comp)]
+        
+        # PLOTTING ONLY
+        fig = plt.figure(facecolor='w')
+        ax = fig.add_subplot(111)
+        try:
+            c = plt.cmap.viridis
+            mpl_new_ver = True
+        except:
+            mpl_new_ver = False
+        from palettable.colorbrewer.qualitative import Dark2_8
+        from palettable.colorbrewer.qualitative import Set3_10
+        if len(source_list) < 6:
+            colours = Dark2_8.hex_colors[1:len(source_list)+1]
+        # else:
+            # colours = len(source_list) * ['#7D3C98']
+        # last colour reserved for OQMD
+        colours.insert(0, Dark2_8.hex_colors[0])
+        colours.append(Set3_10.hex_colors[-1])
+        scatter = []
+        hull_scatter = []
+        plt.draw() 
+        for ind in range(len(hull.vertices)):
+            if structures[hull.vertices[ind], 1] <= 0:
+                hull_scatter.append(ax.scatter(structures[hull.vertices[ind], 0],
+                                               structures[hull.vertices[ind], 1],
+                                               c=colours[source_ind[hull.vertices[ind]]],
+                                               marker='*', zorder=99999, edgecolor='k',
+                                               s=250, lw=1, alpha=1,
+                                               label=info[hull.vertices[ind]]))
+        if include_oqmd:
+            for ind in range(len(oqmd_hull.vertices)):
+                if oqmd_structures[oqmd_hull.vertices[ind], 1] <= 0:
+                    hull_scatter.append(ax.scatter(oqmd_structures[oqmd_hull.vertices[ind], 0],
+                                                   oqmd_structures[oqmd_hull.vertices[ind], 1],
+                                                   c=colours[-1], marker='*', zorder=10000,
+                                                   edgecolor='k',
+                                                   s=250, lw=1, alpha=1,
+                                                   label=oqmd_info[oqmd_hull.vertices[ind]]))
+        if include_oqmd:
+            for ind in range(len(oqmd_stoich)):
+                scatter.append(ax.scatter(oqmd_stoich[ind], oqmd_formation[ind], s=35, lw=1,
+                               alpha=1, c=colours[-1], edgecolor='k', marker='D',
+                               label=oqmd_info[ind],
+                               zorder=200))
+        
+        for ind in range(len(structures)-2):
+            lw = 0 if mpl_new_ver else 1
+            scatter.append(ax.scatter(structures[ind, 0], structures[ind, 1], s=35, lw=lw,
+                                      alpha=0.8, c=colours[source_ind[ind]],
+                                      edgecolor='k', label=info[ind], zorder=100))
+            if dis and warren:
+                ax.plot([structures[ind, 0]-disorder[ind]/10, structures[ind, 0]],
+                        [structures[ind, 1], structures[ind, 1]],
+                        c='g', alpha=0.5, lw=0.5)
+            if dis and not warren:
+                ax.plot([structures[ind, 0]-disorder[ind]/10, structures[ind, 0] + disorder[ind]],
+                        [structures[ind, 1], structures[ind, 1]],
+                        c='#28B453', alpha=0.5, lw=0.5)
+        # tie line
+        for ind in range(len(hull_comp)-1):
+            ax.plot([hull_comp[ind], hull_comp[ind+1]],
+                    [hull_energy[ind], hull_energy[ind+1]],
+                    c=colours[0], lw=2, alpha=1, zorder=1000, label='')
+            if self.hull_cutoff > 0:
+                ax.plot([hull_comp[ind], hull_comp[ind+1]],
+                        [hull_energy[ind]+self.hull_cutoff, hull_energy[ind+1]+self.hull_cutoff],
+                        '--', c=colours[0], lw=2, alpha=1, zorder=1000, label='')
+        # oqmd tie line        
+        if include_oqmd:
             for ind in range(len(oqmd_stable_comp)-1):
                 ax.plot([oqmd_stable_comp[ind], oqmd_stable_comp[ind+1]],
                         [oqmd_stable_energy[ind], oqmd_stable_energy[ind+1]],
-                        '#28B463', lw=2, alpha=1, zorder=900, label='')
+                        c=colours[-1], lw=2, alpha=1, zorder=900, label='')
         ax.set_xlim(-0.05, 1.05)
+        # data cursor
         if not dis:
             datacursor(scatter[:], formatter='{label}'.format, draggable=False,
-                       bbox=dict(fc='yellow'),
+                       bbox=dict(fc='white'),
                        arrowprops=dict(arrowstyle='simple', alpha=1))
             datacursor(hull_scatter[:], formatter='{label}'.format, draggable=False,
                        bbox=dict(fc='white'),
