@@ -152,7 +152,6 @@ class ResRun:
                 print('Completed', res)
         return
 
-
 class FullRelaxer:
     """ Turn res file name into "full relax" CASTEP job.
     """
@@ -179,7 +178,7 @@ class FullRelaxer:
         process = self.castep(seed)
         process.communicate()
         print('CASTEP finished...')
-        return
+        pass
 
     def castep(self, seed):
         """ Calls CASTEP on desired seed with desired number of cores. """
