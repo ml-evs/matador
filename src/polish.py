@@ -39,7 +39,10 @@ class Polisher:
         self.periodic_table['Act'] = ['Ac', 'Th', 'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk',
                                       'Cf', 'Es', 'Fm', 'Md', 'No', 'Lr']
         self.template_structure = None
-        self.cursor = list(cursor)
+        try:
+            self.cursor = cursor.clone()
+        except:
+            self.cursor = list(cursor)
         # parse new parameters
         self.cell_dict, self.param_dict = self.get_accuracy()
         if self.args['subcmd'] == 'swaps':
