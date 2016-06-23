@@ -582,7 +582,8 @@ class DBQuery:
         query_dict = []
         # if missing xc, return dict that will have no matches
         if 'xc_functional' not in doc:
-            return dict(('xc_functional', 'missing'))
+            query_dict.append(dict())
+            query_dict[-1]['xc_functional'] = 'missing'
         temp_dict = dict()
         temp_dict['xc_functional'] = doc['xc_functional']
         query_dict.append(temp_dict)
