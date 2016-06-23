@@ -43,7 +43,6 @@ class Spatula:
             self.dryrun = True
         self.debug = self.args['debug']
         self.verbosity = self.args['verbosity']
-        self.scratch = self.args['scratch']
         self.tags = self.args['tags']
         self.tag_dict = dict()
         self.tag_dict['tags'] = self.tags
@@ -84,8 +83,11 @@ class Spatula:
         elif self.args['db'] is not None:
             if 'oqmd' in self.args['db']:
                 exit('Cannot import directly to oqmd repo')
+            elif len(self.args.get('db')) > 1:
+                exit('Can only import to one collection.')
             else:
-                self.repo = self.db[self.args.get('db')]
+                print(self.args.get('db')[0])
+                self.repo = self.db[self.args.get('db')[0]]
         if not self.dryrun:
             # either drop and recreate or create spatula report collection
             try:
