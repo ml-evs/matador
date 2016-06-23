@@ -173,9 +173,8 @@ if __name__ == '__main__':
     # define parent parser for global arguments
     global_parser = argparse.ArgumentParser(add_help=False)
     # common arguments to all subcommands
-    global_parser.add_argument('--db', choices=['ajm', 'oqmd', 'all', 'scratch'],
-                               help='choose which databases to query. \
-                                     NB: "all" does not include scratch',
+    global_parser.add_argument('--db',
+                               help='choose which databases to query',
                                nargs='+')
     # define structure parser for structure query strings
     structure_parser = argparse.ArgumentParser(add_help=False)
@@ -262,7 +261,7 @@ if __name__ == '__main__':
                               help='includes possibly bad structures')
     import_parser = subparsers.add_parser('import',
                                           help='import new structures in folder into database',
-                                          parents=[spatula_parser])
+                                          parents=[global_parser, spatula_parser])
     rebuild_parser = subparsers.add_parser('rebuild',
                                            help='rebuild whole database.',
                                            parents=[spatula_parser])
