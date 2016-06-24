@@ -34,7 +34,7 @@ class DBQuery:
         self.periodic_table = dict()
         self.periodic_table['I'] = ['Li', 'Na', 'K', 'Rb', 'Cs', 'Fr']
         self.periodic_table['II'] = ['Be', 'Mg', 'Ca', 'Sr', 'Ba', 'Ra']
-        self.periodic_table['III'] = ['B', 'Al', 'Ga', 'In', 'Ti']
+        self.periodic_table['III'] = ['B', 'Al', 'Ga', 'In', 'Tl']
         self.periodic_table['IV'] = ['C', 'Si', 'Ge', 'Sn', 'Pb']
         self.periodic_table['V'] = ['N', 'P', 'As', 'Sb', 'Bi']
         self.periodic_table['VI'] = ['O', 'S', 'Se', 'Te', 'Po']
