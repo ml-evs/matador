@@ -4,7 +4,8 @@
 including parsing user inputs, displaying results
 and calling other functionality. """
 from __future__ import print_function
-# matador modules from query import DBQuery
+# matador modules 
+from query import DBQuery
 from hull import QueryConvexHull
 from polish import Polisher
 from spatula import Spatula
