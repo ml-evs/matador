@@ -79,9 +79,9 @@ class Spatula:
             remote = None
         self.client = pm.MongoClient(remote)
         self.db = self.client.crystals
-        if self.args['db'] is None:
+        if self.args.get('db') is None:
             self.repo = self.db.repo
-        elif self.args['db'] is not None:
+        else:
             if 'oqmd' in self.args['db']:
                 exit('Cannot import directly to oqmd repo')
             elif len(self.args.get('db')) > 1:
