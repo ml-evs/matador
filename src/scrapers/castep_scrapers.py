@@ -8,6 +8,7 @@ from __future__ import print_function
 from cell_utils import abc2cart
 # external libraries
 import bson.json_util as json
+import numpy as np
 # standard library
 from collections import defaultdict
 from os import getcwd, stat
@@ -389,15 +390,13 @@ def castep2dict(seed, **kwargs):
                 castep['cut_off_energy'] = float(line.split(':')[-1].split()[0])
             elif 'finite_basis_corr' not in castep and 'finite basis set correction  ' in line:
                 castep['finite_basis_corr'] = line.split(':')[-1].strip()
-            elif 'kpoints_mp_grid' not in castep and 'MP grid size for SCF' in line:
+            elif 'MP grid size for SCF' in line:
                 castep['kpoints_mp_grid'] = map(int, list(line.split('is')[-1].split()))
             elif 'sedc_apply' not in castep and \
                     'DFT+D: Semi-empirical dispersion correction    : on' in line:
                 castep['sedc_apply'] = True
                 castep['sedc_scheme'] = flines[line_no+1].split(':')[1].split()[0]
-            elif 'kpoints_calculated' not in castep and 'Number of kpoints used' in line:
-                castep['kpoints_calculated'] = int(line.split('=')[-1])
-            elif 'space_group' not in castep and 'Space group of crystal' in line:
+            elif 'Space group of crystal' in line:
                 castep['space_group'] = line.split(':')[-1].split(',')[0].strip().replace(" ", "")
             elif 'external_pressure' not in castep and 'External pressure/stress' in line:
                 castep['external_pressure'] = list()
@@ -528,17 +527,6 @@ def castep2dict(seed, **kwargs):
                                     final_flines[line_no+i+2].split('=')[-1].strip()
                                 ]
                                 ))
-                        recip_abc = 3*[0]
-                        for j in range(3):
-                            recip_abc[j] = 2 * pi / float(castep['lattice_abc'][0][j])
-                        if 'kpoints_mp_grid' in castep:
-                            max_spacing = 0
-                            for j in range(3):
-                                spacing = recip_abc[j]/(2 * pi * castep['kpoints_mp_grid'][j])
-                                max_spacing = spacing if spacing > max_spacing else max_spacing
-                            exponent = round(log10(max_spacing) - 1)
-                            temp_spacing = max_spacing + 0.5 * 10 ** exponent
-                            castep['kpoints_mp_spacing'] = float(round(temp_spacing, 2))
                     elif 'Current cell volume' in line:
                         castep['cell_volume'] = float(line.split('=')[1].split()[0].strip())
                     elif 'Cell Contents' in line:
@@ -643,6 +631,23 @@ def castep2dict(seed, **kwargs):
                             castep['bulk_modulus'] = float(line.split('=')[-1].split()[0])
                         except:
                             continue
+                # calculate kpoint spacing if not found
+                if 'kpoints_mp_grid' in castep and \
+                       'kpoints_mp_spacing' not in castep and \
+                       'lattice_cart' in castep:
+                    real_lat = np.asarray(castep['lattice_cart'])
+                    recip_lat = np.zeros((3, 3))
+                    recip_lat[0] = (2*pi)*np.cross(real_lat[1], real_lat[2])/(np.dot(real_lat[0], np.cross(real_lat[1], real_lat[2])))
+                    recip_lat[1] = (2*pi)*np.cross(real_lat[2], real_lat[0])/(np.dot(real_lat[1], np.cross(real_lat[2], real_lat[0])))
+                    recip_lat[2] = (2*pi)*np.cross(real_lat[0], real_lat[1])/(np.dot(real_lat[2], np.cross(real_lat[0], real_lat[1])))
+                    recip_len = np.zeros((3))
+                    recip_len = np.sqrt(np.sum(np.power(recip_lat, 2), axis=1))
+                    max_spacing = 0
+                    for j in range(3):
+                        spacing = recip_len[j] / (2*pi*castep['kpoints_mp_grid'][j])
+                        max_spacing = (spacing if spacing > max_spacing else max_spacing)
+                    exponent = round(log10(max_spacing) - 1)
+                    castep['kpoints_mp_spacing'] = round(max_spacing + 0.5*10**exponent, 2)
         # computing metadata, i.e. parallelism, time, memory, version
         for line in flines:
             if 'Release CASTEP version' in line:
@@ -670,7 +675,7 @@ def castep2dict(seed, **kwargs):
         if 'space_group' not in castep:
             castep['space_group'] = 'xxx'
     except Exception as oops:
-        if kwargs.get('dryrun'):
+        if kwargs.get('dryrun') or kwargs.get('verbosity') > 0:
             print_exc()
             print('Error in .castep file', seed, 'skipping...')
         if type(oops) == DFTError:

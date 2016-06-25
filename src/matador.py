@@ -69,7 +69,6 @@ class Matador:
                 self.swaps = Polisher(self.query.cursor, self.args)
         if self.args['subcmd'] == 'polish':
             self.query = DBQuery(self.client, self.collections, self.args)
-            print(self.args)
             self.polish = Polisher(self.query.cursor, self.args)
         if self.args['subcmd'] == 'hull':
             self.query = DBQuery(self.client, self.collections, self.args)
