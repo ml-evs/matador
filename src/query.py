@@ -145,10 +145,12 @@ class DBQuery:
                             self.display_results(self.cursor.clone())
             # building hull from just comp, find best structure to calc_match
             if self.args.get('subcmd') == 'hull' or self.args.get('subcmd') == 'voltage' or self.args.get('hull_cutoff') is not None:
-                if 'repo' in self.collections:
-                    self.repo = self.collections['repo']
+                if 'oqmd' in self.collections:
+                    exit('Use --include_oqmd instead of --db, exiting...')
+                if len(self.collections.keys()) == 1:
+                    self.repo = self.collections[self.collections.keys()[0]]
                 else:
-                    exit('Hulls and voltage curves require AJM repo structures, exiting...')
+                    exit('Hulls and voltage curves require just one source or --include_oqmd, exiting...')
                 print('Creating hull from AJM db structures.')
                 self.args['summary'] = True
                 if self.args.get('biggest'):
@@ -607,15 +609,16 @@ class DBQuery:
             query_dict.append(temp_dict)
             query_dict.append(dict())
             query_dict[-1]['cut_off_energy'] = doc['cut_off_energy']
-        for species in doc['species_pot']:
-            temp_dict = dict()
-            temp_dict['$or'] = []
-            temp_dict['$or'].append(dict())
-            temp_dict['$or'][-1]['species_pot.'+species] = dict()
-            temp_dict['$or'][-1]['species_pot.'+species]['$exists'] = False
-            temp_dict['$or'].append(dict())
-            temp_dict['$or'][-1]['species_pot.'+species] = doc['species_pot'][species]
-            query_dict.append(temp_dict)
+        if 'species_pot' in doc:
+            for species in doc['species_pot']:
+                temp_dict = dict()
+                temp_dict['$or'] = []
+                temp_dict['$or'].append(dict())
+                temp_dict['$or'][-1]['species_pot.'+species] = dict()
+                temp_dict['$or'][-1]['species_pot.'+species]['$exists'] = False
+                temp_dict['$or'].append(dict())
+                temp_dict['$or'][-1]['species_pot.'+species] = doc['species_pot'][species]
+                query_dict.append(temp_dict)
         return query_dict
 
     def temp_collection(self, cursor):
