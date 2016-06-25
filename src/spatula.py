@@ -11,6 +11,7 @@ from scrapers.castep_scrapers import res2dict, dir2dict
 from scrapers.experiment_scrapers import expt2dict, synth2dict
 # external libraries
 import pymongo as pm
+from numpy import asarray, dot, cross, zeros
 # standard library
 import subprocess
 from random import randint
@@ -86,7 +87,6 @@ class Spatula:
             elif len(self.args.get('db')) > 1:
                 exit('Can only import to one collection.')
             else:
-                print(self.args.get('db')[0])
                 self.repo = self.db[self.args.get('db')[0]]
         if not self.dryrun:
             # either drop and recreate or create spatula report collection
@@ -217,7 +217,9 @@ class Spatula:
                         airss = True
             if airss:
                 if file_lists[root]['param_count'] == 1:
-                    param_dict, success = param2dict(file_lists[root]['param'][0])
+                    param_dict, success = param2dict(file_lists[root]['param'][0],
+                                                     debug=self.debug,
+                                                     verbosity=self.verbosity)
                     param = success
                     if not success:
                         self.logfile.write(param_dict)
@@ -226,7 +228,9 @@ class Spatula:
                         print('Multiple param files found!')
                     multi = True
                 if file_lists[root]['cell_count'] == 1:
-                    cell_dict, success = cell2dict(file_lists[root]['cell'][0])
+                    cell_dict, success = cell2dict(file_lists[root]['cell'][0],
+                                                   debug=self.debug,
+                                                   verbosity=self.verbosity)
                     cell = success
                     if not success:
                         self.logfile.write(cell_dict)
@@ -239,11 +243,15 @@ class Spatula:
                     for param_name in file_lists[root]['param']:
                         for cell_name in file_lists[root]['cell']:
                             if param_name.split('.')[0] in cell_name:
-                                param_dict, success = param2dict(param_name)
+                                param_dict, success = param2dict(param_name, 
+                                                                 debug=self.debug,
+                                                                 verbosity=self.verbosity)
                                 param = success
                                 if not success:
                                     self.logfile.write(param_dict)
-                                cell_dict, success = cell2dict(cell_name)
+                                cell_dict, success = cell2dict(cell_name,
+                                                               debug=self.debug,
+                                                               verbosity=self.verbosity)
                                 cell = success
                                 if not success:
                                     self.logfile.write(cell_dict)
@@ -278,36 +286,41 @@ class Spatula:
                 for ind, file in enumerate(file_lists[root]['res']):
                     if file.replace('.res', '.castep') in file_lists[root]['castep']:
                         struct_dict, success = castep2dict(file.replace('.res', '.castep'),
-                                                           debug=self.debug)
+                                                           debug=self.debug,
+                                                           verbosity=self.verbosity)
                     elif file.replace('.res', '.history') in file_lists[root]['castep']:
                         struct_dict, success = castep2dict(file.replace('.res', '.history'),
-                                                           debug=self.debug)
+                                                           debug=self.debug,
+                                                           verbosity=self.verbosity)
                     elif file.replace('.res', '.history.gz') in file_lists[root]['castep']:
                         struct_dict, success = castep2dict(file.replace('.res', '.history.gz'),
-                                                           debug=self.debug)
+                                                           debug=self.debug,
+                                                           verbosity=self.verbosity)
                     else:
-                        struct_dict, success = res2dict(file)
+                        struct_dict, success = res2dict(file,
+                                                        debug=self.debug,
+                                                        verbosity=self.verbosity)
                     if not success:
                         self.logfile.write(struct_dict)
                     else:
                         final_struct = input_dict.copy()
                         final_struct.update(struct_dict)
                         try:
-                            # calculate kpoint spacing if not found; only an approximation
-                            recip_abc = 3*[0]
-                            for j in range(3):
-                                recip_abc[j] = 2*pi / float(final_struct['lattice_abc'][0][j])
-                                if 'kpoints_mp_spacing' not in final_struct:
-                                    if 'kpoints_mp_grid' in final_struct:
-                                        max_spacing = 0
-                                        for j in range(3):
-                                            spacing = recip_abc[j] / \
-                                                (2*pi*final_struct['kpoints_mp_grid'][j])
-                                            max_spacing = (spacing if spacing > max_spacing
-                                                           else max_spacing)
-                                        exponent = round(log10(max_spacing)-1)
-                                        final_struct['kpoints_mp_spacing'] = \
-                                            round(max_spacing + 0.5*10**exponent, 2)
+                            # calculate kpoint spacing if not found
+                            if 'kpoints_mp_spacing' not in final_struct and 'kpoints_mp_grid' in final_struct:
+                                real_lat = np.asarray(final_struct['lattice_cart'])
+                                recip_lat = np.zeros((3, 3))
+                                recip_lat[0] = (2*pi)*np.cross(real_lat[1], real_lat[2])/(np.dot(real_lat[0], np.cross(real_lat[1], real_lat[2])))
+                                recip_lat[1] = (2*pi)*np.cross(real_lat[2], real_lat[0])/(np.dot(real_lat[1], np.cross(real_lat[2], real_lat[0])))
+                                recip_lat[2] = (2*pi)*np.cross(real_lat[0], real_lat[1])/(np.dot(real_lat[2], np.cross(real_lat[0], real_lat[1])))
+                                recip_len = np.zeros((3))
+                                recip_len = np.sqrt(np.sum(np.power(recip_lat, 2), axis=1))
+                                max_spacing = 0
+                                for j in range(3):
+                                    spacing = recip_len[j] / (2*pi*final_struct['kpoints_mp_grid'][j])
+                                    max_spacing = (spacing if spacing > max_spacing else max_spacing)
+                                # exponent = round(log10(max_spacing) - 1)
+                                final_struct['kpoints_mp_spacing'] = round(max_spacing, 2)# + 0.5*10**exponent, 2)
                         except:
                             print(struct_dict['source'])
                             print(input_dict['source'])
@@ -321,7 +334,9 @@ class Spatula:
                             self.import_count += self.struct2db(final_struct)
             else:
                 for ind, file in enumerate(file_lists[root]['castep']):
-                    castep_dict, success = castep2dict(file, debug=self.debug)
+                    castep_dict, success = castep2dict(file, 
+                                                       debug=self.debug,
+                                                       verbosity=self.verbosity)
                     if not success:
                         self.logfile.write(castep_dict)
                     else:
@@ -330,7 +345,9 @@ class Spatula:
                             final_struct.update(self.tag_dict)
                             self.import_count += self.struct2db(final_struct)
         for ind, file in enumerate(file_lists[root]['synth']):
-                    synth_dict, success = synth2dict(file, debug=self.debug)
+                    synth_dict, success = synth2dict(file,
+                                                     debug=self.debug,
+                                                     verbosity=self.verbosity)
                     if not success:
                         self.logfile.write(synth_dict)
                     else:
