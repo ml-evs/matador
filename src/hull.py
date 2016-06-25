@@ -297,7 +297,7 @@ class QueryConvexHull():
         fig = plt.figure(facecolor='w')
         ax = fig.add_subplot(111)
         try:
-            c = plt.cmap.viridis
+            c = plt.cm.viridis(np.linspace(0, 1, 100))
             mpl_new_ver = True
         except:
             mpl_new_ver = False
@@ -305,8 +305,6 @@ class QueryConvexHull():
         from palettable.colorbrewer.qualitative import Set3_10
         if len(source_list) < 6:
             colours = Dark2_8.hex_colors[1:len(source_list)+1]
-        # else:
-            # colours = len(source_list) * ['#7D3C98']
         # last colour reserved for OQMD
         colours.insert(0, Dark2_8.hex_colors[0])
         colours.append(Set3_10.hex_colors[-1])
