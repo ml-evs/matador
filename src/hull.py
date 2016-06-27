@@ -55,6 +55,7 @@ class QueryConvexHull():
         for ind, elem in enumerate(elements):
             print('Scanning for suitable', elem, 'chemical potential...')
             query_dict['$and'] = list(query.calc_dict['$and'])
+            query_dict['$and'].append(query.query_quality())
             query_dict['$and'].append(query.query_composition(custom_elem=[elem]))
             # if oqmd, only query composition, not parameters
             if query.args.get('tags') is not None:
@@ -142,17 +143,8 @@ class QueryConvexHull():
                         formation[ind] -= (mu['enthalpy_per_atom'] * doc['stoichiometry'][j][1] /
                                            atoms_per_fu)
             for elem in doc['stoichiometry']:
-                stoich_string = (str(doc['stoichiometry'][0][0]) +
-                                 str(doc['stoichiometry'][0][1]) +
-                                 str(doc['stoichiometry'][1][0]) +
-                                 str(doc['stoichiometry'][1][1]))
                 if x_elem in elem[0]:
                     stoich[ind] = elem[1]/float(atoms_per_fu)
-            info.append("{0:^10}\n{1:^24}\n{2:^5s}\n{3:2f} eV".format(stoich_string,
-                                                                      doc['text_id'][0] + ' ' +
-                                                                      doc['text_id'][1],
-                                                                      doc['space_group'],
-                                                                      formation[ind]))
             if dis:
                 disorder[ind], warren = disorder_hull(doc)
         # put chem pots in same array as formation for easy hulls
@@ -161,14 +153,6 @@ class QueryConvexHull():
         enthalpy = np.append(mu_enthalpy[1], enthalpy)
         enthalpy = np.append(enthalpy, mu_enthalpy[0])
         ind = len(formation)-3
-        for doc in match:
-            stoich_string = str(doc['stoichiometry'][0][0]) + str(doc['stoichiometry'][0][1])
-            info.append("{0:^10}\n{1:24}\n{2:5s}\n{3:2f} eV".format(stoich_string,
-                                                                    doc['text_id'][0] + ' ' +
-                                                                    doc['text_id'][1],
-                                                                    doc['space_group'],
-                                                                    formation[ind]))
-            ind += 1
         stoich = np.append([0.0], stoich)
         stoich = np.append(stoich, [1.0])
         structures = np.vstack((stoich, formation)).T
@@ -215,12 +199,11 @@ class QueryConvexHull():
                     stoich_string, 'OQMD' + ' ' + doc['text_id'][0] + ' ' + doc['text_id'][1],
                     doc['space_group'], oqmd_formation[ind]))
                 ind += 1
-
         # create hull with SciPy routine
         hull = ConvexHull(structures)
         if include_oqmd:
             oqmd_hull = ConvexHull(oqmd_structures)
-        
+
         hull_energy = []
         hull_comp = []
         hull_enthalpy = []
@@ -248,7 +231,7 @@ class QueryConvexHull():
                          gradient * (comp_pair[1] + comp_pair[0])) / 2
             # calculate hull_dist
             hull_dist[ind] = structures[ind, 1] - (gradient * structures[ind, 0] + intercept)
-        
+
         # if below cutoff, include in arg to voltage curve
         stable_energy = list(hull_energy)
         stable_enthalpy = list(hull_enthalpy)
@@ -264,11 +247,12 @@ class QueryConvexHull():
                     stable_comp.append(structures[ind, 0])
         # create hull_cursor to pass to other modules
         # skip last and first as they are chem pots
+        hull_cursor.append(match[0])
         for ind in range(1, len(hull_dist)-1):
             if hull_dist[ind] <= self.hull_cutoff:
                 # take ind-1 to ignore first chem pot
                 hull_cursor.append(self.cursor[ind-1])
-        
+        hull_cursor.append(match[1])
         if include_oqmd:
             oqmd_stable_comp = []
             oqmd_stable_energy = []
@@ -284,15 +268,40 @@ class QueryConvexHull():
             oqmd_stable_energy = oqmd_stable_energy[np.argsort(oqmd_stable_comp)]
             oqmd_stable_enthalpy = oqmd_stable_enthalpy[np.argsort(oqmd_stable_comp)]
             oqmd_stable_comp = oqmd_stable_comp[np.argsort(oqmd_stable_comp)]
-        
-        
+        # grab info for datacursor
+        info = []
+        doc = match[0]
+        ind = 0
+        stoich_string = str(doc['stoichiometry'][0][0]) + str(doc['stoichiometry'][0][1])
+        info.append("{0:^10}\n{1:24}\n{2:5s}\n{3:2f} eV".format(stoich_string,
+                                                                doc['text_id'][0] + ' ' +
+                                                                doc['text_id'][1],
+                                                                doc['space_group'],
+                                                                hull_dist[ind]))
+        for ind, doc in enumerate(self.cursor):
+            stoich_string = (str(doc['stoichiometry'][0][0]) +  str(doc['stoichiometry'][0][1]) +
+                             str(doc['stoichiometry'][1][0]) + str(doc['stoichiometry'][1][1]))
+            info.append("{0:^10}\n{1:^24}\n{2:^5s}\n{3:2f} eV".format(stoich_string,
+                                                                      doc['text_id'][0] + ' ' +
+                                                                      doc['text_id'][1],
+                                                                      doc['space_group'],
+                                                                      hull_dist[ind+1]))
+        doc = match[1]
+        ind = len(hull_dist)-1
+        stoich_string = str(doc['stoichiometry'][0][0]) + str(doc['stoichiometry'][0][1])
+        info.append("{0:^10}\n{1:24}\n{2:5s}\n{3:2f} eV".format(stoich_string,
+                                                                doc['text_id'][0] + ' ' +
+                                                                doc['text_id'][1],
+                                                                doc['space_group'],
+                                                                hull_dist[ind]))
+
         stable_energy = np.asarray(stable_energy)
         stable_comp = np.asarray(stable_comp)
         stable_enthalpy = np.asarray(stable_enthalpy)
         stable_energy = stable_energy[np.argsort(stable_comp)]
         stable_enthalpy = stable_enthalpy[np.argsort(stable_comp)]
         stable_comp = stable_comp[np.argsort(stable_comp)]
-        
+
         # PLOTTING ONLY
         fig = plt.figure(facecolor='w')
         ax = fig.add_subplot(111)
@@ -305,20 +314,44 @@ class QueryConvexHull():
         from palettable.colorbrewer.qualitative import Set3_10
         if len(source_list) < 6:
             colours = Dark2_8.hex_colors[1:len(source_list)+1]
-        # last colour reserved for OQMD
+        # first colour reserved for hull
         colours.insert(0, Dark2_8.hex_colors[0])
+        # penultimate colour reserved for off hull above cutoff
+        colours.append(Set3_10.hex_colors[-2])
+        # last colour reserved for OQMD
         colours.append(Set3_10.hex_colors[-1])
         scatter = []
         hull_scatter = []
-        plt.draw() 
+        plt.draw()
+        # structures on hull
         for ind in range(len(hull.vertices)):
             if structures[hull.vertices[ind], 1] <= 0:
                 hull_scatter.append(ax.scatter(structures[hull.vertices[ind], 0],
                                                structures[hull.vertices[ind], 1],
                                                c=colours[source_ind[hull.vertices[ind]]],
                                                marker='*', zorder=99999, edgecolor='k',
-                                               s=250, lw=1, alpha=1,
+                                               s=100, lw=1, alpha=0.8,
                                                label=info[hull.vertices[ind]]))
+        lw = 0.1 if mpl_new_ver else 1
+        # off hull structures
+        for ind in range(len(structures)):
+            if hull_dist[ind] <= self.hull_cutoff or self.hull_cutoff == 0:
+                c = colours[source_ind[ind]] if self.hull_cutoff == 0 else colours[1]
+                scatter.append(ax.scatter(structures[ind, 0], structures[ind, 1], s=30, lw=lw,
+                               alpha=0.8, c=c, edgecolor='k', label=info[ind], zorder=100))
+            # if dis and warren:
+                # ax.plot([structures[ind, 0]-disorder[ind]/10, structures[ind, 0]],
+                        # [structures[ind, 1], structures[ind, 1]],
+                        # c='g', alpha=0.5, lw=0.5)
+            # if dis and not warren:
+                # ax.plot([structures[ind, 0]-disorder[ind]/10, structures[ind, 0] + disorder[ind]],
+                        # [structures[ind, 1], structures[ind, 1]],
+                        # c='#28B453', alpha=0.5, lw=0.5)
+        if self.hull_cutoff != 0:
+            c = colours[source_ind[ind]] if self.hull_cutoff == 0 else colours[1]
+            ax.scatter(structures[1:-1, 0], structures[1:-1, 1], s=30, lw=lw,
+                       alpha=0.8, c=colours[-2],
+                       edgecolor='k', zorder=10)
         if include_oqmd:
             for ind in range(len(oqmd_hull.vertices)):
                 if oqmd_structures[oqmd_hull.vertices[ind], 1] <= 0:
@@ -326,29 +359,14 @@ class QueryConvexHull():
                                                    oqmd_structures[oqmd_hull.vertices[ind], 1],
                                                    c=colours[-1], marker='*', zorder=10000,
                                                    edgecolor='k',
-                                                   s=250, lw=1, alpha=1,
+                                                   s=100, lw=1, alpha=1,
                                                    label=oqmd_info[oqmd_hull.vertices[ind]]))
-        if include_oqmd:
             for ind in range(len(oqmd_stoich)):
-                scatter.append(ax.scatter(oqmd_stoich[ind], oqmd_formation[ind], s=35, lw=1,
+                scatter.append(ax.scatter(oqmd_stoich[ind], oqmd_formation[ind], s=20, lw=1,
                                alpha=1, c=colours[-1], edgecolor='k', marker='D',
                                label=oqmd_info[ind],
                                zorder=200))
-        
-        for ind in range(len(structures)-2):
-            lw = 0 if mpl_new_ver else 1
-            scatter.append(ax.scatter(structures[ind, 0], structures[ind, 1], s=35, lw=lw,
-                                      alpha=0.8, c=colours[source_ind[ind]],
-                                      edgecolor='k', label=info[ind], zorder=100))
-            if dis and warren:
-                ax.plot([structures[ind, 0]-disorder[ind]/10, structures[ind, 0]],
-                        [structures[ind, 1], structures[ind, 1]],
-                        c='g', alpha=0.5, lw=0.5)
-            if dis and not warren:
-                ax.plot([structures[ind, 0]-disorder[ind]/10, structures[ind, 0] + disorder[ind]],
-                        [structures[ind, 1], structures[ind, 1]],
-                        c='#28B453', alpha=0.5, lw=0.5)
-        # tie line
+        # tie lines
         for ind in range(len(hull_comp)-1):
             ax.plot([hull_comp[ind], hull_comp[ind+1]],
                     [hull_energy[ind], hull_energy[ind+1]],
@@ -356,8 +374,7 @@ class QueryConvexHull():
             if self.hull_cutoff > 0:
                 ax.plot([hull_comp[ind], hull_comp[ind+1]],
                         [hull_energy[ind]+self.hull_cutoff, hull_energy[ind+1]+self.hull_cutoff],
-                        '--', c=colours[0], lw=2, alpha=1, zorder=1000, label='')
-        # oqmd tie line        
+                        '--', c=colours[1], lw=1, alpha=0.5, zorder=1000, label='')
         if include_oqmd:
             for ind in range(len(oqmd_stable_comp)-1):
                 ax.plot([oqmd_stable_comp[ind], oqmd_stable_comp[ind+1]],
@@ -369,9 +386,9 @@ class QueryConvexHull():
             datacursor(scatter[:], formatter='{label}'.format, draggable=False,
                        bbox=dict(fc='white'),
                        arrowprops=dict(arrowstyle='simple', alpha=1))
-            datacursor(hull_scatter[:], formatter='{label}'.format, draggable=False,
-                       bbox=dict(fc='white'),
-                       arrowprops=dict(arrowstyle='simple', alpha=1))
+            # datacursor(hull_scatter[:], formatter='{label}'.format, draggable=False,
+                       # bbox=dict(fc='white'),
+                       # arrowprops=dict(arrowstyle='simple', alpha=1))
         ax.set_ylim(-0.1 if np.min(structures[hull.vertices, 1]) > 0
                     else np.min(structures[hull.vertices, 1])-0.1,
                     0.5 if np.max(structures[hull.vertices, 1]) > 1
@@ -384,7 +401,6 @@ class QueryConvexHull():
             self.voltage_curve(stable_enthalpy, stable_comp, mu_enthalpy, elements)
         plt.show()
         self.hull_cursor = hull_cursor
-        return hull_cursor
 
     def voltage_curve(self, stable_enthalpy, stable_comp, mu_enthalpy, elements):
         """ Take convex hull and plot voltage curves. """
