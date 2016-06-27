@@ -153,6 +153,7 @@ class DBQuery:
                     exit('Hulls and voltage curves require just one source or --include_oqmd, exiting...')
                 print('Creating hull from AJM db structures.')
                 self.args['summary'] = True
+                self.args['top'] = -1
                 if self.args.get('biggest'):
                     print('\nFinding biggest calculation set for hull...\n')
                 else:
@@ -365,11 +366,10 @@ class DBQuery:
         print(len(header_string)*'─')
         if self.args.get('summary'):
             current_formula = ''
+            formula_list = []
             count = 0
             for ind, substring in enumerate(formula_string):
-                if count > self.top:
-                    break
-                if substring != current_formula and substring not in formula_string[:ind]:
+                if substring != current_formula and substring not in formula_list:
                     count += 1
                     print(struct_string[ind])
                     if details:
@@ -378,6 +378,7 @@ class DBQuery:
                     if self.args.get('source'):
                         print(source_string[ind])
                     current_formula = substring
+                    formula_list.append(substring)
         else:
             for ind, substring in enumerate(struct_string):
                 print(substring)
@@ -594,18 +595,22 @@ class DBQuery:
             if doc['spin_polarized'] != []:
                 temp_dict['spin_polarized'] = doc['spin_polarized']
                 query_dict.append(temp_dict)
+        else:
+            temp_dict['spin_polarized'] = dict()
+            temp_dict['spin_polarized']['$exists'] = False
         if self.args.get('loose'):
             temp_dict = dict()
             query_dict.append(dict())
-            temp_dict['$gte'] = float(doc['cut_off_energy'])
-            query_dict[-1]['cut_off_energy'] = temp_dict
+            query_dict[-1]['cut_off_energy'] = doc['cut_off_energy']
             # temp_dict = dict()
             # query_dict.append(dict())
             # temp_dict['$lte'] = float(doc['kpoints_mp_spacing'])
             # query_dict[-1]['kpoints_mp_spacing'] = temp_dict
         else:
             temp_dict = dict()
-            temp_dict['kpoints_mp_spacing'] = doc['kpoints_mp_spacing']
+            temp_dict['kpoints_mp_spacing'] = dict()
+            temp_dict['kpoints_mp_spacing']['$gt'] = doc['kpoints_mp_spacing'] - 0.02
+            temp_dict['kpoints_mp_spacing']['$lt'] = doc['kpoints_mp_spacing'] + 0.02
             query_dict.append(temp_dict)
             query_dict.append(dict())
             query_dict[-1]['cut_off_energy'] = doc['cut_off_energy']
