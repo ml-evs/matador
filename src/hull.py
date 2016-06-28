@@ -216,7 +216,7 @@ class QueryConvexHull():
                 hull_comp.append(structures[hull.vertices[ind], 0])
         # calculate distance to hull of all structures
         hull_energy = np.asarray(hull_energy)
-        hull_enthalpy = np.asarray(hull_energy)
+        hull_enthalpy = np.asarray(hull_enthalpy)
         hull_comp = np.asarray(hull_comp)
         hull_energy = hull_energy[np.argsort(hull_comp)]
         hull_enthalpy = hull_enthalpy[np.argsort(hull_comp)]
@@ -301,6 +301,7 @@ class QueryConvexHull():
         stable_enthalpy = np.asarray(stable_enthalpy)
         stable_energy = stable_energy[np.argsort(stable_comp)]
         stable_enthalpy = stable_enthalpy[np.argsort(stable_comp)]
+        print(stable_energy, stable_enthalpy)
         stable_comp = stable_comp[np.argsort(stable_comp)]
 
         # PLOTTING ONLY
@@ -403,12 +404,13 @@ class QueryConvexHull():
             print('Generating voltage curve...')
             self.voltage_curve(stable_enthalpy, stable_comp, mu_enthalpy, elements)
         plt.show()
-        # plt.savefig('LiAs_hull.png', dpi=500)
         self.hull_cursor = hull_cursor
 
     def voltage_curve(self, stable_enthalpy, stable_comp, mu_enthalpy, elements):
         """ Take convex hull and plot voltage curves. """
         stable_num = []
+        stable_comp = stable_comp[1:-1]
+        stable_enthalpy = stable_enthalpy[1:-1]
         V = []
         x = []
         for i in range(len(stable_comp)):
@@ -425,7 +427,7 @@ class QueryConvexHull():
         V.append(V[-1])
         x.append(0)
         V[0] = 0
-        fig = plt.figure(facecolor='w', figsize=(3,2))
+        fig = plt.figure(facecolor='w')
         ax = fig.add_subplot(111)
         colour = []
         try:
