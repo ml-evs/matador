@@ -341,7 +341,7 @@ class QueryConvexHull():
                 c = colours[source_ind[ind]] if self.hull_cutoff == 0 else colours[1]
                 # print(c)
                 scatter.append(ax.scatter(structures[ind, 0], structures[ind, 1], s=scale*30, lw=lw,
-                               alpha=0.9, c=c, edgecolor='#a64902', label=info[ind], zorder=100))
+                               alpha=0.9, c=c, edgecolor='k', label=info[ind], zorder=100))
             # if dis and warren:
                 # ax.plot([structures[ind, 0]-disorder[ind]/10, structures[ind, 0]],
                         # [structures[ind, 1], structures[ind, 1]],
