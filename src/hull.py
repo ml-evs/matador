@@ -306,7 +306,7 @@ class QueryConvexHull():
         # PLOTTING ONLY
         fig = plt.figure(facecolor=None)
         ax = fig.add_subplot(111)
-        scale = 2
+        scale = 1
         try:
             c = plt.cm.viridis(np.linspace(0, 1, 100))
             mpl_new_ver = True
