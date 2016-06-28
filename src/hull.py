@@ -303,6 +303,7 @@ class QueryConvexHull():
         stable_enthalpy = np.asarray(stable_enthalpy)
         stable_energy = stable_energy[np.argsort(stable_comp)]
         stable_enthalpy = stable_enthalpy[np.argsort(stable_comp)]
+        print(stable_energy, stable_enthalpy)
         stable_comp = stable_comp[np.argsort(stable_comp)]
 
         self.structures = structures 
@@ -345,9 +346,8 @@ class QueryConvexHull():
         for ind in range(len(self.structures)):
             if self.hull_dist[ind] <= self.hull_cutoff or self.hull_cutoff == 0:
                 c = self.colours[self.source_ind[ind]] if self.hull_cutoff == 0 else self.colours[1]
-                # print(c)
-                scatter.append(ax.scatter(self.structures[ind, 0], self.structures[ind, 1], s=self.scale*30, lw=lw,
-                               alpha=0.9, c=c, edgecolor='#a64902', label=self.info[ind], zorder=100))
+                scatter.append(ax.scatter(structures[ind, 0], structures[ind, 1], s=scale*30, lw=lw,
+                               alpha=0.9, c=c, edgecolor='k', label=info[ind], zorder=100))
             # if dis and warren:
                 # ax.plot([self.structures[ind, 0]-disorder[ind]/10, self.structures[ind, 0]],
                         # [self.structures[ind, 1], self.structures[ind, 1]],
@@ -406,10 +406,13 @@ class QueryConvexHull():
         ax.set_xlabel('$x$')
         ax.set_ylabel('formation enthalpy per atom (eV)')
         plt.show()
+        self.hull_cursor = hull_cursor
 
     def voltage_curve(self, stable_enthalpy, stable_comp, mu_enthalpy, elements):
         """ Take convex hull and plot voltage curves. """
         stable_num = []
+        stable_comp = stable_comp[1:-1]
+        stable_enthalpy = stable_enthalpy[1:-1]
         V = []
         x = []
         for i in range(len(stable_comp)):

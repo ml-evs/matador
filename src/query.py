@@ -591,13 +591,13 @@ class DBQuery:
         temp_dict['xc_functional'] = doc['xc_functional']
         query_dict.append(temp_dict)
         temp_dict = dict()
-        if 'spin_polarized' in doc:
-            if doc['spin_polarized'] != []:
-                temp_dict['spin_polarized'] = doc['spin_polarized']
-                query_dict.append(temp_dict)
+        if 'spin_polarized' in doc and doc['spin_polarized'] != []:
+            temp_dict['spin_polarized'] = doc['spin_polarized']
+            query_dict.append(temp_dict)
         else:
             temp_dict['spin_polarized'] = dict()
             temp_dict['spin_polarized']['$exists'] = False
+            query_dict.append(temp_dict)
         if self.args.get('loose'):
             temp_dict = dict()
             query_dict.append(dict())
