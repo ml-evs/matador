@@ -15,6 +15,7 @@ import numpy as np
 
 try:
     plt.style.use('bmh')
+    plt.style.use('presentation')
 except:
     pass
 
@@ -303,8 +304,9 @@ class QueryConvexHull():
         stable_comp = stable_comp[np.argsort(stable_comp)]
 
         # PLOTTING ONLY
-        fig = plt.figure(facecolor='w')
+        fig = plt.figure(facecolor=None)
         ax = fig.add_subplot(111)
+        scale = 2
         try:
             c = plt.cm.viridis(np.linspace(0, 1, 100))
             mpl_new_ver = True
@@ -317,7 +319,7 @@ class QueryConvexHull():
         # first colour reserved for hull
         colours.insert(0, Dark2_8.hex_colors[0])
         # penultimate colour reserved for off hull above cutoff
-        colours.append(Set3_10.hex_colors[-2])
+        colours.append(Dark2_8.hex_colors[-1])
         # last colour reserved for OQMD
         colours.append(Set3_10.hex_colors[-1])
         scatter = []
@@ -330,15 +332,16 @@ class QueryConvexHull():
                                                structures[hull.vertices[ind], 1],
                                                c=colours[source_ind[hull.vertices[ind]]],
                                                marker='*', zorder=99999, edgecolor='k',
-                                               s=100, lw=1, alpha=0.8,
+                                               s=scale*150, lw=1, alpha=1,
                                                label=info[hull.vertices[ind]]))
-        lw = 0.1 if mpl_new_ver else 1
+        lw = scale * 0.05 if mpl_new_ver else 1
         # off hull structures
         for ind in range(len(structures)):
             if hull_dist[ind] <= self.hull_cutoff or self.hull_cutoff == 0:
                 c = colours[source_ind[ind]] if self.hull_cutoff == 0 else colours[1]
-                scatter.append(ax.scatter(structures[ind, 0], structures[ind, 1], s=30, lw=lw,
-                               alpha=0.8, c=c, edgecolor='k', label=info[ind], zorder=100))
+                # print(c)
+                scatter.append(ax.scatter(structures[ind, 0], structures[ind, 1], s=scale*30, lw=lw,
+                               alpha=0.9, c=c, edgecolor='#a64902', label=info[ind], zorder=100))
             # if dis and warren:
                 # ax.plot([structures[ind, 0]-disorder[ind]/10, structures[ind, 0]],
                         # [structures[ind, 1], structures[ind, 1]],
@@ -349,8 +352,8 @@ class QueryConvexHull():
                         # c='#28B453', alpha=0.5, lw=0.5)
         if self.hull_cutoff != 0:
             c = colours[source_ind[ind]] if self.hull_cutoff == 0 else colours[1]
-            ax.scatter(structures[1:-1, 0], structures[1:-1, 1], s=30, lw=lw,
-                       alpha=0.8, c=colours[-2],
+            ax.scatter(structures[1:-1, 0], structures[1:-1, 1], s=scale*30, lw=lw,
+                       alpha=0.3, c=colours[-2],
                        edgecolor='k', zorder=10)
         if include_oqmd:
             for ind in range(len(oqmd_hull.vertices)):
@@ -359,10 +362,10 @@ class QueryConvexHull():
                                                    oqmd_structures[oqmd_hull.vertices[ind], 1],
                                                    c=colours[-1], marker='*', zorder=10000,
                                                    edgecolor='k',
-                                                   s=100, lw=1, alpha=1,
+                                                   s=scale*150, lw=1, alpha=1,
                                                    label=oqmd_info[oqmd_hull.vertices[ind]]))
             for ind in range(len(oqmd_stoich)):
-                scatter.append(ax.scatter(oqmd_stoich[ind], oqmd_formation[ind], s=20, lw=1,
+                scatter.append(ax.scatter(oqmd_stoich[ind], oqmd_formation[ind], s=scale*20, lw=1,
                                alpha=1, c=colours[-1], edgecolor='k', marker='D',
                                label=oqmd_info[ind],
                                zorder=200))
@@ -400,6 +403,7 @@ class QueryConvexHull():
             print('Generating voltage curve...')
             self.voltage_curve(stable_enthalpy, stable_comp, mu_enthalpy, elements)
         plt.show()
+        # plt.savefig('LiAs_hull.png', dpi=500)
         self.hull_cursor = hull_cursor
 
     def voltage_curve(self, stable_enthalpy, stable_comp, mu_enthalpy, elements):
@@ -421,9 +425,8 @@ class QueryConvexHull():
         V.append(V[-1])
         x.append(0)
         V[0] = 0
-        fig = plt.figure(facecolor='w')
+        fig = plt.figure(facecolor='w', figsize=(3,2))
         ax = fig.add_subplot(111)
-        plt.style.use('bmh')
         colour = []
         try:
             colour.append(ax._get_lines.prop_cycler.next()['color'])
