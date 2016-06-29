@@ -596,7 +596,7 @@ class DBQuery:
             query_dict.append(temp_dict)
         else:
             temp_dict['spin_polarized'] = dict()
-            temp_dict['spin_polarized']['$exists'] = False
+            temp_dict['spin_polarized']['$ne'] = True
             query_dict.append(temp_dict)
         if self.args.get('loose'):
             temp_dict = dict()
