@@ -223,6 +223,11 @@ if __name__ == '__main__':
                                  help='return only structures within a certain distance from hull')
     material_parser.add_argument('--biggest', action='store_true',
                                  help='try to use the largest subset of structures to create a hull')
+    plot_parser = argparse.ArgumentParser(add_help=False)
+    plot_parser.add_argument('--png', action='store_true',
+                             help='save png rather than showing plot in X')
+    plot_parser.add_argument('--subplot', action='store_true',
+                             help='plot combined hull and voltage graph')
     spatula_parser = argparse.ArgumentParser(add_help=False)
     spatula_parser.add_argument('-d', '--dryrun', action='store_true',
                                 help='run the importer without connecting to the database')
@@ -275,12 +280,12 @@ if __name__ == '__main__':
                                         help='create a convex hull from query results \
                                         (currently limited to binaries)',
                                         parents=[global_parser, structure_parser,
-                                                 material_parser])
+                                                 material_parser, plot_parser])
     voltage_parser = subparsers.add_parser('voltage',
                                            help='plot a voltage curve from query results \
                                            (currently limited to binaries)',
                                            parents=[global_parser, structure_parser,
-                                                    material_parser])
+                                                    material_parser, plot_parser])
     swaps_parser = subparsers.add_parser('swaps',
                                          help='perform atomic swaps on query results',
                                          parents=[global_parser, collection_parser,
@@ -294,9 +299,6 @@ if __name__ == '__main__':
                                           new parameters.',
                                           parents=[global_parser, collection_parser,
                                                    structure_parser])
-    # parser.add_argument('--strict', action='store_true',
-                        # help=('strictly matches with calc_match,'
-                              # 'useful for hulls where convergence is rough'))
     # parser.add_argument('--dis', action='store_true',
                         # help='smear hull with local stoichiometry')
     # parser.add_argument('--write_pressure', nargs='+', type=str,

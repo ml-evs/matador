@@ -13,12 +13,6 @@ import matplotlib.pyplot as plt
 import re
 import numpy as np
 
-try:
-    plt.style.use('bmh')
-    plt.style.use('presentation')
-except:
-    pass
-
 
 class QueryConvexHull():
     """
@@ -37,6 +31,17 @@ class QueryConvexHull():
         if self.args.get('self.include_oqmd'):
             self.include_oqmd = True
         self.binary_hull()
+        if self.args['subcmd'] == 'voltage':
+            print('Generating voltage curve...')
+            self.voltage_curve(self.stable_enthalpy, self.stable_comp, self.mu_enthalpy)
+            self.set_plot_param()
+            if self.args.get('subplot'):
+                self.subplot_voltage_hull()
+            else:
+                self.plot_voltage_curve()
+        else:
+            self.set_plot_param()
+            self.plot_hull()
 
     def binary_hull(self, dis=False):
         """ Create a convex hull for two elements. """
@@ -98,7 +103,7 @@ class QueryConvexHull():
                     print(60*'─')
                 else:
                     print('No possible chem pots found for', elem, '.')
-                    return
+                    exit()
         print('Constructing hull...')
         num_structures = len(self.cursor)
         formation = np.zeros((num_structures))
@@ -260,11 +265,11 @@ class QueryConvexHull():
             oqmd_stable_comp = []
             oqmd_stable_energy = []
             oqmd_stable_enthalpy = []
-            for ind in range(len(oqmd_self.hull.vertices)):
-                if oqmd_structures[oqmd_self.hull.vertices[ind], 1] <= 0:
-                    oqmd_stable_energy.append(oqmd_structures[oqmd_self.hull.vertices[ind], 1])
-                    oqmd_stable_enthalpy.append(oqmd_enthalpy[oqmd_self.hull.vertices[ind]])
-                    oqmd_stable_comp.append(oqmd_structures[oqmd_self.hull.vertices[ind], 0])
+            for ind in range(len(oqmd_hull.vertices)):
+                if oqmd_structures[oqmd_hull.vertices[ind], 1] <= 0:
+                    oqmd_stable_energy.append(oqmd_structures[oqmd_hull.vertices[ind], 1])
+                    oqmd_stable_enthalpy.append(oqmd_enthalpy[oqmd_hull.vertices[ind]])
+                    oqmd_stable_comp.append(oqmd_structures[oqmd_hull.vertices[ind], 0])
             oqmd_stable_comp = np.asarray(oqmd_stable_comp)
             oqmd_stable_energy = np.asarray(oqmd_stable_energy)
             oqmd_stable_enthalpy = np.asarray(oqmd_stable_enthalpy)
@@ -303,7 +308,6 @@ class QueryConvexHull():
         stable_enthalpy = np.asarray(stable_enthalpy)
         stable_energy = stable_energy[np.argsort(stable_comp)]
         stable_enthalpy = stable_enthalpy[np.argsort(stable_comp)]
-        print(stable_energy, stable_enthalpy)
         stable_comp = stable_comp[np.argsort(stable_comp)]
 
         self.structures = structures 
@@ -314,18 +318,37 @@ class QueryConvexHull():
         self.hull_dist = hull_dist
         self.hull_comp = hull_comp
         self.hull_energy = hull_energy
+        self.stable_enthalpy = stable_enthalpy
+        self.stable_comp = stable_comp
+        self.mu_enthalpy = mu_enthalpy
 
-        if self.args['subcmd'] == 'voltage':
-            print('Generating voltage curve...')
-            self.set_plot_param()
-            self.voltage_curve(stable_enthalpy, stable_comp, mu_enthalpy, self.elements)
-        else:
-            self.set_plot_param()
-            self.plot_hull()
-        
+    def voltage_curve(self, stable_enthalpy, stable_comp, mu_enthalpy):
+        """ Take convex hull and plot voltage curves. """
+        stable_num = []
+        stable_comp = stable_comp
+        stable_enthalpy = stable_enthalpy
+        V = []
+        x = []
+        for i in range(len(stable_comp)):
+            if 1-stable_comp[i] == 0:
+                stable_num.append(1e5)
+            else:
+                stable_num.append(stable_comp[i]/(1-stable_comp[i]))
+        # V.append(0)
+        for i in range(len(stable_num)-1, 0, -1):
+            V.append(-(stable_enthalpy[i] - stable_enthalpy[i-1]) /
+                      (stable_num[i] - stable_num[i-1]) +
+                      (mu_enthalpy[0]))
+            x.append(stable_num[i])
+        V.append(V[-1])
+        x.append(0)
+        self.voltages = V
+        self.x = x
+        return 
+
     def plot_hull(self, dis=False):
         """ Plot calculated hull. """
-        fig = plt.figure(facecolor=None)
+        fig = plt.figure(facecolor=None, figsize=(3,1.5))
         ax = fig.add_subplot(111)
         scatter = []
         hull_scatter = []
@@ -337,17 +360,17 @@ class QueryConvexHull():
             if self.structures[self.hull.vertices[ind], 1] <= 0:
                 hull_scatter.append(ax.scatter(self.structures[self.hull.vertices[ind], 0],
                                                self.structures[self.hull.vertices[ind], 1],
-                                               c=self.colours[self.source_ind[self.hull.vertices[ind]]],
+                                               c=self.colours[0],
                                                marker='*', zorder=99999, edgecolor='k',
                                                s=self.scale*150, lw=1, alpha=1,
                                                label=self.info[self.hull.vertices[ind]]))
-        lw = self.scale * 0.05 if mpl_new_ver else 1
+        lw = self.scale * 0.05 if self.mpl_new_ver else 1
         # points for off hull structures
         for ind in range(len(self.structures)):
             if self.hull_dist[ind] <= self.hull_cutoff or self.hull_cutoff == 0:
                 c = self.colours[self.source_ind[ind]] if self.hull_cutoff == 0 else self.colours[1]
-                scatter.append(ax.scatter(structures[ind, 0], structures[ind, 1], s=scale*30, lw=lw,
-                               alpha=0.9, c=c, edgecolor='k', label=info[ind], zorder=100))
+                scatter.append(ax.scatter(self.structures[ind, 0], self.structures[ind, 1], s=self.scale*30, lw=lw,
+                               alpha=0.9, c=c, edgecolor='k', label=self.info[ind], zorder=100))
             # if dis and warren:
                 # ax.plot([self.structures[ind, 0]-disorder[ind]/10, self.structures[ind, 0]],
                         # [self.structures[ind, 1], self.structures[ind, 1]],
@@ -362,18 +385,18 @@ class QueryConvexHull():
                        alpha=0.3, c=self.colours[-2],
                        edgecolor='k', zorder=10)
         if self.include_oqmd:
-            for ind in range(len(oqmd_self.hull.vertices)):
-                if oqmd_self.structures[oqmd_self.hull.vertices[ind], 1] <= 0:
-                    hull_scatter.append(ax.scatter(oqmd_self.structures[oqmd_self.hull.vertices[ind], 0],
-                                                   oqmd_self.structures[oqmd_self.hull.vertices[ind], 1],
+            for ind in range(len(oqmd_hull.vertices)):
+                if oqmd_structures[oqmd_hull.vertices[ind], 1] <= 0:
+                    hull_scatter.append(ax.scatter(oqmd_structures[oqmd_hull.vertices[ind], 0],
+                                                   oqmd_structures[oqmd_hull.vertices[ind], 1],
                                                    c=self.colours[-1], marker='*', zorder=10000,
                                                    edgecolor='k',
                                                    s=self.scale*150, lw=1, alpha=1,
-                                                   label=oqmd_self.info[oqmd_self.hull.vertices[ind]]))
+                                                   label=oqmd_info[oqmd_hull.vertices[ind]]))
             for ind in range(len(oqmd_stoich)):
                 scatter.append(ax.scatter(oqmd_stoich[ind], oqmd_formation[ind], s=self.scale*20, lw=1,
                                alpha=1, c=self.colours[-1], edgecolor='k', marker='D',
-                               label=oqmd_self.info[ind],
+                               label=oqmd_info[ind],
                                zorder=200))
         # tie lines
         for ind in range(len(self.hull_comp)-1):
@@ -402,63 +425,155 @@ class QueryConvexHull():
                     else np.min(self.structures[self.hull.vertices, 1])-0.1,
                     0.5 if np.max(self.structures[self.hull.vertices, 1]) > 1
                     else np.max(self.structures[self.hull.vertices, 1])+0.1)
-        ax.set_title('$\mathrm{'+str(x_elem)+'_x'+str(one_minus_x_elem)+'_{1-x}}$')
+        ax.set_title('$\mathrm{'+x_elem+'_x'+one_minus_x_elem+'_{1-x}}$')
+        plt.locator_params(nbins=3)
         ax.set_xlabel('$x$')
-        ax.set_ylabel('formation enthalpy per atom (eV)')
-        plt.show()
-        self.hull_cursor = hull_cursor
-
-    def voltage_curve(self, stable_enthalpy, stable_comp, mu_enthalpy, elements):
-        """ Take convex hull and plot voltage curves. """
-        stable_num = []
-        stable_comp = stable_comp[1:-1]
-        stable_enthalpy = stable_enthalpy[1:-1]
-        V = []
-        x = []
-        for i in range(len(stable_comp)):
-            if 1-stable_comp[i] == 0:
-                stable_num.append(1e5)
-            else:
-                stable_num.append(stable_comp[i]/(1-stable_comp[i]))
-        # V.append(0)
-        for i in range(len(stable_num)-1, 0, -1):
-            V.append(-(stable_enthalpy[i] - stable_enthalpy[i-1]) /
-                      (stable_num[i] - stable_num[i-1]) +
-                      (mu_enthalpy[0]))
-            x.append(stable_num[i])
-        V.append(V[-1])
-        x.append(0)
-        print(V[0])
-        V[0] = 0
-        fig = plt.figure(facecolor='w')
+        ax.set_xticks([0, 0.33, 0.5, 0.66, 1])
+        ax.set_ylabel('$E_\mathrm{F}$ (eV/atom)')
+        if self.args.get('png'):
+            plt.savefig(self.elements[0]+self.elements[1]+'_hull.png', dpi=300, bbox_inches='tight')
+        else:
+            plt.show()
+    
+    def plot_voltage_curve(self):
+        fig = plt.figure(facecolor=None, figsize=(3,1.5))
         ax = fig.add_subplot(111)
-        # for i in range(0, len(V)):
-            # ax.scatter(x[i], V[i],
-                       # marker='*', c=self.colours[0], zorder=1000, edgecolor='k', s=200, lw=1)
-        for i in range(2, len(V)):
-            # ax.scatter(x[i], V[i-1],
-                       # marker='*', c=self.colours[0], zorder=1000, edgecolor='k', s=200, lw=1)
-            ax.plot([x[i], x[i]], [V[i], V[i-1]], lw=2, c=self.colours[0])
-            ax.plot([x[i-1], x[i]], [V[i-1], V[i-1]], lw=2, c=self.colours[0])
-        print(V)
-        print(x)
-        ax.set_ylabel('V')
-        ax.set_xlim(0, np.max(np.asarray(x[2:]))+1)
-        ax.set_ylim(np.min(np.asarray(V[2:]))/2.0)
-        ax.set_title('$\mathrm{'+elements[0]+'_x'+elements[1]+'}$')
+        for i in range(2, len(self.voltages)):
+            ax.scatter(self.x[i-1], self.voltages[i-1], marker='*', s=100, edgecolor='k', c=self.colours[0], zorder=1000)
+            ax.plot([self.x[i], self.x[i]], [self.voltages[i], self.voltages[i-1]], lw=2, c=self.colours[0])
+            ax.plot([self.x[i-1], self.x[i]], [self.voltages[i-1], self.voltages[i-1]], lw=2, c=self.colours[0])
+        ax.set_ylabel('Voltage (V)')
+        plt.locator_params(nbins=4)
+        ax.set_xlim(0, np.max(np.asarray(self.x[1:]))+1)
+        ax.set_ylim(np.min(np.asarray(self.voltages[2:]))-0.1,np.max(np.asarray(self.voltages[2:]))+0.1)
+        ax.set_title('$\mathrm{'+self.elements[0]+'_x'+self.elements[1]+'}$')
         ax.set_xlabel('$x$')
-        plt.show()
+        if self.args.get('png'):
+            plt.savefig(self.elements[0]+self.elements[1]+'_voltage.png', dpi=300, bbox_inches='tight')
+        else:
+            plt.show()
+
+    def subplot_voltage_hull(self, dis=False):
+        """ Plot calculated hull with inset voltage curve. """
+        fig = plt.figure(facecolor=None, figsize=(4.5,1.5))
+        ax = plt.subplot2grid((1,3), (0,0), colspan=2)
+        ax2 = plt.subplot2grid((1,3), (0,2))
+        scatter = []
+        hull_scatter = []
+        x_elem = self.elements[0]
+        one_minus_x_elem = self.elements[1]
+        plt.locator_params(nbins=3)
+        # star structures on hull
+        for ind in range(len(self.hull.vertices)):
+            if self.structures[self.hull.vertices[ind], 1] <= 0:
+                hull_scatter.append(ax.scatter(self.structures[self.hull.vertices[ind], 0],
+                                               self.structures[self.hull.vertices[ind], 1],
+                                               c=self.colours[0],
+                                               marker='*', zorder=99999, edgecolor='k',
+                                               s=self.scale*150, lw=1, alpha=1,
+                                               label=self.info[self.hull.vertices[ind]]))
+        lw = self.scale * 0.05 if self.mpl_new_ver else 1
+        # points for off hull structures
+        for ind in range(len(self.structures)):
+            if self.hull_dist[ind] <= self.hull_cutoff or self.hull_cutoff == 0:
+                c = self.colours[self.source_ind[ind]] if self.hull_cutoff == 0 else self.colours[1]
+                scatter.append(ax.scatter(self.structures[ind, 0], self.structures[ind, 1], s=self.scale*30, lw=lw,
+                               alpha=0.9, c=c, edgecolor='k', label=self.info[ind], zorder=100))
+            # if dis and warren:
+                # ax.plot([self.structures[ind, 0]-disorder[ind]/10, self.structures[ind, 0]],
+                        # [self.structures[ind, 1], self.structures[ind, 1]],
+                        # c='g', alpha=0.5, lw=0.5)
+            # if dis and not warren:
+                # ax.plot([self.structures[ind, 0]-disorder[ind]/10, self.structures[ind, 0] + disorder[ind]],
+                        # [self.structures[ind, 1], self.structures[ind, 1]],
+                        # c='#28B453', alpha=0.5, lw=0.5)
+        if self.hull_cutoff != 0:
+            c = self.colours[self.source_ind[ind]] if self.hull_cutoff == 0 else self.colours[1]
+            ax.scatter(self.structures[1:-1, 0], self.structures[1:-1, 1], s=self.scale*30, lw=lw,
+                       alpha=0.3, c=self.colours[-2],
+                       edgecolor='k', zorder=10)
+        if self.include_oqmd:
+            for ind in range(len(oqmd_hull.vertices)):
+                if oqmd_structures[oqmd_hull.vertices[ind], 1] <= 0:
+                    hull_scatter.append(ax.scatter(oqmd_structures[oqmd_hull.vertices[ind], 0],
+                                                   oqmd_structures[oqmd_hull.vertices[ind], 1],
+                                                   c=self.colours[-1], marker='*', zorder=10000,
+                                                   edgecolor='k',
+                                                   s=self.scale*150, lw=1, alpha=1,
+                                                   label=oqmd_info[oqmd_hull.vertices[ind]]))
+            for ind in range(len(oqmd_stoich)):
+                scatter.append(ax.scatter(oqmd_stoich[ind], oqmd_formation[ind], s=self.scale*20, lw=1,
+                               alpha=1, c=self.colours[-1], edgecolor='k', marker='D',
+                               label=oqmd_info[ind],
+                               zorder=200))
+        # tie lines
+        for ind in range(len(self.hull_comp)-1):
+            ax.plot([self.hull_comp[ind], self.hull_comp[ind+1]],
+                    [self.hull_energy[ind], self.hull_energy[ind+1]],
+                    c=self.colours[0], lw=2, alpha=1, zorder=1000, label='')
+            if self.hull_cutoff > 0:
+                ax.plot([self.hull_comp[ind], self.hull_comp[ind+1]],
+                        [self.hull_energy[ind]+self.hull_cutoff, self.hull_energy[ind+1]+self.hull_cutoff],
+                        '--', c=self.colours[1], lw=1, alpha=0.5, zorder=1000, label='')
+        if self.include_oqmd:
+            for ind in range(len(oqmd_stable_comp)-1):
+                ax.plot([oqmd_stable_comp[ind], oqmd_stable_comp[ind+1]],
+                        [oqmd_stable_energy[ind], oqmd_stable_energy[ind+1]],
+                        c=self.colours[-1], lw=2, alpha=1, zorder=900, label='')
+        ax.set_xlim(-0.05, 1.05)
+        # data cursor
+        if not dis:
+            datacursor(scatter[:], formatter='{label}'.format, draggable=False,
+                       bbox=dict(fc='white'),
+                       arrowprops=dict(arrowstyle='simple', alpha=1))
+            # datacursor(hull_scatter[:], formatter='{label}'.format, draggable=False,
+                       # bbox=dict(fc='white'),
+                       # arrowprops=dict(arrowstyle='simple', alpha=1))
+        ax.set_ylim(-0.1 if np.min(self.structures[self.hull.vertices, 1]) > 0
+                    else np.min(self.structures[self.hull.vertices, 1])-0.1,
+                    0.5 if np.max(self.structures[self.hull.vertices, 1]) > 1
+                    else np.max(self.structures[self.hull.vertices, 1])+0.1)
+        ax.set_title('$\mathrm{'+x_elem+'_x'+one_minus_x_elem+'_{1-x}}$')
+        ax.set_xlabel('$x$', labelpad=-3)
+        ax.set_xticks([0, 1])
+        ax.set_yticks([-0.4, 0, 0.4])
+        ax.set_ylabel('$E_\mathrm{F}$ (eV/atom)')
+       
+        # plot voltage
+        for i in range(2, len(self.voltages)):
+            ax2.scatter(self.x[i-1], self.voltages[i-1], marker='*', s=100, edgecolor='k', c=self.colours[0], zorder=1000)
+            ax2.plot([self.x[i], self.x[i]], [self.voltages[i], self.voltages[i-1]], lw=2, c=self.colours[0])
+            ax2.plot([self.x[i-1], self.x[i]], [self.voltages[i-1], self.voltages[i-1]], lw=2, c=self.colours[0])
+        ax2.set_ylabel('Voltage (V)')
+        ax2.yaxis.tick_right()
+        ax2.yaxis.set_label_position("right")
+        ax2.set_xlim(0, np.max(np.asarray(self.x[1:]))+1)
+        ax2.set_ylim(np.min(np.asarray(self.voltages[1:]))-0.1,np.max(np.asarray(self.voltages[1:]))+0.1)
+        ax2.set_xlabel('$n_\mathrm{Li}$', labelpad=-3)
+        if self.args.get('png'):
+            plt.savefig(self.elements[0]+self.elements[1]+'_hull_voltage.png', dpi=300, bbox_inches='tight')
+        else:
+            plt.show()
 
     def set_plot_param(self):
         """ Set some plotting options global to
         voltage and hull plots.
         """
+        try:
+            plt.style.use('bmh')
+        except:
+            pass
+        if self.args.get('png'):
+            try:
+                plt.style.use('poster')
+            except:
+                pass
         self.scale = 1
         try:
             c = plt.cm.viridis(np.linspace(0, 1, 100))
-            mpl_new_ver = True
+            self.mpl_new_ver = True
         except:
-            mpl_new_ver = False
+            self.mpl_new_ver = False
         from palettable.colorbrewer.qualitative import Dark2_8
         from palettable.colorbrewer.qualitative import Set3_10
         if len(self.source_list) < 6:
