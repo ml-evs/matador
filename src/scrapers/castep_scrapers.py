@@ -665,9 +665,9 @@ def castep2dict(seed, **kwargs):
         if castep['optimised'] is False:
             raise DFTError('CASTEP GO failed to converge.')
         if 'enthalpy' not in castep:
-            raise DFTError('Could not find enthalpy')
+            raise RuntimeError('Could not find enthalpy')
         if 'positions_frac' not in castep:
-            raise DFTError('Could not find positions')
+            raise RuntimeError('Could not find positions')
         if 'pressure' not in castep:
             castep['pressure'] = 'xxx'
         if 'cell_volume' not in castep:
@@ -679,7 +679,7 @@ def castep2dict(seed, **kwargs):
             print_exc()
             print('Error in .castep file', seed, 'skipping...')
         if type(oops) == DFTError:
-            return '', False
+            return castep, False
         else:
             return seed + '\t\t' + str(type(oops)) + ' ' + str(oops)+'\n', False
     if kwargs.get('debug'):
