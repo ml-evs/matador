@@ -13,19 +13,21 @@ Matthew Evans 2016
 """
 
 from __future__ import print_function
-from os import walk, makedirs
+from os import walk, makedirs, remove, sys
 from os.path import isfile, exists
 from collections import defaultdict
 from scrapers.castep_scrapers import cell2dict, param2dict
 from scrapers.castep_scrapers import res2dict, castep2dict
-from export import doc2cell, doc2param
+from export import doc2cell, doc2param, doc2res
+from traceback import print_exc
 import bson.json_util as json
 import argparse
 import multiprocessing as mp
 import subprocess as sp
+import glob
 
 
-class ResRun:
+class BatchRun:
     """ A class that implements the running of multiple CASTEP jobs from a series
     of .res files and single cell and param files.
     """
@@ -99,16 +101,9 @@ class ResRun:
         # prepare folders and text files
         self.paths = dict()
         self.paths['completed_dir'] = 'completed'
-        self.paths['running_dir'] = 'running'
         self.paths['failed_dir'] = 'bad_castep'
         self.paths['jobs_fname'] = 'jobs.txt'
         self.paths['completed_fname'] = 'finished_cleanly.txt'
-        if not exists(self.paths['completed_dir']):
-            makedirs(self.paths['completed_dir'])
-        if not exists(self.paths['running_dir']):
-            makedirs(self.paths['running_dir'])
-        if not exists(self.paths['failed_dir']):
-            makedirs(self.paths['failed_dir'])
         if not isfile(self.paths['jobs_fname']):
             with open(self.paths['jobs_fname'], 'a'):
                 pass
@@ -142,14 +137,18 @@ class ResRun:
                 with open(paths['jobs_fname'], 'a') as job_file:
                     job_file.write(res+'\n')
                 # create full relaxer object for creation and running of job
-                print('Starting', res)
-                FullRelaxer(paths=self.paths,
-                            ncores=self.ncores,
-                            res=res,
-                            param_dict=self.param_dict,
-                            cell_dict=self.cell_dict,
-                            debug=self.debug)
-                print('Completed', res)
+                try:
+                    print('Starting', res)
+                    FullRelaxer(paths=self.paths,
+                                ncores=self.ncores,
+                                res=res,
+                                param_dict=self.param_dict,
+                                cell_dict=self.cell_dict,
+                                debug=self.debug)
+                    print('Completed', res)
+                except:
+                    print(res, 'failed')
+                    pass
         return
 
 class FullRelaxer:
@@ -163,22 +162,90 @@ class FullRelaxer:
         self.ncores = ncores
         self.executable = 'castep'
         self.debug = debug
+        # read in initial structure
         res_dict, success = res2dict(res)
         if not success:
             return False
         calc_doc = res_dict
-        seed = self.paths['running_dir'] + '/' + calc_doc['source'][0].replace('.res', '')
+        # set seed name
+        self.seed = calc_doc['source'][0].replace('.res', '')
+        # update global doc with cell and param dicts for folder
         calc_doc.update(cell_dict)
         calc_doc.update(param_dict)
-        doc2cell(calc_doc, seed, hash_dupe=False, copy_pspots=False)
-        doc2param(calc_doc, seed, hash_dupe=False)
         if self.debug:
             print(json.dumps(calc_doc, indent=2))
-        print('Running castep...')
-        process = self.castep(seed)
-        process.communicate()
-        print('CASTEP finished...')
-        pass
+        self.success = self.relax(calc_doc)
+        if not success:
+            raise RuntimeError('Failed to relax structure')
+
+    def relax(self, calc_doc):
+        """ Set up the calculation to perform 4 sets of two steps,
+        then continue with the remainder of steps.
+        """
+        seed = self.seed
+        geom_max_iter_list = [2, 2, 2, 2, calc_doc['geom_max_iter']]
+        for num_iter in geom_max_iter_list:
+            calc_doc['geom_max_iter'] = num_iter
+            print(calc_doc['geom_max_iter'])
+            try:
+                # delete any existing files
+                if isfile(self.seed + '.param'):
+                    print('IS FILE?')
+                    remove(seed+'.param')
+                if isfile(seed + '.cell'):
+                    print('IS FILE?')
+                    remove(seed+'.cell')
+            except:
+                print_exc()
+                print('Failed to clean up...')
+                raise RuntimeError('Failure')
+            try:
+                # write new param and cell
+                doc2param(calc_doc, seed, hash_dupe=False)
+                doc2cell(calc_doc, seed, hash_dupe=False, copy_pspots=False)
+            except:
+                print('Failed to prepare calc')
+                sys('rm ' + seed + '.cell')
+                sys('rm ' + seed + '.param')
+                raise RuntimeError('Failure')
+            try:
+                # run CASTEP
+                process = self.castep(seed)
+                process.communicate()
+                # scrape new structure from castep file
+            except:
+                print('Failed to start CASTEP...')
+                print_exc()
+                sys('rm ' + seed + '.cell')
+                sys('rm ' + seed + '.param')
+                raise RuntimeError('Failure')
+            opti_dict, success = castep2dict(seed)
+            if not success and opti_dict == '':
+                print('Failed to scrape castep file...')
+                return False
+            if opti_dict['optimised'] == True:
+                if not exists('completed'):
+                    makedirs('completed')
+                print('Successfully relaxed', seed)
+                # write res and castep file out to completed folder
+                doc2res(opti_dict, 'completed/' + seed)
+                sys('mv ' + seed + '.castep' + ' completed/' + seed + '.castep')
+                sys('mv ' + seed + '.param' + ' completed/' + seed + '.param')
+                sys('mv ' + seed + '.cell' + ' completed/' + seed + '.cell')
+                # clean up rest of files
+                sys('rm ' + seed + '.*')
+                return True
+            else:
+                err_file = seed + '*.err'
+                for globbed in glob.glob(pspot_seed):
+                    if isfile(globbed):
+                        if not exists('bad_castep'):
+                            makedirs('bad_castep')
+                        print('CASTEP crashed... skipping...')
+                        sys('mv ' + seed + '* bad_castep')
+                        return False
+                calc_doc.update(opti_dict)
+                doc2res(calc_doc, seed + '-save')
 
     def castep(self, seed):
         """ Calls CASTEP on desired seed with desired number of cores. """
@@ -206,5 +273,5 @@ if __name__ == '__main__':
     parser.add_argument('-d', '--debug', action='store_true',
                         help='debug output')
     args = parser.parse_args()
-    runner = ResRun(ncores=args.ncores, nprocesses=args.nprocesses, debug=args.debug)
+    runner = BatchRun(ncores=args.ncores, nprocesses=args.nprocesses, debug=args.debug)
     runner.spawn()
