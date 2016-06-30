@@ -213,6 +213,8 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, *args):
 
 def doc2res(doc, path, info=True, hash_dupe=True, *args):
     """ Write .res file for single doc. """
+    if path.endswith('.res'):
+        path.replace('.res', '')
     try:
         if isfile(path+'.res'):
             if hash_dupe:
