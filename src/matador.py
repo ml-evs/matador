@@ -305,4 +305,6 @@ if __name__ == '__main__':
                         # help=('pressure to add to new cell file, either one float' +
                               # 'for isotropic or 6 floats for anisotropic.'))
     args = parser.parse_args()
+    if vars(args)['include_oqmd']:
+        exit('--include_oqmd is currently disabled, please try again soon...')
     matador = Matador(args, argstr=argv[1:])
