@@ -348,7 +348,10 @@ class QueryConvexHull():
 
     def plot_hull(self, dis=False):
         """ Plot calculated hull. """
-        fig = plt.figure(facecolor=None, figsize=(3,1.5))
+        if self.args['png']:
+            fig = plt.figure(facecolor=None, figsize=(3,1.5))
+        else:
+            fig = plt.figure(facecolor=None)
         ax = fig.add_subplot(111)
         scatter = []
         hull_scatter = []
@@ -436,7 +439,10 @@ class QueryConvexHull():
             plt.show()
     
     def plot_voltage_curve(self):
-        fig = plt.figure(facecolor=None, figsize=(3,1.5))
+        if self.args['png']:
+            fig = plt.figure(facecolor=None, figsize=(3,1.5))
+        else:
+            fig = plt.figure(facecolor=None)
         ax = fig.add_subplot(111)
         for i in range(2, len(self.voltages)):
             ax.scatter(self.x[i-1], self.voltages[i-1], marker='*', s=100, edgecolor='k', c=self.colours[0], zorder=1000)
@@ -455,7 +461,10 @@ class QueryConvexHull():
 
     def subplot_voltage_hull(self, dis=False):
         """ Plot calculated hull with inset voltage curve. """
-        fig = plt.figure(facecolor=None, figsize=(4.5,1.5))
+        if self.args['png']:
+            fig = plt.figure(facecolor=None, figsize=(4.5,1.5))
+        else:
+            fig = plt.figure(facecolor=None)
         ax = plt.subplot2grid((1,3), (0,0), colspan=2)
         ax2 = plt.subplot2grid((1,3), (0,2))
         scatter = []
