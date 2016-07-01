@@ -5,11 +5,9 @@ from database queries.
 """
 from __future__ import print_function
 from scipy.spatial import ConvexHull
-from mpldatacursor import datacursor
 from bson.son import SON
 from bisect import bisect_left
 import pymongo as pm
-import matplotlib.pyplot as plt
 import re
 import numpy as np
 
@@ -323,7 +321,7 @@ class QueryConvexHull():
         self.mu_enthalpy = mu_enthalpy
 
     def voltage_curve(self, stable_enthalpy, stable_comp, mu_enthalpy):
-        """ Take convex hull and plot voltage curves. """
+        """ Take convex hull and calculate voltages. """
         stable_num = []
         stable_comp = stable_comp
         stable_enthalpy = stable_enthalpy
@@ -348,6 +346,8 @@ class QueryConvexHull():
 
     def plot_hull(self, dis=False):
         """ Plot calculated hull. """
+        from mpldatacursor import datacursor
+        import matplotlib.pyplot as plt
         if self.args['png']:
             fig = plt.figure(facecolor=None, figsize=(3,1.5))
         else:
@@ -439,6 +439,9 @@ class QueryConvexHull():
             plt.show()
     
     def plot_voltage_curve(self):
+        """ Plot calculated voltage curve. """
+        from mpldatacursor import datacursor
+        import matplotlib.pyplot as plt
         if self.args['png']:
             fig = plt.figure(facecolor=None, figsize=(3,1.5))
         else:
@@ -461,6 +464,8 @@ class QueryConvexHull():
 
     def subplot_voltage_hull(self, dis=False):
         """ Plot calculated hull with inset voltage curve. """
+        from mpldatacursor import datacursor
+        import matplotlib.pyplot as plt
         if self.args['png']:
             fig = plt.figure(facecolor=None, figsize=(4.5,1.5))
         else:
