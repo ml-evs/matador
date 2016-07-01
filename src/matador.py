@@ -71,7 +71,7 @@ class Matador:
         if self.args['subcmd'] == 'polish':
             self.query = DBQuery(self.client, self.collections, self.args)
             self.polish = Polisher(self.query.cursor, self.args)
-        if self.args['subcmd'] == 'hull':
+        if self.args['subcmd'] == 'hull' or self.args['subcmd'] == 'voltage':
             self.query = DBQuery(self.client, self.collections, self.args)
             self.hull = QueryConvexHull(self.query, self.args)
             if len(self.hull.hull_cursor) == 0:
@@ -80,9 +80,6 @@ class Matador:
                 print(len(self.hull.hull_cursor), 'structures within', self.hull.hull_cutoff,
                       'eV of the hull with chosen chemical potentials.')
                 self.query.display_results(self.hull.hull_cursor)
-        if self.args['subcmd'] == 'voltage':
-            self.query = DBQuery(self.client, self.collections, self.args)
-            self.hull = QueryConvexHull(self.query, self.args)
 
     def print_report(self):
         """ Print spatula report on current database. """
