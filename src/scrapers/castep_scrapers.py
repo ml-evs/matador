@@ -257,7 +257,7 @@ def param2dict(seed, db=True, **kwargs):
                                     param['spin_polarized'] = False
                                 else:
                                     param['spin_polarized'] = True
-                            if 'cut_off_energy' in line:
+                            if 'cut_off_energy' in line and not 'mix_cut_off_energy' in line:
                                 temp_cut_off = (param['cut_off_energy'].replace('ev', '')).strip()
                                 param['cut_off_energy'] = float(temp_cut_off)
                             if 'xc_functional' in line:
