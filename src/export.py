@@ -188,9 +188,16 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, *args):
                         str(doc['kpoints_mp_grid'][0]) + ' ' +
                         str(doc['kpoints_mp_grid'][1]) + ' ' +
                         str(doc['kpoints_mp_grid'][2]) + '\n')
+            if 'cell_constraints' in doc:
+                f.write('%BLOCK CELL_CONSTRAINTS\n')
+                f.write(''.join(str(doc['cell_constraints'][0]).strip('[]'))+'\n')
+                f.write(''.join(str(doc['cell_constraints'][1]).strip('[]'))+'\n')
+                f.write('%ENDBLOCK CELL_CONSTRAINTS\n\n')
+            if 'fix_com' in doc:
+                f.write('FIX_COM : ' + doc['fix_com'] + '\n')
             if 'species_pot' in doc:
                 f.write('\n%BLOCK SPECIES_POT\n')
-                for elem in doc['species_pot']:
+                for elem in doc['species_pot']: 
                     if copy_pspots:
                         # copy across pspots if they exist
                         if not isfile(''.join(path.split('/')[:-1])+'/'+doc['species_pot'][elem]):

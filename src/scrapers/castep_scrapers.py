@@ -157,6 +157,10 @@ def cell2dict(seed, **kwargs):
                     except:
                         pass
                     i += 1
+            elif '%block cell_constraints' in line.lower():
+                cell['cell_constraints'] = list()
+                for j in range(2):
+                    cell['cell_constraints'].append(map(int, flines[line_no+j+1].split()))
             elif '%block external_pressure' in line.lower():
                 cell['external_pressure'] = list()
                 for j in range(3):
@@ -166,6 +170,8 @@ def cell2dict(seed, **kwargs):
                 cell['kpoints_mp_spacing'] = float(line.split()[-1])
             elif 'mp_grid' in line.lower():
                 cell['kpoints_mp_grid'] = map(int, line.split()[-3:])
+            elif 'fix_com' in line.lower():
+                cell['fix_com'] = line.split()[-1]
         if 'external_pressure' not in cell:
             cell['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0], [0.0]]
     except Exception as oops:
