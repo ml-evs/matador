@@ -13,7 +13,7 @@ Matthew Evans 2016
 """
 
 from __future__ import print_function
-from os import walk, makedirs, remove, sys
+from os import walk, makedirs, remove, system
 from os.path import isfile, exists
 from collections import defaultdict
 from scrapers.castep_scrapers import cell2dict, param2dict
@@ -172,6 +172,7 @@ class FullRelaxer:
         # update global doc with cell and param dicts for folder
         calc_doc.update(cell_dict)
         calc_doc.update(param_dict)
+        calc_doc['task'] = 'geometryoptimization'
         if self.debug:
             print(json.dumps(calc_doc, indent=2))
         self.success = self.relax(calc_doc)
@@ -183,17 +184,15 @@ class FullRelaxer:
         then continue with the remainder of steps.
         """
         seed = self.seed
-        geom_max_iter_list = [2, 2, 2, 2, calc_doc['geom_max_iter']]
+        geom_max_iter_list = [2, 2, 2, 2, 10, calc_doc['geom_max_iter']]
         for num_iter in geom_max_iter_list:
             calc_doc['geom_max_iter'] = num_iter
             print(calc_doc['geom_max_iter'])
             try:
                 # delete any existing files
                 if isfile(self.seed + '.param'):
-                    print('IS FILE?')
                     remove(seed+'.param')
                 if isfile(seed + '.cell'):
-                    print('IS FILE?')
                     remove(seed+'.cell')
             except:
                 print_exc()
@@ -205,47 +204,53 @@ class FullRelaxer:
                 doc2cell(calc_doc, seed, hash_dupe=False, copy_pspots=False)
             except:
                 print('Failed to prepare calc')
-                sys('rm ' + seed + '.cell')
-                sys('rm ' + seed + '.param')
+                system('rm ' + seed + '.cell')
+                system('rm ' + seed + '.param')
                 raise RuntimeError('Failure')
             try:
                 # run CASTEP
                 process = self.castep(seed)
                 process.communicate()
-                # scrape new structure from castep file
             except:
                 print('Failed to start CASTEP...')
                 print_exc()
-                sys('rm ' + seed + '.cell')
-                sys('rm ' + seed + '.param')
+                system('rm ' + seed + '.cell')
+                system('rm ' + seed + '.param')
                 raise RuntimeError('Failure')
-            opti_dict, success = castep2dict(seed)
-            if not success and opti_dict == '':
-                print('Failed to scrape castep file...')
-                return False
-            if opti_dict['optimised'] == True:
-                if not exists('completed'):
-                    makedirs('completed')
-                print('Successfully relaxed', seed)
-                # write res and castep file out to completed folder
-                doc2res(opti_dict, 'completed/' + seed)
-                sys('mv ' + seed + '.castep' + ' completed/' + seed + '.castep')
-                sys('mv ' + seed + '.param' + ' completed/' + seed + '.param')
-                sys('mv ' + seed + '.cell' + ' completed/' + seed + '.cell')
-                # clean up rest of files
-                sys('rm ' + seed + '.*')
-                return True
-            else:
-                err_file = seed + '*.err'
-                for globbed in glob.glob(pspot_seed):
-                    if isfile(globbed):
-                        if not exists('bad_castep'):
-                            makedirs('bad_castep')
-                        print('CASTEP crashed... skipping...')
-                        sys('mv ' + seed + '* bad_castep')
-                        return False
-                calc_doc.update(opti_dict)
-                doc2res(calc_doc, seed + '-save')
+            try:
+                # scrape new structure from castep file
+                opti_dict, success = castep2dict(seed + '.castep')
+                if not success and opti_dict == '':
+                    print('Failed to scrape castep file...')
+                    return False
+                if opti_dict['optimised'] == True:
+                    if not exists('completed'):
+                        makedirs('completed')
+                    print('Successfully relaxed', seed)
+                    # write res and castep file out to completed folder
+                    doc2res(opti_dict, 'completed/' + seed)
+                    system('mv ' + seed + '.castep' + ' completed/' + seed + '.castep')
+                    system('mv ' + seed + '.param' + ' completed/' + seed + '.param')
+                    system('mv ' + seed + '.cell' + ' completed/' + seed + '.cell')
+                    # clean up rest of files
+                    system('rm ' + seed + '.*')
+                    return True
+                else:
+                    err_file = seed + '*.err'
+                    for globbed in glob.glob(err_file):
+                        if isfile(globbed):
+                            if not exists('bad_castep'):
+                                makedirs('bad_castep')
+                            print('CASTEP crashed... skipping...')
+                            system('mv ' + seed + '* bad_castep')
+                            return False
+                    calc_doc.update(opti_dict)
+                    if isfile(seed + '-save.res'):
+                        system('rm ' + seed + '-save.res')
+                    doc2res(calc_doc, seed + '-save')
+            except:
+                print_exc()
+                raise RuntimeError('failure')
 
     def castep(self, seed):
         """ Calls CASTEP on desired seed with desired number of cores. """
