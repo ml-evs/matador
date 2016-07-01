@@ -10,6 +10,8 @@ from bisect import bisect_left
 import pymongo as pm
 import re
 import numpy as np
+from mpldatacursor import datacursor
+import matplotlib.pyplot as plt
 
 
 class QueryConvexHull():
@@ -32,6 +34,7 @@ class QueryConvexHull():
         if self.args['subcmd'] == 'voltage':
             print('Generating voltage curve...')
             self.voltage_curve(self.stable_enthalpy, self.stable_comp, self.mu_enthalpy)
+
             self.set_plot_param()
             if self.args.get('subplot'):
                 self.subplot_voltage_hull()
@@ -346,8 +349,6 @@ class QueryConvexHull():
 
     def plot_hull(self, dis=False):
         """ Plot calculated hull. """
-        from mpldatacursor import datacursor
-        import matplotlib.pyplot as plt
         if self.args['png']:
             fig = plt.figure(facecolor=None, figsize=(3,1.5))
         else:
@@ -440,8 +441,6 @@ class QueryConvexHull():
     
     def plot_voltage_curve(self):
         """ Plot calculated voltage curve. """
-        from mpldatacursor import datacursor
-        import matplotlib.pyplot as plt
         if self.args['png']:
             fig = plt.figure(facecolor=None, figsize=(3,1.5))
         else:
@@ -464,8 +463,6 @@ class QueryConvexHull():
 
     def subplot_voltage_hull(self, dis=False):
         """ Plot calculated hull with inset voltage curve. """
-        from mpldatacursor import datacursor
-        import matplotlib.pyplot as plt
         if self.args['png']:
             fig = plt.figure(facecolor=None, figsize=(4.5,1.5))
         else:
