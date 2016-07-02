@@ -494,9 +494,11 @@ def castep2dict(seed, db=True, **kwargs):
         # write zero pressure if not found in file
         if 'external_pressure' not in castep:
             castep['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0], [0.0]]
+        if 'spin_polarized' not in castep:
+            castep['spin_polarized'] = False
         # task specific options
         if castep['task'] != 'geometryoptimization' and castep['task'] != 'geometry optimization':
-            raise DFTError('CASTEP file does not contain GO calculation')
+            raise RuntimeError('CASTEP file does not contain GO calculation')
         else:
             final = False
             finish_line = 0
@@ -508,7 +510,10 @@ def castep2dict(seed, db=True, **kwargs):
                     for line_next in range(line_no+1, len(flines)):
                         if any(finished in flines[line_next] for finished in [success_string, failure_string]):
                             finish_line = line_next
-                    castep['optimised'] = True
+                            if success_string in flines[line_next]:
+                                castep['optimised'] = True
+                            elif failure_string in flines[line_next]:
+                                castep['optimised'] = False
                     final = True
             if final:
                 final_flines = flines[finish_line+1:]
