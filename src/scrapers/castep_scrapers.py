@@ -22,54 +22,56 @@ import glob
 import gzip
 
 
-def res2dict(seed, **kwargs):
+def res2dict(seed, db=True, **kwargs):
     """ Extract available information from .res file; preferably
     used in conjunction with cell or param file.
     """
     # use defaultdict to allow for easy appending
     res = defaultdict(list)
-    # read .res file into array
-    if seed.endswith('.res'):
-        seed = seed.replace('.res', '')
-    with open(seed+'.res', 'r') as f:
-        flines = f.readlines()
-    # add .res to source
-    res['source'].append(seed+'.res')
-    # grab file owner username
     try:
-        res['user'] = getpwuid(stat(seed+'.res').st_uid).pw_name
-    except:
-        if kwargs.get('debug'):
-            print(seed+'.res has no owner.')
-        res['user'] == 'xxx'
-    if 'CollCode' in seed:
-        res['icsd'] = seed.split('CollCode')[-1]
-    # alias special lines in res file
-    try:
+        # read .res file into array
+        if seed.endswith('.res'):
+            seed = seed.replace('.res', '')
+        with open(seed+'.res', 'r') as f:
+            flines = f.readlines()
+        # add .res to source
+        res['source'].append(seed+'.res')
+        # grab file owner username
+        try:
+            res['user'] = getpwuid(stat(seed+'.res').st_uid).pw_name
+        except:
+            if kwargs.get('debug'):
+                print(seed+'.res has no owner.')
+            res['user'] == 'xxx'
+        if 'CollCode' in seed:
+            res['icsd'] = seed.split('CollCode')[-1]
+        # alias special lines in res file
         titl = ''
         cell = ''
         remark = ''
         for line in flines:
-            if 'TITL' in line:
+            if 'TITL' in line and db:
+                # if not db, then don't read title
                 titl = line.split()
                 if len(titl) != 12:
-                    raise RuntimeError('missing TITL info')
+                    raise RuntimeError('missing some TITL info')
             elif 'CELL' in line:
                 cell = line.split()
             elif 'REM' in line:
                 remark = line.split()
         if cell == '':
             raise RuntimeError('missing CELL info')
-        elif titl == '':
-            raise RuntimeError('missing TITL info')
-        res['pressure'] = float(titl[2])
-        res['cell_volume'] = float(titl[3])
-        res['enthalpy'] = float(titl[4])
-        res['num_atoms'] = int(titl[7])
-        res['space_group'] = titl[8].strip('()')
-        res['enthalpy_per_atom'] = res['enthalpy'] / res['num_atoms']
-        res['total_energy'] = res['enthalpy'] - res['pressure']*res['cell_volume']
-        res['total_energy_per_atom'] = res['total_energy'] / res['num_atoms']
+        elif titl == '' and db:
+            raise RuntimeError('missing TITL')
+        if db:
+            res['pressure'] = float(titl[2])
+            res['cell_volume'] = float(titl[3])
+            res['enthalpy'] = float(titl[4])
+            res['num_atoms'] = int(titl[7])
+            res['space_group'] = titl[8].strip('()')
+            res['enthalpy_per_atom'] = res['enthalpy'] / res['num_atoms']
+            res['total_energy'] = res['enthalpy'] - res['pressure']*res['cell_volume']
+            res['total_energy_per_atom'] = res['total_energy'] / res['num_atoms']
         res['lattice_abc'] = [map(float, cell[2:5]), map(float, cell[5:8])]
         # calculate lattice_cart from abc
         res['lattice_cart'] = abc2cart(res['lattice_abc'])
@@ -121,11 +123,13 @@ def res2dict(seed, **kwargs):
         atoms_per_fu = 0
         for elem in res['stoichiometry']:
             atoms_per_fu += elem[1]
-        res['num_fu'] = res['num_atoms'] / atoms_per_fu
+        res['num_fu'] = len(res['atom_types']) / atoms_per_fu
     except Exception as oops:
         if kwargs.get('verbosity') > 0:
             print_exc()
             print('Error in .res file', seed + '.res, skipping...')
+        if type(oops) == IOError:
+            print_exc()
         return seed+'.res\t\t' + str(type(oops)) + ' ' + str(oops) + '\n', False
     if kwargs.get('verbosity') > 4:
         print(json.dumps(res, indent=2))
@@ -137,11 +141,11 @@ def cell2dict(seed, **kwargs):
     to be merged with another dict from a .param or .res file.
     """
     cell = defaultdict(list)
-    if seed.endswith('.cell'):
-        seed = seed.replace('.cell', '')
-    with open(seed+'.cell', 'r') as f:
-        flines = f.readlines()
     try:
+        if seed.endswith('.cell'):
+            seed = seed.replace('.cell', '')
+        with open(seed+'.cell', 'r') as f:
+            flines = f.readlines()
         # add cell file to source
         cell['source'].append(seed+'.cell')
         for line_no, line in enumerate(flines):
@@ -207,6 +211,8 @@ def cell2dict(seed, **kwargs):
         if kwargs.get('verbosity') > 0:
             print_exc()
             print('Error in', seed + '.cell, skipping...')
+        if type(oops) == IOError:
+            print_exc()
         return seed + '.cell\t\t' + str(type(oops)) + ' ' + str(oops), False
     if kwargs.get('debug'):
         print(json.dumps(cell, indent=2))
@@ -221,21 +227,21 @@ def param2dict(seed, db=True, **kwargs):
     db    : if True, only scrape relevant info, otherwise scrape all
 
     """
-    param = defaultdict(list)
-    if seed.endswith('.param'):
-        seed = seed.replace('.param', '')
-    with open(seed+'.param', 'r') as f:
-        flines = f.readlines()
-    param['source'].append(seed+'.param')
-    # exclude some useless info
-    scrub_list = ['checkpoint', 'write_bib', 'mix_history_length',
-                  'fix_occupancy', 'page_wvfns', 'num_dump_cycles',
-                  'backup_interval', 'geom_max_iter', 'fixed_npw',
-                  'write_cell_structure', 'bs_write_eigenvalues',
-                  'calculate_stress', 'opt_strategy', 'max_scf_cycles']
-    false_str = ['False', 'false', '0']
-    splitters = [':', '=', ' ']
     try:
+        param = defaultdict(list)
+        if seed.endswith('.param'):
+            seed = seed.replace('.param', '')
+        with open(seed+'.param', 'r') as f:
+            flines = f.readlines()
+        param['source'].append(seed+'.param')
+        # exclude some useless info if importing to db
+        scrub_list = ['checkpoint', 'write_bib', 'mix_history_length',
+                      'fix_occupancy', 'page_wvfns', 'num_dump_cycles',
+                      'backup_interval', 'geom_max_iter', 'fixed_npw',
+                      'write_cell_structure', 'bs_write_eigenvalues',
+                      'calculate_stress', 'opt_strategy', 'max_scf_cycles']
+        false_str = ['False', 'false', '0']
+        splitters = [':', '=', ' ']
         for line_no, line in enumerate(flines):
             line = line.lower()
             # skip blank lines and comments
@@ -274,7 +280,8 @@ def param2dict(seed, db=True, **kwargs):
         if kwargs.get('verbosity') > 0:
             print_exc()
             print('Error in', seed+'.param, skipping...')
-        print_exc()
+        if type(oops) == IOError:
+            print_exc()
         return seed + '.param\t\t' + str(type(oops)) + ' ' + str(oops), False
     if kwargs.get('debug'):
         print(json.dumps(param, indent=2))
@@ -285,15 +292,15 @@ def dir2dict(seed, **kwargs):
     """ Try to extract information from directory name; last hope
     if no param file has been found.
     """
-    dir_dict = defaultdict(list)
-    info = False
-    if seed == '.':
-        seed = getcwd().split('/')[-1]
-    dirs_as_list = seed.split('/')
-    task_list = ['GO', 'NMR', 'OPTICS']
-    phase_list = ['alpha', 'beta', 'gamma', 'theta']
-    defect_list = ['vacancy', 'interstitial']
     try:
+        dir_dict = defaultdict(list)
+        info = False
+        if seed == '.':
+            seed = getcwd().split('/')[-1]
+        dirs_as_list = seed.split('/')
+        task_list = ['GO', 'NMR', 'OPTICS']
+        phase_list = ['alpha', 'beta', 'gamma', 'theta']
+        defect_list = ['vacancy', 'interstitial']
         for dir in dirs_as_list:
             if dir == '.':
                 dir = getcwd().split('/')[-1]
@@ -352,27 +359,27 @@ def dir2dict(seed, **kwargs):
     return dir_dict, True
 
 
-def castep2dict(seed, **kwargs):
+def castep2dict(seed, db=True, **kwargs):
     """ From seed filename, create dict of the most relevant
     information about a calculation.
     """
     # use defaultdict to allow for easy appending
     castep = defaultdict(list)
-    # read .castep, .history or .history.gz file
-    if '.gz' in seed:
-        with gzip.open(seed, 'r') as f:
-            flines = f.readlines()
-    else:
-        with open(seed, 'r') as f:
-            flines = f.readlines()
-    # set source tag to castep file
-    castep['source'].append(seed)
-    # grab file owner
-    castep['user'] = getpwuid(stat(seed).st_uid).pw_name
-    if 'CollCode' in seed:
-        temp_icsd = seed.split('CollCode')[-1].replace('.castep', '').replace('.history', '')
-        castep['icsd'] = temp_icsd
     try:
+        # read .castep, .history or .history.gz file
+        if '.gz' in seed:
+            with gzip.open(seed, 'r') as f:
+                flines = f.readlines()
+        else:
+            with open(seed, 'r') as f:
+                flines = f.readlines()
+        # set source tag to castep file
+        castep['source'].append(seed)
+        # grab file owner
+        castep['user'] = getpwuid(stat(seed).st_uid).pw_name
+        if 'CollCode' in seed:
+            temp_icsd = seed.split('CollCode')[-1].replace('.castep', '').replace('.history', '')
+            castep['icsd'] = temp_icsd
         # wrangle castep file for basic parameters
         for line_no, line in enumerate(flines):
             if 'task' not in castep and 'type of calculation' in line:
@@ -685,8 +692,17 @@ def castep2dict(seed, **kwargs):
             print_exc()
             print('Error in .castep file', seed, 'skipping...')
         if type(oops) == DFTError:
-            return castep, False
+            if db:
+                # if importing to db, skip unconverged structure
+                # and don't report in log file
+                return '', False
+            else:
+                # if not importing to db, return unconverged structure
+                # but notify that it is unconverged
+                return castep, False
         else:
+            if type(oops) == IOError:
+                print_exc()
             return seed + '\t\t' + str(type(oops)) + ' ' + str(oops)+'\n', False
     if kwargs.get('debug'):
         print(json.dumps(castep, indent=2, ensure_ascii=False))
