@@ -128,8 +128,13 @@ class BatchRun:
         for ind in range(self.nprocesses):
             procs.append(mp.Process(target=self.perform_new_calculations,
                          args=(self.file_lists['res'], self.paths)))
-        for proc in procs:
-            proc.start()
+        try:
+            for proc in procs:
+                proc.start()
+        except(KeyboardInterrupt, SystemExit):
+            for proc in procs:
+                proc.terminate()
+            exit('Killing running jobs and exiting...')
 
     def perform_new_calculations(self, res_list, paths):
         """ Perform all calculations that have not already
@@ -154,10 +159,8 @@ class BatchRun:
                                 cell_dict=self.cell_dict,
                                 debug=self.debug)
                     print('Completed', res)
-                except:
-                    print_exc()
-                    print(res, 'failed')
-                    pass
+                except(KeyboardInterrupt, SystemExit):
+                    raise SystemExit
         return
 
 class FullRelaxer:
@@ -192,7 +195,7 @@ class FullRelaxer:
         then continue with the remainder of steps.
         """
         seed = self.seed
-        geom_max_iter_list = [2, 2, 2, 2, 10, calc_doc['geom_max_iter']]
+        geom_max_iter_list = [2, 2, 2, 2, 4, calc_doc['geom_max_iter']]
         for num_iter in geom_max_iter_list:
             calc_doc['geom_max_iter'] = num_iter
             try:
@@ -204,7 +207,7 @@ class FullRelaxer:
             except:
                 print_exc()
                 print('Failed to clean up...')
-                raise RuntimeError('Failure')
+                raise RuntimeError
             try:
                 # write new param and cell
                 doc2param(calc_doc, seed, hash_dupe=False)
@@ -213,20 +216,19 @@ class FullRelaxer:
                 print('Failed to prepare calc')
                 system('rm ' + seed + '.cell')
                 system('rm ' + seed + '.param')
-                raise RuntimeError('Failure')
+                raise RuntimeError
             try:
                 # run CASTEP
-                process = self.castep(seed)
+                process = self.castep()
                 process.communicate()
             except:
-                print('Failed to start CASTEP...')
                 print_exc()
                 system('rm ' + seed + '.cell')
                 system('rm ' + seed + '.param')
-                raise RuntimeError('Failure')
+                raise SystemExit('Killing jobs...')
             try:
                 # scrape new structure from castep file
-                opti_dict, success = castep2dict(seed + '.castep')
+                opti_dict, success = castep2dict(seed + '.castep', db=False)
                 if not success and opti_dict == '':
                     print('Failed to scrape castep file...')
                     return False
@@ -254,7 +256,7 @@ class FullRelaxer:
                     doc2res(calc_doc, seed + '-save')
             except:
                 print_exc()
-                raise RuntimeError('failure')
+                raise RuntimeError('Failed to restart calculation...')
 
     def mv_to_bad(self):
         """ Move all associated files to bad_castep. """
@@ -265,12 +267,14 @@ class FullRelaxer:
         return
 
     def castep(self):
-        """ Calls CASTEP on desired seed with desired number of cores. """
+        """ Calls CASTEP on desired seed with desired number of cores. 
+        Errors piped to /dev/null for now...
+        """
         if self.ncores == 1:
             process = sp.Popen(['nice', '-n', '15', self.executable, self.seed])
         else:
-            process = sp.Popen(['nice', '-n', '15', 'mpirun', '-n',
-                                str(self.ncores), self.executable, self.seed])
+            process = sp.Popen(['nice', '-n', '15', 'mpirun', '-n', str(self.ncores),
+                                self.executable, self.seed])
         return process
 
 
@@ -293,4 +297,7 @@ if __name__ == '__main__':
                         help='manually enter seed if more than one param or cell')
     args = parser.parse_args()
     runner = BatchRun(ncores=args.ncores, nprocesses=args.nprocesses, debug=args.debug, seed=args.seed)
-    runner.spawn()
+    try:
+        runner.spawn()
+    except(KeyboardInterrupt, SystemExit):
+        exit('Exiting top-level...')
