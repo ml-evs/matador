@@ -62,26 +62,37 @@ class BatchRun:
                         self.file_lists['cell'].append(file)
                     elif file.endswith('.param'):
                         self.file_lists['param'].append(file)
-        # check for correct multiplicity of file types
         valid = True
-        if len(self.file_lists['cell']) != 1:
-            valid = False
-            print('run3 requires exactly 1 cell file in folder, found',
-                  len(self.file_lists['cell']))
-        if len(self.file_lists['param']) != 1:
-            valid = False
-            print('run3 requires exactly 1 param file in folder, found',
-                  len(self.file_lists['param']))
+        if self.args.get('seed') is not None:
+            if self.args.get('seed') + '.cell' in self.file_lists['cell']:
+                cell_seed = self.args.get('seed')
+            else:
+                print(param_seed + '.cell not found!')
+                valid = False
+            if self.args.get('seed') + '.param' in self.file_lists['param']:
+                param_seed = self.args.get('seed')
+            else:
+                print(param_seed + '.param not found!')
+                valid = False
+        else:
+            # check for correct multiplicity of file types
+            if len(self.file_lists['cell']) != 1:
+                valid = False
+                print('run3 requires exactly 1 cell file in folder, found',
+                      len(self.file_lists['cell']))
+            if len(self.file_lists['param']) != 1:
+                valid = False
+                print('run3 requires exactly 1 param file in folder, found',
+                      len(self.file_lists['param']))
+            # read cell and param files into dicts
+            cell_seed = self.file_lists['cell'][0]
+            param_seed = self.file_lists['param'][0]
         if len(self.file_lists['res']) < 1:
             valid = False
             print('run3 requires at least 1 res file in folder, found',
                   len(self.file_lists['res']))
         if not valid:
             exit('Exiting...')
-
-        # read cell and param files into dicts
-        cell_seed = self.file_lists['cell'][0]
-        param_seed = self.file_lists['param'][0]
         self.cell_dict, cell_success = cell2dict(cell_seed)
         if not cell_success:
             print('Failed to parse cell file')
@@ -93,8 +104,6 @@ class BatchRun:
             success = True
         if not success:
             exit()
-        # print(json.dumps(self.cell_dict, indent=2))
-        # print(json.dumps(self.param_dict, indent=2))
         # delete source from cell and param
         del self.cell_dict['source']
         del self.param_dict['source']
@@ -138,7 +147,6 @@ class BatchRun:
                     job_file.write(res+'\n')
                 # create full relaxer object for creation and running of job
                 try:
-                    print('Starting', res)
                     FullRelaxer(paths=self.paths,
                                 ncores=self.ncores,
                                 res=res,
@@ -147,6 +155,7 @@ class BatchRun:
                                 debug=self.debug)
                     print('Completed', res)
                 except:
+                    print_exc()
                     print(res, 'failed')
                     pass
         return
@@ -163,12 +172,11 @@ class FullRelaxer:
         self.executable = 'castep'
         self.debug = debug
         # read in initial structure
-        res_dict, success = res2dict(res)
-        if not success:
-            return False
+        res_dict, success = res2dict(res, db=False)
         calc_doc = res_dict
         # set seed name
         self.seed = calc_doc['source'][0].replace('.res', '')
+        print('Relaxing', self.seed)
         # update global doc with cell and param dicts for folder
         calc_doc.update(cell_dict)
         calc_doc.update(param_dict)
@@ -177,7 +185,7 @@ class FullRelaxer:
             print(json.dumps(calc_doc, indent=2))
         self.success = self.relax(calc_doc)
         if not success:
-            raise RuntimeError('Failed to relax structure')
+            self.mv_to_bad()
 
     def relax(self, calc_doc):
         """ Set up the calculation to perform 4 sets of two steps,
@@ -187,7 +195,6 @@ class FullRelaxer:
         geom_max_iter_list = [2, 2, 2, 2, 10, calc_doc['geom_max_iter']]
         for num_iter in geom_max_iter_list:
             calc_doc['geom_max_iter'] = num_iter
-            print(calc_doc['geom_max_iter'])
             try:
                 # delete any existing files
                 if isfile(self.seed + '.param'):
@@ -239,10 +246,7 @@ class FullRelaxer:
                     err_file = seed + '*.err'
                     for globbed in glob.glob(err_file):
                         if isfile(globbed):
-                            if not exists('bad_castep'):
-                                makedirs('bad_castep')
-                            print('CASTEP crashed... skipping...')
-                            system('mv ' + seed + '* bad_castep')
+                            self.mv_to_bad()
                             return False
                     calc_doc.update(opti_dict)
                     if isfile(seed + '-save.res'):
@@ -252,13 +256,21 @@ class FullRelaxer:
                 print_exc()
                 raise RuntimeError('failure')
 
-    def castep(self, seed):
+    def mv_to_bad(self):
+        """ Move all associated files to bad_castep. """
+        if not exists('bad_castep'):
+            makedirs('bad_castep')
+        print('CASTEP crashed... skipping...')
+        system('mv ' + self.seed + '* bad_castep')
+        return
+
+    def castep(self):
         """ Calls CASTEP on desired seed with desired number of cores. """
         if self.ncores == 1:
-            process = sp.Popen(['nice', '-n', '15', self.executable, seed])
+            process = sp.Popen(['nice', '-n', '15', self.executable, self.seed])
         else:
             process = sp.Popen(['nice', '-n', '15', 'mpirun', '-n',
-                                str(self.ncores), self.executable, seed])
+                                str(self.ncores), self.executable, self.seed])
         return process
 
 
@@ -277,6 +289,8 @@ if __name__ == '__main__':
                         help='number of concurrent calculations [DEFAULT=1]')
     parser.add_argument('-d', '--debug', action='store_true',
                         help='debug output')
+    parser.add_argument('-s', '--seed', 
+                        help='manually enter seed if more than one param or cell')
     args = parser.parse_args()
-    runner = BatchRun(ncores=args.ncores, nprocesses=args.nprocesses, debug=args.debug)
+    runner = BatchRun(ncores=args.ncores, nprocesses=args.nprocesses, debug=args.debug, seed=args.seed)
     runner.spawn()
