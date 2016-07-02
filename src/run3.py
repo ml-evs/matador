@@ -240,7 +240,7 @@ class FullRelaxer:
                     doc2res(opti_dict, 'completed/' + seed)
                     system('mv ' + seed + '.castep' + ' completed/' + seed + '.castep')
                     system('mv ' + seed + '.param' + ' completed/' + seed + '.param')
-                    system('mv ' + seed + '.cell' + ' completed/' + seed + '.cell')
+                    system('mv ' + seed + '*.cell' + ' completed/' + seed + '.cell')
                     # clean up rest of files
                     system('rm ' + seed + '.*')
                     return True
