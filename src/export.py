@@ -200,6 +200,12 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, *args):
                 f.write('%ENDBLOCK CELL_CONSTRAINTS\n\n')
             if 'fix_com' in doc:
                 f.write('FIX_COM : ' + doc['fix_com'] + '\n')
+            if 'symmetry_generate' in doc:
+                f.write('SYMMETRY_GENERATE\n')
+            if 'snap_to_symmetry' in doc:
+                f.write('SNAP_TO_SYMMETRY\n')
+            if 'symmetry_tol' in doc:
+                f.write('SYMMETRY_TOL ' + str(doc['symmetry_tol'] + '\n'))
             if 'species_pot' in doc:
                 f.write('\n%BLOCK SPECIES_POT\n')
                 for elem in doc['species_pot']: 

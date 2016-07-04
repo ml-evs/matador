@@ -136,7 +136,7 @@ def res2dict(seed, db=True, **kwargs):
     return res, True
 
 
-def cell2dict(seed, **kwargs):
+def cell2dict(seed, db=True, **kwargs):
     """ Extract available information from .cell file; probably
     to be merged with another dict from a .param or .res file.
     """
@@ -174,8 +174,15 @@ def cell2dict(seed, **kwargs):
                 cell['kpoints_mp_spacing'] = float(line.split()[-1])
             elif 'mp_grid' in line.lower():
                 cell['kpoints_mp_grid'] = map(int, line.split()[-3:])
-            elif 'fix_com' in line.lower():
-                cell['fix_com'] = line.split()[-1]
+            if not db:
+                if 'fix_com' in line.lower():
+                    cell['fix_com'] = line.split()[-1]
+                elif 'symmetry_generate' in line.lower():
+                    cell['symmetry_generate'] = True
+                elif 'symmetry_tol' in line.lower():
+                    cell['symmetry_tol'] = float(line.split()[-1])
+                elif 'snap_to_symmetry' in line.lower():
+                    cell['snap_to_symmetry'] = True
         if 'external_pressure' not in cell:
             cell['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0], [0.0]]
     except Exception as oops:
