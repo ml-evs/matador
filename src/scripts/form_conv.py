@@ -10,18 +10,23 @@ structure_files = defaultdict(list)
 for root, dirs, files in walk('.', topdown=True, followlinks=True):
     for file in files:
         if file.endswith('.castep'):
+            print(root + '/' + file)
             castep_dict, success = castep2dict(root + '/' + file)
             if not success:
-                exit('Failure to read castep')
+                print('Failure to read castep')
             else:
                 structure_files[castep_dict['source'][0].split('/')[-1]].append(castep_dict)
 
 cutoff_chempots_dict = defaultdict(dict)
+cutoff_chempots = defaultdict(list)
+chempot_list = dict()
 for key in structure_files:
     for doc in structure_files[key]:
         if len(doc['stoichiometry']) == 1:
             doc['formation_enthalpy_per_atom'] = 0
             cutoff_chempots_dict[str(doc['cut_off_energy'])][doc['atom_types'][0]] = doc['enthalpy_per_atom']
+            cutoff_chempots[key].append([doc['cut_off_energy'], doc['enthalpy_per_atom']])
+            chempot_list[key] = doc['stoichiometry'][0][0] 
 
 cutoff_form = defaultdict(list)
 stoich_list = dict()
@@ -38,18 +43,29 @@ for key in cutoff_form:
     cutoff_form[key].sort()
     cutoff_form[key] = np.asarray(cutoff_form[key])
 
+for key in cutoff_chempots:
+    cutoff_chempots[key].sort()
+    cutoff_chempots[key] = np.asarray(cutoff_chempots[key])
+
 import matplotlib.pyplot as plt
 plt.style.use('bmh')
 fig = plt.figure(facecolor='w')
-ax = fig.add_subplot(111)
+ax = fig.add_subplot(121)
+ax2 = fig.add_subplot(122)
 for key in cutoff_form:
     ax.plot(1/cutoff_form[key][:,0], cutoff_form[key][:,1]-cutoff_form[key][-1,1], 'o--', alpha=1, label=stoich_list[key], lw=2)
-# ax.plot(1/struct1[:,0], struct1[:,1]-struct1[-1,1], 'o--', alpha=1, label=struct1_stoich, lw=2)
-# ax.plot(1/struct2[:,0], struct2[:,1]-struct2[-1,1], 'o--', alpha=0.8, label=struct2_stoich, lw=2)
-plt.legend(loc=3)
+ax.legend(loc=3)
 ax.axhline(0, linestyle='--', c='k', alpha=0.4)
 ax.set_xticks(1/cutoff_form[key][:,0])
 ax.set_ylabel('$E(e_c) - E(' + str(cutoff_form[key][-1,0]) + ' \mathrm{eV})$')
 ax.set_xlabel('$1/e_c  (\mathrm{eV}^{-1})$')
 ax.set_xticklabels(['1/' + str(E) for E in cutoff_form[key][:,0]])
+for key in cutoff_chempots:
+    ax2.plot(1/cutoff_chempots[key][:,0], cutoff_chempots[key][:,1]-cutoff_chempots[key][-1, 1], 'o--', alpha=1, label=chempot_list[key], lw=2)
+ax2.legend(loc=3)
+ax2.axhline(0, linestyle='--', c='k', alpha=0.4)
+ax2.set_xticks(1/cutoff_chempots[key][:,0])
+ax2.set_ylabel('$E(e_c) - E(' + str(cutoff_chempots[key][-1,0]) + ' \mathrm{eV})$')
+ax2.set_xlabel('$1/e_c  (\mathrm{eV}^{-1})$')
+ax2.set_xticklabels(['1/' + str(E) for E in cutoff_chempots[key][:,0]])
 plt.show()
