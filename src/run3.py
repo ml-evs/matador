@@ -64,7 +64,7 @@ class BatchRun:
             valid = False
             print('run3 requires at least 1 res file in folder, found',
                   len(self.file_lists['res']))
-        self.cell_dict, cell_success = cell2dict(self.seed + '.cell')
+        self.cell_dict, cell_success = cell2dict(self.seed + '.cell', db=False)
         if not cell_success:
             valid = False
             print('Failed to parse cell file')
@@ -168,10 +168,10 @@ class FullRelaxer:
         """
         seed = self.seed
         geom_max_iter_list = [2, 2, 2, 2, 
-                              int(calc_doc['geom_max_iter']/4),
-                              int(calc_doc['geom_max_iter']/4),
-                              int(calc_doc['geom_max_iter']/4),
-                              int(calc_doc['geom_max_iter']/4)]
+                              int(calc_doc['geom_max_iter'])/4,
+                              int(calc_doc['geom_max_iter'])/4,
+                              int(calc_doc['geom_max_iter'])/4,
+                              int(calc_doc['geom_max_iter'])/4]
         # relax structure
         for num_iter in geom_max_iter_list:
             calc_doc['geom_max_iter'] = num_iter
@@ -228,7 +228,7 @@ class FullRelaxer:
 
     def tidy_up(self):
         """ Delete all run3 created files before quitting. """
-        system('rm ' + seed + '*')
+        system('rm ' + self.seed + '*')
         return
 
     def castep(self):
