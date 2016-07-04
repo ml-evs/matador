@@ -89,7 +89,10 @@ def query2files(cursor, *args):
                 name += source.split('/')[-1].split('.')[0]
             elif 'OQMD' in source:
                 # grab OQMD entry_id
-                name += 'OQMD_' + source.split(' ')[-1]
+                stoich_string = ''
+                for atom in doc['stoichiometry']:
+                    stoich_string += atom[0]+str(atom[1])
+                name += stoich_string + '-OQMD_' + source.split(' ')[-1]
         path += name
         # always write param for each doc; also handles dirs
         if param:
