@@ -64,7 +64,7 @@ class BatchRun:
             valid = False
             print('run3 requires at least 1 res file in folder, found',
                   len(self.file_lists['res']))
-        self.cell_dict, cell_success = cell2dict(self.seed + '.cell')
+        self.cell_dict, cell_success = cell2dict(self.seed + '.cell', db=False)
         if not cell_success:
             valid = False
             print('Failed to parse cell file')
