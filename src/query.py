@@ -12,21 +12,50 @@ import numpy as np
 from bson.son import SON
 # import standard library
 import re
+from os import uname
 
 
 class DBQuery:
     """ Class that implements queries to MongoDB
     structure database.
     """
-    def __init__(self, client, collections, *args):
-        """ Initialise the query with command line
-        arguments and return results.
+    def __init__(self, client=False, collections=False, *args, **kwargs):
+        """ Parse arguments from matador or API call
+        before calling query.
         """
         # read args
-        self.args = args[0]
-        self.client = client
-        self.db = client.crystals
-        self.collections = collections
+        try:
+            self.args = args[0]
+            self.client = client
+            self.db = client.crystals
+            self.collections = collections
+        except:
+            pass
+        # if empty collections, assume called from API and read kwargs, 
+        # also need to connect to db
+        if not collections or not client:
+            local = uname()[1]
+            if local == 'cluster2':
+                remote = 'node1'
+            else:
+                remote = None
+            self.client = pm.MongoClient(remote)
+            self.db = self.client.crystals
+            self.args = dict()
+            self.collections = dict()
+            if kwargs['db'] is not None:
+                for database in kwargs['db']:
+                    if database == 'all':
+                        self.collections['ajm'] = self.db['repo']
+                        self.collections['oqmd'] = self.db['oqmd']
+                    elif database == 'ajm':
+                        database = 'repo'
+                        self.collections['ajm'] = self.db['repo']
+                    else:
+                        self.collections[database] = self.db[database]
+            else:
+                self.collections['ajm'] = self.db['repo']
+            self.args['tags'] = kwargs['tags']
         if self.args.get('summary'):
             self.top = -1
         else:
@@ -47,7 +76,13 @@ class DBQuery:
                                       'Dy', 'Ho', 'Er', 'Tm', 'Yb', 'Lu']
         self.periodic_table['Act'] = ['Ac', 'Th', 'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk',
                                       'Cf', 'Es', 'Fm', 'Md', 'No', 'Lr']
-        """ PERFORM QUERY """
+
+        self.perform_query()
+
+    def perform_query(self):
+        """ Set up query dict and perform query depending on 
+        command-line / API arguments. 
+        """
         self.cursor = EmptyCursor()
         # initalize query_dict to '$and' all queries
         self.query_dict = dict()
