@@ -168,10 +168,10 @@ class FullRelaxer:
         """
         seed = self.seed
         geom_max_iter_list = [2, 2, 2, 2, 
-                              int(calc_doc['geom_max_iter']/4),
-                              int(calc_doc['geom_max_iter']/4),
-                              int(calc_doc['geom_max_iter']/4),
-                              int(calc_doc['geom_max_iter']/4)]
+                              int(calc_doc['geom_max_iter'])/4,
+                              int(calc_doc['geom_max_iter'])/4,
+                              int(calc_doc['geom_max_iter'])/4,
+                              int(calc_doc['geom_max_iter'])/4]
         # relax structure
         for num_iter in geom_max_iter_list:
             calc_doc['geom_max_iter'] = num_iter
@@ -228,7 +228,7 @@ class FullRelaxer:
 
     def tidy_up(self):
         """ Delete all run3 created files before quitting. """
-        system('rm ' + seed + '*')
+        system('rm ' + self.seed + '*')
         return
 
     def castep(self):
