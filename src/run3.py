@@ -167,11 +167,7 @@ class FullRelaxer:
         then continue with the remainder of steps.
         """
         seed = self.seed
-        geom_max_iter_list = [2, 2, 2, 2, 
-                              int(calc_doc['geom_max_iter'])/4,
-                              int(calc_doc['geom_max_iter'])/4,
-                              int(calc_doc['geom_max_iter'])/4,
-                              int(calc_doc['geom_max_iter'])/4]
+        geom_max_iter_list = [2, 2, 2, 2, calc_doc['geom_max_iter']]
         # relax structure
         for num_iter in geom_max_iter_list:
             calc_doc['geom_max_iter'] = num_iter
@@ -205,6 +201,9 @@ class FullRelaxer:
                     # clean up rest of files
                     self.tidy_up()
                     return True
+                elif num_iter == len(geom_max_iter) - 1:
+                    print('Failed to optimise', self.seed)
+                    self.mv_to_bad()
                 else:
                     err_file = seed + '*.err'
                     for globbed in glob.glob(err_file):
