@@ -81,7 +81,7 @@ class QueryConvexHull():
                 print(60*'─')
             else:
                 print('No possible chem pots found for', elem, '.')
-                return
+                exit()
         # include OQMD structures if desired, first find chem pots
         if self.include_oqmd:
             oqmd_mu_enthalpy = np.zeros((2))
