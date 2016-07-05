@@ -99,7 +99,7 @@ class DBQuery:
             if len(self.cursor) < 1:
                 exit('Could not find a match, try widening your search.')
             elif len(self.cursor) >= 1:
-                if self.args.get('cell') or self.args.get('res'):
+                if self.args.get('cell') or self.args.get('res') and self.args.get('calc_match') is None:
                     query2files(self.cursor, self.args)
                 self.display_results(self.cursor)
                 if len(self.cursor) > 1:
