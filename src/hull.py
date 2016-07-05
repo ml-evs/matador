@@ -34,7 +34,6 @@ class QueryConvexHull():
         if self.args['subcmd'] == 'voltage':
             print('Generating voltage curve...')
             self.voltage_curve(self.stable_enthalpy, self.stable_comp, self.mu_enthalpy)
-
             self.set_plot_param()
             if self.args.get('subplot'):
                 self.subplot_voltage_hull()
@@ -589,6 +588,9 @@ class QueryConvexHull():
         from palettable.colorbrewer.qualitative import Set3_10
         if len(self.source_list) < 6:
             self.colours = Dark2_8.hex_colors[1:len(self.source_list)+1]
+        else:
+            self.colours = Dark2_8.hex_colors[1:]
+            self.colours.extend(Dark2_8.hex_colors[1:])
         # first colour reserved for hull
         self.colours.insert(0, Dark2_8.hex_colors[0])
         # penultimate colour reserved for off hull above cutoff
