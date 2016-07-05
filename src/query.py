@@ -6,6 +6,7 @@ and calling other functionality. """
 from __future__ import print_function
 # import related crysdb functionality
 from export import query2files
+from print_utils import print_failure, print_success, print_warning
 # import external libraries
 import pymongo as pm
 import numpy as np
@@ -14,6 +15,7 @@ from bson.son import SON
 import re
 from os import uname
 from itertools import combinations
+from traceback import print_exc
 
 
 class DBQuery:
@@ -453,6 +455,23 @@ class DBQuery:
         # if there's only one string, try split it by caps
         if len(stoich) == 1:
             stoich = [elem for elem in re.split(r'([A-Z][a-z]*)', stoich[0]) if elem]
+            while '[' in stoich:
+                tmp_stoich = list(stoich)
+                for ind, tmp in enumerate(tmp_stoich):
+                    if tmp == '[':
+                        while tmp_stoich[ind+1] != ']':
+                            tmp_stoich[ind] += tmp_stoich[ind+1]
+                            del tmp_stoich[ind+1]
+                        tmp_stoich[ind] += ']'
+                try:
+                    tmp_stoich.remove(']')
+                except:
+                    pass
+                try: 
+                    tmp_stoich.remove('')
+                except:
+                    pass
+                stoich = tmp_stoich
         elements = []
         fraction = []
         for i in range(0, len(stoich), 1):
@@ -467,10 +486,20 @@ class DBQuery:
         query_dict = dict()
         query_dict['$and'] = []
         for ind, elem in enumerate(elements):
-            stoich_dict = dict()
-            stoich_dict['stoichiometry'] = dict()
-            stoich_dict['stoichiometry']['$in'] = [[elem, fraction[ind]]]
-            query_dict['$and'].append(stoich_dict)
+            if '[' in elem or ']' in elem:
+                types_dict = dict()
+                types_dict['$or'] = list()
+                elem = elem.strip('[').strip(']')
+                for group_elem in self.periodic_table[elem]:
+                    types_dict['$or'].append(dict())
+                    types_dict['$or'][-1]['stoichiometry'] = dict()
+                    types_dict['$or'][-1]['stoichiometry']['$in'] = [[group_elem, fraction[ind]]]
+                query_dict['$and'].append(types_dict)
+            else:
+                stoich_dict = dict()
+                stoich_dict['stoichiometry'] = dict()
+                stoich_dict['stoichiometry']['$in'] = [[elem, fraction[ind]]]
+                query_dict['$and'].append(stoich_dict)
         if not self.args.get('partial_formula'):
             size_dict = dict()
             size_dict['stoichiometry'] = dict()
@@ -489,6 +518,10 @@ class DBQuery:
         else:
             elements = custom_elem
         # if there's only one string, try split it by caps
+        for char in elements[0]:
+            if char.isdigit():
+                print_failure('Composition cannot contain a number.')
+                exit()
         try:
             if len(elements) == 1:
                 valid = False
@@ -499,9 +532,6 @@ class DBQuery:
                     print_failure('Composition must contain at least one upper case character.')
                     exit()
                 elements = [elem for elem in re.split(r'([A-Z][a-z]*)', elements[0]) if elem]
-                if elements[0].isdigit():
-                    raise RuntimeError('Composition string must be a ' +
-                                       'list of elements, use --num_species.')
                 while '[' in elements:
                     tmp_elements = list(elements)
                     for ind, tmp in enumerate(tmp_elements):
@@ -519,15 +549,9 @@ class DBQuery:
                     except:
                         pass
                     elements = tmp_elements
-                    for i in range(len(elements)):
-                        elements = elements[i].split('][')
-                for elem in elements:
-                    if bool(re.search(r'\d', elem)):
-                        raise RuntimeError('Composition string must be a ' +
-                                           'list of elements or a single number.')
         except Exception as oops:
-            print(type(oops), oops)
-            return EmptyCursor()
+            print_exc()
+            exit()
         if self.args.get('intersection'):
             query_dict = dict()
             query_dict['$or'] = []
@@ -556,7 +580,8 @@ class DBQuery:
                     elem = elem.strip('[').strip(']')
                     for group_elem in self.periodic_table[elem]:
                         types_dict['$or'].append(dict())
-                        types_dict['$or'][-1]['atom_types'] = group_elem
+                        types_dict['$or'][-1]['atom_types'] = dict() 
+                        types_dict['$or'][-1]['atom_types']['$in'] = [group_elem]
                 else:
                     types_dict = dict()
                     types_dict['atom_types'] = dict()
