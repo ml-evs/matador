@@ -227,6 +227,11 @@ class DBQuery:
                     print("{:^24}".format(self.cursor[ind]['text_id'][0] + ' ' +
                                           self.cursor[ind]['text_id'][1]) +
                           ': matched ' + str(test_cursor_count[-1]), 'structures.')
+                    try:
+                        print(12*' ' + '└╌╌╌╌╌╌╌╌╌╌╌╌╌ ', self.cursor[ind]['xc_functional'] + ',',
+                              self.cursor[ind]['cut_off_energy'], 'eV,', self.cursor[ind]['kpoints_mp_spacing'], '1/A')
+                    except:
+                        pass
                     if self.args.get('biggest'):
                         if test_cursor_count[-1] > 2*int(count/3):
                             print('Matched at least 2/3 of total number, composing hull...')
