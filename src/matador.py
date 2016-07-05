@@ -190,6 +190,9 @@ if __name__ == '__main__':
                                   help='find all structures containing exclusively the given elements, \
                                         e.g. LiSi. Macros defined for groups [I]-[VII], [Tran] \
                                         [Lan] and [Act], used with square brackets.')
+    structure_parser.add_argument('-int', '--intersection', action='store_true',
+                                  help='query the intersection of compositions instead of the union \
+                                        e.g. -c LiSnS -int queries Li, Sn, S, LiSn, LiS and LiSnS.')
     structure_parser.add_argument('-n', '--num_species', type=int, nargs='+',
                                   help='find all structures containing a certain \
                                         number of species.')
@@ -309,4 +312,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
     if vars(args).get('include_oqmd'):
         exit('--include_oqmd is currently disabled, please try again soon...')
+    if vars(args).get('intersection') and vars(args).get('composition') is None:
+        exit('--intersection requires --composition.')
     matador = Matador(args, argstr=argv[1:])

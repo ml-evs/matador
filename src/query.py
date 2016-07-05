@@ -13,6 +13,7 @@ from bson.son import SON
 # import standard library
 import re
 from os import uname
+from itertools import combinations
 
 
 class DBQuery:
@@ -527,28 +528,46 @@ class DBQuery:
         except Exception as oops:
             print(type(oops), oops)
             return EmptyCursor()
-        query_dict = dict()
-        query_dict['$and'] = []
-        for ind, elem in enumerate(elements):
-            # prototype for chemically motivated searches, e.g. transition metals
-            if '[' in elem or ']' in elem:
-                types_dict = dict()
-                types_dict['$or'] = list()
-                elem = elem.strip('[').strip(']')
-                for group_elem in self.periodic_table[elem]:
-                    types_dict['$or'].append(dict())
-                    types_dict['$or'][-1]['atom_types'] = group_elem
-            else:
-                types_dict = dict()
-                types_dict['atom_types'] = dict()
-                types_dict['atom_types']['$in'] = [elem]
-            query_dict['$and'].append(types_dict)
-        if not self.args.get('partial_formula'):
-            size_dict = dict()
-            size_dict['stoichiometry'] = dict()
-            num = len(elements)
-            size_dict['stoichiometry']['$size'] = num
-            query_dict['$and'].append(size_dict)
+        if self.args.get('intersection'):
+            query_dict = dict()
+            query_dict['$or'] = []
+            # iterate over all combinations
+            for rlen in range(1, len(elements)+1):
+                for combi in combinations(elements, r=rlen):
+                    list_combi = list(combi)
+                    types_dict = dict()
+                    types_dict['$and'] = list()
+                    types_dict['$and'].append(dict())
+                    types_dict['$and'][-1]['stoichiometry'] = dict()
+                    types_dict['$and'][-1]['stoichiometry']['$size'] = len(list_combi)
+                    for elem in list_combi:
+                        types_dict['$and'].append(dict())
+                        types_dict['$and'][-1]['atom_types'] = dict()
+                        types_dict['$and'][-1]['atom_types']['$in'] = [elem]
+                    query_dict['$or'].append(types_dict)
+        else:
+            query_dict = dict()
+            query_dict['$and'] = []
+            for ind, elem in enumerate(elements):
+                # prototype for chemically motivated searches, e.g. transition metals
+                if '[' in elem or ']' in elem:
+                    types_dict = dict()
+                    types_dict['$or'] = list()
+                    elem = elem.strip('[').strip(']')
+                    for group_elem in self.periodic_table[elem]:
+                        types_dict['$or'].append(dict())
+                        types_dict['$or'][-1]['atom_types'] = group_elem
+                else:
+                    types_dict = dict()
+                    types_dict['atom_types'] = dict()
+                    types_dict['atom_types']['$in'] = [elem]
+                query_dict['$and'].append(types_dict)
+            if not self.args.get('partial_formula'):
+                size_dict = dict()
+                size_dict['stoichiometry'] = dict()
+                num = len(elements)
+                size_dict['stoichiometry']['$size'] = num
+                query_dict['$and'].append(size_dict)
         return query_dict
 
     def query_num_species(self):
