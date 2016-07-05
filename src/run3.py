@@ -211,6 +211,10 @@ class FullRelaxer:
                             self.mv_to_bad()
                             return False
                     calc_doc.update(opti_dict)
+            except(SystemExit, KeyboardInterrupt):
+                self.mv_to_bad()
+                self.tidy_up()
+                raise SystemExit
             except:
                 print_exc()
                 self.mv_to_bad()
