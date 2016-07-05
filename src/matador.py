@@ -300,7 +300,7 @@ if __name__ == '__main__':
                                           help='re-relax a series of structures with \
                                           new parameters.',
                                           parents=[global_parser, collection_parser,
-                                                   structure_parser])
+                                                   structure_parser, material_parser])
     # parser.add_argument('--dis', action='store_true',
                         # help='smear hull with local stoichiometry')
     # parser.add_argument('--write_pressure', nargs='+', type=str,

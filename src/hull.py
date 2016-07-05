@@ -39,7 +39,7 @@ class QueryConvexHull():
                 self.subplot_voltage_hull()
             else:
                 self.plot_voltage_curve()
-        else:
+        elif self.args['subcmd'] == 'hull':
             self.set_plot_param()
             self.plot_hull()
 
@@ -348,7 +348,7 @@ class QueryConvexHull():
 
     def plot_hull(self, dis=False):
         """ Plot calculated hull. """
-        if self.args['png']:
+        if self.args.get('png'):
             fig = plt.figure(facecolor=None, figsize=(3,1.5))
         else:
             fig = plt.figure(facecolor=None)
