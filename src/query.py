@@ -117,7 +117,7 @@ class DBQuery:
                     self.args['composition'] = ''
                     for elem in self.cursor[0]['stoichiometry']:
                         self.args['composition'] += elem[0]
-                self.args['composition'] = [self.args['composition']]
+                    self.args['composition'] = [self.args['composition']]
                 empty_query = False
         # create alias for formula for backwards-compatibility
         self.args['stoichiometry'] = self.args.get('formula')
@@ -490,6 +490,13 @@ class DBQuery:
         # if there's only one string, try split it by caps
         try:
             if len(elements) == 1:
+                valid = False
+                for char in elements[0]:
+                    if char.isupper():
+                        valid = True
+                if not valid:
+                    print('Composition must contain at least one upper case character.')
+                    exit()
                 elements = [elem for elem in re.split(r'([A-Z][a-z]*)', elements[0]) if elem]
                 if elements[0].isdigit():
                     raise RuntimeError('Composition string must be a ' +
