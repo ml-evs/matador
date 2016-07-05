@@ -455,6 +455,23 @@ class DBQuery:
         # if there's only one string, try split it by caps
         if len(stoich) == 1:
             stoich = [elem for elem in re.split(r'([A-Z][a-z]*)', stoich[0]) if elem]
+            while '[' in stoich:
+                tmp_stoich = list(stoich)
+                for ind, tmp in enumerate(tmp_stoich):
+                    if tmp == '[':
+                        while tmp_stoich[ind+1] != ']':
+                            tmp_stoich[ind] += tmp_stoich[ind+1]
+                            del tmp_stoich[ind+1]
+                        tmp_stoich[ind] += ']'
+                try:
+                    tmp_stoich.remove(']')
+                except:
+                    pass
+                try: 
+                    tmp_stoich.remove('')
+                except:
+                    pass
+                stoich = tmp_stoich
         elements = []
         fraction = []
         for i in range(0, len(stoich), 1):
@@ -469,10 +486,20 @@ class DBQuery:
         query_dict = dict()
         query_dict['$and'] = []
         for ind, elem in enumerate(elements):
-            stoich_dict = dict()
-            stoich_dict['stoichiometry'] = dict()
-            stoich_dict['stoichiometry']['$in'] = [[elem, fraction[ind]]]
-            query_dict['$and'].append(stoich_dict)
+            if '[' in elem or ']' in elem:
+                types_dict = dict()
+                types_dict['$or'] = list()
+                elem = elem.strip('[').strip(']')
+                for group_elem in self.periodic_table[elem]:
+                    types_dict['$or'].append(dict())
+                    types_dict['$or'][-1]['stoichiometry'] = dict()
+                    types_dict['$or'][-1]['stoichiometry']['$in'] = [[group_elem, fraction[ind]]]
+                query_dict['$and'].append(types_dict)
+            else:
+                stoich_dict = dict()
+                stoich_dict['stoichiometry'] = dict()
+                stoich_dict['stoichiometry']['$in'] = [[elem, fraction[ind]]]
+                query_dict['$and'].append(stoich_dict)
         if not self.args.get('partial_formula'):
             size_dict = dict()
             size_dict['stoichiometry'] = dict()
@@ -553,7 +580,8 @@ class DBQuery:
                     elem = elem.strip('[').strip(']')
                     for group_elem in self.periodic_table[elem]:
                         types_dict['$or'].append(dict())
-                        types_dict['$or'][-1]['atom_types'] = group_elem
+                        types_dict['$or'][-1]['atom_types'] = dict() 
+                        types_dict['$or'][-1]['atom_types']['$in'] = [group_elem]
                 else:
                     types_dict = dict()
                     types_dict['atom_types'] = dict()
