@@ -70,7 +70,11 @@ class Matador:
                 self.swaps = Polisher(self.query.cursor, self.args)
         if self.args['subcmd'] == 'polish':
             self.query = DBQuery(self.client, self.collections, self.args)
-            self.polish = Polisher(self.query.cursor, self.args)
+            if self.args['hull_cutoff'] is not None:
+                self.hull = QueryConvexHull(self.query, self.args)
+                self.polish = Polisher(self.hull.hull_cursor, self.args)
+            else:
+                self.polish = Polisher(self.query.cursor, self.args)
         if self.args['subcmd'] == 'hull' or self.args['subcmd'] == 'voltage':
             self.query = DBQuery(self.client, self.collections, self.args)
             self.hull = QueryConvexHull(self.query, self.args)
