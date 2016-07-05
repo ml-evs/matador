@@ -7,6 +7,7 @@ from __future__ import print_function
 from scipy.spatial import ConvexHull
 from bson.son import SON
 from bisect import bisect_left
+from print_utils import print_failure, print_success, print_success
 import pymongo as pm
 import re
 import numpy as np
@@ -80,7 +81,7 @@ class QueryConvexHull():
                       match[ind]['text_id'][1]]), 'as chem pot for', elem)
                 print(60*'─')
             else:
-                print('No possible chem pots found for', elem, '.')
+                print_failure('No possible chem pots found for', elem, '.')
                 exit()
         # include OQMD structures if desired, first find chem pots
         if self.include_oqmd:
@@ -98,11 +99,11 @@ class QueryConvexHull():
                         break
                 if oqmd_match[ind] is not None:
                     oqmd_mu_enthalpy[ind] = float(oqmd_match[ind]['enthalpy_per_atom'])
-                    print('Using', ''.join([oqmd_match[ind]['text_id'][0], ' ',
+                    print_success('Using', ''.join([oqmd_match[ind]['text_id'][0], ' ',
                           match[ind]['text_id'][1]]), 'as OQMD chem pot for', elem)
                     print(60*'─')
                 else:
-                    print('No possible chem pots found for', elem, '.')
+                    print_failure('No possible chem pots found for', elem, '.')
                     exit()
         print('Constructing hull...')
         num_structures = len(self.cursor)
@@ -135,7 +136,8 @@ class QueryConvexHull():
             elif doc['stoichiometry'][1][0] == one_minus_x_elem:
                 num_b = doc['stoichiometry'][1][1]
             else:
-                exit('Something went wrong!')
+                print_failure('Something went wrong!')
+                exit()
             # get enthalpy per unit B
             enthalpy[ind] = doc['enthalpy'] / (num_b*num_fu)
             formation[ind] = doc['enthalpy_per_atom']
@@ -174,7 +176,8 @@ class QueryConvexHull():
                 elif doc['stoichiometry'][1][0] == one_minus_x_elem:
                     num_b = doc['stoichiometry'][1][1]
                 else:
-                    exit('Something went wrong!')
+                    print_failure('Something went wrong!')
+                    exit()
                 oqmd_enthalpy[ind] = doc['enthalpy'] / (num_b * num_fu)
                 oqmd_formation[ind] = doc['enthalpy_per_atom']
                 for mu in oqmd_match:

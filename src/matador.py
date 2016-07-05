@@ -7,6 +7,7 @@ from __future__ import print_function
 # matador modules
 from query import DBQuery
 from hull import QueryConvexHull
+from print_utils import print_failure, print_warning, print_success
 from polish import Polisher
 from spatula import Spatula
 # import external libraries
@@ -142,7 +143,8 @@ class Matador:
             from ascii_graph.colors import Gre, Blu, Red
             from ascii_graph.colordata import hcolor
         except:
-            exit('Pyascii graph missing; not printing detailed stats.')
+            print_failure('Pyascii graph missing; not printing detailed stats.')
+            exit()
         graph = Pyasciigraph(line_length=80, multivalue=False)
         thresholds = {int(overall_stats_dict['count'] / 40): Gre,
                       int(overall_stats_dict['count'] / 10): Blu,
@@ -166,7 +168,8 @@ class Matador:
             self.temp.insert(cursor)
         else:
             self.temp.drop()
-            exit('No structures found.')
+            print_failure('No structures found.')
+            exit()
         return self.temp
 
 if __name__ == '__main__':
@@ -311,7 +314,9 @@ if __name__ == '__main__':
                               # 'for isotropic or 6 floats for anisotropic.'))
     args = parser.parse_args()
     if vars(args).get('include_oqmd'):
-        exit('--include_oqmd is currently disabled, please try again soon...')
+        print_failure('--include_oqmd is currently disabled, please try again soon...')
+        exit()
     if vars(args).get('intersection') and vars(args).get('composition') is None:
-        exit('--intersection requires --composition.')
+        print_failure('--intersection requires --composition.')
+        exit()
     matador = Matador(args, argstr=argv[1:])

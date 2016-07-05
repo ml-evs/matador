@@ -104,8 +104,8 @@ class DBQuery:
                     query2files(self.cursor, self.args)
                 self.display_results(self.cursor)
                 if len(self.cursor) > 1:
-                    print('\033[93m\033[4m' + 'WARNING: matched multiple structures with same text_id.',
-                          'The first one will be used.\033[0m')
+                    print_warning('WARNING: matched multiple structures with same text_id.',
+                                  'The first one will be used.')
             if self.args.get('calc_match') or self.args['subcmd'] == 'hull':
                 # save special copy of calc_dict for hulls
                 self.calc_dict = dict()
@@ -224,8 +224,8 @@ class DBQuery:
                         ind = np.random.randint(rand_sample, count-1)
                     id_cursor = self.repo.find({'text_id': self.cursor[ind]['text_id']})
                     if id_cursor.count() > 1:
-                        print('\033[93m\033[4m' + 'WARNING: matched multiple structures with text_id',
-                              id_cursor[0]['text_id'], 'Skipping this set...\033[0m')
+                        print_warning('WARNING: matched multiple structures with text_id',
+                              id_cursor[0]['text_id'], 'Skipping this set...')
                         rand_sample += 1
                     else:
                         self.query_dict = dict()
@@ -496,7 +496,7 @@ class DBQuery:
                     if char.isupper():
                         valid = True
                 if not valid:
-                    print('Composition must contain at least one upper case character.')
+                    print_failure('Composition must contain at least one upper case character.')
                     exit()
                 elements = [elem for elem in re.split(r'([A-Z][a-z]*)', elements[0]) if elem]
                 if elements[0].isdigit():
