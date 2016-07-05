@@ -52,7 +52,7 @@ def query2files(cursor, *args):
         for comp in args['composition']:
             dirname += comp
     elif args['formula'] is not None:
-        dirname += args['formula']
+        dirname += args['formula'][0]
     if args['db'] is not None:
         dirname += '-' + args['db'][0]
     if args.get('swap') is not None:
