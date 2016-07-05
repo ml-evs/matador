@@ -6,6 +6,7 @@ and calling other functionality. """
 from __future__ import print_function
 # import related crysdb functionality
 from export import query2files
+from print_utils import print_failure, print_success, print_warning
 # import external libraries
 import pymongo as pm
 import numpy as np
@@ -14,6 +15,7 @@ from bson.son import SON
 import re
 from os import uname
 from itertools import combinations
+from traceback import print_exc
 
 
 class DBQuery:
@@ -489,6 +491,10 @@ class DBQuery:
         else:
             elements = custom_elem
         # if there's only one string, try split it by caps
+        for char in elements[0]:
+            if char.isdigit():
+                print_failure('Composition cannot contain a number.')
+                exit()
         try:
             if len(elements) == 1:
                 valid = False
@@ -499,9 +505,6 @@ class DBQuery:
                     print_failure('Composition must contain at least one upper case character.')
                     exit()
                 elements = [elem for elem in re.split(r'([A-Z][a-z]*)', elements[0]) if elem]
-                if elements[0].isdigit():
-                    raise RuntimeError('Composition string must be a ' +
-                                       'list of elements, use --num_species.')
                 while '[' in elements:
                     tmp_elements = list(elements)
                     for ind, tmp in enumerate(tmp_elements):
@@ -519,15 +522,9 @@ class DBQuery:
                     except:
                         pass
                     elements = tmp_elements
-                    for i in range(len(elements)):
-                        elements = elements[i].split('][')
-                for elem in elements:
-                    if bool(re.search(r'\d', elem)):
-                        raise RuntimeError('Composition string must be a ' +
-                                           'list of elements or a single number.')
         except Exception as oops:
-            print(type(oops), oops)
-            return EmptyCursor()
+            print_exc()
+            exit()
         if self.args.get('intersection'):
             query_dict = dict()
             query_dict['$or'] = []
