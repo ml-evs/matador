@@ -98,11 +98,14 @@ class DBQuery:
                     self.cursor.append(doc)
             if len(self.cursor) < 1:
                 exit('Could not find a match, try widening your search.')
-            elif len(self.cursor) == 1:
+            elif len(self.cursor) >= 1:
                 if self.args.get('cell') or self.args.get('res'):
                     query2files(self.cursor, self.args)
                 self.display_results(self.cursor)
-            if self.args.get('calc_match'):
+                if len(self.cursor) > 1:
+                    print('\033[93m\033[4m' + 'WARNING: matched multiple structures with same text_id.',
+                          'The first one will be used.\033[0m')
+            if self.args.get('calc_match') or self.args['subcmd'] == 'hull':
                 # save special copy of calc_dict for hulls
                 self.calc_dict = dict()
                 self.calc_dict['$and'] = []
@@ -110,6 +113,11 @@ class DBQuery:
                 # don't append, just set
                 self.query_dict['$and'] = self.query_calc(self.cursor[0])
                 self.calc_dict['$and'] = list(self.query_dict['$and'])
+                if self.args['subcmd'] == 'hull':
+                    self.args['composition'] = ''
+                    for elem in self.cursor[0]['stoichiometry']:
+                        self.args['composition'] += elem[0]
+                self.args['composition'] = [self.args['composition']]
                 empty_query = False
         # create alias for formula for backwards-compatibility
         self.args['stoichiometry'] = self.args.get('formula')
@@ -180,7 +188,8 @@ class DBQuery:
                         else:
                             self.display_results(self.cursor.clone())
             # building hull from just comp, find best structure to calc_match
-            if self.args.get('subcmd') == 'hull' or self.args.get('subcmd') == 'voltage' or self.args.get('hull_cutoff') is not None:
+            if self.args.get('id') is None and (self.args.get('subcmd') == 'hull' or self.args.get('subcmd') == 'voltage' or 
+               self.args.get('hull_cutoff') is not None):
                 if 'oqmd' in self.collections:
                     exit('Use --include_oqmd instead of --db, exiting...')
                 if len(self.collections.keys()) == 1:
@@ -199,8 +208,8 @@ class DBQuery:
                 test_query_dict = []
                 calc_dicts = []
                 cutoff = []
-                sample = 5
-                rand_sample = 5 if self.args.get('biggest') else 2
+                sample = 2
+                rand_sample = 5 if self.args.get('biggest') else 5
                 i = 0
                 count = self.cursor.count()
                 if count <= 0:
@@ -213,29 +222,34 @@ class DBQuery:
                     else:
                         ind = np.random.randint(rand_sample, count-1)
                     id_cursor = self.repo.find({'text_id': self.cursor[ind]['text_id']})
-                    self.query_dict = dict()
-                    self.query_dict['$and'] = self.query_calc(id_cursor[0])
-                    cutoff.append(id_cursor[0]['cut_off_energy'])
-                    calc_dicts.append(dict())
-                    calc_dicts[-1]['$and'] = list(self.query_dict['$and'])
-                    self.query_dict['$and'].append(self.query_composition())
-                    test_query_dict.append(self.query_dict)
-                    test_cursors.append(
-                        self.repo.find(SON(test_query_dict[-1])).sort('enthalpy_per_atom',
-                                                                      pm.ASCENDING))
-                    test_cursor_count.append(test_cursors[-1].count())
-                    print("{:^24}".format(self.cursor[ind]['text_id'][0] + ' ' +
-                                          self.cursor[ind]['text_id'][1]) +
-                          ': matched ' + str(test_cursor_count[-1]), 'structures.')
-                    try:
-                        print(12*' ' + '└╌╌╌╌╌╌╌╌╌╌╌╌╌ ', self.cursor[ind]['xc_functional'] + ',',
-                              self.cursor[ind]['cut_off_energy'], 'eV,', self.cursor[ind]['kpoints_mp_spacing'], '1/A')
-                    except:
-                        pass
-                    if self.args.get('biggest'):
-                        if test_cursor_count[-1] > 2*int(count/3):
-                            print('Matched at least 2/3 of total number, composing hull...')
-                            break
+                    if id_cursor.count() > 1:
+                        print('\033[93m\033[4m' + 'WARNING: matched multiple structures with text_id',
+                              id_cursor[0]['text_id'], 'Skipping this set...\033[0m')
+                        rand_sample += 1
+                    else:
+                        self.query_dict = dict()
+                        self.query_dict['$and'] = self.query_calc(id_cursor[0])
+                        cutoff.append(id_cursor[0]['cut_off_energy'])
+                        calc_dicts.append(dict())
+                        calc_dicts[-1]['$and'] = list(self.query_dict['$and'])
+                        self.query_dict['$and'].append(self.query_composition())
+                        test_query_dict.append(self.query_dict)
+                        test_cursors.append(
+                            self.repo.find(SON(test_query_dict[-1])).sort('enthalpy_per_atom',
+                                                                          pm.ASCENDING))
+                        test_cursor_count.append(test_cursors[-1].count())
+                        print("{:^24}".format(self.cursor[ind]['text_id'][0] + ' ' +
+                                              self.cursor[ind]['text_id'][1]) +
+                              ': matched ' + str(test_cursor_count[-1]), 'structures.', end=' -> ')
+                        try:
+                            print(self.cursor[ind]['xc_functional'] + ',', self.cursor[ind]['cut_off_energy'], 'eV,',
+                                  self.cursor[ind]['kpoints_mp_spacing'], '1/A')
+                        except:
+                            pass
+                        if self.args.get('biggest'):
+                            if test_cursor_count[-1] > 2*int(count/3):
+                                print('Matched at least 2/3 of total number, composing hull...')
+                                break
                     i += 1
                 if self.args.get('biggest'):
                     choice = np.argmax(np.asarray(test_cursor_count))
