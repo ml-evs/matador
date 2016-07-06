@@ -205,7 +205,7 @@ class QueryConvexHull():
             oqmd_structures = np.vstack((oqmd_stoich, oqmd_formation)).T
             ind = len(oqmd_formation)-3
             for doc in match:
-                stoich_string = str(doc['stoichiometry'][0][0]) + str(doc['stoichiometry'][0][1])
+                stoich_string = str(doc['stoichiometry'][0][0]) 
                 oqmd_info.append("{0:^10}\n{1:24}\n{2:5s}\n{3:2f} eV".format(
                     stoich_string, 'OQMD' + ' ' + doc['text_id'][0] + ' ' + doc['text_id'][1],
                     doc['space_group'], oqmd_formation[ind]))
@@ -283,15 +283,17 @@ class QueryConvexHull():
         info = []
         doc = match[0]
         ind = 0
-        stoich_string = str(doc['stoichiometry'][0][0]) + str(doc['stoichiometry'][0][1])
+        stoich_string = str(doc['stoichiometry'][0][0]) 
         info.append("{0:^10}\n{1:24}\n{2:5s}\n{3:2f} eV".format(stoich_string,
                                                                 doc['text_id'][0] + ' ' +
                                                                 doc['text_id'][1],
                                                                 doc['space_group'],
                                                                 hull_dist[ind]))
         for ind, doc in enumerate(self.cursor):
-            stoich_string = (str(doc['stoichiometry'][0][0]) +  str(doc['stoichiometry'][0][1]) +
-                             str(doc['stoichiometry'][1][0]) + str(doc['stoichiometry'][1][1]))
+            stoich_string = str(doc['stoichiometry'][0][0])
+            stoich_string += str(doc['stoichiometry'][0][1]) if doc['stoichiometry'][0][1] != 1 else ''
+            stoich_string += str(doc['stoichiometry'][1][0])
+            stoich_string += str(doc['stoichiometry'][1][1]) if doc['stoichiometry'][1][1] != 1 else ''
             info.append("{0:^10}\n{1:^24}\n{2:^5s}\n{3:2f} eV".format(stoich_string,
                                                                       doc['text_id'][0] + ' ' +
                                                                       doc['text_id'][1],
@@ -299,7 +301,7 @@ class QueryConvexHull():
                                                                       hull_dist[ind+1]))
         doc = match[1]
         ind = len(hull_dist)-1
-        stoich_string = str(doc['stoichiometry'][0][0]) + str(doc['stoichiometry'][0][1])
+        stoich_string = str(doc['stoichiometry'][0][0]) 
         info.append("{0:^10}\n{1:24}\n{2:5s}\n{3:2f} eV".format(stoich_string,
                                                                 doc['text_id'][0] + ' ' +
                                                                 doc['text_id'][1],
@@ -370,6 +372,14 @@ class QueryConvexHull():
                                                marker='*', zorder=99999, edgecolor='k',
                                                s=self.scale*150, lw=1, alpha=1,
                                                label=self.info[self.hull.vertices[ind]]))
+                ax.annotate(self.info[self.hull.vertices[ind]].split('\n')[0],
+                            xy=(self.structures[self.hull.vertices[ind], 0],
+                                self.structures[self.hull.vertices[ind], 1]),
+                            textcoords='data',
+                            ha='center',
+                            xytext=(self.structures[self.hull.vertices[ind], 0],
+                                    self.structures[self.hull.vertices[ind], 1]-0.07))
+                                                                
         lw = self.scale * 0.05 if self.mpl_new_ver else 1
         # points for off hull structures
         for ind in range(len(self.structures)):
@@ -428,7 +438,7 @@ class QueryConvexHull():
                        # bbox=dict(fc='white'),
                        # arrowprops=dict(arrowstyle='simple', alpha=1))
         ax.set_ylim(-0.1 if np.min(self.structures[self.hull.vertices, 1]) > 0
-                    else np.min(self.structures[self.hull.vertices, 1])-0.1,
+                    else np.min(self.structures[self.hull.vertices, 1])-0.15,
                     0.5 if np.max(self.structures[self.hull.vertices, 1]) > 1
                     else np.max(self.structures[self.hull.vertices, 1])+0.1)
         ax.set_title('$\mathrm{'+x_elem+'_x'+one_minus_x_elem+'_{1-x}}$')
