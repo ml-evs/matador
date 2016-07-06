@@ -236,6 +236,8 @@ class DBQuery:
                         calc_dicts.append(dict())
                         calc_dicts[-1]['$and'] = list(self.query_dict['$and'])
                         self.query_dict['$and'].append(self.query_composition())
+                        if self.args.get('ignore_warnings') is False:
+                            self.query_dict['$and'].append(self.query_quality())
                         test_query_dict.append(self.query_dict)
                         test_cursors.append(
                             self.repo.find(SON(test_query_dict[-1])).sort('enthalpy_per_atom',
