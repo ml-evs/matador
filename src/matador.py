@@ -93,7 +93,7 @@ class Matador:
             print('Database last modified on', report['last_modified'], 'with spatula',
                   report['version'], 'changeset (' + report['git_hash'] + ').')
         except:
-            print('Failed to print database report: spatula is probably running!')
+            print_warning('Failed to print database report: spatula is probably running!')
 
     def stats(self):
         """ Print some useful stats about the database. """
