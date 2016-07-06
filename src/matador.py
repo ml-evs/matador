@@ -319,4 +319,7 @@ if __name__ == '__main__':
     if vars(args).get('intersection') and vars(args).get('composition') is None:
         print_failure('--intersection requires --composition.')
         exit()
+    if vars(args).get('subcmd') == 'hull' and vars(args).get('formula') is not None:
+        print_failure('hull not compatible with --formula, please use --composition')
+        exit()
     matador = Matador(args, argstr=argv[1:])
