@@ -15,7 +15,11 @@ for root, dirs, files in walk('.', topdown=True, followlinks=True):
             if not success:
                 print('Failure to read castep')
             else:
-                structure_files[castep_dict['source'][0].split('/')[-1]].append(castep_dict)
+                source = castep_dict['source'][0].split('/')[-1]
+                source = source.replace('.castep', '')
+                source = ''.join(source.split('_')[:-1])
+                print(source)
+                structure_files[source].append(castep_dict)
 
 cutoff_chempots_dict = defaultdict(dict)
 cutoff_chempots = defaultdict(list)
@@ -49,12 +53,12 @@ for key in cutoff_chempots:
 
 import matplotlib.pyplot as plt
 plt.style.use('bmh')
-fig = plt.figure(facecolor='w')
-ax = fig.add_subplot(121)
-ax2 = fig.add_subplot(122)
+fig = plt.figure(facecolor='w', figsize=(10,10))
+ax = fig.add_subplot(211)
+ax2 = fig.add_subplot(212)
 for key in cutoff_form:
     ax.plot(1/cutoff_form[key][:,0], cutoff_form[key][:,1]-cutoff_form[key][-1,1], 'o--', alpha=1, label=stoich_list[key], lw=2)
-ax.legend(loc=3)
+ax.legend(loc=2)
 ax.axhline(0, linestyle='--', c='k', alpha=0.4)
 ax.set_xticks(1/cutoff_form[key][:,0])
 ax.set_ylabel('$E(e_c) - E(' + str(cutoff_form[key][-1,0]) + ' \mathrm{eV})$')
@@ -62,7 +66,7 @@ ax.set_xlabel('$1/e_c  (\mathrm{eV}^{-1})$')
 ax.set_xticklabels(['1/' + str(E) for E in cutoff_form[key][:,0]])
 for key in cutoff_chempots:
     ax2.plot(1/cutoff_chempots[key][:,0], cutoff_chempots[key][:,1]-cutoff_chempots[key][-1, 1], 'o--', alpha=1, label=chempot_list[key], lw=2)
-ax2.legend(loc=3)
+ax2.legend(loc=2)
 ax2.axhline(0, linestyle='--', c='k', alpha=0.4)
 ax2.set_xticks(1/cutoff_chempots[key][:,0])
 ax2.set_ylabel('$E(e_c) - E(' + str(cutoff_chempots[key][-1,0]) + ' \mathrm{eV})$')
