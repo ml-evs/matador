@@ -81,7 +81,7 @@ class QueryConvexHull():
                       match[ind]['text_id'][1]]), 'as chem pot for', elem)
                 print(60*'─')
             else:
-                print_failure('No possible chem pots found for', elem, '.')
+                print_failure('No possible chem pots found for ' + elem + '.')
                 exit()
         # include OQMD structures if desired, first find chem pots
         if self.include_oqmd:
