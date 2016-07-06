@@ -179,6 +179,7 @@ class FullRelaxer:
         calc_doc.update(cell_dict)
         calc_doc.update(param_dict)
         calc_doc['task'] = 'geometryoptimization'
+        self.max_iter = calc_doc['geom_max_iter']
         if self.debug:
             print(json.dumps(calc_doc, indent=2))
         if self.conv_cutoff_bool:
@@ -198,11 +199,11 @@ class FullRelaxer:
         num_rough_iter = 4
         num_fine_iter = 4
         rough_iter = 2
-        fine_iter = int(calc_doc['geom_max_iter'])/num_fine_iter
+        fine_iter = int(self.max_iter)/num_fine_iter
         geom_max_iter_list = (num_rough_iter * [rough_iter])
         geom_max_iter_list.extend(num_fine_iter * [fine_iter])
-        print(geom_max_iter_list)
         # relax structure
+        print(geom_max_iter_list)
         for ind, num_iter in enumerate(geom_max_iter_list):
             calc_doc['geom_max_iter'] = num_iter
             try:
@@ -231,7 +232,8 @@ class FullRelaxer:
                     system('mv ' + seed + '.castep' + ' completed/' + seed + '.castep')
                     system('mv ' + seed + '.param' + ' completed/' + seed + '.param')
                     system('mv ' + seed + '.cell' + ' completed/' + seed + '.cell')
-                    system('mv ' + seed + '-out.cell' + ' completed/' + seed + '-out.cell')
+                    if calc_doc.get('write_cell_structure') == 'true':
+                        system('mv ' + seed + '-out.cell' + ' completed/' + seed + '-out.cell')
                     # clean up rest of files
                     self.tidy_up(seed)
                     return True
