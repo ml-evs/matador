@@ -202,7 +202,7 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, *args):
                 f.write(''.join(str(doc['cell_constraints'][1]).strip('[]'))+'\n')
                 f.write('%ENDBLOCK CELL_CONSTRAINTS\n\n')
             if 'fix_com' in doc:
-                f.write('FIX_COM')
+                f.write('FIX_COM : TRUE\n')
             if 'symmetry_generate' in doc:
                 f.write('SYMMETRY_GENERATE\n')
             if 'snap_to_symmetry' in doc:
