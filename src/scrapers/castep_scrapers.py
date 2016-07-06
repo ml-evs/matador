@@ -514,7 +514,7 @@ def castep2dict(seed, db=True, **kwargs):
             failure_string = 'Geometry optimization failed to converge after'
             for line_no, line in enumerate(flines):
                 if any(finished in line for finished in [success_string, failure_string]):
-                    for line_next in range(line_no+1, len(flines)):
+                    for line_next in range(line_no, len(flines)):
                         if any(finished in flines[line_next] for finished in [success_string, failure_string]):
                             finish_line = line_next
                             if success_string in flines[line_next]:
