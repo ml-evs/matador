@@ -223,6 +223,8 @@ if __name__ == '__main__':
     structure_parser.add_argument('--loose', action='store_true',
                                   help='loosely matches with calc_match, i.e. only matches \
                                         pspot and xc_functional')
+    structure_parser.add_argument('--ignore_warnings', action='store_true',
+                              help='includes possibly bad structures')
     # define material parser for hull/voltage arguments
     material_parser = argparse.ArgumentParser(add_help=False)
     material_parser.add_argument('--include_oqmd', action='store_true',
@@ -276,8 +278,6 @@ if __name__ == '__main__':
                               help='export query to .cell files in folder name from query string')
     query_parser.add_argument('--res', action='store_true',
                               help='export query to .res files in folder name from query string')
-    query_parser.add_argument('--ignore_warnings', action='store_true',
-                              help='includes possibly bad structures')
     import_parser = subparsers.add_parser('import',
                                           help='import new structures in folder into database',
                                           parents=[global_parser, spatula_parser])
