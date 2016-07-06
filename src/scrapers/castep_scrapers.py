@@ -157,7 +157,7 @@ def cell2dict(seed, db=True, **kwargs):
                 while 'endblock' not in flines[line_no+i].lower():
                     try:
                         cell['species_pot'][flines[line_no+i].split()[0]] = \
-                            flines[line_no+i].split()[1].split('/')[-1]
+                            flines[line_no+i].split()[1].split('/')[-1].replace('compat7', '').replace(',', '')
                     except:
                         pass
                     i += 1
