@@ -236,7 +236,7 @@ class DBQuery:
                         calc_dicts.append(dict())
                         calc_dicts[-1]['$and'] = list(self.query_dict['$and'])
                         self.query_dict['$and'].append(self.query_composition())
-                        if self.args.get('ignore_warnings') is False:
+                        if not self.args.get('ignore_warnings'):
                             self.query_dict['$and'].append(self.query_quality())
                         test_query_dict.append(self.query_dict)
                         test_cursors.append(
@@ -699,7 +699,7 @@ class DBQuery:
         temp_dict['xc_functional'] = doc['xc_functional']
         query_dict.append(temp_dict)
         temp_dict = dict()
-        if 'spin_polarized' in doc and doc['spin_polarized'] != []:
+        if 'spin_polarized' in doc and doc['spin_polarized']:
             temp_dict['spin_polarized'] = doc['spin_polarized']
             query_dict.append(temp_dict)
         else:
