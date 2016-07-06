@@ -41,7 +41,6 @@ class BatchRun:
         self.debug = self.args.get('debug')
         self.all_cores = mp.cpu_count()
         self.seed = self.args.get('seed')
-        self.conv_cutoff = self.args.get('conv_cutoff')
         valid = True
         if self.args.get('nprocesses') is not None:
             self.nprocesses = self.args['nprocesses']
@@ -77,6 +76,21 @@ class BatchRun:
         if int(self.param_dict['geom_max_iter']) < 20:
             valid = False
             print_failure('geom_max_iter is only ' + str(self.param_dict['geom_max_iter']) + '... quitting.')
+        if self.args.get('conv_cutoff'):
+            try:
+                if isfile('cutoff.conv'):
+                    with open('cutoff.conv', 'r') as f:
+                        flines = f.readlines()
+                        self.cutoffs = []
+                        for line in flines:
+                            self.cutoffs.append(int(line))
+                else:
+                    raise RuntimeError
+            except:
+                valid = False
+                print_failure('Error with cutoff.conv file.')
+        else:
+            self.cutoffs = None
         if not valid:
             exit('Exiting...')
         # delete source from cell and param
@@ -132,7 +146,7 @@ class BatchRun:
                                 param_dict=self.param_dict,
                                 cell_dict=self.cell_dict,
                                 debug=self.debug,
-                                conv_cutoff=self.conv_cutoff)
+                                conv_cutoff=self.cutoffs)
                     print('Completed', res)
                 except(KeyboardInterrupt, SystemExit, RuntimeError):
                     raise SystemExit
@@ -283,8 +297,8 @@ if __name__ == '__main__':
                         help='number of concurrent calculations [DEFAULT=1]')
     parser.add_argument('-d', '--debug', action='store_true',
                         help='debug output')
-    parser.add_argument('--conv_cutoff', type=int, nargs='+',
-                        help='provide a list of cutoffs to run all structures at')
+    parser.add_argument('--conv_cutoff', action='store_true',
+                        help='run all res files at cutoff defined in cutoff.conv file')
     args = parser.parse_args()
     runner = BatchRun(ncores=args.ncores, nprocesses=args.nprocesses, debug=args.debug, seed=args.seed,
                       conv_cutoff=args.conv_cutoff)
