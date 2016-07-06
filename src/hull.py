@@ -7,7 +7,7 @@ from __future__ import print_function
 from scipy.spatial import ConvexHull
 from bson.son import SON
 from bisect import bisect_left
-from print_utils import print_failure, print_success, print_success
+from print_utils import print_failure, print_success, print_warning
 import pymongo as pm
 import re
 import numpy as np
@@ -99,11 +99,11 @@ class QueryConvexHull():
                         break
                 if oqmd_match[ind] is not None:
                     oqmd_mu_enthalpy[ind] = float(oqmd_match[ind]['enthalpy_per_atom'])
-                    print_success('Using', ''.join([oqmd_match[ind]['text_id'][0], ' ',
-                          match[ind]['text_id'][1]]), 'as OQMD chem pot for', elem)
+                    print_success('Using ' + ''.join([oqmd_match[ind]['text_id'][0] + ' ' +
+                          match[ind]['text_id'][1]]) + ' as OQMD chem pot for ' + elem)
                     print(60*'─')
                 else:
-                    print_failure('No possible chem pots found for', elem, '.')
+                    print_failure('No possible chem pots found for ' + elem + '.')
                     exit()
         print('Constructing hull...')
         num_structures = len(self.cursor)

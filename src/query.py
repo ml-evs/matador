@@ -106,7 +106,7 @@ class DBQuery:
                     query2files(self.cursor, self.args)
                 self.display_results(self.cursor)
                 if len(self.cursor) > 1:
-                    print_warning('WARNING: matched multiple structures with same text_id.',
+                    print_warning('WARNING: matched multiple structures with same text_id. ' + 
                                   'The first one will be used.')
             if self.args.get('calc_match') or self.args['subcmd'] == 'hull':
                 # save special copy of calc_dict for hulls
@@ -226,8 +226,8 @@ class DBQuery:
                         ind = np.random.randint(rand_sample, count-1)
                     id_cursor = self.repo.find({'text_id': self.cursor[ind]['text_id']})
                     if id_cursor.count() > 1:
-                        print_warning('WARNING: matched multiple structures with text_id',
-                              id_cursor[0]['text_id'], 'Skipping this set...')
+                        print_warning('WARNING: matched multiple structures with text_id ' +
+                              id_cursor[0]['text_id'][0] + ' ' + id_cursor[0]['text_id'][1] + '.  Skipping this set...')
                         rand_sample += 1
                     else:
                         self.query_dict = dict()
