@@ -197,7 +197,7 @@ class FullRelaxer:
         then continue with the remainder of steps.
         """
         num_rough_iter = 4
-        num_fine_iter = 4
+        num_fine_iter = 10
         rough_iter = 2
         fine_iter = int(self.max_iter)/num_fine_iter
         geom_max_iter_list = (num_rough_iter * [rough_iter])
