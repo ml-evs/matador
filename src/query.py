@@ -457,14 +457,22 @@ class DBQuery:
         # if there's only one string, try split it by caps
         if len(stoich) == 1:
             stoich = [elem for elem in re.split(r'([A-Z][a-z]*)', stoich[0]) if elem]
-            while '[' in stoich:
+            while '[' in stoich or '][' in stoich:
                 tmp_stoich = list(stoich)
                 for ind, tmp in enumerate(tmp_stoich):
+                    if tmp == '][':
+                        del tmp_stoich[ind]
+                        tmp_stoich.insert(ind, '[')
+                        tmp_stoich.insert(ind, ']')
+                        break
+                for ind, tmp in enumerate(tmp_stoich):
                     if tmp == '[':
-                        while tmp_stoich[ind+1] != ']':
+                        end_bracket = False
+                        while not end_bracket:
+                            if tmp_stoich[ind+1] == ']':
+                                end_bracket = True
                             tmp_stoich[ind] += tmp_stoich[ind+1]
                             del tmp_stoich[ind+1]
-                        tmp_stoich[ind] += ']'
                 try:
                     tmp_stoich.remove(']')
                 except:
@@ -485,6 +493,7 @@ class DBQuery:
                     fraction.append(1.0)
         fraction = np.asarray(fraction)
         fraction /= np.min(fraction)
+        print(fraction)
         query_dict = dict()
         query_dict['$and'] = []
         for ind, elem in enumerate(elements):
@@ -534,23 +543,31 @@ class DBQuery:
                     print_failure('Composition must contain at least one upper case character.')
                     exit()
                 elements = [elem for elem in re.split(r'([A-Z][a-z]*)', elements[0]) if elem]
-                while '[' in elements:
-                    tmp_elements = list(elements)
-                    for ind, tmp in enumerate(tmp_elements):
+                while '[' in elements or '][' in elements:
+                    tmp_stoich = list(elements)
+                    for ind, tmp in enumerate(tmp_stoich):
+                        if tmp == '][':
+                            del tmp_stoich[ind]
+                            tmp_stoich.insert(ind, '[')
+                            tmp_stoich.insert(ind, ']')
+                            break
+                    for ind, tmp in enumerate(tmp_stoich):
                         if tmp == '[':
-                            while tmp_elements[ind+1] != ']':
-                                tmp_elements[ind] += tmp_elements[ind+1]
-                                del tmp_elements[ind+1]
-                            tmp_elements[ind] += ']'
+                            end_bracket = False
+                            while not end_bracket:
+                                if tmp_stoich[ind+1] == ']':
+                                    end_bracket = True
+                                tmp_stoich[ind] += tmp_stoich[ind+1]
+                                del tmp_stoich[ind+1]
                     try:
-                        tmp_elements.remove(']')
+                        tmp_stoich.remove(']')
                     except:
                         pass
                     try:
-                        tmp_elements.remove('')
+                        tmp_stoich.remove('')
                     except:
                         pass
-                    elements = tmp_elements
+                    elements = tmp_stoich 
         except Exception as oops:
             print_exc()
             exit()
