@@ -21,7 +21,6 @@ from scrapers.castep_scrapers import res2dict, castep2dict
 from print_utils import print_failure, print_success, print_warning, print_notify
 from export import doc2cell, doc2param, doc2res
 from traceback import print_exc
-import bson.json_util as json
 import argparse
 import multiprocessing as mp
 import subprocess as sp
@@ -52,7 +51,7 @@ class BatchRun:
             self.ncores = self.all_cores / self.nprocesses
         if self.ncores*self.nprocesses > self.all_cores:
             print_failure('Requested more cores (' + str(self.ncores*self.nprocesses) +
-                  ') than available (' + str(self.all_cores) + ').')
+                          ') than available (' + str(self.all_cores) + ').')
             exit('Exiting...')
         # scan directory for files to run
         self.file_lists = defaultdict(list)
@@ -75,7 +74,8 @@ class BatchRun:
             print_failure('Failed to parse cell file')
         if int(self.param_dict['geom_max_iter']) < 20:
             valid = False
-            print_failure('geom_max_iter is only ' + str(self.param_dict['geom_max_iter']) + '... quitting.')
+            print_failure('geom_max_iter is only ' +
+                          str(self.param_dict['geom_max_iter']) + '... quitting.')
         if self.args.get('conv_cutoff'):
             try:
                 if isfile('cutoff.conv'):
@@ -147,9 +147,12 @@ class BatchRun:
                                 cell_dict=self.cell_dict,
                                 debug=self.debug,
                                 conv_cutoff=self.cutoffs)
+                    with open(paths['completed_fname'], 'a') as job_file:
+                        job_file.write(res+'\n')
                 except(KeyboardInterrupt, SystemExit, RuntimeError):
                     raise SystemExit
         return
+
 
 class FullRelaxer:
     """ Perform full relxation of res input by first doing
@@ -157,7 +160,8 @@ class FullRelaxer:
     4 larger optimisations with many iterations,
     e.g. 4 lots of 2 then 4 lots of geom_max_iter/4.
     """
-    def __init__(self, paths, ncores, res, param_dict, cell_dict, debug, conv_cutoff):
+    def __init__(self, paths, ncores, res, param_dict, cell_dict,
+                 debug=False, conv_cutoff=None):
         """ Make the files to run the calculation and handle
         the calling of CASTEP itself.
         """
@@ -178,9 +182,14 @@ class FullRelaxer:
         calc_doc.update(cell_dict)
         calc_doc.update(param_dict)
         calc_doc['task'] = 'geometryoptimization'
+        # set up geom opt parameters
         self.max_iter = calc_doc['geom_max_iter']
-        if self.debug:
-            print(json.dumps(calc_doc, indent=2))
+        num_rough_iter = 4
+        fine_iter = 20
+        rough_iter = 2
+        num_fine_iter = int(self.max_iter)/fine_iter
+        self.geom_max_iter_list = (num_rough_iter * [rough_iter])
+        self.geom_max_iter_list.extend(num_fine_iter * [fine_iter])
         if self.conv_cutoff_bool:
             for cutoff in self.conv_cutoff:
                 calc_doc.update({'cut_off_energy': cutoff})
@@ -195,12 +204,7 @@ class FullRelaxer:
         """ Set up the calculation to perform 4 sets of two steps,
         then continue with the remainder of steps.
         """
-        num_rough_iter = 4
-        fine_iter = 20
-        rough_iter = 2
-        num_fine_iter = int(self.max_iter)/fine_iter
-        geom_max_iter_list = (num_rough_iter * [rough_iter])
-        geom_max_iter_list.extend(num_fine_iter * [fine_iter])
+        geom_max_iter_list = self.geom_max_iter_list
         # relax structure
         print(geom_max_iter_list)
         # copy initial res file to seed
@@ -208,7 +212,7 @@ class FullRelaxer:
         for ind, num_iter in enumerate(geom_max_iter_list):
             if ind == 0:
                 print_notify('Beginning rough geometry optimisation...')
-            elif ind == num_rough_iter:
+            elif ind == self.num_rough_iter:
                 print_notify('Beginning fine geometry optimisation...')
             calc_doc['geom_max_iter'] = num_iter
             try:
@@ -238,6 +242,7 @@ class FullRelaxer:
                     if not exists('completed'):
                         makedirs('completed')
                     print_success('Successfully relaxed ' + seed)
+
                     # write res and castep file out to completed folder
                     doc2res(opti_dict, 'completed/' + seed, hash_dupe=False)
                     system('mv ' + seed + '.castep' + ' completed/' + seed + '.castep')
@@ -275,6 +280,16 @@ class FullRelaxer:
                 self.tidy_up(seed)
                 return False
 
+    def castep(self, seed):
+        """ Calls CASTEP on desired seed with desired number of cores.
+        """
+        if self.ncores == 1:
+            process = sp.Popen(['nice', '-n', '15', self.executable, seed])
+        else:
+            process = sp.Popen(['nice', '-n', '15', 'mpirun', '-n', str(self.ncores),
+                                self.executable, seed])
+        return process
+
     def mv_to_bad(self, seed):
         """ Move all associated files to bad_castep. """
         if not exists('bad_castep'):
@@ -294,17 +309,6 @@ class FullRelaxer:
         """ Delete all run3 created files before quitting. """
         system('rm ' + seed + '*')
         return
-
-    def castep(self, seed):
-        """ Calls CASTEP on desired seed with desired number of cores.
-        Errors piped to /dev/null for now...
-        """
-        if self.ncores == 1:
-            process = sp.Popen(['nice', '-n', '15', self.executable, seed])
-        else:
-            process = sp.Popen(['nice', '-n', '15', 'mpirun', '-n', str(self.ncores),
-                                self.executable, seed])
-        return process
 
 
 if __name__ == '__main__':
@@ -327,8 +331,8 @@ if __name__ == '__main__':
     parser.add_argument('--conv_cutoff', action='store_true',
                         help='run all res files at cutoff defined in cutoff.conv file')
     args = parser.parse_args()
-    runner = BatchRun(ncores=args.ncores, nprocesses=args.nprocesses, debug=args.debug, seed=args.seed,
-                      conv_cutoff=args.conv_cutoff)
+    runner = BatchRun(ncores=args.ncores, nprocesses=args.nprocesses, debug=args.debug,
+                      seed=args.seed, conv_cutoff=args.conv_cutoff)
     try:
         runner.spawn()
     except(KeyboardInterrupt, SystemExit):
