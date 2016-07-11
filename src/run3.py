@@ -18,7 +18,7 @@ from os.path import isfile, exists
 from collections import defaultdict
 from scrapers.castep_scrapers import cell2dict, param2dict
 from scrapers.castep_scrapers import res2dict, castep2dict
-from print_utils import print_failure, print_success, print_warning
+from print_utils import print_failure, print_success, print_warning, print_notify
 from export import doc2cell, doc2param, doc2res
 from traceback import print_exc
 import bson.json_util as json
@@ -147,7 +147,6 @@ class BatchRun:
                                 cell_dict=self.cell_dict,
                                 debug=self.debug,
                                 conv_cutoff=self.cutoffs)
-                    print('Completed', res)
                 except(KeyboardInterrupt, SystemExit, RuntimeError):
                     raise SystemExit
         return
@@ -174,7 +173,7 @@ class FullRelaxer:
         calc_doc = res_dict
         # set seed name
         self.seed = calc_doc['source'][0].replace('.res', '')
-        print('Relaxing', self.seed)
+        print_notify('Relaxing ' + self.seed)
         # update global doc with cell and param dicts for folder
         calc_doc.update(cell_dict)
         calc_doc.update(param_dict)
@@ -197,14 +196,18 @@ class FullRelaxer:
         then continue with the remainder of steps.
         """
         num_rough_iter = 4
-        num_fine_iter = 10
+        fine_iter = 20
         rough_iter = 2
-        fine_iter = int(self.max_iter)/num_fine_iter
+        num_fine_iter = int(self.max_iter)/fine_iter
         geom_max_iter_list = (num_rough_iter * [rough_iter])
         geom_max_iter_list.extend(num_fine_iter * [fine_iter])
         # relax structure
         print(geom_max_iter_list)
         for ind, num_iter in enumerate(geom_max_iter_list):
+            if ind == 0:
+                print_notify('Beginning rough geometry optimisation...')
+            elif ind == num_rough_iter:
+                print_notify('Beginning fine geometry optimisation...')
             calc_doc['geom_max_iter'] = num_iter
             try:
                 # delete any existing files
