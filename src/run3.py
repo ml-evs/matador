@@ -223,6 +223,12 @@ class FullRelaxer:
                 process.communicate()
                 # scrape new structure from castep file
                 opti_dict, success = castep2dict(seed + '.castep', db=False)
+                try:
+                    # delete any k-point information
+                    del opti_dict['kpoint_mp_spacing']
+                    del opti_dict['kpoint_mp_grid']
+                except:
+                    pass
                 if not success and opti_dict == '':
                     print_warning('Failed to scrape castep file...')
                     return False
