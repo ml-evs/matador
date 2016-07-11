@@ -239,7 +239,7 @@ class FullRelaxer:
                         makedirs('completed')
                     print_success('Successfully relaxed ' + seed)
                     # write res and castep file out to completed folder
-                    doc2res(opti_dict, 'completed/' + seed)
+                    doc2res(opti_dict, 'completed/' + seed, hash_dupe=False)
                     system('mv ' + seed + '.castep' + ' completed/' + seed + '.castep')
                     system('mv ' + seed + '.param' + ' completed/' + seed + '.param')
                     system('mv ' + seed + '.cell' + ' completed/' + seed + '.cell')
@@ -252,18 +252,18 @@ class FullRelaxer:
                     print_warning('Failed to optimise ' + seed)
                     self.mv_to_bad(seed)
                     # write final res file to bad_castep
-                    doc2res(opti_dict, 'bad_castep/' + seed)
+                    doc2res(opti_dict, 'bad_castep/' + seed, hash_dupe=False)
                 else:
                     err_file = seed + '*.err'
                     for globbed in glob.glob(err_file):
                         if isfile(globbed):
                             print_warning('Failed to optimise ' + seed + ' CASTEP crashed.')
                             # write final res file to bad_castep
-                            doc2res(opti_dict, 'bad_castep/' + seed)
+                            doc2res(opti_dict, 'bad_castep/' + seed, hash_dupe=False)
                             self.mv_to_bad(seed)
                             return False
                     # update res file to latest step for restarts
-                    doc2res(opti_dict, + seed)
+                    doc2res(opti_dict, seed, hash_dupe=False)
                     calc_doc.update(opti_dict)
             except(SystemExit, KeyboardInterrupt):
                 self.mv_to_bad(seed)
