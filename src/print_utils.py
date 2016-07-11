@@ -5,7 +5,7 @@ from __future__ import print_function
 
 
 def print_warning(string):
-    print('\033[93m\033[4m', end='')
+    print('\033[93m', end='')
     print(string, end='')
     print('\033[0m')
 
@@ -19,3 +19,7 @@ def print_success(string):
     print(string, end='')
     print('\033[0m')
 
+def print_notify(string):
+    print('\033[94m', end='')
+    print(string, end='')
+    print('\033[0m')
