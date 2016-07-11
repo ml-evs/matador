@@ -280,9 +280,6 @@ def param2dict(seed, db=True, **kwargs):
                             if 'geom_force_tol' in line:
                                 param['geom_force_tol'] = float(param['geom_force_tol'])
                             break
-        # if no defined geom_force_tol, use CASTEP default
-        if 'max_force_on_atom' not in param:
-            param['geom_force_tol'] = 0.05
     except Exception as oops:
         if kwargs.get('verbosity') > 0:
             print_exc()
