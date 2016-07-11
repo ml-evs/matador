@@ -63,7 +63,7 @@ class BatchRun:
                         self.file_lists['res'].append(file)
         if len(self.file_lists['res']) < 1:
             valid = False
-            print_failure('run3 requires at least 1 res file in folder, found' + 
+            print_failure('run3 requires at least 1 res file in folder, found' +
                           str(len(self.file_lists['res'])))
         self.cell_dict, cell_success = cell2dict(self.seed + '.cell', db=False)
         if not cell_success:
@@ -152,7 +152,7 @@ class BatchRun:
         return
 
 class FullRelaxer:
-    """ Perform full relxation of res input by first doing 
+    """ Perform full relxation of res input by first doing
     4 rough optimisations with only a few iterations, followed by
     4 larger optimisations with many iterations,
     e.g. 4 lots of 2 then 4 lots of geom_max_iter/4.
@@ -189,7 +189,7 @@ class FullRelaxer:
         else:
             self.success = self.relax(calc_doc, self.seed)
         if not success:
-            self.mv_to_bad()
+            self.mv_to_bad(self.seed)
 
     def relax(self, calc_doc, seed):
         """ Set up the calculation to perform 4 sets of two steps,
@@ -203,6 +203,8 @@ class FullRelaxer:
         geom_max_iter_list.extend(num_fine_iter * [fine_iter])
         # relax structure
         print(geom_max_iter_list)
+        # copy initial res file to seed
+        self.cp_to_input(self.seed)
         for ind, num_iter in enumerate(geom_max_iter_list):
             if ind == 0:
                 print_notify('Beginning rough geometry optimisation...')
@@ -249,12 +251,19 @@ class FullRelaxer:
                 elif ind == len(geom_max_iter_list) - 1:
                     print_warning('Failed to optimise ' + seed)
                     self.mv_to_bad(seed)
+                    # write final res file to bad_castep
+                    doc2res(opti_dict, 'bad_castep/' + seed)
                 else:
                     err_file = seed + '*.err'
                     for globbed in glob.glob(err_file):
                         if isfile(globbed):
+                            print_warning('Failed to optimise ' + seed + ' CASTEP crashed.')
+                            # write final res file to bad_castep
+                            doc2res(opti_dict, 'bad_castep/' + seed)
                             self.mv_to_bad(seed)
                             return False
+                    # update res file to latest step for restarts
+                    doc2res(opti_dict, + seed)
                     calc_doc.update(opti_dict)
             except(SystemExit, KeyboardInterrupt):
                 self.mv_to_bad(seed)
@@ -274,13 +283,20 @@ class FullRelaxer:
         system('mv ' + seed + '* bad_castep')
         return
 
+    def cp_to_input(self, seed):
+        """ Copy initial cell and res to input folder. """
+        if not exists('input'):
+            makedirs('input')
+        system('cp ' + seed + '.res input')
+        return
+
     def tidy_up(self, seed):
         """ Delete all run3 created files before quitting. """
         system('rm ' + seed + '*')
         return
 
     def castep(self, seed):
-        """ Calls CASTEP on desired seed with desired number of cores. 
+        """ Calls CASTEP on desired seed with desired number of cores.
         Errors piped to /dev/null for now...
         """
         if self.ncores == 1:
