@@ -219,7 +219,7 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, *args):
                 f.write('eV\n')
                 for elem in doc['hubbard_u']:
                     for orbital in doc['hubbard_u'][elem]:
-                        shift = doc['hubbard_u'][elem][orbital]
+                        shift = str(doc['hubbard_u'][elem][orbital])
                         f.write(elem + ' ' + orbital + ' : ' + shift + '\n')
                 f.write('%ENDBLOCK HUBBARD_U\n')
             if 'species_pot' in doc:
@@ -245,6 +245,7 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, *args):
             print(type(oops), oops)
         else:
             print_exc()
+
 
 def doc2res(doc, path, info=True, hash_dupe=True, *args):
     """ Write .res file for single doc. """

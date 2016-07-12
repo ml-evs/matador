@@ -174,7 +174,6 @@ def cell2dict(seed, db=True, **kwargs):
                 i = 0
                 while 'endblock' not in flines[line_no+i].lower():
                     line = flines[line_no+i]
-                    print(line)
                     if line == 'eV' or len(line.split()) < 3:
                         i += 1
                         continue
