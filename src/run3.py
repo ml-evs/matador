@@ -51,7 +51,8 @@ class BatchRun:
             self.ncores = self.all_cores / self.nprocesses
         if self.ncores*self.nprocesses > self.all_cores:
             print_warning('Requested more cores (' + str(self.ncores*self.nprocesses) +
-                          ') than available (' + str(self.all_cores) + '). (Maybe you are using a queueing system).')
+                          ') than available (' + str(self.all_cores) + ').' +
+                          '(Maybe you are using a queueing system).')
         # scan directory for files to run
         self.file_lists = defaultdict(list)
         for root, dirs, files in walk('.'):

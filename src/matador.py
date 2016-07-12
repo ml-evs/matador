@@ -7,7 +7,7 @@ from __future__ import print_function
 # matador modules
 from query import DBQuery
 from hull import QueryConvexHull
-from print_utils import print_failure, print_warning, print_success
+from print_utils import print_failure, print_warning
 from polish import Polisher
 from spatula import Spatula
 # import external libraries
@@ -195,7 +195,7 @@ if __name__ == '__main__':
                                         [Lan] and [Act], used with square brackets.')
     structure_parser.add_argument('-int', '--intersection', action='store_true',
                                   help='query the intersection of compositions instead of the union \
-                                        e.g. -c LiSnS -int queries Li, Sn, S, LiSn, LiS and LiSnS.')
+                                        e.g. -c LiSnS -int queries Li, Sn, S, LiSn, LiS & LiSnS.')
     structure_parser.add_argument('-n', '--num_species', type=int, nargs='+',
                                   help='find all structures containing a certain \
                                         number of species.')
@@ -224,7 +224,7 @@ if __name__ == '__main__':
                                   help='loosely matches with calc_match, i.e. only matches \
                                         pspot and xc_functional')
     structure_parser.add_argument('--ignore_warnings', action='store_true',
-                              help='includes possibly bad structures')
+                                  help='includes possibly bad structures')
     # define material parser for hull/voltage arguments
     material_parser = argparse.ArgumentParser(add_help=False)
     material_parser.add_argument('--include_oqmd', action='store_true',
@@ -232,7 +232,7 @@ if __name__ == '__main__':
     material_parser.add_argument('-hc', '--hull_cutoff', type=float,
                                  help='return only structures within a certain distance from hull')
     material_parser.add_argument('--biggest', action='store_true',
-                                 help='try to use the largest subset of structures to create a hull')
+                                 help='use the largest subset of structures to create a hull')
     plot_parser = argparse.ArgumentParser(add_help=False)
     plot_parser.add_argument('--png', action='store_true',
                              help='save png rather than showing plot in X')
@@ -257,8 +257,8 @@ if __name__ == '__main__':
                                    help=('the seedname (must be within pwd) of cell and param ' +
                                          'files to use for polishing/swaps'))
     collection_parser.add_argument('--prefix', type=str,
-                              help='add a prefix to all file names to write out (auto-appended \
-                              with an underscore')
+                                   help='add a prefix to all file names to write out (auto-appended \
+                                         with an underscore')
     # define subcommand parsers and their arguments
     stat_parser = subparsers.add_parser('stats',
                                         help='print some stats about the database.',

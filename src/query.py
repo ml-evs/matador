@@ -6,7 +6,7 @@ and calling other functionality. """
 from __future__ import print_function
 # import related crysdb functionality
 from export import query2files
-from print_utils import print_failure, print_success, print_warning
+from print_utils import print_failure, print_warning
 # import external libraries
 import pymongo as pm
 import numpy as np
@@ -35,7 +35,7 @@ class DBQuery:
             self.collections = collections
         except:
             pass
-        # if empty collections, assume called from API and read kwargs, 
+        # if empty collections, assume called from API and read kwargs,
         # also need to connect to db
         if not collections or not client:
             local = uname()[1]
@@ -84,8 +84,8 @@ class DBQuery:
         self.perform_query()
 
     def perform_query(self):
-        """ Set up query dict and perform query depending on 
-        command-line / API arguments. 
+        """ Set up query dict and perform query depending on
+        command-line / API arguments.
         """
         self.cursor = EmptyCursor()
         # initalize query_dict to '$and' all queries
@@ -103,11 +103,12 @@ class DBQuery:
             if len(self.cursor) < 1:
                 exit('Could not find a match, try widening your search.')
             elif len(self.cursor) >= 1:
-                if (self.args.get('cell') or self.args.get('res')) and not self.args.get('calc_match'):
+                if (self.args.get('cell') or self.args.get('res')) and \
+                        not self.args.get('calc_match'):
                     query2files(self.cursor, self.args)
                 self.display_results(self.cursor)
                 if len(self.cursor) > 1:
-                    print_warning('WARNING: matched multiple structures with same text_id. ' + 
+                    print_warning('WARNING: matched multiple structures with same text_id. ' +
                                   'The first one will be used.')
             if self.args.get('calc_match') or self.args['subcmd'] == 'hull':
                 # save special copy of calc_dict for hulls
@@ -192,14 +193,16 @@ class DBQuery:
                         else:
                             self.display_results(self.cursor.clone())
             # building hull from just comp, find best structure to calc_match
-            if self.args.get('id') is None and (self.args.get('subcmd') == 'hull' or self.args.get('subcmd') == 'voltage' or 
-               self.args.get('hull_cutoff') is not None):
+            if self.args.get('id') is None and (self.args.get('subcmd') == 'hull' or
+                                                self.args.get('subcmd') == 'voltage' or
+                                                self.args.get('hull_cutoff') is not None):
                 if 'oqmd' in self.collections:
                     exit('Use --include_oqmd instead of --db, exiting...')
                 if len(self.collections.keys()) == 1:
                     self.repo = self.collections[self.collections.keys()[0]]
                 else:
-                    exit('Hulls and voltage curves require just one source or --include_oqmd, exiting...')
+                    exit('Hulls and voltage curves require just one source or --include_oqmd, \
+                          exiting...')
                 print('Creating hull from AJM db structures.')
                 self.args['summary'] = True
                 self.args['top'] = -1
@@ -228,7 +231,9 @@ class DBQuery:
                     id_cursor = self.repo.find({'text_id': self.cursor[ind]['text_id']})
                     if id_cursor.count() > 1:
                         print_warning('WARNING: matched multiple structures with text_id ' +
-                              id_cursor[0]['text_id'][0] + ' ' + id_cursor[0]['text_id'][1] + '.  Skipping this set...')
+                                      id_cursor[0]['text_id'][0] + ' ' +
+                                      id_cursor[0]['text_id'][1] + '.' +
+                                      'Skipping this set...')
                         rand_sample += 1
                     else:
                         self.query_dict = dict()
@@ -248,7 +253,8 @@ class DBQuery:
                                               self.cursor[ind]['text_id'][1]) +
                               ': matched ' + str(test_cursor_count[-1]), 'structures.', end=' -> ')
                         try:
-                            print(self.cursor[ind]['xc_functional'] + ',', self.cursor[ind]['cut_off_energy'], 'eV,',
+                            print(self.cursor[ind]['xc_functional'] + ',',
+                                  self.cursor[ind]['cut_off_energy'], 'eV,',
                                   self.cursor[ind]['kpoints_mp_spacing'], '1/A')
                         except:
                             pass
@@ -478,7 +484,7 @@ class DBQuery:
                     tmp_stoich.remove(']')
                 except:
                     pass
-                try: 
+                try:
                     tmp_stoich.remove('')
                 except:
                     pass
@@ -574,8 +580,8 @@ class DBQuery:
                         tmp_stoich.remove('')
                     except:
                         pass
-                    elements = tmp_stoich 
-        except Exception as oops:
+                    elements = tmp_stoich
+        except Exception:
             print_exc()
             exit()
         if self.args.get('intersection'):
@@ -606,7 +612,7 @@ class DBQuery:
                     elem = elem.strip('[').strip(']')
                     for group_elem in self.periodic_table[elem]:
                         types_dict['$or'].append(dict())
-                        types_dict['$or'][-1]['atom_types'] = dict() 
+                        types_dict['$or'][-1]['atom_types'] = dict()
                         types_dict['$or'][-1]['atom_types']['$in'] = [group_elem]
                 else:
                     types_dict = dict()

@@ -20,7 +20,7 @@ def query2files(cursor, *args):
     res = args.get('res')
     prefix = (args.get('prefix') + '-') if args.get('prefix') is not None else ''
     pressure = args.get('write_pressure')
-    if args['subcmd'] == 'polish' or args['subcmd'] == 'swaps': 
+    if args['subcmd'] == 'polish' or args['subcmd'] == 'swaps':
         info = False
         hash = False
     else:
@@ -118,14 +118,14 @@ def doc2param(doc, path, hash_dupe=True, *args):
         if path.endswith('.param'):
             path.replace('.param', '')
         param_set = set(['task', 'cut_off_energy', 'xc_functional', 'write_cell_structure',
-                      'finite_basis_corr', 'spin_polarized', 'smearing_width',
-                      'write_bib', 'finite_basis_corr', 'calculate_stress',
-                      'page_wvfns', 'geom_method', 'geom_max_iter', 'write_checkpoint',
-                      'fix_occupancy', 'metals_method', 'max_scf_cycles', 'cut_off_energy',
-                      'opt_strategy', 'page_wvfns', 'num_dump_cycles', 'bs_write_eigenvalues',
-                      'backup_interval', 'fixed_npw', 'mix_cut_off_energy', 'mix_charge_amp',
-                      'mixing_scheme', 'mix_charge_gmax', 'geom_force_tol', 'perc_extra_bands',
-                      'elec_energy_tol'])
+                         'finite_basis_corr', 'spin_polarized', 'smearing_width',
+                         'write_bib', 'finite_basis_corr', 'calculate_stress',
+                         'page_wvfns', 'geom_method', 'geom_max_iter', 'write_checkpoint',
+                         'fix_occupancy', 'metals_method', 'max_scf_cycles', 'cut_off_energy',
+                         'opt_strategy', 'page_wvfns', 'num_dump_cycles', 'bs_write_eigenvalues',
+                         'backup_interval', 'fixed_npw', 'mix_cut_off_energy', 'mix_charge_amp',
+                         'mixing_scheme', 'mix_charge_gmax', 'geom_force_tol', 'perc_extra_bands',
+                         'elec_energy_tol'])
         param_dict = dict()
         for param in [param for param in param_set if param in doc]:
             param_dict[param] = doc[param]
@@ -215,7 +215,7 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, *args):
                 f.write('SYMMETRY_TOL ' + str(doc['symmetry_tol'] + '\n'))
             if 'species_pot' in doc:
                 f.write('\n%BLOCK SPECIES_POT\n')
-                for elem in doc['species_pot']: 
+                for elem in doc['species_pot']:
                     if copy_pspots:
                         # copy across pspots if they exist
                         if not isfile(''.join(path.split('/')[:-1])+'/'+doc['species_pot'][elem]):
