@@ -5,20 +5,18 @@ inputs and outputs.
 """
 from __future__ import print_function
 # matador modules
-from cell_utils import abc2cart
+from cell_utils import abc2cart, calc_mp_spacing
 # external libraries
 try:
-	import bson.json_util as json
+    import bson.json_util as json
 except:
-	pass
-import numpy as np
+    pass
 # standard library
 from collections import defaultdict
 from os import getcwd, stat
 from os.path import isfile
 from time import strptime
 from fractions import gcd
-from math import pi, log10
 from pwd import getpwuid
 from traceback import print_exc
 import glob
@@ -158,16 +156,36 @@ def cell2dict(seed, db=True, **kwargs):
                 cell['species_pot'] = dict()
                 i = 1
                 while 'endblock' not in flines[line_no+i].lower():
-                    try:
-                        cell['species_pot'][flines[line_no+i].split()[0]] = \
-                            flines[line_no+i].split()[1].split('/')[-1].replace('compat7', '').replace(',', '').replace('()','')
-                    except:
-                        pass
+                    cell['species_pot'][flines[line_no+i].split()[0]] = \
+                        flines[line_no+i].split()[1].split('/')[-1]
+                    cell['species_pot'][flines[line_no+i].split()[0]] = \
+                        cell['species_pot'][flines[line_no+i].split()[0]].replace('compat7', '')
+                    cell['species_pot'][flines[line_no+i].split()[0]] = \
+                        cell['species_pot'][flines[line_no+i].split()[0]].replace(',', '')
+                    cell['species_pot'][flines[line_no+i].split()[0]] = \
+                        cell['species_pot'][flines[line_no+i].split()[0]].replace('()', '')
                     i += 1
             elif '%block cell_constraints' in line.lower():
                 cell['cell_constraints'] = list()
                 for j in range(2):
                     cell['cell_constraints'].append(map(int, flines[line_no+j+1].split()))
+            elif '%block hubbard_u' in line.lower():
+                cell['hubbard_u'] = defaultdict(list)
+                i = 0
+                while 'endblock' not in flines[line_no+i].lower():
+                    line = flines[line_no+i]
+                    print(line)
+                    if line == 'eV' or len(line.split()) < 3:
+                        i += 1
+                        continue
+                    else:
+                        atom = line.split()[0]
+                        orbital = line.split()[1].replace(':', '')
+                        shift = float(line.split()[-1])
+                        atom = line.split()[0]
+                        cell['hubbard_u'][atom] = dict()
+                        cell['hubbard_u'][atom][orbital] = shift
+                        i += 1
             elif '%block external_pressure' in line.lower():
                 cell['external_pressure'] = list()
                 for j in range(3):
@@ -273,7 +291,7 @@ def param2dict(seed, db=True, **kwargs):
                                     param['spin_polarized'] = False
                                 else:
                                     param['spin_polarized'] = True
-                            if 'cut_off_energy' in line and not 'mix_cut_off_energy' in line:
+                            if 'cut_off_energy' in line and 'mix_cut_off_energy' not in line:
                                 temp_cut_off = (param['cut_off_energy'].replace('ev', '')).strip()
                                 param['cut_off_energy'] = float(temp_cut_off)
                             if 'xc_functional' in line:
@@ -466,6 +484,27 @@ def castep2dict(seed, db=True, **kwargs):
                 for elem in castep['stoichiometry']:
                     atoms_per_fu += elem[1]
                 castep['num_fu'] = castep['num_atoms'] / atoms_per_fu
+            elif 'hubbard_u' not in castep and 'Hubbard U values are eV' in line:
+                castep['hubbard_u'] = defaultdict(list)
+                i = 5
+                while i < castep['num_atoms']:
+                    line = flines[line_no+i].strip()
+                    atom = line.split()[0].replace('|', '')
+                    shifts = map(float, line.split()[-5:-1])
+                    for ind, shift in enumerate(shifts):
+                        if shift != 0:
+                            if atom not in castep['hubbard_u']:
+                                castep['hubbard_u'][atom] = dict()
+                            if ind == 0:
+                                orbital = 's'
+                            elif ind == 1:
+                                orbital = 'p'
+                            elif ind == 2:
+                                orbital = 'd'
+                            elif ind == 3:
+                                orbital = 'f'
+                            castep['hubbard_u'][atom][orbital] = shift
+                    i += 1
             elif 'species_pot' not in castep and 'Pseudopotential Report' in line:
                 castep['species_pot'] = dict()
                 i = 0
@@ -515,7 +554,8 @@ def castep2dict(seed, db=True, **kwargs):
             for line_no, line in enumerate(flines):
                 if any(finished in line for finished in [success_string, failure_string]):
                     for line_next in range(line_no, len(flines)):
-                        if any(finished in flines[line_next] for finished in [success_string, failure_string]):
+                        if any(finished in flines[line_next] for
+                                finished in [success_string, failure_string]):
                             finish_line = line_next
                             if success_string in flines[line_next]:
                                 castep['optimised'] = True
@@ -659,22 +699,10 @@ def castep2dict(seed, db=True, **kwargs):
                         except:
                             continue
                 # calculate kpoint spacing if not found
-                if 'kpoints_mp_grid' in castep and \
-                       'kpoints_mp_spacing' not in castep and \
-                       'lattice_cart' in castep:
-                    real_lat = np.asarray(castep['lattice_cart'])
-                    recip_lat = np.zeros((3, 3))
-                    recip_lat[0] = (2*pi)*np.cross(real_lat[1], real_lat[2])/(np.dot(real_lat[0], np.cross(real_lat[1], real_lat[2])))
-                    recip_lat[1] = (2*pi)*np.cross(real_lat[2], real_lat[0])/(np.dot(real_lat[1], np.cross(real_lat[2], real_lat[0])))
-                    recip_lat[2] = (2*pi)*np.cross(real_lat[0], real_lat[1])/(np.dot(real_lat[2], np.cross(real_lat[0], real_lat[1])))
-                    recip_len = np.zeros((3))
-                    recip_len = np.sqrt(np.sum(np.power(recip_lat, 2), axis=1))
-                    max_spacing = 0
-                    for j in range(3):
-                        spacing = recip_len[j] / (2*pi*castep['kpoints_mp_grid'][j])
-                        max_spacing = (spacing if spacing > max_spacing else max_spacing)
-                    exponent = round(log10(max_spacing) - 1)
-                    castep['kpoints_mp_spacing'] = round(max_spacing + 0.5*10**exponent, 2)
+                if 'kpoints_mp_grid' in castep and 'kpoints_mp_spacing' not in castep and \
+                   'lattice_cart' in castep:
+                    castep['kpoints_mp_spacing'] = calc_mp_spacing(castep['lattice_cart'],
+                                                                   castep['kpoints_mp_grid'])
         # computing metadata, i.e. parallelism, time, memory, version
         for line in flines:
             if 'Release CASTEP version' in line:
