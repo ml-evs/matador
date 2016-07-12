@@ -50,9 +50,8 @@ class BatchRun:
         else:
             self.ncores = self.all_cores / self.nprocesses
         if self.ncores*self.nprocesses > self.all_cores:
-            print_failure('Requested more cores (' + str(self.ncores*self.nprocesses) +
-                          ') than available (' + str(self.all_cores) + ').')
-            exit('Exiting...')
+            print_warning('Requested more cores (' + str(self.ncores*self.nprocesses) +
+                          ') than available (' + str(self.all_cores) + '). (Maybe you are using a queueing system).')
         # scan directory for files to run
         self.file_lists = defaultdict(list)
         for root, dirs, files in walk('.'):
@@ -184,11 +183,11 @@ class FullRelaxer:
         calc_doc['task'] = 'geometryoptimization'
         # set up geom opt parameters
         self.max_iter = calc_doc['geom_max_iter']
-        num_rough_iter = 4
+        self.num_rough_iter = 4
         fine_iter = 20
         rough_iter = 2
         num_fine_iter = int(self.max_iter)/fine_iter
-        self.geom_max_iter_list = (num_rough_iter * [rough_iter])
+        self.geom_max_iter_list = (self.num_rough_iter * [rough_iter])
         self.geom_max_iter_list.extend(num_fine_iter * [fine_iter])
         if self.conv_cutoff_bool:
             for cutoff in self.conv_cutoff:
@@ -286,7 +285,7 @@ class FullRelaxer:
         if self.ncores == 1:
             process = sp.Popen(['nice', '-n', '15', self.executable, seed])
         else:
-            process = sp.Popen(['nice', '-n', '15', 'mpirun', '-n', str(self.ncores),
+            process = sp.Popen(['mpirun', '-n', str(self.ncores),
                                 self.executable, seed])
         return process
 
