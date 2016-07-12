@@ -2,7 +2,8 @@
 for cell manipulation.
 """
 
-from math import pi, cos, sin, sqrt, acos
+from math import pi, cos, sin, sqrt, acos, log10
+import numpy as np
 
 
 def abc2cart(lattice_abc):
@@ -74,3 +75,33 @@ def cart2abc(lattice_cart):
     gamma = 180.0*acos(cos_gamma)/pi
     lattice_abc.append([alpha, beta, gamma])
     return lattice_abc
+
+
+def real2recip(real_lat):
+    """ Convert the real lattice in Cartesian basis to
+    the reciprocal space lattice.
+    """
+    real_lat = np.asarray(real_lat)
+    recip_lat = np.zeros((3, 3))
+    recip_lat[0] = (2*pi)*np.cross(real_lat[1], real_lat[2]) / \
+        (np.dot(real_lat[0], np.cross(real_lat[1], real_lat[2])))
+    recip_lat[1] = (2*pi)*np.cross(real_lat[2], real_lat[0]) / \
+        (np.dot(real_lat[1], np.cross(real_lat[2], real_lat[0])))
+    recip_lat[2] = (2*pi)*np.cross(real_lat[0], real_lat[1]) / \
+        (np.dot(real_lat[2], np.cross(real_lat[0], real_lat[1])))
+    return recip_lat
+
+
+def calc_mp_spacing(real_lat, mp_grid):
+    """ Convert real lattice in Cartesian basis and the
+    kpoint_mp_grid into a grid spacing.
+    """
+    recip_lat = real2recip(real_lat)
+    recip_len = np.zeros((3))
+    recip_len = np.sqrt(np.sum(np.power(recip_lat, 2), axis=1))
+    max_spacing = 0
+    for j in range(3):
+        spacing = recip_len[j] / (2*pi*mp_grid[j])
+        max_spacing = (spacing if spacing > max_spacing else max_spacing)
+    exponent = round(log10(max_spacing) - 1)
+    return round(max_spacing + 0.5*10**exponent, 2)
