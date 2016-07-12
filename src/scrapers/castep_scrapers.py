@@ -7,7 +7,10 @@ from __future__ import print_function
 # matador modules
 from cell_utils import abc2cart
 # external libraries
-import bson.json_util as json
+try:
+	import bson.json_util as json
+except:
+	pass
 import numpy as np
 # standard library
 from collections import defaultdict
