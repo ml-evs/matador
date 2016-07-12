@@ -16,6 +16,7 @@ import re
 from os import uname
 from itertools import combinations
 from traceback import print_exc
+from fractions import gcd
 
 
 class DBQuery:
@@ -491,8 +492,14 @@ class DBQuery:
                     fraction.append(float(stoich[i+1]))
                 except:
                     fraction.append(1.0)
+        gcd_val = 0
+        for frac in fraction:
+            if gcd_val == 0:
+                gcd_val = frac
+            else:
+                gcd_val = gcd(frac, gcd_val)
         fraction = np.asarray(fraction)
-        fraction /= np.min(fraction)
+        fraction /= gcd_val
         print(fraction)
         query_dict = dict()
         query_dict['$and'] = []
