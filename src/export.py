@@ -8,6 +8,7 @@ import string
 import numpy as np
 from os.path import exists, isfile, expanduser
 from os import system, makedirs
+from traceback import print_exc
 
 
 def query2files(cursor, *args):
@@ -212,7 +213,7 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, *args):
             if 'snap_to_symmetry' in doc:
                 f.write('SNAP_TO_SYMMETRY\n')
             if 'symmetry_tol' in doc:
-                f.write('SYMMETRY_TOL ' + str(doc['symmetry_tol'] + '\n'))
+                f.write('SYMMETRY_TOL : ' + str(doc['symmetry_tol']) + '\n')
             if 'species_pot' in doc:
                 f.write('\n%BLOCK SPECIES_POT\n')
                 for elem in doc['species_pot']:
@@ -235,8 +236,7 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, *args):
         if hash_dupe:
             print(type(oops), oops)
         else:
-            pass
-
+            print_exc()
 
 def doc2res(doc, path, info=True, hash_dupe=True, *args):
     """ Write .res file for single doc. """
