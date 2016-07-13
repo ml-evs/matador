@@ -40,6 +40,7 @@ class BatchRun:
         self.debug = self.args.get('debug')
         self.all_cores = mp.cpu_count()
         self.seed = self.args.get('seed')
+        self.limit = self.args.get('limit')
         valid = True
         if self.args.get('nprocesses') is not None:
             self.nprocesses = self.args['nprocesses']
@@ -127,6 +128,7 @@ class BatchRun:
     def perform_new_calculations(self, res_list, paths):
         """ Perform all calculations that have not already
         failed or finished to completion. """
+        job_count = 0
         for res in res_list:
             running = False
             with open(paths['jobs_fname'], 'rw') as job_file:
@@ -136,6 +138,9 @@ class BatchRun:
                         running = True
                         break
             if not running:
+                if self.limit is not None:
+                    if job_count == self.limit:
+                        raise SystemExit
                 with open(paths['jobs_fname'], 'a') as job_file:
                     job_file.write(res+'\n')
                 # create full relaxer object for creation and running of job
@@ -149,6 +154,7 @@ class BatchRun:
                                 conv_cutoff=self.cutoffs)
                     with open(paths['completed_fname'], 'a') as job_file:
                         job_file.write(res+'\n')
+                    job_count += 1
                 except(KeyboardInterrupt, SystemExit, RuntimeError):
                     raise SystemExit
         return
@@ -330,6 +336,8 @@ if __name__ == '__main__':
                         help='debug output')
     parser.add_argument('--conv_cutoff', action='store_true',
                         help='run all res files at cutoff defined in cutoff.conv file')
+    parser.add_argument('-l', '--limit', type=int,
+                        help='limit to n structures per run')
     args = parser.parse_args()
     runner = BatchRun(ncores=args.ncores, nprocesses=args.nprocesses, debug=args.debug,
                       seed=args.seed, conv_cutoff=args.conv_cutoff)
