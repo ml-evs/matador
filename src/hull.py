@@ -419,15 +419,15 @@ class QueryConvexHull():
                                # alpha=1, c=self.colours[-1], edgecolor='k', marker='D',
                                # label=oqmd_info[ind],
                                # zorder=200))
-        # # tie lines
-        # for ind in range(len(self.hull_comp)-1):
-            # ax.plot([self.hull_comp[ind], self.hull_comp[ind+1]],
-                    # [self.hull_energy[ind], self.hull_energy[ind+1]],
-                    # c=self.colours[0], lw=2, alpha=1, zorder=1000, label='')
-            # if self.hull_cutoff > 0:
-                # ax.plot([self.hull_comp[ind], self.hull_comp[ind+1]],
-                        # [self.hull_energy[ind]+self.hull_cutoff, self.hull_energy[ind+1]+self.hull_cutoff],
-                        # '--', c=self.colours[1], lw=1, alpha=0.5, zorder=1000, label='')
+        # tie lines
+        for ind in range(len(self.hull_comp)-1):
+            ax.plot([self.hull_comp[ind], self.hull_comp[ind+1]],
+                    [self.hull_energy[ind], self.hull_energy[ind+1]],
+                    c=self.colours[0], lw=2, alpha=1, zorder=1000, label='')
+            if self.hull_cutoff > 0:
+                ax.plot([self.hull_comp[ind], self.hull_comp[ind+1]],
+                        [self.hull_energy[ind]+self.hull_cutoff, self.hull_energy[ind+1]+self.hull_cutoff],
+                        '--', c=self.colours[1], lw=1, alpha=0.5, zorder=1000, label='')
         # if self.include_oqmd:
             # for ind in range(len(oqmd_stable_comp)-1):
                 # ax.plot([oqmd_stable_comp[ind], oqmd_stable_comp[ind+1]],
