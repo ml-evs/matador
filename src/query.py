@@ -180,7 +180,13 @@ class DBQuery:
                 # write query to res or cell with param files
                 if self.args.get('cell') or self.args.get('res'):
                     if cursor_count >= 1:
-                        query2files(self.cursor, self.args)
+                        cursor = list(self.cursor)
+                        if self.args.get('top') is not None:
+                            print('stuff')
+                            print(len(cursor[:self.args.get('top')]))
+                            query2files(cursor[:self.args.get('top')], self.args)
+                        else:
+                            query2files(cursor, self.args)
                 # if called as script, always print results
                 if self.args.get('id') is None:
                     print(cursor_count, 'results found for query in', collection+'.')
@@ -342,9 +348,9 @@ class DBQuery:
             except:
                 struct_string[-1] += "{:5}".format(' ')
             try:
-                struct_string[-1] += "{:^ 12.3f}".format(doc['pressure'])
+                struct_string[-1] += "{:^12.3f}".format(doc['pressure'])
             except:
-                struct_string[-1] += "{:^12}".format(doc['pressure'])
+                struct_string[-1] += "{:^12}".format('xxx')
             try:
                 struct_string[-1] += "{:^12.3f}".format(doc['cell_volume']/doc['num_fu'])
             except:
@@ -506,7 +512,6 @@ class DBQuery:
                 gcd_val = gcd(frac, gcd_val)
         fraction = np.asarray(fraction)
         fraction /= gcd_val
-        print(fraction)
         query_dict = dict()
         query_dict['$and'] = []
         for ind, elem in enumerate(elements):
