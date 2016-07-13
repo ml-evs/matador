@@ -289,6 +289,9 @@ if __name__ == '__main__':
                                         (currently limited to binaries)',
                                         parents=[global_parser, structure_parser,
                                                  material_parser, plot_parser])
+    hull_parser.add_argument('--chempots', type=float, nargs='+',
+                             help='manually specify chem pots as enthalpy per atom for \
+                                   a rough hull.')
     voltage_parser = subparsers.add_parser('voltage',
                                            help='plot a voltage curve from query results \
                                            (currently limited to binaries)',
