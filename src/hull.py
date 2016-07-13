@@ -29,8 +29,13 @@ class QueryConvexHull():
             self.hull_cutoff = float(self.args['hull_cutoff'])
         else:
             self.hull_cutoff = 0.0
-        if self.args.get('self.include_oqmd'):
+        if self.args.get('include_oqmd'):
             self.include_oqmd = True
+        if self.args.get('chempots') is not None:
+            self.chem_pots = self.args.get('chempots')
+        else:
+            self.chem_pots = None
+            print(self.chem_pots)
         self.binary_hull()
         if self.args['subcmd'] == 'voltage':
             print('Generating voltage curve...')
@@ -44,6 +49,82 @@ class QueryConvexHull():
             self.set_plot_param()
             self.plot_hull()
 
+    def get_chempots(self):
+        """ Search for chemical potentials that match
+        the structures in the query cursor.
+        """
+        query = self.query
+        self.mu_enthalpy = np.zeros((2))
+        self.match = [None, None]
+        query_dict = dict()
+        print(60*'─')
+        if self.chem_pots is not None:
+            # read chem pots from command line
+            self.mu_enthalpy[0] = self.chem_pots[0]
+            self.match[0] = dict()
+            self.match[0]['enthalpy_per_atom'] = self.mu_enthalpy[0]
+            self.match[0]['text_id'] = ['command', 'line']
+            self.match[0]['stoichiometry'] = [[self.elements[0], 1]]
+            self.match[0]['space_group'] = 'xxx'
+            self.mu_enthalpy[1] = self.chem_pots[1]
+            self.match[1] = dict()
+            self.match[1]['enthalpy_per_atom'] = self.mu_enthalpy[1]
+            self.match[1]['text_id'] = ['command', 'line']
+            self.match[1]['text_id'] = ['command', 'line']
+            self.match[1]['stoichiometry'] = [[self.elements[1], 1]]
+            self.match[1]['space_group'] = 'xxx'
+            print('Using custom energies of', self.mu_enthalpy[0], 'eV/atom '
+                  'and', self.mu_enthalpy[1], 'eV/atom as chemical potentials.')
+            print(60*'─')
+        else:
+            # scan for suitable chem pots in database
+            for ind, elem in enumerate(self.elements):
+                print('Scanning for suitable', elem, 'chemical potential...')
+                query_dict['$and'] = list(query.calc_dict['$and'])
+                query_dict['$and'].append(query.query_quality())
+                query_dict['$and'].append(query.query_composition(custom_elem=[elem]))
+                # if oqmd, only query composition, not parameters
+                if query.args.get('tags') is not None:
+                    query_dict['$and'].append(query.query_tags())
+                mu_cursor = query.repo.find(SON(query_dict)).sort('enthalpy_per_atom',
+                                                                  pm.ASCENDING)
+                for doc_ind, doc in enumerate(mu_cursor):
+                    if doc_ind == 0:
+                        self.match[ind] = doc
+                        break
+                if self.match[ind] is not None:
+                    self.mu_enthalpy[ind] = float(self.match[ind]['enthalpy_per_atom'])
+                    print('Using', ''.join([self.match[ind]['text_id'][0], ' ',
+                          self.match[ind]['text_id'][1]]), 'as chem pot for', elem)
+                    print(60*'─')
+                else:
+                    print_failure('No possible chem pots found for ' + elem + '.')
+                    exit()
+        # include OQMD structures if desired, first find chem pots
+        # if self.include_oqmd:
+            # oqmd_mu_enthalpy = np.zeros((2))
+            # oqmd_match = [None, None]
+            # oqmd_query_dict = dict()
+            # for ind, elem in enumerate(self.elements):
+                # print('Scanning for suitable', elem, 'OQMD chemical potential...')
+                # oqmd_query_dict = query.query_composition(custom_elem=[elem])
+                # oqmd_mu_cursor = query.oqmd_repo.find(SON(oqmd_query_dict))
+                # oqmd_mu_cursor.sort('enthalpy_per_atom', pm.ASCENDING)
+                # for doc_ind, doc in enumerate(oqmd_mu_cursor):
+                    # if doc_ind == 0:
+                        # oqmd_match[ind] = doc
+                        # break
+                # if oqmd_match[ind] is not None:
+                    # oqmd_mu_enthalpy[ind] = float(oqmd_match[ind]['enthalpy_per_atom'])
+                    # print_success('Using ' + ''.join([oqmd_match[ind]['text_id'][0] + ' ' +
+                                  # oqmd_match[ind]['text_id'][1]]) + \
+                                  # ' as OQMD chem pot for ' + elem)
+                    # print(60*'─')
+                # else:
+                    # print_failure('No possible chem pots found for ' + elem + '.')
+                    # exit()
+        return
+
     def binary_hull(self, dis=False):
         """ Create a convex hull for two elements. """
         query = self.query
@@ -53,58 +134,7 @@ class QueryConvexHull():
         if len(self.elements) != 2:
             print('Cannot create binary hull for more or less than 2 elements (yet!).')
             return
-        # try to get decent chemical potentials:
-        # this relies on all of the first composition query
-        # having the same parameters; need to think about this
-        # should probably refactor this into a function
-        mu_enthalpy = np.zeros((2))
-        match = [None, None]
-        query_dict = dict()
-        print(60*'─')
-        for ind, elem in enumerate(self.elements):
-            print('Scanning for suitable', elem, 'chemical potential...')
-            query_dict['$and'] = list(query.calc_dict['$and'])
-            query_dict['$and'].append(query.query_quality())
-            query_dict['$and'].append(query.query_composition(custom_elem=[elem]))
-            # if oqmd, only query composition, not parameters
-            if query.args.get('tags') is not None:
-                query_dict['$and'].append(query.query_tags())
-            mu_cursor = query.repo.find(SON(query_dict)).sort('enthalpy_per_atom',
-                                                              pm.ASCENDING)
-            for doc_ind, doc in enumerate(mu_cursor):
-                if doc_ind == 0:
-                    match[ind] = doc
-                    break
-            if match[ind] is not None:
-                mu_enthalpy[ind] = float(match[ind]['enthalpy_per_atom'])
-                print('Using', ''.join([match[ind]['text_id'][0], ' ',
-                      match[ind]['text_id'][1]]), 'as chem pot for', elem)
-                print(60*'─')
-            else:
-                print_failure('No possible chem pots found for ' + elem + '.')
-                exit()
-        # include OQMD structures if desired, first find chem pots
-        if self.include_oqmd:
-            oqmd_mu_enthalpy = np.zeros((2))
-            oqmd_match = [None, None]
-            oqmd_query_dict = dict()
-            for ind, elem in enumerate(self.elements):
-                print('Scanning for suitable', elem, 'OQMD chemical potential...')
-                oqmd_query_dict = query.query_composition(custom_elem=[elem])
-                oqmd_mu_cursor = query.oqmd_repo.find(SON(oqmd_query_dict))
-                oqmd_mu_cursor.sort('enthalpy_per_atom', pm.ASCENDING)
-                for doc_ind, doc in enumerate(oqmd_mu_cursor):
-                    if doc_ind == 0:
-                        oqmd_match[ind] = doc
-                        break
-                if oqmd_match[ind] is not None:
-                    oqmd_mu_enthalpy[ind] = float(oqmd_match[ind]['enthalpy_per_atom'])
-                    print_success('Using ' + ''.join([oqmd_match[ind]['text_id'][0] + ' ' +
-                                  match[ind]['text_id'][1]]) + ' as OQMD chem pot for ' + elem)
-                    print(60*'─')
-                else:
-                    print_failure('No possible chem pots found for ' + elem + '.')
-                    exit()
+        self.get_chempots()
         print('Constructing hull...')
         num_structures = len(self.cursor)
         formation = np.zeros((num_structures))
@@ -115,12 +145,12 @@ class QueryConvexHull():
         hull_dist = np.zeros((num_structures+2))
         info = []
         self.source_list = []
-        if self.include_oqmd:
-            oqmd_num_structures = query.oqmd_cursor.count()
-            oqmd_formation = np.zeros((oqmd_num_structures))
-            oqmd_stoich = np.zeros((oqmd_num_structures))
-            oqmd_enthalpy = np.zeros((oqmd_num_structures))
-            oqmd_info = []
+        # if self.include_oqmd:
+            # oqmd_num_structures = query.oqmd_cursor.count()
+            # oqmd_formation = np.zeros((oqmd_num_structures))
+            # oqmd_stoich = np.zeros((oqmd_num_structures))
+            # oqmd_enthalpy = np.zeros((oqmd_num_structures))
+            # oqmd_info = []
         if dis:
             from disorder import disorder_hull
         # define hull by order in command-line arguments
@@ -147,7 +177,7 @@ class QueryConvexHull():
             else:
                 self.source_list.append(source_dir)
                 source_ind[ind] = self.source_list.index(source_dir) + 1
-            for mu in match:
+            for mu in self.match:
                 for j in range(len(doc['stoichiometry'])):
                     if mu['stoichiometry'][0][0] == doc['stoichiometry'][j][0]:
                         formation[ind] -= (mu['enthalpy_per_atom'] * doc['stoichiometry'][j][1] /
@@ -160,60 +190,60 @@ class QueryConvexHull():
         # put chem pots in same array as formation for easy hulls
         formation = np.append([0.0], formation)
         formation = np.append(formation, [0.0])
-        enthalpy = np.append(mu_enthalpy[1], enthalpy)
-        enthalpy = np.append(enthalpy, mu_enthalpy[0])
+        enthalpy = np.append(self.mu_enthalpy[1], enthalpy)
+        enthalpy = np.append(enthalpy, self.mu_enthalpy[0])
         ind = len(formation)-3
         stoich = np.append([0.0], stoich)
         stoich = np.append(stoich, [1.0])
         structures = np.vstack((stoich, formation)).T
-        if self.include_oqmd:
-            for ind, doc in enumerate(query.oqmd_cursor):
-                oqmd_formation[ind] = doc['enthalpy_per_atom']
-                atoms_per_fu = doc['stoichiometry'][0][1] + doc['stoichiometry'][1][1]
-                num_fu = (doc['enthalpy']/doc['enthalpy_per_atom']) / float(atoms_per_fu)
-                if doc['stoichiometry'][0][0] == one_minus_x_elem:
-                    num_b = doc['stoichiometry'][0][1]
-                elif doc['stoichiometry'][1][0] == one_minus_x_elem:
-                    num_b = doc['stoichiometry'][1][1]
-                else:
-                    print_failure('Something went wrong!')
-                    exit()
-                oqmd_enthalpy[ind] = doc['enthalpy'] / (num_b * num_fu)
-                oqmd_formation[ind] = doc['enthalpy_per_atom']
-                for mu in oqmd_match:
-                    for j in range(len(doc['stoichiometry'])):
-                        if mu['stoichiometry'][0][0] == doc['stoichiometry'][j][0]:
-                            oqmd_formation[ind] -= (mu['enthalpy_per_atom'] *
-                                                    doc['stoichiometry'][j][1] /
-                                                    atoms_per_fu)
-                for elem in doc['stoichiometry']:
-                    stoich_string = (str(doc['stoichiometry'][0][0]) +
-                                     str(doc['stoichiometry'][0][1]) +
-                                     str(doc['stoichiometry'][1][0]) +
-                                     str(doc['stoichiometry'][1][1]))
-                    if x_elem in elem[0]:
-                        oqmd_stoich[ind] = (elem[1])/float(atoms_per_fu)
-                oqmd_info.append("{0:^10}\n{1:^24}\n{2:^5s}\n{3:2f} eV".format(
-                    stoich_string, 'OQMD' + ' ' + doc['text_id'][0] + ' ' + doc['text_id'][1],
-                    doc['space_group'], formation[ind]))
-            oqmd_stoich = np.append([0.0], oqmd_stoich)
-            oqmd_stoich = np.append(oqmd_stoich, [1.0])
-            oqmd_formation = np.append([0.0], oqmd_formation)
-            oqmd_formation = np.append(oqmd_formation, [0.0])
-            oqmd_enthalpy = np.append(oqmd_mu_enthalpy[1], oqmd_enthalpy)
-            oqmd_enthalpy = np.append(oqmd_enthalpy, oqmd_mu_enthalpy[0])
-            oqmd_structures = np.vstack((oqmd_stoich, oqmd_formation)).T
-            ind = len(oqmd_formation)-3
-            for doc in match:
-                stoich_string = str(doc['stoichiometry'][0][0])
-                oqmd_info.append("{0:^10}\n{1:24}\n{2:5s}\n{3:2f} eV".format(
-                    stoich_string, 'OQMD' + ' ' + doc['text_id'][0] + ' ' + doc['text_id'][1],
-                    doc['space_group'], oqmd_formation[ind]))
-                ind += 1
+        # if self.include_oqmd:
+            # for ind, doc in enumerate(query.oqmd_cursor):
+                # oqmd_formation[ind] = doc['enthalpy_per_atom']
+                # atoms_per_fu = doc['stoichiometry'][0][1] + doc['stoichiometry'][1][1]
+                # num_fu = (doc['enthalpy']/doc['enthalpy_per_atom']) / float(atoms_per_fu)
+                # if doc['stoichiometry'][0][0] == one_minus_x_elem:
+                    # num_b = doc['stoichiometry'][0][1]
+                # elif doc['stoichiometry'][1][0] == one_minus_x_elem:
+                    # num_b = doc['stoichiometry'][1][1]
+                # else:
+                    # print_failure('Something went wrong!')
+                    # exit()
+                # oqmd_enthalpy[ind] = doc['enthalpy'] / (num_b * num_fu)
+                # oqmd_formation[ind] = doc['enthalpy_per_atom']
+                # for mu in oqmd_match:
+                    # for j in range(len(doc['stoichiometry'])):
+                        # if mu['stoichiometry'][0][0] == doc['stoichiometry'][j][0]:
+                            # oqmd_formation[ind] -= (mu['enthalpy_per_atom'] *
+                                                    # doc['stoichiometry'][j][1] /
+                                                    # atoms_per_fu)
+                # for elem in doc['stoichiometry']:
+                    # stoich_string = (str(doc['stoichiometry'][0][0]) +
+                                     # str(doc['stoichiometry'][0][1]) +
+                                     # str(doc['stoichiometry'][1][0]) +
+                                     # str(doc['stoichiometry'][1][1]))
+                    # if x_elem in elem[0]:
+                        # oqmd_stoich[ind] = (elem[1])/float(atoms_per_fu)
+                # oqmd_info.append("{0:^10}\n{1:^24}\n{2:^5s}\n{3:2f} eV".format(
+                    # stoich_string, 'OQMD' + ' ' + doc['text_id'][0] + ' ' + doc['text_id'][1],
+                    # doc['space_group'], formation[ind]))
+            # oqmd_stoich = np.append([0.0], oqmd_stoich)
+            # oqmd_stoich = np.append(oqmd_stoich, [1.0])
+            # oqmd_formation = np.append([0.0], oqmd_formation)
+            # oqmd_formation = np.append(oqmd_formation, [0.0])
+            # oqmd_enthalpy = np.append(oqmd_mu_enthalpy[1], oqmd_enthalpy)
+            # oqmd_enthalpy = np.append(oqmd_enthalpy, oqmd_mu_enthalpy[0])
+            # oqmd_structures = np.vstack((oqmd_stoich, oqmd_formation)).T
+            # ind = len(oqmd_formation)-3
+            # for doc in match:
+                # stoich_string = str(doc['stoichiometry'][0][0])
+                # oqmd_info.append("{0:^10}\n{1:24}\n{2:5s}\n{3:2f} eV".format(
+                    # stoich_string, 'OQMD' + ' ' + doc['text_id'][0] + ' ' + doc['text_id'][1],
+                    # doc['space_group'], oqmd_formation[ind]))
+                # ind += 1
         # create hull with SciPy routine
         self.hull = ConvexHull(structures)
-        if self.include_oqmd:
-            oqmd_hull = ConvexHull(oqmd_structures)
+        # if self.include_oqmd:
+            # oqmd_hull = ConvexHull(oqmd_structures)
 
         hull_energy = []
         hull_comp = []
@@ -258,30 +288,30 @@ class QueryConvexHull():
                     stable_comp.append(structures[ind, 0])
         # create hull_cursor to pass to other modules
         # skip last and first as they are chem pots
-        hull_cursor.append(match[0])
+        hull_cursor.append(self.match[0])
         for ind in range(1, len(hull_dist)-1):
             if hull_dist[ind] <= self.hull_cutoff:
                 # take ind-1 to ignore first chem pot
                 hull_cursor.append(self.cursor[ind-1])
-        hull_cursor.append(match[1])
-        if self.include_oqmd:
-            oqmd_stable_comp = []
-            oqmd_stable_energy = []
-            oqmd_stable_enthalpy = []
-            for ind in range(len(oqmd_hull.vertices)):
-                if oqmd_structures[oqmd_hull.vertices[ind], 1] <= 0:
-                    oqmd_stable_energy.append(oqmd_structures[oqmd_hull.vertices[ind], 1])
-                    oqmd_stable_enthalpy.append(oqmd_enthalpy[oqmd_hull.vertices[ind]])
-                    oqmd_stable_comp.append(oqmd_structures[oqmd_hull.vertices[ind], 0])
-            oqmd_stable_comp = np.asarray(oqmd_stable_comp)
-            oqmd_stable_energy = np.asarray(oqmd_stable_energy)
-            oqmd_stable_enthalpy = np.asarray(oqmd_stable_enthalpy)
-            oqmd_stable_energy = oqmd_stable_energy[np.argsort(oqmd_stable_comp)]
-            oqmd_stable_enthalpy = oqmd_stable_enthalpy[np.argsort(oqmd_stable_comp)]
-            oqmd_stable_comp = oqmd_stable_comp[np.argsort(oqmd_stable_comp)]
+        hull_cursor.append(self.match[1])
+        # if self.include_oqmd:
+            # oqmd_stable_comp = []
+            # oqmd_stable_energy = []
+            # oqmd_stable_enthalpy = []
+            # for ind in range(len(oqmd_hull.vertices)):
+                # if oqmd_structures[oqmd_hull.vertices[ind], 1] <= 0:
+                    # oqmd_stable_energy.append(oqmd_structures[oqmd_hull.vertices[ind], 1])
+                    # oqmd_stable_enthalpy.append(oqmd_enthalpy[oqmd_hull.vertices[ind]])
+                    # oqmd_stable_comp.append(oqmd_structures[oqmd_hull.vertices[ind], 0])
+            # oqmd_stable_comp = np.asarray(oqmd_stable_comp)
+            # oqmd_stable_energy = np.asarray(oqmd_stable_energy)
+            # oqmd_stable_enthalpy = np.asarray(oqmd_stable_enthalpy)
+            # oqmd_stable_energy = oqmd_stable_energy[np.argsort(oqmd_stable_comp)]
+            # oqmd_stable_enthalpy = oqmd_stable_enthalpy[np.argsort(oqmd_stable_comp)]
+            # oqmd_stable_comp = oqmd_stable_comp[np.argsort(oqmd_stable_comp)]
         # grab info for datacursor
         info = []
-        doc = match[0]
+        doc = self.match[0]
         ind = 0
         stoich_string = str(doc['stoichiometry'][0][0])
         info.append("{0:^10}\n{1:24}\n{2:5s}\n{3:2f} eV".format(stoich_string,
@@ -301,7 +331,7 @@ class QueryConvexHull():
                                                                       doc['text_id'][1],
                                                                       doc['space_group'],
                                                                       hull_dist[ind+1]))
-        doc = match[1]
+        doc = self.match[1]
         ind = len(hull_dist)-1
         stoich_string = str(doc['stoichiometry'][0][0])
         info.append("{0:^10}\n{1:24}\n{2:5s}\n{3:2f} eV".format(stoich_string,
@@ -327,7 +357,6 @@ class QueryConvexHull():
         self.hull_energy = hull_energy
         self.stable_enthalpy = stable_enthalpy
         self.stable_comp = stable_comp
-        self.mu_enthalpy = mu_enthalpy
 
     def voltage_curve(self, stable_enthalpy, stable_comp, mu_enthalpy):
         """ Take convex hull and calculate voltages. """
