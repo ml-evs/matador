@@ -41,6 +41,7 @@ class BatchRun:
         self.all_cores = mp.cpu_count()
         self.seed = self.args.get('seed')
         self.limit = self.args.get('limit')
+        print(self.limit)
         valid = True
         if self.args.get('nprocesses') is not None:
             self.nprocesses = self.args['nprocesses']
@@ -140,6 +141,7 @@ class BatchRun:
             if not running:
                 if self.limit is not None:
                     if job_count == self.limit:
+                        print(self.limit)
                         raise SystemExit
                 with open(paths['jobs_fname'], 'a') as job_file:
                     job_file.write(res+'\n')
@@ -340,7 +342,7 @@ if __name__ == '__main__':
                         help='limit to n structures per run')
     args = parser.parse_args()
     runner = BatchRun(ncores=args.ncores, nprocesses=args.nprocesses, debug=args.debug,
-                      seed=args.seed, conv_cutoff=args.conv_cutoff)
+                      seed=args.seed, conv_cutoff=args.conv_cutoff, limit=args.limit)
     try:
         runner.spawn()
     except(KeyboardInterrupt, SystemExit):
