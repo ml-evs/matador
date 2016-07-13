@@ -126,7 +126,7 @@ def doc2param(doc, path, hash_dupe=True, *args):
                          'opt_strategy', 'page_wvfns', 'num_dump_cycles', 'bs_write_eigenvalues',
                          'backup_interval', 'fixed_npw', 'mix_cut_off_energy', 'mix_charge_amp',
                          'mixing_scheme', 'mix_charge_gmax', 'geom_force_tol', 'perc_extra_bands',
-                         'elec_energy_tol', 'grid_scale', 'spin'])
+                         'elec_energy_tol', 'grid_scale', 'spin', 'continuation'])
         param_dict = dict()
         for param in [param for param in param_set if param in doc]:
             param_dict[param] = doc[param]
