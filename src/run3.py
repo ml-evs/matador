@@ -61,7 +61,7 @@ class BatchRun:
         try:
             assert self.nnodes >= 1
             assert self.ncores >= 1
-            assert self.nprocess >= 1
+            assert self.nprocesses >= 1
         except(AssertionError):
             print_failure('Invalid number of cores, nodes or processes.')
             exit()
