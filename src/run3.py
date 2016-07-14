@@ -57,7 +57,7 @@ class BatchRun:
                            that you are using Intel MPI or this will produce \
                            unexpected behaviour!')
         else:
-            self.nnodes = 1 
+            self.nnodes = 1
         try:
             assert self.nnodes >= 1
             assert self.ncores >= 1
@@ -314,7 +314,8 @@ class FullRelaxer:
                 process = sp.Popen(['nice', '-n', '15', 'mpirun', '-n', str(self.ncores),
                                     self.executable, seed])
         elif self.nnodes > 1:
-            process = sp.Popen(['mpirun', '-n', str(self.ncores*self.nnodes), '-ppn', str(self.ncores)])
+            process = sp.Popen(['mpirun', '-n', str(self.ncores*self.nnodes),
+                                '-ppn', str(self.ncores)])
         return process
 
     def mv_to_bad(self, seed):
@@ -343,11 +344,12 @@ if __name__ == '__main__':
         prog='run3',
         description='Run multiple CASTEP geometry optmizations from a series of .res \
                      files and single cell and param files. The geometry optimization will \
-                     be split into four chunks of 2 iteratiosn, followed by chunks of 20 iterations, \
-                     until geom_max_iter is reached in the param file. \
-                     Successful runs will be moved to completed, crashes/failures will go to bad_castep \
-                     and initial res files will go into input. Running jobs will be listed in jobs.txt \
-                     and those that completed cleanly will be listed in finished_cleanly.txt.',
+                     be split into four chunks of 2 iteratiosn, followed by chunks of 20 \
+                     iterations, until geom_max_iter is reached in the param file. \
+                     Successful runs will be moved to completed, crashes/failures will go to \
+                     bad_castep and initial res files will go into input. Running jobs will \
+                     be listed in jobs.txt and those that completed cleanly will be listed \
+                     in finished_cleanly.txt.',
         epilog='Written by Matthew Evans (2016), based primarily on run.pl and run2.pl \
                 by Chris Pickard and Andrew Morris and PyAIRSS CastepRunner by Jamie Wynn.')
     parser.add_argument('seed', type=str,
@@ -368,8 +370,9 @@ if __name__ == '__main__':
     parser.add_argument('-l', '--limit', type=int,
                         help='limit to n structures per run')
     args = parser.parse_args()
-    runner = BatchRun(ncores=args.ncores, nprocesses=args.nprocesses, nnodes=args.nnodes, debug=args.debug,
-                      seed=args.seed, conv_cutoff=args.conv_cutoff, limit=args.limit)
+    runner = BatchRun(ncores=args.ncores, nprocesses=args.nprocesses, nnodes=args.nnodes,
+                      debug=args.debug, seed=args.seed, conv_cutoff=args.conv_cutoff,
+                      limit=args.limit)
     try:
         runner.spawn()
     except(KeyboardInterrupt, SystemExit):
