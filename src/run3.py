@@ -314,7 +314,8 @@ class FullRelaxer:
                                     self.executable, seed])
         elif self.nnodes > 1:
             process = sp.Popen(['mpirun', '-n', str(self.ncores*self.nnodes),
-                                '-ppn', str(self.ncores)])
+                                '-ppn', str(self.ncores),
+                                self.executable, seed])
         return process
 
     def mv_to_bad(self, seed):
