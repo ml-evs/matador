@@ -41,7 +41,6 @@ class BatchRun:
         self.all_cores = mp.cpu_count()
         self.seed = self.args.get('seed')
         self.limit = self.args.get('limit')
-        print(self.limit)
         valid = True
         if self.args.get('nprocesses') is not None:
             self.nprocesses = self.args['nprocesses']
