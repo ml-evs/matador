@@ -51,6 +51,20 @@ class BatchRun:
             self.ncores = self.args['ncores']
         else:
             self.ncores = self.all_cores / self.nprocesses
+        if self.args.get('nnodes') is not None:
+            self.nnodes = self.args['nnodes']
+            print_warning('Attempting to run over multiple nodes, please ensure \
+                           that you are using Intel MPI or this will produce \
+                           unexpected behaviour!')
+        else:
+            self.nnodes = 1 
+        try:
+            assert self.nnodes >= 1
+            assert self.ncores >= 1
+            assert self.nprocess >= 1
+        except(AssertionError):
+            print_failure('Invalid number of cores, nodes or processes.')
+            exit()
         if self.ncores*self.nprocesses > self.all_cores:
             print_warning('Requested more cores (' + str(self.ncores*self.nprocesses) +
                           ') than available (' + str(self.all_cores) + ').' +
@@ -149,6 +163,7 @@ class BatchRun:
                 try:
                     FullRelaxer(paths=self.paths,
                                 ncores=self.ncores,
+                                nnodes=self.nnodes,
                                 res=res,
                                 param_dict=self.param_dict,
                                 cell_dict=self.cell_dict,
@@ -168,13 +183,14 @@ class FullRelaxer:
     4 larger optimisations with many iterations,
     e.g. 4 lots of 2 then 4 lots of geom_max_iter/4.
     """
-    def __init__(self, paths, ncores, res, param_dict, cell_dict,
+    def __init__(self, paths, ncores, nnodes, res, param_dict, cell_dict,
                  debug=False, conv_cutoff=None):
         """ Make the files to run the calculation and handle
         the calling of CASTEP itself.
         """
         self.paths = paths
         self.ncores = ncores
+        self.nnodes = nnodes
         self.executable = 'castep'
         self.debug = debug
         self.conv_cutoff_bool = True if conv_cutoff is not None else False
@@ -291,11 +307,14 @@ class FullRelaxer:
     def castep(self, seed):
         """ Calls CASTEP on desired seed with desired number of cores.
         """
-        if self.ncores == 1:
-            process = sp.Popen(['nice', '-n', '15', self.executable, seed])
-        else:
-            process = sp.Popen(['mpirun', '-n', str(self.ncores),
-                                self.executable, seed])
+        if self.nnodes == 1:
+            if self.ncores == 1:
+                process = sp.Popen(['nice', '-n', '15', self.executable, seed])
+            else:
+                process = sp.Popen(['nice', '-n', '15', 'mpirun', '-n', str(self.ncores),
+                                    self.executable, seed])
+        elif self.nnodes > 1:
+            process = sp.Popen(['mpirun', '-n', str(self.ncores*self.nnodes), '-ppn', str(self.ncores)])
         return process
 
     def mv_to_bad(self, seed):
@@ -323,9 +342,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         prog='run3',
         description='Run multiple CASTEP geometry optmizations from a series of .res \
-                     files and single cell and param files. The calculation will be \
-                     restarted after 3 geom_opt steps by default, or otherwise by \
-                     value of geom_max_iter in the param file.',
+                     files and single cell and param files. The geometry optimization will \
+                     be split into four chunks of 2 iteratiosn, followed by chunks of 20 iterations, \
+                     until geom_max_iter is reached in the param file. \
+                     Successful runs will be moved to completed, crashes/failures will go to bad_castep \
+                     and initial res files will go into input. Running jobs will be listed in jobs.txt \
+                     and those that completed cleanly will be listed in finished_cleanly.txt.',
         epilog='Written by Matthew Evans (2016), based primarily on run.pl and run2.pl \
                 by Chris Pickard and Andrew Morris and PyAIRSS CastepRunner by Jamie Wynn.')
     parser.add_argument('seed', type=str,
@@ -333,7 +355,12 @@ if __name__ == '__main__':
     parser.add_argument('-nc', '--ncores', type=int,
                         help='number of cores CASTEP per job [DEFAULT=cpu_count/nprocesses]')
     parser.add_argument('-np', '--nprocesses', type=int,
-                        help='number of concurrent calculations [DEFAULT=1]')
+                        help='number of concurrent calculations, i.e. number \
+                              of concurrent mpiruns [DEFAULT=1]')
+    parser.add_argument('-nn', '--nnodes', type=int,
+                        help='number of nodes per job, i.e. number of nodes \
+                              using -nc cores [DEFAULT=1]. REQUIRES Intel MPI as \
+                              found on e.g. Darwin HPC.')
     parser.add_argument('-d', '--debug', action='store_true',
                         help='debug output')
     parser.add_argument('--conv_cutoff', action='store_true',
@@ -341,7 +368,7 @@ if __name__ == '__main__':
     parser.add_argument('-l', '--limit', type=int,
                         help='limit to n structures per run')
     args = parser.parse_args()
-    runner = BatchRun(ncores=args.ncores, nprocesses=args.nprocesses, debug=args.debug,
+    runner = BatchRun(ncores=args.ncores, nprocesses=args.nprocesses, nnodes=args.nnodes, debug=args.debug,
                       seed=args.seed, conv_cutoff=args.conv_cutoff, limit=args.limit)
     try:
         runner.spawn()
