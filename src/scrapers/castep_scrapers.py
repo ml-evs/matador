@@ -215,7 +215,7 @@ def cell2dict(seed, db=True, **kwargs):
                 elif 'snap_to_symmetry' in line.lower():
                     cell['snap_to_symmetry'] = True
                 elif 'quantisation_axis' in line.lower():
-                    cell['quantisation_axis'] = map(int, line.split())
+                    cell['quantisation_axis'] = map(int, line.split()[1:])
         if 'external_pressure' not in cell:
             cell['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0], [0.0]]
     except Exception as oops:
