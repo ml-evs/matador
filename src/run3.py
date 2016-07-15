@@ -41,6 +41,7 @@ class BatchRun:
         self.all_cores = mp.cpu_count()
         self.seed = self.args.get('seed')
         self.limit = self.args.get('limit')
+	self.executable = self.args.get('executable')
         valid = True
         if self.args.get('nprocesses') is not None:
             self.nprocesses = self.args['nprocesses']
@@ -56,9 +57,9 @@ class BatchRun:
                            that you are using Intel MPI or this will produce \
                            unexpected behaviour!')
         else:
-            self.nnodes = 1
+            self.nnodes = None
         try:
-            assert self.nnodes >= 1
+            assert (self.nnodes >= 1 or self.nnodes is None)
             assert self.ncores >= 1
             assert self.nprocesses >= 1
         except(AssertionError):
@@ -166,6 +167,7 @@ class BatchRun:
                                 res=res,
                                 param_dict=self.param_dict,
                                 cell_dict=self.cell_dict,
+				executable=self.executable,
                                 debug=self.debug,
                                 conv_cutoff=self.cutoffs)
                     with open(paths['completed_fname'], 'a') as job_file:
@@ -183,14 +185,14 @@ class FullRelaxer:
     e.g. 4 lots of 2 then 4 lots of geom_max_iter/4.
     """
     def __init__(self, paths, ncores, nnodes, res, param_dict, cell_dict,
-                 debug=False, conv_cutoff=None):
+		 executable, debug=False, conv_cutoff=None):
         """ Make the files to run the calculation and handle
         the calling of CASTEP itself.
         """
         self.paths = paths
         self.ncores = ncores
         self.nnodes = nnodes
-        self.executable = 'castep'
+        self.executable = executable
         self.debug = debug
         self.conv_cutoff_bool = True if conv_cutoff is not None else False
         if self.conv_cutoff_bool:
@@ -306,13 +308,13 @@ class FullRelaxer:
     def castep(self, seed):
         """ Calls CASTEP on desired seed with desired number of cores.
         """
-        if self.nnodes == 1:
+        if self.nnodes is None:
             if self.ncores == 1:
                 process = sp.Popen(['nice', '-n', '15', self.executable, seed])
             else:
                 process = sp.Popen(['nice', '-n', '15', 'mpirun', '-n', str(self.ncores),
                                     self.executable, seed])
-        elif self.nnodes > 1:
+        elif self.nnodes is not None:
             process = sp.Popen(['mpirun', '-n', str(self.ncores*self.nnodes),
                                 '-ppn', str(self.ncores),
                                 self.executable, seed])
@@ -363,6 +365,8 @@ if __name__ == '__main__':
                         help='number of nodes per job, i.e. number of nodes \
                               using -nc cores [DEFAULT=1]. REQUIRES Intel MPI as \
                               found on e.g. Darwin HPC.')
+    parser.add_argument('-exec', '--executable', type=str,
+			help='specify path to or name of executable')
     parser.add_argument('-d', '--debug', action='store_true',
                         help='debug output')
     parser.add_argument('--conv_cutoff', action='store_true',
@@ -372,7 +376,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     runner = BatchRun(ncores=args.ncores, nprocesses=args.nprocesses, nnodes=args.nnodes,
                       debug=args.debug, seed=args.seed, conv_cutoff=args.conv_cutoff,
-                      limit=args.limit)
+                      limit=args.limit, executable=args.executable)
     try:
         runner.spawn()
     except(KeyboardInterrupt, SystemExit):
