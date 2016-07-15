@@ -296,6 +296,9 @@ class FullRelaxer:
                             return False
                     # update res file to latest step for restarts
                     doc2res(opti_dict, seed, hash_dupe=False)
+                    # remove atomic_init_spins from calc_doc if there
+                    if 'atomic_init_spins' in calc_doc:
+                        del calc_doc['atomic_init_spins']
                     calc_doc.update(opti_dict)
             except(SystemExit, KeyboardInterrupt):
                 self.mv_to_bad(seed)
