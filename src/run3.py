@@ -41,9 +41,9 @@ class BatchRun:
         self.all_cores = mp.cpu_count()
         self.seed = self.args.get('seed')
         self.limit = self.args.get('limit')
-	self.executable = self.args.get('executable')
-	if self.args.get('executable') is None:
-	    self.executable = 'castep'
+        self.executable = self.args.get('executable')
+        if self.args.get('executable') is None:
+            self.executable = 'castep'
         valid = True
         if self.args.get('nprocesses') is not None:
             self.nprocesses = self.args['nprocesses']
@@ -169,7 +169,7 @@ class BatchRun:
                                 res=res,
                                 param_dict=self.param_dict,
                                 cell_dict=self.cell_dict,
-				executable=self.executable,
+                                executable=self.executable,
                                 debug=self.debug,
                                 conv_cutoff=self.cutoffs)
                     with open(paths['completed_fname'], 'a') as job_file:
@@ -187,7 +187,7 @@ class FullRelaxer:
     e.g. 4 lots of 2 then 4 lots of geom_max_iter/4.
     """
     def __init__(self, paths, ncores, nnodes, res, param_dict, cell_dict,
-		 executable, debug=False, conv_cutoff=None):
+                 executable, debug=False, conv_cutoff=None):
         """ Make the files to run the calculation and handle
         the calling of CASTEP itself.
         """
@@ -368,7 +368,7 @@ if __name__ == '__main__':
                               using -nc cores [DEFAULT=1]. REQUIRES Intel MPI as \
                               found on e.g. Darwin HPC.')
     parser.add_argument('-exec', '--executable', type=str,
-			help='specify path to or name of executable')
+                        help='specify path to or name of executable')
     parser.add_argument('-d', '--debug', action='store_true',
                         help='debug output')
     parser.add_argument('--conv_cutoff', action='store_true',
