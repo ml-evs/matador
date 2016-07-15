@@ -178,9 +178,17 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, *args):
                 f.write('\n')
             f.write('%ENDBLOCK LATTICE_CART\n')
             f.write('\n%BLOCK POSITIONS_FRAC\n')
-            for ind, atom in enumerate(zip(doc['atom_types'], doc['positions_frac'])):
-                f.write("{0:8s} {1[0]: 15f} {1[1]: 15f} {1[2]: 15f}\n".format(atom[0],
-                        atom[1]))
+            if 'atomic_init_spins' in doc:
+                for ind, atom in enumerate(zip(doc['atom_types'], doc['positions_frac'])):
+                    if atom[0] in doc['atomic_init_spins']:
+                        f.write("{0:8s} {1[0]: 15f} {1[1]: 15f} {1[2]: 15f} SPIN={2:}\n".format(
+                                atom[0], atom[1], doc['atomic_init_spins'][atom[0]]))
+                    else:
+                        f.write("{0:8s} {1[0]: 15f} {1[1]: 15f} {1[2]: 15f}\n".format(
+                            atom[0], atom[1]))
+            else:
+                f.write("{0:8s} {1[0]: 15f} {1[1]: 15f} {1[2]: 15f}\n".format(
+                        atom[0], atom[1]))
             f.write('%ENDBLOCK POSITIONS_FRAC\n\n')
             if pressure is not None:
                 f.write('\n%block external_pressure\n'.upper())
@@ -223,6 +231,11 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, *args):
                         shift = str(doc['hubbard_u'][elem][orbital])
                         f.write(elem + ' ' + orbital + ' : ' + shift + '\n')
                 f.write('%ENDBLOCK HUBBARD_U\n')
+            if 'quantisation_axis' in doc:
+                f.write('\nQUANTISATION_AXIS : ')
+                for integer in doc['quantisation_axis']:
+                    f.write(str(integer) + ' ')
+                f.write('\n\n')
             if 'species_pot' in doc:
                 f.write('\n%BLOCK SPECIES_POT\n')
                 for elem in doc['species_pot']:
