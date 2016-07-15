@@ -42,6 +42,8 @@ class BatchRun:
         self.seed = self.args.get('seed')
         self.limit = self.args.get('limit')
 	self.executable = self.args.get('executable')
+	if self.args.get('executable') is None:
+	    self.executable = 'castep'
         valid = True
         if self.args.get('nprocesses') is not None:
             self.nprocesses = self.args['nprocesses']
