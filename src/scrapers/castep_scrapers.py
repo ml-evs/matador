@@ -195,7 +195,18 @@ def cell2dict(seed, db=True, **kwargs):
             elif 'mp_grid' in line.lower():
                 cell['kpoints_mp_grid'] = map(int, line.split()[-3:])
             if not db:
-                if 'fix_com' in line.lower():
+                if '%block positions_frac' in line.lower():
+                    atomic_init_spins = defaultdict(list)
+                    i = 0
+                    while '%endblock positions_frac' not in flines[line_no+i].lower():
+                        if 'spin=' in flines[line_no+i].lower():
+                            split_line = flines[line_no+i].split()
+                            atomic_init_spins[split_line[0]] = \
+                                split_line[-1].lower().replace('spin=', '')
+                        i += 1
+                    if atomic_init_spins:
+                        cell['atomic_init_spins'] = atomic_init_spins
+                elif 'fix_com' in line.lower():
                     cell['fix_com'] = line.split()[-1]
                 elif 'symmetry_generate' in line.lower():
                     cell['symmetry_generate'] = True
@@ -203,6 +214,8 @@ def cell2dict(seed, db=True, **kwargs):
                     cell['symmetry_tol'] = float(line.split()[-1])
                 elif 'snap_to_symmetry' in line.lower():
                     cell['snap_to_symmetry'] = True
+                elif 'quantisation_axis' in line.lower():
+                    cell['quantisation_axis'] = map(int, line.split())
         if 'external_pressure' not in cell:
             cell['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0], [0.0]]
     except Exception as oops:
