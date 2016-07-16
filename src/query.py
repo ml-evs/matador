@@ -313,6 +313,7 @@ class DBQuery:
         header_string += "{:^12}".format('Space group')
         header_string += "{:^10}".format('Formula')
         header_string += "{:^8}".format('# fu')
+        header_string += "{:^8}".format('Prov.')
         for ind, doc in enumerate(cursor):
             formula_substring = ''
             if 'phase' in doc:
@@ -367,6 +368,27 @@ class DBQuery:
             struct_string[-1] += "{:^10}".format(formula_substring)
             try:
                 struct_string[-1] += "{:^8}".format(doc['num_fu'])
+            except:
+                struct_string[-1] += "{:^8}".format('xxx')
+            try:
+                source = 'AIRSS'
+                if doc['source'] is str:
+                    source_list = [doc['source']]
+                else:
+                    source_list = doc['source']
+                for fname in source_list:
+                    if (fname.endswith('.castep') or fname.endswith('.res') or
+                            fname.endswith('.history') or fname.contains('OQMD')):
+                        if 'swap' in fname.lower():
+                            source = 'SWAPS'
+                        elif 'oqmd' in fname.lower():
+                            source = 'OQMD'
+                        elif 'collcode' in fname.lower():
+                            if fname.split('/')[-1].count('-') == 2:
+                                source = 'SWAPS'
+                            else:
+                                source = 'ICSD'
+                struct_string[-1] += "{:^8}".format(source)
             except:
                 struct_string[-1] += "{:^8}".format('xxx')
             if last_formula != formula_substring:

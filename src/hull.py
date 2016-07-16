@@ -288,9 +288,12 @@ class QueryConvexHull():
                     stable_comp.append(structures[ind, 0])
         # create hull_cursor to pass to other modules
         # skip last and first as they are chem pots
+        self.match[0]['enthalpy_per_atom'] = 0.0
+        self.match[1]['enthalpy_per_atom'] = 0.0
         hull_cursor.append(self.match[0])
         for ind in range(1, len(hull_dist)-1):
             if hull_dist[ind] <= self.hull_cutoff:
+                self.cursor[ind-1]['enthalpy_per_atom'] = hull_dist[ind]
                 # take ind-1 to ignore first chem pot
                 hull_cursor.append(self.cursor[ind-1])
         hull_cursor.append(self.match[1])
