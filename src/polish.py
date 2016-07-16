@@ -58,7 +58,7 @@ class Polisher:
                     swap_cursor.extend(docs)
             self.cursor = swap_cursor
             if self.swap_counter > 0:
-                print_success('Performed swaps on ' + str(self.swap_counter) + ' structures.')
+                print_success('Performed ' + str(self.swap_counter) + ' swaps.')
             else:
                 print_warning('No swaps performed.')
         polish_cursor = []
@@ -176,7 +176,6 @@ class Polisher:
         """ Swap atomic species according to parsed
         options.
         """
-        swap_counter = 0
         docs = [source_doc]
         # iterate over sets of swaps
         for swap_pair in self.swap_pairs:
@@ -198,8 +197,7 @@ class Polisher:
                                         new_doc['atom_types'][ind] = new_atom
                                 # add to list of all structures post-swapping
                                 tmp_docs.append(new_doc)
-                                swap_counter += 1
             docs.extend(tmp_docs)
         # delete source structure from list
         del docs[0]
-        return docs, swap_counter
+        return docs, len(docs)
