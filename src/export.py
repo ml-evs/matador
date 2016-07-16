@@ -127,7 +127,7 @@ def doc2param(doc, path, hash_dupe=True, *args):
                          'backup_interval', 'fixed_npw', 'mix_cut_off_energy', 'mix_charge_amp',
                          'mixing_scheme', 'mix_charge_gmax', 'geom_force_tol', 'perc_extra_bands',
                          'elec_energy_tol', 'grid_scale', 'spin', 'continuation', 'mix_spin_amp',
-                         'spin_treatment', 'spin_fix', 'spin_unit'])
+                         'spin_treatment', 'spin_fix', 'spin_unit', 'fine_grid_scale'])
         param_dict = dict()
         for param in [param for param in param_set if param in doc]:
             param_dict[param] = doc[param]
@@ -187,8 +187,9 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, *args):
                         f.write("{0:8s} {1[0]: 15f} {1[1]: 15f} {1[2]: 15f}\n".format(
                             atom[0], atom[1]))
             else:
-                f.write("{0:8s} {1[0]: 15f} {1[1]: 15f} {1[2]: 15f}\n".format(
-                        atom[0], atom[1]))
+                for ind, atom in enumerate(zip(doc['atom_types'], doc['positions_frac'])):
+                    f.write("{0:8s} {1[0]: 15f} {1[1]: 15f} {1[2]: 15f}\n".format(
+                            atom[0], atom[1]))
             f.write('%ENDBLOCK POSITIONS_FRAC\n\n')
             if pressure is not None:
                 f.write('\n%block external_pressure\n'.upper())
