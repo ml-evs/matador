@@ -2,11 +2,12 @@
 # coding: utf-8
 """ This file implements the creation of
 new input files from a query and a desired
-level of accuracy.
+level of accuracy and atomic swaps.
 """
 from __future__ import print_function
 from scrapers.castep_scrapers import cell2dict
 from scrapers.castep_scrapers import param2dict
+from print_utils import print_notify, print_success, print_warning
 from export import query2files
 from traceback import print_exc
 import re
@@ -55,7 +56,10 @@ class Polisher:
                 if counter == 1:
                     swap_cursor.append(doc)
             self.cursor = swap_cursor
-            print('Performed swaps on', self.swap_counter, 'structures.')
+            if self.swap_counter > 0:
+                print_success('Performed swaps on ' + str(self.swap_counter) + ' structures.')
+            else:
+                print_warning('No swaps performed.')
         polish_cursor = []
         for doc in self.cursor[:]:
             polish_cursor.append(self.change_accuracy(doc))
@@ -152,20 +156,20 @@ class Polisher:
                 tmp_list.remove(']')
             while '' in tmp_list:
                 tmp_list.remove('')
-            new_atom = tmp_list[-1]
-            for atom in tmp_list:
-                if atom == new_atom or atom == '':
-                    continue
-                if 'I' in atom:
+            swap_test = tmp_list
+            for ind, atom in enumerate(tmp_list):
+                if '[' in atom:
                     group = atom.strip(']').strip('[')
                     atoms = self.periodic_table[group]
-                    for group_atom in atoms:
-                        if group_atom != new_atom:
-                            self.swap_pairs.append([group_atom, new_atom])
+                    swap_test[ind] = atoms
                 else:
-                    self.swap_pairs.append([atom, new_atom])
+                    swap_test[ind] = [atom]
+            for old_atom in swap_test[0]:
+                for new_atom in swap_test[1]:
+                    if old_atom != new_atom:
+                        self.swap_pairs.append([old_atom, new_atom])
         for pair in self.swap_pairs:
-            print('Swapping all', pair[0], 'for', pair[1])
+            print_notify('Swapping all ' + pair[0] + ' for ' + pair[1])
 
     def atomic_swaps(self, doc):
         """ Swap atomic species according to parsed
