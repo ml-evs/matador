@@ -388,6 +388,8 @@ class DBQuery:
                                 source = 'SWAPS'
                             else:
                                 source = 'ICSD'
+                        elif '-icsd' in fname.lower()
+                            source = 'ICSD'
                 struct_string[-1] += "{:^8}".format(source)
             except:
                 struct_string[-1] += "{:^8}".format('xxx')
