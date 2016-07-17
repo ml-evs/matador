@@ -42,6 +42,7 @@ class BatchRun:
         self.seed = self.args.get('seed')
         self.limit = self.args.get('limit')
         self.executable = self.args.get('executable')
+        self.rough = self.args.get('rough')
         if self.args.get('executable') is None:
             self.executable = 'castep'
         valid = True
@@ -170,6 +171,7 @@ class BatchRun:
                                 param_dict=self.param_dict,
                                 cell_dict=self.cell_dict,
                                 executable=self.executable,
+                                rough=self.rough,
                                 debug=self.debug,
                                 conv_cutoff=self.cutoffs)
                     with open(paths['completed_fname'], 'a') as job_file:
@@ -187,7 +189,7 @@ class FullRelaxer:
     e.g. 4 lots of 2 then 4 lots of geom_max_iter/4.
     """
     def __init__(self, paths, ncores, nnodes, res, param_dict, cell_dict,
-                 executable, debug=False, conv_cutoff=None):
+                 executable='castep', rough=None, debug=False, conv_cutoff=None):
         """ Make the files to run the calculation and handle
         the calling of CASTEP itself.
         """
@@ -211,7 +213,7 @@ class FullRelaxer:
         calc_doc['task'] = 'geometryoptimization'
         # set up geom opt parameters
         self.max_iter = calc_doc['geom_max_iter']
-        self.num_rough_iter = 4
+        self.num_rough_iter = rough if rough is not None else 4
         fine_iter = 20
         rough_iter = 2
         num_fine_iter = int(self.max_iter)/fine_iter
@@ -376,12 +378,15 @@ if __name__ == '__main__':
                         help='debug output')
     parser.add_argument('--conv_cutoff', action='store_true',
                         help='run all res files at cutoff defined in cutoff.conv file')
+    parser.add_argument('--rough', type=int,
+                        help='choose how many cycles of 2 geometry optimization iterations \
+                              to perform, decrease if lattice is nearly correct. [DEFAULT: 4].')
     parser.add_argument('-l', '--limit', type=int,
                         help='limit to n structures per run')
     args = parser.parse_args()
     runner = BatchRun(ncores=args.ncores, nprocesses=args.nprocesses, nnodes=args.nnodes,
                       debug=args.debug, seed=args.seed, conv_cutoff=args.conv_cutoff,
-                      limit=args.limit, executable=args.executable)
+                      limit=args.limit, executable=args.executable, rough=args.rough)
     try:
         runner.spawn()
     except(KeyboardInterrupt, SystemExit):
