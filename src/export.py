@@ -82,6 +82,14 @@ def query2files(cursor, *args):
         # write either cell, res or both
         for source in doc['source']:
             source = str(source)
+            if args['subcmd'] == 'swaps':
+                comp_string = ''
+                comp_list = []
+                for atom in doc['atom_types']:
+                    if atom not in comp_list:
+                        comp_list.append(atom)
+                        comp_string += atom
+                name = comp_string + '-' + name
             if '.res' in source:
                 name += source.split('/')[-1].split('.')[0]
             elif '.castep' in source:
@@ -89,13 +97,15 @@ def query2files(cursor, *args):
             elif '.history' in source:
                 name += source.split('/')[-1].split('.')[0]
             elif 'OQMD' in source:
-                # grab OQMD entry_id
                 stoich_string = ''
+                # prepend new stoich
                 if len(doc['stoichiometry']) == 1:
                     stoich_string += doc['stoichiometry'][0][0]
                 else:
                     for atom in doc['stoichiometry']:
-                        stoich_string += atom[0]+str(atom[1])
+                        stoich_string += atom[0]
+                        stoich_string += str(atom[1]) if atom[1] != 1 else ''
+                # grab OQMD entry_id
                 name += stoich_string + '-OQMD_' + source.split(' ')[-1]
         path += name
         # always write param for each doc; also handles dirs

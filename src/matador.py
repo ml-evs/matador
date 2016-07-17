@@ -292,6 +292,8 @@ if __name__ == '__main__':
     hull_parser.add_argument('--chempots', type=float, nargs='+',
                              help='manually specify chem pots as enthalpy per atom for \
                                    a rough hull.')
+    hull_parser.add_argument('--source', action='store_true',
+                             help='print filenames from which structures were wrangled')
     voltage_parser = subparsers.add_parser('voltage',
                                            help='plot a voltage curve from query results \
                                            (currently limited to binaries)',

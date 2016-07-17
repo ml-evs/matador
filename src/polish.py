@@ -2,11 +2,13 @@
 # coding: utf-8
 """ This file implements the creation of
 new input files from a query and a desired
-level of accuracy.
+level of accuracy and atomic swaps.
 """
 from __future__ import print_function
+from copy import deepcopy
 from scrapers.castep_scrapers import cell2dict
 from scrapers.castep_scrapers import param2dict
+from print_utils import print_notify, print_success, print_warning
 from export import query2files
 from traceback import print_exc
 import re
@@ -50,12 +52,15 @@ class Polisher:
             self.parse_swaps()
             swap_cursor = []
             for doc in self.cursor[:]:
-                doc, counter = self.atomic_swaps(doc)
+                docs, counter = self.atomic_swaps(doc)
                 self.swap_counter += counter
-                if counter == 1:
-                    swap_cursor.append(doc)
+                if counter > 0:
+                    swap_cursor.extend(docs)
             self.cursor = swap_cursor
-            print('Performed swaps on', self.swap_counter, 'structures.')
+            if self.swap_counter > 0:
+                print_success('Performed ' + str(self.swap_counter) + ' swaps.')
+            else:
+                print_warning('No swaps performed.')
         polish_cursor = []
         for doc in self.cursor[:]:
             polish_cursor.append(self.change_accuracy(doc))
@@ -137,11 +142,13 @@ class Polisher:
         e.g. --swap Li,As |--> ['Li', 'As']
         """
         self.swap_pairs = []
+        # split by comma to get pairs of swaps
         swap_list = self.args.get('swap')[0].split(',')
         for swap in swap_list:
             if len(swap) <= 1:
                 exit('Not enough arguments for swap!')
             tmp_list = re.split(r'([A-Z][a-z]*)', swap)
+            # scrub square brackets
             for ind, tmp in enumerate(tmp_list):
                 if tmp == '[':
                     while tmp_list[ind+1] != ']':
@@ -152,32 +159,45 @@ class Polisher:
                 tmp_list.remove(']')
             while '' in tmp_list:
                 tmp_list.remove('')
-            new_atom = tmp_list[-1]
-            for atom in tmp_list:
-                if atom == new_atom or atom == '':
-                    continue
-                if 'I' in atom:
+            swap_test = tmp_list
+            # expand swap_test with periodic table
+            for ind, atom in enumerate(tmp_list):
+                if '[' in atom:
                     group = atom.strip(']').strip('[')
                     atoms = self.periodic_table[group]
-                    for group_atom in atoms:
-                        if group_atom != new_atom:
-                            self.swap_pairs.append([group_atom, new_atom])
+                    swap_test[ind] = atoms
                 else:
-                    self.swap_pairs.append([atom, new_atom])
+                    swap_test[ind] = [atom]
+            self.swap_pairs.append(swap_test)
         for pair in self.swap_pairs:
-            print('Swapping all', pair[0], 'for', pair[1])
+            print_notify('Swapping all ' + str(pair[0]) + ' for ' + str(pair[1]))
 
-    def atomic_swaps(self, doc):
+    def atomic_swaps(self, source_doc):
         """ Swap atomic species according to parsed
         options.
         """
-        swapped = False
-        for ind, atom in enumerate(doc['atom_types']):
-            for swap_pair in self.swap_pairs:
-                if atom == swap_pair[0]:
-                    doc['atom_types'][ind] = swap_pair[1]
-                    swapped = True
-        if swapped:
-            return doc, 1
-        else:
-            return doc, 0
+        docs = [source_doc]
+        # iterate over sets of swaps
+        for swap_pair in self.swap_pairs:
+            # iterate over all structures including those already swapped
+            for doc in docs:
+                tmp_docs = []
+                # for each atom to be swapped
+                for swap_atom in swap_pair[0]:
+                    # if structure contains an atom to be swapped
+                    if swap_atom in doc['atom_types']:
+                        # iterate over new atoms and swap
+                        for new_atom in swap_pair[1]:
+                            # don't swap structure to itself
+                            if new_atom != swap_atom:
+                                new_doc = deepcopy(doc)
+                                # iterate over structure and swap all to new atom
+                                for ind, source_atom in enumerate(doc['atom_types']):
+                                    if source_atom == swap_atom:
+                                        new_doc['atom_types'][ind] = new_atom
+                                # add to list of all structures post-swapping
+                                tmp_docs.append(new_doc)
+            docs.extend(tmp_docs)
+        # delete source structure from list
+        del docs[0]
+        return docs, len(docs)
