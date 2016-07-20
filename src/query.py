@@ -378,7 +378,7 @@ class DBQuery:
                     source_list = doc['source']
                 for fname in source_list:
                     if (fname.endswith('.castep') or fname.endswith('.res') or
-                            fname.endswith('.history') or fname.contains('OQMD')):
+                            fname.endswith('.history') or 'OQMD' in fname):
                         if 'swap' in fname.lower():
                             source = 'SWAPS'
                         elif 'oqmd' in fname.lower():
