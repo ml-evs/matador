@@ -260,8 +260,8 @@ class FullRelaxer:
                 opti_dict, success = castep2dict(seed + '.castep', db=False)
                 try:
                     # delete any k-point information
-                    del opti_dict['kpoint_mp_spacing']
-                    del opti_dict['kpoint_mp_grid']
+                    del opti_dict['kpoints_mp_spacing']
+                    del opti_dict['kpoints_mp_grid']
                 except:
                     pass
                 if not success and opti_dict == '':
