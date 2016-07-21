@@ -218,7 +218,7 @@ if __name__ == '__main__':
                                         any structure containing Li, not just pure Li.')
     structure_parser.add_argument('--tags', nargs='+', type=str,
                                   help=('search for up to 3 manual tags at once'))
-    structure_parser.add_argument('--encap', action='store_true',
+    structure_parser.add_argument('-encap', '--encapsulated', action='store_true',
                                   help='query only structures encapsulated in a carbon nanotube.')
     structure_parser.add_argument('--loose', action='store_true',
                                   help='loosely matches with calc_match, i.e. only matches \
