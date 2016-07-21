@@ -314,6 +314,8 @@ if __name__ == '__main__':
                                           new parameters.',
                                           parents=[global_parser, collection_parser,
                                                    structure_parser, material_parser])
+    polish_parser.add_argument('-t', '--top', type=int,
+                               help='number of structures to show (DEFAULT: 10)')
     # parser.add_argument('--dis', action='store_true',
                         # help='smear hull with local stoichiometry')
     # parser.add_argument('--write_pressure', nargs='+', type=str,

@@ -42,9 +42,13 @@ class Polisher:
                                       'Cf', 'Es', 'Fm', 'Md', 'No', 'Lr']
         self.template_structure = None
         try:
-            self.cursor = cursor.clone()
-        except:
             self.cursor = list(cursor)
+            if self.args.get('top') is not None:
+                self.cursor = self.cursor[:self.args.get('top')]
+        except:
+            print_exc()
+            print_error('Something went wrong!')
+            exit()
         # parse new parameters
         self.cell_dict, self.param_dict = self.get_accuracy()
         if self.args['subcmd'] == 'swaps':
