@@ -748,8 +748,8 @@ def castep2dict(seed, db=True, **kwargs):
         if type(oops) == DFTError:
             if db:
                 # if importing to db, skip unconverged structure
-                # and don't report in log file
-                return '', False
+                # and report in log file
+                return seed + '\t\t' + str(type(oops)) + ' ' + str(oops)+'\n', False
             else:
                 # if not importing to db, return unconverged structure
                 # but notify that it is unconverged
