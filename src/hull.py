@@ -323,10 +323,10 @@ class QueryConvexHull():
                                                                 hull_dist[ind]))
         for ind, doc in enumerate(self.cursor):
             stoich_string = str(doc['stoichiometry'][0][0])
-            stoich_string += str(doc['stoichiometry'][0][1]) \
+            stoich_string += '$_{' + str(doc['stoichiometry'][0][1]) + '}$' \
                 if doc['stoichiometry'][0][1] != 1 else ''
             stoich_string += str(doc['stoichiometry'][1][0])
-            stoich_string += str(doc['stoichiometry'][1][1]) \
+            stoich_string += '$_{' + str(doc['stoichiometry'][1][1]) + '}$' \
                 if doc['stoichiometry'][1][1] != 1 else ''
             info.append("{0:^10}\n{1:^24}\n{2:^5s}\n{3:2f} eV".format(stoich_string,
                                                                       doc['text_id'][0] + ' ' +
@@ -387,7 +387,7 @@ class QueryConvexHull():
     def plot_hull(self, dis=False):
         """ Plot calculated hull. """
         if self.args.get('png'):
-            fig = plt.figure(facecolor=None, figsize=(3, 1.5))
+            fig = plt.figure(facecolor=None, figsize=(6, 4))
         else:
             fig = plt.figure(facecolor=None)
         ax = fig.add_subplot(111)
@@ -411,28 +411,26 @@ class QueryConvexHull():
                             textcoords='data',
                             ha='center',
                             xytext=(self.structures[self.hull.vertices[ind], 0],
-                                    self.structures[self.hull.vertices[ind], 1]-0.07))
-
-        lw = self.scale * 0.05 if self.mpl_new_ver else 1
+                                    self.structures[self.hull.vertices[ind], 1]-0.1))
+        lw = self.scale * 0 if self.mpl_new_ver else 1
         # points for off hull structures
-        for ind in range(len(self.structures)):
-            if self.hull_dist[ind] <= self.hull_cutoff or self.hull_cutoff == 0:
-                c = self.colours[self.source_ind[ind]] \
-                    if self.hull_cutoff == 0 else self.colours[1]
-                scatter.append(ax.scatter(self.structures[ind, 0], self.structures[ind, 1],
-                               s=self.scale*30, lw=lw, alpha=0.9, c=c, edgecolor='k',
-                               label=self.info[ind], zorder=100))
-            # if dis and warren:
-                # ax.plot([self.structures[ind, 0]-disorder[ind]/10, self.structures[ind, 0]],
-                        # [self.structures[ind, 1], self.structures[ind, 1]],
-                        # c='g', alpha=0.5, lw=0.5)
-            # if dis and not warren:
-                # ax.plot([self.structures[ind, 0]-disorder[ind]/10,
-                # self.structures[ind, 0] + disorder[ind]],
-                        # [self.structures[ind, 1], self.structures[ind, 1]],
-                        # c='#28B453', alpha=0.5, lw=0.5)
+        if self.hull_cutoff == 0:
+            # if no specified hull cutoff, ignore labels and colour
+            # by distance from hull
+            coolwarm = plt.cm.get_cmap('coolwarm')
+            eVtoK = 1/(0.086173e-3)
+            scatter = ax.scatter(self.structures[:, 0], self.structures[:, 1],
+                                 s=self.scale*30, lw=lw, alpha=0.9, c=self.hull_dist*eVtoK,
+                                 edgecolor='k', zorder=300, cmap=coolwarm)
+            plt.colorbar(scatter)
         if self.hull_cutoff != 0:
-            c = self.colours[self.source_ind[ind]] if self.hull_cutoff == 0 else self.colours[1]
+            # if specified hull cutoff, label and colour those below
+            for ind in range(len(self.structures)):
+                if self.hull_dist[ind] <= self.hull_cutoff or self.hull_cutoff == 0:
+                    c = self.colours[1]
+                    scatter.append(ax.scatter(self.structures[ind, 0], self.structures[ind, 1],
+                                   s=self.scale*30, lw=lw, alpha=0.9, c=c, edgecolor='k',
+                                   label=self.info[ind], zorder=300))
             ax.scatter(self.structures[1:-1, 0], self.structures[1:-1, 1], s=self.scale*30, lw=lw,
                        alpha=0.3, c=self.colours[-2],
                        edgecolor='k', zorder=10)
@@ -466,7 +464,7 @@ class QueryConvexHull():
                         # c=self.colours[-1], lw=2, alpha=1, zorder=900, label='')
         ax.set_xlim(-0.05, 1.05)
         # data cursor
-        if not dis:
+        if not dis and self.hull_cutoff != 0:
             datacursor(scatter[:], formatter='{label}'.format, draggable=False,
                        bbox=dict(fc='white'),
                        arrowprops=dict(arrowstyle='simple', alpha=1))
@@ -477,14 +475,15 @@ class QueryConvexHull():
                     else np.min(self.structures[self.hull.vertices, 1])-0.15,
                     0.5 if np.max(self.structures[self.hull.vertices, 1]) > 1
                     else np.max(self.structures[self.hull.vertices, 1])+0.1)
-        ax.set_title('$\mathrm{'+x_elem+'_x'+one_minus_x_elem+'_{1-x}}$')
+        ax.set_title(x_elem+'$_\mathrm{x}$'+one_minus_x_elem+'$_\mathrm{1-x}$')
         plt.locator_params(nbins=3)
-        ax.set_xlabel('$x$')
+        ax.set_xlabel('$\mathrm{x}$')
+        ax.grid(False)
         ax.set_xticks([0, 0.33, 0.5, 0.66, 1])
-        ax.set_ylabel('$E_\mathrm{F}$ (eV/atom)')
+        ax.set_ylabel('E$_\mathrm{F}$ (eV/atom)')
         if self.args.get('png'):
-            plt.savefig(self.elements[0]+self.elements[1]+'_hull.png',
-                        dpi=300, bbox_inches='tight')
+            plt.savefig(self.elements[0]+self.elements[1]+'_hull.pdf',
+                        dpi=200, bbox_inches='tight')
         else:
             plt.show()
 
@@ -636,7 +635,7 @@ class QueryConvexHull():
             pass
         if self.args.get('png'):
             try:
-                plt.style.use('poster')
+                plt.style.use('article')
             except:
                 pass
         self.scale = 1
