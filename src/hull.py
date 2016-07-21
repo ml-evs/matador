@@ -387,7 +387,7 @@ class QueryConvexHull():
     def plot_hull(self, dis=False):
         """ Plot calculated hull. """
         if self.args.get('png'):
-            fig = plt.figure(facecolor=None, figsize=(6, 4))
+            fig = plt.figure(facecolor=None, figsize=(7, 4))
         else:
             fig = plt.figure(facecolor=None)
         ax = fig.add_subplot(111)
@@ -418,11 +418,11 @@ class QueryConvexHull():
             # if no specified hull cutoff, ignore labels and colour
             # by distance from hull
             coolwarm = plt.cm.get_cmap('coolwarm')
-            eVtoK = 1/(0.086173e-3)
             scatter = ax.scatter(self.structures[:, 0], self.structures[:, 1],
-                                 s=self.scale*30, lw=lw, alpha=0.9, c=self.hull_dist*eVtoK,
+                                 s=self.scale*30, lw=lw, alpha=0.9, c=self.hull_dist,
                                  edgecolor='k', zorder=300, cmap=coolwarm)
-            plt.colorbar(scatter)
+            cbar = plt.colorbar(scatter, aspect=30, pad=0.02)
+            cbar.set_label('Distance from hull (eV)')
         if self.hull_cutoff != 0:
             # if specified hull cutoff, label and colour those below
             for ind in range(len(self.structures)):
@@ -613,8 +613,8 @@ class QueryConvexHull():
             ax2.plot([self.x[i-1], self.x[i]], [self.voltages[i-1], self.voltages[i-1]],
                      lw=2, c=self.colours[0])
         ax2.set_ylabel('Voltage (V)')
-        ax2.yaxis.tick_right()
         ax2.yaxis.set_label_position("right")
+        ax2.yaxis.tick_right()
         ax2.set_xlim(0, np.max(np.asarray(self.x[1:]))+1)
         ax2.set_ylim(np.min(np.asarray(self.voltages[1:]))-0.1,
                      np.max(np.asarray(self.voltages[1:]))+0.1)
