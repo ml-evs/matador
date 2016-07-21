@@ -35,7 +35,6 @@ class QueryConvexHull():
             self.chem_pots = self.args.get('chempots')
         else:
             self.chem_pots = None
-            print(self.chem_pots)
         self.binary_hull()
         if self.args['subcmd'] == 'voltage':
             print('Generating voltage curve...')
@@ -45,7 +44,7 @@ class QueryConvexHull():
                 self.subplot_voltage_hull()
             else:
                 self.plot_voltage_curve()
-        elif self.args['subcmd'] == 'hull':
+        elif self.args['subcmd'] == 'hull' and not self.args['no_plot']:
             self.set_plot_param()
             self.plot_hull()
 

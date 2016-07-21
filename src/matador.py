@@ -294,6 +294,8 @@ if __name__ == '__main__':
                                    a rough hull.')
     hull_parser.add_argument('--source', action='store_true',
                              help='print filenames from which structures were wrangled')
+    hull_parser.add_argument('--no_plot', action='store_true',
+                             help='suppress plotting')
     voltage_parser = subparsers.add_parser('voltage',
                                            help='plot a voltage curve from query results \
                                            (currently limited to binaries)',
