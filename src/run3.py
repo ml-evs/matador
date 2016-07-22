@@ -164,6 +164,7 @@ class BatchRun:
                     job_file.write(res+'\n')
                 # create full relaxer object for creation and running of job
                 try:
+                    job_count += 1
                     FullRelaxer(paths=self.paths,
                                 ncores=self.ncores,
                                 nnodes=self.nnodes,
@@ -176,7 +177,6 @@ class BatchRun:
                                 conv_cutoff=self.cutoffs)
                     with open(paths['completed_fname'], 'a') as job_file:
                         job_file.write(res+'\n')
-                    job_count += 1
                 except(KeyboardInterrupt, SystemExit, RuntimeError):
                     raise SystemExit
         return
