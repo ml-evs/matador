@@ -223,8 +223,8 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, *args):
                         str(doc['kpoints_mp_grid'][2]) + '\n')
             if 'cell_constraints' in doc:
                 f.write('\n%BLOCK CELL_CONSTRAINTS\n')
-                f.write(''.join(str(doc['cell_constraints'][0]).strip('[]'))+'\n')
-                f.write(''.join(str(doc['cell_constraints'][1]).strip('[]'))+'\n')
+                f.write((''.join(str(doc['cell_constraints'][0]).strip('[]'))+'\n').replace(',', ''))
+                f.write((''.join(str(doc['cell_constraints'][1]).strip('[]'))+'\n').replace(',', ''))
                 f.write('%ENDBLOCK CELL_CONSTRAINTS\n')
             if 'fix_com' in doc:
                 f.write('FIX_COM : TRUE\n')

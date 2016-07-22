@@ -549,31 +549,39 @@ def castep2dict(seed, db=True, **kwargs):
             elif 'Final free energy' in line:
                 castep['free_energy'] = float(line.split('=')[1].split()[0])
                 castep['free_energy_per_atom'] = castep['free_energy'] / castep['num_atoms']
+            elif '0K energy' in line:
+                castep['0K_energy'] = float(line.split('=')[1].split()[0])
+                castep['0K_energy_per_atom'] = castep['0K_energy'] / castep['num_atoms']
         # write zero pressure if not found in file
         if 'external_pressure' not in castep:
             castep['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0], [0.0]]
         if 'spin_polarized' not in castep:
             castep['spin_polarized'] = False
         # task specific options
-        if castep['task'] != 'geometryoptimization' and castep['task'] != 'geometry optimization':
+        if db and castep['task'] != 'geometryoptimization' and \
+                castep['task'] != 'geometry optimization':
             raise RuntimeError('CASTEP file does not contain GO calculation')
         else:
-            final = False
-            finish_line = 0
-            castep['optimised'] = False
-            success_string = 'Geometry optimization completed successfully'
-            failure_string = 'Geometry optimization failed to converge after'
-            for line_no, line in enumerate(flines):
-                if any(finished in line for finished in [success_string, failure_string]):
-                    for line_next in range(line_no, len(flines)):
-                        if any(finished in flines[line_next] for
-                                finished in [success_string, failure_string]):
-                            finish_line = line_next
-                            if success_string in flines[line_next]:
-                                castep['optimised'] = True
-                            elif failure_string in flines[line_next]:
-                                castep['optimised'] = False
-                    final = True
+            if db and castep['task'].strip() == 'geometryoptimization':
+                final = False
+                finish_line = 0
+                castep['optimised'] = False
+                success_string = 'Geometry optimization completed successfully'
+                failure_string = 'Geometry optimization failed to converge after'
+                for line_no, line in enumerate(flines):
+                    if any(finished in line for finished in [success_string, failure_string]):
+                        for line_next in range(line_no, len(flines)):
+                            if any(finished in flines[line_next] for
+                                    finished in [success_string, failure_string]):
+                                finish_line = line_next
+                                if success_string in flines[line_next]:
+                                    castep['optimised'] = True
+                                elif failure_string in flines[line_next]:
+                                    castep['optimised'] = False
+                        final = True
+            else:
+                final = True
+                finish_line = 0
             if final:
                 final_flines = flines[finish_line+1:]
                 for line_no, line in enumerate(final_flines):
@@ -731,10 +739,11 @@ def castep2dict(seed, db=True, **kwargs):
         # check that any optimized results were saved and raise errors if not
         if castep['optimised'] is False:
             raise DFTError('CASTEP GO failed to converge.')
-        if 'enthalpy' not in castep:
-            raise RuntimeError('Could not find enthalpy')
         if 'positions_frac' not in castep:
             raise RuntimeError('Could not find positions')
+        if 'enthalpy' not in castep:
+            castep['enthalpy'] = 'xxx'
+            castep['enthalpy_per_atom'] = 'xxx'
         if 'pressure' not in castep:
             castep['pressure'] = 'xxx'
         if 'cell_volume' not in castep:

@@ -206,34 +206,32 @@ class FullRelaxer:
         calc_doc = res_dict
         # set seed name
         self.seed = calc_doc['source'][0].replace('.res', '')
-        print_notify('Relaxing ' + self.seed)
         # update global doc with cell and param dicts for folder
         calc_doc.update(cell_dict)
         calc_doc.update(param_dict)
-        calc_doc['task'] = 'geometryoptimization'
-        # set up geom opt parameters
-        self.max_iter = calc_doc['geom_max_iter']
-        self.num_rough_iter = rough if rough is not None else 4
-        fine_iter = 20
-        rough_iter = 2
-        num_fine_iter = int(self.max_iter)/fine_iter
-        self.geom_max_iter_list = (self.num_rough_iter * [rough_iter])
-        self.geom_max_iter_list.extend(num_fine_iter * [fine_iter])
         if self.conv_cutoff_bool:
             for cutoff in self.conv_cutoff:
                 calc_doc.update({'cut_off_energy': cutoff})
                 seed = self.seed + '_' + str(cutoff) + 'eV'
-                self.success = self.relax(calc_doc, seed)
+                self.success = self.scf(calc_doc, seed)
         else:
+            # set up geom opt parameters
+            self.max_iter = calc_doc['geom_max_iter']
+            self.num_rough_iter = rough if rough is not None else 4
+            fine_iter = 20
+            rough_iter = 2
+            num_fine_iter = int(self.max_iter)/fine_iter
+            self.geom_max_iter_list = (self.num_rough_iter * [rough_iter])
+            self.geom_max_iter_list.extend(num_fine_iter * [fine_iter])
             self.success = self.relax(calc_doc, self.seed)
-        if not success:
-            self.mv_to_bad(self.seed)
 
     def relax(self, calc_doc, seed):
         """ Set up the calculation to perform 4 sets of two steps,
         then continue with the remainder of steps.
         """
+        print_notify('Relaxing ' + self.seed)
         geom_max_iter_list = self.geom_max_iter_list
+        calc_doc['task'] = 'geometryoptimization'
         # relax structure
         print(geom_max_iter_list)
         # copy initial res file to seed
@@ -268,15 +266,10 @@ class FullRelaxer:
                     print_warning('Failed to scrape castep file...')
                     return False
                 if opti_dict['optimised'] == True:
-                    if not exists('completed'):
-                        makedirs('completed')
                     print_success('Successfully relaxed ' + seed)
-
                     # write res and castep file out to completed folder
                     doc2res(opti_dict, 'completed/' + seed, hash_dupe=False)
-                    system('mv ' + seed + '.castep' + ' completed/' + seed + '.castep')
-                    system('mv ' + seed + '.param' + ' completed/' + seed + '.param')
-                    system('mv ' + seed + '.cell' + ' completed/' + seed + '.cell')
+                    self.mv_to_completed(seed)
                     if calc_doc.get('write_cell_structure') == 'true':
                         system('mv ' + seed + '-out.cell' + ' completed/' + seed + '-out.cell')
                     # clean up rest of files
@@ -312,6 +305,35 @@ class FullRelaxer:
                 self.tidy_up(seed)
                 return False
 
+    def scf(self, calc_doc, seed):
+        """ Perform only the scf calculation without relaxation.  """
+        try:
+            print_notify('Calculating SCF ' + self.seed)
+            doc2param(calc_doc, seed, hash_dupe=False)
+            doc2cell(calc_doc, seed, hash_dupe=False, copy_pspots=False)
+            calc_doc['task'] = 'singlepoint'
+            # run CASTEP
+            process = self.castep(seed)
+            process.communicate()
+            # scrape dict
+            opti_dict, success = castep2dict(seed + '.castep', db=False)
+            print(opti_dict, success)
+            if not success:
+                self.mv_to_bad(seed)
+            else:
+                self.mv_to_completed(seed)
+            self.tidy_up(seed)
+            return True
+        except(SystemExit, KeyboardInterrupt):
+            self.mv_to_bad(seed)
+            self.tidy_up(seed)
+            raise SystemExit
+        except:
+            print_exc()
+            self.mv_to_bad(seed)
+            self.tidy_up(seed)
+            return False
+
     def castep(self, seed):
         """ Calls CASTEP on desired seed with desired number of cores.
         """
@@ -333,6 +355,15 @@ class FullRelaxer:
             makedirs('bad_castep')
         print('Something went wrong, moving files to bad_castep')
         system('mv ' + seed + '* bad_castep')
+        return
+
+    def mv_to_completed(self, seed):
+        """ Move all associated files to completed. """
+        if not exists('completed'):
+            makedirs('completed')
+        system('mv ' + seed + '.castep' + ' completed/' + seed + '.castep')
+        system('mv ' + seed + '.param' + ' completed/' + seed + '.param')
+        system('mv ' + seed + '.cell' + ' completed/' + seed + '.cell')
         return
 
     def cp_to_input(self, seed):
