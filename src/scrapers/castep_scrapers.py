@@ -661,7 +661,10 @@ def castep2dict(seed, db=True, **kwargs):
                                     castep['stress'].append((map(
                                         float, (final_flines[line_no+i+j+4].split()[2:5]))))
                             elif 'Pressure' in final_flines[line_no+i]:
-                                castep['pressure'] = float(final_flines[line_no+i].split()[-2])
+                                try:
+                                    castep['pressure'] = float(final_flines[line_no+i].split()[-2])
+                                except:
+                                    pass
                                 break
                             i += 1
                     elif 'Atomic Populations (Mulliken)' in line:
