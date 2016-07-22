@@ -231,7 +231,6 @@ class FullRelaxer:
         """
         print_notify('Relaxing ' + self.seed)
         geom_max_iter_list = self.geom_max_iter_list
-        calc_doc['task'] = 'geometryoptimization'
         # relax structure
         print(geom_max_iter_list)
         # copy initial res file to seed
@@ -311,7 +310,6 @@ class FullRelaxer:
             print_notify('Calculating SCF ' + self.seed)
             doc2param(calc_doc, seed, hash_dupe=False)
             doc2cell(calc_doc, seed, hash_dupe=False, copy_pspots=False)
-            calc_doc['task'] = 'singlepoint'
             # run CASTEP
             process = self.castep(seed)
             process.communicate()
