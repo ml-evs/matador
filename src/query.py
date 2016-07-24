@@ -185,8 +185,6 @@ class DBQuery:
                     if cursor_count >= 1:
                         cursor = list(self.cursor)
                         if self.args.get('top') is not None:
-                            print('stuff')
-                            print(len(cursor[:self.args.get('top')]))
                             query2files(cursor[:self.args.get('top')], self.args)
                         else:
                             query2files(cursor, self.args)
