@@ -147,6 +147,9 @@ class DBQuery:
         if self.args.get('encapsulated') is True:
             self.query_dict['$and'].append(self.query_encap())
             empty_query = False
+        if self.args.get('cnt_radius') is not None:
+            self.query_dict['$and'].append(self.query_cnt_radius())
+            empty_query = False
         if self.args.get('tags') is not None:
             self.query_dict['$and'].append(self.query_tags())
             empty_query = False
@@ -744,6 +747,18 @@ class DBQuery:
         query_dict['encapsulated']['$exists'] = True
         return query_dict
 
+    def query_cnt_radius(self):
+        """ Query structures within a nanotube of given radius
+        to within a tolerance of 0.01 A.
+        """
+        query_dict = dict()
+        query_dict['$and'] = []
+        query_dict['$and'].append(dict())
+        query_dict['$and'][-1]['cnt_radius'] = dict()
+        query_dict['$and'][-1]['cnt_radius']['$gt'] = self.args.get('cnt_radius') - 0.01
+        query_dict['$and'][-1]['cnt_radius']['$lt'] = self.args.get('cnt_radius') + 0.01
+        return query_dict
+
     def query_calc(self, doc):
         """ Find all structures with matching
         accuracy to specified structure.
@@ -769,10 +784,6 @@ class DBQuery:
             temp_dict = dict()
             query_dict.append(dict())
             query_dict[-1]['cut_off_energy'] = doc['cut_off_energy']
-            # temp_dict = dict()
-            # query_dict.append(dict())
-            # temp_dict['$lte'] = float(doc['kpoints_mp_spacing'])
-            # query_dict[-1]['kpoints_mp_spacing'] = temp_dict
         else:
             temp_dict = dict()
             temp_dict['kpoints_mp_spacing'] = dict()

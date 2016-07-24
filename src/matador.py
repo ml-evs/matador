@@ -220,6 +220,9 @@ if __name__ == '__main__':
                                   help=('search for up to 3 manual tags at once'))
     structure_parser.add_argument('-encap', '--encapsulated', action='store_true',
                                   help='query only structures encapsulated in a carbon nanotube.')
+    structure_parser.add_argument('-cntr', '--cnt_radius', type=float,
+                                  help='specify the radius of the encapsulating nanotube \
+                                        to within 0.01 A')
     structure_parser.add_argument('--loose', action='store_true',
                                   help='loosely matches with calc_match, i.e. only matches \
                                         pspot and xc_functional')
