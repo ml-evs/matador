@@ -563,7 +563,7 @@ def castep2dict(seed, db=True, **kwargs):
                 castep['task'] != 'geometry optimization':
             raise RuntimeError('CASTEP file does not contain GO calculation')
         else:
-            if db and castep['task'].strip() == 'geometryoptimization':
+            if castep['task'].strip() == 'geometryoptimization':
                 final = False
                 finish_line = 0
                 castep['optimised'] = False
@@ -580,7 +580,7 @@ def castep2dict(seed, db=True, **kwargs):
                                 elif failure_string in flines[line_next]:
                                     castep['optimised'] = False
                         final = True
-            else:
+            elif not db:
                 final = True
                 finish_line = 0
             if final:
