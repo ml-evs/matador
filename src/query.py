@@ -211,7 +211,6 @@ class DBQuery:
                     exit('Hulls and voltage curves require just one source or --include_oqmd, \
                           exiting...')
                 print('Creating hull from AJM db structures.')
-                self.args['summary'] = True
                 self.args['top'] = -1
                 if self.args.get('biggest'):
                     print('\nFinding biggest calculation set for hull...\n')
@@ -495,6 +494,12 @@ class DBQuery:
         # if there's only one string, try split it by caps
         if len(stoich) == 1:
             stoich = [elem for elem in re.split(r'([A-Z][a-z]*)', stoich[0]) if elem]
+            tmp_stoich = stoich
+            print(stoich)
+            for ind, strng in enumerate(stoich):
+                tmp_stoich[ind] = [elem for elem in re.split(r'([0-9]*)', strng) if elem]
+            stoich = [item for sublist in tmp_stoich for item in sublist]
+            print(stoich)
             while '[' in stoich or '][' in stoich:
                 tmp_stoich = list(stoich)
                 for ind, tmp in enumerate(tmp_stoich):
@@ -522,6 +527,7 @@ class DBQuery:
                 stoich = tmp_stoich
         elements = []
         fraction = []
+        print(stoich)
         for i in range(0, len(stoich), 1):
             if not bool(re.search(r'\d', stoich[i])):
                 elements.append(stoich[i])
@@ -530,6 +536,7 @@ class DBQuery:
                 except:
                     fraction.append(1.0)
         gcd_val = 0
+        print(fraction)
         for frac in fraction:
             if gcd_val == 0:
                 gcd_val = frac

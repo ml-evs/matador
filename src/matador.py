@@ -297,6 +297,8 @@ if __name__ == '__main__':
                                    a rough hull.')
     hull_parser.add_argument('--source', action='store_true',
                              help='print filenames from which structures were wrangled')
+    hull_parser.add_argument('-s', '--summary', action='store_true',
+                             help='show only the ground state for each stoichiometry.')
     hull_parser.add_argument('--no_plot', action='store_true',
                              help='suppress plotting')
     voltage_parser = subparsers.add_parser('voltage',
