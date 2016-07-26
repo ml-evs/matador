@@ -291,7 +291,7 @@ class QueryConvexHull():
         self.match[1]['enthalpy_per_atom'] = 0.0
         hull_cursor.append(self.match[0])
         for ind in range(1, len(hull_dist)-1):
-            if hull_dist[ind] <= self.hull_cutoff:
+            if hull_dist[ind] <= self.hull_cutoff+1e-12:
                 self.cursor[ind-1]['enthalpy_per_atom'] = hull_dist[ind]
                 # take ind-1 to ignore first chem pot
                 hull_cursor.append(self.cursor[ind-1])
