@@ -9,9 +9,9 @@ from __future__ import print_function
 from scrapers.castep_scrapers import castep2dict, param2dict, cell2dict
 from scrapers.castep_scrapers import res2dict, dir2dict
 from scrapers.experiment_scrapers import expt2dict, synth2dict
+from cell_utils import calc_mp_spacing
 # external libraries
 import pymongo as pm
-from numpy import asarray, dot, cross, zeros
 # standard library
 import subprocess
 from random import randint
@@ -19,7 +19,6 @@ from collections import defaultdict
 import datetime
 from os import walk, getcwd, uname, chdir, chmod, rename
 from os.path import realpath, abspath, dirname, getmtime, isfile
-from math import pi, log10
 from traceback import print_exc
 from copy import deepcopy
 
@@ -132,7 +131,7 @@ class Spatula:
             self.logfile.close()
         if not self.dryrun:
             # set log file to read only
-            chmod(logfile_name, 0550)
+            chmod(logfile_name, 0o550)
         if not self.scan:
             self.logfile = open(logfile_name, 'r')
             errors = sum(1 for line in self.logfile)
@@ -243,7 +242,7 @@ class Spatula:
                     for param_name in file_lists[root]['param']:
                         for cell_name in file_lists[root]['cell']:
                             if param_name.split('.')[0] in cell_name:
-                                param_dict, success = param2dict(param_name, 
+                                param_dict, success = param2dict(param_name,
                                                                  debug=self.debug,
                                                                  verbosity=self.verbosity)
                                 param = success
@@ -307,20 +306,10 @@ class Spatula:
                         final_struct.update(struct_dict)
                         try:
                             # calculate kpoint spacing if not found
-                            if 'kpoints_mp_spacing' not in final_struct and 'kpoints_mp_grid' in final_struct:
-                                real_lat = np.asarray(final_struct['lattice_cart'])
-                                recip_lat = np.zeros((3, 3))
-                                recip_lat[0] = (2*pi)*np.cross(real_lat[1], real_lat[2])/(np.dot(real_lat[0], np.cross(real_lat[1], real_lat[2])))
-                                recip_lat[1] = (2*pi)*np.cross(real_lat[2], real_lat[0])/(np.dot(real_lat[1], np.cross(real_lat[2], real_lat[0])))
-                                recip_lat[2] = (2*pi)*np.cross(real_lat[0], real_lat[1])/(np.dot(real_lat[2], np.cross(real_lat[0], real_lat[1])))
-                                recip_len = np.zeros((3))
-                                recip_len = np.sqrt(np.sum(np.power(recip_lat, 2), axis=1))
-                                max_spacing = 0
-                                for j in range(3):
-                                    spacing = recip_len[j] / (2*pi*final_struct['kpoints_mp_grid'][j])
-                                    max_spacing = (spacing if spacing > max_spacing else max_spacing)
-                                # exponent = round(log10(max_spacing) - 1)
-                                final_struct['kpoints_mp_spacing'] = round(max_spacing, 2)# + 0.5*10**exponent, 2)
+                            if 'kpoints_mp_spacing' not in final_struct and \
+                                    'kpoints_mp_grid' in final_struct:
+                                final_struct['kpoints_mp_spacing'] = calc_mp_spacing(
+                                    final_struct['lattice_cart'], final_struct['mp_grid'])
                         except:
                             print(struct_dict['source'])
                             print(input_dict['source'])
@@ -334,7 +323,7 @@ class Spatula:
                             self.import_count += self.struct2db(final_struct)
             else:
                 for ind, file in enumerate(file_lists[root]['castep']):
-                    castep_dict, success = castep2dict(file, 
+                    castep_dict, success = castep2dict(file,
                                                        debug=self.debug,
                                                        verbosity=self.verbosity)
                     if not success:
