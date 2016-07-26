@@ -6,10 +6,8 @@ and calling other functionality. """
 from __future__ import print_function
 # matador modules
 from query import DBQuery
-from hull import QueryConvexHull
 from print_utils import print_failure, print_warning
 from polish import Polisher
-from spatula import Spatula
 # import external libraries
 import pymongo as pm
 # import standard library
@@ -59,6 +57,7 @@ class Matador:
         if self.args['subcmd'] == 'stats':
             self.stats()
         if self.args['subcmd'] in ['import', 'rebuild']:
+            from spatula import Spatula
             self.importer = Spatula(self.args)
         if self.args['subcmd'] == 'query':
             self.query = DBQuery(self.client, self.collections, self.args)
@@ -76,14 +75,22 @@ class Matador:
                 self.polish = Polisher(self.hull.hull_cursor, self.args)
             else:
                 self.polish = Polisher(self.query.cursor, self.args)
-        if self.args['subcmd'] == 'hull' or self.args['subcmd'] == 'voltage':
+        if self.args['subcmd'] == 'hull' or \
+           self.args['subcmd'] == 'voltage' or \
+           self.args['subcmd'] == 'volume':
+            from hull import QueryConvexHull
             self.query = DBQuery(self.client, self.collections, self.args)
             self.hull = QueryConvexHull(self.query, self.args)
             if len(self.hull.hull_cursor) == 0:
                 print('No structures on hull with chosen chemical potentials.')
             else:
-                print(len(self.hull.hull_cursor), 'structures within', self.hull.hull_cutoff,
-                      'eV of the hull with chosen chemical potentials.')
+                if self.args.get('hull_temp'):
+                    print(len(self.hull.hull_cursor), 'structures within',
+                          self.args.get('hull_temp'),
+                          'K of the hull with chosen chemical potentials.')
+                else:
+                    print(len(self.hull.hull_cursor), 'structures within', self.hull.hull_cutoff,
+                          'eV of the hull with chosen chemical potentials.')
                 self.query.display_results(self.hull.hull_cursor)
 
     def print_report(self):
@@ -182,150 +189,154 @@ if __name__ == '__main__':
                                        description='valid sub-commands',
                                        dest='subcmd')
     # define parent parser for global arguments
-    global_parser = argparse.ArgumentParser(add_help=False)
+    global_flags = argparse.ArgumentParser(add_help=False)
     # common arguments to all subcommands
-    global_parser.add_argument('--db',
-                               help='choose which databases to query',
-                               nargs='+')
-    # define structure parser for structure query strings
-    structure_parser = argparse.ArgumentParser(add_help=False)
-    structure_parser.add_argument('-c', '--composition', type=str, nargs='+',
-                                  help='find all structures containing exclusively the given elements, \
-                                        e.g. LiSi. Macros defined for groups [I]-[VII], [Tran] \
-                                        [Lan] and [Act], used with square brackets.')
-    structure_parser.add_argument('-int', '--intersection', action='store_true',
-                                  help='query the intersection of compositions instead of the union \
-                                        e.g. -c LiSnS -int queries Li, Sn, S, LiSn, LiS & LiSnS.')
-    structure_parser.add_argument('-n', '--num_species', type=int, nargs='+',
-                                  help='find all structures containing a certain \
-                                        number of species.')
-    structure_parser.add_argument('-f', '--formula', type=str, nargs='+',
-                                  help='query a particular chemical formula, e.g. GeTeSi3')
-    structure_parser.add_argument('-i', '--id', type=str, nargs='+',
-                                  help='specify a particular structure by its text_id')
-    structure_parser.add_argument('-ac', '--calc-match', action='store_true',
-                                  help='display calculations of the same accuracy as specified id')
-    structure_parser.add_argument('-z', '--num_fu', type=int,
-                                  help='query a calculations with more than n formula units')
-    structure_parser.add_argument('-sg', '--space_group',
-                                  help='query a particular space group')
-    structure_parser.add_argument('-p', '--pressure', type=float,
-                                  help='specify an isotropic external pressure to search for \
-                                        , e.g. 10 (GPa)')
-    structure_parser.add_argument('-pf', '--partial-formula', action='store_true',
-                                  help='stoichiometry/composition queries will include other \
-                                        unspecified species, e.g. -pf search for Li will query \
-                                        any structure containing Li, not just pure Li.')
-    structure_parser.add_argument('--tags', nargs='+', type=str,
-                                  help=('search for up to 3 manual tags at once'))
-    structure_parser.add_argument('-encap', '--encapsulated', action='store_true',
-                                  help='query only structures encapsulated in a carbon nanotube.')
-    structure_parser.add_argument('-cntr', '--cnt_radius', type=float,
-                                  help='specify the radius of the encapsulating nanotube \
-                                        to within 0.01 A')
-    structure_parser.add_argument('--loose', action='store_true',
-                                  help='loosely matches with calc_match, i.e. only matches \
-                                        pspot and xc_functional')
-    structure_parser.add_argument('--ignore_warnings', action='store_true',
-                                  help='includes possibly bad structures')
-    # define material parser for hull/voltage arguments
-    material_parser = argparse.ArgumentParser(add_help=False)
-    material_parser.add_argument('--include_oqmd', action='store_true',
-                                 help='include OQMD structures on hull and voltage curve.')
-    material_parser.add_argument('-hc', '--hull_cutoff', type=float,
-                                 help='return only structures within a certain distance from hull')
-    material_parser.add_argument('--biggest', action='store_true',
-                                 help='use the largest subset of structures to create a hull')
-    plot_parser = argparse.ArgumentParser(add_help=False)
-    plot_parser.add_argument('--png', action='store_true',
-                             help='save png rather than showing plot in X')
-    plot_parser.add_argument('--subplot', action='store_true',
-                             help='plot combined hull and voltage graph')
-    spatula_parser = argparse.ArgumentParser(add_help=False)
-    spatula_parser.add_argument('-d', '--dryrun', action='store_true',
-                                help='run the importer without connecting to the database')
-    spatula_parser.add_argument('-v', '--verbosity', action='count',
-                                help='enable verbose output')
-    spatula_parser.add_argument('-t', '--tags', nargs='+', type=str,
-                                help='set user tags, e.g. nanotube, project name')
-    spatula_parser.add_argument('--debug', action='store_true',
-                                help='enable debug output to print every dict')
-    spatula_parser.add_argument('-s', '--scan', action='store_true',
-                                help='only scan the database for new structures, do not dictify')
+    global_flags.add_argument('--db',
+                              help='choose which databases to query',
+                              nargs='+')
+    # define all other flags by group
+    # define flags for query contents
+    structure_flags = argparse.ArgumentParser(add_help=False)
+    structure_flags.add_argument('-c', '--composition', type=str, nargs='+',
+                                 help='find all structures containing exclusively the given elements, \
+                                       e.g. LiSi. Macros defined for groups [I]-[VII], [Tran] \
+                                       [Lan] and [Act], used with square brackets.')
+    structure_flags.add_argument('-int', '--intersection', action='store_true',
+                                 help='query the intersection of compositions instead of the union \
+                                       e.g. -c LiSnS -int queries Li, Sn, S, LiSn, LiS & LiSnS.')
+    structure_flags.add_argument('-n', '--num_species', type=int, nargs='+',
+                                 help='find all structures containing a certain \
+                                       number of species.')
+    structure_flags.add_argument('-f', '--formula', type=str, nargs='+',
+                                 help='query a particular chemical formula, e.g. GeTeSi3')
+    structure_flags.add_argument('-i', '--id', type=str, nargs='+',
+                                 help='specify a particular structure by its text_id')
+    structure_flags.add_argument('-ac', '--calc-match', action='store_true',
+                                 help='display calculations of the same accuracy as specified id')
+    structure_flags.add_argument('-z', '--num_fu', type=int,
+                                 help='query a calculations with more than n formula units')
+    structure_flags.add_argument('-sg', '--space_group',
+                                 help='query a particular space group')
+    structure_flags.add_argument('-p', '--pressure', type=float,
+                                 help='specify an isotropic external pressure to search for \
+                                       , e.g. 10 (GPa)')
+    structure_flags.add_argument('-pf', '--partial-formula', action='store_true',
+                                 help='stoichiometry/composition queries will include other \
+                                       unspecified species, e.g. -pf search for Li will query \
+                                       any structure containing Li, not just pure Li.')
+    structure_flags.add_argument('--tags', nargs='+', type=str,
+                                 help=('search for up to 3 manual tags at once'))
+    structure_flags.add_argument('-encap', '--encapsulated', action='store_true',
+                                 help='query only structures encapsulated in a carbon nanotube.')
+    structure_flags.add_argument('-cntr', '--cnt_radius', type=float,
+                                 help='specify the radius of the encapsulating nanotube \
+                                       to within 0.01 A')
+    structure_flags.add_argument('--loose', action='store_true',
+                                 help='loosely matches with calc_match, i.e. only matches \
+                                       pspot and xc_functional')
+    structure_flags.add_argument('--ignore_warnings', action='store_true',
+                                 help='includes possibly bad structures')
+    # define material flags for hull/voltage arguments
+    material_flags = argparse.ArgumentParser(add_help=False)
+    material_flags.add_argument('-hc', '--hull_cutoff', type=float,
+                                help='return only structures within a certain distance from hull \
+                                      in eV/atom')
+    material_flags.add_argument('-hT', '--hull_temp', type=float,
+                                help='return only structures within a certain distance from hull \
+                                      in K')
+    material_flags.add_argument('--biggest', action='store_true',
+                                help='use the largest subset of structures to create a hull')
+    material_flags.add_argument('--chempots', type=float, nargs='+',
+                                help='manually specify chem pots as enthalpy per atom for \
+                                      a rough hull.')
+    # define flags for plotting output
+    plot_flags = argparse.ArgumentParser(add_help=False)
+    plot_flags.add_argument('--pdf', action='store_true',
+                            help='save pdf rather than showing plot in X')
+    plot_flags.add_argument('--subplot', action='store_true',
+                            help='plot combined hull and voltage graph')
+    plot_flags.add_argument('--ascii', action='store_true',
+                            help='plot as ascii without X')
+    plot_flags.add_argument('--no_plot', action='store_true',
+                            help='suppress plotting')
+    # define flags for spatula scraping
+    spatula_flags = argparse.ArgumentParser(add_help=False)
+    spatula_flags.add_argument('-d', '--dryrun', action='store_true',
+                               help='run the importer without connecting to the database')
+    spatula_flags.add_argument('-v', '--verbosity', action='count',
+                               help='enable verbose output')
+    spatula_flags.add_argument('-t', '--tags', nargs='+', type=str,
+                               help='set user tags, e.g. nanotube, project name')
+    spatula_flags.add_argument('--debug', action='store_true',
+                               help='enable debug output to print every dict')
+    spatula_flags.add_argument('-s', '--scan', action='store_true',
+                               help='only scan the database for new structures, do not dictify')
     # define parser for output of new files for swaps/polishes
-    collection_parser = argparse.ArgumentParser(add_help=False)
-    collection_parser.add_argument('--to', type=str,
-                                   help='the text_id of a structure with the desired parameters')
-    collection_parser.add_argument('--with', type=str,
-                                   help=('the seedname (must be within pwd) of cell and param ' +
-                                         'files to use for polishing/swaps'))
-    collection_parser.add_argument('--prefix', type=str,
-                                   help='add a prefix to all file names to write out (auto-appended \
-                                         with an underscore')
+    collection_flags = argparse.ArgumentParser(add_help=False)
+    collection_flags.add_argument('--to', type=str,
+                                  help='the text_id of a structure with the desired parameters')
+    collection_flags.add_argument('--with', type=str,
+                                  help=('the seedname (must be within pwd) of cell and param ' +
+                                        'files to use for polishing/swaps'))
+    collection_flags.add_argument('--prefix', type=str,
+                                  help='add a prefix to all file names to write out (auto-appended \
+                                        with an underscore')
+    query_flags = argparse.ArgumentParser(add_help=False)
+    query_flags.add_argument('-s', '--summary', action='store_true',
+                             help='show only the ground state for each stoichiometry.')
+    query_flags.add_argument('-t', '--top', type=int,
+                             help='number of structures to show (DEFAULT: 10)')
+    query_flags.add_argument('-d', '--details', action='store_true',
+                             help='show as much detail about calculation as possible')
+    query_flags.add_argument('--source', action='store_true',
+                             help='print filenames from which structures were wrangled')
+    query_flags.add_argument('--cell', action='store_true',
+                             help='export query to .cell files in folder name from query string')
+    query_flags.add_argument('--res', action='store_true',
+                             help='export query to .res files in folder name from query string')
+    swap_flags = argparse.ArgumentParser(add_help=False)
+    swap_flags.add_argument('-s', '--swap', type=str, nargs='+',
+                            help='swap all atoms in structures from a query from the first n-1 \
+                                  species to the nth, e.g. --swaps N P As will swap all N, P \
+                                  atoms for As. Uses the same macros  as --composition.')
     # define subcommand parsers and their arguments
     stat_parser = subparsers.add_parser('stats',
                                         help='print some stats about the database.',
-                                        parents=[global_parser])
+                                        parents=[global_flags])
     query_parser = subparsers.add_parser('query',
                                          help='query and extract structures from the database',
-                                         parents=[global_parser, structure_parser])
-    query_parser.add_argument('-s', '--summary', action='store_true',
-                              help='show only the ground state for each stoichiometry.')
-    query_parser.add_argument('-t', '--top', type=int,
-                              help='number of structures to show (DEFAULT: 10)')
-    query_parser.add_argument('-d', '--details', action='store_true',
-                              help='show as much detail about calculation as possible')
-    query_parser.add_argument('--source', action='store_true',
-                              help='print filenames from which structures were wrangled')
-    query_parser.add_argument('--cell', action='store_true',
-                              help='export query to .cell files in folder name from query string')
-    query_parser.add_argument('--res', action='store_true',
-                              help='export query to .res files in folder name from query string')
+                                         parents=[global_flags, query_flags, structure_flags])
     import_parser = subparsers.add_parser('import',
                                           help='import new structures in folder into database',
-                                          parents=[global_parser, spatula_parser])
+                                          parents=[global_flags, spatula_flags])
     rebuild_parser = subparsers.add_parser('rebuild',
                                            help='rebuild whole database.',
-                                           parents=[spatula_parser])
+                                           parents=[spatula_flags])
     hull_parser = subparsers.add_parser('hull',
                                         help='create a convex hull from query results \
                                         (currently limited to binaries)',
-                                        parents=[global_parser, structure_parser,
-                                                 material_parser, plot_parser])
-    hull_parser.add_argument('--chempots', type=float, nargs='+',
-                             help='manually specify chem pots as enthalpy per atom for \
-                                   a rough hull.')
-    hull_parser.add_argument('--source', action='store_true',
-                             help='print filenames from which structures were wrangled')
-    hull_parser.add_argument('-s', '--summary', action='store_true',
-                             help='show only the ground state for each stoichiometry.')
-    hull_parser.add_argument('--no_plot', action='store_true',
-                             help='suppress plotting')
+                                        parents=[global_flags, structure_flags,
+                                                 material_flags, plot_flags, query_flags])
     voltage_parser = subparsers.add_parser('voltage',
                                            help='plot a voltage curve from query results \
                                            (currently limited to binaries)',
-                                           parents=[global_parser, structure_parser,
-                                                    material_parser, plot_parser])
+                                           parents=[global_flags, structure_flags,
+                                                    material_flags, plot_flags, query_flags])
+    volume_parser = subparsers.add_parser('volume',
+                                          help='plot a volume curve from convex hull\
+                                               (currently limited to binaries)',
+                                          parents=[global_flags, structure_flags,
+                                                   material_flags, plot_flags, query_flags])
     swaps_parser = subparsers.add_parser('swaps',
                                          help='perform atomic swaps on query results',
-                                         parents=[global_parser, collection_parser,
-                                                  structure_parser, material_parser])
-    swaps_parser.add_argument('-s', '--swap', type=str, nargs='+',
-                              help='swap all atoms in structures from a query from the first n-1 \
-                                    species to the nth, e.g. --swaps N P As will swap all N, P \
-                                    atoms for As. Uses the same macros  as --composition.')
+                                         parents=[global_flags, collection_flags,
+                                                  structure_flags, material_flags, swap_flags])
     polish_parser = subparsers.add_parser('polish',
                                           help='re-relax a series of structures with \
                                           new parameters.',
-                                          parents=[global_parser, collection_parser,
-                                                   structure_parser, material_parser])
-    polish_parser.add_argument('-t', '--top', type=int,
-                               help='number of structures to show (DEFAULT: 10)')
-    # parser.add_argument('--dis', action='store_true',
-                        # help='smear hull with local stoichiometry')
-    # parser.add_argument('--write_pressure', nargs='+', type=str,
-                        # help=('pressure to add to new cell file, either one float' +
-                              # 'for isotropic or 6 floats for anisotropic.'))
+                                          parents=[global_flags, collection_flags,
+                                                   structure_flags, material_flags,
+                                                   query_flags])
     args = parser.parse_args()
     if vars(args).get('include_oqmd'):
         print_failure('--include_oqmd is currently disabled, please try again soon...')
@@ -335,5 +346,8 @@ if __name__ == '__main__':
         exit()
     if vars(args).get('subcmd') == 'hull' and vars(args).get('formula') is not None:
         print_failure('hull not compatible with --formula, please use --composition')
+        exit()
+    if vars(args).get('hull_cutoff') and vars(args).get('hull_temp'):
+        print_failure('hull_cutoff and hull_temp both specified, exiting...')
         exit()
     matador = Matador(args, argstr=argv[1:])
