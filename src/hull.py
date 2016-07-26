@@ -13,6 +13,7 @@ import re
 import numpy as np
 from mpldatacursor import datacursor
 import matplotlib.pyplot as plt
+import matplotlib.colors as colours
 
 
 class QueryConvexHull():
@@ -417,10 +418,13 @@ class QueryConvexHull():
         if self.hull_cutoff == 0:
             # if no specified hull cutoff, ignore labels and colour
             # by distance from hull
-            coolwarm = plt.cm.get_cmap('coolwarm')
+            cmap_full = plt.cm.get_cmap('GnBu_r')
+            cmap = colours.LinearSegmentedColormap.from_list(
+                'trunc({n},{a:.2f},{b:.2f})'.format(n=cmap_full.name, a=0, b=0.9),
+                cmap_full(np.linspace(0, 0.9, 100)))
             scatter = ax.scatter(self.structures[:, 0], self.structures[:, 1],
                                  s=self.scale*30, lw=lw, alpha=0.9, c=self.hull_dist,
-                                 edgecolor='k', zorder=300, cmap=coolwarm)
+                                 edgecolor='k', zorder=300, cmap=cmap)
             cbar = plt.colorbar(scatter, aspect=30, pad=0.02)
             cbar.set_label('Distance from hull (eV)')
         if self.hull_cutoff != 0:
