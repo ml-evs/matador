@@ -1,4 +1,3 @@
-#!/usr/bin/python
 # coding: utf-8
 """ This file implements convex hull functionality
 from database queries.
@@ -43,20 +42,24 @@ class QueryConvexHull():
         self.binary_hull()
         if self.args['subcmd'] == 'voltage':
             print('Generating voltage curve...')
-            self.voltage_curve(self.stable_enthalpy, self.stable_comp, self.mu_enthalpy)
+            self.voltage_curve(self.stable_enthalpy_per_b, self.stable_comp, self.mu_enthalpy)
             self.set_plot_param()
             if self.args.get('subplot'):
                 self.subplot_voltage_hull()
             else:
                 self.plot_voltage_curve()
-        elif self.args['subcmd'] == 'volume':
+            self.set_plot_param()
+            self.plot_hull()
+        elif self.args.get('volume'):
             self.volume_curve(self.stable_comp, self.stable_vol)
-            self.set_plot_param()
-            self.plot_volume_curve()
-            self.plot_hull()
-        elif self.args['subcmd'] == 'hull' and not self.args['no_plot']:
-            self.set_plot_param()
-            self.plot_hull()
+        if self.args['subcmd'] == 'hull' and not self.args['no_plot']:
+            if self.args.get('bokeh'):
+                self.plot_hull_bokeh()
+            else:
+                self.set_plot_param()
+                self.plot_hull()
+            if self.args.get('volume'):
+                self.plot_volume_curve()
 
     def get_chempots(self):
         """ Search for chemical potentials that match
@@ -112,29 +115,6 @@ class QueryConvexHull():
                 else:
                     print_failure('No possible chem pots found for ' + elem + '.')
                     exit()
-        # include OQMD structures if desired, first find chem pots
-        # if self.include_oqmd:
-            # oqmd_mu_enthalpy = np.zeros((2))
-            # oqmd_match = [None, None]
-            # oqmd_query_dict = dict()
-            # for ind, elem in enumerate(self.elements):
-                # print('Scanning for suitable', elem, 'OQMD chemical potential...')
-                # oqmd_query_dict = query.query_composition(custom_elem=[elem])
-                # oqmd_mu_cursor = query.oqmd_repo.find(SON(oqmd_query_dict))
-                # oqmd_mu_cursor.sort('enthalpy_per_atom', pm.ASCENDING)
-                # for doc_ind, doc in enumerate(oqmd_mu_cursor):
-                    # if doc_ind == 0:
-                        # oqmd_match[ind] = doc
-                        # break
-                # if oqmd_match[ind] is not None:
-                    # oqmd_mu_enthalpy[ind] = float(oqmd_match[ind]['enthalpy_per_atom'])
-                    # print_success('Using ' + ''.join([oqmd_match[ind]['text_id'][0] + ' ' +
-                                  # oqmd_match[ind]['text_id'][1]]) + \
-                                  # ' as OQMD chem pot for ' + elem)
-                    # print(60*'─')
-                # else:
-                    # print_failure('No possible chem pots found for ' + elem + '.')
-                    # exit()
         return
 
     def binary_hull(self, dis=False):
@@ -158,12 +138,6 @@ class QueryConvexHull():
         hull_dist = np.zeros((num_structures+2))
         info = []
         self.source_list = []
-        # if self.include_oqmd:
-            # oqmd_num_structures = query.oqmd_cursor.count()
-            # oqmd_formation = np.zeros((oqmd_num_structures))
-            # oqmd_stoich = np.zeros((oqmd_num_structures))
-            # oqmd_enthalpy = np.zeros((oqmd_num_structures))
-            # oqmd_info = []
         if dis:
             from disorder import disorder_hull
         # define hull by order in command-line arguments
@@ -212,70 +186,29 @@ class QueryConvexHull():
         stoich = np.append([0.0], stoich)
         stoich = np.append(stoich, [1.0])
         structures = np.vstack((stoich, formation)).T
-        # if self.include_oqmd:
-            # for ind, doc in enumerate(query.oqmd_cursor):
-                # oqmd_formation[ind] = doc['enthalpy_per_atom']
-                # atoms_per_fu = doc['stoichiometry'][0][1] + doc['stoichiometry'][1][1]
-                # num_fu = (doc['enthalpy']/doc['enthalpy_per_atom']) / float(atoms_per_fu)
-                # if doc['stoichiometry'][0][0] == one_minus_x_elem:
-                    # num_b = doc['stoichiometry'][0][1]
-                # elif doc['stoichiometry'][1][0] == one_minus_x_elem:
-                    # num_b = doc['stoichiometry'][1][1]
-                # else:
-                    # print_failure('Something went wrong!')
-                    # exit()
-                # oqmd_enthalpy[ind] = doc['enthalpy'] / (num_b * num_fu)
-                # oqmd_formation[ind] = doc['enthalpy_per_atom']
-                # for mu in oqmd_match:
-                    # for j in range(len(doc['stoichiometry'])):
-                        # if mu['stoichiometry'][0][0] == doc['stoichiometry'][j][0]:
-                            # oqmd_formation[ind] -= (mu['enthalpy_per_atom'] *
-                                                    # doc['stoichiometry'][j][1] /
-                                                    # atoms_per_fu)
-                # for elem in doc['stoichiometry']:
-                    # stoich_string = (str(doc['stoichiometry'][0][0]) +
-                                     # str(doc['stoichiometry'][0][1]) +
-                                     # str(doc['stoichiometry'][1][0]) +
-                                     # str(doc['stoichiometry'][1][1]))
-                    # if x_elem in elem[0]:
-                        # oqmd_stoich[ind] = (elem[1])/float(atoms_per_fu)
-                # oqmd_info.append("{0:^10}\n{1:^24}\n{2:^5s}\n{3:2f} eV".format(
-                    # stoich_string, 'OQMD' + ' ' + doc['text_id'][0] + ' ' + doc['text_id'][1],
-                    # doc['space_group'], formation[ind]))
-            # oqmd_stoich = np.append([0.0], oqmd_stoich)
-            # oqmd_stoich = np.append(oqmd_stoich, [1.0])
-            # oqmd_formation = np.append([0.0], oqmd_formation)
-            # oqmd_formation = np.append(oqmd_formation, [0.0])
-            # oqmd_enthalpy = np.append(oqmd_mu_enthalpy[1], oqmd_enthalpy)
-            # oqmd_enthalpy = np.append(oqmd_enthalpy, oqmd_mu_enthalpy[0])
-            # oqmd_structures = np.vstack((oqmd_stoich, oqmd_formation)).T
-            # ind = len(oqmd_formation)-3
-            # for doc in match:
-                # stoich_string = str(doc['stoichiometry'][0][0])
-                # oqmd_info.append("{0:^10}\n{1:24}\n{2:5s}\n{3:2f} eV".format(
-                    # stoich_string, 'OQMD' + ' ' + doc['text_id'][0] + ' ' + doc['text_id'][1],
-                    # doc['space_group'], oqmd_formation[ind]))
-                # ind += 1
+
         # create hull with SciPy routine
         self.hull = ConvexHull(structures)
-        # if self.include_oqmd:
-            # oqmd_hull = ConvexHull(oqmd_structures)
 
         hull_energy = []
         hull_comp = []
         hull_enthalpy = []
+        hull_volume = []
         hull_cursor = []
         for ind in range(len(self.hull.vertices)):
             if structures[self.hull.vertices[ind], 1] <= 0:
                 hull_energy.append(structures[self.hull.vertices[ind], 1])
                 hull_enthalpy.append(enthalpy[self.hull.vertices[ind]])
                 hull_comp.append(structures[self.hull.vertices[ind], 0])
+                hull_volume.append(volume[ind])
         # calculate distance to hull of all structures
         hull_energy = np.asarray(hull_energy)
         hull_enthalpy = np.asarray(hull_enthalpy)
         hull_comp = np.asarray(hull_comp)
+        hull_volume = np.asarray(hull_volume)
         hull_energy = hull_energy[np.argsort(hull_comp)]
         hull_enthalpy = hull_enthalpy[np.argsort(hull_comp)]
+        hull_volume = hull_volume[np.argsort(hull_comp)]
         hull_comp = hull_comp[np.argsort(hull_comp)]
         for ind in range(len(structures)):
             # get the index of the next stoich on the hull from the current structure
@@ -290,19 +223,19 @@ class QueryConvexHull():
             hull_dist[ind] = structures[ind, 1] - (gradient * structures[ind, 0] + intercept)
         # if below cutoff, include in arg to voltage curve
         stable_energy = list(hull_energy)
-        stable_enthalpy = list(hull_enthalpy)
+        stable_enthalpy_per_b = list(hull_enthalpy)
         stable_comp = list(hull_comp)
-        stable_vol = []
+        stable_vol = list(hull_volume)
         for ind in range(len(structures)):
             if hull_dist[ind] <= self.hull_cutoff:
                 # recolour if under cutoff
                 source_ind[ind] = 0
-                stable_vol.append(volume[ind])
                 # get lowest enthalpy at particular comp
                 if structures[ind, 0] not in stable_comp:
                     stable_energy.append(structures[ind, 1])
-                    stable_enthalpy.append(enthalpy[ind])
+                    stable_enthalpy_per_b.append(enthalpy[ind])
                     stable_comp.append(structures[ind, 0])
+                    stable_vol.append(volume[ind])
         # create hull_cursor to pass to other modules
         # skip last and first as they are chem pots
         self.match[0]['enthalpy_per_atom'] = 0.0
@@ -314,21 +247,6 @@ class QueryConvexHull():
                 # take ind-1 to ignore first chem pot
                 hull_cursor.append(self.cursor[ind-1])
         hull_cursor.append(self.match[1])
-        # if self.include_oqmd:
-            # oqmd_stable_comp = []
-            # oqmd_stable_energy = []
-            # oqmd_stable_enthalpy = []
-            # for ind in range(len(oqmd_hull.vertices)):
-                # if oqmd_structures[oqmd_hull.vertices[ind], 1] <= 0:
-                    # oqmd_stable_energy.append(oqmd_structures[oqmd_hull.vertices[ind], 1])
-                    # oqmd_stable_enthalpy.append(oqmd_enthalpy[oqmd_hull.vertices[ind]])
-                    # oqmd_stable_comp.append(oqmd_structures[oqmd_hull.vertices[ind], 0])
-            # oqmd_stable_comp = np.asarray(oqmd_stable_comp)
-            # oqmd_stable_energy = np.asarray(oqmd_stable_energy)
-            # oqmd_stable_enthalpy = np.asarray(oqmd_stable_enthalpy)
-            # oqmd_stable_energy = oqmd_stable_energy[np.argsort(oqmd_stable_comp)]
-            # oqmd_stable_enthalpy = oqmd_stable_enthalpy[np.argsort(oqmd_stable_comp)]
-            # oqmd_stable_comp = oqmd_stable_comp[np.argsort(oqmd_stable_comp)]
         # grab info for datacursor
         info = []
         doc = self.match[0]
@@ -362,10 +280,10 @@ class QueryConvexHull():
 
         stable_energy = np.asarray(stable_energy)
         stable_comp = np.asarray(stable_comp)
-        stable_enthalpy = np.asarray(stable_enthalpy)
+        stable_enthalpy_per_b = np.asarray(stable_enthalpy_per_b)
         stable_vol = np.asarray(stable_vol)
         stable_energy = stable_energy[np.argsort(stable_comp)]
-        stable_enthalpy = stable_enthalpy[np.argsort(stable_comp)]
+        stable_enthalpy_per_b = stable_enthalpy_per_b[np.argsort(stable_comp)]
         stable_vol = stable_vol[np.argsort(stable_comp)]
         stable_comp = stable_comp[np.argsort(stable_comp)]
 
@@ -377,11 +295,11 @@ class QueryConvexHull():
         self.hull_dist = hull_dist
         self.hull_comp = hull_comp
         self.hull_energy = hull_energy
-        self.stable_enthalpy = stable_enthalpy
+        self.stable_enthalpy_per_b = stable_enthalpy_per_b
         self.stable_vol = stable_vol
         self.stable_comp = stable_comp
 
-    def voltage_curve(self, stable_enthalpy, stable_comp, mu_enthalpy):
+    def voltage_curve(self, stable_enthalpy_per_b, stable_comp, mu_enthalpy):
         """ Take convex hull and calculate voltages. """
         stable_num = []
         V = []
@@ -393,7 +311,7 @@ class QueryConvexHull():
                 stable_num.append(stable_comp[i]/(1-stable_comp[i]))
         # V.append(0)
         for i in range(len(stable_num)-1, 0, -1):
-            V.append(-(stable_enthalpy[i] - stable_enthalpy[i-1]) /
+            V.append(-(stable_enthalpy_per_b[i] - stable_enthalpy_per_b[i-1]) /
                       (stable_num[i] - stable_num[i-1]) +
                       (mu_enthalpy[0]))
             x.append(stable_num[i])
@@ -425,7 +343,7 @@ class QueryConvexHull():
 
     def plot_hull(self, dis=False):
         """ Plot calculated hull. """
-        if self.args.get('png'):
+        if self.args.get('pdf'):
             fig = plt.figure(facecolor=None, figsize=(7, 4))
         else:
             fig = plt.figure(facecolor=None)
@@ -502,15 +420,82 @@ class QueryConvexHull():
         ax.grid(False)
         ax.set_xticks([0, 0.33, 0.5, 0.66, 1])
         ax.set_ylabel('E$_\mathrm{F}$ (eV/atom)')
-        if self.args.get('png'):
+        if self.args.get('pdf'):
             plt.savefig(self.elements[0]+self.elements[1]+'_hull.pdf',
                         dpi=200, bbox_inches='tight')
         else:
             plt.show()
 
+    def plot_hull_bokeh(self):
+        """ Plot interactive hull with Bokeh. """
+        from bokeh.plotting import figure, show, output_file
+        from bokeh.models import ColumnDataSource, HoverTool
+        # x_elem = self.elements[0]
+        # one_minus_x_elem = self.elements[1]
+        # prepare data for bokeh
+        tie_line_data = dict()
+        tie_line_data['info'] = list()
+        tie_line_data['composition'] = list()
+        tie_line_data['energy'] = list()
+        for ind in range(len(self.hull.vertices)):
+            if self.structures[self.hull.vertices[ind], 1] <= 0:
+                tie_line_data['composition'].append(self.structures[self.hull.vertices[ind], 0])
+                tie_line_data['energy'].append(self.structures[self.hull.vertices[ind], 1])
+                tie_line_data['info'].append(self.info[self.hull.vertices[ind]])
+        tie_line_data['energy'] = np.asarray(tie_line_data['energy'])
+        tie_line_data['composition'] = np.asarray(tie_line_data['composition'])
+        tie_line_data['energy'] = tie_line_data['energy'][np.argsort(tie_line_data['composition'])]
+        tie_line_data['info'] = [tie_line_data['info'][i]
+                                 for i in list(np.argsort(tie_line_data['composition']))]
+        tie_line_data['composition'] = np.sort(tie_line_data['composition'])
+        tie_line_data['colour'] = len(tie_line_data['energy']) * ['blue']
+        hull_data = dict()
+        hull_data['energy'] = list()
+        hull_data['composition'] = list()
+        hull_data['info'] = list()
+        # points for off hull structures
+        hull_data['composition'] = self.structures[:, 0]
+        hull_data['energy'] = self.structures[:, 1]
+        hull_data['info'] = self.info
+        hull_data['colour'] = len(hull_data['energy']) * ['red']
+
+        tie_line_source = ColumnDataSource(data=tie_line_data)
+        hull_source = ColumnDataSource(data=hull_data)
+
+        hover = HoverTool(tooltips="""
+                          <div>
+                              <div>
+                                  <span style="font-size: 12px;">@info</span>
+                              </div>
+                          </div>
+                          """)
+
+        tools = ['pan', 'wheel_zoom']
+        tools.append(hover)
+        fig = figure(tools=tools)
+
+        fig.line('composition', 'energy',
+                 source=tie_line_source,
+                 line_color='blue')
+        fig.circle('composition', 'energy',
+                   source=hull_source,
+                   alpha=1,
+                   size=5,
+                   color='colour')
+        fig.square('composition', 'energy',
+                   source=tie_line_source,
+                   color='colour',
+                   alpha=1,
+                   size=10)
+
+        fig.plot_width = 800
+        fig.plot_height = 800
+        output_file('test.html', title='test.py example')
+        show(fig)
+
     def plot_voltage_curve(self):
         """ Plot calculated voltage curve. """
-        if self.args['png']:
+        if self.args.get('pdf'):
             fig = plt.figure(facecolor=None, figsize=(3, 1.5))
         else:
             fig = plt.figure(facecolor=None)
@@ -529,15 +514,15 @@ class QueryConvexHull():
                     np.max(np.asarray(self.voltages[2:]))+0.1)
         ax.set_title('$\mathrm{'+self.elements[0]+'_x'+self.elements[1]+'}$')
         ax.set_xlabel('$x$')
-        if self.args.get('png'):
-            plt.savefig(self.elements[0]+self.elements[1]+'_voltage.png',
+        if self.args.get('pdf'):
+            plt.savefig(self.elements[0]+self.elements[1]+'_voltage.pdf',
                         dpi=300, bbox_inches='tight')
         else:
             plt.show()
 
     def plot_volume_curve(self):
         """ Plot calculate volume curve. """
-        if self.args['png']:
+        if self.args.get('pdf'):
             fig = plt.figure(facecolor=None, figsize=(3, 1.5))
         else:
             fig = plt.figure(facecolor=None)
@@ -555,15 +540,15 @@ class QueryConvexHull():
         ax.set_ylim(0.9*self.vol_per_y[0])
         ax2.set_ylim(0.9)
         ax2.grid('off')
-        if self.args.get('png'):
-            plt.savefig(self.elements[0]+self.elements[1]+'_voltage.png',
+        if self.args.get('pdf'):
+            plt.savefig(self.elements[0]+self.elements[1]+'_voltage.pdf',
                         dpi=300, bbox_inches='tight')
         else:
             plt.show()
 
     def subplot_voltage_hull(self, dis=False):
         """ Plot calculated hull with inset voltage curve. """
-        if self.args['png']:
+        if self.args.get('pdf'):
             fig = plt.figure(facecolor=None, figsize=(4.5, 1.5))
         else:
             fig = plt.figure(facecolor=None, figsize=(4.5, 1.5))
@@ -637,8 +622,8 @@ class QueryConvexHull():
         ax2.set_ylim(np.min(np.asarray(self.voltages[1:]))-0.1,
                      np.max(np.asarray(self.voltages[1:]))+0.1)
         ax2.set_xlabel('$n_\mathrm{Li}$', labelpad=-3)
-        if self.args.get('png'):
-            plt.savefig(self.elements[0]+self.elements[1]+'_hull_voltage.png',
+        if self.args.get('pdf'):
+            plt.savefig(self.elements[0]+self.elements[1]+'_hull_voltage.pdf',
                         dpi=300, bbox_inches='tight')
         else:
             fig.show()
@@ -651,7 +636,7 @@ class QueryConvexHull():
             plt.style.use('bmh')
         except:
             pass
-        if self.args.get('png'):
+        if self.args.get('pdf'):
             try:
                 plt.style.use('article')
             except:
