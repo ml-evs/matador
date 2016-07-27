@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # coding: utf-8
 """ This file implements all queries to the database,
 including parsing user inputs, displaying results
@@ -64,6 +64,7 @@ class Matador:
         if self.args['subcmd'] == 'swaps':
             self.query = DBQuery(self.client, self.collections, self.args)
             if self.args['hull_cutoff'] is not None:
+                from hull import QueryConvexHull
                 self.hull = QueryConvexHull(self.query, self.args)
                 self.swaps = Polisher(self.hull.hull_cursor, self.args)
             else:
@@ -71,13 +72,12 @@ class Matador:
         if self.args['subcmd'] == 'polish':
             self.query = DBQuery(self.client, self.collections, self.args)
             if self.args['hull_cutoff'] is not None:
+                from hull import QueryConvexHull
                 self.hull = QueryConvexHull(self.query, self.args)
                 self.polish = Polisher(self.hull.hull_cursor, self.args)
             else:
                 self.polish = Polisher(self.query.cursor, self.args)
-        if self.args['subcmd'] == 'hull' or \
-           self.args['subcmd'] == 'voltage' or \
-           self.args['subcmd'] == 'volume':
+        if self.args['subcmd'] == 'hull' or self.args['subcmd'] == 'voltage':
             from hull import QueryConvexHull
             self.query = DBQuery(self.client, self.collections, self.args)
             self.hull = QueryConvexHull(self.query, self.args)
@@ -246,6 +246,9 @@ if __name__ == '__main__':
                                       in K')
     material_flags.add_argument('--biggest', action='store_true',
                                 help='use the largest subset of structures to create a hull')
+    material_flags.add_argument('--volume', action='store_true',
+                                help='plot a volume curve from convex hull\
+                                      (currently limited to binaries)')
     material_flags.add_argument('--chempots', type=float, nargs='+',
                                 help='manually specify chem pots as enthalpy per atom for \
                                       a rough hull.')
@@ -255,8 +258,8 @@ if __name__ == '__main__':
                             help='save pdf rather than showing plot in X')
     plot_flags.add_argument('--subplot', action='store_true',
                             help='plot combined hull and voltage graph')
-    plot_flags.add_argument('--ascii', action='store_true',
-                            help='plot as ascii without X')
+    plot_flags.add_argument('--bokeh', action='store_true',
+                            help='plot using bokeh')
     plot_flags.add_argument('--no_plot', action='store_true',
                             help='suppress plotting')
     # define flags for spatula scraping
@@ -322,11 +325,6 @@ if __name__ == '__main__':
                                            (currently limited to binaries)',
                                            parents=[global_flags, structure_flags,
                                                     material_flags, plot_flags, query_flags])
-    volume_parser = subparsers.add_parser('volume',
-                                          help='plot a volume curve from convex hull\
-                                               (currently limited to binaries)',
-                                          parents=[global_flags, structure_flags,
-                                                   material_flags, plot_flags, query_flags])
     swaps_parser = subparsers.add_parser('swaps',
                                          help='perform atomic swaps on query results',
                                          parents=[global_flags, collection_flags,
