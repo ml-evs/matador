@@ -206,7 +206,7 @@ class DBQuery:
                 if 'oqmd' in self.collections:
                     exit('Use --include_oqmd instead of --db, exiting...')
                 if len(self.collections.keys()) == 1:
-                    self.repo = self.collections[self.collections.keys()[0]]
+                    self.repo = self.collections[list(self.collections.keys())[0]]
                 else:
                     exit('Hulls and voltage curves require just one source or --include_oqmd, \
                           exiting...')
