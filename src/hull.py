@@ -513,7 +513,7 @@ class QueryConvexHull():
         ax.set_ylim(np.min(np.asarray(self.voltages[2:]))-0.1,
                     np.max(np.asarray(self.voltages[2:]))+0.1)
         ax.set_title('$\mathrm{'+self.elements[0]+'_x'+self.elements[1]+'}$')
-        ax.set_xlabel('$x$')
+        ax.set_xlabel('$\mathrm{x}$')
         if self.args.get('pdf'):
             plt.savefig(self.elements[0]+self.elements[1]+'_voltage.pdf',
                         dpi=300, bbox_inches='tight')
