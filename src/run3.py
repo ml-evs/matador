@@ -342,6 +342,9 @@ class FullRelaxer:
                 process = sp.Popen(['nice', '-n', '15', 'mpirun', '-n', str(self.ncores),
                                     self.executable, seed])
         elif self.nnodes is not None:
+            print(['mpirun', '-n', str(self.ncores*self.nnodes),
+                                '-ppn', str(self.ncores),
+                                self.executable, seed])
             process = sp.Popen(['mpirun', '-n', str(self.ncores*self.nnodes),
                                 '-ppn', str(self.ncores),
                                 self.executable, seed])
