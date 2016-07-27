@@ -42,7 +42,7 @@ class Spatula:
         if self.scan:
             self.dryrun = True
         self.debug = self.args['debug']
-        self.verbosity = self.args['verbosity']
+        self.verbosity = self.args['verbosity'] if self.args['verbosity'] is not None else 0
         self.tags = self.args['tags']
         self.tag_dict = dict()
         self.tag_dict['tags'] = self.tags
