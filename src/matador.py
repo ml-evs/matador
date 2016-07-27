@@ -81,17 +81,6 @@ class Matador:
             from hull import QueryConvexHull
             self.query = DBQuery(self.client, self.collections, self.args)
             self.hull = QueryConvexHull(self.query, self.args)
-            if len(self.hull.hull_cursor) == 0:
-                print('No structures on hull with chosen chemical potentials.')
-            else:
-                if self.args.get('hull_temp'):
-                    print(len(self.hull.hull_cursor), 'structures within',
-                          self.args.get('hull_temp'),
-                          'K of the hull with chosen chemical potentials.')
-                else:
-                    print(len(self.hull.hull_cursor), 'structures within', self.hull.hull_cutoff,
-                          'eV of the hull with chosen chemical potentials.')
-                self.query.display_results(self.hull.hull_cursor)
 
     def print_report(self):
         """ Print spatula report on current database. """

@@ -6,7 +6,7 @@ from __future__ import print_function
 from scipy.spatial import ConvexHull
 from bson.son import SON
 from bisect import bisect_left
-from print_utils import print_failure
+from print_utils import print_failure, print_notify
 import pymongo as pm
 import re
 import numpy as np
@@ -39,7 +39,22 @@ class QueryConvexHull():
                     self.chem_pots[ind] = -1*self.chem_pots[ind]
         else:
             self.chem_pots = None
+
         self.binary_hull()
+
+        if len(self.hull_cursor) == 0:
+            print_warning('No structures on hull with chosen chemical potentials.')
+        else:
+            if self.args.get('hull_temp'):
+                print_notify(str(len(self.hull_cursor)) + ' structures within ' +
+                             str(self.args.get('hull_temp')) + 
+                             ' K of the hull with chosen chemical potentials.')
+            else:
+                print_notify(str(len(self.hull_cursor)) + ' structures within ' + str(self.hull_cutoff) +
+                             ' eV of the hull with chosen chemical potentials.')
+
+        self.query.display_results(self.hull_cursor)
+
         if self.args['subcmd'] == 'voltage':
             print('Generating voltage curve...')
             self.voltage_curve(self.stable_enthalpy_per_b, self.stable_comp, self.mu_enthalpy)
@@ -200,7 +215,7 @@ class QueryConvexHull():
                 hull_energy.append(structures[self.hull.vertices[ind], 1])
                 hull_enthalpy.append(enthalpy[self.hull.vertices[ind]])
                 hull_comp.append(structures[self.hull.vertices[ind], 0])
-                hull_volume.append(volume[ind])
+                hull_volume.append(volume[self.hull.vertices[ind]])
         # calculate distance to hull of all structures
         hull_energy = np.asarray(hull_energy)
         hull_enthalpy = np.asarray(hull_enthalpy)
@@ -332,10 +347,7 @@ class QueryConvexHull():
         # and v is the volume per x atom
         v = []
         for i in range(len(stable_comp)):
-            if 1-stable_comp[i] == 0:
-                x.append(1e5)
-            else:
-                x.append(stable_comp[i]/(1-stable_comp[i]))
+            x.append(stable_comp[i]/(1-stable_comp[i]))
             v.append(stable_vol[i])
         self.x = x
         self.vol_per_y = v
