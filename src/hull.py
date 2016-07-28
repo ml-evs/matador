@@ -6,7 +6,7 @@ from __future__ import print_function
 from scipy.spatial import ConvexHull
 from bson.son import SON
 from bisect import bisect_left
-from print_utils import print_failure, print_notify
+from print_utils import print_failure, print_notify, print_warning
 import pymongo as pm
 import re
 import numpy as np
@@ -47,10 +47,11 @@ class QueryConvexHull():
         else:
             if self.args.get('hull_temp'):
                 print_notify(str(len(self.hull_cursor)) + ' structures within ' +
-                             str(self.args.get('hull_temp')) + 
+                             str(self.args.get('hull_temp')) +
                              ' K of the hull with chosen chemical potentials.')
             else:
-                print_notify(str(len(self.hull_cursor)) + ' structures within ' + str(self.hull_cutoff) +
+                print_notify(str(len(self.hull_cursor)) + ' structures within ' +
+                             str(self.hull_cutoff) +
                              ' eV of the hull with chosen chemical potentials.')
 
         self.query.display_results(self.hull_cursor)
@@ -356,7 +357,7 @@ class QueryConvexHull():
     def plot_hull(self, dis=False):
         """ Plot calculated hull. """
         if self.args.get('pdf') or self.args.get('png'):
-            fig = plt.figure(facecolor=None, figsize=(7, 4))
+            fig = plt.figure(facecolor=None, figsize=(5, 4))
         else:
             fig = plt.figure(facecolor=None)
         ax = fig.add_subplot(111)
@@ -370,9 +371,9 @@ class QueryConvexHull():
             if self.structures[self.hull.vertices[ind], 1] <= 0:
                 hull_scatter.append(ax.scatter(self.structures[self.hull.vertices[ind], 0],
                                                self.structures[self.hull.vertices[ind], 1],
-                                               c=self.colours[0],
-                                               marker='*', zorder=99999, edgecolor='k',
-                                               s=self.scale*150, lw=1, alpha=1,
+                                               c=self.colours[1],
+                                               marker='o', zorder=99999, edgecolor='k',
+                                               s=self.scale*40, lw=1, alpha=1,
                                                label=self.info[self.hull.vertices[ind]]))
                 ax.annotate(self.info[self.hull.vertices[ind]].split('\n')[0],
                             xy=(self.structures[self.hull.vertices[ind], 0],
@@ -391,7 +392,7 @@ class QueryConvexHull():
                 'trunc({n},{a:.2f},{b:.2f})'.format(n=cmap_full.name, a=0, b=0.9),
                 cmap_full(np.linspace(0, 0.9, 100)))
             scatter = ax.scatter(self.structures[:, 0], self.structures[:, 1],
-                                 s=self.scale*30, lw=lw, alpha=0.9, c=self.hull_dist,
+                                 s=self.scale*40, lw=lw, alpha=0.9, c=self.hull_dist,
                                  edgecolor='k', zorder=300, cmap=cmap)
             cbar = plt.colorbar(scatter, aspect=30, pad=0.02)
             cbar.set_label('Distance from hull (eV)')
@@ -401,7 +402,7 @@ class QueryConvexHull():
                 if self.hull_dist[ind] <= self.hull_cutoff or self.hull_cutoff == 0:
                     c = self.colours[1]
                     scatter.append(ax.scatter(self.structures[ind, 0], self.structures[ind, 1],
-                                   s=self.scale*30, lw=lw, alpha=0.9, c=c, edgecolor='k',
+                                   s=self.scale*40, lw=lw, alpha=0.9, c=c, edgecolor='k',
                                    label=self.info[ind], zorder=300))
             ax.scatter(self.structures[1:-1, 0], self.structures[1:-1, 1], s=self.scale*30, lw=lw,
                        alpha=0.3, c=self.colours[-2],
@@ -436,7 +437,7 @@ class QueryConvexHull():
             plt.savefig(self.elements[0]+self.elements[1]+'_hull.pdf',
                         dpi=200, bbox_inches='tight')
         elif self.args.get('png'):
-            plt.savefig(self.elements[0]+self.elements[1]+'_hull.png', 
+            plt.savefig(self.elements[0]+self.elements[1]+'_hull.png',
                         dpi=200, bbox_inches='tight')
         else:
             plt.show()
