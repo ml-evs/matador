@@ -281,10 +281,8 @@ class FullRelaxer:
                 elif self.rerun and opti_dict['optimised']:
                     print_success('Successfully relaxed ' + seed)
                     # write res and castep file out to completed folder
-                    if isfile(seed+'.res'):
-                        remove(seed+'.res')
-                    doc2res(opti_dict, 'completed/' + seed, hash_dupe=False)
                     self.mv_to_completed(seed)
+                    doc2res(opti_dict, 'completed/' + seed, hash_dupe=False)
                     if calc_doc.get('write_cell_structure') == 'true':
                         system('mv ' + seed + '-out.cell' + ' completed/' + seed + '-out.cell')
                     # clean up rest of files
