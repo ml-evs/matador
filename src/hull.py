@@ -264,7 +264,7 @@ class QueryConvexHull():
         hull_cursor.append(self.match[1])
         # grab info for datacursor
         info = []
-        doc = self.match[0]
+        doc = self.match[1]
         ind = 0
         stoich_string = str(doc['stoichiometry'][0][0])
         info.append("{0:^10}\n{1:24}\n{2:5s}\n{3:2f} eV".format(stoich_string,
@@ -284,7 +284,7 @@ class QueryConvexHull():
                                                                       doc['text_id'][1],
                                                                       doc['space_group'],
                                                                       hull_dist[ind+1]))
-        doc = self.match[1]
+        doc = self.match[0]
         ind = len(hull_dist)-1
         stoich_string = str(doc['stoichiometry'][0][0])
         info.append("{0:^10}\n{1:24}\n{2:5s}\n{3:2f} eV".format(stoich_string,
@@ -355,7 +355,7 @@ class QueryConvexHull():
 
     def plot_hull(self, dis=False):
         """ Plot calculated hull. """
-        if self.args.get('pdf'):
+        if self.args.get('pdf') or self.args.get('png'):
             fig = plt.figure(facecolor=None, figsize=(7, 4))
         else:
             fig = plt.figure(facecolor=None)
@@ -435,6 +435,9 @@ class QueryConvexHull():
         if self.args.get('pdf'):
             plt.savefig(self.elements[0]+self.elements[1]+'_hull.pdf',
                         dpi=200, bbox_inches='tight')
+        elif self.args.get('png'):
+            plt.savefig(self.elements[0]+self.elements[1]+'_hull.png', 
+                        dpi=200, bbox_inches='tight')
         else:
             plt.show()
 
@@ -507,7 +510,7 @@ class QueryConvexHull():
 
     def plot_voltage_curve(self):
         """ Plot calculated voltage curve. """
-        if self.args.get('pdf'):
+        if self.args.get('pdf') or self.args.get('png'):
             fig = plt.figure(facecolor=None, figsize=(3, 1.5))
         else:
             fig = plt.figure(facecolor=None)
@@ -529,12 +532,15 @@ class QueryConvexHull():
         if self.args.get('pdf'):
             plt.savefig(self.elements[0]+self.elements[1]+'_voltage.pdf',
                         dpi=300, bbox_inches='tight')
+        elif self.args.get('png'):
+            plt.savefig(self.elements[0]+self.elements[1]+'_voltage.png',
+                        dpi=300, bbox_inches='tight')
         else:
             plt.show()
 
     def plot_volume_curve(self):
         """ Plot calculate volume curve. """
-        if self.args.get('pdf'):
+        if self.args.get('pdf') or self.args.get('png'):
             fig = plt.figure(facecolor=None, figsize=(3, 1.5))
         else:
             fig = plt.figure(facecolor=None)
@@ -553,14 +559,17 @@ class QueryConvexHull():
         ax2.set_ylim(0.9)
         ax2.grid('off')
         if self.args.get('pdf'):
-            plt.savefig(self.elements[0]+self.elements[1]+'_voltage.pdf',
+            plt.savefig(self.elements[0]+self.elements[1]+'_volume.pdf',
+                        dpi=300, bbox_inches='tight')
+        elif self.args.get('png'):
+            plt.savefig(self.elements[0]+self.elements[1]+'_volume.png',
                         dpi=300, bbox_inches='tight')
         else:
             plt.show()
 
     def subplot_voltage_hull(self, dis=False):
         """ Plot calculated hull with inset voltage curve. """
-        if self.args.get('pdf'):
+        if self.args.get('pdf') or self.args.get('png'):
             fig = plt.figure(facecolor=None, figsize=(4.5, 1.5))
         else:
             fig = plt.figure(facecolor=None, figsize=(4.5, 1.5))
@@ -637,6 +646,9 @@ class QueryConvexHull():
         if self.args.get('pdf'):
             plt.savefig(self.elements[0]+self.elements[1]+'_hull_voltage.pdf',
                         dpi=300, bbox_inches='tight')
+        elif self.args.get('png'):
+            plt.savefig(self.elements[0]+self.elements[1]+'_hull_voltage.png',
+                        dpi=300, bbox_inches='tight')
         else:
             fig.show()
 
@@ -648,7 +660,7 @@ class QueryConvexHull():
             plt.style.use('bmh')
         except:
             pass
-        if self.args.get('pdf'):
+        if self.args.get('pdf') or self.args.get('png'):
             try:
                 plt.style.use('article')
             except:

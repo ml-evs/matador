@@ -245,6 +245,8 @@ if __name__ == '__main__':
     plot_flags = argparse.ArgumentParser(add_help=False)
     plot_flags.add_argument('--pdf', action='store_true',
                             help='save pdf rather than showing plot in X')
+    plot_flags.add_argument('--png', action='store_true',
+                            help='save png rather than showing plot in X')
     plot_flags.add_argument('--subplot', action='store_true',
                             help='plot combined hull and voltage graph')
     plot_flags.add_argument('--bokeh', action='store_true',
