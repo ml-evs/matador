@@ -235,7 +235,11 @@ class FullRelaxer:
         print(geom_max_iter_list)
         # copy initial res file to seed
         self.cp_to_input(self.seed)
+        self.rerun = False
         for ind, num_iter in enumerate(geom_max_iter_list):
+            if self.rerun:
+                print_notify('Performing one last iteration...')
+                num_iter = 2
             if ind == 0:
                 print_notify('Beginning rough geometry optimisation...')
             elif ind == self.num_rough_iter:
@@ -264,7 +268,15 @@ class FullRelaxer:
                 if not success and opti_dict == '':
                     print_warning('Failed to scrape castep file...')
                     return False
-                if opti_dict['optimised'] == True:
+                if self.rerun and not opti_dict['optimised']:
+                    self.rerun = False
+                if not self.rerun and opti_dict['optimised']:
+                    # run once more to get correct symmetry
+                    self.rerun = True
+                    doc2res(opti_dict, seed, hash_dupe=False)
+                    calc_doc.update(opti_dict)
+                    continue
+                elif self.rerun and opti_dict['optimised']:
                     print_success('Successfully relaxed ' + seed)
                     # write res and castep file out to completed folder
                     doc2res(opti_dict, 'completed/' + seed, hash_dupe=False)
@@ -279,6 +291,7 @@ class FullRelaxer:
                     self.mv_to_bad(seed)
                     # write final res file to bad_castep
                     doc2res(opti_dict, 'bad_castep/' + seed, hash_dupe=False)
+                    return False
                 else:
                     err_file = seed + '*.err'
                     for globbed in glob.glob(err_file):
@@ -288,12 +301,14 @@ class FullRelaxer:
                             doc2res(opti_dict, 'bad_castep/' + seed, hash_dupe=False)
                             self.mv_to_bad(seed)
                             return False
-                    # update res file to latest step for restarts
-                    doc2res(opti_dict, seed, hash_dupe=False)
-                    # remove atomic_init_spins from calc_doc if there
-                    if 'atomic_init_spins' in calc_doc:
-                        del calc_doc['atomic_init_spins']
-                    calc_doc.update(opti_dict)
+
+                # update res file to latest step for restarts
+                doc2res(opti_dict, seed, hash_dupe=False)
+                # remove atomic_init_spins from calc_doc if there
+                if 'atomic_init_spins' in calc_doc:
+                    del calc_doc['atomic_init_spins']
+                calc_doc.update(opti_dict)
+
             except(SystemExit, KeyboardInterrupt):
                 self.mv_to_bad(seed)
                 self.tidy_up(seed)
@@ -343,8 +358,8 @@ class FullRelaxer:
                                     self.executable, seed])
         elif self.nnodes is not None:
             print(['mpirun', '-n', str(self.ncores*self.nnodes),
-                                '-ppn', str(self.ncores),
-                                self.executable, seed])
+                   '-ppn', str(self.ncores),
+                   self.executable, seed])
             process = sp.Popen(['mpirun', '-n', str(self.ncores*self.nnodes),
                                 '-ppn', str(self.ncores),
                                 self.executable, seed])
@@ -363,8 +378,6 @@ class FullRelaxer:
         if not exists('completed'):
             makedirs('completed')
         system('mv ' + seed + '.castep' + ' completed/' + seed + '.castep')
-        system('mv ' + seed + '.param' + ' completed/' + seed + '.param')
-        system('mv ' + seed + '.cell' + ' completed/' + seed + '.cell')
         return
 
     def cp_to_input(self, seed):
