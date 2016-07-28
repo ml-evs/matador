@@ -275,7 +275,7 @@ class FullRelaxer:
                     self.rerun = True
                     if isfile(seed+'.res'):
                         remove(seed+'.res')
-                    doc2res(opti_dict, seed, hash_dupe=False, overwrite=True)
+                    doc2res(opti_dict, seed, hash_dupe=False)
                     calc_doc.update(opti_dict)
                     continue
                 elif self.rerun and opti_dict['optimised']:
@@ -296,7 +296,7 @@ class FullRelaxer:
                     # write final res file to bad_castep
                     if isfile(seed+'.res'):
                         remove(seed+'.res')
-                    doc2res(opti_dict, 'bad_castep/' + seed, hash_dupe=False, overwrite=True)
+                    doc2res(opti_dict, 'bad_castep/' + seed, hash_dupe=False)
                     return False
                 else:
                     err_file = seed + '*.err'
@@ -306,14 +306,14 @@ class FullRelaxer:
                             # write final res file to bad_castep
                             if isfile(seed+'.res'):
                                 remove(seed+'.res')
-                            doc2res(opti_dict, 'bad_castep/' + seed, hash_dupe=False, overwrite=True)
+                            doc2res(opti_dict, 'bad_castep/' + seed, hash_dupe=False)
                             self.mv_to_bad(seed)
                             return False
 
                 # update res file to latest step for restarts
                 if isfile(seed+'.res'):
                     remove(seed+'.res')
-                doc2res(opti_dict, seed, hash_dupe=False, overwrite=True)
+                doc2res(opti_dict, seed, hash_dupe=False)
                 # remove atomic_init_spins from calc_doc if there
                 if 'atomic_init_spins' in calc_doc:
                     del calc_doc['atomic_init_spins']
