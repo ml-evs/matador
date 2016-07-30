@@ -28,13 +28,12 @@ class DBQuery:
         before calling query.
         """
         # read args
-        try:
-            self.args = kwargs
+        self.args = kwargs
+        if client is not False:
             self.client = client
             self.db = client.crystals
+        if collections is not False:
             self.collections = collections
-        except:
-            pass
         # if empty collections, assume called from API and read kwargs,
         # also need to connect to db
         if not collections or not client:
@@ -45,9 +44,10 @@ class DBQuery:
                 remote = None
             self.client = pm.MongoClient(remote)
             self.db = self.client.crystals
-            self.args = dict()
             self.collections = dict()
             if self.args.get('db') is not None:
+                if type(self.args['db']) is not list:
+                    self.args['db'] = [self.args['db']]
                 for database in self.args['db']:
                     if database == 'all':
                         self.collections['ajm'] = self.db['repo']
@@ -59,7 +59,6 @@ class DBQuery:
                         self.collections[database] = self.db[database]
             else:
                 self.collections['ajm'] = self.db['repo']
-            # self.args['tags'] = args.get('tags')
         if self.args.get('summary'):
             self.top = -1
         else:
