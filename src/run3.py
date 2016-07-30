@@ -275,9 +275,6 @@ class FullRelaxer:
                     self.rerun = True
                     if isfile(seed+'.res'):
                         remove(seed+'.res')
-                    doc2res(opti_dict, seed, hash_dupe=False)
-                    calc_doc.update(opti_dict)
-                    continue
                 elif self.rerun and opti_dict['optimised']:
                     print_success('Successfully relaxed ' + seed)
                     # write res and castep file out to completed folder
@@ -296,17 +293,16 @@ class FullRelaxer:
                         remove(seed+'.res')
                     doc2res(opti_dict, 'bad_castep/' + seed, hash_dupe=False)
                     return False
-                else:
-                    err_file = seed + '*.err'
-                    for globbed in glob.glob(err_file):
-                        if isfile(globbed):
-                            print_warning('Failed to optimise ' + seed + ' CASTEP crashed.')
-                            # write final res file to bad_castep
-                            if isfile(seed+'.res'):
-                                remove(seed+'.res')
-                            doc2res(opti_dict, 'bad_castep/' + seed, hash_dupe=False)
-                            self.mv_to_bad(seed)
-                            return False
+                err_file = seed + '*.err'
+                for globbed in glob.glob(err_file):
+                    if isfile(globbed):
+                        print_warning('Failed to optimise ' + seed + ' CASTEP crashed.')
+                        # write final res file to bad_castep
+                        if isfile(seed+'.res'):
+                            remove(seed+'.res')
+                        doc2res(opti_dict, 'bad_castep/' + seed, hash_dupe=False)
+                        self.mv_to_bad(seed)
+                        return False
 
                 # update res file to latest step for restarts
                 if isfile(seed+'.res'):
