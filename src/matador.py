@@ -60,9 +60,9 @@ class Matador:
             from spatula import Spatula
             self.importer = Spatula(self.args)
         if self.args['subcmd'] == 'query':
-            self.query = DBQuery(self.client, self.collections, self.args)
+            self.query = DBQuery(self.client, self.collections, **self.args)
         if self.args['subcmd'] == 'swaps':
-            self.query = DBQuery(self.client, self.collections, self.args)
+            self.query = DBQuery(self.client, self.collections, **self.args)
             if self.args['hull_cutoff'] is not None:
                 from hull import QueryConvexHull
                 self.hull = QueryConvexHull(self.query, self.args)
@@ -70,7 +70,7 @@ class Matador:
             else:
                 self.swaps = Polisher(self.query.cursor, self.args)
         if self.args['subcmd'] == 'polish':
-            self.query = DBQuery(self.client, self.collections, self.args)
+            self.query = DBQuery(self.client, self.collections, **self.args)
             if self.args['hull_cutoff'] is not None:
                 from hull import QueryConvexHull
                 self.hull = QueryConvexHull(self.query, self.args)
@@ -79,7 +79,7 @@ class Matador:
                 self.polish = Polisher(self.query.cursor, self.args)
         if self.args['subcmd'] == 'hull' or self.args['subcmd'] == 'voltage':
             from hull import QueryConvexHull
-            self.query = DBQuery(self.client, self.collections, self.args)
+            self.query = DBQuery(self.client, self.collections, **self.args)
             self.hull = QueryConvexHull(self.query, self.args)
 
     def print_report(self):
