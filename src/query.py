@@ -23,13 +23,13 @@ class DBQuery:
     """ Class that implements queries to MongoDB
     structure database.
     """
-    def __init__(self, client=False, collections=False, *args, **kwargs):
+    def __init__(self, client=False, collections=False, **kwargs):
         """ Parse arguments from matador or API call
         before calling query.
         """
         # read args
         try:
-            self.args = args[0]
+            self.args = kwargs
             self.client = client
             self.db = client.crystals
             self.collections = collections
@@ -47,8 +47,8 @@ class DBQuery:
             self.db = self.client.crystals
             self.args = dict()
             self.collections = dict()
-            if kwargs['db'] is not None:
-                for database in kwargs['db']:
+            if self.args.get('db') is not None:
+                for database in self.args['db']:
                     if database == 'all':
                         self.collections['ajm'] = self.db['repo']
                         self.collections['oqmd'] = self.db['oqmd']
@@ -59,7 +59,7 @@ class DBQuery:
                         self.collections[database] = self.db[database]
             else:
                 self.collections['ajm'] = self.db['repo']
-            self.args['tags'] = kwargs['tags']
+            # self.args['tags'] = args.get('tags')
         if self.args.get('summary'):
             self.top = -1
         else:

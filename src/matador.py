@@ -6,7 +6,7 @@ and calling other functionality. """
 from __future__ import print_function
 # matador modules
 from query import DBQuery
-from print_utils import print_failure, print_warning
+from print_utils import print_failure, print_warning, print_notify
 from polish import Polisher
 # import external libraries
 import pymongo as pm
@@ -60,9 +60,9 @@ class Matador:
             from spatula import Spatula
             self.importer = Spatula(self.args)
         if self.args['subcmd'] == 'query':
-            self.query = DBQuery(self.client, self.collections, self.args)
+            self.query = DBQuery(self.client, self.collections, **self.args)
         if self.args['subcmd'] == 'swaps':
-            self.query = DBQuery(self.client, self.collections, self.args)
+            self.query = DBQuery(self.client, self.collections, **self.args)
             if self.args['hull_cutoff'] is not None:
                 from hull import QueryConvexHull
                 self.hull = QueryConvexHull(self.query, self.args)
@@ -70,7 +70,7 @@ class Matador:
             else:
                 self.swaps = Polisher(self.query.cursor, self.args)
         if self.args['subcmd'] == 'polish':
-            self.query = DBQuery(self.client, self.collections, self.args)
+            self.query = DBQuery(self.client, self.collections, **self.args)
             if self.args['hull_cutoff'] is not None:
                 from hull import QueryConvexHull
                 self.hull = QueryConvexHull(self.query, self.args)
@@ -79,7 +79,7 @@ class Matador:
                 self.polish = Polisher(self.query.cursor, self.args)
         if self.args['subcmd'] == 'hull' or self.args['subcmd'] == 'voltage':
             from hull import QueryConvexHull
-            self.query = DBQuery(self.client, self.collections, self.args)
+            self.query = DBQuery(self.client, self.collections, **self.args)
             self.hull = QueryConvexHull(self.query, self.args)
 
     def print_report(self):
@@ -93,62 +93,71 @@ class Matador:
 
     def stats(self):
         """ Print some useful stats about the database. """
-        comp_list = dict()
-        overall_stats_dict = dict()
-        overall_stats_dict['count'] = 0
-        overall_stats_dict['avgObjSize'] = 0
-        overall_stats_dict['storageSize'] = 0
-        for collection in self.collections:
-            db_stats_dict = self.db.command('collstats', collection)
-            overall_stats_dict['count'] += db_stats_dict['count']
-            overall_stats_dict['avgObjSize'] += db_stats_dict['avgObjSize']
-            overall_stats_dict['storageSize'] += db_stats_dict['storageSize']
-        print('The collection(s) queried in', self.db.name, 'contain',
-              overall_stats_dict['count'], 'structures at',
-              "{:.1f}".format(overall_stats_dict['avgObjSize'] / (1024 * len(self.collections))),
-              'kB each, totalling', "{:.1f}".format(overall_stats_dict['storageSize'] / (1024**2)),
-              'MB when padding is included.')
-        for collname in self.collections:
-            cursor = self.collections[collname].find()
-            for doc in cursor:
-                temp = ''
-                for ind, elem in enumerate(doc['stoichiometry']):
-                    temp += str(elem[0])
-                    if ind != len(doc['stoichiometry']) - 1:
-                        temp += '+'
-                if temp not in comp_list:
-                    comp_list[temp] = 0
-                comp_list[temp] += 1
-        keys = list(comp_list.keys())
-        vals = list(comp_list.values())
-        comp_list = zip(keys, vals)
-        comp_list.sort(key=lambda t: t[1], reverse=True)
-        small_count = 0
-        first_ind = 1000
-        cutoff = 100
-        for ind, comp in enumerate(comp_list):
-            if comp[1] < cutoff:
-                if ind < first_ind:
-                    first_ind = ind
-                small_count += comp[1]
-        comp_list = comp_list[:first_ind]
-        comp_list.append(['others < ' + str(cutoff), small_count])
-        comp_list.sort(key=lambda t: t[1], reverse=True)
-        try:
-            from ascii_graph import Pyasciigraph
-            from ascii_graph.colors import Gre, Blu, Red
-            from ascii_graph.colordata import hcolor
-        except:
-            print_failure('Pyascii graph missing; not printing detailed stats.')
-            exit()
-        graph = Pyasciigraph(line_length=80, multivalue=False)
-        thresholds = {int(overall_stats_dict['count'] / 40): Gre,
-                      int(overall_stats_dict['count'] / 10): Blu,
-                      int(overall_stats_dict['count'] / 4): Red}
-        data = hcolor(comp_list, thresholds)
-        for line in graph.graph(label=None, data=data):
-            print(line)
-        print('\n')
+        if self.args.get('list'):
+            print_notify(str(len(self.db.collection_names())) +
+                         ' collections found in database:\n')
+            for name in self.db.collection_names():
+                collstats = self.db.command('collstats', name)
+                print("\t{:<15}\t\t{:>10d}".format(name, collstats['count']))
+            print('\n')
+        else:
+            comp_list = dict()
+            overall_stats_dict = dict()
+            overall_stats_dict['count'] = 0
+            overall_stats_dict['avgObjSize'] = 0
+            overall_stats_dict['storageSize'] = 0
+            for collection in self.collections:
+                db_stats_dict = self.db.command('collstats', collection)
+                overall_stats_dict['count'] += db_stats_dict['count']
+                overall_stats_dict['avgObjSize'] += db_stats_dict['avgObjSize']
+                overall_stats_dict['storageSize'] += db_stats_dict['storageSize']
+            print('The collection(s) queried in', self.db.name, 'contain',
+                  overall_stats_dict['count'], 'structures at',
+                  "{:.1f}".format(overall_stats_dict['avgObjSize']/(1024*len(self.collections))),
+                  'kB each, totalling',
+                  "{:.1f}".format(overall_stats_dict['storageSize']/(1024**2)),
+                  'MB when padding is included.')
+            for collname in self.collections:
+                cursor = self.collections[collname].find()
+                for doc in cursor:
+                    temp = ''
+                    for ind, elem in enumerate(doc['stoichiometry']):
+                        temp += str(elem[0])
+                        if ind != len(doc['stoichiometry']) - 1:
+                            temp += '+'
+                    if temp not in comp_list:
+                        comp_list[temp] = 0
+                    comp_list[temp] += 1
+            keys = list(comp_list.keys())
+            vals = list(comp_list.values())
+            comp_list = zip(keys, vals)
+            comp_list.sort(key=lambda t: t[1], reverse=True)
+            small_count = 0
+            first_ind = 1000
+            cutoff = 100
+            for ind, comp in enumerate(comp_list):
+                if comp[1] < cutoff:
+                    if ind < first_ind:
+                        first_ind = ind
+                    small_count += comp[1]
+            comp_list = comp_list[:first_ind]
+            comp_list.append(['others < ' + str(cutoff), small_count])
+            comp_list.sort(key=lambda t: t[1], reverse=True)
+            try:
+                from ascii_graph import Pyasciigraph
+                from ascii_graph.colors import Gre, Blu, Red
+                from ascii_graph.colordata import hcolor
+            except:
+                print_failure('Pyascii graph missing; not printing detailed stats.')
+                exit()
+            graph = Pyasciigraph(line_length=80, multivalue=False)
+            thresholds = {int(overall_stats_dict['count'] / 40): Gre,
+                          int(overall_stats_dict['count'] / 10): Blu,
+                          int(overall_stats_dict['count'] / 4): Red}
+            data = hcolor(comp_list, thresholds)
+            for line in graph.graph(label=None, data=data):
+                print(line)
+            print('\n')
 
     def temp_collection(self, cursor):
         """ Create temporary collection
@@ -293,10 +302,13 @@ if __name__ == '__main__':
                             help='swap all atoms in structures from a query from the first n-1 \
                                   species to the nth, e.g. --swaps N P As will swap all N, P \
                                   atoms for As. Uses the same macros  as --composition.')
+    stats_flags = argparse.ArgumentParser(add_help=False)
+    stats_flags.add_argument('-l', '--list', action='store_true',
+                             help='list all available collections.')
     # define subcommand parsers and their arguments
     stat_parser = subparsers.add_parser('stats',
                                         help='print some stats about the database.',
-                                        parents=[global_flags])
+                                        parents=[global_flags, stats_flags])
     query_parser = subparsers.add_parser('query',
                                          help='query and extract structures from the database',
                                          parents=[global_flags, query_flags, structure_flags])
