@@ -1,12 +1,12 @@
-#!/usr/bin/python
 # coding: utf-8
 """ This file implements all queries to the database,
 including parsing user inputs, displaying results
 and calling other functionality. """
 from __future__ import print_function
-# import related crysdb functionality
+# import related matador functionality
 from export import query2files
 from print_utils import print_failure, print_warning
+from chem_utils import get_periodic_table
 # import external libraries
 import pymongo as pm
 import numpy as np
@@ -34,6 +34,7 @@ class DBQuery:
             self.db = client.crystals
         if collections is not False:
             self.collections = collections
+
         # if empty collections, assume called from API and read kwargs,
         # also need to connect to db
         if not collections or not client:
@@ -59,26 +60,14 @@ class DBQuery:
                         self.collections[database] = self.db[database]
             else:
                 self.collections['ajm'] = self.db['repo']
+
         if self.args.get('summary'):
             self.top = -1
         else:
             self.top = self.args.get('top') if self.args.get('top') is not None else 10
+        
         # define some periodic table macros
-        self.periodic_table = dict()
-        self.periodic_table['I'] = ['Li', 'Na', 'K', 'Rb', 'Cs', 'Fr']
-        self.periodic_table['II'] = ['Be', 'Mg', 'Ca', 'Sr', 'Ba', 'Ra']
-        self.periodic_table['III'] = ['B', 'Al', 'Ga', 'In', 'Tl']
-        self.periodic_table['IV'] = ['C', 'Si', 'Ge', 'Sn', 'Pb']
-        self.periodic_table['V'] = ['N', 'P', 'As', 'Sb', 'Bi']
-        self.periodic_table['VI'] = ['O', 'S', 'Se', 'Te', 'Po']
-        self.periodic_table['VII'] = ['F', 'Cl', 'Br', 'I', 'At']
-        self.periodic_table['Tran'] = ['Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn',
-                                       'Y', 'Zr', 'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd',
-                                       'Hf', 'Ta', 'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg']
-        self.periodic_table['Lan'] = ['La', 'Ce', 'Pr', 'Nd', 'Pm', 'Sm', 'Eu', 'Gd', 'Tb',
-                                      'Dy', 'Ho', 'Er', 'Tm', 'Yb', 'Lu']
-        self.periodic_table['Act'] = ['Ac', 'Th', 'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk',
-                                      'Cf', 'Es', 'Fm', 'Md', 'No', 'Lr']
+        self.periodic_table = get_periodic_table()
 
         self.construct_query()
         self.perform_query()

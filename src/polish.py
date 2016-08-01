@@ -4,13 +4,19 @@
 new input files from a query and a desired
 level of accuracy and atomic swaps.
 """
+
 from __future__ import print_function
-from copy import deepcopy
+
+# matador functionality
 from scrapers.castep_scrapers import cell2dict
 from scrapers.castep_scrapers import param2dict
-from print_utils import print_notify, print_success, print_warning
+from print_utils import print_notify, print_success, print_warning, print_failure
+from chem_utils import get_periodic_table
 from export import query2files
+
+# standard library
 from traceback import print_exc
+from copy import deepcopy
 import re
 
 
@@ -24,7 +30,9 @@ class Polisher:
         and arguments.
         """
         self.args = args[0]
+
         # define some swap macros
+        self.periodic_table = get_periodic_table()
         self.periodic_table = dict()
         self.periodic_table['I'] = ['Li', 'Na', 'K', 'Rb', 'Cs', 'Fr']
         self.periodic_table['II'] = ['Be', 'Mg', 'Ca', 'Sr', 'Ba', 'Ra']
@@ -40,6 +48,7 @@ class Polisher:
                                       'Dy', 'Ho', 'Er', 'Tm', 'Yb', 'Lu']
         self.periodic_table['Act'] = ['Ac', 'Th', 'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk',
                                       'Cf', 'Es', 'Fm', 'Md', 'No', 'Lr']
+
         self.template_structure = None
         try:
             self.cursor = list(cursor)
@@ -47,8 +56,9 @@ class Polisher:
                 self.cursor = self.cursor[:self.args.get('top')]
         except:
             print_exc()
-            print_error('Something went wrong!')
+            print_failure('Something went wrong!')
             exit()
+
         # parse new parameters
         self.cell_dict, self.param_dict = self.get_accuracy()
         if self.args['subcmd'] == 'swaps':
@@ -65,13 +75,16 @@ class Polisher:
                 print_success('Performed ' + str(self.swap_counter) + ' swaps.')
             else:
                 print_warning('No swaps performed.')
+
         polish_cursor = []
         for doc in self.cursor[:]:
             polish_cursor.append(self.change_accuracy(doc))
         self.cursor = polish_cursor
+
         self.args['cell'] = False
         self.args['param'] = False
         self.args['res'] = True
+
         query2files(self.cursor, self.args)
 
     def get_accuracy(self):
@@ -81,9 +94,11 @@ class Polisher:
         """
         final_param = dict()
         final_cell = dict()
+
         # set some decent defaults
         default_parameters = dict()
         default_parameters['task'] = 'GeometryOptimization'
+
         # to maintain kpoints_mp_spacing
         default_parameters['geom_max_iter'] = 3
         default_parameters['finite_basis_corr'] = 0
@@ -124,6 +139,7 @@ class Polisher:
         else:
             final_param = default_parameters
             final_cell = dict()
+
         # scrub sources to prevent overwriting
         try:
             del final_cell['source']
@@ -146,12 +162,14 @@ class Polisher:
         e.g. --swap Li,As |--> ['Li', 'As']
         """
         self.swap_pairs = []
+
         # split by comma to get pairs of swaps
         swap_list = self.args.get('swap')[0].split(',')
         for swap in swap_list:
             if len(swap) <= 1:
                 exit('Not enough arguments for swap!')
             tmp_list = re.split(r'([A-Z][a-z]*)', swap)
+
             # scrub square brackets
             for ind, tmp in enumerate(tmp_list):
                 if tmp == '[':
@@ -164,6 +182,7 @@ class Polisher:
             while '' in tmp_list:
                 tmp_list.remove('')
             swap_test = tmp_list
+
             # expand swap_test with periodic table
             for ind, atom in enumerate(tmp_list):
                 if '[' in atom:
@@ -181,6 +200,7 @@ class Polisher:
         options.
         """
         docs = [source_doc]
+
         # iterate over sets of swaps
         for swap_pair in self.swap_pairs:
             # iterate over all structures including those already swapped
