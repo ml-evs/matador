@@ -373,7 +373,7 @@ class QueryConvexHull():
                                                self.structures[self.hull.vertices[ind], 1],
                                                c=self.colours[1],
                                                marker='o', zorder=99999, edgecolor='k',
-                                               s=self.scale*40, lw=1, alpha=1,
+                                               s=self.scale*40, lw=1.5, alpha=1,
                                                label=self.info[self.hull.vertices[ind]]))
                 ax.annotate(self.info[self.hull.vertices[ind]].split('\n')[0],
                             xy=(self.structures[self.hull.vertices[ind], 0],
