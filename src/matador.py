@@ -1,13 +1,16 @@
 #!/usr/bin/python
 # coding: utf-8
-""" This file implements all queries to the database,
-including parsing user inputs, displaying results
-and calling other functionality. """
+""" This file calls all matador functionality,
+parses user inputs and implements the stats submodule.
+"""
+
 from __future__ import print_function
-# matador modules
+
+# matador modules excluding hull, spatula and pdffitter, which are imported JIT
 from query import DBQuery
 from print_utils import print_failure, print_warning, print_notify
 from polish import Polisher
+
 # import external libraries
 import pymongo as pm
 # import standard library
@@ -27,6 +30,7 @@ class Matador:
         # read args
         self.kwargs = kwargs
         self.args = vars(args[0])
+
         # connect to MonoDB structure repository
         local = uname()[1]
         if local == 'cluster2':
@@ -35,6 +39,7 @@ class Matador:
             remote = None
         self.client = pm.MongoClient(remote)
         self.db = self.client.crystals
+
         # choose desired collections
         self.collections = dict()
         if self.args['subcmd'] not in ['import', 'rebuild']:
@@ -51,16 +56,21 @@ class Matador:
                         self.collections[database] = self.db[database]
             else:
                 self.collections['repo'] = self.db['repo']
+
         # print last spatula report
         self.report = self.client.crystals.spatula
         self.print_report()
+
         if self.args['subcmd'] == 'stats':
             self.stats()
+
         if self.args['subcmd'] in ['import', 'rebuild']:
             from spatula import Spatula
             self.importer = Spatula(self.args)
+
         if self.args['subcmd'] == 'query':
             self.query = DBQuery(self.client, self.collections, **self.args)
+
         if self.args['subcmd'] == 'swaps':
             self.query = DBQuery(self.client, self.collections, **self.args)
             if self.args['hull_cutoff'] is not None:
@@ -69,6 +79,12 @@ class Matador:
                 self.swaps = Polisher(self.hull.hull_cursor, self.args)
             else:
                 self.swaps = Polisher(self.query.cursor, self.args)
+
+        if self.args['subcmd'] == 'pdffit':
+            from pdffit import PDFFitter
+            self.query = DBQuery(self.client, self.collections, **self.args)
+            self.pdffit = PDFFitter(self.query, self.args)
+
         if self.args['subcmd'] == 'polish':
             self.query = DBQuery(self.client, self.collections, **self.args)
             if self.args['hull_cutoff'] is not None:
@@ -77,6 +93,7 @@ class Matador:
                 self.polish = Polisher(self.hull.hull_cursor, self.args)
             else:
                 self.polish = Polisher(self.query.cursor, self.args)
+
         if self.args['subcmd'] == 'hull' or self.args['subcmd'] == 'voltage':
             from hull import QueryConvexHull
             self.query = DBQuery(self.client, self.collections, **self.args)
@@ -182,18 +199,21 @@ if __name__ == '__main__':
         prog='MATADor',
         description='MATerial and Atomic Database Of Refined structures.',
         epilog='Written by Matthew Evans (2016).')
+
     # define subparsers for subcommands
     subparsers = parser.add_subparsers(title='subcommands',
                                        description='valid sub-commands',
                                        dest='subcmd')
+
     # define parent parser for global arguments
     global_flags = argparse.ArgumentParser(add_help=False)
+
     # common arguments to all subcommands
     global_flags.add_argument('--db',
                               help='choose which databases to query',
                               nargs='+')
+
     # define all other flags by group
-    # define flags for query contents
     structure_flags = argparse.ArgumentParser(add_help=False)
     structure_flags.add_argument('-c', '--composition', type=str, nargs='+',
                                  help='find all structures containing exclusively the given elements, \
@@ -234,7 +254,7 @@ if __name__ == '__main__':
                                        pspot and xc_functional')
     structure_flags.add_argument('--ignore_warnings', action='store_true',
                                  help='includes possibly bad structures')
-    # define material flags for hull/voltage arguments
+
     material_flags = argparse.ArgumentParser(add_help=False)
     material_flags.add_argument('-hc', '--hull_cutoff', type=float,
                                 help='return only structures within a certain distance from hull \
@@ -250,7 +270,7 @@ if __name__ == '__main__':
     material_flags.add_argument('--chempots', type=float, nargs='+',
                                 help='manually specify chem pots as enthalpy per atom for \
                                       a rough hull.')
-    # define flags for plotting output
+
     plot_flags = argparse.ArgumentParser(add_help=False)
     plot_flags.add_argument('--pdf', action='store_true',
                             help='save pdf rather than showing plot in X')
@@ -262,7 +282,7 @@ if __name__ == '__main__':
                             help='plot using bokeh')
     plot_flags.add_argument('--no_plot', action='store_true',
                             help='suppress plotting')
-    # define flags for spatula scraping
+
     spatula_flags = argparse.ArgumentParser(add_help=False)
     spatula_flags.add_argument('-d', '--dryrun', action='store_true',
                                help='run the importer without connecting to the database')
@@ -274,7 +294,7 @@ if __name__ == '__main__':
                                help='enable debug output to print every dict')
     spatula_flags.add_argument('-s', '--scan', action='store_true',
                                help='only scan the database for new structures, do not dictify')
-    # define parser for output of new files for swaps/polishes
+
     collection_flags = argparse.ArgumentParser(add_help=False)
     collection_flags.add_argument('--to', type=str,
                                   help='the text_id of a structure with the desired parameters')
@@ -284,6 +304,7 @@ if __name__ == '__main__':
     collection_flags.add_argument('--prefix', type=str,
                                   help='add a prefix to all file names to write out (auto-appended \
                                         with an underscore')
+
     query_flags = argparse.ArgumentParser(add_help=False)
     query_flags.add_argument('-s', '--summary', action='store_true',
                              help='show only the ground state for each stoichiometry.')
@@ -297,14 +318,29 @@ if __name__ == '__main__':
                              help='export query to .cell files in folder name from query string')
     query_flags.add_argument('--res', action='store_true',
                              help='export query to .res files in folder name from query string')
+
     swap_flags = argparse.ArgumentParser(add_help=False)
     swap_flags.add_argument('-s', '--swap', type=str, nargs='+',
                             help='swap all atoms in structures from a query from the first n-1 \
                                   species to the nth, e.g. --swaps N P As will swap all N, P \
                                   atoms for As. Uses the same macros  as --composition.')
+
+    pdffit_flags = argparse.ArgumentParser(add_help=False)
+    pdffit_flags.add_arugment('-file', '--file', type=str,
+                              help='experimental input file to fit structures to.')
+    pdffit_flags.add_argument('--min', type=float,
+                              help='minimum value to compute the PDF')
+    pdffit_flags.add_argument('--max', type=float,
+                              help='maximum value to compute the PDF')
+    pdffit_flags.add_argument('-dx', '--spacing', type=float,
+                              help='spacing to compute PDF at')
+    pdffit_flags.add_argument('-2', '--two_phase', type=float,
+                              help='fit two phases to experimental PDF')
+
     stats_flags = argparse.ArgumentParser(add_help=False)
     stats_flags.add_argument('-l', '--list', action='store_true',
                              help='list all available collections.')
+
     # define subcommand parsers and their arguments
     stat_parser = subparsers.add_parser('stats',
                                         help='print some stats about the database.',
@@ -318,6 +354,11 @@ if __name__ == '__main__':
     rebuild_parser = subparsers.add_parser('rebuild',
                                            help='rebuild whole database.',
                                            parents=[spatula_flags])
+    pdffit_parser = subparsers.add_parser('pdffit',
+                                          help='provide experimental .gr file and fit to calculated \
+                                                PDF of structures in query',
+                                          parents=[global_flags, query_flags,
+                                                   structure_flags, pdffit_flags])
     hull_parser = subparsers.add_parser('hull',
                                         help='create a convex hull from query results \
                                         (currently limited to binaries)',
@@ -338,7 +379,10 @@ if __name__ == '__main__':
                                           parents=[global_flags, collection_flags,
                                                    structure_flags, material_flags,
                                                    query_flags])
+
     args = parser.parse_args()
+
+    # check for inconsistent argument combinations
     if vars(args).get('include_oqmd'):
         print_failure('--include_oqmd is currently disabled, please try again soon...')
         exit()
@@ -351,4 +395,5 @@ if __name__ == '__main__':
     if vars(args).get('hull_cutoff') and vars(args).get('hull_temp'):
         print_failure('hull_cutoff and hull_temp both specified, exiting...')
         exit()
+
     matador = Matador(args, argstr=argv[1:])
