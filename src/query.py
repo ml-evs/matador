@@ -80,9 +80,10 @@ class DBQuery:
         self.periodic_table['Act'] = ['Ac', 'Th', 'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk',
                                       'Cf', 'Es', 'Fm', 'Md', 'No', 'Lr']
 
+        self.construct_query()
         self.perform_query()
 
-    def perform_query(self):
+    def construct_query(self):
         """ Set up query dict and perform query depending on
         command-line / API arguments.
         """
@@ -90,7 +91,7 @@ class DBQuery:
         # initalize query_dict to '$and' all queries
         self.query_dict = dict()
         self.query_dict['$and'] = []
-        empty_query = True
+        self.empty_query = True
         # benchmark enthalpy to display (set by calc_match)
         self.gs_enthalpy = 0.0
         if self.args.get('id') is not None:
@@ -122,41 +123,46 @@ class DBQuery:
                     for elem in self.cursor[0]['stoichiometry']:
                         self.args['composition'] += elem[0]
                     self.args['composition'] = [self.args['composition']]
-                empty_query = False
+                self.empty_query = False
         # create alias for formula for backwards-compatibility
         self.args['stoichiometry'] = self.args.get('formula')
         if self.args.get('stoichiometry') is not None:
             self.query_dict['$and'].append(self.query_stoichiometry())
-            empty_query = False
+            self.empty_query = False
         if self.args.get('composition') is not None:
             self.query_dict['$and'].append(self.query_composition())
-            empty_query = False
+            self.empty_query = False
         if self.args.get('num_species') is not None:
             self.query_dict['$and'].append(self.query_num_species())
-            empty_query = False
+            self.empty_query = False
         if self.args.get('pressure') is not None:
             self.query_dict['$and'].append(self.query_pressure())
-            empty_query = False
+            self.empty_query = False
         if self.args.get('space_group') is not None:
             self.query_dict['$and'].append(self.query_space_group())
-            empty_query = False
+            self.empty_query = False
         if self.args.get('num_fu') is not None:
             self.query_dict['$and'].append(self.query_num_fu())
-            empty_query = False
+            self.empty_query = False
         if self.args.get('encapsulated') is True:
             self.query_dict['$and'].append(self.query_encap())
-            empty_query = False
+            self.empty_query = False
         if self.args.get('cnt_radius') is not None:
             self.query_dict['$and'].append(self.query_cnt_radius())
-            empty_query = False
+            self.empty_query = False
         if self.args.get('tags') is not None:
             self.query_dict['$and'].append(self.query_tags())
-            empty_query = False
+            self.empty_query = False
         # only query quality when making a hull
         if not self.args.get('ignore_warnings'):
             self.query_dict['$and'].append(self.query_quality())
+
+    def perform_query(self):
+        """ Find results that match the query_dict
+        inside the MongoDB database.
+        """
         # if no query submitted, find all
-        if empty_query:
+        if self.empty_query:
             if self.args.get('id') is None:
                 for collection in self.collections:
                     self.repo = self.collections[collection]
@@ -167,7 +173,7 @@ class DBQuery:
                         self.top = self.cursor.count()
                     self.display_results(self.cursor[:self.top])
         # if no special query has been made already, begin executing the query
-        if not empty_query:
+        if not self.empty_query:
             self.cursors = []
             for collection in self.collections:
                 self.repo = self.collections[collection]
