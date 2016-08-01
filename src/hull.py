@@ -2,6 +2,7 @@
 """ This file implements convex hull functionality
 from database queries.
 """
+
 from __future__ import print_function
 from scipy.spatial import ConvexHull
 from bson.son import SON
@@ -26,12 +27,14 @@ class QueryConvexHull():
         self.cursor = list(query.cursor)
         self.args = args[0]
         self.K2eV = 8.61733e-5
+
         if self.args.get('hull_temp') is not None:
             self.hull_cutoff = float(self.args['hull_temp']*self.K2eV)
         elif self.args.get('hull_cutoff') is not None:
             self.hull_cutoff = float(self.args['hull_cutoff'])
         else:
             self.hull_cutoff = 0.0
+
         if self.args.get('chempots') is not None:
             self.chem_pots = self.args.get('chempots')
             for ind, pot in enumerate(self.chem_pots):
@@ -68,6 +71,7 @@ class QueryConvexHull():
             self.plot_hull()
         elif self.args.get('volume'):
             self.volume_curve(self.stable_comp, self.stable_vol)
+
         if self.args['subcmd'] == 'hull' and not self.args['no_plot']:
             if self.args.get('bokeh'):
                 self.plot_hull_bokeh()
