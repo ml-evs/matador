@@ -220,6 +220,9 @@ class FullRelaxer:
             self.num_rough_iter = rough if rough is not None else 4
             fine_iter = 20
             rough_iter = 2
+            if 'geom_method' in calc_doc:
+                if calc_doc['geom_method'].lower() == 'tpsd':
+                    rough_iter = 3
             num_fine_iter = int(self.max_iter)/fine_iter
             self.geom_max_iter_list = (self.num_rough_iter * [rough_iter])
             self.geom_max_iter_list.extend(num_fine_iter * [fine_iter])
