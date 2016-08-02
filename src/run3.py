@@ -296,7 +296,7 @@ class FullRelaxer:
                         remove(seed+'.res')
                     doc2res(opti_dict, 'bad_castep/' + seed, hash_dupe=False)
                     return False
-                err_file = seed + '*.err'
+                err_file = seed + '*001.err'
                 for globbed in glob.glob(err_file):
                     if isfile(globbed):
                         print_warning('Failed to optimise ' + seed + ' CASTEP crashed.')
