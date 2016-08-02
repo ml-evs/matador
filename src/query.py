@@ -65,7 +65,7 @@ class DBQuery:
             self.top = -1
         else:
             self.top = self.args.get('top') if self.args.get('top') is not None else 10
-        
+
         # define some periodic table macros
         self.periodic_table = get_periodic_table()
 
@@ -77,18 +77,22 @@ class DBQuery:
         command-line / API arguments.
         """
         self.cursor = EmptyCursor()
+
         # initalize query_dict to '$and' all queries
         self.query_dict = dict()
         self.query_dict['$and'] = []
         self.empty_query = True
+
         # benchmark enthalpy to display (set by calc_match)
         self.gs_enthalpy = 0.0
         if self.args.get('id') is not None:
             self.cursor = []
+
             for collection in self.collections:
                 temp_cursor = self.collections[collection].find({'text_id': self.args.get('id')})
                 for doc in temp_cursor:
                     self.cursor.append(doc)
+
             if len(self.cursor) < 1:
                 exit('Could not find a match, try widening your search.')
             elif len(self.cursor) >= 1:
@@ -99,6 +103,7 @@ class DBQuery:
                 if len(self.cursor) > 1:
                     print_warning('WARNING: matched multiple structures with same text_id. ' +
                                   'The first one will be used.')
+
             if self.args.get('calc_match') or self.args['subcmd'] == 'hull':
                 # save special copy of calc_dict for hulls
                 self.calc_dict = dict()
@@ -113,35 +118,45 @@ class DBQuery:
                         self.args['composition'] += elem[0]
                     self.args['composition'] = [self.args['composition']]
                 self.empty_query = False
+
         # create alias for formula for backwards-compatibility
         self.args['stoichiometry'] = self.args.get('formula')
         if self.args.get('stoichiometry') is not None:
             self.query_dict['$and'].append(self.query_stoichiometry())
             self.empty_query = False
+
         if self.args.get('composition') is not None:
             self.query_dict['$and'].append(self.query_composition())
             self.empty_query = False
+
         if self.args.get('num_species') is not None:
             self.query_dict['$and'].append(self.query_num_species())
             self.empty_query = False
+
         if self.args.get('pressure') is not None:
             self.query_dict['$and'].append(self.query_pressure())
             self.empty_query = False
+
         if self.args.get('space_group') is not None:
             self.query_dict['$and'].append(self.query_space_group())
             self.empty_query = False
+
         if self.args.get('num_fu') is not None:
             self.query_dict['$and'].append(self.query_num_fu())
             self.empty_query = False
+
         if self.args.get('encapsulated') is True:
             self.query_dict['$and'].append(self.query_encap())
             self.empty_query = False
+
         if self.args.get('cnt_radius') is not None:
             self.query_dict['$and'].append(self.query_cnt_radius())
             self.empty_query = False
+
         if self.args.get('tags') is not None:
             self.query_dict['$and'].append(self.query_tags())
             self.empty_query = False
+
         # only query quality when making a hull
         if not self.args.get('ignore_warnings'):
             self.query_dict['$and'].append(self.query_quality())
@@ -161,6 +176,7 @@ class DBQuery:
                     if self.top == -1:
                         self.top = self.cursor.count()
                     self.display_results(self.cursor[:self.top])
+
         # if no special query has been made already, begin executing the query
         if not self.empty_query:
             self.cursors = []
@@ -168,12 +184,13 @@ class DBQuery:
                 self.repo = self.collections[collection]
                 if self.args.get('details'):
                     print(self.query_dict)
+
                 # execute query
                 self.cursor = self.repo.find(SON(self.query_dict)).sort('enthalpy_per_atom',
                                                                         pm.ASCENDING)
                 self.cursors.append(self.cursor.clone())
                 cursor_count = self.cursor.count()
-                """ QUERY POST-PROCESSING """
+
                 # write query to res or cell with param files
                 if self.args.get('cell') or self.args.get('res'):
                     if cursor_count >= 1:
@@ -182,6 +199,7 @@ class DBQuery:
                             query2files(cursor[:self.args.get('top')], self.args)
                         else:
                             query2files(cursor, self.args)
+
                 # if called as script, always print results
                 if self.args.get('id') is None:
                     print(cursor_count, 'results found for query in', collection+'.')
@@ -193,6 +211,7 @@ class DBQuery:
                             self.display_results(self.cursor.clone()[:self.top])
                         else:
                             self.display_results(self.cursor.clone())
+
             # building hull from just comp, find best structure to calc_match
             if self.args.get('id') is None and (self.args.get('subcmd') == 'hull' or
                                                 self.args.get('subcmd') == 'voltage' or
@@ -210,6 +229,7 @@ class DBQuery:
                     print('\nFinding biggest calculation set for hull...\n')
                 else:
                     print('\nFinding the best calculation set for hull...')
+
                 test_cursors = []
                 test_cursor_count = []
                 test_query_dict = []
@@ -263,6 +283,7 @@ class DBQuery:
                                 print('Matched at least 2/3 of total number, composing hull...')
                                 break
                     i += 1
+
                 if self.args.get('biggest'):
                     choice = np.argmax(np.asarray(test_cursor_count))
                 else:
@@ -270,6 +291,7 @@ class DBQuery:
                     choice = np.argmax(np.asarray(cutoff))
                 self.cursor = test_cursors[choice]
                 self.calc_dict = calc_dicts[choice]
+
             # if including oqmd, connect to oqmd collection and generate new query
             if self.args.get('include_oqmd'):
                 self.oqmd_repo = self.client.crystals.oqmd
@@ -299,6 +321,7 @@ class DBQuery:
         source_string = []
         formula_string = []
         last_formula = ''
+
         header_string = "{:^24}".format('ID')
         header_string += "{:^5}".format('!?!')
         header_string += "{:^12}".format('Pressure')
@@ -308,6 +331,7 @@ class DBQuery:
         header_string += "{:^10}".format('Formula')
         header_string += "{:^8}".format('# fu')
         header_string += "{:^8}".format('Prov.')
+
         for ind, doc in enumerate(cursor):
             formula_substring = ''
             if 'phase' in doc:
@@ -335,6 +359,7 @@ class DBQuery:
             formula_string.append(formula_substring)
             struct_string.append(
                 "{:^24}".format(doc['text_id'][0]+' '+doc['text_id'][1]))
+
             try:
                 if doc['quality'] == 0:
                     struct_string[-1] += "{:^5}".format('!!!')
@@ -387,9 +412,11 @@ class DBQuery:
                 struct_string[-1] += "{:^8}".format(source)
             except:
                 struct_string[-1] += "{:^8}".format('xxx')
+
             if last_formula != formula_substring:
                 self.gs_enthalpy = doc['enthalpy_per_atom']
             last_formula = formula_substring
+
             if details:
                 detail_string.append(11 * ' ' + u"├╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌ ")
                 if self.args.get('source'):
@@ -441,6 +468,7 @@ class DBQuery:
                         pass
                 detail_string[-1] += ' ' + (len(header_string)-len(detail_string[-1])-1)*u"╌"
                 detail_substring[-1] += ' ' + (len(header_string)-len(detail_substring[-1])-1)*u"╌"
+
             if self.args.get('source'):
                 source_string.append(11*' ' + u"└───────────────┬──")
                 for num, file in enumerate(doc['source']):
@@ -452,9 +480,11 @@ class DBQuery:
                     source_string[-1] += ' ' + file.split('structure_repository')[-1]
                     if num != len(doc['source'])-1:
                         source_string[-1] += '\n'
+
         print(len(header_string)*'─')
         print(header_string)
         print(len(header_string)*'─')
+
         if self.args.get('summary'):
             current_formula = ''
             formula_list = []
@@ -485,6 +515,7 @@ class DBQuery:
         """ Query DB for particular stoichiometry. """
         # alias stoichiometry
         stoich = self.args.get('stoichiometry')
+
         # if there's only one string, try split it by caps
         if len(stoich) == 1:
             stoich = [elem for elem in re.split(r'([A-Z][a-z]*)', stoich[0]) if elem]
@@ -517,6 +548,7 @@ class DBQuery:
                 except:
                     pass
                 stoich = tmp_stoich
+
         elements = []
         fraction = []
         for i in range(0, len(stoich), 1):
@@ -534,8 +566,10 @@ class DBQuery:
                 gcd_val = gcd(frac, gcd_val)
         fraction = np.asarray(fraction)
         fraction /= gcd_val
+
         query_dict = dict()
         query_dict['$and'] = []
+
         for ind, elem in enumerate(elements):
             if '[' in elem or ']' in elem:
                 types_dict = dict()
@@ -556,6 +590,7 @@ class DBQuery:
             size_dict['stoichiometry'] = dict()
             size_dict['stoichiometry']['$size'] = len(elements)
             query_dict['$and'].append(size_dict)
+
         return query_dict
 
     def query_composition(self, custom_elem=None):
@@ -568,6 +603,7 @@ class DBQuery:
             elements = self.args.get('composition')
         else:
             elements = custom_elem
+
         # if there's only one string, try split it by caps
         for char in elements[0]:
             if char.isdigit():
@@ -611,6 +647,7 @@ class DBQuery:
         except Exception:
             print_exc()
             exit()
+
         if self.args.get('intersection'):
             query_dict = dict()
             query_dict['$or'] = []
@@ -652,6 +689,7 @@ class DBQuery:
                 num = len(elements)
                 size_dict['stoichiometry']['$size'] = num
                 query_dict['$and'].append(size_dict)
+
         return query_dict
 
     def query_num_species(self):
@@ -666,6 +704,7 @@ class DBQuery:
         query_dict = dict()
         query_dict['stoichiometry'] = dict()
         query_dict['stoichiometry']['$size'] = num
+
         return query_dict
 
     def query_space_group(self):
@@ -674,6 +713,7 @@ class DBQuery:
         """
         query_dict = dict()
         query_dict['space_group'] = str(self.args.get('space_group'))
+
         return query_dict
 
     def query_num_fu(self):
@@ -683,6 +723,7 @@ class DBQuery:
         query_dict = dict()
         query_dict['num_fu'] = dict()
         query_dict['num_fu']['$gte'] = self.args.get('num_fu')
+
         return query_dict
 
     def query_tags(self):
@@ -694,6 +735,7 @@ class DBQuery:
             temp_dict['tags'] = dict()
             temp_dict['tags']['$in'] = [tag]
             query_dict['$and'].append(temp_dict)
+
         return query_dict
 
     def query_quality(self):
@@ -707,6 +749,7 @@ class DBQuery:
         query_dict['$or'].append(dict())
         query_dict['$or'][-1]['quality'] = dict()
         query_dict['$or'][-1]['quality']['$exists'] = False
+
         return query_dict
 
     def query_pressure(self):
@@ -715,11 +758,13 @@ class DBQuery:
         of either 0.05 GPa or 10%.
         """
         input_pressure = self.args.get('pressure')
+
         print(input_pressure, 'GPa')
         if input_pressure < 0:
             approx_pressure = [1.1*input_pressure-0.05, 0.9*input_pressure+0.05]
         else:
             approx_pressure = [0.9*input_pressure-0.05, 1.1*input_pressure+0.05]
+
         query_dict = dict()
         query_dict['$and'] = []
         temp_dict = dict()
@@ -733,6 +778,7 @@ class DBQuery:
         temp_dict['pressure'] = dict()
         temp_dict['pressure']['$gt'] = approx_pressure[0]
         query_dict['$and'].append(temp_dict)
+
         return query_dict
 
     def query_encap(self):
@@ -740,6 +786,7 @@ class DBQuery:
         query_dict = dict()
         query_dict['encapsulated'] = dict()
         query_dict['encapsulated']['$exists'] = True
+
         return query_dict
 
     def query_cnt_radius(self):
@@ -752,6 +799,7 @@ class DBQuery:
         query_dict['$and'][-1]['cnt_radius'] = dict()
         query_dict['$and'][-1]['cnt_radius']['$gt'] = self.args.get('cnt_radius') - 0.01
         query_dict['$and'][-1]['cnt_radius']['$lt'] = self.args.get('cnt_radius') + 0.01
+
         return query_dict
 
     def query_calc(self, doc):
@@ -759,6 +807,7 @@ class DBQuery:
         accuracy to specified structure.
         """
         self.gs_enthalpy = doc['enthalpy_per_atom']
+
         query_dict = []
         # if missing xc, return dict that will have no matches
         if 'xc_functional' not in doc:
@@ -797,6 +846,7 @@ class DBQuery:
                 temp_dict['$or'].append(dict())
                 temp_dict['$or'][-1]['species_pot.'+species] = doc['species_pot'][species]
                 query_dict.append(temp_dict)
+
         return query_dict
 
     def temp_collection(self, cursor):
@@ -814,6 +864,7 @@ class DBQuery:
         else:
             self.temp.drop()
             exit('No structures found.')
+
         return self.temp
 
 

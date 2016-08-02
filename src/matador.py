@@ -17,6 +17,7 @@ import pymongo as pm
 import argparse
 from sys import argv
 from os import uname
+from os.path import isfile
 
 
 class Matador:
@@ -81,9 +82,9 @@ class Matador:
                 self.swaps = Polisher(self.query.cursor, self.args)
 
         if self.args['subcmd'] == 'pdffit':
-            from pdffit import PDFFitter
             self.query = DBQuery(self.client, self.collections, **self.args)
-            self.pdffit = PDFFitter(self.query, self.args)
+            from pdffit import PDFFitter
+            self.pdffit = PDFFitter(self.query.cursor, **self.args)
 
         if self.args['subcmd'] == 'polish':
             self.query = DBQuery(self.client, self.collections, **self.args)
@@ -326,13 +327,13 @@ if __name__ == '__main__':
                                   atoms for As. Uses the same macros  as --composition.')
 
     pdffit_flags = argparse.ArgumentParser(add_help=False)
-    pdffit_flags.add_arugment('-file', '--file', type=str,
+    pdffit_flags.add_argument('-file', '--file', type=str,
                               help='experimental input file to fit structures to.')
-    pdffit_flags.add_argument('--min', type=float,
+    pdffit_flags.add_argument('-min', '--xmin', type=float,
                               help='minimum value to compute the PDF')
-    pdffit_flags.add_argument('--max', type=float,
+    pdffit_flags.add_argument('-max', '--xmax', type=float,
                               help='maximum value to compute the PDF')
-    pdffit_flags.add_argument('-dx', '--spacing', type=float,
+    pdffit_flags.add_argument('-dx', '--dx', type=float,
                               help='spacing to compute PDF at')
     pdffit_flags.add_argument('-2', '--two_phase', type=float,
                               help='fit two phases to experimental PDF')
@@ -392,6 +393,13 @@ if __name__ == '__main__':
     if vars(args).get('subcmd') == 'hull' and vars(args).get('formula') is not None:
         print_failure('hull not compatible with --formula, please use --composition')
         exit()
+    if vars(args).get('subcmd') == 'pdffit':
+        if vars(args).get('file') is None:
+            print_failure('pdffit requires specified --file, exiting...')
+            exit()
+        if not isfile(vars(args).get('file')):
+            print_failure('specified --file does not exist, exiting...')
+            exit()
     if vars(args).get('hull_cutoff') and vars(args).get('hull_temp'):
         print_failure('hull_cutoff and hull_temp both specified, exiting...')
         exit()
