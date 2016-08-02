@@ -13,7 +13,9 @@ from print_utils import print_failure, print_warning
 # standard library
 from traceback import print_exc
 # external libraries
-from scipy.optimize.minpack import leastsq
+from scipy.optimize import leastsq
+from numpy import zeros_like
+import matplotlib.pyplot as plt
 # diffpy
 from diffpy.srfit.pdf import PDFContribution
 from diffpy.srfit.fitbase import FitRecipe, FitResults
@@ -41,16 +43,42 @@ class PDFFitter:
         self.total_num_candidates = len(self.cursor)
 
         for ind, doc in enumerate(self.cursor):
+            print(doc['text_id'][0], doc['text_id'][1])
             # cast db document as diffpy Structure
             structure = doc2diffpy(doc)
             # make recipe and fit
             fit = self.make_recipe(structure, doc)
             # assess quality of fit
             try:
-                result = self.regression(fit)
+                self.regression(fit, structure.title)
             except:
                 print_exc()
+            # self.plot_fit(fit, structure)
 
+    def plot_fit(self, fit, structure):
+        """ Plot results. """
+        fig_name = structure.title + ".png"
+        # Plot the observed and refined PDF.
+        # Get the experimental data from the recipe
+        r = fit.Contribution.profile.x
+        gobs = fit.Contribution.profile.y
+        # Get the calculated PDF and compute the difference between the calculated and
+        # measured PDF
+        gcalc = fit.Contribution.evaluate()
+        baseline = 1.1 * gobs.min()
+        gdiff = gobs - gcalc
+        # Plot!
+        plt.figure(figsize=(5, 5))
+        plt.plot(r, gobs, 'bo', label="G(r) data",
+                 markerfacecolor='none', markeredgecolor='b')
+        plt.plot(r, gcalc, 'r-', label="G(r) fit")
+        plt.plot(r, gdiff + baseline, 'g-', label="G(r) diff")
+        plt.plot(r, zeros_like(r) + baseline, 'k:')
+        plt.xlabel(r"r ($\AA$)")
+        plt.ylabel(r"G ($\AA^{-2}$)")
+        plt.legend()
+        plt.savefig(fig_name, bbox_inches='tight')
+        plt.show()
 
     def make_recipe(self, structure, doc):
         """ Construct PDF with diffpy. """
@@ -61,7 +89,7 @@ class PDFFitter:
         try:
             pdf.loadData(self.input_file)
         except:
-            print_failure('Failed to parse ' + data_file + '. Exiting...')
+            print_failure('Failed to parse ' + self.input_file + '. Exiting...')
             exit()
 
         pdf.setCalculationRange(self.xmin, self.xmax, self.dx)
@@ -77,7 +105,8 @@ class PDFFitter:
         else:
             print_warning('Invalid space group... skipping')
             raise RuntimeError('Invalid space group for', doc['text_id'][0], doc['text_id'][1])
-        print (', '.join([p.name for p in spacegroup_params]))
+        print('Space group parameters:')
+        print(', '.join([param.name for param in spacegroup_params]))
         # iterate through spacegroup params and activate them
         for param in spacegroup_params.latpars:
             fit.addVar(param)
@@ -85,7 +114,7 @@ class PDFFitter:
             fit.addVar(param, fixed=True)
         # these next parameters are taken from Martin's PDFht.py,
         # though I have a feeling that was not their origin...
-        # set initial ADP parameters 
+        # set initial ADP parameters
         for param in spacegroup_params.adppars:
             fit.addVar(param, value=0.03, fixed=True)
         # overall scale of PDF and delta2 parameter for correlated motion - from PDFht.py
@@ -99,32 +128,31 @@ class PDFFitter:
 
         return fit
 
-
-    def regression(self, fit):
+    def regression(self, fit, title):
         """ Assess quality of fit. """
+
         fit.fithooks[0].verbose = 0
-        
-        # free parameters one-by-one and fit
-        # fit.free("scale")
+
         # We can now execute the fit using scipy's least square optimizer.
         print("Refine PDF using scipy's least-squares optimizer:")
         print("  variables:", fit.names)
         print("  initial values:", fit.values)
+        # free parameters one-by-one and fit
+        fit.free("scale")
         leastsq(fit.residual, fit.values)
-        print("  final values:", fit.values)
-        print
-
-        # leastsq(fit.residual, fit.values)
-        # fit.free("delta2")
-        # leastsq(fit.residual, fit.values)
-        # fit.free("all")
+        print("  freed scale:", fit.values)
+        fit.free("delta2")
         leastsq(fit.residual, fit.values)
+        print("  freed delta2:", fit.values)
+        fit.free("all")
+        leastsq(fit.residual, fit.values)
+        print("  freed all:", fit.values)
 
         ContributionResult = FitResults(fit)
-        ContributionResult.saveResults('test.dat')
+        ContributionResult.saveResults(title+'.results')
 
         return
-    
+
 
 def doc2diffpy(doc):
     """ Convert doc into diffpy Structure object. """
@@ -132,7 +160,7 @@ def doc2diffpy(doc):
     from diffpy.Structure.atom import Atom
     from diffpy.Structure.lattice import Lattice
     from diffpy.Structure.structure import Structure
-
+    
     lattice = Lattice(a=doc['lattice_abc'][0][0],
                       b=doc['lattice_abc'][0][1],
                       c=doc['lattice_abc'][0][2],
@@ -142,11 +170,12 @@ def doc2diffpy(doc):
                       )
     atoms = []
     for ind, atom in enumerate(doc['atom_types']):
-        atoms.append(Atom(atype=atom,
+        # encode atype as utf-8 or you will waste hours of your life
+        atoms.append(Atom(atype=atom.encode('utf-8'),
                           xyz=asarray(doc['positions_frac'][ind])))
     title = None
     for sources in doc['source']:
         if sources.endswith('.res') or sources.endswith('.castep'):
             title = sources.split('/')[-1].split('.')[0].encode('utf-8')
 
-    return Structure(atoms, lattice)#, title=title)
+    return Structure(atoms, lattice, title=title)
