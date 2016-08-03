@@ -1,5 +1,10 @@
 # coding: utf-8
 """ This file defines some useful chemistry. """
+import periodictable
+import numpy as np
+
+FARADAY_CONSTANT_Cpermol = 96.485332e3
+Cperg_to_mAhperg = 2.778e-1
 
 
 def get_periodic_table():
@@ -20,3 +25,17 @@ def get_periodic_table():
     periodic_table['Act'] = ['Ac', 'Th', 'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk',
                              'Cf', 'Es', 'Fm', 'Md', 'No', 'Lr']
     return periodic_table
+
+
+def get_molar_mass(elem):
+    """ Return molar mass of chosen element. """
+    return periodictable.elements.symbol(elem).mass
+
+
+def get_capacities(x, m_B):
+    """ Return capacity in mAh/g from x in A_x B
+    and m_B in a.m.u.
+    """
+    x = np.array(x)
+    Q = x * FARADAY_CONSTANT_Cpermol * Cperg_to_mAhperg / m_B
+    return Q
