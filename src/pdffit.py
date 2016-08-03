@@ -8,10 +8,12 @@ in the database with the diffpy package.
 from __future__ import print_function
 
 # matador functionality
-from print_utils import print_failure, print_warning
+from print_utils import print_failure, print_warning, print_notify
 
 # standard library
+import multiprocessing as mp
 from traceback import print_exc
+from os.path import isfile
 # external libraries
 from scipy.optimize import leastsq
 from numpy import zeros_like
@@ -34,6 +36,7 @@ class PDFFitter:
         candidates.
         """
         self.args = kwargs
+        self.nprocesses = 2
         self.input_file = self.args.get('file')
         self.cursor = list(cursor)
         self.dx = dx
@@ -41,19 +44,66 @@ class PDFFitter:
         self.xmax = xmax
         self.two_phase = two_phase
         self.total_num_candidates = len(self.cursor)
-
+        self.structures = []
+        self.space_groups = []
+        # collect structures and space groups
         for ind, doc in enumerate(self.cursor):
-            print(doc['text_id'][0], doc['text_id'][1])
             # cast db document as diffpy Structure
-            structure = doc2diffpy(doc)
-            # make recipe and fit
-            fit = self.make_recipe(structure, doc)
-            # assess quality of fit
-            try:
-                self.regression(fit, structure.title)
-            except:
-                print_exc()
-            # self.plot_fit(fit, structure)
+            self.structures.append(doc2diffpy(doc))
+            self.space_groups.append(doc['space_group'])
+
+        self.jobs_fname = 'pdf_jobs.txt'
+        if not isfile(self.jobs_fname):
+            with open(self.jobs_fname, 'a'):
+                pass
+        self.completed_fname = 'pdf_complete.txt'
+        if not isfile(self.completed_fname):
+            with open(self.completed_fname, 'a'):
+                pass
+        self.failed_fname = 'pdf_failed.txt'
+        if not isfile(self.failed_fname):
+            with open(self.failed_fname, 'a'):
+                pass
+
+    def perform_fits(self):
+        """ Scan for fit that has not yet been
+        done, then do it.
+        """
+        for ind, structure in enumerate(self.structures):
+            running = False
+            with open(self.jobs_fname, 'rw') as job_file:
+                flines = job_file.readlines()
+                for line in flines:
+                    if structure.title in line:
+                        running = True
+                        break
+            if not running:
+                sg = self.space_groups[ind]
+                with open(self.jobs_fname, 'a') as job_file:
+                    job_file.write(structure.title + '\n')
+                try:
+                    self.fit(structure, sg)
+                    with open(self.completed_fname, 'a') as job_file:
+                        job_file.write(structure.title + '\n')
+                except(KeyboardInterrupt, SystemExit, RuntimeError):
+                    print_exc()
+                    raise SystemExit
+                except:
+                    with open(self.failed_fname, 'a') as job_file:
+                        job_file.write(structure.title + '\n')
+                    print_exc()
+                    pass
+        return
+
+    def fit(self, structure, sg):
+        """ Prepare to fit, fit, then plot. """
+        fit = self.make_recipe(structure, sg)
+        try:
+            self.regression(fit, structure.title)
+            self.plot_fit(fit, structure)
+        except:
+            print_exc()
+        return
 
     def plot_fit(self, fit, structure):
         """ Plot results. """
@@ -77,20 +127,21 @@ class PDFFitter:
         plt.xlabel(r"r ($\AA$)")
         plt.ylabel(r"G ($\AA^{-2}$)")
         plt.legend()
-        plt.savefig(fig_name, bbox_inches='tight')
-        plt.show()
+        plt.savefig(fig_name, bbox_inches='tight', dpi=300)
+        return
 
-    def make_recipe(self, structure, doc):
+    def make_recipe(self, structure, sg):
         """ Construct PDF with diffpy. """
         # construct a PDFContribution object
-        pdf = PDFContribution("structure")
-
+        pdf = PDFContribution("Contribution")
         # read experimental data
         try:
             pdf.loadData(self.input_file)
         except:
             print_failure('Failed to parse ' + self.input_file + '. Exiting...')
             exit()
+
+        print('Constructing PDF object for', structure.title)
 
         pdf.setCalculationRange(self.xmin, self.xmax, self.dx)
         pdf.addStructure("Contribution", structure)
@@ -99,14 +150,13 @@ class PDFFitter:
         fit = FitRecipe()
         fit.addContribution(pdf)
         # configure variables and add to recipe
-        if doc['space_group'] != 'xxx':
-            spacegroup_params = constrainAsSpaceGroup(pdf.Contribution.phase,
-                                                      str(doc['space_group']))
+        if sg != 'xxx' and sg is not None:
+            spacegroup_params = constrainAsSpaceGroup(pdf.Contribution.phase, sg)
         else:
             print_warning('Invalid space group... skipping')
-            raise RuntimeError('Invalid space group for', doc['text_id'][0], doc['text_id'][1])
-        print('Space group parameters:')
-        print(', '.join([param.name for param in spacegroup_params]))
+            raise RuntimeError('Invalid space group for', structure.title)
+        # print('Space group parameters:')
+        # print(', '.join([param.name for param in spacegroup_params]))
         # iterate through spacegroup params and activate them
         for param in spacegroup_params.latpars:
             fit.addVar(param)
@@ -129,29 +179,39 @@ class PDFFitter:
         return fit
 
     def regression(self, fit, title):
-        """ Assess quality of fit. """
+        """ Apply least squares to the free parameters. """
 
+        print('Fitting PDF of', title, 'to expt. data.')
         fit.fithooks[0].verbose = 0
 
         # We can now execute the fit using scipy's least square optimizer.
-        print("Refine PDF using scipy's least-squares optimizer:")
-        print("  variables:", fit.names)
-        print("  initial values:", fit.values)
         # free parameters one-by-one and fit
         fit.free("scale")
         leastsq(fit.residual, fit.values)
-        print("  freed scale:", fit.values)
         fit.free("delta2")
         leastsq(fit.residual, fit.values)
-        print("  freed delta2:", fit.values)
         fit.free("all")
         leastsq(fit.residual, fit.values)
-        print("  freed all:", fit.values)
 
         ContributionResult = FitResults(fit)
         ContributionResult.saveResults(title+'.results')
 
         return
+
+    def spawn(self):
+        """ Spawn processes to perform PDF fitting. """
+        print_notify('Performing ' + str(self.nprocesses) +
+                     ' concurrent fits.')
+        procs = []
+        for ind in range(self.nprocesses):
+            procs.append(mp.Process(target=self.perform_fits))
+        try:
+            for proc in procs:
+                proc.start()
+        except(KeyboardInterrupt, SystemExit, RuntimeError):
+            for proc in procs:
+                proc.terminate()
+            exit('Killing running jobs and exiting...')
 
 
 def doc2diffpy(doc):
@@ -160,7 +220,7 @@ def doc2diffpy(doc):
     from diffpy.Structure.atom import Atom
     from diffpy.Structure.lattice import Lattice
     from diffpy.Structure.structure import Structure
-    
+
     lattice = Lattice(a=doc['lattice_abc'][0][0],
                       b=doc['lattice_abc'][0][1],
                       c=doc['lattice_abc'][0][2],
