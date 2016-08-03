@@ -5,9 +5,11 @@ from database queries.
 
 from __future__ import print_function
 from scipy.spatial import ConvexHull
+from traceback import print_exc
 from bson.son import SON
 from bisect import bisect_left
 from print_utils import print_failure, print_notify, print_warning
+from chem_utils import get_capacities, get_molar_mass
 import pymongo as pm
 import re
 import numpy as np
@@ -337,8 +339,10 @@ class QueryConvexHull():
             x.append(stable_num[i])
         V.append(V[-1])
         x.append(0)
-        self.voltages = V
-        self.x = x
+        self.voltages = np.asarray(V)
+        self.x = np.asarray(x)
+        # gravimetric capacity
+        self.Q = get_capacities(x, get_molar_mass(self.elements[1]))
         return
 
     def volume_curve(self, stable_comp, stable_vol):
@@ -520,20 +524,39 @@ class QueryConvexHull():
         else:
             fig = plt.figure(facecolor=None)
         ax = fig.add_subplot(111)
+        axQ = ax.twiny()
+        if self.args.get('expt') is not None:
+            try:
+                expt_data = np.loadtxt(self.args.get('expt'), delimiter=',')
+                axQ.plot(expt_data[:, 0], expt_data[:, 1], c='k', ls='--')
+            except:
+                print_exc()
+                pass
         for i in range(2, len(self.voltages)):
-            # ax.scatter(self.x[i-1], self.voltages[i-1],
-                       # marker='*', s=100, edgecolor='k', c=self.colours[0], zorder=1000)
             ax.plot([self.x[i], self.x[i]], [self.voltages[i], self.voltages[i-1]],
                     lw=2, c=self.colours[0])
             ax.plot([self.x[i-1], self.x[i]], [self.voltages[i-1], self.voltages[i-1]],
                     lw=2, c=self.colours[0])
+            axQ.plot([self.Q[i], self.Q[i]], [self.voltages[i], self.voltages[i-1]],
+                     lw=2, c=self.colours[0], alpha=0)
+            axQ.plot([self.Q[i-1], self.Q[i]], [self.voltages[i-1], self.voltages[i-1]],
+                     lw=2, c=self.colours[0], alpha=0)
+            ax.annotate(('Li$_\mathrm{' + str(self.x[i-1]) + '}$As'),
+                        xy=(self.x[i-1], self.voltages[i]),
+                        textcoords='data',
+                        ha='center',
+                        xytext=(self.x[i-1]-0.05, 0.01+self.voltages[i-1]))
         ax.set_ylabel('Voltage (V)')
+        axQ.set_xlabel('Gravimetric capacity (mAh/g)')
         plt.locator_params(nbins=4)
         ax.set_xlim(0, np.max(np.asarray(self.x[1:]))+1)
-        ax.set_ylim(np.min(np.asarray(self.voltages[2:]))-0.1,
-                    np.max(np.asarray(self.voltages[2:]))+0.1)
-        ax.set_title('$\mathrm{'+self.elements[0]+'_x'+self.elements[1]+'}$')
-        ax.set_xlabel('$\mathrm{x}$')
+        ax.grid('off')
+        axQ.grid('off')
+        axQ.set_xticks(self.Q[1:])
+        axQ.set_xlim(0)
+        # ax.set_ylim(np.min(np.asarray(self.voltages[2:]))-0.1,
+                    # np.max(np.asarray(self.voltages[2:]))+0.1)
+        ax.set_xlabel('$\mathrm{x}$ in $\mathrm{'+self.elements[0]+'_x'+self.elements[1]+'}$')
         if self.args.get('pdf'):
             plt.savefig(self.elements[0]+self.elements[1]+'_voltage.pdf',
                         dpi=300, bbox_inches='tight')
