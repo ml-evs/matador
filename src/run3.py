@@ -129,8 +129,7 @@ class BatchRun:
                 pass
 
     def spawn(self):
-        # begin running calculations that have not already started
-        # initialise pool of processes
+        """ Spawn processes to perform calculations. """
         procs = []
         for ind in range(self.nprocesses):
             procs.append(mp.Process(target=self.perform_new_calculations,
