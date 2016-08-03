@@ -83,8 +83,23 @@ class Matador:
 
         if self.args['subcmd'] == 'pdffit':
             self.query = DBQuery(self.client, self.collections, **self.args)
-            from pdffit import PDFFitter
-            self.pdffit = PDFFitter(self.query.cursor, **self.args)
+            self.cursor = list(self.query.cursor)
+            if self.args.get('top') is not None:
+                self.top = self.args.get('top')
+            else:
+                self.top = len(self.cursor)
+            if len(self.cursor[:self.top]) > 0:
+                print_notify('Performing PDF fit for ' +
+                             str(len(self.cursor[:self.top])) +
+                             ' structures.')
+                from pdffit import PDFFitter
+                self.pdffit = PDFFitter(self.cursor[:self.top], **self.args)
+                try:
+                    self.pdffit.spawn()
+                except(KeyboardInterrupt, SystemExit):
+                    exit('Exiting top-level...')
+            else:
+                exit('No structure match query.')
 
         if self.args['subcmd'] == 'polish':
             self.query = DBQuery(self.client, self.collections, **self.args)
@@ -283,6 +298,8 @@ if __name__ == '__main__':
                             help='plot using bokeh')
     plot_flags.add_argument('--no_plot', action='store_true',
                             help='suppress plotting')
+    plot_flags.add_argument('--expt', type=str,
+                            help='enter experimental voltage curve .csv file for plotting.')
 
     spatula_flags = argparse.ArgumentParser(add_help=False)
     spatula_flags.add_argument('-d', '--dryrun', action='store_true',
