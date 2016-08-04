@@ -166,6 +166,10 @@ class Polisher:
         # split by comma to get pairs of swaps
         if self.args.get('debug'):
             print(self.args.get('swap'))
+        if len(self.args.get('swap')) > 1:
+            print_failure('Detected whitespace in your input, '\
+                          + 'clear it and try again.')
+            exit()
         swap_list = self.args.get('swap')[0].split(':')
         if self.args.get('debug'):
             print(swap_list)
