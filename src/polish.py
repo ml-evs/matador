@@ -167,8 +167,8 @@ class Polisher:
         if self.args.get('debug'):
             print(self.args.get('swap'))
         if len(self.args.get('swap')) > 1:
-            print_failure('Detected whitespace in your input, '\
-                          + 'clear it and try again.')
+            print_failure('Detected whitespace in your input, ' +
+                          'clear it and try again.')
             exit()
         swap_list = self.args.get('swap')[0].split(':')
         if self.args.get('debug'):
@@ -194,7 +194,7 @@ class Polisher:
             if self.args.get('debug'):
                 print(tmp_list)
 
-            # parse list of elements or group 
+            # parse list of elements or group
             for ind, atom in enumerate(tmp_list):
                 if '[' in atom:
                     group = atom.strip(']').strip('[')
