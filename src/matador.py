@@ -228,6 +228,8 @@ if __name__ == '__main__':
     global_flags.add_argument('--db',
                               help='choose which databases to query',
                               nargs='+')
+    global_flags.add_argument('--debug', action='store_true',
+                              help='enable debug printing throughout code.')
 
     # define all other flags by group
     structure_flags = argparse.ArgumentParser(add_help=False)
@@ -308,8 +310,6 @@ if __name__ == '__main__':
                                help='enable verbose output')
     spatula_flags.add_argument('-t', '--tags', nargs='+', type=str,
                                help='set user tags, e.g. nanotube, project name')
-    spatula_flags.add_argument('--debug', action='store_true',
-                               help='enable debug output to print every dict')
     spatula_flags.add_argument('-s', '--scan', action='store_true',
                                help='only scan the database for new structures, do not dictify')
 

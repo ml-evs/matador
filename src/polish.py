@@ -164,12 +164,17 @@ class Polisher:
         self.swap_pairs = []
 
         # split by comma to get pairs of swaps
-        swap_list = self.args.get('swap')[0].split(',')
+        if self.args.get('debug'):
+            print(self.args.get('swap'))
+        swap_list = self.args.get('swap')[0].split(':')
+        if self.args.get('debug'):
+            print(swap_list)
         for swap in swap_list:
             if len(swap) <= 1:
                 exit('Not enough arguments for swap!')
             tmp_list = re.split(r'([A-Z][a-z]*)', swap)
-
+            if self.args.get('debug'):
+                print(tmp_list)
             # scrub square brackets
             for ind, tmp in enumerate(tmp_list):
                 if tmp == '[':
@@ -182,16 +187,23 @@ class Polisher:
             while '' in tmp_list:
                 tmp_list.remove('')
             swap_test = tmp_list
+            if self.args.get('debug'):
+                print(tmp_list)
 
-            # expand swap_test with periodic table
+            # parse list of elements or group 
             for ind, atom in enumerate(tmp_list):
                 if '[' in atom:
                     group = atom.strip(']').strip('[')
-                    atoms = self.periodic_table[group]
+                    if group in self.periodic_table:
+                        atoms = self.periodic_table[group]
+                    else:
+                        atoms = group.split(',')
                     swap_test[ind] = atoms
                 else:
                     swap_test[ind] = [atom]
             self.swap_pairs.append(swap_test)
+            if self.args.get('debug'):
+                print(self.swap_pairs)
         for pair in self.swap_pairs:
             print_notify('Swapping all ' + str(pair[0]) + ' for ' + str(pair[1]))
 
