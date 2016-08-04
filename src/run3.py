@@ -91,7 +91,7 @@ class BatchRun:
         if not param_success:
             valid = False
             print_failure('Failed to parse cell file')
-        if int(self.param_dict['geom_max_iter']) < 20:
+        if 'geom_max_iter' in self.param_dict and int(self.param_dict['geom_max_iter']) < 20:
             valid = False
             print_failure('geom_max_iter is only ' +
                           str(self.param_dict['geom_max_iter']) + '... quitting.')
@@ -218,7 +218,7 @@ class FullRelaxer:
 
         elif calc_doc['task'].upper() == 'SPECTRAL':
             # batch run density of states
-            self.success = self.scf(calc_doc, seed, keep=True)
+            self.success = self.scf(calc_doc, self.seed, keep=True)
         else:
             # set up geom opt parameters
             self.max_iter = calc_doc['geom_max_iter']
