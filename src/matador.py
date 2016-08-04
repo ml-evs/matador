@@ -340,8 +340,10 @@ if __name__ == '__main__':
     swap_flags = argparse.ArgumentParser(add_help=False)
     swap_flags.add_argument('-s', '--swap', type=str, nargs='+',
                             help='swap all atoms in structures from a query from the first n-1 \
-                                  species to the nth, e.g. --swaps N P As will swap all N, P \
-                                  atoms for As. Uses the same macros  as --composition.')
+                                  species to the nth, e.g. -s NAs will swap all N to As, \
+                                  -s NAs:LiNa will swap all N to As, and all Li to Na, and \
+                                  -s [V]As:[Li,K,Rb]Na will swap all group V elements to As \
+                                  and all of Li, K and Rb to Na.')
 
     pdffit_flags = argparse.ArgumentParser(add_help=False)
     pdffit_flags.add_argument('-file', '--file', type=str,
