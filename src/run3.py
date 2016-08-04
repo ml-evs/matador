@@ -208,11 +208,17 @@ class FullRelaxer:
         # update global doc with cell and param dicts for folder
         calc_doc.update(cell_dict)
         calc_doc.update(param_dict)
+
         if self.conv_cutoff_bool:
+            # run series of singlepoints for various cutoffs
             for cutoff in self.conv_cutoff:
                 calc_doc.update({'cut_off_energy': cutoff})
                 seed = self.seed + '_' + str(cutoff) + 'eV'
-                self.success = self.scf(calc_doc, seed)
+                self.success = self.scf(calc_doc, seed, keep=False)
+
+        elif calc_doc['task'].upper() == 'SPECTRAL':
+            # batch run density of states
+            self.success = self.scf(calc_doc, seed, keep=True)
         else:
             # set up geom opt parameters
             self.max_iter = calc_doc['geom_max_iter']
@@ -325,7 +331,7 @@ class FullRelaxer:
                 self.tidy_up(seed)
                 return False
 
-    def scf(self, calc_doc, seed):
+    def scf(self, calc_doc, seed, keep=True):
         """ Perform only the scf calculation without relaxation.  """
         try:
             print_notify('Calculating SCF ' + self.seed)
@@ -340,8 +346,9 @@ class FullRelaxer:
             if not success:
                 self.mv_to_bad(seed)
             else:
-                self.mv_to_completed(seed)
-            self.tidy_up(seed)
+                self.mv_to_completed(seed, keep)
+            if not keep:
+                self.tidy_up(seed)
             return True
         except(SystemExit, KeyboardInterrupt):
             self.mv_to_bad(seed)
@@ -379,11 +386,14 @@ class FullRelaxer:
         system('mv ' + seed + '* bad_castep')
         return
 
-    def mv_to_completed(self, seed):
+    def mv_to_completed(self, seed, keep=False):
         """ Move all associated files to completed. """
         if not exists('completed'):
             makedirs('completed')
-        system('mv ' + seed + '.castep' + ' completed/' + seed + '.castep')
+        if keep:
+            system('mv ' + seed + '*' + ' completed')
+        else:
+            system('mv ' + seed + '.castep' + ' completed/' + seed + '.castep')
         return
 
     def cp_to_input(self, seed):
