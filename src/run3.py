@@ -202,8 +202,11 @@ class FullRelaxer:
             self.conv_cutoff = conv_cutoff
         # read in initial structure
         res_dict, success = res2dict(res, db=False)
+        if not success:
+            exit('Failed to parse res file...')
         calc_doc = res_dict
         # set seed name
+        print(calc_doc['source'])
         self.seed = calc_doc['source'][0].replace('.res', '')
         # update global doc with cell and param dicts for folder
         calc_doc.update(cell_dict)
