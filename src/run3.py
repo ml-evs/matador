@@ -110,6 +110,21 @@ class BatchRun:
                 print_failure('Error with cutoff.conv file.')
         else:
             self.cutoffs = None
+        if self.args.get('conv_kpt'):
+            try:
+                if isfile('kpt.conv'):
+                    with open('kpt.conv', 'r') as f:
+                        flines = f.readlines()
+                        self.kpts = []
+                        for line in flines:
+                            self.kpts.append(float(line))
+                else:
+                    raise RuntimeError
+            except:
+                valid = False
+                print_failure('Error with kpt.conv file.')
+        else:
+            self.kpts = None
         if not valid:
             exit('Exiting...')
         # delete source from cell and param
@@ -173,7 +188,8 @@ class BatchRun:
                                 executable=self.executable,
                                 rough=self.rough,
                                 debug=self.debug,
-                                conv_cutoff=self.cutoffs)
+                                conv_cutoff=self.cutoffs,
+                                conv_kpt=self.kpts)
                     with open(paths['completed_fname'], 'a') as job_file:
                         job_file.write(res+'\n')
                 except(KeyboardInterrupt, SystemExit, RuntimeError):
@@ -188,7 +204,8 @@ class FullRelaxer:
     e.g. 4 lots of 2 then 4 lots of geom_max_iter/4.
     """
     def __init__(self, paths, ncores, nnodes, res, param_dict, cell_dict,
-                 executable='castep', rough=None, debug=False, conv_cutoff=None):
+                 executable='castep', rough=None, debug=False,
+                 conv_cutoff=None, conv_kpt=None):
         """ Make the files to run the calculation and handle
         the calling of CASTEP itself.
         """
@@ -198,16 +215,22 @@ class FullRelaxer:
         self.executable = executable
         self.debug = debug
         self.conv_cutoff_bool = True if conv_cutoff is not None else False
+        self.conv_kpt_bool = True if conv_kpt is not None else False
         if self.conv_cutoff_bool:
             self.conv_cutoff = conv_cutoff
+        if self.conv_kpt_bool:
+            self.conv_kpt = conv_kpt
+
         # read in initial structure
         res_dict, success = res2dict(res, db=False)
         if not success:
             exit('Failed to parse res file...')
         calc_doc = res_dict
+
         # set seed name
         print(calc_doc['source'])
         self.seed = calc_doc['source'][0].replace('.res', '')
+
         # update global doc with cell and param dicts for folder
         calc_doc.update(cell_dict)
         calc_doc.update(param_dict)
@@ -217,6 +240,13 @@ class FullRelaxer:
             for cutoff in self.conv_cutoff:
                 calc_doc.update({'cut_off_energy': cutoff})
                 seed = self.seed + '_' + str(cutoff) + 'eV'
+                self.success = self.scf(calc_doc, seed, keep=False)
+        
+        elif self.conv_kpt_bool:
+            # run series of singlepoints for various cutoffs
+            for kpt in self.conv_kpt:
+                calc_doc.update({'kpoints_mp_spacing': kpt})
+                seed = self.seed + '_' + str(kpt) + 'A'
                 self.success = self.scf(calc_doc, seed, keep=False)
 
         elif calc_doc['task'].upper() == 'SPECTRAL':
@@ -345,21 +375,19 @@ class FullRelaxer:
             process.communicate()
             # scrape dict
             opti_dict, success = castep2dict(seed + '.castep', db=False)
-            print(opti_dict, success)
-            if not success:
-                self.mv_to_bad(seed)
-            else:
-                self.mv_to_completed(seed, keep)
+            self.mv_to_completed(seed, keep)
             if not keep:
                 self.tidy_up(seed)
             return True
         except(SystemExit, KeyboardInterrupt):
             self.mv_to_bad(seed)
-            self.tidy_up(seed)
+            if not keep:
+                self.tidy_up(seed)
             raise SystemExit
         except:
             print_exc()
-            self.mv_to_bad(seed)
+            if not keep:
+                self.mv_to_bad(seed)
             self.tidy_up(seed)
             return False
 
@@ -442,6 +470,8 @@ if __name__ == '__main__':
                         help='debug output')
     parser.add_argument('--conv_cutoff', action='store_true',
                         help='run all res files at cutoff defined in cutoff.conv file')
+    parser.add_argument('--conv_kpt', action='store_true',
+                        help='run all res files at kpoint spacings defined in kpt.conv file')
     parser.add_argument('--rough', type=int,
                         help='choose how many cycles of 2 geometry optimization iterations \
                               to perform, decrease if lattice is nearly correct. [DEFAULT: 4].')
@@ -449,7 +479,7 @@ if __name__ == '__main__':
                         help='limit to n structures per run')
     args = parser.parse_args()
     runner = BatchRun(ncores=args.ncores, nprocesses=args.nprocesses, nnodes=args.nnodes,
-                      debug=args.debug, seed=args.seed, conv_cutoff=args.conv_cutoff,
+                      debug=args.debug, seed=args.seed, conv_cutoff=args.conv_cutoff, conv_kpt=args.conv_kpt,
                       limit=args.limit, executable=args.executable, rough=args.rough)
     try:
         runner.spawn()
