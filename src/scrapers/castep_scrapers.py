@@ -150,7 +150,6 @@ def cell2dict(seed, db=True, **kwargs):
         # add cell file to source
         cell['source'].append(seed+'.cell')
         for line_no, line in enumerate(flines):
-            print(line)
             if line.startswith('#'):
                 continue
             elif '%block species_pot' in line.lower():
