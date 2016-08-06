@@ -222,6 +222,12 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, *args):
                         str(doc['kpoints_mp_grid'][0]) + ' ' +
                         str(doc['kpoints_mp_grid'][1]) + ' ' +
                         str(doc['kpoints_mp_grid'][2]) + '\n')
+            if 'spectral_kpoints_mp_offset' in doc:
+                f.write('SPECTRAL_KPOINTS_MP_OFFSET ' +
+                        str(doc['spectral_kpoints_mp_offset']) + '\n')
+            if 'spectral_kpoints_mp_spacing' in doc:
+                f.write('SPECTRAL_KPOINTS_MP_SPACING ' +
+                        str(doc['spectral_kpoints_mp_spacing']) + '\n')
             if 'cell_constraints' in doc:
                 f.write('\n%BLOCK CELL_CONSTRAINTS\n')
                 f.write((''.join(str(doc['cell_constraints'][0]).strip('[]'))+'\n').replace(',', ''))

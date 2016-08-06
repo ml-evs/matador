@@ -190,10 +190,18 @@ def cell2dict(seed, db=True, **kwargs):
                 for j in range(3):
                     flines[line_no+j+1] = flines[line_no+j+1].replace(',', '')
                     cell['external_pressure'].append(map(float, flines[line_no+j+1].split()))
-            elif 'mp_spacing' in line.lower():
+            elif 'kpoints_mp_spacing' in line.lower() or 'kpoint_mp_spacing' in line.lower():
                 cell['kpoints_mp_spacing'] = float(line.split()[-1])
-            elif 'mp_grid' in line.lower():
+            elif 'kpoints_mp_grid' in line.lower() or 'kpoint_mp_grid' in line.lower():
                 cell['kpoints_mp_grid'] = map(int, line.split()[-3:])
+            elif 'kpoints_mp_offset' in line.lower() or 'kpoint_mp_offset' in line.lower():
+                cell['kpoints_mp_offset'] = map(float, line.split()[-3:])
+            elif 'spectral_kpoints_mp_spacing' in line.lower() or 'spectral_kpoint_mp_spacing' in line.lower():
+                cell['spectral_kpoints_mp_spacing'] = float(line.split()[-1])
+            elif 'spectral_kpoints_mp_grid' in line.lower() or 'spectral_kpoint_mp_grid' in line.lower():
+                cell['spectral_kpoints_mp_grid'] = map(int, line.split()[-3:])
+            elif 'spectral_kpoints_mp_offset' in line.lower() or 'spectral_kpoint_mp_offset' in line.lower():
+                cell['spectral_kpoints_mp_offset'] = map(float, line.split()[-3:])
             if not db:
                 if '%block positions_frac' in line.lower():
                     atomic_init_spins = defaultdict(list)
