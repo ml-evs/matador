@@ -294,6 +294,8 @@ if __name__ == '__main__':
                             help='save pdf rather than showing plot in X')
     plot_flags.add_argument('--png', action='store_true',
                             help='save png rather than showing plot in X')
+    plot_flags.add_argument('--svg', action='store_true',
+                            help='save svg rather than showing plot in X')
     plot_flags.add_argument('--subplot', action='store_true',
                             help='plot combined hull and voltage graph')
     plot_flags.add_argument('--bokeh', action='store_true',

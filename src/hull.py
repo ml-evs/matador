@@ -364,7 +364,7 @@ class QueryConvexHull():
 
     def plot_hull(self, dis=False):
         """ Plot calculated hull. """
-        if self.args.get('pdf') or self.args.get('png'):
+        if self.args.get('pdf') or self.args.get('png') or self.args.get('svg'):
             fig = plt.figure(facecolor=None, figsize=(5, 4))
         else:
             fig = plt.figure(facecolor=None)
@@ -395,14 +395,20 @@ class QueryConvexHull():
         if self.hull_cutoff == 0:
             # if no specified hull cutoff, ignore labels and colour
             # by distance from hull
-            cmap_full = plt.cm.get_cmap('GnBu_r')
+            cmap_full = plt.cm.get_cmap('Dark2')
             cmap = colours.LinearSegmentedColormap.from_list(
-                'trunc({n},{a:.2f},{b:.2f})'.format(n=cmap_full.name, a=0, b=0.9),
-                cmap_full(np.linspace(0, 0.9, 100)))
+                'trunc({n},{a:.2f},{b:.2f})'.format(n=cmap_full.name, a=0, b=1),
+                cmap_full(np.linspace(0.15, 0.4, 100)))
             scatter = ax.scatter(self.structures[:, 0], self.structures[:, 1],
                                  s=self.scale*40, lw=lw, alpha=0.9, c=self.hull_dist,
                                  edgecolor='k', zorder=300, cmap=cmap)
-            cbar = plt.colorbar(scatter, aspect=30, pad=0.02)
+
+            scatter = ax.scatter(self.structures[np.argsort(self.hull_dist), 0][::-1],
+                                 self.structures[np.argsort(self.hull_dist), 1][::-1],
+                                 s=self.scale*40, lw=lw, alpha=1, c=np.sort(self.hull_dist)[::-1],
+                                 edgecolor='k', zorder=10000, cmap=cmap, norm=colours.LogNorm(0.02, 2))
+            cbar = plt.colorbar(scatter, aspect=30, pad=0.02, ticks=[0, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28])
+            cbar.ax.set_yticklabels([0, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28])
             cbar.set_label('Distance from hull (eV)')
         if self.hull_cutoff != 0:
             # if specified hull cutoff, label and colour those below
@@ -440,9 +446,14 @@ class QueryConvexHull():
         ax.set_xlabel('$\mathrm{x}$')
         ax.grid(False)
         ax.set_xticks([0, 0.33, 0.5, 0.66, 1])
+        ax.set_xticklabels(ax.get_xticks())
+        ax.set_yticklabels(ax.get_yticks())
         ax.set_ylabel('E$_\mathrm{F}$ (eV/atom)')
         if self.args.get('pdf'):
             plt.savefig(self.elements[0]+self.elements[1]+'_hull.pdf',
+                        dpi=200, bbox_inches='tight')
+        elif self.args.get('svg'):
+            plt.savefig(self.elements[0]+self.elements[1]+'_hull.svg',
                         dpi=200, bbox_inches='tight')
         elif self.args.get('png'):
             plt.savefig(self.elements[0]+self.elements[1]+'_hull.png',
@@ -553,10 +564,14 @@ class QueryConvexHull():
         ax.grid('off')
         axQ.grid('off')
         axQ.set_xticks(self.Q[1:])
+        axQ.set_xticklabels(ax.get_xticks())
+        axQ.set_yticklabels(ax.get_yticks())
         axQ.set_xlim(0)
         # ax.set_ylim(np.min(np.asarray(self.voltages[2:]))-0.1,
                     # np.max(np.asarray(self.voltages[2:]))+0.1)
         ax.set_xlabel('$\mathrm{x}$ in $\mathrm{'+self.elements[0]+'_x'+self.elements[1]+'}$')
+        ax.set_xticklabels(ax.get_xticks())
+        ax.set_yticklabels(ax.get_yticks())
         if self.args.get('pdf'):
             plt.savefig(self.elements[0]+self.elements[1]+'_voltage.pdf',
                         dpi=300, bbox_inches='tight')
@@ -584,6 +599,10 @@ class QueryConvexHull():
         ax.set_title('$\mathrm{'+self.elements[0]+'_x'+self.elements[1]+'}$')
         ax.set_xlabel('$x$')
         ax.set_ylim(0.9*self.vol_per_y[0])
+        ax.set_xticklabels(ax.get_xticks())
+        ax.set_yticklabels(ax.get_yticks())
+        ax2.set_xticklabels(ax.get_xticks())
+        ax2.set_yticklabels(ax.get_yticks())
         ax2.set_ylim(0.9)
         ax2.grid('off')
         if self.args.get('pdf'):
