@@ -365,7 +365,7 @@ class QueryConvexHull():
     def plot_hull(self, dis=False):
         """ Plot calculated hull. """
         if self.args.get('pdf') or self.args.get('png') or self.args.get('svg'):
-            fig = plt.figure(facecolor=None, figsize=(5, 4))
+            fig = plt.figure(facecolor=None, figsize=(6, 4))
         else:
             fig = plt.figure(facecolor=None)
         ax = fig.add_subplot(111)
@@ -451,7 +451,7 @@ class QueryConvexHull():
         ax.set_ylabel('E$_\mathrm{F}$ (eV/atom)')
         if self.args.get('pdf'):
             plt.savefig(self.elements[0]+self.elements[1]+'_hull.pdf',
-                        dpi=200, bbox_inches='tight')
+                        dpi=400, bbox_inches='tight')
         elif self.args.get('svg'):
             plt.savefig(self.elements[0]+self.elements[1]+'_hull.svg',
                         dpi=200, bbox_inches='tight')
