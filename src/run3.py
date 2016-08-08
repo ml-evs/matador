@@ -249,7 +249,7 @@ class FullRelaxer:
                 seed = self.seed + '_' + str(kpt) + 'A'
                 self.success = self.scf(calc_doc, seed, keep=False)
 
-        elif calc_doc['task'].upper() == 'SPECTRAL':
+        elif calc_doc['task'].upper() in ['SPECTRAL', 'SINGLEPOINT']:
             # batch run density of states
             self.success = self.scf(calc_doc, self.seed, keep=True)
         else:
