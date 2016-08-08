@@ -150,7 +150,7 @@ def cell2dict(seed, db=True, **kwargs):
         # add cell file to source
         cell['source'].append(seed+'.cell')
         for line_no, line in enumerate(flines):
-            if line.startswith('#'):
+            if line.startswith(('#', '!')):
                 continue
             elif '%block species_pot' in line.lower():
                 cell['species_pot'] = dict()
@@ -205,7 +205,7 @@ def cell2dict(seed, db=True, **kwargs):
                     cell['spectral_kpoints_mp_offset'] = map(float, line.split()[-3:])
                 else:
                     cell['kpoints_mp_offset'] = map(float, line.split()[-3:])
-            if not db:
+            elif not db:
                 if '%block positions_frac' in line.lower():
                     atomic_init_spins = defaultdict(list)
                     i = 0
