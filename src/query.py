@@ -11,6 +11,7 @@ from chem_utils import get_periodic_table
 import pymongo as pm
 import numpy as np
 from bson.son import SON
+from bson.json_util import dumps
 # import standard library
 import re
 from os import uname
@@ -183,7 +184,7 @@ class DBQuery:
             for collection in self.collections:
                 self.repo = self.collections[collection]
                 if self.args.get('details'):
-                    print(self.query_dict)
+                    print(dumps(self.query_dict, indent=4))
 
                 # execute query
                 self.cursor = self.repo.find(SON(self.query_dict)).sort('enthalpy_per_atom',
@@ -831,8 +832,8 @@ class DBQuery:
         else:
             temp_dict = dict()
             temp_dict['kpoints_mp_spacing'] = dict()
-            temp_dict['kpoints_mp_spacing']['$gt'] = doc['kpoints_mp_spacing'] - 0.02
-            temp_dict['kpoints_mp_spacing']['$lt'] = doc['kpoints_mp_spacing'] + 0.02
+            temp_dict['kpoints_mp_spacing']['$gt'] = doc['kpoints_mp_spacing'] - 0.01
+            temp_dict['kpoints_mp_spacing']['$lt'] = doc['kpoints_mp_spacing'] + 0.01
             query_dict.append(temp_dict)
             query_dict.append(dict())
             query_dict[-1]['cut_off_energy'] = doc['cut_off_energy']
