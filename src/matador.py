@@ -424,5 +424,8 @@ if __name__ == '__main__':
     if vars(args).get('hull_cutoff') and vars(args).get('hull_temp'):
         print_failure('hull_cutoff and hull_temp both specified, exiting...')
         exit()
+    if vars(args).get('calc_match') and vars(args).get('id') is None:
+        print_failure('calc_match requires specification of a text_id with -i, exiting...')
+        exit()
 
     matador = Matador(args, argstr=argv[1:])

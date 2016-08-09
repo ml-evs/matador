@@ -327,7 +327,7 @@ class DBQuery:
         header_string += "{:^5}".format('!?!')
         header_string += "{:^12}".format('Pressure')
         header_string += "{:^12}".format('Volume/fu')
-        header_string += "{:^18}".format('Enthalpy/atom')
+        header_string += "{:^18}".format('Enthalpy/fu')
         header_string += "{:^12}".format('Space group')
         header_string += "{:^10}".format('Formula')
         header_string += "{:^8}".format('# fu')
