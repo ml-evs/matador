@@ -29,7 +29,7 @@ def abc2cart(lattice_abc):
     if abs(by) < tol:
         by = 0.0
     cx = c*cos(beta)
-    if cx < tol:
+    if abs(cx) < tol:
         cx = 0.0
     cy = c*(cos(alpha)-cos(beta)*cos(gamma))/sin(gamma)
     if abs(cy) < tol:
@@ -37,6 +37,7 @@ def abc2cart(lattice_abc):
     cz = sqrt(c**2 - cx**2 - cy**2)
     lattice_cart.append([bx, by, 0.0])
     lattice_cart.append([cx, cy, cz])
+    assert(cart2abc(lattice_cart) != lattice_abc)
     return lattice_cart
 
 
@@ -64,9 +65,9 @@ def cart2abc(lattice_cart):
     cos_beta = 0
     cos_gamma = 0
     for i in range(3):
-        cos_alpha = vec_b[i] * vec_c[i]
-        cos_beta = vec_c[i] * vec_a[i]
-        cos_gamma = vec_a[i] * vec_b[i]
+        cos_alpha += vec_b[i] * vec_c[i]
+        cos_beta += vec_c[i] * vec_a[i]
+        cos_gamma += vec_a[i] * vec_b[i]
     cos_alpha /= b*c
     cos_beta /= c*a
     cos_gamma /= a*b
