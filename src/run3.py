@@ -43,6 +43,7 @@ class BatchRun:
         self.limit = self.args.get('limit')
         self.executable = self.args.get('executable')
         self.rough = self.args.get('rough')
+        self.spin = self.args.get('spin')
         if self.args.get('executable') is None:
             self.executable = 'castep'
         valid = True
@@ -188,6 +189,7 @@ class BatchRun:
                                 executable=self.executable,
                                 rough=self.rough,
                                 debug=self.debug,
+                                spin=self.spin,
                                 conv_cutoff=self.cutoffs,
                                 conv_kpt=self.kpts)
                     with open(paths['completed_fname'], 'a') as job_file:
@@ -204,7 +206,7 @@ class FullRelaxer:
     e.g. 4 lots of 2 then 4 lots of geom_max_iter/4.
     """
     def __init__(self, paths, ncores, nnodes, res, param_dict, cell_dict,
-                 executable='castep', rough=None, debug=False,
+                 executable='castep', rough=None, debug=False, spin=False,
                  conv_cutoff=None, conv_kpt=None):
         """ Make the files to run the calculation and handle
         the calling of CASTEP itself.
@@ -214,6 +216,7 @@ class FullRelaxer:
         self.nnodes = nnodes
         self.executable = executable
         self.debug = debug
+        self.spin = spin
         self.conv_cutoff_bool = True if conv_cutoff is not None else False
         self.conv_kpt_bool = True if conv_kpt is not None else False
         if self.conv_cutoff_bool:
@@ -294,7 +297,7 @@ class FullRelaxer:
                     remove(seed+'.cell')
                 # write new param and cell
                 doc2param(calc_doc, seed, hash_dupe=False)
-                doc2cell(calc_doc, seed, hash_dupe=False, copy_pspots=False)
+                doc2cell(calc_doc, seed, hash_dupe=False, copy_pspots=False, spin=self.spin)
                 # run CASTEP
                 process = self.castep(seed)
                 process.communicate()
@@ -479,6 +482,8 @@ if __name__ == '__main__':
                         help='run all res files at cutoff defined in cutoff.conv file')
     parser.add_argument('--conv_kpt', action='store_true',
                         help='run all res files at kpoint spacings defined in kpt.conv file')
+    parser.add_argument('--spin', action='store_true',
+                        help='if not specified in .cell file, break spin symmetry on first atom')
     parser.add_argument('--rough', type=int,
                         help='choose how many cycles of 2 geometry optimization iterations \
                               to perform, decrease if lattice is nearly correct. [DEFAULT: 4].')
