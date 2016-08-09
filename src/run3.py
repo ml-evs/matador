@@ -241,7 +241,7 @@ class FullRelaxer:
                 calc_doc.update({'cut_off_energy': cutoff})
                 seed = self.seed + '_' + str(cutoff) + 'eV'
                 self.success = self.scf(calc_doc, seed, keep=False)
-        
+
         elif self.conv_kpt_bool:
             # run series of singlepoints for various cutoffs
             for kpt in self.conv_kpt:
@@ -328,11 +328,11 @@ class FullRelaxer:
                     return True
                 elif ind == len(geom_max_iter_list) - 1:
                     print_warning('Failed to optimise ' + seed)
-                    self.mv_to_bad(seed)
                     # write final res file to bad_castep
                     if isfile(seed+'.res'):
                         remove(seed+'.res')
-                    doc2res(opti_dict, 'bad_castep/' + seed, hash_dupe=False)
+                    doc2res(opti_dict, seed, hash_dupe=False)
+                    self.mv_to_bad(seed)
                     return False
                 err_file = seed + '*001.err'
                 for globbed in glob.glob(err_file):
@@ -341,7 +341,7 @@ class FullRelaxer:
                         # write final res file to bad_castep
                         if isfile(seed+'.res'):
                             remove(seed+'.res')
-                        doc2res(opti_dict, 'bad_castep/' + seed, hash_dupe=False)
+                        doc2res(opti_dict, seed, hash_dupe=False)
                         self.mv_to_bad(seed)
                         return False
 
