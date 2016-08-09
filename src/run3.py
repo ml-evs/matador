@@ -380,9 +380,6 @@ class FullRelaxer:
                 if isfile(globbed):
                     print_warning('Failed to optimise ' + seed + ' CASTEP crashed.')
                     # write final res file to bad_castep
-                    if isfile(seed+'.res'):
-                        remove(seed+'.res')
-                    doc2res(opti_dict, seed, hash_dupe=False)
                     self.mv_to_bad(seed)
                     return False
             self.mv_to_completed(seed, keep)
