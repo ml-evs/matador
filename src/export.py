@@ -159,7 +159,7 @@ def doc2param(doc, path, hash_dupe=True, *args):
         print(oops)
 
 
-def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, *args):
+def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, spin=False, *args):
     """ Write .cell file for single doc.
 
     doc         : the document to write to file
@@ -199,8 +199,13 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, *args):
                             atom[0], atom[1]))
             else:
                 for ind, atom in enumerate(zip(doc['atom_types'], doc['positions_frac'])):
-                    f.write("{0:8s} {1[0]: 15f} {1[1]: 15f} {1[2]: 15f}\n".format(
-                            atom[0], atom[1]))
+                    if ind == 0 and spin:
+                        # if spin is True, break spin symmetry on first atom a la run.pl
+                        f.write("{0:8s} {1[0]: 15f} {1[1]: 15f} {1[2]: 15f SPIN=5}\n".format(
+                                atom[0], atom[1]))
+                    else:
+                        f.write("{0:8s} {1[0]: 15f} {1[1]: 15f} {1[2]: 15f}\n".format(
+                                atom[0], atom[1]))
             f.write('%ENDBLOCK POSITIONS_FRAC\n\n')
             if pressure is not None:
                 f.write('\n%block external_pressure\n'.upper())
