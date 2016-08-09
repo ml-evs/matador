@@ -201,7 +201,7 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, spin=Fa
                 for ind, atom in enumerate(zip(doc['atom_types'], doc['positions_frac'])):
                     if ind == 0 and spin:
                         # if spin is True, break spin symmetry on first atom a la run.pl
-                        f.write("{0:8s} {1[0]: 15f} {1[1]: 15f} {1[2]: 15f SPIN=5}\n".format(
+                        f.write("{0:8s} {1[0]: 15f} {1[1]: 15f} {1[2]: 15f}\tSPIN=5\n".format(
                                 atom[0], atom[1]))
                     else:
                         f.write("{0:8s} {1[0]: 15f} {1[1]: 15f} {1[2]: 15f}\n".format(

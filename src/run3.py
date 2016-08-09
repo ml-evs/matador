@@ -494,7 +494,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     runner = BatchRun(ncores=args.ncores, nprocesses=args.nprocesses, nnodes=args.nnodes,
                       debug=args.debug, seed=args.seed, conv_cutoff=args.conv_cutoff, conv_kpt=args.conv_kpt,
-                      limit=args.limit, executable=args.executable, rough=args.rough)
+                      limit=args.limit, executable=args.executable, rough=args.rough,
+                      spin=args.spin)
     try:
         runner.spawn()
     except(KeyboardInterrupt, SystemExit):
