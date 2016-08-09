@@ -288,6 +288,8 @@ class FullRelaxer:
                 print_notify('Beginning rough geometry optimisation...')
             elif ind == self.num_rough_iter:
                 print_notify('Beginning fine geometry optimisation...')
+            if ind != 0:
+                self.spin = False
             calc_doc['geom_max_iter'] = num_iter
             try:
                 # delete any existing files
