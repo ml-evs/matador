@@ -185,7 +185,7 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, *args):
             f.write('\n%BLOCK LATTICE_CART\n')
             for vec in doc['lattice_cart']:
                 for coeff in vec:
-                    f.write(str(round(coeff, 3)) + ' ')
+                    f.write(str(coeff) + ' ')
                 f.write('\n')
             f.write('%ENDBLOCK LATTICE_CART\n')
             f.write('\n%BLOCK POSITIONS_FRAC\n')
@@ -319,7 +319,7 @@ def doc2res(doc, path, info=True, hash_dupe=True, *args):
             f.write('1.0 ')
             for vec in doc['lattice_abc']:
                 for coeff in vec:
-                    f.write(' ' + str(round(coeff, 3)))
+                    f.write(' ' + str(coeff, 3))
             f.write('\n')
             f.write('LATT -1\n')
             f.write('SFAC \t')
