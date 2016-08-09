@@ -324,7 +324,7 @@ def doc2res(doc, path, info=True, hash_dupe=True, *args):
             f.write('1.0 ')
             for vec in doc['lattice_abc']:
                 for coeff in vec:
-                    f.write(' ' + str(coeff, 3))
+                    f.write(' ' + str(coeff))
             f.write('\n')
             f.write('LATT -1\n')
             f.write('SFAC \t')
@@ -350,8 +350,8 @@ def doc2res(doc, path, info=True, hash_dupe=True, *args):
             f.write('\n')
     except Exception as oops:
         if hash_dupe:
+            print_exc()
             print('Writing res file failed for ', doc['text_id'])
-            print(type(oops), oops)
         else:
             pass
 
