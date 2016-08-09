@@ -377,7 +377,7 @@ class DBQuery:
             except:
                 struct_string[-1] += "{:^12}".format('xxx')
             try:
-                struct_string[-1] += "{:^18.5f}".format(doc['enthalpy_per_atom'] -
+                struct_string[-1] += "{:^18.5f}".format(doc['enthalpy']/doc['num_fu'] -
                                                         self.gs_enthalpy)
             except:
                 struct_string[-1] += "{:^18}".format('xxx')
@@ -415,7 +415,7 @@ class DBQuery:
                 struct_string[-1] += "{:^8}".format('xxx')
 
             if last_formula != formula_substring:
-                self.gs_enthalpy = doc['enthalpy_per_atom']
+                self.gs_enthalpy = doc['enthalpy'] / doc['num_fu']
             last_formula = formula_substring
 
             if details:
