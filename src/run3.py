@@ -375,6 +375,15 @@ class FullRelaxer:
             process.communicate()
             # scrape dict
             opti_dict, success = castep2dict(seed + '.castep', db=False)
+            err_file = seed + '*0001.err'
+            for globbed in glob.glob(err_file):
+                if isfile(globbed):
+                    print_warning('Failed to optimise ' + seed + ' CASTEP crashed.')
+                    # write final res file to bad_castep
+                    if isfile(seed+'.res'):
+                        remove(seed+'.res')
+                    self.mv_to_bad(seed)
+                    return False
             self.mv_to_completed(seed, keep)
             if not keep:
                 self.tidy_up(seed)
