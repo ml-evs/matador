@@ -113,7 +113,7 @@ def plot_both(cutoff_chempots, kpt_chempots,
     import matplotlib.pyplot as plt
     plt.style.use('bmh')
     plt.style.use('article')
-    fig = plt.figure(facecolor='w', figsize=(7, 3))
+    fig = plt.figure(facecolor='w', figsize=(6, 3))
     ax = fig.add_subplot(121, axisbg='w')
     ax2 = fig.add_subplot(122, axisbg='w')
     for key in cutoff_form:
