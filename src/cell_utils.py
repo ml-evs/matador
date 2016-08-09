@@ -37,7 +37,6 @@ def abc2cart(lattice_abc):
     cz = sqrt(c**2 - cx**2 - cy**2)
     lattice_cart.append([bx, by, 0.0])
     lattice_cart.append([cx, cy, cz])
-    assert(cart2abc(lattice_cart) != lattice_abc)
     return lattice_cart
 
 
