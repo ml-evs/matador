@@ -89,7 +89,7 @@ def query2files(cursor, *args):
                     if atom not in comp_list:
                         comp_list.append(atom)
                         comp_string += atom
-                name = comp_string + '-' + name
+                name = comp_string # + '-' + name
             if '.res' in source:
                 name += source.split('/')[-1].split('.')[0]
             elif '.castep' in source:
