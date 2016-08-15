@@ -563,10 +563,12 @@ class QueryConvexHull():
         ax.set_xlim(0, np.max(np.asarray(self.x[1:]))+1)
         ax.grid('off')
         axQ.grid('off')
-        axQ.set_xticks(self.Q[1:])
-        axQ.set_xticklabels(ax.get_xticks())
-        axQ.set_yticklabels(ax.get_yticks())
-        axQ.set_xlim(0)
+        tick_list = list(self.Q[1:])
+        for idx, tick in enumerate(tick_list):
+            tick_list[idx] = int(tick)
+        axQ.set_xticks(tick_list)
+        axQ.set_xticklabels(axQ.get_xticks())
+        # axQ.set_xlim(0)
         # ax.set_ylim(np.min(np.asarray(self.voltages[2:]))-0.1,
                     # np.max(np.asarray(self.voltages[2:]))+0.1)
         ax.set_xlabel('$\mathrm{x}$ in $\mathrm{'+self.elements[0]+'_x'+self.elements[1]+'}$')
