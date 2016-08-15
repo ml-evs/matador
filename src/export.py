@@ -82,17 +82,25 @@ def query2files(cursor, *args):
         # write either cell, res or both
         for source in doc['source']:
             source = str(source)
-            if args['subcmd'] == 'swaps':
-                comp_string = ''
-                comp_list = []
-                for atom in doc['atom_types']:
-                    if atom not in comp_list:
-                        comp_list.append(atom)
-                        comp_string += atom
-                name = comp_string # + '-' + name
             if '.res' in source:
+                if args['subcmd'] == 'swaps':
+                    comp_string = ''
+                    comp_list = []
+                    for atom in doc['atom_types']:
+                        if atom not in comp_list:
+                            comp_list.append(atom)
+                            comp_string += atom
+                    name = comp_string + '-'
                 name += source.split('/')[-1].split('.')[0]
             elif '.castep' in source:
+                if args['subcmd'] == 'swaps':
+                    comp_string = ''
+                    comp_list = []
+                    for atom in doc['atom_types']:
+                        if atom not in comp_list:
+                            comp_list.append(atom)
+                            comp_string += atom
+                    name = comp_string + '-'
                 name += source.split('/')[-1].split('.')[0]
             elif '.history' in source:
                 name += source.split('/')[-1].split('.')[0]
