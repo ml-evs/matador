@@ -16,7 +16,6 @@ from traceback import print_exc
 from os.path import isfile
 # external libraries
 from scipy.optimize import leastsq
-from numpy import zeros_like
 import matplotlib.pyplot as plt
 # diffpy
 from diffpy.srfit.pdf import PDFContribution
@@ -100,6 +99,7 @@ class PDFFitter:
         fit = self.make_recipe(structure, sg)
         try:
             self.regression(fit, structure.title)
+            self.write_to_file(fit, structure.title)
             self.plot_fit(fit, structure)
         except:
             print_exc()
@@ -107,31 +107,38 @@ class PDFFitter:
 
     def plot_fit(self, fit, structure):
         """ Plot results. """
-        fig_name = structure.title + ".png"
+        fig_name = structure.title + ".pdf"
+        plt.style.use('bmh')
+        plt.style.use('article')
         # Plot the observed and refined PDF.
         # Get the experimental data from the recipe
-        r = fit.Contribution.profile.x
-        gobs = fit.Contribution.profile.y
+        r_expt = fit.Contribution.profile.x
+        g_expt = fit.Contribution.profile.y
         # Get the calculated PDF and compute the difference between the calculated and
         # measured PDF
-        gcalc = fit.Contribution.evaluate()
-        baseline = 1.1 * gobs.min()
-        gdiff = gobs - gcalc
-        # Plot!
-        plt.figure(figsize=(5, 5))
-        plt.plot(r, gobs, 'bo', label="G(r) data",
-                 markerfacecolor='none', markeredgecolor='b')
-        plt.plot(r, gcalc, 'r-', label="G(r) fit")
-        plt.plot(r, gdiff + baseline, 'g-', label="G(r) diff")
-        plt.plot(r, zeros_like(r) + baseline, 'k:')
-        plt.xlabel(r"r ($\AA$)")
-        plt.ylabel(r"G ($\AA^{-2}$)")
-        plt.legend()
+        g_calc = fit.Contribution.evaluate()
+        baseline = 1.2 * g_expt.min()
+        g_diff = g_expt - g_calc
+
+        fig = plt.figure(figsize=(4, 4))
+        ax = fig.add_subplot(111)
+        ax.plot(r_expt, g_expt, 'o', label="G(r) expt.",
+                markerfacecolor='none', lw=1)
+        ax.plot(r_expt, g_calc, '-', label="G(r) calc. fit")
+        ax.plot(r_expt, g_diff + baseline, '-', label="G(r) diff")
+        ax.axhline(baseline, ls='--', c='k', lw=1)
+        ax.set_xlabel(r"r ($\mathrm{\AA}$)")
+        ax.set_xticklabels(ax.get_xticks())
+        ax.set_ylabel(r"G(r) ($\mathrm{\AA}^{-2}$)")
+        ax.set_yticklabels(ax.get_yticks())
+        ax.grid('off')
+        ax.legend(loc='upper center', ncol=3, fontsize=12, shadow=True, bbox_to_anchor=(0.5, 1.2))
         plt.savefig(fig_name, bbox_inches='tight', dpi=300)
         return
 
     def make_recipe(self, structure, sg):
         """ Construct PDF with diffpy. """
+
         # construct a PDFContribution object
         pdf = PDFContribution("Contribution")
         # read experimental data
@@ -180,7 +187,6 @@ class PDFFitter:
 
     def regression(self, fit, title):
         """ Apply least squares to the free parameters. """
-
         print('Fitting PDF of', title, 'to expt. data.')
         fit.fithooks[0].verbose = 0
 
@@ -196,6 +202,20 @@ class PDFFitter:
         ContributionResult = FitResults(fit)
         ContributionResult.saveResults(title+'.results')
 
+        return
+
+    def write_to_file(self, fit, title):
+        """ Write final fit to file. """
+        from numpy import savetxt, zeros
+        r_expt = fit.Contribution.profile.x
+        g_expt = fit.Contribution.profile.y
+        g_calc = fit.Contribution.evaluate()
+        fit_data = zeros((3, len(r_expt)))
+        fit_data[0] = r_expt
+        fit_data[1] = g_expt
+        fit_data[2] = g_calc
+        savetxt(title+'.fit', fit_data.T,
+                header='\tr (Angstrom)\t\t\tG_expt(r)\t\t\tG_calc(r)')
         return
 
     def spawn(self):
