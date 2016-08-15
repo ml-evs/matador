@@ -351,9 +351,9 @@ if __name__ == '__main__':
     pdffit_flags.add_argument('-file', '--file', type=str,
                               help='experimental input file to fit structures to.')
     pdffit_flags.add_argument('-min', '--xmin', type=float,
-                              help='minimum value to compute the PDF')
+                              help='minimum value to compute the PDF (DEFAULT: 1 Angstrom)')
     pdffit_flags.add_argument('-max', '--xmax', type=float,
-                              help='maximum value to compute the PDF')
+                              help='maximum value to compute the PDF (DEFAULT: 50 Angstrom')
     pdffit_flags.add_argument('-dx', '--dx', type=float,
                               help='spacing to compute PDF at')
     pdffit_flags.add_argument('-2', '--two_phase', type=float,
