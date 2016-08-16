@@ -292,7 +292,7 @@ def param2dict(seed, db=True, **kwargs):
                       'write_cell_structure', 'bs_write_eigenvalues',
                       'calculate_stress', 'opt_strategy', 'max_scf_cycles']
         false_str = ['False', 'false', '0']
-        splitters = [':', '=', ' ']
+        splitters = [':', '=', '\t', ' ']
         for line_no, line in enumerate(flines):
             line = line.lower()
             # skip blank lines and comments
