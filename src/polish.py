@@ -215,29 +215,27 @@ class Polisher:
         """ Swap atomic species according to parsed
         options.
         """
-        docs = [source_doc]
-
+        doc = source_doc
+        new_doc = deepcopy(doc)
+        swapped_docs = []
+        swapped = False
         # iterate over sets of swaps
         for swap_pair in self.swap_pairs:
-            # iterate over all structures including those already swapped
-            for doc in docs:
-                tmp_docs = []
-                # for each atom to be swapped
-                for swap_atom in swap_pair[0]:
-                    # if structure contains an atom to be swapped
-                    if swap_atom in doc['atom_types']:
-                        # iterate over new atoms and swap
-                        for new_atom in swap_pair[1]:
-                            # don't swap structure to itself
-                            if new_atom != swap_atom:
-                                new_doc = deepcopy(doc)
-                                # iterate over structure and swap all to new atom
-                                for ind, source_atom in enumerate(doc['atom_types']):
-                                    if source_atom == swap_atom:
-                                        new_doc['atom_types'][ind] = new_atom
-                                # add to list of all structures post-swapping
-                                tmp_docs.append(new_doc)
-            docs.extend(tmp_docs)
-        # delete source structure from list
-        del docs[0]
-        return docs, len(docs)
+            print(swap_pair)
+            # for each atom to be swapped
+            for swap_atom in swap_pair[0]:
+                # if structure contains an atom to be swapped
+                if swap_atom in new_doc['atom_types']:
+                    # iterate over new atoms and swap
+                    for new_atom in swap_pair[1]:
+                        # don't swap structure to itself
+                        if new_atom != swap_atom:
+                            # iterate over structure and swap all to new atom
+                            for ind, source_atom in enumerate(new_doc['atom_types']):
+                                if source_atom == swap_atom:
+                                    new_doc['atom_types'][ind] = new_atom
+                                    swapped = True
+        if swapped:
+            # add to list of all structures post-swapping
+            swapped_docs.append(new_doc)
+        return swapped_docs, len(swapped_docs)
