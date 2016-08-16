@@ -91,7 +91,7 @@ class BatchRun:
         self.param_dict, param_success = param2dict(self.seed + '.param', db=False)
         if not param_success:
             valid = False
-            print_failure('Failed to parse cell file')
+            print_failure('Failed to parse param file')
         if 'geom_max_iter' in self.param_dict and int(self.param_dict['geom_max_iter']) < 20:
             valid = False
             print_failure('geom_max_iter is only ' +
