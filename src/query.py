@@ -70,7 +70,10 @@ class DBQuery:
         # define some periodic table macros
         self.periodic_table = get_periodic_table()
 
+        # create the dictionary to pass to MongoDB
         self.construct_query()
+
+        # execute the query
         self.perform_query()
 
     def construct_query(self):
@@ -313,7 +316,7 @@ class DBQuery:
         except:
             pass
 
-    def display_results(self, cursor):
+    def display_results(self, cursor, hull=False):
         """ Print query results in a cryan-like fashion. """
         details = self.args.get('details')
         struct_string = []
@@ -327,7 +330,10 @@ class DBQuery:
         header_string += "{:^5}".format('!?!')
         header_string += "{:^12}".format('Pressure')
         header_string += "{:^12}".format('Volume/fu')
-        header_string += "{:^18}".format('Enthalpy/fu')
+        if hull:
+            header_string += "{:^18}".format('Hull dist./atom')
+        else:
+            header_string += "{:^18}".format('Enthalpy/fu')
         header_string += "{:^12}".format('Space group')
         header_string += "{:^10}".format('Formula')
         header_string += "{:^8}".format('# fu')
@@ -358,8 +364,12 @@ class DBQuery:
             if last_formula != formula_substring:
                 self.gs_enthalpy = 0.0
             formula_string.append(formula_substring)
-            struct_string.append(
-                "{:^24}".format(doc['text_id'][0]+' '+doc['text_id'][1]))
+            if hull and doc['hull_distance'] == 0.0:
+                struct_string.append(
+                    '* ' + "{:^22}".format(doc['text_id'][0]+' '+doc['text_id'][1]))
+            else:
+                struct_string.append(
+                    "{:^24}".format(doc['text_id'][0]+' '+doc['text_id'][1]))
 
             try:
                 if doc['quality'] == 0:
@@ -377,8 +387,11 @@ class DBQuery:
             except:
                 struct_string[-1] += "{:^12}".format('xxx')
             try:
-                struct_string[-1] += "{:^18.5f}".format(doc['enthalpy']/doc['num_fu'] -
-                                                        self.gs_enthalpy)
+                if hull:
+                    struct_string[-1] += "{:^18.5f}".format(doc['hull_distance'])
+                else:
+                    struct_string[-1] += "{:^18.5f}".format(doc['enthalpy']/doc['num_fu'] -
+                                                            self.gs_enthalpy)
             except:
                 struct_string[-1] += "{:^18}".format('xxx')
             try:

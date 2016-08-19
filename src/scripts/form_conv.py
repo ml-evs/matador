@@ -117,18 +117,18 @@ def plot_both(cutoff_chempots, kpt_chempots,
     ax = fig.add_subplot(121, axisbg='w')
     ax2 = fig.add_subplot(122, axisbg='w')
     for key in cutoff_form:
-        ax.plot(cutoff_form[key][:, 0], np.abs(cutoff_form[key][:, 1]-cutoff_form[key][-1, 1])*1000,
+        ax.plot(-1/cutoff_form[key][:, 0], np.abs(cutoff_form[key][:, 1]-cutoff_form[key][-1, 1])*1000,
                 'o-', markersize=5, alpha=1, label=cutoff_stoich_list[key], lw=1, zorder=1000)
     for key in cutoff_chempots:
-        ax.plot(cutoff_chempots[key][:, 0], np.abs(cutoff_chempots[key][:, 1]-cutoff_chempots[key][-1, 1])*1000, 'o-', markersize=5, alpha=1, label=cutoff_chempot_list[key], lw=1)
+        ax.plot(-1/cutoff_chempots[key][:, 0], np.abs(cutoff_chempots[key][:, 1]-cutoff_chempots[key][-1, 1])*1000, 'o-', markersize=5, alpha=1, label=cutoff_chempot_list[key], lw=1)
     ax.set_ylabel('Relative energy difference (meV/atom)')
     ax.set_xlabel('Energy cutoff (eV)')
-    ax.set_xlim(200, 900)
-    ax.set_xticks([200, 300, 400, 500, 600, 700, 800, 900])
+    ax.set_xlim(-1/300.0, 0)
+    ax.set_xticks([-1/300.0, -1/500.0, -1/900.0])
     ax.legend(loc='upper center', fontsize=10, ncol=4, shadow=True, bbox_to_anchor=(1.0, 1.25))
     ax.set_ylim(-0.002e3, 0.03e3)
+    ax.set_xticklabels(['300', '500', '700', '900'])
     ax.set_yticklabels(ax.get_yticks())
-    ax.set_xticklabels(ax.get_xticks())
     ax.grid('off')
 
     for key in kpt_form:
@@ -146,12 +146,12 @@ def plot_both(cutoff_chempots, kpt_chempots,
 
     subax = plt.axes([.3, .50, .16, .36], axisbg='w')
     for key in cutoff_form:
-        subax.plot(cutoff_form[key][:, 0], np.abs(cutoff_form[key][:, 1]-cutoff_form[key][-1, 1])*1000,
+        subax.plot(1/cutoff_form[key][:, 0], np.abs(cutoff_form[key][:, 1]-cutoff_form[key][-1, 1])*1000,
                    'o-', markersize=5, alpha=1, label=cutoff_stoich_list[key], lw=1, zorder=1000)
     for key in cutoff_chempots:
-        subax.plot(cutoff_chempots[key][:, 0], np.abs(cutoff_chempots[key][:, 1]-cutoff_chempots[key][-1, 1])*1000, 'o-', markersize=5, alpha=1, label=cutoff_chempot_list[key], lw=1)
+        subax.plot(1/cutoff_chempots[key][:, 0], np.abs(cutoff_chempots[key][:, 1]-cutoff_chempots[key][-1, 1])*1000, 'o-', markersize=5, alpha=1, label=cutoff_chempot_list[key], lw=1)
     subax.set_ylim(-0.0001e3, 0.0005e3)
-    subax.set_xlim(500, 850)
+    subax.set_xlim(500, 800)
     subax.set_xticks([500, 600, 700, 800])
     subax.set_yticks([0, 0.00025e3, 0.0005e3])
     subax.set_xticklabels(subax.get_xticks())

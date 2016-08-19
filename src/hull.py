@@ -59,7 +59,7 @@ class QueryConvexHull():
                              str(self.hull_cutoff) +
                              ' eV of the hull with chosen chemical potentials.')
 
-        self.query.display_results(self.hull_cursor)
+        self.query.display_results(self.hull_cursor, hull=True)
 
         if self.args['subcmd'] == 'voltage':
             print('Generating voltage curve...')
@@ -260,12 +260,12 @@ class QueryConvexHull():
                     stable_vol.append(volume[ind])
         # create hull_cursor to pass to other modules
         # skip last and first as they are chem pots
-        self.match[0]['enthalpy_per_atom'] = 0.0
-        self.match[1]['enthalpy_per_atom'] = 0.0
+        self.match[0]['hull_distance'] = 0.0
+        self.match[1]['hull_distance'] = 0.0
         hull_cursor.append(self.match[1])
         for ind in range(1, len(hull_dist)-1):
             if hull_dist[ind] <= self.hull_cutoff+1e-12:
-                self.cursor[ind-1]['enthalpy_per_atom'] = hull_dist[ind]
+                self.cursor[ind-1]['hull_distance'] = hull_dist[ind]
                 # take ind-1 to ignore first chem pot
                 hull_cursor.append(self.cursor[ind-1])
         hull_cursor.append(self.match[0])
@@ -326,6 +326,7 @@ class QueryConvexHull():
         stable_num = []
         V = []
         x = []
+        print(stable_comp)
         for i in range(len(stable_comp)):
             if 1-stable_comp[i] == 0:
                 stable_num.append(1e5)
