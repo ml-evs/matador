@@ -326,7 +326,6 @@ class QueryConvexHull():
         stable_num = []
         V = []
         x = []
-        print(stable_comp)
         for i in range(len(stable_comp)):
             if 1-stable_comp[i] == 0:
                 stable_num.append(1e5)
@@ -532,11 +531,11 @@ class QueryConvexHull():
     def plot_voltage_curve(self):
         """ Plot calculated voltage curve. """
         if self.args.get('pdf') or self.args.get('png'):
-            fig = plt.figure(facecolor=None, figsize=(3, 1.5))
+            fig = plt.figure(facecolor=None, figsize=(3, 2))
         else:
             fig = plt.figure(facecolor=None)
-        ax = fig.add_subplot(111)
-        axQ = ax.twiny()
+        axQ = fig.add_subplot(111)
+        # axQ = ax.twiny()
         if self.args.get('expt') is not None:
             try:
                 expt_data = np.loadtxt(self.args.get('expt'), delimiter=',')
@@ -545,39 +544,52 @@ class QueryConvexHull():
                 print_exc()
                 pass
         for i in range(2, len(self.voltages)):
-            ax.plot([self.x[i], self.x[i]], [self.voltages[i], self.voltages[i-1]],
-                    lw=2, c=self.colours[0])
-            ax.plot([self.x[i-1], self.x[i]], [self.voltages[i-1], self.voltages[i-1]],
-                    lw=2, c=self.colours[0])
+            # ax.plot([self.x[i], self.x[i]], [self.voltages[i], self.voltages[i-1]],
+                    # lw=2, c=self.colours[0])
+            # ax.plot([self.x[i-1], self.x[i]], [self.voltages[i-1], self.voltages[i-1]],
+                    # lw=2, c=self.colours[0])
             axQ.plot([self.Q[i], self.Q[i]], [self.voltages[i], self.voltages[i-1]],
-                     lw=2, c=self.colours[0], alpha=0)
+                     lw=2, c=self.colours[0])
             axQ.plot([self.Q[i-1], self.Q[i]], [self.voltages[i-1], self.voltages[i-1]],
-                     lw=2, c=self.colours[0], alpha=0)
-            ax.annotate(('Li$_\mathrm{' + str(self.x[i-1]) + '}$As'),
-                        xy=(self.x[i-1], self.voltages[i]),
+                     lw=2, c=self.colours[0])
+            if abs(np.ceil(self.x[i-1])-self.x[i-1]) > 1e-8:
+                string_stoich = str(round(self.x[i-1], 1))
+            else:
+                string_stoich = str(int(np.ceil(self.x[i-1])))
+                if string_stoich is '1':
+                    string_stoich = ''
+            axQ.annotate(('Li$_\mathrm{' + string_stoich + '}$As'),
+                        xy=(self.Q[i-1], self.voltages[i]),
                         textcoords='data',
                         ha='center',
-                        xytext=(self.x[i-1]-0.05, 0.01+self.voltages[i-1]))
-        ax.set_ylabel('Voltage (V)')
-        axQ.set_xlabel('Gravimetric capacity (mAh/g)')
-        plt.locator_params(nbins=4)
-        ax.set_xlim(0, np.max(np.asarray(self.x[1:]))+1)
-        ax.grid('off')
+                        xytext=(self.Q[i-1]-0.01, 0.001+self.voltages[i-1]))
+        axQ.set_ylabel('Voltage (V)')
+        axQ.set_xlabel('Gravimetric cap. (mAh/g)')
+        axQ.set_ylim(0.89, 1.01)
+        start, end = axQ.get_ylim()
+        axQ.yaxis.set_ticks(np.arange(start+0.01, end, 0.05))
+        # plt.locator_params(nbins=4)
+        # axQ.set_xlim(0, np.max(np.asarray(self.x[1:]))+1)
+        # ax.grid('off')
         axQ.grid('off')
-        tick_list = list(self.Q[1:])
-        for idx, tick in enumerate(tick_list):
-            tick_list[idx] = int(tick)
-        axQ.set_xticks(tick_list)
+        # tick_list = list(self.Q[1:])
+        # for idx, tick in enumerate(tick_list):
+            # tick_list[idx] = int(tick)
+        start, end = axQ.get_xlim()
+        axQ.xaxis.set_ticks(np.arange(start, end, 300))
+        # axQ.set_xticks(tick_list)
         axQ.set_xticklabels(axQ.get_xticks())
+        axQ.set_yticklabels(axQ.get_yticks())
         # axQ.set_xlim(0)
         # ax.set_ylim(np.min(np.asarray(self.voltages[2:]))-0.1,
                     # np.max(np.asarray(self.voltages[2:]))+0.1)
-        ax.set_xlabel('$\mathrm{x}$ in $\mathrm{'+self.elements[0]+'_x'+self.elements[1]+'}$')
-        ax.set_xticklabels(ax.get_xticks())
-        ax.set_yticklabels(ax.get_yticks())
+        # axQ.set_xlabel('$\mathrm{x}$ in $\mathrm{'+self.elements[0]+'_x'+self.elements[1]+'}$')
+        # ax.set_xticklabels(ax.get_xticks())
+        plt.tight_layout(pad=0.0, h_pad=1.0, w_pad=0.2)
+        # ax.set_yticklabels(ax.get_yticks())
         if self.args.get('pdf'):
             plt.savefig(self.elements[0]+self.elements[1]+'_voltage.pdf',
-                        dpi=300, bbox_inches='tight')
+                        dpi=300)
         elif self.args.get('png'):
             plt.savefig(self.elements[0]+self.elements[1]+'_voltage.png',
                         dpi=300, bbox_inches='tight')
@@ -587,30 +599,36 @@ class QueryConvexHull():
     def plot_volume_curve(self):
         """ Plot calculate volume curve. """
         if self.args.get('pdf') or self.args.get('png'):
-            fig = plt.figure(facecolor=None, figsize=(3, 1.5))
+            fig = plt.figure(facecolor=None, figsize=(2.7, 2))
         else:
             fig = plt.figure(facecolor=None)
         ax = fig.add_subplot(111)
-        ax.scatter(self.x, self.vol_per_y, marker='*', s=100, edgecolor='k',
-                   c=self.colours[0], zorder=1000)
+        ax.scatter(self.x, self.vol_per_y, marker='o', s=40, edgecolor='k', lw=1.5,
+                   c=self.colours[1], zorder=1000)
         ax2 = ax.twinx()
         ax2.scatter(self.x, self.vol_per_y/self.vol_per_y[0], alpha=0)
-        ax.plot(self.x, self.vol_per_y, marker='*', lw=2,
+        ax.plot(self.x, self.vol_per_y, marker='o', lw=2,
                 c=self.colours[0], zorder=100)
-        ax.set_ylabel('Volume per ' + self.elements[1] + ' atom ($\AA^3$)')
-        ax2.set_ylabel('Volume ratio with to bulk ' + self.elements[1])
-        ax.set_title('$\mathrm{'+self.elements[0]+'_x'+self.elements[1]+'}$')
-        ax.set_xlabel('$x$')
-        ax.set_ylim(0.9*self.vol_per_y[0])
+        # ax.set_ylabel('Volume per ' + self.elements[1] + ' atom ($\AA^3$)')
+        ax.set_xlabel('$\mathrm{x}$ in $\mathrm{'+self.elements[0]+'_x'+self.elements[1]+'}$')
+        ax2.set_ylabel('Volume ratio with bulk')
+        # ax.set_title('$\mathrm{'+self.elements[0]+'_x'+self.elements[1]+'}$')
+        start, end = ax.get_xlim()
+        ax.xaxis.set_ticks(range(0, int(end)+1, 1))
+        start, end = ax2.get_ylim()
+        ax2.yaxis.set_ticks(range(1, int(end)+1, 1))
+        ax.set_yticks([])
         ax.set_xticklabels(ax.get_xticks())
         ax.set_yticklabels(ax.get_yticks())
-        ax2.set_xticklabels(ax.get_xticks())
-        ax2.set_yticklabels(ax.get_yticks())
-        ax2.set_ylim(0.9)
+        ax2.set_xticklabels(ax2.get_xticks())
+        ax2.set_yticklabels(ax2.get_yticks())
+        ax2.set_ylim(0.9, 3.1)
         ax2.grid('off')
+        ax.grid('off')
+        plt.tight_layout(pad=0.0, h_pad=1.0, w_pad=0.2)
         if self.args.get('pdf'):
             plt.savefig(self.elements[0]+self.elements[1]+'_volume.pdf',
-                        dpi=300, bbox_inches='tight')
+                        dpi=300)
         elif self.args.get('png'):
             plt.savefig(self.elements[0]+self.elements[1]+'_volume.png',
                         dpi=300, bbox_inches='tight')
