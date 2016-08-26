@@ -98,12 +98,16 @@ class QueryConvexHull():
             self.mu_enthalpy[0] = self.chem_pots[0]
             self.match[0] = dict()
             self.match[0]['enthalpy_per_atom'] = self.mu_enthalpy[0]
+            self.match[0]['enthalpy'] = self.mu_enthalpy[0]
+            self.match[0]['num_fu'] = 1
             self.match[0]['text_id'] = ['command', 'line']
             self.match[0]['stoichiometry'] = [[self.elements[0], 1]]
             self.match[0]['space_group'] = 'xxx'
             self.mu_enthalpy[1] = self.chem_pots[1]
             self.match[1] = dict()
             self.match[1]['enthalpy_per_atom'] = self.mu_enthalpy[1]
+            self.match[1]['enthalpy'] = self.mu_enthalpy[1]
+            self.match[1]['num_fu'] = 1
             self.match[1]['text_id'] = ['command', 'line']
             self.match[1]['text_id'] = ['command', 'line']
             self.match[1]['stoichiometry'] = [[self.elements[1], 1]]
@@ -248,6 +252,7 @@ class QueryConvexHull():
         stable_enthalpy_per_b = list(hull_enthalpy)
         stable_comp = list(hull_comp)
         stable_vol = list(hull_volume)
+        stable_hull_dist = len(hull_energy)*[0]
         for ind in range(len(structures)):
             if hull_dist[ind] <= self.hull_cutoff:
                 # recolour if under cutoff
@@ -258,6 +263,7 @@ class QueryConvexHull():
                     stable_enthalpy_per_b.append(enthalpy[ind])
                     stable_comp.append(structures[ind, 0])
                     stable_vol.append(volume[ind])
+                    stable_hull_dist.append(hull_dist[ind])
         # create hull_cursor to pass to other modules
         # skip last and first as they are chem pots
         self.match[0]['hull_distance'] = 0.0
@@ -302,9 +308,11 @@ class QueryConvexHull():
 
         stable_energy = np.asarray(stable_energy)
         stable_comp = np.asarray(stable_comp)
+        stable_hull_dist = np.asarray(stable_hull_dist)
         stable_enthalpy_per_b = np.asarray(stable_enthalpy_per_b)
         stable_vol = np.asarray(stable_vol)
         stable_energy = stable_energy[np.argsort(stable_comp)]
+        stable_hull_dist = stable_hull_dist[np.argsort(stable_comp)]
         stable_enthalpy_per_b = stable_enthalpy_per_b[np.argsort(stable_comp)]
         stable_vol = stable_vol[np.argsort(stable_comp)]
         stable_comp = stable_comp[np.argsort(stable_comp)]
@@ -315,6 +323,7 @@ class QueryConvexHull():
         self.source_ind = source_ind
         self.hull_cursor = hull_cursor
         self.hull_dist = hull_dist
+        self.stable_hull_dist = stable_hull_dist
         self.hull_comp = hull_comp
         self.hull_energy = hull_energy
         self.stable_enthalpy_per_b = stable_enthalpy_per_b
@@ -365,7 +374,7 @@ class QueryConvexHull():
     def plot_hull(self, dis=False):
         """ Plot calculated hull. """
         if self.args.get('pdf') or self.args.get('png') or self.args.get('svg'):
-            fig = plt.figure(facecolor=None, figsize=(6, 4))
+            fig = plt.figure(facecolor=None, figsize=(5, 4))
         else:
             fig = plt.figure(facecolor=None)
         ax = fig.add_subplot(111)
@@ -531,7 +540,7 @@ class QueryConvexHull():
     def plot_voltage_curve(self):
         """ Plot calculated voltage curve. """
         if self.args.get('pdf') or self.args.get('png'):
-            fig = plt.figure(facecolor=None, figsize=(3, 2))
+            fig = plt.figure(facecolor=None, figsize=(3, 2.7))
         else:
             fig = plt.figure(facecolor=None)
         axQ = fig.add_subplot(111)
@@ -558,16 +567,16 @@ class QueryConvexHull():
                 string_stoich = str(int(np.ceil(self.x[i-1])))
                 if string_stoich is '1':
                     string_stoich = ''
-            axQ.annotate(('Li$_\mathrm{' + string_stoich + '}$As'),
-                        xy=(self.Q[i-1], self.voltages[i]),
-                        textcoords='data',
-                        ha='center',
-                        xytext=(self.Q[i-1]-0.01, 0.001+self.voltages[i-1]))
+            # axQ.annotate(('Li$_\mathrm{' + string_stoich + '}$As'),
+                        # xy=(self.Q[i-1], self.voltages[i]),
+                        # textcoords='data',
+                        # ha='center',
+                        # xytext=(self.Q[i-1]-0.01, 0.001+self.voltages[i-1]))
         axQ.set_ylabel('Voltage (V)')
         axQ.set_xlabel('Gravimetric cap. (mAh/g)')
-        axQ.set_ylim(0.89, 1.01)
+        # axQ.set_ylim(0.89, 1.01)
         start, end = axQ.get_ylim()
-        axQ.yaxis.set_ticks(np.arange(start+0.01, end, 0.05))
+        # axQ.yaxis.set_ticks(np.arange(start+0.01, end, 0.05))
         # plt.locator_params(nbins=4)
         # axQ.set_xlim(0, np.max(np.asarray(self.x[1:]))+1)
         # ax.grid('off')
@@ -575,11 +584,11 @@ class QueryConvexHull():
         # tick_list = list(self.Q[1:])
         # for idx, tick in enumerate(tick_list):
             # tick_list[idx] = int(tick)
-        start, end = axQ.get_xlim()
-        axQ.xaxis.set_ticks(np.arange(start, end, 300))
+        # start, end = axQ.get_xlim()
+        # axQ.xaxis.set_ticks(np.arange(start, end, 300))
         # axQ.set_xticks(tick_list)
-        axQ.set_xticklabels(axQ.get_xticks())
-        axQ.set_yticklabels(axQ.get_yticks())
+        # axQ.set_xticklabels(axQ.get_xticks())
+        # axQ.set_yticklabels(axQ.get_yticks())
         # axQ.set_xlim(0)
         # ax.set_ylim(np.min(np.asarray(self.voltages[2:]))-0.1,
                     # np.max(np.asarray(self.voltages[2:]))+0.1)
@@ -599,31 +608,38 @@ class QueryConvexHull():
     def plot_volume_curve(self):
         """ Plot calculate volume curve. """
         if self.args.get('pdf') or self.args.get('png'):
-            fig = plt.figure(facecolor=None, figsize=(2.7, 2))
+            fig = plt.figure(facecolor=None, figsize=(2.7, 2.7))
         else:
             fig = plt.figure(facecolor=None)
         ax = fig.add_subplot(111)
-        ax.scatter(self.x, self.vol_per_y, marker='o', s=40, edgecolor='k', lw=1.5,
-                   c=self.colours[1], zorder=1000)
-        ax2 = ax.twinx()
-        ax2.scatter(self.x, self.vol_per_y/self.vol_per_y[0], alpha=0)
-        ax.plot(self.x, self.vol_per_y, marker='o', lw=2,
+        hull_vols = []
+        hull_comps = []
+        for i in range(len(self.vol_per_y)):
+            if self.stable_hull_dist[i] <= 0:
+                hull_vols.append(self.vol_per_y[i])
+                hull_comps.append(self.x[i])
+                ax.scatter(self.x[i], self.vol_per_y[i]/self.vol_per_y[0], marker='o', s=40, edgecolor='k', lw=1.5,
+                           c=self.colours[1], zorder=1000)
+            else:
+                ax.scatter(self.x[i], self.vol_per_y[i]/self.vol_per_y[0], marker='o', s=30, edgecolor=None, lw=0,
+                           c=self.colours[-2], zorder=100, alpha=0.7)
+        hull_comps, hull_vols = np.asarray(hull_comps), np.asarray(hull_vols)
+        ax.plot(hull_comps, hull_vols/self.vol_per_y[0], marker='o', lw=2,
                 c=self.colours[0], zorder=100)
         # ax.set_ylabel('Volume per ' + self.elements[1] + ' atom ($\AA^3$)')
         ax.set_xlabel('$\mathrm{x}$ in $\mathrm{'+self.elements[0]+'_x'+self.elements[1]+'}$')
-        ax2.set_ylabel('Volume ratio with bulk')
+        ax.set_ylabel('Volume ratio with bulk')
         # ax.set_title('$\mathrm{'+self.elements[0]+'_x'+self.elements[1]+'}$')
         start, end = ax.get_xlim()
         ax.xaxis.set_ticks(range(0, int(end)+1, 1))
-        start, end = ax2.get_ylim()
-        ax2.yaxis.set_ticks(range(1, int(end)+1, 1))
-        ax.set_yticks([])
+        start, end = ax.get_ylim()
+        ax.yaxis.set_ticks(range(1, int(end)+1, 1))
+        ax.yaxis.tick_right()
+        # ax.yaxis.set_ticks_position('right')
+        ax.yaxis.set_label_position('right')
         ax.set_xticklabels(ax.get_xticks())
         ax.set_yticklabels(ax.get_yticks())
-        ax2.set_xticklabels(ax2.get_xticks())
-        ax2.set_yticklabels(ax2.get_yticks())
-        ax2.set_ylim(0.9, 3.1)
-        ax2.grid('off')
+        # ax.set_ylim(0.9, 3.1)
         ax.grid('off')
         plt.tight_layout(pad=0.0, h_pad=1.0, w_pad=0.2)
         if self.args.get('pdf'):
