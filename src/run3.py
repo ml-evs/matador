@@ -321,6 +321,7 @@ class FullRelaxer:
                     self.rerun = True
                     if isfile(seed+'.res'):
                         remove(seed+'.res')
+                    doc2res(opti_dict, seed, hash_dupe=False)
                 elif self.rerun and opti_dict['optimised']:
                     print_success('Successfully relaxed ' + seed)
                     # write res and castep file out to completed folder
@@ -437,6 +438,7 @@ class FullRelaxer:
             system('mv ' + seed + '*' + ' completed')
         else:
             system('mv ' + seed + '.castep' + ' completed/' + seed + '.castep')
+            system('mv ' + seed + '.res' + ' completed/' + seed + '.res')
         return
 
     def cp_to_input(self, seed):
