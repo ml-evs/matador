@@ -212,7 +212,7 @@ class Matador:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
-        prog='MATADor',
+        prog='matador',
         description='MATerial and Atomic Database Of Refined structures.',
         epilog='Written by Matthew Evans (2016).')
 
