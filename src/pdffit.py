@@ -120,7 +120,7 @@ class PDFFitter:
         baseline = 1.2 * g_expt.min()
         g_diff = g_expt - g_calc
 
-        fig = plt.figure(figsize=(4, 4))
+        fig = plt.figure(figsize=(5, 3))
         ax = fig.add_subplot(111)
         ax.plot(r_expt, g_expt, 'o', label="G(r) expt.",
                 markerfacecolor='none', lw=1)

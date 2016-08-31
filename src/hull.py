@@ -621,13 +621,13 @@ class QueryConvexHull():
                 ax.scatter(self.x[i], self.vol_per_y[i]/self.vol_per_y[0], marker='o', s=40, edgecolor='k', lw=1.5,
                            c=self.colours[1], zorder=1000)
             else:
-                ax.scatter(self.x[i], self.vol_per_y[i]/self.vol_per_y[0], marker='o', s=30, edgecolor=None, lw=0,
-                           c=self.colours[-2], zorder=100, alpha=0.7)
+                ax.scatter(self.x[i], self.vol_per_y[i]/self.vol_per_y[0], marker='o', s=30, edgecolor='k', lw=0,
+                           c=self.colours[1], zorder=900, alpha=1)
         hull_comps, hull_vols = np.asarray(hull_comps), np.asarray(hull_vols)
-        ax.plot(hull_comps, hull_vols/self.vol_per_y[0], marker='o', lw=2,
+        ax.plot(hull_comps, hull_vols/self.vol_per_y[0], marker='o', lw=4,
                 c=self.colours[0], zorder=100)
         # ax.set_ylabel('Volume per ' + self.elements[1] + ' atom ($\AA^3$)')
-        ax.set_xlabel('$\mathrm{x}$ in $\mathrm{'+self.elements[0]+'_x'+self.elements[1]+'}$')
+        ax.set_xlabel('$\mathrm{u}$ in $\mathrm{'+self.elements[0]+'_u'+self.elements[1]+'}$')
         ax.set_ylabel('Volume ratio with bulk')
         # ax.set_title('$\mathrm{'+self.elements[0]+'_x'+self.elements[1]+'}$')
         start, end = ax.get_xlim()
