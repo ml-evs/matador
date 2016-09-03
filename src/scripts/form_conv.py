@@ -21,7 +21,7 @@ def get_files(path):
                     source = castep_dict['source'][0].split('/')[-1]
                     source = source.replace('.castep', '')
                     source = ''.join(source.split('_')[:-1])
-                    # print(source)
+                    print(source)
                     structure_files[source].append(castep_dict)
     chdir('..')
     return structure_files
@@ -141,7 +141,6 @@ def plot_both(cutoff_chempots, kpt_chempots,
     ax2.set_xlim(-0.075, -0.02)
     ax2.set_yticklabels(ax2.get_yticks())
     ax2.set_xticklabels([0.03, 0.04, 0.05, 0.06, 0.07])
-    # ax2.set_ylabel('Relative energy difference (meV)')
     ax2.grid('off')
 
     subax = plt.axes([.3, .50, .16, .36], axisbg='w')

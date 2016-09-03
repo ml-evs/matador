@@ -356,7 +356,7 @@ def doc2res(doc, path, info=True, hash_dupe=True, *args):
             f.write('END')
             # very important newline for compatibliy with cryan
             f.write('\n')
-    except Exception as oops:
+    except Exception:
         if hash_dupe:
             print_exc()
             print('Writing res file failed for ', doc['text_id'])

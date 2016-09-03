@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # coding: utf-8
-""" This file implements some prototype scrapers of 
+""" This file implements some prototype scrapers of
 experimental .synth and .expt files.
 """
 from __future__ import print_function
@@ -8,7 +8,7 @@ from __future__ import print_function
 import bson.json_util as json
 # standard library
 from collections import defaultdict
-from pwd import getpwuid
+
 
 def synth2dict(seed, **kwargs):
     """ Take a .synth file and create a dict
@@ -25,7 +25,7 @@ def synth2dict(seed, **kwargs):
     try:
         for line_no, line in enumerate(flines):
             # skip blank lines and comments
-            if line.startswith(('#', '!')) or len(line.strip())==0:
+            if line.startswith(('#', '!')) or len(line.strip()) == 0:
                 continue
             else:
                 # check if line is split further by semi-colons
@@ -48,8 +48,9 @@ def synth2dict(seed, **kwargs):
             print('Error in', seed+'.synth, skipping...')
         return seed + '\t\t' + str(oopsy), False
     if kwargs.get('debug'):
-        print(json.dumps(synth,indent=2, ensure_ascii=False))
+        print(json.dumps(synth, indent=2, ensure_ascii=False))
     return synth, True
+
 
 def expt2dict(seed, **kwargs):
     """ Take a .expt file and create a dict
@@ -66,7 +67,7 @@ def expt2dict(seed, **kwargs):
     try:
         for line_no, line in enumerate(flines):
             # skip blank lines and comments
-            if line.startswith(('#', '!')) or len(line.strip())==0:
+            if line.startswith(('#', '!')) or len(line.strip()) == 0:
                 continue
             else:
                 # check if line is split further by semi-colons
@@ -93,5 +94,5 @@ def expt2dict(seed, **kwargs):
             print('Error in', seed+'.expt, skipping...')
         return seed + '\t\t' + str(oopsy), False
     if kwargs.get('debug'):
-        print(json.dumps(expt,indent=2,ensure_ascii=False))
+        print(json.dumps(expt, indent=2, ensure_ascii=False))
     return expt, True

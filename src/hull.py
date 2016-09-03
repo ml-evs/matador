@@ -63,6 +63,8 @@ class QueryConvexHull():
 
         if self.args['subcmd'] == 'voltage':
             print('Generating voltage curve...')
+            if self.args.get('debug'):
+                self.metastable_voltage_profile()
             self.voltage_curve(self.stable_enthalpy_per_b, self.stable_comp, self.mu_enthalpy)
             self.set_plot_param()
             if self.args.get('subplot'):
@@ -214,6 +216,7 @@ class QueryConvexHull():
         structures = np.vstack((stoich, formation)).T
 
         # create hull with SciPy routine
+        # print(structures)
         self.hull = ConvexHull(structures)
 
         hull_energy = []
@@ -354,6 +357,36 @@ class QueryConvexHull():
         self.Q = get_capacities(x, get_molar_mass(self.elements[1]))
         return
 
+    def metastable_voltage_profile(self):
+        """ Construct a smeared voltage profile from metastable hull,
+        weighting either with Boltzmann, PDF overlap of nothing.
+        """
+        structures = self.hull_cursor[:-1]
+        for i in range(len(structures)):
+            print(structures[i]['stoichiometry'])
+        # grab reference cathode
+        reference = self.hull_cursor[-1]
+
+        # set up running average voltage profiles
+        num_divisions = 100
+        running_average_profile = np.zeros((num_divisions))
+        advanced_average_profile = np.zeros_like(running_average_profile)
+        diff_average_profile = np.ones_like(running_average_profile)
+        # set convergance of voltage profile tolerance
+        tolerance = 1e-3 * num_divisions
+
+        def boltzmann(structures):
+            return structures
+
+        def pdf_overlap(structures):
+            return structures
+
+        weighting = None
+
+        while np.abs(diff_average_profile).sum() < tolerance:
+            start = pick_metastable_structure(structures, weighting=weighting, last=None)
+
+
     def volume_curve(self, stable_comp, stable_vol):
         """ Take stable compositions and volume and calculate
         volume expansion per "B" in AB binary.
@@ -397,8 +430,9 @@ class QueryConvexHull():
                                 self.structures[self.hull.vertices[ind], 1]),
                             textcoords='data',
                             ha='center',
+                            zorder=99999,
                             xytext=(self.structures[self.hull.vertices[ind], 0],
-                                    self.structures[self.hull.vertices[ind], 1]-0.1))
+                                    self.structures[self.hull.vertices[ind], 1]-0.05))
         lw = self.scale * 0 if self.mpl_new_ver else 1
         # points for off hull structures
         if self.hull_cutoff == 0:
@@ -448,7 +482,7 @@ class QueryConvexHull():
                        arrowprops=dict(arrowstyle='simple', alpha=1))
         ax.set_ylim(-0.1 if np.min(self.structures[self.hull.vertices, 1]) > 0
                     else np.min(self.structures[self.hull.vertices, 1])-0.15,
-                    0.5 if np.max(self.structures[self.hull.vertices, 1]) > 1
+                    0.1 if np.max(self.structures[self.hull.vertices, 1]) > 1
                     else np.max(self.structures[self.hull.vertices, 1])+0.1)
         ax.set_title(x_elem+'$_\mathrm{x}$'+one_minus_x_elem+'$_\mathrm{1-x}$')
         plt.locator_params(nbins=3)
@@ -553,10 +587,6 @@ class QueryConvexHull():
                 print_exc()
                 pass
         for i in range(2, len(self.voltages)):
-            # ax.plot([self.x[i], self.x[i]], [self.voltages[i], self.voltages[i-1]],
-                    # lw=2, c=self.colours[0])
-            # ax.plot([self.x[i-1], self.x[i]], [self.voltages[i-1], self.voltages[i-1]],
-                    # lw=2, c=self.colours[0])
             axQ.plot([self.Q[i], self.Q[i]], [self.voltages[i], self.voltages[i-1]],
                      lw=2, c=self.colours[0])
             axQ.plot([self.Q[i-1], self.Q[i]], [self.voltages[i-1], self.voltages[i-1]],
@@ -567,35 +597,11 @@ class QueryConvexHull():
                 string_stoich = str(int(np.ceil(self.x[i-1])))
                 if string_stoich is '1':
                     string_stoich = ''
-            # axQ.annotate(('Li$_\mathrm{' + string_stoich + '}$As'),
-                        # xy=(self.Q[i-1], self.voltages[i]),
-                        # textcoords='data',
-                        # ha='center',
-                        # xytext=(self.Q[i-1]-0.01, 0.001+self.voltages[i-1]))
         axQ.set_ylabel('Voltage (V)')
         axQ.set_xlabel('Gravimetric cap. (mAh/g)')
-        # axQ.set_ylim(0.89, 1.01)
         start, end = axQ.get_ylim()
-        # axQ.yaxis.set_ticks(np.arange(start+0.01, end, 0.05))
-        # plt.locator_params(nbins=4)
-        # axQ.set_xlim(0, np.max(np.asarray(self.x[1:]))+1)
-        # ax.grid('off')
         axQ.grid('off')
-        # tick_list = list(self.Q[1:])
-        # for idx, tick in enumerate(tick_list):
-            # tick_list[idx] = int(tick)
-        # start, end = axQ.get_xlim()
-        # axQ.xaxis.set_ticks(np.arange(start, end, 300))
-        # axQ.set_xticks(tick_list)
-        # axQ.set_xticklabels(axQ.get_xticks())
-        # axQ.set_yticklabels(axQ.get_yticks())
-        # axQ.set_xlim(0)
-        # ax.set_ylim(np.min(np.asarray(self.voltages[2:]))-0.1,
-                    # np.max(np.asarray(self.voltages[2:]))+0.1)
-        # axQ.set_xlabel('$\mathrm{x}$ in $\mathrm{'+self.elements[0]+'_x'+self.elements[1]+'}$')
-        # ax.set_xticklabels(ax.get_xticks())
         plt.tight_layout(pad=0.0, h_pad=1.0, w_pad=0.2)
-        # ax.set_yticklabels(ax.get_yticks())
         if self.args.get('pdf'):
             plt.savefig(self.elements[0]+self.elements[1]+'_voltage.pdf',
                         dpi=300)
@@ -626,20 +632,16 @@ class QueryConvexHull():
         hull_comps, hull_vols = np.asarray(hull_comps), np.asarray(hull_vols)
         ax.plot(hull_comps, hull_vols/self.vol_per_y[0], marker='o', lw=4,
                 c=self.colours[0], zorder=100)
-        # ax.set_ylabel('Volume per ' + self.elements[1] + ' atom ($\AA^3$)')
         ax.set_xlabel('$\mathrm{u}$ in $\mathrm{'+self.elements[0]+'_u'+self.elements[1]+'}$')
         ax.set_ylabel('Volume ratio with bulk')
-        # ax.set_title('$\mathrm{'+self.elements[0]+'_x'+self.elements[1]+'}$')
         start, end = ax.get_xlim()
         ax.xaxis.set_ticks(range(0, int(end)+1, 1))
         start, end = ax.get_ylim()
         ax.yaxis.set_ticks(range(1, int(end)+1, 1))
         ax.yaxis.tick_right()
-        # ax.yaxis.set_ticks_position('right')
         ax.yaxis.set_label_position('right')
         ax.set_xticklabels(ax.get_xticks())
         ax.set_yticklabels(ax.get_yticks())
-        # ax.set_ylim(0.9, 3.1)
         ax.grid('off')
         plt.tight_layout(pad=0.0, h_pad=1.0, w_pad=0.2)
         if self.args.get('pdf'):
