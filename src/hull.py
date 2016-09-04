@@ -62,7 +62,6 @@ class QueryConvexHull():
         self.query.display_results(self.hull_cursor, hull=True)
 
         if self.args['subcmd'] == 'voltage':
-            print('Generating voltage curve...')
             if self.args.get('debug'):
                 self.metastable_voltage_profile()
             self.voltage_curve(self.stable_enthalpy_per_b, self.stable_comp, self.mu_enthalpy)
@@ -185,6 +184,7 @@ class QueryConvexHull():
                 exit()
             # get enthalpy and volume per unit B
             enthalpy[ind] = doc['enthalpy'] / (num_b*num_fu)
+            self.cursor[ind]['enthalpy_per_b'] = enthalpy[ind]
             formation[ind] = doc['enthalpy_per_atom']
             volume[ind] = doc['cell_volume'] / (num_b*num_fu)
             source_dir = ''.join(doc['source'][0].split('/')[:-1])
@@ -201,6 +201,11 @@ class QueryConvexHull():
             for elem in doc['stoichiometry']:
                 if x_elem in elem[0]:
                     stoich[ind] = elem[1]/float(atoms_per_fu)
+                    self.cursor[ind]['stoich'] = stoich[ind]
+                    try:
+                        self.cursor[ind]['num_a'] = stoich[ind]/(1-stoich[ind])
+                    except:
+                        self.cursor[ind]['num_a'] = float('inf')
             if dis:
                 disorder[ind], warren = disorder_hull(doc)
         # put chem pots in same array as formation for easy hulls
@@ -335,6 +340,7 @@ class QueryConvexHull():
 
     def voltage_curve(self, stable_enthalpy_per_b, stable_comp, mu_enthalpy):
         """ Take convex hull and calculate voltages. """
+        print('Generating voltage curve...')
         stable_num = []
         V = []
         x = []
@@ -361,31 +367,76 @@ class QueryConvexHull():
         """ Construct a smeared voltage profile from metastable hull,
         weighting either with Boltzmann, PDF overlap of nothing.
         """
+        print('Generating metastable voltage profile...')
         structures = self.hull_cursor[:-1]
         for i in range(len(structures)):
             print(structures[i]['stoichiometry'])
         # grab reference cathode
-        reference = self.hull_cursor[-1]
+        reference_cathode = self.hull_cursor[-1]
 
         # set up running average voltage profiles
         num_divisions = 100
         running_average_profile = np.zeros((num_divisions))
         advanced_average_profile = np.zeros_like(running_average_profile)
         diff_average_profile = np.ones_like(running_average_profile)
+        all_voltage_profiles = []
         # set convergance of voltage profile tolerance
         tolerance = 1e-3 * num_divisions
+        print(tolerance)
 
         def boltzmann(structures):
-            return structures
+            idx = np.random.randint(0, len(structures))
+            return structures[idx]
 
         def pdf_overlap(structures):
-            return structures
+            idx = np.random.randint(0, len(structures))
+            return structures[idx]
+
+        def pick_metastable_structure(structures, weighting=None, last=None):
+            """ Pick an acceptable metastable structure. """
+            if last is not None:
+                # TO-DO: filter out more lithiated structures
+                structures = structures
+            if weighting is None:
+                return structures[np.random.randint(0, len(structures))]
+            else:
+                return weighting(structures)
+
+        def get_voltage_profile_segment(structure_new, structure_old):
+            """ Return voltage between two structures. """
+            V = (-(structure_new['enthalpy_per_b'] - structure_old['enthalpy_per_b']) /
+                 (structure_new['num_a'] - structure_old['num_a']) +
+                 (self.mu_enthalpy[0]))
+            Q = get_capacities(structure_new['num_a'], get_molar_mass(self.elements[1]))
+            print(Q, V)
+            return np.asarray(Q, V)
 
         weighting = None
+        num_contribs = 0
+        print(diff_average_profile)
+        print(np.abs(diff_average_profile).sum())
 
-        while np.abs(diff_average_profile).sum() < tolerance:
-            start = pick_metastable_structure(structures, weighting=weighting, last=None)
-
+        while np.abs(diff_average_profile).sum() > tolerance:
+            print('help')
+            delithiated = False
+            voltage_profile = []
+            prev = reference_cathode
+            while not delithiated:
+                next = pick_metastable_structure(structures, weighting=weighting, last=prev)
+                voltage_profile = np.append(voltage_profile, get_voltage_profile_segment(next, prev))
+                if next['num_a'] == 0:
+                    delithiated = True
+                else:
+                    next = prev
+            if delithiated:
+                # piecewise linear interpolation of V and add to running average
+                advanced_average_profile += np.interp(np.linspace(0, 5000, num_divisions),
+                                                      voltage_profile[0, :], voltage_profile[1, :])
+                num_contribs += 1
+                diff_average_profile = np.diff(advanced_average_profile/num_contribs, running_average_profile/(num_contribs-1))
+                all_voltage_profiles.append(voltage_profile)
+                print(voltage_profile)
+                print(diff_average_profile)
 
     def volume_curve(self, stable_comp, stable_vol):
         """ Take stable compositions and volume and calculate
