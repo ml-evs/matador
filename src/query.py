@@ -88,6 +88,8 @@ class DBQuery:
 
         # benchmark enthalpy to display (set by calc_match)
         self.gs_enthalpy = 0.0
+
+        # operate on one structure and related others
         if self.args.get('id') is not None:
             self.cursor = []
 
@@ -121,6 +123,9 @@ class DBQuery:
                         self.args['composition'] += elem[0]
                     self.args['composition'] = [self.args['composition']]
                 self.empty_query = False
+
+        if self.args.get('db') is not None:
+            self.empty_query = False
 
         # create alias for formula for backwards-compatibility
         self.args['stoichiometry'] = self.args.get('formula')
