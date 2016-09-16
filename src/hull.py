@@ -63,15 +63,17 @@ class QueryConvexHull():
 
         if self.args['subcmd'] == 'voltage':
             if self.args.get('debug'):
+                self.set_plot_param()
+                self.voltage_curve(self.stable_enthalpy_per_b, self.stable_comp, self.mu_enthalpy)
                 self.metastable_voltage_profile()
-            self.voltage_curve(self.stable_enthalpy_per_b, self.stable_comp, self.mu_enthalpy)
-            self.set_plot_param()
-            if self.args.get('subplot'):
-                self.subplot_voltage_hull()
             else:
-                self.plot_voltage_curve()
-            self.set_plot_param()
-            self.plot_hull()
+                self.voltage_curve(self.stable_enthalpy_per_b, self.stable_comp, self.mu_enthalpy)
+                self.set_plot_param()
+                if self.args.get('subplot'):
+                    self.subplot_voltage_hull()
+                else:
+                    self.plot_voltage_curve()
+                self.plot_hull()
         elif self.args.get('volume'):
             self.volume_curve(self.stable_comp, self.stable_vol)
 
@@ -268,14 +270,18 @@ class QueryConvexHull():
                 # get lowest enthalpy at particular comp
                 if structures[ind, 0] not in stable_comp:
                     stable_energy.append(structures[ind, 1])
-                    stable_enthalpy_per_b.append(enthalpy[ind])
-                    stable_comp.append(structures[ind, 0])
+                    # stable_enthalpy_per_b.append(enthalpy[ind])
+                    # stable_comp.append(structures[ind, 0])
                     stable_vol.append(volume[ind])
                     stable_hull_dist.append(hull_dist[ind])
         # create hull_cursor to pass to other modules
         # skip last and first as they are chem pots
         self.match[0]['hull_distance'] = 0.0
         self.match[1]['hull_distance'] = 0.0
+        self.match[0]['enthalpy_per_b'] = self.match[0]['enthalpy_per_atom']
+        self.match[1]['enthalpy_per_b'] = self.match[1]['enthalpy_per_atom']
+        self.match[0]['num_a'] = float('inf')
+        self.match[1]['num_a'] = 0
         hull_cursor.append(self.match[1])
         for ind in range(1, len(hull_dist)-1):
             if hull_dist[ind] <= self.hull_cutoff+1e-12:
@@ -369,8 +375,12 @@ class QueryConvexHull():
         """
         print('Generating metastable voltage profile...')
         structures = self.hull_cursor[:-1]
+        guest_atoms = []
         for i in range(len(structures)):
-            print(structures[i]['stoichiometry'])
+            guest_atoms.append(structures[i]['num_a'])
+            structures[i]['capacity'] = get_capacities(guest_atoms[-1], get_molar_mass(self.elements[1]))
+        # guest_atoms = np.asarray(guest_atoms)
+        max_guest = np.max(guest_atoms)
         # grab reference cathode
         reference_cathode = self.hull_cursor[-1]
 
@@ -379,10 +389,11 @@ class QueryConvexHull():
         running_average_profile = np.zeros((num_divisions))
         advanced_average_profile = np.zeros_like(running_average_profile)
         diff_average_profile = np.ones_like(running_average_profile)
+        # replace with max cap
+        capacity_space = np.linspace(0, 2000, num_divisions)
         all_voltage_profiles = []
         # set convergance of voltage profile tolerance
-        tolerance = 1e-3 * num_divisions
-        print(tolerance)
+        tolerance = 1e-9 * num_divisions
 
         def boltzmann(structures):
             idx = np.random.randint(0, len(structures))
@@ -394,11 +405,15 @@ class QueryConvexHull():
 
         def pick_metastable_structure(structures, weighting=None, last=None):
             """ Pick an acceptable metastable structure. """
-            if last is not None:
-                # TO-DO: filter out more lithiated structures
-                structures = structures
-            if weighting is None:
-                return structures[np.random.randint(0, len(structures))]
+            count = 0
+            while True:
+                count += 1
+                if count > 1000:
+                    exit('Something went wrong...')
+                test = structures[np.random.randint(0, len(structures))]
+                if test['num_a'] < last['num_a']:
+                    print(count)
+                    return test
             else:
                 return weighting(structures)
 
@@ -407,36 +422,77 @@ class QueryConvexHull():
             V = (-(structure_new['enthalpy_per_b'] - structure_old['enthalpy_per_b']) /
                  (structure_new['num_a'] - structure_old['num_a']) +
                  (self.mu_enthalpy[0]))
-            Q = get_capacities(structure_new['num_a'], get_molar_mass(self.elements[1]))
-            print(Q, V)
-            return np.asarray(Q, V)
+            if structure_old['num_a'] == float('inf'):
+                V = 0
+            return V
+
+        def interp_steps(xspace, x, y):
+            """ Interpolate (x,y) across xspace with step functions. """
+            yspace = np.zeros_like(xspace)
+            for x_val, y_val in zip(x, y):
+                yspace[np.where(xspace <= x_val)] = y_val
+            return yspace
 
         weighting = None
+        converged = False
+        convergence_window = 3
+        last_converged = False
         num_contribs = 0
-        print(diff_average_profile)
-        print(np.abs(diff_average_profile).sum())
-
-        while np.abs(diff_average_profile).sum() > tolerance:
-            print('help')
+        num_converged = 0
+        num_trials = 100000
+        while not converged:
+            if np.abs(diff_average_profile).sum() < tolerance:
+                if num_converged > convergence_window:
+                    converged = True
+                    break
+                if not last_converged:
+                    last_converged = True
+                    num_converged = 1
+                if last_converged:
+                    num_converged += 1
+            if num_contribs > num_trials:
+                break
+            # print('Sampling path', num_contribs)
             delithiated = False
             voltage_profile = []
             prev = reference_cathode
+            path_structures = list(structures)
             while not delithiated:
-                next = pick_metastable_structure(structures, weighting=weighting, last=prev)
-                voltage_profile = np.append(voltage_profile, get_voltage_profile_segment(next, prev))
+                next = pick_metastable_structure(path_structures, weighting=weighting, last=prev)
+                idx = path_structures.index(next)
+                path_structures = path_structures[:idx]
+                if prev['num_a'] != float('inf'):
+                    voltage_profile.append([next['capacity'], get_voltage_profile_segment(next, prev)])
                 if next['num_a'] == 0:
                     delithiated = True
                 else:
-                    next = prev
-            if delithiated:
+                    prev = next
+            if delithiated and len(voltage_profile) != 0:
                 # piecewise linear interpolation of V and add to running average
-                advanced_average_profile += np.interp(np.linspace(0, 5000, num_divisions),
-                                                      voltage_profile[0, :], voltage_profile[1, :])
+                voltage_profile = np.asarray(voltage_profile)
+                # print(voltage_profile)
+                advanced_average_profile += interp_steps(capacity_space, voltage_profile[:, 0], voltage_profile[:, 1])
                 num_contribs += 1
-                diff_average_profile = np.diff(advanced_average_profile/num_contribs, running_average_profile/(num_contribs-1))
+                diff_average_profile = advanced_average_profile/num_contribs - running_average_profile
+                # print(advanced_average_profile)
                 all_voltage_profiles.append(voltage_profile)
-                print(voltage_profile)
-                print(diff_average_profile)
+                running_average_profile = advanced_average_profile/num_contribs
+
+        print('Convergence achieved with', num_contribs, 'paths.')
+        print(np.abs(diff_average_profile).sum(), tolerance)
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        # for idx, vp in enumerate(all_voltage_profiles):
+            # if idx % len(all_voltage_profiles) == 0:
+                # ax.scatter(vp[:, 0], vp[:, 1], s=50)
+            # print(vp)
+        for i in range(2, len(self.voltages)):
+            ax.plot([self.Q[i], self.Q[i]], [self.voltages[i], self.voltages[i-1]],
+                    lw=2, c=self.colours[0])
+            ax.plot([self.Q[i-1], self.Q[i]], [self.voltages[i-1], self.voltages[i-1]],
+                    lw=2, c=self.colours[0])
+        ax.scatter(capacity_space, running_average_profile, c='r', marker='*', s=50)
+        plt.show()
 
     def volume_curve(self, stable_comp, stable_vol):
         """ Take stable compositions and volume and calculate
@@ -496,7 +552,7 @@ class QueryConvexHull():
             scatter = ax.scatter(self.structures[:, 0], self.structures[:, 1],
                                  s=self.scale*40, lw=lw, alpha=0.9, c=self.hull_dist,
                                  edgecolor='k', zorder=300, cmap=cmap)
-
+                                 # edgecolor='k', zorder=300, cmap=cmap)
             scatter = ax.scatter(self.structures[np.argsort(self.hull_dist), 0][::-1],
                                  self.structures[np.argsort(self.hull_dist), 1][::-1],
                                  s=self.scale*40, lw=lw, alpha=1, c=np.sort(self.hull_dist)[::-1],
