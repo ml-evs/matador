@@ -306,9 +306,11 @@ class FullRelaxer:
                 # scrape new structure from castep file
                 opti_dict, success = castep2dict(seed + '.castep', db=False)
                 try:
-                    # delete any k-point information
+                    print(opti_dict['species_pot'])
+                    # delete any k-point and pspot information
                     del opti_dict['kpoints_mp_spacing']
                     del opti_dict['kpoints_mp_grid']
+                    del opti_dict['species_pot']
                 except:
                     pass
                 if not success and opti_dict == '':
