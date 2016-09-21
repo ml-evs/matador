@@ -6,7 +6,7 @@ parses user inputs and implements the stats submodule.
 
 from __future__ import print_function
 
-# matador modules excluding hull, spatula and pdffitter, which are imported JIT
+# matador modules 
 from query import DBQuery
 from hull import QueryConvexHull
 from print_utils import print_failure, print_warning, print_notify
@@ -104,14 +104,14 @@ class Matador:
         if self.args['subcmd'] == 'polish':
             self.query = DBQuery(self.client, self.collections, **self.args)
             if self.args['hull_cutoff'] is not None:
-                from hull import QueryConvexHull
+                # from hull import QueryConvexHull
                 self.hull = QueryConvexHull(self.query, self.args)
                 self.polish = Polisher(self.hull.hull_cursor, self.args)
             else:
                 self.polish = Polisher(self.query.cursor, self.args)
 
         if self.args['subcmd'] == 'hull' or self.args['subcmd'] == 'voltage':
-            from hull import QueryConvexHull
+            # from hull import QueryConvexHull
             self.query = DBQuery(self.client, self.collections, **self.args)
             self.hull = QueryConvexHull(self.query, self.args)
 
