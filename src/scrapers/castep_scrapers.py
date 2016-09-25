@@ -299,33 +299,32 @@ def param2dict(seed, db=True, **kwargs):
             if line.startswith(('#', '!')) or len(line.strip()) == 0:
                 continue
             else:
+                # if scraping to db, ignore "rubbish"
                 if db:
                     if [rubbish for rubbish in scrub_list if rubbish in line]:
                         continue
-                    # read all other parameters in
-                    else:
-                        for splitter in splitters:
-                            print(splitter, line)
-                            if splitter in line:
-                                param[line.split(splitter)[0].strip()] = \
-                                    line.split(splitter)[-1].strip()
-                                if 'spin_polarized' in line:
-                                    if [false for false in false_str
-                                            if false in param['spin_polarized']]:
-                                        param['spin_polarized'] = False
-                                    else:
-                                        param['spin_polarized'] = True
-                                if 'cut_off_energy' in line and 'mix_cut_off_energy' not in line:
-                                    temp_cut_off = (param['cut_off_energy'].replace('ev', ''))
-                                    temp_cut_off = temp_cut_off.strip()
-                                    param['cut_off_energy'] = float(temp_cut_off)
-                                if 'xc_functional' in line:
-                                    param['xc_functional'] = param['xc_functional'].upper()
-                                if 'perc_extra_bands' in line:
-                                    param['perc_extra_bands'] = float(param['perc_extra_bands'])
-                                if 'geom_force_tol' in line:
-                                    param['geom_force_tol'] = float(param['geom_force_tol'])
-                                break
+                # read all other parameters in
+                for splitter in splitters:
+                    if splitter in line:
+                        param[line.split(splitter)[0].strip()] = \
+                            line.split(splitter)[-1].strip()
+                        if 'spin_polarized' in line:
+                            if [false for false in false_str
+                                    if false in param['spin_polarized']]:
+                                param['spin_polarized'] = False
+                            else:
+                                param['spin_polarized'] = True
+                        if 'cut_off_energy' in line and 'mix_cut_off_energy' not in line:
+                            temp_cut_off = (param['cut_off_energy'].replace('ev', ''))
+                            temp_cut_off = temp_cut_off.strip()
+                            param['cut_off_energy'] = float(temp_cut_off)
+                        if 'xc_functional' in line:
+                            param['xc_functional'] = param['xc_functional'].upper()
+                        if 'perc_extra_bands' in line:
+                            param['perc_extra_bands'] = float(param['perc_extra_bands'])
+                        if 'geom_force_tol' in line:
+                            param['geom_force_tol'] = float(param['geom_force_tol'])
+                        break
     except Exception as oops:
         if kwargs.get('verbosity') > 0:
             print_exc()
