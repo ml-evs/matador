@@ -369,9 +369,6 @@ def dir2dict(seed, **kwargs):
                     dir_dict['spin_polarized'] = True
                 if [task for task in task_list if task in dir.split('-')[offset+5]]:
                     dir_dict['task'] = dir.split('-')[offset+5]
-                # else:
-                    # this is broken; need to fix for certain cases
-                    # dir_dict['species_pot'] = dir.split('-')[offset+5]
                 info = True
             elif 'GPa' in dir:
                 try:
@@ -540,8 +537,9 @@ def castep2dict(seed, db=True, **kwargs):
                         i += 2
                         castep['species_pot'][elem] = flines[line_no+i].split('"')[1]
                     i += 1
-            elif 'species_pot' not in castep and 'Files used for pseudopotentials' in line:
-                castep['species_pot'] = dict()
+            elif 'Files used for pseudopotentials' in line:
+                if 'species_pot' not in castep:
+                    castep['species_pot'] = dict()
                 i = 1
                 while True:
                     if len(flines[line_no+i].strip()) == 0:
