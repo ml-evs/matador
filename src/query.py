@@ -254,7 +254,7 @@ class DBQuery:
                         ind = i
                     # then do some random samples
                     else:
-                        ind = np.random.randint(rand_sample, count-1)
+                        ind = np.random.randint(rand_sample if rand_sample < count-1 else 0, count-1)
                     id_cursor = self.repo.find({'text_id': self.cursor[ind]['text_id']})
                     if id_cursor.count() > 1:
                         print_warning('WARNING: matched multiple structures with text_id ' +
