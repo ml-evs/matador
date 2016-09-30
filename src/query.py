@@ -848,7 +848,7 @@ class DBQuery:
         else:
             temp_dict = dict()
             temp_dict['kpoints_mp_spacing'] = dict()
-            temp_dict['kpoints_mp_spacing']['$gte'] = doc['kpoints_mp_spacing'] - 0.02
+            temp_dict['kpoints_mp_spacing']['$gte'] = doc['kpoints_mp_spacing'] - 0.01
             temp_dict['kpoints_mp_spacing']['$lte'] = doc['kpoints_mp_spacing'] + 0.01
             query_dict.append(temp_dict)
             query_dict.append(dict())
