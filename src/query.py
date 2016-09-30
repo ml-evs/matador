@@ -165,7 +165,6 @@ class DBQuery:
             self.query_dict['$and'].append(self.query_tags())
             self.empty_query = False
 
-        # only query quality when making a hull
         if not self.args.get('ignore_warnings'):
             self.query_dict['$and'].append(self.query_quality())
 
@@ -278,12 +277,14 @@ class DBQuery:
                         test_cursor_count.append(test_cursors[-1].count())
                         print("{:^24}".format(self.cursor[ind]['text_id'][0] + ' ' +
                                               self.cursor[ind]['text_id'][1]) +
-                              ': matched ' + str(test_cursor_count[-1]), 'structures.', end=' -> ')
+                              ': matched ' + str(test_cursor_count[-1]), 'structures.', end='\t-> ')
                         try:
-                            print(self.cursor[ind]['xc_functional'] + ',',
-                                  self.cursor[ind]['cut_off_energy'], 'eV,',
-                                  self.cursor[ind]['kpoints_mp_spacing'], '1/A')
+                            print('S-' if self.cursor[ind].get('spin_polarized') else '',
+                                  self.cursor[ind]['xc_functional'] + ', ',
+                                  self.cursor[ind]['cut_off_energy'], 'eV, ',
+                                  self.cursor[ind]['kpoints_mp_spacing'], ' 1/A', sep='')
                         except:
+                            print_exc()
                             pass
                         if self.args.get('biggest'):
                             if test_cursor_count[-1] > 2*int(count/3):

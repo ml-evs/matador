@@ -19,15 +19,14 @@ import matplotlib.colors as colours
 
 
 class QueryConvexHull():
-    """
-    Implements a Convex Hull for formation energies
+    """ Implements a Convex Hull for formation energies
     from a fryan DBQuery.
     """
-    def __init__(self, query, *args):
+    def __init__(self, query, **kwargs):
         """ Accept query from fryan as argument. """
         self.query = query
         self.cursor = list(query.cursor)
-        self.args = args[0]
+        self.args = kwargs
         self.K2eV = 8.61733e-5
 
         if self.args.get('hull_temp') is not None:
@@ -45,7 +44,7 @@ class QueryConvexHull():
         else:
             self.chem_pots = None
 
-        self.binary_hull()
+        self.hull_2d()
 
         if len(self.hull_cursor) == 0:
             print_warning('No structures on hull with chosen chemical potentials.')
@@ -93,11 +92,11 @@ class QueryConvexHull():
         query = self.query
         self.mu_enthalpy = np.zeros((2))
         self.mu_volume = np.zeros((2))
-        self.match = [None, None]
+        self.match = len(self.elements)*[None]
         query_dict = dict()
         print(60*'─')
         if self.chem_pots is not None:
-            # read chem pots from command line
+            # read chem pots from command line and fake docs for them
             self.mu_enthalpy[0] = self.chem_pots[0]
             self.match[0] = dict()
             self.match[0]['enthalpy_per_atom'] = self.mu_enthalpy[0]
@@ -130,14 +129,19 @@ class QueryConvexHull():
                     query_dict['$and'].append(query.query_tags())
                 mu_cursor = query.repo.find(SON(query_dict)).sort('enthalpy_per_atom',
                                                                   pm.ASCENDING)
-                for doc_ind, doc in enumerate(mu_cursor):
-                    if doc_ind == 0:
-                        self.match[ind] = doc
-                        break
+                try:
+                    self.match[ind] = mu_cursor[0]
+                except:
+                    self.match[ind] = None
                 if self.match[ind] is not None:
-                    self.mu_enthalpy[ind] = float(self.match[ind]['enthalpy_per_atom'])
-                    self.mu_volume[ind] = float(self.match[ind]['cell_volume'] /
-                                                self.match[ind]['num_atoms'])
+                    if ind == 0:
+                        self.mu_enthalpy[ind] = float(self.match[ind]['enthalpy_per_atom'])
+                        self.mu_volume[ind] = float(self.match[ind]['cell_volume'] /
+                                                    self.match[ind]['num_atoms'])
+                    else:
+                        self.mu_enthalpy[1] += float(self.match[ind]['enthalpy_per_atom'])
+                        self.mu_volume[1] = float(self.match[ind]['cell_volume'] /
+                                                  self.match[ind]['num_atoms'])
                     print('Using', ''.join([self.match[ind]['text_id'][0], ' ',
                           self.match[ind]['text_id'][1]]), 'as chem pot for', elem)
                     print(60*'─')
@@ -146,13 +150,32 @@ class QueryConvexHull():
                     exit()
         return
 
-    def binary_hull(self, dis=False):
+    def get_atoms_per_fu(self, doc):
+        """ Calculate the number of atoms per formula unit. """
+        atoms_per_fu = 0
+        for j in range(len(doc['stoichiometry'])):
+            atoms_per_fu += doc['stoichiometry'][j][1]
+        return atoms_per_fu
+
+    def get_formation_energy(self, doc):
+        """ From given chemical potentials, calculate the simplest
+        formation energy of the desired document.
+        """
+        formation = doc['enthalpy_per_atom']
+        for mu in self.match:
+            for j in range(len(doc['stoichiometry'])):
+                if mu['stoichiometry'][0][0] == doc['stoichiometry'][j][0]:
+                    formation -= (mu['enthalpy_per_atom'] * doc['stoichiometry'][j][1] /
+                                  self.get_atoms_per_fu(doc))
+        return formation
+
+    def hull_2d(self, dis=False):
         """ Create a convex hull for two elements. """
         query = self.query
         self.include_oqmd = query.args.get('self.include_oqmd')
         self.elements = query.args.get('composition')
         self.elements = [elem for elem in re.split(r'([A-Z][a-z]*)', self.elements[0]) if elem]
-        if len(self.elements) != 2:
+        if len(self.elements) > 3:
             print('Cannot create binary hull for more or less than 2 elements (yet!).')
             return
         self.get_chempots()
@@ -162,32 +185,26 @@ class QueryConvexHull():
         stoich = np.zeros((num_structures))
         enthalpy = np.zeros((num_structures))
         volume = np.zeros((num_structures))
-        disorder = np.zeros((num_structures))
         source_ind = np.zeros((num_structures+2), dtype=int)
         hull_dist = np.zeros((num_structures+2))
         info = []
         self.source_list = []
-        if dis:
-            from disorder import disorder_hull
         # define hull by order in command-line arguments
-        x_elem = self.elements[0]
-        one_minus_x_elem = self.elements[1]
+        x_elem = [self.elements[0]]
+        one_minus_x_elem = list(self.elements[1:])
         # grab relevant information from query results; also make function?
         for ind, doc in enumerate(self.cursor):
-            atoms_per_fu = doc['stoichiometry'][0][1] + doc['stoichiometry'][1][1]
             num_fu = doc['num_fu']
             # calculate number of atoms of type B per formula unit
-            if doc['stoichiometry'][0][0] == one_minus_x_elem:
-                num_b = doc['stoichiometry'][0][1]
-            elif doc['stoichiometry'][1][0] == one_minus_x_elem:
-                num_b = doc['stoichiometry'][1][1]
-            else:
-                print_failure('Something went wrong!')
-                exit()
+            nums_b = len(one_minus_x_elem)*[0]
+            for elem in doc['stoichiometry']:
+                for chem_pot_ind, chem_pot in enumerate(one_minus_x_elem):
+                    if elem[0] == chem_pot:
+                        nums_b[chem_pot_ind] += elem[1]
+            num_b = sum(nums_b)
             # get enthalpy and volume per unit B
             enthalpy[ind] = doc['enthalpy'] / (num_b*num_fu)
             self.cursor[ind]['enthalpy_per_b'] = enthalpy[ind]
-            formation[ind] = doc['enthalpy_per_atom']
             volume[ind] = doc['cell_volume'] / (num_b*num_fu)
             source_dir = ''.join(doc['source'][0].split('/')[:-1])
             if source_dir in self.source_list:
@@ -195,21 +212,15 @@ class QueryConvexHull():
             else:
                 self.source_list.append(source_dir)
                 source_ind[ind] = self.source_list.index(source_dir) + 1
-            for mu in self.match:
-                for j in range(len(doc['stoichiometry'])):
-                    if mu['stoichiometry'][0][0] == doc['stoichiometry'][j][0]:
-                        formation[ind] -= (mu['enthalpy_per_atom'] * doc['stoichiometry'][j][1] /
-                                           atoms_per_fu)
+            formation[ind] = self.get_formation_energy(doc)
             for elem in doc['stoichiometry']:
-                if x_elem in elem[0]:
-                    stoich[ind] = elem[1]/float(atoms_per_fu)
+                if x_elem[0] in elem[0]:
+                    stoich[ind] = elem[1]/float(self.get_atoms_per_fu(doc))
                     self.cursor[ind]['stoich'] = stoich[ind]
                     try:
                         self.cursor[ind]['num_a'] = stoich[ind]/(1-stoich[ind])
                     except:
                         self.cursor[ind]['num_a'] = float('inf')
-            if dis:
-                disorder[ind], warren = disorder_hull(doc)
         # put chem pots in same array as formation for easy hulls
         formation = np.append([0.0], formation)
         formation = np.append(formation, [0.0])
@@ -223,7 +234,6 @@ class QueryConvexHull():
         structures = np.vstack((stoich, formation)).T
 
         # create hull with SciPy routine
-        # print(structures)
         self.hull = ConvexHull(structures)
 
         hull_energy = []
@@ -300,12 +310,10 @@ class QueryConvexHull():
                                                                 doc['space_group'],
                                                                 hull_dist[ind]))
         for ind, doc in enumerate(self.cursor):
-            stoich_string = str(doc['stoichiometry'][0][0])
-            stoich_string += '$_{' + str(doc['stoichiometry'][0][1]) + '}$' \
-                if doc['stoichiometry'][0][1] != 1 else ''
-            stoich_string += str(doc['stoichiometry'][1][0])
-            stoich_string += '$_{' + str(doc['stoichiometry'][1][1]) + '}$' \
-                if doc['stoichiometry'][1][1] != 1 else ''
+            stoich_string = ''
+            for elem in doc['stoichiometry']:
+                stoich_string += elem[0]
+                stoich_string += '$_{' + str(elem[1]) + '}$' if elem[1] != 1 else ''
             info.append("{0:^10}\n{1:^24}\n{2:^5s}\n{3:2f} eV".format(stoich_string,
                                                                       doc['text_id'][0] + ' ' +
                                                                       doc['text_id'][1],
@@ -520,8 +528,8 @@ class QueryConvexHull():
         ax = fig.add_subplot(111)
         scatter = []
         hull_scatter = []
-        x_elem = self.elements[0]
-        one_minus_x_elem = self.elements[1]
+        x_elem = [self.elements[0]]
+        one_minus_x_elem = list(self.elements[1:])
         plt.draw()
         # star structures on hull
         for ind in range(len(self.hull.vertices)):
@@ -591,7 +599,7 @@ class QueryConvexHull():
                     else np.min(self.structures[self.hull.vertices, 1])-0.15,
                     0.1 if np.max(self.structures[self.hull.vertices, 1]) > 1
                     else np.max(self.structures[self.hull.vertices, 1])+0.1)
-        ax.set_title(x_elem+'$_\mathrm{x}$'+one_minus_x_elem+'$_\mathrm{1-x}$')
+        ax.set_title(x_elem[0] + '$_\mathrm{x}$' + "".join([elem for elem in one_minus_x_elem]) + '$_\mathrm{1-x}$')
         plt.locator_params(nbins=3)
         ax.set_xlabel('$\mathrm{x}$')
         ax.grid(False)
