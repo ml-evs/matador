@@ -5,7 +5,7 @@ and calling other functionality. """
 from __future__ import print_function
 # import related matador functionality
 from export import query2files
-from print_utils import print_failure, print_warning
+from print_utils import print_failure, print_warning, print_success
 from chem_utils import get_periodic_table
 # import external libraries
 import pymongo as pm
@@ -281,7 +281,7 @@ class DBQuery:
                         try:
                             print('S-' if self.cursor[ind].get('spin_polarized') else '',
                                   self.cursor[ind]['xc_functional'] + ', ',
-                                  self.cursor[ind]['cut_off_energy'], 'eV, ',
+                                  self.cursor[ind]['cut_off_energy'], ' eV, ',
                                   self.cursor[ind]['kpoints_mp_spacing'], ' 1/A', sep='')
                         except:
                             print_exc()
@@ -298,6 +298,8 @@ class DBQuery:
                     # by default, find highest cutoff hull as first proxy for quality
                     choice = np.argmax(np.asarray(cutoff))
                 self.cursor = test_cursors[choice]
+                print_success('Composing hull from set containing ' +
+                              self.cursor[0]['text_id'][0] + ' ' + self.cursor[0]['text_id'][1])
                 self.calc_dict = calc_dicts[choice]
 
             # if including oqmd, connect to oqmd collection and generate new query
@@ -621,12 +623,17 @@ class DBQuery:
             elements = self.args.get('composition')
         else:
             elements = custom_elem
-
+        if ':' in elements[0]:
+            if not self.args['subcmd'] == 'hull':
+                print(self.args)
+                elements[0] = elements[0].replace(':', '')
+                print('Ignoring colon...')
         # if there's only one string, try split it by caps
-        for char in elements[0]:
-            if char.isdigit():
-                print_failure('Composition cannot contain a number.')
-                exit()
+        if not self.args['subcmd'] == 'hull':
+            for char in elements[0]:
+                if char.isdigit():
+                    print_failure('Composition cannot contain a number.')
+                    exit()
         try:
             if len(elements) == 1:
                 valid = False
@@ -666,7 +673,7 @@ class DBQuery:
             print_exc()
             exit()
 
-        if self.args.get('intersection'):
+        if self.args.get('intersection') or self.args['subcmd'] == 'hull':
             query_dict = dict()
             query_dict['$or'] = []
             # iterate over all combinations
