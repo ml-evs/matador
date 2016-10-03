@@ -232,7 +232,6 @@ class QueryConvexHull():
         """ Create a convex hull for two elements. """
         query = self.query
         self.elements = query.args.get('composition')
-        print(query.args.get('composition'))
         self.elements = [elem for elem in re.split(r'([A-Z][a-z]*)', self.elements[0]) if elem]
         if len(self.elements) > 3:
             print('Cannot create binary hull for more or less than 2 elements (yet!).')
