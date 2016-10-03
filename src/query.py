@@ -117,7 +117,7 @@ class DBQuery:
                 # don't append, just set
                 self.query_dict['$and'] = self.query_calc(self.cursor[0])
                 self.calc_dict['$and'] = list(self.query_dict['$and'])
-                if self.args['subcmd'] == 'hull':
+                if self.args['subcmd'] == 'hull' and self.args.get('composition') is None:
                     self.args['composition'] = ''
                     for elem in self.cursor[0]['stoichiometry']:
                         self.args['composition'] += elem[0]
@@ -625,7 +625,6 @@ class DBQuery:
             elements = custom_elem
         if ':' in elements[0]:
             if not self.args['subcmd'] == 'hull':
-                print(self.args)
                 elements[0] = elements[0].replace(':', '')
                 print('Ignoring colon...')
         # if there's only one string, try split it by caps

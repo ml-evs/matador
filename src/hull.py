@@ -210,8 +210,8 @@ class QueryConvexHull():
     def get_hull_distances(self, structures):
         """ Returns array of hull distances. """
         hull_dist = np.zeros((len(structures)))
-        hull_comp = structures[self.hull.vertices, 0]
-        hull_energy = structures[self.hull.vertices, 1]
+        hull_comp = self.structure_slice[self.hull.vertices, 0]
+        hull_energy = self.structure_slice[self.hull.vertices, 1]
         hull_comp = np.asarray(hull_comp)
         hull_energy = hull_energy[np.argsort(hull_comp)]
         hull_comp = hull_comp[np.argsort(hull_comp)]
@@ -232,6 +232,7 @@ class QueryConvexHull():
         """ Create a convex hull for two elements. """
         query = self.query
         self.elements = query.args.get('composition')
+        print(query.args.get('composition'))
         self.elements = [elem for elem in re.split(r'([A-Z][a-z]*)', self.elements[0]) if elem]
         if len(self.elements) > 3:
             print('Cannot create binary hull for more or less than 2 elements (yet!).')
@@ -269,8 +270,9 @@ class QueryConvexHull():
         structures = np.vstack((self.get_array_from_cursor(self.cursor, 'concentration'),
                                 self.get_array_from_cursor(self.cursor, 'formation_enthalpy_per_atom'))).T
 
-        # create hull with SciPy routine
-        self.hull = ConvexHull(structures)
+        # create hull with SciPy routine, including only points with E_F < 0
+        self.structure_slice = structures[np.where(structures[:, 1] <= 0 + 1e-9)]
+        self.hull = ConvexHull(self.structure_slice)
         hull_dist, hull_energy, hull_comp = self.get_hull_distances(structures)
         self.set_cursor_from_array(hull_dist, 'hull_distance')
 
@@ -384,21 +386,21 @@ class QueryConvexHull():
         plt.draw()
         # star structures on hull
         for ind in range(len(self.hull.vertices)):
-            if self.structures[self.hull.vertices[ind], 1] <= 0:
-                hull_scatter.append(ax.scatter(self.structures[self.hull.vertices[ind], 0],
-                                               self.structures[self.hull.vertices[ind], 1],
+            if self.structure_slice[self.hull.vertices[ind], 1] <= 0:
+                hull_scatter.append(ax.scatter(self.structure_slice[self.hull.vertices[ind], 0],
+                                               self.structure_slice[self.hull.vertices[ind], 1],
                                                c=self.colours[1],
                                                marker='o', zorder=99999, edgecolor='k',
                                                s=self.scale*40, lw=1.5, alpha=1))
                                                # label=self.info[self.hull.vertices[ind]]))
                 # ax.annotate(self.info[self.hull.vertices[ind]].split('\n')[0],
-                            # xy=(self.structures[self.hull.vertices[ind], 0],
-                                # self.structures[self.hull.vertices[ind], 1]),
+                            # xy=(self.structure_slice[self.hull.vertices[ind], 0],
+                                # self.structure_slice[self.hull.vertices[ind], 1]),
                             # textcoords='data',
                             # ha='center',
                             # zorder=99999,
-                            # xytext=(self.structures[self.hull.vertices[ind], 0],
-                                    # self.structures[self.hull.vertices[ind], 1]-0.05))
+                            # xytext=(self.structure_slice[self.hull.vertices[ind], 0],
+                                    # self.structure_slice[self.hull.vertices[ind], 1]-0.05))
         lw = self.scale * 0 if self.mpl_new_ver else 1
         # points for off hull structures
         if self.hull_cutoff == 0:
@@ -446,10 +448,10 @@ class QueryConvexHull():
             datacursor(scatter[:], formatter='{label}'.format, draggable=False,
                        bbox=dict(fc='white'),
                        arrowprops=dict(arrowstyle='simple', alpha=1))
-        ax.set_ylim(-0.1 if np.min(self.structures[self.hull.vertices, 1]) > 0
-                    else np.min(self.structures[self.hull.vertices, 1])-0.15,
-                    0.1 if np.max(self.structures[self.hull.vertices, 1]) > 1
-                    else np.max(self.structures[self.hull.vertices, 1])+0.1)
+        ax.set_ylim(-0.1 if np.min(self.structure_slice[self.hull.vertices, 1]) > 0
+                    else np.min(self.structure_slice[self.hull.vertices, 1])-0.15,
+                    0.1 if np.max(self.structure_slice[self.hull.vertices, 1]) > 1
+                    else np.max(self.structure_slice[self.hull.vertices, 1])+0.1)
         if len(one_minus_x_elem) == 1:
             ax.set_title(x_elem[0] + '$_\mathrm{x}$' + one_minus_x_elem[0] + '$_\mathrm{1-x}$')
         else:
@@ -459,7 +461,6 @@ class QueryConvexHull():
         ax.grid(False)
         ax.set_xticks([0, 0.33, 0.5, 0.66, 1])
         ax.set_xticklabels(ax.get_xticks())
-        ax.set_yticklabels(ax.get_yticks())
         ax.set_ylabel('E$_\mathrm{F}$ (eV/atom)')
         if self.args.get('pdf'):
             plt.savefig(self.elements[0]+self.elements[1]+'_hull.pdf',
@@ -481,57 +482,71 @@ class QueryConvexHull():
         # one_minus_x_elem = self.elements[1]
         # prepare data for bokeh
         tie_line_data = dict()
-        tie_line_data['info'] = list()
+        # tie_line_data['info'] = list()
         tie_line_data['composition'] = list()
         tie_line_data['energy'] = list()
         for ind in range(len(self.hull.vertices)):
-            if self.structures[self.hull.vertices[ind], 1] <= 0:
-                tie_line_data['composition'].append(self.structures[self.hull.vertices[ind], 0])
-                tie_line_data['energy'].append(self.structures[self.hull.vertices[ind], 1])
-                tie_line_data['info'].append(self.info[self.hull.vertices[ind]])
+            if self.structure_slice[self.hull.vertices[ind], 1] <= 0:
+                tie_line_data['composition'].append(self.structure_slice[self.hull.vertices[ind], 0])
+                tie_line_data['energy'].append(self.structure_slice[self.hull.vertices[ind], 1])
+                # tie_line_data['info'].append(self.info[self.hull.vertices[ind]])
         tie_line_data['energy'] = np.asarray(tie_line_data['energy'])
         tie_line_data['composition'] = np.asarray(tie_line_data['composition'])
         tie_line_data['energy'] = tie_line_data['energy'][np.argsort(tie_line_data['composition'])]
-        tie_line_data['info'] = [tie_line_data['info'][i]
-                                 for i in list(np.argsort(tie_line_data['composition']))]
+        # tie_line_data['info'] = [tie_line_data['info'][i]
+                                 # for i in list(np.argsort(tie_line_data['composition']))]
         tie_line_data['composition'] = np.sort(tie_line_data['composition'])
-        tie_line_data['colour'] = len(tie_line_data['energy']) * ['blue']
         hull_data = dict()
-        hull_data['energy'] = list()
-        hull_data['composition'] = list()
-        hull_data['info'] = list()
+        # hull_data['info'] = list()
         # points for off hull structures
         hull_data['composition'] = self.structures[:, 0]
         hull_data['energy'] = self.structures[:, 1]
-        hull_data['info'] = self.info
-        hull_data['colour'] = len(hull_data['energy']) * ['red']
+        hull_data['hull_dist'] = self.hull_dist
+        # hull_data['info'] = self.info
+        cmap_limits = [0, 0.5]
+        colormap = plt.cm.get_cmap('Dark2')
+        cmap_input = np.interp(hull_data['hull_dist'], cmap_limits, [0.15, 0.4], left=0.15, right=0.4)
+        colours = colormap(cmap_input, 1, True)
+        bokeh_colours = ["#%02x%02x%02x" % (r, g, b) for r, g, b in colours[:, 0:3]]
+        fixed_colours = colormap([0.0, 0.15], 1, True)
+        tie_line_colour, on_hull_colour = ["#%02x%02x%02x" % (r, g, b) for r, g, b in fixed_colours[:, 0:3]]
 
         tie_line_source = ColumnDataSource(data=tie_line_data)
         hull_source = ColumnDataSource(data=hull_data)
 
-        hover = HoverTool(tooltips="""
-                          <div>
-                              <div>
-                                  <span style="font-size: 12px;">@info</span>
-                              </div>
-                          </div>
-                          """)
+        # hover = HoverTool(tooltips="""
+                          # <div>
+                              # <div>
+                                  # <span style="font-size: 12px;">@info</span>
+                              # </div>
+                          # </div>
+                          # """)
 
         tools = ['pan', 'wheel_zoom']
-        tools.append(hover)
+        # tools.append(hover)
         fig = figure(tools=tools)
+
+        fig.xaxis.axis_label = 'x'
+        fig.yaxis.axis_label = 'Formation energy (eV/atom)'
+
+        fig.xaxis.axis_label_text_font_size = '20pt'
+        fig.yaxis.axis_label_text_font_size = '20pt'
 
         fig.line('composition', 'energy',
                  source=tie_line_source,
-                 line_color='blue')
-        fig.circle('composition', 'energy',
-                   source=hull_source,
-                   alpha=1,
-                   size=5,
-                   color='colour')
+                 line_width=4,
+                 line_color=tie_line_colour)
+        fig.scatter('composition', 'energy',
+                    source=hull_source,
+                    alpha=1,
+                    size=10,
+                    fill_color=bokeh_colours,
+                    line_color=None)
         fig.square('composition', 'energy',
                    source=tie_line_source,
-                   color='colour',
+                   line_color='black',
+                   color=on_hull_colour,
+                   line_width=2,
                    alpha=1,
                    size=10)
 
@@ -610,7 +625,6 @@ class QueryConvexHull():
         ax.yaxis.tick_right()
         ax.yaxis.set_label_position('right')
         ax.set_xticklabels(ax.get_xticks())
-        ax.set_yticklabels(ax.get_yticks())
         ax.grid('off')
         plt.tight_layout(pad=0.0, h_pad=1.0, w_pad=0.2)
         if self.args.get('pdf'):
@@ -637,9 +651,9 @@ class QueryConvexHull():
         plt.locator_params(nbins=3)
         # star structures on hull
         for ind in range(len(self.hull.vertices)):
-            if self.structures[self.hull.vertices[ind], 1] <= 0:
-                hull_scatter.append(ax.scatter(self.structures[self.hull.vertices[ind], 0],
-                                               self.structures[self.hull.vertices[ind], 1],
+            if self.structure_slice[self.hull.vertices[ind], 1] <= 0:
+                hull_scatter.append(ax.scatter(self.structure_slice[self.hull.vertices[ind], 0],
+                                               self.structure_slice[self.hull.vertices[ind], 1],
                                                c=self.colours[0],
                                                marker='*', zorder=99999, edgecolor='k',
                                                s=self.scale*150, lw=1, alpha=1,
@@ -674,10 +688,10 @@ class QueryConvexHull():
             datacursor(scatter[:], formatter='{label}'.format, draggable=False,
                        bbox=dict(fc='white'),
                        arrowprops=dict(arrowstyle='simple', alpha=1))
-        ax.set_ylim(-0.1 if np.min(self.structures[self.hull.vertices, 1]) > 0
-                    else np.min(self.structures[self.hull.vertices, 1])-0.1,
-                    0.5 if np.max(self.structures[self.hull.vertices, 1]) > 1
-                    else np.max(self.structures[self.hull.vertices, 1])+0.1)
+        ax.set_ylim(-0.1 if np.min(self.structure_slice[self.hull.vertices, 1]) > 0
+                    else np.min(self.structure_slice[self.hull.vertices, 1]) - 0.05,
+                    0.5 if np.max(self.structures[:, 1]) > 0.5
+                    else np.max(self.structures[:, 1]) + 0.1)
         ax.set_title('$\mathrm{'+x_elem+'_x'+one_minus_x_elem+'_{1-x}}$')
         ax.set_xlabel('$x$', labelpad=-3)
         ax.set_xticks([0, 1])
