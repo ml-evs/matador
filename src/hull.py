@@ -228,6 +228,21 @@ class QueryConvexHull():
             hull_dist[ind] = structures[ind, 1] - (gradient * structures[ind, 0] + intercept)
         return hull_dist, hull_energy, hull_comp
 
+    def get_text_info(self):
+        """ Grab textual info for plot labels. """
+        info = []
+        for ind, doc in enumerate(self.cursor):
+            stoich_string = ''
+            for elem in doc['stoichiometry']:
+                stoich_string += elem[0]
+                stoich_string += '$_{' + str(elem[1]) + '}$' if elem[1] != 1 else ''
+            info.append("{0:^10}\n{1:^24}\n{2:^5s}\n{3:2f} eV".format(stoich_string,
+                                                                      doc['text_id'][0] + ' ' +
+                                                                      doc['text_id'][1],
+                                                                      doc['space_group'],
+                                                                      doc['hull_distance']))
+        return info
+
     def hull_2d(self, dis=False):
         """ Create a convex hull for two elements. """
         query = self.query
@@ -240,7 +255,6 @@ class QueryConvexHull():
         print('Constructing hull...')
         # num_structures = len(self.cursor)
         # source_ind = np.zeros((num_structures))
-        info = []
         # self.source_list = []
         # define hull by order in command-line arguments
         self.x_elem = [self.elements[0]]
@@ -272,62 +286,13 @@ class QueryConvexHull():
         # create hull with SciPy routine, including only points with E_F < 0
         self.structure_slice = structures[np.where(structures[:, 1] <= 0 + 1e-9)]
         self.hull = ConvexHull(self.structure_slice)
-        hull_dist, hull_energy, hull_comp = self.get_hull_distances(structures)
-        self.set_cursor_from_array(hull_dist, 'hull_distance')
+        self.hull_dist, self.hull_energy, self.hull_comp = self.get_hull_distances(structures)
+        self.set_cursor_from_array(self.hull_dist, 'hull_distance')
 
+        self.info = self.get_text_info()
         # create hull_cursor to pass to other modules
-        hull_cursor = [self.cursor[idx] for idx in np.where(hull_dist <= self.hull_cutoff + 1e-12)[0]]
-
-        def get_text_info(self, cursor):
-            # grab info for datacursor
-            info = []
-            docs = self.match[1:]
-            ind = 0
-            stoich_string = ''
-            if len(docs) > 1:
-                stoich_string += '['
-            for ind, doc in enumerate(docs):
-                for elem in doc['stoichiometry']:
-                    stoich_string += elem[0]
-                    stoich_string += '$_{' + str(elem[1]) + '}$' if elem[1] != 1 else ''
-                if ind != len(docs) - 1:
-                    stoich_string += ', '
-            if len(docs) > 1:
-                stoich_string += ']'
-            info.append("{0:^10}\n{1:24}\n{2:5s}\n{3:2f} eV".format(stoich_string,
-                                                                    doc['text_id'][0] + ' ' +
-                                                                    doc['text_id'][1],
-                                                                    doc['space_group'],
-                                                                    hull_dist[ind]))
-            for ind, doc in enumerate(self.cursor):
-                stoich_string = ''
-                for elem in doc['stoichiometry']:
-                    stoich_string += elem[0]
-                    stoich_string += '$_{' + str(elem[1]) + '}$' if elem[1] != 1 else ''
-                info.append("{0:^10}\n{1:^24}\n{2:^5s}\n{3:2f} eV".format(stoich_string,
-                                                                          doc['text_id'][0] + ' ' +
-                                                                          doc['text_id'][1],
-                                                                          doc['space_group'],
-                                                                          hull_dist[ind+1]))
-            doc = self.match[0]
-            ind = len(hull_dist)-1
-            stoich_string = ''
-            for elem in doc['stoichiometry']:
-                stoich_string += elem[0]
-                stoich_string += '$_{' + str(elem[1]) + '}$' if elem[1] != 1 else ''
-            info.append("{0:^10}\n{1:24}\n{2:5s}\n{3:2f} eV".format(stoich_string,
-                                                                    doc['text_id'][0] + ' ' +
-                                                                    doc['text_id'][1],
-                                                                    doc['space_group'],
-                                                                    hull_dist[ind]))
-
+        self.hull_cursor = [self.cursor[idx] for idx in np.where(self.hull_dist <= self.hull_cutoff + 1e-12)[0]]
         self.structures = structures
-        self.info = info
-        # self.source_ind = source_ind
-        self.hull_cursor = hull_cursor
-        self.hull_dist = hull_dist
-        self.hull_comp = hull_comp
-        self.hull_energy = hull_energy
 
     def voltage_curve(self, stable_enthalpy_per_b, stable_comp, mu_enthalpy):
         """ Take convex hull and calculate voltages. """
@@ -501,6 +466,7 @@ class QueryConvexHull():
         hull_data['composition'] = self.structures[:, 0]
         hull_data['energy'] = self.structures[:, 1]
         hull_data['hull_dist'] = self.hull_dist
+        hull_data['info'] = self.info
         # hull_data['info'] = self.info
         cmap_limits = [0, 0.5]
         colormap = plt.cm.get_cmap('Dark2')
@@ -513,16 +479,16 @@ class QueryConvexHull():
         tie_line_source = ColumnDataSource(data=tie_line_data)
         hull_source = ColumnDataSource(data=hull_data)
 
-        # hover = HoverTool(tooltips="""
-                          # <div>
-                              # <div>
-                                  # <span style="font-size: 12px;">@info</span>
+        hover = HoverTool(tooltips="""
+                          <div>
+                              <div>
+                                  <span style="font-size: 12px;">@info</span>
                               # </div>
                           # </div>
                           # """)
 
         tools = ['pan', 'wheel_zoom']
-        # tools.append(hover)
+        tools.append(hover)
         fig = figure(tools=tools)
 
         fig.xaxis.axis_label = 'x'
