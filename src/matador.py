@@ -249,6 +249,8 @@ if __name__ == '__main__':
                                  help='specify a particular structure by its text_id')
     structure_flags.add_argument('-ac', '--calc-match', action='store_true',
                                  help='display calculations of the same accuracy as specified id')
+    structure_flags.add_argument('-kpttol', '--kpoint-tolerance', type=float, 
+                                 help='kpoint tolerance for calculation matches (DEFAULT: +/- 0.01 1/A')
     structure_flags.add_argument('-z', '--num_fu', type=int,
                                  help='query a calculations with more than n formula units')
     structure_flags.add_argument('-sg', '--space_group',

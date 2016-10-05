@@ -848,8 +848,15 @@ class DBQuery:
         else:
             temp_dict = dict()
             temp_dict['kpoints_mp_spacing'] = dict()
-            temp_dict['kpoints_mp_spacing']['$gte'] = doc['kpoints_mp_spacing'] - 0.01
-            temp_dict['kpoints_mp_spacing']['$lte'] = doc['kpoints_mp_spacing'] + 0.01
+            if self.args.get('kpoint_tolerance') is not None:
+                try:
+                    tol = float(self.args.get('kpoint_tolerance'))
+                except:
+                    print_warning('Failed to read custom kpoint tolerance.')
+            else:
+                tol = 0.01
+            temp_dict['kpoints_mp_spacing']['$gte'] = doc['kpoints_mp_spacing'] - tol
+            temp_dict['kpoints_mp_spacing']['$lte'] = doc['kpoints_mp_spacing'] + tol
             query_dict.append(temp_dict)
             query_dict.append(dict())
             query_dict[-1]['cut_off_energy'] = doc['cut_off_energy']
