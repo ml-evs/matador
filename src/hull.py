@@ -10,6 +10,7 @@ from bson.son import SON
 from bisect import bisect_left
 from print_utils import print_failure, print_notify, print_warning
 from chem_utils import get_capacities, get_molar_mass
+from export import generate_hash, generate_relevant_path
 import pymongo as pm
 import re
 import numpy as np
@@ -228,7 +229,7 @@ class QueryConvexHull():
             hull_dist[ind] = structures[ind, 1] - (gradient * structures[ind, 0] + intercept)
         return hull_dist, hull_energy, hull_comp
 
-    def get_text_info(self):
+    def get_text_info(self, html=False):
         """ Grab textual info for plot labels. """
         info = []
         for ind, doc in enumerate(self.cursor):
@@ -236,11 +237,15 @@ class QueryConvexHull():
             for elem in doc['stoichiometry']:
                 stoich_string += elem[0]
                 stoich_string += '$_{' + str(elem[1]) + '}$' if elem[1] != 1 else ''
-            info.append("{0:^10}\n{1:^24}\n{2:^5s}\n{3:2f} eV".format(stoich_string,
-                                                                      doc['text_id'][0] + ' ' +
-                                                                      doc['text_id'][1],
-                                                                      doc['space_group'],
-                                                                      doc['hull_distance']))
+            info_string = "{0:^10}\n{1:^24}\n{2:^5s}\n{3:.3f} eV".format(stoich_string,
+                                                                        doc['text_id'][0] + ' ' + doc['text_id'][1],
+                                                                        doc['space_group'],
+                                                                        doc['hull_distance'])
+            if html:
+                for char in ['$', '_', '{', '}']:
+                    info_string = info_string.replace(char, '') 
+                info_string = info_string.split('\n')
+            info.append(info_string)
         return info
 
     def hull_2d(self, dis=False):
@@ -289,7 +294,7 @@ class QueryConvexHull():
         self.hull_dist, self.hull_energy, self.hull_comp = self.get_hull_distances(structures)
         self.set_cursor_from_array(self.hull_dist, 'hull_distance')
 
-        self.info = self.get_text_info()
+        self.info = self.get_text_info(html=self.args.get('bokeh'))
         # create hull_cursor to pass to other modules
         self.hull_cursor = [self.cursor[idx] for idx in np.where(self.hull_dist <= self.hull_cutoff + 1e-12)[0]]
         self.structures = structures
@@ -440,34 +445,34 @@ class QueryConvexHull():
 
     def plot_2d_hull_bokeh(self):
         """ Plot interactive hull with Bokeh. """
-        from bokeh.plotting import figure, show, output_file
+        from bokeh.plotting import figure, show, save, output_file
         from bokeh.models import ColumnDataSource, HoverTool
-        # x_elem = self.elements[0]
-        # one_minus_x_elem = self.elements[1]
-        # prepare data for bokeh
+       
+        # grab tie-line structures
         tie_line_data = dict()
-        # tie_line_data['info'] = list()
         tie_line_data['composition'] = list()
         tie_line_data['energy'] = list()
         for ind in range(len(self.hull.vertices)):
             if self.structure_slice[self.hull.vertices[ind], 1] <= 0:
                 tie_line_data['composition'].append(self.structure_slice[self.hull.vertices[ind], 0])
                 tie_line_data['energy'].append(self.structure_slice[self.hull.vertices[ind], 1])
-                # tie_line_data['info'].append(self.info[self.hull.vertices[ind]])
         tie_line_data['energy'] = np.asarray(tie_line_data['energy'])
         tie_line_data['composition'] = np.asarray(tie_line_data['composition'])
         tie_line_data['energy'] = tie_line_data['energy'][np.argsort(tie_line_data['composition'])]
-        # tie_line_data['info'] = [tie_line_data['info'][i]
-                                 # for i in list(np.argsort(tie_line_data['composition']))]
         tie_line_data['composition'] = np.sort(tie_line_data['composition'])
-        hull_data = dict()
-        # hull_data['info'] = list()
+        
         # points for off hull structures
+        hull_data = dict()
         hull_data['composition'] = self.structures[:, 0]
         hull_data['energy'] = self.structures[:, 1]
         hull_data['hull_dist'] = self.hull_dist
-        hull_data['info'] = self.info
-        # hull_data['info'] = self.info
+        hull_data['formula'], hull_data['text_id'] = [], []
+        hull_data['space_group'], hull_data['hull_dist_string'] = [], []
+        for structure in self.info:
+            hull_data['formula'].append(structure[0])
+            hull_data['text_id'].append(structure[1])
+            hull_data['space_group'].append(structure[2])
+            hull_data['hull_dist_string'].append(structure[3])
         cmap_limits = [0, 0.5]
         colormap = plt.cm.get_cmap('Dark2')
         cmap_input = np.interp(hull_data['hull_dist'], cmap_limits, [0.15, 0.4], left=0.15, right=0.4)
@@ -482,20 +487,29 @@ class QueryConvexHull():
         hover = HoverTool(tooltips="""
                           <div>
                               <div>
-                                  <span style="font-size: 12px;">@info</span>
-                              # </div>
-                          # </div>
-                          # """)
+                                  <span style="font-size: 12px;">
+                                      Formula: @formula <br>
+                                      ID: @text_id <br>
+                                      Space group: @space_group <br>
+                                      Distance from hull: @hull_dist_string
+                                  </span>
+                              </div>
+                          </div>
+                          """)
 
-        tools = ['pan', 'wheel_zoom']
+        tools = ['pan', 'wheel_zoom', 'reset', 'save']
         tools.append(hover)
-        fig = figure(tools=tools)
+        title = self.elements[0] + 'x' + ''.join(elem for elem in self.elements[1]) + '(1-x)'
+        fig = figure(tools=tools, title=title)
 
         fig.xaxis.axis_label = 'x'
         fig.yaxis.axis_label = 'Formation energy (eV/atom)'
-
         fig.xaxis.axis_label_text_font_size = '20pt'
         fig.yaxis.axis_label_text_font_size = '20pt'
+        fig.yaxis.axis_label_text_font_style = 'normal'
+        fig.xaxis.axis_label_text_font_style = 'normal'
+        fig.title.text_font_size = '20pt'
+        fig.title.align = 'center'
 
         fig.line('composition', 'energy',
                  source=tie_line_source,
@@ -514,11 +528,13 @@ class QueryConvexHull():
                    line_width=2,
                    alpha=1,
                    size=10)
-
         fig.plot_width = 800
-        fig.plot_height = 800
-        output_file('test.html', title='test.py example')
-        show(fig)
+        fig.plot_height = 600
+        path = '/u/fs1/me388/data/hulls/'
+        fname = generate_relevant_path(self.args) + '_' + generate_hash() + '.html'
+        output_file(path+fname, title='Convex hull')
+        print('Hull will be available shortly at http://www.tcm.phy.cam.ac.uk/~me388/hulls/' + fname)
+        save(fig)
 
     def plot_voltage_curve(self):
         """ Plot calculated voltage curve. """
