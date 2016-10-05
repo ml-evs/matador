@@ -47,23 +47,7 @@ def query2files(cursor, *args):
     except:
         write = True
         pass
-    # handle new file and directory names
-    dirname = args['subcmd'] + '-'
-    if args['composition'] is not None:
-        for comp in args['composition']:
-            dirname += comp
-    elif args['formula'] is not None:
-        dirname += args['formula'][0]
-    if args['db'] is not None:
-        dirname += '-' + args['db'][0]
-    if args.get('swap') is not None:
-        for swap in args['swap']:
-            dirname += '-' + swap
-        if args.get('hull_cutoff') is not None:
-            dirname += '-hull-' + str(args.get('hull_cutoff')) + 'eV'
-    if args.get('id') is not None:
-        dirname += '-' + args.get('id')[0] + '_' + args.get('id')[1]
-    dirname = dirname.replace('--', '-')
+    dirname = generate_relevant_path(args)
     dir = False
     dir_counter = 0
     while not dir:
@@ -374,3 +358,23 @@ def generate_hash(hashLen=6):
     for i in range(hashLen):
         hash += np.random.choice(hashChars)
     return hash
+
+def generate_relevant_path(args):
+    """ Generates a suitable path name based on query. """
+    dirname = args['subcmd'] + '-'
+    if args['composition'] is not None:
+        for comp in args['composition']:
+            dirname += comp
+    elif args['formula'] is not None:
+        dirname += args['formula'][0]
+    if args['db'] is not None:
+        dirname += '-' + args['db'][0]
+    if args.get('swap') is not None:
+        for swap in args['swap']:
+            dirname += '-' + swap
+        if args.get('hull_cutoff') is not None:
+            dirname += '-hull-' + str(args.get('hull_cutoff')) + 'eV'
+    if args.get('id') is not None:
+        dirname += '-' + args.get('id')[0] + '_' + args.get('id')[1]
+    dirname = dirname.replace('--', '-')
+    return dirname
