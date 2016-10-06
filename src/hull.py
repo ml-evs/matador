@@ -445,9 +445,9 @@ class QueryConvexHull():
 
     def plot_2d_hull_bokeh(self):
         """ Plot interactive hull with Bokeh. """
-        from bokeh.plotting import figure, show, save, output_file
+        from bokeh.plotting import figure, save, output_file
         from bokeh.models import ColumnDataSource, HoverTool
-       
+
         # grab tie-line structures
         tie_line_data = dict()
         tie_line_data['composition'] = list()
@@ -460,7 +460,7 @@ class QueryConvexHull():
         tie_line_data['composition'] = np.asarray(tie_line_data['composition'])
         tie_line_data['energy'] = tie_line_data['energy'][np.argsort(tie_line_data['composition'])]
         tie_line_data['composition'] = np.sort(tie_line_data['composition'])
-        
+
         # points for off hull structures
         hull_data = dict()
         hull_data['composition'] = self.structures[:, 0]
@@ -515,12 +515,13 @@ class QueryConvexHull():
                  source=tie_line_source,
                  line_width=4,
                  line_color=tie_line_colour)
-        fig.scatter('composition', 'energy',
-                    source=hull_source,
-                    alpha=1,
-                    size=10,
-                    fill_color=bokeh_colours,
-                    line_color=None)
+        hull_scatter = fig.scatter('composition', 'energy',
+                                   source=hull_source,
+                                   alpha=1,
+                                   size=10,
+                                   fill_color=bokeh_colours,
+                                   line_color=None)
+        fig.tools[-1].renderers.append(hull_scatter)
         fig.square('composition', 'energy',
                    source=tie_line_source,
                    line_color='black',
