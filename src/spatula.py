@@ -136,11 +136,11 @@ class Spatula:
             self.logfile = open(logfile_name, 'r')
             errors = sum(1 for line in self.logfile)
             if errors == 1:
-                print('There is', errors, 'error to view in spatala.log')
+                print('There is', errors, 'error to view in', logfile_name)
             elif errors == 0:
                 print('There were no errors.')
             elif errors > 1:
-                print('There are', errors, 'errors to view in spatala.log')
+                print('There are', errors, 'errors to view in', logfile_name)
             self.logfile.close()
         if not self.dryrun:
             # construct dictionary in spatula_report collection to hold info
