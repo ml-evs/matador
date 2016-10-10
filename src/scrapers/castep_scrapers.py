@@ -427,7 +427,53 @@ def castep2dict(seed, db=True, **kwargs):
         if 'CollCode' in seed:
             temp_icsd = seed.split('CollCode')[-1].replace('.castep', '').replace('.history', '')
             castep['icsd'] = temp_icsd
-        # wrangle castep file for basic parameters
+        # wrangle castep file for parameters in 3 passes:
+        # once forwards to get number and types of atoms
+        # once backwards to get the final parameter set for the calculation
+        # once more forwards, from the final step, to get the final structure
+        for line_no, line in enumerate(flines):
+            if 'atom types' not in castep and 'Cell Contents' in line:
+                castep['atom_types'] = list()
+                castep['positions_frac'] = list()
+                i = 1
+                atoms = False
+                while True:
+                    if atoms:
+                        if 'xxxxxxxxx' in flines[line_no+i]:
+                            atoms = False
+                            break
+                        else:
+                            castep['atom_types'].append(flines[line_no+i].split()[1])
+                            castep['positions_frac'].append((map(float,
+                                                            (flines[line_no+i].split()[3:6]))))
+                    if 'x------' in flines[line_no+i]:
+                        atoms = True
+                    i += 1
+                castep['num_atoms'] = len(castep['atom_types'])
+                castep['stoichiometry'] = defaultdict(float)
+                for atom in castep['atom_types']:
+                    if atom not in castep['stoichiometry']:
+                        castep['stoichiometry'][atom] = 0
+                    castep['stoichiometry'][atom] += 1
+                gcd_val = 0
+                for atom in castep['atom_types']:
+                    if gcd_val == 0:
+                        gcd_val = castep['stoichiometry'][atom]
+                    else:
+                        gcd_val = gcd(castep['stoichiometry'][atom], gcd_val)
+                # convert stoichiometry to tuple for fryan
+                temp_stoich = []
+                for key, value in castep['stoichiometry'].iteritems():
+                    if float(value)/gcd_val % 1 != 0:
+                        temp_stoich.append([key, float(value)/gcd_val])
+                    else:
+                        temp_stoich.append([key, value/gcd_val])
+                castep['stoichiometry'] = temp_stoich
+                atoms_per_fu = 0
+                for elem in castep['stoichiometry']:
+                    atoms_per_fu += elem[1]
+                castep['num_fu'] = castep['num_atoms'] / atoms_per_fu
+                break
         for line_no, line in enumerate(reversed(flines)):
             line_no = len(flines) - 1 - line_no
             if 'task' not in castep and 'type of calculation' in line:
@@ -469,47 +515,6 @@ def castep2dict(seed, db=True, **kwargs):
                     castep['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
             elif 'spin_polarized' not in castep and 'treating system as spin-polarized' in line:
                 castep['spin_polarized'] = True
-            elif 'atom types' not in castep and 'Cell Contents' in line:
-                castep['atom_types'] = list()
-                castep['positions_frac'] = list()
-                i = 1
-                atoms = False
-                while True:
-                    if atoms:
-                        if 'xxxxxxxxx' in flines[line_no+i]:
-                            atoms = False
-                            break
-                        else:
-                            castep['atom_types'].append(flines[line_no+i].split()[1])
-                            castep['positions_frac'].append((map(float,
-                                                            (flines[line_no+i].split()[3:6]))))
-                    if 'x------' in flines[line_no+i]:
-                        atoms = True
-                    i += 1
-                castep['num_atoms'] = len(castep['atom_types'])
-                castep['stoichiometry'] = defaultdict(float)
-                for atom in castep['atom_types']:
-                    if atom not in castep['stoichiometry']:
-                        castep['stoichiometry'][atom] = 0
-                    castep['stoichiometry'][atom] += 1
-                gcd_val = 0
-                for atom in castep['atom_types']:
-                    if gcd_val == 0:
-                        gcd_val = castep['stoichiometry'][atom]
-                    else:
-                        gcd_val = gcd(castep['stoichiometry'][atom], gcd_val)
-                # convert stoichiometry to tuple for fryan
-                temp_stoich = []
-                for key, value in castep['stoichiometry'].iteritems():
-                    if float(value)/gcd_val % 1 != 0:
-                        temp_stoich.append([key, float(value)/gcd_val])
-                    else:
-                        temp_stoich.append([key, value/gcd_val])
-                castep['stoichiometry'] = temp_stoich
-                atoms_per_fu = 0
-                for elem in castep['stoichiometry']:
-                    atoms_per_fu += elem[1]
-                castep['num_fu'] = castep['num_atoms'] / atoms_per_fu
             elif 'hubbard_u' not in castep and 'Hubbard U values are eV' in line:
                 castep['hubbard_u'] = defaultdict(list)
                 i = 5
@@ -561,16 +566,6 @@ def castep2dict(seed, db=True, **kwargs):
                                 castep['species_pot'][elem] = flines[line_no+i].split()[0].strip()+'_OTF.usp'
                             pspot_report_dict[elem] = False
                     i += 1
-            # don't check if final_energy exists, as this will update for each GO step
-            elif 'Final energy, E' in line:
-                castep['total_energy'] = float(line.split('=')[1].split()[0])
-                castep['total_energy_per_atom'] = castep['total_energy'] / castep['num_atoms']
-            elif 'Final free energy' in line:
-                castep['free_energy'] = float(line.split('=')[1].split()[0])
-                castep['free_energy_per_atom'] = castep['free_energy'] / castep['num_atoms']
-            elif '0K energy' in line:
-                castep['0K_energy'] = float(line.split('=')[1].split()[0])
-                castep['0K_energy_per_atom'] = castep['0K_energy'] / castep['num_atoms']
         # write zero pressure if not found in file
         if 'external_pressure' not in castep:
             castep['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0], [0.0]]
@@ -650,6 +645,16 @@ def castep2dict(seed, db=True, **kwargs):
                             if 'x------' in final_flines[line_no+i]:
                                 atoms = True
                             i += 1
+                    # don't check if final_energy exists, as this will update for each GO step
+                    elif 'Final energy, E' in line:
+                        castep['total_energy'] = float(line.split('=')[1].split()[0])
+                        castep['total_energy_per_atom'] = castep['total_energy'] / castep['num_atoms']
+                    elif 'Final free energy' in line:
+                        castep['free_energy'] = float(line.split('=')[1].split()[0])
+                        castep['free_energy_per_atom'] = castep['free_energy'] / castep['num_atoms']
+                    elif '0K energy' in line:
+                        castep['0K_energy'] = float(line.split('=')[1].split()[0])
+                        castep['0K_energy_per_atom'] = castep['0K_energy'] / castep['num_atoms']
                     elif 'Forces' in line:
                         i = 1
                         max_force = 0
