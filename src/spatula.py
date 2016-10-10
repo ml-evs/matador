@@ -136,11 +136,11 @@ class Spatula:
             self.logfile = open(logfile_name, 'r')
             errors = sum(1 for line in self.logfile)
             if errors == 1:
-                print('There is', errors, 'error to view in spatala.log')
+                print('There is', errors, 'error to view in', logfile_name)
             elif errors == 0:
                 print('There were no errors.')
             elif errors > 1:
-                print('There are', errors, 'errors to view in spatala.log')
+                print('There are', errors, 'errors to view in', logfile_name)
             self.logfile.close()
         if not self.dryrun:
             # construct dictionary in spatula_report collection to hold info
@@ -286,14 +286,17 @@ class Spatula:
                     if file.replace('.res', '.castep') in file_lists[root]['castep']:
                         struct_dict, success = castep2dict(file.replace('.res', '.castep'),
                                                            debug=self.debug,
+                                                           dryrun=self.args.get('dryrun'),
                                                            verbosity=self.verbosity)
                     elif file.replace('.res', '.history') in file_lists[root]['castep']:
                         struct_dict, success = castep2dict(file.replace('.res', '.history'),
                                                            debug=self.debug,
+                                                           dryrun=self.args.get('dryrun'),
                                                            verbosity=self.verbosity)
                     elif file.replace('.res', '.history.gz') in file_lists[root]['castep']:
                         struct_dict, success = castep2dict(file.replace('.res', '.history.gz'),
                                                            debug=self.debug,
+                                                           dryrun=self.args.get('dryrun'),
                                                            verbosity=self.verbosity)
                     else:
                         struct_dict, success = res2dict(file,
