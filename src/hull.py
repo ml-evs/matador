@@ -11,6 +11,7 @@ from bisect import bisect_left
 from print_utils import print_failure, print_notify, print_warning
 from chem_utils import get_capacities, get_molar_mass
 from export import generate_hash, generate_relevant_path
+from glmol_wrapper import get_glmol_placeholder_string
 import pymongo as pm
 import re
 import numpy as np
@@ -521,7 +522,7 @@ class QueryConvexHull():
                                    size=10,
                                    fill_color=bokeh_colours,
                                    line_color=None)
-        fig.tools[-1].renderers.append(hull_scatter)
+        fig.tools[0].renderers.append(hull_scatter)
         fig.square('composition', 'energy',
                    source=tie_line_source,
                    line_color='black',
@@ -536,6 +537,16 @@ class QueryConvexHull():
         output_file(path+fname, title='Convex hull')
         print('Hull will be available shortly at http://www.tcm.phy.cam.ac.uk/~me388/hulls/' + fname)
         save(fig)
+        html_string, js_string = get_glmol_placeholder_string()
+        with open(path+fname) as f:
+            flines = f.readlines()
+            for ind, line in enumerate(flines):
+                if  "<div class=\"bk-root\">" in line:
+                    flines.insert(ind - 1, html_string)
+                    break
+            flines.append(js_string)
+        with open(path+fname, 'w') as f:
+            f.write('\n'.join(map(str, flines)))
 
     def plot_voltage_curve(self):
         """ Plot calculated voltage curve. """
