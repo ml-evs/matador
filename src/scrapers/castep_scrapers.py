@@ -421,13 +421,15 @@ def castep2dict(seed, db=True, **kwargs):
                 flines = f.readlines()
         # set source tag to castep file
         castep['source'].append(seed)
+        pspot_report_dict = dict()
         # grab file owner
         castep['user'] = getpwuid(stat(seed).st_uid).pw_name
         if 'CollCode' in seed:
             temp_icsd = seed.split('CollCode')[-1].replace('.castep', '').replace('.history', '')
             castep['icsd'] = temp_icsd
         # wrangle castep file for basic parameters
-        for line_no, line in enumerate(flines):
+        for line_no, line in enumerate(reversed(flines)):
+            line_no = len(flines) - 1 - line_no
             if 'task' not in castep and 'type of calculation' in line:
                 castep['task'] = line.split(':')[-1].strip().replace(" ", "")
             elif 'xc_functional' not in castep and 'functional' in line:
@@ -458,10 +460,13 @@ def castep2dict(seed, db=True, **kwargs):
             elif 'Space group of crystal' in line:
                 castep['space_group'] = line.split(':')[-1].split(',')[0].strip().replace(" ", "")
             elif 'external_pressure' not in castep and 'External pressure/stress' in line:
-                castep['external_pressure'] = list()
-                castep['external_pressure'].append(map(float, flines[line_no+1].split()))
-                castep['external_pressure'].append(map(float, flines[line_no+2].split()))
-                castep['external_pressure'].append(map(float, flines[line_no+3].split()))
+                try:
+                    castep['external_pressure'] = list()
+                    castep['external_pressure'].append(map(float, flines[line_no+1].split()))
+                    castep['external_pressure'].append(map(float, flines[line_no+2].split()))
+                    castep['external_pressure'].append(map(float, flines[line_no+3].split()))
+                except:
+                    castep['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
             elif 'spin_polarized' not in castep and 'treating system as spin-polarized' in line:
                 castep['spin_polarized'] = True
             elif 'atom types' not in castep and 'Cell Contents' in line:
@@ -526,18 +531,22 @@ def castep2dict(seed, db=True, **kwargs):
                                 orbital = 'f'
                             castep['hubbard_u'][atom][orbital] = shift
                     i += 1
-            elif 'species_pot' not in castep and 'Pseudopotential Report' in line:
-                castep['species_pot'] = dict()
+            elif 'Pseudopotential Report' in line:
+                if 'species_pot' not in castep:
+                    castep['species_pot'] = dict()
                 i = 0
                 while i+line_no < len(flines)-3:
                     if 'Pseudopotential Report' in flines[line_no+i]:
                         i += 2
                         elem = flines[line_no+i].split(':')[1].split()[0]
+
                     elif 'core correction' in flines[line_no+i]:
                         i += 2
-                        castep['species_pot'][elem] = flines[line_no+i].split('"')[1]
+                        if not pspot_report_dict[elem]:
+                            castep['species_pot'][elem] = flines[line_no+i].split('"')[1]
+                            pspot_report_dict[elem] = True
                     i += 1
-            elif 'Files used for pseudopotentials' in line:
+            elif 'species_pot' not in castep and 'Files used for pseudopotentials' in line:
                 if 'species_pot' not in castep:
                     castep['species_pot'] = dict()
                 i = 1
@@ -545,13 +554,13 @@ def castep2dict(seed, db=True, **kwargs):
                     if len(flines[line_no+i].strip()) == 0:
                         break
                     else:
-                        castep['species_pot'][flines[line_no+i].split()[0].strip()] = \
-                            flines[line_no+i].split()[1].split('/')[-1]
-                        if(castep['species_pot'][flines[line_no+i].split()[0].strip()] ==
-                                'Pseudopotential'):
-                            castep['species_pot'][flines[line_no+i].split()[0].strip()] = \
-                                flines[line_no+i].split()[0].strip()+'_OTF.usp'
-                        i += 1
+                        elem = flines[line_no+i].split()[0].strip()
+                        if not pspot_report_dict.get(elem):
+                            castep['species_pot'][elem] = flines[line_no+i].split()[1].split('/')[-1]
+                            if castep['species_pot'][elem] == 'Pseudopotential':
+                                castep['species_pot'][elem] = flines[line_no+i].split()[0].strip()+'_OTF.usp'
+                            pspot_report_dict[elem] = False
+                    i += 1
             # don't check if final_energy exists, as this will update for each GO step
             elif 'Final energy, E' in line:
                 castep['total_energy'] = float(line.split('=')[1].split()[0])
