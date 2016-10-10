@@ -5,6 +5,7 @@ parses user inputs and implements the stats submodule.
 """
 
 from __future__ import print_function
+from version import __version__
 
 # matador modules
 from query import DBQuery
@@ -215,6 +216,7 @@ if __name__ == '__main__':
         prog='matador',
         description='MATerial and Atomic Database Of Refined structures.',
         epilog='Written by Matthew Evans (2016).')
+    parser.add_argument('-v', '--version', action='version', version='matador version ' + __version__)
 
     # define subparsers for subcommands
     subparsers = parser.add_subparsers(title='subcommands',
