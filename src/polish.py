@@ -81,8 +81,8 @@ class Polisher:
             polish_cursor.append(self.change_accuracy(doc))
         self.cursor = polish_cursor
 
-        self.args['cell'] = False
-        self.args['param'] = False
+        self.args['cell'] = True
+        self.args['param'] = True
         self.args['res'] = True
 
         query2files(self.cursor, self.args)
