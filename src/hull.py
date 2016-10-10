@@ -361,16 +361,16 @@ class QueryConvexHull():
                                                self.structure_slice[self.hull.vertices[ind], 1],
                                                c=self.colours[1],
                                                marker='o', zorder=99999, edgecolor='k',
-                                               s=self.scale*40, lw=1.5, alpha=1))
-                                               # label=self.info[self.hull.vertices[ind]]))
-                # ax.annotate(self.info[self.hull.vertices[ind]].split('\n')[0],
-                            # xy=(self.structure_slice[self.hull.vertices[ind], 0],
-                                # self.structure_slice[self.hull.vertices[ind], 1]),
-                            # textcoords='data',
-                            # ha='center',
-                            # zorder=99999,
-                            # xytext=(self.structure_slice[self.hull.vertices[ind], 0],
-                                    # self.structure_slice[self.hull.vertices[ind], 1]-0.05))
+                                               s=self.scale*40, lw=1.5, alpha=1,
+                                               label=self.info[self.hull.vertices[ind]]))
+                ax.annotate(self.info[self.hull.vertices[ind]].split('\n')[0],
+                            xy=(self.structure_slice[self.hull.vertices[ind], 0],
+                                self.structure_slice[self.hull.vertices[ind], 1]),
+                            textcoords='data',
+                            ha='center',
+                            zorder=99999,
+                            xytext=(self.structure_slice[self.hull.vertices[ind], 0],
+                                    self.structure_slice[self.hull.vertices[ind], 1]-0.05))
         lw = self.scale * 0 if self.mpl_new_ver else 1
         # points for off hull structures
         if self.hull_cutoff == 0:
@@ -397,8 +397,8 @@ class QueryConvexHull():
                 if self.hull_dist[ind] <= self.hull_cutoff or self.hull_cutoff == 0:
                     c = self.colours[1]
                     scatter.append(ax.scatter(self.structures[ind, 0], self.structures[ind, 1],
-                                   s=self.scale*40, lw=lw, alpha=0.9, c=c, edgecolor='k'))
-                                   # label=self.info[ind], zorder=300))
+                                   s=self.scale*40, lw=lw, alpha=0.9, c=c, edgecolor='k',
+                                   label=self.info[ind], zorder=300))
             ax.scatter(self.structures[1:-1, 0], self.structures[1:-1, 1], s=self.scale*30, lw=lw,
                        alpha=0.3, c=self.colours[-2],
                        edgecolor='k', zorder=10)
