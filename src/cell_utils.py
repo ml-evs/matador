@@ -40,6 +40,24 @@ def abc2cart(lattice_abc):
     return lattice_cart
 
 
+def cart2abcstar(lattice_cart):
+    """ Convert lattice_cart =[[a1,a2,a3],[b1,b2,b3],[c1,c2,c3]]
+    to a*, b*, c*.
+    """
+    lattice_cart = np.asarray(lattice_cart)
+    lattice_star = np.zeros_like(lattice_cart)
+    lattice_star[0] = np.cross(lattice_cart[1], lattice_cart[2])
+    lattice_star[1] = np.cross(lattice_cart[2], lattice_cart[0])
+    lattice_star[2] = np.cross(lattice_cart[0], lattice_cart[1])
+    vol = np.linalg.det(lattice_star)
+    print('vol = ', vol)
+    vol = np.dot(np.cross(lattice_cart[0], lattice_cart[1]), lattice_cart[2])
+    print('vol = ', vol)
+    lattice_star /= vol
+    print(lattice_star)
+    return lattice_star
+
+
 def cart2abc(lattice_cart):
     """ Convert lattice_cart =[[a1,a2,a3],[b1,b2,b3],[c1,c2,c3]]
     to lattice_abc=[[a,b,c],[alpha,beta,gamma]].
@@ -75,6 +93,20 @@ def cart2abc(lattice_cart):
     gamma = 180.0*acos(cos_gamma)/pi
     lattice_abc.append([alpha, beta, gamma])
     return lattice_abc
+
+
+def frac2cart(lattice_cart, positions_frac):
+    """ Convert positions_frac block into positions_abs. """
+    positions_frac = np.asarray(positions_frac)
+    lattice_cart = np.asarray(lattice_cart)
+    print(lattice_cart)
+    print(positions_frac)
+    positions_abs = np.zeros_like(positions_frac)
+    print(np.shape(positions_abs), np.shape(positions_frac))
+    for i in range(len(positions_frac)):
+        for j in range(3):
+            positions_abs[i] += lattice_cart[j]*positions_frac[i][j]
+    return positions_abs
 
 
 def real2recip(real_lat):

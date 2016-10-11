@@ -4,6 +4,7 @@
 can create a file from a db document.
 """
 from __future__ import print_function
+from cell_utils import cart2abcstar, frac2cart
 import string
 import numpy as np
 from os.path import exists, isfile, expanduser
@@ -19,6 +20,7 @@ def query2files(cursor, *args):
     cell = args.get('cell')
     param = args.get('param')
     res = args.get('res')
+    pdb = args.get('pdb')
     prefix = (args.get('prefix') + '-') if args.get('prefix') is not None else ''
     pressure = args.get('write_pressure')
     if args['subcmd'] == 'polish' or args['subcmd'] == 'swaps':
@@ -107,6 +109,8 @@ def query2files(cursor, *args):
             doc2cell(doc, path, pressure, hash_dupe=hash)
         if res:
             doc2res(doc, path, info=info, hash_dupe=hash)
+        if pdb:
+            doc2pdb(doc, path, hash_dupe=hash)
 
 
 def doc2param(doc, path, hash_dupe=True, *args):
@@ -278,6 +282,77 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, spin=Fa
             print_exc()
 
 
+def doc2pdb(doc, path, info=True, hash_dupe=True, *args):
+    """ Write a simple .pdb for single doc. """
+    if path.endswith('.pdb'):
+        path.replace('.pdb', '')
+    try:
+        if isfile(path+'.pdb'):
+            if hash_dupe:
+                print('File already exists, generating hash...')
+                path += '-' + generate_hash()
+            else:
+                raise RuntimeError('Skipping duplicate structure...')
+        with open(path+'.pdb', 'w') as f:
+            HEADER = 'HEADER    {} {}'.format(doc['text_id'][0], doc['text_id'][1])
+            try:
+                # write res file header if info
+                TITLE = 'TITLE     '
+                TITLE += path.split('/')[-1] + ' '
+                if type(doc['pressure']) == str:
+                    TITLE += '0.00 '
+                else:
+                    TITLE += str(doc['pressure']) + ' '
+                TITLE += str(doc['cell_volume']) + ' '
+                TITLE += str(doc['enthalpy']) + ' '
+                TITLE += '0 0 '             # spin
+                TITLE += str(doc['num_atoms']) + ' '
+                try:
+                    if 'x' in doc['space_group']:
+                        TITLE += '(P1) '
+                    else:
+                        TITLE += '(' + str(doc['space_group']) + ')' + ' '
+                except:
+                    TITLE += '(P1) '
+                TITLE += 'n - 1'
+            except:
+                if not info:
+                    TITLE = 'TITLE\t' + path.split('/')[-1]
+                raise RuntimeError('Failed to get info for res file, turn info off.')
+            AUTHOR = 'AUTHOR    Generated with matador (Matthew Evans, 2016)'
+            f.write(HEADER + '\n')
+            f.write(TITLE + '\n')
+            f.write(AUTHOR + '\n')
+            # use dummy SG for CRYST1, shouldn't matter
+            CRYST1 = 'CRYST1 {v[0][0]:9.3f} {v[0][1]:9.3f} {v[0][2]:9.3f} {v[1][0]:7.2f} {v[1][1]:7.2f} {v[1][2]:7.2f} P 1'.format(v=doc['lattice_abc'])
+            f.write(CRYST1 + '\n')
+            SCALEn = cart2abcstar(doc['lattice_cart']).tolist()
+            f.write('SCALE1    {v[0][0]:10.6f} {v[0][1]:10.6f} {v[0][2]:10.6f}      {:10.5f}\n'.format(0.0, v=SCALEn))
+            f.write('SCALE2    {v[1][0]:10.6f} {v[1][1]:10.6f} {v[1][2]:10.6f}      {:10.5f}\n'.format(0.0, v=SCALEn))
+            f.write('SCALE3    {v[2][0]:10.6f} {v[2][1]:10.6f} {v[2][2]:10.6f}      {:10.5f}\n'.format(0.0, v=SCALEn))
+            if 'positions_abs' not in doc:
+                doc['positions_abs'] = frac2cart(doc['lattice_cart'], doc['positions_frac'])
+            for ind, atom in enumerate(doc['atom_types']):
+                try:
+                    HETATM = 'HETATM '
+                    # append 00 to atom type, a la cell2pdb...
+                    HETATM += '{:4d} {:.4} NON A   1     '.format(ind+1, atom+'00')
+                    HETATM += '{v[0]:7.3f} {v[1]:7.3f} {v[2]:7.3f} {:5.2f} {:5.2f}          {:.2}'.format(1.0, 0.0, atom, v=doc['positions_abs'][ind])
+                    f.write(HETATM + '\n')
+                except:
+                    print_exc()
+            TER = 'TER       {}       NON A   1'.format(len(doc['atom_types']))
+            f.write(TER + '\n')
+            f.write('END')
+    except:
+        if hash_dupe:
+            print_exc()
+            print('Writing pdb file failed for ', doc['text_id'])
+        else:
+            print_exc()
+            pass
+
+
 def doc2res(doc, path, info=True, hash_dupe=True, *args):
     """ Write .res file for single doc. """
     if path.endswith('.res'):
@@ -285,7 +360,7 @@ def doc2res(doc, path, info=True, hash_dupe=True, *args):
     try:
         if isfile(path+'.res'):
             if hash_dupe:
-                print('File name already exists, generating hash...')
+                print('File already exists, generating hash...')
                 path += '-' + generate_hash()
             else:
                 raise RuntimeError('Skipping duplicate structure...')
@@ -358,6 +433,7 @@ def generate_hash(hashLen=6):
     for i in range(hashLen):
         hash += np.random.choice(hashChars)
     return hash
+
 
 def generate_relevant_path(args):
     """ Generates a suitable path name based on query. """

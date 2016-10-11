@@ -340,6 +340,8 @@ if __name__ == '__main__':
                              help='export query to .cell files in folder name from query string')
     query_flags.add_argument('--res', action='store_true',
                              help='export query to .res files in folder name from query string')
+    query_flags.add_argument('--pdb', action='store_true',
+                             help='export query to .pdb files in folder name from query string')
 
     swap_flags = argparse.ArgumentParser(add_help=False)
     swap_flags.add_argument('-s', '--swap', type=str, nargs='+',
