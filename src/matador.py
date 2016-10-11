@@ -10,6 +10,7 @@ from version import __version__
 # matador modules
 from query import DBQuery
 from hull import QueryConvexHull
+from export import query2files
 from print_utils import print_failure, print_warning, print_notify
 from polish import Polisher
 
@@ -64,6 +65,11 @@ class Matador:
         self.report = self.client.crystals.spatula
         self.print_report()
 
+        if self.args.get('cell') or self.args.get('res') or self.args.get('pdb'):
+            self.export = True
+        else:
+            self.export = False
+
         if self.args['subcmd'] == 'stats':
             self.stats()
 
@@ -73,6 +79,7 @@ class Matador:
 
         if self.args['subcmd'] == 'query':
             self.query = DBQuery(self.client, self.collections, **self.args)
+            self.cursor = list(self.query.cursor)
 
         if self.args['subcmd'] == 'swaps':
             self.query = DBQuery(self.client, self.collections, **self.args)
@@ -105,16 +112,21 @@ class Matador:
         if self.args['subcmd'] == 'polish':
             self.query = DBQuery(self.client, self.collections, **self.args)
             if self.args['hull_cutoff'] is not None:
-                # from hull import QueryConvexHull
                 self.hull = QueryConvexHull(self.query, **self.args)
                 self.polish = Polisher(self.hull.hull_cursor, self.args)
             else:
                 self.polish = Polisher(self.query.cursor, self.args)
 
         if self.args['subcmd'] == 'hull' or self.args['subcmd'] == 'voltage':
-            # from hull import QueryConvexHull
             self.query = DBQuery(self.client, self.collections, **self.args)
             self.hull = QueryConvexHull(self.query, **self.args)
+            if self.args.get('hull_cutoff'):
+                self.cursor = list(self.hull.hull_cursor)
+            else:
+                self.cursor = list(self.hull.cursor)
+        
+        if self.export and len(self.cursor) > 0:
+            query2files(self.cursor, self.args)
 
     def print_report(self):
         """ Print spatula report on current database. """

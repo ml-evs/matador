@@ -101,9 +101,9 @@ class DBQuery:
             if len(self.cursor) < 1:
                 exit('Could not find a match, try widening your search.')
             elif len(self.cursor) >= 1:
-                if (self.args.get('cell') or self.args.get('res')) or self.args.get('pdb') and \
-                        not self.args.get('calc_match'):
-                    query2files(self.cursor, self.args)
+                # if (self.args.get('cell') or self.args.get('res')) or self.args.get('pdb') and \
+                        # not self.args.get('calc_match'):
+                    # query2files(list(self.cursor), self.args)
                 self.display_results(self.cursor)
                 if len(self.cursor) > 1:
                     print_warning('WARNING: matched multiple structures with same text_id. ' +
@@ -198,25 +198,26 @@ class DBQuery:
                 cursor_count = self.cursor.count()
 
                 # write query to res or cell with param files
-                if self.args.get('cell') or self.args.get('res'):
-                    if cursor_count >= 1:
-                        cursor = list(self.cursor)
-                        if self.args.get('top') is not None:
-                            query2files(cursor[:self.args.get('top')], self.args)
-                        else:
-                            query2files(cursor, self.args)
+                if self.args.get('subcmd') != 'hull' and self.args.get('subcmd') != 'voltage':
+                    if self.args.get('cell') or self.args.get('res') or self.args.get('pdb'):
+                        if cursor_count >= 1:
+                            cursor = list(self.cursor)
+                            # if self.args.get('top') is not None:
+                                # query2files(cursor[:self.args.get('top')], self.args)
+                            # else:
+                                # query2files(cursor, self.args)
 
                 # if called as script, always print results
                 if self.args.get('id') is None:
                     print(cursor_count, 'results found for query in', collection+'.')
-                if self.args.get('subcmd') != 'hull':
+                if self.args.get('subcmd') != 'hull' and self.args.get('subcmd') != 'voltage':
                     if cursor_count >= 1:
                         if self.top == -1:
                             self.top = cursor_count
                         if cursor_count > self.top:
-                            self.display_results(self.cursor.clone()[:self.top])
+                            self.display_results(list(self.cursor)[:self.top])
                         else:
-                            self.display_results(self.cursor.clone())
+                            self.display_results(list(self.cursor))
 
             # building hull from just comp, find best structure to calc_match
             if self.args.get('id') is None and (self.args.get('subcmd') == 'hull' or
