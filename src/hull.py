@@ -447,7 +447,7 @@ class QueryConvexHull():
     def plot_2d_hull_bokeh(self):
         """ Plot interactive hull with Bokeh. """
         from bokeh.plotting import figure, save, output_file
-        from bokeh.models import ColumnDataSource, HoverTool
+        from bokeh.models import ColumnDataSource, HoverTool, Range1d
 
         # grab tie-line structures
         tie_line_data = dict()
@@ -511,6 +511,12 @@ class QueryConvexHull():
         fig.xaxis.axis_label_text_font_style = 'normal'
         fig.title.text_font_size = '20pt'
         fig.title.align = 'center'
+        
+        ylim = [-0.1 if np.min(self.structure_slice[self.hull.vertices, 1]) > 0
+                    else np.min(self.structure_slice[self.hull.vertices, 1])-0.15,
+                    0.1 if np.max(self.structure_slice[self.hull.vertices, 1]) > 1
+                    else np.max(self.structure_slice[self.hull.vertices, 1])+0.1]
+        fig.set(x_range=Range1d(-0.1, 1.1), y_range=Range1d(ylim[0], ylim[1]))
 
         fig.line('composition', 'energy',
                  source=tie_line_source,
