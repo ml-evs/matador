@@ -4,6 +4,6 @@ from os import getcwd, chdir
 
 cwd = getcwd()
 chdir(dirname(realpath(__file__)))
-__version__ = check_output(["git", "describe", "--tags"]).strip()
-__version__ += '-' + check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"])
+__version__ = str(check_output(["git", "describe", "--tags"])).strip()
+__version__ += '-' + str(check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"]))
 chdir(cwd)
