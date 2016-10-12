@@ -123,7 +123,7 @@ def doc2param(doc, path, hash_dupe=True, *args):
     """
     try:
         if path.endswith('.param'):
-            path.replace('.param', '')
+            path = path.replace('.param', '')
         param_set = set(['task', 'cut_off_energy', 'xc_functional', 'write_cell_structure',
                          'finite_basis_corr', 'spin_polarized', 'smearing_width',
                          'write_bib', 'finite_basis_corr', 'calculate_stress',
@@ -166,7 +166,8 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, spin=Fa
 
     """
     if path.endswith('.cell'):
-        path.replace('.cell', '')
+        path = path.replace('.cell', '')
+        print(path)
     try:
         if isfile(path+'.cell'):
             if hash_dupe:
@@ -197,11 +198,9 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, spin=Fa
                 for ind, atom in enumerate(zip(doc['atom_types'], doc['positions_frac'])):
                     if ind == 0 and spin:
                         # if spin is True, break spin symmetry on first atom a la run.pl
-                        f.write("{0:8s} {1[0]: 15f} {1[1]: 15f} {1[2]: 15f}\tSPIN=5\n".format(
-                                atom[0], atom[1]))
+                        f.write("{0:8s} {1[0]: 15f} {1[1]: 15f} {1[2]: 15f}\tSPIN=5\n".format(atom[0], atom[1]))
                     else:
-                        f.write("{0:8s} {1[0]: 15f} {1[1]: 15f} {1[2]: 15f}\n".format(
-                                atom[0], atom[1]))
+                        f.write("{0:8s} {1[0]: 15f} {1[1]: 15f} {1[2]: 15f}\n".format(atom[0], atom[1]))
             f.write('%ENDBLOCK POSITIONS_FRAC\n\n')
             if pressure is not None:
                 f.write('\n%block external_pressure\n'.upper())
@@ -275,17 +274,15 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, spin=Fa
                     f.write('#' + elem[0] + ' ~/pspot/' + elem[0] + '_00PBE.usp\n')
                 f.write('#%ENDBLOCK SPECIES_POT\n')
 
-    except Exception as oops:
-        if hash_dupe:
-            print(type(oops), oops)
-        else:
-            print_exc()
+    except Exception:
+        print_exc()
+        print('Continuing...')
 
 
 def doc2pdb(doc, path, info=True, hash_dupe=True, *args):
     """ Write a simple .pdb for single doc. """
     if path.endswith('.pdb'):
-        path.replace('.pdb', '')
+        path = path.replace('.pdb', '')
     try:
         if isfile(path+'.pdb'):
             if hash_dupe:
@@ -356,7 +353,7 @@ def doc2pdb(doc, path, info=True, hash_dupe=True, *args):
 def doc2res(doc, path, info=True, hash_dupe=True, *args):
     """ Write .res file for single doc. """
     if path.endswith('.res'):
-        path.replace('.res', '')
+        path = path.replace('.res', '')
     try:
         if isfile(path+'.res'):
             if hash_dupe:
