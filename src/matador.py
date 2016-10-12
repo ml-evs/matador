@@ -276,6 +276,8 @@ if __name__ == '__main__':
                                        any structure containing Li, not just pure Li.')
     structure_flags.add_argument('--tags', nargs='+', type=str,
                                  help=('search for up to 3 manual tags at once'))
+    structure_flags.add_argument('-icsd', '--icsd', type=int,
+                                 help=('search for up an ICSDCollCode'))
     structure_flags.add_argument('-encap', '--encapsulated', action='store_true',
                                  help='query only structures encapsulated in a carbon nanotube.')
     structure_flags.add_argument('-cntr', '--cnt_radius', type=float,

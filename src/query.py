@@ -164,6 +164,10 @@ class DBQuery:
         if self.args.get('tags') is not None:
             self.query_dict['$and'].append(self.query_tags())
             self.empty_query = False
+        
+        if self.args.get('icsd') is not None:
+            self.query_dict['$and'].append(self.query_icsd())
+            self.empty_query = False
 
         if not self.args.get('ignore_warnings'):
             self.query_dict['$and'].append(self.query_quality())
@@ -413,6 +417,8 @@ class DBQuery:
                             source = 'SWAPS'
                         elif 'oqmd' in fname.lower():
                             source = 'OQMD'
+                        elif 'icsd' in doc:
+                            source = 'ICSD'
                         elif 'collcode' in fname.lower():
                             if fname.split('/')[-1].count('-') == 2:
                                 source = 'SWAPS'
@@ -751,6 +757,16 @@ class DBQuery:
             temp_dict['tags']['$in'] = [tag]
             query_dict['$and'].append(temp_dict)
 
+        return query_dict
+    
+    def query_icsd(self):
+        """ Find all structures matching given tags. """
+        query_dict = dict()
+        query_dict['$and'] = []
+        temp_dict = dict()
+        temp_dict['icsd'] = dict()
+        temp_dict['icsd']['$eq'] = str(self.args.get('icsd'))
+        query_dict['$and'].append(temp_dict)
         return query_dict
 
     def query_quality(self):
