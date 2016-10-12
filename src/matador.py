@@ -124,7 +124,7 @@ class Matador:
                 self.cursor = list(self.hull.hull_cursor)
             else:
                 self.cursor = list(self.hull.cursor)
-        
+
         if self.export and len(self.cursor) > 0:
             query2files(self.cursor, self.args)
 
@@ -215,7 +215,7 @@ class Matador:
         except:
             pass
         self.temp = self.client.crystals.temp
-        if cursor.count() != 0:
+        if len(cursor) != 0:
             self.temp.insert(cursor)
         else:
             self.temp.drop()

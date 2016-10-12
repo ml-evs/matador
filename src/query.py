@@ -4,7 +4,7 @@ including parsing user inputs, displaying results
 and calling other functionality. """
 from __future__ import print_function
 # import related matador functionality
-from export import query2files
+# from export import query2files
 from print_utils import print_failure, print_warning, print_success
 from chem_utils import get_periodic_table
 # import external libraries
@@ -104,7 +104,7 @@ class DBQuery:
                 # if (self.args.get('cell') or self.args.get('res')) or self.args.get('pdb') and \
                         # not self.args.get('calc_match'):
                     # query2files(list(self.cursor), self.args)
-                self.display_results(self.cursor)
+                self.display_results(list(self.cursor))
                 if len(self.cursor) > 1:
                     print_warning('WARNING: matched multiple structures with same text_id. ' +
                                   'The first one will be used.')
@@ -179,29 +179,29 @@ class DBQuery:
                     self.repo = self.collections[collection]
                     if self.args.get('debug'):
                         print('Empty query, showing all...')
-                    self.cursor = self.repo.find().sort('enthalpy_per_atom', pm.ASCENDING)
+                    self.cursor = list(self.repo.find().sort('enthalpy_per_atom', pm.ASCENDING))
                     if self.top == -1:
-                        self.top = self.cursor.count()
-                    self.display_results(self.cursor[:self.top])
+                        self.top = len(self.cursor)
+                    self.display_results(list(self.cursor[:self.top]))
 
         # if no special query has been made already, begin executing the query
         if not self.empty_query:
-            self.cursors = []
+            # self.cursors = []
             for collection in self.collections:
                 self.repo = self.collections[collection]
                 if self.args.get('details'):
                     print(self.query_dict)
                 # execute query
-                self.cursor = self.repo.find(SON(self.query_dict)).sort('enthalpy_per_atom',
-                                                                        pm.ASCENDING)
-                self.cursors.append(self.cursor.clone())
-                cursor_count = self.cursor.count()
+                self.cursor = list(self.repo.find(SON(self.query_dict)).sort('enthalpy_per_atom',
+                                                                             pm.ASCENDING))
+                # self.cursors.append(self.cursor)
+                cursor_count = len(self.cursor)
 
                 # write query to res or cell with param files
-                if self.args.get('subcmd') != 'hull' and self.args.get('subcmd') != 'voltage':
-                    if self.args.get('cell') or self.args.get('res') or self.args.get('pdb'):
-                        if cursor_count >= 1:
-                            cursor = list(self.cursor)
+                # if self.args.get('subcmd') != 'hull' and self.args.get('subcmd') != 'voltage':
+                    # if self.args.get('cell') or self.args.get('res') or self.args.get('pdb'):
+                        # if cursor_count >= 1:
+                            # cursor = list(self.cursor)
                             # if self.args.get('top') is not None:
                                 # query2files(cursor[:self.args.get('top')], self.args)
                             # else:
@@ -245,7 +245,7 @@ class DBQuery:
                 sample = 2
                 rand_sample = 5 if self.args.get('biggest') else 5
                 i = 0
-                count = self.cursor.count()
+                count = len(self.cursor)
                 if count <= 0:
                     exit('No structures found for hull.')
                 while i < sample+rand_sample:
@@ -255,8 +255,8 @@ class DBQuery:
                     # then do some random samples
                     else:
                         ind = np.random.randint(rand_sample if rand_sample < count-1 else 0, count-1)
-                    id_cursor = self.repo.find({'text_id': self.cursor[ind]['text_id']})
-                    if id_cursor.count() > 1:
+                    id_cursor = list(self.repo.find({'text_id': self.cursor[ind]['text_id']}))
+                    if len(id_cursor) > 1:
                         print_warning('WARNING: matched multiple structures with text_id ' +
                                       id_cursor[0]['text_id'][0] + ' ' +
                                       id_cursor[0]['text_id'][1] + '.' +
@@ -264,33 +264,34 @@ class DBQuery:
                         rand_sample += 1
                     else:
                         self.query_dict = dict()
-                        self.query_dict['$and'] = self.query_calc(id_cursor[0])
-                        cutoff.append(id_cursor[0]['cut_off_energy'])
-                        calc_dicts.append(dict())
-                        calc_dicts[-1]['$and'] = list(self.query_dict['$and'])
-                        self.query_dict['$and'].append(self.query_composition())
-                        if not self.args.get('ignore_warnings'):
-                            self.query_dict['$and'].append(self.query_quality())
-                        test_query_dict.append(self.query_dict)
-                        test_cursors.append(
-                            self.repo.find(SON(test_query_dict[-1])).sort('enthalpy_per_atom',
-                                                                          pm.ASCENDING))
-                        test_cursor_count.append(test_cursors[-1].count())
-                        print("{:^24}".format(self.cursor[ind]['text_id'][0] + ' ' +
-                                              self.cursor[ind]['text_id'][1]) +
-                              ': matched ' + str(test_cursor_count[-1]), 'structures.', end='\t-> ')
                         try:
+                            self.query_dict['$and'] = self.query_calc(id_cursor[0])
+                            cutoff.append(id_cursor[0]['cut_off_energy'])
+                            calc_dicts.append(dict())
+                            calc_dicts[-1]['$and'] = list(self.query_dict['$and'])
+                            self.query_dict['$and'].append(self.query_composition())
+                            if not self.args.get('ignore_warnings'):
+                                self.query_dict['$and'].append(self.query_quality())
+                            test_query_dict.append(self.query_dict)
+                            test_cursors.append(
+                                list(self.repo.find(SON(test_query_dict[-1])).sort('enthalpy_per_atom',
+                                                                                   pm.ASCENDING)))
+                            test_cursor_count.append(len(test_cursors[-1]))
+                            print("{:^24}".format(self.cursor[ind]['text_id'][0] + ' ' +
+                                                  self.cursor[ind]['text_id'][1]) +
+                                  ': matched ' + str(test_cursor_count[-1]), 'structures.', end='\t-> ')
                             print('S-' if self.cursor[ind].get('spin_polarized') else '',
                                   self.cursor[ind]['xc_functional'] + ', ',
                                   self.cursor[ind]['cut_off_energy'], ' eV, ',
                                   self.cursor[ind]['kpoints_mp_spacing'], ' 1/A', sep='')
+                            if self.args.get('biggest'):
+                                if test_cursor_count[-1] > 2*int(count/3):
+                                    print('Matched at least 2/3 of total number, composing hull...')
+                                    break
                         except:
                             print_exc()
-                            pass
-                        if self.args.get('biggest'):
-                            if test_cursor_count[-1] > 2*int(count/3):
-                                print('Matched at least 2/3 of total number, composing hull...')
-                                break
+                            print_warning('Error with ' + id_cursor[0]['text_id'][0] + ' ' + id_cursor[0]['text_id'][1])
+                            rand_sample += 1
                     i += 1
 
                 if self.args.get('biggest'):
@@ -302,17 +303,6 @@ class DBQuery:
                 print_success('Composing hull from set containing ' +
                               self.cursor[0]['text_id'][0] + ' ' + self.cursor[0]['text_id'][1])
                 self.calc_dict = calc_dicts[choice]
-
-            # if including oqmd, connect to oqmd collection and generate new query
-            if self.args.get('include_oqmd'):
-                self.oqmd_repo = self.client.crystals.oqmd
-                self.oqmd_query = dict()
-                self.oqmd_query['$and'] = []
-                # query only oqmd, assume all calculations are over-converged:
-                # this is bad!
-                self.oqmd_query['$and'].append(self.query_composition())
-                self.oqmd_cursor = self.oqmd_repo.find(SON(self.oqmd_query))
-                self.oqmd_cursor.sort('enthalpy_per_atom', pm.ASCENDING)
 
     def __del__(self):
         """ Clean up any temporary databases on garbage
@@ -884,7 +874,7 @@ class DBQuery:
         except:
             pass
         self.temp = self.client.crystals.temp
-        if cursor.count() != 0:
+        if len(cursor) != 0:
             self.temp.insert(cursor)
         else:
             self.temp.drop()
