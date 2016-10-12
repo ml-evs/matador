@@ -10,7 +10,7 @@ for fname in fnames:
     print_notify('Reading ' + fname)
     cell_dict, success = castep_scrapers.cell2dict(fname, db=False)
     if success:
-        doc2res(cell_dict, fname.replace('.cell', ''), copy_pspots=False, hash_dupe=True)
+        doc2res(cell_dict, fname.replace('.cell', ''), hash_dupe=True)
         print_success('Wrote .res file to ' + fname.replace('.cell', '') + '.res')
     else:
         print_failure('Unable to find final structure in ' + fname + '.')
