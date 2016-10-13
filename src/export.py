@@ -291,7 +291,10 @@ def doc2pdb(doc, path, info=True, hash_dupe=True, *args):
             else:
                 raise RuntimeError('Skipping duplicate structure...')
         with open(path+'.pdb', 'w') as f:
-            HEADER = 'HEADER    {} {}'.format(doc['text_id'][0], doc['text_id'][1])
+            try:
+                HEADER = 'HEADER    {} {}'.format(doc['text_id'][0], doc['text_id'][1])
+            except:
+                HEADER = 'HEADER    Generated with matador.'
             try:
                 # write res file header if info
                 TITLE = 'TITLE     '

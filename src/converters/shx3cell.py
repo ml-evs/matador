@@ -11,7 +11,7 @@ for fname in fnames:
     res_dict, success = castep_scrapers.res2dict(fname, db=False)
     if success:
         doc2cell(res_dict, fname.replace('.res', ''), copy_pspots=False, hash_dupe=True)
-        print_success('Wrote .res file to ' + fname.replace('.cell', '') + '.res')
+        print_success('Wrote .cell file to ' + fname.replace('.cell', '') + '.cell')
     else:
         print_failure('Unable to find final structure in ' + fname + '.')
 print_success('Completed!')
