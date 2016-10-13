@@ -165,6 +165,10 @@ class DBQuery:
             self.query_dict['$and'].append(self.query_tags())
             self.empty_query = False
         
+        if self.args.get('src_str') is not None:
+            self.query_dict['$and'].append(self.query_source())
+            self.empty_query = False
+        
         if self.args.get('icsd') is not None:
             self.query_dict['$and'].append(self.query_icsd())
             self.empty_query = False
@@ -183,7 +187,7 @@ class DBQuery:
                     self.repo = self.collections[collection]
                     if self.args.get('debug'):
                         print('Empty query, showing all...')
-                    self.cursor = list(self.repo.find().sort('enthalpy_per_atom', pm.ASCENDING))
+                    self.cursor = self.repo.find().sort('enthalpy_per_atom', pm.ASCENDING)
                     if self.top == -1:
                         self.top = len(self.cursor)
                     self.display_results(list(self.cursor[:self.top]))
@@ -760,13 +764,23 @@ class DBQuery:
         return query_dict
     
     def query_icsd(self):
-        """ Find all structures matching given tags. """
+        """ Find all structures matching given ICSD CollCode. """
         query_dict = dict()
         query_dict['$and'] = []
-        temp_dict = dict()
-        temp_dict['icsd'] = dict()
-        temp_dict['icsd']['$eq'] = str(self.args.get('icsd'))
-        query_dict['$and'].append(temp_dict)
+        sub_dict = dict()
+        sub_dict['icsd'] = dict()
+        sub_dict['icsd']['$eq'] = str(self.args.get('icsd'))
+        query_dict['$and'].append(sub_dict)
+        return query_dict
+
+    def query_source(self):
+        """ Find all structures with partial source string from args. """
+        query_dict = dict()
+        query_dict['$and'] = []
+        sub_dict = dict()
+        sub_dict['source'] = dict()
+        sub_dict['source']['$in'] = [self.args.get('src_str')]
+        query_dict['$and'].append(sub_dict)
         return query_dict
 
     def query_quality(self):

@@ -277,7 +277,9 @@ if __name__ == '__main__':
     structure_flags.add_argument('--tags', nargs='+', type=str,
                                  help=('search for up to 3 manual tags at once'))
     structure_flags.add_argument('-icsd', '--icsd', type=int,
-                                 help=('search for up an ICSDCollCode'))
+                                 help=('search for an ICSD CollCode'))
+    structure_flags.add_argument('-ss', '--src_str', type=str,
+                                 help=('search for a string inside the structure sources'))
     structure_flags.add_argument('-encap', '--encapsulated', action='store_true',
                                  help='query only structures encapsulated in a carbon nanotube.')
     structure_flags.add_argument('-cntr', '--cnt_radius', type=float,
