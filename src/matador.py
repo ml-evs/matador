@@ -10,6 +10,7 @@ from version import __version__
 # matador modules
 from query import DBQuery
 from hull import QueryConvexHull
+from refine import Refiner
 from export import query2files
 from print_utils import print_failure, print_warning, print_notify
 from polish import Polisher
@@ -79,7 +80,6 @@ class Matador:
 
         if self.args['subcmd'] == 'query':
             self.query = DBQuery(self.client, self.collections, **self.args)
-            self.cursor = list(self.query.cursor)
 
         if self.args['subcmd'] == 'swaps':
             self.query = DBQuery(self.client, self.collections, **self.args)
@@ -88,6 +88,10 @@ class Matador:
                 self.swaps = Polisher(self.hull.hull_cursor, self.args)
             else:
                 self.swaps = Polisher(self.query.cursor, self.args)
+        
+        if self.args['subcmd'] == 'refine':
+            self.query = DBQuery(self.client, self.collections, **self.args)
+            self.refiner = Refiner(self.query.cursor)
 
         if self.args['subcmd'] == 'pdffit':
             self.query = DBQuery(self.client, self.collections, **self.args)
@@ -421,6 +425,9 @@ if __name__ == '__main__':
                                           parents=[global_flags, collection_flags,
                                                    structure_flags, material_flags,
                                                    query_flags])
+    query_parser = subparsers.add_parser('refine',
+                                         help='refine database structures',
+                                         parents=[global_flags, query_flags, structure_flags])
 
     args = parser.parse_args()
 
