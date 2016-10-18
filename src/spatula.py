@@ -174,7 +174,7 @@ class Spatula:
             if 'tags' in self.tag_dict:
                 struct['tags'] = self.tag_dict['tags']
             struct['quality'] = 5
-            # if no pspot info at all, score = 0
+            # if any missing info at all, score = 0
             if 'species_pot' not in struct:
                 struct['quality'] = 0
             else:
@@ -187,6 +187,8 @@ class Spatula:
                         # remove a point for a generic OTF pspot
                         if 'OTF' in struct['species_pot'][elem[0]].upper():
                             struct['quality'] -= 1
+            if 'xc_functional' not in struct:
+                struct['quality'] = 0
             struct_id = self.repo.insert_one(struct).inserted_id
             if self.debug:
                 print('Inserted', struct_id)
