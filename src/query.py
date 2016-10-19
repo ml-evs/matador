@@ -94,7 +94,11 @@ class DBQuery:
             self.cursor = []
 
             for collection in self.collections:
-                temp_cursor = self.collections[collection].find({'text_id': self.args.get('id')})
+                query_dict = dict()
+                query_dict['$and'] = []
+                query_dict['$and'].append(self.query_id())
+                query_dict['$and'].append(self.query_quality())
+                temp_cursor = self.collections[collection].find(query_dict)
                 for doc in temp_cursor:
                     self.cursor.append(doc)
 
@@ -164,11 +168,11 @@ class DBQuery:
         if self.args.get('tags') is not None:
             self.query_dict['$and'].append(self.query_tags())
             self.empty_query = False
-        
+
         if self.args.get('src_str') is not None:
             self.query_dict['$and'].append(self.query_source())
             self.empty_query = False
-        
+
         if self.args.get('icsd') is not None:
             self.query_dict['$and'].append(self.query_icsd())
             self.empty_query = False
@@ -673,7 +677,7 @@ class DBQuery:
             print_exc()
             exit()
 
-        if self.args.get('intersection') or self.args['subcmd'] == 'hull':
+        if self.args.get('intersection'):
             query_dict = dict()
             query_dict['$or'] = []
             # iterate over all combinations
@@ -762,7 +766,13 @@ class DBQuery:
             query_dict['$and'].append(temp_dict)
 
         return query_dict
-    
+
+    def query_id(self):
+        """ Find all structures matching given tags. """
+        query_dict = dict()
+        query_dict['text_id'] = self.args.get('id')
+        return query_dict
+
     def query_icsd(self):
         """ Find all structures matching given ICSD CollCode. """
         query_dict = dict()
