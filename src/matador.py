@@ -88,7 +88,7 @@ class Matador:
                 self.swaps = Polisher(self.hull.hull_cursor, self.args)
             else:
                 self.swaps = Polisher(self.query.cursor, self.args)
-        
+
         if self.args['subcmd'] == 'refine':
             self.query = DBQuery(self.client, self.collections, **self.args)
             self.refiner = Refiner(self.query.cursor)
@@ -124,10 +124,7 @@ class Matador:
         if self.args['subcmd'] == 'hull' or self.args['subcmd'] == 'voltage':
             self.query = DBQuery(self.client, self.collections, **self.args)
             self.hull = QueryConvexHull(self.query, **self.args)
-            if self.args.get('hull_cutoff'):
-                self.cursor = list(self.hull.hull_cursor)
-            else:
-                self.cursor = list(self.hull.cursor)
+            self.cursor = list(self.hull.cursor)
 
         if self.export and len(self.cursor) > 0:
             query2files(self.cursor, self.args)
