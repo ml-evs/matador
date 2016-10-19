@@ -89,7 +89,8 @@ class QueryConvexHull():
 
     def get_chempots(self):
         """ Search for chemical potentials that match
-        the structures in the query cursor.
+        the structures in the query cursor,
+        and add them to the cursor.
         """
         query = self.query
         self.mu_enthalpy = np.zeros((2))
@@ -135,6 +136,8 @@ class QueryConvexHull():
                 self.match[i]['enthalpy_per_b'] = mu['enthalpy_per_atom']
                 self.match[i]['num_a'] = 0
             self.match[0]['num_a'] = float('inf')
+            self.cursor.insert(0, self.match[0])
+            self.cursor.append(self.match[1])
         return
 
     def fake_chempots(self):
