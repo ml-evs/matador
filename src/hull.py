@@ -65,10 +65,10 @@ class QueryConvexHull():
         if self.args['subcmd'] == 'voltage':
             if self.args.get('debug'):
                 self.set_plot_param()
-                self.voltage_curve(self.stable_enthalpy_per_b, self.stable_comp, self.mu_enthalpy)
-                self.metastable_voltage_profile()
+                self.voltage_curve()
+                # self.metastable_voltage_profile()
             else:
-                self.voltage_curve(self.stable_enthalpy_per_b, self.stable_comp, self.mu_enthalpy)
+                self.voltage_curve()
                 self.set_plot_param()
                 if self.args.get('subplot'):
                     self.subplot_voltage_hull()
@@ -310,10 +310,13 @@ class QueryConvexHull():
         self.hull_info = self.get_text_info(cursor=self.hull_cursor, hull=True, html=self.args.get('bokeh'))
         self.structures = structures
 
-    def voltage_curve(self, stable_enthalpy_per_b, stable_comp, mu_enthalpy):
+    def voltage_curve(self):
         """ Take convex hull and calculate voltages. """
         print('Generating voltage curve...')
         stable_num = []
+        stable_comp = self.get_array_from_cursor(self.hull_cursor, 'concentration')
+        stable_enthalpy_per_b = self.get_array_from_cursor(self.hull_cursor, 'enthalpy_per_b')
+        mu_enthalpy = self.get_array_from_cursor(self.match, 'enthalpy_per_atom')
         V = []
         x = []
         for i in range(len(stable_comp)):
