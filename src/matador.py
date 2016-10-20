@@ -10,7 +10,6 @@ from version import __version__
 # matador modules
 from query import DBQuery
 from hull import QueryConvexHull
-from refine import Refiner
 from export import query2files
 from print_utils import print_failure, print_warning, print_notify
 from polish import Polisher
@@ -80,6 +79,7 @@ class Matador:
 
         if self.args['subcmd'] == 'query':
             self.query = DBQuery(self.client, self.collections, **self.args)
+            self.cursor = self.query.cursor
 
         if self.args['subcmd'] == 'swaps':
             self.query = DBQuery(self.client, self.collections, **self.args)
@@ -90,6 +90,7 @@ class Matador:
                 self.swaps = Polisher(self.query.cursor, self.args)
 
         if self.args['subcmd'] == 'refine':
+            from refine import Refiner
             self.query = DBQuery(self.client, self.collections, **self.args)
             self.refiner = Refiner(self.query.cursor)
 

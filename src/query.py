@@ -227,7 +227,8 @@ class DBQuery:
                         if self.top == -1:
                             self.top = cursor_count
                         if cursor_count > self.top:
-                            self.display_results(list(self.cursor)[:self.top])
+                            self.cursor = self.cursor[:self.top]
+                            self.display_results(list(self.cursor))
                         else:
                             self.display_results(list(self.cursor))
 

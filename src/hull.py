@@ -136,8 +136,8 @@ class QueryConvexHull():
                 self.match[i]['enthalpy_per_b'] = mu['enthalpy_per_atom']
                 self.match[i]['num_a'] = 0
             self.match[0]['num_a'] = float('inf')
-            self.cursor.insert(0, self.match[0])
-            self.cursor.append(self.match[1])
+            self.cursor.insert(0, self.match[1])
+            self.cursor.append(self.match[0])
         return
 
     def fake_chempots(self):
@@ -233,14 +233,21 @@ class QueryConvexHull():
             hull_dist[ind] = structures[ind, 1] - (gradient * structures[ind, 0] + intercept)
         return hull_dist, hull_energy, hull_comp
 
-    def get_text_info(self, html=False):
+    def get_text_info(self, cursor=None, hull=False, html=False):
         """ Grab textual info for plot labels. """
         info = []
-        for ind, doc in enumerate(self.cursor):
+        if cursor is None:
+            cursor = self.cursor
+        if hull:
+            stoich_strings = []
+        for ind, doc in enumerate(cursor):
             stoich_string = ''
             for elem in doc['stoichiometry']:
                 stoich_string += elem[0]
                 stoich_string += '$_{' + str(elem[1]) + '}$' if elem[1] != 1 else ''
+            if hull:
+                if stoich_string not in stoich_strings:
+                    stoich_strings.append(stoich_string)
             info_string = "{0:^10}\n{1:^24}\n{2:^5s}\n{3:.3f} eV".format(stoich_string,
                                                                         doc['text_id'][0] + ' ' + doc['text_id'][1],
                                                                         doc['space_group'],
@@ -250,6 +257,8 @@ class QueryConvexHull():
                     info_string = info_string.replace(char, '') 
                 info_string = info_string.split('\n')
             info.append(info_string)
+        if hull:
+            info = stoich_strings
         return info
 
     def hull_2d(self, dis=False):
@@ -262,30 +271,27 @@ class QueryConvexHull():
             return
         self.get_chempots()
         print('Constructing hull...')
-        # num_structures = len(self.cursor)
-        # source_ind = np.zeros((num_structures))
-        # self.source_list = []
         # define hull by order in command-line arguments
         self.x_elem = [self.elements[0]]
         self.one_minus_x_elem = list(self.elements[1:])
         one_minus_x_elem = self.one_minus_x_elem
         # grab relevant information from query results; also make function?
         for ind, doc in enumerate(self.cursor):
-            # num_fu = doc['num_fu']
             # calculate number of atoms of type B per formula unit
             nums_b = len(one_minus_x_elem)*[0]
             for elem in doc['stoichiometry']:
                 for chem_pot_ind, chem_pot in enumerate(one_minus_x_elem):
                     if elem[0] == chem_pot:
                         nums_b[chem_pot_ind] += elem[1]
-            # num_b = sum(nums_b)
+            num_b = sum(nums_b)
+            num_fu = doc['num_fu']
             # get enthalpy and volume per unit B
-            # self.cursor[ind]['enthalpy_per_b'] = doc['enthalpy'] / (num_b*num_fu)
-            # self.cursor[ind]['cell_volume_per_b'] = doc['cell_volume'] / (num_b*num_fu)
-            # source_dir = ''.join(doc['source'][0].split('/')[:-1])
-            # self.cursor[ind]['source_idx'] = self.source_list.index(source_dir) + 1
-            # if source_dir not in self.source_list:
-                # self.source_list.append(source_dir)
+            if num_b == 0:
+                self.cursor[ind]['enthalpy_per_b'] = 1e10
+                self.cursor[ind]['cell_volume_per_b'] = 1e10
+            else:
+                self.cursor[ind]['enthalpy_per_b'] = doc['enthalpy'] / (num_b*num_fu)
+                self.cursor[ind]['cell_volume_per_b'] = doc['cell_volume'] / (num_b*num_fu)
             self.cursor[ind]['formation_enthalpy_per_atom'] = self.get_formation_energy(doc)
             self.cursor[ind]['concentration'] = self.get_concentration(doc)
         # put chem pots in same array as formation for easy hulls
@@ -301,6 +307,7 @@ class QueryConvexHull():
         self.info = self.get_text_info(html=self.args.get('bokeh'))
         # create hull_cursor to pass to other modules
         self.hull_cursor = [self.cursor[idx] for idx in np.where(self.hull_dist <= self.hull_cutoff + 1e-12)[0]]
+        self.hull_info = self.get_text_info(cursor=self.hull_cursor, hull=True, html=self.args.get('bokeh'))
         self.structures = structures
 
     def voltage_curve(self, stable_enthalpy_per_b, stable_comp, mu_enthalpy):
@@ -366,14 +373,14 @@ class QueryConvexHull():
                                                marker='o', zorder=99999, edgecolor='k',
                                                s=self.scale*40, lw=1.5, alpha=1,
                                                label=self.info[self.hull.vertices[ind]]))
-                ax.annotate(self.info[self.hull.vertices[ind]].split('\n')[0],
-                            xy=(self.structure_slice[self.hull.vertices[ind], 0],
-                                self.structure_slice[self.hull.vertices[ind], 1]),
-                            textcoords='data',
-                            ha='center',
-                            zorder=99999,
-                            xytext=(self.structure_slice[self.hull.vertices[ind], 0],
-                                    self.structure_slice[self.hull.vertices[ind], 1]-0.05))
+            # ax.annotate(self.hull_info[ind],
+                        # xy=(self.structure_slice[self.hull.vertices[ind], 0],
+                            # self.structure_slice[self.hull.vertices[ind], 1]),
+                        # textcoords='data',
+                        # ha='center',
+                        # zorder=99999,
+                        # xytext=(self.structure_slice[self.hull.vertices[ind], 0],
+                                # self.structure_slice[self.hull.vertices[ind], 1]-0.05))
         lw = self.scale * 0 if self.mpl_new_ver else 1
         # points for off hull structures
         if self.hull_cutoff == 0:
