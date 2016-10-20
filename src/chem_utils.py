@@ -28,14 +28,19 @@ def get_periodic_table():
 
 
 def get_molar_mass(elem):
-    """ Return molar mass of chosen element. """
+    """ Returns molar mass of chosen element. """
     return periodictable.elements.symbol(elem).mass
 
+def get_atomic_number(elem):
+    """ Returns atomic number of chosen element. """
+    return periodictable.elements.symbol(elem).number
 
 def get_capacities(x, m_B):
-    """ Return capacity in mAh/g from x in A_x B
+    """ Returns capacity in mAh/g from x in A_x B
     and m_B in a.m.u.
     """
     x = np.array(x)
     Q = x * FARADAY_CONSTANT_Cpermol * Cperg_to_mAhperg / m_B
     return Q
+
+

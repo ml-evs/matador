@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 from __future__ import print_function
 from scrapers.castep_scrapers import castep2dict
 from os import walk, chdir
@@ -35,19 +35,21 @@ def get_cutoffs(structure_files):
     for key in structure_files:
         for doc in structure_files[key]:
             if len(doc['stoichiometry']) == 1:
-                doc['formation_free_energy_per_atom'] = 0
-                cutoff_chempots_dict[str(doc['cut_off_energy'])][doc['atom_types'][0]] = doc['free_energy_per_atom']
-                cutoff_chempots[key].append([doc['cut_off_energy'], doc['free_energy_per_atom']])
+                doc['formation_enthalpy_per_atom'] = 0
+                cutoff_chempots_dict[str(doc['cut_off_energy'])][doc['atom_types'][0]] = doc['enthalpy_per_atom']
+                cutoff_chempots[key].append([doc['cut_off_energy'], doc['enthalpy_per_atom']])
                 chempot_list[key] = doc['stoichiometry'][0][0]
     cutoff_form = defaultdict(list)
     stoich_list = dict()
+    print(cutoff_chempots_dict)
     for key in structure_files:
         for doc in structure_files[key]:
+            print(doc['cut_off_energy'])
             if len(doc['stoichiometry']) == 2:
-                doc['formation_free_energy_per_atom'] = doc['free_energy_per_atom']
+                doc['formation_enthalpy_per_atom'] = doc['enthalpy_per_atom']
                 for atom in doc['atom_types']:
-                    doc['formation_free_energy_per_atom'] -= cutoff_chempots_dict[str(doc['cut_off_energy'])][atom] / len(doc['atom_types'])
-                cutoff_form[key].append([doc['cut_off_energy'], doc['formation_free_energy_per_atom']])
+                    doc['formation_enthalpy_per_atom'] -= cutoff_chempots_dict[str(doc['cut_off_energy'])][atom] / len(doc['atom_types'])
+                cutoff_form[key].append([doc['cut_off_energy'], doc['formation_enthalpy_per_atom']])
                 stoich_list[key] = (doc['stoichiometry'][1][0])
                 stoich_list[key] += ('$_\mathrm{' + str(doc['stoichiometry'][1][1]) + '}$') if doc['stoichiometry'][1][1] != 1 else ''
                 stoich_list[key] += (doc['stoichiometry'][0][0])
@@ -71,12 +73,12 @@ def get_kpts(structure_files):
     for key in structure_files:
         for doc in structure_files[key]:
             if len(doc['stoichiometry']) == 1:
-                doc['formation_free_energy_per_atom'] = 0
+                doc['formation_enthalpy_per_atom'] = 0
                 grid = doc['kpoints_mp_grid']
                 num_k = sum(grid)
                 num_k = doc['kpoints_mp_spacing']
-                kpt_chempots_dict[str(round(doc['kpoints_mp_spacing'], 2))][doc['atom_types'][0]] = doc['free_energy_per_atom']
-                kpt_chempots[key].append([num_k, doc['free_energy_per_atom']])
+                kpt_chempots_dict[str(round(doc['kpoints_mp_spacing'], 2))][doc['atom_types'][0]] = doc['enthalpy_per_atom']
+                kpt_chempots[key].append([num_k, doc['enthalpy_per_atom']])
                 chempot_list[key] = doc['stoichiometry'][0][0]
 
     kpt_form = defaultdict(list)
@@ -87,10 +89,10 @@ def get_kpts(structure_files):
             num_k = sum(grid)
             num_k = doc['kpoints_mp_spacing']
             if len(doc['stoichiometry']) == 2:
-                doc['formation_free_energy_per_atom'] = doc['free_energy_per_atom']
+                doc['formation_enthalpy_per_atom'] = doc['enthalpy_per_atom']
                 for atom in doc['atom_types']:
-                    doc['formation_free_energy_per_atom'] -= kpt_chempots_dict[str(round(doc['kpoints_mp_spacing'], 2))][atom] / len(doc['atom_types'])
-                kpt_form[key].append([num_k, doc['formation_free_energy_per_atom']])
+                    doc['formation_enthalpy_per_atom'] -= kpt_chempots_dict[str(round(doc['kpoints_mp_spacing'], 2))][atom] / len(doc['atom_types'])
+                kpt_form[key].append([num_k, doc['formation_enthalpy_per_atom']])
                 stoich_list[key] = (doc['stoichiometry'][1][0])
                 stoich_list[key] += ('$_\mathrm{' + str(doc['stoichiometry'][1][1]) + '}$') if doc['stoichiometry'][1][1] != 1 else ''
                 stoich_list[key] += (doc['stoichiometry'][0][0])
