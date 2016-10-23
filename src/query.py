@@ -17,18 +17,21 @@ from os import uname
 from itertools import combinations
 from traceback import print_exc
 from fractions import gcd
+from sys import exit
 
 
 class DBQuery:
     """ Class that implements queries to MongoDB
     structure database.
     """
-    def __init__(self, client=False, collections=False, **kwargs):
+    def __init__(self, client=False, collections=False, subcmd='query', **kwargs):
         """ Parse arguments from matador or API call
         before calling query.
         """
         # read args
         self.args = kwargs
+        if self.args.get('subcmd') is None:
+            self.args['subcmd'] = subcmd
         if client is not False:
             self.client = client
             self.db = client.crystals
@@ -255,8 +258,8 @@ class DBQuery:
                 test_query_dict = []
                 calc_dicts = []
                 cutoff = []
-                sample = 2
-                rand_sample = 5 if self.args.get('biggest') else 5
+                sample = 1
+                rand_sample = 0 if self.args.get('biggest') else 5
                 i = 0
                 count = len(self.cursor)
                 if count <= 0:
@@ -626,7 +629,7 @@ class DBQuery:
         by query_num_species.
         """
         if custom_elem is None:
-            elements = self.args.get('composition')
+            elements = list(self.args.get('composition'))
         else:
             elements = custom_elem
         if ':' in elements[0]:
