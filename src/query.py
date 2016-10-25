@@ -239,8 +239,8 @@ class DBQuery:
             if self.args.get('id') is None and (self.args.get('subcmd') == 'hull' or
                                                 self.args.get('subcmd') == 'voltage' or
                                                 self.args.get('hull_cutoff') is not None):
-                if 'oqmd' in self.collections:
-                    exit('Use --include_oqmd instead of --db, exiting...')
+                # if 'oqmd' in self.collections:
+                    # exit('Use --include_oqmd instead of --db, exiting...')
                 if len(self.collections.keys()) == 1:
                     self.repo = self.collections[list(self.collections.keys())[0]]
                 else:
@@ -296,10 +296,13 @@ class DBQuery:
                             print("{:^24}".format(self.cursor[ind]['text_id'][0] + ' ' +
                                                   self.cursor[ind]['text_id'][1]) +
                                   ': matched ' + str(test_cursor_count[-1]), 'structures.', end='\t-> ')
-                            print('S-' if self.cursor[ind].get('spin_polarized') else '',
-                                  self.cursor[ind]['xc_functional'] + ', ',
-                                  self.cursor[ind]['cut_off_energy'], ' eV, ',
-                                  self.cursor[ind]['kpoints_mp_spacing'], ' 1/A', sep='')
+                            try:
+                                print('S-' if self.cursor[ind].get('spin_polarized') else '',
+                                      self.cursor[ind]['xc_functional'] + ', ',
+                                      self.cursor[ind]['cut_off_energy'], ' eV, ',
+                                      self.cursor[ind]['kpoints_mp_spacing'], ' 1/A', sep='')
+                            except:
+                                pass
                             if self.args.get('biggest'):
                                 if test_cursor_count[-1] > 2*int(count/3):
                                     print('Matched at least 2/3 of total number, composing hull...')
@@ -884,9 +887,10 @@ class DBQuery:
             temp_dict['spin_polarized']['$ne'] = True
             query_dict.append(temp_dict)
         if self.args.get('loose'):
-            temp_dict = dict()
-            query_dict.append(dict())
-            query_dict[-1]['cut_off_energy'] = doc['cut_off_energy']
+            return query_dict
+            # temp_dict = dict()
+            # query_dict.append(dict())
+            # query_dict[-1]['cut_off_energy'] = doc['cut_off_energy']
         else:
             temp_dict = dict()
             temp_dict['kpoints_mp_spacing'] = dict()

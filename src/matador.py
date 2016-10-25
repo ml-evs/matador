@@ -125,7 +125,7 @@ class Matador:
         if self.args['subcmd'] == 'hull' or self.args['subcmd'] == 'voltage':
             self.query = DBQuery(self.client, self.collections, **self.args)
             self.hull = QueryConvexHull(self.query, **self.args)
-            self.cursor = list(self.hull.cursor)
+            self.cursor = self.hull.hull_cursor
 
         if self.export and len(self.cursor) > 0:
             query2files(self.cursor, self.args)
