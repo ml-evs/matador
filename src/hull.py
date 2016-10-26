@@ -24,11 +24,13 @@ class QueryConvexHull():
     """ Implements a Convex Hull for formation energies
     from a fryan DBQuery.
     """
-    def __init__(self, query, **kwargs):
+    def __init__(self, query, subcmd='hull', **kwargs):
         """ Accept query from fryan as argument. """
+        self.args = kwargs
+        if self.args.get('subcmd') is None:
+            self.args['subcmd'] = subcmd
         self.query = query
         self.cursor = list(query.cursor)
-        self.args = kwargs
         self.K2eV = 8.61733e-5
 
         if self.args.get('hull_temp') is not None:
@@ -78,7 +80,7 @@ class QueryConvexHull():
         elif self.args.get('volume'):
             self.volume_curve(self.stable_comp, self.stable_vol)
 
-        if self.args['subcmd'] == 'hull' and not self.args['no_plot']:
+        if self.args['subcmd'] == 'hull' and not self.args.get('no_plot'):
             if self.args.get('bokeh'):
                 self.plot_2d_hull_bokeh()
             else:
