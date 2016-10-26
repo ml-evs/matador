@@ -18,6 +18,7 @@ import numpy as np
 from mpldatacursor import datacursor
 import matplotlib.pyplot as plt
 import matplotlib.colors as colours
+import ternary
 
 
 class QueryConvexHull():
@@ -85,7 +86,10 @@ class QueryConvexHull():
                 self.plot_2d_hull_bokeh()
             else:
                 self.set_plot_param()
-                self.plot_2d_hull()
+                if len(self.elements) == 3):
+                    self.plot_ternary_hull()
+                else:
+                    self.plot_2d_hull()
             if self.args.get('volume'):
                 self.plot_volume_curve()
 
@@ -185,11 +189,12 @@ class QueryConvexHull():
         return formation
 
     def get_concentration(self, doc):
-        """ Returns x for A_x B_{1-x}. """
-        stoich = 0.0
-        for elem in doc['stoichiometry']:
-            if self.x_elem[0] in elem[0]:
-                stoich = elem[1]/float(self.get_atoms_per_fu(doc))
+        """ Returns x for A_x B_{1-x}
+        or xyz for A_x B_y C_z, (x+y+z=1). """
+        stoich = [0.0] * (len(self.elements)-1)
+        for ind, elem in enumerate(doc['stoichiometry']):
+            if elem[0] in self.elements[:-1]:
+                stoich[self.elements.index(elem[0])] = elem[1]/float(self.get_atoms_per_fu(doc))
         return stoich
 
     def get_array_from_cursor(self, cursor, key):
@@ -203,6 +208,7 @@ class QueryConvexHull():
         except:
             print_exc()
         array = np.asarray(array)
+        assert(len(array) == len(cursor))
         return array
 
     def set_cursor_from_array(self, array, key):
@@ -268,9 +274,10 @@ class QueryConvexHull():
         query = self.query
         self.elements = query.args.get('composition')
         self.elements = [elem for elem in re.split(r'([A-Z][a-z]*)', self.elements[0]) if elem]
-        if len(self.elements) > 3:
-            print('Cannot create binary hull for more or less than 2 elements (yet!).')
-            return
+        assert(len(self.elements) < 4 and len(self.elements) > 1)
+        ternary = False
+        if len(self.elements) == 3:
+            ternary = True
         self.get_chempots()
         print('Constructing hull...')
         # define hull by order in command-line arguments
@@ -279,28 +286,29 @@ class QueryConvexHull():
         one_minus_x_elem = self.one_minus_x_elem
         # grab relevant information from query results; also make function?
         for ind, doc in enumerate(self.cursor):
-            # calculate number of atoms of type B per formula unit
-            nums_b = len(one_minus_x_elem)*[0]
-            for elem in doc['stoichiometry']:
-                for chem_pot_ind, chem_pot in enumerate(one_minus_x_elem):
-                    if elem[0] == chem_pot:
-                        nums_b[chem_pot_ind] += elem[1]
-            num_b = sum(nums_b)
-            num_fu = doc['num_fu']
-            # get enthalpy and volume per unit B
-            if num_b == 0:
-                self.cursor[ind]['enthalpy_per_b'] = 1e10
-                self.cursor[ind]['cell_volume_per_b'] = 1e10
-            else:
-                self.cursor[ind]['enthalpy_per_b'] = doc['enthalpy'] / (num_b*num_fu)
-                self.cursor[ind]['cell_volume_per_b'] = doc['cell_volume'] / (num_b*num_fu)
+            if not ternary:
+                # calculate number of atoms of type B per formula unit
+                nums_b = len(one_minus_x_elem)*[0]
+                for elem in doc['stoichiometry']:
+                    for chem_pot_ind, chem_pot in enumerate(one_minus_x_elem):
+                        if elem[0] == chem_pot:
+                            nums_b[chem_pot_ind] += elem[1]
+                num_b = sum(nums_b)
+                num_fu = doc['num_fu']
+                # get enthalpy and volume per unit B
+                if num_b == 0:
+                    self.cursor[ind]['enthalpy_per_b'] = 1e10
+                    self.cursor[ind]['cell_volume_per_b'] = 1e10
+                else:
+                    self.cursor[ind]['enthalpy_per_b'] = doc['enthalpy'] / (num_b*num_fu)
+                    self.cursor[ind]['cell_volume_per_b'] = doc['cell_volume'] / (num_b*num_fu)
             self.cursor[ind]['formation_enthalpy_per_atom'] = self.get_formation_energy(doc)
             self.cursor[ind]['concentration'] = self.get_concentration(doc)
-        # put chem pots in same array as formation for easy hulls
-        structures = np.vstack((self.get_array_from_cursor(self.cursor, 'concentration'),
-                                self.get_array_from_cursor(self.cursor, 'formation_enthalpy_per_atom'))).T
-
-        # create hull with SciPy routine, including only points with E_F < 0
+        # create stacked array of hull data 
+        structures = np.hstack((self.get_array_from_cursor(self.cursor, 'concentration'),
+                                self.get_array_from_cursor(self.cursor, 'formation_enthalpy_per_atom').reshape(len(self.cursor), 1)))
+        
+        # create hull with SciPy routine, including only points with formation energy < 0
         self.structure_slice = structures[np.where(structures[:, 1] <= 0 + 1e-9)]
         self.hull = ConvexHull(self.structure_slice)
         self.hull_dist, self.hull_energy, self.hull_comp = self.get_hull_distances(structures)
@@ -568,6 +576,26 @@ class QueryConvexHull():
             flines.append(js_string)
         with open(path+fname, 'w') as f:
             f.write('\n'.join(map(str, flines)))
+
+    def plot_ternary_hull(self):
+        """ Plot calculated ternary hull. """
+        print('Plotting ternary hull...')
+        scale = 1
+        fig, ax = ternary.figure(scale=scale)
+
+        ax.boundary(linewidth=2.0)
+        ax.gridlines(multiple=0.1)
+        fontsize = 18
+        
+        concs = np.zeros((len(self.structures), 3))
+
+        concs[:, :-1] = self.structures[:, :-1]
+        for i in range(len(concs)):
+            concs[i, -1] = 1 - concs[i, 0] - concs[i, 1]
+
+        ax.scatter(concs, marker='D', color='green')
+        ax.show()
+
 
     def plot_voltage_curve(self):
         """ Plot calculated voltage curve. """
