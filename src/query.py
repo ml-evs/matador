@@ -258,8 +258,8 @@ class DBQuery:
                 test_query_dict = []
                 calc_dicts = []
                 cutoff = []
-                sample = 1
-                rand_sample = 0 if self.args.get('biggest') else 5
+                sample = 2
+                rand_sample = 5 if self.args.get('biggest') else 3
                 i = 0
                 count = len(self.cursor)
                 if count <= 0:
