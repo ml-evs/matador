@@ -262,7 +262,7 @@ class QueryConvexHull():
                                                                         doc['hull_distance'])
             if html:
                 for char in ['$', '_', '{', '}']:
-                    info_string = info_string.replace(char, '') 
+                    info_string = info_string.replace(char, '')
                 info_string = info_string.split('\n')
             info.append(info_string)
         if hull:
@@ -307,20 +307,29 @@ class QueryConvexHull():
                     self.cursor[ind]['cell_volume_per_b'] = doc['cell_volume'] / (num_b*num_fu)
             self.cursor[ind]['formation_enthalpy_per_atom'] = self.get_formation_energy(doc)
             self.cursor[ind]['concentration'] = self.get_concentration(doc)
-        # create stacked array of hull data 
+        # create stacked array of hull data
         structures = np.hstack((self.get_array_from_cursor(self.cursor, 'concentration'),
                                 self.get_array_from_cursor(self.cursor, 'formation_enthalpy_per_atom').reshape(len(self.cursor), 1)))
-        
         # create hull with SciPy routine, including only points with formation energy < 0
-        self.structure_slice = structures[np.where(structures[:, 1] <= 0 + 1e-9)]
-        self.hull = ConvexHull(self.structure_slice)
-        self.hull_dist, self.hull_energy, self.hull_comp = self.get_hull_distances(structures)
-        self.set_cursor_from_array(self.hull_dist, 'hull_distance')
+        if ternary:
+            self.structure_slice = structures
+        else:
+            self.structure_slice = structures[np.where(structures[:, 1] <= 0 + 1e-9)]
+        # assert(len(self.structure_slice) > 2)
+        try:
+            self.hull = ConvexHull(self.structure_slice)
+            self.hull_dist, self.hull_energy, self.hull_comp = self.get_hull_distances(structures)
+            # self.hull_dist = np.ones((len(structures)))
+            # self.hull_dist[:-3] = 0
+            self.set_cursor_from_array(self.hull_dist, 'hull_distance')
 
-        self.info = self.get_text_info(html=self.args.get('bokeh'))
-        # create hull_cursor to pass to other modules
-        self.hull_cursor = [self.cursor[idx] for idx in np.where(self.hull_dist <= self.hull_cutoff + 1e-12)[0]]
-        self.hull_info = self.get_text_info(cursor=self.hull_cursor, hull=True, html=self.args.get('bokeh'))
+            self.info = self.get_text_info(html=self.args.get('bokeh'))
+            # create hull_cursor to pass to other modules
+            self.hull_cursor = [self.cursor[idx] for idx in np.where(self.hull_dist <= self.hull_cutoff + 1e-12)[0]]
+            self.hull_info = self.get_text_info(cursor=self.hull_cursor, hull=True, html=self.args.get('bokeh'))
+        except:
+            print('Error with QHull, plotting points only...')
+            self.hull_cursor = self.cursor[-len(self.elements):]
         self.structures = structures
 
     def voltage_curve(self):
@@ -381,73 +390,87 @@ class QueryConvexHull():
         one_minus_x_elem = list(self.elements[1:])
         plt.draw()
         # star structures on hull
-        for ind in range(len(self.hull.vertices)):
-            if self.structure_slice[self.hull.vertices[ind], 1] <= 0:
-                hull_scatter.append(ax.scatter(self.structure_slice[self.hull.vertices[ind], 0],
-                                               self.structure_slice[self.hull.vertices[ind], 1],
-                                               c=self.colours[1],
-                                               marker='o', zorder=99999, edgecolor='k',
-                                               s=self.scale*40, lw=1.5, alpha=1,
-                                               label=self.info[self.hull.vertices[ind]]))
-            # ax.annotate(self.hull_info[ind],
-                        # xy=(self.structure_slice[self.hull.vertices[ind], 0],
-                            # self.structure_slice[self.hull.vertices[ind], 1]),
-                        # textcoords='data',
-                        # ha='center',
-                        # zorder=99999,
-                        # xytext=(self.structure_slice[self.hull.vertices[ind], 0],
-                                # self.structure_slice[self.hull.vertices[ind], 1]-0.05))
-        lw = self.scale * 0 if self.mpl_new_ver else 1
-        # points for off hull structures
-        if self.hull_cutoff == 0:
-            # if no specified hull cutoff, ignore labels and colour
-            # by distance from hull
-            cmap_full = plt.cm.get_cmap('Dark2')
-            cmap = colours.LinearSegmentedColormap.from_list(
-                'trunc({n},{a:.2f},{b:.2f})'.format(n=cmap_full.name, a=0, b=1),
-                cmap_full(np.linspace(0.15, 0.4, 100)))
-            scatter = ax.scatter(self.structures[:, 0], self.structures[:, 1],
-                                 s=self.scale*40, lw=lw, alpha=0.9, c=self.hull_dist,
-                                 edgecolor='k', zorder=300, cmap=cmap)
-                                 # edgecolor='k', zorder=300, cmap=cmap)
-            scatter = ax.scatter(self.structures[np.argsort(self.hull_dist), 0][::-1],
-                                 self.structures[np.argsort(self.hull_dist), 1][::-1],
-                                 s=self.scale*40, lw=lw, alpha=1, c=np.sort(self.hull_dist)[::-1],
-                                 edgecolor='k', zorder=10000, cmap=cmap, norm=colours.LogNorm(0.02, 2))
-            cbar = plt.colorbar(scatter, aspect=30, pad=0.02, ticks=[0, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28])
-            cbar.ax.set_yticklabels([0, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28])
-            cbar.set_label('Distance from hull (eV)')
-        if self.hull_cutoff != 0:
-            # if specified hull cutoff, label and colour those below
-            for ind in range(len(self.structures)):
-                if self.hull_dist[ind] <= self.hull_cutoff or self.hull_cutoff == 0:
-                    c = self.colours[1]
-                    scatter.append(ax.scatter(self.structures[ind, 0], self.structures[ind, 1],
-                                   s=self.scale*40, lw=lw, alpha=0.9, c=c, edgecolor='k',
-                                   label=self.info[ind], zorder=300))
-            ax.scatter(self.structures[1:-1, 0], self.structures[1:-1, 1], s=self.scale*30, lw=lw,
-                       alpha=0.3, c=self.colours[-2],
-                       edgecolor='k', zorder=10)
-        # tie lines
-        for ind in range(len(self.hull_comp)-1):
-            ax.plot([self.hull_comp[ind], self.hull_comp[ind+1]],
-                    [self.hull_energy[ind], self.hull_energy[ind+1]],
-                    c=self.colours[0], lw=2, alpha=1, zorder=1000, label='')
-            if self.hull_cutoff > 0:
+        try:
+            for ind in range(len(self.hull.vertices)):
+                if self.structure_slice[self.hull.vertices[ind], 1] <= 0:
+                    hull_scatter.append(ax.scatter(self.structure_slice[self.hull.vertices[ind], 0],
+                                                   self.structure_slice[self.hull.vertices[ind], 1],
+                                                   c=self.colours[1],
+                                                   marker='o', zorder=99999, edgecolor='k',
+                                                   s=self.scale*40, lw=1.5, alpha=1,
+                                                   label=self.info[self.hull.vertices[ind]]))
+                # ax.annotate(self.hull_info[ind],
+                            # xy=(self.structure_slice[self.hull.vertices[ind], 0],
+                                # self.structure_slice[self.hull.vertices[ind], 1]),
+                            # textcoords='data',
+                            # ha='center',
+                            # zorder=99999,
+                            # xytext=(self.structure_slice[self.hull.vertices[ind], 0],
+                                    # self.structure_slice[self.hull.vertices[ind], 1]-0.05))
+            lw = self.scale * 0 if self.mpl_new_ver else 1
+            # points for off hull structures
+            if self.hull_cutoff == 0:
+                # if no specified hull cutoff, ignore labels and colour
+                # by distance from hull
+                cmap_full = plt.cm.get_cmap('Dark2')
+                cmap = colours.LinearSegmentedColormap.from_list(
+                    'trunc({n},{a:.2f},{b:.2f})'.format(n=cmap_full.name, a=0, b=1),
+                    cmap_full(np.linspace(0.15, 0.4, 100)))
+                scatter = ax.scatter(self.structures[:, 0], self.structures[:, 1],
+                                     s=self.scale*40, lw=lw, alpha=0.9, c=self.hull_dist,
+                                     edgecolor='k', zorder=300, cmap=cmap)
+                                     # edgecolor='k', zorder=300, cmap=cmap)
+                scatter = ax.scatter(self.structures[np.argsort(self.hull_dist), 0][::-1],
+                                     self.structures[np.argsort(self.hull_dist), 1][::-1],
+                                     s=self.scale*40, lw=lw, alpha=1, c=np.sort(self.hull_dist)[::-1],
+                                     edgecolor='k', zorder=10000, cmap=cmap, norm=colours.LogNorm(0.02, 2))
+                cbar = plt.colorbar(scatter, aspect=30, pad=0.02, ticks=[0, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28])
+                cbar.ax.set_yticklabels([0, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28])
+                cbar.set_label('Distance from hull (eV)')
+            if self.hull_cutoff != 0:
+                # if specified hull cutoff, label and colour those below
+                c = self.colours[1]
+                for ind in range(len(self.structures)):
+                    if self.hull_dist[ind] <= self.hull_cutoff or self.hull_cutoff == 0:
+                        scatter.append(ax.scatter(self.structures[ind, 0], self.structures[ind, 1],
+                                       s=self.scale*40, lw=lw, alpha=0.9, c=c, edgecolor='k',
+                                       label=self.info[ind], zorder=300))
+                ax.scatter(self.structures[1:-1, 0], self.structures[1:-1, 1], s=self.scale*30, lw=lw,
+                           alpha=0.3, c=self.colours[-2],
+                           edgecolor='k', zorder=10)
+            # tie lines
+            for ind in range(len(self.hull_comp)-1):
                 ax.plot([self.hull_comp[ind], self.hull_comp[ind+1]],
-                        [self.hull_energy[ind]+self.hull_cutoff,
-                         self.hull_energy[ind+1]+self.hull_cutoff],
-                        '--', c=self.colours[1], lw=1, alpha=0.5, zorder=1000, label='')
-        ax.set_xlim(-0.05, 1.05)
-        # data cursor
-        if not dis and self.hull_cutoff != 0:
-            datacursor(scatter[:], formatter='{label}'.format, draggable=False,
-                       bbox=dict(fc='white'),
-                       arrowprops=dict(arrowstyle='simple', alpha=1))
-        ax.set_ylim(-0.1 if np.min(self.structure_slice[self.hull.vertices, 1]) > 0
-                    else np.min(self.structure_slice[self.hull.vertices, 1])-0.15,
-                    0.1 if np.max(self.structure_slice[self.hull.vertices, 1]) > 1
-                    else np.max(self.structure_slice[self.hull.vertices, 1])+0.1)
+                        [self.hull_energy[ind], self.hull_energy[ind+1]],
+                        c=self.colours[0], lw=2, alpha=1, zorder=1000, label='')
+                if self.hull_cutoff > 0:
+                    ax.plot([self.hull_comp[ind], self.hull_comp[ind+1]],
+                            [self.hull_energy[ind]+self.hull_cutoff,
+                             self.hull_energy[ind+1]+self.hull_cutoff],
+                            '--', c=self.colours[1], lw=1, alpha=0.5, zorder=1000, label='')
+            # data cursor
+            if not dis and self.hull_cutoff != 0:
+                datacursor(scatter[:], formatter='{label}'.format, draggable=False,
+                           bbox=dict(fc='white'),
+                           arrowprops=dict(arrowstyle='simple', alpha=1))
+            ax.set_ylim(-0.1 if np.min(self.structure_slice[self.hull.vertices, 1]) > 0
+                        else np.min(self.structure_slice[self.hull.vertices, 1])-0.15,
+                        0.1 if np.max(self.structure_slice[self.hull.vertices, 1]) > 1
+                        else np.max(self.structure_slice[self.hull.vertices, 1])+0.1)
+        except:
+            c = self.colours[1]
+            lw = self.scale * 0 if self.mpl_new_ver else 1
+            for ind in range(len(self.hull_cursor)):
+                scatter.append(ax.scatter(self.hull_cursor[ind]['concentration'], self.hull_cursor[ind]['hull_distance'],
+                               s=self.scale*40, lw=1.5, alpha=1, c=c, edgecolor='k',
+                               zorder=1000))
+                ax.plot([0, 1], [0, 0], lw=2, c=self.colours[0], zorder=900)
+            for ind in range(len(self.structures)):
+                scatter.append(ax.scatter(self.structures[ind, 0], self.structures[ind, 1],
+                               s=self.scale*40, lw=lw, alpha=0.9, c=c, edgecolor='k',
+                               zorder=300))
+
+
         if len(one_minus_x_elem) == 1:
             ax.set_title(x_elem[0] + '$_\mathrm{x}$' + one_minus_x_elem[0] + '$_\mathrm{1-x}$')
         else:
@@ -455,6 +478,7 @@ class QueryConvexHull():
         plt.locator_params(nbins=3)
         ax.set_xlabel('$\mathrm{x}$')
         ax.grid(False)
+        ax.set_xlim(-0.05, 1.05)
         ax.set_xticks([0, 0.33, 0.5, 0.66, 1])
         ax.set_xticklabels(ax.get_xticks())
         ax.set_ylabel('E$_\mathrm{F}$ (eV/atom)')
@@ -537,7 +561,7 @@ class QueryConvexHull():
         fig.xaxis.axis_label_text_font_style = 'normal'
         fig.title.text_font_size = '20pt'
         fig.title.align = 'center'
-        
+
         ylim = [-0.1 if np.min(self.structure_slice[self.hull.vertices, 1]) > 0
                     else np.min(self.structure_slice[self.hull.vertices, 1])-0.15,
                     0.1 if np.max(self.structure_slice[self.hull.vertices, 1]) > 1
@@ -597,15 +621,20 @@ class QueryConvexHull():
         ax.ticks(axis='lbr', linewidth=1, multiple=0.1)
         ax.clear_matplotlib_ticks()
 
+        colours = []
+        alpha = []
         concs = np.zeros((len(self.structures), 3))
 
         concs[:, :-1] = self.structures[:, :-1]
         for i in range(len(concs)):
             concs[i, -1] = 1 - concs[i, 0] - concs[i, 1]
+            colours.append('green')
 
-        ax.scatter(concs, marker='D', color='green', zorder=1000)
+        for ind in range(len(self.hull.vertices)):
+            colours[self.hull.vertices[ind]] = 'red'
+
+        ax.scatter(concs, marker='D', color=colours, zorder=1000)
         ax.show()
-
 
     def plot_voltage_curve(self):
         """ Plot calculated voltage curve. """
