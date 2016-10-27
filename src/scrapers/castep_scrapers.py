@@ -497,13 +497,13 @@ def castep2dict(seed, db=True, **kwargs):
                 castep['cut_off_energy'] = float(line.split(':')[-1].split()[0])
             elif 'finite_basis_corr' not in castep and 'finite basis set correction  ' in line:
                 castep['finite_basis_corr'] = line.split(':')[-1].strip()
-            elif 'MP grid size for SCF' in line:
+            elif 'kpoints_mp_grid' not in castep and 'MP grid size for SCF' in line:
                 castep['kpoints_mp_grid'] = map(int, list(line.split('is')[-1].split()))
             elif 'sedc_apply' not in castep and \
                     'DFT+D: Semi-empirical dispersion correction    : on' in line:
                 castep['sedc_apply'] = True
                 castep['sedc_scheme'] = flines[line_no+1].split(':')[1].split()[0]
-            elif 'Space group of crystal' in line:
+            elif 'space_group' not in castep and 'Space group of crystal' in line:
                 castep['space_group'] = line.split(':')[-1].split(',')[0].strip().replace(" ", "")
             elif 'external_pressure' not in castep and 'External pressure/stress' in line:
                 try:
