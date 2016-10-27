@@ -79,14 +79,14 @@ class QueryConvexHull():
                     self.plot_voltage_curve()
                 self.plot_2d_hull()
         elif self.args.get('volume'):
-            self.volume_curve(self.stable_comp, self.stable_vol)
+            self.volume_curve()
 
         if self.args['subcmd'] == 'hull' and not self.args.get('no_plot'):
             if self.args.get('bokeh'):
                 self.plot_2d_hull_bokeh()
             else:
                 self.set_plot_param()
-                if len(self.elements) == 3):
+                if len(self.elements) == 3:
                     self.plot_ternary_hull()
                 else:
                     self.plot_2d_hull()
@@ -142,8 +142,8 @@ class QueryConvexHull():
                 self.match[i]['enthalpy_per_b'] = mu['enthalpy_per_atom']
                 self.match[i]['num_a'] = 0
             self.match[0]['num_a'] = float('inf')
-            self.cursor.insert(0, self.match[1])
-            self.cursor.append(self.match[0])
+            for match in self.match:
+                self.cursor.append(match)
         return
 
     def fake_chempots(self):
@@ -279,7 +279,10 @@ class QueryConvexHull():
         if len(self.elements) == 3:
             ternary = True
         self.get_chempots()
-        print('Constructing hull...')
+        if ternary:
+            print('Constructing ternary hull...')
+        else:
+            print('Constructing binary hull...')
         # define hull by order in command-line arguments
         self.x_elem = [self.elements[0]]
         self.one_minus_x_elem = list(self.elements[1:])
@@ -348,12 +351,12 @@ class QueryConvexHull():
         self.Q = get_capacities(x, get_molar_mass(self.elements[1]))
         return
 
-    def volume_curve(self, stable_comp, stable_vol):
+    def volume_curve(self):
         """ Take stable compositions and volume and calculate
         volume expansion per "B" in AB binary.
         """
-        stable_comp = stable_comp[:-1]
-        stable_vol = stable_vol[:-1]
+        stable_comp = self.get_array_from_cursor(self.hull_cursor, 'concentration')
+        stable_vol = self.get_array_from_cursor(self.hull_cursor, 'cell_volume_per_b')
         # here, in A_x B_y
         x = []
         # and v is the volume per x atom
@@ -489,7 +492,7 @@ class QueryConvexHull():
         hull_data = dict()
         hull_data['composition'] = self.structures[:, 0]
         hull_data['energy'] = self.structures[:, 1]
-        hull_data['hull_dist'] = self.hull_dist
+        hull_data['hull_distance'] = self.hull_dist
         hull_data['formula'], hull_data['text_id'] = [], []
         hull_data['space_group'], hull_data['hull_dist_string'] = [], []
         for structure in self.info:
@@ -499,7 +502,7 @@ class QueryConvexHull():
             hull_data['hull_dist_string'].append(structure[3])
         cmap_limits = [0, 0.5]
         colormap = plt.cm.get_cmap('Dark2')
-        cmap_input = np.interp(hull_data['hull_dist'], cmap_limits, [0.15, 0.4], left=0.15, right=0.4)
+        cmap_input = np.interp(hull_data['hull_distance'], cmap_limits, [0.15, 0.4], left=0.15, right=0.4)
         colours = colormap(cmap_input, 1, True)
         bokeh_colours = ["#%02x%02x%02x" % (r, g, b) for r, g, b in colours[:, 0:3]]
         fixed_colours = colormap([0.0, 0.15], 1, True)
@@ -581,19 +584,26 @@ class QueryConvexHull():
         """ Plot calculated ternary hull. """
         print('Plotting ternary hull...')
         scale = 1
+        fontsize=18
         fig, ax = ternary.figure(scale=scale)
 
         ax.boundary(linewidth=2.0)
-        ax.gridlines(multiple=0.1)
-        fontsize = 18
-        
+        ax.gridlines(color='black', multiple=0.1, linewidth=0.5)
+
+        ax.left_axis_label(self.elements[0], fontsize=fontsize)
+        ax.right_axis_label(self.elements[1], fontsize=fontsize)
+        ax.bottom_axis_label(self.elements[2], fontsize=fontsize)
+
+        ax.ticks(axis='lbr', linewidth=1, multiple=0.1)
+        ax.clear_matplotlib_ticks()
+
         concs = np.zeros((len(self.structures), 3))
 
         concs[:, :-1] = self.structures[:, :-1]
         for i in range(len(concs)):
             concs[i, -1] = 1 - concs[i, 0] - concs[i, 1]
 
-        ax.scatter(concs, marker='D', color='green')
+        ax.scatter(concs, marker='D', color='green', zorder=1000)
         ax.show()
 
 
@@ -644,19 +654,29 @@ class QueryConvexHull():
         else:
             fig = plt.figure(facecolor=None)
         ax = fig.add_subplot(111)
+        stable_hull_dist = self.get_array_from_cursor(self.hull_cursor, 'hull_distance')
         hull_vols = []
         hull_comps = []
+        bulk_vol = self.vol_per_y[-1]
         for i in range(len(self.vol_per_y)):
-            if self.stable_hull_dist[i] <= 0:
+            if stable_hull_dist[i] <= 0 + 1e-16:
                 hull_vols.append(self.vol_per_y[i])
                 hull_comps.append(self.x[i])
-                ax.scatter(self.x[i], self.vol_per_y[i]/self.vol_per_y[0], marker='o', s=40, edgecolor='k', lw=1.5,
-                           c=self.colours[1], zorder=1000)
+                s = 40
+                zorder = 1000
+                alpha = 1
+                markeredgewidth = 1.5
+                c = self.colours[1]
             else:
-                ax.scatter(self.x[i], self.vol_per_y[i]/self.vol_per_y[0], marker='o', s=30, edgecolor='k', lw=0,
-                           c=self.colours[1], zorder=900, alpha=1)
+                s = 30
+                zorder = 900
+                markeredgewidth = 0.5
+                alpha = 0.8
+                c = 'grey'
+            ax.scatter(self.x[i], self.vol_per_y[i]/bulk_vol, marker='o', s=s, edgecolor='k', lw=markeredgewidth,
+                       c=c, zorder=zorder)
         hull_comps, hull_vols = np.asarray(hull_comps), np.asarray(hull_vols)
-        ax.plot(hull_comps, hull_vols/self.vol_per_y[0], marker='o', lw=4,
+        ax.plot(hull_comps, hull_vols/bulk_vol, marker='o', lw=4,
                 c=self.colours[0], zorder=100)
         ax.set_xlabel('$\mathrm{u}$ in $\mathrm{'+self.elements[0]+'_u'+self.elements[1]+'}$')
         ax.set_ylabel('Volume ratio with bulk')
