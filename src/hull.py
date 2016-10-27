@@ -142,7 +142,8 @@ class QueryConvexHull():
                 self.match[i]['enthalpy_per_b'] = mu['enthalpy_per_atom']
                 self.match[i]['num_a'] = 0
             self.match[0]['num_a'] = float('inf')
-            for match in self.match:
+            self.cursor.insert(0, self.match[0])
+            for match in self.match[1:]:
                 self.cursor.append(match)
         return
 
@@ -300,8 +301,8 @@ class QueryConvexHull():
                 num_fu = doc['num_fu']
                 # get enthalpy and volume per unit B
                 if num_b == 0:
-                    self.cursor[ind]['enthalpy_per_b'] = 1e10
-                    self.cursor[ind]['cell_volume_per_b'] = 1e10
+                    self.cursor[ind]['enthalpy_per_b'] = 12345e5
+                    self.cursor[ind]['cell_volume_per_b'] = 12345e5
                 else:
                     self.cursor[ind]['enthalpy_per_b'] = doc['enthalpy'] / (num_b*num_fu)
                     self.cursor[ind]['cell_volume_per_b'] = doc['cell_volume'] / (num_b*num_fu)
@@ -339,6 +340,10 @@ class QueryConvexHull():
         stable_comp = self.get_array_from_cursor(self.hull_cursor, 'concentration')
         stable_enthalpy_per_b = self.get_array_from_cursor(self.hull_cursor, 'enthalpy_per_b')
         mu_enthalpy = self.get_array_from_cursor(self.match, 'enthalpy_per_atom')
+
+        stable_comp = stable_comp.reshape(len(stable_comp))
+        stable_enthalpy_per_b = stable_enthalpy_per_b[np.argsort(stable_comp)]
+        stable_comp = np.sort(stable_comp)
         V = []
         x = []
         for i in range(len(stable_comp)):
