@@ -212,16 +212,6 @@ class DBQuery:
                 # self.cursors.append(self.cursor)
                 cursor_count = len(self.cursor)
 
-                # write query to res or cell with param files
-                # if self.args.get('subcmd') != 'hull' and self.args.get('subcmd') != 'voltage':
-                    # if self.args.get('cell') or self.args.get('res') or self.args.get('pdb'):
-                        # if cursor_count >= 1:
-                            # cursor = list(self.cursor)
-                            # if self.args.get('top') is not None:
-                                # query2files(cursor[:self.args.get('top')], self.args)
-                            # else:
-                                # query2files(cursor, self.args)
-
                 # if called as script, always print results
                 if self.args.get('id') is None:
                     print(cursor_count, 'results found for query in', collection+'.')
@@ -303,6 +293,9 @@ class DBQuery:
                                       self.cursor[ind]['kpoints_mp_spacing'], ' 1/A', sep='')
                             except:
                                 pass
+                            if test_cursor_count[-1] == count:
+                                print('Matched all structures...')
+                                break
                             if self.args.get('biggest'):
                                 if test_cursor_count[-1] > 2*int(count/3):
                                     print('Matched at least 2/3 of total number, composing hull...')
@@ -380,7 +373,7 @@ class DBQuery:
             if last_formula != formula_substring:
                 self.gs_enthalpy = 0.0
             formula_string.append(formula_substring)
-            if hull and doc['hull_distance'] == 0.0:
+            if hull and doc.get('hull_distance') == 0.0:
                 struct_string.append(
                     '* ' + "{:^22}".format(doc['text_id'][0]+' '+doc['text_id'][1]))
             else:
@@ -404,7 +397,7 @@ class DBQuery:
                 struct_string[-1] += "{:^12}".format('xxx')
             try:
                 if hull:
-                    struct_string[-1] += "{:^18.5f}".format(doc['hull_distance'])
+                    struct_string[-1] += "{:^18.5f}".format(doc.get('hull_distance'))
                 else:
                     struct_string[-1] += "{:^18.5f}".format(doc['enthalpy']/doc['num_fu'] -
                                                             self.gs_enthalpy)
