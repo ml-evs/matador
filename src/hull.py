@@ -87,6 +87,7 @@ class QueryConvexHull():
             else:
                 self.set_plot_param()
                 if len(self.elements) == 3:
+                    self.plot_3d_ternary_hull()
                     self.plot_ternary_hull()
                 else:
                     self.plot_2d_hull()
@@ -216,31 +217,43 @@ class QueryConvexHull():
         """ Updates the key-value pair for documents in
         internal cursor from a numpy array.
         """
-        assert(len(array) == len(self.cursor))
+        assert(len(array) == len(self.cursor) or len(array) - 1 == len(self.cursor))
         for ind, doc in enumerate(self.cursor):
             self.cursor[ind][key] = array[ind]
         return
 
     def get_hull_distances(self, structures):
         """ Returns array of hull distances. """
-        hull_dist = np.zeros((len(structures)))
-        hull_comp = self.structure_slice[self.hull.vertices, 0]
-        hull_energy = self.structure_slice[self.hull.vertices, 1]
-        hull_comp = np.asarray(hull_comp)
-        hull_energy = hull_energy[np.argsort(hull_comp)]
-        hull_comp = hull_comp[np.argsort(hull_comp)]
-        for ind in range(len(structures)):
-            # get the index of the next stoich on the hull from the current structure
-            i = bisect_left(hull_comp, structures[ind, 0])
-            energy_pair = (hull_energy[i-1], hull_energy[i])
-            comp_pair = (hull_comp[i-1], hull_comp[i])
-            # calculate equation of line between the two
-            gradient = (energy_pair[1] - energy_pair[0]) / (comp_pair[1] - comp_pair[0])
-            intercept = ((energy_pair[1] + energy_pair[0]) -
-                         gradient * (comp_pair[1] + comp_pair[0])) / 2
-            # calculate hull_dist
-            hull_dist[ind] = structures[ind, 1] - (gradient * structures[ind, 0] + intercept)
-        return hull_dist, hull_energy, hull_comp
+        tie_line_comp = self.structure_slice[self.hull.vertices, 0]
+        tie_line_energy = self.structure_slice[self.hull.vertices, -1]
+        tie_line_comp = np.asarray(tie_line_comp)
+        tie_line_energy = tie_line_energy[np.argsort(tie_line_comp)]
+        tie_line_comp = tie_line_comp[np.argsort(tie_line_comp)]
+        # if only chem pots on hull, dist = energy
+        if len(self.structure_slice) == 2:
+            hull_dist = np.ones((len(structures)))
+            hull_dist = structures[:, -1]
+        # if only binary hull, do binary search
+        elif len(self.structure_slice[0]) == 2:
+            hull_dist = np.ones((len(structures)))
+            for ind in range(len(structures)):
+                # get the index of the next stoich on the hull from the current structure
+                i = bisect_left(tie_line_comp, structures[ind, 0])
+                energy_pair = (tie_line_energy[i-1], tie_line_energy[i])
+                comp_pair = (tie_line_comp[i-1], tie_line_comp[i])
+                # calculate equation of line between the two
+                gradient = (energy_pair[1] - energy_pair[0]) / (comp_pair[1] - comp_pair[0])
+                intercept = ((energy_pair[1] + energy_pair[0]) -
+                             gradient * (comp_pair[1] + comp_pair[0])) / 2
+                # calculate hull_dist
+                hull_dist[ind] = structures[ind, -1] - (gradient * structures[ind, 0] + intercept)
+        # otherwise, set to zero until proper N-d distance can be implemented
+        else:
+            hull_dist = np.ones((len(structures)+1))
+            for ind in self.hull.vertices:
+                hull_dist[ind] = 0.0
+        
+        return hull_dist, tie_line_energy, tie_line_comp
 
     def get_text_info(self, cursor=None, hull=False, html=False):
         """ Grab textual info for plot labels. """
@@ -282,6 +295,9 @@ class QueryConvexHull():
         self.get_chempots()
         if ternary:
             print('Constructing ternary hull...')
+            if not self.args.get('intersection'):
+                print_warning('Please query with -int/--intersection when creating ternary hulls.')
+                exit('Exiting...')
         else:
             print('Constructing binary hull...')
         # define hull by order in command-line arguments
@@ -313,24 +329,39 @@ class QueryConvexHull():
                                 self.get_array_from_cursor(self.cursor, 'formation_enthalpy_per_atom').reshape(len(self.cursor), 1)))
         # create hull with SciPy routine, including only points with formation energy < 0
         if ternary:
-            self.structure_slice = structures
+            self.structure_slice = structures#[np.where(structures[:, -1] <= 0 + 1e-9)]
+            # self.structure_slice[np.where(structures[:, -1] <= 0 + 1e-9)][-1] = 10
+            self.structure_slice = np.vstack((self.structure_slice, np.array([0,0,1e5])))
         else:
-            self.structure_slice = structures[np.where(structures[:, 1] <= 0 + 1e-9)]
-        # assert(len(self.structure_slice) > 2)
-        try:
-            self.hull = ConvexHull(self.structure_slice)
+            self.structure_slice = structures[np.where(structures[:, -1] <= 0 + 1e-9)]
+        if len(self.structure_slice) == 2:
+            self.hull = FakeHull()
             self.hull_dist, self.hull_energy, self.hull_comp = self.get_hull_distances(structures)
-            # self.hull_dist = np.ones((len(structures)))
-            # self.hull_dist[:-3] = 0
+            # should add chempots only to hull_cursor
             self.set_cursor_from_array(self.hull_dist, 'hull_distance')
+        else:
+            try:
+                self.hull = ConvexHull(self.structure_slice)
+                # filter out top of hull - ugly
+                if ternary:
+                    temp = [vertex for vertex in self.hull.vertices if self.structure_slice[vertex, -1] <= 0 + 1e-9]
+                    del self.hull
+                    self.hull = FakeHull()
+                    self.hull.vertices = list(temp)
+                self.hull_dist, self.hull_energy, self.hull_comp = self.get_hull_distances(structures)
+                if ternary:
+                    self.hull_dist = self.hull_dist[:-1]
+                self.set_cursor_from_array(self.hull_dist, 'hull_distance')
+            except:
+                print_exc()
+                print('Error with QHull, plotting points only...')
 
+        try: 
             self.info = self.get_text_info(html=self.args.get('bokeh'))
-            # create hull_cursor to pass to other modules
-            self.hull_cursor = [self.cursor[idx] for idx in np.where(self.hull_dist <= self.hull_cutoff + 1e-12)[0]]
             self.hull_info = self.get_text_info(cursor=self.hull_cursor, hull=True, html=self.args.get('bokeh'))
         except:
-            print('Error with QHull, plotting points only...')
-            self.hull_cursor = self.cursor[-len(self.elements):]
+            pass
+        self.hull_cursor = [self.cursor[idx] for idx in np.where(self.hull_dist <= self.hull_cutoff + 1e-12)[0]]
         self.structures = structures
 
     def voltage_curve(self):
@@ -340,7 +371,6 @@ class QueryConvexHull():
         stable_comp = self.get_array_from_cursor(self.hull_cursor, 'concentration')
         stable_enthalpy_per_b = self.get_array_from_cursor(self.hull_cursor, 'enthalpy_per_b')
         mu_enthalpy = self.get_array_from_cursor(self.match, 'enthalpy_per_atom')
-
         stable_comp = stable_comp.reshape(len(stable_comp))
         stable_enthalpy_per_b = stable_enthalpy_per_b[np.argsort(stable_comp)]
         stable_comp = np.sort(stable_comp)
@@ -395,7 +425,7 @@ class QueryConvexHull():
         one_minus_x_elem = list(self.elements[1:])
         plt.draw()
         # star structures on hull
-        try:
+        if len(self.structure_slice) != 2:
             for ind in range(len(self.hull.vertices)):
                 if self.structure_slice[self.hull.vertices[ind], 1] <= 0:
                     hull_scatter.append(ax.scatter(self.structure_slice[self.hull.vertices[ind], 0],
@@ -421,12 +451,12 @@ class QueryConvexHull():
                 cmap = colours.LinearSegmentedColormap.from_list(
                     'trunc({n},{a:.2f},{b:.2f})'.format(n=cmap_full.name, a=0, b=1),
                     cmap_full(np.linspace(0.15, 0.4, 100)))
-                scatter = ax.scatter(self.structures[:, 0], self.structures[:, 1],
-                                     s=self.scale*40, lw=lw, alpha=0.9, c=self.hull_dist,
-                                     edgecolor='k', zorder=300, cmap=cmap)
+                # scatter = ax.scatter(self.structures[:, 0], self.structures[:, 1],
+                                     # s=self.scale*40, lw=lw, alpha=0.9,
+                                     # c=self.hull_dist,
                                      # edgecolor='k', zorder=300, cmap=cmap)
                 scatter = ax.scatter(self.structures[np.argsort(self.hull_dist), 0][::-1],
-                                     self.structures[np.argsort(self.hull_dist), 1][::-1],
+                                     self.structures[np.argsort(self.hull_dist), -1][::-1],
                                      s=self.scale*40, lw=lw, alpha=1, c=np.sort(self.hull_dist)[::-1],
                                      edgecolor='k', zorder=10000, cmap=cmap, norm=colours.LogNorm(0.02, 2))
                 cbar = plt.colorbar(scatter, aspect=30, pad=0.02, ticks=[0, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28])
@@ -462,11 +492,13 @@ class QueryConvexHull():
                         else np.min(self.structure_slice[self.hull.vertices, 1])-0.15,
                         0.1 if np.max(self.structure_slice[self.hull.vertices, 1]) > 1
                         else np.max(self.structure_slice[self.hull.vertices, 1])+0.1)
-        except:
+        else:
+            scatter = []
+            print_exc()
             c = self.colours[1]
             lw = self.scale * 0 if self.mpl_new_ver else 1
             for ind in range(len(self.hull_cursor)):
-                scatter.append(ax.scatter(self.hull_cursor[ind]['concentration'], self.hull_cursor[ind]['hull_distance'],
+                scatter.append(ax.scatter(self.hull_cursor[ind]['concentration'], self.hull_cursor[ind]['formation_enthalpy_per_atom'],
                                s=self.scale*40, lw=1.5, alpha=1, c=c, edgecolor='k',
                                zorder=1000))
                 ax.plot([0, 1], [0, 0], lw=2, c=self.colours[0], zorder=900)
@@ -609,8 +641,33 @@ class QueryConvexHull():
         with open(path+fname, 'w') as f:
             f.write('\n'.join(map(str, flines)))
 
+    def plot_3d_ternary_hull(self):
+        """ Plot calculated ternary hull in 3D. """
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        coords = self.structures2coords()
+        stable = coords[np.where(self.hull_dist < 0 + 1e-9)]
+        # stable = [coords[ind] for ind in self.hull.vertices[:-1]]
+        stable = np.asarray(stable)
+        ax.plot_trisurf(stable[:, 0], stable[:, 1], stable[:, 2], cmap=plt.cm.gnuplot, linewidth=1, color='grey', alpha=0.2)
+        ax.scatter(stable[:, 0], stable[:, 1], stable[:, 2], s=100, c='k', marker='o')
+        ax.set_zlim(-0.5, 0)
+        plt.show()
+
+    def structures2coords(self):
+        """ Convert ternary (x, y) in A_x B_y C_{1-x-y}
+        to positions projected onto 2D plane. """
+        concs = self.structures[:, :-1]
+        cos30 = np.cos(np.pi/6)
+        cos60 = np.cos(np.pi/3)
+        coords = np.zeros_like(self.structures)
+        coords[:, 0] = concs[:, 0] + concs[:, 1] * cos60
+        coords[:, 1] = concs[:, 1] * cos30
+        coords[:, 2] = self.structures[:, -1]
+        return coords
+
     def plot_ternary_hull(self):
-        """ Plot calculated ternary hull. """
+        """ Plot calculated ternary hull as a 2D projection. """
         print('Plotting ternary hull...')
         scale = 1
         fontsize=18
@@ -619,26 +676,24 @@ class QueryConvexHull():
         ax.boundary(linewidth=2.0)
         ax.gridlines(color='black', multiple=0.1, linewidth=0.5)
 
-        ax.left_axis_label(self.elements[0], fontsize=fontsize)
-        ax.right_axis_label(self.elements[1], fontsize=fontsize)
-        ax.bottom_axis_label(self.elements[2], fontsize=fontsize)
 
         ax.ticks(axis='lbr', linewidth=1, multiple=0.1)
         ax.clear_matplotlib_ticks()
 
-        colours = []
-        alpha = []
+        ax.annotate(self.elements[0], [1, 0], fontsize=fontsize, zorder=10000)
+        ax.annotate(self.elements[1], [0, 0], fontsize=fontsize, zorder=10000)
+        ax.annotate(self.elements[2], [1, 1], fontsize=fontsize, zorder=10000)
+
         concs = np.zeros((len(self.structures), 3))
 
         concs[:, :-1] = self.structures[:, :-1]
         for i in range(len(concs)):
             concs[i, -1] = 1 - concs[i, 0] - concs[i, 1]
-            colours.append('green')
 
-        for ind in range(len(self.hull.vertices)):
-            colours[self.hull.vertices[ind]] = 'red'
+        stable = [concs[ind] for ind in self.hull.vertices]
 
-        ax.scatter(concs, marker='D', color=colours, zorder=1000)
+        ax.scatter(concs, marker='o', color='green', zorder=1000)
+        ax.scatter(stable, marker='D', color='red', zorder=10000, s=40, lw=1)
         ax.show()
 
     def plot_voltage_curve(self):
@@ -982,3 +1037,10 @@ class QueryConvexHull():
                     lw=2, c=self.colours[0])
         ax.scatter(capacity_space, running_average_profile, c='r', marker='*', s=50)
         plt.show()
+
+class FakeHull:
+    """ Implements a thin class to mimic a ConvexHull object
+    that would otherwise be undefined for two points. """
+    def __init__(self):
+        """ Define the used hull properties. """
+        self.vertices = [0, 1]

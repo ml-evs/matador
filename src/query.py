@@ -106,11 +106,8 @@ class DBQuery:
                     self.cursor.append(doc)
 
             if len(self.cursor) < 1:
-                exit('Could not find a match, try widening your search.')
+                exit('Could not find a match with ' + str(self.args.get('id')) + ' try widening your search.')
             elif len(self.cursor) >= 1:
-                # if (self.args.get('cell') or self.args.get('res')) or self.args.get('pdb') and \
-                        # not self.args.get('calc_match'):
-                    # query2files(list(self.cursor), self.args)
                 self.display_results(list(self.cursor))
                 if len(self.cursor) > 1:
                     print_warning('WARNING: matched multiple structures with same text_id. ' +
@@ -130,9 +127,6 @@ class DBQuery:
                         self.args['composition'] += elem[0]
                     self.args['composition'] = [self.args['composition']]
                 self.empty_query = False
-
-        if self.args.get('db') is not None:
-            self.empty_query = False
 
         # create alias for formula for backwards-compatibility
         self.args['stoichiometry'] = self.args.get('formula')
@@ -300,6 +294,9 @@ class DBQuery:
                                 if test_cursor_count[-1] > 2*int(count/3):
                                     print('Matched at least 2/3 of total number, composing hull...')
                                     break
+                        except(KeyboardInterrupt, SystemExit):
+                            print('Received exit signal, exiting...')
+                            exit()
                         except:
                             print_exc()
                             print_warning('Error with ' + id_cursor[0]['text_id'][0] + ' ' + id_cursor[0]['text_id'][1])
@@ -398,6 +395,7 @@ class DBQuery:
             try:
                 if hull:
                     struct_string[-1] += "{:^18.5f}".format(doc.get('hull_distance'))
+                    # struct_string[-1] += "{:^18.5f}".format(doc.get('formation_enthalpy_per_atom'))
                 else:
                     struct_string[-1] += "{:^18.5f}".format(doc['enthalpy']/doc['num_fu'] -
                                                             self.gs_enthalpy)
