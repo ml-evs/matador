@@ -2,6 +2,7 @@
 """ This file defines some useful chemistry. """
 import periodictable
 import numpy as np
+from cursor_utils import get_array_from_cursor, set_cursor_from_array
 
 FARADAY_CONSTANT_Cpermol = 96.485332e3
 Cperg_to_mAhperg = 2.778e-1
@@ -26,7 +27,6 @@ def get_periodic_table():
                              'Cf', 'Es', 'Fm', 'Md', 'No', 'Lr']
     return periodic_table
 
-
 def get_molar_mass(elem):
     """ Returns molar mass of chosen element. """
     return periodictable.elements.symbol(elem).mass
@@ -35,6 +35,18 @@ def get_atomic_number(elem):
     """ Returns atomic number of chosen element. """
     return periodictable.elements.symbol(elem).number
 
+def get_num_intercalated(cursor):
+    """ Return array of the number of intercalated atoms
+    per host atom from a list of structures. """
+    x = np.zeros((len(cursor)))
+    comps = get_array_from_cursor(cursor, 'concentration')
+    for idx, comp in enumerate(comps):
+        if 1-comp == 0:
+            x[idx] = np.NaN
+        else:
+            x[idx] = comp/(1-comp)
+    return x
+
 def get_capacities(x, m_B):
     """ Returns capacity in mAh/g from x in A_x B
     and m_B in a.m.u.
@@ -42,5 +54,3 @@ def get_capacities(x, m_B):
     x = np.array(x)
     Q = x * FARADAY_CONSTANT_Cpermol * Cperg_to_mAhperg / m_B
     return Q
-
-

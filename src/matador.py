@@ -10,6 +10,7 @@ from version import __version__
 # matador modules
 from query import DBQuery
 from hull import QueryConvexHull
+from cursor_utils import filter_cursor
 from export import query2files
 from print_utils import print_failure, print_warning, print_notify
 from polish import Polisher
@@ -83,7 +84,7 @@ class Matador:
 
         if self.args['subcmd'] == 'swaps':
             self.query = DBQuery(self.client, self.collections, **self.args)
-            if self.args['hull_cutoff'] is not None:
+            if self.args.get('hull_cutoff') is not None:
                 self.hull = QueryConvexHull(self.query, **self.args)
                 self.swaps = Polisher(self.hull.hull_cursor, self.args)
             else:
@@ -97,10 +98,14 @@ class Matador:
         if self.args['subcmd'] == 'pdffit':
             self.query = DBQuery(self.client, self.collections, **self.args)
             self.cursor = list(self.query.cursor)
+            if self.args.get('hull_cutoff') is not None:
+                self.hull = QueryConvexHull(self.query, **self.args)
+                self.cursor = self.hull.hull_cursor
+                self.cursor = filter_cursor(self.cursor, 'gravimetric_capacity', 800, 1000)
+                print(self.cursor)
+                self.top = len(self.cursor)
             if self.args.get('top') is not None:
                 self.top = self.args.get('top')
-            else:
-                self.top = len(self.cursor)
             if len(self.cursor[:self.top]) > 0:
                 print_notify('Performing PDF fit for ' +
                              str(len(self.cursor[:self.top])) +
@@ -403,7 +408,7 @@ if __name__ == '__main__':
     pdffit_parser = subparsers.add_parser('pdffit',
                                           help='provide experimental .gr file and fit to calculated \
                                                 PDF of structures in query',
-                                          parents=[global_flags, query_flags,
+                                          parents=[global_flags, query_flags, material_flags,
                                                    structure_flags, pdffit_flags])
     hull_parser = subparsers.add_parser('hull',
                                         help='create a convex hull from query results \
@@ -454,5 +459,4 @@ if __name__ == '__main__':
     if vars(args).get('calc_match') and vars(args).get('id') is None:
         print_failure('calc_match requires specification of a text_id with -i, exiting...')
         exit()
-
     matador = Matador(args, argstr=argv[1:])
