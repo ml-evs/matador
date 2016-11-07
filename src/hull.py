@@ -9,7 +9,8 @@ from traceback import print_exc
 from bson.son import SON
 from bisect import bisect_left
 from print_utils import print_failure, print_notify, print_warning
-from chem_utils import get_capacities, get_molar_mass
+from chem_utils import get_capacities, get_molar_mass, get_num_intercalated
+from cursor_utils import set_cursor_from_array, get_array_from_cursor
 from export import generate_hash, generate_relevant_path
 from glmol_wrapper import get_glmol_placeholder_string
 import pymongo as pm
@@ -325,8 +326,8 @@ class QueryConvexHull():
             self.cursor[ind]['formation_enthalpy_per_atom'] = self.get_formation_energy(doc)
             self.cursor[ind]['concentration'] = self.get_concentration(doc)
         # create stacked array of hull data
-        structures = np.hstack((self.get_array_from_cursor(self.cursor, 'concentration'),
-                                self.get_array_from_cursor(self.cursor, 'formation_enthalpy_per_atom').reshape(len(self.cursor), 1)))
+        structures = np.hstack((get_array_from_cursor(self.cursor, 'concentration'),
+                                get_array_from_cursor(self.cursor, 'formation_enthalpy_per_atom').reshape(len(self.cursor), 1)))
         # create hull with SciPy routine, including only points with formation energy < 0
         if ternary:
             self.structure_slice = structures#[np.where(structures[:, -1] <= 0 + 1e-9)]
@@ -338,7 +339,7 @@ class QueryConvexHull():
             self.hull = FakeHull()
             self.hull_dist, self.hull_energy, self.hull_comp = self.get_hull_distances(structures)
             # should add chempots only to hull_cursor
-            self.set_cursor_from_array(self.hull_dist, 'hull_distance')
+            set_cursor_from_array(self.cursor, self.hull_dist, 'hull_distance')
         else:
             try:
                 self.hull = ConvexHull(self.structure_slice)
@@ -351,7 +352,7 @@ class QueryConvexHull():
                 self.hull_dist, self.hull_energy, self.hull_comp = self.get_hull_distances(structures)
                 if ternary:
                     self.hull_dist = self.hull_dist[:-1]
-                self.set_cursor_from_array(self.hull_dist, 'hull_distance')
+                set_cursor_from_array(self.cursor, self.hull_dist, 'hull_distance')
             except:
                 print_exc()
                 print('Error with QHull, plotting points only...')
@@ -361,46 +362,48 @@ class QueryConvexHull():
             self.hull_info = self.get_text_info(cursor=self.hull_cursor, hull=True, html=self.args.get('bokeh'))
         except:
             pass
+        Q = get_capacities(get_num_intercalated(self.cursor), get_molar_mass(self.elements[1]))
+        set_cursor_from_array(self.cursor, Q, 'gravimetric_capacity')
         self.hull_cursor = [self.cursor[idx] for idx in np.where(self.hull_dist <= self.hull_cutoff + 1e-12)[0]]
         self.structures = structures
 
     def voltage_curve(self):
         """ Take convex hull and calculate voltages. """
         print('Generating voltage curve...')
-        stable_num = []
-        stable_comp = self.get_array_from_cursor(self.hull_cursor, 'concentration')
-        stable_enthalpy_per_b = self.get_array_from_cursor(self.hull_cursor, 'enthalpy_per_b')
-        mu_enthalpy = self.get_array_from_cursor(self.match, 'enthalpy_per_atom')
-        stable_comp = stable_comp.reshape(len(stable_comp))
-        stable_enthalpy_per_b = stable_enthalpy_per_b[np.argsort(stable_comp)]
-        stable_comp = np.sort(stable_comp)
+        mu_enthalpy = get_array_from_cursor(self.match, 'enthalpy_per_atom')
+        x = get_num_intercalated(self.hull_cursor)
+        # sort for voltage calculation
+        Q = get_capacities(x, get_molar_mass(self.elements[1]))
+        # set_cursor_from_array(self.hull_cursor, Q, 'gravimetric_capacity')
+        Q = Q[np.argsort(x)]
+        stable_enthalpy_per_b = get_array_from_cursor(self.hull_cursor, 'enthalpy_per_b')[np.argsort(x)]
+        print(stable_enthalpy_per_b)
+        x = np.sort(x)
+        x, uniq_idxs = np.unique(x, return_index=True)
+        stable_enthalpy_per_b = stable_enthalpy_per_b[uniq_idxs]
+        Q = Q[uniq_idxs]
         V = []
-        x = []
-        for i in range(len(stable_comp)):
-            if 1-stable_comp[i] == 0:
-                stable_num.append(1e5)
-            else:
-                stable_num.append(stable_comp[i]/(1-stable_comp[i]))
-        # V.append(0)
-        for i in range(len(stable_num)-1, 0, -1):
+        # for i in range(len(x)-1, 0, -1):
+        for i in range(len(x)):
             V.append(-(stable_enthalpy_per_b[i] - stable_enthalpy_per_b[i-1]) /
-                      (stable_num[i] - stable_num[i-1]) +
+                      (x[i] - x[i-1]) +
                       (mu_enthalpy[0]))
-            x.append(stable_num[i])
-        V.append(V[-1])
-        x.append(0)
-        self.voltages = np.asarray(V)
-        self.x = np.asarray(x)
-        # gravimetric capacity
-        self.Q = get_capacities(x, get_molar_mass(self.elements[1]))
+        V[0] = V[1]
+        # x = np.append([0], x)
+        # Q = np.append([0], Q)
+        # make V, Q and x available for plotting
+        self.voltages = V
+        self.Q = Q
+        self.x = x
+        print(zip(self.Q, self.x, self.voltages))
         return
 
     def volume_curve(self):
         """ Take stable compositions and volume and calculate
         volume expansion per "B" in AB binary.
         """
-        stable_comp = self.get_array_from_cursor(self.hull_cursor, 'concentration')
-        stable_vol = self.get_array_from_cursor(self.hull_cursor, 'cell_volume_per_b')
+        stable_comp = get_array_from_cursor(self.hull_cursor, 'concentration')
+        stable_vol = get_array_from_cursor(self.hull_cursor, 'cell_volume_per_b')
         # here, in A_x B_y
         x = []
         # and v is the volume per x atom
@@ -711,20 +714,34 @@ class QueryConvexHull():
             except:
                 print_exc()
                 pass
-        for i in range(2, len(self.voltages)):
-            axQ.plot([self.Q[i], self.Q[i]], [self.voltages[i], self.voltages[i-1]],
+        print(zip(self.Q, self.voltages))
+        for i in range(len(self.voltages)-1):
+            axQ.plot([self.Q[i-1], self.Q[i]], [self.voltages[i], self.voltages[i]],
                      lw=2, c=self.colours[0])
-            axQ.plot([self.Q[i-1], self.Q[i]], [self.voltages[i-1], self.voltages[i-1]],
+            axQ.plot([self.Q[i], self.Q[i]], [self.voltages[i], self.voltages[i+1]],
                      lw=2, c=self.colours[0])
-            if abs(np.ceil(self.x[i-1])-self.x[i-1]) > 1e-8:
-                string_stoich = str(round(self.x[i-1], 1))
-            else:
-                string_stoich = str(int(np.ceil(self.x[i-1])))
+        for i in range(len(self.x)):
+            if self.x[i] < 1e9: 
+                string_stoich = ''
+                if abs(np.ceil(self.x[i])-self.x[i]) > 1e-8:
+                    string_stoich = str(round(self.x[i], 1))
+                else:
+                    string_stoich = str(int(np.ceil(self.x[i])))
                 if string_stoich is '1':
                     string_stoich = ''
+                if string_stoich is '0':
+                    string_stoich = ''
+                else:
+                    string_stoich = self.elements[0] + '$_{' + string_stoich + '}$' + self.elements[1]
+                axQ.annotate(string_stoich,
+                             xy=(self.Q[i], self.voltages[i]+0.001),
+                             textcoords='data',
+                             ha='center',
+                             zorder=9999)
         axQ.set_ylabel('Voltage (V)')
         axQ.set_xlabel('Gravimetric cap. (mAh/g)')
         start, end = axQ.get_ylim()
+        axQ.set_ylim(start-0.01, end+0.01)
         axQ.grid('off')
         plt.tight_layout(pad=0.0, h_pad=1.0, w_pad=0.2)
         if self.args.get('pdf'):
@@ -743,7 +760,7 @@ class QueryConvexHull():
         else:
             fig = plt.figure(facecolor=None)
         ax = fig.add_subplot(111)
-        stable_hull_dist = self.get_array_from_cursor(self.hull_cursor, 'hull_distance')
+        stable_hull_dist = get_array_from_cursor(self.hull_cursor, 'hull_distance')
         hull_vols = []
         hull_comps = []
         bulk_vol = self.vol_per_y[-1]
