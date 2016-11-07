@@ -423,13 +423,13 @@ class DBQuery:
                             source = 'SWAPS'
                         elif 'oqmd' in fname.lower():
                             source = 'OQMD'
-                        elif 'icsd' in doc:
-                            source = 'ICSD'
                         elif 'collcode' in fname.lower():
                             if fname.split('/')[-1].count('-') == 2:
                                 source = 'SWAPS'
                             else:
                                 source = 'ICSD'
+                        elif 'icsd' in doc:
+                            source = 'ICSD'
                         elif '-icsd' in fname.lower():
                             source = 'ICSD'
                 struct_string[-1] += "{:^8}".format(source)
