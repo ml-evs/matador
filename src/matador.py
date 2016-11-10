@@ -101,8 +101,7 @@ class Matador:
             if self.args.get('hull_cutoff') is not None:
                 self.hull = QueryConvexHull(self.query, **self.args)
                 self.cursor = self.hull.hull_cursor
-                self.cursor = filter_cursor(self.cursor, 'gravimetric_capacity', 800, 1000)
-                print(self.cursor)
+                self.cursor = filter_cursor(self.cursor, 'gravimetric_capacity', 500, 1000)
                 self.top = len(self.cursor)
             if self.args.get('top') is not None:
                 self.top = self.args.get('top')
@@ -387,6 +386,8 @@ if __name__ == '__main__':
                               help='spacing to compute PDF at')
     pdffit_flags.add_argument('-2', '--two_phase', type=float,
                               help='fit two phases to experimental PDF')
+    pdffit_flags.add_argument('-np', '--num_processes', type=int,
+                              help='number of concurrent fits to perform.')
 
     stats_flags = argparse.ArgumentParser(add_help=False)
     stats_flags.add_argument('-l', '--list', action='store_true',
