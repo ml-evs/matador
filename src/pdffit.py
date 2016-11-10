@@ -9,6 +9,8 @@ from __future__ import print_function
 
 # matador functionality
 from print_utils import print_failure, print_warning, print_notify
+from cell_utils import abc2cart
+from chem_utils import get_atomic_number
 
 # standard library
 import multiprocessing as mp
@@ -17,6 +19,7 @@ from os.path import isfile
 # external libraries
 from scipy.optimize import leastsq
 import matplotlib.pyplot as plt
+import spglib as spg
 # diffpy
 from diffpy.srfit.pdf import PDFContribution
 from diffpy.srfit.fitbase import FitRecipe, FitResults
@@ -35,7 +38,9 @@ class PDFFitter:
         candidates.
         """
         self.args = kwargs
-        self.nprocesses = 2
+        self.nprocesses = self.args.get('num_processes')
+        if self.nprocesses is None:
+            self.nprocesses = 2
         self.input_file = self.args.get('file')
         self.cursor = list(cursor)
         self.dx = dx
@@ -90,7 +95,7 @@ class PDFFitter:
                 except:
                     with open(self.failed_fname, 'a') as job_file:
                         job_file.write(structure.title + '\n')
-                    print_exc()
+                    # print_exc()
                     pass
         return
 
@@ -108,8 +113,10 @@ class PDFFitter:
     def plot_fit(self, fit, structure):
         """ Plot results. """
         fig_name = structure.title + ".pdf"
-        plt.style.use('bmh')
-        plt.style.use('article')
+        try:
+            plt.style.use('bmh')
+        except:
+            pass
         # Plot the observed and refined PDF.
         # Get the experimental data from the recipe
         r_expt = fit.Contribution.profile.x
@@ -158,10 +165,22 @@ class PDFFitter:
         fit.addContribution(pdf)
         # configure variables and add to recipe
         if sg != 'xxx' and sg is not None:
+            print(sg)
             spacegroup_params = constrainAsSpaceGroup(pdf.Contribution.phase, sg)
         else:
-            print_warning('Invalid space group... skipping')
-            raise RuntimeError('Invalid space group for', structure.title)
+            cart_lat = abc2cart([[structure.lattice.a, structure.lattice.b, structure.lattice.c],
+                                 [structure.lattice.alpha, structure.lattice.beta, structure.lattice.gamma]])
+            positions_frac = structure.xyz
+            atomic_numbers = []
+            for atom in structure.element:
+                atomic_numbers.append(get_atomic_number(atom))
+            cell = (cart_lat,
+                    positions_frac,
+                    atomic_numbers)
+            sg = spg.get_spacegroup(cell, symprec=0.01).split(' ')[0].strip()
+            print(sg)
+            print_warning('Invalid space group... recalculated...')
+            spacegroup_params = constrainAsSpaceGroup(pdf.Contribution.phase, sg)
         # print('Space group parameters:')
         # print(', '.join([param.name for param in spacegroup_params]))
         # iterate through spacegroup params and activate them
