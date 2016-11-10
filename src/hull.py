@@ -362,8 +362,9 @@ class QueryConvexHull():
             self.hull_info = self.get_text_info(cursor=self.hull_cursor, hull=True, html=self.args.get('bokeh'))
         except:
             pass
-        Q = get_capacities(get_num_intercalated(self.cursor), get_molar_mass(self.elements[1]))
-        set_cursor_from_array(self.cursor, Q, 'gravimetric_capacity')
+        if not ternary:
+            Q = get_capacities(get_num_intercalated(self.cursor), get_molar_mass(self.elements[1]))
+            set_cursor_from_array(self.cursor, Q, 'gravimetric_capacity')
         self.hull_cursor = [self.cursor[idx] for idx in np.where(self.hull_dist <= self.hull_cutoff + 1e-12)[0]]
         self.structures = structures
 
