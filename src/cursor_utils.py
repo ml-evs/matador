@@ -35,5 +35,4 @@ def filter_cursor(cursor, key, min, max):
                 filtered_cursor.append(doc)
         except:
             pass
-    print(len(filtered_cursor), 'results.')
     return filtered_cursor
