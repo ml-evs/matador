@@ -377,7 +377,6 @@ class QueryConvexHull():
         # set_cursor_from_array(self.hull_cursor, Q, 'gravimetric_capacity')
         Q = Q[np.argsort(x)]
         stable_enthalpy_per_b = get_array_from_cursor(self.hull_cursor, 'enthalpy_per_b')[np.argsort(x)]
-        print(stable_enthalpy_per_b)
         x = np.sort(x)
         x, uniq_idxs = np.unique(x, return_index=True)
         stable_enthalpy_per_b = stable_enthalpy_per_b[uniq_idxs]
@@ -395,7 +394,6 @@ class QueryConvexHull():
         self.voltages = V
         self.Q = Q
         self.x = x
-        print(zip(self.Q, self.x, self.voltages))
         return
 
     def volume_curve(self):
@@ -714,7 +712,6 @@ class QueryConvexHull():
             except:
                 print_exc()
                 pass
-        print(zip(self.Q, self.voltages))
         for i in range(len(self.voltages)-1):
             axQ.plot([self.Q[i-1], self.Q[i]], [self.voltages[i], self.voltages[i]],
                      lw=2, c=self.colours[0])
