@@ -375,7 +375,6 @@ class QueryConvexHull():
         x = get_num_intercalated(self.hull_cursor)
         # sort for voltage calculation
         Q = get_capacities(x, get_molar_mass(self.elements[1]))
-        # set_cursor_from_array(self.hull_cursor, Q, 'gravimetric_capacity')
         Q = Q[np.argsort(x)]
         stable_enthalpy_per_b = get_array_from_cursor(self.hull_cursor, 'enthalpy_per_b')[np.argsort(x)]
         x = np.sort(x)
@@ -383,14 +382,11 @@ class QueryConvexHull():
         stable_enthalpy_per_b = stable_enthalpy_per_b[uniq_idxs]
         Q = Q[uniq_idxs]
         V = []
-        # for i in range(len(x)-1, 0, -1):
         for i in range(len(x)):
             V.append(-(stable_enthalpy_per_b[i] - stable_enthalpy_per_b[i-1]) /
                       (x[i] - x[i-1]) +
                       (mu_enthalpy[0]))
         V[0] = V[1]
-        # x = np.append([0], x)
-        # Q = np.append([0], Q)
         # make V, Q and x available for plotting
         self.voltages = V
         self.Q = Q
