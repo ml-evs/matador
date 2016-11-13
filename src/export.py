@@ -203,18 +203,14 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, spin=Fa
                     else:
                         f.write("{0:8s} {1[0]: 15f} {1[1]: 15f} {1[2]: 15f}\n".format(atom[0], atom[1]))
             f.write('%ENDBLOCK POSITIONS_FRAC\n\n')
-            if pressure is not None:
+            if 'external_pressure' in doc:
                 f.write('\n%block external_pressure\n'.upper())
-                for pressures in pressure:
-                    pressures = str(pressures)
-                if len(pressure) == 1:
-                    f.write(pressure[0] + ' 0 0\n')
-                    f.write(pressure[0] + ' 0\n')
-                    f.write(pressure[0] + '\n')
-                elif len(pressure) == 6:
-                    f.write(pressure[0] + ' ' + pressure[1] + ' ' + pressure[2] + '\n')
-                    f.write(pressure[3] + ' ' + pressure[4] + '\n')
-                    f.write(pressure[5] + '\n')
+                pressure = doc['external_pressure'][0]
+                f.write(str(pressure[0]) + ' ' + str(pressure[1]) + ' ' + str(pressure[2]) + '\n')
+                pressure = doc['external_pressure'][1]
+                f.write(str(pressure[0]) + ' ' + str(pressure[1]) + '\n')
+                pressure = doc['external_pressure'][2]
+                f.write(str(pressure[0]) + '\n')
                 f.write('%endblock external_pressure\n'.upper())
             if 'kpoints_mp_spacing' in doc:
                 f.write('kpoints_mp_spacing : ' + str(doc['kpoints_mp_spacing']) + '\n')
@@ -223,6 +219,11 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, spin=Fa
                         str(doc['kpoints_mp_grid'][0]) + ' ' +
                         str(doc['kpoints_mp_grid'][1]) + ' ' +
                         str(doc['kpoints_mp_grid'][2]) + '\n')
+            if 'kpoints_mp_offset' in doc:
+                f.write('kpoints_mp_offset : ' +
+                        str(doc['kpoints_mp_offset'][0]) + ' ' +
+                        str(doc['kpoints_mp_offset'][1]) + ' ' +
+                        str(doc['kpoints_mp_offset'][2]) + '\n')
             if 'spectral_kpoints_mp_offset' in doc:
                 f.write('SPECTRAL_KPOINTS_MP_OFFSET ' +
                         str(doc['spectral_kpoints_mp_offset'][0]) + ' ' +
