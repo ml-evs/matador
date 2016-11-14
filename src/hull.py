@@ -573,7 +573,7 @@ class QueryConvexHull():
         hover = HoverTool(tooltips="""
                           <div>
                               <div>
-                                  <span style="font-size: 12px;">
+                                  <span style="font-size: 16px; font-family: "Fira Sans", sans-serif">
                                       Formula: @formula <br>
                                       ID: @text_id <br>
                                       Space group: @space_group <br>
@@ -585,15 +585,19 @@ class QueryConvexHull():
 
         tools = ['pan', 'wheel_zoom', 'reset', 'save']
         tools.append(hover)
-        title = self.elements[0] + 'x' + ''.join(elem for elem in self.elements[1]) + '(1-x)'
-        fig = figure(tools=tools, title=title)
+        # title = self.elements[0] + 'x' + ''.join(elem for elem in self.elements[1]) + '(1-x)'
+        fig = figure(tools=tools)#, title=title)
 
         fig.xaxis.axis_label = 'x'
         fig.yaxis.axis_label = 'Formation energy (eV/atom)'
         fig.xaxis.axis_label_text_font_size = '20pt'
+        fig.xaxis.axis_label_text_font = "Fira Sans, sans-serif"
         fig.yaxis.axis_label_text_font_size = '20pt'
+        fig.yaxis.axis_label_text_font = "Fira Sans, sans-serif"
         fig.yaxis.axis_label_text_font_style = 'normal'
         fig.xaxis.axis_label_text_font_style = 'normal'
+        fig.background_fill_alpha = 0
+        fig.border_fill_alpha = 0
         fig.title.text_font_size = '20pt'
         fig.title.align = 'center'
 
