@@ -63,8 +63,8 @@ class DBQuery:
                         self.collections[database] = self.db[database]
             else:
                 self.collections['ajm'] = self.db['repo']
-
-        if self.args.get('summary'):
+        # improve this clause at some point
+        if self.args.get('summary') or self.args.get('subcmd') in ['swaps', 'polish']:
             self.top = -1
         else:
             self.top = self.args.get('top') if self.args.get('top') is not None else 10

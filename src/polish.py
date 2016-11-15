@@ -33,22 +33,6 @@ class Polisher:
 
         # define some swap macros
         self.periodic_table = get_periodic_table()
-        self.periodic_table = dict()
-        self.periodic_table['I'] = ['Li', 'Na', 'K', 'Rb', 'Cs', 'Fr']
-        self.periodic_table['II'] = ['Be', 'Mg', 'Ca', 'Sr', 'Ba', 'Ra']
-        self.periodic_table['III'] = ['B', 'Al', 'Ga', 'In', 'Tl']
-        self.periodic_table['IV'] = ['C', 'Si', 'Ge', 'Sn', 'Pb']
-        self.periodic_table['V'] = ['N', 'P', 'As', 'Sb', 'Bi']
-        self.periodic_table['VI'] = ['O', 'S', 'Se', 'Te', 'Po']
-        self.periodic_table['VII'] = ['F', 'Cl', 'Br', 'I', 'At']
-        self.periodic_table['Tran'] = ['Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn',
-                                       'Y', 'Zr', 'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd',
-                                       'Hf', 'Ta', 'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg']
-        self.periodic_table['Lan'] = ['La', 'Ce', 'Pr', 'Nd', 'Pm', 'Sm', 'Eu', 'Gd', 'Tb',
-                                      'Dy', 'Ho', 'Er', 'Tm', 'Yb', 'Lu']
-        self.periodic_table['Act'] = ['Ac', 'Th', 'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk',
-                                      'Cf', 'Es', 'Fm', 'Md', 'No', 'Lr']
-
         self.template_structure = None
         try:
             self.cursor = list(cursor)
@@ -81,11 +65,7 @@ class Polisher:
             polish_cursor.append(self.change_accuracy(doc))
         self.cursor = polish_cursor
 
-        self.args['cell'] = True
-        self.args['param'] = True
-        self.args['res'] = True
-
-        query2files(self.cursor, self.args)
+        # query2files(self.cursor, self.args)
 
     def get_accuracy(self):
         """ Read the correct key-value pairs
@@ -221,7 +201,8 @@ class Polisher:
         swapped = False
         # iterate over sets of swaps
         for swap_pair in self.swap_pairs:
-            print(swap_pair)
+            if self.args.get('debug'):
+                print(swap_pair)
             # for each atom to be swapped
             for swap_atom in swap_pair[0]:
                 # if structure contains an atom to be swapped
