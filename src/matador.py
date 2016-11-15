@@ -82,13 +82,15 @@ class Matador:
             self.query = DBQuery(self.client, self.collections, **self.args)
             self.cursor = self.query.cursor
 
-        if self.args['subcmd'] == 'swaps':
+        if self.args['subcmd'] in ['swaps', 'polish']:
             self.query = DBQuery(self.client, self.collections, **self.args)
             if self.args.get('hull_cutoff') is not None:
                 self.hull = QueryConvexHull(self.query, **self.args)
                 self.swaps = Polisher(self.hull.hull_cursor, self.args)
+                self.cursor = self.hull.hull_cursor
             else:
                 self.swaps = Polisher(self.query.cursor, self.args)
+                self.cursor = self.query.cursor
 
         if self.args['subcmd'] == 'refine':
             from refine import Refiner
@@ -117,14 +119,6 @@ class Matador:
                     exit('Exiting top-level...')
             else:
                 exit('No structure match query.')
-
-        if self.args['subcmd'] == 'polish':
-            self.query = DBQuery(self.client, self.collections, **self.args)
-            if self.args['hull_cutoff'] is not None:
-                self.hull = QueryConvexHull(self.query, **self.args)
-                self.polish = Polisher(self.hull.hull_cursor, self.args)
-            else:
-                self.polish = Polisher(self.query.cursor, self.args)
 
         if self.args['subcmd'] == 'hull' or self.args['subcmd'] == 'voltage':
             self.query = DBQuery(self.client, self.collections, **self.args)
@@ -269,7 +263,7 @@ if __name__ == '__main__':
                                  help='specify a particular structure by its text_id')
     structure_flags.add_argument('-ac', '--calc-match', action='store_true',
                                  help='display calculations of the same accuracy as specified id')
-    structure_flags.add_argument('-kpttol', '--kpoint-tolerance', type=float, 
+    structure_flags.add_argument('-kpttol', '--kpoint-tolerance', type=float,
                                  help='kpoint tolerance for calculation matches (DEFAULT: +/- 0.01 1/A')
     structure_flags.add_argument('-z', '--num_fu', type=int,
                                  help='query a calculations with more than n formula units')
@@ -362,13 +356,15 @@ if __name__ == '__main__':
                              help='print filenames from which structures were wrangled')
     query_flags.add_argument('--cell', action='store_true',
                              help='export query to .cell files in folder name from query string')
+    query_flags.add_argument('--param', action='store_true',
+                             help='export query to .param files in folder name from query string')
     query_flags.add_argument('--res', action='store_true',
                              help='export query to .res files in folder name from query string')
     query_flags.add_argument('--pdb', action='store_true',
                              help='export query to .pdb files in folder name from query string')
 
     swap_flags = argparse.ArgumentParser(add_help=False)
-    swap_flags.add_argument('-s', '--swap', type=str, nargs='+',
+    swap_flags.add_argument('-sw', '--swap', type=str, nargs='+',
                             help='swap all atoms in structures from a query from the first n-1 \
                                   species to the nth, e.g. -s NAs will swap all N to As, \
                                   -s NAs:LiNa will swap all N to As, and all Li to Na, and \
@@ -423,7 +419,7 @@ if __name__ == '__main__':
                                                     material_flags, plot_flags, query_flags])
     swaps_parser = subparsers.add_parser('swaps',
                                          help='perform atomic swaps on query results',
-                                         parents=[global_flags, collection_flags,
+                                         parents=[global_flags, collection_flags, query_flags,
                                                   structure_flags, material_flags, swap_flags])
     polish_parser = subparsers.add_parser('polish',
                                           help='re-relax a series of structures with \
