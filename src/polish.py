@@ -33,6 +33,7 @@ class Polisher:
 
         # define some swap macros
         self.periodic_table = get_periodic_table()
+        del self.periodic_table['X']
         self.template_structure = None
         try:
             self.cursor = list(cursor)
@@ -178,6 +179,9 @@ class Polisher:
             for ind, atom in enumerate(tmp_list):
                 if '[' in atom:
                     group = atom.strip(']').strip('[')
+                    if group == 'X':
+                        print_failure('Cannot swap from macro [X], please reconsider...')
+                        exit()
                     if group in self.periodic_table:
                         atoms = self.periodic_table[group]
                     else:

@@ -86,11 +86,10 @@ class Matador:
             self.query = DBQuery(self.client, self.collections, **self.args)
             if self.args.get('hull_cutoff') is not None:
                 self.hull = QueryConvexHull(self.query, **self.args)
-                self.swaps = Polisher(self.hull.hull_cursor, self.args)
-                self.cursor = self.hull.hull_cursor
+                self.polisher = Polisher(self.hull.hull_cursor, self.args)
             else:
-                self.swaps = Polisher(self.query.cursor, self.args)
-                self.cursor = self.query.cursor
+                self.polisher = Polisher(self.query.cursor, self.args)
+            self.cursor = self.polisher.cursor
 
         if self.args['subcmd'] == 'refine':
             from refine import Refiner
