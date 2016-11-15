@@ -25,6 +25,7 @@ def get_periodic_table():
                              'Dy', 'Ho', 'Er', 'Tm', 'Yb', 'Lu']
     periodic_table['Act'] = ['Ac', 'Th', 'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk',
                              'Cf', 'Es', 'Fm', 'Md', 'No', 'Lr']
+    periodic_table['X'] = [elem for group in periodic_table.keys() for elem in periodic_table[group]]
     return periodic_table
 
 def get_molar_mass(elem):
