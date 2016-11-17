@@ -13,6 +13,7 @@ from hull import QueryConvexHull
 from cursor_utils import filter_cursor
 from export import query2files
 from print_utils import print_failure, print_warning, print_notify
+from cursor_utils import get_spg_uniq
 from polish import Polisher
 
 # import external libraries
@@ -123,6 +124,12 @@ class Matador:
             self.query = DBQuery(self.client, self.collections, **self.args)
             self.hull = QueryConvexHull(self.query, **self.args)
             self.cursor = self.hull.hull_cursor
+
+        if self.args.get('uniq'):
+            print_notify('Filtering for unique structures...')
+            uniq = list(get_spg_uniq(self.cursor))
+            print(uniq)
+            self.cursor = [self.cursor[ind] for ind in uniq]
 
         if self.export and len(self.cursor) > 0:
             query2files(self.cursor, self.args)
@@ -268,6 +275,8 @@ if __name__ == '__main__':
                                  help='query a calculations with more than n formula units')
     structure_flags.add_argument('-sg', '--space_group',
                                  help='query a particular space group')
+    structure_flags.add_argument('-u', '--uniq', action='store_true',
+                                 help='return only unique structures, to some tolerance')
     structure_flags.add_argument('-p', '--pressure', type=float,
                                  help='specify an isotropic external pressure to search for \
                                        , e.g. 10 (GPa)')
