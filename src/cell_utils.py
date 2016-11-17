@@ -4,6 +4,7 @@ for cell manipulation.
 
 from math import pi, cos, sin, sqrt, acos, log10
 import numpy as np
+from chem_utils import get_atomic_number
 
 
 def abc2cart(lattice_abc):
@@ -131,3 +132,16 @@ def calc_mp_spacing(real_lat, mp_grid):
         max_spacing = (spacing if spacing > max_spacing else max_spacing)
     exponent = round(log10(max_spacing) - 1)
     return round(max_spacing + 0.5*10**exponent, 2)
+
+
+def doc2spg(doc):
+    """ Return an spglib input tuple from a matador doc. """
+    try:
+        if 'lattice_cart' not in doc:
+            doc['lattice_cart'] = abc2cart(doc['lattice_abc'])
+        cell = (doc['lattice_cart'],
+                doc['positions_frac'],
+                [get_atomic_number(elem) for elem in doc['atom_types']])
+        return cell
+    except:
+        return False
