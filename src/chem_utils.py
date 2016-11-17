@@ -2,7 +2,7 @@
 """ This file defines some useful chemistry. """
 import periodictable
 import numpy as np
-from cursor_utils import get_array_from_cursor, set_cursor_from_array
+from cursor_utils import get_array_from_cursor
 
 FARADAY_CONSTANT_Cpermol = 96.485332e3
 Cperg_to_mAhperg = 2.778e-1

@@ -24,12 +24,14 @@ class DBQuery:
     """ Class that implements queries to MongoDB
     structure database.
     """
-    def __init__(self, client=False, collections=False, subcmd='query', **kwargs):
+    def __init__(self, client=False, collections=False, subcmd='query', debug=False, **kwargs):
         """ Parse arguments from matador or API call
         before calling query.
         """
         # read args
         self.args = kwargs
+        if debug:
+            print(self.args)
         if self.args.get('subcmd') is None:
             self.args['subcmd'] = subcmd
         if client is not False:
@@ -94,6 +96,8 @@ class DBQuery:
 
         # operate on one structure and related others
         if self.args.get('id') is not None:
+            if type(self.args.get('id')) == str:
+                self.args['id'] = self.args['id'].strip().split(' ')
             self.cursor = []
 
             for collection in self.collections:

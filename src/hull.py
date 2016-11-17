@@ -12,14 +12,12 @@ from print_utils import print_failure, print_notify, print_warning
 from chem_utils import get_capacities, get_molar_mass, get_num_intercalated
 from cursor_utils import set_cursor_from_array, get_array_from_cursor
 from export import generate_hash, generate_relevant_path
-from glmol_wrapper import get_glmol_placeholder_string
 import pymongo as pm
 import re
 import numpy as np
 from mpldatacursor import datacursor
 import matplotlib.pyplot as plt
 import matplotlib.colors as colours
-import ternary
 
 
 class QueryConvexHull():
@@ -253,7 +251,7 @@ class QueryConvexHull():
             hull_dist = np.ones((len(structures)+1))
             for ind in self.hull.vertices:
                 hull_dist[ind] = 0.0
-        
+
         return hull_dist, tie_line_energy, tie_line_comp
 
     def get_text_info(self, cursor=None, hull=False, html=False):
@@ -272,9 +270,9 @@ class QueryConvexHull():
                 if stoich_string not in stoich_strings:
                     stoich_strings.append(stoich_string)
             info_string = "{0:^10}\n{1:^24}\n{2:^5s}\n{3:.3f} eV".format(stoich_string,
-                                                                        doc['text_id'][0] + ' ' + doc['text_id'][1],
-                                                                        doc['space_group'],
-                                                                        doc['hull_distance'])
+                                                                         doc['text_id'][0] + ' ' + doc['text_id'][1],
+                                                                         doc['space_group'],
+                                                                         doc['hull_distance'])
             if html:
                 for char in ['$', '_', '{', '}']:
                     info_string = info_string.replace(char, '')
@@ -330,9 +328,9 @@ class QueryConvexHull():
                                 get_array_from_cursor(self.cursor, 'formation_enthalpy_per_atom').reshape(len(self.cursor), 1)))
         # create hull with SciPy routine, including only points with formation energy < 0
         if ternary:
-            self.structure_slice = structures#[np.where(structures[:, -1] <= 0 + 1e-9)]
+            self.structure_slice = structures  # [np.where(structures[:, -1] <= 0 + 1e-9)]
             # self.structure_slice[np.where(structures[:, -1] <= 0 + 1e-9)][-1] = 10
-            self.structure_slice = np.vstack((self.structure_slice, np.array([0,0,1e5])))
+            self.structure_slice = np.vstack((self.structure_slice, np.array([0, 0, 1e5])))
         else:
             self.structure_slice = structures[np.where(structures[:, -1] <= 0 + 1e-9)]
         if len(self.structure_slice) == 2:
@@ -357,7 +355,7 @@ class QueryConvexHull():
                 print_exc()
                 print('Error with QHull, plotting points only...')
 
-        try: 
+        try:
             self.info = self.get_text_info(html=self.args.get('bokeh'))
             self.hull_info = self.get_text_info(cursor=self.hull_cursor, hull=True, html=self.args.get('bokeh'))
         except:
@@ -505,7 +503,6 @@ class QueryConvexHull():
                                s=self.scale*40, lw=lw, alpha=0.9, c=c, edgecolor='k',
                                zorder=300))
 
-
         if len(one_minus_x_elem) == 1:
             ax.set_title(x_elem[0] + '$_\mathrm{x}$' + one_minus_x_elem[0] + '$_\mathrm{1-x}$')
         else:
@@ -585,8 +582,8 @@ class QueryConvexHull():
 
         tools = ['pan', 'wheel_zoom', 'reset', 'save']
         tools.append(hover)
-        # title = self.elements[0] + 'x' + ''.join(elem for elem in self.elements[1]) + '(1-x)'
-        fig = figure(tools=tools)#, title=title)
+
+        fig = figure(tools=tools)
 
         fig.xaxis.axis_label = 'x'
         fig.yaxis.axis_label = 'Formation energy (eV/atom)'
@@ -602,9 +599,9 @@ class QueryConvexHull():
         fig.title.align = 'center'
 
         ylim = [-0.1 if np.min(self.structure_slice[self.hull.vertices, 1]) > 0
-                    else np.min(self.structure_slice[self.hull.vertices, 1])-0.15,
-                    0.1 if np.max(self.structure_slice[self.hull.vertices, 1]) > 1
-                    else np.max(self.structure_slice[self.hull.vertices, 1])+0.1]
+                else np.min(self.structure_slice[self.hull.vertices, 1])-0.15,
+                0.1 if np.max(self.structure_slice[self.hull.vertices, 1]) > 1
+                else np.max(self.structure_slice[self.hull.vertices, 1])+0.1]
         fig.set(x_range=Range1d(-0.1, 1.1), y_range=Range1d(ylim[0], ylim[1]))
 
         fig.line('composition', 'energy',
@@ -632,16 +629,19 @@ class QueryConvexHull():
         output_file(path+fname, title='Convex hull')
         print('Hull will be available shortly at http://www.tcm.phy.cam.ac.uk/~me388/hulls/' + fname)
         save(fig)
-        html_string, js_string = get_glmol_placeholder_string()
-        with open(path+fname) as f:
-            flines = f.readlines()
-            for ind, line in enumerate(flines):
-                if  "<div class=\"bk-root\">" in line:
-                    flines.insert(ind - 1, html_string)
-                    break
-            flines.append(js_string)
-        with open(path+fname, 'w') as f:
-            f.write('\n'.join(map(str, flines)))
+        glmol = False
+        if glmol:
+            from glmol_wrapper import get_glmol_placeholder_string
+            html_string, js_string = get_glmol_placeholder_string()
+            with open(path+fname) as f:
+                flines = f.readlines()
+                for ind, line in enumerate(flines):
+                    if "<div class=\"bk-root\">" in line:
+                        flines.insert(ind - 1, html_string)
+                        break
+                flines.append(js_string)
+            with open(path+fname, 'w') as f:
+                f.write('\n'.join(map(str, flines)))
 
     def plot_3d_ternary_hull(self):
         """ Plot calculated ternary hull in 3D. """
@@ -670,14 +670,14 @@ class QueryConvexHull():
 
     def plot_ternary_hull(self):
         """ Plot calculated ternary hull as a 2D projection. """
+        import ternary
         print('Plotting ternary hull...')
         scale = 1
-        fontsize=18
+        fontsize = 18
         fig, ax = ternary.figure(scale=scale)
 
         ax.boundary(linewidth=2.0)
         ax.gridlines(color='black', multiple=0.1, linewidth=0.5)
-
 
         ax.ticks(axis='lbr', linewidth=1, multiple=0.1)
         ax.clear_matplotlib_ticks()
@@ -719,7 +719,7 @@ class QueryConvexHull():
             axQ.plot([self.Q[i], self.Q[i]], [self.voltages[i], self.voltages[i+1]],
                      lw=2, c=self.colours[0])
         for i in range(len(self.x)):
-            if self.x[i] < 1e9: 
+            if self.x[i] < 1e9:
                 string_stoich = ''
                 if abs(np.ceil(self.x[i])-self.x[i]) > 1e-8:
                     string_stoich = str(round(self.x[i], 1))
@@ -768,14 +768,12 @@ class QueryConvexHull():
                 hull_comps.append(self.x[i])
                 s = 40
                 zorder = 1000
-                alpha = 1
                 markeredgewidth = 1.5
                 c = self.colours[1]
             else:
                 s = 30
                 zorder = 900
                 markeredgewidth = 0.5
-                alpha = 0.8
                 c = 'grey'
             ax.scatter(self.x[i], self.vol_per_y[i]/bulk_vol, marker='o', s=s, edgecolor='k', lw=markeredgewidth,
                        c=c, zorder=zorder)
@@ -1052,6 +1050,7 @@ class QueryConvexHull():
                     lw=2, c=self.colours[0])
         ax.scatter(capacity_space, running_average_profile, c='r', marker='*', s=50)
         plt.show()
+
 
 class FakeHull:
     """ Implements a thin class to mimic a ConvexHull object

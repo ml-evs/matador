@@ -7,9 +7,12 @@ from __future__ import print_function
 
 import spglib as spg
 from chem_utils import get_atomic_number
-from print_utils import print_warning, print_success
 
-class Refiner: 
+
+class Refiner:
+    """ A class to crudely assess the quality of
+    symmetry info of a structure in the database, with spglib.
+    """
 
     def __init__(self, cursor):
         wrong_count = dict()
@@ -46,7 +49,7 @@ class Refiner:
                 print('Precision: ', sym, '\t# wrong:', wrong_count[sym])
             print('\n')
             print('# tested:', tested_count)
-            print('# failed:', failed_count) 
+            print('# failed:', failed_count)
             print('# total:', total)
         except:
             for sym in symprec:
