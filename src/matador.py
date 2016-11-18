@@ -128,7 +128,8 @@ class Matador:
         if self.args.get('uniq'):
             print_notify('Filtering for unique structures...')
             uniq = list(get_spg_uniq(self.cursor))
-            print(uniq)
+            if self.args.get('debug'):
+                print(uniq)
             self.cursor = [self.cursor[ind] for ind in uniq]
 
         if self.export and len(self.cursor) > 0:

@@ -227,8 +227,6 @@ class DBQuery:
             if self.args.get('id') is None and (self.args.get('subcmd') == 'hull' or
                                                 self.args.get('subcmd') == 'voltage' or
                                                 self.args.get('hull_cutoff') is not None):
-                # if 'oqmd' in self.collections:
-                    # exit('Use --include_oqmd instead of --db, exiting...')
                 if len(self.collections.keys()) == 1:
                     self.repo = self.collections[list(self.collections.keys())[0]]
                 else:
@@ -881,7 +879,7 @@ class DBQuery:
             temp_dict['spin_polarized'] = dict()
             temp_dict['spin_polarized']['$ne'] = True
             query_dict.append(temp_dict)
-        if self.args.get('loose'):
+        if self.args.get('loose') or 'oqmd' in self.args.get('db')[0]:
             return query_dict
             # temp_dict = dict()
             # query_dict.append(dict())
