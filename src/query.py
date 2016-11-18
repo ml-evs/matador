@@ -337,7 +337,10 @@ class DBQuery:
         header_string = "{:^24}".format('ID')
         header_string += "{:^5}".format('!?!')
         header_string += "{:^12}".format('Pressure')
-        header_string += "{:^12}".format('Volume/fu')
+        if self.args.get('per_atom'):
+            header_string += "{:^12}".format('Volume/atom')
+        else:
+            header_string += "{:^12}".format('Volume/fu')
         if hull:
             header_string += "{:^18}".format('Hull dist./atom')
         else:
@@ -391,7 +394,10 @@ class DBQuery:
             except:
                 struct_string[-1] += "{:^12}".format('xxx')
             try:
-                struct_string[-1] += "{:^12.3f}".format(doc['cell_volume']/doc['num_fu'])
+                if self.args.get('per_atom'):
+                    struct_string[-1] += "{:^12.3f}".format(doc['cell_volume']/doc['num_atoms'])
+                else:
+                    struct_string[-1] += "{:^12.3f}".format(doc['cell_volume']/doc['num_fu'])
             except:
                 struct_string[-1] += "{:^12}".format('xxx')
             try:
@@ -823,14 +829,8 @@ class DBQuery:
         query_dict = dict()
         query_dict['$and'] = []
         temp_dict = dict()
-        temp_dict['external_pressure'] = dict()
-        temp_dict['external_pressure']['$in'] = [[input_pressure]]
-        query_dict['$and'].append(temp_dict)
-        temp_dict = dict()
         temp_dict['pressure'] = dict()
         temp_dict['pressure']['$lt'] = approx_pressure[1]
-        query_dict['$and'].append(temp_dict)
-        temp_dict['pressure'] = dict()
         temp_dict['pressure']['$gt'] = approx_pressure[0]
         query_dict['$and'].append(temp_dict)
 
