@@ -24,6 +24,7 @@ import argparse
 import re
 from traceback import print_exc
 from ast import literal_eval
+from sys import exit
 
 
 class OQMDConverter:
@@ -31,7 +32,7 @@ class OQMDConverter:
     a MySQL table of OQMD structures which can be found at:
     http://oqmd.org/static/docs/getting_started.html.
     """
-    def __init__(self, dryrun=False, debug=False, verbosity=0, scratch=False, label=None):
+    def __init__(self, dryrun=False, debug=False, verbosity=0, scratch=False, converged=False, label=None):
         """ Connect to the relevant databases and
         set off the scraper.
         """
@@ -40,6 +41,7 @@ class OQMDConverter:
         self.debug = debug
         self.verbosity = verbosity
         self.scratch = scratch
+        self.converged = converged
         self.label = label
         # set up I/O for text_id
         if not self.dryrun:
@@ -56,8 +58,9 @@ class OQMDConverter:
                 exit(oops)
         # connect to SQL database as root, with "use oqmd"
         print('Connecting to OQMD SQL...')
-        self.oqmd = MySQLdb.connect(host='localhost',
+        self.oqmd = MySQLdb.connect(host='127.0.0.1',
                                     user='root',
+                                    port=3306,
                                     cursorclass=MySQLdb.cursors.DictCursor,
                                     db='oqmd')
         print('Successfully connected.')
@@ -82,15 +85,26 @@ class OQMDConverter:
         """
         # start by scraping all converged structures with chosen label
         cursor = self.oqmd.cursor()
-        cursor.execute("select count(label) from calculations where label in ('" +
-                       self.label + "') and converged in ('1')")
+        if self.converged:
+            cursor.execute("select count(label) from calculations where label in ('" +
+                           self.label + "') and converged in ('1')")
+        else:
+            cursor.execute("select count(label) from calculations where label in ('" +
+                           self.label + "')")
         count = cursor.fetchone()['count(label)']
         if count == 0:
             exit('No structures found with that label.')
-        print(count, 'converged structures found.')
+        if self.converged:
+            print(count, 'converged structures found.')
+        else:
+            print(count, 'structures found.')
         # select only converged structures
-        cursor.execute("select * from calculations where label in ('" +
-                       self.label + "') and converged in ('1')")
+        if self.converged:
+            cursor.execute("select * from calculations where label in ('" +
+                           self.label + "') and converged in ('1')")
+        else:
+            cursor.execute("select * from calculations where label in ('" +
+                           self.label + "')")
         success_count = 0
         for row in cursor:
             calc_doc = row
@@ -121,6 +135,20 @@ class OQMDConverter:
                 structure_dict['space_group'] = 'xxx'
                 if self.debug:
                     print('Failed to get space group.')
+            # get top level entry to scrape ICSD
+            sql_query = "select * from entries where id in ('" + str(entry_id) + "')"
+            cursor.execute(sql_query)
+            entry_doc = cursor.fetchone()
+            try:
+                if entry_doc['label'] is not None:
+                    if 'icsd' in entry_doc['label']:
+                        structure_dict['icsd'] = entry_doc['label'].split('-')[-1]
+
+            except:
+                if self.debug:
+                    print_exc()
+                    print('Failed to get ICSD CollCode.')
+            # if formation energy is positive, skip structure
             sql_query = "select * from atoms where structure_id in \
                               ('" + str(structure_id) + "')"
             cursor.execute(sql_query)
@@ -208,8 +236,8 @@ class OQMDConverter:
             for elem in structure['stoichiometry']:
                 atoms_per_fu += elem[1]
             structure['num_fu'] = structure['num_atoms'] / atoms_per_fu
-            # get pressure from -1/3 Tr(stress)
-            structure['pressure'] = -(doc['sxx'] + doc['syy'] + doc['szz'])/3.0
+            # get pressure from -1/3 Tr(stress), then convert to GPa
+            structure['pressure'] = 0.1*-(doc['sxx'] + doc['syy'] + doc['szz'])/3.0
             structure['lattice_cart'].append([doc['x1'], doc['x2'], doc['x3']])
             structure['lattice_cart'].append([doc['y1'], doc['y2'], doc['y3']])
             structure['lattice_cart'].append([doc['z1'], doc['z2'], doc['z3']])
@@ -258,6 +286,8 @@ if __name__ == '__main__':
     parser.add_argument('-l', '--label', type=str,
                         help='choose which OQMD calculation label to query, best options \
                         are fine_relax or relaxation.')
+    parser.add_argument('-conv', action='store_true',
+                        help='allow only converged geom opts.')
     parser.add_argument('--debug', action='store_true',
                         help='enable debug output to print every dict')
     parser.add_argument('-s', '--scratch', action='store_true',
@@ -269,4 +299,5 @@ if __name__ == '__main__':
                              debug=args.debug,
                              verbosity=args.verbosity,
                              scratch=args.scratch,
+                             converged=args.conv,
                              label=args.label)
