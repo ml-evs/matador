@@ -41,6 +41,7 @@ class BatchRun:
         self.all_cores = mp.cpu_count()
         self.seed = self.args.get('seed')
         self.limit = self.args.get('limit')
+        self.archer = self.args.get('archer')
         self.executable = self.args.get('executable')
         self.rough = self.args.get('rough')
         self.spin = self.args.get('spin')
@@ -188,6 +189,7 @@ class BatchRun:
                                 cell_dict=self.cell_dict,
                                 executable=self.executable,
                                 rough=self.rough,
+                                archer=self.archer,
                                 debug=self.debug,
                                 spin=self.spin,
                                 conv_cutoff=self.cutoffs,
@@ -207,12 +209,13 @@ class FullRelaxer:
     """
     def __init__(self, paths, ncores, nnodes, res, param_dict, cell_dict,
                  executable='castep', rough=None, debug=False, spin=False,
-                 conv_cutoff=None, conv_kpt=None):
+                 conv_cutoff=None, conv_kpt=None, archer=False):
         """ Make the files to run the calculation and handle
         the calling of CASTEP itself.
         """
         self.paths = paths
         self.ncores = ncores
+        self.archer = archer
         self.nnodes = nnodes
         self.executable = executable
         self.debug = debug
@@ -411,16 +414,28 @@ class FullRelaxer:
         if self.nnodes is None:
             if self.ncores == 1:
                 process = sp.Popen(['nice', '-n', '15', self.executable, seed])
+            elif self.archer:
+                process = sp.Popen(['aprun', '-n', str(self.ncores),
+                                    self.executable, seed])
             else:
                 process = sp.Popen(['nice', '-n', '15', 'mpirun', '-n', str(self.ncores),
                                     self.executable, seed])
         elif self.nnodes is not None:
-            print(['mpirun', '-n', str(self.ncores*self.nnodes),
-                   '-ppn', str(self.ncores),
-                   self.executable, seed])
-            process = sp.Popen(['mpirun', '-n', str(self.ncores*self.nnodes),
-                                '-ppn', str(self.ncores),
-                                self.executable, seed])
+            if self.archer:
+                command = ['aprun', '-n', str(self.ncores*self.nnodes),
+                           '-N', str(self.ncores),
+                           '-S', '12',
+                           '-d', '1',
+                           self.executable, seed]
+                print(command)
+                process = sp.Popen(command)
+            else:
+                print(['mpirun', '-n', str(self.ncores*self.nnodes),
+                       '-ppn', str(self.ncores),
+                       self.executable, seed])
+                process = sp.Popen(['mpirun', '-n', str(self.ncores*self.nnodes),
+                                    '-ppn', str(self.ncores),
+                                    self.executable, seed])
         return process
 
     def mv_to_bad(self, seed):
@@ -483,6 +498,8 @@ if __name__ == '__main__':
                         help='specify path to or name of executable')
     parser.add_argument('-d', '--debug', action='store_true',
                         help='debug output')
+    parser.add_argument('--archer', action='store_true',
+                        help='use aprun over mpirun')
     parser.add_argument('--conv_cutoff', action='store_true',
                         help='run all res files at cutoff defined in cutoff.conv file')
     parser.add_argument('--conv_kpt', action='store_true',
@@ -497,7 +514,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     runner = BatchRun(ncores=args.ncores, nprocesses=args.nprocesses, nnodes=args.nnodes,
                       debug=args.debug, seed=args.seed, conv_cutoff=args.conv_cutoff, conv_kpt=args.conv_kpt,
-                      limit=args.limit, executable=args.executable, rough=args.rough,
+                      limit=args.limit, archer=args.archer, executable=args.executable, rough=args.rough,
                       spin=args.spin)
     try:
         runner.spawn()
