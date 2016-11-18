@@ -101,6 +101,8 @@ def query2files(cursor, *args):
                         stoich_string += str(atom[1]) if atom[1] != 1 else ''
                 # grab OQMD entry_id
                 name += stoich_string + '-OQMD_' + source.split(' ')[-1]
+                if 'icsd' in doc:
+                    name += '-CollCode' + doc['icsd']
         path += name
         # always write param for each doc; also handles dirs
         if param:

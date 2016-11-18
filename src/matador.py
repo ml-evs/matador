@@ -361,6 +361,8 @@ if __name__ == '__main__':
                              help='number of structures to show (DEFAULT: 10)')
     query_flags.add_argument('-d', '--details', action='store_true',
                              help='show as much detail about calculation as possible')
+    query_flags.add_argument('-pa', '--per_atom', action='store_true',
+                             help='show quantities per atom not per fu.')
     query_flags.add_argument('--source', action='store_true',
                              help='print filenames from which structures were wrangled')
     query_flags.add_argument('--cell', action='store_true',
