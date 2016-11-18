@@ -166,6 +166,10 @@ class DBQuery:
             self.query_dict['$and'].append(self.query_cnt_radius())
             self.empty_query = False
 
+        if self.args.get('cutoff') is not None:
+            self.query_dict['$and'].append(self.query_cutoff())
+            self.empty_query = False
+
         if self.args.get('tags') is not None:
             self.query_dict['$and'].append(self.query_tags())
             self.empty_query = False
@@ -857,6 +861,14 @@ class DBQuery:
 
         return query_dict
 
+    def query_cutoff(self):
+        """ Query all calculations above given plane-wave cutoff. """
+        query_dict = dict()
+        query_dict['cut_off_energy'] = dict()
+        query_dict['cut_off_energy']['$gte'] = self.args.get('cutoff')
+
+        return query_dict
+
     def query_calc(self, doc):
         """ Find all structures with matching
         accuracy to specified structure.
@@ -879,7 +891,12 @@ class DBQuery:
             temp_dict['spin_polarized'] = dict()
             temp_dict['spin_polarized']['$ne'] = True
             query_dict.append(temp_dict)
-        if self.args.get('loose') or 'oqmd' in self.args.get('db')[0]:
+        db = self.args.get('db')
+        if db is not None:
+            db = db[0]
+        else:
+            db = ''
+        if self.args.get('loose') or 'oqmd' in db:
             return query_dict
             # temp_dict = dict()
             # query_dict.append(dict())

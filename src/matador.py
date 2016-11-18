@@ -296,6 +296,8 @@ if __name__ == '__main__':
     structure_flags.add_argument('-cntr', '--cnt_radius', type=float,
                                  help='specify the radius of the encapsulating nanotube \
                                        to within 0.01 A')
+    structure_flags.add_argument('-ecut', '--cutoff', type=float,
+                                 help='specify the minimum planewave cutoff.')
     structure_flags.add_argument('--loose', action='store_true',
                                  help='loosely matches with calc_match, i.e. only matches \
                                        pspot and xc_functional')
