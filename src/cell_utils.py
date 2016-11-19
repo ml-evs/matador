@@ -119,7 +119,7 @@ def real2recip(real_lat):
     return recip_lat
 
 
-def calc_mp_spacing(real_lat, mp_grid):
+def calc_mp_spacing(real_lat, mp_grid, prec=2):
     """ Convert real lattice in Cartesian basis and the
     kpoint_mp_grid into a grid spacing.
     """
@@ -131,7 +131,8 @@ def calc_mp_spacing(real_lat, mp_grid):
         spacing = recip_len[j] / (2*pi*mp_grid[j])
         max_spacing = (spacing if spacing > max_spacing else max_spacing)
     exponent = round(log10(max_spacing) - 1)
-    return round(max_spacing + 0.5*10**exponent, 2)
+    return round(max_spacing + 0.5*10**exponent, prec)
+
 
 
 def doc2spg(doc):

@@ -748,8 +748,13 @@ def castep2dict(seed, db=True, **kwargs):
                 # calculate kpoint spacing if not found
                 if 'kpoints_mp_grid' in castep and 'kpoints_mp_spacing' not in castep and \
                    'lattice_cart' in castep:
+                    if db:
+                        prec = 2
+                    else:
+                        prec = 3
                     castep['kpoints_mp_spacing'] = calc_mp_spacing(castep['lattice_cart'],
-                                                                   castep['kpoints_mp_grid'])
+                                                                   castep['kpoints_mp_grid'],
+                                                                   prec)
         # computing metadata, i.e. parallelism, time, memory, version
         for line in flines:
             if 'Release CASTEP version' in line:
