@@ -177,9 +177,7 @@ class PDFFitter:
             cell = (cart_lat,
                     positions_frac,
                     atomic_numbers)
-            sg = spg.get_spacegroup(cell, symprec=0.01).split(' ')[0].strip()
-            print(sg)
-            print_warning('Invalid space group... recalculated...')
+            sg = int(spg.get_spacegroup(cell, symprec=1e-2).split(' ')[1].replace('(','').replace(')',''))
             spacegroup_params = constrainAsSpaceGroup(pdf.Contribution.phase, sg)
         # print('Space group parameters:')
         # print(', '.join([param.name for param in spacegroup_params]))
