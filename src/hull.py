@@ -10,7 +10,7 @@ from bson.son import SON
 from bisect import bisect_left
 from print_utils import print_failure, print_notify, print_warning
 from chem_utils import get_capacities, get_molar_mass, get_num_intercalated
-from cursor_utils import set_cursor_from_array, get_array_from_cursor
+from cursor_utils import set_cursor_from_array, get_array_from_cursor, filter_cursor
 from export import generate_hash, generate_relevant_path
 import pymongo as pm
 import re
@@ -67,7 +67,8 @@ class QueryConvexHull():
         if self.args['subcmd'] == 'voltage':
             if self.args.get('debug'):
                 self.set_plot_param()
-                self.voltage_curve()
+                self.generic_voltage_curve()
+                # self.voltage_curve()
                 # self.metastable_voltage_profile()
             else:
                 self.voltage_curve()
@@ -1050,6 +1051,65 @@ class QueryConvexHull():
                     lw=2, c=self.colours[0])
         ax.scatter(capacity_space, running_average_profile, c='r', marker='*', s=50)
         plt.show()
+
+    def generic_voltage_curve(self):
+        
+        def get_voltage_profile_segment(structure_new, structure_old,
+                                        chempot_Li=self.mu_enthalpy[0]):
+            """ Return voltage between two structures. """
+            if structure_old['num_intercalated'] == float('inf'):
+                V = 0
+            else:
+                V = (-(structure_new['enthalpy_per_b'] - structure_old['enthalpy_per_b']) /
+                     (structure_new['num_intercalated'] - structure_old['num_intercalated']) +
+                     (chempot_Li))
+            return V
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        plt.style.use('fivethirtyeight')
+
+        mu_enthalpy = get_array_from_cursor(self.match, 'enthalpy_per_atom')
+        x = get_num_intercalated(self.hull_cursor)
+        stable_enthalpy_per_b = get_array_from_cursor(self.hull_cursor, 'enthalpy_per_b')[np.argsort(x)]
+        set_cursor_from_array(self.hull_cursor, x, 'num_intercalated')
+        for i in range(len(x)):
+            for j in range(len(x)):
+                if(self.hull_cursor[i]['gravimetric_capacity'] > self.hull_cursor[j]['gravimetric_capacity']
+                        and self.hull_cursor[i]['num_intercalated'] < self.hull_cursor[j]['num_intercalated']+2):
+                    V = get_voltage_profile_segment(self.hull_cursor[i], self.hull_cursor[j], mu_enthalpy[0])
+                    ax.plot([self.hull_cursor[i]['gravimetric_capacity'],
+                            self.hull_cursor[j]['gravimetric_capacity']],
+                            [V, V], alpha=0.05, c='b', lw=4)
+                    ax.scatter((self.hull_cursor[i]['gravimetric_capacity'] + self.hull_cursor[j]['gravimetric_capacity']) / 2,
+                                V, alpha=1, c='b', s=10, marker='o', zorder=10000000)
+        self.hull_cursor = filter_cursor(self.hull_cursor, 'hull_distance', 0, 0.0001)
+        x = get_num_intercalated(self.hull_cursor)
+        Q = get_capacities(x, get_molar_mass(self.elements[1]))
+        stable_enthalpy_per_b = get_array_from_cursor(self.hull_cursor, 'enthalpy_per_b')[np.argsort(x)]
+        Q = Q[np.argsort(x)]
+        x = np.sort(x)
+        x, uniq_idxs = np.unique(x, return_index=True)
+        stable_enthalpy_per_b = stable_enthalpy_per_b[uniq_idxs]
+        Q = Q[uniq_idxs]
+        V = []
+        for i in range(len(x)):
+            V.append(-(stable_enthalpy_per_b[i] - stable_enthalpy_per_b[i-1]) /
+                      (x[i] - x[i-1]) +
+                      (mu_enthalpy[0]))
+        V[0] = V[1]
+        # make V, Q and x available for plotting
+        self.voltages = V
+        self.Q = Q
+        for i in range(len(self.voltages)-1):
+            ax.plot([self.Q[i-1], self.Q[i]], [self.voltages[i], self.voltages[i]],
+                     c='k', zorder=99999, lw=6)
+            ax.plot([self.Q[i], self.Q[i]], [self.voltages[i], self.voltages[i+1]],
+                     c='k', zorder=99999, lw=6)
+        ax.set_ylabel('Voltage (V)')
+        ax.set_xlabel('Gravimetric capacity (mAh/g)')
+        plt.show()
+        return
 
 
 class FakeHull:
