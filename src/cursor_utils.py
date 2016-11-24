@@ -101,7 +101,7 @@ def filter_cursor(cursor, key, min, max):
     print('Filtering', key, min, max)
     for doc in cursor:
         try:
-            if doc[key] < max and doc[key] > min:
+            if doc[key] < max and doc[key] >= min:
                 filtered_cursor.append(doc)
         except:
             pass
