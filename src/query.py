@@ -103,7 +103,8 @@ class DBQuery:
                 query_dict = dict()
                 query_dict['$and'] = []
                 query_dict['$and'].append(self.query_id())
-                query_dict['$and'].append(self.query_quality())
+                if not self.args.get('ignore_warnings'):
+                    query_dict['$and'].append(self.query_quality())
                 temp_cursor = self.collections[collection].find(query_dict)
                 for doc in temp_cursor:
                     self.cursor.append(doc)
@@ -886,13 +887,13 @@ class DBQuery:
         temp_dict['xc_functional'] = doc['xc_functional']
         query_dict.append(temp_dict)
         temp_dict = dict()
-        if 'spin_polarized' in doc and doc['spin_polarized']:
-            temp_dict['spin_polarized'] = doc['spin_polarized']
-            query_dict.append(temp_dict)
-        else:
-            temp_dict['spin_polarized'] = dict()
-            temp_dict['spin_polarized']['$ne'] = True
-            query_dict.append(temp_dict)
+        # if 'spin_polarized' in doc and doc['spin_polarized']:
+            # temp_dict['spin_polarized'] = doc['spin_polarized']
+            # query_dict.append(temp_dict)
+        # else:
+            # temp_dict['spin_polarized'] = dict()
+            # temp_dict['spin_polarized']['$ne'] = True
+            # query_dict.append(temp_dict)
         db = self.args.get('db')
         if db is not None:
             db = db[0]
