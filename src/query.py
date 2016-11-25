@@ -4,7 +4,6 @@ including parsing user inputs, displaying results
 and calling other functionality. """
 from __future__ import print_function
 # import related matador functionality
-# from export import query2files
 from utils.print_utils import print_failure, print_warning, print_success
 from utils.chem_utils import get_periodic_table
 # import external libraries
@@ -112,7 +111,7 @@ class DBQuery:
             if len(self.cursor) < 1:
                 exit('Could not find a match with ' + str(self.args.get('id')) + ' try widening your search.')
             elif len(self.cursor) >= 1:
-                self.display_results(list(self.cursor))
+                self.display_results(list(self.cursor)[:self.top])
                 if len(self.cursor) > 1:
                     print_warning('WARNING: matched multiple structures with same text_id. ' +
                                   'The first one will be used.')
@@ -222,8 +221,7 @@ class DBQuery:
                         if self.top == -1:
                             self.top = cursor_count
                         if cursor_count > self.top:
-                            self.cursor = self.cursor[:self.top]
-                            self.display_results(list(self.cursor))
+                            self.display_results(list(self.cursor)[:self.top])
                         else:
                             self.display_results(list(self.cursor))
 

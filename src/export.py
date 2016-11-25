@@ -18,6 +18,7 @@ def query2files(cursor, *args):
     """
     args = args[0]
     cell = args.get('cell')
+    top = args.get('top')
     param = args.get('param')
     res = args.get('res')
     pdb = args.get('pdb')
@@ -33,22 +34,27 @@ def query2files(cursor, *args):
         num = len(cursor)
     except:
         num = cursor.count()
-    print('Writing', num, 'structures to file...')
-    try:
-        if len(cursor) > 10000:
+    if top is not None:
+        if top < num:
+            cursor = cursor[:top]
+            num = top
+    print('Intending to write', num, 'structures to file...')
+    if len(cursor) > 10000:
+        try:
             write = raw_input('This operation will write ' + str(len(cursor)) + ' structures' +
                               ' are you sure you want to do this? [y/n] ')
-            if write == 'y' or write == 'Y':
-                print('Writing them all.')
-                write = True
-            else:
-                write = False
-                return
-        else:
+        except:
+            write = input('This operation will write ' + str(len(cursor)) + ' structures' +
+                              ' are you sure you want to do this? [y/n] ')
+
+        if write == 'y' or write == 'Y':
+            print('Writing them all.')
             write = True
-    except:
+        else:
+            write = False
+            return
+    else:
         write = True
-        pass
     dirname = generate_relevant_path(args)
     dir = False
     dir_counter = 0
@@ -113,6 +119,7 @@ def query2files(cursor, *args):
             doc2res(doc, path, info=info, hash_dupe=hash)
         if pdb:
             doc2pdb(doc, path, hash_dupe=hash)
+    print('Done!')
 
 
 def doc2param(doc, path, hash_dupe=True, *args):
