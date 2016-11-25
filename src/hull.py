@@ -233,7 +233,7 @@ class QueryConvexHull():
         if len(self.structure_slice) == 2:
             hull_dist = np.ones((len(structures)))
             hull_dist = structures[:, -1]
-        # if only binary hull, do binary search
+        # if binary hull, do binary search
         elif len(self.structure_slice[0]) == 2:
             hull_dist = np.ones((len(structures)))
             for ind in range(len(structures)):
@@ -249,6 +249,29 @@ class QueryConvexHull():
                 hull_dist[ind] = structures[ind, -1] - (gradient * structures[ind, 0] + intercept)
         # otherwise, set to zero until proper N-d distance can be implemented
         else:
+            # for each plane, convert each point into barycentric coordinates
+            # for that plane and test for negative values
+            self.hull.planes = [[self.structure_slice[vertex] for vertex in simplex] for simplex in self.hull.simplices]
+            self.plane_points = []
+            structures_sorted = [False]*len(structures)
+            for ind, plane in enumerate(self.hull.planes):
+                self.plane_points.append([])
+                R = self.barycentric2cart(plane).T
+                R[-1, :] = 1
+                # if projection of triangle in 2D is a line, do binary search
+                if np.linalg.det(R) == 0:
+                    continue
+                else:
+                    R_inv = np.linalg.inv(R)
+                    for idx, structure in enumerate(structures):
+                        if not structures_sorted[idx]:
+                            barycentric_structure = self.barycentric2cart(structure.reshape(1, 3)).T
+                            barycentric_structure[-1, :] = 1
+                            plane_barycentric_structure = np.matmul(R_inv, barycentric_structure)
+                            if (plane_barycentric_structure >= 0).all():
+                                self.plane_points[-1].append(idx)
+                                structures_sorted[idx] = True
+
             hull_dist = np.ones((len(structures)+1))
             for ind in self.hull.vertices:
                 hull_dist[ind] = 0.0
@@ -344,10 +367,20 @@ class QueryConvexHull():
                 self.hull = ConvexHull(self.structure_slice)
                 # filter out top of hull - ugly
                 if ternary:
-                    temp = [vertex for vertex in self.hull.vertices if self.structure_slice[vertex, -1] <= 0 + 1e-9]
+                    filtered_vertices = [vertex for vertex in self.hull.vertices if self.structure_slice[vertex, -1] <= 0 + 1e-9]
+                    temp_simplices = self.hull.simplices
+                    bad_simplices = []
+                    for ind, simplex in enumerate(temp_simplices):
+                        for vertex in simplex:
+                            if vertex not in filtered_vertices:
+                                bad_simplices.append(ind)
+                                break
+                    filtered_simplices = [simplex for ind, simplex in enumerate(temp_simplices) if ind not in bad_simplices]
                     del self.hull
                     self.hull = FakeHull()
-                    self.hull.vertices = list(temp)
+                    self.hull.vertices = list(filtered_vertices)
+                    self.hull.simplices = list(filtered_simplices)
+
                 self.hull_dist, self.hull_energy, self.hull_comp = self.get_hull_distances(structures)
                 if ternary:
                     self.hull_dist = self.hull_dist[:-1]
@@ -648,7 +681,7 @@ class QueryConvexHull():
         """ Plot calculated ternary hull in 3D. """
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
-        coords = self.structures2coords()
+        coords = self.barycentric2cart(self.structures)
         stable = coords[np.where(self.hull_dist < 0 + 1e-9)]
         # stable = [coords[ind] for ind in self.hull.vertices[:-1]]
         stable = np.asarray(stable)
@@ -657,16 +690,27 @@ class QueryConvexHull():
         ax.set_zlim(-0.5, 0)
         plt.show()
 
-    def structures2coords(self):
+    def barycentric2cart(self, structures):
         """ Convert ternary (x, y) in A_x B_y C_{1-x-y}
-        to positions projected onto 2D plane. """
-        concs = self.structures[:, :-1]
+        to positions projected onto 2D plane.
+
+        Input structures array is of the form:
+
+            [[l(1)_0, l(2)_0 Eform_0],
+             ...,
+             [l(1)_n, l(2)_n, Eform_n]]
+
+
+        where l3 = 1 - l2 - l1 are the barycentric coordinates of the point
+        in the triangle defined by the chemical potentials.
+        """
+        structures = np.asarray(structures)
         cos30 = np.cos(np.pi/6)
         cos60 = np.cos(np.pi/3)
-        coords = np.zeros_like(self.structures)
-        coords[:, 0] = concs[:, 0] + concs[:, 1] * cos60
-        coords[:, 1] = concs[:, 1] * cos30
-        coords[:, 2] = self.structures[:, -1]
+        coords = np.zeros_like(structures)
+        coords[:, 0] = structures[:, 0] + structures[:, 1] * cos60
+        coords[:, 1] = structures[:, 1] * cos30
+        coords[:, 2] = structures[:, -1]
         return coords
 
     def plot_ternary_hull(self):
@@ -693,10 +737,25 @@ class QueryConvexHull():
         for i in range(len(concs)):
             concs[i, -1] = 1 - concs[i, 0] - concs[i, 1]
 
+        colours = plt.cm.prism(np.linspace(0, 1, len(self.plane_points)))
+
+        for plane in self.hull.planes:
+            plane.append(plane[0])
+            ax.plot(plane, c='k', lw=0.5)
+        total = 0
+        for i in range(len(self.plane_points)):
+            num = len(self.plane_points[i])
+            if num >= 1:
+                for j in range(len(self.plane_points[i])):
+                    ax.scatter(concs[self.plane_points[i][j]].reshape(1, 3), color=colours[i])
+            total += num
+
+        print(total, len(concs))
+
         stable = [concs[ind] for ind in self.hull.vertices]
 
-        ax.scatter(concs, marker='o', color='green', zorder=1000)
-        ax.scatter(stable, marker='D', color='red', zorder=10000, s=40, lw=1)
+        # ax.scatter(concs, marker='o', color='green', zorder=1000)
+        ax.scatter(stable, marker='D', color='black', zorder=10000, s=40, lw=1)
         ax.show()
 
     def plot_voltage_curve(self):
@@ -1053,7 +1112,7 @@ class QueryConvexHull():
         plt.show()
 
     def generic_voltage_curve(self):
-        
+
         def get_voltage_profile_segment(structure_new, structure_old,
                                         chempot_Li=self.mu_enthalpy[0]):
             """ Return voltage between two structures. """
@@ -1118,3 +1177,4 @@ class FakeHull:
     def __init__(self):
         """ Define the used hull properties. """
         self.vertices = [0, 1]
+        self.simplices = []
