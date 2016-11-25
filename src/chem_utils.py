@@ -55,3 +55,22 @@ def get_capacities(x, m_B):
     x = np.array(x)
     Q = x * FARADAY_CONSTANT_Cpermol * Cperg_to_mAhperg / m_B
     return Q
+
+def get_atoms_per_fu(doc):
+    """ Calculate the number of atoms per formula unit. """
+    atoms_per_fu = 0
+    for j in range(len(doc['stoichiometry'])):
+        atoms_per_fu += doc['stoichiometry'][j][1]
+    return atoms_per_fu
+
+def get_formation_energy(chempots, doc):
+    """ From given chemical potentials, calculate the simplest
+    formation energy per atom of the desired document.
+    """
+    formation = doc['enthalpy_per_atom']
+    for mu in chempots:
+        for j in range(len(doc['stoichiometry'])):
+            if mu['stoichiometry'][0][0] == doc['stoichiometry'][j][0]:
+                formation -= (mu['enthalpy_per_atom'] * doc['stoichiometry'][j][1] /
+                              get_atoms_per_fu(doc))
+    return formation

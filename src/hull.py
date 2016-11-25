@@ -9,7 +9,9 @@ from traceback import print_exc
 from bson.son import SON
 from bisect import bisect_left
 from print_utils import print_failure, print_notify, print_warning
+from hull_utils import barycentric2cart, points2plane
 from chem_utils import get_capacities, get_molar_mass, get_num_intercalated
+from chem_utils import get_atoms_per_fu, get_formation_energy
 from cursor_utils import set_cursor_from_array, get_array_from_cursor, filter_cursor
 from export import generate_hash, generate_relevant_path
 import pymongo as pm
@@ -171,56 +173,14 @@ class QueryConvexHull():
         print(notify)
         print(len(notify)*'─')
 
-    def get_atoms_per_fu(self, doc):
-        """ Calculate the number of atoms per formula unit. """
-        atoms_per_fu = 0
-        for j in range(len(doc['stoichiometry'])):
-            atoms_per_fu += doc['stoichiometry'][j][1]
-        return atoms_per_fu
-
-    def get_formation_energy(self, doc):
-        """ From given chemical potentials, calculate the simplest
-        formation energy of the desired document.
-        """
-        formation = doc['enthalpy_per_atom']
-        for mu in self.match:
-            for j in range(len(doc['stoichiometry'])):
-                if mu['stoichiometry'][0][0] == doc['stoichiometry'][j][0]:
-                    formation -= (mu['enthalpy_per_atom'] * doc['stoichiometry'][j][1] /
-                                  self.get_atoms_per_fu(doc))
-        return formation
-
     def get_concentration(self, doc):
         """ Returns x for A_x B_{1-x}
         or xyz for A_x B_y C_z, (x+y+z=1). """
         stoich = [0.0] * (len(self.elements)-1)
         for ind, elem in enumerate(doc['stoichiometry']):
             if elem[0] in self.elements[:-1]:
-                stoich[self.elements.index(elem[0])] = elem[1]/float(self.get_atoms_per_fu(doc))
+                stoich[self.elements.index(elem[0])] = elem[1]/float(get_atoms_per_fu(doc))
         return stoich
-
-    def get_array_from_cursor(self, cursor, key):
-        """ Returns a numpy array of the values of a key
-        in a cursor.
-        """
-        array = []
-        try:
-            for doc in cursor:
-                array.append(doc[key])
-        except:
-            print_exc()
-        array = np.asarray(array)
-        assert(len(array) == len(cursor))
-        return array
-
-    def set_cursor_from_array(self, array, key):
-        """ Updates the key-value pair for documents in
-        internal cursor from a numpy array.
-        """
-        assert(len(array) == len(self.cursor) or len(array) - 1 == len(self.cursor))
-        for ind, doc in enumerate(self.cursor):
-            self.cursor[ind][key] = array[ind]
-        return
 
     def get_hull_distances(self, structures):
         """ Returns array of hull distances. """
@@ -256,7 +216,7 @@ class QueryConvexHull():
             structures_sorted = [False]*len(structures)
             for ind, plane in enumerate(self.hull.planes):
                 self.plane_points.append([])
-                R = self.barycentric2cart(plane).T
+                R = barycentric2cart(plane).T
                 R[-1, :] = 1
                 # if projection of triangle in 2D is a line, do binary search
                 if np.linalg.det(R) == 0:
@@ -265,7 +225,7 @@ class QueryConvexHull():
                     R_inv = np.linalg.inv(R)
                     for idx, structure in enumerate(structures):
                         if not structures_sorted[idx]:
-                            barycentric_structure = self.barycentric2cart(structure.reshape(1, 3)).T
+                            barycentric_structure = barycentric2cart(structure.reshape(1, 3)).T
                             barycentric_structure[-1, :] = 1
                             plane_barycentric_structure = np.matmul(R_inv, barycentric_structure)
                             if (plane_barycentric_structure >= 0).all():
@@ -345,7 +305,7 @@ class QueryConvexHull():
                 else:
                     self.cursor[ind]['enthalpy_per_b'] = doc['enthalpy'] / (num_b*num_fu)
                     self.cursor[ind]['cell_volume_per_b'] = doc['cell_volume'] / (num_b*num_fu)
-            self.cursor[ind]['formation_enthalpy_per_atom'] = self.get_formation_energy(doc)
+            self.cursor[ind]['formation_enthalpy_per_atom'] = get_formation_energy(self.match, doc)
             self.cursor[ind]['concentration'] = self.get_concentration(doc)
         # create stacked array of hull data
         structures = np.hstack((get_array_from_cursor(self.cursor, 'concentration'),
@@ -681,7 +641,7 @@ class QueryConvexHull():
         """ Plot calculated ternary hull in 3D. """
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
-        coords = self.barycentric2cart(self.structures)
+        coords = barycentric2cart(self.structures)
         stable = coords[np.where(self.hull_dist < 0 + 1e-9)]
         # stable = [coords[ind] for ind in self.hull.vertices[:-1]]
         stable = np.asarray(stable)
@@ -689,29 +649,6 @@ class QueryConvexHull():
         ax.scatter(stable[:, 0], stable[:, 1], stable[:, 2], s=100, c='k', marker='o')
         ax.set_zlim(-0.5, 0)
         plt.show()
-
-    def barycentric2cart(self, structures):
-        """ Convert ternary (x, y) in A_x B_y C_{1-x-y}
-        to positions projected onto 2D plane.
-
-        Input structures array is of the form:
-
-            [[l(1)_0, l(2)_0 Eform_0],
-             ...,
-             [l(1)_n, l(2)_n, Eform_n]]
-
-
-        where l3 = 1 - l2 - l1 are the barycentric coordinates of the point
-        in the triangle defined by the chemical potentials.
-        """
-        structures = np.asarray(structures)
-        cos30 = np.cos(np.pi/6)
-        cos60 = np.cos(np.pi/3)
-        coords = np.zeros_like(structures)
-        coords[:, 0] = structures[:, 0] + structures[:, 1] * cos60
-        coords[:, 1] = structures[:, 1] * cos30
-        coords[:, 2] = structures[:, -1]
-        return coords
 
     def plot_ternary_hull(self):
         """ Plot calculated ternary hull as a 2D projection. """
@@ -979,137 +916,6 @@ class QueryConvexHull():
         # last colour reserved for OQMD
         self.colours.append(Set3_10.hex_colors[-1])
         return
-
-    def metastable_voltage_profile(self):
-        """ Construct a smeared voltage profile from metastable hull,
-        weighting either with Boltzmann, PDF overlap of nothing.
-        """
-        print('Generating metastable voltage profile...')
-        structures = self.hull_cursor[:-1]
-        guest_atoms = []
-        for i in range(len(structures)):
-            stoich = self.get_formation_energy(structures[i])
-            try:
-                structures['num_a'] = stoich / (1 - stoich)
-            except:
-                structures['num_a'] = float('inf')
-        for i in range(len(structures)):
-            guest_atoms.append(structures[i]['num_a'])
-            structures[i]['capacity'] = get_capacities(guest_atoms[-1], get_molar_mass(self.elements[1]))
-        # guest_atoms = np.asarray(guest_atoms)
-        # max_guest = np.max(guest_atoms)
-        # grab reference cathode
-        reference_cathode = self.hull_cursor[-1]
-
-        # set up running average voltage profiles
-        num_divisions = 100
-        running_average_profile = np.zeros((num_divisions))
-        advanced_average_profile = np.zeros_like(running_average_profile)
-        diff_average_profile = np.ones_like(running_average_profile)
-        # replace with max cap
-        capacity_space = np.linspace(0, 2000, num_divisions)
-        all_voltage_profiles = []
-        # set convergance of voltage profile tolerance
-        tolerance = 1e-9 * num_divisions
-
-        def boltzmann(structures):
-            idx = np.random.randint(0, len(structures))
-            return structures[idx]
-
-        def pdf_overlap(structures):
-            idx = np.random.randint(0, len(structures))
-            return structures[idx]
-
-        def pick_metastable_structure(structures, weighting=None, last=None):
-            """ Pick an acceptable metastable structure. """
-            count = 0
-            while True:
-                count += 1
-                if count > 1000:
-                    exit('Something went wrong...')
-                test = structures[np.random.randint(0, len(structures))]
-                if test['num_a'] < last['num_a']:
-                    print(count)
-                    return test
-            else:
-                return weighting(structures)
-
-        def get_voltage_profile_segment(structure_new, structure_old):
-            """ Return voltage between two structures. """
-            V = (-(structure_new['enthalpy_per_b'] - structure_old['enthalpy_per_b']) /
-                 (structure_new['num_a'] - structure_old['num_a']) +
-                 (self.mu_enthalpy[0]))
-            if structure_old['num_a'] == float('inf'):
-                V = 0
-            return V
-
-        def interp_steps(xspace, x, y):
-            """ Interpolate (x,y) across xspace with step functions. """
-            yspace = np.zeros_like(xspace)
-            for x_val, y_val in zip(x, y):
-                yspace[np.where(xspace <= x_val)] = y_val
-            return yspace
-
-        weighting = None
-        converged = False
-        convergence_window = 3
-        last_converged = False
-        num_contribs = 0
-        num_converged = 0
-        num_trials = 100000
-        while not converged:
-            if np.abs(diff_average_profile).sum() < tolerance:
-                if num_converged > convergence_window:
-                    converged = True
-                    break
-                if not last_converged:
-                    last_converged = True
-                    num_converged = 1
-                if last_converged:
-                    num_converged += 1
-            if num_contribs > num_trials:
-                break
-            # print('Sampling path', num_contribs)
-            delithiated = False
-            voltage_profile = []
-            prev = reference_cathode
-            path_structures = list(structures)
-            while not delithiated:
-                next = pick_metastable_structure(path_structures, weighting=weighting, last=prev)
-                idx = path_structures.index(next)
-                path_structures = path_structures[:idx]
-                if prev['num_a'] != float('inf'):
-                    voltage_profile.append([next['capacity'], get_voltage_profile_segment(next, prev)])
-                if next['num_a'] == 0:
-                    delithiated = True
-                else:
-                    prev = next
-            if delithiated and len(voltage_profile) != 0:
-                # piecewise linear interpolation of V and add to running average
-                voltage_profile = np.asarray(voltage_profile)
-                # print(voltage_profile)
-                advanced_average_profile += interp_steps(capacity_space, voltage_profile[:, 0], voltage_profile[:, 1])
-                num_contribs += 1
-                diff_average_profile = advanced_average_profile/num_contribs - running_average_profile
-                # print(advanced_average_profile)
-                all_voltage_profiles.append(voltage_profile)
-                running_average_profile = advanced_average_profile/num_contribs
-
-        print('Convergence achieved with', num_contribs, 'paths.')
-        print(np.abs(diff_average_profile).sum(), tolerance)
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        # for idx, vp in enumerate(all_voltage_profiles):
-            # if idx % len(all_voltage_profiles) == 0:
-                # ax.scatter(vp[:, 0], vp[:, 1], s=50)
-            # print(vp)
-        for i in range(2, len(self.voltages)):
-            ax.plot([self.Q[i], self.Q[i]], [self.voltages[i], self.voltages[i-1]],
-                    lw=2, c=self.colours[0])
-            ax.plot([self.Q[i-1], self.Q[i]], [self.voltages[i-1], self.voltages[i-1]],
-                    lw=2, c=self.colours[0])
-        ax.scatter(capacity_space, running_average_profile, c='r', marker='*', s=50)
-        plt.show()
 
     def generic_voltage_curve(self):
 
