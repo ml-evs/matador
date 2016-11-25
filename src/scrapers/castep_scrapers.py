@@ -5,7 +5,7 @@ inputs and outputs.
 """
 from __future__ import print_function
 # matador modules
-from cell_utils import abc2cart, calc_mp_spacing
+from utils.cell_utils import abc2cart, calc_mp_spacing
 # external libraries
 try:
     import bson.json_util as json

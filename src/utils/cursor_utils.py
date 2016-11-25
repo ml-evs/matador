@@ -41,7 +41,7 @@ def get_spg_uniq(cursor, symprec=1e-2, latvecprec=1e-3, posprec=1e-3):
     * same_list  : list of pairs indices of duplicate structures.
     """
 
-    from cell_utils import doc2spg
+    from utils.cell_utils import doc2spg
     import spglib as spg
 
     spg_cursor = list()

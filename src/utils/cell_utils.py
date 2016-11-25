@@ -4,7 +4,7 @@ for cell manipulation.
 
 from math import pi, cos, sin, sqrt, acos, log10
 import numpy as np
-from chem_utils import get_atomic_number
+from utils.chem_utils import get_atomic_number
 
 
 def abc2cart(lattice_abc):
