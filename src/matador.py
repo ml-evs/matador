@@ -10,10 +10,10 @@ from version import __version__
 # matador modules
 from query import DBQuery
 from hull import QueryConvexHull
-from cursor_utils import filter_cursor
 from export import query2files
-from print_utils import print_failure, print_warning, print_notify
-from cursor_utils import get_spg_uniq
+from utils.cursor_utils import filter_cursor
+from utils.print_utils import print_failure, print_warning, print_notify
+from utils.cursor_utils import get_spg_uniq
 from polish import Polisher
 
 # import external libraries

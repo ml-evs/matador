@@ -11,7 +11,7 @@ TO-DO
 """
 from __future__ import print_function
 # matador modules
-from cell_utils import cart2abc
+from utils.cell_utils import cart2abc
 # external libraries
 import MySQLdb
 import MySQLdb.cursors

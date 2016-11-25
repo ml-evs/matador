@@ -10,8 +10,8 @@ from __future__ import print_function
 # matador functionality
 from scrapers.castep_scrapers import cell2dict
 from scrapers.castep_scrapers import param2dict
-from print_utils import print_notify, print_success, print_warning, print_failure
-from chem_utils import get_periodic_table
+from utils.print_utils import print_notify, print_success, print_warning, print_failure
+from utils.chem_utils import get_periodic_table
 from export import query2files
 
 # standard library

@@ -8,9 +8,9 @@ in the database with the diffpy package.
 from __future__ import print_function
 
 # matador functionality
-from print_utils import print_failure, print_warning, print_notify
-from cell_utils import abc2cart
-from chem_utils import get_atomic_number
+from utils.print_utils import print_failure, print_warning, print_notify
+from utils.cell_utils import abc2cart
+from utils.chem_utils import get_atomic_number
 
 # standard library
 import multiprocessing as mp

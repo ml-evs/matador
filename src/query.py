@@ -5,8 +5,8 @@ and calling other functionality. """
 from __future__ import print_function
 # import related matador functionality
 # from export import query2files
-from print_utils import print_failure, print_warning, print_success
-from chem_utils import get_periodic_table
+from utils.print_utils import print_failure, print_warning, print_success
+from utils.chem_utils import get_periodic_table
 # import external libraries
 import pymongo as pm
 import numpy as np

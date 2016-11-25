@@ -9,7 +9,7 @@ from __future__ import print_function
 from scrapers.castep_scrapers import castep2dict, param2dict, cell2dict
 from scrapers.castep_scrapers import res2dict, dir2dict
 from scrapers.experiment_scrapers import expt2dict, synth2dict
-from cell_utils import calc_mp_spacing
+from utils.cell_utils import calc_mp_spacing
 # external libraries
 import pymongo as pm
 # standard library

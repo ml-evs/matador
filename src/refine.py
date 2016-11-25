@@ -6,7 +6,7 @@ level of accuracy and atomic swaps.
 from __future__ import print_function
 
 import spglib as spg
-from chem_utils import get_atomic_number
+from utils.chem_utils import get_atomic_number
 
 
 class Refiner:

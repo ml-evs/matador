@@ -18,7 +18,7 @@ from os.path import isfile, exists
 from collections import defaultdict
 from scrapers.castep_scrapers import cell2dict, param2dict
 from scrapers.castep_scrapers import res2dict, castep2dict
-from print_utils import print_failure, print_success, print_warning, print_notify
+from utils.print_utils import print_failure, print_success, print_warning, print_notify
 from export import doc2cell, doc2param, doc2res
 from traceback import print_exc
 import argparse
