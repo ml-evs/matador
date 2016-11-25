@@ -347,6 +347,8 @@ class DBQuery:
             header_string += "{:^12}".format('Volume/fu')
         if hull:
             header_string += "{:^18}".format('Hull dist./atom')
+        elif self.args.get('per_atom'):
+            header_string += "{:^18}".format('Enthalpy/atom')
         else:
             header_string += "{:^18}".format('Enthalpy/fu')
         header_string += "{:^12}".format('Space group')
@@ -408,6 +410,8 @@ class DBQuery:
                 if hull:
                     struct_string[-1] += "{:^18.5f}".format(doc.get('hull_distance'))
                     # struct_string[-1] += "{:^18.5f}".format(doc.get('formation_enthalpy_per_atom'))
+                elif self.args.get('per_atom'):
+                    struct_string[-1] += "{:^18.5f}".format(doc['enthalpy_per_atom'])
                 else:
                     struct_string[-1] += "{:^18.5f}".format(doc['enthalpy']/doc['num_fu'] -
                                                             self.gs_enthalpy)
