@@ -214,6 +214,7 @@ class QueryConvexHull():
             self.hull.planes = [[self.structure_slice[vertex] for vertex in simplex] for simplex in self.hull.simplices]
             self.plane_points = []
             structures_sorted = [False]*len(structures)
+            hull_dist = np.ones((len(structures)+1))
             for ind, plane in enumerate(self.hull.planes):
                 self.plane_points.append([])
                 R = barycentric2cart(plane).T
@@ -222,6 +223,7 @@ class QueryConvexHull():
                 if np.linalg.det(R) == 0:
                     continue
                 else:
+                    get_height_above_plane = points2plane(plane)
                     R_inv = np.linalg.inv(R)
                     for idx, structure in enumerate(structures):
                         if not structures_sorted[idx]:
@@ -231,6 +233,7 @@ class QueryConvexHull():
                             if (plane_barycentric_structure >= 0).all():
                                 self.plane_points[-1].append(idx)
                                 structures_sorted[idx] = True
+                                hull_dist[idx] = get_height_above_plane(structure)
 
             hull_dist = np.ones((len(structures)+1))
             for ind in self.hull.vertices:
@@ -643,11 +646,11 @@ class QueryConvexHull():
         ax = fig.add_subplot(111, projection='3d')
         coords = barycentric2cart(self.structures)
         stable = coords[np.where(self.hull_dist < 0 + 1e-9)]
-        # stable = [coords[ind] for ind in self.hull.vertices[:-1]]
         stable = np.asarray(stable)
         ax.plot_trisurf(stable[:, 0], stable[:, 1], stable[:, 2], cmap=plt.cm.gnuplot, linewidth=1, color='grey', alpha=0.2)
         ax.scatter(stable[:, 0], stable[:, 1], stable[:, 2], s=100, c='k', marker='o')
-        ax.set_zlim(-0.5, 0)
+        ax.set_zlim(-1, 1)
+        ax.view_init(-90, 90)
         plt.show()
 
     def plot_ternary_hull(self):
@@ -940,14 +943,14 @@ class QueryConvexHull():
         set_cursor_from_array(self.hull_cursor, x, 'num_intercalated')
         for i in range(len(x)):
             for j in range(len(x)):
-                if(self.hull_cursor[i]['gravimetric_capacity'] > self.hull_cursor[j]['gravimetric_capacity']
-                        and self.hull_cursor[i]['num_intercalated'] < self.hull_cursor[j]['num_intercalated']+2):
+                if(self.hull_cursor[i]['gravimetric_capacity'] > self.hull_cursor[j]['gravimetric_capacity'] and
+                   self.hull_cursor[i]['num_intercalated'] < self.hull_cursor[j]['num_intercalated']+2):
                     V = get_voltage_profile_segment(self.hull_cursor[i], self.hull_cursor[j], mu_enthalpy[0])
                     ax.plot([self.hull_cursor[i]['gravimetric_capacity'],
                             self.hull_cursor[j]['gravimetric_capacity']],
                             [V, V], alpha=0.05, c='b', lw=4)
                     ax.scatter((self.hull_cursor[i]['gravimetric_capacity'] + self.hull_cursor[j]['gravimetric_capacity']) / 2,
-                                V, alpha=1, c='b', s=10, marker='o', zorder=10000000)
+                               V, alpha=1, c='b', s=10, marker='o', zorder=10000000)
         self.hull_cursor = filter_cursor(self.hull_cursor, 'hull_distance', 0, 0.0001)
         x = get_num_intercalated(self.hull_cursor)
         Q = get_capacities(x, get_molar_mass(self.elements[1]))
@@ -968,14 +971,13 @@ class QueryConvexHull():
         self.Q = Q
         for i in range(len(self.voltages)-1):
             ax.plot([self.Q[i-1], self.Q[i]], [self.voltages[i], self.voltages[i]],
-                     c='k', zorder=99999, lw=6)
+                    c='k', zorder=99999, lw=6)
             ax.plot([self.Q[i], self.Q[i]], [self.voltages[i], self.voltages[i+1]],
-                     c='k', zorder=99999, lw=6)
+                    c='k', zorder=99999, lw=6)
         ax.set_ylabel('Voltage (V)')
         ax.set_xlabel('Gravimetric capacity (mAh/g)')
         plt.show()
         return
-
 
 class FakeHull:
     """ Implements a thin class to mimic a ConvexHull object

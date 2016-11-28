@@ -4,6 +4,7 @@ for the construction and manipulation of convex hulls.
 """
 import numpy as np
 
+
 def points2plane(points):
     """ Convert points (xi, yi, zi) for i=1,..,3 into the
     equation of the plane spanned by the vectors v12, v13.
@@ -19,17 +20,40 @@ def points2plane(points):
 
         points = [np.array([x1, y1, z1]), ...,  np.array([x3, y3, z3])].
 
-    Returns:
+    Returns a function which will return the vertical distance between
+    the point and the plane:
 
-        equation = np.array([i, j, k, d]).
+        h = height_above_plane(structure)
+
 
     """
+    esp = 1e-12
     v12 = points[1] - points[0]
     v13 = points[2] - points[0]
     normal = np.cross(v12, v13)
-    d = -np.sum(normal)
-    equation = np.append(normal, d)
-    return equation
+    d = -np.sum(np.dot(normal, points[0]))
+    # check other points are on the plane, to some precision
+    assert(np.abs(np.dot(normal, points[2]) + d) < 0 + esp)
+    assert(np.abs(np.dot(normal, points[1]) + d) < 0 + esp)
+
+    def get_height_above_plane(structure):
+        """ Find the z-coordinate on the plane matching
+        the (x, y) coordinates of the structure, then calculate
+        the difference between this z and the z of the point given.
+        """
+        x = structure[0]
+        y = structure[1]
+        z = structure[2]
+        if normal[2] == 0:
+            print(-z)
+            return -z
+        z_plane = -(x*normal[0] + y*normal[1] + d / normal[2])
+        height = z - z_plane
+        print(height)
+        # assert(height >= 0)
+        return height
+
+    return get_height_above_plane
 
 
 def barycentric2cart(structures):
