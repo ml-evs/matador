@@ -113,7 +113,8 @@ class QueryConvexHull():
             for ind, elem in enumerate(self.elements):
                 print('Scanning for suitable', elem, 'chemical potential...')
                 query_dict['$and'] = list(query.calc_dict['$and'])
-                query_dict['$and'].append(query.query_quality())
+                if self.args.get('ignore_warnings') is None:
+                    query_dict['$and'].append(query.query_quality())
                 query_dict['$and'].append(query.query_composition(custom_elem=[elem]))
                 # if oqmd, only query composition, not parameters
                 if query.args.get('tags') is not None:
