@@ -17,7 +17,6 @@ from export import generate_hash, generate_relevant_path
 import pymongo as pm
 import re
 import numpy as np
-from mpldatacursor import datacursor
 import matplotlib.pyplot as plt
 import matplotlib.colors as colours
 
@@ -352,16 +351,17 @@ class QueryConvexHull():
                 print_exc()
                 print('Error with QHull, plotting points only...')
 
-        try:
-            self.info = self.get_text_info(html=self.args.get('bokeh'))
-            self.hull_info = self.get_text_info(cursor=self.hull_cursor, hull=True, html=self.args.get('bokeh'))
-        except:
-            pass
         if not ternary:
             Q = get_capacities(get_num_intercalated(self.cursor), get_molar_mass(self.elements[1]))
             set_cursor_from_array(self.cursor, Q, 'gravimetric_capacity')
         self.hull_cursor = [self.cursor[idx] for idx in np.where(self.hull_dist <= self.hull_cutoff + 1e-12)[0]]
         self.structures = structures
+        try:
+            self.info = self.get_text_info(html=self.args.get('bokeh'))
+            self.hull_info = self.get_text_info(cursor=self.cursor, hull=True, html=self.args.get('bokeh'))
+        except:
+            print_exc()
+            pass
 
     def voltage_curve(self):
         """ Take convex hull and calculate voltages. """
@@ -413,28 +413,29 @@ class QueryConvexHull():
             fig = plt.figure(facecolor=None)
         ax = fig.add_subplot(111)
         scatter = []
-        hull_scatter = []
         x_elem = [self.elements[0]]
         one_minus_x_elem = list(self.elements[1:])
+        tie_line = self.structure_slice[self.hull.vertices]
         plt.draw()
         # star structures on hull
         if len(self.structure_slice) != 2:
-            for ind in range(len(self.hull.vertices)):
-                if self.structure_slice[self.hull.vertices[ind], 1] <= 0:
-                    hull_scatter.append(ax.scatter(self.structure_slice[self.hull.vertices[ind], 0],
-                                                   self.structure_slice[self.hull.vertices[ind], 1],
-                                                   c=self.colours[1],
-                                                   marker='o', zorder=99999, edgecolor='k',
-                                                   s=self.scale*40, lw=1.5, alpha=1,
-                                                   label=self.info[self.hull.vertices[ind]]))
+            ax.scatter(tie_line[:, 0], tie_line[:, 1],
+                       c=self.colours[1],
+                       marker='o', zorder=99999, edgecolor='k',
+                       s=self.scale*40, lw=1.5, alpha=1)
+            ax.plot(np.sort(tie_line[:, 0]), tie_line[np.argsort(tie_line[:, 0]), 1],
+                    c=self.colours[0], lw=2, alpha=1, zorder=1000)
+            if self.hull_cutoff > 0:
+                ax.plot(np.sort(tie_line[:, 0]), tie_line[np.argsort(tie_line[:, 0]), 1] + self.hull_cutoff,
+                        '--', c=self.colours[1], lw=1, alpha=0.5, zorder=1000, label='')
+            # annotate hull structures
+            # for ind, doc in enumerate(tie_line):
                 # ax.annotate(self.hull_info[ind],
-                            # xy=(self.structure_slice[self.hull.vertices[ind], 0],
-                                # self.structure_slice[self.hull.vertices[ind], 1]),
+                            # xy=(tie_line[ind, 0], tie_line[ind, 1]),
+                            # xytext=(tie_line[ind, 0], tie_line[ind, 1] - 0.08),
                             # textcoords='data',
                             # ha='center',
-                            # zorder=99999,
-                            # xytext=(self.structure_slice[self.hull.vertices[ind], 0],
-                                    # self.structure_slice[self.hull.vertices[ind], 1]-0.05))
+                            # zorder=99999)
             lw = self.scale * 0 if self.mpl_new_ver else 1
             # points for off hull structures
             if self.hull_cutoff == 0:
@@ -467,20 +468,6 @@ class QueryConvexHull():
                            alpha=0.3, c=self.colours[-2],
                            edgecolor='k', zorder=10)
             # tie lines
-            for ind in range(len(self.hull_comp)-1):
-                ax.plot([self.hull_comp[ind], self.hull_comp[ind+1]],
-                        [self.hull_energy[ind], self.hull_energy[ind+1]],
-                        c=self.colours[0], lw=2, alpha=1, zorder=1000, label='')
-                if self.hull_cutoff > 0:
-                    ax.plot([self.hull_comp[ind], self.hull_comp[ind+1]],
-                            [self.hull_energy[ind]+self.hull_cutoff,
-                             self.hull_energy[ind+1]+self.hull_cutoff],
-                            '--', c=self.colours[1], lw=1, alpha=0.5, zorder=1000, label='')
-            # data cursor
-            if not dis and self.hull_cutoff != 0:
-                datacursor(scatter[:], formatter='{label}'.format, draggable=False,
-                           bbox=dict(fc='white'),
-                           arrowprops=dict(arrowstyle='simple', alpha=1))
             ax.set_ylim(-0.1 if np.min(self.structure_slice[self.hull.vertices, 1]) > 0
                         else np.min(self.structure_slice[self.hull.vertices, 1])-0.15,
                         0.1 if np.max(self.structure_slice[self.hull.vertices, 1]) > 1
@@ -642,6 +629,7 @@ class QueryConvexHull():
 
     def plot_3d_ternary_hull(self):
         """ Plot calculated ternary hull in 3D. """
+        from mpl_toolkits.mplot3d import axes3d
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
         coords = barycentric2cart(self.structures)
@@ -848,10 +836,6 @@ class QueryConvexHull():
                         '--', c=self.colours[1], lw=1, alpha=0.5, zorder=1000, label='')
         ax.set_xlim(-0.05, 1.05)
         # data cursor
-        if not dis:
-            datacursor(scatter[:], formatter='{label}'.format, draggable=False,
-                       bbox=dict(fc='white'),
-                       arrowprops=dict(arrowstyle='simple', alpha=1))
         ax.set_ylim(-0.1 if np.min(self.structure_slice[self.hull.vertices, 1]) > 0
                     else np.min(self.structure_slice[self.hull.vertices, 1]) - 0.05,
                     0.5 if np.max(self.structures[:, 1]) > 0.5
@@ -978,6 +962,7 @@ class QueryConvexHull():
         ax.set_xlabel('Gravimetric capacity (mAh/g)')
         plt.show()
         return
+
 
 class FakeHull:
     """ Implements a thin class to mimic a ConvexHull object
