@@ -23,7 +23,7 @@ import glob
 import gzip
 
 
-def res2dict(seed, db=True, **kwargs):
+def res2dict(seed, db=True, verbosity=0, **kwargs):
     """ Extract available information from .res file; preferably
     used in conjunction with cell or param file.
     """
@@ -137,7 +137,7 @@ def res2dict(seed, db=True, **kwargs):
     return res, True
 
 
-def cell2dict(seed, db=True, **kwargs):
+def cell2dict(seed, db=True, verbosity=0, **kwargs):
     """ Extract available information from .cell file; probably
     to be merged with another dict from a .param or .res file.
     """
@@ -270,7 +270,7 @@ def cell2dict(seed, db=True, **kwargs):
     return cell, True
 
 
-def param2dict(seed, db=True, **kwargs):
+def param2dict(seed, db=True, verbosity=0, **kwargs):
     """ Extract available information from .param file; probably
     to be merged with other dicts from other files.
 
@@ -337,7 +337,7 @@ def param2dict(seed, db=True, **kwargs):
     return param, True
 
 
-def dir2dict(seed, **kwargs):
+def dir2dict(seed, verbosity=0, **kwargs):
     """ Try to extract information from directory name; last hope
     if no param file has been found.
     """
@@ -405,7 +405,7 @@ def dir2dict(seed, **kwargs):
     return dir_dict, True
 
 
-def castep2dict(seed, db=True, **kwargs):
+def castep2dict(seed, db=True, verbosity=0, **kwargs):
     """ From seed filename, create dict of the most relevant
     information about a calculation.
     """
