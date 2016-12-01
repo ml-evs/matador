@@ -5,7 +5,7 @@ for the construction and manipulation of convex hulls.
 import numpy as np
 
 
-def points2plane(points):
+def vertices2plane(points):
     """ Convert points (xi, yi, zi) for i=1,..,3 into the
     equation of the plane spanned by the vectors v12, v13.
     For unit vectors e(i):
@@ -45,15 +45,33 @@ def points2plane(points):
         y = structure[1]
         z = structure[2]
         if normal[2] == 0:
-            print(-z)
-            return -z
-        z_plane = -(x*normal[0] + y*normal[1] + d / normal[2])
+            return -0.01
+        z_plane = -((x*normal[0] + y*normal[1] + d) / normal[2])
         height = z - z_plane
-        print(height)
-        # assert(height >= 0)
+        assert(height >= 0-1e-12)
         return height
 
     return get_height_above_plane
+
+
+def vertices2line(points):
+    """ Perform a simple linear interpolation on
+    two points.
+
+    Input:
+
+        [[x1, E1], [x2, E2]]
+
+    Returns:
+
+        m = (E2 - E1) / (x2 - x1),
+        c = ((E2 - E1) - m * (x1 + x2)) / 2
+
+    """
+    gradient = (points[1][1] - points[0][1]) / (points[1][0] - points[0][0])
+    intercept = ((points[1][1] + points[0][1]) -
+                 gradient * (points[1][1] + points[1][0])) / 2.0
+    return gradient, intercept
 
 
 def barycentric2cart(structures):
@@ -71,6 +89,7 @@ def barycentric2cart(structures):
 
     where l3 = 1 - l2 - l1 are the barycentric coordinates of the point
     in the triangle defined by the chemical potentials.
+
     """
     structures = np.asarray(structures)
     cos30 = np.cos(np.pi/6)

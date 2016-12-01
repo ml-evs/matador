@@ -9,7 +9,7 @@ from traceback import print_exc
 from bson.son import SON
 from bisect import bisect_left
 from utils.print_utils import print_failure, print_notify, print_warning
-from utils.hull_utils import barycentric2cart, points2plane
+from utils.hull_utils import barycentric2cart, vertices2plane, vertices2line
 from utils.chem_utils import get_capacities, get_molar_mass, get_num_intercalated
 from utils.chem_utils import get_atoms_per_fu, get_formation_energy
 from utils.cursor_utils import set_cursor_from_array, get_array_from_cursor, filter_cursor
@@ -199,12 +199,10 @@ class QueryConvexHull():
             for ind in range(len(structures)):
                 # get the index of the next stoich on the hull from the current structure
                 i = bisect_left(tie_line_comp, structures[ind, 0])
-                energy_pair = (tie_line_energy[i-1], tie_line_energy[i])
-                comp_pair = (tie_line_comp[i-1], tie_line_comp[i])
                 # calculate equation of line between the two
-                gradient = (energy_pair[1] - energy_pair[0]) / (comp_pair[1] - comp_pair[0])
-                intercept = ((energy_pair[1] + energy_pair[0]) -
-                             gradient * (comp_pair[1] + comp_pair[0])) / 2
+                tie_line_points = [[tie_line_comp[i-1], tie_line_energy[i-1]],
+                                   [tie_line_comp[i], tie_line_energy[i]]]
+                gradient, intercept = vertices2line(tie_line_points)
                 # calculate hull_dist
                 hull_dist[ind] = structures[ind, -1] - (gradient * structures[ind, 0] + intercept)
         # otherwise, set to zero until proper N-d distance can be implemented
@@ -221,9 +219,10 @@ class QueryConvexHull():
                 R[-1, :] = 1
                 # if projection of triangle in 2D is a line, do binary search
                 if np.linalg.det(R) == 0:
+                    print('MATRIX IS SINGULAR')
                     continue
                 else:
-                    get_height_above_plane = points2plane(plane)
+                    get_height_above_plane = vertices2plane(plane)
                     R_inv = np.linalg.inv(R)
                     for idx, structure in enumerate(structures):
                         if not structures_sorted[idx]:
@@ -235,10 +234,13 @@ class QueryConvexHull():
                                 structures_sorted[idx] = True
                                 hull_dist[idx] = get_height_above_plane(structure)
 
-            hull_dist = np.ones((len(structures)+1))
             for ind in self.hull.vertices:
                 hull_dist[ind] = 0.0
-
+            self.failed_structures = []
+            for ind in range(len(structures_sorted)):
+                if not structures_sorted[ind]:
+                    self.failed_structures.append(ind)
+            self.failed_structures = np.asarray(self.failed_structures)
         return hull_dist, tie_line_energy, tie_line_comp
 
     def get_text_info(self, cursor=None, hull=False, html=False):
@@ -638,6 +640,7 @@ class QueryConvexHull():
         stable = np.asarray(stable)
         ax.plot_trisurf(stable[:, 0], stable[:, 1], stable[:, 2], cmap=plt.cm.gnuplot, linewidth=1, color='grey', alpha=0.2)
         ax.scatter(stable[:, 0], stable[:, 1], stable[:, 2], s=100, c='k', marker='o')
+        ax.scatter(coords[self.failed_structures, 0], coords[self.failed_structures, 1], coords[self.failed_structures, 2], c='r')
         ax.set_zlim(-1, 1)
         ax.view_init(-90, 90)
         plt.show()
