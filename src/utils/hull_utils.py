@@ -35,6 +35,7 @@ def vertices2plane(points):
     # check other points are on the plane, to some precision
     assert(np.abs(np.dot(normal, points[2]) + d) < 0 + esp)
     assert(np.abs(np.dot(normal, points[1]) + d) < 0 + esp)
+    # assert(normal[2] != 0)
 
     def get_height_above_plane(structure):
         """ Find the z-coordinate on the plane matching
@@ -44,8 +45,7 @@ def vertices2plane(points):
         x = structure[0]
         y = structure[1]
         z = structure[2]
-        if normal[2] == 0:
-            return -0.01
+        assert(normal[2] != 0)
         z_plane = -((x*normal[0] + y*normal[1] + d) / normal[2])
         height = z - z_plane
         assert(height >= 0-1e-12)
@@ -68,9 +68,11 @@ def vertices2line(points):
         c = ((E2 - E1) - m * (x1 + x2)) / 2
 
     """
-    gradient = (points[1][1] - points[0][1]) / (points[1][0] - points[0][0])
-    intercept = ((points[1][1] + points[0][1]) -
-                 gradient * (points[1][1] + points[1][0])) / 2.0
+    energy_pair = [points[0][1], points[1][1]]
+    comp_pair = [points[0][0], points[1][0]]
+    gradient = (energy_pair[1] - energy_pair[0]) / (comp_pair[1] - comp_pair[0])
+    intercept = ((energy_pair[1] + energy_pair[0]) -
+                 gradient * (comp_pair[1] + comp_pair[0])) / 2
     return gradient, intercept
 
 

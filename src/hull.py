@@ -88,7 +88,8 @@ class QueryConvexHull():
             else:
                 self.set_plot_param()
                 if len(self.elements) == 3:
-                    self.plot_3d_ternary_hull()
+                    if self.args.get('debug'):
+                        self.plot_3d_ternary_hull()
                     self.plot_ternary_hull()
                 else:
                     self.plot_2d_hull()
@@ -197,12 +198,9 @@ class QueryConvexHull():
         elif len(self.structure_slice[0]) == 2:
             hull_dist = np.ones((len(structures)))
             for ind in range(len(structures)):
-                # get the index of the next stoich on the hull from the current structure
                 i = bisect_left(tie_line_comp, structures[ind, 0])
-                # calculate equation of line between the two
-                tie_line_points = [[tie_line_comp[i-1], tie_line_energy[i-1]],
-                                   [tie_line_comp[i], tie_line_energy[i]]]
-                gradient, intercept = vertices2line(tie_line_points)
+                gradient, intercept = vertices2line([[tie_line_comp[i-1], tie_line_energy[i-1]],
+                                                     [tie_line_comp[i], tie_line_energy[i]]])
                 # calculate hull_dist
                 hull_dist[ind] = structures[ind, -1] - (gradient * structures[ind, 0] + intercept)
         # otherwise, set to zero until proper N-d distance can be implemented
@@ -219,7 +217,8 @@ class QueryConvexHull():
                 R[-1, :] = 1
                 # if projection of triangle in 2D is a line, do binary search
                 if np.linalg.det(R) == 0:
-                    print('MATRIX IS SINGULAR')
+                    if self.args.get('debug'):
+                        print('TRANSFORMATION MATRIX IS SINGULAR')
                     continue
                 else:
                     get_height_above_plane = vertices2plane(plane)
@@ -229,7 +228,7 @@ class QueryConvexHull():
                             barycentric_structure = barycentric2cart(structure.reshape(1, 3)).T
                             barycentric_structure[-1, :] = 1
                             plane_barycentric_structure = np.matmul(R_inv, barycentric_structure)
-                            if (plane_barycentric_structure >= 0).all():
+                            if (plane_barycentric_structure >= 0-1e-12).all():
                                 self.plane_points[-1].append(idx)
                                 structures_sorted[idx] = True
                                 hull_dist[idx] = get_height_above_plane(structure)
@@ -640,7 +639,8 @@ class QueryConvexHull():
         stable = np.asarray(stable)
         ax.plot_trisurf(stable[:, 0], stable[:, 1], stable[:, 2], cmap=plt.cm.gnuplot, linewidth=1, color='grey', alpha=0.2)
         ax.scatter(stable[:, 0], stable[:, 1], stable[:, 2], s=100, c='k', marker='o')
-        ax.scatter(coords[self.failed_structures, 0], coords[self.failed_structures, 1], coords[self.failed_structures, 2], c='r')
+        if len(self.failed_structures) > 0:
+            ax.scatter(coords[self.failed_structures, 0], coords[self.failed_structures, 1], coords[self.failed_structures, 2], c='r')
         ax.set_zlim(-1, 1)
         ax.view_init(-90, 90)
         plt.show()
@@ -654,14 +654,14 @@ class QueryConvexHull():
         fig, ax = ternary.figure(scale=scale)
 
         ax.boundary(linewidth=2.0)
-        ax.gridlines(color='black', multiple=0.1, linewidth=0.5)
+        ax.gridlines(color='black', multiple=0.2, linewidth=0.1)
 
         ax.ticks(axis='lbr', linewidth=1, multiple=0.1)
         ax.clear_matplotlib_ticks()
 
-        ax.annotate(self.elements[0], [1, 0], fontsize=fontsize, zorder=10000)
-        ax.annotate(self.elements[1], [0, 0], fontsize=fontsize, zorder=10000)
-        ax.annotate(self.elements[2], [1, 1], fontsize=fontsize, zorder=10000)
+        ax.annotate(self.elements[0], [0.9, 0.02], fontsize=fontsize, zorder=10000)
+        ax.annotate(self.elements[1], [0.02, 0.92], fontsize=fontsize, zorder=10000)
+        ax.annotate(self.elements[2], [0.02, 0.02], fontsize=fontsize, zorder=10000)
 
         concs = np.zeros((len(self.structures), 3))
 
@@ -669,25 +669,32 @@ class QueryConvexHull():
         for i in range(len(concs)):
             concs[i, -1] = 1 - concs[i, 0] - concs[i, 1]
 
-        colours = plt.cm.prism(np.linspace(0, 1, len(self.plane_points)))
+        Ncolours = 1000
+        max_eform = 1
+        colours_hull = plt.cm.Dark2(np.linspace(0.15, 0.4, Ncolours))
 
+        colours_list = []
+        for i in range(len(self.hull_dist)):
+            if self.hull_dist[i] >= max_eform:
+                colours_list.append(Ncolours-1)
+            elif self.hull_dist[i] <= 0.02:
+                colours_list.append(0)
+            else:
+                colours_list.append(int(Ncolours/2*(2+np.log10(self.hull_dist[i] / max_eform))))
+
+        colours_list = np.asarray(colours_list)
         for plane in self.hull.planes:
             plane.append(plane[0])
-            ax.plot(plane, c='k', lw=0.5)
-        total = 0
-        for i in range(len(self.plane_points)):
-            num = len(self.plane_points[i])
-            if num >= 1:
-                for j in range(len(self.plane_points[i])):
-                    ax.scatter(concs[self.plane_points[i][j]].reshape(1, 3), color=colours[i])
-            total += num
+            ax.plot(plane, c=colours_hull[0], lw=1, alpha=0.5)
 
-        print(total, len(concs))
+        for i in range(len(concs)):
+            ax.scatter(concs[i].reshape(1, 3),
+                       color=colours_hull[colours_list[i]],
+                       zorder=10000-colours_list[i], alpha=1, s=40)
 
         stable = [concs[ind] for ind in self.hull.vertices]
 
-        # ax.scatter(concs, marker='o', color='green', zorder=1000)
-        ax.scatter(stable, marker='D', color='black', zorder=10000, s=40, lw=1)
+        ax.scatter(stable, marker='o', color=colours_hull[0], edgecolors='black', zorder=10000, s=90, lw=1)
         ax.show()
 
     def plot_voltage_curve(self):
