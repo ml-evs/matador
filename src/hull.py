@@ -227,7 +227,7 @@ class QueryConvexHull():
                         if not structures_sorted[idx]:
                             barycentric_structure = barycentric2cart(structure.reshape(1, 3)).T
                             barycentric_structure[-1, :] = 1
-                            plane_barycentric_structure = np.matmul(R_inv, barycentric_structure)
+                            plane_barycentric_structure = np.matrix(R_inv) * np.matrix(barycentric_structure)
                             if (plane_barycentric_structure >= 0-1e-12).all():
                                 self.plane_points[-1].append(idx)
                                 structures_sorted[idx] = True
