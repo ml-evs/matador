@@ -10,15 +10,13 @@ from bson.son import SON
 from bisect import bisect_left
 from utils.print_utils import print_failure, print_notify, print_warning
 from utils.hull_utils import barycentric2cart, vertices2plane, vertices2line
-from utils.chem_utils import get_capacities, get_molar_mass, get_num_intercalated
-from utils.chem_utils import get_atoms_per_fu, get_formation_energy
+from utils.chem_utils import get_binary_capacities, get_molar_mass, get_num_intercalated
+from utils.chem_utils import get_formation_energy, get_concentration
 from utils.cursor_utils import set_cursor_from_array, get_array_from_cursor, filter_cursor
 from export import generate_hash, generate_relevant_path
 import pymongo as pm
 import re
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.colors as colours
 
 
 class QueryConvexHull():
@@ -65,15 +63,16 @@ class QueryConvexHull():
 
         self.query.display_results(self.hull_cursor, hull=True)
 
+        if not self.args.get('no_plot'):
+            self.set_plot_param()
+
         if self.args['subcmd'] == 'voltage':
             if self.args.get('debug'):
-                self.set_plot_param()
                 self.generic_voltage_curve()
                 # self.voltage_curve()
                 # self.metastable_voltage_profile()
             else:
                 self.voltage_curve()
-                self.set_plot_param()
                 if self.args.get('subplot'):
                     self.subplot_voltage_hull()
                 else:
@@ -86,7 +85,6 @@ class QueryConvexHull():
             if self.args.get('bokeh'):
                 self.plot_2d_hull_bokeh()
             else:
-                self.set_plot_param()
                 if len(self.elements) == 3:
                     if self.args.get('debug'):
                         self.plot_3d_ternary_hull()
@@ -173,15 +171,6 @@ class QueryConvexHull():
         print(len(notify)*'─')
         print(notify)
         print(len(notify)*'─')
-
-    def get_concentration(self, doc):
-        """ Returns x for A_x B_{1-x}
-        or xyz for A_x B_y C_z, (x+y+z=1). """
-        stoich = [0.0] * (len(self.elements)-1)
-        for ind, elem in enumerate(doc['stoichiometry']):
-            if elem[0] in self.elements[:-1]:
-                stoich[self.elements.index(elem[0])] = elem[1]/float(get_atoms_per_fu(doc))
-        return stoich
 
     def get_hull_distances(self, structures):
         """ Returns array of hull distances. """
@@ -274,8 +263,11 @@ class QueryConvexHull():
         """ Create a convex hull for two elements. """
         query = self.query
         self.elements = query.args.get('composition')
+        if ':' in self.elements[0]:
+            self.elements[0].replace(':', '')
         self.elements = [elem for elem in re.split(r'([A-Z][a-z]*)', self.elements[0]) if elem]
-        assert(len(self.elements) < 4 and len(self.elements) > 1)
+        # if ':' in self.elements
+        # assert(len(self.elements) < 4 and len(self.elements) > 1)
         ternary = False
         if len(self.elements) == 3:
             ternary = True
@@ -310,7 +302,7 @@ class QueryConvexHull():
                     self.cursor[ind]['enthalpy_per_b'] = doc['enthalpy'] / (num_b*num_fu)
                     self.cursor[ind]['cell_volume_per_b'] = doc['cell_volume'] / (num_b*num_fu)
             self.cursor[ind]['formation_enthalpy_per_atom'] = get_formation_energy(self.match, doc)
-            self.cursor[ind]['concentration'] = self.get_concentration(doc)
+            self.cursor[ind]['concentration'] = get_concentration(doc, self.elements)
         # create stacked array of hull data
         structures = np.hstack((get_array_from_cursor(self.cursor, 'concentration'),
                                 get_array_from_cursor(self.cursor, 'formation_enthalpy_per_atom').reshape(len(self.cursor), 1)))
@@ -354,7 +346,7 @@ class QueryConvexHull():
                 print('Error with QHull, plotting points only...')
 
         if not ternary:
-            Q = get_capacities(get_num_intercalated(self.cursor), get_molar_mass(self.elements[1]))
+            Q = get_binary_capacities(get_num_intercalated(self.cursor), get_molar_mass(self.elements[1]))
             set_cursor_from_array(self.cursor, Q, 'gravimetric_capacity')
         self.hull_cursor = [self.cursor[idx] for idx in np.where(self.hull_dist <= self.hull_cutoff + 1e-12)[0]]
         self.structures = structures
@@ -371,7 +363,7 @@ class QueryConvexHull():
         mu_enthalpy = get_array_from_cursor(self.match, 'enthalpy_per_atom')
         x = get_num_intercalated(self.hull_cursor)
         # sort for voltage calculation
-        Q = get_capacities(x, get_molar_mass(self.elements[1]))
+        Q = get_binary_capacities(x, get_molar_mass(self.elements[1]))
         Q = Q[np.argsort(x)]
         stable_enthalpy_per_b = get_array_from_cursor(self.hull_cursor, 'enthalpy_per_b')[np.argsort(x)]
         x = np.sort(x)
@@ -409,6 +401,8 @@ class QueryConvexHull():
 
     def plot_2d_hull(self, dis=False):
         """ Plot calculated hull. """
+        import matplotlib.pyplot as plt
+        import matplotlib.colors as colours
         if self.args.get('pdf') or self.args.get('png') or self.args.get('svg'):
             fig = plt.figure(facecolor=None, figsize=(5, 4))
         else:
@@ -516,7 +510,7 @@ class QueryConvexHull():
         """ Plot interactive hull with Bokeh. """
         from bokeh.plotting import figure, save, output_file
         from bokeh.models import ColumnDataSource, HoverTool, Range1d
-
+        from matplotlib.pyplot.cm import get_cmap
         # grab tie-line structures
         tie_line_data = dict()
         tie_line_data['composition'] = list()
@@ -543,7 +537,7 @@ class QueryConvexHull():
             hull_data['space_group'].append(structure[2])
             hull_data['hull_dist_string'].append(structure[3])
         cmap_limits = [0, 0.5]
-        colormap = plt.cm.get_cmap('Dark2')
+        colormap = get_cmap('Dark2')
         cmap_input = np.interp(hull_data['hull_distance'], cmap_limits, [0.15, 0.4], left=0.15, right=0.4)
         colours = colormap(cmap_input, 1, True)
         bokeh_colours = ["#%02x%02x%02x" % (r, g, b) for r, g, b in colours[:, 0:3]]
@@ -632,6 +626,7 @@ class QueryConvexHull():
     def plot_3d_ternary_hull(self):
         """ Plot calculated ternary hull in 3D. """
         from mpl_toolkits.mplot3d import axes3d
+        import matplotlib.pyplot as plt
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
         coords = barycentric2cart(self.structures)
@@ -648,57 +643,96 @@ class QueryConvexHull():
     def plot_ternary_hull(self):
         """ Plot calculated ternary hull as a 2D projection. """
         import ternary
+        import matplotlib.pyplot as plt
+        import matplotlib.colors as colours
         print('Plotting ternary hull...')
-        scale = 1
+        if self.args.get('capmap'):
+            scale = 50
+        else:
+            scale = 1
         fontsize = 18
         fig, ax = ternary.figure(scale=scale)
+        fig.set_size_inches(10, 7.5)
 
-        ax.boundary(linewidth=2.0)
-        ax.gridlines(color='black', multiple=0.2, linewidth=0.1)
+        ax.boundary(linewidth=2.0, zorder=99)
+        ax.gridlines(color='black', multiple=scale*0.1, linewidth=0.5)
 
-        ax.ticks(axis='lbr', linewidth=1, multiple=0.1)
         ax.clear_matplotlib_ticks()
+        ax.ticks(axis='lbr', linewidth=1, multiple=scale*0.1)
 
-        ax.annotate(self.elements[0], [0.9, 0.02], fontsize=fontsize, zorder=10000)
-        ax.annotate(self.elements[1], [0.02, 0.92], fontsize=fontsize, zorder=10000)
-        ax.annotate(self.elements[2], [0.02, 0.02], fontsize=fontsize, zorder=10000)
+        ax.set_title(''.join(self.elements), fontsize=fontsize)
+        ax.left_axis_label(self.elements[2], fontsize=fontsize)
+        ax.right_axis_label(self.elements[1], fontsize=fontsize)
+        ax.bottom_axis_label(self.elements[0], fontsize=fontsize)
 
         concs = np.zeros((len(self.structures), 3))
 
         concs[:, :-1] = self.structures[:, :-1]
         for i in range(len(concs)):
+            # set third triangular coordinate
             concs[i, -1] = 1 - concs[i, 0] - concs[i, 1]
-
-        Ncolours = 1000
-        max_eform = 1
-        colours_hull = plt.cm.Dark2(np.linspace(0.15, 0.4, Ncolours))
-
-        colours_list = []
-        for i in range(len(self.hull_dist)):
-            if self.hull_dist[i] >= max_eform:
-                colours_list.append(Ncolours-1)
-            elif self.hull_dist[i] <= 0.02:
-                colours_list.append(0)
-            else:
-                colours_list.append(int(Ncolours/2*(2+np.log10(self.hull_dist[i] / max_eform))))
-
-        colours_list = np.asarray(colours_list)
-        for plane in self.hull.planes:
-            plane.append(plane[0])
-            ax.plot(plane, c=colours_hull[0], lw=1, alpha=0.5)
-
-        for i in range(len(concs)):
-            ax.scatter(concs[i].reshape(1, 3),
-                       color=colours_hull[colours_list[i]],
-                       zorder=10000-colours_list[i], alpha=1, s=40)
 
         stable = [concs[ind] for ind in self.hull.vertices]
 
-        ax.scatter(stable, marker='o', color=colours_hull[0], edgecolors='black', zorder=10000, s=90, lw=1)
+        # sort by hull distances so things are plotting the right order
+        concs = concs[np.argsort(self.hull_dist)]
+        hull_dist = np.sort(self.hull_dist)
+
+        Ncolours = 1000
+        min_cut = 0.01
+        max_cut = 0.2
+        min_colour = 0.15
+        max_colour = 0.4
+        colours_hull = plt.cm.Dark2(np.linspace(min_colour, max_colour, Ncolours))
+
+        for plane in self.hull.planes:
+            plane.append(plane[0])
+            ax.plot(scale*plane, c=self.colours[0], lw=1.5, alpha=1, zorder=98)
+
+        cmap_full = plt.cm.get_cmap('Dark2')
+        cmap = colours.LinearSegmentedColormap.from_list(
+            'trunc({n},{a:.2f},{b:.2f})'.format(n=cmap_full.name, a=0, b=1),
+            # cmap_full(np.logspace(-0.8239, -0.3979, 100)))
+            cmap_full(np.linspace(min_colour, max_colour, Ncolours)))
+
+        colours_list = []
+        colour_metric = hull_dist
+        for i in range(len(colour_metric)):
+            if colour_metric[i] >= max_cut:
+                colours_list.append(Ncolours-1)
+            elif colour_metric[i] <= min_cut:
+                colours_list.append(0)
+            else:
+                colours_list.append(int((Ncolours-1)*(colour_metric[i] / max_cut)))
+        colours_list = np.asarray(colours_list)
+        ax.scatter(concs, colormap=cmap, colorbar=True,
+                   c=hull_dist, vmax=max_cut, vmin=min_cut, zorder=1000, s=40, alpha=0)
+        ax.scatter(scale*stable, marker='o', color=colours_hull[0], edgecolors='black', zorder=10000, s=120, lw=1.5)
+        if self.args.get('capmap'):
+            for i in range(len(concs)):
+                ax.scatter(scale*concs[i].reshape(1, 3),
+                           color=colours_hull[colours_list[i]],
+                           marker='s',
+                           zorder=10000-colours_list[i],
+                           alpha=1,
+                           s=70*(1-float(colours_list[i])/Ncolours)+10,
+                           lw=1, edgecolors='black')
+            from utils.chem_utils import get_generic_capacity
+            capacities = dict()
+            from ternary.helpers import simplex_iterator
+            for (i, j, k) in simplex_iterator(scale):
+                capacities[(i, j, k)] = get_generic_capacity([float(i)/scale, float(j)/scale, float(scale-i-j)/scale], self.elements)
+            ax.heatmap(capacities, style="hexagonal", vmin=0, vmax=3000, cmap='viridis')
+
+        if self.args.get('png'):
+            plt.savefig('ternary.png', dpi=400)
+        elif self.args.get('pdf'):
+            plt.savefig('ternary.pdf', dpi=400)
         ax.show()
 
     def plot_voltage_curve(self):
         """ Plot calculated voltage curve. """
+        import matplotlib.pyplot as plt
         if self.args.get('pdf') or self.args.get('png'):
             fig = plt.figure(facecolor=None, figsize=(3, 2.7))
         else:
@@ -752,6 +786,7 @@ class QueryConvexHull():
 
     def plot_volume_curve(self):
         """ Plot calculate volume curve. """
+        import matplotlib.pyplot as plt
         if self.args.get('pdf') or self.args.get('png'):
             fig = plt.figure(facecolor=None, figsize=(2.7, 2.7))
         else:
@@ -801,6 +836,7 @@ class QueryConvexHull():
 
     def subplot_voltage_hull(self, dis=False):
         """ Plot calculated hull with inset voltage curve. """
+        import matplotlib.pyplot as plt
         if self.args.get('pdf') or self.args.get('png'):
             fig = plt.figure(facecolor=None, figsize=(4.5, 1.5))
         else:
@@ -884,6 +920,7 @@ class QueryConvexHull():
         """ Set some plotting options global to
         voltage and hull plots.
         """
+        import matplotlib.pyplot as plt
         try:
             plt.style.use('bmh')
         except:
@@ -916,6 +953,9 @@ class QueryConvexHull():
         return
 
     def generic_voltage_curve(self):
+        """ A more generic version of voltage curve. """
+
+        import matplotlib.pyplot as plt
 
         def get_voltage_profile_segment(structure_new, structure_old,
                                         chempot_Li=self.mu_enthalpy[0]):
@@ -948,7 +988,7 @@ class QueryConvexHull():
                                V, alpha=1, c='b', s=10, marker='o', zorder=10000000)
         self.hull_cursor = filter_cursor(self.hull_cursor, 'hull_distance', 0, 0.0001)
         x = get_num_intercalated(self.hull_cursor)
-        Q = get_capacities(x, get_molar_mass(self.elements[1]))
+        Q = get_binary_capacities(x, get_molar_mass(self.elements[1]))
         stable_enthalpy_per_b = get_array_from_cursor(self.hull_cursor, 'enthalpy_per_b')[np.argsort(x)]
         Q = Q[np.argsort(x)]
         x = np.sort(x)
