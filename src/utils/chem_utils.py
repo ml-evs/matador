@@ -28,13 +28,26 @@ def get_periodic_table():
     periodic_table['X'] = [elem for group in periodic_table.keys() for elem in periodic_table[group]]
     return periodic_table
 
+
 def get_molar_mass(elem):
     """ Returns molar mass of chosen element. """
     return periodictable.elements.symbol(elem).mass
 
+
 def get_atomic_number(elem):
     """ Returns atomic number of chosen element. """
     return periodictable.elements.symbol(elem).number
+
+
+def get_concentration(doc, elements):
+    """ Returns x for A_x B_{1-x}
+    or x,y for A_x B_y C_z, (x+y+z=1). """
+    concs = [0.0] * (len(elements)-1)
+    for ind, elem in enumerate(doc['stoichiometry']):
+        if elem[0] in elements[:-1]:
+            concs[elements.index(elem[0])] = elem[1]/float(get_atoms_per_fu(doc))
+    return concs
+
 
 def get_num_intercalated(cursor):
     """ Return array of the number of intercalated atoms
@@ -48,13 +61,35 @@ def get_num_intercalated(cursor):
             x[idx] = comp/(1-comp)
     return x
 
-def get_capacities(x, m_B):
-    """ Returns capacity in mAh/g from x in A_x B
+
+def get_binary_capacities(x, m_B):
+    """ Returns capacity in mAh/g from x/y in A_x B_y
     and m_B in a.m.u.
     """
     x = np.array(x)
     Q = x * FARADAY_CONSTANT_Cpermol * Cperg_to_mAhperg / m_B
     return Q
+
+
+def get_generic_capacity(concs, elements):
+    """ Returns gravimetric capacity of
+    <elements[0]> in mAh/g of matador doc.
+    """
+    concs = np.asarray(concs)
+    x = concs[0]
+    concs /= x
+    masses = dict()
+    m_B = 0
+    for elem in elements:
+        masses[elem] = get_molar_mass(elem)
+    for ind, elem in enumerate(elements):
+        if ind == 0:
+            continue
+        else:
+            m_B += masses[elem]*concs[ind]
+    Q = get_binary_capacities(x, m_B)
+    return Q
+
 
 def get_atoms_per_fu(doc):
     """ Calculate the number of atoms per formula unit. """
@@ -62,6 +97,7 @@ def get_atoms_per_fu(doc):
     for j in range(len(doc['stoichiometry'])):
         atoms_per_fu += doc['stoichiometry'][j][1]
     return atoms_per_fu
+
 
 def get_formation_energy(chempots, doc):
     """ From given chemical potentials, calculate the simplest
