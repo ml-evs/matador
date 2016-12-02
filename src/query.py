@@ -549,10 +549,15 @@ class DBQuery:
                 if details or self.args.get('source'):
                     print(len(header_string) * '─')
 
-    def query_stoichiometry(self):
+    def query_stoichiometry(self, custom_stoich=None, partial_formula=None):
         """ Query DB for particular stoichiometry. """
         # alias stoichiometry
-        stoich = self.args.get('stoichiometry')
+        if custom_stoich is None:
+            stoich = self.args.get('stoichiometry')
+        else:
+            stoich = custom_stoich
+        if partial_formula is None:
+            partial_formula = self.args.get('partial_formula')
 
         # if there's only one string, try split it by caps
         if len(stoich) == 1:
@@ -623,7 +628,7 @@ class DBQuery:
                 stoich_dict['stoichiometry'] = dict()
                 stoich_dict['stoichiometry']['$in'] = [[elem, fraction[ind]]]
                 query_dict['$and'].append(stoich_dict)
-        if not self.args.get('partial_formula'):
+        if not partial_formula:
             size_dict = dict()
             size_dict['stoichiometry'] = dict()
             size_dict['stoichiometry']['$size'] = len(elements)
@@ -631,7 +636,7 @@ class DBQuery:
 
         return query_dict
 
-    def query_composition(self, custom_elem=None):
+    def query_composition(self, custom_elem=None, partial_formula=None):
         """ Query DB for all structures containing
         all the elements taken as input. Passing this
         function a number is a deprecated feature, replaced
@@ -641,12 +646,13 @@ class DBQuery:
             elements = list(self.args.get('composition'))
         else:
             elements = custom_elem
+        if partial_formula is None:
+            partial_formula = self.args.get('partial_formula')
+        non_binary = False
         if ':' in elements[0]:
-            if not self.args['subcmd'] == 'hull':
-                elements[0] = elements[0].replace(':', '')
-                print('Ignoring colon...')
+            non_binary = True
         # if there's only one string, try split it by caps
-        if not self.args['subcmd'] == 'hull':
+        if not non_binary:
             for char in elements[0]:
                 if char.isdigit():
                     print_failure('Composition cannot contain a number.')
@@ -693,6 +699,7 @@ class DBQuery:
         if self.args.get('intersection'):
             query_dict = dict()
             query_dict['$or'] = []
+            size = len(elements)
             # iterate over all combinations
             for rlen in range(1, len(elements)+1):
                 for combi in combinations(elements, r=rlen):
@@ -707,9 +714,21 @@ class DBQuery:
                         types_dict['$and'][-1]['atom_types'] = dict()
                         types_dict['$and'][-1]['atom_types']['$in'] = [elem]
                     query_dict['$or'].append(types_dict)
+        elif non_binary:
+            query_dict = dict()
+            query_dict['$and'] = []
+            size = 0
+            for ind, elem in enumerate(elements):
+                if elem != ':' and not elem.isdigit():
+                    query_dict['$and'].append(self.query_composition(custom_elem=[elem], partial_formula=True))
+                    size += 1
+                if elem == ':':
+                    stoich = ''.join(elements[ind+1:])
+                    query_dict['$and'].append(self.query_stoichiometry(custom_stoich=[stoich], partial_formula=True))
         else:
             query_dict = dict()
             query_dict['$and'] = []
+            size = len(elements)
             for ind, elem in enumerate(elements):
                 # prototype for chemically motivated searches, e.g. transition metals
                 if '[' in elem or ']' in elem:
@@ -725,12 +744,11 @@ class DBQuery:
                     types_dict['atom_types'] = dict()
                     types_dict['atom_types']['$in'] = [elem]
                 query_dict['$and'].append(types_dict)
-            if not self.args.get('partial_formula'):
-                size_dict = dict()
-                size_dict['stoichiometry'] = dict()
-                num = len(elements)
-                size_dict['stoichiometry']['$size'] = num
-                query_dict['$and'].append(size_dict)
+        if not partial_formula and not self.args.get('intersection'):
+            size_dict = dict()
+            size_dict['stoichiometry'] = dict()
+            size_dict['stoichiometry']['$size'] = size
+            query_dict['$and'].append(size_dict)
 
         return query_dict
 
