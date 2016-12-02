@@ -705,24 +705,24 @@ class QueryConvexHull():
             else:
                 colours_list.append(int((Ncolours-1)*(colour_metric[i] / max_cut)))
         colours_list = np.asarray(colours_list)
-        ax.scatter(concs, colormap=cmap, colorbar=True,
+        ax.scatter(scale*concs, colormap=cmap, colorbar=True,
                    c=hull_dist, vmax=max_cut, vmin=min_cut, zorder=1000, s=40, alpha=0)
         ax.scatter(scale*stable, marker='o', color=colours_hull[0], edgecolors='black', zorder=10000, s=120, lw=1.5)
+        for i in range(len(concs)):
+            ax.scatter(scale*concs[i].reshape(1, 3),
+                       color=colours_hull[colours_list[i]],
+                       marker='s',
+                       zorder=10000-colours_list[i],
+                       alpha=1,
+                       s=70*(1-float(colours_list[i])/Ncolours)+10,
+                       lw=1, edgecolors='black')
         if self.args.get('capmap'):
-            for i in range(len(concs)):
-                ax.scatter(scale*concs[i].reshape(1, 3),
-                           color=colours_hull[colours_list[i]],
-                           marker='s',
-                           zorder=10000-colours_list[i],
-                           alpha=1,
-                           s=70*(1-float(colours_list[i])/Ncolours)+10,
-                           lw=1, edgecolors='black')
             from utils.chem_utils import get_generic_capacity
             capacities = dict()
             from ternary.helpers import simplex_iterator
             for (i, j, k) in simplex_iterator(scale):
                 capacities[(i, j, k)] = get_generic_capacity([float(i)/scale, float(j)/scale, float(scale-i-j)/scale], self.elements)
-            ax.heatmap(capacities, style="hexagonal", vmin=0, vmax=3000, cmap='viridis')
+            ax.heatmap(capacities, style="hexagonal", vmin=0, vmax=3000, cmap='Dark2')
 
         if self.args.get('png'):
             plt.savefig('ternary.png', dpi=400)
