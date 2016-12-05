@@ -85,9 +85,9 @@ class QueryConvexHull():
             if self.args.get('bokeh'):
                 self.plot_2d_hull_bokeh()
             else:
-                if len(self.elements) == 3:
-                    if self.args.get('debug'):
-                        self.plot_3d_ternary_hull()
+                if self.args.get('debug'):
+                    self.plot_3d_ternary_hull()
+                if self.ternary:
                     self.plot_ternary_hull()
                 else:
                     self.plot_2d_hull()
@@ -263,17 +263,19 @@ class QueryConvexHull():
         """ Create a convex hull for two elements. """
         query = self.query
         self.elements = query.args.get('composition')
+        self.non_binary = False
         if ':' in self.elements[0]:
-            self.elements[0].replace(':', '')
-        self.elements = [elem for elem in re.split(r'([A-Z][a-z]*)', self.elements[0]) if elem]
-        # if ':' in self.elements
+            self.non_binary = True
+        self.elements = [elem for elem in re.split(r'([A-Z][a-z]*)', self.elements[0]) if elem.isalpha()]
         # assert(len(self.elements) < 4 and len(self.elements) > 1)
-        ternary = False
-        if len(self.elements) == 3:
-            ternary = True
+        self.ternary = False
+        if len(self.elements) == 3 and not self.non_binary:
+            self.ternary = True
         self.get_chempots()
-        if ternary:
-            print('Constructing ternary hull...')
+        if self.non_binary:
+            print('Contructing hull with non-elemental chemical potentials...')
+        elif self.ternary:
+            print('Constructing self.ternary hull...')
             if not self.args.get('intersection'):
                 print_warning('Please query with -int/--intersection when creating ternary hulls.')
                 exit('Exiting...')
@@ -285,7 +287,7 @@ class QueryConvexHull():
         one_minus_x_elem = self.one_minus_x_elem
         # grab relevant information from query results; also make function?
         for ind, doc in enumerate(self.cursor):
-            if not ternary:
+            if not self.ternary:
                 # calculate number of atoms of type B per formula unit
                 nums_b = len(one_minus_x_elem)*[0]
                 for elem in doc['stoichiometry']:
@@ -307,9 +309,8 @@ class QueryConvexHull():
         structures = np.hstack((get_array_from_cursor(self.cursor, 'concentration'),
                                 get_array_from_cursor(self.cursor, 'formation_enthalpy_per_atom').reshape(len(self.cursor), 1)))
         # create hull with SciPy routine, including only points with formation energy < 0
-        if ternary:
+        if self.ternary:
             self.structure_slice = structures  # [np.where(structures[:, -1] <= 0 + 1e-9)]
-            # self.structure_slice[np.where(structures[:, -1] <= 0 + 1e-9)][-1] = 10
             self.structure_slice = np.vstack((self.structure_slice, np.array([0, 0, 1e5])))
         else:
             self.structure_slice = structures[np.where(structures[:, -1] <= 0 + 1e-9)]
@@ -322,7 +323,7 @@ class QueryConvexHull():
             try:
                 self.hull = ConvexHull(self.structure_slice)
                 # filter out top of hull - ugly
-                if ternary:
+                if self.ternary:
                     filtered_vertices = [vertex for vertex in self.hull.vertices if self.structure_slice[vertex, -1] <= 0 + 1e-9]
                     temp_simplices = self.hull.simplices
                     bad_simplices = []
@@ -338,14 +339,14 @@ class QueryConvexHull():
                     self.hull.simplices = list(filtered_simplices)
 
                 self.hull_dist, self.hull_energy, self.hull_comp = self.get_hull_distances(structures)
-                if ternary:
+                if self.ternary:
                     self.hull_dist = self.hull_dist[:-1]
                 set_cursor_from_array(self.cursor, self.hull_dist, 'hull_distance')
             except:
                 print_exc()
                 print('Error with QHull, plotting points only...')
 
-        if not ternary:
+        if not self.ternary and not self.non_binary:
             Q = get_binary_grav_capacities(get_num_intercalated(self.cursor), get_molar_mass(self.elements[1]))
             set_cursor_from_array(self.cursor, Q, 'gravimetric_capacity')
         self.hull_cursor = [self.cursor[idx] for idx in np.where(self.hull_dist <= self.hull_cutoff + 1e-12)[0]]
@@ -719,11 +720,11 @@ class QueryConvexHull():
                        s=70*(1-float(colours_list[i])/Ncolours)+15,
                        lw=1, edgecolors='black')
         if self.args.get('capmap'):
-            from utils.chem_utils import get_generic_capacity
+            from utils.chem_utils import get_generic_grav_capacity
             capacities = dict()
             from ternary.helpers import simplex_iterator
             for (i, j, k) in simplex_iterator(scale):
-                capacities[(i, j, k)] = get_generic_capacity([float(i)/scale, float(j)/scale, float(scale-i-j)/scale], self.elements)
+                capacities[(i, j, k)] = get_generic_grav_capacity([float(i)/scale, float(j)/scale, float(scale-i-j)/scale], self.elements)
             ax.heatmap(capacities, style="hexagonal", cbarlabel='Gravimetric capacity (maH/g)',
                        vmin=0, vmax=3000, cmap='Pastel2')
         elif self.args.get('efmap'):
