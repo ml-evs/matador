@@ -12,7 +12,6 @@ from scrapers.castep_scrapers import cell2dict
 from scrapers.castep_scrapers import param2dict
 from utils.print_utils import print_notify, print_success, print_warning, print_failure
 from utils.chem_utils import get_periodic_table
-from export import query2files
 
 # standard library
 from traceback import print_exc
@@ -65,8 +64,6 @@ class Polisher:
         for doc in self.cursor[:]:
             polish_cursor.append(self.change_accuracy(doc))
         self.cursor = polish_cursor
-
-        # query2files(self.cursor, self.args)
 
     def get_accuracy(self):
         """ Read the correct key-value pairs
