@@ -62,7 +62,7 @@ def get_num_intercalated(cursor):
     return x
 
 
-def get_binary_capacities(x, m_B):
+def get_binary_grav_capacities(x, m_B):
     """ Returns capacity in mAh/g from x/y in A_x B_y
     and m_B in a.m.u.
     """
@@ -71,7 +71,7 @@ def get_binary_capacities(x, m_B):
     return Q
 
 
-def get_generic_capacity(concs, elements):
+def get_generic_grav_capacity(concs, elements):
     """ Returns gravimetric capacity of
     <elements[0]> in mAh/g of matador doc.
     """
@@ -87,9 +87,16 @@ def get_generic_capacity(concs, elements):
             continue
         else:
             m_B += masses[elem]*concs[ind]
-    Q = get_binary_capacities(x, m_B)
+    Q = get_binary_grav_capacities(x, m_B)
     return Q
 
+# def get_volumetric_capacity(cursor, element):
+    # """ Returns the volumetric capacity of
+    # element in doc, mAh/cm^{-3}.
+    # """
+    # x = get_num_intercalated(cursor)
+    # vols = get_array_from_cursor(cursor, 'cell_volume')
+    # num_fu = get_array_from_cursor('cell_volume_per_b')
 
 def get_atoms_per_fu(doc):
     """ Calculate the number of atoms per formula unit. """

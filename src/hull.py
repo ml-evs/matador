@@ -10,7 +10,7 @@ from bson.son import SON
 from bisect import bisect_left
 from utils.print_utils import print_failure, print_notify, print_warning
 from utils.hull_utils import barycentric2cart, vertices2plane, vertices2line
-from utils.chem_utils import get_binary_capacities, get_molar_mass, get_num_intercalated
+from utils.chem_utils import get_binary_grav_capacities, get_molar_mass, get_num_intercalated
 from utils.chem_utils import get_formation_energy, get_concentration
 from utils.cursor_utils import set_cursor_from_array, get_array_from_cursor, filter_cursor
 from export import generate_hash, generate_relevant_path
@@ -346,7 +346,7 @@ class QueryConvexHull():
                 print('Error with QHull, plotting points only...')
 
         if not ternary:
-            Q = get_binary_capacities(get_num_intercalated(self.cursor), get_molar_mass(self.elements[1]))
+            Q = get_binary_grav_capacities(get_num_intercalated(self.cursor), get_molar_mass(self.elements[1]))
             set_cursor_from_array(self.cursor, Q, 'gravimetric_capacity')
         self.hull_cursor = [self.cursor[idx] for idx in np.where(self.hull_dist <= self.hull_cutoff + 1e-12)[0]]
         self.structures = structures
@@ -363,7 +363,7 @@ class QueryConvexHull():
         mu_enthalpy = get_array_from_cursor(self.match, 'enthalpy_per_atom')
         x = get_num_intercalated(self.hull_cursor)
         # sort for voltage calculation
-        Q = get_binary_capacities(x, get_molar_mass(self.elements[1]))
+        Q = get_binary_grav_capacities(x, get_molar_mass(self.elements[1]))
         Q = Q[np.argsort(x)]
         stable_enthalpy_per_b = get_array_from_cursor(self.hull_cursor, 'enthalpy_per_b')[np.argsort(x)]
         x = np.sort(x)
@@ -646,8 +646,8 @@ class QueryConvexHull():
         import matplotlib.pyplot as plt
         import matplotlib.colors as colours
         print('Plotting ternary hull...')
-        if self.args.get('capmap'):
-            scale = 50
+        if self.args.get('capmap') or self.args.get('efmap'):
+            scale = 100
         else:
             scale = 1
         fontsize = 18
@@ -672,7 +672,7 @@ class QueryConvexHull():
             # set third triangular coordinate
             concs[i, -1] = 1 - concs[i, 0] - concs[i, 1]
 
-        stable = [concs[ind] for ind in self.hull.vertices]
+        stable = np.asarray([concs[ind] for ind in self.hull.vertices])
 
         # sort by hull distances so things are plotting the right order
         concs = concs[np.argsort(self.hull_dist)]
@@ -687,6 +687,7 @@ class QueryConvexHull():
 
         for plane in self.hull.planes:
             plane.append(plane[0])
+            plane = np.asarray(plane)
             ax.plot(scale*plane, c=self.colours[0], lw=1.5, alpha=1, zorder=98)
 
         cmap_full = plt.cm.get_cmap('Dark2')
@@ -707,14 +708,15 @@ class QueryConvexHull():
         colours_list = np.asarray(colours_list)
         ax.scatter(scale*concs, colormap=cmap, colorbar=True,
                    c=hull_dist, vmax=max_cut, vmin=min_cut, zorder=1000, s=40, alpha=0)
-        ax.scatter(scale*stable, marker='o', color=colours_hull[0], edgecolors='black', zorder=10000, s=120, lw=1.5)
+        ax.scatter(scale*stable, marker='o', color=colours_hull[0], edgecolors='black', zorder=9999999,
+                   s=150, lw=1.5)
         for i in range(len(concs)):
             ax.scatter(scale*concs[i].reshape(1, 3),
                        color=colours_hull[colours_list[i]],
                        marker='s',
                        zorder=10000-colours_list[i],
                        alpha=1,
-                       s=70*(1-float(colours_list[i])/Ncolours)+10,
+                       s=70*(1-float(colours_list[i])/Ncolours)+15,
                        lw=1, edgecolors='black')
         if self.args.get('capmap'):
             from utils.chem_utils import get_generic_capacity
@@ -722,7 +724,22 @@ class QueryConvexHull():
             from ternary.helpers import simplex_iterator
             for (i, j, k) in simplex_iterator(scale):
                 capacities[(i, j, k)] = get_generic_capacity([float(i)/scale, float(j)/scale, float(scale-i-j)/scale], self.elements)
-            ax.heatmap(capacities, style="hexagonal", vmin=0, vmax=3000, cmap='Dark2')
+            ax.heatmap(capacities, style="hexagonal", cbarlabel='Gravimetric capacity (maH/g)',
+                       vmin=0, vmax=3000, cmap='Pastel2')
+        elif self.args.get('efmap'):
+            energies = dict()
+            fake_structures = []
+            from ternary.helpers import simplex_iterator
+            for (i, j, k) in simplex_iterator(scale):
+                fake_structures.append([float(i)/scale, float(j)/scale, 0.0])
+            fake_structures = np.asarray(fake_structures)
+            plane_energies, _, _ = self.get_hull_distances(fake_structures)
+            ind = 0
+            for (i, j, k) in simplex_iterator(scale):
+                energies[(i, j, k)] = -1*plane_energies[ind]
+                ind += 1
+            ax.heatmap(energies, style="hexagonal", cbarlabel='Formation energy (eV/atom)',
+                       vmax=0, cmap='viridis')
 
         if self.args.get('png'):
             plt.savefig('ternary.png', dpi=400)
@@ -988,7 +1005,7 @@ class QueryConvexHull():
                                V, alpha=1, c='b', s=10, marker='o', zorder=10000000)
         self.hull_cursor = filter_cursor(self.hull_cursor, 'hull_distance', 0, 0.0001)
         x = get_num_intercalated(self.hull_cursor)
-        Q = get_binary_capacities(x, get_molar_mass(self.elements[1]))
+        Q = get_binary_grav_capacities(x, get_molar_mass(self.elements[1]))
         stable_enthalpy_per_b = get_array_from_cursor(self.hull_cursor, 'enthalpy_per_b')[np.argsort(x)]
         Q = Q[np.argsort(x)]
         x = np.sort(x)
