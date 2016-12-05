@@ -45,7 +45,7 @@ def query2files(cursor, *args):
                               ' are you sure you want to do this? [y/n] ')
         except:
             write = input('This operation will write ' + str(len(cursor)) + ' structures' +
-                              ' are you sure you want to do this? [y/n] ')
+                          ' are you sure you want to do this? [y/n] ')
 
         if write == 'y' or write == 'Y':
             print('Writing them all.')
@@ -99,16 +99,14 @@ def query2files(cursor, *args):
             elif 'OQMD' in source:
                 stoich_string = ''
                 # prepend new stoich
-                if len(doc['stoichiometry']) == 1:
-                    stoich_string += doc['stoichiometry'][0][0]
-                else:
-                    for atom in doc['stoichiometry']:
-                        stoich_string += atom[0]
-                        stoich_string += str(atom[1]) if atom[1] != 1 else ''
+                for atom in doc['atom_types']:
+                    if atom not in comp_list:
+                        comp_list.append(atom)
+                        comp_string += atom
                 # grab OQMD entry_id
-                name += stoich_string + '-OQMD_' + source.split(' ')[-1]
-                if 'icsd' in doc:
-                    name += '-CollCode' + doc['icsd']
+                name += comp_string + '-OQMD_' + source.split(' ')[-1]
+            if 'icsd' in doc:
+                name += '-CollCode' + doc['icsd']
         path += name
         # always write param for each doc; also handles dirs
         if param:
