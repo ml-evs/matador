@@ -287,7 +287,7 @@ if __name__ == '__main__':
                                        any structure containing Li, not just pure Li.')
     structure_flags.add_argument('--tags', nargs='+', type=str,
                                  help=('search for up to 3 manual tags at once'))
-    structure_flags.add_argument('-icsd', '--icsd', type=int,
+    structure_flags.add_argument('-icsd', '--icsd', type=int, const=0, nargs='?',
                                  help=('search for an ICSD CollCode'))
     structure_flags.add_argument('-ss', '--src_str', type=str,
                                  help=('search for a string inside the structure sources'))

@@ -29,7 +29,7 @@ class DBQuery:
         """
         # read args
         self.args = kwargs
-        if debug:
+        if debug or self.args.get('debug'):
             print(self.args)
         if self.args.get('subcmd') is None:
             self.args['subcmd'] = subcmd
@@ -436,6 +436,8 @@ class DBQuery:
                             fname.endswith('.history') or 'OQMD' in fname):
                         if 'swap' in fname.lower():
                             source = 'SWAPS'
+                        elif 'icsd' in doc:
+                            source = 'ICSD'
                         elif 'oqmd' in fname.lower():
                             source = 'OQMD'
                         elif 'collcode' in fname.lower():
@@ -443,8 +445,6 @@ class DBQuery:
                                 source = 'SWAPS'
                             else:
                                 source = 'ICSD'
-                        elif 'icsd' in doc:
-                            source = 'ICSD'
                         elif '-icsd' in fname.lower():
                             source = 'ICSD'
                 struct_string[-1] += "{:^8}".format(source)
@@ -810,7 +810,10 @@ class DBQuery:
         query_dict['$and'] = []
         sub_dict = dict()
         sub_dict['icsd'] = dict()
-        sub_dict['icsd']['$eq'] = str(self.args.get('icsd'))
+        if self.args.get('icsd') == 0:
+            sub_dict['icsd']['$exists'] = True
+        else:
+            sub_dict['icsd']['$eq'] = str(self.args.get('icsd'))
         query_dict['$and'].append(sub_dict)
         return query_dict
 
