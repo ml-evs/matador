@@ -105,7 +105,8 @@ class DBQuery:
                 query_dict['$and'].append(self.query_id())
                 if not self.args.get('ignore_warnings'):
                     query_dict['$and'].append(self.query_quality())
-                temp_cursor = self.collections[collection].find(query_dict)
+                self.repo = self.collections[collection]
+                temp_cursor = self.repo.find(query_dict)
                 for doc in temp_cursor:
                     self.cursor.append(doc)
 
@@ -380,7 +381,7 @@ class DBQuery:
             if last_formula != formula_substring:
                 self.gs_enthalpy = 0.0
             formula_string.append(formula_substring)
-            if hull and doc.get('hull_distance') == 0.0:
+            if hull and np.abs(doc.get('hull_distance')) <= 0.0 + 1e-12:
                 struct_string.append(
                     '* ' + "{:^22}".format(doc['text_id'][0]+' '+doc['text_id'][1]))
             else:
