@@ -95,7 +95,7 @@ class Matador:
         if self.args['subcmd'] == 'refine':
             from refine import Refiner
             self.query = DBQuery(self.client, self.collections, **self.args)
-            self.refiner = Refiner(self.query.cursor)
+            self.refiner = Refiner(self.query.cursor, self.query.repo, **self.args)
 
         if self.args['subcmd'] == 'pdffit':
             self.query = DBQuery(self.client, self.collections, **self.args)
@@ -402,9 +402,15 @@ if __name__ == '__main__':
     pdffit_flags.add_argument('-np', '--num_processes', type=int,
                               help='number of concurrent fits to perform.')
 
+    refine_flags = argparse.ArgumentParser(add_help=False)
+    refine_flags.add_argument('-task', '--task', type=str,
+                              help='refine subtask to perform: options are spg or sub')
+    refine_flags.add_argument('-mode', '--mode', type=str,
+                              help='mode of refinement: options are display, set and overwrite')
+    refine_flags.add_argument('-symprec', '--symprec', type=float,
+                              help='spglib symmetry precision for refinement')
+
     stats_flags = argparse.ArgumentParser(add_help=False)
-    stats_flags.add_argument('-l', '--list', action='store_true',
-                             help='list all available collections.')
 
     # define subcommand parsers and their arguments
     stat_parser = subparsers.add_parser('stats',
@@ -446,7 +452,7 @@ if __name__ == '__main__':
                                                    query_flags])
     query_parser = subparsers.add_parser('refine',
                                          help='refine database structures',
-                                         parents=[global_flags, query_flags, structure_flags])
+                                         parents=[global_flags, query_flags, structure_flags, refine_flags])
 
     args = parser.parse_args()
 
