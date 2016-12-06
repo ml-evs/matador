@@ -222,8 +222,8 @@ class QueryConvexHull():
                                 structures_sorted[idx] = True
                                 hull_dist[idx] = get_height_above_plane(structure)
 
-            for ind in self.hull.vertices:
-                hull_dist[ind] = 0.0
+            # for ind in self.hull.vertices:
+                # hull_dist[ind] = 0.0
             self.failed_structures = []
             for ind in range(len(structures_sorted)):
                 if not structures_sorted[ind]:
@@ -275,7 +275,7 @@ class QueryConvexHull():
         if self.non_binary:
             print('Contructing hull with non-elemental chemical potentials...')
         elif self.ternary:
-            print('Constructing self.ternary hull...')
+            print('Constructing ternary hull...')
             if not self.args.get('intersection'):
                 print_warning('Please query with -int/--intersection when creating ternary hulls.')
                 exit('Exiting...')
@@ -740,7 +740,7 @@ class QueryConvexHull():
                 energies[(i, j, k)] = -1*plane_energies[ind]
                 ind += 1
             ax.heatmap(energies, style="hexagonal", cbarlabel='Formation energy (eV/atom)',
-                       vmax=0, cmap='viridis')
+                       vmax=0, cmap='Blues_r')
 
         if self.args.get('png'):
             plt.savefig('ternary.png', dpi=400)
