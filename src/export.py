@@ -73,7 +73,6 @@ def query2files(cursor, *args):
         path = directory + '/'
         # write either cell, res or both
         for source in doc['source']:
-            print(source)
             source = str(source)
             if '.res' in source:
                 if args['subcmd'] == 'swaps':
@@ -405,7 +404,7 @@ def doc2res(doc, path, info=True, hash_dupe=True, *args):
             f.write('1.0 ')
             for vec in doc['lattice_abc']:
                 for coeff in vec:
-                    f.write(' ' + str(coeff))
+                    f.write(' ' + str(round(coeff, 5)))
             f.write('\n')
             f.write('LATT -1\n')
             f.write('SFAC \t')
