@@ -73,6 +73,7 @@ def query2files(cursor, *args):
         path = directory + '/'
         # write either cell, res or both
         for source in doc['source']:
+            print(source)
             source = str(source)
             if '.res' in source:
                 if args['subcmd'] == 'swaps':
@@ -97,16 +98,17 @@ def query2files(cursor, *args):
             elif '.history' in source:
                 name += source.split('/')[-1].split('.')[0]
             elif 'OQMD' in source:
-                stoich_string = ''
+                comp_list = []
+                comp_string = ''
                 # prepend new stoich
                 for atom in doc['atom_types']:
                     if atom not in comp_list:
                         comp_list.append(atom)
                         comp_string += atom
                 # grab OQMD entry_id
-                name += comp_string + '-OQMD_' + source.split(' ')[-1]
-            if 'icsd' in doc:
-                name += '-CollCode' + doc['icsd']
+                name = comp_string + '-OQMD_' + source.split(' ')[-1]
+                if 'icsd' in doc and 'CollCode' not in source:
+                    name += '-CollCode' + doc['icsd']
         path += name
         # always write param for each doc; also handles dirs
         if param:
