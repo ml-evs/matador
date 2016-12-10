@@ -524,13 +524,17 @@ class DBQuery:
                 detail_substring[-1] += ' ' + (len(header_string)-len(detail_substring[-1])-1)*u"╌"
 
             if self.args.get('source'):
-                source_string.append(11*' ' + u"└───────────────┬──")
+                if len(doc['source']) == 1:
+                    source_string.append(11*' ' + u"└──────────────────")
+                else:
+                    source_string.append(11*' ' + u"└───────────────┬──")
                 for num, file in enumerate(doc['source']):
-                    if num == len(doc['source'])-1:
+                    if len(doc['source']) == 1:
+                        source_string[-1] += ''
+                    elif num == len(doc['source'])-1:
                         source_string[-1] += (len(u"└────────────── ")+11)*' ' + u'└──'
                     elif num != 0:
                         source_string[-1] += (len(u"└────────────── ")+11)*' ' + u'├──'
-                    # elif num == 0:
                     source_string[-1] += ' ' + file.split('structure_repository')[-1]
                     if num != len(doc['source'])-1:
                         source_string[-1] += '\n'
