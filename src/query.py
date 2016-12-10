@@ -10,6 +10,7 @@ from utils.chem_utils import get_periodic_table
 import pymongo as pm
 import numpy as np
 from bson.son import SON
+from bson.json_util import dumps
 # import standard library
 import re
 from os import uname
@@ -29,7 +30,8 @@ class DBQuery:
         """
         # read args
         self.args = kwargs
-        if debug or self.args.get('debug'):
+        self.debug = debug
+        if debug:
             print(self.args)
         if self.args.get('subcmd') is None:
             self.args['subcmd'] = subcmd
@@ -117,6 +119,9 @@ class DBQuery:
                 if len(self.cursor) > 1:
                     print_warning('WARNING: matched multiple structures with same text_id. ' +
                                   'The first one will be used.')
+                print(self.debug)
+                if self.debug:
+                    print(dumps(self.cursor[0], indent=2))
 
             if self.args.get('calc_match') or self.args['subcmd'] == 'hull':
                 # save special copy of calc_dict for hulls
@@ -195,7 +200,7 @@ class DBQuery:
             if self.args.get('id') is None:
                 for collection in self.collections:
                     self.repo = self.collections[collection]
-                    if self.args.get('debug'):
+                    if self.debug:
                         print('Empty query, showing all...')
                     self.cursor = self.repo.find().sort('enthalpy_per_atom', pm.ASCENDING)
                     if self.top == -1:
@@ -637,6 +642,20 @@ class DBQuery:
 
         return query_dict
 
+    def query_ratio(self, ratios):
+        """ Query DB for ratio of two elements.
+
+        Input, e.g.:
+
+            ratios = [['MoS', 2],
+                      ['LiS', 1]]
+
+        """
+        query_dict = dict()
+        for pair in ratios:
+            query_dict['ratios.' + pair[0]] = pair[1]
+        return query_dict
+
     def query_composition(self, custom_elem=None, partial_formula=None):
         """ Query DB for all structures containing
         all the elements taken as input. Passing this
@@ -724,8 +743,20 @@ class DBQuery:
                     query_dict['$and'].append(self.query_composition(custom_elem=[elem], partial_formula=True))
                     size += 1
                 if elem == ':':
-                    stoich = ''.join(elements[ind+1:])
-                    query_dict['$and'].append(self.query_stoichiometry(custom_stoich=[stoich], partial_formula=True))
+                    # convert e.g. MoS2 to [['MoS', 2]]
+                    # or LiMoS2 to [['LiMo', 1], ['MoS', '2], ['LiS', 2]]
+                    ratio_elements = elements[ind+1:]
+                    for ind in range(len(ratio_elements)):
+                        if ind < len(ratio_elements)-1:
+                            if not ratio_elements[ind].isdigit() and not ratio_elements[ind+1].isdigit():
+                                ratio_elements.insert(ind+1, '1')
+                    ratios = []
+                    for ind in range(0, len(ratio_elements), 2):
+                        for jind in range(ind, len(ratio_elements), 2):
+                            if ratio_elements[ind] != ratio_elements[jind]:
+                                ratios.append([ratio_elements[ind]+ratio_elements[jind],
+                                               round(float(ratio_elements[ind+1])/float(ratio_elements[jind+1]), 3)])
+                    query_dict['$and'].append(self.query_ratio(ratios))
         else:
             query_dict = dict()
             query_dict['$and'] = []

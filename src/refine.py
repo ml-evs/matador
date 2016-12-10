@@ -14,7 +14,9 @@ class Refiner:
 
     def __init__(self, cursor, collection=None, task=None, mode='display', **kwargs):
         possible_tasks = ['sym', 'spg',
-                          'substruc', 'sub', 'remove']
+                          'substruc', 'sub',
+                          'ratios', 
+                          'remove']
         possible_modes = ['display', 'overwrite', 'set']
         if mode not in possible_modes:
             print('Mode not understood, defaulting to "display".')
@@ -43,6 +45,9 @@ class Refiner:
         elif task == 'substruc' or task == 'sub':
             self.substruc()
             self.field = 'substruc'
+        elif task == 'ratios':
+            self.ratios()
+            self.field = 'ratios'
         try:
             self.cursor.close()
         except:
@@ -77,16 +82,16 @@ class Refiner:
         for ind, doc in enumerate(self.cursor):
             try:
                 self.changed_count += 1
-                self.cursor[ind]['substruc'] = get_voronoi_substructure(doc)
+                doc['substruc'] = get_voronoi_substructure(doc)
+                self.diff_cursor.append(doc)
             except:
                 self.failed_count += 1
-                self.cursor[ind]['substruc'] = 'xxx'
                 if self.args.get('debug'):
                     print_exc()
                     print_failure('Failed for' + ' '.join(doc['text_id']))
                 pass
         if self.mode == 'display':
-            for doc in self.cursor:
+            for doc in self.diff_cursor:
                 print(doc['substruc'])
 
     def symmetry(self, symprec=1e-3):
@@ -114,4 +119,21 @@ class Refiner:
                 if self.args.get('debug'):
                     print_exc()
                     print_failure('Failed for' + ' '.join(doc['text_id']))
+                pass
+
+    def ratios(self):
+        for ind, doc in enumerate(self.cursor):
+            try:
+                ratio_dict = dict()
+                for i, elem_i in enumerate(doc['stoichiometry']):
+                    for j, elem_j in enumerate(doc['stoichiometry']):
+                        if elem_j != elem_i:
+                            ratio_dict[doc['stoichiometry'][i][0]+doc['stoichiometry'][j][0]] = round(float(doc['stoichiometry'][i][1]) / doc['stoichiometry'][j][1], 3)
+                if self.args.get('debug'):
+                    print(ratio_dict)
+                doc['ratios'] = ratio_dict
+                self.diff_cursor.append(doc)
+                self.changed_count += 1
+            except:
+                self.failed_count += 1
                 pass
