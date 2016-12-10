@@ -77,6 +77,9 @@ def get_generic_grav_capacity(concs, elements):
     """
     concs = np.asarray(concs)
     x = concs[0]
+    # if no Li, capacity = 0...
+    if x == 0:
+        return 0.0
     concs /= x
     masses = dict()
     m_B = 0
