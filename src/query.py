@@ -764,6 +764,8 @@ class DBQuery:
                         if ind < len(ratio_elements)-1:
                             if not ratio_elements[ind].isdigit() and not ratio_elements[ind+1].isdigit():
                                 ratio_elements.insert(ind+1, '1')
+                    if not ratio_elements[-1].isdigit():
+                        ratio_elements.append('1')
                     ratios = []
                     for ind in range(0, len(ratio_elements), 2):
                         for jind in range(ind, len(ratio_elements), 2):
