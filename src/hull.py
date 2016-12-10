@@ -667,6 +667,8 @@ class QueryConvexHull():
         print('Plotting ternary hull...')
         if self.args.get('capmap') or self.args.get('efmap'):
             scale = 100
+        elif self.args.get('sampmap'):
+            scale = 20
         else:
             scale = 1
         fontsize = 18
@@ -677,7 +679,8 @@ class QueryConvexHull():
         ax.gridlines(color='black', multiple=scale*0.1, linewidth=0.5)
 
         ax.clear_matplotlib_ticks()
-        ax.ticks(axis='lbr', linewidth=1, multiple=scale*0.1)
+        ax.ticks(axis='lbr', linewidth=1, multiple=scale*0.1,
+                 ticks=[str(round(num, 1)) for num in np.linspace(0.0, 1.0, 11)])
 
         ax.set_title(''.join(self.elements), fontsize=fontsize)
         ax.left_axis_label(self.elements[2], fontsize=fontsize)
@@ -759,6 +762,19 @@ class QueryConvexHull():
                 ind += 1
             ax.heatmap(energies, style="hexagonal", cbarlabel='Formation energy (eV/atom)',
                        vmax=0, cmap='bone')
+        elif self.args.get('sampmap'):
+            sampling = dict()
+            from ternary.helpers import simplex_iterator
+            eps = 1.0/float(scale)
+            for (i, j, k) in simplex_iterator(scale):
+                sampling[(i, j, k)] = np.size(np.where((concs[:, 0] <= float(i)/scale + eps) *
+                                                       (concs[:, 0] >= float(i)/scale - eps) *
+                                                       (concs[:, 1] <= float(j)/scale + eps) *
+                                                       (concs[:, 1] >= float(j)/scale - eps) *
+                                                       (concs[:, 2] <= float(k)/scale + eps) *
+                                                       (concs[:, 2] >= float(k)/scale - eps)))
+            ax.heatmap(sampling, style="hexagonal", cbarlabel='Number of structures',
+                       cmap='afmhot')
 
         if self.args.get('png'):
             plt.savefig('ternary.png', dpi=400)

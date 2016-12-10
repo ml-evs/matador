@@ -342,6 +342,8 @@ if __name__ == '__main__':
                             help='suppress plotting')
     plot_flags.add_argument('--capmap', action='store_true',
                             help='plot heat map of gravimetric capacity')
+    plot_flags.add_argument('--sampmap', action='store_true',
+                            help='plot heat map of concentration sampling')
     plot_flags.add_argument('--efmap', action='store_true',
                             help='plot heat map of formation energy')
     plot_flags.add_argument('--expt', type=str,
