@@ -98,6 +98,7 @@ def get_generic_grav_capacity(concs, elements):
     # vols = get_array_from_cursor(cursor, 'cell_volume')
     # num_fu = get_array_from_cursor('cell_volume_per_b')
 
+
 def get_atoms_per_fu(doc):
     """ Calculate the number of atoms per formula unit. """
     atoms_per_fu = 0
@@ -111,9 +112,11 @@ def get_formation_energy(chempots, doc):
     formation energy per atom of the desired document.
     """
     formation = doc['enthalpy_per_atom']
+    num_atoms_per_fu = get_atoms_per_fu(doc)
     for mu in chempots:
         for j in range(len(doc['stoichiometry'])):
-            if mu['stoichiometry'][0][0] == doc['stoichiometry'][j][0]:
-                formation -= (mu['enthalpy_per_atom'] * doc['stoichiometry'][j][1] /
-                              get_atoms_per_fu(doc))
+            for i in range(len(mu['stoichiometry'])):
+                if mu['stoichiometry'][i][0] == doc['stoichiometry'][j][0]:
+                    formation -= (mu['enthalpy_per_atom'] * doc['stoichiometry'][j][1] /
+                                  num_atoms_per_fu)
     return formation
