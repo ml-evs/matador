@@ -107,14 +107,21 @@ class QueryConvexHull():
             self.fake_chempots()
         else:
             print(60*'─')
-            self.match = len(self.elements)*[None]
+            if not self.non_binary:
+                elements = self.elements
+            else:
+                elements = self.chempot_search
+            self.match = len(elements)*[None]
             # scan for suitable chem pots in database
-            for ind, elem in enumerate(self.elements):
+            for ind, elem in enumerate(elements):
                 print('Scanning for suitable', elem, 'chemical potential...')
                 query_dict['$and'] = list(query.calc_dict['$and'])
                 if self.args.get('ignore_warnings') is None:
                     query_dict['$and'].append(query.query_quality())
-                query_dict['$and'].append(query.query_composition(custom_elem=[elem]))
+                if not self.non_binary or ind == 0:
+                    query_dict['$and'].append(query.query_composition(custom_elem=[elem]))
+                else:
+                    query_dict['$and'].append(query.query_stoichiometry(custom_stoich=[elem]))
                 # if oqmd, only query composition, not parameters
                 if query.args.get('tags') is not None:
                     query_dict['$and'].append(query.query_tags())
@@ -145,8 +152,9 @@ class QueryConvexHull():
                 self.match[i]['num_a'] = 0
             self.match[0]['num_a'] = float('inf')
             self.cursor.insert(0, self.match[0])
-            for match in self.match[1:]:
-                self.cursor.append(match)
+            if not self.args.get('intersection'):
+                for match in self.match[1:]:
+                    self.cursor.append(match)
         return
 
     def fake_chempots(self):
@@ -266,8 +274,9 @@ class QueryConvexHull():
         self.non_binary = False
         if ':' in self.elements[0]:
             self.non_binary = True
+            self.chempot_search = self.elements[0].split(':')
         self.elements = [elem for elem in re.split(r'([A-Z][a-z]*)', self.elements[0]) if elem.isalpha()]
-        # assert(len(self.elements) < 4 and len(self.elements) > 1)
+        assert(len(self.elements) < 4 and len(self.elements) > 1)
         self.ternary = False
         if len(self.elements) == 3 and not self.non_binary:
             self.ternary = True
@@ -296,7 +305,7 @@ class QueryConvexHull():
                             nums_b[chem_pot_ind] += elem[1]
                 num_b = sum(nums_b)
                 num_fu = doc['num_fu']
-                # get enthalpy and volume per unit B
+                # get enthalpy and volume per unit B: TODO - generalise this
                 if num_b == 0:
                     self.cursor[ind]['enthalpy_per_b'] = 12345e5
                     self.cursor[ind]['cell_volume_per_b'] = 12345e5
@@ -310,8 +319,12 @@ class QueryConvexHull():
                                 get_array_from_cursor(self.cursor, 'formation_enthalpy_per_atom').reshape(len(self.cursor), 1)))
         # create hull with SciPy routine, including only points with formation energy < 0
         if self.ternary:
-            self.structure_slice = structures  # [np.where(structures[:, -1] <= 0 + 1e-9)]
+            self.structure_slice = structures
             self.structure_slice = np.vstack((self.structure_slice, np.array([0, 0, 1e5])))
+        elif self.non_binary:
+            # if non-binary hull, remove middle concentration
+            structures = structures[:, [0, -1]]
+            self.structure_slice = structures[np.where(structures[:, -1] <= 0 + 1e-9)]
         else:
             self.structure_slice = structures[np.where(structures[:, -1] <= 0 + 1e-9)]
         if len(self.structure_slice) == 2:
@@ -475,9 +488,14 @@ class QueryConvexHull():
             c = self.colours[1]
             lw = self.scale * 0 if self.mpl_new_ver else 1
             for ind in range(len(self.hull_cursor)):
-                scatter.append(ax.scatter(self.hull_cursor[ind]['concentration'], self.hull_cursor[ind]['formation_enthalpy_per_atom'],
-                               s=self.scale*40, lw=1.5, alpha=1, c=c, edgecolor='k',
-                               zorder=1000))
+                if type(self.hull_cursor[ind]['concentration']) is list:
+                    scatter.append(ax.scatter(self.hull_cursor[ind]['concentration'][0], self.hull_cursor[ind]['formation_enthalpy_per_atom'],
+                                   s=self.scale*40, lw=1.5, alpha=1, c=c, edgecolor='k',
+                                   zorder=1000))
+                else:
+                    scatter.append(ax.scatter(self.hull_cursor[ind]['concentration'], self.hull_cursor[ind]['formation_enthalpy_per_atom'],
+                                   s=self.scale*40, lw=1.5, alpha=1, c=c, edgecolor='k',
+                                   zorder=1000))
                 ax.plot([0, 1], [0, 0], lw=2, c=self.colours[0], zorder=900)
             for ind in range(len(self.structures)):
                 scatter.append(ax.scatter(self.structures[ind, 0], self.structures[ind, 1],
