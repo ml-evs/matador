@@ -504,8 +504,8 @@ class QueryConvexHull():
 
         if len(one_minus_x_elem) == 1:
             ax.set_title(x_elem[0] + '$_\mathrm{x}$' + one_minus_x_elem[0] + '$_\mathrm{1-x}$')
-        else:
-            ax.set_title(x_elem[0] + '$_\mathrm{x}$(' + ''.join([elem for elem in one_minus_x_elem]) + ')$_\mathrm{1-x}$')
+        if self.non_binary:
+            ax.set_title(self.chempot_search[0] + '$_\mathrm{x}$(' + self.chempot_search[1] + ')$_\mathrm{1-x}$')
         plt.locator_params(nbins=3)
         ax.set_xlabel('$\mathrm{x}$')
         ax.grid(False)
