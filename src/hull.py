@@ -740,7 +740,7 @@ class QueryConvexHull():
                 energies[(i, j, k)] = -1*plane_energies[ind]
                 ind += 1
             ax.heatmap(energies, style="hexagonal", cbarlabel='Formation energy (eV/atom)',
-                       vmax=0, cmap='Blues_r')
+                       vmax=0, cmap='bone')
 
         if self.args.get('png'):
             plt.savefig('ternary.png', dpi=400)
