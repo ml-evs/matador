@@ -176,6 +176,18 @@ class DBQuery:
             self.query_dict['$and'].append(self.query_cutoff())
             self.empty_query = False
 
+        if self.args.get('sedc') is not None:
+            self.query_dict['$and'].append(self.query_sedc())
+            self.empty_query = False
+
+        if self.args.get('mp_spacing') is not None:
+            self.query_dict['$and'].append(self.query_kpoints())
+            self.empty_query = False
+
+        if self.args.get('spin') is not None:
+            self.query_dict['$and'].append(self.query_spin())
+            self.empty_query = False
+
         if self.args.get('tags') is not None:
             self.query_dict['$and'].append(self.query_tags())
             self.empty_query = False
@@ -291,13 +303,11 @@ class DBQuery:
                             print("{:^24}".format(self.cursor[ind]['text_id'][0] + ' ' +
                                                   self.cursor[ind]['text_id'][1]) +
                                   ': matched ' + str(test_cursor_count[-1]), 'structures.', end='\t-> ')
-                            try:
-                                print('S-' if self.cursor[ind].get('spin_polarized') else '',
-                                      self.cursor[ind]['xc_functional'] + ', ',
-                                      self.cursor[ind]['cut_off_energy'], ' eV, ',
-                                      self.cursor[ind]['kpoints_mp_spacing'], ' 1/A', sep='')
-                            except:
-                                pass
+                            print('S-' if self.cursor[ind].get('spin_polarized') else '',
+                                  self.cursor[ind]['sedc_scheme'] + '-' if self.cursor[ind].get('sedc_scheme') is not None else '',
+                                  self.cursor[ind]['xc_functional'] + ', ',
+                                  self.cursor[ind]['cut_off_energy'], ' eV, ',
+                                  self.cursor[ind]['kpoints_mp_spacing'], ' 1/A', sep='')
                             if test_cursor_count[-1] == count:
                                 print('Matched all structures...')
                                 break
@@ -925,6 +935,40 @@ class DBQuery:
 
         return query_dict
 
+    def query_sedc(self):
+        """ Query all calculations using given SEDC scheme.
+
+        Use --sedc null to query for no dispersion correction.
+        """
+        query_dict = dict()
+        if self.args.get('sedc') != 'null':
+            query_dict['sedc_scheme'] = self.args.get('sedc')
+        else:
+            query_dict['sedc_scheme'] = dict()
+            query_dict['sedc_scheme']['$exists'] = False
+
+        return query_dict
+
+    def query_kpoints(self):
+        """ Query all calculations with finer than the given
+        kpoint sampling.
+        """
+        query_dict = dict()
+        query_dict['kpoints_mp_spacing'] = dict()
+        query_dict['kpoints_mp_spacing']['$lte'] = self.args.get('mp_spacing')
+        return query_dict
+
+    def query_spin(self):
+        """ Query all calculations with spin polarisation,
+        i.e. --spin n!=0, or non-spin-polarization, i.e. --spin 0.
+        """
+        query_dict = dict()
+        if self.args.get('spin') == 0:
+            query_dict['spin_polarized'] = False
+        else:
+            query_dict['spin_polarized'] = True
+        return query_dict
+
     def query_calc(self, doc):
         """ Find all structures with matching
         accuracy to specified structure.
@@ -940,13 +984,21 @@ class DBQuery:
         temp_dict['xc_functional'] = doc['xc_functional']
         query_dict.append(temp_dict)
         temp_dict = dict()
-        # if 'spin_polarized' in doc and doc['spin_polarized']:
-            # temp_dict['spin_polarized'] = doc['spin_polarized']
-            # query_dict.append(temp_dict)
-        # else:
-            # temp_dict['spin_polarized'] = dict()
-            # temp_dict['spin_polarized']['$ne'] = True
-            # query_dict.append(temp_dict)
+        if 'spin_polarized' in doc and doc['spin_polarized']:
+            temp_dict['spin_polarized'] = doc['spin_polarized']
+            query_dict.append(temp_dict)
+        else:
+            temp_dict['spin_polarized'] = dict()
+            temp_dict['spin_polarized']['$ne'] = True
+            query_dict.append(temp_dict)
+        if 'sedc_scheme' in doc:
+            temp_dict['sedc_scheme'] = doc['sedc_scheme']
+            query_dict.append(temp_dict)
+        else:
+            temp_dict['sedc_scheme'] = dict()
+            temp_dict['sedc_scheme']['$exists'] = False
+            query_dict.append(temp_dict)
+
         db = self.args.get('db')
         if db is not None:
             db = db[0]

@@ -298,6 +298,13 @@ if __name__ == '__main__':
                                        to within 0.01 A')
     structure_flags.add_argument('-ecut', '--cutoff', type=float,
                                  help='specify the minimum planewave cutoff.')
+    structure_flags.add_argument('--sedc', type=str,
+                                 help='specify the dispersion correction scheme, e.g. TS or null.')
+    structure_flags.add_argument('--mp_spacing', type=float,
+                                 help='specify a minimum MP grid spacing in 2pi/A units, e.g. 0.05.')
+    structure_flags.add_argument('--spin', type=str,
+                                 help='specifiy whether to query non-spin-polarized (0) calcs or \
+                                 spin polarized calcs (!=1).')
     structure_flags.add_argument('--loose', action='store_true',
                                  help='loosely matches with calc_match, i.e. only matches \
                                        pspot and xc_functional')
