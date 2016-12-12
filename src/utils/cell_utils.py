@@ -5,6 +5,7 @@ for cell manipulation.
 from math import pi, cos, sin, sqrt, acos, log10
 import numpy as np
 from utils.chem_utils import get_atomic_number
+from utils.chem_utils import get_atomic_symbol
 
 
 def abc2cart(lattice_abc):
@@ -134,7 +135,6 @@ def calc_mp_spacing(real_lat, mp_grid, prec=2):
     return round(max_spacing + 0.5*10**exponent, prec)
 
 
-
 def doc2spg(doc):
     """ Return an spglib input tuple from a matador doc. """
     try:
@@ -146,3 +146,15 @@ def doc2spg(doc):
         return cell
     except:
         return False
+
+
+def standardize_doc_cell(doc):
+    """ Inserts spglib e.g. standardized cell data
+    into matador doc. """
+    import spglib as spg
+    spg_cell = doc2spg(doc)
+    spg_standardized = spg.standardize_cell(spg_cell)
+    doc['lattice_cart'] = [list(vec) for vec in spg_standardized[0]]
+    doc['positions_frac'] = [list(atom) for atom in spg_standardized[1]]
+    doc['atom_types'] = [get_atomic_symbol(atom) for atom in spg_standardized[2]]
+    return doc
