@@ -1,3 +1,4 @@
+```
 usage: matador [-h] [-v]
                
                {stats,query,import,rebuild,pdffit,hull,voltage,swaps,polish,refine}
@@ -26,6 +27,7 @@ subcommands:
     swaps               perform atomic swaps on query results
     polish              re-relax a series of structures with new parameters.
     refine              refine database structures
+```
 
 Written by Matthew Evans (2016).
 
