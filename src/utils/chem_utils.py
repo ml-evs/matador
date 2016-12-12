@@ -39,6 +39,11 @@ def get_atomic_number(elem):
     return periodictable.elements.symbol(elem).number
 
 
+def get_atomic_symbol(atomic_number):
+    """ Returns elemental symbol from atomic number. """
+    return periodictable.elements[atomic_number].symbol
+
+
 def get_concentration(doc, elements):
     """ Returns x for A_x B_{1-x}
     or x,y for A_x B_y C_z, (x+y+z=1). """
@@ -55,6 +60,8 @@ def get_num_intercalated(cursor):
     x = np.zeros((len(cursor)))
     comps = get_array_from_cursor(cursor, 'concentration')
     for idx, comp in enumerate(comps):
+        if len(comp) > 1:
+            comp = comp[0]
         if 1-comp == 0:
             x[idx] = np.NaN
         else:
