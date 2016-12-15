@@ -8,6 +8,7 @@ from scipy.spatial import ConvexHull
 from traceback import print_exc
 from bson.son import SON
 from bisect import bisect_left
+from sys import exit
 from utils.print_utils import print_failure, print_notify, print_warning
 from utils.hull_utils import barycentric2cart, vertices2plane, vertices2line
 from utils.chem_utils import get_binary_grav_capacities, get_molar_mass, get_num_intercalated
@@ -679,8 +680,11 @@ class QueryConvexHull():
         ax.gridlines(color='black', multiple=scale*0.1, linewidth=0.5)
 
         ax.clear_matplotlib_ticks()
-        ax.ticks(axis='lbr', linewidth=1, multiple=scale*0.1,
-                 ticks=[str(round(num, 1)) for num in np.linspace(0.0, 1.0, 11)])
+        if scale == 1:
+            ax.ticks(axis='lbr', linewidth=1, multiple=scale*0.1)
+        else:
+            ax.ticks(axis='lbr', linewidth=1, multiple=scale*0.1,
+                     ticks=[str(round(num, 1)) for num in np.linspace(0.0, 1.0, 11)])
 
         ax.set_title(''.join(self.elements), fontsize=fontsize)
         ax.left_axis_label(self.elements[2], fontsize=fontsize)
