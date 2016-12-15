@@ -346,6 +346,8 @@ if __name__ == '__main__':
                             help='plot heat map of concentration sampling')
     plot_flags.add_argument('--efmap', action='store_true',
                             help='plot heat map of formation energy')
+    plot_flags.add_argument('--pathways', action='store_true',
+                            help='plot line from stable B_x C_y to pure A in ABC ternary.')
     plot_flags.add_argument('--expt', type=str,
                             help='enter experimental voltage curve .csv file for plotting.')
 

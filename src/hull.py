@@ -716,6 +716,12 @@ class QueryConvexHull():
             plane = np.asarray(plane)
             ax.plot(scale*plane, c=self.colours[0], lw=1.5, alpha=1, zorder=98)
 
+        if self.args.get('pathways'):
+            for phase in stable:
+                print(phase)
+                if phase[0] == 0 and phase[1] != 0 and phase[2] != 0:
+                    ax.plot([scale*phase, [scale, 0, 0]], c='r', alpha=0.2, lw=6, zorder=100000000)
+
         cmap_full = plt.cm.get_cmap('Dark2')
         cmap = colours.LinearSegmentedColormap.from_list(
             'trunc({n},{a:.2f},{b:.2f})'.format(n=cmap_full.name, a=0, b=1),
@@ -779,7 +785,6 @@ class QueryConvexHull():
                                                        (concs[:, 2] >= float(k)/scale - eps)))
             ax.heatmap(sampling, style="hexagonal", cbarlabel='Number of structures',
                        cmap='afmhot')
-
         if self.args.get('png'):
             plt.savefig('ternary.png', dpi=400)
         elif self.args.get('pdf'):
