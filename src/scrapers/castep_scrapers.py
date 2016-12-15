@@ -5,10 +5,11 @@ inputs and outputs.
 """
 from __future__ import print_function
 # matador modules
-from utils.cell_utils import abc2cart, calc_mp_spacing
+from utils.cell_utils import abc2cart, calc_mp_spacing, doc2spg
 # external libraries
 try:
     import bson.json_util as json
+    import spglib as spg
 except:
     pass
 # standard library
@@ -125,6 +126,11 @@ def res2dict(seed, db=True, verbosity=0, **kwargs):
         for elem in res['stoichiometry']:
             atoms_per_fu += elem[1]
         res['num_fu'] = len(res['atom_types']) / atoms_per_fu
+        if db and res['space_group'] == 'P1':
+            spg_cell = doc2spg(res)
+            res['space_group'] = spg.get_spacegroup(spg_cell, symprec=1e-3).split(' ')[0]
+            if verbosity > 0:
+                print(res['space_group'])
     except Exception as oops:
         if kwargs.get('verbosity') > 0:
             print_exc()
