@@ -82,12 +82,12 @@ def get_generic_grav_capacity(concs, elements):
     """ Returns gravimetric capacity of
     <elements[0]> in mAh/g of matador doc.
     """
-    concs = np.asarray(concs)
-    x = concs[0]
+    tmp_concs = np.array(concs, copy=True)
     # if no Li, capacity = 0...
+    # tmp_concs /= np.min(concs)
+    x = tmp_concs[0]
     if x == 0:
         return 0.0
-    concs /= x
     masses = dict()
     m_B = 0
     for elem in elements:
@@ -96,7 +96,7 @@ def get_generic_grav_capacity(concs, elements):
         if ind == 0:
             continue
         else:
-            m_B += masses[elem]*concs[ind]
+            m_B += masses[elem]*tmp_concs[ind]
     Q = get_binary_grav_capacities(x, m_B)
     return Q
 

@@ -4,11 +4,10 @@ import unittest
 import json
 import numpy as np
 from hull import QueryConvexHull
-from traceback import print_exc
+
 
 class VoltageTest(unittest.TestCase):
     """ Test voltage_curve(). """
-
     def test(self):
         print('Testing voltage_curve()...')
         match, hull_cursor = [], []
@@ -16,10 +15,10 @@ class VoltageTest(unittest.TestCase):
         test_Q = np.loadtxt('data/Q.dat')
         test_V = np.loadtxt('data/V.dat')
         for i in range(5):
-            with open('data/hull_data' + str(i) +'.json') as f:
+            with open('data/hull_data' + str(i) + '.json') as f:
                 hull_cursor.append(json.load(f))
         for i in range(2):
-            with open('data/mu' + str(i) +'.json') as f:
+            with open('data/mu' + str(i) + '.json') as f:
                 match.append(json.load(f))
         with open('data/elements.json') as f:
             elements = json.load(f)

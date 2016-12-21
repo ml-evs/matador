@@ -12,6 +12,7 @@ from sys import exit
 from utils.print_utils import print_failure, print_notify, print_warning
 from utils.hull_utils import barycentric2cart, vertices2plane, vertices2line
 from utils.chem_utils import get_binary_grav_capacities, get_molar_mass, get_num_intercalated
+from utils.chem_utils import get_generic_grav_capacity
 from utils.chem_utils import get_formation_energy, get_concentration
 from utils.cursor_utils import set_cursor_from_array, get_array_from_cursor, filter_cursor
 from export import generate_hash, generate_relevant_path
@@ -318,6 +319,16 @@ class QueryConvexHull():
         # create stacked array of hull data
         structures = np.hstack((get_array_from_cursor(self.cursor, 'concentration'),
                                 get_array_from_cursor(self.cursor, 'formation_enthalpy_per_atom').reshape(len(self.cursor), 1)))
+        if not self.ternary and not self.non_binary:
+            Q = get_binary_grav_capacities(get_num_intercalated(self.cursor), get_molar_mass(self.elements[1]))
+            set_cursor_from_array(self.cursor, Q, 'gravimetric_capacity')
+        else:
+            Q = np.zeros((len(self.cursor)))
+            for i in range(len(self.cursor)):
+                concs = structures[i, 0:-1].tolist()
+                concs.append(1-concs[0]-concs[1])
+                Q[i] = get_generic_grav_capacity(concs, self.elements)
+            set_cursor_from_array(self.cursor, Q, 'gravimetric_capacity')
         # create hull with SciPy routine, including only points with formation energy < 0
         if self.ternary:
             self.structure_slice = structures
@@ -360,9 +371,6 @@ class QueryConvexHull():
                 print_exc()
                 print('Error with QHull, plotting points only...')
 
-        if not self.ternary and not self.non_binary:
-            Q = get_binary_grav_capacities(get_num_intercalated(self.cursor), get_molar_mass(self.elements[1]))
-            set_cursor_from_array(self.cursor, Q, 'gravimetric_capacity')
         self.hull_cursor = [self.cursor[idx] for idx in np.where(self.hull_dist <= self.hull_cutoff + 1e-12)[0]]
         self.structures = structures
         try:
@@ -378,7 +386,8 @@ class QueryConvexHull():
         mu_enthalpy = get_array_from_cursor(self.match, 'enthalpy_per_atom')
         x = get_num_intercalated(self.hull_cursor)
         # sort for voltage calculation
-        Q = get_binary_grav_capacities(x, get_molar_mass(self.elements[1]))
+        # Q = get_binary_grav_capacities(x, get_molar_mass(self.elements[1]))
+        Q = get_array_from_cursor(self.hull_cursor, 'gravimetric_capacity')
         Q = Q[np.argsort(x)]
         stable_enthalpy_per_b = get_array_from_cursor(self.hull_cursor, 'enthalpy_per_b')[np.argsort(x)]
         x = np.sort(x)
@@ -751,7 +760,6 @@ class QueryConvexHull():
                        s=70*(1-float(colours_list[i])/Ncolours)+15,
                        lw=1, edgecolors='black')
         if self.args.get('capmap'):
-            from utils.chem_utils import get_generic_grav_capacity
             capacities = dict()
             from ternary.helpers import simplex_iterator
             for (i, j, k) in simplex_iterator(scale):
@@ -825,11 +833,11 @@ class QueryConvexHull():
                     string_stoich = ''
                 else:
                     string_stoich = self.elements[0] + '$_{' + string_stoich + '}$' + self.elements[1]
-                axQ.annotate(string_stoich,
-                             xy=(self.Q[i], self.voltages[i]+0.001),
-                             textcoords='data',
-                             ha='center',
-                             zorder=9999)
+                # axQ.annotate(string_stoich,
+                             # xy=(self.Q[i], self.voltages[i]+0.001),
+                             # textcoords='data',
+                             # ha='center',
+                             # zorder=9999)
         axQ.set_ylabel('Voltage (V)')
         axQ.set_xlabel('Gravimetric cap. (mAh/g)')
         start, end = axQ.get_ylim()
