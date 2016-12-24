@@ -121,7 +121,7 @@ class DBQuery:
                                   'The first one will be used.')
                 print(self.debug)
                 if self.debug:
-                    print(dumps(self.cursor[0], indent=2))
+                    print(dumps(self.cursor[0], indent=1))
 
             if self.args.get('calc_match') or self.args['subcmd'] == 'hull':
                 # save special copy of calc_dict for hulls
@@ -225,7 +225,7 @@ class DBQuery:
             for collection in self.collections:
                 self.repo = self.collections[collection]
                 if self.args.get('details'):
-                    print(self.query_dict)
+                    print(dumps(self.query_dict, indent=1))
                 # execute query
                 self.cursor = list(self.repo.find(SON(self.query_dict)).sort('enthalpy_per_atom',
                                                                              pm.ASCENDING))
@@ -307,7 +307,7 @@ class DBQuery:
                                   self.cursor[ind]['sedc_scheme'] + '-' if self.cursor[ind].get('sedc_scheme') is not None else '',
                                   self.cursor[ind]['xc_functional'] + ', ',
                                   self.cursor[ind]['cut_off_energy'], ' eV, ',
-                                  self.cursor[ind]['kpoints_mp_spacing'], ' 1/A', sep='')
+                                  self.cursor[ind]['kpoints_mp_spacing'] if self.cursor[ind].get('kpoints_mp_spacing') is not None else 'xxx', ' 1/A', sep='')
                             if test_cursor_count[-1] == count:
                                 print('Matched all structures...')
                                 break
@@ -638,11 +638,18 @@ class DBQuery:
                 types_dict = dict()
                 types_dict['$or'] = list()
                 elem = elem.strip('[').strip(']')
-                for group_elem in self.periodic_table[elem]:
-                    types_dict['$or'].append(dict())
-                    types_dict['$or'][-1]['stoichiometry'] = dict()
-                    types_dict['$or'][-1]['stoichiometry']['$in'] = [[group_elem, fraction[ind]]]
-                query_dict['$and'].append(types_dict)
+                if elem in self.periodic_table:
+                    for group_elem in self.periodic_table[elem]:
+                        types_dict['$or'].append(dict())
+                        types_dict['$or'][-1]['stoichiometry'] = dict()
+                        types_dict['$or'][-1]['stoichiometry']['$in'] = [[group_elem, fraction[ind]]]
+                    query_dict['$and'].append(types_dict)
+                elif ',' in elem:
+                    for group_elem in elem.split(','):
+                        types_dict['$or'].append(dict())
+                        types_dict['$or'][-1]['stoichiometry'] = dict()
+                        types_dict['$or'][-1]['stoichiometry']['$in'] = [[group_elem, fraction[ind]]]
+                    query_dict['$and'].append(types_dict)
             else:
                 stoich_dict = dict()
                 stoich_dict['stoichiometry'] = dict()
@@ -783,10 +790,16 @@ class DBQuery:
                     types_dict = dict()
                     types_dict['$or'] = list()
                     elem = elem.strip('[').strip(']')
-                    for group_elem in self.periodic_table[elem]:
-                        types_dict['$or'].append(dict())
-                        types_dict['$or'][-1]['atom_types'] = dict()
-                        types_dict['$or'][-1]['atom_types']['$in'] = [group_elem]
+                    if elem in self.periodic_table:
+                        for group_elem in self.periodic_table[elem]:
+                            types_dict['$or'].append(dict())
+                            types_dict['$or'][-1]['atom_types'] = dict()
+                            types_dict['$or'][-1]['atom_types']['$in'] = [group_elem]
+                    elif ',' in elem:
+                        for group_elem in elem.split(','):
+                            types_dict['$or'].append(dict())
+                            types_dict['$or'][-1]['atom_types'] = dict()
+                            types_dict['$or'][-1]['atom_types']['$in'] = [group_elem]
                 else:
                     types_dict = dict()
                     types_dict['atom_types'] = dict()
@@ -969,8 +982,9 @@ class DBQuery:
         i.e. --spin n!=0, or non-spin-polarization, i.e. --spin 0.
         """
         query_dict = dict()
-        if self.args.get('spin') == 0:
-            query_dict['spin_polarized'] = False
+        if self.args.get('spin') == '0':
+            query_dict['spin_polarized'] = dict()
+            query_dict['spin_polarized']['$ne'] = True
         else:
             query_dict['spin_polarized'] = True
         return query_dict
