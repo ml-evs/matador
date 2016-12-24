@@ -168,9 +168,8 @@ class QueryConvexHull():
                 self.match[i]['num_a'] = 0
             self.match[0]['num_a'] = float('inf')
             self.cursor.insert(0, self.match[0])
-            if not self.args.get('intersection'):
-                for match in self.match[1:]:
-                    self.cursor.append(match)
+            for match in self.match[1:]:
+                self.cursor.append(match)
         return
 
     def fake_chempots(self):

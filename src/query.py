@@ -119,7 +119,6 @@ class DBQuery:
                 if len(self.cursor) > 1:
                     print_warning('WARNING: matched multiple structures with same text_id. ' +
                                   'The first one will be used.')
-                print(self.debug)
                 if self.debug:
                     print(dumps(self.cursor[0], indent=1))
 
@@ -224,7 +223,7 @@ class DBQuery:
             # self.cursors = []
             for collection in self.collections:
                 self.repo = self.collections[collection]
-                if self.args.get('details'):
+                if self.debug:
                     print(dumps(self.query_dict, indent=1))
                 # execute query
                 self.cursor = list(self.repo.find(SON(self.query_dict)).sort('enthalpy_per_atom',
