@@ -129,6 +129,20 @@ class QueryConvexHull():
                     query_dict['$and'].append(query.query_tags())
                 mu_cursor = query.repo.find(SON(query_dict)).sort('enthalpy_per_atom',
                                                                   pm.ASCENDING)
+                if mu_cursor.count() == 0:
+                    print('Failed... searching without spin polarization field...')
+                    scanned = False
+                    while not scanned:
+                        for idx, dicts in enumerate(query_dict['$and']):
+                            for key in dicts:
+                                if key == 'spin_polarized':
+                                    del query_dict['$and'][idx][key]
+                                    break
+                            if idx == len(query_dict['$and'])-1:
+                                scanned = True
+                    mu_cursor = query.repo.find(SON(query_dict)).sort('enthalpy_per_atom',
+                                                                      pm.ASCENDING)
+
                 try:
                     self.match[ind] = mu_cursor[0]
                 except:
