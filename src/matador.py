@@ -135,6 +135,8 @@ class Matador:
         if self.export and len(self.cursor) > 0:
             query2files(self.cursor, self.args)
 
+        self.client.close()
+
     def print_report(self):
         """ Print spatula report on current database. """
         try:
