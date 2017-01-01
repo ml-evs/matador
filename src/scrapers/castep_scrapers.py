@@ -16,7 +16,10 @@ from collections import defaultdict
 from os import getcwd, stat
 from os.path import isfile
 from time import strptime
-from math import gcd
+try:
+    from math import gcd
+except:
+    from fractions import gcd
 from pwd import getpwuid
 from traceback import print_exc
 import glob

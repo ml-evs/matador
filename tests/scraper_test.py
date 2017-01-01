@@ -94,7 +94,8 @@ class ScrapeTest(unittest.TestCase):
                 print_exc()
                 failed = True
             try:
-                self.assertEqual(test_dict['stoichiometry'], [['Na', 3], ['Zn', 4]], msg='Wrong stoichiometry!')
+                self.assertTrue(['Na', 3] in test_dict['stoichiometry'], msg='Wrong stoichiometry!')
+                self.assertTrue(['Zn', 4] in test_dict['stoichiometry'], msg='Wrong stoichiometry!')
             except Exception as oops:
                 print_exc()
                 failed = True
