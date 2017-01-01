@@ -16,7 +16,7 @@ from collections import defaultdict
 from os import getcwd, stat
 from os.path import isfile
 from time import strptime
-from fractions import gcd
+from math import gcd
 from pwd import getpwuid
 from traceback import print_exc
 import glob
@@ -471,7 +471,8 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
                         gcd_val = gcd(castep['stoichiometry'][atom], gcd_val)
                 # convert stoichiometry to tuple for fryan
                 temp_stoich = []
-                for key, value in castep['stoichiometry'].iteritems():
+                for key in castep['stoichiometry']:
+                    value = castep['stoichiometry'][key]
                     if float(value)/gcd_val % 1 != 0:
                         temp_stoich.append([key, float(value)/gcd_val])
                     else:
@@ -520,6 +521,8 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
                     castep['external_pressure'].append(list(map(float, flines[line_no+2].split())))
                     castep['external_pressure'].append(list(map(float, flines[line_no+3].split())))
                 except:
+                    if kwargs.get('dryrun') or verbosity > 0:
+                        print_exc()
                     castep['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
             elif 'spin_polarized' not in castep and 'treating system as spin-polarized' in line:
                 castep['spin_polarized'] = True
@@ -690,6 +693,8 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
                                 try:
                                     castep['pressure'] = float(final_flines[line_no+i].split()[-2])
                                 except:
+                                    if kwargs.get('dryrun') or verbosity > 0:
+                                        print_exc()
                                     pass
                                 break
                             i += 1
@@ -737,6 +742,8 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
                                 if '===' in final_flines[line_no+i]:
                                     break
                         except:
+                            if kwargs.get('dryrun') or verbosity > 0:
+                                print_exc()
                             pass
                     elif 'Final Enthalpy' in line:
                         castep['enthalpy'] = float(line.split('=')[-1].split()[0])

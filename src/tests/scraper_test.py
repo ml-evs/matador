@@ -1,26 +1,125 @@
 #!/usr/bin/env python
 import unittest
 from scrapers.castep_scrapers import castep2dict, res2dict, param2dict, cell2dict
+from utils.print_utils import print_warning
+from traceback import print_exc
 
 
 class ScrapeTest(unittest.TestCase):
     """ Test scraper functions. """
-    def test(self):
-        print('Testing scraping functions...')
-        print(70*'-')
-        print('Testing cell scraper...')
+    def test_cell(self):
         cell_fname = 'data/LiP2Zn-0bm995-a_9-out.cell'
-        test_cell, s = cell2dict(cell_fname, db=False)
-        assert s, 'Cell scraping failed entirely, oh dear!'
-        assert test_cell['lattice_cart'][0][0] == 9.83262140721165, 'Cell scraping failed to read lattice vectors.'
-        assert test_cell['lattice_cart'][1][1] == 5.96357780025648, 'Cell scraping failed to read lattice vectors.'
-        assert test_cell['lattice_cart'][2][2] == 4.39895761828278, 'Cell scraping failed to read lattice vectors.'
-        assert test_cell['lattice_cart'][1][0] == -0.115688800302997, 'Cell scraping failed to read lattice vectors.'
-        assert test_cell['symmetry_tol'] == 0.001, 'Cell scraping failed to read symmetry tolerance.'
-        assert test_cell['kpoints_mp_grid'] == [2, 3, 4], 'Cell scraping failed to read kpoint grid {}'.format(test_cell['kpoints_mp_grid'])
-        assert test_cell['species_pot']['Li'] == 'Li_00PBE.usp', 'Cell scraping failed to read pspots.'
-        assert test_cell['species_pot']['P'] == 'P_00PBE.usp', 'Cell scraping failed to read pspots.'
-        assert test_cell['species_pot']['Zn'] == 'Zn_00PBE.usp', 'Cell scraping failed to read pspots.'
+        failed_open = False
+        failed = False
+        try:
+            f = open(cell_fname, 'r')
+        except:
+            failed_open = True
+            print_warning('Failed to open test case ' + cell_fname + ' - please check installation.')
+
+        if not failed_open:
+            f.close()
+            test_dict, s = cell2dict(cell_fname, db=False, verbosity=5)
+            try:
+                self.assertTrue(s, msg='Failed entirely, oh dear!')
+            except Exception as oops:
+                print_exc()
+                failed = True
+                raise AssertionError 
+            try:
+                self.assertEqual(test_dict['lattice_cart'][0][0], 9.83262140721165, msg='Failed to read lattice vectors.')
+                self.assertEqual(test_dict['lattice_cart'][1][1], 5.96357780025648, msg='Failed to read lattice vectors.')
+                self.assertEqual(test_dict['lattice_cart'][2][2], 4.39895761828278, msg='Failed to read lattice vectors.')
+                self.assertEqual(test_dict['lattice_cart'][1][0], -0.115688800302997, msg='Failed to read lattice vectors.')
+            except Exception as oops:
+                print_exc()
+                failed = True
+                pass
+            try:
+                self.assertEqual(test_dict['symmetry_tol'], 0.001, msg='Failed to read symmetry tolerance.')
+            except Exception as oops:
+                print_exc()
+                failed = True
+                pass
+            try:
+                self.assertEqual(test_dict['kpoints_mp_grid'], [2, 3, 4], msg='Failed to read kpoint grid {}'.format(test_dict['kpoints_mp_grid']))
+            except Exception as oops:
+                print_exc()
+                failed = True
+                pass
+            try:
+                self.assertEqual(test_dict['species_pot']['Li'], 'Li_00PBE.usp', msg='Failed to read pspots.')
+                self.assertEqual(test_dict['species_pot']['P'], 'P_00PBE.usp', msg='Failed to read pspots.')
+                self.assertEqual(test_dict['species_pot']['Zn'], 'Zn_00PBE.usp', msg='Failed to read pspots.')
+            except Exception as oops:
+                print_exc()
+                failed = True
+                pass
+            if failed:
+                raise(AssertionError, 'Cell test failed!')
+
+    def test_castep(self):
+
+        castep_fname = 'data/Na3Zn4-OQMD_759599.castep'
+
+        failed_open = False
+        failed = False
+        try:
+            f = open(castep_fname, 'r')
+        except:
+            failed_open = True
+            print('Failed to open test case', castep_fname, '- please check installation.')
+        if not failed_open:
+            f.close()
+            test_dict, s = castep2dict(castep_fname, db=True, verbosity=5)
+            try:
+                self.assertTrue(s, 'Failed entirely, oh dear!')
+            except Exception as oops:
+                print_exc()
+                failed = True
+                raise AssertionError 
+            try:
+                self.assertEqual(test_dict['pressure'], 0.0763, msg='Failed to read pressure!')
+            except Exception as oops:
+                print_exc()
+                failed = True
+            try:
+                self.assertEqual(test_dict['enthalpy'], -2.15036930e4, msg='Failed to read enthalpy!')
+            except Exception as oops:
+                print_exc()
+                failed = True
+            try:
+                self.assertEqual(test_dict['num_atoms'], 14, msg='Wrong number of atoms!')
+            except Exception as oops:
+                print_exc()
+                failed = True
+            try:
+                self.assertEqual(test_dict['stoichiometry'], [['Na', 3], ['Zn', 4]], msg='Wrong stoichiometry!')
+            except Exception as oops:
+                print_exc()
+                failed = True
+            try:
+                self.assertEqual(test_dict['cell_volume'], 288.041941, msg='Wrong cell volume!')
+            except Exception as oops:
+                print_exc()
+                failed = True
+            try:
+                self.assertEqual(test_dict['space_group'], 'Pm', msg='Wrong space group!')
+            except Exception as oops:
+                print_exc()
+                failed = True
+            try:
+                self.assertEqual(test_dict['lattice_abc'][0][0], 9.039776, msg='Wrong lattice constants!')
+                self.assertEqual(test_dict['lattice_abc'][0][1], 9.045651, msg='Wrong lattice constants!')
+                self.assertEqual(test_dict['lattice_abc'][0][2], 4.068682, msg='Wrong lattice constants!')
+                self.assertEqual(test_dict['lattice_abc'][1][0], 90, msg='Wrong lattice constants!')
+                self.assertEqual(test_dict['lattice_abc'][1][1], 90, msg='Wrong lattice constants!')
+                self.assertEqual(test_dict['lattice_abc'][1][2], 59.971185, msg='Wrong lattice constants!')
+            except Exception as oops:
+                print_exc()
+                failed = True
+        if failed:
+            raise(AssertionError, 'Castep test failed!')
 
 if __name__ == '__main__':
     unittest.main()
