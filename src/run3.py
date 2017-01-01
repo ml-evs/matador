@@ -278,8 +278,6 @@ class FullRelaxer:
         """
         print_notify('Relaxing ' + self.seed)
         geom_max_iter_list = self.geom_max_iter_list
-        # relax structure
-        print(geom_max_iter_list)
         # copy initial res file to seed
         self.cp_to_input(self.seed)
         self.rerun = False
@@ -318,6 +316,7 @@ class FullRelaxer:
                 if not success and opti_dict == '':
                     print_warning('Failed to scrape castep file...')
                     return False
+                print('OPTI_DICT = ', opti_dict)
                 if self.rerun and not opti_dict['optimised']:
                     self.rerun = False
                 if not self.rerun and opti_dict['optimised']:
@@ -362,6 +361,10 @@ class FullRelaxer:
                 # remove atomic_init_spins from calc_doc if there
                 if 'atomic_init_spins' in calc_doc:
                     del calc_doc['atomic_init_spins']
+                # if writing out cell, use it for higher precision lattice_cart
+                if calc_doc['write_cell_structure']:
+                    cell_dict, success = cell2dict(seed + '-out.cell', db=False, outcell=True)
+                    opti_dict['lattice_cart'] = list(cell_dict['lattice_cart'])
                 calc_doc.update(opti_dict)
 
             except(SystemExit, KeyboardInterrupt):

@@ -140,7 +140,7 @@ def res2dict(seed, db=True, verbosity=0, **kwargs):
     return res, True
 
 
-def cell2dict(seed, db=True, verbosity=0, **kwargs):
+def cell2dict(seed, db=True, outcell=False, verbosity=0, **kwargs):
     """ Extract available information from .cell file; probably
     to be merged with another dict from a .param or .res file.
     """
@@ -155,7 +155,7 @@ def cell2dict(seed, db=True, verbosity=0, **kwargs):
         for line_no, line in enumerate(flines):
             if line.startswith(('#', '!')):
                 continue
-            elif '%block lattice_cart' in line.lower() and not db:
+            elif '%block lattice_cart' in line.lower() and outcell:
                 cell['lattice_cart'] = []
                 i = 1
                 while 'endblock' not in flines[line_no+i].lower():

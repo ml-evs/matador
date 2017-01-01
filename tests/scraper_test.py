@@ -19,13 +19,13 @@ class ScrapeTest(unittest.TestCase):
 
         if not failed_open:
             f.close()
-            test_dict, s = cell2dict(cell_fname, db=False, verbosity=5)
+            test_dict, s = cell2dict(cell_fname, db=False, outcell=True, verbosity=5)
             try:
                 self.assertTrue(s, msg='Failed entirely, oh dear!')
             except Exception as oops:
                 print_exc()
                 failed = True
-                raise AssertionError 
+                raise AssertionError
             try:
                 self.assertEqual(test_dict['lattice_cart'][0][0], 9.83262140721165, msg='Failed to read lattice vectors.')
                 self.assertEqual(test_dict['lattice_cart'][1][1], 5.96357780025648, msg='Failed to read lattice vectors.')
@@ -55,6 +55,13 @@ class ScrapeTest(unittest.TestCase):
                 print_exc()
                 failed = True
                 pass
+            try:
+                # test that lattice_vec only read when outcell is true
+                test_dict, s = cell2dict(cell_fname, db=False, outcell=False, verbosity=5)
+                self.assertTrue(test_dict.get('lattice_cart') is None)
+            except:
+                print_exc()
+                failed = True
             if failed:
                 raise(AssertionError, 'Cell test failed!')
 
@@ -77,7 +84,7 @@ class ScrapeTest(unittest.TestCase):
             except Exception as oops:
                 print_exc()
                 failed = True
-                raise AssertionError 
+                raise AssertionError
             try:
                 self.assertEqual(test_dict['pressure'], 0.0763, msg='Failed to read pressure!')
             except Exception as oops:
@@ -119,6 +126,7 @@ class ScrapeTest(unittest.TestCase):
             except Exception as oops:
                 print_exc()
                 failed = True
+
         if failed:
             raise(AssertionError, 'Castep test failed!')
 
