@@ -45,9 +45,9 @@ class CapacityTest(unittest.TestCase):
             Q.append(get_generic_grav_capacity(temp_conc, elem))
             print(doc['stoichiometry'], Q[-1], 'mAh/g')
 
-        assert(Q[0] == Q[1])
-        assert(round(8*Q[2], 3) == round(Q[3], 3))
-        assert(round(Q[2], 3) == round(2*Q[4], 3))
+        assert Q[0] == Q[1]
+        assert round(8*Q[2], 3) == round(Q[3], 3)
+        assert round(Q[2], 3) == round(2*Q[4], 3)
 
 if __name__ == '__main__':
     unittest.main()
