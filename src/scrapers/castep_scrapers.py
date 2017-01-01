@@ -5,11 +5,10 @@ inputs and outputs.
 """
 from __future__ import print_function
 # matador modules
-from utils.cell_utils import abc2cart, calc_mp_spacing, doc2spg
+from utils.cell_utils import abc2cart, calc_mp_spacing
 # external libraries
 try:
     import bson.json_util as json
-    import spglib as spg
 except:
     pass
 # standard library
@@ -74,7 +73,7 @@ def res2dict(seed, db=True, verbosity=0, **kwargs):
             res['enthalpy_per_atom'] = res['enthalpy'] / res['num_atoms']
             res['total_energy'] = res['enthalpy'] - res['pressure']*res['cell_volume']
             res['total_energy_per_atom'] = res['total_energy'] / res['num_atoms']
-        res['lattice_abc'] = [map(float, cell[2:5]), map(float, cell[5:8])]
+        res['lattice_abc'] = [list(map(float, cell[2:5])), list(map(float, cell[5:8]))]
         # calculate lattice_cart from abc
         res['lattice_cart'] = abc2cart(res['lattice_abc'])
         for line_no, line in enumerate(flines):
@@ -83,7 +82,7 @@ def res2dict(seed, db=True, verbosity=0, **kwargs):
                 while 'END' not in flines[line_no+i] and line_no+i < len(flines):
                     cursor = flines[line_no+i].split()
                     res['atom_types'].append(cursor[0])
-                    res['positions_frac'].append(map(float, cursor[2:5]))
+                    res['positions_frac'].append(list(map(float, cursor[2:5])))
                     i += 1
         # deal with implicit encapsulation
         if len(remark) > 0:
@@ -126,19 +125,14 @@ def res2dict(seed, db=True, verbosity=0, **kwargs):
         for elem in res['stoichiometry']:
             atoms_per_fu += elem[1]
         res['num_fu'] = len(res['atom_types']) / atoms_per_fu
-        if db and res['space_group'] == 'P1':
-            spg_cell = doc2spg(res)
-            res['space_group'] = spg.get_spacegroup(spg_cell, symprec=1e-3).split(' ')[0]
-            if verbosity > 0:
-                print(res['space_group'])
     except Exception as oops:
-        if kwargs.get('verbosity') > 0:
+        if verbosity > 0:
             print_exc()
             print('Error in .res file', seed + '.res, skipping...')
         if type(oops) == IOError:
             print_exc()
         return seed+'.res\t\t' + str(type(oops)) + ' ' + str(oops) + '\n', False
-    if kwargs.get('verbosity') > 4:
+    if verbosity > 4:
         print(json.dumps(res, indent=2))
     return res, True
 
@@ -158,6 +152,14 @@ def cell2dict(seed, db=True, verbosity=0, **kwargs):
         for line_no, line in enumerate(flines):
             if line.startswith(('#', '!')):
                 continue
+            elif '%block lattice_cart' in line.lower() and not db:
+                cell['lattice_cart'] = []
+                i = 1
+                while 'endblock' not in flines[line_no+i].lower():
+                    if not flines[line_no+i].strip()[0].isalpha():
+                        cell['lattice_cart'].append(list(map(float, flines[line_no+i].split())))
+                    i += 1
+                assert(len(cell['lattice_cart']) == 3)
             elif '%block species_pot' in line.lower():
                 cell['species_pot'] = dict()
                 i = 1
@@ -174,7 +176,7 @@ def cell2dict(seed, db=True, verbosity=0, **kwargs):
             elif '%block cell_constraints' in line.lower():
                 cell['cell_constraints'] = list()
                 for j in range(2):
-                    cell['cell_constraints'].append(map(int, flines[line_no+j+1].split()))
+                    cell['cell_constraints'].append(list(map(int, flines[line_no+j+1].split())))
             elif '%block hubbard_u' in line.lower():
                 cell['hubbard_u'] = defaultdict(list)
                 i = 0
@@ -195,7 +197,7 @@ def cell2dict(seed, db=True, verbosity=0, **kwargs):
                 cell['external_pressure'] = list()
                 for j in range(3):
                     flines[line_no+j+1] = flines[line_no+j+1].replace(',', '')
-                    cell['external_pressure'].append(map(float, flines[line_no+j+1].split()))
+                    cell['external_pressure'].append(list(map(float, flines[line_no+j+1].split())))
             elif 'kpoints_mp_spacing' in line.lower() or 'kpoint_mp_spacing' in line.lower():
                 if 'spectral_kpoints_mp_spacing' in line.lower() or 'spectral_kpoint_mp_spacing' in line.lower():
                     cell['spectral_kpoints_mp_spacing'] = float(line.split()[-1])
@@ -203,14 +205,14 @@ def cell2dict(seed, db=True, verbosity=0, **kwargs):
                     cell['kpoints_mp_spacing'] = float(line.split()[-1])
             elif 'kpoints_mp_grid' in line.lower() or 'kpoint_mp_grid' in line.lower():
                 if 'spectral_kpoints_mp_grid' in line.lower() or 'spectral_kpoint_mp_grid' in line.lower():
-                    cell['spectral_kpoints_mp_grid'] = map(int, line.split()[-3:])
+                    cell['spectral_kpoints_mp_grid'] = list(map(int, line.split()[-3:]))
                 else:
-                    cell['kpoints_mp_grid'] = map(int, line.split()[-3:])
+                    cell['kpoints_mp_grid'] = list(map(int, line.split()[-3:]))
             elif 'kpoints_mp_offset' in line.lower() or 'kpoint_mp_offset' in line.lower():
                 if 'spectral_kpoints_mp_offset' in line.lower() or 'spectral_kpoint_mp_offset' in line.lower():
-                    cell['spectral_kpoints_mp_offset'] = map(float, line.split()[-3:])
+                    cell['spectral_kpoints_mp_offset'] = list(map(float, line.split()[-3:]))
                 else:
-                    cell['kpoints_mp_offset'] = map(float, line.split()[-3:])
+                    cell['kpoints_mp_offset'] = list(map(float, line.split()[-3:]))
             elif not db:
                 if '%block positions_frac' in line.lower():
                     atomic_init_spins = defaultdict(list)
@@ -232,11 +234,11 @@ def cell2dict(seed, db=True, verbosity=0, **kwargs):
                 elif 'snap_to_symmetry' in line.lower():
                     cell['snap_to_symmetry'] = True
                 elif 'quantisation_axis' in line.lower():
-                    cell['quantisation_axis'] = map(int, line.split()[1:])
+                    cell['quantisation_axis'] = list(map(int, line.split()[1:]))
         if 'external_pressure' not in cell:
             cell['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0], [0.0]]
     except Exception as oops:
-        if kwargs.get('verbosity') > 0:
+        if verbosity > 0:
             print_exc()
             print('Error in', seed + '.cell, skipping...')
         return seed + '\t\t' + str(type(oops)) + ' ' + str(oops), False
@@ -265,7 +267,7 @@ def cell2dict(seed, db=True, verbosity=0, **kwargs):
                                                 flines[line_no+i].split('"')[1]
                                         i += 1
     except Exception as oops:
-        if kwargs.get('verbosity') > 0:
+        if verbosity > 0:
             print_exc()
             print('Error in', seed + '.cell, skipping...')
         if type(oops) == IOError:
@@ -332,7 +334,7 @@ def param2dict(seed, db=True, verbosity=0, **kwargs):
                             param['geom_force_tol'] = float(param['geom_force_tol'])
                         break
     except Exception as oops:
-        if kwargs.get('verbosity') > 0:
+        if verbosity > 0:
             print_exc()
             print('Error in', seed+'.param, skipping...')
         if type(oops) == IOError:
@@ -399,10 +401,10 @@ def dir2dict(seed, verbosity=0, **kwargs):
         if info:
             dir_dict['source'].append(seed)
         else:
-            if kwargs.get('verbosity') > 0:
+            if verbosity > 0:
                 print('No information found in dirname', seed)
     except Exception as oops:
-        if kwargs.get('verbosity') > 0:
+        if verbosity > 0:
             print_exc()
             print('Error wrangling dir name', seed)
         return seed + '\t\t' + str(type(oops)) + ' ' + str(oops), False
@@ -450,7 +452,7 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
                             break
                         else:
                             castep['atom_types'].append(flines[line_no+i].split()[1])
-                            castep['positions_frac'].append((map(float,
+                            castep['positions_frac'].append(list(map(float,
                                                             (flines[line_no+i].split()[3:6]))))
                     if 'x------' in flines[line_no+i]:
                         atoms = True
@@ -504,7 +506,7 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
             elif 'finite_basis_corr' not in castep and 'finite basis set correction  ' in line:
                 castep['finite_basis_corr'] = line.split(':')[-1].strip()
             elif 'kpoints_mp_grid' not in castep and 'MP grid size for SCF' in line:
-                castep['kpoints_mp_grid'] = map(int, list(line.split('is')[-1].split()))
+                castep['kpoints_mp_grid'] = list(map(int, list(line.split('is')[-1].split())))
             elif 'sedc_apply' not in castep and \
                     'DFT+D: Semi-empirical dispersion correction    : on' in line:
                 castep['sedc_apply'] = True
@@ -514,9 +516,9 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
             elif 'external_pressure' not in castep and 'External pressure/stress' in line:
                 try:
                     castep['external_pressure'] = list()
-                    castep['external_pressure'].append(map(float, flines[line_no+1].split()))
-                    castep['external_pressure'].append(map(float, flines[line_no+2].split()))
-                    castep['external_pressure'].append(map(float, flines[line_no+3].split()))
+                    castep['external_pressure'].append(list(map(float, flines[line_no+1].split())))
+                    castep['external_pressure'].append(list(map(float, flines[line_no+2].split())))
+                    castep['external_pressure'].append(list(map(float, flines[line_no+3].split())))
                 except:
                     castep['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
             elif 'spin_polarized' not in castep and 'treating system as spin-polarized' in line:
@@ -527,7 +529,7 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
                 while i < castep['num_atoms']:
                     line = flines[line_no+i].strip()
                     atom = line.split()[0].replace('|', '')
-                    shifts = map(float, line.split()[-5:-1])
+                    shifts = list(map(float, line.split()[-5:-1]))
                     for ind, shift in enumerate(shifts):
                         if shift != 0:
                             if atom not in castep['hubbard_u']:
@@ -613,27 +615,21 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
                                 break
                             else:
                                 temp_line = final_flines[line_no+i].split()[0:3]
-                                castep['lattice_cart'].append((map(float, temp_line)))
+                                castep['lattice_cart'].append(list(map(float, temp_line)))
                             i += 1
                     elif 'Lattice parameters' in line:
                         castep['lattice_abc'] = list()
                         i = 1
                         castep['lattice_abc'].append(
-                            map(float,
-                                [
-                                    final_flines[line_no+i].split('=')[1].strip().split(' ')[0],
-                                    final_flines[line_no+i+1].split('=')[1].strip().split(' ')[0],
-                                    final_flines[line_no+i+2].split('=')[1].strip().split(' ')[0]
-                                ]
-                                ))
+                            list(map(float,
+                                     [final_flines[line_no+i].split('=')[1].strip().split(' ')[0],
+                                      final_flines[line_no+i+1].split('=')[1].strip().split(' ')[0],
+                                      final_flines[line_no+i+2].split('=')[1].strip().split(' ')[0]])))
                         castep['lattice_abc'].append(
-                            map(float,
-                                [
-                                    final_flines[line_no+i].split('=')[-1].strip(),
-                                    final_flines[line_no+i+1].split('=')[-1].strip(),
-                                    final_flines[line_no+i+2].split('=')[-1].strip()
-                                ]
-                                ))
+                            list(map(float,
+                                     [final_flines[line_no+i].split('=')[-1].strip(),
+                                      final_flines[line_no+i+1].split('=')[-1].strip(),
+                                      final_flines[line_no+i+2].split('=')[-1].strip()])))
                     elif 'Current cell volume' in line:
                         castep['cell_volume'] = float(line.split('=')[1].split()[0].strip())
                     elif 'Cell Contents' in line:
@@ -647,7 +643,7 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
                                     break
                                 else:
                                     temp_frac = final_flines[line_no+i].split()[3:6]
-                                    castep['positions_frac'].append((map(float, temp_frac)))
+                                    castep['positions_frac'].append(list(map(float, temp_frac)))
                             if 'x------' in final_flines[line_no+i]:
                                 atoms = True
                             i += 1
@@ -688,7 +684,7 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
                             if 'Cartesian components' in final_flines[line_no+i]:
                                 castep['stress'] = []
                                 for j in range(3):
-                                    castep['stress'].append((map(
+                                    castep['stress'].append(list(map(
                                         float, (final_flines[line_no+i+j+4].split()[2:5]))))
                             elif 'Pressure' in final_flines[line_no+i]:
                                 try:
@@ -789,7 +785,7 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
         if 'space_group' not in castep:
             castep['space_group'] = 'xxx'
     except Exception as oops:
-        if kwargs.get('dryrun') or kwargs.get('verbosity') > 0:
+        if kwargs.get('dryrun') or verbosity > 0:
             print_exc()
             print('Error in .castep file', seed, 'skipping...')
         if type(oops) == DFTError:
