@@ -13,7 +13,7 @@ Matthew Evans 2016
 """
 
 from __future__ import print_function
-from os import walk, makedirs, remove, system
+from os import walk, makedirs, remove, system, devnull
 from os.path import isfile, exists
 from collections import defaultdict
 from scrapers.castep_scrapers import cell2dict, param2dict
@@ -234,7 +234,6 @@ class FullRelaxer:
         calc_doc = res_dict
 
         # set seed name
-        print(calc_doc['source'])
         self.seed = calc_doc['source'][0].replace('.res', '')
 
         # update global doc with cell and param dicts for folder
@@ -316,7 +315,6 @@ class FullRelaxer:
                 if not success and opti_dict == '':
                     print_warning('Failed to scrape castep file...')
                     return False
-                print('OPTI_DICT = ', opti_dict)
                 if self.rerun and not opti_dict['optimised']:
                     self.rerun = False
                 if not self.rerun and opti_dict['optimised']:
@@ -330,7 +328,7 @@ class FullRelaxer:
                     # write res and castep file out to completed folder
                     doc2res(opti_dict, seed, hash_dupe=False)
                     self.mv_to_completed(seed)
-                    if calc_doc.get('write_cell_structure') == 'true':
+                    if calc_doc.get('write_cell_structure'):
                         system('mv ' + seed + '-out.cell' + ' completed/' + seed + '-out.cell')
                     # clean up rest of files
                     self.tidy_up(seed)
@@ -362,7 +360,7 @@ class FullRelaxer:
                 if 'atomic_init_spins' in calc_doc:
                     del calc_doc['atomic_init_spins']
                 # if writing out cell, use it for higher precision lattice_cart
-                if calc_doc['write_cell_structure']:
+                if calc_doc.get('write_cell_structure'):
                     cell_dict, success = cell2dict(seed + '-out.cell', db=False, outcell=True)
                     opti_dict['lattice_cart'] = list(cell_dict['lattice_cart'])
                 calc_doc.update(opti_dict)
@@ -421,8 +419,10 @@ class FullRelaxer:
                 process = sp.Popen(['aprun', '-n', str(self.ncores),
                                     self.executable, seed])
             else:
+                dev_null = open(devnull, 'w')
                 process = sp.Popen(['nice', '-n', '15', 'mpirun', '-n', str(self.ncores),
-                                    self.executable, seed])
+                                    self.executable, seed], stdout=dev_null, stderr=dev_null)
+                dev_null.close()
         elif self.nnodes is not None:
             if self.archer:
                 command = ['aprun', '-n', str(self.ncores*self.nnodes),
