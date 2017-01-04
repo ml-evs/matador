@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 # coding :utf-8
 """ Submits the same job across multiple nodes
 on a cluster with a shared filesystem, and no queuing,
