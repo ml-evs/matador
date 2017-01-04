@@ -58,9 +58,13 @@ if __name__ == '__main__':
         description='Run a single script on multiple nodes, numbered node<n>.',
         epilog='Written by Matthew Evans (2017).')
     parser.add_argument('command', type=str,
-                        help='command to run, with arguments. Enclose in apostrophes.')
+                        help='command to run, with arguments - must be apostrophized. \
+                        Use the $ALL_CORES macro to use, unsurprisingly, all the cores \
+                        on the node in question. e.g. oddjob \'pyairss -c $ALL_CORES -ha \
+                        <seed>\' -n 1 16')
     parser.add_argument('-n', '--nodes', type=str, nargs='+',
-                        help='list node numbers to run job on')
+                        help='list node numbers to run job on with space delimiters, e.g. \
+                        -n 3 14 15')
     parser.add_argument('-d', '--debug', action='store_true',
                         help='debug output')
     args = parser.parse_args()
