@@ -950,8 +950,8 @@ class DBQuery:
         query_dict = dict()
         query_dict['cut_off_energy'] = dict()
         if len(self.args.get('cutoff')) == 2:
-            query_dict['cut_off_energy']['$lte'] = self.args.get('cutoff')[0]
-            query_dict['cut_off_energy']['$gte'] = self.args.get('cutoff')[1]
+            query_dict['cut_off_energy']['$gte'] = self.args.get('cutoff')[0]
+            query_dict['cut_off_energy']['$lte'] = self.args.get('cutoff')[1]
         else:
             query_dict['cut_off_energy']['$gte'] = self.args.get('cutoff')[0]
         return query_dict
