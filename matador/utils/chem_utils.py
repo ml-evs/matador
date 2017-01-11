@@ -1,10 +1,7 @@
 # coding: utf-8
 """ This file defines some useful chemistry. """
 
-# matador modules
-from .cursor_utils import get_array_from_cursor
 # external libraries
-import periodictable
 import numpy as np
 
 # global consts
@@ -35,16 +32,19 @@ def get_periodic_table():
 
 def get_molar_mass(elem):
     """ Returns molar mass of chosen element. """
+    import periodictable
     return periodictable.elements.symbol(elem).mass
 
 
 def get_atomic_number(elem):
     """ Returns atomic number of chosen element. """
+    import periodictable
     return periodictable.elements.symbol(elem).number
 
 
 def get_atomic_symbol(atomic_number):
     """ Returns elemental symbol from atomic number. """
+    import periodictable
     return periodictable.elements[atomic_number].symbol
 
 
@@ -61,6 +61,7 @@ def get_concentration(doc, elements):
 def get_num_intercalated(cursor):
     """ Return array of the number of intercalated atoms
     per host atom from a list of structures. """
+    from .cursor_utils import get_array_from_cursor
     x = np.zeros((len(cursor)))
     comps = get_array_from_cursor(cursor, 'concentration')
     for idx, comp in enumerate(comps):

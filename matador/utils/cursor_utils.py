@@ -1,11 +1,8 @@
 # coding: utf-8
 """ This file defines some useful generic cursor methods. """
 
-# matador modules
-from .cell_utils import doc2spg
 # external libraries
 import numpy as np
-import spglib as spg
 # standard library
 from traceback import print_exc
 from time import strftime
@@ -316,6 +313,8 @@ def get_spg_uniq(cursor, symprec=1e-2, latvecprec=1e-3, posprec=1e-3):
     * uniq_list  : list of indices of the unique structures in cursor.
     * same_list  : list of pairs indices of duplicate structures.
     """
+    import spglib as spg
+    from .cell_utils import doc2spg
 
     spg_cursor = list()
     for doc in cursor:

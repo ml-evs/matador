@@ -5,16 +5,14 @@ parses user inputs and implements the stats submodule.
 """
 
 from __future__ import print_function
-
 # matador modules
-from query import DBQuery
-from hull import QueryConvexHull
-from export import query2files
-from utils.cursor_utils import filter_cursor
-from utils.print_utils import print_failure, print_warning, print_notify
-from utils.cursor_utils import get_spg_uniq
-from polish import Polisher
-
+from matador.query import DBQuery
+from matador.hull import QueryConvexHull
+from matador.export import query2files
+from matador.utils.cursor_utils import filter_cursor
+from matador.utils.print_utils import print_failure, print_warning, print_notify
+from matador.utils.cursor_utils import get_spg_uniq
+from matador.polish import Polisher
 # import external libraries
 import pymongo as pm
 # import standard library

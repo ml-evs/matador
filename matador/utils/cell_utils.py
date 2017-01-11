@@ -2,11 +2,7 @@
 for cell manipulation.
 """
 
-# matador modules
-from .chem_utils import get_atomic_number
-from .chem_utils import get_atomic_symbol
 # external libraries
-import spglib as spg
 import numpy as np
 # standard library
 from math import pi, cos, sin, sqrt, acos, log10
@@ -141,6 +137,7 @@ def calc_mp_spacing(real_lat, mp_grid, prec=2):
 
 def doc2spg(doc):
     """ Return an spglib input tuple from a matador doc. """
+    from .chem_utils import get_atomic_number
     try:
         if 'lattice_cart' not in doc:
             doc['lattice_cart'] = abc2cart(doc['lattice_abc'])
@@ -155,6 +152,8 @@ def doc2spg(doc):
 def standardize_doc_cell(doc):
     """ Inserts spglib e.g. standardized cell data
     into matador doc. """
+    import spglib as spg
+    from .chem_utils import get_atomic_symbol
     spg_cell = doc2spg(doc)
     spg_standardized = spg.standardize_cell(spg_cell)
     doc['lattice_cart'] = [list(vec) for vec in spg_standardized[0]]

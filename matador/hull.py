@@ -11,6 +11,7 @@ from .utils.chem_utils import get_binary_grav_capacities, get_molar_mass, get_nu
 from .utils.chem_utils import get_generic_grav_capacity
 from .utils.chem_utils import get_formation_energy, get_concentration
 from .utils.cursor_utils import set_cursor_from_array, get_array_from_cursor, filter_cursor
+from .utils.cursor_utils import display_results
 from .utils.glmol_wrapper import get_glmol_placeholder_string
 from .export import generate_hash, generate_relevant_path
 # external libraries
@@ -67,7 +68,7 @@ class QueryConvexHull():
                              str(self.hull_cutoff) +
                              ' eV of the hull with chosen chemical potentials.')
 
-        self.query.display_results(self.hull_cursor, hull=True)
+        display_results(self.hull_cursor, self.args, hull=True)
 
         if not self.args.get('no_plot'):
             self.set_plot_param()

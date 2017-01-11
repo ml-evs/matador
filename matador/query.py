@@ -5,9 +5,9 @@ and calling other functionality. """
 
 from __future__ import print_function
 # matador modules
-from utils.print_utils import print_failure, print_warning, print_success
-from utils.chem_utils import get_periodic_table
-from utils.cursor_utils import display_results
+from .utils.print_utils import print_failure, print_warning, print_success
+from .utils.chem_utils import get_periodic_table
+from .utils.cursor_utils import display_results
 # external libraries
 import pymongo as pm
 import numpy as np
