@@ -5,6 +5,7 @@ can create a file from a db document.
 """
 from __future__ import print_function
 from utils.cell_utils import cart2abcstar, frac2cart
+from utils.cursor_utils import display_results
 import string
 import numpy as np
 from os.path import exists, isfile, expanduser
@@ -22,6 +23,8 @@ def query2files(cursor, *args):
     param = args.get('param')
     res = args.get('res')
     pdb = args.get('pdb')
+    md = args.get('markdown')
+    multiple_files = cell or param or res or pdb
     prefix = (args.get('prefix') + '-') if args.get('prefix') is not None else ''
     pressure = args.get('write_pressure')
     if args['subcmd'] == 'polish' or args['subcmd'] == 'swaps':
@@ -38,23 +41,23 @@ def query2files(cursor, *args):
         if top < num:
             cursor = cursor[:top]
             num = top
-    print('Intending to write', num, 'structures to file...')
-    if len(cursor) > 10000:
-        try:
-            write = raw_input('This operation will write ' + str(len(cursor)) + ' structures' +
+    if multiple_files:
+        print('Intending to write', num, 'structures to file...')
+        if len(cursor) > 10000:
+            try:
+                write = raw_input('This operation will write ' + str(len(cursor)) + ' structures' +
+                                  ' are you sure you want to do this? [y/n] ')
+            except:
+                write = input('This operation will write ' + str(len(cursor)) + ' structures' +
                               ' are you sure you want to do this? [y/n] ')
-        except:
-            write = input('This operation will write ' + str(len(cursor)) + ' structures' +
-                          ' are you sure you want to do this? [y/n] ')
-
-        if write == 'y' or write == 'Y':
-            print('Writing them all.')
-            write = True
+            if write == 'y' or write == 'Y':
+                print('Writing them all.')
+                write = True
+            else:
+                write = False
+                return
         else:
-            write = False
-            return
-    else:
-        write = True
+            write = True
     dirname = generate_relevant_path(args)
     dir = False
     dir_counter = 0
@@ -119,6 +122,15 @@ def query2files(cursor, *args):
             doc2res(doc, path, info=info, hash_dupe=hash)
         if pdb:
             doc2pdb(doc, path, hash_dupe=hash)
+
+    if md:
+        md_path = path.split('/')[0] + '/' + path.split('/')[0] + '.md'
+        print('Writing markdown file', md_path + '...')
+        hull = True if args['subcmd'] in ['hull', 'voltage'] else False
+        md_string = display_results(cursor, args, markdown=True, hull=hull)
+        with open(md_path, 'w') as f:
+            f.write(md_string)
+
     print('Done!')
 
 
