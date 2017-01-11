@@ -22,7 +22,7 @@ setup(name='matador',
           'matplotlib>=1.5',
           'bokeh>=0.12',
           'python-ternary'],
-      scripts=['bin/matador', 'bin/run3'],
+      scripts=['bin/matador', 'bin/run3', 'bin/oddjob'],
       dependency_links=["https://github.com/marcharper/python-ternary/tarball/master"],
       extras_require={
           'pdffit': ["diffpy.Structure", "diffpy.srfit"],
