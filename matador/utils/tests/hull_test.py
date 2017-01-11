@@ -3,7 +3,7 @@
 import unittest
 import json
 import numpy as np
-from hull import QueryConvexHull
+from matador.hull import QueryConvexHull
 
 
 class VoltageTest(unittest.TestCase):

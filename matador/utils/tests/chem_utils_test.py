@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import unittest
-from utils.chem_utils import get_concentration
-from utils.chem_utils import get_generic_grav_capacity
+from matador.utils.chem_utils import get_concentration
+from matador.utils.chem_utils import get_generic_grav_capacity
 
 
 class CapacityTest(unittest.TestCase):
