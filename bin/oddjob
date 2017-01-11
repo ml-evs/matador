@@ -5,13 +5,15 @@ on a cluster with a shared filesystem, and no queuing,
 handling killed jobs and crashes.
 """
 
+# matador modules
+from matador.utils.print_utils import print_notify, print_warning
+# standard library
+from traceback import print_exc
+from sys import stdout
 import argparse
 import multiprocessing as mp
 import subprocess as sp
 from os import getcwd
-from utils.print_utils import print_notify, print_warning
-from traceback import print_exc
-from sys import stdout
 
 
 class Hive:

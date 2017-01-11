@@ -4,21 +4,25 @@ from database queries.
 """
 
 from __future__ import print_function
+# matador modules
+from .utils.print_utils import print_failure, print_notify, print_warning
+from .utils.hull_utils import barycentric2cart, vertices2plane, vertices2line
+from .utils.chem_utils import get_binary_grav_capacities, get_molar_mass, get_num_intercalated
+from .utils.chem_utils import get_generic_grav_capacity
+from .utils.chem_utils import get_formation_energy, get_concentration
+from .utils.cursor_utils import set_cursor_from_array, get_array_from_cursor, filter_cursor
+from .utils.glmol_wrapper import get_glmol_placeholder_string
+from .export import generate_hash, generate_relevant_path
+# external libraries
 from scipy.spatial import ConvexHull
-from traceback import print_exc
 from bson.son import SON
+import pymongo as pm
+import numpy as np
+# standard library
+from traceback import print_exc
 from bisect import bisect_left
 from sys import exit
-from utils.print_utils import print_failure, print_notify, print_warning
-from utils.hull_utils import barycentric2cart, vertices2plane, vertices2line
-from utils.chem_utils import get_binary_grav_capacities, get_molar_mass, get_num_intercalated
-from utils.chem_utils import get_generic_grav_capacity
-from utils.chem_utils import get_formation_energy, get_concentration
-from utils.cursor_utils import set_cursor_from_array, get_array_from_cursor, filter_cursor
-from export import generate_hash, generate_relevant_path
-import pymongo as pm
 import re
-import numpy as np
 
 
 class QueryConvexHull():
@@ -552,7 +556,7 @@ class QueryConvexHull():
         """ Plot interactive hull with Bokeh. """
         from bokeh.plotting import figure, save, output_file
         from bokeh.models import ColumnDataSource, HoverTool, Range1d
-        from matplotlib.pyplot.cm import get_cmap
+        import matplotlib.pyplot as plt
         # grab tie-line structures
         tie_line_data = dict()
         tie_line_data['composition'] = list()
@@ -579,7 +583,7 @@ class QueryConvexHull():
             hull_data['space_group'].append(structure[2])
             hull_data['hull_dist_string'].append(structure[3])
         cmap_limits = [0, 0.5]
-        colormap = get_cmap('Dark2')
+        colormap = plt.cm.get_cmap('Dark2')
         cmap_input = np.interp(hull_data['hull_distance'], cmap_limits, [0.15, 0.4], left=0.15, right=0.4)
         colours = colormap(cmap_input, 1, True)
         bokeh_colours = ["#%02x%02x%02x" % (r, g, b) for r, g, b in colours[:, 0:3]]
@@ -624,7 +628,8 @@ class QueryConvexHull():
                 else np.min(self.structure_slice[self.hull.vertices, 1])-0.15,
                 0.1 if np.max(self.structure_slice[self.hull.vertices, 1]) > 1
                 else np.max(self.structure_slice[self.hull.vertices, 1])+0.1]
-        fig.set(x_range=Range1d(-0.1, 1.1), y_range=Range1d(ylim[0], ylim[1]))
+        fig.x_range = Range1d(-0.1, 1.1)
+        fig.y_range = Range1d(ylim[0], ylim[1])
 
         fig.line('composition', 'energy',
                  source=tie_line_source,
@@ -653,7 +658,6 @@ class QueryConvexHull():
         save(fig)
         glmol = False
         if glmol:
-            from glmol_wrapper import get_glmol_placeholder_string
             html_string, js_string = get_glmol_placeholder_string()
             with open(path+fname) as f:
                 flines = f.readlines()
@@ -1019,19 +1023,13 @@ class QueryConvexHull():
             self.mpl_new_ver = True
         except:
             self.mpl_new_ver = False
-        from palettable.colorbrewer.qualitative import Dark2_8
-        from palettable.colorbrewer.qualitative import Set3_10
-        # if len(self.source_list) < 6:
-            # self.colours = Dark2_8.hex_colors[1:len(self.source_list)+1]
-        # else:
-        self.colours = Dark2_8.hex_colors[1:]
-        self.colours.extend(Dark2_8.hex_colors[1:])
+        Dark2_8 = ['#1b9e77', '#d95f02', '#7570b3', '#e7298a',
+                   '#66a61e', '#e6ab02', '#a6761d', '#666666']
         # first colour reserved for hull
-        self.colours.insert(0, Dark2_8.hex_colors[0])
         # penultimate colour reserved for off hull above cutoff
-        self.colours.append(Dark2_8.hex_colors[-1])
         # last colour reserved for OQMD
-        self.colours.append(Set3_10.hex_colors[-1])
+        self.colours = Dark2_8
+        self.colours.append('#bc80bd')
         return
 
     def generic_voltage_curve(self):

@@ -5,25 +5,23 @@ which attempts fitting of structures to an
 experimental diffraction input to structures
 in the database with the diffpy package.
 """
+
 from __future__ import print_function
-
-# matador functionality
-from utils.print_utils import print_failure, print_warning, print_notify
-from utils.cell_utils import abc2cart
-from utils.chem_utils import get_atomic_number
-
-# standard library
-import multiprocessing as mp
-from traceback import print_exc
-from os.path import isfile
+# matador modules
+from .utils.print_utils import print_failure, print_notify
+from .utils.cell_utils import abc2cart
+from .utils.chem_utils import get_atomic_number
 # external libraries
 from scipy.optimize import leastsq
 import matplotlib.pyplot as plt
 import spglib as spg
-# diffpy
 from diffpy.srfit.pdf import PDFContribution
 from diffpy.srfit.fitbase import FitRecipe, FitResults
 from diffpy.srfit.structure import constrainAsSpaceGroup
+# standard library
+import multiprocessing as mp
+from traceback import print_exc
+from os.path import isfile
 
 
 class PDFFitter:
@@ -177,7 +175,7 @@ class PDFFitter:
             cell = (cart_lat,
                     positions_frac,
                     atomic_numbers)
-            sg = int(spg.get_spacegroup(cell, symprec=1e-2).split(' ')[1].replace('(','').replace(')',''))
+            sg = int(spg.get_spacegroup(cell, symprec=1e-2).split(' ')[1].replace('(', '').replace(')', ''))
             spacegroup_params = constrainAsSpaceGroup(pdf.Contribution.phase, sg)
         # print('Space group parameters:')
         # print(', '.join([param.name for param in spacegroup_params]))

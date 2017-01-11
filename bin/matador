@@ -5,7 +5,6 @@ parses user inputs and implements the stats submodule.
 """
 
 from __future__ import print_function
-from version import __version__
 
 # matador modules
 from query import DBQuery
@@ -23,6 +22,11 @@ import argparse
 from sys import argv
 from os import uname
 from os.path import isfile
+from pkg_resources import require
+try:
+    __version__ = require("matador")[0].version
+except:
+    from matador.version import __version__
 
 
 class Matador:
@@ -236,8 +240,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         prog='matador',
         description='MATerial and Atomic Database Of Refined structures.',
-        epilog='Written by Matthew Evans (2016).')
-    parser.add_argument('-v', '--version', action='version', version='matador version ' + __version__)
+        epilog='Written and maintained by Matthew Evans (me388@cam.ac.uk) 2016-2017, version ' + __version__.strip() + '.')
+    parser.add_argument('-v', '--version', action='version', version='matador version ' + __version__ + '.')
 
     # define subparsers for subcommands
     subparsers = parser.add_subparsers(title='subcommands',

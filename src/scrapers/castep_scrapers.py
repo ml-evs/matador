@@ -1,11 +1,11 @@
-#!/usr/bin/python
 # coding: utf-8
 """ This file implements the scraper functions for CASTEP-related
 inputs and outputs.
 """
+
 from __future__ import print_function
 # matador modules
-from utils.cell_utils import abc2cart, calc_mp_spacing
+from .utils.cell_utils import abc2cart, calc_mp_spacing
 # external libraries
 try:
     import bson.json_util as json

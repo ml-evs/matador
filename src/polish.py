@@ -6,13 +6,11 @@ level of accuracy and atomic swaps.
 """
 
 from __future__ import print_function
-
-# matador functionality
-from scrapers.castep_scrapers import cell2dict
-from scrapers.castep_scrapers import param2dict
-from utils.print_utils import print_notify, print_success, print_warning, print_failure
-from utils.chem_utils import get_periodic_table
-
+# matador modules
+from .scrapers.castep_scrapers import cell2dict
+from .scrapers.castep_scrapers import param2dict
+from .utils.print_utils import print_notify, print_success, print_warning, print_failure
+from .utils.chem_utils import get_periodic_table
 # standard library
 from traceback import print_exc
 from copy import deepcopy

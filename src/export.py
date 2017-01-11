@@ -4,10 +4,13 @@
 can create a file from a db document.
 """
 from __future__ import print_function
-from utils.cell_utils import cart2abcstar, frac2cart
-from utils.cursor_utils import display_results
-import string
+# matador internals
+from .utils.cell_utils import cart2abcstar, frac2cart
+from .utils.cursor_utils import display_results
+# external libraries
 import numpy as np
+# standard library
+import string
 from os.path import exists, isfile, expanduser
 from os import system, makedirs
 from traceback import print_exc

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # coding: utf-8
 """ This file scrapes structures from the OQMD SQL dump.
 You probably don't want to be using this unless you have
@@ -9,9 +9,8 @@ TO-DO
 * fix pspots
 * find k-points
 """
-from __future__ import print_function
 # matador modules
-from utils.cell_utils import cart2abc
+from matador.utils.cell_utils import cart2abc
 # external libraries
 import MySQLdb
 import MySQLdb.cursors

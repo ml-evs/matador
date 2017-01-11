@@ -3,8 +3,11 @@
 written by Can Kocer, for use with matador queries and docs.
 
 https://bitbucket.org/can_kocer/ajm_group_voronoi_code
+
+Requires Can's code to be on your PYTHONPATH.
 """
-from export import generate_hash
+
+from .export import generate_hash
 
 
 def get_voronoi_substructure(doc):

@@ -1,8 +1,8 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # coding: utf-8
-from scrapers import castep_scrapers
-from export import doc2cell
-from print_utils import print_notify, print_success, print_failure
+from matador.scrapers import castep_scrapers
+from matador.export import doc2cell
+from matador.print_utils import print_notify, print_success, print_failure
 from sys import argv
 
 fnames = argv[1:]

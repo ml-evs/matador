@@ -2,22 +2,26 @@
 """ This file implements all queries to the database,
 including parsing user inputs, displaying results
 and calling other functionality. """
+
 from __future__ import print_function
-# import related matador functionality
+# matador modules
 from utils.print_utils import print_failure, print_warning, print_success
 from utils.chem_utils import get_periodic_table
 from utils.cursor_utils import display_results
-# import external libraries
+# external libraries
 import pymongo as pm
 import numpy as np
 from bson.son import SON
 from bson.json_util import dumps
-# import standard library
+# standard library
 import re
 from os import uname
 from itertools import combinations
 from traceback import print_exc
-from fractions import gcd
+try:
+    from math import gcd
+except:
+    from fractions import gcd
 from sys import exit
 
 

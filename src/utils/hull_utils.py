@@ -2,6 +2,8 @@
 """ This file implements some useful geometric functions
 for the construction and manipulation of convex hulls.
 """
+
+# external libraries
 import numpy as np
 
 

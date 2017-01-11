@@ -1,10 +1,9 @@
-#!/usr/bin/python
 # coding: utf-8
 """ This file implements some scraper functions for
-Quantum Esppwoutso-related inputs and outputs.
+Quantum Espresso-related inputs and outputs.
 """
+
 from __future__ import print_function
-# matador modules
 # external libraries
 try:
     import bson.json_util as json

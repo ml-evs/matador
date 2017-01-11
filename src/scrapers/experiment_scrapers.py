@@ -1,8 +1,8 @@
-#!/usr/bin/python
 # coding: utf-8
 """ This file implements some prototype scrapers of
 experimental .synth and .expt files.
 """
+
 from __future__ import print_function
 # external libraries
 import bson.json_util as json

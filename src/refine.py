@@ -3,11 +3,18 @@
 and overwrite database entries with specific tasks,
 e.g. symmetry and substructure analysis.
 """
-from __future__ import print_function
-from traceback import print_exc
 
-from sys import exit
+from __future__ import print_function
+# matador modules
 from utils.print_utils import print_notify, print_warning, print_failure
+from utils.cell_utils import doc2spg
+from voronoi_interface import get_voronoi_substructure
+# external library
+import pymongo as pm
+import spglib as spg
+# standard library
+from sys import exit
+from traceback import print_exc
 
 
 class Refiner:
@@ -15,7 +22,7 @@ class Refiner:
     def __init__(self, cursor, collection=None, task=None, mode='display', **kwargs):
         possible_tasks = ['sym', 'spg',
                           'substruc', 'sub',
-                          'ratios', 
+                          'ratios',
                           'remove']
         possible_modes = ['display', 'overwrite', 'set']
         if mode not in possible_modes:
@@ -59,7 +66,6 @@ class Refiner:
             self.update_docs()
 
     def update_docs(self):
-        import pymongo as pm
         requests = []
         # if in "set" mode, do not overwrite, just apply
         if self.mode == 'set':
@@ -78,7 +84,6 @@ class Refiner:
 
     def substruc(self):
         print('Performing substructure analysis...')
-        from voronoi_interface import get_voronoi_substructure
         for ind, doc in enumerate(self.cursor):
             try:
                 self.changed_count += 1
@@ -95,8 +100,6 @@ class Refiner:
                 print(doc['substruc'])
 
     def symmetry(self, symprec=1e-3):
-        import spglib as spg
-        from utils.cell_utils import doc2spg
         print('Refining symmetries...')
         if self.mode == 'display':
             print_warning('{}'.format('At symprec: ' + str(symprec)))

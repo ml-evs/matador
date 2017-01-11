@@ -1,9 +1,13 @@
 # coding: utf-8
 """ This file defines some useful chemistry. """
+
+# matador modules
+from .cursor_utils import get_array_from_cursor
+# external libraries
 import periodictable
 import numpy as np
-from utils.cursor_utils import get_array_from_cursor
 
+# global consts
 FARADAY_CONSTANT_Cpermol = 96.485332e3
 Cperg_to_mAhperg = 2.778e-1
 
@@ -99,14 +103,6 @@ def get_generic_grav_capacity(concs, elements):
             m_B += masses[elem]*tmp_concs[ind]
     Q = get_binary_grav_capacities(x, m_B)
     return Q
-
-# def get_volumetric_capacity(cursor, element):
-    # """ Returns the volumetric capacity of
-    # element in doc, mAh/cm^{-3}.
-    # """
-    # x = get_num_intercalated(cursor)
-    # vols = get_array_from_cursor(cursor, 'cell_volume')
-    # num_fu = get_array_from_cursor('cell_volume_per_b')
 
 
 def get_atoms_per_fu(doc):
