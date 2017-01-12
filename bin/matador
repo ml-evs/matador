@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # coding: utf-8
 """ This file calls all matador functionality,
 parses user inputs and implements the stats submodule.
@@ -8,11 +8,9 @@ from __future__ import print_function
 # matador modules
 from matador.query import DBQuery
 from matador.hull import QueryConvexHull
-from matador.export import query2files
 from matador.utils.cursor_utils import filter_cursor
 from matador.utils.print_utils import print_failure, print_warning, print_notify
 from matador.utils.cursor_utils import get_spg_uniq
-from matador.polish import Polisher
 # import external libraries
 import pymongo as pm
 # import standard library
@@ -70,6 +68,7 @@ class Matador:
         self.print_report()
 
         if self.args.get('cell') or self.args.get('res') or self.args.get('pdb') or self.args.get('markdown'):
+            from matador.export import query2files
             self.export = True
         else:
             self.export = False
@@ -78,7 +77,7 @@ class Matador:
             self.stats()
 
         if self.args['subcmd'] in ['import', 'rebuild']:
-            from spatula import Spatula
+            from matador.spatula import Spatula
             self.importer = Spatula(self.args)
 
         if self.args['subcmd'] == 'query':
@@ -86,6 +85,7 @@ class Matador:
             self.cursor = self.query.cursor
 
         if self.args['subcmd'] in ['swaps', 'polish']:
+            from matador.polish import Polisher
             self.query = DBQuery(self.client, self.collections, **self.args)
             if self.args.get('hull_cutoff') is not None:
                 self.hull = QueryConvexHull(self.query, **self.args)
@@ -95,9 +95,13 @@ class Matador:
             self.cursor = self.polisher.cursor
 
         if self.args['subcmd'] == 'refine':
-            from refine import Refiner
+            from matador.refine import Refiner
             self.query = DBQuery(self.client, self.collections, **self.args)
-            self.refiner = Refiner(self.query.cursor, self.query.repo, **self.args)
+            if self.args.get('hull_cutoff') is not None:
+                self.hull = QueryConvexHull(self.query, **self.args)
+                self.refiner = Refiner(self.hull.cursor, self.query.repo, **self.args)
+            else:
+                self.refiner = Refiner(self.query.cursor, self.query.repo, **self.args)
 
         if self.args['subcmd'] == 'pdffit':
             self.query = DBQuery(self.client, self.collections, **self.args)
@@ -290,7 +294,9 @@ if __name__ == '__main__':
                                        unspecified species, e.g. -pf search for Li will query \
                                        any structure containing Li, not just pure Li.')
     structure_flags.add_argument('--tags', nargs='+', type=str,
-                                 help=('search for up to 3 manual tags at once'))
+                                 help=('search for manual tags'))
+    structure_flags.add_argument('--doi', type=str,
+                                 help=('search for DOI in format xxxx/xxxx'))
     structure_flags.add_argument('-icsd', '--icsd', type=int, const=0, nargs='?',
                                  help=('search for an ICSD CollCode'))
     structure_flags.add_argument('-ss', '--src_str', type=str,
@@ -426,6 +432,10 @@ if __name__ == '__main__':
                               help='mode of refinement: options are display, set and overwrite')
     refine_flags.add_argument('-symprec', '--symprec', type=float,
                               help='spglib symmetry precision for refinement')
+    refine_flags.add_argument('--new_tag', type=str,
+                              help='new tag to add to structures in query')
+    refine_flags.add_argument('--new_doi', type=str,
+                              help='new doi to add to structures in query')
 
     stats_flags = argparse.ArgumentParser(add_help=False)
 
@@ -467,9 +477,10 @@ if __name__ == '__main__':
                                           parents=[global_flags, collection_flags,
                                                    structure_flags, material_flags,
                                                    query_flags])
-    query_parser = subparsers.add_parser('refine',
+    refine_parser = subparsers.add_parser('refine',
                                          help='refine database structures',
-                                         parents=[global_flags, query_flags, structure_flags, refine_flags])
+                                         parents=[global_flags, query_flags, structure_flags,
+                                                  refine_flags, material_flags])
 
     args = parser.parse_args()
 
