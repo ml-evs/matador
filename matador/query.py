@@ -20,8 +20,10 @@ from itertools import combinations
 from traceback import print_exc
 try:
     from math import gcd
-except:
+except ImportError:
     from fractions import gcd
+    print_warning('Use of fractions.gcd is deprecated - \
+                   Python3 is recommended but will try to proceed.')
 from sys import exit
 
 
@@ -194,6 +196,10 @@ class DBQuery:
 
         if self.args.get('tags') is not None:
             self.query_dict['$and'].append(self.query_tags())
+            self.empty_query = False
+
+        if self.args.get('doi') is not None:
+            self.query_dict['$and'].append(self.query_doi())
             self.empty_query = False
 
         if self.args.get('src_str') is not None:
@@ -404,7 +410,7 @@ class DBQuery:
             if gcd_val == 0:
                 gcd_val = frac
             else:
-                gcd_val = gcd(frac, gcd_val)
+                gcd_val = gcd(int(frac), int(gcd_val))
         fraction = np.asarray(fraction)
         fraction /= gcd_val
 
@@ -634,6 +640,20 @@ class DBQuery:
             temp_dict['tags'] = dict()
             temp_dict['tags']['$in'] = [tag]
             query_dict['$and'].append(temp_dict)
+
+        return query_dict
+
+    def query_doi(self):
+        """ Find all structures matching given DOI,
+        in format xxxx/xxxx.
+        """
+        query_dict = dict()
+        query_dict['$and'] = []
+        doi = self.args.get('doi')
+        temp_dict = dict()
+        temp_dict['doi'] = dict()
+        temp_dict['doi']['$eq'] = doi
+        query_dict['$and'].append(temp_dict)
 
         return query_dict
 
