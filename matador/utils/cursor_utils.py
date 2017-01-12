@@ -10,7 +10,7 @@ from pkg_resources import require
 try:
     __version__ = require("matador")[0].version
 except:
-    from version import __version__
+    from ..version import __version__
 __version__ = __version__.strip()
 
 
