@@ -406,9 +406,9 @@ if __name__ == '__main__':
     swap_flags = argparse.ArgumentParser(add_help=False)
     swap_flags.add_argument('-sw', '--swap', type=str, nargs='+',
                             help='swap all atoms in structures from a query from the first n-1 \
-                                  species to the nth, e.g. -s NAs will swap all N to As, \
-                                  -s NAs:LiNa will swap all N to As, and all Li to Na, and \
-                                  -s [V]As:[Li,K,Rb]Na will swap all group V elements to As \
+                                  species to the nth, e.g. -sw NAs will swap all N to As, \
+                                  -sw NAs:LiNa will swap all N to As, and all Li to Na, and \
+                                  -sw [V]As:[Li,K,Rb]Na will swap all group V elements to As \
                                   and all of Li, K and Rb to Na.')
 
     pdffit_flags = argparse.ArgumentParser(add_help=False)
@@ -478,9 +478,9 @@ if __name__ == '__main__':
                                                    structure_flags, material_flags,
                                                    query_flags])
     refine_parser = subparsers.add_parser('refine',
-                                         help='refine database structures',
-                                         parents=[global_flags, query_flags, structure_flags,
-                                                  refine_flags, material_flags])
+                                          help='refine database structures',
+                                          parents=[global_flags, query_flags, structure_flags,
+                                                   refine_flags, material_flags])
 
     args = parser.parse_args()
 
