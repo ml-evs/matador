@@ -24,6 +24,8 @@ setup(name='matador',
           'python-ternary'],
       scripts=['bin/matador', 'bin/run3', 'bin/oddjob'],
       dependency_links=["https://github.com/marcharper/python-ternary/tarball/master"],
+      package_data={'': ['matador/scrapers/words', 'matador/scrapers/nouns',
+                         'matador/scrapers/tests/data/*', 'matador/utils/tests/data/*']},
       extras_require={
           'pdffit': ["diffpy.Structure", "diffpy.srfit"],
           'scrape_oqmd': ["mysqlclient"],
