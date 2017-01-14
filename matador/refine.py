@@ -18,13 +18,14 @@ class Refiner:
     """ Refiner implements methods to alter certain parts of the
     database in place, either in overwrite, set or compare/display mode.
     Current modifiables are space groups, substructures, atomic ratios,
-    tags and DOIs.
+    the set of elements, tags and DOIs.
     """
 
     def __init__(self, cursor, collection=None, task=None, mode='display', **kwargs):
         """ Parses args and initiates modification. """
         possible_tasks = ['sym', 'spg',
                           'substruc', 'sub',
+                          'elem_set',
                           'ratios',
                           'tag',
                           'doi']
@@ -63,6 +64,9 @@ class Refiner:
         elif task == 'ratios':
             self.ratios()
             self.field = 'ratios'
+        elif task == 'elem_set':
+            self.elem_set()
+            self.field = 'elems'
         elif task == 'tag':
             self.field = 'tags'
             self.tag = self.args.get('new_tag')
@@ -80,10 +84,16 @@ class Refiner:
                 self.add_doi()
         try:
             self.cursor.close()
-        except:
+        except Exception as oops:
+            if self.args.get('debug'):
+                print(repr(oops))
             pass
-        print(self.changed_count, '/', len(self.cursor), 'to be changed.')
-        print(self.failed_count, '/', len(self.cursor), 'failed.')
+        try:
+            print(self.changed_count, '/', len(self.cursor), 'to be changed.')
+            print(self.failed_count, '/', len(self.cursor), 'failed.')
+        except:
+            print(self.changed_count, '/', self.cursor.count(), 'to be changed.')
+            print(self.failed_count, '/', self.cursor.count(), 'failed.')
 
         if self.mode in ['set', 'overwrite'] and self.changed_count > 0:
             self.update_docs()
@@ -178,6 +188,21 @@ class Refiner:
                 self.diff_cursor.append(doc)
                 self.changed_count += 1
             except:
+                self.failed_count += 1
+                pass
+
+    def elem_set(self):
+        """ Imbue documents with the set of elements,
+        i.e. set(doc['atom_types']), for quicker look-up.
+        """
+        for ind, doc in enumerate(self.cursor):
+            try:
+                doc['elems'] = list(set(doc['atom_types']))
+                self.diff_cursor.append(doc)
+                self.changed_count += 1
+            except Exception as oops:
+                if self.args.get('debug'):
+                    print(repr(oops))
                 self.failed_count += 1
                 pass
 
