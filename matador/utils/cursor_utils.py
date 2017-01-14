@@ -72,7 +72,7 @@ def display_results(cursor, args=None, hull=False, markdown=False):
                     formula_substring += str(subitem)
                 if item_ind == 1:
                     if subitem != 1:
-                        formula_substring += str(subitem)
+                        formula_substring += str(int(subitem))
                     atom_per_fu += subitem
         if 'encapsulated' in doc:
             formula_substring += '+CNT'
