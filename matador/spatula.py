@@ -10,10 +10,10 @@ from .scrapers.castep_scrapers import castep2dict, param2dict, cell2dict
 from .scrapers.castep_scrapers import res2dict, dir2dict
 from .scrapers.experiment_scrapers import expt2dict, synth2dict
 from .utils.cell_utils import calc_mp_spacing
+from .version import __version__
 # external libraries
 import pymongo as pm
 # standard library
-import subprocess
 from random import randint
 from collections import defaultdict
 import datetime
@@ -151,15 +151,11 @@ class Spatula:
             try:
                 cwd = getcwd()
                 chdir(dirname(realpath(__file__)))
-                report_dict['version'] = subprocess.check_output(["git",
-                                                                  "describe", "--tags"]).strip()
-                report_dict['git_hash'] = subprocess.check_output(["git", "rev-parse",
-                                                                   "--short", "HEAD"]).strip()
+                report_dict['version'] = __version__
                 chdir(cwd)
             except:
                 print('Failed to get CVS info.')
                 report_dict['version'] = 'unknown'
-                report_dict['git_hash'] = 'unknown'
             self.report.insert_one(report_dict)
 
     def struct2db(self, struct):

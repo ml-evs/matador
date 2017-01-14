@@ -11,6 +11,7 @@ from matador.hull import QueryConvexHull
 from matador.utils.cursor_utils import filter_cursor
 from matador.utils.print_utils import print_failure, print_warning, print_notify
 from matador.utils.cursor_utils import get_spg_uniq
+from matador.version import __version__
 # import external libraries
 import pymongo as pm
 # import standard library
@@ -18,11 +19,6 @@ import argparse
 from sys import argv
 from os import uname
 from os.path import isfile
-from pkg_resources import require
-try:
-    __version__ = require("matador")[0].version
-except:
-    from matador.version import __version__
 
 
 class Matador:
@@ -147,8 +143,8 @@ class Matador:
         """ Print spatula report on current database. """
         try:
             report = self.report.find_one()
-            print('Database last modified on', report['last_modified'], 'with spatula',
-                  report['version'], 'changeset (' + report['git_hash'] + ').')
+            print('Database last modified on', report['last_modified'], 'with matador',
+                  report['version'] + '.')
         except:
             print_warning('Failed to print database report: spatula is probably running!')
 

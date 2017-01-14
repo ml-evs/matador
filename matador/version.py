@@ -1,9 +1,7 @@
 from subprocess import check_output
+from matador.utils.print_utils import print_warning
 from os.path import realpath, dirname
 from os import getcwd, chdir
+from pkg_resources import require
 
-cwd = getcwd()
-chdir(dirname(realpath(__file__)))
-__version__ = str(check_output(["git", "describe", "--tags"])).strip()
-__version__ += '-' + str(check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"]))
-chdir(cwd)
+__version__ = require('matador')[0].version
