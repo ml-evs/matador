@@ -118,11 +118,18 @@ def res2dict(seed, db=True, verbosity=0, **kwargs):
                 gcd_val = gcd(res['stoichiometry'][atom], gcd_val)
         # convert stoichiometry to tuple for fryan
         temp_stoich = []
-        for key, value in res['stoichiometry'].iteritems():
-            if float(value)/gcd_val % 1 != 0:
-                temp_stoich.append([key, float(value)/gcd_val])
-            else:
-                temp_stoich.append([key, value/gcd_val])
+        try:
+            for key, value in res['stoichiometry'].items():
+                if float(value)/gcd_val % 1 != 0:
+                    temp_stoich.append([key, float(value)/gcd_val])
+                else:
+                    temp_stoich.append([key, value/gcd_val])
+        except AttributeError:
+            for key, value in res['stoichiometry'].iteritems():
+                if float(value)/gcd_val % 1 != 0:
+                    temp_stoich.append([key, float(value)/gcd_val])
+                else:
+                    temp_stoich.append([key, value/gcd_val])
         res['stoichiometry'] = temp_stoich
         atoms_per_fu = 0
         for elem in res['stoichiometry']:
