@@ -151,6 +151,7 @@ class DBQuery:
             self.empty_query = False
 
         if self.args.get('composition') is not None:
+            # self.query_dict['$and'].append(self.__query_composition_compactified())
             self.query_dict['$and'].append(self.query_composition())
             self.empty_query = False
 
@@ -588,6 +589,142 @@ class DBQuery:
                     types_dict = dict()
                     types_dict['atom_types'] = dict()
                     types_dict['atom_types']['$in'] = [elem]
+                query_dict['$and'].append(types_dict)
+        if not partial_formula and not self.args.get('intersection'):
+            size_dict = dict()
+            size_dict['stoichiometry'] = dict()
+            size_dict['stoichiometry']['$size'] = size
+            query_dict['$and'].append(size_dict)
+
+        return query_dict
+
+    def __query_composition_compactified(self, custom_elem=None, partial_formula=None):
+        """ Query DB for all structures containing
+        all the elements taken as input. Passing this
+        function a number is a deprecated feature, replaced
+        by query_num_species.
+        """
+        if custom_elem is None:
+            elements = list(self.args.get('composition'))
+        else:
+            elements = custom_elem
+        if partial_formula is None:
+            partial_formula = self.args.get('partial_formula')
+        non_binary = False
+        if ':' in elements[0]:
+            non_binary = True
+        # if there's only one string, try split it by caps
+        if not non_binary:
+            for char in elements[0]:
+                if char.isdigit():
+                    print_failure('Composition cannot contain a number.')
+                    exit()
+        try:
+            if len(elements) == 1:
+                valid = False
+                for char in elements[0]:
+                    if char.isupper():
+                        valid = True
+                if not valid:
+                    print_failure('Composition must contain at least one upper case character.')
+                    exit()
+                elements = [elem for elem in re.split(r'([A-Z][a-z]*)', elements[0]) if elem]
+                while '[' in elements or '][' in elements:
+                    tmp_stoich = list(elements)
+                    for ind, tmp in enumerate(tmp_stoich):
+                        if tmp == '][':
+                            del tmp_stoich[ind]
+                            tmp_stoich.insert(ind, '[')
+                            tmp_stoich.insert(ind, ']')
+                            break
+                    for ind, tmp in enumerate(tmp_stoich):
+                        if tmp == '[':
+                            end_bracket = False
+                            while not end_bracket:
+                                if tmp_stoich[ind+1] == ']':
+                                    end_bracket = True
+                                tmp_stoich[ind] += tmp_stoich[ind+1]
+                                del tmp_stoich[ind+1]
+                    try:
+                        tmp_stoich.remove(']')
+                    except:
+                        pass
+                    try:
+                        tmp_stoich.remove('')
+                    except:
+                        pass
+                    elements = tmp_stoich
+        except Exception:
+            print_exc()
+            exit()
+
+        if self.args.get('intersection'):
+            query_dict = dict()
+            query_dict['$or'] = []
+            size = len(elements)
+            # iterate over all combinations
+            for rlen in range(1, len(elements)+1):
+                for combi in combinations(elements, r=rlen):
+                    list_combi = list(combi)
+                    types_dict = dict()
+                    types_dict['$and'] = list()
+                    types_dict['$and'].append(dict())
+                    types_dict['$and'][-1]['stoichiometry'] = dict()
+                    types_dict['$and'][-1]['stoichiometry']['$size'] = len(list_combi)
+                    for elem in list_combi:
+                        types_dict['$and'].append(dict())
+                        types_dict['$and'][-1]['elems'] = dict()
+                        types_dict['$and'][-1]['elems']['$in'] = [elem]
+                    query_dict['$or'].append(types_dict)
+        elif non_binary:
+            query_dict = dict()
+            query_dict['$and'] = []
+            size = 0
+            for ind, elem in enumerate(elements):
+                if elem != ':' and not elem.isdigit():
+                    query_dict['$and'].append(self.query_composition(custom_elem=[elem], partial_formula=True))
+                    size += 1
+                if elem == ':':
+                    # convert e.g. MoS2 to [['MoS', 2]]
+                    # or LiMoS2 to [['LiMo', 1], ['MoS', '2], ['LiS', 2]]
+                    ratio_elements = elements[ind+1:]
+                    for ind in range(len(ratio_elements)):
+                        if ind < len(ratio_elements)-1:
+                            if not ratio_elements[ind].isdigit() and not ratio_elements[ind+1].isdigit():
+                                ratio_elements.insert(ind+1, '1')
+                    if not ratio_elements[-1].isdigit():
+                        ratio_elements.append('1')
+                    ratios = []
+                    for ind in range(0, len(ratio_elements), 2):
+                        for jind in range(ind, len(ratio_elements), 2):
+                            if ratio_elements[ind] != ratio_elements[jind]:
+                                ratios.append([ratio_elements[ind]+ratio_elements[jind],
+                                               round(float(ratio_elements[ind+1])/float(ratio_elements[jind+1]), 3)])
+                    query_dict['$and'].append(self.query_ratio(ratios))
+        else:
+            query_dict = dict()
+            query_dict['$and'] = []
+            size = len(elements)
+            for ind, elem in enumerate(elements):
+                # prototype for chemically motivated searches, e.g. transition metals
+                if '[' in elem or ']' in elem:
+                    types_dict = dict()
+                    types_dict['$or'] = list()
+                    elem = elem.strip('[').strip(']')
+                    if elem in self.periodic_table:
+                        for group_elem in self.periodic_table[elem]:
+                            types_dict['$or'].append(dict())
+                            types_dict['$or'][-1]['elems'] = dict()
+                            types_dict['$or'][-1]['elems']['$in'] = [group_elem]
+                    elif ',' in elem:
+                        for group_elem in elem.split(','):
+                            types_dict['$or'].append(dict())
+                            types_dict['$or'][-1]['elems'] = dict()
+                            types_dict['$or'][-1]['elems']['$in'] = [group_elem]
+                else:
+                    types_dict = dict()
+                    types_dict['elems'] = dict()
+                    types_dict['elems']['$in'] = [elem]
                 query_dict['$and'].append(types_dict)
         if not partial_formula and not self.args.get('intersection'):
             size_dict = dict()
