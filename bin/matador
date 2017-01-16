@@ -255,6 +255,8 @@ if __name__ == '__main__':
                               nargs='+')
     global_flags.add_argument('--debug', action='store_true',
                               help='enable debug printing throughout code.')
+    global_flags.add_argument('--devel', action='store_true',
+                              help='test devel code.')
 
     # define all other flags by group
     structure_flags = argparse.ArgumentParser(add_help=False)
