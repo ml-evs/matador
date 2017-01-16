@@ -125,7 +125,7 @@ def display_results(cursor, args=None, hull=False, markdown=False):
             struct_string[-1] += "{:^12}".format('xxx')
         struct_string[-1] += "{:^10}".format(formula_substring)
         try:
-            struct_string[-1] += "{:^8}".format(doc['num_fu'])
+            struct_string[-1] += "{:^8}".format(int(doc['num_fu']))
         except:
             struct_string[-1] += "{:^8}".format('xxx')
         try:
