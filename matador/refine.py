@@ -44,7 +44,7 @@ class Refiner:
                          'please use mode \'overwrite\'.')
             exit()
 
-        self.cursor = cursor
+        self.cursor = list(cursor)
         self.diff_cursor = []
         self.collection = collection
         self.mode = mode
@@ -70,7 +70,6 @@ class Refiner:
         elif task == 'tag':
             self.field = 'tags'
             self.tag = self.args.get('new_tag')
-            print(self.tag)
             if self.tag is None:
                 print_warning('No new tag defined, nothing will be done.')
             else:
@@ -82,18 +81,8 @@ class Refiner:
                 print_warning('No new DOI defined, nothing will be done.')
             else:
                 self.add_doi()
-        try:
-            self.cursor.close()
-        except Exception as oops:
-            if self.args.get('debug'):
-                print(repr(oops))
-            pass
-        try:
-            print(self.changed_count, '/', len(self.cursor), 'to be changed.')
-            print(self.failed_count, '/', len(self.cursor), 'failed.')
-        except:
-            print(self.changed_count, '/', self.cursor.count(), 'to be changed.')
-            print(self.failed_count, '/', self.cursor.count(), 'failed.')
+        print(self.changed_count, '/', len(self.cursor), 'to be changed.')
+        print(self.failed_count, '/', len(self.cursor), 'failed.')
 
         if self.mode in ['set', 'overwrite'] and self.changed_count > 0:
             self.update_docs()
@@ -195,7 +184,7 @@ class Refiner:
         """ Imbue documents with the set of elements,
         i.e. set(doc['atom_types']), for quicker look-up.
         """
-        for ind, doc in enumerate(self.cursor):
+        for doc in self.cursor:
             try:
                 doc['elems'] = list(set(doc['atom_types']))
                 self.diff_cursor.append(doc)

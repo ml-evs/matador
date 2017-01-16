@@ -227,8 +227,9 @@ class DBQuery:
                         print('Empty query, showing all...')
                     self.cursor = self.repo.find().sort('enthalpy_per_atom', pm.ASCENDING)
                     if self.top == -1:
-                        self.top = len(self.cursor)
-                    display_results(list(self.cursor[:self.top]), args=self.args)
+                        self.top = self.cursor.count()
+                    self.cursor = list(self.cursor)
+                    display_results(self.cursor[:self.top], args=self.args)
 
         # if no special query has been made already, begin executing the query
         if not self.empty_query:
