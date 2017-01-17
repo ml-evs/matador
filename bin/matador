@@ -32,6 +32,7 @@ class Matador:
         # read args
         self.kwargs = kwargs
         self.args = vars(args[0])
+        self.argstr = kwargs.get('argstr')
 
         # connect to MonoDB structure repository
         local = uname()[1]
@@ -61,10 +62,8 @@ class Matador:
 
         # print last spatula report
         self.report = self.client.crystals.spatula
-        self.print_report()
 
         if self.args.get('cell') or self.args.get('res') or self.args.get('pdb') or self.args.get('markdown'):
-            from matador.export import query2files
             self.export = True
         else:
             self.export = False
@@ -135,7 +134,8 @@ class Matador:
             self.cursor = [self.cursor[ind] for ind in uniq]
 
         if self.export and len(self.cursor) > 0:
-            query2files(self.cursor, self.args)
+            from matador.export import query2files
+            query2files(self.cursor, self.args, argstr=self.argstr)
 
         self.client.close()
 

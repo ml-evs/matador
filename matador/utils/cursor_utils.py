@@ -14,7 +14,7 @@ except:
 __version__ = __version__.strip()
 
 
-def display_results(cursor, args=None, hull=False, markdown=False):
+def display_results(cursor, args=None, argstr=None, hull=False, markdown=False):
     """ Print query results in a cryan-like fashion, optionally
     in a markdown format.
     """
@@ -28,27 +28,34 @@ def display_results(cursor, args=None, hull=False, markdown=False):
     formula_string = []
     last_formula = ''
     header_string = ''
+    units_string = ''
 
     if markdown:
-        markdown_string = ('Query generated with matador ' + __version__ +
-                           ' at ' + strftime("%I:%M%S") + ' on ' + strftime("%d/%m/%Y") + '\n\n')
+        markdown_string = ('Generation date: ' + strftime("%H:%M %d/%m/%Y") + '\n')
+        if argstr is not None:
+            markdown_string += ('Command: matador ' + ' '.join(argstr) + '\n')
+        markdown_string += ('Version:  ' + __version__ + '\n\n')
 
     if not markdown:
         header_string += "{:^24}".format('ID')
         header_string += "{:^5}".format('!?!')
     else:
         header_string += "{:^30}".format('Root')
+        units_string += "{:^30}".format('')
     header_string += "{:^12}".format('Pressure')
+    units_string += "{:^12}".format('(GPa)')
     if args.get('per_atom'):
         header_string += "{:^12}".format('Volume/atom')
     else:
         header_string += "{:^12}".format('Volume/fu')
+    units_string += "{:^12}".format('(Ang^3)')
     if hull:
         header_string += "{:^18}".format('Hull dist./atom')
     elif args.get('per_atom'):
         header_string += "{:^18}".format('Enthalpy/atom')
     else:
         header_string += "{:^18}".format('Enthalpy/fu')
+    units_string += "{:^18}".format('(eV)')
     header_string += "{:^12}".format('Space group')
     header_string += "{:^10}".format('Formula')
     header_string += "{:^8}".format('# fu')
@@ -211,7 +218,9 @@ def display_results(cursor, args=None, hull=False, markdown=False):
         print(header_string)
         print(len(header_string)*'─')
     else:
+        markdown_string += len(header_string)*'-' + '\n'
         markdown_string += header_string + '\n'
+        markdown_string += units_string + '\n'
         markdown_string += len(header_string)*'-' + '\n'
     if args.get('summary'):
         current_formula = ''

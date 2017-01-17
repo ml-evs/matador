@@ -16,7 +16,7 @@ from os import system, makedirs
 from traceback import print_exc
 
 
-def query2files(cursor, *args):
+def query2files(cursor, *args, **kwargs):
     """ Write either .res or .cell + .param files
     for all documents in a cursor.
     """
@@ -27,6 +27,7 @@ def query2files(cursor, *args):
     res = args.get('res')
     pdb = args.get('pdb')
     md = args.get('markdown')
+    argstr = kwargs.get('argstr')
     multiple_files = cell or param or res or pdb
     prefix = (args.get('prefix') + '-') if args.get('prefix') is not None else ''
     pressure = args.get('write_pressure')
@@ -130,7 +131,7 @@ def query2files(cursor, *args):
         md_path = path.split('/')[0] + '/' + path.split('/')[0] + '.md'
         print('Writing markdown file', md_path + '...')
         hull = True if args['subcmd'] in ['hull', 'voltage'] else False
-        md_string = display_results(cursor, args, markdown=True, hull=hull)
+        md_string = display_results(cursor, args, argstr=argstr, markdown=True, hull=hull)
         with open(md_path, 'w') as f:
             f.write(md_string)
 
