@@ -222,7 +222,7 @@ class Refiner:
         for ind, doc in enumerate(self.cursor):
             try:
                 if 'doi' in doc:
-                    raise Exception('DOI already exists in doc, will skip for now...')
+                    doc['doi'].append(self.doi)
                 else:
                     doc['doi'] = [self.doi]
                 self.diff_cursor.append(doc)

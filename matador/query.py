@@ -792,7 +792,7 @@ class DBQuery:
         doi = self.args.get('doi')
         temp_dict = dict()
         temp_dict['doi'] = dict()
-        temp_dict['doi']['$eq'] = doi
+        temp_dict['doi']['$in'] = [doi]
         query_dict['$and'].append(temp_dict)
 
         return query_dict
