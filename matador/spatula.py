@@ -173,6 +173,9 @@ class Spatula:
             # if any missing info at all, score = 0
             if 'species_pot' not in struct:
                 struct['quality'] = 0
+            # include elem set for faster querying
+            if 'elems' not in struct:
+                struct['elems'] = list(set(struct['atom_types']))
             else:
                 for elem in struct['stoichiometry']:
                     # remove all points for a missing pseudo
