@@ -745,7 +745,6 @@ class QueryConvexHull():
 
         if self.args.get('pathways'):
             for phase in stable:
-                print(phase)
                 if phase[0] == 0 and phase[1] != 0 and phase[2] != 0:
                     ax.plot([scale*phase, [scale, 0, 0]], c='r', alpha=0.2, lw=6, zorder=100000000)
 
