@@ -67,7 +67,7 @@ class BatchRun:
         else:
             self.nnodes = None
         try:
-            assert (self.nnodes >= 1 or self.nnodes is None)
+            assert (self.nnodes is None or self.nnodes >= 1)
             assert self.ncores >= 1
             assert self.nprocesses >= 1
         except(AssertionError):
@@ -168,7 +168,7 @@ class BatchRun:
         job_count = 0
         for res in res_list:
             running = False
-            with open(paths['jobs_fname'], 'rw') as job_file:
+            with open(paths['jobs_fname'], 'r') as job_file:
                 flines = job_file.readlines()
                 for line in flines:
                     if res in line:
@@ -269,7 +269,7 @@ class FullRelaxer:
             if 'geom_method' in calc_doc:
                 if calc_doc['geom_method'].lower() == 'tpsd':
                     rough_iter = 3
-            num_fine_iter = int(self.max_iter)/fine_iter
+            num_fine_iter = int(int(self.max_iter)/fine_iter)
             self.geom_max_iter_list = (self.num_rough_iter * [rough_iter])
             self.geom_max_iter_list.extend(num_fine_iter * [fine_iter])
             self.success = self.relax(calc_doc, self.seed)
