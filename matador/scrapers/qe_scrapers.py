@@ -4,6 +4,8 @@ Quantum Espresso-related inputs and outputs.
 """
 
 from __future__ import print_function
+# matador modules
+from ..utils.cell_utils import cart2abc
 # external libraries
 try:
     import bson.json_util as json
@@ -47,7 +49,7 @@ def pwout2dict(seed, db=True, **kwargs):
                 pwout['lattice_cart'] = []
                 for j in range(3):
                     line = flines[ind+j+1].strip().split()
-                    pwout['lattice_cart'].append(map(float, line))
+                    pwout['lattice_cart'].append(list(map(float, line)))
             elif 'atomic_positions' in line.lower() and 'positions_frac' not in pwout:
                 pwout['positions_frac'] = []
                 pwout['atom_types'] = []
@@ -56,19 +58,21 @@ def pwout2dict(seed, db=True, **kwargs):
                     while 'End final coordinates' not in flines[j+ind]:
                         line = flines[j+ind].strip().split()
                         pwout['atom_types'].append(line[0])
-                        pwout['positions_frac'].append(map(float, line[1:5]))
+                        pwout['positions_frac'].append(list(map(float, line[1:5])))
                         j += 1
                 else:
                     while True:
                         try:
                             line = flines[j+ind].strip().split()
                             pwout['atom_types'].append(line[0])
-                            pwout['positions_frac'].append(map(float, line[1:5]))
+                            pwout['positions_frac'].append(list(map(float, line[1:5])))
                             j += 1
                         except:
                             break
             elif 'lattice_cart' in pwout and 'positions_frac' in pwout:
                 break
+        # get abc lattice
+        pwout['lattice_abc'] = cart2abc(pwout['lattice_cart'])
         # calculate stoichiometry
         pwout['stoichiometry'] = defaultdict(float)
         for atom in pwout['atom_types']:
@@ -83,7 +87,7 @@ def pwout2dict(seed, db=True, **kwargs):
                 gcd_val = gcd(pwout['stoichiometry'][atom], gcd_val)
         # convert stoichiometry to tuple for fryan
         temp_stoich = []
-        for key, value in pwout['stoichiometry'].iteritems():
+        for key, value in pwout['stoichiometry'].items():
             if float(value)/gcd_val % 1 != 0:
                 temp_stoich.append([key, float(value)/gcd_val])
             else:

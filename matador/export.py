@@ -419,6 +419,8 @@ def doc2res(doc, path, info=True, hash_dupe=True, *args):
             f.write('\n')
             f.write('CELL ')
             f.write('1.0 ')
+            if len(doc['lattice_abc']) != 2 and len(doc['lattice_abc'][0] != 3) and len(doc['lattice_abc'][1] != 3):
+                raise RuntimeError('Failed to get lattice, something has gone wrong...')
             for vec in doc['lattice_abc']:
                 for coeff in vec:
                     f.write(' ' + str(round(coeff, 8)))
