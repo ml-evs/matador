@@ -249,7 +249,7 @@ class DBQuery:
                 # if called as script, always print results
                 if self.args.get('id') is None:
                     print(cursor_count, 'results found for query in', collection+'.')
-                if self.args.get('subcmd') != 'hull' and self.args.get('subcmd') != 'voltage':
+                if self.args.get('subcmd') != 'hull' and self.args.get('subcmd') != 'voltage' and self.args.get('subcmd') != 'swaps':
                     if cursor_count >= 1:
                         if self.top == -1:
                             self.top = cursor_count

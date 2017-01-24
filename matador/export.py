@@ -105,15 +105,24 @@ def query2files(cursor, *args, **kwargs):
                 name += source.split('/')[-1].split('.')[0]
             elif 'OQMD' in source:
                 stoich_string = ''
-                # prepend new stoich
+                # prepend old stoich
                 if len(doc['stoichiometry']) == 1:
                     stoich_string += doc['stoichiometry'][0][0]
                 else:
                     for atom in doc['stoichiometry']:
                         stoich_string += atom[0]
                         stoich_string += str(atom[1]) if atom[1] != 1 else ''
-                # grab OQMD entry_id
                 name = stoich_string + '-OQMD_' + source.split(' ')[-1]
+                # if swaps, prepend new composition
+                if args['subcmd'] == 'swaps':
+                    comp_string = ''
+                    comp_list = []
+                    for atom in doc['atom_types']:
+                        if atom not in comp_list:
+                            comp_list.append(atom)
+                            comp_string += atom
+                    name = comp_string + '-' + name
+                # grab OQMD entry_id
                 if 'icsd' in doc and 'CollCode' not in source:
                     name += '-CollCode' + doc['icsd']
         path += name
