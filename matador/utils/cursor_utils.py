@@ -346,7 +346,7 @@ def get_spg_uniq(cursor, symprec=1e-2, latvecprec=1e-3, posprec=1e-3):
     shift_list = []
     for i in range(len(spg_cursor)):
         for j in range(i+1, len(spg_cursor)):
-            if cursor[i]['stoichiometry'] == cursor[j]['stoichiometry']:
+            if sorted(cursor[i]['stoichiometry']) == sorted(cursor[j]['stoichiometry']):
                 if np.allclose(refined_list[i][0], refined_list[j][0], atol=latvecprec, rtol=0):
                     if np.allclose(refined_list[i][1], refined_list[j][1], atol=posprec, rtol=0):
                         same_list.append((i, j))
