@@ -5,8 +5,7 @@ from matador.utils.chem_utils import get_generic_grav_capacity
 
 
 class CapacityTest(unittest.TestCase):
-    """ Test capacity functions. """
-    def test(self):
+    def testGravimetricCapacity(self):
         test_docs = []
         test_elements = []
         Q = []

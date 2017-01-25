@@ -210,11 +210,14 @@ class Polisher:
             for new_atom in swap_pair[1]:
                 for swap_atom in swap_pair[0]:
                     if new_atom != swap_atom:
-                        if swap_atom in new_doc['atom_types']:
+                        if swap_atom in doc['atom_types']:
                             for ind, source_atom in enumerate(doc['atom_types']):
                                 if source_atom == swap_atom:
                                     new_doc['atom_types'][ind] = new_atom
                                     swapped = True
                 if swapped:
-                    swapped_docs.append(new_doc)
+                    swapped_doc = deepcopy(new_doc)
+                    if self.args.get('debug'):
+                        print(swapped_doc['atom_types'])
+                    swapped_docs.append(swapped_doc)
         return swapped_docs, len(swapped_docs)

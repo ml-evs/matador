@@ -1,14 +1,18 @@
 #!/usr/bin/env python
 import unittest
-from scrapers.castep_scrapers import castep2dict, res2dict, param2dict, cell2dict
-from utils.print_utils import print_warning
+from matador.scrapers.castep_scrapers import castep2dict, cell2dict
+from matador.utils.print_utils import print_warning
 from traceback import print_exc
+from os.path import realpath
+
+# grab abs path for accessing test data
+REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
 
 
 class ScrapeTest(unittest.TestCase):
     """ Test scraper functions. """
-    def test_cell(self):
-        cell_fname = 'data/LiP2Zn-0bm995-a_9-out.cell'
+    def testCellScraper(self):
+        cell_fname = REAL_PATH + 'data/LiP2Zn-0bm995-a_9-out.cell'
         failed_open = False
         failed = False
         try:
@@ -65,10 +69,8 @@ class ScrapeTest(unittest.TestCase):
             if failed:
                 raise(AssertionError, 'Cell test failed!')
 
-    def test_castep(self):
-
-        castep_fname = 'data/Na3Zn4-OQMD_759599.castep'
-
+    def testCastep(self):
+        castep_fname = REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep'
         failed_open = False
         failed = False
         try:
