@@ -27,6 +27,9 @@ class Polisher:
         and arguments.
         """
         self.args = args[0]
+        if self.args.get('debug'):
+            print('Args for Polisher:')
+            print(args[0])
 
         # define some swap macros
         self.periodic_table = get_periodic_table()
@@ -132,29 +135,31 @@ class Polisher:
         doc.update(self.param_dict)
         return doc
 
-    def parse_swaps(self):
+    def parse_swaps(self, swap_args=None):
         """ Parse command line options into valid
         atomic species swaps.
         e.g. --swap Li,As |--> ['Li', 'As']
         """
         self.swap_pairs = []
+        if swap_args is None:
+            swap_args = self.args.get('swap')
 
         # split by comma to get pairs of swaps
         if self.args.get('debug'):
-            print(self.args.get('swap'))
-        if len(self.args.get('swap')) > 1:
+            print('Swap arguments:', swap_args)
+        if len(swap_args) > 1:
             print_failure('Detected whitespace in your input, ' +
                           'clear it and try again.')
             exit()
-        swap_list = self.args.get('swap')[0].split(':')
+        swap_list = swap_args[0].split(':')
         if self.args.get('debug'):
-            print(swap_list)
+            print('Swap list:', swap_list)
         for swap in swap_list:
             if len(swap) <= 1:
                 exit('Not enough arguments for swap!')
             tmp_list = re.split(r'([A-Z][a-z]*)', swap)
             if self.args.get('debug'):
-                print(tmp_list)
+                print('Split swap:', tmp_list)
             # scrub square brackets
             for ind, tmp in enumerate(tmp_list):
                 if tmp == '[':
@@ -168,7 +173,7 @@ class Polisher:
                 tmp_list.remove('')
             swap_test = tmp_list
             if self.args.get('debug'):
-                print(tmp_list)
+                print('Final swap_list:', tmp_list)
 
             # parse list of elements or group
             for ind, atom in enumerate(tmp_list):
@@ -186,7 +191,7 @@ class Polisher:
                     swap_test[ind] = [atom]
             self.swap_pairs.append(swap_test)
             if self.args.get('debug'):
-                print(self.swap_pairs)
+                print('Swap pairs:', self.swap_pairs)
         for pair in self.swap_pairs:
             print_notify('Swapping all ' + str(pair[0]) + ' for ' + str(pair[1]))
 
@@ -202,20 +207,14 @@ class Polisher:
         for swap_pair in self.swap_pairs:
             if self.args.get('debug'):
                 print(swap_pair)
-            # for each atom to be swapped
-            for swap_atom in swap_pair[0]:
-                # if structure contains an atom to be swapped
-                if swap_atom in new_doc['atom_types']:
-                    # iterate over new atoms and swap
-                    for new_atom in swap_pair[1]:
-                        # don't swap structure to itself
-                        if new_atom != swap_atom:
-                            # iterate over structure and swap all to new atom
-                            for ind, source_atom in enumerate(new_doc['atom_types']):
+            for new_atom in swap_pair[1]:
+                for swap_atom in swap_pair[0]:
+                    if new_atom != swap_atom:
+                        if swap_atom in new_doc['atom_types']:
+                            for ind, source_atom in enumerate(doc['atom_types']):
                                 if source_atom == swap_atom:
                                     new_doc['atom_types'][ind] = new_atom
                                     swapped = True
-        if swapped:
-            # add to list of all structures post-swapping
-            swapped_docs.append(new_doc)
+                if swapped:
+                    swapped_docs.append(new_doc)
         return swapped_docs, len(swapped_docs)
