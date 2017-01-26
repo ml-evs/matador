@@ -99,6 +99,7 @@ def frac2cart(lattice_cart, positions_frac):
     positions_frac = np.asarray(positions_frac)
     lattice_cart = np.asarray(lattice_cart)
     positions_abs = np.zeros_like(positions_frac)
+    assert(len(lattice_cart) == 3)
     for i in range(len(positions_frac)):
         for j in range(3):
             positions_abs[i] += lattice_cart[j]*positions_frac[i][j]
