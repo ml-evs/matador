@@ -9,5 +9,5 @@ pipelines:
   default:
     - step:
         script: # Modify the commands below to build your repository.
-          - pip install -U matador
+          - pip install .
           - python setup.py test
