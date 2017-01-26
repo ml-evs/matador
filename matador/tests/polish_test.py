@@ -8,9 +8,9 @@ import os
 
 class SwapTest(unittest.TestCase):
     """ Test atomic swap functions. """
-    def testOneToManySwap(self):
+    def testSingleSimpleSwap(self):
         # spoof Polisher __init__
-        swap_args = {'swap': ['As[P,Sb,Zn,Cu]'], 'debug': False}
+        swap_args = {'swap': ['AsP'], 'debug': True}
         bare_polish = Polisher.__new__(Polisher)
         bare_polish.periodic_table = get_periodic_table()
         bare_polish.args = swap_args
@@ -18,6 +18,42 @@ class SwapTest(unittest.TestCase):
         with open(os.devnull, 'w') as sys.stdout:
             bare_polish.parse_swaps()
         sys.stdout = sys.__stdout__
+        self.assertEqual(bare_polish.swap_pairs, [[['As'], ['P']]])
+        # set up test data for real swap
+        doc = dict()
+        doc['atom_types'] = ['Li', 'Li', 'As', 'As']
+        swapped_docs, num_swapped = bare_polish.atomic_swaps(doc)
+        self.assertEqual(num_swapped, 1)
+        self.assertEqual(swapped_docs[0]['atom_types'], ['Li', 'Li', 'P', 'P'])
+
+    def testMultipleSimpleSwap(self):
+        # spoof Polisher __init__
+        swap_args = {'swap': ['AsP:LiNa'], 'debug': True}
+        bare_polish = Polisher.__new__(Polisher)
+        bare_polish.periodic_table = get_periodic_table()
+        bare_polish.args = swap_args
+        # try to parse swaps
+        with open(os.devnull, 'w') as sys.stdout:
+            bare_polish.parse_swaps()
+        sys.stdout = sys.__stdout__
+        self.assertEqual(bare_polish.swap_pairs, [[['As'], ['P']], [['Li'], ['Na']]])
+        # set up test data for real swap
+        doc = dict()
+        doc['atom_types'] = ['Li', 'Li', 'As', 'As']
+        swapped_docs, num_swapped = bare_polish.atomic_swaps(doc)
+        self.assertEqual(num_swapped, 1)
+        self.assertEqual(swapped_docs[0]['atom_types'], ['Na', 'Na', 'P', 'P'])
+
+    def testOneToManySwap(self):
+        # spoof Polisher __init__
+        swap_args = {'swap': ['As[P,Sb,Zn,Cu]'], 'debug': True}
+        bare_polish = Polisher.__new__(Polisher)
+        bare_polish.periodic_table = get_periodic_table()
+        bare_polish.args = swap_args
+        # try to parse swaps
+        # with open(os.devnull, 'w') as sys.stdout:
+        bare_polish.parse_swaps()
+        # sys.stdout = sys.__stdout__
         self.assertEqual(bare_polish.swap_pairs, [[['As'], ['P', 'Sb', 'Zn', 'Cu']]])
         # set up test data for real swap
         doc = dict()
@@ -51,8 +87,19 @@ class SwapTest(unittest.TestCase):
         self.assertTrue(Zn_found)
         self.assertTrue(Cu_found)
 
+    def testMistakenMacro(self):
+        swap_args = {'swap': ['VP'], 'debug': True}
+        bare_polish = Polisher.__new__(Polisher)
+        bare_polish.periodic_table = get_periodic_table()
+        bare_polish.args = swap_args
+        # try to parse swaps
+        with open(os.devnull, 'w') as sys.stdout:
+            bare_polish.parse_swaps()
+        sys.stdout = sys.__stdout__
+        self.assertEqual(bare_polish.swap_pairs, [[['V'], ['P']]])
+
     def testManyToOneMacroSwap(self):
-        swap_args = {'swap': ['[V]P'], 'debug': False}
+        swap_args = {'swap': ['[V]P'], 'debug': True}
         bare_polish = Polisher.__new__(Polisher)
         bare_polish.periodic_table = get_periodic_table()
         bare_polish.args = swap_args
@@ -67,6 +114,61 @@ class SwapTest(unittest.TestCase):
         swapped_docs, num_swapped = bare_polish.atomic_swaps(doc)
         self.assertEqual(num_swapped, 1)
         self.assertEqual(swapped_docs[0]['atom_types'], ['P', 'P', 'P', 'P'])
+
+    def testManyToManyMacroSwap(self):
+        swap_args = {'swap': ['[V][Tc,Mo]'], 'debug': True}
+        bare_polish = Polisher.__new__(Polisher)
+        bare_polish.periodic_table = get_periodic_table()
+        bare_polish.args = swap_args
+        # try to parse swaps
+        with open(os.devnull, 'w') as sys.stdout:
+            bare_polish.parse_swaps()
+        sys.stdout = sys.__stdout__
+        # set up test data for real swap
+        doc = dict()
+        doc['atom_types'] = ['P', 'Sb', 'As', 'As', 'Bi']
+        self.assertEqual(bare_polish.swap_pairs, [[['N', 'P', 'As', 'Sb', 'Bi'], ['Tc', 'Mo']]])
+        swapped_docs, num_swapped = bare_polish.atomic_swaps(doc)
+        self.assertEqual(num_swapped, 2)
+        self.assertEqual(swapped_docs[0]['atom_types'], ['Tc', 'Tc', 'Tc', 'Tc', 'Tc'])
+        self.assertEqual(swapped_docs[1]['atom_types'], ['Mo', 'Mo', 'Mo', 'Mo', 'Mo'])
+
+    def testMultipleManyToOneSwap(self):
+        # spoof Polisher __init__
+        swap_args = {'swap': ['[Li,Na]K:[Ru, Rh]La'], 'debug': True}
+        bare_polish = Polisher.__new__(Polisher)
+        bare_polish.periodic_table = get_periodic_table()
+        bare_polish.args = swap_args
+        # try to parse swaps
+        with open(os.devnull, 'w') as sys.stdout:
+            bare_polish.parse_swaps()
+        sys.stdout = sys.__stdout__
+        self.assertEqual(bare_polish.swap_pairs, [[['Li', 'Na'], ['K']], [['Ru', 'Rh'], ['La']]])
+        # set up test data for real swap
+        doc = dict()
+        doc['atom_types'] = ['Li', 'Na', 'Ru', 'Rh']
+        swapped_docs, num_swapped = bare_polish.atomic_swaps(doc)
+        self.assertEqual(num_swapped, 1)
+        self.assertEqual(swapped_docs[0]['atom_types'], ['K', 'K', 'La', 'La'])
+
+    def testMultipleManyToManySwapsWithProblematicElementNames(self):
+        # spoof Polisher __init__
+        swap_args = {'swap': ['[Li,Na]K:[V,I][I]'], 'debug': True}
+        bare_polish = Polisher.__new__(Polisher)
+        bare_polish.periodic_table = get_periodic_table()
+        bare_polish.args = swap_args
+        # try to parse swaps
+        with open(os.devnull, 'w') as sys.stdout:
+            bare_polish.parse_swaps()
+        sys.stdout = sys.__stdout__
+        self.assertEqual(bare_polish.swap_pairs, [[['Li', 'Na'], ['K']], [['V', 'I'], ['Li', 'Na', 'K', 'Rb', 'Cs', 'Fr']]])
+        # set up test data for real swap
+        doc = dict()
+        doc['atom_types'] = ['Li', 'Na', 'V', 'I']
+        swapped_docs, num_swapped = bare_polish.atomic_swaps(doc)
+        self.assertEqual(num_swapped, 6)
+        self.assertEqual(swapped_docs[0]['atom_types'], ['K', 'K', 'Li', 'Li'])
+        self.assertEqual(swapped_docs[5]['atom_types'], ['K', 'K', 'Fr', 'Fr'])
 
 if __name__ == '__main__':
     unittest.main()

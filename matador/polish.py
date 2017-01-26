@@ -9,7 +9,7 @@ from __future__ import print_function
 # matador modules
 from .scrapers.castep_scrapers import cell2dict
 from .scrapers.castep_scrapers import param2dict
-from .utils.print_utils import print_notify, print_success, print_warning, print_failure
+from .utils.print_utils import print_success, print_warning, print_failure
 from .utils.chem_utils import get_periodic_table
 # standard library
 from traceback import print_exc
@@ -27,10 +27,6 @@ class Polisher:
         and arguments.
         """
         self.args = args[0]
-        if self.args.get('debug'):
-            print('Args for Polisher:')
-            print(args[0])
-
         # define some swap macros
         self.periodic_table = get_periodic_table()
         del self.periodic_table['X']
@@ -138,62 +134,73 @@ class Polisher:
     def parse_swaps(self, swap_args=None):
         """ Parse command line options into valid
         atomic species swaps.
-        e.g. --swap Li,As |--> ['Li', 'As']
+
+        e.g. --swap LiP:NaAs
+
+            ==> [[['Li'], ['P']], [['Na'], ['P']].
+
+        Handles multiple many-to-many swaps, macros for
+        groups of the periodic table, and wildcards.
         """
+
         self.swap_pairs = []
         if swap_args is None:
             swap_args = self.args.get('swap')
-
-        # split by comma to get pairs of swaps
-        if self.args.get('debug'):
-            print('Swap arguments:', swap_args)
         if len(swap_args) > 1:
             print_failure('Detected whitespace in your input, ' +
                           'clear it and try again.')
             exit()
         swap_list = swap_args[0].split(':')
-        if self.args.get('debug'):
-            print('Swap list:', swap_list)
         for swap in swap_list:
             if len(swap) <= 1:
                 exit('Not enough arguments for swap!')
-            tmp_list = re.split(r'([A-Z][a-z]*)', swap)
-            if self.args.get('debug'):
-                print('Split swap:', tmp_list)
-            # scrub square brackets
+            # check is both options are groups
+            if '][' in swap:
+                tmp_list = [x for x in swap.split('][') if x is not '']
+            # check if only first option is group
+            elif swap[0] is '[':
+                tmp_list = [x for x in swap.split(']') if x is not '']
+            # check if only last option is group
+            elif swap[-1] is ']':
+                tmp_list = [x for x in swap.split('[') if x is not '']
+            # check if no groups
+            else:
+                tmp_list = [x for x in re.split(r'([A-Z][a-z]*)', swap) if x is not '']
             for ind, tmp in enumerate(tmp_list):
-                if tmp == '[':
-                    while tmp_list[ind+1] != ']':
-                        tmp_list[ind] += tmp_list[ind+1]
-                        del tmp_list[ind+1]
-                    tmp_list[ind] += ']'
-            while ']' in tmp_list:
-                tmp_list.remove(']')
-            while '' in tmp_list:
-                tmp_list.remove('')
-            swap_test = tmp_list
-            if self.args.get('debug'):
-                print('Final swap_list:', tmp_list)
+                tmp_list[ind] = self._atoms_to_list(tmp)
+            assert(len(tmp_list) == 2)
+            self.swap_pairs.append(tmp_list)
+            self.construct_swap_options()
 
-            # parse list of elements or group
-            for ind, atom in enumerate(tmp_list):
-                if '[' in atom:
-                    group = atom.strip(']').strip('[')
-                    if group == 'X':
-                        print_failure('Cannot swap from macro [X], please reconsider...')
-                        exit()
-                    if group in self.periodic_table:
-                        atoms = self.periodic_table[group]
-                    else:
-                        atoms = group.split(',')
-                    swap_test[ind] = atoms
-                else:
-                    swap_test[ind] = [atom]
-            self.swap_pairs.append(swap_test)
-            if self.args.get('debug'):
-                print('Swap pairs:', self.swap_pairs)
-        for pair in self.swap_pairs:
-            print_notify('Swapping all ' + str(pair[0]) + ' for ' + str(pair[1]))
+    def _atoms_to_list(self, atom_string):
+        """ For a given set of atoms in a string,
+        parse any macros and return a list of options.
+
+        e.g. '[V' -> [<all group V atoms>],
+        and 'V' -> ['V'].
+        """
+        if '[' in atom_string or ']' in atom_string:
+            group = atom_string.replace('[', '')
+            group = group.replace(']', '')
+            if group in self.periodic_table:
+                atom_list = self.periodic_table[group]
+            else:
+                atom_list = group.split(',')
+        else:
+            return [atom_string]
+        return [x.strip() for x in atom_list]
+
+    def construct_swap_options(self):
+        """ Iterate over possible combinations of multiple
+        many-to-many swaps and create a dict for each swap.
+        """
+        from itertools import product
+        self.swap_dict_list = []
+        for branch in product(*([pair[1] for pair in self.swap_pairs])):
+            self.swap_dict_list.append(dict())
+            for ind, pair in enumerate(self.swap_pairs):
+                for swap_from in pair[0]:
+                    self.swap_dict_list[-1][swap_from] = branch[ind]
 
     def atomic_swaps(self, source_doc):
         """ Swap atomic species according to parsed
@@ -203,21 +210,12 @@ class Polisher:
         new_doc = deepcopy(doc)
         swapped_docs = []
         swapped = False
-        # iterate over sets of swaps
-        for swap_pair in self.swap_pairs:
-            if self.args.get('debug'):
-                print(swap_pair)
-            for new_atom in swap_pair[1]:
-                for swap_atom in swap_pair[0]:
-                    if new_atom != swap_atom:
-                        if swap_atom in doc['atom_types']:
-                            for ind, source_atom in enumerate(doc['atom_types']):
-                                if source_atom == swap_atom:
-                                    new_doc['atom_types'][ind] = new_atom
-                                    swapped = True
-                if swapped:
-                    swapped_doc = deepcopy(new_doc)
-                    if self.args.get('debug'):
-                        print(swapped_doc['atom_types'])
-                    swapped_docs.append(swapped_doc)
+        for swap in self.swap_dict_list:
+            for ind, source_atom in enumerate(doc['atom_types']):
+                if source_atom in swap:
+                    new_doc['atom_types'][ind] = swap[source_atom]
+                    swapped = True
+            if swapped:
+                swapped_doc = deepcopy(new_doc)
+                swapped_docs.append(swapped_doc)
         return swapped_docs, len(swapped_docs)
