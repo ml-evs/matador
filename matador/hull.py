@@ -79,12 +79,12 @@ class QueryConvexHull(object):
                 # self.voltage_curve()
                 # self.metastable_voltage_profile()
             else:
-                self.voltage_curve()
+                self.voltage_curve(self.hull_cursor)
                 if self.args.get('subplot'):
                     self.subplot_voltage_hull()
                 else:
                     self.plot_voltage_curve()
-                self.plot_2d_hull()
+                self.plot_hull()
         elif self.args.get('volume'):
             self.volume_curve()
 
@@ -398,30 +398,102 @@ class QueryConvexHull(object):
             print_exc()
             pass
 
-    def voltage_curve(self):
+    def voltage_curve(self, hull_cursor):
         """ Take convex hull and calculate voltages. """
-        print('Generating voltage curve...')
-        mu_enthalpy = get_array_from_cursor(self.match, 'enthalpy_per_atom')
-        x = get_num_intercalated(self.hull_cursor)
-        # sort for voltage calculation
-        # Q = get_binary_grav_capacities(x, get_molar_mass(self.elements[1]))
-        Q = get_array_from_cursor(self.hull_cursor, 'gravimetric_capacity')
-        Q = Q[np.argsort(x)]
-        stable_enthalpy_per_b = get_array_from_cursor(self.hull_cursor, 'enthalpy_per_b')[np.argsort(x)]
-        x = np.sort(x)
-        x, uniq_idxs = np.unique(x, return_index=True)
-        stable_enthalpy_per_b = stable_enthalpy_per_b[uniq_idxs]
-        Q = Q[uniq_idxs]
-        V = []
-        for i in range(len(x)):
-            V.append(-(stable_enthalpy_per_b[i] - stable_enthalpy_per_b[i-1]) /
-                      (x[i] - x[i-1]) +
-                      (mu_enthalpy[0]))
-        V[0] = V[1]
-        # make V, Q and x available for plotting
-        self.voltages = V
-        self.Q = Q
-        self.x = x
+        if not self.ternary:
+            print('Generating voltage curve...')
+            mu_enthalpy = get_array_from_cursor(self.match, 'enthalpy_per_atom')
+            x = get_num_intercalated(hull_cursor)
+            # sort for voltage calculation
+            Q = get_array_from_cursor(hull_cursor, 'gravimetric_capacity')
+            Q = Q[np.argsort(x)]
+            stable_enthalpy_per_b = get_array_from_cursor(hull_cursor, 'enthalpy_per_b')[np.argsort(x)]
+            x = np.sort(x)
+            x, uniq_idxs = np.unique(x, return_index=True)
+            stable_enthalpy_per_b = stable_enthalpy_per_b[uniq_idxs]
+            Q = Q[uniq_idxs]
+            V = []
+            for i in range(len(x)):
+                V.append(-(stable_enthalpy_per_b[i] - stable_enthalpy_per_b[i-1]) /
+                          (x[i] - x[i-1]) +
+                          (mu_enthalpy[0]))
+            V[0] = V[1]
+            # make V, Q and x available for plotting
+            self.voltages = V
+            self.Q = Q
+            self.x = x
+        elif self.ternary:
+            """ Written by James Darby, jpd47@cam.ac.uk. """
+            # points = self.hull_cursor
+            points = np.hstack((get_array_from_cursor(hull_cursor, 'concentration'),
+                                get_array_from_cursor(hull_cursor, 'enthalpy_per_atom').reshape(len(hull_cursor), 1)))
+            mu_enthalpy = get_array_from_cursor(self.match, 'enthalpy_per_atom')
+            Q = get_array_from_cursor(hull_cursor, 'gravimetric_capacity')
+            enthalpy_active_ion = mu_enthalpy[0]
+
+            hull = ConvexHull(points)
+
+            for ind, point in enumerate(points):
+                if point[0] == 0 and point[1] != 0:
+                    endpoint = point
+                    break
+            y0 = endpoint[1] / (1 - endpoint[0])
+            simp_in = 0
+            intersections = []
+            for simplex in hull.simplices:
+                tints = []
+                for i in range (0,3):
+                    j = (i+1)%3
+
+                    e = points[simplex[i], 0]
+                    f = points[simplex[i], 1]
+                    g = points[simplex[j], 0] - points[simplex[i],0]
+                    h = points[simplex[j], 1] - points[simplex[i],1]
+
+                    if h + g*y0 !=0:
+                        tin = (e*h + g*y0 - f*g)/(h + g*y0)
+                        s2 = (y0 - e*y0 -f)/(h + g*y0)
+
+                        if tin >=0 and tin <=1 and s2 >=0 and s2 <=1:
+                            tints = np.append(tints, tin)
+
+                if len(tints) != 0:
+                    temp = [simp_in,  np.amin(tints), np.amax(tints)]
+                    dif = temp[2] - temp[1]
+                    #condition removes the big triangle and the points which only graze the line of interest
+                    if temp[2] > 0 and temp[1] < 1 and temp[2] - temp[1] > 0:
+                      intersections = np.append(intersections, temp)
+                simp_in = simp_in + 1
+
+            intersections = intersections.reshape(-1,3)
+            #dodgym remove first row as corresponds to big triangle
+            intersections = np.delete(intersections, (0), axis=0)
+            intersections = intersections[intersections[:,1].argsort()]
+            #store energies of formation in a column vector, one for each triangle to be used
+
+            int_in = intersections.astype(int)
+
+            Vpoints = []
+            voltages = []
+            for face in intersections:
+                fn=face[0].astype(int)
+                Evec = points[hull.simplices[fn],2]
+                Comp = points[hull.simplices[fn],:]
+                Comp[:,2] = 1 - Comp[:,0] - Comp[:,1] #modify so that comp is now elemental composition
+
+                Comp = Comp.T
+                Compinv =  np.linalg.inv(Comp)
+                X = [1,0,0] #ion in elemental basis
+                V = -(Compinv.dot(X)).dot(Evec)
+                V = V + enthalpy_active_ion
+                for i in range(0,2):
+                    Vpoints = np.append(Vpoints, [face[i+1], V])
+                    voltages.append(V)
+
+            self.Vpoints = Vpoints.reshape(-1,2)
+            self.Q = np.sort(Q)
+            self.voltages = voltages
+
         return
 
     def volume_curve(self):
@@ -687,6 +759,14 @@ class QueryConvexHull(object):
         ax.view_init(-90, 90)
         plt.show()
 
+    def plot_hull(self):
+        """ Hull plot helper function. """
+        if self.ternary:
+            self.plot_ternary_hull()
+        else:
+            self.plot_2d_hull()
+        return
+
     def plot_ternary_hull(self):
         """ Plot calculated ternary hull as a 2D projection. """
         import ternary
@@ -837,19 +917,19 @@ class QueryConvexHull(object):
                      lw=2, c=self.colours[0])
             axQ.plot([self.Q[i], self.Q[i]], [self.voltages[i], self.voltages[i+1]],
                      lw=2, c=self.colours[0])
-        for i in range(len(self.x)):
-            if self.x[i] < 1e9:
-                string_stoich = ''
-                if abs(np.ceil(self.x[i])-self.x[i]) > 1e-8:
-                    string_stoich = str(round(self.x[i], 1))
-                else:
-                    string_stoich = str(int(np.ceil(self.x[i])))
-                if string_stoich is '1':
-                    string_stoich = ''
-                if string_stoich is '0':
-                    string_stoich = ''
-                else:
-                    string_stoich = self.elements[0] + '$_{' + string_stoich + '}$' + self.elements[1]
+        # for i in range(len(self.x)):
+            # if self.x[i] < 1e9:
+                # string_stoich = ''
+                # if abs(np.ceil(self.x[i])-self.x[i]) > 1e-8:
+                    # string_stoich = str(round(self.x[i], 1))
+                # else:
+                    # string_stoich = str(int(np.ceil(self.x[i])))
+                # if string_stoich is '1':
+                    # string_stoich = ''
+                # if string_stoich is '0':
+                    # string_stoich = ''
+                # else:
+                    # string_stoich = self.elements[0] + '$_{' + string_stoich + '}$' + self.elements[1]
                 # axQ.annotate(string_stoich,
                              # xy=(self.Q[i], self.voltages[i]+0.001),
                              # textcoords='data',
