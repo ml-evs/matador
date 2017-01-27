@@ -22,8 +22,8 @@ try:
     from math import gcd
 except ImportError:
     from fractions import gcd
-    print_warning('Use of fractions.gcd is deprecated - \
-                   Python3 is recommended but will try to proceed.')
+    print_warning('Use of fractions.gcd is deprecated - '\
+                   'Python3 is recommended but will try to proceed.')
 from sys import exit
 
 
