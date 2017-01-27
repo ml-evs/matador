@@ -23,7 +23,7 @@ from traceback import print_exc
 from copy import deepcopy
 
 
-class Spatula:
+class Spatula(object):
     """ The Spatula class implements methods to scrape folders
     and individual files for crystal structures and create a
     MongoDB document for each.

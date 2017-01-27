@@ -27,7 +27,7 @@ except ImportError:
 from sys import exit
 
 
-class DBQuery:
+class DBQuery(object):
     """ Class that implements queries to MongoDB
     structure database.
     """

@@ -26,7 +26,7 @@ from sys import exit
 import re
 
 
-class QueryConvexHull():
+class QueryConvexHull(object):
     """ Implements a Convex Hull for formation energies
     from a fryan DBQuery.
     """

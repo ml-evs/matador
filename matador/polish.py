@@ -17,7 +17,7 @@ from copy import deepcopy
 import re
 
 
-class Polisher:
+class Polisher(object):
     """ This class handles the creation of
     input files from database queries that have
     a new level of accuracy.

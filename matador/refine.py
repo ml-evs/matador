@@ -14,7 +14,7 @@ from sys import exit
 from traceback import print_exc
 
 
-class Refiner:
+class Refiner(object):
     """ Refiner implements methods to alter certain parts of the
     database in place, either in overwrite, set or compare/display mode.
     Current modifiables are space groups, substructures, atomic ratios,

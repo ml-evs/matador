@@ -1,6 +1,13 @@
 # coding: utf-8
 """ This file defines various measures and ways of calculating
 the similarity between two structures.
+
+TO-DO:
+    * standardize overlap integrals
+    * otf calculation of required num_images
+    * non-diagonal supercells
+    * generic wrapper for a cursor to be screened
+
 """
 
 # matador modules
@@ -11,7 +18,7 @@ import numpy as np
 from itertools import product, combinations_with_replacement
 
 
-class PDF:
+class PDF(object):
     """ This class implements the calculation and comparison of pair
     distribution functions.
     """
@@ -93,7 +100,7 @@ class PDF:
         return
 
 
-class PDFOverlap:
+class PDFOverlap(object):
     def __init__(self, pdf_A, pdf_B):
         self.pdf_A = pdf_A
         self.pdf_B = pdf_B

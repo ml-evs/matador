@@ -24,7 +24,7 @@ from traceback import print_exc
 from os.path import isfile
 
 
-class PDFFitter:
+class PDFFitter(object):
     """ Take in a completed query and find the best fit of
     one or two structures to the experimental PDF.
     """
