@@ -79,8 +79,10 @@ def get_binary_grav_capacities(x, m_B):
     and m_B in a.m.u.
     """
     x = np.array(x)
-    Q = x * FARADAY_CONSTANT_Cpermol * Cperg_to_mAhperg / m_B
-    return Q
+    if m_B != 0:
+        return x * FARADAY_CONSTANT_Cpermol * Cperg_to_mAhperg / m_B
+    else:
+        return 0
 
 
 def get_generic_grav_capacity(concs, elements):
@@ -127,3 +129,20 @@ def get_formation_energy(chempots, doc):
                     formation -= (mu['enthalpy_per_atom'] * doc['stoichiometry'][j][1] /
                                   num_atoms_per_fu)
     return formation
+
+
+def get_formula_from_stoich(stoich):
+    """ Get the chemical formula of a structure from
+    its matador stoichiometry.
+
+    Input: stoich = [['Li', 3.0], ['P', 2.0]]
+    Output: 'Li3P2'
+
+    """
+    form = ''
+    for elem in stoich:
+        if elem[1] == 1:
+            form += elem[0]
+        elif int(elem[1]) != 0:
+            form += elem[0] + str(int(elem[1]))
+    return form
