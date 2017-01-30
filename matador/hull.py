@@ -8,7 +8,7 @@ from __future__ import print_function
 from .utils.print_utils import print_failure, print_notify, print_warning
 from .utils.hull_utils import barycentric2cart, vertices2plane, vertices2line
 from .utils.chem_utils import get_binary_grav_capacities, get_molar_mass, get_num_intercalated
-from .utils.chem_utils import get_generic_grav_capacity
+from .utils.chem_utils import get_generic_grav_capacity, get_formula_from_stoich
 from .utils.chem_utils import get_formation_energy, get_concentration
 from .utils.cursor_utils import set_cursor_from_array, get_array_from_cursor, filter_cursor
 from .utils.cursor_utils import display_results
@@ -81,7 +81,7 @@ class QueryConvexHull(object):
             else:
                 self.voltage_curve(self.hull_cursor)
                 if self.args.get('subplot'):
-                    self.subplot_voltage_hull()
+                    self._subplot_voltage_hull()
                 else:
                     self.plot_voltage_curve()
                 self.plot_hull()
@@ -389,7 +389,14 @@ class QueryConvexHull(object):
                 print_exc()
                 print('Error with QHull, plotting points only...')
 
-        self.hull_cursor = [self.cursor[idx] for idx in np.where(self.hull_dist <= self.hull_cutoff + 1e-12)[0]]
+        hull_cursor = [self.cursor[idx] for idx in np.where(self.hull_dist <= self.hull_cutoff + 1e-12)[0]]
+        self.hull_cursor = []
+        compositions = set()
+        for ind, member in enumerate(hull_cursor):
+            formula = get_formula_from_stoich(member['stoichiometry'])
+            if formula not in compositions:
+                compositions.add(formula)
+                self.hull_cursor.append(member)
         self.structures = structures
         try:
             self.info = self.get_text_info(html=self.args.get('bokeh'))
@@ -419,80 +426,105 @@ class QueryConvexHull(object):
                           (mu_enthalpy[0]))
             V[0] = V[1]
             # make V, Q and x available for plotting
-            self.voltages = V
-            self.Q = Q
-            self.x = x
+            self.voltages = []
+            self.voltages.append(V)
+            self.Q = []
+            self.Q.append(Q)
+            self.x = []
+            self.x.append(x)
+
         elif self.ternary:
             """ Written by James Darby, jpd47@cam.ac.uk. """
-            # points = self.hull_cursor
             points = np.hstack((get_array_from_cursor(hull_cursor, 'concentration'),
                                 get_array_from_cursor(hull_cursor, 'enthalpy_per_atom').reshape(len(hull_cursor), 1)))
+            stoichs = get_array_from_cursor(hull_cursor, 'stoichiometry')
             mu_enthalpy = get_array_from_cursor(self.match, 'enthalpy_per_atom')
-            Q = get_array_from_cursor(hull_cursor, 'gravimetric_capacity')
+            # Q = get_array_from_cursor(self.cursor, 'gravimetric_capacity')
             enthalpy_active_ion = mu_enthalpy[0]
-
+            # do another convex hull on just the known hull points, to allow access to useful indices
             hull = ConvexHull(points)
 
+            endpoints = []
+            endstoichs = []
             for ind, point in enumerate(points):
-                if point[0] == 0 and point[1] != 0:
-                    endpoint = point
-                    break
-            y0 = endpoint[1] / (1 - endpoint[0])
-            simp_in = 0
-            intersections = []
-            for simplex in hull.simplices:
-                tints = []
-                for i in range (0,3):
-                    j = (i+1)%3
+                if point[0] == 0 and point[1] != 0 and point[1] != 1:
+                    endpoints.append(point)
+                    endstoichs.append(stoichs[ind])
 
-                    e = points[simplex[i], 0]
-                    f = points[simplex[i], 1]
-                    g = points[simplex[j], 0] - points[simplex[i],0]
-                    h = points[simplex[j], 1] - points[simplex[i],1]
+            print('{} starting point(s) found.'.format(len(endstoichs)))
+            for endstoich in endstoichs:
+                print(get_formula_from_stoich(endstoich), end=' ')
+            print('\n')
 
-                    if h + g*y0 !=0:
-                        tin = (e*h + g*y0 - f*g)/(h + g*y0)
-                        s2 = (y0 - e*y0 -f)/(h + g*y0)
+            # iterate over possible endpoints of delithiation
+            self.voltages = []
+            self.Q = []
+            self.Vpoints = []
+            for reaction_ind, endpoint in enumerate(endpoints):
+                print(30*'-')
+                print('Reaction {}'.format(reaction_ind))
+                y0 = endpoint[1] / (1 - endpoint[0])
+                simp_in = 0
+                intersections = []
+                for simplex in hull.simplices:
+                    tints = []
+                    for i in range(0, 3):
+                        j = (i + 1) % 3
 
-                        if tin >=0 and tin <=1 and s2 >=0 and s2 <=1:
-                            tints = np.append(tints, tin)
+                        e = points[simplex[i], 0]
+                        f = points[simplex[i], 1]
+                        g = points[simplex[j], 0] - points[simplex[i], 0]
+                        h = points[simplex[j], 1] - points[simplex[i], 1]
 
-                if len(tints) != 0:
-                    temp = [simp_in,  np.amin(tints), np.amax(tints)]
-                    dif = temp[2] - temp[1]
-                    #condition removes the big triangle and the points which only graze the line of interest
-                    if temp[2] > 0 and temp[1] < 1 and temp[2] - temp[1] > 0:
-                      intersections = np.append(intersections, temp)
-                simp_in = simp_in + 1
+                        if h + g*y0 != 0:
+                            tin = (e*h + g*y0 - f*g)/(h + g*y0)
+                            s2 = (y0 - e*y0 - f) / (h + g*y0)
 
-            intersections = intersections.reshape(-1,3)
-            #dodgym remove first row as corresponds to big triangle
-            intersections = np.delete(intersections, (0), axis=0)
-            intersections = intersections[intersections[:,1].argsort()]
-            #store energies of formation in a column vector, one for each triangle to be used
+                            if tin >= 0 and tin <= 1 and s2 >= 0 and s2 <= 1:
+                                tints = np.append(tints, tin)
+                    if len(tints) != 0:
+                        temp = [simp_in, np.amin(tints), np.amax(tints)]
+                        # condition removes the big triangle and the points which only graze the line of interest
+                        if temp[2] > 0 and temp[1] < 1 and temp[2] - temp[1] > 0:
+                            intersections = np.append(intersections, temp)
+                    simp_in = simp_in + 1
 
-            int_in = intersections.astype(int)
+                intersections = intersections.reshape(-1, 3)
+                # dodgym remove first row as corresponds to big triangle
+                intersections = np.delete(intersections, (0), axis=0)
+                intersections = intersections[intersections[:, 1].argsort()]
 
-            Vpoints = []
-            voltages = []
-            for face in intersections:
-                fn=face[0].astype(int)
-                Evec = points[hull.simplices[fn],2]
-                Comp = points[hull.simplices[fn],:]
-                Comp[:,2] = 1 - Comp[:,0] - Comp[:,1] #modify so that comp is now elemental composition
+                Vpoints = []
+                voltages = []
+                Q = []
+                reaction = [get_formula_from_stoich(endstoichs[reaction_ind])]
+                for ind, face in enumerate(intersections):
+                    fn = face[0].astype(int)
+                    reaction = []
+                    reaction = [get_formula_from_stoich(hull_cursor[idx]['stoichiometry'])
+                                for idx in hull.simplices[fn]
+                                if get_formula_from_stoich(hull_cursor[idx]['stoichiometry']) not in reaction]
+                    print('{d[0]} + {d[1]} + {d[2]}'.format(d=reaction))
+                    Evec = points[hull.simplices[fn], 2]
+                    Comp = points[hull.simplices[fn], :]
+                    Comp[:, 2] = 1 - Comp[:, 0] - Comp[:, 1]
 
-                Comp = Comp.T
-                Compinv =  np.linalg.inv(Comp)
-                X = [1,0,0] #ion in elemental basis
-                V = -(Compinv.dot(X)).dot(Evec)
-                V = V + enthalpy_active_ion
-                for i in range(0,2):
-                    Vpoints = np.append(Vpoints, [face[i+1], V])
-                    voltages.append(V)
+                    Comp = Comp.T
+                    Compinv = np.linalg.inv(Comp)
+                    X = [1, 0, 0]
+                    V = -(Compinv.dot(X)).dot(Evec)
+                    V = V + enthalpy_active_ion
+                    for i in range(0, 2):
+                        Vpoints = np.append(Vpoints, [face[i+1], V])
+                        voltages.append(V)
+                        Q.append(face[i+1])
+                    if ind != len(intersections)-1:
+                        print(5*(ind+1)*' ' + ' ---> ', end='')
 
-            self.Vpoints = Vpoints.reshape(-1,2)
-            self.Q = np.sort(Q)
-            self.voltages = voltages
+                self.Vpoints.append(Vpoints.reshape(-1, 2))
+                self.Q.append(Q)
+                self.voltages.append(voltages)
+                print('\n')
 
         return
 
@@ -745,6 +777,8 @@ class QueryConvexHull(object):
     def plot_3d_ternary_hull(self):
         """ Plot calculated ternary hull in 3D. """
         from mpl_toolkits.mplot3d import axes3d
+        # avoids annoying flake8 warning
+        del axes3d
         import matplotlib.pyplot as plt
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
@@ -912,11 +946,12 @@ class QueryConvexHull(object):
             except:
                 print_exc()
                 pass
-        for i in range(len(self.voltages)-1):
-            axQ.plot([self.Q[i-1], self.Q[i]], [self.voltages[i], self.voltages[i]],
-                     lw=2, c=self.colours[0])
-            axQ.plot([self.Q[i], self.Q[i]], [self.voltages[i], self.voltages[i+1]],
-                     lw=2, c=self.colours[0])
+        for ind, voltage in enumerate(self.voltages):
+            for i in range(len(voltage)-1):
+                axQ.plot([self.Q[ind][i-1], self.Q[ind][i]], [voltage[i], voltage[i]],
+                         lw=2, c=self.colours[0])
+                axQ.plot([self.Q[ind][i], self.Q[ind][i]], [voltage[i], voltage[i+1]],
+                         lw=2, c=self.colours[0])
         # for i in range(len(self.x)):
             # if self.x[i] < 1e9:
                 # string_stoich = ''
@@ -1000,8 +1035,12 @@ class QueryConvexHull(object):
         else:
             plt.show()
 
-    def subplot_voltage_hull(self, dis=False):
-        """ Plot calculated hull with inset voltage curve. """
+    def _subplot_voltage_hull(self, dis=False):
+        """ Plot calculated hull with inset voltage curve.
+
+        DEPRECATED.
+
+        """
         import matplotlib.pyplot as plt
         if self.args.get('pdf') or self.args.get('png'):
             fig = plt.figure(facecolor=None, figsize=(4.5, 1.5))
