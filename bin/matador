@@ -137,6 +137,23 @@ class Matador(object):
             from matador.export import query2files
             query2files(self.cursor, self.args, argstr=self.argstr)
 
+        if self.args.get('view'):
+            from matador.viz import viz
+            if len(self.cursor) > 10:
+                from time import sleep
+                print_warning('WARNING: opening {} files with ase-gui...'.format(len(self.cursor)))
+                print_warning('Please kill script within 3 seconds if undesired...')
+                sleep(3)
+            if len(self.cursor) > 20:
+                print_failure('You will literally be opening that many windows, ' +
+                              'I\'ll give you another 5 seconds to reconsider...')
+
+                sleep(5)
+                print_notify('It\'s your funeral...')
+                sleep(1)
+            for doc in self.cursor:
+                viz(doc)
+
         self.client.close()
 
     def print_report(self):
@@ -239,7 +256,7 @@ if __name__ == '__main__':
         prog='matador',
         description='MATerial and Atomic Database Of Refined structures.',
         epilog='Written and maintained by Matthew Evans (me388@cam.ac.uk) 2016-2017, version ' + __version__.strip() + '.')
-    parser.add_argument('-v', '--version', action='version', version='matador version ' + __version__ + '.')
+    parser.add_argument('--version', action='version', version='matador version ' + __version__ + '.')
 
     # define subparsers for subcommands
     subparsers = parser.add_subparsers(title='subcommands',
@@ -274,8 +291,7 @@ if __name__ == '__main__':
                                        number of species.')
     structure_flags.add_argument('-f', '--formula', type=str, nargs='+',
                                  help='query a particular chemical formula, e.g. GeTeSi3')
-    structure_flags.add_argument('-i', '--id', type=str, nargs='+',
-                                 help='specify a particular structure by its text_id')
+    structure_flags.add_argument('-i', '--id', type=str, nargs='+', help='specify a particular structure by its text_id')
     structure_flags.add_argument('-ac', '--calc-match', action='store_true',
                                  help='display calculations of the same accuracy as specified id')
     structure_flags.add_argument('-kpttol', '--kpoint-tolerance', type=float,
@@ -392,6 +408,8 @@ if __name__ == '__main__':
                              help='show quantities per atom not per fu.')
     query_flags.add_argument('--source', action='store_true',
                              help='print filenames from which structures were wrangled')
+    query_flags.add_argument('-v', '--view', action='store_true',
+                             help='quickly view a structure/structures with ase-gui')
     query_flags.add_argument('--cell', action='store_true',
                              help='export query to .cell files in folder name from query string')
     query_flags.add_argument('--param', action='store_true',
