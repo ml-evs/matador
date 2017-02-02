@@ -80,12 +80,13 @@ class QueryConvexHull(object):
                 # self.metastable_voltage_profile()
             else:
                 self.voltage_curve(self.hull_cursor)
-                if self.args.get('subplot'):
-                    self._subplot_voltage_hull()
-                else:
-                    self.plot_voltage_curve()
-                self.plot_hull()
-        elif self.args.get('volume'):
+                if not self.args.get('no_plot'):
+                    if self.args.get('subplot'):
+                        self._subplot_voltage_hull()
+                    else:
+                        self.plot_voltage_curve()
+                    self.plot_hull()
+        elif self.args.get('volume') and not self.args.get('no_plot'):
             self.volume_curve()
 
         if self.args['subcmd'] == 'hull' and not self.args.get('no_plot'):
@@ -390,13 +391,16 @@ class QueryConvexHull(object):
                 print('Error with QHull, plotting points only...')
 
         hull_cursor = [self.cursor[idx] for idx in np.where(self.hull_dist <= self.hull_cutoff + 1e-12)[0]]
-        self.hull_cursor = []
-        compositions = set()
-        for ind, member in enumerate(hull_cursor):
-            formula = get_formula_from_stoich(member['stoichiometry'])
-            if formula not in compositions:
+        # if summary requested, filter for lowest per stoich
+        if self.args.get('summary'):
+            compositions = set()
+            for ind, member in enumerate(hull_cursor):
+                formula = get_formula_from_stoich(member['stoichiometry'])
+                if formula not in compositions:
                 compositions.add(formula)
-                self.hull_cursor.append(member)
+            self.hull_cursor.append(member)
+        else:
+            self.hull_cursor = hull_cursor
         self.structures = structures
         try:
             self.info = self.get_text_info(html=self.args.get('bokeh'))
@@ -439,7 +443,7 @@ class QueryConvexHull(object):
                                 get_array_from_cursor(hull_cursor, 'enthalpy_per_atom').reshape(len(hull_cursor), 1)))
             stoichs = get_array_from_cursor(hull_cursor, 'stoichiometry')
             mu_enthalpy = get_array_from_cursor(self.match, 'enthalpy_per_atom')
-            # Q = get_array_from_cursor(self.cursor, 'gravimetric_capacity')
+            Q = get_array_from_cursor(self.cursor, 'gravimetric_capacity')
             enthalpy_active_ion = mu_enthalpy[0]
             # do another convex hull on just the known hull points, to allow access to useful indices
             hull = ConvexHull(points)
@@ -462,7 +466,7 @@ class QueryConvexHull(object):
             self.Vpoints = []
             for reaction_ind, endpoint in enumerate(endpoints):
                 print(30*'-')
-                print('Reaction {}'.format(reaction_ind))
+                print('Reaction {}, {}:'.format(reaction_ind, get_formula_from_stoich(endstoichs[reaction_ind])))
                 y0 = endpoint[1] / (1 - endpoint[0])
                 simp_in = 0
                 intersections = []
@@ -490,9 +494,12 @@ class QueryConvexHull(object):
                     simp_in = simp_in + 1
 
                 intersections = intersections.reshape(-1, 3)
-                # dodgym remove first row as corresponds to big triangle
+                # dodgy remove first row as corresponds to big triangle
+                print(intersections[0])
                 intersections = np.delete(intersections, (0), axis=0)
                 intersections = intersections[intersections[:, 1].argsort()]
+
+                print(intersections)
 
                 Vpoints = []
                 voltages = []
@@ -517,12 +524,13 @@ class QueryConvexHull(object):
                     for i in range(0, 2):
                         Vpoints = np.append(Vpoints, [face[i+1], V])
                         voltages.append(V)
-                        Q.append(face[i+1])
                     if ind != len(intersections)-1:
                         print(5*(ind+1)*' ' + ' ---> ', end='')
 
                 self.Vpoints.append(Vpoints.reshape(-1, 2))
                 self.Q.append(Q)
+                print(Q)
+                print(voltages)
                 self.voltages.append(voltages)
                 print('\n')
 
