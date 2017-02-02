@@ -112,7 +112,7 @@ class Matador(object):
                 print_notify('Performing PDF fit for ' +
                              str(len(self.cursor[:self.top])) +
                              ' structures.')
-                from pdffit import PDFFitter
+                from matador.pdffit import PDFFitter
                 self.pdffit = PDFFitter(self.cursor[:self.top], **self.args)
                 try:
                     self.pdffit.spawn()

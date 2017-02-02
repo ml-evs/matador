@@ -1,4 +1,3 @@
-#!/usr/bin/python
 # coding: utf-8
 """ This file implements the PDFFitter class,
 which attempts fitting of structures to an
@@ -66,6 +65,7 @@ class PDFFitter(object):
         if not isfile(self.failed_fname):
             with open(self.failed_fname, 'a'):
                 pass
+        self.spawn()
 
     def perform_fits(self):
         """ Scan for fit that has not yet been
@@ -108,9 +108,12 @@ class PDFFitter(object):
             print_exc()
         return
 
-    def plot_fit(self, fit, structure):
+    def plot_fit(self, fit, title, num=None):
         """ Plot results. """
-        fig_name = structure.title + ".pdf"
+        if num is None:
+            fig_name = title + ".pdf"
+        else:
+            fig_name = title + str(num) + ".pdf"
         try:
             plt.style.use('bmh')
         except:
@@ -207,12 +210,20 @@ class PDFFitter(object):
 
         # We can now execute the fit using scipy's least square optimizer.
         # free parameters one-by-one and fit
+        self.plot_fit(fit, title, num=0)
+        print(title, '[1/3]')
         fit.free("scale")
         leastsq(fit.residual, fit.values)
+        self.plot_fit(fit, title, num=1)
+        print(title, '[2/3]')
         fit.free("delta2")
         leastsq(fit.residual, fit.values)
+        self.plot_fit(fit, title, num=2)
+        print(title, '[3/3]')
         fit.free("all")
         leastsq(fit.residual, fit.values)
+        self.plot_fit(fit, title, num=3)
+        print(title, 'Done!')
 
         ContributionResult = FitResults(fit)
         ContributionResult.saveResults(title+'.results')
@@ -225,6 +236,7 @@ class PDFFitter(object):
         r_expt = fit.Contribution.profile.x
         g_expt = fit.Contribution.profile.y
         g_calc = fit.Contribution.evaluate()
+        print(g_calc)
         fit_data = zeros((3, len(r_expt)))
         fit_data[0] = r_expt
         fit_data[1] = g_expt

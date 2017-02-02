@@ -25,10 +25,10 @@ class PDF(object):
     def __init__(self, doc, **kwargs):
         """ Initialise parameters.
 
-        dr             : bin width for PDF (Angstrom)
-        gaussian_width : width of Gaussian smearing (Angstrom)
-        num_images     : number of unit cell images include in PDF calculation
-        rmax           : maximum distance cutoff for PDF (Angstrom)
+        dr             : bin width for PDF (Angstrom) (DEFAULT: 0.001)
+        gaussian_width : width of Gaussian smearing (Angstrom) (DEFAULT: 0.01)
+        num_images     : number of unit cell images include in PDF calculation (DEFAULT: 1)
+        rmax           : maximum distance cutoff for PDF (Angstrom) (DEFAULT: 10)
 
         """
         if kwargs.get('dr') is None:
@@ -55,6 +55,7 @@ class PDF(object):
         self.lattice = np.asarray(doc['lattice_cart'])
         self.atoms = frac2cart(doc['lattice_cart'], doc['positions_frac'])
         self.types = doc['atom_types']
+        self.label = ' '.join(doc['text_id'])
         self.num_atoms = len(self.atoms)
         self.image_atoms = np.copy(self.atoms)
         if not kwargs.get('lazy'):
@@ -70,7 +71,7 @@ class PDF(object):
             for j in range(i+1, self.num_atoms):
                 d_ij = np.sqrt(np.sum((self.atoms[i] - self.atoms[j])**2))
                 if d_ij <= self.rmax:
-                    self.Gr += 2*np.exp(-(self.r_space - d_ij)**2 / self.gaussian_width) / self.num_atoms
+                    self.Gr += 2*np.exp(-(self.r_space - d_ij)**2 / self.gaussian_width) / (self.num_atoms * (self.num_images+1)**3)
                     self.elem_Gr[tuple(set((self.types[i], self.types[j])))] += 2*np.exp(-(self.r_space - d_ij)**2 / self.gaussian_width) / (self.num_atoms * (self.num_images+1)**3)
         # iterate over image cells
         trans = np.zeros((3))
@@ -84,19 +85,33 @@ class PDF(object):
                 for j in range(self.num_atoms):
                     d_ij = np.sqrt(np.sum((self.atoms[i] - self.atoms[j] - trans)**2))
                     if d_ij < self.rmax:
-                        self.Gr += np.exp(-(self.r_space - d_ij)**2 / self.gaussian_width) / self.num_atoms
+                        self.Gr += np.exp(-(self.r_space - d_ij)**2 / self.gaussian_width) / (self.num_atoms * (self.num_images+1)**3)
                         self.elem_Gr[tuple(set((self.types[i], self.types[j])))] += np.exp(-(self.r_space - d_ij)**2 / self.gaussian_width) / (self.num_atoms * (self.num_images+1)**3)
         return
 
-    def plot_projected(self):
+    def plot_projected(self, keys=None):
         """ Plot projected PDFs. """
         import matplotlib.pyplot as plt
         fig = plt.figure(figsize=(12, 5))
         ax1 = fig.add_subplot(111)
-        ax1.plot(self.r_space, self.Gr, lw=0.5, c='k', ls='--', label='total')
-        for key in self.elem_Gr:
-            ax1.plot(self.r_space, self.elem_Gr[key], label=key)
-        ax1.legend()
+        ax1.plot(self.r_space, self.Gr, lw=1, ls='--', label='total')
+        if keys is None:
+            keys = [key for key in self.elem_Gr]
+        for key in keys:
+            ax1.plot(self.r_space, self.elem_Gr[key], label='-'.join(key))
+        ax1.legend(loc=1)
+        ax1.set_ylabel('$g(r)$')
+        ax1.set_xlabel('$r$ (Angstrom)')
+        return
+
+    def plot_pdf(self):
+        """ Plot projected PDFs. """
+        import matplotlib.pyplot as plt
+        fig = plt.figure(figsize=(12, 5))
+        ax1 = fig.add_subplot(111)
+        ax1.plot(self.r_space, self.Gr, lw=2)
+        ax1.set_ylabel('$g(r)$')
+        ax1.set_xlabel('$r$ (Angstrom)')
         return
 
 
@@ -104,36 +119,50 @@ class PDFOverlap(object):
     def __init__(self, pdf_A, pdf_B):
         self.pdf_A = pdf_A
         self.pdf_B = pdf_B
+        self.fine_dr = self.pdf_A.dr/2.0
         self.pdf_overlap()
 
     def pdf_overlap(self):
         """ Calculate the overlap of two PDFs via
         a simple meshed sum of their difference.
         """
-        self.fine_space = np.arange(0, self.pdf_A.rmax, self.pdf_A.dr/2.0)
+        self.fine_space = np.arange(0, self.pdf_A.rmax, self.fine_dr)
         self.fine_Gr_A = np.interp(self.fine_space, self.pdf_A.r_space, self.pdf_A.Gr)
         self.fine_Gr_B = np.interp(self.fine_space, self.pdf_B.r_space, self.pdf_B.Gr)
         self.overlap_fn = self.fine_Gr_A - self.fine_Gr_B
         self.overlap_int = np.trapz(np.abs(self.overlap_fn), dx=self.pdf_A.dr/2.0)
 
-    def pdf_convolve(self):
+    def pdf_convolve(self, mode='same'):
         """ Calculate the convolution of two PDFs.
         """
-        self.convolution = np.convolve(self.pdf_A.Gr, self.pdf_B.Gr)
+        self.convolution = np.convolve(self.fine_Gr_A, self.fine_Gr_B, mode=mode)
 
-    def pdf_diff_plot(self):
+    def plot_diff(self):
         """ Simple plot for comparing two PDF's. """
         import matplotlib.pyplot as plt
         fig = plt.figure(figsize=(12, 10))
         ax1 = fig.add_subplot(211)
         ax2 = fig.add_subplot(212)
-        ax1.plot(self.pdf_A.r_space, self.pdf_A.Gr)
-        ax1.plot(self.pdf_B.r_space, self.pdf_B.Gr)
+        ax1.plot(self.pdf_A.r_space, self.pdf_A.Gr, label=self.pdf_A.label)
+        ax1.plot(self.pdf_B.r_space, self.pdf_B.Gr, label=self.pdf_B.label)
+        ax1.legend(loc=1)
         ax1.set_xlabel('$r$ (Angstrom)')
-        ax1.set_ylabel('$G(r)$')
+        ax1.set_ylabel('$g(r)$')
         ax2.axhline(0, ls='--', c='k', lw=0.5)
         ax2.plot(self.fine_space, self.overlap_fn, ls='--')
         ax2.set_ylim(-0.5*ax1.get_ylim()[1], 0.5*ax1.get_ylim()[1])
         ax2.set_xlabel('$r$ (Angstrom)')
-        ax2.set_ylabel('$G(r)$')
+        ax2.set_ylabel('$g(r)$')
+        return
+
+    def plot_convolution(self):
+        """ Plot the convolution of two PDFs.
+        """
+        import matplotlib.pyplot as plt
+        fig = plt.figure(figsize=(12, 10))
+        ax1 = fig.add_subplot(211)
+        ax1.plot(np.arange(len(self.convolution), 0, step=-1) * self.fine_dr / 2.0,
+                 self.convolution)
+        ax1.set_ylabel('$g_A(r) \\ast g_B(r)$')
+        ax1.set_xlabel('$\\Delta$ (Angstrom)')
         return
