@@ -393,11 +393,12 @@ class QueryConvexHull(object):
         hull_cursor = [self.cursor[idx] for idx in np.where(self.hull_dist <= self.hull_cutoff + 1e-12)[0]]
         # if summary requested, filter for lowest per stoich
         if self.args.get('summary'):
+            self.hull_cursor = []
             compositions = set()
             for ind, member in enumerate(hull_cursor):
-                formula = get_formula_from_stoich(member['stoichiometry'])
+                formula = get_formula_from_stoich(sorted(member['stoichiometry']))
                 if formula not in compositions:
-                compositions.add(formula)
+                    compositions.add(formula)
             self.hull_cursor.append(member)
         else:
             self.hull_cursor = hull_cursor
@@ -463,6 +464,7 @@ class QueryConvexHull(object):
             # iterate over possible endpoints of delithiation
             self.voltages = []
             self.Q = []
+            self.x = []
             self.Vpoints = []
             for reaction_ind, endpoint in enumerate(endpoints):
                 print(30*'-')
@@ -495,15 +497,13 @@ class QueryConvexHull(object):
 
                 intersections = intersections.reshape(-1, 3)
                 # dodgy remove first row as corresponds to big triangle
-                print(intersections[0])
                 intersections = np.delete(intersections, (0), axis=0)
                 intersections = intersections[intersections[:, 1].argsort()]
-
-                print(intersections)
 
                 Vpoints = []
                 voltages = []
                 Q = []
+                x = []
                 reaction = [get_formula_from_stoich(endstoichs[reaction_ind])]
                 for ind, face in enumerate(intersections):
                     fn = face[0].astype(int)
@@ -524,13 +524,15 @@ class QueryConvexHull(object):
                     for i in range(0, 2):
                         Vpoints = np.append(Vpoints, [face[i+1], V])
                         voltages.append(V)
+                        x.append(face[i+1])
+                        # TO-DO: fix this - should be composition at conc of crossover
+                        Q.append(face[i+1])
                     if ind != len(intersections)-1:
                         print(5*(ind+1)*' ' + ' ---> ', end='')
 
                 self.Vpoints.append(Vpoints.reshape(-1, 2))
                 self.Q.append(Q)
-                print(Q)
-                print(voltages)
+                self.x.append(x)
                 self.voltages.append(voltages)
                 print('\n')
 
