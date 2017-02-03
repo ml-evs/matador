@@ -73,7 +73,7 @@ def display_results(cursor, args=None, argstr=None, hull=False, markdown=False):
             elif 'theta' in doc['phase']:
                 formula_substring += 'θ-'
         atom_per_fu = 0
-        for item in doc['stoichiometry']:
+        for item in sorted(doc['stoichiometry']):
             for item_ind, subitem in enumerate(item):
                 if item_ind == 0:
                     formula_substring += str(subitem)

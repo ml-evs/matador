@@ -139,19 +139,23 @@ class Matador(object):
 
         if self.args.get('view'):
             from matador.viz import viz
-            if len(self.cursor) > 10:
+            if self.args.get('top') is None:
+                self.top = len(self.cursor)
+            else:
+                self.top = self.args.get('top')
+            if len(self.cursor[:self.top]) > 10:
                 from time import sleep
                 print_warning('WARNING: opening {} files with ase-gui...'.format(len(self.cursor)))
                 print_warning('Please kill script within 3 seconds if undesired...')
                 sleep(3)
-            if len(self.cursor) > 20:
+            if len(self.cursor[:self.top]) > 20:
                 print_failure('You will literally be opening that many windows, ' +
                               'I\'ll give you another 5 seconds to reconsider...')
 
                 sleep(5)
                 print_notify('It\'s your funeral...')
                 sleep(1)
-            for doc in self.cursor:
+            for doc in self.cursor[:self.top]:
                 viz(doc)
 
         self.client.close()
