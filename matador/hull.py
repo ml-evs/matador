@@ -460,6 +460,7 @@ class QueryConvexHull(object):
             for endstoich in endstoichs:
                 print(get_formula_from_stoich(endstoich), end=' ')
             print('\n')
+            self.endstoichs = endstoichs
 
             # iterate over possible endpoints of delithiation
             self.voltages = []
@@ -529,7 +530,6 @@ class QueryConvexHull(object):
                         Q.append(face[i+1])
                     if ind != len(intersections)-1:
                         print(5*(ind+1)*' ' + ' ---> ', end='')
-
                 self.Vpoints.append(Vpoints.reshape(-1, 2))
                 self.Q.append(Q)
                 self.x.append(x)
@@ -875,7 +875,6 @@ class QueryConvexHull(object):
         cmap_full = plt.cm.get_cmap('Dark2')
         cmap = colours.LinearSegmentedColormap.from_list(
             'trunc({n},{a:.2f},{b:.2f})'.format(n=cmap_full.name, a=0, b=1),
-            # cmap_full(np.logspace(-0.8239, -0.3979, 100)))
             cmap_full(np.linspace(min_colour, max_colour, Ncolours)))
 
         colours_list = []
@@ -948,7 +947,6 @@ class QueryConvexHull(object):
         else:
             fig = plt.figure(facecolor=None)
         axQ = fig.add_subplot(111)
-        # axQ = ax.twiny()
         if self.args.get('expt') is not None:
             try:
                 expt_data = np.loadtxt(self.args.get('expt'), delimiter=',')
@@ -957,11 +955,15 @@ class QueryConvexHull(object):
                 print_exc()
                 pass
         for ind, voltage in enumerate(self.voltages):
-            for i in range(len(voltage)-1):
+            if len(self.voltages) != 1:
+                axQ.annotate(get_formula_from_stoich(self.endstoichs[ind]),
+                             xy=(self.Q[ind][0]+0.05, voltage[0]+0.01),
+                             textcoords='data', ha='center', zorder=99999)
+            for i in range(int(self.ternary), len(voltage)-1):
                 axQ.plot([self.Q[ind][i-1], self.Q[ind][i]], [voltage[i], voltage[i]],
-                         lw=2, c=self.colours[0])
+                         lw=2, c=self.colours[ind])
                 axQ.plot([self.Q[ind][i], self.Q[ind][i]], [voltage[i], voltage[i+1]],
-                         lw=2, c=self.colours[0])
+                         lw=2, c=self.colours[ind])
         # for i in range(len(self.x)):
             # if self.x[i] < 1e9:
                 # string_stoich = ''
