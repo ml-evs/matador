@@ -376,14 +376,28 @@ def rigid_shift(structA, structB, dim, posprec):
     return np.all((np.abs(np.diff(shift_array)) < 1e-4))
 
 
-def filter_cursor(cursor, key, min, max):
+def filter_cursor(cursor, key, vals):
     """ Returns a cursor obeying the filter on the given key. """
     filtered_cursor = list()
-    print('Filtering', key, min, max)
-    for doc in cursor:
-        try:
-            if doc[key] < max and doc[key] >= min:
-                filtered_cursor.append(doc)
-        except:
-            pass
+    orig_cursor_len = len(cursor)
+    if len(vals) == 2:
+        min_val = float(vals[0])
+        max_val = float(vals[1])
+        print('Filtering', key, min_val, max_val)
+        for doc in cursor:
+            try:
+                if doc[key] < max_val and doc[key] >= min_val:
+                    filtered_cursor.append(doc)
+            except:
+                print_exc()
+    else:
+        min_val = float(vals[0])
+        print('Filtering', key, min_val)
+        for doc in cursor:
+            try:
+                if doc[key] >= min_val:
+                    filtered_cursor.append(doc)
+            except:
+                print_exc()
+    print(orig_cursor_len, 'filtered to', len(filtered_cursor), 'documents.')
     return filtered_cursor

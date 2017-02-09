@@ -104,7 +104,6 @@ class Matador(object):
             if self.args.get('hull_cutoff') is not None:
                 self.hull = QueryConvexHull(self.query, **self.args)
                 self.cursor = self.hull.hull_cursor
-                self.cursor = filter_cursor(self.cursor, 'gravimetric_capacity', 500, 1000)
                 self.top = len(self.cursor)
             if self.args.get('top') is not None:
                 self.top = self.args.get('top')
@@ -132,6 +131,10 @@ class Matador(object):
             if self.args.get('debug'):
                 print(uniq)
             self.cursor = [self.cursor[ind] for ind in uniq]
+
+        # perform any extra filtration
+        if self.args.get('filter'):
+            self.cursor = filter_cursor(self.cursor, self.args.get('filter'), self.args.get('values'))
 
         if self.export and len(self.cursor) > 0:
             from matador.export import query2files
@@ -340,6 +343,10 @@ if __name__ == '__main__':
                                        pspot and xc_functional')
     structure_flags.add_argument('--ignore_warnings', action='store_true',
                                  help='includes possibly bad structures')
+    structure_flags.add_argument('--filter', type=str,
+                                 help='specify a simple float field to filter. Requires --values')
+    structure_flags.add_argument('--values', nargs='+', type=float,
+                                 help='specify the minimum floats, or [min, max] values of field')
 
     material_flags = argparse.ArgumentParser(add_help=False)
     material_flags.add_argument('-hc', '--hull_cutoff', type=float,
@@ -513,6 +520,11 @@ if __name__ == '__main__':
     if vars(args).get('intersection') and vars(args).get('composition') is None:
         print_failure('--intersection requires --composition.')
         exit()
+    if vars(args).get('filter') and vars(args).get('values') is None:
+        print_failure('--filter requires --values.')
+        exit()
+    if vars(args).get('values') and vars(args).get('filter') is None:
+        print_warning('Ignoring redundant supplied values...')
     if vars(args).get('subcmd') == 'hull' and vars(args).get('composition') is None:
         print_failure('hull requires --composition')
         exit()
