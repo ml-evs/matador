@@ -338,6 +338,11 @@ def param2dict(seed, db=True, verbosity=0, **kwargs):
                             param['cut_off_energy'] = float(temp_cut_off)
                         if 'xc_functional' in line:
                             param['xc_functional'] = param['xc_functional'].upper()
+                        if 'write_cell_structure' in line:
+                            if param['write_cell_structure'] == 'false':
+                                param['write_cell_structure'] = False
+                            else:
+                                param['write_cell_structure'] = True
                         if 'perc_extra_bands' in line:
                             param['perc_extra_bands'] = float(param['perc_extra_bands'])
                         if 'geom_force_tol' in line:

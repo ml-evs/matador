@@ -1,5 +1,5 @@
-#!/usr/bin/python
-# coding :utf-8
+#!/usr/bin/env python
+# coding: utf-8
 """ Run many CASTEP calculations from multiple res,
 a single cell and a single param file.
 
@@ -96,6 +96,9 @@ class BatchRun:
         if not param_success:
             valid = False
             print_failure('Failed to parse param file')
+        if 'geom_max_iter' not in self.param_dict:
+            valid = False
+            print_failure('geom_max_iter is unset, please fix this.')
         if 'geom_max_iter' in self.param_dict and int(self.param_dict['geom_max_iter']) < 20:
             valid = False
             print_failure('geom_max_iter is only ' +
@@ -366,6 +369,9 @@ class FullRelaxer:
                 if calc_doc.get('write_cell_structure'):
                     cell_dict, success = cell2dict(seed + '-out.cell', db=False, outcell=True)
                     opti_dict['lattice_cart'] = list(cell_dict['lattice_cart'])
+                if self.args.get('debug'):
+                    print('Restarting calculation with current state:')
+                    print(calc_doc)
                 calc_doc.update(opti_dict)
 
             except(SystemExit, KeyboardInterrupt):
