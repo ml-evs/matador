@@ -58,7 +58,7 @@ class BatchRun:
         if self.args.get('ncores') is not None:
             self.ncores = self.args['ncores']
         else:
-            self.ncores = self.all_cores / self.nprocesses
+            self.ncores = int(self.all_cores / self.nprocesses)
         if self.args.get('nnodes') is not None:
             self.nnodes = self.args['nnodes']
             print_warning('Attempting to run over multiple nodes, please ensure \
@@ -129,6 +129,7 @@ class BatchRun:
                 else:
                     raise RuntimeError
             except:
+                print_exc()
                 valid = False
                 print_failure('Error with kpt.conv file.')
         else:
@@ -144,11 +145,15 @@ class BatchRun:
         self.paths['failed_dir'] = 'bad_castep'
         self.paths['jobs_fname'] = 'jobs.txt'
         self.paths['completed_fname'] = 'finished_cleanly.txt'
+        self.paths['failures_fname'] = 'failures.txt'
         if not isfile(self.paths['jobs_fname']):
             with open(self.paths['jobs_fname'], 'a'):
                 pass
         if not isfile(self.paths['completed_fname']):
             with open(self.paths['completed_fname'], 'a'):
+                pass
+        if not isfile(self.paths['failures_fname']):
+            with open(self.paths['failures_fname'], 'a'):
                 pass
 
     def spawn(self):
@@ -161,6 +166,7 @@ class BatchRun:
             for proc in procs:
                 proc.start()
         except(KeyboardInterrupt, SystemExit, RuntimeError):
+            print_exc()
             for proc in procs:
                 proc.terminate()
             exit('Killing running jobs and exiting...')
@@ -187,22 +193,27 @@ class BatchRun:
                 # create full relaxer object for creation and running of job
                 try:
                     job_count += 1
-                    FullRelaxer(paths=self.paths,
-                                ncores=self.ncores,
-                                nnodes=self.nnodes,
-                                res=res,
-                                param_dict=self.param_dict,
-                                cell_dict=self.cell_dict,
-                                executable=self.executable,
-                                rough=self.rough,
-                                archer=self.archer,
-                                debug=self.debug,
-                                spin=self.spin,
-                                conv_cutoff=self.cutoffs,
-                                conv_kpt=self.kpts)
-                    with open(paths['completed_fname'], 'a') as job_file:
-                        job_file.write(res+'\n')
+                    relaxer = FullRelaxer(paths=self.paths,
+                                          ncores=self.ncores,
+                                          nnodes=self.nnodes,
+                                          res=res,
+                                          param_dict=self.param_dict,
+                                          cell_dict=self.cell_dict,
+                                          executable=self.executable,
+                                          rough=self.rough,
+                                          archer=self.archer,
+                                          debug=self.debug,
+                                          spin=self.spin,
+                                          conv_cutoff=self.cutoffs,
+                                          conv_kpt=self.kpts)
+                    if relaxer.success:
+                        with open(paths['completed_fname'], 'a') as job_file:
+                            job_file.write(res+'\n')
+                    else:
+                        with open(paths['failures_fname'], 'a') as job_file:
+                            job_file.write(res+'\n')
                 except(KeyboardInterrupt, SystemExit, RuntimeError):
+                    print_exc()
                     raise SystemExit
         return
 
@@ -232,50 +243,55 @@ class FullRelaxer:
             self.conv_cutoff = conv_cutoff
         if self.conv_kpt_bool:
             self.conv_kpt = conv_kpt
+        self.success = None
 
-        # read in initial structure
+        # read in initial structure and skip if failed
         res_dict, success = res2dict(res, db=False)
         if not success:
-            exit('Failed to parse res file...')
-        calc_doc = res_dict
+            print(res_dict)
+            print_warning('Failed to parse res file ' + str(res))
+            self.success = False
 
-        # set seed name
-        self.seed = calc_doc['source'][0].replace('.res', '')
+        if self.success is None:
+            calc_doc = res_dict
 
-        # update global doc with cell and param dicts for folder
-        calc_doc.update(cell_dict)
-        calc_doc.update(param_dict)
+            # set seed name
+            self.seed = calc_doc['source'][0].replace('.res', '')
 
-        if self.conv_cutoff_bool:
-            # run series of singlepoints for various cutoffs
-            for cutoff in self.conv_cutoff:
-                calc_doc.update({'cut_off_energy': cutoff})
-                seed = self.seed + '_' + str(cutoff) + 'eV'
-                self.success = self.scf(calc_doc, seed, keep=False)
+            # update global doc with cell and param dicts for folder
+            calc_doc.update(cell_dict)
+            calc_doc.update(param_dict)
 
-        elif self.conv_kpt_bool:
-            # run series of singlepoints for various cutoffs
-            for kpt in self.conv_kpt:
-                calc_doc.update({'kpoints_mp_spacing': kpt})
-                seed = self.seed + '_' + str(kpt) + 'A'
-                self.success = self.scf(calc_doc, seed, keep=False)
+            if self.conv_cutoff_bool:
+                # run series of singlepoints for various cutoffs
+                for cutoff in self.conv_cutoff:
+                    calc_doc.update({'cut_off_energy': cutoff})
+                    seed = self.seed + '_' + str(cutoff) + 'eV'
+                    self.success = self.scf(calc_doc, seed, keep=False)
 
-        elif calc_doc['task'].upper() in ['SPECTRAL', 'SINGLEPOINT']:
-            # batch run density of states
-            self.success = self.scf(calc_doc, self.seed, keep=True)
-        else:
-            # set up geom opt parameters
-            self.max_iter = calc_doc['geom_max_iter']
-            self.num_rough_iter = rough if rough is not None else 4
-            fine_iter = 20
-            rough_iter = 2
-            if 'geom_method' in calc_doc:
-                if calc_doc['geom_method'].lower() == 'tpsd':
-                    rough_iter = 3
-            num_fine_iter = int(int(self.max_iter)/fine_iter)
-            self.geom_max_iter_list = (self.num_rough_iter * [rough_iter])
-            self.geom_max_iter_list.extend(num_fine_iter * [fine_iter])
-            self.success = self.relax(calc_doc, self.seed)
+            elif self.conv_kpt_bool:
+                # run series of singlepoints for various cutoffs
+                for kpt in self.conv_kpt:
+                    calc_doc.update({'kpoints_mp_spacing': kpt})
+                    seed = self.seed + '_' + str(kpt) + 'A'
+                    self.success = self.scf(calc_doc, seed, keep=False)
+
+            elif calc_doc['task'].upper() in ['SPECTRAL', 'SINGLEPOINT']:
+                # batch run density of states
+                self.success = self.scf(calc_doc, self.seed, keep=True)
+            else:
+                # set up geom opt parameters
+                self.max_iter = calc_doc['geom_max_iter']
+                self.num_rough_iter = rough if rough is not None else 4
+                fine_iter = 20
+                rough_iter = 2
+                if 'geom_method' in calc_doc:
+                    if calc_doc['geom_method'].lower() == 'tpsd':
+                        rough_iter = 3
+                num_fine_iter = int(int(self.max_iter)/fine_iter)
+                self.geom_max_iter_list = (self.num_rough_iter * [rough_iter])
+                self.geom_max_iter_list.extend(num_fine_iter * [fine_iter])
+                self.success = self.relax(calc_doc, self.seed)
 
     def relax(self, calc_doc, seed):
         """ Set up the calculation to perform 4 sets of two steps,
@@ -311,16 +327,20 @@ class FullRelaxer:
                 process.communicate()
                 # scrape new structure from castep file
                 opti_dict, success = castep2dict(seed + '.castep', db=False)
+                if self.debug:
+                    print_notify('Intermediate calculation finished')
+                    print(opti_dict)
+                if not success and opti_dict == '':
+                    print_warning('Failed to scrape castep file...')
+                    return False
                 try:
                     # delete any k-point and pspot information
                     del opti_dict['kpoints_mp_spacing']
                     del opti_dict['kpoints_mp_grid']
                     del opti_dict['species_pot']
                 except:
+                    print_exc()
                     pass
-                if not success and opti_dict == '':
-                    print_warning('Failed to scrape castep file...')
-                    return False
                 if self.rerun and not opti_dict['optimised']:
                     self.rerun = False
                 if not self.rerun and opti_dict['optimised']:
@@ -369,12 +389,13 @@ class FullRelaxer:
                 if calc_doc.get('write_cell_structure'):
                     cell_dict, success = cell2dict(seed + '-out.cell', db=False, outcell=True)
                     opti_dict['lattice_cart'] = list(cell_dict['lattice_cart'])
-                if self.args.get('debug'):
-                    print('Restarting calculation with current state:')
+                if self.debug:
+                    print_notify('Restarting calculation with current state:')
                     print(calc_doc)
                 calc_doc.update(opti_dict)
 
             except(SystemExit, KeyboardInterrupt):
+                print_exc()
                 self.mv_to_bad(seed)
                 self.tidy_up(seed)
                 raise SystemExit
@@ -407,6 +428,7 @@ class FullRelaxer:
                 self.tidy_up(seed)
             return True
         except(SystemExit, KeyboardInterrupt):
+            print_exc()
             self.mv_to_bad(seed)
             if not keep:
                 self.tidy_up(seed)
@@ -428,10 +450,14 @@ class FullRelaxer:
                 process = sp.Popen(['aprun', '-n', str(self.ncores),
                                     self.executable, seed])
             else:
-                dev_null = open(devnull, 'w')
-                process = sp.Popen(['nice', '-n', '15', 'mpirun', '-n', str(self.ncores),
-                                    self.executable, seed], stdout=dev_null, stderr=dev_null)
-                dev_null.close()
+                if self.debug:
+                    process = sp.Popen(['nice', '-n', '15', 'mpirun', '-n', str(self.ncores),
+                                        self.executable, seed])
+                else:
+                    dev_null = open(devnull, 'w')
+                    process = sp.Popen(['nice', '-n', '15', 'mpirun', '-n', str(self.ncores),
+                                        self.executable, seed], stdout=dev_null, stderr=dev_null)
+                    dev_null.close()
         elif self.nnodes is not None:
             if self.archer:
                 command = ['aprun', '-n', str(self.ncores*self.nnodes),

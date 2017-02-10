@@ -399,7 +399,7 @@ class QueryConvexHull(object):
                 formula = get_formula_from_stoich(sorted(member['stoichiometry']))
                 if formula not in compositions:
                     compositions.add(formula)
-            self.hull_cursor.append(member)
+                    self.hull_cursor.append(member)
         else:
             self.hull_cursor = hull_cursor
         self.structures = structures
