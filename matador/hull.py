@@ -93,7 +93,7 @@ class QueryConvexHull(object):
             if self.args.get('bokeh'):
                 self.plot_2d_hull_bokeh()
             else:
-                if self.args.get('debug'):
+                if self.args.get('debug') and self.ternary:
                     self.plot_3d_ternary_hull()
                 if self.ternary:
                     self.plot_ternary_hull()
@@ -111,14 +111,14 @@ class QueryConvexHull(object):
         self.mu_enthalpy = np.zeros((2))
         self.mu_volume = np.zeros((2))
         query_dict = dict()
+        if not self.non_binary:
+            elements = self.elements
+        else:
+            elements = self.chempot_search
         if self.chem_pots is not None:
-            self.fake_chempots()
+            self.fake_chempots(custom_elem=elements)
         else:
             print(60*'─')
-            if not self.non_binary:
-                elements = self.elements
-            else:
-                elements = self.chempot_search
             self.match = len(elements)*[None]
             # scan for suitable chem pots in database
             for ind, elem in enumerate(elements):
@@ -173,30 +173,40 @@ class QueryConvexHull(object):
                 self.match[i]['enthalpy_per_b'] = mu['enthalpy_per_atom']
                 self.match[i]['num_a'] = 0
             self.match[0]['num_a'] = float('inf')
-            self.cursor.insert(0, self.match[0])
-            for match in self.match[1:]:
-                self.cursor.append(match)
+        self.cursor.insert(0, self.match[0])
+        for match in self.match[1:]:
+            self.cursor.append(match)
         return
 
-    def fake_chempots(self):
+    def fake_chempots(self, custom_elem=None):
         """ Spoof documents for command-line
         chemical potentials.
         """
         self.match = [dict(), dict()]
+        if custom_elem is None:
+            custom_elem = self.elements
         for i, mu in enumerate(self.match):
             self.mu_enthalpy[i] = self.chem_pots[i]
             self.match[i]['enthalpy_per_atom'] = self.mu_enthalpy[i]
             self.match[i]['enthalpy'] = self.mu_enthalpy[i]
             self.match[i]['num_fu'] = 1
             self.match[i]['text_id'] = ['command', 'line']
-            self.match[i]['stoichiometry'] = [[self.elements[i], 1]]
+            # vomit-inducing cludge so that this works for custom chemical potentials for binarys that don't exist, provided
+            # the first element has a two character symbol and the second has a one character symbol, e.g. TiP4...
+            if self.non_binary and i == len(self.match)-1:
+                self.match[i]['stoichiometry'] = [[custom_elem[i][:2], 1], [custom_elem[i][2:3], int(custom_elem[i][-1])]]
+            else:
+                self.match[i]['stoichiometry'] = [[custom_elem[i], 1]]
             self.match[i]['space_group'] = 'xxx'
             self.match[i]['hull_distance'] = 0.0
             self.match[i]['enthalpy_per_b'] = self.match[i]['enthalpy_per_atom']
             self.match[i]['num_a'] = 0
+            self.match[i]['cell_volume'] = 1
         self.match[0]['num_a'] = float('inf')
         notify = ('Using custom energies of ' + str(self.mu_enthalpy[0]) + ' eV/atom ' +
                   'and ' + str(self.mu_enthalpy[1]) + ' eV/atom as chemical potentials.')
+        for match in self.match:
+            print(match)
         print(len(notify)*'─')
         print(notify)
         print(len(notify)*'─')
@@ -358,7 +368,9 @@ class QueryConvexHull(object):
             self.structure_slice = structures[np.where(structures[:, -1] <= 0 + 1e-9)]
         else:
             self.structure_slice = structures[np.where(structures[:, -1] <= 0 + 1e-9)]
-        if len(self.structure_slice) == 2:
+        if len(self.structure_slice) <= 2:
+            if len(self.structure_slice) < 2:
+                print_warning('No chemical potentials on hull... either mysterious use of custom chempots, or worry!')
             self.hull = FakeHull()
             self.hull_dist, self.hull_energy, self.hull_comp = self.get_hull_distances(structures)
             # should add chempots only to hull_cursor
@@ -444,7 +456,6 @@ class QueryConvexHull(object):
                                 get_array_from_cursor(hull_cursor, 'enthalpy_per_atom').reshape(len(hull_cursor), 1)))
             stoichs = get_array_from_cursor(hull_cursor, 'stoichiometry')
             mu_enthalpy = get_array_from_cursor(self.match, 'enthalpy_per_atom')
-            Q = get_array_from_cursor(self.cursor, 'gravimetric_capacity')
             enthalpy_active_ion = mu_enthalpy[0]
             # do another convex hull on just the known hull points, to allow access to useful indices
             hull = ConvexHull(points)
