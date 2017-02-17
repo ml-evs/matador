@@ -116,6 +116,10 @@ class QueryConvexHull(object):
         else:
             elements = self.chempot_search
         if self.chem_pots is not None:
+            if self.args['subcmd'] == 'voltage':
+                print_warning('WARNING: trying to calculate a voltage ' +
+                              'curve with spoofed chemical potentials: ' +
+                              'this will give you garbage.')
             self.fake_chempots(custom_elem=elements)
         else:
             print(60*'─')
@@ -205,8 +209,9 @@ class QueryConvexHull(object):
         self.match[0]['num_a'] = float('inf')
         notify = ('Using custom energies of ' + str(self.mu_enthalpy[0]) + ' eV/atom ' +
                   'and ' + str(self.mu_enthalpy[1]) + ' eV/atom as chemical potentials.')
-        for match in self.match:
-            print(match)
+        if self.args.get('debug'):
+            for match in self.match:
+                print(match)
         print(len(notify)*'─')
         print(notify)
         print(len(notify)*'─')
