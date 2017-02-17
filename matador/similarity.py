@@ -7,6 +7,7 @@ TO-DO:
     * otf calculation of required num_images
     * non-diagonal supercells
     * generic wrapper for a cursor to be screened
+    * comparing PDFs at different parameters
 
 """
 
@@ -57,6 +58,7 @@ class PDF(object):
         self.types = doc['atom_types']
         self.label = ' '.join(doc['text_id'])
         self.num_atoms = len(self.atoms)
+        self.volume = doc['cell_volume']
         self.image_atoms = np.copy(self.atoms)
         if not kwargs.get('lazy'):
             self._calc_pdf()
@@ -64,7 +66,7 @@ class PDF(object):
     def _calc_pdf(self):
         """ Calculate PDF of a matador document.
 
-        TO-DO: vectorise and element-projected.
+        TO-DO: vectorise.
 
         """
         for i in range(self.num_atoms):
@@ -116,10 +118,11 @@ class PDF(object):
 
 
 class PDFOverlap(object):
-    def __init__(self, pdf_A, pdf_B):
+    def __init__(self, pdf_A, pdf_B, rescale=None):
         self.pdf_A = pdf_A
         self.pdf_B = pdf_B
         self.fine_dr = self.pdf_A.dr/2.0
+        self.rescale = rescale
         self.pdf_overlap()
 
     def pdf_overlap(self):
@@ -129,7 +132,26 @@ class PDFOverlap(object):
         self.fine_space = np.arange(0, self.pdf_A.rmax, self.fine_dr)
         self.fine_Gr_A = np.interp(self.fine_space, self.pdf_A.r_space, self.pdf_A.Gr)
         self.fine_Gr_B = np.interp(self.fine_space, self.pdf_B.r_space, self.pdf_B.Gr)
+        # discard last quarter before rmax to remove noise
+        if self.rescale is not None:
+            val = 0.2
+            # scaling factor here is essentially equalising the shortest bond length
+            self.bond_rescaling_factor = np.argmax(self.fine_Gr_B > val) / np.argmax(self.fine_Gr_A > val)
+            # scaling factor here is normalising to number density
+            self.density_rescaling_factor = pow((self.pdf_B.volume / self.pdf_B.num_atoms) / (self.pdf_A.volume / self.pdf_A.num_atoms), 1/3)
+            if self.rescale == 'density':
+                self.rescale_factor = self.density_rescaling_factor
+            else:
+                if self.rescale != 'bond':
+                    print('Rescaling mode not specified, performing default (bond rescaling).')
+                self.rescale_factor = self.bond_rescaling_factor
+            self.fine_Gr_A = np.interp(self.fine_space, self.rescale_factor*self.fine_space, self.fine_Gr_A)
+        self.fine_Gr_A = self.fine_Gr_A[:int(len(self.fine_space)*0.75)]
+        self.fine_Gr_B = self.fine_Gr_B[:int(len(self.fine_space)*0.75)]
+        self.fine_space = self.fine_space[:int(len(self.fine_space)*0.75)]
         self.overlap_fn = self.fine_Gr_A - self.fine_Gr_B
+        self.worst_case_overlap_int = np.trapz(np.abs(self.fine_Gr_A), dx=self.pdf_A.dr/2.0) + \
+            np.trapz(np.abs(self.fine_Gr_B), dx=self.pdf_B.dr/2.0)
         self.overlap_int = np.trapz(np.abs(self.overlap_fn), dx=self.pdf_A.dr/2.0)
 
     def pdf_convolve(self, mode='same'):
@@ -143,8 +165,8 @@ class PDFOverlap(object):
         fig = plt.figure(figsize=(12, 10))
         ax1 = fig.add_subplot(211)
         ax2 = fig.add_subplot(212)
-        ax1.plot(self.pdf_A.r_space, self.pdf_A.Gr, label=self.pdf_A.label)
-        ax1.plot(self.pdf_B.r_space, self.pdf_B.Gr, label=self.pdf_B.label)
+        ax1.plot(self.fine_space, self.fine_Gr_A, label=self.pdf_A.label)
+        ax1.plot(self.fine_space, self.fine_Gr_B, label=self.pdf_B.label)
         ax1.legend(loc=1)
         ax1.set_xlabel('$r$ (Angstrom)')
         ax1.set_ylabel('$g(r)$')
