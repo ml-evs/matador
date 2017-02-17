@@ -147,7 +147,7 @@ def res2dict(seed, db=True, verbosity=0, **kwargs):
     return res, True
 
 
-def cell2dict(seed, db=True, outcell=False, verbosity=0, **kwargs):
+def cell2dict(seed, db=True, outcell=False, positions=False, verbosity=0, **kwargs):
     """ Extract available information from .cell file; probably
     to be merged with another dict from a .param or .res file.
     """
@@ -226,8 +226,15 @@ def cell2dict(seed, db=True, outcell=False, verbosity=0, **kwargs):
             elif not db:
                 if '%block positions_frac' in line.lower():
                     atomic_init_spins = defaultdict(list)
-                    i = 0
+                    i = 1
+                    if positions:
+                        cell['atom_types'] = []
+                        cell['positions_frac'] = []
                     while '%endblock positions_frac' not in flines[line_no+i].lower():
+                        line = flines[line_no+i].split()
+                        if positions:
+                            cell['atom_types'].append(line[0])
+                            cell['positions_frac'].append(list(map(float, line[1:4])))
                         if 'spin=' in flines[line_no+i].lower():
                             split_line = flines[line_no+i].split()
                             atomic_init_spins[split_line[0]] = \
