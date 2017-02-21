@@ -57,6 +57,14 @@ def cart2abcstar(lattice_cart):
     return lattice_star
 
 
+def cart2volume(lattice_cart):
+    """ Convert lattice_cart to cell volume. """
+    lattice_cart = np.asarray(lattice_cart)
+    vol = np.dot(np.cross(lattice_cart[0], lattice_cart[1]), lattice_cart[2])
+    assert vol > 0
+    return vol
+
+
 def cart2abc(lattice_cart):
     """ Convert lattice_cart =[[a1,a2,a3],[b1,b2,b3],[c1,c2,c3]]
     to lattice_abc=[[a,b,c],[alpha,beta,gamma]].
