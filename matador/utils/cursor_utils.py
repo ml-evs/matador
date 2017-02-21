@@ -1,6 +1,8 @@
 # coding: utf-8
 """ This file defines some useful generic cursor methods. """
 
+# matador modules
+from matador.similarity import PDF
 # external libraries
 import numpy as np
 # standard library
@@ -309,6 +311,24 @@ def get_guess_doc_provenance(sources, icsd=None):
             elif '-icsd' in fname.lower():
                 prov = 'ICSD'
     return prov
+
+
+def get_uniq_cursor(cursor, sim_calculator=PDF, sim_tol=1e-2):
+    """ Use sim_calculator to filter cursor into
+    unique structures to some tolerance sim_tol.
+    """
+    fingerprint_list = []
+    print('Calculating fingerprints...')
+    for doc in cursor:
+        fingerprint_list.append(sim_calculator(doc))
+
+    print('Assessing similarities...')
+    for i in range(len(fingerprint_list)):
+        for j in range(i+1, len(fingerprint_list)):
+            sim = fingerprint_list[i].get_sim_distance(fingerprint_list[j])
+            print('{}, {}, {}'.format(i, j, sim))
+            if sim < sim_tol:
+                print('found close structure to {}, {}'.format(i, j))
 
 
 def get_spg_uniq(cursor, symprec=1e-2, latvecprec=1e-3, posprec=1e-3):

@@ -91,6 +91,10 @@ class PDF(object):
                         self.elem_Gr[tuple(set((self.types[i], self.types[j])))] += np.exp(-(self.r_space - d_ij)**2 / self.gaussian_width) / (self.num_atoms * (self.num_images+1)**3)
         return
 
+    def get_sim_distance(self, pdf_B):
+        """ Return the similarity between two PDFs. """
+        return PDFOverlap(self, pdf_B, rescale='bond').similarity_distance
+
     def plot_projected(self, keys=None):
         """ Plot projected PDFs. """
         import matplotlib.pyplot as plt
@@ -123,6 +127,8 @@ class PDFOverlap(object):
         self.pdf_B = pdf_B
         self.fine_dr = self.pdf_A.dr/2.0
         self.rescale = rescale
+        # initialise with large number
+        self.similarity_distance = 1e10
         self.pdf_overlap()
 
     def pdf_overlap(self):
@@ -136,16 +142,16 @@ class PDFOverlap(object):
         if self.rescale is not None:
             val = 0.2
             # scaling factor here is essentially equalising the shortest bond length
-            self.bond_rescaling_factor = np.argmax(self.fine_Gr_B > val) / np.argmax(self.fine_Gr_A > val)
+            bond_rescaling_factor = np.argmax(self.fine_Gr_B > val) / np.argmax(self.fine_Gr_A > val)
             # scaling factor here is normalising to number density
-            self.density_rescaling_factor = pow((self.pdf_B.volume / self.pdf_B.num_atoms) / (self.pdf_A.volume / self.pdf_A.num_atoms), 1/3)
+            density_rescaling_factor = pow((self.pdf_B.volume / self.pdf_B.num_atoms) / (self.pdf_A.volume / self.pdf_A.num_atoms), 1/3)
             if self.rescale == 'density':
-                self.rescale_factor = self.density_rescaling_factor
+                rescale_factor = density_rescaling_factor
             else:
                 if self.rescale != 'bond':
                     print('Rescaling mode not specified, performing default (bond rescaling).')
-                self.rescale_factor = self.bond_rescaling_factor
-            self.fine_Gr_A = np.interp(self.fine_space, self.rescale_factor*self.fine_space, self.fine_Gr_A)
+                rescale_factor = bond_rescaling_factor
+            self.fine_Gr_A = np.interp(self.fine_space, rescale_factor*self.fine_space, self.fine_Gr_A)
         self.fine_Gr_A = self.fine_Gr_A[:int(len(self.fine_space)*0.75)]
         self.fine_Gr_B = self.fine_Gr_B[:int(len(self.fine_space)*0.75)]
         self.fine_space = self.fine_space[:int(len(self.fine_space)*0.75)]
@@ -153,6 +159,7 @@ class PDFOverlap(object):
         self.worst_case_overlap_int = np.trapz(np.abs(self.fine_Gr_A), dx=self.pdf_A.dr/2.0) + \
             np.trapz(np.abs(self.fine_Gr_B), dx=self.pdf_B.dr/2.0)
         self.overlap_int = np.trapz(np.abs(self.overlap_fn), dx=self.pdf_A.dr/2.0)
+        self.similarity_distance = self.overlap_int / self.worst_case_overlap_int
 
     def pdf_convolve(self, mode='same'):
         """ Calculate the convolution of two PDFs.
@@ -178,8 +185,7 @@ class PDFOverlap(object):
         return
 
     def plot_convolution(self):
-        """ Plot the convolution of two PDFs.
-        """
+        """ Plot the convolution of two PDFs. """
         import matplotlib.pyplot as plt
         fig = plt.figure(figsize=(12, 10))
         ax1 = fig.add_subplot(211)
