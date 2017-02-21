@@ -211,7 +211,7 @@ class Matador(object):
                     comp_list[temp] += 1
             keys = list(comp_list.keys())
             vals = list(comp_list.values())
-            comp_list = zip(keys, vals)
+            comp_list = list(zip(keys, vals))
             comp_list.sort(key=lambda t: t[1], reverse=True)
             small_count = 0
             first_ind = 1000
