@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 import unittest
 from matador.scrapers.castep_scrapers import castep2dict, cell2dict, res2dict
+from matador.export import doc2res
 from matador.utils.print_utils import print_warning
 from os.path import realpath
+from os import system
 
 # grab abs path for accessing test data
 REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
@@ -82,6 +84,33 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(test_dict['cell_volume'], 105.918342, msg='Wrong cell volume!')
             self.assertEqual(test_dict['space_group'], 'Pmc2_1', msg='Wrong space group!')
             self.assertEqual(test_dict['lattice_abc'], [[5.057429, 4.93404, 4.244619], [90.0, 90.0, 90.0]], msg='Wrong lattice constants!')
+
+
+class ExportTest(unittest.TestCase):
+    """ Test file export functions. """
+    def testDoc2Res(self):
+        res_fname = REAL_PATH + 'data/LiPZn-r57des.res'
+        test_fname = REAL_PATH + 'data/doc2res.res'
+        failed_open = False
+        try:
+            f = open(res_fname, 'r')
+        except:
+            failed_open = True
+            print('Failed to open test case', res_fname, '- please check installation.')
+        if not failed_open:
+            f.close()
+            doc, s = res2dict(res_fname)
+            doc2res(doc, test_fname, hash_dupe=False)
+            doc_exported, s = res2dict(test_fname)
+            self.assertTrue(s, msg='Failed entirely, oh dear!')
+            for key in doc:
+                if key not in ['source', 'positions_frac']:
+                    self.assertEqual(doc_exported[key], doc[key], msg='Input and output of {} do not match after scraping.'.format(key))
+                if key == 'positions_frac':
+                    for ind, atom in enumerate(doc['positions_frac']):
+                        self.assertIn(atom, doc_exported['positions_frac'], msg='Atom with this position is missing.')
+                        self.assertEqual(doc['atom_types'][ind], doc_exported['atom_types'][doc_exported['positions_frac'].index(atom)], msg='Atom has wrong type!')
+            system('rm {}'.format(test_fname))
 
 
 if __name__ == '__main__':
