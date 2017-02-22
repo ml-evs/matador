@@ -440,8 +440,13 @@ def doc2res(doc, path, info=True, hash_dupe=True, spoof_titl=False, *args):
             f.write('\n')
             f.write('LATT -1\n')
             f.write('SFAC \t')
+
+            # enforce correct order by elements
+            positions_frac, atom_types = zip(*[(pos, types) for (types, pos) in
+                                               sorted(zip(doc['atom_types'], doc['positions_frac']))])
+
             written_atoms = []
-            for elem in doc['atom_types']:
+            for elem in atom_types:
                 if elem not in written_atoms:
                     f.write(' ' + str(elem))
                     written_atoms.append(str(elem))
@@ -449,12 +454,12 @@ def doc2res(doc, path, info=True, hash_dupe=True, spoof_titl=False, *args):
             atom_labels = []
             i = 0
             j = 1
-            while i < len(doc['atom_types']):
-                num = doc['atom_types'].count(doc['atom_types'][i])
+            while i < len(atom_types):
+                num = atom_types.count(atom_types[i])
                 atom_labels.extend(num*[j])
                 i += num
                 j += 1
-            for atom in zip(doc['atom_types'], atom_labels, doc['positions_frac']):
+            for atom in zip(atom_types, atom_labels, positions_frac):
                 f.write("{0:8s}{1:3d}{2[0]: 15f} {2[1]: 15f} {2[2]: 15f}   1.0\n".format(
                     atom[0], atom[1], atom[2]))
             f.write('END')
