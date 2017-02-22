@@ -54,7 +54,7 @@ def cart2abcstar(lattice_cart):
     vol = np.linalg.det(lattice_star)
     vol = np.dot(np.cross(lattice_cart[0], lattice_cart[1]), lattice_cart[2])
     lattice_star /= vol
-    return lattice_star
+    return lattice_star.tolist()
 
 
 def cart2volume(lattice_cart):
@@ -111,7 +111,7 @@ def frac2cart(lattice_cart, positions_frac):
     for i in range(len(positions_frac)):
         for j in range(3):
             positions_abs[i] += lattice_cart[j]*positions_frac[i][j]
-    return positions_abs
+    return positions_abs.tolist()
 
 
 def real2recip(real_lat):
@@ -126,7 +126,7 @@ def real2recip(real_lat):
         (np.dot(real_lat[1], np.cross(real_lat[2], real_lat[0])))
     recip_lat[2] = (2*pi)*np.cross(real_lat[0], real_lat[1]) / \
         (np.dot(real_lat[2], np.cross(real_lat[0], real_lat[1])))
-    return recip_lat
+    return recip_lat.tolist()
 
 
 def calc_mp_spacing(real_lat, mp_grid, prec=2):
