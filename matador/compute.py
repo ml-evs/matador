@@ -1,6 +1,8 @@
 # coding: utf-8
 """ Contains the FullRelaxer class for continuously
 restarted geometry optimisations. Previously part of run3.
+
+TO-DO: replace wildcard with safe glob
 """
 # matador modules
 from matador.scrapers.castep_scrapers import cell2dict
@@ -21,14 +23,14 @@ class FullRelaxer:
     4 larger optimisations with many iterations,
     e.g. 4 lots of 2 then 4 lots of geom_max_iter/4.
     """
-    def __init__(self, paths, ncores, nnodes, res, param_dict, cell_dict,
+    def __init__(self, ncores, nnodes, res, param_dict, cell_dict,
                  executable='castep', rough=None, debug=False, spin=False,
                  conv_cutoff=None, conv_kpt=None, archer=False):
         """ Make the files to run the calculation and handle
         the calling of CASTEP itself.
         """
-        self.paths = paths
         self.ncores = ncores
+        self.res = res
         self.archer = archer
         self.nnodes = nnodes
         self.executable = executable
@@ -57,11 +59,17 @@ class FullRelaxer:
             calc_doc = res_dict
 
             # set seed name
+            assert isinstance(calc_doc['source'], list)
             self.seed = calc_doc['source'][0].replace('.res', '')
 
             # update global doc with cell and param dicts for folder
             calc_doc.update(cell_dict)
             calc_doc.update(param_dict)
+
+            # check for pseudos
+            for elem in res_dict['stoichiometry']:
+                if not isfile(calc_doc['species_pot'][elem[0]]):
+                    exit('You forgot your pseudos, you silly goose!')
 
             if self.conv_cutoff_bool:
                 # run series of singlepoints for various cutoffs
@@ -92,6 +100,8 @@ class FullRelaxer:
                 num_fine_iter = int(int(self.max_iter)/fine_iter)
                 self.geom_max_iter_list = (self.num_rough_iter * [rough_iter])
                 self.geom_max_iter_list.extend(num_fine_iter * [fine_iter])
+
+                # begin relaxation
                 self.success = self.relax(calc_doc, self.seed)
 
     def relax(self, calc_doc, seed):
@@ -101,7 +111,8 @@ class FullRelaxer:
         print_notify('Relaxing ' + self.seed)
         geom_max_iter_list = self.geom_max_iter_list
         # copy initial res file to seed
-        self.cp_to_input(self.seed)
+        if isinstance(self.res, str):
+            self.cp_to_input(self.seed)
         self.rerun = False
         for ind, num_iter in enumerate(geom_max_iter_list):
             if self.rerun:
@@ -131,9 +142,9 @@ class FullRelaxer:
                 if self.debug:
                     print_notify('Intermediate calculation finished')
                     print(opti_dict)
-                if not success and opti_dict == '':
+                if not success and isinstance(opti_dict, str):
                     print_warning('Failed to scrape castep file...')
-                    return False
+                    exit()
                 try:
                     # delete any k-point and pspot information
                     del opti_dict['kpoints_mp_spacing']
@@ -196,11 +207,13 @@ class FullRelaxer:
                     print(calc_doc)
                 calc_doc.update(opti_dict)
 
-            except(SystemExit, KeyboardInterrupt):
+            except(KeyboardInterrupt):
                 print_exc()
                 self.mv_to_bad(seed)
                 self.tidy_up(seed)
                 raise SystemExit
+            except(SystemExit):
+                exit()
             except:
                 print_exc()
                 self.mv_to_bad(seed)
@@ -245,7 +258,7 @@ class FullRelaxer:
     def castep(self, seed):
         """ Calls CASTEP on desired seed with desired number of cores.
         """
-        if self.nnodes is None:
+        if self.nnodes is None or self.nnodes == 1:
             if self.ncores == 1:
                 process = sp.Popen(['nice', '-n', '15', self.executable, seed])
             elif self.archer:
@@ -260,7 +273,8 @@ class FullRelaxer:
                     process = sp.Popen(['nice', '-n', '15', 'mpirun', '-n', str(self.ncores),
                                         self.executable, seed], stdout=dev_null, stderr=dev_null)
                     dev_null.close()
-        elif self.nnodes is not None:
+        else:
+            raise NotImplementedError
             if self.archer:
                 command = ['aprun', '-n', str(self.ncores*self.nnodes),
                            '-N', str(self.ncores),
