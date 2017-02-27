@@ -140,6 +140,8 @@ def get_formula_from_stoich(stoich):
 
     """
     form = ''
+    if not isinstance(stoich, list):
+        stoich = stoich.tolist()
     for elem in sorted(stoich):
         if elem[1] == 1:
             form += elem[0]
