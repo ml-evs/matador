@@ -5,8 +5,8 @@ can create a file from a db document.
 """
 from __future__ import print_function
 # matador internals
-from .utils.cell_utils import cart2abcstar, frac2cart
-from .utils.cursor_utils import display_results
+from matador.utils.cell_utils import cart2abcstar, frac2cart, cart2abc
+from matador.utils.cursor_utils import display_results
 # external libraries
 import numpy as np
 # standard library
@@ -362,7 +362,7 @@ def doc2pdb(doc, path, info=True, hash_dupe=True, *args):
             # use dummy SG for CRYST1, shouldn't matter
             CRYST1 = 'CRYST1 {v[0][0]:9.3f} {v[0][1]:9.3f} {v[0][2]:9.3f} {v[1][0]:7.2f} {v[1][1]:7.2f} {v[1][2]:7.2f} P 1'.format(v=doc['lattice_abc'])
             f.write(CRYST1 + '\n')
-            SCALEn = cart2abcstar(doc['lattice_cart']).tolist()
+            SCALEn = cart2abcstar(doc['lattice_cart'])
             f.write('SCALE1    {v[0][0]:10.6f} {v[0][1]:10.6f} {v[0][2]:10.6f}      {:10.5f}\n'.format(0.0, v=SCALEn))
             f.write('SCALE2    {v[1][0]:10.6f} {v[1][1]:10.6f} {v[1][2]:10.6f}      {:10.5f}\n'.format(0.0, v=SCALEn))
             f.write('SCALE3    {v[2][0]:10.6f} {v[2][1]:10.6f} {v[2][2]:10.6f}      {:10.5f}\n'.format(0.0, v=SCALEn))
@@ -433,15 +433,23 @@ def doc2res(doc, path, info=True, hash_dupe=True, spoof_titl=False, *args):
             f.write('CELL ')
             f.write('1.0 ')
             if len(doc['lattice_abc']) != 2 or len(doc['lattice_abc'][0]) != 3 or len(doc['lattice_abc'][1]) != 3:
-                raise RuntimeError('Failed to get lattice, something has gone wrong...')
+                try:
+                    doc['lattice_abc'] = cart2abc(doc['lattice_cart'])
+                except:
+                    raise RuntimeError('Failed to get lattice, something has gone wrong...')
             for vec in doc['lattice_abc']:
                 for coeff in vec:
                     f.write(' ' + str(round(coeff, 8)))
             f.write('\n')
             f.write('LATT -1\n')
             f.write('SFAC \t')
+
+            # enforce correct order by elements
+            positions_frac, atom_types = zip(*[(pos, types) for (types, pos) in
+                                               sorted(zip(doc['atom_types'], doc['positions_frac']))])
+
             written_atoms = []
-            for elem in doc['atom_types']:
+            for elem in atom_types:
                 if elem not in written_atoms:
                     f.write(' ' + str(elem))
                     written_atoms.append(str(elem))
@@ -449,12 +457,12 @@ def doc2res(doc, path, info=True, hash_dupe=True, spoof_titl=False, *args):
             atom_labels = []
             i = 0
             j = 1
-            while i < len(doc['atom_types']):
-                num = doc['atom_types'].count(doc['atom_types'][i])
+            while i < len(atom_types):
+                num = atom_types.count(atom_types[i])
                 atom_labels.extend(num*[j])
                 i += num
                 j += 1
-            for atom in zip(doc['atom_types'], atom_labels, doc['positions_frac']):
+            for atom in zip(atom_types, atom_labels, positions_frac):
                 f.write("{0:8s}{1:3d}{2[0]: 15f} {2[1]: 15f} {2[2]: 15f}   1.0\n".format(
                     atom[0], atom[1], atom[2]))
             f.write('END')

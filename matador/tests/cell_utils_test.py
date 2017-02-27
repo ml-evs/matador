@@ -29,6 +29,8 @@ class CellUtilTest(unittest.TestCase):
                                 msg='Conversion abc2cart failed.')
                 self.assertAlmostEqual(test_doc['cell_volume'], cart2volume(test_doc['lattice_cart']),
                                        msg='Failed to calculate volume from lattice vectors.', places=5)
+                self.assertIsInstance(test_doc['lattice_abc'], list, msg='Failed abc numpy cast to list')
+                self.assertIsInstance(test_doc['lattice_cart'], list, msg='Failed cartesian numpy cast to list')
             except(AssertionError):
                 print('cart:', test_doc['lattice_cart'], abc2cart(test_doc['lattice_abc']))
                 print('abc:', test_doc['lattice_abc'], cart2abc(test_doc['lattice_cart']))
