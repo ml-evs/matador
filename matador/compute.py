@@ -10,7 +10,7 @@ from matador.scrapers.castep_scrapers import res2dict, castep2dict
 from matador.utils.print_utils import print_success, print_warning, print_notify
 from matador.export import doc2cell, doc2param, doc2res
 # standard library
-from os import makedirs, remove, system, devnull
+from os import makedirs, remove, system, devnull, getcwd
 from os.path import isfile, exists
 from traceback import print_exc
 import subprocess as sp
@@ -23,9 +23,9 @@ class FullRelaxer:
     4 larger optimisations with many iterations,
     e.g. 4 lots of 2 then 4 lots of geom_max_iter/4.
     """
-    def __init__(self, ncores, nnodes, res, param_dict, cell_dict,
+    def __init__(self, ncores, nnodes, node, res, param_dict, cell_dict,
                  executable='castep', rough=None, debug=False, spin=False, verbosity=0,
-                 conv_cutoff=None, conv_kpt=None, archer=False):
+                 conv_cutoff=None, conv_kpt=None, archer=False, start=True):
         """ Make the files to run the calculation and handle
         the calling of CASTEP itself.
         """
@@ -33,10 +33,12 @@ class FullRelaxer:
         self.res = res
         self.archer = archer
         self.nnodes = nnodes
+        self.node = node
         self.verbosity = verbosity
         self.executable = executable
         self.debug = debug
         self.spin = spin
+        self.start = start
         self.conv_cutoff_bool = True if conv_cutoff is not None else False
         self.conv_kpt_bool = True if conv_kpt is not None else False
         if self.conv_cutoff_bool:
@@ -101,14 +103,18 @@ class FullRelaxer:
                 num_fine_iter = int(int(self.max_iter)/fine_iter)
                 self.geom_max_iter_list = (self.num_rough_iter * [rough_iter])
                 self.geom_max_iter_list.extend(num_fine_iter * [fine_iter])
+                self.calc_doc = calc_doc
 
                 # begin relaxation
-                self.success = self.relax(calc_doc, self.seed)
+                if self.start:
+                    self.success = self.relax()
 
-    def relax(self, calc_doc, seed):
+    def relax(self):
         """ Set up the calculation to perform 4 sets of two steps,
         then continue with the remainder of steps.
         """
+        seed = self.seed
+        calc_doc = self.calc_doc
         print_notify('Relaxing ' + self.seed)
         geom_max_iter_list = self.geom_max_iter_list
         # copy initial res file to seed
@@ -269,6 +275,13 @@ class FullRelaxer:
             elif self.archer:
                 process = sp.Popen(['aprun', '-n', str(self.ncores),
                                     self.executable, seed])
+            elif self.node is not None:
+                cwd = getcwd()
+                process = sp.Popen(['ssh', 'node{}'.format(self.node),
+                                    'cd', '{};'.format(cwd),
+                                    'mpirun', '-n', str(self.ncores),
+                                    self.executable, seed],
+                                   shell=False)
             else:
                 if self.debug:
                     process = sp.Popen(['nice', '-n', '15', 'mpirun', '-n', str(self.ncores),
