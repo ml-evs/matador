@@ -118,8 +118,10 @@ class FullRelaxer:
         print_notify('Relaxing ' + self.seed)
         geom_max_iter_list = self.geom_max_iter_list
         # copy initial res file to seed
-        if isinstance(self.res, str):
-            self.cp_to_input(self.seed)
+        if not isinstance(self.res, str):
+            doc2res(self.res, self.seed, info=False, hash_dupe=False)
+        self.cp_to_input(self.seed)
+
         self.rerun = False
         for ind, num_iter in enumerate(geom_max_iter_list):
             if self.rerun:
@@ -277,7 +279,7 @@ class FullRelaxer:
                                     self.executable, seed])
             elif self.node is not None:
                 cwd = getcwd()
-                process = sp.Popen(['ssh', 'node{}'.format(self.node),
+                process = sp.Popen(['ssh', '{}'.format(self.node),
                                     'cd', '{};'.format(cwd),
                                     'mpirun', '-n', str(self.ncores),
                                     self.executable, seed],
