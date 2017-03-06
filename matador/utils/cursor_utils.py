@@ -299,6 +299,8 @@ def get_guess_doc_provenance(sources, icsd=None):
                 fname.endswith('.history') or 'OQMD' in fname):
             if 'swap' in fname.lower():
                 prov = 'SWAPS'
+            elif '_ga_' in fname.lower():
+                prov = 'GA'
             elif icsd is not None:
                 prov = 'ICSD'
             elif 'oqmd' in fname.lower():
