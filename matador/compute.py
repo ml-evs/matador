@@ -279,11 +279,20 @@ class FullRelaxer:
                                     self.executable, seed])
             elif self.node is not None:
                 cwd = getcwd()
-                process = sp.Popen(['ssh', '{}'.format(self.node),
-                                    'cd', '{};'.format(cwd),
-                                    'mpirun', '-n', str(self.ncores),
-                                    self.executable, seed],
-                                   shell=False)
+                if self.debug:
+                    process = sp.Popen(['ssh', '{}'.format(self.node),
+                                        'cd', '{};'.format(cwd),
+                                        'mpirun', '-n', str(self.ncores),
+                                        self.executable, seed],
+                                       shell=False)
+                else:
+                    dev_null = open(devnull, 'w')
+                    process = sp.Popen(['ssh', '{}'.format(self.node),
+                                        'cd', '{};'.format(cwd),
+                                        'mpirun', '-n', str(self.ncores),
+                                        self.executable, seed],
+                                       shell=False, stdout=dev_null, stderr=dev_null)
+                    dev_null.close()
             else:
                 if self.debug:
                     process = sp.Popen(['nice', '-n', '15', 'mpirun', '-n', str(self.ncores),
