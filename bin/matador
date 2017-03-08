@@ -369,6 +369,8 @@ if __name__ == '__main__':
                             help='save pdf rather than showing plot in X')
     plot_flags.add_argument('--png', action='store_true',
                             help='save png rather than showing plot in X')
+    plot_flags.add_argument('--labels', action='store_true',
+                            help='label hull plots')
     plot_flags.add_argument('--svg', action='store_true',
                             help='save svg rather than showing plot in X')
     plot_flags.add_argument('--subplot', action='store_true',

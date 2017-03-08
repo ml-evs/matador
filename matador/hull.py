@@ -70,12 +70,8 @@ class QueryConvexHull(object):
 
         display_results(self.hull_cursor, self.args, hull=True)
 
-        import matplotlib
         if not self.args.get('no_plot'):
             self.set_plot_param()
-            matplotlib.use('TKAgg')
-        else:
-            matplotlib.use('Agg')
 
         if self.args['subcmd'] == 'voltage':
             if self.args.get('debug'):
@@ -580,7 +576,7 @@ class QueryConvexHull(object):
         import matplotlib.pyplot as plt
         import matplotlib.colors as colours
         if self.args.get('pdf') or self.args.get('png') or self.args.get('svg'):
-            fig = plt.figure(facecolor=None, figsize=(5, 4))
+            fig = plt.figure(facecolor=None, figsize=(8, 6), dpi=500)
         else:
             fig = plt.figure(facecolor=None)
         ax = fig.add_subplot(111)
@@ -601,13 +597,14 @@ class QueryConvexHull(object):
                 ax.plot(np.sort(tie_line[:, 0]), tie_line[np.argsort(tie_line[:, 0]), 1] + self.hull_cutoff,
                         '--', c=self.colours[1], lw=1, alpha=0.5, zorder=1000, label='')
             # annotate hull structures
-            # for ind, doc in enumerate(tie_line):
-                # ax.annotate(self.hull_info[ind],
-                            # xy=(tie_line[ind, 0], tie_line[ind, 1]),
-                            # xytext=(tie_line[ind, 0], tie_line[ind, 1] - 0.08),
-                            # textcoords='data',
-                            # ha='center',
-                            # zorder=99999)
+            if self.args.get('labels'):
+                for ind, doc in enumerate(self.hull_cursor[1:-1]):
+                    ax.annotate(get_formula_from_stoich(doc['stoichiometry']),
+                                xy=(tie_line[ind+2, 0], tie_line[ind+2, 1]),
+                                xytext=(tie_line[ind+2, 0], tie_line[ind+2, 1] - 0.08),
+                                textcoords='data',
+                                ha='center',
+                                zorder=99999)
             lw = self.scale * 0 if self.mpl_new_ver else 1
             # points for off hull structures
             if self.hull_cutoff == 0:
