@@ -131,7 +131,7 @@ def get_formation_energy(chempots, doc):
     return formation
 
 
-def get_formula_from_stoich(stoich):
+def get_formula_from_stoich(stoich, tex=False):
     """ Get the chemical formula of a structure from
     its matador stoichiometry.
 
@@ -146,5 +146,8 @@ def get_formula_from_stoich(stoich):
         if elem[1] == 1:
             form += elem[0]
         elif int(elem[1]) != 0:
-            form += elem[0] + str(int(elem[1]))
+            if tex:
+                form += elem[0] + '$_{' + str(int(elem[1])) + '}$'
+            else:
+                form += elem[0] + str(int(elem[1]))
     return form

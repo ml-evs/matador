@@ -128,7 +128,7 @@ class QueryConvexHull(object):
             for ind, elem in enumerate(elements):
                 print('Scanning for suitable', elem, 'chemical potential...')
                 query_dict['$and'] = list(query.calc_dict['$and'])
-                if self.args.get('ignore_warnings') is None:
+                if not self.args.get('ignore_warnings'):
                     query_dict['$and'].append(query.query_quality())
                 if not self.non_binary or ind == 0:
                     query_dict['$and'].append(query.query_composition(custom_elem=[elem]))
@@ -599,11 +599,23 @@ class QueryConvexHull(object):
             # annotate hull structures
             if self.args.get('labels'):
                 for ind, doc in enumerate(self.hull_cursor[1:-1]):
-                    ax.annotate(get_formula_from_stoich(doc['stoichiometry']),
+                    if (ind+2) < np.argmin(tie_line[:, 1]):
+                        position = (0.8*tie_line[ind+2, 0], 1.1*(tie_line[ind+2, 1])-0.05)
+                        arrowprops = dict(arrowstyle="->", color='k')
+                    elif (ind+2) == np.argmin(tie_line[:, 1]):
+                        position = (tie_line[ind+2, 0], 1.1*(tie_line[ind+2, 1])-0.05)
+                        arrowprops = dict(arrowstyle="->", color='k')
+                    else:
+                        position = (min(1.1*tie_line[ind+2, 0]+0.15, 0.95), 1.1*(tie_line[ind+2, 1])-0.05)
+                        arrowprops = dict(arrowstyle="->", color='k')
+                    ax.annotate(get_formula_from_stoich(doc['stoichiometry'], tex=True),
                                 xy=(tie_line[ind+2, 0], tie_line[ind+2, 1]),
-                                xytext=(tie_line[ind+2, 0], tie_line[ind+2, 1] - 0.08),
+                                xytext=position,
+                                fontsize=14,
                                 textcoords='data',
-                                ha='center',
+                                ha='right',
+                                va='bottom',
+                                arrowprops=arrowprops,
                                 zorder=99999)
             lw = self.scale * 0 if self.mpl_new_ver else 1
             # points for off hull structures
@@ -960,7 +972,7 @@ class QueryConvexHull(object):
         """ Plot calculated voltage curve. """
         import matplotlib.pyplot as plt
         if self.args.get('pdf') or self.args.get('png'):
-            fig = plt.figure(facecolor=None, figsize=(3, 2.7))
+            fig = plt.figure(facecolor=None, figsize=(6, 6))
         else:
             fig = plt.figure(facecolor=None)
         axQ = fig.add_subplot(111)
