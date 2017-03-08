@@ -107,7 +107,7 @@ class Refiner(object):
 
     def substruc(self):
         """ Compute substructure with Can's Voronoi code. """
-        from voronoi_interface import get_voronoi_substructure
+        from .voronoi_interface import get_voronoi_substructure
         print('Performing substructure analysis...')
         for ind, doc in enumerate(self.cursor):
             try:
@@ -115,6 +115,7 @@ class Refiner(object):
                 doc['substruc'] = get_voronoi_substructure(doc)
                 self.diff_cursor.append(doc)
             except:
+                print_exc()
                 self.failed_count += 1
                 if self.args.get('debug'):
                     print_exc()

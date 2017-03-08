@@ -38,16 +38,16 @@ def get_voronoi_substructure(doc):
     return doc['substruc']
 
 
-if __name__ == '__main__':
-    from matador import DBQuery, QueryConvexHull
-    # test with LiAs
-    query = DBQuery(composition=['LiAs'], subcmd='hull')
-    hull = QueryConvexHull(query, no_plot=True, hull_cutoff=0)
-    hull_cursor = hull.hull_cursor
-    most_lithiated = hull_cursor[-2]
-    most_lithiated_substruc = get_voronoi_substructure(most_lithiated)
-    other_substruc = []
-    for doc in hull_cursor:
-        other_substruc.append(get_voronoi_substructure(doc))
-    print(other_substruc)
-    print(most_lithiated_substruc)
+# if __name__ == '__main__':
+    # from matador import DBQuery, QueryConvexHull
+    # # test with LiAs
+    # query = DBQuery(composition=['LiAs'], subcmd='hull')
+    # hull = QueryConvexHull(query, no_plot=True, hull_cutoff=0)
+    # hull_cursor = hull.hull_cursor
+    # most_lithiated = hull_cursor[-2]
+    # most_lithiated_substruc = get_voronoi_substructure(most_lithiated)
+    # other_substruc = []
+    # for doc in hull_cursor:
+        # other_substruc.append(get_voronoi_substructure(doc))
+    # print(other_substruc)
+    # print(most_lithiated_substruc)
