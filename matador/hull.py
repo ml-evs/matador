@@ -70,8 +70,12 @@ class QueryConvexHull(object):
 
         display_results(self.hull_cursor, self.args, hull=True)
 
+        import matplotlib
         if not self.args.get('no_plot'):
             self.set_plot_param()
+            matplotlib.use('TKAgg')
+        else:
+            matplotlib.use('Agg')
 
         if self.args['subcmd'] == 'voltage':
             if self.args.get('debug'):
