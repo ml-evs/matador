@@ -598,17 +598,34 @@ class QueryConvexHull(object):
                         '--', c=self.colours[1], lw=1, alpha=0.5, zorder=1000, label='')
             # annotate hull structures
             if self.args.get('labels'):
-                for ind, doc in enumerate(self.hull_cursor[1:-1]):
+                ion = self.hull_cursor[0]['stoichiometry'][0][0]
+                for elem in self.hull_cursor[1]['stoichiometry']:
+                    if elem[0] == ion:
+                        num_ion = elem[1]
+                    else:
+                        num_b = elem[1]
+                ratio_A = num_ion / num_b
+                for elem in self.hull_cursor[2]['stoichiometry']:
+                    if elem[0] == ion:
+                        num_ion = elem[1]
+                    else:
+                        num_b = elem[1]
+                ratio_B = num_ion / num_b
+                if ratio_A > ratio_B:
+                    self.label_cursor = reversed(self.hull_cursor[1:-1])
+                else:
+                    self.label_cursor = self.hull_cursor[1:-1]
+                for ind, doc in enumerate(self.label_cursor):
                     if (ind+2) < np.argmin(tie_line[:, 1]):
-                        position = (0.8*tie_line[ind+2, 0], 1.1*(tie_line[ind+2, 1])-0.05)
+                        position = (0.8*tie_line[ind+2, 0], 1.15*(tie_line[ind+2, 1])-0.05)
                         arrowprops = dict(arrowstyle="->", color='k')
                     elif (ind+2) == np.argmin(tie_line[:, 1]):
-                        position = (tie_line[ind+2, 0], 1.1*(tie_line[ind+2, 1])-0.05)
+                        position = (tie_line[ind+2, 0], 1.15*(tie_line[ind+2, 1])-0.05)
                         arrowprops = dict(arrowstyle="->", color='k')
                     else:
-                        position = (min(1.1*tie_line[ind+2, 0]+0.15, 0.95), 1.1*(tie_line[ind+2, 1])-0.05)
+                        position = (min(1.1*tie_line[ind+2, 0]+0.15, 0.95), 1.15*(tie_line[ind+2, 1])-0.05)
                         arrowprops = dict(arrowstyle="->", color='k')
-                    ax.annotate(get_formula_from_stoich(doc['stoichiometry'], tex=True),
+                    ax.annotate(get_formula_from_stoich(doc['stoichiometry'], elements=self.elements, tex=True),
                                 xy=(tie_line[ind+2, 0], tie_line[ind+2, 1]),
                                 xytext=position,
                                 fontsize=14,
@@ -686,13 +703,13 @@ class QueryConvexHull(object):
         ax.set_ylabel('E$_\mathrm{F}$ (eV/atom)')
         if self.args.get('pdf'):
             plt.savefig(self.elements[0]+self.elements[1]+'_hull.pdf',
-                        dpi=400, bbox_inches='tight')
+                        dpi=500, bbox_inches='tight')
         elif self.args.get('svg'):
             plt.savefig(self.elements[0]+self.elements[1]+'_hull.svg',
-                        dpi=200, bbox_inches='tight')
+                        dpi=500, bbox_inches='tight')
         elif self.args.get('png'):
             plt.savefig(self.elements[0]+self.elements[1]+'_hull.png',
-                        dpi=200, bbox_inches='tight')
+                        dpi=500, bbox_inches='tight')
         else:
             plt.show()
 
@@ -972,7 +989,7 @@ class QueryConvexHull(object):
         """ Plot calculated voltage curve. """
         import matplotlib.pyplot as plt
         if self.args.get('pdf') or self.args.get('png'):
-            fig = plt.figure(facecolor=None, figsize=(6, 6))
+            fig = plt.figure(facecolor=None, figsize=(8, 6))
         else:
             fig = plt.figure(facecolor=None)
         axQ = fig.add_subplot(111)
@@ -993,36 +1010,45 @@ class QueryConvexHull(object):
                          lw=2, c=self.colours[ind])
                 axQ.plot([self.Q[ind][i], self.Q[ind][i]], [voltage[i], voltage[i+1]],
                          lw=2, c=self.colours[ind])
-        # for i in range(len(self.x)):
-            # if self.x[i] < 1e9:
-                # string_stoich = ''
-                # if abs(np.ceil(self.x[i])-self.x[i]) > 1e-8:
-                    # string_stoich = str(round(self.x[i], 1))
-                # else:
-                    # string_stoich = str(int(np.ceil(self.x[i])))
-                # if string_stoich is '1':
-                    # string_stoich = ''
-                # if string_stoich is '0':
-                    # string_stoich = ''
-                # else:
-                    # string_stoich = self.elements[0] + '$_{' + string_stoich + '}$' + self.elements[1]
-                # axQ.annotate(string_stoich,
-                             # xy=(self.Q[i], self.voltages[i]+0.001),
-                             # textcoords='data',
-                             # ha='center',
-                             # zorder=9999)
+        if self.args.get('labels'):
+            ion = self.hull_cursor[0]['stoichiometry'][0][0]
+            for elem in self.hull_cursor[1]['stoichiometry']:
+                if elem[0] == ion:
+                    num_ion = elem[1]
+                else:
+                    num_b = elem[1]
+            ratio_A = num_ion / num_b
+            for elem in self.hull_cursor[2]['stoichiometry']:
+                if elem[0] == ion:
+                    num_ion = elem[1]
+                else:
+                    num_b = elem[1]
+            ratio_B = num_ion / num_b
+            num_labels = len(self.hull_cursor)-2
+            if ratio_A > ratio_B:
+                self.label_cursor = list(reversed(self.hull_cursor[1:-1]))
+            else:
+                self.label_cursor = self.hull_cursor[1:-1]
+            for i in range(num_labels):
+                axQ.annotate(get_formula_from_stoich(self.label_cursor[i]['stoichiometry'], elements=self.elements, tex=True),
+                             xy=(self.Q[0][i+1], self.voltages[0][i+1]+0.001),
+                             textcoords='data',
+                             ha='left',
+                             zorder=9999)
         axQ.set_ylabel('Voltage (V)')
         axQ.set_xlabel('Gravimetric cap. (mAh/g)')
         start, end = axQ.get_ylim()
         axQ.set_ylim(start-0.01, end+0.01)
+        start, end = axQ.get_xlim()
+        axQ.set_xlim(0, end+200)
         axQ.grid('off')
         plt.tight_layout(pad=0.0, h_pad=1.0, w_pad=0.2)
         if self.args.get('pdf'):
             plt.savefig(self.elements[0]+self.elements[1]+'_voltage.pdf',
-                        dpi=300)
+                        dpi=500)
         elif self.args.get('png'):
             plt.savefig(self.elements[0]+self.elements[1]+'_voltage.png',
-                        dpi=300, bbox_inches='tight')
+                        dpi=500)
         else:
             plt.show()
 

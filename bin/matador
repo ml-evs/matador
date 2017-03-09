@@ -299,7 +299,7 @@ if __name__ == '__main__':
     structure_flags.add_argument('-f', '--formula', type=str, nargs='+',
                                  help='query a particular chemical formula, e.g. GeTeSi3')
     structure_flags.add_argument('-i', '--id', type=str, nargs='+', help='specify a particular structure by its text_id')
-    structure_flags.add_argument('-ac', '--calc-match', action='store_true',
+    structure_flags.add_argument('-ac', '--calc_match', action='store_true',
                                  help='display calculations of the same accuracy as specified id')
     structure_flags.add_argument('-kpttol', '--kpoint-tolerance', type=float,
                                  help='kpoint tolerance for calculation matches (DEFAULT: +/- 0.01 1/A')
