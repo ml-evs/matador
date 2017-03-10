@@ -1,6 +1,8 @@
-#!/usr/bin/python2
+#!/usr/bin/env python
 from __future__ import print_function
-from scrapers.castep_scrapers import castep2dict
+import matplotlib
+matplotlib.use('Agg')
+from matador.scrapers.castep_scrapers import castep2dict
 from os import walk, chdir
 from os.path import isdir
 from collections import defaultdict
@@ -21,7 +23,7 @@ def get_files(path):
                     source = castep_dict['source'][0].split('/')[-1]
                     source = source.replace('.castep', '')
                     source = ''.join(source.split('_')[:-1])
-                    print(source)
+                    # print(source)
                     structure_files[source].append(castep_dict)
     chdir('..')
     return structure_files
@@ -36,17 +38,17 @@ def get_cutoffs(structure_files):
         for doc in structure_files[key]:
             if len(doc['stoichiometry']) == 1:
                 doc['formation_energy_per_atom'] = 0
-                cutoff_chempots_dict[str(doc['cut_off_energy'])][doc['atom_types'][0]] = doc['total_energy_per_atom']
-                cutoff_chempots[key].append([doc['cut_off_energy'], doc['total_energy_per_atom']])
+                cutoff_chempots_dict[str(doc['cut_off_energy'])][doc['atom_types'][0]] = doc['enthalpy_per_atom']
+                cutoff_chempots[key].append([doc['cut_off_energy'], doc['enthalpy_per_atom']])
                 chempot_list[key] = doc['stoichiometry'][0][0]
     cutoff_form = defaultdict(list)
     stoich_list = dict()
-    print(cutoff_chempots_dict)
+    # print(cutoff_chempots_dict)
     for key in structure_files:
         for doc in structure_files[key]:
-            print(doc['cut_off_energy'])
+            # print(doc['cut_off_energy'])
             if len(doc['stoichiometry']) == 2:
-                doc['formation_energy_per_atom'] = doc['total_energy_per_atom']
+                doc['formation_energy_per_atom'] = doc['enthalpy_per_atom']
                 for atom in doc['atom_types']:
                     doc['formation_energy_per_atom'] -= cutoff_chempots_dict[str(doc['cut_off_energy'])][atom] / len(doc['atom_types'])
                 cutoff_form[key].append([doc['cut_off_energy'], doc['formation_energy_per_atom']])
@@ -76,24 +78,26 @@ def get_kpts(structure_files):
                 doc['formation_energy_per_atom'] = 0
                 # grid = doc['kpoints_mp_grid']
                 # num_k = sum(grid)
-                num_k = doc['kpoints_mp_spacing']
-                kpt_chempots_dict[str(round(doc['kpoints_mp_spacing'], 2))][doc['atom_types'][0]] = doc['total_energy_per_atom']
-                kpt_chempots[key].append([num_k, doc['total_energy_per_atom']])
+                num_k = round(doc['kpoints_mp_spacing'], 2)
+                print(doc['atom_types'][0], num_k, doc['kpoints_mp_spacing'])
+                kpt_chempots_dict[str(num_k)][doc['atom_types'][0]] = doc['enthalpy_per_atom']
+                kpt_chempots[key].append([num_k, doc['enthalpy_per_atom']])
                 chempot_list[key] = doc['stoichiometry'][0][0]
 
     print(kpt_chempots_dict)
-    print(kpt_chempots)
+    # print(kpt_chempots)
 
     kpt_form = defaultdict(list)
     stoich_list = dict()
     for key in structure_files:
         for doc in structure_files[key]:
+            print(doc['source'])
             grid = doc['kpoints_mp_grid']
             num_k = sum(grid)
             num_k = doc['kpoints_mp_spacing']
             if len(doc['stoichiometry']) == 2:
-                doc['formation_energy_per_atom'] = doc['total_energy_per_atom']
-                print(doc['kpoints_mp_spacing'])
+                doc['formation_energy_per_atom'] = doc['enthalpy_per_atom']
+                print('!', round(doc['kpoints_mp_spacing'], 2), doc['kpoints_mp_spacing'])
                 for atom in doc['atom_types']:
                     doc['formation_energy_per_atom'] -= kpt_chempots_dict[str(round(doc['kpoints_mp_spacing'], 2))][atom] / len(doc['atom_types'])
                 kpt_form[key].append([num_k, doc['formation_energy_per_atom']])
@@ -131,25 +135,22 @@ def plot_both(cutoff_chempots, kpt_chempots,
     for key in cutoff_chempots:
         ax.plot(-1/cutoff_chempots[key][:, 0], np.abs(cutoff_chempots[key][:, 1]-cutoff_chempots[key][-1, 1])*1000, 'o-', markersize=5, alpha=1, label=cutoff_chempot_list[key], lw=1)
     ax.set_ylabel('Relative energy difference (meV/atom)')
-    ax.set_xlabel('total_energy cutoff (eV)')
-    # ax.set_xlim(-1/300.0, 0)
-    # ax.set_xticks([-1/300.0, -1/500.0, -1/900.0])
+    ax.set_xlabel('enthalpy cutoff (eV)')
+    cutoffs = np.loadtxt('cutoff.conv')
+    ax.set_xticks(-1/cutoffs)
+    ax.set_xticklabels(cutoffs)
     ax.legend(loc='upper center', fontsize=10, ncol=4, shadow=True, bbox_to_anchor=(1.0, 1.25))
     # ax.set_ylim(-0.002e3, 0.03e3)
-    # ax.set_xticklabels(['300', '500', '700', '900'])
     # ax.set_yticklabels(ax.get_yticks())
     ax.grid('off')
 
     for key in kpt_form:
-        ax2.plot(-kpt_form[key][:, 0], np.abs(kpt_form[key][:, 1]-kpt_form[key][0, 1])*1000, 'o-', markersize=5, alpha=1, label=kpt_stoich_list[key], lw=1, zorder=1000)
+        ax2.plot(kpt_form[key][:, 0], np.abs(kpt_form[key][:, 1]-kpt_form[key][0, 1])*1000, 'o-', markersize=5, alpha=1, label=kpt_stoich_list[key], lw=1, zorder=1000)
     for key in kpt_chempots:
-        ax2.plot(-kpt_chempots[key][:, 0], np.abs(kpt_chempots[key][:, 1]-kpt_chempots[key][0, 1])*1000, 'o-', markersize=5, alpha=1, label=kpt_chempot_list[key], lw=1)
+        ax2.plot(kpt_chempots[key][:, 0], np.abs(kpt_chempots[key][:, 1]-kpt_chempots[key][0, 1])*1000, 'o-', markersize=5, alpha=1, label=kpt_chempot_list[key], lw=1)
+    kpts = list(reversed(np.loadtxt('kpt.conv').tolist()))
+    ax2.set_xticks(kpts)
     ax2.set_xlabel('max k-point spacing (1/A)')
-    # ax2.set_xticks([-0.03, -0.04, -0.05, -0.06, -0.07])
-    # ax2.set_ylim(-0.002e3, 0.03e3)
-    # ax2.set_xlim(-0.075, -0.02)
-    # ax2.set_yticklabels(ax2.get_yticks())
-    # ax2.set_xticklabels([0.03, 0.04, 0.05, 0.06, 0.07])
     ax2.grid('off')
 
     subax = plt.axes([.3, .50, .16, .36], axisbg='w')
@@ -166,8 +167,9 @@ def plot_both(cutoff_chempots, kpt_chempots,
     subax.set_yticklabels(subax.get_yticks())
     subax.grid('off')
     # plt.show()
-    plt.tight_layout()
-    plt.savefig('LiAs_conv.pdf', bbox_inches='tight')
+    # plt.tight_layout()
+    plt.savefig('conv.png', bbox_inches='tight')
+
 
 if __name__ == '__main__':
     if isdir('completed_cutoff'):
