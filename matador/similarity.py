@@ -54,7 +54,7 @@ class PDF(object):
         for comb in combinations_with_replacement(set(doc['atom_types']), 2):
             self.elem_Gr[tuple(set(comb))] = np.zeros((int(self.rmax / self.dr)))
         self.lattice = np.asarray(doc['lattice_cart'])
-        self.atoms = frac2cart(doc['lattice_cart'], doc['positions_frac'])
+        self.atoms = np.asarray(frac2cart(doc['lattice_cart'], doc['positions_frac']))
         self.types = doc['atom_types']
         self.label = ' '.join(doc['text_id'])
         self.num_atoms = len(self.atoms)
