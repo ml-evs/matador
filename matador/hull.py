@@ -1002,14 +1002,22 @@ class QueryConvexHull(object):
                 pass
         for ind, voltage in enumerate(self.voltages):
             if len(self.voltages) != 1:
+                fudge = 1/(0.675/1301)
                 axQ.annotate(get_formula_from_stoich(self.endstoichs[ind]),
-                             xy=(self.Q[ind][0]+0.05, voltage[0]+0.01),
+                             xy=(self.Q[ind][0]+fudge*0.05, voltage[0]+0.01),
                              textcoords='data', ha='center', zorder=99999)
-            for i in range(int(self.ternary), len(voltage)-1):
-                axQ.plot([self.Q[ind][i-1], self.Q[ind][i]], [voltage[i], voltage[i]],
-                         lw=2, c=self.colours[ind])
-                axQ.plot([self.Q[ind][i], self.Q[ind][i]], [voltage[i], voltage[i+1]],
-                         lw=2, c=self.colours[ind])
+                self.Q[ind] = [fudge*Q for Q in self.Q[ind]]
+                for i in range(int(self.ternary), len(voltage)-1):
+                    axQ.plot([self.Q[ind][i-1], self.Q[ind][i]], [voltage[i], voltage[i]],
+                             lw=2, c=self.colours[ind])
+                    axQ.plot([self.Q[ind][i], self.Q[ind][i]], [voltage[i], voltage[i+1]],
+                             lw=2, c=self.colours[ind])
+            else:
+                for i in range(int(self.ternary), len(voltage)-1):
+                    axQ.plot([self.Q[ind][i-1], self.Q[ind][i]], [voltage[i], voltage[i]],
+                             lw=2, c=self.colours[ind])
+                    axQ.plot([self.Q[ind][i], self.Q[ind][i]], [voltage[i], voltage[i+1]],
+                             lw=2, c=self.colours[ind])
         if self.args.get('labels'):
             ion = self.hull_cursor[0]['stoichiometry'][0][0]
             for elem in self.hull_cursor[1]['stoichiometry']:
@@ -1038,9 +1046,9 @@ class QueryConvexHull(object):
         axQ.set_ylabel('Voltage (V)')
         axQ.set_xlabel('Gravimetric cap. (mAh/g)')
         start, end = axQ.get_ylim()
-        axQ.set_ylim(start-0.01, end+0.01)
+        axQ.set_ylim(1.1*(start-0.01), 1.1*end)
         start, end = axQ.get_xlim()
-        axQ.set_xlim(0, end+200)
+        axQ.set_xlim(0, 1.1*end)
         axQ.grid('off')
         plt.tight_layout(pad=0.0, h_pad=1.0, w_pad=0.2)
         if self.args.get('pdf'):

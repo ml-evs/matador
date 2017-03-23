@@ -214,7 +214,7 @@ class FullRelaxer:
                 if self.debug:
                     print_notify('Restarting calculation with current state:')
                     print(calc_doc)
-                if self.verbosity > 2:
+                if self.verbosity >= 2:
                     print('max F: {:5f} eV/A, stress: {:5f} GPa, cell volume: {:5f} A^3, enthalpy per atom {:5f} eV'
                           .format(opti_dict['max_force_on_atom'], opti_dict['pressure'],
                                   opti_dict['cell_volume'], opti_dict['enthalpy_per_atom']))
