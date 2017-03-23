@@ -315,7 +315,7 @@ def get_guess_doc_provenance(sources, icsd=None):
     return prov
 
 
-def get_uniq_cursor(cursor, sim_calculator=PDF, sim_tol=1e-2):
+def get_uniq_cursor(cursor, sim_calculator=PDF, sim_tol=1e-1):
     """ Use sim_calculator to filter cursor into
     unique structures to some tolerance sim_tol.
     """
@@ -323,14 +323,18 @@ def get_uniq_cursor(cursor, sim_calculator=PDF, sim_tol=1e-2):
     print('Calculating fingerprints...')
     for doc in cursor:
         fingerprint_list.append(sim_calculator(doc))
-
+    corr_mat = np.zeros((len(fingerprint_list), len(fingerprint_list)))
     print('Assessing similarities...')
     for i in range(len(fingerprint_list)):
+        corr_mat[i, i] = 0
         for j in range(i+1, len(fingerprint_list)):
             sim = fingerprint_list[i].get_sim_distance(fingerprint_list[j])
+            corr_mat[i, j] = sim
+            corr_mat[j, i] = sim
             print('{}, {}, {}'.format(i, j, sim))
             if sim < sim_tol:
                 print('found close structure to {}, {}'.format(i, j))
+    return fingerprint_list, corr_mat
 
 
 def get_spg_uniq(cursor, symprec=1e-2, latvecprec=1e-3, posprec=1e-3):
