@@ -2,7 +2,7 @@
 # coding: utf-8
 from matador.scrapers import castep_scrapers
 from matador.export import doc2cell
-from matador.print_utils import print_notify, print_success, print_failure
+from matador.utils.print_utils import print_notify, print_success, print_failure
 from sys import argv
 
 fnames = argv[1:]

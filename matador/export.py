@@ -246,7 +246,12 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, spin=Fa
                 pressure = doc['external_pressure'][2]
                 f.write(str(pressure[0]) + '\n')
                 f.write('%endblock external_pressure\n'.upper())
-            if 'kpoints_mp_spacing' in doc:
+            if 'kpoints_list' in doc:
+                f.write('%BLOCK KPOINTS_LIST' + '\n')
+                for kpoint in doc['kpoints_list']:
+                    f.write('{p[0]:f} {p[1]:f} {p[2]:f} {p[3]:f}\n'.format(p=kpoint))
+                f.write('%ENDBLOCK KPOINTS_LIST' + '\n')
+            elif 'kpoints_mp_spacing' in doc:
                 f.write('kpoints_mp_spacing : ' + str(doc['kpoints_mp_spacing']) + '\n')
             elif 'kpoints_mp_grid' in doc:
                 f.write('kpoints_mp_grid : ' +
