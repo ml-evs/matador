@@ -27,9 +27,9 @@ class PDF(object):
         """ Initialise parameters.
 
         dr             : bin width for PDF (Angstrom) (DEFAULT: 0.001)
-        gaussian_width : width of Gaussian smearing (Angstrom) (DEFAULT: 0.01)
-        num_images     : number of unit cell images include in PDF calculation (DEFAULT: 1)
-        rmax           : maximum distance cutoff for PDF (Angstrom) (DEFAULT: 10)
+        gaussian_width : width of Gaussian smearing (Angstrom) (DEFAULT: 0.05)
+        num_images     : number of unit cell images include in PDF calculation (DEFAULT: 3)
+        rmax           : maximum distance cutoff for PDF (Angstrom) (DEFAULT: 15)
 
         """
         if kwargs.get('dr') is None:
@@ -37,15 +37,15 @@ class PDF(object):
         else:
             self.dr = kwargs['dr']
         if kwargs.get('gaussian_width') is None:
-            self.gaussian_width = 0.01
+            self.gaussian_width = 0.05
         else:
             self.gaussian_width = kwargs['gaussian_width']
         if kwargs.get('num_images') is None:
-            self.num_images = 1
+            self.num_images = 3
         else:
             self.num_images = kwargs['num_images']
         if kwargs.get('rmax') is None:
-            self.rmax = 10
+            self.rmax = 15
         else:
             self.rmax = kwargs['rmax']
         self.r_space = np.arange(0, self.rmax, self.dr)
@@ -54,7 +54,7 @@ class PDF(object):
         for comb in combinations_with_replacement(set(doc['atom_types']), 2):
             self.elem_Gr[tuple(set(comb))] = np.zeros((int(self.rmax / self.dr)))
         self.lattice = np.asarray(doc['lattice_cart'])
-        self.atoms = frac2cart(doc['lattice_cart'], doc['positions_frac'])
+        self.atoms = np.asarray(frac2cart(doc['lattice_cart'], doc['positions_frac']))
         self.types = doc['atom_types']
         self.label = ' '.join(doc['text_id'])
         self.num_atoms = len(self.atoms)
@@ -178,7 +178,7 @@ class PDFOverlap(object):
         ax1.set_xlabel('$r$ (Angstrom)')
         ax1.set_ylabel('$g(r)$')
         ax2.axhline(0, ls='--', c='k', lw=0.5)
-        ax2.plot(self.fine_space, self.overlap_fn, ls='--')
+        ax2.plot(self.fine_space, self.overlap_fn, ls='-')
         ax2.set_ylim(-0.5*ax1.get_ylim()[1], 0.5*ax1.get_ylim()[1])
         ax2.set_xlabel('$r$ (Angstrom)')
         ax2.set_ylabel('$g(r)$')
