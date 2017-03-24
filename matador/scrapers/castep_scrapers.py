@@ -30,8 +30,7 @@ def res2dict(seed, db=True, verbosity=0, **kwargs):
     """ Extract available information from .res file; preferably
     used in conjunction with cell or param file.
     """
-    # use defaultdict to allow for easy appending
-    res = defaultdict(list)
+    res = dict()
     try:
         # read .res file into array
         if seed.endswith('.res'):
@@ -39,6 +38,7 @@ def res2dict(seed, db=True, verbosity=0, **kwargs):
         with open(seed+'.res', 'r') as f:
             flines = f.readlines()
         # add .res to source
+        res['source'] = []
         res['source'].append(seed+'.res')
         # grab file owner username
         try:
@@ -79,6 +79,8 @@ def res2dict(seed, db=True, verbosity=0, **kwargs):
         res['lattice_abc'] = [list(map(float, cell[2:5])), list(map(float, cell[5:8]))]
         # calculate lattice_cart from abc
         res['lattice_cart'] = abc2cart(res['lattice_abc'])
+        res['atom_types'] = []
+        res['positions_frac'] = []
         for line_no, line in enumerate(flines):
             if 'SFAC' in line:
                 i = 1
@@ -151,13 +153,14 @@ def cell2dict(seed, db=True, outcell=False, positions=False, verbosity=0, **kwar
     """ Extract available information from .cell file; probably
     to be merged with another dict from a .param or .res file.
     """
-    cell = defaultdict(list)
+    cell = dict()
     try:
         if seed.endswith('.cell'):
             seed = seed.replace('.cell', '')
         with open(seed+'.cell', 'r') as f:
             flines = f.readlines()
         # add cell file to source
+        cell['source'] = []
         cell['source'].append(seed+'.cell')
         for line_no, line in enumerate(flines):
             if line.startswith(('#', '!')):
@@ -184,7 +187,7 @@ def cell2dict(seed, db=True, outcell=False, positions=False, verbosity=0, **kwar
                         cell['species_pot'][flines[line_no+i].split()[0]].replace('()', '')
                     i += 1
             elif '%block cell_constraints' in line.lower():
-                cell['cell_constraints'] = list()
+                cell['cell_constraints'] = []
                 for j in range(2):
                     cell['cell_constraints'].append(list(map(int, flines[line_no+j+1].split())))
             elif '%block hubbard_u' in line.lower():
@@ -304,11 +307,12 @@ def param2dict(seed, db=True, verbosity=0, **kwargs):
 
     """
     try:
-        param = defaultdict(list)
+        param = dict()
         if seed.endswith('.param'):
             seed = seed.replace('.param', '')
         with open(seed+'.param', 'r') as f:
             flines = f.readlines()
+        param['souce'] = []
         param['source'].append(seed+'.param')
         # exclude some useless info if importing to db
         scrub_list = ['checkpoint', 'write_bib', 'mix_history_length',
@@ -440,7 +444,7 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
     information about a calculation.
     """
     # use defaultdict to allow for easy appending
-    castep = defaultdict(list)
+    castep = dict()
     try:
         # read .castep, .history or .history.gz file
         if '.gz' in seed:
@@ -450,6 +454,7 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
             with open(seed, 'r') as f:
                 flines = f.readlines()
         # set source tag to castep file
+        castep['source'] = []
         castep['source'].append(seed)
         pspot_report_dict = dict()
         # grab file owner
@@ -463,8 +468,8 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
         # once more forwards, from the final step, to get the final structure
         for line_no, line in enumerate(flines):
             if 'atom types' not in castep and 'Cell Contents' in line:
-                castep['atom_types'] = list()
-                castep['positions_frac'] = list()
+                castep['atom_types'] = []
+                castep['positions_frac'] = []
                 i = 1
                 atoms = False
                 while True:
@@ -530,6 +535,8 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
                 castep['finite_basis_corr'] = line.split(':')[-1].strip()
             elif 'kpoints_mp_grid' not in castep and 'MP grid size for SCF' in line:
                 castep['kpoints_mp_grid'] = list(map(int, list(line.split('is')[-1].split())))
+            elif 'num_kpoints' not in castep and 'Number of kpoints used' in line:
+                castep['num_kpoints'] = int(line.split()[-1])
             elif 'sedc_apply' not in castep and \
                     'DFT+D: Semi-empirical dispersion correction    : on' in line:
                 castep['sedc_apply'] = True
@@ -538,7 +545,7 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
                 castep['space_group'] = line.split(':')[-1].split(',')[0].strip().replace(" ", "")
             elif 'external_pressure' not in castep and 'External pressure/stress' in line:
                 try:
-                    castep['external_pressure'] = list()
+                    castep['external_pressure'] = []
                     castep['external_pressure'].append(list(map(float, flines[line_no+1].split())))
                     castep['external_pressure'].append(list(map(float, flines[line_no+2].split())))
                     castep['external_pressure'].append(list(map(float, flines[line_no+3].split())))
@@ -633,7 +640,7 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
                 final_flines = flines[finish_line+1:]
                 for line_no, line in enumerate(final_flines):
                     if 'Real Lattice' in line:
-                        castep['lattice_cart'] = list()
+                        castep['lattice_cart'] = []
                         i = 1
                         while True:
                             if len(final_flines[line_no+i].strip()) == 0:
@@ -643,7 +650,7 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
                                 castep['lattice_cart'].append(list(map(float, temp_line)))
                             i += 1
                     elif 'Lattice parameters' in line:
-                        castep['lattice_abc'] = list()
+                        castep['lattice_abc'] = []
                         i = 1
                         castep['lattice_abc'].append(
                             list(map(float,
@@ -658,7 +665,7 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
                     elif 'Current cell volume' in line:
                         castep['cell_volume'] = float(line.split('=')[1].split()[0].strip())
                     elif 'Cell Contents' in line:
-                        castep['positions_frac'] = list()
+                        castep['positions_frac'] = []
                         i = 1
                         atoms = False
                         while True:
