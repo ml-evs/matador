@@ -807,7 +807,8 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
             elif 'Peak Memory Use' in line:
                 castep['peak_mem_MB'] = int(float(line.split()[-2])/1024)
         # check that any optimized results were saved and raise errors if not
-        if castep['optimised'] is False:
+        if castep.get('optimised') is False:
+            castep['optimised'] = False
             raise DFTError('CASTEP GO failed to converge.')
         if 'positions_frac' not in castep:
             raise RuntimeError('Could not find positions')
