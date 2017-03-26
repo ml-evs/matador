@@ -1,0 +1,22 @@
+task                 : geometryoptimization 
+xc_functional        : PBE 
+spin_polarized       : false 
+fix_occupancy        : false 
+metals_method        : dm 
+max_scf_cycles       : 100
+cut_off_energy       : 500 eV
+opt_strategy         : speed 
+page_wvfns           : 0
+perc_extra_bands     : 40
+num_dump_cycles      : 0 
+backup_interval      : 0 
+geom_method          : LBFGS 
+geom_max_iter        : 200
+mix_history_length   : 20 
+finite_basis_corr    : 0
+fixed_npw            : false
+write_cell_structure : true
+write_checkpoint     : none
+write_bib            : false
+bs_write_eigenvalues : false
+calculate_stress     : true

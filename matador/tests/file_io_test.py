@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import unittest
-from matador.scrapers.castep_scrapers import castep2dict, cell2dict, res2dict
+from matador.scrapers.castep_scrapers import castep2dict, cell2dict, res2dict, param2dict
 from matador.export import doc2res
 from matador.utils.print_utils import print_warning
 from os.path import realpath
@@ -84,6 +84,35 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(test_dict['cell_volume'], 105.918342, msg='Wrong cell volume!')
             self.assertEqual(test_dict['space_group'], 'Pmc2_1', msg='Wrong space group!')
             self.assertEqual(test_dict['lattice_abc'], [[5.057429, 4.93404, 4.244619], [90.0, 90.0, 90.0]], msg='Wrong lattice constants!')
+
+    def testParam(self):
+        param_fname = REAL_PATH + 'data/KX.param'
+        failed_open = False
+        try:
+            f = open(param_fname, 'r')
+        except:
+            failed_open = True
+            print('Failed to open test case', param_fname, '- please check installation.')
+        if not failed_open:
+            f.close()
+            test_dict, s = param2dict(param_fname, db=True)
+            self.assertTrue(s, 'Failed entirely, oh dear!')
+            self.assertEqual(test_dict['source'][0].split('/')[-1], 'KX.param', msg='Wrong source!')
+            self.assertEqual(test_dict['task'], 'geometryoptimization', msg='Failed to read task!')
+            self.assertEqual(test_dict['xc_functional'], 'PBE', msg='Failed to read xc!')
+            self.assertEqual(test_dict['perc_extra_bands'], 40.0, msg='Failed to read extra bands!')
+
+            test_dict, s = param2dict(param_fname, db=False)
+            self.assertTrue(s, 'Failed db=False test entirely, oh dear!')
+            self.assertEqual(test_dict['source'][0].split('/')[-1], 'KX.param', msg='Wrong db=False source!')
+            self.assertEqual(test_dict['task'], 'geometryoptimization', msg='Failed to read db=False task!')
+            self.assertEqual(test_dict['xc_functional'], 'PBE', msg='Failed to read db=False xc!')
+            self.assertEqual(test_dict['fix_occupancy'], 'false', msg='Failed to read db=False occupancy!')
+            self.assertEqual(test_dict['perc_extra_bands'], 40.0, msg='Failed to read db=False extra bands!')
+            self.assertEqual(test_dict['geom_max_iter'], '200', msg='Wrong db=False geom_max_iter!')
+            self.assertEqual(test_dict['fixed_npw'], 'false', msg='Wrong db=False fixed_npw!')
+            self.assertEqual(test_dict['write_checkpoint'], 'none', msg='Wrong db=False checkpointing!')
+            self.assertEqual(test_dict['write_cell_structure'], True, msg='Wrong db=False cell_structure!')
 
 
 class ExportTest(unittest.TestCase):
