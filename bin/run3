@@ -96,7 +96,7 @@ class BatchRun:
         if not param_success:
             valid = False
             print_failure('Failed to parse param file')
-        if 'geom_max_iter' not in self.param_dict and 'geometry' in self.param_dict['task']:
+        if 'geom_max_iter' not in self.param_dict and self.param_dict['task'].upper() in ['GEOMETRYOPTIMISATION', 'GEOMETRYOPTIMIZATION']:
             valid = False
             print_failure('geom_max_iter is unset, please fix this.')
         if 'geom_max_iter' in self.param_dict and int(self.param_dict['geom_max_iter']) < 20:
