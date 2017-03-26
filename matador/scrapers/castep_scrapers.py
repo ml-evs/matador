@@ -312,7 +312,7 @@ def param2dict(seed, db=True, verbosity=0, **kwargs):
             seed = seed.replace('.param', '')
         with open(seed+'.param', 'r') as f:
             flines = f.readlines()
-        param['souce'] = []
+        param['source'] = []
         param['source'].append(seed+'.param')
         # exclude some useless info if importing to db
         scrub_list = ['checkpoint', 'write_bib', 'mix_history_length',
