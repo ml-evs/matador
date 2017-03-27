@@ -12,6 +12,7 @@ from matador.export import doc2cell, doc2param, doc2res
 # standard library
 from os import makedirs, remove, system, devnull, getcwd
 from os.path import isfile, exists
+from copy import deepcopy
 from traceback import print_exc
 import subprocess as sp
 import glob
@@ -108,6 +109,9 @@ class FullRelaxer:
                 # begin relaxation
                 if self.start:
                     self.success = self.relax()
+                    # if geom opt was successful, modify input dict
+                    if self.success:
+                        res = self.opti_dict
 
     def relax(self):
         """ Set up the calculation to perform 4 sets of two steps,
@@ -175,6 +179,7 @@ class FullRelaxer:
                     print_success('Successfully relaxed ' + seed)
                     # write res and castep file out to completed folder
                     doc2res(opti_dict, seed, hash_dupe=False)
+                    self.opti_dict = deepcopy(opti_dict)
                     self.mv_to_completed(seed)
                     if calc_doc.get('write_cell_structure'):
                         system('mv ' + seed + '-out.cell' + ' completed/' + seed + '-out.cell')
@@ -187,6 +192,7 @@ class FullRelaxer:
                     if isfile(seed+'.res'):
                         remove(seed+'.res')
                     doc2res(opti_dict, seed, hash_dupe=False)
+                    self.opti_dict = deepcopy(opti_dict)
                     self.mv_to_bad(seed)
                     return False
                 err_file = seed + '*001.err'
