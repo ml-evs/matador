@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 from __future__ import print_function
-import matplotlib
-matplotlib.use('Agg')
 from matador.scrapers.castep_scrapers import castep2dict
 from os import walk, chdir
 from os.path import isdir
 from collections import defaultdict
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')
 
 
 def get_files(path):
@@ -135,7 +135,7 @@ def plot_both(cutoff_chempots, kpt_chempots,
     for key in cutoff_chempots:
         ax.plot(-1/cutoff_chempots[key][:, 0], np.abs(cutoff_chempots[key][:, 1]-cutoff_chempots[key][-1, 1])*1000, 'o-', markersize=5, alpha=1, label=cutoff_chempot_list[key], lw=1)
     ax.set_ylabel('Relative energy difference (meV/atom)')
-    ax.set_xlabel('enthalpy cutoff (eV)')
+    ax.set_xlabel('plane wave cutoff (eV)')
     cutoffs = np.loadtxt('cutoff.conv')
     ax.set_xticks(-1/cutoffs)
     ax.set_xticklabels(cutoffs)
