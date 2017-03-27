@@ -1,8 +1,10 @@
 from setuptools import setup, find_packages
 from subprocess import check_output
-
-__version__ = check_output(["git", "describe", "--tags"]).decode("utf-8").strip()
-__version__ += '-' + check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"]).decode("utf-8").strip()
+try:
+    __version__ = check_output(["git", "describe", "--tags"]).decode("utf-8").strip()
+    __version__ += '-' + check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"]).decode("utf-8").strip()
+except:
+    __version__ = 'xxx'
 
 setup(name='matador',
       version=__version__,
