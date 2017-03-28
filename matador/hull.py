@@ -700,6 +700,7 @@ class QueryConvexHull(object):
         ax.set_xlim(-0.05, 1.05)
         ax.set_xticks([0, 0.33, 0.5, 0.66, 1])
         ax.set_xticklabels(ax.get_xticks())
+        ax.set_yticks([0, -0.2, -0.4])
         ax.set_ylabel('E$_\mathrm{F}$ (eV/atom)')
         if self.args.get('pdf'):
             plt.savefig(self.elements[0]+self.elements[1]+'_hull.pdf',
