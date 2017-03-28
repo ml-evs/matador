@@ -1,0 +1,11 @@
+{
+ 'real':     {'8':   'double',
+              'dp':  'double'},
+ 'complex' : {'8':   'complex_double',
+              'dp':  'complex_double'},
+ 'integer' : {'':       'int',
+ 	          'bit_32': 'int',
+              'bit_64': 'long_long',
+	          '8':      'long_long',
+	          'dp':     'long_long' }
+}

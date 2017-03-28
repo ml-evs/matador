@@ -3,11 +3,8 @@
 the similarity between two structures.
 
 TO-DO:
-    * standardize overlap integrals
     * otf calculation of required num_images
     * non-diagonal supercells
-    * generic wrapper for a cursor to be screened
-    * comparing PDFs at different parameters
 
 """
 
