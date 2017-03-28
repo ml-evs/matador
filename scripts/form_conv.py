@@ -64,6 +64,8 @@ def get_cutoffs(structure_files):
         cutoff_chempots[key].sort()
         cutoff_chempots[key] = np.asarray(cutoff_chempots[key])
 
+    print(cutoff_chempots)
+
     return cutoff_chempots, cutoff_form, stoich_list, chempot_list
 
 
@@ -84,7 +86,7 @@ def get_kpts(structure_files):
                 kpt_chempots[key].append([num_k, doc['enthalpy_per_atom']])
                 chempot_list[key] = doc['stoichiometry'][0][0]
 
-    print(kpt_chempots_dict)
+    # print(kpt_chempots_dict)
     # print(kpt_chempots)
 
     kpt_form = defaultdict(list)
@@ -129,11 +131,11 @@ def plot_both(cutoff_chempots, kpt_chempots,
     fig = plt.figure(facecolor='w', figsize=(10, 6))
     ax = fig.add_subplot(121, axisbg='w')
     ax2 = fig.add_subplot(122, axisbg='w')
-    for key in cutoff_form:
-        ax.plot(-1/cutoff_form[key][:, 0], np.abs(cutoff_form[key][:, 1]-cutoff_form[key][-1, 1])*1000,
+    for ind, key in enumerate(cutoff_form):
+        ax.plot(-1/cutoff_form[key][:, 0], np.abs(cutoff_form[key][:, 1]-cutoff_form[key][0, 1])*1000,
                 'o-', markersize=5, alpha=1, label=cutoff_stoich_list[key], lw=1, zorder=1000)
-    for key in cutoff_chempots:
-        ax.plot(-1/cutoff_chempots[key][:, 0], np.abs(cutoff_chempots[key][:, 1]-cutoff_chempots[key][-1, 1])*1000, 'o-', markersize=5, alpha=1, label=cutoff_chempot_list[key], lw=1)
+    # for key in cutoff_chempots:
+        # ax_chempots.plot(-1/cutoff_chempots[key][:, 0], np.abs(cutoff_chempots[key][:, 1]-cutoff_chempots[key][-1, 1])*1000, 'o-', markersize=5, alpha=1, label=cutoff_chempot_list[key], lw=1)
     ax.set_ylabel('Relative energy difference (meV/atom)')
     ax.set_xlabel('plane wave cutoff (eV)')
     cutoffs = np.loadtxt('cutoff.conv')
@@ -153,19 +155,19 @@ def plot_both(cutoff_chempots, kpt_chempots,
     ax2.set_xlabel('max k-point spacing (1/A)')
     ax2.grid('off')
 
-    subax = plt.axes([.3, .50, .16, .36], axisbg='w')
-    for key in cutoff_form:
-        subax.plot(1/cutoff_form[key][:, 0], np.abs(cutoff_form[key][:, 1]-cutoff_form[key][-1, 1])*1000,
-                   'o-', markersize=5, alpha=1, label=cutoff_stoich_list[key], lw=1, zorder=1000)
-    for key in cutoff_chempots:
-        subax.plot(1/cutoff_chempots[key][:, 0], np.abs(cutoff_chempots[key][:, 1]-cutoff_chempots[key][-1, 1])*1000, 'o-', markersize=5, alpha=1, label=cutoff_chempot_list[key], lw=1)
+    # subax = plt.axes([.3, .50, .16, .36], axisbg='w')
+    # for key in cutoff_form:
+        # subax.plot(1/cutoff_form[key][:, 0], np.abs(cutoff_form[key][:, 1]-cutoff_form[key][-1, 1])*1000,
+                   # 'o-', markersize=5, alpha=1, label=cutoff_stoich_list[key], lw=1, zorder=1000)
+    # for key in cutoff_chempots:
+        # subax.plot(1/cutoff_chempots[key][:, 0], np.abs(cutoff_chempots[key][:, 1]-cutoff_chempots[key][-1, 1])*1000, 'o-', markersize=5, alpha=1, label=cutoff_chempot_list[key], lw=1)
     # subax.set_ylim(-0.0001e3, 0.0005e3)
     # subax.set_xlim(500, 800)
     # subax.set_xticks([500, 600, 700, 800])
     # subax.set_yticks([0, 0.00025e3, 0.0005e3])
-    subax.set_xticklabels(subax.get_xticks())
-    subax.set_yticklabels(subax.get_yticks())
-    subax.grid('off')
+    # subax.set_xticklabels(subax.get_xticks())
+    # subax.set_yticklabels(subax.get_yticks())
+    # subax.grid('off')
     # plt.show()
     # plt.tight_layout()
     plt.savefig('conv.png', bbox_inches='tight')
