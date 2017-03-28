@@ -5,6 +5,7 @@ the similarity between two structures.
 TO-DO:
     * otf calculation of required num_images
     * non-diagonal supercells
+    * element-projected Fortran PDF calculator
 
 """
 
@@ -27,6 +28,7 @@ class PDF(object):
         gaussian_width : width of Gaussian smearing (Angstrom) (DEFAULT: 0.05)
         num_images     : number of unit cell images include in PDF calculation (DEFAULT: 3)
         rmax           : maximum distance cutoff for PDF (Angstrom) (DEFAULT: 15)
+        calculator     : F or None, for Fortran or Python calculator (DEFAULT: None)
 
         """
         if kwargs.get('dr') is None:
@@ -45,6 +47,10 @@ class PDF(object):
             self.rmax = 15
         else:
             self.rmax = kwargs['rmax']
+        if kwargs.get('calculator') is None:
+            self._calc_pdf = self._calc_py_pdf
+        else:
+            self._calc_pdf = self._calc_fortran_pdf
         self.r_space = np.arange(0, self.rmax, self.dr)
         self.Gr = np.zeros((int(self.rmax / self.dr)))
         self.elem_Gr = dict()
@@ -60,12 +66,13 @@ class PDF(object):
         if not kwargs.get('lazy'):
             self._calc_pdf()
 
-    def _calc_pdf(self):
-        """ Calculate PDF of a matador document.
+    def _calc_fortran_pdf(self):
+        """ Calculate PDF of a matador document with Fortran calculator. """
+        from similarity.pdf.pdf_calculator import pdf_calc
+        raise NotImplementedError
 
-        TO-DO: vectorise.
-
-        """
+    def _calc_py_pdf(self):
+        """ Calculate PDF of a matador document with Python calculator. """
         for i in range(self.num_atoms):
             for j in range(i+1, self.num_atoms):
                 d_ij = np.sqrt(np.sum((self.atoms[i] - self.atoms[j])**2))
@@ -119,6 +126,10 @@ class PDF(object):
 
 
 class PDFOverlap(object):
+    """ Calculate the PDFOverlap between two PDF objects,
+    pdf_A and pdf_B, with appropriate rescaling by either
+    "bond" or "density".
+    """
     def __init__(self, pdf_A, pdf_B, rescale=None):
         self.pdf_A = pdf_A
         self.pdf_B = pdf_B

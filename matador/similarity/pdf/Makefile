@@ -1,5 +1,5 @@
 FFLAGS = -O3 -Wall -fPIC
-FC = gfortran
+FC = gfortran 
 
 
 objects = double.o pdf_calculator.o
