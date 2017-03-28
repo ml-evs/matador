@@ -36,7 +36,7 @@ class PDF(object):
         else:
             self.dr = kwargs['dr']
         if kwargs.get('gaussian_width') is None:
-            self.gaussian_width = 0.05
+            self.gaussian_width = 0.01
         else:
             self.gaussian_width = kwargs['gaussian_width']
         if kwargs.get('num_images') is None:
@@ -137,12 +137,15 @@ class PDFOverlap(object):
         self.rescale = rescale
         # initialise with large number
         self.similarity_distance = 1e10
+        self.overlap_int = 0
         self.pdf_overlap()
 
     def pdf_overlap(self):
         """ Calculate the overlap of two PDFs via
         a simple meshed sum of their difference.
         """
+        self.overlap_int = 0
+        self.similarity_distance = 1e10
         self.fine_space = np.arange(0, self.pdf_A.rmax, self.fine_dr)
         self.fine_Gr_A = np.interp(self.fine_space, self.pdf_A.r_space, self.pdf_A.Gr)
         self.fine_Gr_B = np.interp(self.fine_space, self.pdf_B.r_space, self.pdf_B.Gr)
@@ -168,6 +171,50 @@ class PDFOverlap(object):
             np.trapz(np.abs(self.fine_Gr_B), dx=self.pdf_B.dr/2.0)
         self.overlap_int = np.trapz(np.abs(self.overlap_fn), dx=self.pdf_A.dr/2.0)
         self.similarity_distance = self.overlap_int / self.worst_case_overlap_int
+
+    def projected_pdf_overlap(self):
+        """ Calculate the overlap of two projected PDFs via
+        a simple meshed sum of their difference.
+        """
+        self.fine_space = np.arange(0, self.pdf_A.rmax, self.fine_dr)
+        self.overlap_int = 0
+        self.similarity_distance = 1e10
+        elems = set(key for key in self.pdf_A.elem_Gr)
+        if elems != set(key for key in self.pdf_B.elem_Gr):
+            print('WARNING: PDFs have different elements.')
+        self.fine_elem_Gr_A, self.fine_elem_Gr_B = 2*[dict()]
+        for key in elems:
+            self.fine_elem_Gr_A[key] = np.interp(self.fine_space, self.pdf_A.r_space, self.pdf_A.elem_Gr[key])
+            self.fine_elem_Gr_B[key] = np.interp(self.fine_space, self.pdf_B.r_space, self.pdf_B.elem_Gr[key])
+        # discard last quarter before rmax to remove noise
+        if self.rescale is not None:
+            val = 0.5 * np.max(self.fine_Gr_B)
+            # scaling factor here is essentially equalising the shortest bond length
+            bond_rescaling_factor = np.argmax(self.fine_Gr_B > val) / np.argmax(self.fine_Gr_A > val)
+            # scaling factor here is normalising to number density
+            density_rescaling_factor = pow((self.pdf_B.volume / self.pdf_B.num_atoms) / (self.pdf_A.volume / self.pdf_A.num_atoms), 1/3)
+            if self.rescale == 'density':
+                rescale_factor = density_rescaling_factor
+            else:
+                if self.rescale != 'bond':
+                    print('Rescaling mode not specified, performing default (bond rescaling).')
+                rescale_factor = bond_rescaling_factor
+            for key in elems:
+                self.fine_elem_Gr_A[key] = np.interp(self.fine_space, rescale_factor*self.fine_space, self.fine_elem_Gr_A[key])
+        for key in elems:
+            self.fine_elem_Gr_A[key] = self.fine_elem_Gr_A[key][:int(len(self.fine_space)*0.75)]
+            self.fine_elem_Gr_B[key] = self.fine_elem_Gr_B[key][:int(len(self.fine_space)*0.75)]
+        self.fine_space = self.fine_space[:int(len(self.fine_space)*0.75)]
+        self.overlap_fn = dict()
+        for key in elems:
+            self.overlap_fn[key] = self.fine_elem_Gr_A[key] - self.fine_elem_Gr_B[key]
+        self.worst_case_overlap_int = dict()
+        for key in elems:
+            self.worst_case_overlap_int[key] = np.trapz(np.abs(self.fine_elem_Gr_A[key]), dx=self.pdf_A.dr/2.0) + \
+                np.trapz(np.abs(self.fine_elem_Gr_B[key]), dx=self.pdf_B.dr/2.0)
+        for key in elems:
+            self.overlap_int += np.trapz(np.abs(self.overlap_fn[key]), dx=self.pdf_A.dr/2.0) / self.worst_case_overlap_int[key]
+        self.similarity_distance = self.overlap_int / len(elems)
 
     def pdf_convolve(self, mode='same'):
         """ Calculate the convolution of two PDFs.
