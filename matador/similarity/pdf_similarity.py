@@ -13,8 +13,10 @@ TO-DO:
 from matador.utils.cell_utils import frac2cart
 # external libraries
 import numpy as np
+from scipy.spatial.distance import cdist
 # standard library
 from itertools import product, combinations_with_replacement
+from math import floor
 
 
 class PDF(object):
@@ -36,7 +38,7 @@ class PDF(object):
         else:
             self.dr = kwargs['dr']
         if kwargs.get('gaussian_width') is None:
-            self.gaussian_width = 0.01
+            self.gaussian_width = 0.05
         else:
             self.gaussian_width = kwargs['gaussian_width']
         if kwargs.get('num_images') is None:
@@ -53,6 +55,7 @@ class PDF(object):
             self._calc_pdf = self._calc_fortran_pdf
         self.r_space = np.arange(0, self.rmax, self.dr)
         self.Gr = np.zeros((int(self.rmax / self.dr)))
+        self._deprecated_Gr = np.zeros((int(self.rmax / self.dr)))
         self.elem_Gr = dict()
         for comb in combinations_with_replacement(set(doc['atom_types']), 2):
             self.elem_Gr[tuple(set(comb))] = np.zeros((int(self.rmax / self.dr)))
@@ -62,22 +65,63 @@ class PDF(object):
         self.label = ' '.join(doc['text_id'])
         self.num_atoms = len(self.atoms)
         self.volume = doc['cell_volume']
-        self.image_atoms = np.copy(self.atoms)
+        self.number_density = self.num_atoms / self.volume
         if not kwargs.get('lazy'):
             self._calc_pdf()
+        if kwargs.get('debug'):
+            print('num_atoms: {}, number_density: {}'.format(self.num_atoms, self.number_density))
 
     def _calc_fortran_pdf(self):
         """ Calculate PDF of a matador document with Fortran calculator. """
-        from similarity.pdf.pdf_calculator import pdf_calc
+        # from similarity.pdf.pdf_calculator import pdf_calc
         raise NotImplementedError
 
-    def _calc_py_pdf(self):
-        """ Calculate PDF of a matador document with Python calculator. """
+    def _calc_distances(self, debug=False):
+        """ Calculate PBC distances with cdist. """
+        distances = np.array([])
+        for prod in product(range(-self.num_images, self.num_images+1), repeat=3):
+            trans = np.zeros((3))
+            for ind, multi in enumerate(prod):
+                trans += self.lattice[ind] * multi
+            distances = np.append(distances, cdist(self.atoms+trans, self.atoms))
+        # mask by rmax/0 and remove masked values
+        distances = np.ma.masked_where(distances > self.rmax, distances)
+        distances = np.ma.masked_where(distances < 1e-12, distances)
+        if debug:
+            print('Calculated: {}, Used: {}, Ignored: {}'.format(len(distances),
+                                                                 np.ma.count(distances),
+                                                                 np.ma.count_masked(distances)))
+        self.distances = distances.compressed()
+        return self.distances
+
+    def _calc_py_pdf(self, debug=False, style='smear'):
+        """ Calculate broadened and normalised PDF of distance array. """
+        self._calc_distances(debug)
+        self.Gr = np.zeros((int(self.rmax / self.dr)))
+        # norm = 1.0 / (self.num_atoms * (self.num_images+1)**3)
+        if style == 'histogram':
+            for d_ij in self.distances:
+                self.Gr[floor(d_ij/self.dr)] += 1
+            # normalise G(r) by ideal gas
+            self.Gr = np.divide(self.Gr,
+                                4*np.pi * (self.r_space + self.dr)**2 * self.dr * self.num_atoms * self.number_density)
+        else:
+            for d_ij in self.distances:
+                self.Gr += np.exp(-(self.r_space - d_ij)**2 / self.gaussian_width)
+            # normalise G(r) by Gaussian integral and then ideal gas
+            self.Gr = np.divide(self.Gr,
+                                np.sqrt(np.pi * self.gaussian_width) *
+                                4*np.pi * (self.r_space + self.dr)**2 * self.num_atoms * self.number_density)
+
+    def _calc_py_projected_pdf(self):
+        """ Calculate element-projected PDF of a matador document with Python calculator. """
+        raise DeprecationWarning
+        self._deprecated_Gr = np.zeros((int(self.rmax / self.dr)))
         for i in range(self.num_atoms):
             for j in range(i+1, self.num_atoms):
                 d_ij = np.sqrt(np.sum((self.atoms[i] - self.atoms[j])**2))
                 if d_ij <= self.rmax:
-                    self.Gr += 2*np.exp(-(self.r_space - d_ij)**2 / self.gaussian_width) / (self.num_atoms * (self.num_images+1)**3)
+                    self._deprecated_Gr += 2*np.exp(-(self.r_space - d_ij)**2 / self.gaussian_width) / (self.num_atoms * (self.num_images+1)**3)
                     self.elem_Gr[tuple(set((self.types[i], self.types[j])))] += 2*np.exp(-(self.r_space - d_ij)**2 / self.gaussian_width) / (self.num_atoms * (self.num_images+1)**3)
         # iterate over image cells
         trans = np.zeros((3))
@@ -90,8 +134,8 @@ class PDF(object):
             for i in range(self.num_atoms):
                 for j in range(self.num_atoms):
                     d_ij = np.sqrt(np.sum((self.atoms[i] - self.atoms[j] - trans)**2))
-                    if d_ij < self.rmax:
-                        self.Gr += np.exp(-(self.r_space - d_ij)**2 / self.gaussian_width) / (self.num_atoms * (self.num_images+1)**3)
+                    if d_ij <= self.rmax:
+                        self._deprecated_Gr += np.exp(-(self.r_space - d_ij)**2 / self.gaussian_width) / (self.num_atoms * (self.num_images+1)**3)
                         self.elem_Gr[tuple(set((self.types[i], self.types[j])))] += np.exp(-(self.r_space - d_ij)**2 / self.gaussian_width) / (self.num_atoms * (self.num_images+1)**3)
         return
 
@@ -114,12 +158,17 @@ class PDF(object):
         ax1.set_xlabel('$r$ (Angstrom)')
         return
 
-    def plot_pdf(self):
-        """ Plot projected PDFs. """
+    def plot_pdf(self, other_pdfs=None):
+        """ Plot projected PDFs, with optional list of
+        tuples [(r_space, Gr), ...] of other PDFs.
+        """
         import matplotlib.pyplot as plt
         fig = plt.figure(figsize=(12, 5))
         ax1 = fig.add_subplot(111)
         ax1.plot(self.r_space, self.Gr, lw=2)
+        if other_pdfs is not None:
+            for r_space, Gr in other_pdfs:
+                ax1.plot(r_space, Gr, lw=2)
         ax1.set_ylabel('$g(r)$')
         ax1.set_xlabel('$r$ (Angstrom)')
         return
