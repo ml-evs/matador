@@ -35,5 +35,6 @@ setup(name='matador',
           'pdffit': ["diffpy.Structure", "diffpy.srfit"],
           'scrape_oqmd': ["mysqlclient"],
           'docs': ["sphinx"],
+          'viz': ["ase", "nglview"],
       },
       zip_safe=False)
