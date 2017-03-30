@@ -9,3 +9,4 @@ f90wrap*
 .f2py*
 *.so
 *pdf_calculator_funcs*
+htmlcov
