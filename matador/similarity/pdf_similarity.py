@@ -121,8 +121,10 @@ class PDF(object):
             self.Gr = np.divide(self.Gr,
                                 4*np.pi * (self.r_space + self.dr)**2 * self.dr * self.num_atoms * self.number_density)
         else:
-            for d_ij in self.distances:
-                self.Gr += np.exp(-(self.r_space - d_ij)**2 / self.gaussian_width)
+            new_space = np.zeros((len(self.distances), len(self.r_space)))
+            for i in range(len(self.distances)):
+                new_space[i] = self.r_space - self.distances[i]
+            self.Gr = np.sum(np.exp(-(new_space)**2 / self.gaussian_width), axis=0)
             # normalise G(r) by Gaussian integral and then ideal gas
             self.Gr = np.divide(self.Gr,
                                 np.sqrt(np.pi * self.gaussian_width) *
