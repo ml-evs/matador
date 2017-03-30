@@ -16,7 +16,7 @@ import numpy as np
 from scipy.spatial.distance import cdist
 # standard library
 from itertools import product, combinations_with_replacement
-from math import floor
+from math import ceil
 
 
 class PDF(object):
@@ -26,23 +26,25 @@ class PDF(object):
     def __init__(self, doc, **kwargs):
         """ Initialise parameters.
 
-        dr             : bin width for PDF (Angstrom) (DEFAULT: 0.001)
-        gaussian_width : width of Gaussian smearing (Angstrom) (DEFAULT: 0.05)
-        num_images     : number of unit cell images include in PDF calculation (DEFAULT: 3)
+        dr             : bin width for PDF (Angstrom) (DEFAULT: 0.1)
+        gaussian_width : width of Gaussian smearing (Angstrom) (DEFAULT: 0.01)
+        num_images     : number of unit cell images include in PDF calculation (DEFAULT: 2)
         rmax           : maximum distance cutoff for PDF (Angstrom) (DEFAULT: 15)
         calculator     : F or None, for Fortran or Python calculator (DEFAULT: None)
 
         """
+        if 'sim_calc_args' in kwargs:
+            kwargs = kwargs['sim_calc_args']
         if kwargs.get('dr') is None:
-            self.dr = 0.001
+            self.dr = 0.1
         else:
             self.dr = kwargs['dr']
         if kwargs.get('gaussian_width') is None:
-            self.gaussian_width = 0.05
+            self.gaussian_width = 0.01
         else:
             self.gaussian_width = kwargs['gaussian_width']
         if kwargs.get('num_images') is None:
-            self.num_images = 3
+            self.num_images = 2
         else:
             self.num_images = kwargs['num_images']
         if kwargs.get('rmax') is None:
@@ -53,23 +55,27 @@ class PDF(object):
             self._calc_pdf = self._calc_py_pdf
         else:
             self._calc_pdf = self._calc_fortran_pdf
-        self.r_space = np.arange(0, self.rmax, self.dr)
-        self.Gr = np.zeros((int(self.rmax / self.dr)))
-        self._deprecated_Gr = np.zeros((int(self.rmax / self.dr)))
-        self.elem_Gr = dict()
-        for comb in combinations_with_replacement(set(doc['atom_types']), 2):
-            self.elem_Gr[tuple(set(comb))] = np.zeros((int(self.rmax / self.dr)))
+        if kwargs.get('style') is not None:
+            self.style = kwargs.get('style')
+        else:
+            self.style = 'smear'
+        self.doc = doc
         self.lattice = np.asarray(doc['lattice_cart'])
         self.atoms = np.asarray(frac2cart(doc['lattice_cart'], doc['positions_frac']))
         self.types = doc['atom_types']
-        self.label = ' '.join(doc['text_id'])
+        if 'text_id' in doc:
+            self.label = ' '.join(doc['text_id'])
+        else:
+            self.label = 'null'
         self.num_atoms = len(self.atoms)
         self.volume = doc['cell_volume']
         self.number_density = self.num_atoms / self.volume
+        if kwargs.get('debug'):
+            self.debug = True
+        else:
+            self.debug = False
         if not kwargs.get('lazy'):
             self._calc_pdf()
-        if kwargs.get('debug'):
-            print('num_atoms: {}, number_density: {}'.format(self.num_atoms, self.number_density))
 
     def _calc_fortran_pdf(self):
         """ Calculate PDF of a matador document with Fortran calculator. """
@@ -94,14 +100,23 @@ class PDF(object):
         self.distances = distances.compressed()
         return self.distances
 
-    def _calc_py_pdf(self, debug=False, style='smear'):
+    def _calc_py_pdf(self, debug=False):
         """ Calculate broadened and normalised PDF of distance array. """
+        if self.debug:
+            import time
+            start = time.time()
+        style = self.style
         self._calc_distances(debug)
-        self.Gr = np.zeros((int(self.rmax / self.dr)))
-        # norm = 1.0 / (self.num_atoms * (self.num_images+1)**3)
-        if style == 'histogram':
+        if self.debug:
+            end = time.time()
+            print('Calculated distances in {} s'.format(end-start))
+        self.r_space = np.arange(0, self.rmax+self.dr, self.dr)
+        self.Gr = np.zeros_like(self.r_space)
+        if self.debug:
+            start = time.time()
+        if style == 'histogram' or self.gaussian_width == 0:
             for d_ij in self.distances:
-                self.Gr[floor(d_ij/self.dr)] += 1
+                self.Gr[ceil(d_ij/self.dr)] += 1
             # normalise G(r) by ideal gas
             self.Gr = np.divide(self.Gr,
                                 4*np.pi * (self.r_space + self.dr)**2 * self.dr * self.num_atoms * self.number_density)
@@ -112,10 +127,16 @@ class PDF(object):
             self.Gr = np.divide(self.Gr,
                                 np.sqrt(np.pi * self.gaussian_width) *
                                 4*np.pi * (self.r_space + self.dr)**2 * self.num_atoms * self.number_density)
+        if self.debug:
+            end = time.time()
+            print('Calculated broadening and normalised in {} s'.format(end-start))
 
     def _calc_py_projected_pdf(self):
         """ Calculate element-projected PDF of a matador document with Python calculator. """
         raise DeprecationWarning
+        self.elem_Gr = dict()
+        for comb in combinations_with_replacement(set(self.doc['atom_types']), 2):
+            self.elem_Gr[tuple(set(comb))] = np.zeros((int(self.rmax / self.dr)))
         self._deprecated_Gr = np.zeros((int(self.rmax / self.dr)))
         for i in range(self.num_atoms):
             for j in range(i+1, self.num_atoms):
@@ -142,6 +163,13 @@ class PDF(object):
     def get_sim_distance(self, pdf_B):
         """ Return the similarity between two PDFs. """
         return PDFOverlap(self, pdf_B, rescale='bond').similarity_distance
+
+    def pdf(self):
+        """ Return G(r) and the r_space for easy plotting. """
+        try:
+            return (self.r_space, self.Gr)
+        except:
+            return (None, None)
 
     def plot_projected(self, keys=None):
         """ Plot projected PDFs. """

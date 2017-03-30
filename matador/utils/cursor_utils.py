@@ -1,8 +1,6 @@
 # coding: utf-8
 """ This file defines some useful generic cursor methods. """
 
-# matador modules
-from matador.similarity.pdf_similarity import PDF
 # external libraries
 import numpy as np
 # standard library
@@ -313,53 +311,6 @@ def get_guess_doc_provenance(sources, icsd=None):
             elif '-icsd' in fname.lower():
                 prov = 'ICSD'
     return prov
-
-
-def get_uniq_cursor(cursor, sim_calculator=PDF, sim_tol=1e-1, debug=False):
-    """ Use sim_calculator to filter cursor into
-    unique structures to some tolerance sim_tol.
-
-    Returns:
-
-        distinct_set     : a set of indices of unique documents
-        fingerprint_list : a list <SimilarityCalculator> objects
-        corr_matt        : the correlation matrix of pair similarity distances
-
-    """
-    fingerprint_list = []
-    print('Calculating fingerprints...')
-    if debug:
-        import time
-    for doc in cursor:
-        if debug:
-            start = time.time()
-        fingerprint_list.append(sim_calculator(doc))
-        if debug:
-            completed = time.time() - start
-            print('PDF of {} completed in {:0.1f} s'.format(' '.join(doc['text_id']), completed))
-
-    corr_mat = np.zeros((len(fingerprint_list), len(fingerprint_list)))
-    print('Assessing similarities...')
-    for i in range(len(fingerprint_list)):
-        corr_mat[i, i] = 0
-        for j in range(i+1, len(fingerprint_list)):
-            sim = fingerprint_list[i].get_sim_distance(fingerprint_list[j])
-            corr_mat[i, j] = sim
-            corr_mat[j, i] = sim
-            if debug and sim < sim_tol:
-                print('{} similar to {} with distance {}'.format(' '.join(cursor[i]['text_id']),
-                                                                 ' '.join(cursor[j]['text_id']),
-                                                                 sim))
-    rows, cols = np.where(corr_mat <= sim_tol)
-    distinct_set = set()
-    dupe_set = set()
-    for coord in zip(rows, cols):
-        if coord[0] == coord[1]:
-            pass
-        elif coord[0] not in dupe_set:
-            distinct_set.add(coord[0])
-            dupe_set.add(coord[1])
-    return distinct_set, fingerprint_list, corr_mat
 
 
 def get_spg_uniq(cursor, symprec=1e-2, latvecprec=1e-3, posprec=1e-3):

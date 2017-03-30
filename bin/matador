@@ -8,9 +8,7 @@ from __future__ import print_function
 # matador modules
 from matador.query import DBQuery
 from matador.hull import QueryConvexHull
-from matador.utils.cursor_utils import filter_cursor
 from matador.utils.print_utils import print_failure, print_warning, print_notify
-from matador.utils.cursor_utils import get_uniq_cursor
 from matador.version import __version__
 # import external libraries
 import pymongo as pm
@@ -126,6 +124,7 @@ class Matador(object):
             self.cursor = self.hull.hull_cursor
 
         if self.args.get('uniq'):
+            from matador.similarity.similarity import get_uniq_cursor
             print_notify('Filtering for unique structures...')
             if self.args.get('top') is not None:
                 unique_set, _, _ = get_uniq_cursor(self.cursor[:self.args.get('top')], debug=self.args.get('debug'))
@@ -141,6 +140,7 @@ class Matador(object):
 
         # perform any extra filtration
         if self.args.get('filter'):
+            from matador.utils.cursor_utils import filter_cursor
             self.cursor = filter_cursor(self.cursor, self.args.get('filter'), self.args.get('values'))
 
         if self.export and len(self.cursor) > 0:
