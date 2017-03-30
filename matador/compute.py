@@ -73,7 +73,7 @@ class FullRelaxer:
 
             # check for pseudos
             for elem in res_dict['stoichiometry']:
-                if not isfile(calc_doc['species_pot'][elem[0]]):
+                if '|' not in calc_doc['species_pot'][elem[0]] and not isfile(calc_doc['species_pot'][elem[0]]):
                     exit('You forgot your pseudos, you silly goose!')
 
             if self.conv_cutoff_bool:
