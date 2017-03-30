@@ -20,7 +20,7 @@ from matador.utils.print_utils import print_failure, print_success, print_warnin
 from matador.export import doc2cell, doc2param, doc2res
 
 # standard library
-from os import walk, makedirs, remove, system, devnull
+from os import makedirs, remove, system, devnull
 from os.path import isfile, exists
 from collections import defaultdict
 from traceback import print_exc
@@ -78,16 +78,6 @@ class BatchRun:
                           ') than available (' + str(self.all_cores) + ').' +
                           '(Maybe you are using a queueing system).')
         # scan directory for files to run
-        self.file_lists = defaultdict(list)
-        for root, dirs, files in walk('.'):
-            for file in files:
-                if root == '.':
-                    if file.endswith('.res'):
-                        self.file_lists['res'].append(file)
-        if len(self.file_lists['res']) < 1:
-            valid = False
-            print_failure('run3 requires at least 1 res file in folder, found' +
-                          str(len(self.file_lists['res'])))
         self.cell_dict, cell_success = cell2dict(self.seed + '.cell', db=False)
         if not cell_success:
             valid = False
@@ -96,6 +86,12 @@ class BatchRun:
         if not param_success:
             valid = False
             print_failure('Failed to parse param file')
+        self.file_lists = defaultdict(list)
+        self.file_lists['res'] = glob.glob('*.res')
+        if len(self.file_lists['res']) < 1:
+            valid = False
+            print_failure('run3 requires at least 1 res file in folder, found' +
+                          str(len(self.file_lists['res'])))
         if 'geom_max_iter' not in self.param_dict and self.param_dict['task'].upper() in ['GEOMETRYOPTIMISATION', 'GEOMETRYOPTIMIZATION']:
             valid = False
             print_failure('geom_max_iter is unset, please fix this.')
