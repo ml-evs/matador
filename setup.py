@@ -21,8 +21,7 @@ setup(name='matador',
           'scipy>=0.18',
           'pymongo>=3.3.0',
           'periodictable>=1.4',
-          'spglib>=1.9',
-          'ascii_graph>=1.2'],
+          'spglib>=1.9'],
       scripts=['bin/matador', 'bin/run3', 'bin/oddjob'],
       dependency_links=['https://github.com/marcharper/python-ternary/tarball/master'],
       package_data={'matador.scrapers': ['words', 'nouns'],
@@ -38,7 +37,7 @@ setup(name='matador',
                   'nglview'],
           'plotting': ['matplotlib==1.5',
                        'python-ternary',
-                       'bokeh>=0.12']
-
+                       'bokeh>=0.12'],
+          'stats': ['ascii_graph>=1.2']
       },
       zip_safe=False)

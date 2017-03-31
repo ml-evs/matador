@@ -9,11 +9,24 @@ from matador.utils.cursor_utils import get_array_from_cursor
 import numpy as np
 # standard library
 from collections import defaultdict
+from math import isclose
 
 
-def get_uniq_cursor(cursor, sim_calculator=PDF, sim_tol=1e-1, debug=False, **sim_calc_args):
-    """ Use sim_calculator to filter cursor into
-    unique structures to some tolerance sim_tol.
+def get_uniq_cursor(cursor, sim_calculator=PDF, sim_tol=1e-1, energy_tol=5e-2,
+                    same_stoich=True, debug=False, **sim_calc_args):
+    """ Uses sim_calculator to filter cursor into unique structures to some
+    tolerance sim_tol,additionally returning a dict of duplicates and the
+    correlation matrix.
+
+    Inputs:
+
+        cursor           : matador cursor to be filtered
+        sim_calculator   : fingerprint object type to compare
+        sim_tol          : tolerance in similarity distance for duplicates
+        energy_tol       : compare only structures within a certain energy tolerance
+        same_stoich      : compare only structures of the same stoichiometry
+        debug            : print timings and list similarities
+        sim_calc_args    : dict containing parameters to pass to sim_calculator
 
     Returns:
 
@@ -27,7 +40,9 @@ def get_uniq_cursor(cursor, sim_calculator=PDF, sim_tol=1e-1, debug=False, **sim
     print('Calculating fingerprints...')
     if debug:
         import time
-    for doc in cursor:
+    import progressbar
+    bar = progressbar.ProgressBar(term_width=80)
+    for doc in bar(cursor):
         if debug:
             start = time.time()
         fingerprint_list.append(sim_calculator(doc, **sim_calc_args))
@@ -37,12 +52,23 @@ def get_uniq_cursor(cursor, sim_calculator=PDF, sim_tol=1e-1, debug=False, **sim
 
     sim_mat = np.zeros((len(fingerprint_list), len(fingerprint_list)))
     print('Assessing similarities...')
-    for i in range(len(fingerprint_list)):
+    import progressbar
+    bar = progressbar.ProgressBar(term_width=80)
+    for i in bar(range(len(fingerprint_list))):
         sim_mat[i, i] = 0
         for j in range(i+1, len(fingerprint_list)):
-            sim = fingerprint_list[i].get_sim_distance(fingerprint_list[j])
-            sim_mat[i, j] = sim
-            sim_mat[j, i] = sim
+            # are we checking stoichiometries, if so, ensure they're the same
+            if (not same_stoich or
+                    sorted(cursor[j]['stoichiometry']) == sorted(cursor[i]['stoichiometry']))\
+                    and isclose(cursor[j]['enthalpy_per_atom'], cursor[i]['enthalpy_per_atom'],
+                                abs_tol=5e-2):
+                sim = fingerprint_list[i].get_sim_distance(fingerprint_list[j])
+                sim_mat[i, j] = sim
+                sim_mat[j, i] = sim
+            else:
+                sim = 1e10
+                sim_mat[i, j] = sim
+                sim_mat[i, j] = sim
             if debug and sim < sim_tol:
                 print('{} similar to {} with distance {}'.format(' '.join(cursor[i]['text_id']),
                                                                  ' '.join(cursor[j]['text_id']),
