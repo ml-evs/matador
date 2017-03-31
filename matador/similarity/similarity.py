@@ -40,8 +40,12 @@ def get_uniq_cursor(cursor, sim_calculator=PDF, sim_tol=1e-1, energy_tol=5e-2,
     print('Calculating fingerprints...')
     if debug:
         import time
-    import progressbar
-    bar = progressbar.ProgressBar(term_width=80)
+    try:
+        import progressbar
+        bar = progressbar.ProgressBar(term_width=80)
+    except(ImportError):
+        def bar(cursor):
+            return cursor
     for doc in bar(cursor):
         if debug:
             start = time.time()
@@ -52,8 +56,11 @@ def get_uniq_cursor(cursor, sim_calculator=PDF, sim_tol=1e-1, energy_tol=5e-2,
 
     sim_mat = np.zeros((len(fingerprint_list), len(fingerprint_list)))
     print('Assessing similarities...')
-    import progressbar
-    bar = progressbar.ProgressBar(term_width=80)
+    try:
+        import progressbar
+        bar = progressbar.ProgressBar(term_width=80)
+    except(ImportError):
+        pass
     for i in bar(range(len(fingerprint_list))):
         sim_mat[i, i] = 0
         for j in range(i+1, len(fingerprint_list)):
