@@ -27,13 +27,14 @@ class FullRelaxer:
     """
     def __init__(self, ncores, nnodes, node, res, param_dict, cell_dict,
                  executable='castep', rough=None, debug=False, spin=False, verbosity=0,
-                 conv_cutoff=None, conv_kpt=None, archer=False, start=True):
+                 conv_cutoff=None, conv_kpt=None, archer=False, bnl=False, start=True):
         """ Make the files to run the calculation and handle
         the calling of CASTEP itself.
         """
         self.ncores = ncores
         self.res = res
         self.archer = archer
+        self.bnl = bnl
         self.nnodes = nnodes
         self.node = node
         self.verbosity = verbosity
@@ -73,7 +74,8 @@ class FullRelaxer:
 
             # check for pseudos
             for elem in res_dict['stoichiometry']:
-                if '|' not in calc_doc['species_pot'][elem[0]] and not isfile(calc_doc['species_pot'][elem[0]]):
+                if '|' not in calc_doc['species_pot'][elem[0]] and\
+                        not isfile(calc_doc['species_pot'][elem[0]]):
                     exit('You forgot your pseudos, you silly goose!')
 
             if self.conv_cutoff_bool:
@@ -222,7 +224,8 @@ class FullRelaxer:
                     print_notify('Restarting calculation with current state:')
                     print(calc_doc)
                 if self.verbosity >= 2:
-                    print('max F: {:5f} eV/A, stress: {:5f} GPa, cell volume: {:5f} A^3, enthalpy per atom {:5f} eV'
+                    print('max F: {:5f} eV/A, stress: {:5f} GPa, cell volume: {:5f} A^3, \
+                           enthalpy per atom {:5f} eV'
                           .format(opti_dict['max_force_on_atom'], opti_dict['pressure'],
                                   opti_dict['cell_volume'], opti_dict['enthalpy_per_atom']))
                 calc_doc.update(opti_dict)
@@ -284,6 +287,11 @@ class FullRelaxer:
             elif self.archer:
                 process = sp.Popen(['aprun', '-n', str(self.ncores),
                                     self.executable, seed])
+            elif self.bnl:
+                command = ['srun', '-n', str(self.ncores), self.executable, seed]
+                if self.debug:
+                    print(command)
+                process = sp.Popen(command)
             elif self.node is not None:
                 cwd = getcwd()
                 if self.debug:
