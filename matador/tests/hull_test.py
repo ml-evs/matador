@@ -19,7 +19,6 @@ REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
 
 class VoltageTest(unittest.TestCase):
     """ Test voltage curve functionality. """
-
     def testBinaryVoltage(self):
         match, hull_cursor = [], []
         test_x = np.loadtxt(REAL_PATH + 'data/x.dat')
@@ -63,8 +62,11 @@ class VoltageTest(unittest.TestCase):
         hull_cursor = []
         for ind, point in enumerate(points):
             hull_cursor.append(dict())
-            hull_cursor[-1]['gravimetric_capacity'] = get_generic_grav_capacity(point[0:3], ['Li', 'Sn', 'S'])
-            hull_cursor[-1]['stoichiometry'] = [['Li', int(pin[ind][0])], ['Sn', int(pin[ind][1])], ['S', int(pin[ind][2])]]
+            hull_cursor[-1]['gravimetric_capacity'] = get_generic_grav_capacity(point[0:3],
+                                                                                ['Li', 'Sn', 'S'])
+            hull_cursor[-1]['stoichiometry'] = [['Li', int(pin[ind][0])],
+                                                ['Sn', int(pin[ind][1])],
+                                                ['S', int(pin[ind][2])]]
             hull_cursor[-1]['concentration'] = point[0:2]
             hull_cursor[-1]['enthalpy_per_atom'] = point[-1]
 
@@ -89,7 +91,15 @@ class VoltageTest(unittest.TestCase):
         bare_hull.match = [{'enthalpy_per_atom': -380.071/2.0}]
         bare_hull.ternary = True
         bare_hull.voltage_curve(bare_hull.hull_cursor)
-        np.testing.assert_array_equal(bare_hull.Vpoints[0], voltage_data)
+        try:
+            np.testing.assert_array_almost_equal(bare_hull.Vpoints[0], voltage_data)
+        except:
+            print('calculated: ', np.shape(bare_hull.Vpoints[0]))
+            print(bare_hull.Vpoints[0])
+            print('data: ', np.shape(voltage_data))
+            print(voltage_data)
+            np.testing.assert_array_almost_equal(bare_hull.Vpoints[0], voltage_data, decimal=8)
+
 
 if __name__ == '__main__':
     unittest.main()
