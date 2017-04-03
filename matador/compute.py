@@ -286,8 +286,6 @@ class FullRelaxer:
                 print('Killing CASTEP...')
                 process.terminate()
                 print_warning('Done!')
-                if output_queue is not None:
-                    output_queue.put(SystemExit)
                 print('Tidying up...', end=' ')
                 self.mv_to_bad(seed)
                 self.tidy_up(seed)
