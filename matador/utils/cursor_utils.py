@@ -9,9 +9,9 @@ from time import strftime
 from pkg_resources import require
 try:
     __version__ = require("matador")[0].version
+    __version__ = __version__.strip()
 except:
-    from ..version import __version__
-__version__ = __version__.strip()
+    __version__ = 'xxx'
 
 
 def display_results(cursor, args=None, argstr=None, hull=False, markdown=False):
@@ -31,17 +31,17 @@ def display_results(cursor, args=None, argstr=None, hull=False, markdown=False):
     units_string = ''
 
     if markdown:
-        markdown_string = ('Generation date: ' + strftime("%H:%M %d/%m/%Y") + '\n')
+        markdown_string = ('GenDate: ' + strftime("%H:%M %d/%m/%Y") + '\n')
         if argstr is not None:
             markdown_string += ('Command: matador ' + ' '.join(argstr) + '\n')
-        markdown_string += ('Version:  ' + __version__ + '\n\n')
+        markdown_string += ('Version: ' + __version__ + '\n\n')
 
     if not markdown:
         header_string += "{:^24}".format('ID')
         header_string += "{:^5}".format('!?!')
     else:
-        header_string += "{:^30}".format('Root')
-        units_string += "{:^30}".format('')
+        header_string += "{:^40}".format('Root')
+        units_string += "{:^40}".format('')
     header_string += "{:^12}".format('Pressure')
     units_string += "{:^12}".format('(GPa)')
     if args.get('per_atom'):
@@ -101,9 +101,12 @@ def display_results(cursor, args=None, argstr=None, hull=False, markdown=False):
             except:
                 struct_string[-1] += "{:5}".format(' ')
         else:
-            struct_string.append("{:30}".format(next(source.split('/')[-1].split('.')[0] for source in doc['source']
-                                                if (source.endswith('.res') or source.endswith('.castep') or
-                                                    source.endswith('.history') or source.endswith('.history.gz')))))
+            struct_string.append("{:40}".format(next(source.split('/')[-1].split('.')[0]
+                                                for source in doc['source']
+                                                if (source.endswith('.res')
+                                                    or source.endswith('.castep')
+                                                    or source.endswith('.history')
+                                                    or source.endswith('.history.gz')))))
         try:
             struct_string[-1] += "{:^12.3f}".format(doc['pressure'])
         except:
@@ -246,13 +249,13 @@ def display_results(cursor, args=None, argstr=None, hull=False, markdown=False):
                 markdown_string += struct_string[ind] + '\n'
             else:
                 print(substring)
-            if details and not markdown:
-                print(detail_string[ind])
-                print(detail_substring[ind])
-            if args.get('source') and not markdown:
-                print(source_string[ind])
-            if details or args.get('source') and not markdown:
-                print(len(header_string) * '─')
+                if details:
+                    print(detail_string[ind])
+                    print(detail_substring[ind])
+                if args.get('source'):
+                    print(source_string[ind])
+                if details or args.get('source'):
+                    print(len(header_string) * '─')
     if markdown:
         return markdown_string
 
@@ -295,7 +298,12 @@ def get_guess_doc_provenance(sources, icsd=None):
     for fname in sources:
         if (fname.endswith('.castep') or fname.endswith('.res') or
                 fname.endswith('.history') or 'OQMD' in fname):
-            if 'swap' in fname.lower():
+            if 'collcode' in fname.lower():
+                if fname.split('/')[-1].count('-') == 2 + fname.lower().count('oqmd'):
+                    prov = 'SWAPS'
+                else:
+                    prov = 'ICSD'
+            elif 'swap' in fname.lower():
                 prov = 'SWAPS'
             elif '_ga_' in fname.lower():
                 prov = 'GA'
@@ -303,11 +311,6 @@ def get_guess_doc_provenance(sources, icsd=None):
                 prov = 'ICSD'
             elif 'oqmd' in fname.lower():
                 prov = 'OQMD'
-            elif 'collcode' in fname.lower():
-                if fname.split('/')[-1].count('-') == 2:
-                    prov = 'SWAPS'
-                else:
-                    prov = 'ICSD'
             elif '-icsd' in fname.lower():
                 prov = 'ICSD'
     return prov
@@ -333,7 +336,10 @@ def get_spg_uniq(cursor, symprec=1e-2, latvecprec=1e-3, posprec=1e-3):
 
     refined_list = []
     for crystal in spg_cursor:
-        refined_list.append(spg.standardize_cell(crystal, to_primitive=False, no_idealize=False, symprec=symprec))
+        refined_list.append(spg.standardize_cell(crystal,
+                                                 to_primitive=False,
+                                                 no_idealize=False,
+                                                 symprec=symprec))
     for i in range(len(refined_list)):
         for j in range(len(refined_list[i][1])):
             for k in range(len(refined_list[i][1][j])):
