@@ -84,6 +84,7 @@ class BatchRun:
         if not param_success:
             valid = False
             print_failure('Failed to parse param file')
+
         self.file_lists = defaultdict(list)
         self.file_lists['res'] = glob.glob('*.res')
         if len(self.file_lists['res']) < 1:
@@ -157,7 +158,7 @@ class BatchRun:
         procs = []
         for ind in range(self.nprocesses):
             procs.append(mp.Process(target=self.perform_new_calculations,
-                         args=(self.file_lists['res'], self.paths)))
+                         args=(self.paths, )))
         try:
             for proc in procs:
                 proc.start()
@@ -167,30 +168,34 @@ class BatchRun:
                 proc.terminate()
             exit('Killing running jobs and exiting...')
 
-    def perform_new_calculations(self, res_list, paths):
+    def res_is_running(self, res):
+        """ Run through job file and check if path res exists,
+        if it does, return True, else False.
+        """
+        job_file_path = self.paths['jobs_fname']
+        with open(job_file_path, 'r') as job_file:
+            flines = job_file.readlines()
+            for line in flines:
+                if res in line:
+                    return True
+        return False
+
+    def perform_new_calculations(self, paths):
         """ Perform all calculations that have not already
         failed or finished to completion. """
         job_count = 0
-        for res in res_list:
-            running = False
-            with open(paths['jobs_fname'], 'r') as job_file:
-                flines = job_file.readlines()
-                for line in flines:
-                    if res in line:
-                        running = True
-                        break
-            if not running:
+        while len([res for res in glob.glob('*.res') if not self.res_is_running(res)]) > 0:
+            for res in [res for res in glob.glob('*.res') if not self.res_is_running(res)]:
                 if self.limit is not None:
                     if job_count == self.limit:
-                        print(self.limit)
                         raise SystemExit
                 with open(paths['jobs_fname'], 'a') as job_file:
                     job_file.write(res+'\n')
                 # create full relaxer object for creation and running of job
                 try:
                     job_count += 1
-                    relaxer = FullRelaxer(paths=self.paths,
-                                          ncores=self.ncores,
+                    relaxer = FullRelaxer(ncores=self.ncores,
+                                          node=None,
                                           nnodes=self.nnodes,
                                           res=res,
                                           param_dict=self.param_dict,
@@ -200,6 +205,8 @@ class BatchRun:
                                           archer=self.archer,
                                           bnl=self.bnl,
                                           debug=self.debug,
+                                          redirect=False,
+                                          start=True,
                                           spin=self.spin,
                                           conv_cutoff=self.cutoffs,
                                           conv_kpt=self.kpts)
