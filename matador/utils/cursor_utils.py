@@ -101,9 +101,12 @@ def display_results(cursor, args=None, argstr=None, hull=False, markdown=False):
             except:
                 struct_string[-1] += "{:5}".format(' ')
         else:
-            struct_string.append("{:30}".format(next(source.split('/')[-1].split('.')[0] for source in doc['source']
-                                                if (source.endswith('.res') or source.endswith('.castep') or
-                                                    source.endswith('.history') or source.endswith('.history.gz')))))
+            struct_string.append("{:30}".format(next(source.split('/')[-1].split('.')[0]
+                                                for source in doc['source']
+                                                if (source.endswith('.res')
+                                                    or source.endswith('.castep')
+                                                    or source.endswith('.history')
+                                                    or source.endswith('.history.gz')))))
         try:
             struct_string[-1] += "{:^12.3f}".format(doc['pressure'])
         except:
@@ -304,8 +307,8 @@ def get_guess_doc_provenance(sources, icsd=None):
             elif 'oqmd' in fname.lower():
                 prov = 'OQMD'
             elif 'collcode' in fname.lower():
-                if fname.split('/')[-1].count('-') == 2:
-                    prov = 'SWAPS'
+                if fname.split('/')[-1].count('-') == 2 + fname.lower().count('oqmd'):
+                    prov = 'SWAPSY'
                 else:
                     prov = 'ICSD'
             elif '-icsd' in fname.lower():
@@ -333,7 +336,10 @@ def get_spg_uniq(cursor, symprec=1e-2, latvecprec=1e-3, posprec=1e-3):
 
     refined_list = []
     for crystal in spg_cursor:
-        refined_list.append(spg.standardize_cell(crystal, to_primitive=False, no_idealize=False, symprec=symprec))
+        refined_list.append(spg.standardize_cell(crystal,
+                                                 to_primitive=False,
+                                                 no_idealize=False,
+                                                 symprec=symprec))
     for i in range(len(refined_list)):
         for j in range(len(refined_list[i][1])):
             for k in range(len(refined_list[i][1][j])):
