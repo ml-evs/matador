@@ -10,11 +10,12 @@ from matador.scrapers.castep_scrapers import res2dict, castep2dict
 from matador.utils.print_utils import print_success, print_warning, print_notify
 from matador.export import doc2cell, doc2param, doc2res
 # standard library
-from os import makedirs, remove, system, devnull, getcwd
+from os import makedirs, remove, system, devnull, getcwd, getpid
 from os.path import isfile, exists
 from copy import deepcopy
-from traceback import print_exc
-from sys import exit
+from traceback import print_exc, format_exception_only
+from sys import exit, exc_info
+import sys
 import subprocess as sp
 import glob
 
@@ -24,10 +25,32 @@ class FullRelaxer:
     4 rough optimisations with only a few iterations, followed by
     4 larger optimisations with many iterations,
     e.g. 4 lots of 2 then 4 lots of geom_max_iter/4.
+
+    Input:
+
+        ncores      : number of cores for mpirun call
+        nnodes      : number of nodes for mpirun call (DEPCRECATED)
+        node        : node name to run on
+        res         : either filename or input structure dict
+        param_dict  : dict of castep parameters
+        cell_dict   : dict of castep cell input
+        executable  : name of binary to execute (DEFAULT: castep)
+        rough       : number of small "rough" calculations (DEFAULT: 4)
+        spin        : set spins in first calculation (DEFAULT: False)
+        conv_cutoff : read cutoffs from cutoff.conv and run them all
+        conv_kpt    : read kpt spacings kpt.conv and run them all
+        archer      : use aprun over mpirun
+        bnl         : use srun over mpirun
+        start       : begin calculation immediately or manually call it
+        redirect    : redirect all output to pid.file
+
     """
     def __init__(self, ncores, nnodes, node, res, param_dict, cell_dict,
-                 executable='castep', rough=None, debug=False, spin=False, verbosity=0,
-                 conv_cutoff=None, conv_kpt=None, archer=False, bnl=False, start=True):
+                 executable='castep', rough=None, spin=False,
+                 conv_cutoff=None, conv_kpt=None,
+                 archer=False, bnl=False,
+                 start=True, redirect=False,
+                 verbosity=0, debug=False):
         """ Make the files to run the calculation and handle
         the calling of CASTEP itself.
         """
@@ -50,6 +73,9 @@ class FullRelaxer:
             self.conv_kpt = conv_kpt
         self.success = None
         self.result_dict = None
+        if redirect:
+            self.redirect = True
+            sys.stdout = open(str(getpid()) + '.out', 'w')
 
         # read in initial structure and skip if failed
         if isinstance(res, str):
@@ -116,14 +142,24 @@ class FullRelaxer:
                     if self.success:
                         res = self.opti_dict
 
-    def relax(self):
+    def relax(self, output_queue=None):
         """ Set up the calculation to perform 4 sets of two steps,
         then continue with the remainder of steps.
+
+        Optional input:
+
+        output_queue : this object will be modified with relaxed (successfully or not) structure.
+
+        Returns:
+
+        True iff structure was optimised, false otherwise.
         """
         seed = self.seed
         calc_doc = self.calc_doc
         print_notify('Relaxing ' + self.seed)
         geom_max_iter_list = self.geom_max_iter_list
+        if output_queue is not None:
+            print('Writing to current output queue.')
         # copy initial res file to seed
         if not isinstance(self.res, str):
             doc2res(self.res, self.seed, info=False, hash_dupe=False)
@@ -178,11 +214,14 @@ class FullRelaxer:
                         remove(seed+'.res')
                     doc2res(opti_dict, seed, hash_dupe=False)
                 elif self.rerun and opti_dict['optimised']:
-                    self.result_dict = opti_dict
+                    self.result_dict = deepcopy(opti_dict)
                     print_success('Successfully relaxed ' + seed)
                     # write res and castep file out to completed folder
                     doc2res(opti_dict, seed, hash_dupe=False)
                     self.opti_dict = deepcopy(opti_dict)
+                    if output_queue is not None:
+                        output_queue.put(deepcopy(opti_dict))
+                        print('wrote relaxed dict out to output_queue')
                     self.mv_to_completed(seed)
                     if calc_doc.get('write_cell_structure'):
                         system('mv ' + seed + '-out.cell' + ' completed/' + seed + '-out.cell')
@@ -196,6 +235,9 @@ class FullRelaxer:
                         remove(seed+'.res')
                     doc2res(opti_dict, seed, hash_dupe=False)
                     self.opti_dict = deepcopy(opti_dict)
+                    if output_queue is not None:
+                        output_queue.put(deepcopy(opti_dict))
+                        print('wrote relaxed dict out to output_queue')
                     self.mv_to_bad(seed)
                     return False
                 err_file = seed + '*001.err'
@@ -205,6 +247,8 @@ class FullRelaxer:
                         # write final res file to bad_castep
                         if isfile(seed+'.res'):
                             remove(seed+'.res')
+                        if output_queue is not None:
+                            output_queue.put(deepcopy(opti_dict))
                         doc2res(opti_dict, seed, hash_dupe=False)
                         self.mv_to_bad(seed)
                         return False
@@ -224,21 +268,34 @@ class FullRelaxer:
                     print_notify('Restarting calculation with current state:')
                     print(calc_doc)
                 if self.verbosity >= 2:
-                    print('max F: {:5f} eV/A, stress: {:5f} GPa, cell volume: {:5f} A^3, \
-                           enthalpy per atom {:5f} eV'
-                          .format(opti_dict['max_force_on_atom'], opti_dict['pressure'],
-                                  opti_dict['cell_volume'], opti_dict['enthalpy_per_atom']))
+                    print(('num_iter: {:3d} | max F: {:5f} eV/A | stress: {: 5f} GPa | '
+                          + 'cell volume: {:5f} A^3 | enthalpy per atom {:5f} eV')
+                          .format(sum(self.geom_max_iter_list[:ind+1]),
+                                  opti_dict['max_force_on_atom'],
+                                  opti_dict['pressure'],
+                                  opti_dict['cell_volume'],
+                                  opti_dict['enthalpy_per_atom']))
                 calc_doc.update(opti_dict)
 
-            except(KeyboardInterrupt):
-                print_exc()
+            except(KeyboardInterrupt, SystemExit):
+                print_warning('Received exception, attempting to fail gracefully...')
+                etype, evalue, etb = exc_info()
+                print(format_exception_only(etype, evalue))
+                if self.debug:
+                    print_exc()
+                print('Killing CASTEP...')
+                process.terminate()
+                print_warning('Done!')
+                if output_queue is not None:
+                    output_queue.put(SystemExit)
+                print('Tidying up...', end=' ')
                 self.mv_to_bad(seed)
                 self.tidy_up(seed)
-                raise SystemExit
-            except(SystemExit):
-                exit()
+                print_warning('Done!')
+                return False
             except:
                 print_exc()
+                process.terminate()
                 self.mv_to_bad(seed)
                 self.tidy_up(seed)
                 return False
@@ -339,7 +396,7 @@ class FullRelaxer:
     def mv_to_bad(self, seed):
         """ Move all associated files to bad_castep. """
         if not exists('bad_castep'):
-            makedirs('bad_castep')
+            makedirs('bad_castep', exist_ok=True)
         print('Something went wrong, moving files to bad_castep')
         system('mv ' + seed + '* bad_castep')
         return
@@ -347,7 +404,7 @@ class FullRelaxer:
     def mv_to_completed(self, seed, keep=False):
         """ Move all associated files to completed. """
         if not exists('completed'):
-            makedirs('completed')
+            makedirs('completed', exist_ok=True)
         if keep:
             system('mv ' + seed + '*' + ' completed')
         else:
@@ -358,11 +415,12 @@ class FullRelaxer:
     def cp_to_input(self, seed):
         """ Copy initial cell and res to input folder. """
         if not exists('input'):
-            makedirs('input')
+            makedirs('input', exist_ok=True)
         system('cp ' + seed + '.res input')
         return
 
     def tidy_up(self, seed):
         """ Delete all run3 created files before quitting. """
-        system('rm ' + seed + '*')
+        for f in glob.glob(seed + '*'):
+            remove(f)
         return
