@@ -78,8 +78,9 @@ class FullRelaxer:
         if isinstance(res, str):
             self.res_dict, success = res2dict(res, db=False)
             if not success:
-                print(self.res_dict)
-                print_warning('Failed to parse res file ' + str(res))
+                if self.verbosity >= 1:
+                    print(self.res_dict)
+                    print_warning('Failed to parse res file ' + str(res))
                 self.success = False
         elif isinstance(res, dict):
             self.res_dict = res
@@ -150,7 +151,8 @@ class FullRelaxer:
         """
         seed = self.seed
         calc_doc = self.calc_doc
-        print_notify('Relaxing ' + self.seed)
+        if self.verbosity >= 1:
+            print_notify('Relaxing ' + self.seed)
         geom_max_iter_list = self.geom_max_iter_list
         # copy initial res file to seed
         if not isinstance(self.res, str):
@@ -161,9 +163,9 @@ class FullRelaxer:
         for ind, num_iter in enumerate(geom_max_iter_list):
             if self.rerun:
                 num_iter = 2
-                if self.verbosity > 1:
+                if self.verbosity >= 1:
                     print_notify('Performing one last iteration...')
-            if self.verbosity > 1:
+            if self.verbosity >= 1:
                 if ind == 0:
                         print_notify('Beginning rough geometry optimisation...')
                 elif ind == self.num_rough_iter:
@@ -197,7 +199,6 @@ class FullRelaxer:
                     del opti_dict['kpoints_mp_grid']
                     del opti_dict['species_pot']
                 except:
-                    print_exc()
                     pass
                 if self.rerun and not opti_dict['optimised']:
                     self.rerun = False
@@ -208,7 +209,8 @@ class FullRelaxer:
                         remove(seed+'.res')
                     doc2res(opti_dict, seed, hash_dupe=False)
                 elif self.rerun and opti_dict['optimised']:
-                    print_success('Successfully relaxed ' + seed)
+                    if self.verbosity >= 1:
+                        print_success('Successfully relaxed ' + seed)
                     # write res and castep file out to completed folder
                     doc2res(opti_dict, seed, hash_dupe=False)
                     self.opti_dict = deepcopy(opti_dict)
@@ -226,7 +228,7 @@ class FullRelaxer:
                     self.tidy_up(seed)
                     return True
                 elif ind == len(geom_max_iter_list) - 1:
-                    if self.verbosity > 1:
+                    if self.verbosity >= 1:
                         print_warning('Failed to optimise ' + seed)
                     # write final res file to bad_castep
                     if isfile(seed+'.res'):
@@ -242,7 +244,7 @@ class FullRelaxer:
                 err_file = seed + '*001.err'
                 for globbed in glob.glob(err_file):
                     if isfile(globbed):
-                        if self.verbosity > 1:
+                        if self.verbosity >= 1:
                             print_warning('Failed to optimise ' + seed + ' CASTEP crashed.')
                         # write final res file to bad_castep
                         if isfile(seed+'.res'):
@@ -281,21 +283,27 @@ class FullRelaxer:
                 calc_doc.update(opti_dict)
 
             except(KeyboardInterrupt, SystemExit):
-                print_warning('Received exception, attempting to fail gracefully...')
+                if self.verbosity >= 1:
+                    print_warning('Received exception, attempting to fail gracefully...')
                 etype, evalue, etb = exc_info()
-                print(format_exception_only(etype, evalue))
+                if self.verbosity >= 1:
+                    print(format_exception_only(etype, evalue))
                 if self.debug:
                     print_exc()
-                print('Killing CASTEP...')
+                if self.verbosity >= 1:
+                    print('Killing CASTEP...')
                 process.terminate()
-                print_warning('Done!')
-                print('Tidying up...', end=' ')
+                if self.verbosity >= 1:
+                    print_warning('Done!')
+                    print('Tidying up...', end=' ')
                 self.mv_to_bad(seed)
                 self.tidy_up(seed)
-                print_warning('Done!')
+                if self.verbosity >= 1:
+                    print_warning('Done!')
                 return False
             except:
-                print_exc()
+                if self.verbosity >= 1:
+                    print_exc()
                 process.terminate()
                 self.mv_to_bad(seed)
                 self.tidy_up(seed)
@@ -304,7 +312,8 @@ class FullRelaxer:
     def scf(self, calc_doc, seed, keep=True):
         """ Perform only the scf calculation without relaxation.  """
         try:
-            print_notify('Calculating SCF ' + self.seed)
+            if self.verbosity >= 1:
+                print_notify('Calculating SCF ' + self.seed)
             doc2param(calc_doc, seed, hash_dupe=False)
             doc2cell(calc_doc, seed, hash_dupe=False, copy_pspots=False)
             # run CASTEP
@@ -315,7 +324,8 @@ class FullRelaxer:
             err_file = seed + '*0001.err'
             for globbed in glob.glob(err_file):
                 if isfile(globbed):
-                    print_warning('Failed to optimise ' + seed + ' CASTEP crashed.')
+                    if self.verbosity >= 1:
+                        print_warning('Failed to optimise ' + seed + ' CASTEP crashed.')
                     # write final res file to bad_castep
                     self.mv_to_bad(seed)
                     return False
@@ -324,13 +334,15 @@ class FullRelaxer:
                 self.tidy_up(seed)
             return True
         except(SystemExit, KeyboardInterrupt):
-            print_exc()
+            if self.verbosity >= 1:
+                print_exc()
             self.mv_to_bad(seed)
             if not keep:
                 self.tidy_up(seed)
             raise SystemExit
         except:
-            print_exc()
+            if self.verbosity >= 1:
+                print_exc()
             if not keep:
                 self.mv_to_bad(seed)
             self.tidy_up(seed)
@@ -383,12 +395,14 @@ class FullRelaxer:
                            '-S', '12',
                            '-d', '1',
                            self.executable, seed]
-                print(command)
+                if self.verbosity >= 1:
+                    print(command)
                 process = sp.Popen(command)
             else:
-                print(['mpirun', '-n', str(self.ncores*self.nnodes),
-                       '-ppn', str(self.ncores),
-                       self.executable, seed])
+                if self.verbosity >= 1:
+                    print(['mpirun', '-n', str(self.ncores*self.nnodes),
+                           '-ppn', str(self.ncores),
+                           self.executable, seed])
                 process = sp.Popen(['mpirun', '-n', str(self.ncores*self.nnodes),
                                     '-ppn', str(self.ncores),
                                     self.executable, seed])
@@ -398,7 +412,8 @@ class FullRelaxer:
         """ Move all associated files to bad_castep. """
         if not exists('bad_castep'):
             makedirs('bad_castep', exist_ok=True)
-        print('Something went wrong, moving files to bad_castep')
+        if self.verbosity >= 1:
+            print('Something went wrong, moving files to bad_castep')
         system('mv ' + seed + '* bad_castep')
         return
 
