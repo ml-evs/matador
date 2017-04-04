@@ -191,7 +191,8 @@ class FullRelaxer:
                     print_notify('Intermediate calculation finished')
                     print(opti_dict)
                 if not success and isinstance(opti_dict, str):
-                    print_warning('Failed to scrape castep file...')
+                    if self.verbosity >= 1:
+                        print_warning('Failed to scrape castep file...')
                     exit()
                 try:
                     # delete any k-point and pspot information
