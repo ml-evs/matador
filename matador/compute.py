@@ -1,8 +1,6 @@
 # coding: utf-8
 """ Contains the FullRelaxer class for continuously
 restarted geometry optimisations. Previously part of run3.
-
-TO-DO: replace wildcard with safe glob
 """
 # matador modules
 from matador.scrapers.castep_scrapers import cell2dict
@@ -72,23 +70,22 @@ class FullRelaxer:
         if self.conv_kpt_bool:
             self.conv_kpt = conv_kpt
         self.success = None
-        self.result_dict = None
         if redirect:
             self.redirect = True
             sys.stdout = open(str(getpid()) + '.out', 'w')
 
         # read in initial structure and skip if failed
         if isinstance(res, str):
-            res_dict, success = res2dict(res, db=False)
+            self.res_dict, success = res2dict(res, db=False)
             if not success:
-                print(res_dict)
+                print(self.res_dict)
                 print_warning('Failed to parse res file ' + str(res))
                 self.success = False
         elif isinstance(res, dict):
-            res_dict = res
+            self.res_dict = res
 
         if self.success is None:
-            calc_doc = res_dict
+            calc_doc = deepcopy(self.res_dict)
 
             # set seed name
             assert isinstance(calc_doc['source'], list)
@@ -99,7 +96,7 @@ class FullRelaxer:
             calc_doc.update(param_dict)
 
             # check for pseudos
-            for elem in res_dict['stoichiometry']:
+            for elem in self.res_dict['stoichiometry']:
                 if '|' not in calc_doc['species_pot'][elem[0]] and\
                         not isfile(calc_doc['species_pot'][elem[0]]):
                     exit('You forgot your pseudos, you silly goose!')
@@ -138,9 +135,6 @@ class FullRelaxer:
                 # begin relaxation
                 if self.start:
                     self.success = self.relax()
-                    # if geom opt was successful, modify input dict
-                    if self.success:
-                        res = self.opti_dict
 
     def relax(self, output_queue=None):
         """ Set up the calculation to perform 4 sets of two steps,
@@ -148,7 +142,7 @@ class FullRelaxer:
 
         Optional input:
 
-        output_queue : this object will be modified with relaxed (successfully or not) structure.
+        output_queue : push node and output dict to a multiprocessing queue (optional).
 
         Returns:
 
@@ -158,8 +152,6 @@ class FullRelaxer:
         calc_doc = self.calc_doc
         print_notify('Relaxing ' + self.seed)
         geom_max_iter_list = self.geom_max_iter_list
-        if output_queue is not None:
-            print('Writing to current output queue.')
         # copy initial res file to seed
         if not isinstance(self.res, str):
             doc2res(self.res, self.seed, info=False, hash_dupe=False)
@@ -168,12 +160,14 @@ class FullRelaxer:
         self.rerun = False
         for ind, num_iter in enumerate(geom_max_iter_list):
             if self.rerun:
-                print_notify('Performing one last iteration...')
                 num_iter = 2
-            if ind == 0:
-                print_notify('Beginning rough geometry optimisation...')
-            elif ind == self.num_rough_iter:
-                print_notify('Beginning fine geometry optimisation...')
+                if self.verbosity > 1:
+                    print_notify('Performing one last iteration...')
+            if self.verbosity > 1:
+                if ind == 0:
+                        print_notify('Beginning rough geometry optimisation...')
+                elif ind == self.num_rough_iter:
+                    print_notify('Beginning fine geometry optimisation...')
             if ind != 0:
                 self.spin = False
             calc_doc['geom_max_iter'] = num_iter
@@ -214,14 +208,17 @@ class FullRelaxer:
                         remove(seed+'.res')
                     doc2res(opti_dict, seed, hash_dupe=False)
                 elif self.rerun and opti_dict['optimised']:
-                    self.result_dict = deepcopy(opti_dict)
                     print_success('Successfully relaxed ' + seed)
                     # write res and castep file out to completed folder
                     doc2res(opti_dict, seed, hash_dupe=False)
                     self.opti_dict = deepcopy(opti_dict)
+                    # overwrite old data in res_dict with opti structure
+                    # so that custom keys in initial res are still accessible
+                    self.res_dict.update(opti_dict)
                     if output_queue is not None:
-                        output_queue.put(deepcopy(opti_dict))
-                        print('wrote relaxed dict out to output_queue')
+                        output_queue.put(self.res_dict)
+                        if self.debug:
+                            print('wrote relaxed dict out to output_queue')
                     self.mv_to_completed(seed)
                     if calc_doc.get('write_cell_structure'):
                         system('mv ' + seed + '-out.cell' + ' completed/' + seed + '-out.cell')
@@ -229,26 +226,32 @@ class FullRelaxer:
                     self.tidy_up(seed)
                     return True
                 elif ind == len(geom_max_iter_list) - 1:
-                    print_warning('Failed to optimise ' + seed)
+                    if self.verbosity > 1:
+                        print_warning('Failed to optimise ' + seed)
                     # write final res file to bad_castep
                     if isfile(seed+'.res'):
                         remove(seed+'.res')
                     doc2res(opti_dict, seed, hash_dupe=False)
-                    self.opti_dict = deepcopy(opti_dict)
+                    self.res_dict.update(opti_dict)
                     if output_queue is not None:
-                        output_queue.put(deepcopy(opti_dict))
-                        print('wrote relaxed dict out to output_queue')
+                        output_queue.put(self.res_dict)
+                        if self.debug:
+                            print('wrote failed dict out to output_queue')
                     self.mv_to_bad(seed)
                     return False
                 err_file = seed + '*001.err'
                 for globbed in glob.glob(err_file):
                     if isfile(globbed):
-                        print_warning('Failed to optimise ' + seed + ' CASTEP crashed.')
+                        if self.verbosity > 1:
+                            print_warning('Failed to optimise ' + seed + ' CASTEP crashed.')
                         # write final res file to bad_castep
                         if isfile(seed+'.res'):
                             remove(seed+'.res')
+                        self.res_dict.update(opti_dict)
                         if output_queue is not None:
-                            output_queue.put(deepcopy(opti_dict))
+                            output_queue.put(self.res_dict)
+                            if self.debug:
+                                print('wrote failed dict out to output_queue')
                         doc2res(opti_dict, seed, hash_dupe=False)
                         self.mv_to_bad(seed)
                         return False
