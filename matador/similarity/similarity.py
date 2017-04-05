@@ -9,34 +9,36 @@ from matador.utils.cursor_utils import get_array_from_cursor
 import numpy as np
 # standard library
 from collections import defaultdict
-from math import isclose
 
 
 def get_uniq_cursor(cursor, sim_calculator=PDF, sim_tol=1e-1, energy_tol=5e-2,
-                    same_stoich=True, debug=False, **sim_calc_args):
+                    enforce_same_stoich=True, debug=False, **sim_calc_args):
     """ Uses sim_calculator to filter cursor into unique structures to some
     tolerance sim_tol,additionally returning a dict of duplicates and the
     correlation matrix.
 
     Inputs:
 
-        cursor           : matador cursor to be filtered
-        sim_calculator   : fingerprint object type to compare
-        sim_tol          : tolerance in similarity distance for duplicates
-        energy_tol       : compare only structures within a certain energy tolerance
-        same_stoich      : compare only structures of the same stoichiometry
-        debug            : print timings and list similarities
-        sim_calc_args    : dict containing parameters to pass to sim_calculator
+        cursor              : matador cursor to be filtered
+        sim_calculator      : fingerprint object type to compare
+        sim_tol             : tolerance in similarity distance for duplicates
+        energy_tol          : compare only structures within a certain energy tolerance
+                              (if enforce_same_stoich is False, this is disabled).
+        enforce_same_stoich : compare only structures of the same stoichiometry
+        debug               : print timings and list similarities
+        sim_calc_args       : dict containing parameters to pass to sim_calculator
 
     Returns:
 
-        distinct_set     : a set of indices of unique documents
-        dupe_dict        : a dict with keys from distinct_set, listing duplicates
-        fingerprint_list : a list <SimilarityCalculator> objects
-        sim_mat          : the correlation matrix of pair similarity distances
+        distinct_set        : a set of indices of unique documents
+        dupe_dict           : a dict with keys from distinct_set, listing duplicates
+        fingerprint_list    : a list <SimilarityCalculator> objects
+        sim_mat             : the correlation matrix of pair similarity distances
 
     """
     fingerprint_list = []
+    if enforce_same_stoich:
+        energy_tol = 1e20
     print('Calculating fingerprints...')
     if debug:
         import time
@@ -54,7 +56,7 @@ def get_uniq_cursor(cursor, sim_calculator=PDF, sim_tol=1e-1, energy_tol=5e-2,
             completed = time.time() - start
             print('PDF of {} completed in {:0.1f} s'.format(' '.join(doc['text_id']), completed))
 
-    sim_mat = np.zeros((len(fingerprint_list), len(fingerprint_list)))
+    sim_mat = np.ones((len(fingerprint_list), len(fingerprint_list)))
     print('Assessing similarities...')
     try:
         import progressbar
@@ -65,10 +67,10 @@ def get_uniq_cursor(cursor, sim_calculator=PDF, sim_tol=1e-1, energy_tol=5e-2,
         sim_mat[i, i] = 0
         for j in range(i+1, len(fingerprint_list)):
             # are we checking stoichiometries, if so, ensure they're the same
-            if (not same_stoich or
-                    sorted(cursor[j]['stoichiometry']) == sorted(cursor[i]['stoichiometry']))\
-                    and isclose(cursor[j]['enthalpy_per_atom'], cursor[i]['enthalpy_per_atom'],
-                                abs_tol=5e-2):
+            if (enforce_same_stoich is False or
+                (sorted(cursor[j]['stoichiometry']) == sorted(cursor[i]['stoichiometry'])
+                 and np.abs(cursor[j]['enthalpy_per_atom']
+                            - cursor[i]['enthalpy_per_atom']) < energy_tol)):
                 sim = fingerprint_list[i].get_sim_distance(fingerprint_list[j])
                 sim_mat[i, j] = sim
                 sim_mat[j, i] = sim
@@ -84,11 +86,15 @@ def get_uniq_cursor(cursor, sim_calculator=PDF, sim_tol=1e-1, energy_tol=5e-2,
     distinct_set = set()
     dupe_set = set()
     dupe_dict = defaultdict(list)
+    for i in range(len(sim_mat)):
+        distinct_set.add(i)
     for coord in zip(rows, cols):
         if coord[0] == coord[1]:
             pass
         elif coord[0] not in dupe_set:
-            distinct_set.add(coord[0])
+            # distinct_set.add(coord[0])
+            if coord[1] in distinct_set:
+                distinct_set.remove(coord[1])
             dupe_set.add(coord[1])
             dupe_dict[coord[0]].append(coord[1])
     print('Done!')
