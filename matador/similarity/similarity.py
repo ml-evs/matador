@@ -12,7 +12,8 @@ from collections import defaultdict
 
 
 def get_uniq_cursor(cursor, sim_calculator=PDF, sim_tol=1e-1, energy_tol=5e-2,
-                    enforce_same_stoich=True, debug=False, **sim_calc_args):
+                    enforce_same_stoich=True, projected=False,
+                    debug=False, **sim_calc_args):
     """ Uses sim_calculator to filter cursor into unique structures to some
     tolerance sim_tol,additionally returning a dict of duplicates and the
     correlation matrix.
@@ -23,8 +24,9 @@ def get_uniq_cursor(cursor, sim_calculator=PDF, sim_tol=1e-1, energy_tol=5e-2,
         sim_calculator      : fingerprint object type to compare
         sim_tol             : tolerance in similarity distance for duplicates
         energy_tol          : compare only structures within a certain energy tolerance
-                              (if enforce_same_stoich is False, this is disabled).
+                              (if enforce_same_stoich is False, this is disabled)
         enforce_same_stoich : compare only structures of the same stoichiometry
+        projected           : use element-projected PDF to calculate similarity
         debug               : print timings and list similarities
         sim_calc_args       : dict containing parameters to pass to sim_calculator
 
@@ -39,6 +41,8 @@ def get_uniq_cursor(cursor, sim_calculator=PDF, sim_tol=1e-1, energy_tol=5e-2,
     fingerprint_list = []
     if enforce_same_stoich:
         energy_tol = 1e20
+    if projected:
+        sim_calc_args['projected'] = True
     print('Calculating fingerprints...')
     if debug:
         import time
@@ -71,7 +75,7 @@ def get_uniq_cursor(cursor, sim_calculator=PDF, sim_tol=1e-1, energy_tol=5e-2,
                 (sorted(cursor[j]['stoichiometry']) == sorted(cursor[i]['stoichiometry'])
                  and np.abs(cursor[j]['enthalpy_per_atom']
                             - cursor[i]['enthalpy_per_atom']) < energy_tol)):
-                sim = fingerprint_list[i].get_sim_distance(fingerprint_list[j])
+                sim = fingerprint_list[i].get_sim_distance(fingerprint_list[j], projected=projected)
                 sim_mat[i, j] = sim
                 sim_mat[j, i] = sim
             else:
@@ -101,15 +105,20 @@ def get_uniq_cursor(cursor, sim_calculator=PDF, sim_tol=1e-1, energy_tol=5e-2,
     return distinct_set, dupe_dict, fingerprint_list, sim_mat
 
 
-def plot_similarity_energy_correlation_matrix(cursor, sim_mat, sim_cutoff=1e-1):
+def plot_similarity_energy_correlation_matrix(cursor, sim_mat, sim_vmin=0.05, sim_vmax=0.5):
     """ Plot a correlation heatmap where the upper triangular displays
     relative energy differences and the lower triangular displays
     structural similarity distance.
 
+    TO-DO:
+    * guidelines for different stoichiometries
+
     Inputs:
 
-        cursor  : a matador cursor
-        sim_mat : matrix where S_{ij} = similarity distance(i, j)
+        cursor   : a matador cursor
+        sim_mat  : matrix where S_{ij} = similarity distance(i, j)
+        sim_vmin : sim distance at which to show minimum colour
+        sim_vmax : "---------------------------" maximum "----"
 
     """
     import matplotlib.pyplot as plt
@@ -138,7 +147,7 @@ def plot_similarity_energy_correlation_matrix(cursor, sim_mat, sim_cutoff=1e-1):
     axarr[1][1].axis('off')
 
     sns.heatmap(_sim_mat, mask=sim_mask, cmap=cmap_sim,
-                vmin=sim_cutoff, vmax=0.5, ax=ax,
+                vmin=sim_vmin, vmax=sim_vmax, ax=ax,
                 xticklabels=False, yticklabels=False, square=True,
                 cbar_kws={'label': 'structural similarity distance',
                           'orientation': 'horizontal'},
