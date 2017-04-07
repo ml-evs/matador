@@ -11,7 +11,7 @@ import numpy as np
 from collections import defaultdict
 
 
-def get_uniq_cursor(cursor, sim_calculator=PDF, sim_tol=1e-1, energy_tol=5e-2,
+def get_uniq_cursor(cursor, sim_calculator=PDF, sim_tol=5e-2, energy_tol=5e-2,
                     enforce_same_stoich=True, projected=False,
                     debug=False, **sim_calc_args):
     """ Uses sim_calculator to filter cursor into unique structures to some
