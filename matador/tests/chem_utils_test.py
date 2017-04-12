@@ -2,9 +2,11 @@
 import unittest
 from matador.utils.chem_utils import get_concentration
 from matador.utils.chem_utils import get_generic_grav_capacity
+from matador.utils.chem_utils import get_stoich, get_formula_from_stoich
 
 
-class CapacityTest(unittest.TestCase):
+class ChemUtilsTest(unittest.TestCase):
+    """ Test chem utils functionality. """
     def testGravimetricCapacity(self):
         test_docs = []
         test_elements = []
@@ -45,6 +47,47 @@ class CapacityTest(unittest.TestCase):
         self.assertEqual(Q[0], Q[1])
         self.assertEqual(round(8*Q[2], 3), round(Q[3], 3))
         self.assertEqual(round(Q[2], 3), round(2*Q[4], 3))
+
+    def testAtoms2Stoich(self):
+        atoms = 5*['Li']
+        atoms.extend(5*['P'])
+        stoich = [['Li', 1], ['P', 1]]
+        self.assertEqual(stoich, get_stoich(atoms))
+        atoms = 99*['Li']
+        atoms.extend(1*['P'])
+        stoich = [['Li', 99], ['P', 1]]
+        self.assertEqual(stoich, get_stoich(atoms))
+        atoms = 4*['Li']
+        atoms.extend(36*['P'])
+        stoich = [['Li', 1], ['P', 9]]
+        self.assertEqual(stoich, get_stoich(atoms))
+        atoms = 3*['Li']
+        atoms.extend(2*['P'])
+        stoich = [['Li', 3], ['P', 2]]
+        self.assertEqual(stoich, get_stoich(atoms))
+        atoms = 9*['Li']
+        atoms.extend(6*['P'])
+        stoich = [['Li', 3], ['P', 2]]
+        self.assertEqual(stoich, get_stoich(atoms))
+        atoms = 36*['P']
+        atoms.extend(4*['Li'])
+        stoich = [['Li', 1], ['P', 9]]
+        self.assertEqual(stoich, get_stoich(atoms))
+
+    def testStoich2Form(self):
+        stoich = [['Li', 1], ['P', 9]]
+        form = 'LiP9'
+        self.assertEqual(form, get_formula_from_stoich(stoich))
+        stoich = [['P', 9], ['Li', 1]]
+        form = 'LiP9'
+        self.assertEqual(form, get_formula_from_stoich(stoich))
+        stoich = [['Li', 1], ['P', 9]]
+        form = 'LiP$_{9}$'
+        self.assertEqual(form, get_formula_from_stoich(stoich, tex=True))
+        stoich = [['Li', 1], ['P', 9]]
+        form = 'P9Li'
+        self.assertEqual(form, get_formula_from_stoich(stoich, elements=['P', 'Li']))
+
 
 if __name__ == '__main__':
     unittest.main()

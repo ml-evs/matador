@@ -131,6 +131,48 @@ def get_formation_energy(chempots, doc):
     return formation
 
 
+def get_stoich(atom_types):
+    """ Return integer stoichiometry from atom_types list.
+
+    Input:
+
+        atom_types: list of elements, e.g. ['Li', 'P', 'P']
+
+    Returns:
+
+        stoich : [['Li', 1], ['P', 2]]
+
+    """
+    from collections import defaultdict
+    from math import gcd
+    stoich = defaultdict(float)
+    for atom in atom_types:
+        if atom not in stoich:
+            stoich[atom] = 0
+        stoich[atom] += 1
+    gcd_val = 0
+    for atom in atom_types:
+        if gcd_val == 0:
+            gcd_val = stoich[atom]
+        else:
+            gcd_val = gcd(stoich[atom], gcd_val)
+    # convert stoichiometry to tuple for fryan
+    temp_stoich = []
+    try:
+        for key, value in stoich.items():
+            if float(value)/gcd_val % 1 != 0:
+                temp_stoich.append([key, float(value)/gcd_val])
+            else:
+                temp_stoich.append([key, value/gcd_val])
+    except AttributeError:
+        for key, value in stoich.iteritems():
+            if float(value)/gcd_val % 1 != 0:
+                temp_stoich.append([key, float(value)/gcd_val])
+            else:
+                temp_stoich.append([key, value/gcd_val])
+    return sorted(temp_stoich)
+
+
 def get_formula_from_stoich(stoich, elements=None, tex=False):
     """ Get the chemical formula of a structure from
     its matador stoichiometry.
