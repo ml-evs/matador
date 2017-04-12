@@ -10,4 +10,5 @@ pipelines:
     - step:
         script: # Modify the commands below to build your repository.
           - pip install .
-          - python setup.py test
+          - coverage run setup.py test
+          - coverage report
