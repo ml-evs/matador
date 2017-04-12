@@ -128,12 +128,12 @@ class Matador(object):
             print_notify('Filtering for unique structures...')
             if self.args.get('top') is not None:
                 unique_set, _, _, _ = get_uniq_cursor(self.cursor[:self.args.get('top')],
-                                                      debug=self.args.get('debug'))
+                                                      debug=self.args.get('debug'), projected=True)
                 print('Filtered {} down to {}'.format(min(len(self.cursor),
                                                       self.args.get('top')),
                                                       len(unique_set)))
             else:
-                unique_set, _, _, _ = get_uniq_cursor(self.cursor, debug=self.args.get('debug'))
+                unique_set, _, _, _ = get_uniq_cursor(self.cursor, debug=self.args.get('debug'), projected=True)
                 print('Filtered {} down to {}'.format(len(self.cursor),
                                                       len(unique_set)))
             self.cursor = [self.cursor[ind] for ind in unique_set]
