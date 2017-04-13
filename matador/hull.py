@@ -27,11 +27,19 @@ import re
 
 
 class QueryConvexHull(object):
-    """ Implements a Convex Hull for formation energies
-    from a fryan DBQuery.
+    """ Construct a binary or ternary phase diagram
+    from matador.DBQuery object.
     """
     def __init__(self, query, subcmd='hull', **kwargs):
-        """ Accept query from fryan as argument. """
+        """
+
+        Inputs:
+
+            query   : matador.DBQuery object containing structures,
+            subcmd  : either 'hull' or 'voltage',
+            kwargs  : mostly CLI arguments, see matador hull --help for full options.
+
+        """
         self.args = kwargs
         if self.args.get('subcmd') is None:
             self.args['subcmd'] = subcmd
