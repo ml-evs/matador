@@ -45,6 +45,7 @@ class FullRelaxer:
     """
     def __init__(self, ncores, nnodes, node, res, param_dict, cell_dict,
                  executable='castep', rough=None, spin=False,
+                 reopt=True,
                  conv_cutoff=None, conv_kpt=None,
                  archer=False, bnl=False,
                  start=True, redirect=False,
@@ -60,6 +61,7 @@ class FullRelaxer:
         self.node = node
         self.verbosity = verbosity
         self.executable = executable
+        self.reopt = reopt
         self.debug = debug
         self.spin = spin
         self.start = start
@@ -161,8 +163,8 @@ class FullRelaxer:
 
         self.rerun = False
         for ind, num_iter in enumerate(geom_max_iter_list):
-            if self.rerun:
-                num_iter = 2
+            if self.reopt and self.rerun:
+                num_iter = 20
                 if self.verbosity >= 1:
                     print_notify('Performing one last iteration...')
             if self.verbosity >= 1:
@@ -201,15 +203,15 @@ class FullRelaxer:
                     del opti_dict['species_pot']
                 except:
                     pass
-                if self.rerun and not opti_dict['optimised']:
+                if self.reopt and self.rerun and not opti_dict['optimised']:
                     self.rerun = False
-                if not self.rerun and opti_dict['optimised']:
+                if self.reopt and not self.rerun and opti_dict['optimised']:
                     # run once more to get correct symmetry
                     self.rerun = True
                     if isfile(seed+'.res'):
                         remove(seed+'.res')
                     doc2res(opti_dict, seed, hash_dupe=False)
-                elif self.rerun and opti_dict['optimised']:
+                elif (not self.reopt or self.rerun) and opti_dict['optimised']:
                     if self.verbosity >= 1:
                         print_success('Successfully relaxed ' + seed)
                     # write res and castep file out to completed folder
@@ -285,6 +287,7 @@ class FullRelaxer:
 
             except(KeyboardInterrupt, SystemExit):
                 if self.verbosity >= 1:
+                    print_exc()
                     print_warning('Received exception, attempting to fail gracefully...')
                 etype, evalue, etb = exc_info()
                 if self.verbosity >= 1:
@@ -411,11 +414,16 @@ class FullRelaxer:
 
     def mv_to_bad(self, seed):
         """ Move all associated files to bad_castep. """
-        if not exists('bad_castep'):
-            makedirs('bad_castep', exist_ok=True)
-        if self.verbosity >= 1:
-            print('Something went wrong, moving files to bad_castep')
-        system('mv ' + seed + '* bad_castep')
+        try:
+            if not exists('bad_castep'):
+                makedirs('bad_castep', exist_ok=True)
+            if self.verbosity >= 1:
+                print('Something went wrong, moving files to bad_castep')
+            system('mv ' + seed + '* bad_castep')
+        except:
+            if self.verbosity > 0:
+                print_exc()
+            pass
         return
 
     def mv_to_completed(self, seed, keep=False):
@@ -431,13 +439,19 @@ class FullRelaxer:
 
     def cp_to_input(self, seed):
         """ Copy initial cell and res to input folder. """
-        if not exists('input'):
-            makedirs('input', exist_ok=True)
-        system('cp ' + seed + '.res input')
+        try:
+            if not exists('input'):
+                makedirs('input', exist_ok=True)
+            system('cp ' + seed + '.res input')
+        except:
+            if self.verbosity > 0:
+                print_exc()
+            pass
         return
 
     def tidy_up(self, seed):
         """ Delete all run3 created files before quitting. """
         for f in glob.glob(seed + '*'):
-            remove(f)
+            if not (f.endswith('.res') or f.endswith('.castep')):
+                remove(f)
         return

@@ -38,6 +38,14 @@ class BatchRun:
         # analyse parallel allocation
         self.args = kwargs
         self.debug = self.args.get('debug')
+        if self.args.get('verbosity') is None:
+            self.verbosity = 0
+        else:
+            self.verbosity = self.args.get('verbosity')
+        if self.args.get('no_reopt'):
+            self.reopt = False
+        else:
+            self.reopt = True
         self.all_cores = mp.cpu_count()
         self.seed = self.args.get('seed')
         self.limit = self.args.get('limit')
@@ -200,6 +208,8 @@ class BatchRun:
                                           archer=self.archer,
                                           bnl=self.bnl,
                                           debug=self.debug,
+                                          verbosity=self.verbosity,
+                                          reopt=self.reopt,
                                           spin=self.spin,
                                           conv_cutoff=self.cutoffs,
                                           conv_kpt=self.kpts)
@@ -241,8 +251,12 @@ if __name__ == '__main__':
                               found on e.g. Darwin HPC.')
     parser.add_argument('-exec', '--executable', type=str,
                         help='specify path to or name of executable')
+    parser.add_argument('--no_reopt', action='store_true',
+                        help='do not run geometry optimisation again after first success')
     parser.add_argument('-d', '--debug', action='store_true',
                         help='debug output')
+    parser.add_argument('-v', '--verbosity', type=int,
+                        help='integer to set level of verbosity')
     parser.add_argument('--archer', action='store_true',
                         help='use aprun over mpirun')
     parser.add_argument('--bnl', action='store_true',
@@ -260,9 +274,9 @@ if __name__ == '__main__':
                         help='limit to n structures per run')
     args = parser.parse_args()
     runner = BatchRun(ncores=args.ncores, nprocesses=args.nprocesses, nnodes=args.nnodes,
-                      debug=args.debug, seed=args.seed,
+                      debug=args.debug, verbosity=args.verbosity, seed=args.seed,
                       conv_cutoff=args.conv_cutoff, conv_kpt=args.conv_kpt,
-                      limit=args.limit, archer=args.archer, bnl=args.bnl,
+                      limit=args.limit, archer=args.archer, bnl=args.bnl, no_reopt=args.no_reopt,
                       executable=args.executable, rough=args.rough, spin=args.spin)
     try:
         runner.spawn()
