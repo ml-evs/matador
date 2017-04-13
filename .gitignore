@@ -10,3 +10,4 @@ f90wrap*
 *.so
 *pdf_calculator_funcs*
 htmlcov
+_build

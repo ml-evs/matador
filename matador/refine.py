@@ -2,6 +2,7 @@
 """ This module contains functionality to update
 and overwrite database entries with specific tasks,
 e.g. symmetry and substructure analysis.
+
 """
 
 from __future__ import print_function
@@ -19,6 +20,7 @@ class Refiner(object):
     database in place, either in overwrite, set or compare/display mode.
     Current modifiables are space groups, substructures, atomic ratios,
     the set of elements, tags and DOIs.
+
     """
 
     def __init__(self, cursor, collection=None, task=None, mode='display', **kwargs):
@@ -160,10 +162,10 @@ class Refiner(object):
         Adds 'ratios' field to the docs, containing, e.g.
 
         Li2AsP:
-        {
-            LiAs: 2.0, AsLi: 0.5, PAs: 1.0,
-            AsP: 1.0, LiP: 2.0, PLi: 0.5
-        }
+
+           {'LiAs': 2.0, 'AsLi': 0.5, 'PAs': 1.0,
+            'AsP' : 1.0, 'LiP' : 2.0, 'PLi': 0.5}
+
         """
         for ind, doc in enumerate(self.cursor):
             try:

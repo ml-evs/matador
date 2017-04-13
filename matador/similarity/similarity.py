@@ -23,8 +23,7 @@ def get_uniq_cursor(cursor, sim_calculator=PDF, sim_tol=5e-2, energy_tol=5e-2,
         cursor              : matador cursor to be filtered
         sim_calculator      : fingerprint object type to compare
         sim_tol             : tolerance in similarity distance for duplicates
-        energy_tol          : compare only structures within a certain energy tolerance
-                              (if enforce_same_stoich is False, this is disabled)
+        energy_tol          : compare only structures within a certain energy tolerance (if enforce_same_stoich is False, this is disabled)
         enforce_same_stoich : compare only structures of the same stoichiometry
         projected           : use element-projected PDF to calculate similarity
         debug               : print timings and list similarities

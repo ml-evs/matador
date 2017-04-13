@@ -1,27 +1,27 @@
-matador.scrapers package
-========================
+matador\.scrapers package
+=========================
 
 Submodules
 ----------
 
-matador.scrapers.castep_scrapers module
----------------------------------------
+matador\.scrapers\.castep\_scrapers module
+------------------------------------------
 
 .. automodule:: matador.scrapers.castep_scrapers
     :members:
     :undoc-members:
     :show-inheritance:
 
-matador.scrapers.experiment_scrapers module
--------------------------------------------
+matador\.scrapers\.experiment\_scrapers module
+----------------------------------------------
 
 .. automodule:: matador.scrapers.experiment_scrapers
     :members:
     :undoc-members:
     :show-inheritance:
 
-matador.scrapers.qe_scrapers module
------------------------------------
+matador\.scrapers\.qe\_scrapers module
+--------------------------------------
 
 .. automodule:: matador.scrapers.qe_scrapers
     :members:

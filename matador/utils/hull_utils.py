@@ -85,11 +85,9 @@ def barycentric2cart(structures):
     Input structures array is of the form:
 
         [
-         [l(1)_0, l(2)_0 Eform_0],
-         ...,
-         [l(1)_n, l(2)_n, Eform_n]
+            [l(1)_0, l(2)_0, Eform_0],
+            [l(1)_n, l(2)_n, Eform_n]
         ]
-
 
     where l3 = 1 - l2 - l1 are the barycentric coordinates of the point
     in the triangle defined by the chemical potentials.
