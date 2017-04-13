@@ -189,8 +189,7 @@ class BatchRun:
                 # create full relaxer object for creation and running of job
                 try:
                     job_count += 1
-                    relaxer = FullRelaxer(paths=self.paths,
-                                          ncores=self.ncores,
+                    relaxer = FullRelaxer(ncores=self.ncores,
                                           nnodes=self.nnodes,
                                           node=None,
                                           res=res,
