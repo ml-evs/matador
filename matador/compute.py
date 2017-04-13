@@ -353,7 +353,7 @@ class FullRelaxer:
         """ Calls CASTEP on desired seed with desired number of cores.
         """
         if self.nnodes is None or self.nnodes == 1:
-            if self.ncores == 1:
+            if self.ncores == 1 and self.node is not None:
                 process = sp.Popen(['nice', '-n', '15', self.executable, seed])
             elif self.archer:
                 process = sp.Popen(['aprun', '-n', str(self.ncores),
