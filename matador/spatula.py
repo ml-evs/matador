@@ -176,16 +176,15 @@ class Spatula(object):
             # include elem set for faster querying
             if 'elems' not in struct:
                 struct['elems'] = list(set(struct['atom_types']))
-            else:
-                for elem in struct['stoichiometry']:
-                    # remove all points for a missing pseudo
-                    if elem[0] not in struct['species_pot']:
-                        struct['quality'] = 0
-                        break
-                    else:
-                        # remove a point for a generic OTF pspot
-                        if 'OTF' in struct['species_pot'][elem[0]].upper():
-                            struct['quality'] -= 1
+            for elem in struct['stoichiometry']:
+                # remove all points for a missing pseudo
+                if elem[0] not in struct['species_pot']:
+                    struct['quality'] = 0
+                    break
+                else:
+                    # remove a point for a generic OTF pspot
+                    if 'OTF' in struct['species_pot'][elem[0]].upper():
+                        struct['quality'] -= 1
             if 'xc_functional' not in struct:
                 struct['quality'] = 0
             struct_id = self.repo.insert_one(struct).inserted_id
