@@ -579,15 +579,16 @@ class QueryConvexHull(object):
         self.vol_per_y = v
         return
 
-    def plot_2d_hull(self, dis=False):
-        """ Plot calculated hull. """
+    def plot_2d_hull(self, ax=None, dis=False, show=True):
+        """ Plot calculated hull, returning ax and fig objects for further editing. """
         import matplotlib.pyplot as plt
         import matplotlib.colors as colours
-        if self.args.get('pdf') or self.args.get('png') or self.args.get('svg'):
-            fig = plt.figure(facecolor=None, figsize=(8, 6), dpi=500)
-        else:
-            fig = plt.figure(facecolor=None)
-        ax = fig.add_subplot(111)
+        if ax is None:
+            if self.args.get('pdf') or self.args.get('png') or self.args.get('svg'):
+                fig = plt.figure(facecolor=None, figsize=(8, 6), dpi=500)
+            else:
+                fig = plt.figure(facecolor=None)
+            ax = fig.add_subplot(111)
         scatter = []
         x_elem = [self.elements[0]]
         one_minus_x_elem = list(self.elements[1:])
@@ -719,8 +720,10 @@ class QueryConvexHull(object):
         elif self.args.get('png'):
             plt.savefig(self.elements[0]+self.elements[1]+'_hull.png',
                         dpi=500, bbox_inches='tight')
-        else:
+        elif show:
             plt.show()
+
+        return ax
 
     def plot_2d_hull_bokeh(self):
         """ Plot interactive hull with Bokeh. """
