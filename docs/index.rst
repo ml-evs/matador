@@ -11,7 +11,8 @@ matador is an aggregator and manipulator of the results first-principles calcula
 Written by `Matthew Evans <www.tcm.phy.cam.ac.uk/~me388>`_, me388@cam.ac.uk (2016).
 
 **New in current version (0.7b):**
-* Ternary voltage curves.
+
+* Ternary voltage curves with e.g. ``matador voltage -c LiPZn --intersection``.
 * Similarity/uniqueness filtering with element-projected PDFs.
 * Updated compute engine for remote calculations (see ``compute.py`` and new binary ``oddjob``).
 * Improved test suite and full pip compatiblity.
@@ -25,7 +26,7 @@ Written by `Matthew Evans <www.tcm.phy.cam.ac.uk/~me388>`_, me388@cam.ac.uk (201
 
 **Core functionality:**
 
-1. The scraping of CASTEP/Quantum Espresso output files into flexible Python dictionaries with a sensible pragma via `matador import`.
+1. The scraping of CASTEP/Quantum Espresso output files into flexible Python dictionaries with a sensible pragma via ``matador import``.
 2. The transferal of said objects into a MongoDB database.
 3. Powerful CLI querying of the database, with a focus on energy storage applications using ``matador query``.
 4. Calculation and presentation of binary and ternary phase diagrams with ``matador hull``.
