@@ -7,7 +7,7 @@ https://bitbucket.org/can_kocer/ajm_group_voronoi_code
 Requires Can's code to be on your PYTHONPATH.
 """
 
-from .export import generate_hash
+from matador.export import generate_hash
 
 
 def get_voronoi_substructure(doc):
@@ -34,20 +34,21 @@ def get_voronoi_substructure(doc):
     voronizer.Vornet = VoronoiNetwork(filename=fname, struc=voronizer.struc, fromfile=False)
     voronizer.printInitInfo()
     voronizer.Vornet.computeVorNet()
-    doc['substruc'] = [vc.getSubStruc(use_area=True) for vc in voronizer.Vornet.VoronoiCells]
+    doc['substruc'] = [vc.getSubStruc(use_area=False) for vc in voronizer.Vornet.VoronoiCells]
     return doc['substruc']
 
 
-# if __name__ == '__main__':
-    # from matador import DBQuery, QueryConvexHull
-    # # test with LiAs
-    # query = DBQuery(composition=['LiAs'], subcmd='hull')
-    # hull = QueryConvexHull(query, no_plot=True, hull_cutoff=0)
-    # hull_cursor = hull.hull_cursor
-    # most_lithiated = hull_cursor[-2]
-    # most_lithiated_substruc = get_voronoi_substructure(most_lithiated)
-    # other_substruc = []
-    # for doc in hull_cursor:
-        # other_substruc.append(get_voronoi_substructure(doc))
-    # print(other_substruc)
-    # print(most_lithiated_substruc)
+if __name__ == '__main__':
+    from matador.query import DBQuery
+    from matador.hull import QueryConvexHull
+    # test with LiAs
+    query = DBQuery(composition=['LiAs'], subcmd='hull')
+    hull = QueryConvexHull(query, no_plot=True, hull_cutoff=0)
+    hull_cursor = hull.hull_cursor
+    most_lithiated = hull_cursor[-2]
+    most_lithiated_substruc = get_voronoi_substructure(most_lithiated)
+    other_substruc = []
+    for doc in hull_cursor:
+        other_substruc.append(get_voronoi_substructure(doc))
+    print(other_substruc)
+    print(most_lithiated_substruc)
