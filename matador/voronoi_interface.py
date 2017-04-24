@@ -7,34 +7,18 @@ https://bitbucket.org/can_kocer/ajm_group_voronoi_code
 Requires Can's code to be on your PYTHONPATH.
 """
 
-from matador.export import generate_hash
+from matador.export import doc2res
+from os import remove
+from Vornetclass import VoronoiNetwork
 
 
 def get_voronoi_substructure(doc):
     """ Run Can's Voronoi analysis on a matador doc. """
-    from Structure import Structure
-    from Voronizer import Voronizer
-    from Vornetclass import VoronoiNetwork
-    fname = generate_hash()
-    # fake init of Structure that normally requires a file
-    voro_struc = Structure.__new__(Structure)
-    voro_struc.noatoms = doc['num_atoms']
-    voro_struc.unitcell = dict()
-    voro_struc.unitcell['va'] = doc['lattice_cart'][0]
-    voro_struc.unitcell['vb'] = doc['lattice_cart'][1]
-    voro_struc.unitcell['vc'] = doc['lattice_cart'][2]
-    voro_struc.atomfracpos = doc['positions_frac']
-    voro_struc.atomID = dict()
-    for ind, atom in enumerate(doc['atom_types']):
-        voro_struc.atomID[ind] = atom
-    voro_struc.FtCM, voro_struc.CtFM = voro_struc.initConvMat()
-    # voro_struc.stdizeCell()
-    voronizer = Voronizer.__new__(Voronizer)
-    voronizer.struc = voro_struc
-    voronizer.Vornet = VoronoiNetwork(filename=fname, struc=voronizer.struc, fromfile=False)
-    voronizer.printInitInfo()
-    voronizer.Vornet.computeVorNet()
-    doc['substruc'] = [vc.getSubStruc(use_area=False) for vc in voronizer.Vornet.VoronoiCells]
+    doc2res(doc, 'Vropple.res', hash_dupe=False)
+    vornet = VoronoiNetwork(filename='Vropple.res')
+    vornet.computeVorNet()
+    doc['substruc'] = [vc.getSubStruc(use_area=False) for vc in vornet.VoronoiCells]
+    remove('Vropple.res')
     return doc['substruc']
 
 
