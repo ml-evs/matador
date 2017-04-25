@@ -85,8 +85,9 @@ class DBQuery(object):
         # create the dictionary to pass to MongoDB
         self.construct_query()
 
-        # execute the query
-        self.perform_query()
+        if not self.args.get('testing'):
+            # execute the query
+            self.perform_query()
 
     def construct_query(self):
         """ Set up query dict and perform query depending on
@@ -161,10 +162,6 @@ class DBQuery(object):
             self.query_dict['$and'].append(self.query_num_species())
             self.empty_query = False
 
-        if self.args.get('pressure') is not None:
-            self.query_dict['$and'].append(self.query_pressure())
-            self.empty_query = False
-
         if self.args.get('space_group') is not None:
             self.query_dict['$and'].append(self.query_space_group())
             self.empty_query = False
@@ -173,16 +170,36 @@ class DBQuery(object):
             self.query_dict['$and'].append(self.query_num_fu())
             self.empty_query = False
 
+        if self.args.get('tags') is not None:
+            self.query_dict['$and'].append(self.query_tags())
+            self.empty_query = False
+
+        if self.args.get('doi') is not None:
+            self.query_dict['$and'].append(self.query_doi())
+            self.empty_query = False
+
+        if self.args.get('icsd') is not None:
+            self.query_dict['$and'].append(self.query_icsd())
+            self.empty_query = False
+
+        if self.args.get('cutoff') is not None:
+            self.query_dict['$and'].append(self.query_cutoff())
+            self.empty_query = False
+
+        if self.args.get('src_str') is not None:
+            self.query_dict['$and'].append(self.query_source())
+            self.empty_query = False
+
+        if self.args.get('pressure') is not None:
+            self.query_dict['$and'].append(self.query_pressure())
+            self.empty_query = False
+
         if self.args.get('encapsulated') is True:
             self.query_dict['$and'].append(self.query_encap())
             self.empty_query = False
 
         if self.args.get('cnt_radius') is not None:
             self.query_dict['$and'].append(self.query_cnt_radius())
-            self.empty_query = False
-
-        if self.args.get('cutoff') is not None:
-            self.query_dict['$and'].append(self.query_cutoff())
             self.empty_query = False
 
         if self.args.get('sedc') is not None:
@@ -195,22 +212,6 @@ class DBQuery(object):
 
         if self.args.get('spin') is not None:
             self.query_dict['$and'].append(self.query_spin())
-            self.empty_query = False
-
-        if self.args.get('tags') is not None:
-            self.query_dict['$and'].append(self.query_tags())
-            self.empty_query = False
-
-        if self.args.get('doi') is not None:
-            self.query_dict['$and'].append(self.query_doi())
-            self.empty_query = False
-
-        if self.args.get('src_str') is not None:
-            self.query_dict['$and'].append(self.query_source())
-            self.empty_query = False
-
-        if self.args.get('icsd') is not None:
-            self.query_dict['$and'].append(self.query_icsd())
             self.empty_query = False
 
         if not self.args.get('ignore_warnings'):
@@ -362,43 +363,16 @@ class DBQuery(object):
         # alias stoichiometry
         if custom_stoich is None:
             stoich = self.args.get('stoichiometry')
+            if isinstance(stoich, str):
+                stoich = [stoich]
         else:
             stoich = custom_stoich
         if partial_formula is None:
             partial_formula = self.args.get('partial_formula')
+        if ':' in stoich[0]:
+            exit('Formula cannot contain ":", you probably meant to query composition.')
 
-        # if there's only one string, try split it by caps
-        if len(stoich) == 1:
-            stoich = [elem for elem in re.split(r'([A-Z][a-z]*)', stoich[0]) if elem]
-            tmp_stoich = stoich
-            for ind, strng in enumerate(stoich):
-                tmp_stoich[ind] = [elem for elem in re.split(r'([0-9]*)', strng) if elem]
-            stoich = [item for sublist in tmp_stoich for item in sublist]
-            while '[' in stoich or '][' in stoich:
-                tmp_stoich = list(stoich)
-                for ind, tmp in enumerate(tmp_stoich):
-                    if tmp == '][':
-                        del tmp_stoich[ind]
-                        tmp_stoich.insert(ind, '[')
-                        tmp_stoich.insert(ind, ']')
-                        break
-                for ind, tmp in enumerate(tmp_stoich):
-                    if tmp == '[':
-                        end_bracket = False
-                        while not end_bracket:
-                            if tmp_stoich[ind+1] == ']':
-                                end_bracket = True
-                            tmp_stoich[ind] += tmp_stoich[ind+1]
-                            del tmp_stoich[ind+1]
-                try:
-                    tmp_stoich.remove(']')
-                except:
-                    pass
-                try:
-                    tmp_stoich.remove('')
-                except:
-                    pass
-                stoich = tmp_stoich
+        stoich = parse_element_string(stoich[0], stoich=True)
 
         elements = []
         fraction = []
@@ -472,7 +446,10 @@ class DBQuery(object):
         by query_num_species.
         """
         if custom_elem is None:
-            elements = list(self.args.get('composition'))
+            if isinstance(self.args.get('composition'), str):
+                elements = [self.args.get('composition')]
+            else:
+                elements = self.args.get('composition')
         else:
             elements = custom_elem
         if partial_formula is None:
@@ -486,44 +463,8 @@ class DBQuery(object):
                 if char.isdigit():
                     print_failure('Composition cannot contain a number.')
                     exit()
-        try:
-            if len(elements) == 1:
-                valid = False
-                for char in elements[0]:
-                    if char.isupper():
-                        valid = True
-                if not valid:
-                    print_failure('Composition must contain at least one upper case character.')
-                    exit()
-                elements = [elem for elem in re.split(r'([A-Z][a-z]*)', elements[0]) if elem]
-                while '[' in elements or '][' in elements:
-                    tmp_stoich = list(elements)
-                    for ind, tmp in enumerate(tmp_stoich):
-                        if tmp == '][':
-                            del tmp_stoich[ind]
-                            tmp_stoich.insert(ind, '[')
-                            tmp_stoich.insert(ind, ']')
-                            break
-                    for ind, tmp in enumerate(tmp_stoich):
-                        if tmp == '[':
-                            end_bracket = False
-                            while not end_bracket:
-                                if tmp_stoich[ind+1] == ']':
-                                    end_bracket = True
-                                tmp_stoich[ind] += tmp_stoich[ind+1]
-                                del tmp_stoich[ind+1]
-                    try:
-                        tmp_stoich.remove(']')
-                    except:
-                        pass
-                    try:
-                        tmp_stoich.remove('')
-                    except:
-                        pass
-                    elements = tmp_stoich
-        except Exception:
-            print_exc()
-            exit()
+
+        elements = parse_element_string(elements[0])
 
         if self.args.get('intersection'):
             query_dict = dict()
@@ -569,6 +510,7 @@ class DBQuery(object):
                                                round(float(ratio_elements[ind+1])/float(ratio_elements[jind+1]), 3)])
                     query_dict['$and'].append(self.query_ratio(ratios))
         else:
+            # expand group macros
             query_dict = dict()
             query_dict['$and'] = []
             size = len(elements)
@@ -601,151 +543,17 @@ class DBQuery(object):
 
         return query_dict
 
-    def __query_composition_compactified(self, custom_elem=None, partial_formula=None):
-        """ Query DB for all structures containing
-        all the elements taken as input. Passing this
-        function a number is a deprecated feature, replaced
-        by query_num_species.
-        """
-        if custom_elem is None:
-            elements = list(self.args.get('composition'))
-        else:
-            elements = custom_elem
-        if partial_formula is None:
-            partial_formula = self.args.get('partial_formula')
-        non_binary = False
-        if ':' in elements[0]:
-            non_binary = True
-        # if there's only one string, try split it by caps
-        if not non_binary:
-            for char in elements[0]:
-                if char.isdigit():
-                    print_failure('Composition cannot contain a number.')
-                    exit()
-        try:
-            if len(elements) == 1:
-                valid = False
-                for char in elements[0]:
-                    if char.isupper():
-                        valid = True
-                if not valid:
-                    print_failure('Composition must contain at least one upper case character.')
-                    exit()
-                elements = [elem for elem in re.split(r'([A-Z][a-z]*)', elements[0]) if elem]
-                while '[' in elements or '][' in elements:
-                    tmp_stoich = list(elements)
-                    for ind, tmp in enumerate(tmp_stoich):
-                        if tmp == '][':
-                            del tmp_stoich[ind]
-                            tmp_stoich.insert(ind, '[')
-                            tmp_stoich.insert(ind, ']')
-                            break
-                    for ind, tmp in enumerate(tmp_stoich):
-                        if tmp == '[':
-                            end_bracket = False
-                            while not end_bracket:
-                                if tmp_stoich[ind+1] == ']':
-                                    end_bracket = True
-                                tmp_stoich[ind] += tmp_stoich[ind+1]
-                                del tmp_stoich[ind+1]
-                    try:
-                        tmp_stoich.remove(']')
-                    except:
-                        pass
-                    try:
-                        tmp_stoich.remove('')
-                    except:
-                        pass
-                    elements = tmp_stoich
-        except Exception:
-            print_exc()
-            exit()
-
-        if self.args.get('intersection'):
-            query_dict = dict()
-            query_dict['$or'] = []
-            size = len(elements)
-            # iterate over all combinations
-            for rlen in range(1, len(elements)+1):
-                for combi in combinations(elements, r=rlen):
-                    list_combi = list(combi)
-                    types_dict = dict()
-                    types_dict['$and'] = list()
-                    types_dict['$and'].append(dict())
-                    types_dict['$and'][-1]['stoichiometry'] = dict()
-                    types_dict['$and'][-1]['stoichiometry']['$size'] = len(list_combi)
-                    for elem in list_combi:
-                        types_dict['$and'].append(dict())
-                        types_dict['$and'][-1]['elems'] = dict()
-                        types_dict['$and'][-1]['elems']['$in'] = [elem]
-                    query_dict['$or'].append(types_dict)
-        elif non_binary:
-            query_dict = dict()
-            query_dict['$and'] = []
-            size = 0
-            for ind, elem in enumerate(elements):
-                if elem != ':' and not elem.isdigit():
-                    query_dict['$and'].append(self.query_composition(custom_elem=[elem], partial_formula=True))
-                    size += 1
-                if elem == ':':
-                    # convert e.g. MoS2 to [['MoS', 2]]
-                    # or LiMoS2 to [['LiMo', 1], ['MoS', '2], ['LiS', 2]]
-                    ratio_elements = elements[ind+1:]
-                    for ind in range(len(ratio_elements)):
-                        if ind < len(ratio_elements)-1:
-                            if not ratio_elements[ind].isdigit() and not ratio_elements[ind+1].isdigit():
-                                ratio_elements.insert(ind+1, '1')
-                    if not ratio_elements[-1].isdigit():
-                        ratio_elements.append('1')
-                    ratios = []
-                    for ind in range(0, len(ratio_elements), 2):
-                        for jind in range(ind, len(ratio_elements), 2):
-                            if ratio_elements[ind] != ratio_elements[jind]:
-                                ratios.append([ratio_elements[ind]+ratio_elements[jind],
-                                               round(float(ratio_elements[ind+1])/float(ratio_elements[jind+1]), 3)])
-                    query_dict['$and'].append(self.query_ratio(ratios))
-        else:
-            query_dict = dict()
-            query_dict['$and'] = []
-            size = len(elements)
-            for ind, elem in enumerate(elements):
-                # prototype for chemically motivated searches, e.g. transition metals
-                if '[' in elem or ']' in elem:
-                    types_dict = dict()
-                    types_dict['$or'] = list()
-                    elem = elem.strip('[').strip(']')
-                    if elem in self.periodic_table:
-                        for group_elem in self.periodic_table[elem]:
-                            types_dict['$or'].append(dict())
-                            types_dict['$or'][-1]['elems'] = dict()
-                            types_dict['$or'][-1]['elems']['$in'] = [group_elem]
-                    elif ',' in elem:
-                        for group_elem in elem.split(','):
-                            types_dict['$or'].append(dict())
-                            types_dict['$or'][-1]['elems'] = dict()
-                            types_dict['$or'][-1]['elems']['$in'] = [group_elem]
-                else:
-                    types_dict = dict()
-                    types_dict['elems'] = dict()
-                    types_dict['elems']['$in'] = [elem]
-                query_dict['$and'].append(types_dict)
-        if not partial_formula and not self.args.get('intersection'):
-            size_dict = dict()
-            size_dict['stoichiometry'] = dict()
-            size_dict['stoichiometry']['$size'] = size
-            query_dict['$and'].append(size_dict)
-
-        return query_dict
-
     def query_num_species(self):
         """ Query database for all structures with a
         given number of elements, e.g. binaries, ternaries etc.
         """
         num = self.args.get('num_species')
-        if len(num) != 1:
-            exit('--num_species takes a single integer')
-        else:
+        if not isinstance(num, list):
+            num = num
+        elif isinstance(num, list):
             num = num[0]
+        else:
+            exit('--num_species takes a single integer or list containing a single integer')
         query_dict = dict()
         query_dict['stoichiometry'] = dict()
         query_dict['stoichiometry']['$size'] = num
@@ -757,7 +565,11 @@ class DBQuery(object):
         space group.
         """
         query_dict = dict()
-        query_dict['space_group'] = str(self.args.get('space_group'))
+        if not isinstance(self.args.get('space_group'), list):
+            spg = [self.args.get('space_group')]
+        else:
+            spg = self.args.get('space_group')
+        query_dict['space_group'] = str(spg[0])
 
         return query_dict
 
@@ -766,8 +578,11 @@ class DBQuery(object):
         given number of formula units in the simulation.
         """
         query_dict = dict()
+        num = self.args.get('num_fu')
+        if isinstance(num, list):
+            num = num[0]
         query_dict['num_fu'] = dict()
-        query_dict['num_fu']['$gte'] = self.args.get('num_fu')
+        query_dict['num_fu']['$gte'] = num
 
         return query_dict
 
@@ -787,13 +602,12 @@ class DBQuery(object):
         """ Find all structures matching given DOI,
         in format xxxx/xxxx.
         """
-        query_dict = dict()
-        query_dict['$and'] = []
         doi = self.args.get('doi')
-        temp_dict = dict()
-        temp_dict['doi'] = dict()
-        temp_dict['doi']['$in'] = [doi]
-        query_dict['$and'].append(temp_dict)
+        if not isinstance(doi, list):
+            doi = [doi]
+        query_dict = dict()
+        query_dict['doi'] = dict()
+        query_dict['doi']['$in'] = doi
 
         return query_dict
 
@@ -805,25 +619,26 @@ class DBQuery(object):
 
     def query_icsd(self):
         """ Find all structures matching given ICSD CollCode. """
-        query_dict = dict()
-        query_dict['$and'] = []
-        sub_dict = dict()
-        sub_dict['icsd'] = dict()
-        if self.args.get('icsd') == 0:
-            sub_dict['icsd']['$exists'] = True
+        if not isinstance(self.args.get('icsd'), list):
+            icsd = [self.args.get('icsd')]
         else:
-            sub_dict['icsd']['$eq'] = str(self.args.get('icsd'))
-        query_dict['$and'].append(sub_dict)
+            icsd = self.args.get('icsd')
+        query_dict = dict()
+        query_dict['icsd'] = dict()
+        if self.args.get('icsd') == 0:
+            query_dict['icsd']['$exists'] = True
+        else:
+            query_dict['icsd']['$eq'] = str(icsd[0])
         return query_dict
 
     def query_source(self):
         """ Find all structures with partial source string from args. """
+        src_str = self.args.get('src_str')
+        if not isinstance(src_str, list):
+            src_str = [src_str]
         query_dict = dict()
-        query_dict['$and'] = []
-        sub_dict = dict()
-        sub_dict['source'] = dict()
-        sub_dict['source']['$in'] = [self.args.get('src_str')]
-        query_dict['$and'].append(sub_dict)
+        query_dict['source'] = dict()
+        query_dict['source']['$in'] = src_str
         return query_dict
 
     def query_quality(self):
@@ -847,19 +662,15 @@ class DBQuery(object):
         """
         input_pressure = self.args.get('pressure')
 
-        print(input_pressure, 'GPa')
         if input_pressure < 0:
             approx_pressure = [1.1*input_pressure-0.05, 0.9*input_pressure+0.05]
         else:
             approx_pressure = [0.9*input_pressure-0.05, 1.1*input_pressure+0.05]
 
         query_dict = dict()
-        query_dict['$and'] = []
-        temp_dict = dict()
-        temp_dict['pressure'] = dict()
-        temp_dict['pressure']['$lt'] = approx_pressure[1]
-        temp_dict['pressure']['$gt'] = approx_pressure[0]
-        query_dict['$and'].append(temp_dict)
+        query_dict['pressure'] = dict()
+        query_dict['pressure']['$lt'] = approx_pressure[1]
+        query_dict['pressure']['$gt'] = approx_pressure[0]
 
         return query_dict
 
@@ -876,11 +687,11 @@ class DBQuery(object):
         to within a tolerance of 0.01 A.
         """
         query_dict = dict()
-        query_dict['$and'] = []
-        query_dict['$and'].append(dict())
-        query_dict['$and'][-1]['cnt_radius'] = dict()
-        query_dict['$and'][-1]['cnt_radius']['$gt'] = self.args.get('cnt_radius') - 0.01
-        query_dict['$and'][-1]['cnt_radius']['$lt'] = self.args.get('cnt_radius') + 0.01
+        if not isinstance(self.args.get('cnt_radius'), list):
+            cnt_rad = [self.args.get('cnt_radius')]
+        query_dict['cnt_radius'] = dict()
+        query_dict['cnt_radius']['$gt'] = cnt_rad[0] - 0.01
+        query_dict['cnt_radius']['$lt'] = cnt_rad[0] + 0.01
 
         return query_dict
 
@@ -888,11 +699,17 @@ class DBQuery(object):
         """ Query all calculations above given plane-wave cutoff. """
         query_dict = dict()
         query_dict['cut_off_energy'] = dict()
-        if len(self.args.get('cutoff')) == 2:
-            query_dict['cut_off_energy']['$gte'] = self.args.get('cutoff')[0]
-            query_dict['cut_off_energy']['$lte'] = self.args.get('cutoff')[1]
+        if not isinstance(self.args.get('cutoff'), list):
+            cutoffs = [self.args.get('cutoff')]
         else:
-            query_dict['cut_off_energy']['$gte'] = self.args.get('cutoff')[0]
+            cutoffs = self.args.get('cutoff')
+        if len(cutoffs) == 2:
+            if cutoffs[0] > cutoffs[1]:
+                exit('Cutoff query needs to be of form [min, max]')
+            query_dict['cut_off_energy']['$gte'] = cutoffs[0]
+            query_dict['cut_off_energy']['$lte'] = cutoffs[1]
+        else:
+            query_dict['cut_off_energy']['$gte'] = cutoffs[0]
         return query_dict
 
     def query_sedc(self):
@@ -914,8 +731,12 @@ class DBQuery(object):
         kpoint sampling.
         """
         query_dict = dict()
+        if not isinstance(self.args.get('mp_spacing'), list):
+            mp_spacing = [self.args.get('mp_spacing')]
+        else:
+            mp_spacing = self.args.get('mp_spacing')
         query_dict['kpoints_mp_spacing'] = dict()
-        query_dict['kpoints_mp_spacing']['$lte'] = self.args.get('mp_spacing')
+        query_dict['kpoints_mp_spacing']['$lte'] = mp_spacing[0]
         return query_dict
 
     def query_spin(self):
@@ -923,7 +744,11 @@ class DBQuery(object):
         i.e. --spin n!=0, or non-spin-polarization, i.e. --spin 0.
         """
         query_dict = dict()
-        if self.args.get('spin') == '0':
+        if not isinstance(self.args.get('spin'), list):
+            spin = [self.args.get('spin')]
+        else:
+            spin = self.args.get('spin')
+        if int(spin[0]) == 0:
             query_dict['spin_polarized'] = dict()
             query_dict['spin_polarized']['$ne'] = True
         else:
@@ -1015,6 +840,62 @@ class DBQuery(object):
             exit('No structures found.')
 
         return self.temp
+
+
+def parse_element_string(elements_str, stoich=False):
+    """ Parse element query string with macros.
+    e.g.
+        Input: '[VII][Fe,Ru,Os][I]'
+        Returns: ['[VII]', '[Fe,Ru,Os]', '[I]']
+
+    e.g.2
+        Input: '[VII]2[Fe,Ru,Os][I]'
+        Returns: ['[VII]2', '[Fe,Ru,Os]', '[I]']
+    """
+    valid = False
+    for char in elements_str:
+        if char.isupper():
+            valid = True
+    if not valid:
+        print_failure('Composition must contain at least one upper case character.')
+        exit()
+    elements = [elem for elem in re.split(r'([A-Z][a-z]*)', elements_str) if elem]
+    if stoich:
+        tmp_stoich = elements
+        for ind, strng in enumerate(elements):
+            tmp_stoich[ind] = [elem for elem in re.split(r'([0-9]*)', strng) if elem]
+        elements = [item for sublist in tmp_stoich for item in sublist]
+    # split macros
+    while '[' in elements or '][' in elements:
+        tmp_stoich = list(elements)
+        cleaned = True
+        while cleaned:
+            for ind, tmp in enumerate(tmp_stoich):
+                if tmp == '][':
+                    del tmp_stoich[ind]
+                    tmp_stoich.insert(ind, '[')
+                    tmp_stoich.insert(ind, ']')
+                    cleaned = True
+                elif ind == len(tmp_stoich)-1:
+                    cleaned = False
+        for ind, tmp in enumerate(tmp_stoich):
+            if tmp == '[':
+                end_bracket = False
+                while not end_bracket:
+                    if tmp_stoich[ind+1] == ']':
+                        end_bracket = True
+                    tmp_stoich[ind] += tmp_stoich[ind+1]
+                    del tmp_stoich[ind+1]
+        try:
+            tmp_stoich.remove(']')
+        except:
+            pass
+        try:
+            tmp_stoich.remove('')
+        except:
+            pass
+        elements = tmp_stoich
+    return elements
 
 
 class EmptyCursor:
