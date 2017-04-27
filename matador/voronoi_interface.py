@@ -14,12 +14,16 @@ from Vornetclass import VoronoiNetwork
 
 def get_voronoi_substructure(doc):
     """ Run Can's Voronoi analysis on a matador doc. """
-    doc2res(doc, 'Vropple.res', hash_dupe=False)
-    vornet = VoronoiNetwork(filename='Vropple.res')
-    vornet.computeVorNet()
-    doc['substruc'] = [vc.getSubStruc(use_area=False) for vc in vornet.VoronoiCells]
-    remove('Vropple.res')
-    return doc['substruc']
+    try:
+        doc2res(doc, 'Vropple.res', hash_dupe=False)
+        vornet = VoronoiNetwork(filename='Vropple.res')
+        vornet.computeVorNet()
+        doc['voronoi_substruc'] = [vc.getSubStruc(use_area=False) for vc in vornet.VoronoiCells]
+        doc['voronoi_nodes'] = vornet.getNodeFracPos()
+        remove('Vropple.res')
+        return doc['voronoi_substruc']
+    except:
+        remove('Vropple.res')
 
 
 if __name__ == '__main__':
