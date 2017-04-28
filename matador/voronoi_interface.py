@@ -20,6 +20,8 @@ def get_voronoi_substructure(doc):
         vornet.computeVorNet()
         doc['voronoi_substruc'] = [vc.getSubStruc(use_area=False) for vc in vornet.VoronoiCells]
         doc['voronoi_nodes'] = vornet.getNodeFracPos()
+        doc['voronoi_face_midpoints'] = vornet.getFracFaceMidpoints()
+        doc['voronoi_edge_midpoints'] = vornet.getFracEdgeMidpoints()
         remove('Vropple.res')
         return doc['voronoi_substruc']
     except:
