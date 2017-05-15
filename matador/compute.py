@@ -244,7 +244,7 @@ class FullRelaxer:
                             print('wrote failed dict out to output_queue')
                     self.mv_to_bad(seed)
                     return False
-                err_file = seed + '*001.err'
+                err_file = seed + '*.err'
                 for globbed in glob.glob(err_file):
                     if isfile(globbed):
                         if self.verbosity >= 1:
@@ -325,7 +325,7 @@ class FullRelaxer:
             process.communicate()
             # scrape dict
             opti_dict, success = castep2dict(seed + '.castep', db=False)
-            err_file = seed + '*0001.err'
+            err_file = seed + '.*err'
             for globbed in glob.glob(err_file):
                 if isfile(globbed):
                     if self.verbosity >= 1:
@@ -451,7 +451,7 @@ class FullRelaxer:
 
     def tidy_up(self, seed):
         """ Delete all run3 created files before quitting. """
-        for f in glob.glob(seed + '*'):
+        for f in glob.glob(seed + '.*'):
             if not (f.endswith('.res') or f.endswith('.castep')):
                 remove(f)
         return
