@@ -215,6 +215,8 @@ class FullRelaxer:
                     if self.verbosity >= 1:
                         print_success('Successfully relaxed ' + seed)
                     # write res and castep file out to completed folder
+                    if isfile(seed+'.res'):
+                        remove(seed+'.res')
                     doc2res(opti_dict, seed, hash_dupe=False)
                     self.opti_dict = deepcopy(opti_dict)
                     # overwrite old data in res_dict with opti structure
