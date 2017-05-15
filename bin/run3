@@ -17,6 +17,7 @@ from __future__ import print_function
 from matador.scrapers.castep_scrapers import cell2dict, param2dict
 from matador.utils.print_utils import print_failure, print_warning
 from matador.compute import FullRelaxer
+from matador.version import __version__
 
 # standard library
 from os.path import isfile
@@ -238,6 +239,8 @@ if __name__ == '__main__':
                      in finished_cleanly.txt.',
         epilog='Written by Matthew Evans (2016), based primarily on run.pl and run2.pl \
                 by Chris Pickard and Andrew Morris and PyAIRSS CastepRunner by Jamie Wynn.')
+    parser.add_argument('--version', action='version', version='run3 operating from matador version '
+                        + __version__ + '.')
     parser.add_argument('seed', type=str,
                         help='cell and param seed to use as template for calculations')
     parser.add_argument('-nc', '--ncores', type=int,
