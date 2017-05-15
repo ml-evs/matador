@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import unittest
+import json
 from matador.scrapers.castep_scrapers import castep2dict, cell2dict, res2dict, param2dict
 from matador.export import doc2res
 from matador.utils.print_utils import print_warning
@@ -24,7 +25,7 @@ class ScrapeTest(unittest.TestCase):
         if not failed_open:
             f.close()
             test_dict, s = cell2dict(cell_fname, db=False, outcell=True, verbosity=5)
-            self.assertTrue(s, msg='Failed entirely, oh dear!')
+            self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
             self.assertEqual(test_dict['lattice_cart'][0][0], 9.83262140721165, msg='Failed to read lattice vectors.')
             self.assertEqual(test_dict['lattice_cart'][1][1], 5.96357780025648, msg='Failed to read lattice vectors.')
             self.assertEqual(test_dict['lattice_cart'][2][2], 4.39895761828278, msg='Failed to read lattice vectors.')
@@ -49,7 +50,7 @@ class ScrapeTest(unittest.TestCase):
         if not failed_open:
             f.close()
             test_dict, s = castep2dict(castep_fname, db=True, verbosity=5)
-            self.assertTrue(s, 'Failed entirely, oh dear!')
+            self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
             self.assertEqual(test_dict['pressure'], 0.0763, msg='Failed to read pressure!')
             self.assertEqual(test_dict['enthalpy'], -2.15036930e4, msg='Failed to read enthalpy!')
             self.assertEqual(test_dict['num_atoms'], 14, msg='Wrong number of atoms!')
@@ -129,12 +130,36 @@ class ExportTest(unittest.TestCase):
         if not failed_open:
             f.close()
             doc, s = res2dict(res_fname)
-            doc2res(doc, test_fname, hash_dupe=False)
+            doc2res(doc, test_fname, hash_dupe=False, overwrite=True)
             doc_exported, s = res2dict(test_fname)
             self.assertTrue(s, msg='Failed entirely, oh dear!')
             for key in doc:
                 if key not in ['source', 'positions_frac']:
                     self.assertEqual(doc_exported[key], doc[key], msg='Input and output of {} do not match after scraping.'.format(key))
+                if key == 'positions_frac':
+                    for ind, atom in enumerate(doc['positions_frac']):
+                        self.assertIn(atom, doc_exported['positions_frac'], msg='Atom with this position is missing.')
+                        self.assertAlmostEqual(doc['atom_types'][ind], doc_exported['atom_types'][doc_exported['positions_frac'].index(atom)], msg='Atom has wrong type!')
+            system('rm {}'.format(test_fname))
+
+    def testDoc2ResFromJson(self):
+        json_fname = REAL_PATH + 'data/doc2res.json'
+        test_fname = REAL_PATH + 'data/doc2res.res'
+        failed_open = False
+        try:
+            f = open(json_fname, 'r')
+        except:
+            failed_open = True
+            print('Failed to open test case', json_fname, '- please check installation.')
+        if not failed_open:
+            doc = json.load(f)
+            f.close()
+            doc2res(doc, test_fname, hash_dupe=False, overwrite=True)
+            with open(test_fname, 'r') as f:
+                print(f.readlines())
+            doc_exported, s = res2dict(test_fname)
+            self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
+            for key in doc:
                 if key == 'positions_frac':
                     for ind, atom in enumerate(doc['positions_frac']):
                         self.assertIn(atom, doc_exported['positions_frac'], msg='Atom with this position is missing.')
