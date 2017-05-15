@@ -17,13 +17,27 @@ def get_voronoi_substructure(doc):
     try:
         doc2res(doc, 'Vropple.res', hash_dupe=False)
         vornet = VoronoiNetwork(filename='Vropple.res')
-        vornet.computeVorNet()
+        vornet.computeSubStrucs()
         doc['voronoi_substruc'] = [vc.getSubStruc(use_area=False) for vc in vornet.VoronoiCells]
+        remove('Vropple.res')
+        return doc['voronoi_substruc']
+    except:
+        remove('Vropple.res')
+
+
+def get_voronoi_points(doc):
+    """ Run Can's Voronoi analysis on a matador doc
+    and return nodes, face midpoints and edge midpoints.
+    """
+    try:
+        doc2res(doc, 'Vropple.res', hash_dupe=False)
+        vornet = VoronoiNetwork(filename='Vropple.res')
+        vornet.computeVorNet()
         doc['voronoi_nodes'] = vornet.getNodeFracPos()
         doc['voronoi_face_midpoints'] = vornet.getFracFaceMidpoints()
         doc['voronoi_edge_midpoints'] = vornet.getFracEdgeMidpoints()
         remove('Vropple.res')
-        return doc['voronoi_substruc']
+        return doc['voronoi_nodes']
     except:
         remove('Vropple.res')
 
