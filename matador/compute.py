@@ -157,6 +157,8 @@ class FullRelaxer:
             print_notify('Relaxing ' + self.seed)
         geom_max_iter_list = self.geom_max_iter_list
         # copy initial res file to seed
+        if isfile(self.seed + '.res'):
+            remove(self.seed + '.res')
         if not isinstance(self.res, str):
             doc2res(self.res, self.seed, info=False, hash_dupe=False)
         self.cp_to_input(self.seed)
