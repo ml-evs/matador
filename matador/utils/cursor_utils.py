@@ -305,7 +305,7 @@ def get_guess_doc_provenance(sources, icsd=None):
                     prov = 'ICSD'
             elif 'swap' in fname.lower():
                 prov = 'SWAPS'
-            elif '_ga_' in fname.lower():
+            elif '-ga-' in fname.lower():
                 prov = 'GA'
             elif icsd is not None:
                 prov = 'ICSD'
