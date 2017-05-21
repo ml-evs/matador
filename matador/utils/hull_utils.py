@@ -50,7 +50,6 @@ def vertices2plane(points):
         assert(normal[2] != 0)
         z_plane = -((x*normal[0] + y*normal[1] + d) / normal[2])
         height = z - z_plane
-        assert(height >= 0-1e-12)
         return height
 
     return get_height_above_plane
