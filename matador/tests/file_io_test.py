@@ -155,8 +155,6 @@ class ExportTest(unittest.TestCase):
             doc = json.load(f)
             f.close()
             doc2res(doc, test_fname, hash_dupe=False, overwrite=True)
-            with open(test_fname, 'r') as f:
-                print(f.readlines())
             doc_exported, s = res2dict(test_fname)
             self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
             for key in doc:
