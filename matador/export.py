@@ -478,8 +478,7 @@ def doc2res(doc, path, info=True, hash_dupe=True, spoof_titl=False, overwrite=Fa
             print_exc()
             print('Writing res file failed for ', path)
         else:
-            print_exc()
-            print('Writing res file failed for ', path)
+            print('Writing res file failed for ', path, 'this is not necessarily a problem...')
             pass
 
 
