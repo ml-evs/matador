@@ -579,7 +579,7 @@ class QueryConvexHull(object):
         self.vol_per_y = v
         return
 
-    def plot_2d_hull(self, ax=None, dis=False, show=True):
+    def plot_2d_hull(self, ax=None, dis=False, show=True, plot_points=True, plot_hull_points=True):
         """ Plot calculated hull, returning ax and fig objects for further editing. """
         import matplotlib.pyplot as plt
         import matplotlib.colors as colours
@@ -596,10 +596,11 @@ class QueryConvexHull(object):
         plt.draw()
         # star structures on hull
         if len(self.structure_slice) != 2:
-            ax.scatter(tie_line[:, 0], tie_line[:, 1],
-                       c=self.colours[1],
-                       marker='o', zorder=99999, edgecolor='k',
-                       s=self.scale*40, lw=1.5, alpha=1)
+            if plot_hull_points:
+                ax.scatter(tie_line[:, 0], tie_line[:, 1],
+                           c=self.colours[1],
+                           marker='o', zorder=99999, edgecolor='k',
+                           s=self.scale*40, lw=1.5, alpha=1)
             ax.plot(np.sort(tie_line[:, 0]), tie_line[np.argsort(tie_line[:, 0]), 1],
                     c=self.colours[0], lw=2, alpha=1, zorder=1000)
             if self.hull_cutoff > 0:
@@ -652,28 +653,27 @@ class QueryConvexHull(object):
                 cmap = colours.LinearSegmentedColormap.from_list(
                     'trunc({n},{a:.2f},{b:.2f})'.format(n=cmap_full.name, a=0, b=1),
                     cmap_full(np.linspace(0.15, 0.4, 100)))
-                # scatter = ax.scatter(self.structures[:, 0], self.structures[:, 1],
-                                     # s=self.scale*40, lw=lw, alpha=0.9,
-                                     # c=self.hull_dist,
-                                     # edgecolor='k', zorder=300, cmap=cmap)
-                scatter = ax.scatter(self.structures[np.argsort(self.hull_dist), 0][::-1],
-                                     self.structures[np.argsort(self.hull_dist), -1][::-1],
-                                     s=self.scale*40, lw=lw, alpha=1, c=np.sort(self.hull_dist)[::-1],
-                                     edgecolor='k', zorder=10000, cmap=cmap, norm=colours.LogNorm(0.02, 2))
-                cbar = plt.colorbar(scatter, aspect=30, pad=0.02, ticks=[0, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28])
-                cbar.ax.set_yticklabels([0, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28])
-                cbar.set_label('Distance from hull (eV)')
+                if plot_points:
+                    scatter = ax.scatter(self.structures[np.argsort(self.hull_dist), 0][::-1],
+                                         self.structures[np.argsort(self.hull_dist), -1][::-1],
+                                         s=self.scale*40, lw=lw, alpha=1, c=np.sort(self.hull_dist)[::-1],
+                                         edgecolor='k', zorder=10000, cmap=cmap, norm=colours.LogNorm(0.02, 2))
+                    cbar = plt.colorbar(scatter, aspect=30, pad=0.02, ticks=[0, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28])
+                    cbar.ax.set_yticklabels([0, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28])
+                    cbar.set_label('Distance from hull (eV)')
             if self.hull_cutoff != 0:
                 # if specified hull cutoff, label and colour those below
                 c = self.colours[1]
                 for ind in range(len(self.structures)):
                     if self.hull_dist[ind] <= self.hull_cutoff or self.hull_cutoff == 0:
-                        scatter.append(ax.scatter(self.structures[ind, 0], self.structures[ind, 1],
-                                       s=self.scale*40, lw=lw, alpha=0.9, c=c, edgecolor='k',
-                                       label=self.info[ind], zorder=300))
-                ax.scatter(self.structures[1:-1, 0], self.structures[1:-1, 1], s=self.scale*30, lw=lw,
-                           alpha=0.3, c=self.colours[-2],
-                           edgecolor='k', zorder=10)
+                        if plot_points:
+                            scatter.append(ax.scatter(self.structures[ind, 0], self.structures[ind, 1],
+                                           s=self.scale*40, lw=lw, alpha=0.9, c=c, edgecolor='k',
+                                           label=self.info[ind], zorder=300))
+                if plot_points:
+                    ax.scatter(self.structures[1:-1, 0], self.structures[1:-1, 1], s=self.scale*30, lw=lw,
+                               alpha=0.3, c=self.colours[-2],
+                               edgecolor='k', zorder=10)
             # tie lines
             ax.set_ylim(-0.1 if np.min(self.structure_slice[self.hull.vertices, 1]) > 0
                         else np.min(self.structure_slice[self.hull.vertices, 1])-0.15,
@@ -686,18 +686,21 @@ class QueryConvexHull(object):
             lw = self.scale * 0 if self.mpl_new_ver else 1
             for ind in range(len(self.hull_cursor)):
                 if type(self.hull_cursor[ind]['concentration']) is list:
-                    scatter.append(ax.scatter(self.hull_cursor[ind]['concentration'][0], self.hull_cursor[ind]['formation_enthalpy_per_atom'],
-                                   s=self.scale*40, lw=1.5, alpha=1, c=c, edgecolor='k',
-                                   zorder=1000))
+                    if plot_points:
+                        scatter.append(ax.scatter(self.hull_cursor[ind]['concentration'][0], self.hull_cursor[ind]['formation_enthalpy_per_atom'],
+                                       s=self.scale*40, lw=1.5, alpha=1, c=c, edgecolor='k',
+                                       zorder=1000))
                 else:
-                    scatter.append(ax.scatter(self.hull_cursor[ind]['concentration'], self.hull_cursor[ind]['formation_enthalpy_per_atom'],
-                                   s=self.scale*40, lw=1.5, alpha=1, c=c, edgecolor='k',
-                                   zorder=1000))
+                    if plot_points:
+                        scatter.append(ax.scatter(self.hull_cursor[ind]['concentration'], self.hull_cursor[ind]['formation_enthalpy_per_atom'],
+                                       s=self.scale*40, lw=1.5, alpha=1, c=c, edgecolor='k',
+                                       zorder=1000))
                 ax.plot([0, 1], [0, 0], lw=2, c=self.colours[0], zorder=900)
             for ind in range(len(self.structures)):
-                scatter.append(ax.scatter(self.structures[ind, 0], self.structures[ind, 1],
-                               s=self.scale*40, lw=lw, alpha=0.9, c=c, edgecolor='k',
-                               zorder=300))
+                if plot_points:
+                    scatter.append(ax.scatter(self.structures[ind, 0], self.structures[ind, 1],
+                                   s=self.scale*40, lw=lw, alpha=0.9, c=c, edgecolor='k',
+                                   zorder=300))
 
         if len(one_minus_x_elem) == 1:
             ax.set_title(x_elem[0] + '$_\mathrm{x}$' + one_minus_x_elem[0] + '$_\mathrm{1-x}$')
@@ -869,8 +872,13 @@ class QueryConvexHull(object):
             self.plot_2d_hull()
         return
 
-    def plot_ternary_hull(self):
-        """ Plot calculated ternary hull as a 2D projection. """
+    def plot_ternary_hull(self, axis=None):
+        """ Plot calculated ternary hull as a 2D projection.
+
+        Takes optional matplotlib subplot axis as a parameter, and returns
+        python-ternary subplot axis object.
+
+        """
         import ternary
         import matplotlib.pyplot as plt
         import matplotlib.colors as colours
@@ -882,7 +890,10 @@ class QueryConvexHull(object):
         else:
             scale = 1
         fontsize = 18
-        fig, ax = ternary.figure(scale=scale)
+        if axis is not None:
+            fig, ax = ternary.figure(scale=scale, ax=axis)
+        else:
+            fig, ax = ternary.figure(scale=scale)
         fig.set_size_inches(10, 7.5)
 
         ax.boundary(linewidth=2.0, zorder=99)
@@ -995,7 +1006,7 @@ class QueryConvexHull(object):
             plt.savefig('ternary.png', dpi=400)
         elif self.args.get('pdf'):
             plt.savefig('ternary.pdf', dpi=400)
-        ax.show()
+        return ax
 
     def plot_voltage_curve(self):
         """ Plot calculated voltage curve. """
