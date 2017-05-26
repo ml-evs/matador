@@ -24,10 +24,9 @@ from copy import deepcopy
 class PDF(object):
     """ This class implements the calculation and comparison of pair
     distribution functions.
-    """
-    def __init__(self, doc, **kwargs):
-        """ Initialise parameters.
 
+    Args:
+        doc            : matador document to calculate PDF of.
         dr             : bin width for PDF (Angstrom) (DEFAULT: 0.1)
         gaussian_width : width of Gaussian smearing (Angstrom) (DEFAULT: 0.01)
         num_images     : number of unit cell images include in PDF calculation (DEFAULT: 2)
@@ -35,7 +34,9 @@ class PDF(object):
         calculator     : F or None, for Fortran or Python calculator (DEFAULT: None)
         projected      : True/False, optionally calculate the element-projected PDF.
 
-        """
+    """
+    def __init__(self, doc, **kwargs):
+        """ Initialise parameters. """
         if 'sim_calc_args' in kwargs:
             kwargs = kwargs['sim_calc_args']
         if kwargs.get('dr') is None:
@@ -288,16 +289,14 @@ class PDFOverlap(object):
     """ Calculate the PDFOverlap between two PDF objects,
     pdf_A and pdf_B, with number density rescaling.
 
+    Args:
+        pdf_A/B : two PDF objects to compare.
+        projected : if True, attempt to use projected PDFs.
+
+
     """
     def __init__(self, pdf_A, pdf_B, projected=False):
-        """ Perform the overlap and similarity distance calculations.
-
-        Input:
-
-            pdf_A/B : two PDF objects to compare.
-            projected : if True, attempt to use projected PDFs.
-
-        """
+        """ Perform the overlap and similarity distance calculations. """
         self.pdf_A = pdf_A
         self.pdf_B = pdf_B
         self.fine_dr = self.pdf_A.dr/2.0
