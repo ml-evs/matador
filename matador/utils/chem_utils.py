@@ -82,7 +82,7 @@ def get_binary_grav_capacities(x, m_B):
     if m_B != 0:
         return x * FARADAY_CONSTANT_Cpermol * Cperg_to_mAhperg / m_B
     else:
-        return 0
+        return float('NaN')
 
 
 def get_generic_grav_capacity(concs, elements):

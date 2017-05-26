@@ -479,7 +479,6 @@ class QueryConvexHull(object):
                 if point[0] == 0 and point[1] != 0 and point[1] != 1:
                     endpoints.append(point)
                     endstoichs.append(stoichs[ind])
-
             print('{} starting point(s) found.'.format(len(endstoichs)))
             for endstoich in endstoichs:
                 print(get_formula_from_stoich(endstoich), end=' ')
@@ -490,48 +489,63 @@ class QueryConvexHull(object):
             self.voltages = []
             self.Q = []
             self.x = []
-            self.Vpoints = []
             for reaction_ind, endpoint in enumerate(endpoints):
                 print(30*'-')
                 print('Reaction {}, {}:'.format(reaction_ind, get_formula_from_stoich(endstoichs[reaction_ind])))
                 y0 = endpoint[1] / (1 - endpoint[0])
                 simp_in = 0
                 intersections = []
+                crossover = []
                 for simplex in hull.simplices:
                     tints = []
-                    for i in range(0, 3):
+                    for i in range(3):
                         j = (i + 1) % 3
-
                         e = points[simplex[i], 0]
                         f = points[simplex[i], 1]
                         g = points[simplex[j], 0] - points[simplex[i], 0]
                         h = points[simplex[j], 1] - points[simplex[i], 1]
+                        x1 = e
+                        y1 = f
+                        z1 = 1 - x1 - y1
+                        x2 = points[simplex[j], 0]
+                        y2 = points[simplex[j], 1]
+                        z2 = 1 - x2 - y2
 
                         if h + g*y0 != 0:
                             tin = (e*h + g*y0 - f*g)/(h + g*y0)
                             s2 = (y0 - e*y0 - f) / (h + g*y0)
-
                             if tin >= 0 and tin <= 1 and s2 >= 0 and s2 <= 1:
                                 tints = np.append(tints, tin)
+                                a = 1
+                                # x1-x2 never == 0 on points we care about
+                                if x1 - x2 != 0:
+                                    b = (y1 - y2)/(x1 - x2)
+                                    c = (z1 - z2)/(x1 - x2)
+                                    x_cross = tin
+                                    y_cross = b * (tin-x1)/a + y1
+                                    z_cross = c * (tin-x1)/a + z1
+                                    # only append unique points
+                                    if len(crossover) == 0 or not np.any([np.isclose([x_cross, y_cross, z_cross], crossover[i]) for i in range(len(crossover))]):
+                                        crossover.append([x_cross, y_cross, z_cross])
                     if len(tints) != 0:
                         temp = [simp_in, np.amin(tints), np.amax(tints)]
                         # condition removes the big triangle and the points which only graze the line of interest
                         if temp[2] > 0 and temp[1] < 1 and temp[2] - temp[1] > 0:
                             intersections = np.append(intersections, temp)
-                    simp_in = simp_in + 1
+                    simp_in += 1
 
                 intersections = intersections.reshape(-1, 3)
                 # dodgy remove first row as corresponds to big triangle
                 intersections = np.delete(intersections, (0), axis=0)
                 intersections = intersections[intersections[:, 1].argsort()]
 
-                Vpoints = []
                 voltages = []
-                Q = []
+                Q = sorted([get_generic_grav_capacity(point, self.elements) for point in crossover])
+                Q.append(Q.pop(0))
                 x = []
                 reaction = [get_formula_from_stoich(endstoichs[reaction_ind])]
                 for ind, face in enumerate(intersections):
-                    fn = face[0].astype(int)
+                    fn = int(face[0])
                     reaction = []
                     reaction = [get_formula_from_stoich(hull_cursor[idx]['stoichiometry'])
                                 for idx in hull.simplices[fn]
@@ -543,21 +557,21 @@ class QueryConvexHull(object):
 
                     Comp = Comp.T
                     Compinv = np.linalg.inv(Comp)
+
                     X = [1, 0, 0]
                     V = -(Compinv.dot(X)).dot(Evec)
                     V = V + enthalpy_active_ion
-                    for i in range(0, 2):
-                        Vpoints = np.append(Vpoints, [face[i+1], V])
+                    # double up on first voltage
+                    if ind == 0:
                         voltages.append(V)
-                        x.append(face[i+1])
-                        # TO-DO: fix this - should be composition at conc of crossover
-                        Q.append(face[i+1])
+                    voltages.append(V)
                     if ind != len(intersections)-1:
                         print(5*(ind+1)*' ' + ' ---> ', end='')
-                self.Vpoints.append(Vpoints.reshape(-1, 2))
                 self.Q.append(Q)
                 self.x.append(x)
                 self.voltages.append(voltages)
+                if self.args.get('debug'):
+                    print(list(zip(self.Q, self.voltages)))
                 print('\n')
 
         return
@@ -1006,6 +1020,7 @@ class QueryConvexHull(object):
             plt.savefig('ternary.png', dpi=400)
         elif self.args.get('pdf'):
             plt.savefig('ternary.pdf', dpi=400)
+        ax.show()
         return ax
 
     def plot_voltage_curve(self):
@@ -1025,22 +1040,14 @@ class QueryConvexHull(object):
                 pass
         for ind, voltage in enumerate(self.voltages):
             if len(self.voltages) != 1:
-                fudge = 1/(0.675/1301)
                 axQ.annotate(get_formula_from_stoich(self.endstoichs[ind]),
-                             xy=(self.Q[ind][0]+fudge*0.05, voltage[0]+0.01),
+                             xy=(self.Q[ind][0]+50, voltage[0]+0.01),
                              textcoords='data', ha='center', zorder=99999)
-                self.Q[ind] = [fudge*Q for Q in self.Q[ind]]
-                for i in range(int(self.ternary), len(voltage)-1):
-                    axQ.plot([self.Q[ind][i-1], self.Q[ind][i]], [voltage[i], voltage[i]],
-                             lw=2, c=self.colours[ind])
-                    axQ.plot([self.Q[ind][i], self.Q[ind][i]], [voltage[i], voltage[i+1]],
-                             lw=2, c=self.colours[ind])
-            else:
-                for i in range(int(self.ternary), len(voltage)-1):
-                    axQ.plot([self.Q[ind][i-1], self.Q[ind][i]], [voltage[i], voltage[i]],
-                             lw=2, c=self.colours[ind])
-                    axQ.plot([self.Q[ind][i], self.Q[ind][i]], [voltage[i], voltage[i+1]],
-                             lw=2, c=self.colours[ind])
+            for i in range(len(voltage)-1):
+                axQ.plot([self.Q[ind][i-1], self.Q[ind][i]], [voltage[i], voltage[i]],
+                         lw=2, c=self.colours[ind])
+                axQ.plot([self.Q[ind][i], self.Q[ind][i]], [voltage[i], voltage[i+1]],
+                         lw=2, c=self.colours[ind])
         if self.args.get('labels'):
             ion = self.hull_cursor[0]['stoichiometry'][0][0]
             for elem in self.hull_cursor[1]['stoichiometry']:

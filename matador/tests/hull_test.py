@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 # matador modules
 from matador.hull import QueryConvexHull
 from matador.utils.chem_utils import get_generic_grav_capacity
@@ -70,35 +69,34 @@ class VoltageTest(unittest.TestCase):
             hull_cursor[-1]['concentration'] = point[0:2]
             hull_cursor[-1]['enthalpy_per_atom'] = point[-1]
 
-        voltage_data = np.array([[-0.0, 1.9415250000000697],
-                                 [0.30769230769230765, 1.9415250000000697],
-                                 [0.30769230769230765, 1.8750000000001705],
-                                 [0.39999999999999997, 1.8750000000001705],
-                                 [0.39999999999999997, 1.487874999999974],
-                                 [0.5714285714285714, 1.487874999999974],
-                                 [0.5714285714285714, 0.6392500000000041],
-                                 [0.625, 0.6392500000000041],
-                                 [0.625, 0.3461250000000007],
-                                 [0.7, 0.3461250000000007],
-                                 [0.7, 0.0],
-                                 [1.0, 0.0]])
+        voltage_data = [np.asarray([1.9415250000000697, 1.9415250000000697, 1.8750000000001705, 1.4878749999999741,
+                                    0.63925000000000409, 0.34612500000000068, 0.0]),
+                        np.asarray([1.4878749999999741, 1.4878749999999741, 0.63925000000000409, 0.34612500000000068, 0.0])]
+
+        Q_data = [np.array([0, 195, 293, 586, 733, 1026, np.NaN]), np.array([0, 356, 533, 889, np.NaN])]
 
         points = np.delete(points, 2, axis=1)
 
         bare_hull = QueryConvexHull.__new__(QueryConvexHull)
         bare_hull.hull = ConvexHull(points)
+        bare_hull.args = {'debug': True}
+        bare_hull.elements = ['Li', 'Sn', 'S']
         bare_hull.hull_cursor = hull_cursor
         bare_hull.match = [{'enthalpy_per_atom': -380.071/2.0}]
         bare_hull.ternary = True
         bare_hull.voltage_curve(bare_hull.hull_cursor)
         try:
-            np.testing.assert_array_almost_equal(bare_hull.Vpoints[0], voltage_data)
+            self.assertEqual(len(bare_hull.Q), len(Q_data))
+            for i in range(len(bare_hull.voltages)):
+                np.testing.assert_array_almost_equal(bare_hull.voltages[i], voltage_data[i])
+                np.testing.assert_array_almost_equal(bare_hull.Q[i], Q_data[i], decimal=0)
         except:
-            print('calculated: ', np.shape(bare_hull.Vpoints[0]))
-            print(bare_hull.Vpoints[0])
+            print('Q = ', bare_hull.Q[0])
+            print('Q = ', Q_data)
+            print('calculated: ', np.shape(bare_hull.voltages[0]))
+            print(bare_hull.voltages[0])
             print('data: ', np.shape(voltage_data))
-            print(voltage_data)
-            np.testing.assert_array_almost_equal(bare_hull.Vpoints[0], voltage_data, decimal=8)
+            raise AssertionError
 
 
 if __name__ == '__main__':
