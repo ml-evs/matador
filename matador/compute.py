@@ -10,6 +10,7 @@ from matador.export import doc2cell, doc2param, doc2res
 # standard library
 from os import makedirs, remove, system, devnull, getcwd, getpid
 from os.path import isfile, exists
+from shutil import copy2
 from copy import deepcopy
 from traceback import print_exc, format_exception_only
 from sys import exit, exc_info
@@ -444,7 +445,7 @@ class FullRelaxer:
         try:
             if not exists('input'):
                 makedirs('input', exist_ok=True)
-            system('cp ' + seed + '.res input')
+            _ = copy2('{}.res'.format(seed), 'input')
         except:
             if self.verbosity > 0:
                 print_exc()
