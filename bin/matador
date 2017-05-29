@@ -9,6 +9,7 @@ from __future__ import print_function
 from matador.query import DBQuery
 from matador.hull import QueryConvexHull
 from matador.utils.print_utils import print_failure, print_warning, print_notify
+from matador.utils.cursor_utils import display_results
 from matador.version import __version__
 # import external libraries
 import pymongo as pm
@@ -137,6 +138,7 @@ class Matador(object):
                 print('Filtered {} down to {}'.format(len(self.cursor),
                                                       len(unique_set)))
             self.cursor = [self.cursor[ind] for ind in unique_set]
+            display_results(self.cursor, hull=None if self.args.get('subcmd') != 'hull' else True, args=self.args)
 
         # perform any extra filtration
         if self.args.get('filter'):
