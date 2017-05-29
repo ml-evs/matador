@@ -8,9 +8,9 @@ from matador.scrapers.castep_scrapers import res2dict, castep2dict
 from matador.utils.print_utils import print_success, print_warning, print_notify
 from matador.export import doc2cell, doc2param, doc2res
 # standard library
-from os import makedirs, remove, system, devnull, getcwd, getpid
+from os import makedirs, remove, devnull, getcwd, getpid
 from os.path import isfile, exists
-from shutil import copy2
+from shutil import copy2, move
 from copy import deepcopy
 from traceback import print_exc, format_exception_only
 from sys import exit, exc_info
@@ -158,9 +158,12 @@ class FullRelaxer:
             print_notify('Relaxing ' + self.seed)
         geom_max_iter_list = self.geom_max_iter_list
         # copy initial res file to seed
-        self.cp_to_input(self.seed)
         if not isinstance(self.res, str):
+            self.cp_to_input(self.seed)
             doc2res(self.res, self.seed, info=False, hash_dupe=False)
+        else:
+            doc2res(self.res_dict, self.seed, info=False, hash_dupe=False)
+            self.cp_to_input(self.seed)
 
         self.rerun = False
         for ind, num_iter in enumerate(geom_max_iter_list):
@@ -229,7 +232,7 @@ class FullRelaxer:
                             print('wrote relaxed dict out to output_queue')
                     self.mv_to_completed(seed)
                     if calc_doc.get('write_cell_structure'):
-                        system('mv ' + seed + '-out.cell' + ' completed/' + seed + '-out.cell')
+                        move('{}-out.cell'.format(seed), 'completed')
                     # clean up rest of files
                     self.tidy_up(seed)
                     return True
@@ -422,7 +425,9 @@ class FullRelaxer:
                 makedirs('bad_castep', exist_ok=True)
             if self.verbosity >= 1:
                 print('Something went wrong, moving files to bad_castep')
-            system('mv ' + seed + '* bad_castep')
+            seed_files = glob.glob(seed + '.*')
+            for _file in seed_files:
+                move(_file, 'bad_castep')
         except:
             if self.verbosity > 0:
                 print_exc()
@@ -434,10 +439,12 @@ class FullRelaxer:
         if not exists('completed'):
             makedirs('completed', exist_ok=True)
         if keep:
-            system('mv ' + seed + '*' + ' completed')
+            seed_files = glob.glob(seed + '.*')
+            for _file in seed_files:
+                move(_file, 'completed')
         else:
-            system('mv ' + seed + '.castep' + ' completed/' + seed + '.castep')
-            system('mv ' + seed + '.res' + ' completed/' + seed + '.res')
+            move('{}.castep'.format(seed), 'completed')
+            move('{}.res'.format(seed), 'completed')
         return
 
     def cp_to_input(self, seed):
