@@ -14,9 +14,9 @@ class PDFCalculatorTest(unittest.TestCase):
     def testIdealGasPDF(self, retry=0):
         # create fake matador doc
         doc = dict()
-        max_retries = 5
+        max_retries = 3
         self.assertLess(retry, max_retries, msg='After {} attempts, PDF still failed.'.format(retry))
-        num_atoms = 200
+        num_atoms = 400
         box_size = 40
         num_samples = 10
         rmax = 15
@@ -43,6 +43,14 @@ class PDFCalculatorTest(unittest.TestCase):
             self.assertAlmostEqual(np.mean(doc['Gr_hist']), 1.0, places=1)
         except:
             self.testIdealGasPDF(retry=retry+1)
+
+    def testPDFAutoImageNumber(self):
+        doc, success = res2dict(REAL_PATH + 'data/LiPZn-r57des.res')
+        doc['lattice_cart'] = abc2cart(doc['lattice_abc'])
+        doc['text_id'] = ['pdf', 'test']
+        doc['pdf_num_images'] = PDF(doc, num_images=5, **{'debug': True})
+        doc['pdf_auto_images'] = PDF(doc, num_images='auto', **{'debug': True})
+        np.testing.assert_array_almost_equal(doc['pdf_num_images'].Gr, doc['pdf_auto_images'].Gr)
 
     def testOverlapPDFSameStructure(self):
         doc, success = res2dict(REAL_PATH + 'data/LiPZn-r57des.res')

@@ -47,14 +47,14 @@ class PDF(object):
             self.gaussian_width = 0.01
         else:
             self.gaussian_width = kwargs['gaussian_width']
-        if kwargs.get('num_images') is None:
-            self.num_images = 2
-        else:
-            self.num_images = kwargs['num_images']
         if kwargs.get('rmax') is None:
             self.rmax = 15
         else:
             self.rmax = kwargs['rmax']
+        if kwargs.get('num_images') is None:
+            self.num_images = 'auto'
+        else:
+            self.num_images = kwargs['num_images']
         if kwargs.get('calculator') is None:
             self._calc_pdf = self._calc_py_pdf
         else:
@@ -63,6 +63,10 @@ class PDF(object):
             self.style = kwargs.get('style')
         else:
             self.style = 'smear'
+        if kwargs.get('debug'):
+            self.debug = True
+        else:
+            self.debug = False
         self.doc = doc
         self.lattice = np.asarray(doc['lattice_cart'])
         self.poscart = np.asarray(frac2cart(doc['lattice_cart'], doc['positions_frac']))
@@ -74,10 +78,7 @@ class PDF(object):
         self.num_atoms = len(self.poscart)
         self.volume = doc['cell_volume']
         self.number_density = self.num_atoms / self.volume
-        if kwargs.get('debug'):
-            self.debug = True
-        else:
-            self.debug = False
+        self._set_image_trans_vectors()
         if not kwargs.get('lazy'):
             self._calc_pdf()
             if kwargs.get('projected'):
@@ -107,7 +108,7 @@ class PDF(object):
         distances = np.array([])
         if poscart_B is None:
             poscart_B = deepcopy(poscart)
-        for prod in product(range(-self.num_images, self.num_images+1), repeat=3):
+        for prod in self.image_vec:
             trans = np.zeros((3))
             for ind, multi in enumerate(prod):
                 trans += self.lattice[ind] * multi
@@ -243,6 +244,48 @@ class PDF(object):
                         self.elem_Gr[tuple(set((self.types[i], self.types[j])))] += np.exp(-(self.r_space - d_ij)**2 / self.gaussian_width) / (self.num_atoms * (self.num_images+1)**3)
         return
 
+    def _set_image_trans_vectors(self):
+        """ Sets self.image_vec to a list/generator of image translation vectors,
+        based on self.num_images.
+
+        If self.num_images is an integer, create all 3-member integer combinations
+        up to the value.
+
+        If self.num_images is 'auto', create all translation vectors up to length self.rmax.
+
+        e.g. self.image_vec = [[1, 0, 1], [0, 1, 1], [1, 1, 1]].
+
+        """
+        if self.num_images is 'auto':
+            self.image_vec = set()
+            any_in_sphere = True
+            # find longest combination of single LV's
+            max_trans = 0
+            for prod in product(range(-1, 2), repeat=3):
+                trans = np.zeros((3))
+                for ind, multi in enumerate(prod):
+                    trans += self.lattice[ind] * multi
+                if np.sqrt(np.sum(trans**2)) > max_trans:
+                    max_trans = np.sqrt(np.sum(trans**2))
+            test_num_images = 1
+            while any_in_sphere:
+                any_in_sphere = False
+                for prod in product(range(-test_num_images, test_num_images+1), repeat=3):
+                    if prod in self.image_vec:
+                        continue
+                    trans = np.zeros((3))
+                    for ind, multi in enumerate(prod):
+                        trans += self.lattice[ind] * multi
+                    if np.sqrt(np.sum(trans**2)) <= self.rmax+self.dr+0.5*max_trans:
+                        self.image_vec.add(prod)
+                        any_in_sphere = True
+                test_num_images += 1
+                if test_num_images > 10:
+                    print('Something has probably gone wrong; required images reached 10.')
+                    raise RuntimeError
+        else:
+            self.image_vec = product(range(-self.num_images, self.num_images+1), repeat=3)
+
     def get_sim_distance(self, pdf_B, projected=False):
         """ Return the similarity between two PDFs. """
         return PDFOverlap(self, pdf_B, projected=projected).similarity_distance
@@ -274,14 +317,22 @@ class PDF(object):
         tuples [(r_space, Gr), ...] of other PDFs.
         """
         import matplotlib.pyplot as plt
+        import seaborn
         fig = plt.figure(figsize=(12, 5))
         ax1 = fig.add_subplot(111)
-        ax1.plot(self.r_space, self.Gr, lw=2)
+        ax1.plot(self.r_space, self.Gr, lw=2, label=self.label)
         if other_pdfs is not None:
-            for r_space, Gr in other_pdfs:
-                ax1.plot(r_space, Gr, lw=2)
+            for pdf in other_pdfs:
+                if isinstance(pdf, PDF):
+                    ax1.plot(pdf.r_space, pdf.Gr, lw=2, label=pdf.label)
+                elif isinstance(pdf, tuple):
+                    ax1.plot(pdf[0], pdf[1], lw=2)
+                else:
+                    raise RuntimeError
         ax1.set_ylabel('$g(r)$')
         ax1.set_xlabel('$r$ (Angstrom)')
+        plt.legend()
+        plt.show()
         return
 
 
@@ -383,6 +434,7 @@ class PDFOverlap(object):
     def plot_diff(self):
         """ Simple plot for comparing two PDF's. """
         import matplotlib.pyplot as plt
+        import seaborn
         fig = plt.figure(figsize=(12, 10))
         ax1 = fig.add_subplot(211)
         ax2 = fig.add_subplot(212)
@@ -396,15 +448,18 @@ class PDFOverlap(object):
         ax2.set_ylim(-0.5*ax1.get_ylim()[1], 0.5*ax1.get_ylim()[1])
         ax2.set_xlabel('$r$ (Angstrom)')
         ax2.set_ylabel('$g(r)$')
+        plt.show()
         return
 
     def plot_convolution(self):
         """ Plot the convolution of two PDFs. """
         import matplotlib.pyplot as plt
+        import seaborn
         fig = plt.figure(figsize=(12, 10))
         ax1 = fig.add_subplot(211)
         ax1.plot(np.arange(len(self.convolution), 0, step=-1) * self.fine_dr / 2.0,
                  self.convolution)
         ax1.set_ylabel('$g_A(r) \\ast g_B(r)$')
         ax1.set_xlabel('$\\Delta$ (Angstrom)')
+        plt.show()
         return
