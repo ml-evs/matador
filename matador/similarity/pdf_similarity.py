@@ -67,6 +67,10 @@ class PDF(object):
             self.debug = True
         else:
             self.debug = False
+        if kwargs.get('low_mem'):
+            self.low_mem = True
+        else:
+            self.low_mem = False
         self.doc = doc
         self.lattice = np.asarray(doc['lattice_cart'])
         self.poscart = np.asarray(frac2cart(doc['lattice_cart'], doc['positions_frac']))
@@ -177,16 +181,20 @@ class PDF(object):
             Gr = np.divide(hist,
                            4*np.pi * (self.r_space + self.dr)**2 * self.dr * self.num_atoms * self.number_density)
         elif style == 'smear':
-            try:
-                # otherwise, stack some Gaussians on that PDF
-                new_space = np.reshape(self.r_space, (1, len(self.r_space))) - np.reshape(self.r_space, (1, len(self.r_space))).T
-                Gr = np.sum(hist*np.exp(-(new_space)**2 / gaussian_width), axis=1)
-                # normalise G(r) by Gaussian integral and then ideal gas
-            except MemoryError:
-                print('{}x{} array exceeded memory, repeating with {}x{} array instead.'.format(len(self.r_space), len(self.r_space), len(self.r_space), len(self.distances)))
+            if not self.low_mem:
+                try:
+                    # otherwise, stack some Gaussians on that PDF
+                    new_space = np.reshape(self.r_space, (1, len(self.r_space))) - np.reshape(self.r_space, (1, len(self.r_space))).T
+                    Gr = np.sum(hist*np.exp(-(new_space)**2 / gaussian_width), axis=1)
+                except MemoryError:
+                    print('Memory usage too high; consider decreasing dr or turning on low_mem mode.')
+            else:
+                if self.debug:
+                    print('Using low memory mode...')
                 # if run out of memory, use low memory mode
                 new_space = np.reshape(self.r_space, (1, len(self.r_space))) - np.reshape(self.distances, (1, len(self.distances))).T
                 Gr = np.sum(np.exp(-(new_space)**2 / gaussian_width), axis=0)
+            # normalise G(r) by Gaussian integral and then ideal gas
             Gr = np.divide(Gr,
                            np.sqrt(np.pi * gaussian_width) *
                            4*np.pi * (self.r_space + self.dr)**2 * self.num_atoms * self.number_density)

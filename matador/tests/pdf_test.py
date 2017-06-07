@@ -56,7 +56,7 @@ class PDFCalculatorTest(unittest.TestCase):
         doc, success = res2dict(REAL_PATH + 'data/LiPZn-r57des.res')
         doc['lattice_cart'] = abc2cart(doc['lattice_abc'])
         doc['text_id'] = ['pdf', 'test']
-        doc['pdf_smear'] = PDF(doc, num_images=3, dr=0.001, gaussian_width=0.01, style='smear')
+        doc['pdf_smear'] = PDF(doc, num_images=3, dr=0.001, gaussian_width=0.01, style='smear', debug=True, low_mem=True)
         overlap = PDFOverlap(doc['pdf_smear'], doc['pdf_smear'])
         self.assertEqual(overlap.similarity_distance, 0.0)
 
@@ -64,10 +64,10 @@ class PDFCalculatorTest(unittest.TestCase):
         doc, success = res2dict(REAL_PATH + 'data/LiPZn-r57des.res')
         doc['lattice_cart'] = abc2cart(doc['lattice_abc'])
         doc['text_id'] = ['pdf', 'test']
-        doc['pdf_smear'] = PDF(doc, num_images=3, dr=0.01, gaussian_width=0.01, style='smear')
+        doc['pdf_smear'] = PDF(doc, num_images=3, dr=0.001, gaussian_width=0.01, style='smear', low_mem=True)
         doc['pdf_hist'] = PDF(doc, num_images=3, dr=0.1, style='histogram')
         overlap = PDFOverlap(doc['pdf_smear'], doc['pdf_hist'])
-        self.assertLessEqual(overlap.similarity_distance, 0.05)
+        self.assertLessEqual(overlap.similarity_distance, 0.02)
         self.assertGreater(overlap.similarity_distance, 0.0)
 
 
