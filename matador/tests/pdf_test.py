@@ -48,8 +48,8 @@ class PDFCalculatorTest(unittest.TestCase):
         doc, success = res2dict(REAL_PATH + 'data/LiPZn-r57des.res')
         doc['lattice_cart'] = abc2cart(doc['lattice_abc'])
         doc['text_id'] = ['pdf', 'test']
-        doc['pdf_num_images'] = PDF(doc, num_images=4, **{'debug': False})
-        doc['pdf_auto_images'] = PDF(doc, num_images='auto', **{'debug': False})
+        doc['pdf_num_images'] = PDF(doc, num_images=5, **{'debug': True})
+        doc['pdf_auto_images'] = PDF(doc, num_images='auto', **{'debug': True})
         np.testing.assert_array_almost_equal(doc['pdf_num_images'].Gr, doc['pdf_auto_images'].Gr)
 
     def testOverlapPDFSameStructure(self):

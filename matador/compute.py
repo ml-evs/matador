@@ -10,7 +10,7 @@ from matador.export import doc2cell, doc2param, doc2res
 # standard library
 from os import makedirs, remove, devnull, getcwd, getpid
 from os.path import isfile, exists
-from shutil import copy2, move
+from shutil import copy, move
 from copy import deepcopy
 from traceback import print_exc, format_exception_only
 from sys import exit, exc_info
@@ -291,7 +291,7 @@ class FullRelaxer:
                                   opti_dict['enthalpy_per_atom']))
                 calc_doc.update(opti_dict)
 
-            except(KeyboardInterrupt, SystemExit):
+            except(KeyboardInterrupt, FileNotFoundError, SystemExit):
                 if self.verbosity >= 1:
                     print_exc()
                     print_warning('Received exception, attempting to fail gracefully...')
@@ -427,7 +427,12 @@ class FullRelaxer:
                 print('Something went wrong, moving files to bad_castep')
             seed_files = glob.glob(seed + '.*')
             for _file in seed_files:
-                move(_file, 'bad_castep')
+                try:
+                    move(_file, 'bad_castep')
+                except:
+                    if self.verbosity > 0:
+                        print_exc()
+                    pass
         except:
             if self.verbosity > 0:
                 print_exc()
@@ -443,8 +448,13 @@ class FullRelaxer:
             for _file in seed_files:
                 move(_file, 'completed')
         else:
-            move('{}.castep'.format(seed), 'completed')
-            move('{}.res'.format(seed), 'completed')
+            try:
+                move('{}.castep'.format(seed), 'completed')
+                move('{}.res'.format(seed), 'completed')
+            except:
+                if self.verbosity > 0:
+                    print_exc()
+                    pass
         return
 
     def cp_to_input(self, seed):
@@ -452,7 +462,7 @@ class FullRelaxer:
         try:
             if not exists('input'):
                 makedirs('input', exist_ok=True)
-            _ = copy2('{}.res'.format(seed), 'input')
+            copy('{}.res'.format(seed), 'input')
         except:
             if self.verbosity > 0:
                 print_exc()
