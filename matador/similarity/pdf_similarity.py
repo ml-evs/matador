@@ -177,10 +177,16 @@ class PDF(object):
             Gr = np.divide(hist,
                            4*np.pi * (self.r_space + self.dr)**2 * self.dr * self.num_atoms * self.number_density)
         elif style == 'smear':
-            # otherwise, stack some Gaussians on that PDF
-            new_space = np.reshape(self.r_space, (1, len(self.r_space))) - np.reshape(self.r_space, (1, len(self.r_space))).T
-            Gr = np.sum(hist*np.exp(-(new_space)**2 / gaussian_width), axis=1)
-            # normalise G(r) by Gaussian integral and then ideal gas
+            try:
+                # otherwise, stack some Gaussians on that PDF
+                new_space = np.reshape(self.r_space, (1, len(self.r_space))) - np.reshape(self.r_space, (1, len(self.r_space))).T
+                Gr = np.sum(hist*np.exp(-(new_space)**2 / gaussian_width), axis=1)
+                # normalise G(r) by Gaussian integral and then ideal gas
+            except MemoryError:
+                print('{}x{} array exceeded memory, repeating with {}x{} array instead.'.format(len(self.r_space), len(self.r_space), len(self.r_space), len(self.distances)))
+                # if run out of memory, use low memory mode
+                new_space = np.reshape(self.r_space, (1, len(self.r_space))) - np.reshape(self.distances, (1, len(self.distances))).T
+                Gr = np.sum(np.exp(-(new_space)**2 / gaussian_width), axis=0)
             Gr = np.divide(Gr,
                            np.sqrt(np.pi * gaussian_width) *
                            4*np.pi * (self.r_space + self.dr)**2 * self.num_atoms * self.number_density)
