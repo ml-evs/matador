@@ -10,7 +10,7 @@ from matador.export import doc2cell, doc2param, doc2res
 # standard library
 from os import makedirs, remove, devnull, getcwd, getpid
 from os.path import isfile, exists
-from shutil import copy, move
+from shutil import copy
 from copy import deepcopy
 from traceback import print_exc, format_exception_only
 from sys import exit, exc_info
@@ -231,8 +231,9 @@ class FullRelaxer:
                         if self.debug:
                             print('wrote relaxed dict out to output_queue')
                     self.mv_to_completed(seed)
-                    if calc_doc.get('write_cell_structure'):
-                        move('{}-out.cell'.format(seed), 'completed')
+                    if calc_doc.get('write_cell_structure') and isfile('{}-out.cell'.format(seed)):
+                        copy('{}-out.cell'.format(seed), 'completed', )
+                        remove('{}-out.cell'.format(seed))
                     # clean up rest of files
                     self.tidy_up(seed)
                     return True
@@ -428,7 +429,8 @@ class FullRelaxer:
             seed_files = glob.glob(seed + '.*')
             for _file in seed_files:
                 try:
-                    move(_file, 'bad_castep')
+                    copy(_file, 'bad_castep')
+                    remove(_file)
                 except:
                     if self.verbosity > 0:
                         print_exc()
@@ -446,11 +448,14 @@ class FullRelaxer:
         if keep:
             seed_files = glob.glob(seed + '.*')
             for _file in seed_files:
-                move(_file, 'completed')
+                copy(_file, 'completed')
+                remove(_file)
         else:
             try:
-                move('{}.castep'.format(seed), 'completed')
-                move('{}.res'.format(seed), 'completed')
+                copy('{}.castep'.format(seed), 'completed')
+                copy('{}.res'.format(seed), 'completed')
+                remove('{}.castep'.format(seed))
+                remove('{}.res'.format(seed))
             except:
                 if self.verbosity > 0:
                     print_exc()
