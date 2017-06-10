@@ -14,6 +14,7 @@ import string
 from os.path import exists, isfile, expanduser
 from os import system, makedirs, remove
 from traceback import print_exc
+from sys import exit
 
 
 def query2files(cursor, *args, **kwargs):
@@ -188,7 +189,10 @@ def doc2param(doc, path, hash_dupe=True, *args):
                     f.write("{0:30}: {1}\n".format(param, param_dict[param]))
 
         if 'encapsulated' in doc and doc['encapsulated']:
-            from implicit_cnts import implicit_cnt_params
+            try:
+                from implicit_cnts import implicit_cnt_params
+            except ImportError:
+                exit('Failed to import implicit_cnt_params, please ensure pyairss is on your PYTHONPATH!')
             cnt_params = implicit_cnt_params(doc['cnt_radius'])
             flines = []
             flines.append('%BLOCK DEVEL_CODE\n')
