@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import unittest
 import json
+import numpy as np
 from matador.scrapers.castep_scrapers import castep2dict, cell2dict, res2dict, param2dict
 from matador.export import doc2res
 from matador.utils.print_utils import print_warning
@@ -133,36 +134,53 @@ class ExportTest(unittest.TestCase):
             doc2res(doc, test_fname, hash_dupe=False, overwrite=True)
             doc_exported, s = res2dict(test_fname)
             self.assertTrue(s, msg='Failed entirely, oh dear!')
-            for key in doc:
-                if key not in ['source', 'positions_frac']:
-                    self.assertEqual(doc_exported[key], doc[key], msg='Input and output of {} do not match after scraping.'.format(key))
-                if key == 'positions_frac':
-                    for ind, atom in enumerate(doc['positions_frac']):
-                        self.assertIn(atom, doc_exported['positions_frac'], msg='Atom with this position is missing.')
-                        self.assertAlmostEqual(doc['atom_types'][ind], doc_exported['atom_types'][doc_exported['positions_frac'].index(atom)], msg='Atom has wrong type!')
-            system('rm {}'.format(test_fname))
+            self.compareResDocwithResDoc(doc, doc_exported)
+        system('rm {}'.format(test_fname))
 
     def testDoc2ResFromJson(self):
         json_fname = REAL_PATH + 'data/doc2res.json'
         test_fname = REAL_PATH + 'data/doc2res.res'
+        self.compareJsonWithRes(json_fname, test_fname)
+
+    def testDoc2ResFromJsonWithEncapsulatedStructure(self):
+        json_fname = REAL_PATH + 'data/doc2res_encap.json'
+        test_fname = REAL_PATH + 'data/doc2res_encap.res'
+        self.compareJsonWithRes(json_fname, test_fname)
+
+    def compareJsonWithRes(self, json_fname, test_fname):
         failed_open = False
         try:
             f = open(json_fname, 'r')
         except:
             failed_open = True
             print('Failed to open test case', json_fname, '- please check installation.')
+            raise AssertionError
         if not failed_open:
             doc = json.load(f)
             f.close()
             doc2res(doc, test_fname, hash_dupe=False, overwrite=True)
             doc_exported, s = res2dict(test_fname)
             self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
-            for key in doc:
-                if key == 'positions_frac':
-                    for ind, atom in enumerate(doc['positions_frac']):
-                        self.assertIn(atom, doc_exported['positions_frac'], msg='Atom with this position is missing.')
-                        self.assertEqual(doc['atom_types'][ind], doc_exported['atom_types'][doc_exported['positions_frac'].index(atom)], msg='Atom has wrong type!')
-            system('rm {}'.format(test_fname))
+            self.compareResDocwithResDoc(doc, doc_exported)
+        system('rm {}'.format(test_fname))
+
+    def compareResDocwithResDoc(self, doc, doc_exported):
+        for key in doc_exported:
+            if key not in ['source', 'atom_types', 'positions_frac', 'stoichiometry', 'user', 'lattice_abc', 'lattice_cart']:
+                self.assertEqual(doc_exported[key], doc[key],
+                                 msg='Input and output of {} do not match after scraping.'.format(key))
+            elif key == 'positions_frac':
+                for ind, atom_pos in enumerate(doc_exported['positions_frac']):
+                    self.assertIn(atom_pos, doc['positions_frac'], msg='Atom with this position is missing.')
+                    self.assertEqual(doc_exported['atom_types'][ind], doc['atom_types'][doc['positions_frac'].index(atom_pos)], msg='Atom has wrong type!')
+            elif key == 'stoichiometry':
+                self.assertEqual(sorted(doc['stoichiometry']), sorted(doc_exported['stoichiometry']), msg='Stoichs do not match!')
+            elif key == 'atom_types':
+                self.assertEqual(sorted(doc['atom_types']), sorted(doc_exported['atom_types']), msg='Atom types do not match!')
+            elif key == 'lattice_abc':
+                np.testing.assert_almost_equal(doc['lattice_abc'], doc_exported['lattice_abc'])
+            elif key == 'lattice_cart':
+                np.testing.assert_almost_equal(doc['lattice_cart'], doc_exported['lattice_cart'])
 
 
 if __name__ == '__main__':
