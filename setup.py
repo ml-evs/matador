@@ -39,6 +39,7 @@ setup(name='matador',
                        'python-ternary',
                        'bokeh>=0.12'],
           'stats': ['ascii_graph>=1.2'],
-          'progressbars': ['progressbar2']
+          'progressbars': ['progressbar2'],
+          'encapsulation': ['pyairss']
       },
       zip_safe=False)

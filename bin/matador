@@ -62,7 +62,7 @@ class Matador(object):
         # print last spatula report
         self.report = self.client.crystals.spatula
 
-        if self.args.get('cell') or self.args.get('res') or self.args.get('pdb') or self.args.get('markdown'):
+        if self.args.get('cell') or self.args.get('res') or self.args.get('pdb') or self.args.get('markdown') or self.args.get('param'):
             self.export = True
         else:
             self.export = False

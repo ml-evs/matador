@@ -49,12 +49,14 @@ def query2files(cursor, *args, **kwargs):
         print('Intending to write', num, 'structures to file...')
         if len(cursor) > 10000:
             try:
-                write = raw_input('This operation will write ' + str(len(cursor)) + ' structures' +
-                                  ' are you sure you want to do this? [y/n] ')
-            except:
                 write = input('This operation will write ' + str(len(cursor)) + ' structures' +
                               ' are you sure you want to do this? [y/n] ')
-            if write == 'y' or write == 'Y':
+            except:
+                print_exc()
+                print('Stop using Python2!')
+                print('Going to assume your answer was yes...')
+                write = 'y'
+            if write.lower() is 'y':
                 print('Writing them all.')
                 write = True
             else:
@@ -126,7 +128,6 @@ def query2files(cursor, *args, **kwargs):
                 if 'icsd' in doc and 'CollCode' not in source:
                     name += '-CollCode' + doc['icsd']
         path += name
-        # always write param for each doc; also handles dirs
         if param:
             doc2param(doc, path, hash_dupe=hash)
         if cell:
@@ -185,9 +186,25 @@ def doc2param(doc, path, hash_dupe=True, *args):
             for param in param_dict:
                 if param != 'source':
                     f.write("{0:30}: {1}\n".format(param, param_dict[param]))
+
+        if 'encapsulated' in doc and doc['encapsulated']:
+            from implicit_cnts import implicit_cnt_params
+            cnt_params = implicit_cnt_params(doc['cnt_radius'])
+            flines = []
+            flines.append('%BLOCK DEVEL_CODE\n')
+            flines.append('\tADD_EXT_LOCPOT: \"gaussian_cylinder\"\n')
+            flines.append('\tgaussian_cylinder_pot:\n')
+            flines.append('\t\tV0 = {V0}\n\t\tradius = {radius}\n\t\tbroadening = {fwhm}\n\t\taxial = \"0 0 1\"\n\t\tcentre = \"0.5 0.5 0\"\n'.format(**cnt_params))
+            flines.append('\t:endgaussian_cylinder_pot\n')
+            flines.append('%ENDBLOCK DEVEL_CODE\n')
+
+        with open(path+'.param', 'a') as f:
+            for line in flines:
+                f.write(line)
+
     except Exception as oops:
+        print_exc()
         print('Writing param file failed!')
-        print(oops)
 
 
 def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, spin=False, *args):
