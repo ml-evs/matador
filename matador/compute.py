@@ -27,26 +27,27 @@ class FullRelaxer:
 
     Input:
 
-        ncores      : number of cores for mpirun call
-        nnodes      : number of nodes for mpirun call (DEPCRECATED)
-        node        : node name to run on
-        res         : either filename or input structure dict
-        param_dict  : dict of castep parameters
-        cell_dict   : dict of castep cell input
-        executable  : name of binary to execute (DEFAULT: castep)
-        rough       : number of small "rough" calculations (DEFAULT: 4)
-        spin        : set spins in first calculation (DEFAULT: False)
-        conv_cutoff : read cutoffs from cutoff.conv and run them all
-        conv_kpt    : read kpt spacings kpt.conv and run them all
-        archer      : use aprun over mpirun
-        bnl         : use srun over mpirun
-        start       : begin calculation immediately or manually call it
-        redirect    : redirect all output to pid.file
+        ncores        : number of cores for mpirun call
+        nnodes        : number of nodes for mpirun call (DEPCRECATED)
+        node          : node name to run on
+        res           : either filename or input structure dict
+        param_dict    : dict of castep parameters
+        cell_dict     : dict of castep cell input
+        executable    : name of binary to execute (DEFAULT: castep)
+        custom_params : use custom param file for each structure
+        rough         : number of small "rough" calculations (DEFAULT: 4)
+        spin          : set spins in first calculation (DEFAULT: False)
+        conv_cutoff   : read cutoffs from cutoff.conv and run them all
+        conv_kpt      : read kpt spacings kpt.conv and run them all
+        archer        : use aprun over mpirun
+        bnl           : use srun over mpirun
+        start         : begin calculation immediately or manually call it
+        redirect      : redirect all output to pid.file
 
     """
     def __init__(self, ncores, nnodes, node, res, param_dict, cell_dict,
                  executable='castep', rough=None, spin=False,
-                 reopt=True,
+                 reopt=True, custom_params=False,
                  conv_cutoff=None, conv_kpt=None,
                  archer=False, bnl=False,
                  start=True, redirect=False,
@@ -62,6 +63,7 @@ class FullRelaxer:
         self.node = node
         self.verbosity = verbosity
         self.executable = executable
+        self.custom_params = custom_params
         self.reopt = reopt
         self.debug = debug
         self.spin = spin
@@ -160,10 +162,10 @@ class FullRelaxer:
         # copy initial res file to seed
         if not isinstance(self.res, str):
             self.cp_to_input(self.seed)
-            doc2res(self.res, self.seed, info=False, hash_dupe=False)
+            doc2res(self.res, self.seed, info=False, hash_dupe=False, overwrite=True)
         else:
-            doc2res(self.res_dict, self.seed, info=False, hash_dupe=False)
             self.cp_to_input(self.seed)
+            doc2res(self.res_dict, self.seed, info=False, hash_dupe=False, overwrite=True)
 
         self.rerun = False
         for ind, num_iter in enumerate(geom_max_iter_list):
@@ -180,14 +182,14 @@ class FullRelaxer:
                 self.spin = False
             calc_doc['geom_max_iter'] = num_iter
             try:
-                # delete any existing files
-                if isfile(seed + '.param'):
-                    remove(seed+'.param')
+                # delete any existing files and write new ones
                 if isfile(seed + '.cell'):
                     remove(seed+'.cell')
-                # write new param and cell
-                doc2param(calc_doc, seed, hash_dupe=False)
                 doc2cell(calc_doc, seed, hash_dupe=False, copy_pspots=False, spin=self.spin)
+                if not self.custom_params:
+                    if isfile(seed + '.param'):
+                        remove(seed+'.param')
+                    doc2param(calc_doc, seed, hash_dupe=False)
                 # run CASTEP
                 process = self.castep(seed)
                 process.communicate()
@@ -325,7 +327,8 @@ class FullRelaxer:
         try:
             if self.verbosity >= 1:
                 print_notify('Calculating SCF ' + self.seed)
-            doc2param(calc_doc, seed, hash_dupe=False)
+            if not self.custom_params:
+                doc2param(calc_doc, seed, hash_dupe=False)
             doc2cell(calc_doc, seed, hash_dupe=False, copy_pspots=False)
             # run CASTEP
             process = self.castep(seed)

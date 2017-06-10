@@ -52,6 +52,7 @@ class BatchRun:
         self.limit = self.args.get('limit')
         self.archer = self.args.get('archer')
         self.bnl = self.args.get('bnl')
+        self.custom_params = self.args.get('custom_params')
         self.executable = self.args.get('executable')
         self.rough = self.args.get('rough')
         self.spin = self.args.get('spin')
@@ -205,6 +206,7 @@ class BatchRun:
                                           param_dict=self.param_dict,
                                           cell_dict=self.cell_dict,
                                           executable=self.executable,
+                                          custom_params=self.custom_params,
                                           rough=self.rough,
                                           archer=self.archer,
                                           bnl=self.bnl,
@@ -258,6 +260,8 @@ if __name__ == '__main__':
                         help='do not run geometry optimisation again after first success')
     parser.add_argument('-d', '--debug', action='store_true',
                         help='debug output')
+    parser.add_argument('-cust', '--custom_params', action='store_true',
+                        help='use custom param file per structure')
     parser.add_argument('-v', '--verbosity', type=int,
                         help='integer to set level of verbosity')
     parser.add_argument('--archer', action='store_true',
