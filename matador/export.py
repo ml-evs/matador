@@ -202,9 +202,9 @@ def doc2param(doc, path, hash_dupe=True, *args):
             flines.append('\t:endgaussian_cylinder_pot\n')
             flines.append('%ENDBLOCK DEVEL_CODE\n')
 
-        with open(path+'.param', 'a') as f:
-            for line in flines:
-                f.write(line)
+            with open(path+'.param', 'a') as f:
+                for line in flines:
+                    f.write(line)
 
     except Exception as oops:
         print_exc()
