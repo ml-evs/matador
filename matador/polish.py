@@ -200,7 +200,8 @@ class Polisher(object):
             self.swap_dict_list.append(dict())
             for ind, pair in enumerate(self.swap_pairs):
                 for swap_from in pair[0]:
-                    self.swap_dict_list[-1][swap_from] = branch[ind]
+                    if swap_from != branch[ind]:
+                        self.swap_dict_list[-1][swap_from] = branch[ind]
 
     def atomic_swaps(self, source_doc):
         """ Swap atomic species according to parsed

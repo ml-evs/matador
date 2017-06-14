@@ -345,7 +345,31 @@ class QueryTest(unittest.TestCase):
         # print(json.dumps(query.query_dict, indent=2))
         self.assertDictEqual(test_dict, query.query_dict)
 
-    def testTrickyStoich(self):
+        kwargs = {'composition': ['[Si,Ge,Sn][Fe,Ru,Os]'], 'ignore_warnings': True,
+                  'testing': True}
+        query = DBQuery(**kwargs)
+        test_dict = ({
+            '$and': [
+                {'$and': [
+                    {'$or': [
+                        {'atom_types': {'$in': ['Si']}},
+                        {'atom_types': {'$in': ['Ge']}},
+                        {'atom_types': {'$in': ['Sn']}}
+                    ]},
+                    {'$or': [
+                        {'atom_types': {'$in': ['Fe']}},
+                        {'atom_types': {'$in': ['Ru']}},
+                        {'atom_types': {'$in': ['Os']}}
+                    ]},
+                    {'stoichiometry': {'$size': 2}}
+                    ]},
+            ]
+        })
+        # print(json.dumps(query.query_dict, indent=2))
+
+        self.assertDictEqual(test_dict, query.query_dict)
+
+    def testTrickyStoichs(self):
         kwargs = {'formula': ['[VII]2[Fe,Ru,Os]3[I]'], 'ignore_warnings': True,
                   'testing': True}
         query = DBQuery(**kwargs)
@@ -378,6 +402,36 @@ class QueryTest(unittest.TestCase):
         })
         # print(json.dumps(query.query_dict, indent=2))
         self.assertDictEqual(test_dict, query.query_dict)
+
+        kwargs = {'formula': ['[Ag,Cd,In]2[Fe,Ru,Os]3[I]'], 'ignore_warnings': True,
+                  'testing': True}
+        query = DBQuery(**kwargs)
+        test_dict = ({
+            '$and': [
+                {'$and': [
+                    {'$or': [
+                        {'stoichiometry': {'$in': [['Ag', 2.0]]}},
+                        {'stoichiometry': {'$in': [['Cd', 2.0]]}},
+                        {'stoichiometry': {'$in': [['In', 2.0]]}}
+                    ]},
+                    {'$or': [
+                        {'stoichiometry': {'$in': [['Fe', 3.0]]}},
+                        {'stoichiometry': {'$in': [['Ru', 3.0]]}},
+                        {'stoichiometry': {'$in': [['Os', 3.0]]}}
+                    ]},
+                    {'$or': [
+                        {'stoichiometry': {'$in': [['Li', 1.0]]}},
+                        {'stoichiometry': {'$in': [['Na', 1.0]]}},
+                        {'stoichiometry': {'$in': [['K', 1.0]]}},
+                        {'stoichiometry': {'$in': [['Rb', 1.0]]}},
+                        {'stoichiometry': {'$in': [['Cs', 1.0]]}},
+                        {'stoichiometry': {'$in': [['Fr', 1.0]]}}
+                    ]},
+                    {'stoichiometry': {'$size': 3}}
+                    ]},
+            ]
+        })
+        # print(json.dumps(query.query_dict, indent=2))
 
     def testRatioQuery(self):
         kwargs = {'composition': ['Li:TiP4'], 'ignore_warnings': True,
