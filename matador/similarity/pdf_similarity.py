@@ -11,7 +11,7 @@ TO-DO:
 """
 
 # matador modules
-from matador.utils.cell_utils import frac2cart
+from matador.utils.cell_utils import frac2cart, cart2abc
 # external libraries
 import numpy as np
 from scipy.spatial.distance import cdist
@@ -71,6 +71,10 @@ class PDF(object):
             self.low_mem = True
         else:
             self.low_mem = False
+        if kwargs.get('max_num_images'):
+            self.max_num_images = kwargs.get('max_num_images')
+        else:
+            self.max_num_images = 30
         self.doc = doc
         self.lattice = np.asarray(doc['lattice_cart'])
         self.poscart = np.asarray(frac2cart(doc['lattice_cart'], doc['positions_frac']))
@@ -294,9 +298,14 @@ class PDF(object):
                         self.image_vec.add(prod)
                         any_in_sphere = True
                 test_num_images += 1
-                if test_num_images > 20:
+                if test_num_images > self.max_num_images:
                     print(self.image_vec)
-                    print('Something has probably gone wrong; required images reached 20.')
+                    print('Something has probably gone wrong; required images reached {}.'.format(self.max_num_images))
+                    print(self.doc['text_id'])
+                    if 'lattice_abc' in self.doc:
+                        print(self.doc['lattice_abc'])
+                    else:
+                        print(cart2abc(self.doc['lattice_cart']))
                     raise RuntimeError
         else:
             self.image_vec = product(range(-self.num_images, self.num_images+1), repeat=3)
