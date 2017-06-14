@@ -175,7 +175,8 @@ class FullRelaxer:
                     print_notify('Performing one last iteration...')
             if self.verbosity >= 1:
                 if ind == 0:
-                        print_notify('Beginning rough geometry optimisation...')
+                    print_notify('custom params: {}'.format(self.custom_params))
+                    print_notify('Beginning rough geometry optimisation...')
                 elif ind == self.num_rough_iter:
                     print_notify('Beginning fine geometry optimisation...')
             if ind != 0:
@@ -186,6 +187,9 @@ class FullRelaxer:
                 if isfile(seed + '.cell'):
                     remove(seed+'.cell')
                 doc2cell(calc_doc, seed, hash_dupe=False, copy_pspots=False, spin=self.spin)
+                if self.custom_params:
+                    if self.verbosity > 2:
+                        print('Using custom param files...')
                 if not self.custom_params:
                     if isfile(seed + '.param'):
                         remove(seed+'.param')

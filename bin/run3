@@ -283,7 +283,7 @@ if __name__ == '__main__':
     runner = BatchRun(ncores=args.ncores, nprocesses=args.nprocesses, nnodes=args.nnodes,
                       debug=args.debug, verbosity=args.verbosity, seed=args.seed,
                       conv_cutoff=args.conv_cutoff, conv_kpt=args.conv_kpt,
-                      limit=args.limit, archer=args.archer, bnl=args.bnl, no_reopt=args.no_reopt,
+                      limit=args.limit, archer=args.archer, bnl=args.bnl, no_reopt=args.no_reopt, custom_params=args.custom_params,
                       executable=args.executable, rough=args.rough, spin=args.spin)
     try:
         runner.spawn()
