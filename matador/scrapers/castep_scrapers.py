@@ -177,14 +177,17 @@ def cell2dict(seed, db=True, outcell=False, positions=False, verbosity=0, **kwar
                 cell['species_pot'] = dict()
                 i = 1
                 while 'endblock' not in flines[line_no+i].lower():
-                    cell['species_pot'][flines[line_no+i].split()[0]] = \
-                        flines[line_no+i].split()[1].split('/')[-1]
-                    cell['species_pot'][flines[line_no+i].split()[0]] = \
-                        cell['species_pot'][flines[line_no+i].split()[0]].replace('compat7', '')
-                    cell['species_pot'][flines[line_no+i].split()[0]] = \
-                        cell['species_pot'][flines[line_no+i].split()[0]].replace(',', '')
-                    cell['species_pot'][flines[line_no+i].split()[0]] = \
-                        cell['species_pot'][flines[line_no+i].split()[0]].replace('()', '')
+                    if db:
+                        cell['species_pot'][flines[line_no+i].split()[0]] = \
+                            flines[line_no+i].split()[1].split('/')[-1]
+                        cell['species_pot'][flines[line_no+i].split()[0]] = \
+                            cell['species_pot'][flines[line_no+i].split()[0]].replace('compat7', '')
+                        cell['species_pot'][flines[line_no+i].split()[0]] = \
+                            cell['species_pot'][flines[line_no+i].split()[0]].replace(',', '')
+                        cell['species_pot'][flines[line_no+i].split()[0]] = \
+                            cell['species_pot'][flines[line_no+i].split()[0]].replace('()', '')
+                    else:
+                        cell['species_pot'][flines[line_no+i].split()[0]] = flines[line_no+i].split()[1]
                     i += 1
             elif '%block cell_constraints' in line.lower():
                 cell['cell_constraints'] = []
