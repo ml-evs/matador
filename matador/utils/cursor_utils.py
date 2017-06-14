@@ -38,11 +38,11 @@ def display_results(cursor, args=None, argstr=None, hull=False, markdown=False, 
         markdown_string += ('Version: ' + __version__ + '\n\n')
 
     if latex:
-        latex_string = ("\\begin{tabular}{l c c c c l l}\n"
+        latex_string = ("\\begin{tabular}{l r r c l l}\n"
                         "\\rowcolor{gray!20}\n"
-                        "\\multicolumn{1}{c}{formula} & \\multicolumn{1}{c}{$\Delta E$ from hull (meV/atom)} & "
-                        "\\multicolumn{1}{c}{grav. cap. (mAh/g)} & \multicolumn{1}{c}{sg.} & "
-                        "\\multicolumn{1}{c}{provenance} & \\multicolumn{1}{c}{description} \\\\\n")
+                        "\\multicolumn{1}{l}{formula} & \\multicolumn{1}{r}{$\Delta E$ from hull (meV/atom)} & "
+                        "\\multicolumn{1}{r}{grav. cap. (mAh/g)} & \multicolumn{1}{c}{sg.} & "
+                        "\\multicolumn{1}{l}{provenance} & \\multicolumn{1}{l}{description} \\\\\n")
         latex_struct_string = []
     if not markdown:
         header_string += "{:^24}".format('ID')
