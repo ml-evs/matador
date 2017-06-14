@@ -15,8 +15,10 @@ def get_files(path):
     for root, dirs, files in walk('.', topdown=True, followlinks=True):
         for file in files:
             if file.endswith('.castep'):
-                print(root + '/' + file)
+                # print(root + '/' + file)
                 castep_dict, success = castep2dict(root + '/' + file, db=False)
+                if castep_dict['stoichiometry'] == [['K', 1.0]]:
+                    print(castep_dict)
                 if not success:
                     print('Failure to read castep')
                 else:
@@ -38,17 +40,17 @@ def get_cutoffs(structure_files):
         for doc in structure_files[key]:
             if len(doc['stoichiometry']) == 1:
                 doc['formation_energy_per_atom'] = 0
-                cutoff_chempots_dict[str(doc['cut_off_energy'])][doc['atom_types'][0]] = doc['enthalpy_per_atom']
-                cutoff_chempots[key].append([doc['cut_off_energy'], doc['enthalpy_per_atom']])
+                cutoff_chempots_dict[str(doc['cut_off_energy'])][doc['atom_types'][0]] = doc['total_energy_per_atom']
+                cutoff_chempots[key].append([doc['cut_off_energy'], doc['total_energy_per_atom']])
                 chempot_list[key] = doc['stoichiometry'][0][0]
     cutoff_form = defaultdict(list)
     stoich_list = dict()
-    # print(cutoff_chempots_dict)
+    print(cutoff_chempots_dict)
     for key in structure_files:
         for doc in structure_files[key]:
             # print(doc['cut_off_energy'])
             if len(doc['stoichiometry']) == 2:
-                doc['formation_energy_per_atom'] = doc['enthalpy_per_atom']
+                doc['formation_energy_per_atom'] = doc['total_energy_per_atom']
                 for atom in doc['atom_types']:
                     doc['formation_energy_per_atom'] -= cutoff_chempots_dict[str(doc['cut_off_energy'])][atom] / len(doc['atom_types'])
                 cutoff_form[key].append([doc['cut_off_energy'], doc['formation_energy_per_atom']])
@@ -82,8 +84,8 @@ def get_kpts(structure_files):
                 # num_k = sum(grid)
                 num_k = round(doc['kpoints_mp_spacing'], 2)
                 print(doc['atom_types'][0], num_k, doc['kpoints_mp_spacing'])
-                kpt_chempots_dict[str(num_k)][doc['atom_types'][0]] = doc['enthalpy_per_atom']
-                kpt_chempots[key].append([num_k, doc['enthalpy_per_atom']])
+                kpt_chempots_dict[str(num_k)][doc['atom_types'][0]] = doc['total_energy_per_atom']
+                kpt_chempots[key].append([num_k, doc['total_energy_per_atom']])
                 chempot_list[key] = doc['stoichiometry'][0][0]
 
     # print(kpt_chempots_dict)
@@ -98,7 +100,7 @@ def get_kpts(structure_files):
             num_k = sum(grid)
             num_k = doc['kpoints_mp_spacing']
             if len(doc['stoichiometry']) == 2:
-                doc['formation_energy_per_atom'] = doc['enthalpy_per_atom']
+                doc['formation_energy_per_atom'] = doc['total_energy_per_atom']
                 print('!', round(doc['kpoints_mp_spacing'], 2), doc['kpoints_mp_spacing'])
                 for atom in doc['atom_types']:
                     doc['formation_energy_per_atom'] -= kpt_chempots_dict[str(round(doc['kpoints_mp_spacing'], 2))][atom] / len(doc['atom_types'])
@@ -132,7 +134,7 @@ def plot_both(cutoff_chempots, kpt_chempots,
     ax = fig.add_subplot(121, axisbg='w')
     ax2 = fig.add_subplot(122, axisbg='w')
     for ind, key in enumerate(cutoff_form):
-        ax.plot(-1/cutoff_form[key][:, 0], np.abs(cutoff_form[key][:, 1]-cutoff_form[key][0, 1])*1000,
+        ax.plot(-1/cutoff_form[key][:, 0], np.abs(cutoff_form[key][:, 1]-cutoff_form[key][-1, 1])*1000,
                 'o-', markersize=5, alpha=1, label=cutoff_stoich_list[key], lw=1, zorder=1000)
     # for key in cutoff_chempots:
         # ax_chempots.plot(-1/cutoff_chempots[key][:, 0], np.abs(cutoff_chempots[key][:, 1]-cutoff_chempots[key][-1, 1])*1000, 'o-', markersize=5, alpha=1, label=cutoff_chempot_list[key], lw=1)
