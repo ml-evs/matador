@@ -169,3 +169,10 @@ def standardize_doc_cell(doc):
     doc['positions_frac'] = [list(atom) for atom in spg_standardized[1]]
     doc['atom_types'] = [get_atomic_symbol(atom) for atom in spg_standardized[2]]
     return doc
+
+
+def get_spacegroup_spg(doc, symprec=0.01):
+    """ Return spglib spacegroup for a cell. """
+    from spglib import get_spacegroup
+    spg_cell = doc2spg(doc)
+    return get_spacegroup(spg_cell, symprec=symprec).split(' ')[0]

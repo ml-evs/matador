@@ -62,7 +62,8 @@ class Matador(object):
         # print last spatula report
         self.report = self.client.crystals.spatula
 
-        if self.args.get('cell') or self.args.get('res') or self.args.get('pdb') or self.args.get('markdown') or self.args.get('param'):
+        if (self.args.get('cell') or self.args.get('res') or self.args.get('pdb')
+                or self.args.get('markdown') or self.args.get('latex') or self.args.get('param')):
             self.export = True
         else:
             self.export = False
@@ -447,6 +448,8 @@ if __name__ == '__main__':
                              help='export query to .pdb files in folder name from query string')
     query_flags.add_argument('--markdown', action='store_true',
                              help='export query summary to a markdown file')
+    query_flags.add_argument('--latex', action='store_true',
+                             help='export query summary to a LaTeX table')
 
     swap_flags = argparse.ArgumentParser(add_help=False)
     swap_flags.add_argument('-sw', '--swap', type=str, nargs='+',

@@ -28,6 +28,7 @@ def query2files(cursor, *args, **kwargs):
     res = args.get('res')
     pdb = args.get('pdb')
     md = args.get('markdown')
+    tex = args.get('latex')
     argstr = kwargs.get('argstr')
     multiple_files = cell or param or res or pdb
     prefix = (args.get('prefix') + '-') if args.get('prefix') is not None else ''
@@ -145,6 +146,13 @@ def query2files(cursor, *args, **kwargs):
         md_string = display_results(cursor, args, argstr=argstr, markdown=True, hull=hull)
         with open(md_path, 'w') as f:
             f.write(md_string)
+    if tex:
+        tex_path = path.split('/')[0] + '/' + path.split('/')[0] + '.tex'
+        print('Writing LaTeX file', tex_path + '...')
+        hull = True if args['subcmd'] in ['hull', 'voltage'] else False
+        tex_string = display_results(cursor, args, argstr=argstr, latex=True, hull=hull)
+        with open(tex_path, 'w') as f:
+            f.write(tex_string)
 
     print('Done!')
 

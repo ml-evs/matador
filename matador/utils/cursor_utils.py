@@ -3,6 +3,7 @@
 
 # external libraries
 import numpy as np
+from matador.utils.cell_utils import get_spacegroup_spg
 # standard library
 from traceback import print_exc
 from time import strftime
@@ -14,7 +15,7 @@ except:
     __version__ = 'xxx'
 
 
-def display_results(cursor, args=None, argstr=None, hull=False, markdown=False):
+def display_results(cursor, args=None, argstr=None, hull=False, markdown=False, latex=False):
     """ Print query results in a cryan-like fashion, optionally
     in a markdown format.
     """
@@ -36,6 +37,13 @@ def display_results(cursor, args=None, argstr=None, hull=False, markdown=False):
             markdown_string += ('Command: matador ' + ' '.join(argstr) + '\n')
         markdown_string += ('Version: ' + __version__ + '\n\n')
 
+    if latex:
+        latex_string = ("\\begin{tabular}{l c c c c l l}\n"
+                        "\\rowcolor{gray!20}\n"
+                        "\\multicolumn{1}{c}{formula} & \\multicolumn{1}{c}{$\Delta E$ from hull (meV/atom)} & "
+                        "\\multicolumn{1}{c}{grav. cap. (mAh/g)} & \multicolumn{1}{c}{sg.} & "
+                        "\\multicolumn{1}{c}{provenance} & \\multicolumn{1}{c}{description} \\\\\n")
+        latex_struct_string = []
     if not markdown:
         header_string += "{:^24}".format('ID')
         header_string += "{:^5}".format('!?!')
@@ -134,6 +142,7 @@ def display_results(cursor, args=None, argstr=None, hull=False, markdown=False):
         except:
             struct_string[-1] += "{:^12}".format('xxx')
         struct_string[-1] += "{:^10}".format(formula_substring)
+
         try:
             struct_string[-1] += "{:^8}".format(int(doc['num_fu']))
         except:
@@ -143,6 +152,17 @@ def display_results(cursor, args=None, argstr=None, hull=False, markdown=False):
             struct_string[-1] += "{:^8}".format(prov)
         except:
             struct_string[-1] += "{:^8}".format('xxx')
+
+        if latex:
+            latex_struct_string.append("{:^20} {:^10} & ".format(formula_substring, '$\star$' if doc['hull_distance'] == 0 else ''))
+            latex_struct_string[-1] += "{:^20.0f} & ".format(doc.get('hull_distance')*1000) if doc.get('hull_distance') > 0 else '{:^20} &'.format('-')
+            latex_struct_string[-1] += "{:^20.0f} & ".format(doc['gravimetric_capacity']) if doc.get('hull_distance') == 0 else '{:^20} &'.format('-')
+            latex_struct_string[-1] += "{:^20} & ".format(get_spacegroup_spg(doc))
+            prov = get_guess_doc_provenance(doc['source'], doc.get('icsd'))
+            if doc.get('icsd'):
+                prov += ' {}'.format(doc['icsd'])
+            latex_struct_string[-1] += "{:^25} & ".format(prov)
+            latex_struct_string[-1] += "{:^30} \\\\ \n".format('')
 
         if last_formula != formula_substring:
             gs_enthalpy = doc['enthalpy'] / doc['num_fu']
@@ -234,6 +254,8 @@ def display_results(cursor, args=None, argstr=None, hull=False, markdown=False):
                 count += 1
                 if markdown:
                     markdown_string += struct_string[ind] + '\n'
+                elif latex:
+                    latex_string += latex_struct_string[ind]
                 else:
                     print(struct_string[ind])
                 if details and not markdown:
@@ -242,11 +264,12 @@ def display_results(cursor, args=None, argstr=None, hull=False, markdown=False):
                 if args.get('source') and not markdown:
                     print(source_string[ind])
                 current_formula = substring
-                formula_list.append(substring)
     else:
         for ind, substring in enumerate(struct_string):
             if markdown:
                 markdown_string += struct_string[ind] + '\n'
+            elif latex:
+                latex_string += latex_struct_string[ind] + '\n'
             else:
                 print(substring)
                 if details:
@@ -258,6 +281,11 @@ def display_results(cursor, args=None, argstr=None, hull=False, markdown=False):
                     print(len(header_string) * '─')
     if markdown:
         return markdown_string
+    elif latex:
+        latex_string += '\\end{tabular}'
+        return latex_string
+    else:
+        return
 
 
 def set_cursor_from_array(cursor, array, key):
@@ -298,7 +326,7 @@ def get_guess_doc_provenance(sources, icsd=None):
     for fname in sources:
         if (fname.endswith('.castep') or fname.endswith('.res') or
                 fname.endswith('.history') or 'OQMD' in fname):
-            if 'collcode' in fname.lower():
+            if 'collcode' in fname.lower() or 'colcode' in fname.lower() or 'collo' in fname.lower():
                 if fname.split('/')[-1].count('-') == 2 + fname.lower().count('oqmd'):
                     prov = 'SWAPS'
                 else:
