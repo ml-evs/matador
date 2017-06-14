@@ -294,8 +294,9 @@ class PDF(object):
                         self.image_vec.add(prod)
                         any_in_sphere = True
                 test_num_images += 1
-                if test_num_images > 10:
-                    print('Something has probably gone wrong; required images reached 10.')
+                if test_num_images > 20:
+                    print(self.image_vec)
+                    print('Something has probably gone wrong; required images reached 20.')
                     raise RuntimeError
         else:
             self.image_vec = product(range(-self.num_images, self.num_images+1), repeat=3)
