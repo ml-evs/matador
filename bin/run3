@@ -56,6 +56,7 @@ class BatchRun:
         self.executable = self.args.get('executable')
         self.rough = self.args.get('rough')
         self.spin = self.args.get('spin')
+        self.kpts_1D = self.args.get('kpts_1D')
         if self.args.get('executable') is None:
             self.executable = 'castep'
         valid = True
@@ -215,7 +216,8 @@ class BatchRun:
                                           reopt=self.reopt,
                                           spin=self.spin,
                                           conv_cutoff=self.cutoffs,
-                                          conv_kpt=self.kpts)
+                                          conv_kpt=self.kpts,
+                                          kpts_1D=self.kpts_1D)
                     if relaxer.success:
                         with open(paths['completed_fname'], 'a') as job_file:
                             job_file.write(res+'\n')
@@ -272,6 +274,8 @@ if __name__ == '__main__':
                         help='run all res files at cutoff defined in cutoff.conv file')
     parser.add_argument('--conv_kpt', action='store_true',
                         help='run all res files at kpoint spacings defined in kpt.conv file')
+    parser.add_argument('--kpts_1D', action='store_true',
+                        help='recalculate a 1D kpoint mesh of spacing specified in template cell')
     parser.add_argument('--spin', action='store_true',
                         help='if not specified in .cell file, break spin symmetry on first atom')
     parser.add_argument('--rough', type=int,
@@ -282,7 +286,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     runner = BatchRun(ncores=args.ncores, nprocesses=args.nprocesses, nnodes=args.nnodes,
                       debug=args.debug, verbosity=args.verbosity, seed=args.seed,
-                      conv_cutoff=args.conv_cutoff, conv_kpt=args.conv_kpt,
+                      conv_cutoff=args.conv_cutoff, conv_kpt=args.conv_kpt, kpts_1D=args.kpts_1D,
                       limit=args.limit, archer=args.archer, bnl=args.bnl, no_reopt=args.no_reopt, custom_params=args.custom_params,
                       executable=args.executable, rough=args.rough, spin=args.spin)
     try:

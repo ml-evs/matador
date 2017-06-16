@@ -14,6 +14,7 @@ from shutil import copy
 from copy import deepcopy
 from traceback import print_exc, format_exception_only
 from sys import exit, exc_info
+from math import ceil
 import sys
 import subprocess as sp
 import glob
@@ -39,6 +40,7 @@ class FullRelaxer:
         spin          : set spins in first calculation (DEFAULT: False)
         conv_cutoff   : read cutoffs from cutoff.conv and run them all
         conv_kpt      : read kpt spacings kpt.conv and run them all
+        kpts_1D       : treat z-direction as special and create kpt_grid [1 1 n_kz].
         archer        : use aprun over mpirun
         bnl           : use srun over mpirun
         start         : begin calculation immediately or manually call it
@@ -48,7 +50,7 @@ class FullRelaxer:
     def __init__(self, ncores, nnodes, node, res, param_dict, cell_dict,
                  executable='castep', rough=None, spin=False,
                  reopt=True, custom_params=False,
-                 conv_cutoff=None, conv_kpt=None,
+                 conv_cutoff=None, conv_kpt=None, kpts_1D=False,
                  archer=False, bnl=False,
                  start=True, redirect=False,
                  verbosity=0, debug=False):
@@ -68,12 +70,15 @@ class FullRelaxer:
         self.debug = debug
         self.spin = spin
         self.start = start
+        self.kpts_1D = kpts_1D
         self.conv_cutoff_bool = True if conv_cutoff is not None else False
         self.conv_kpt_bool = True if conv_kpt is not None else False
         if self.conv_cutoff_bool:
             self.conv_cutoff = conv_cutoff
         if self.conv_kpt_bool:
             self.conv_kpt = conv_kpt
+        if self.kpts_1D:
+            self.target_spacing = deepcopy(cell_dict['kpoints_mp_spacing'])
         self.success = None
         if redirect:
             self.redirect = True
@@ -186,6 +191,12 @@ class FullRelaxer:
                 # delete any existing files and write new ones
                 if isfile(seed + '.cell'):
                     remove(seed+'.cell')
+                if self.kpts_1D:
+                    if self.verbosity > 2:
+                        print('Calculating 1D kpt grid...')
+                    calc_doc['kpoints_mp_grid'] = [1, 1, ceil(1 / (calc_doc['lattice_abc'][0][2] * self.target_spacing))]
+                    if 'kpoints_mp_spacing' in calc_doc:
+                        del calc_doc['kpoints_mp_spacing']
                 doc2cell(calc_doc, seed, hash_dupe=False, copy_pspots=False, spin=self.spin)
                 if self.custom_params:
                     if self.verbosity > 2:
