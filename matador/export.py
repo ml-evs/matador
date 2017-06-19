@@ -204,10 +204,11 @@ def doc2param(doc, path, hash_dupe=True, *args):
             cnt_params = implicit_cnt_params(doc['cnt_radius'])
             flines = []
             flines.append('%BLOCK DEVEL_CODE\n')
-            flines.append('\tADD_EXT_LOCPOT: \"gaussian_cylinder\"\n')
-            flines.append('\tgaussian_cylinder_pot:\n')
-            flines.append('\t\tV0 = {V0}\n\t\tradius = {radius}\n\t\tbroadening = {fwhm}\n\t\taxial = \"0 0 1\"\n\t\tcentre = \"0.5 0.5 0\"\n'.format(**cnt_params))
-            flines.append('\t:endgaussian_cylinder_pot\n')
+            flines.append('ADD_EXT_LOCPOT: \"gaussian_cylinder\"\n')
+            flines.append('1D_STRESS_TENSOR: True\n')
+            flines.append('gaussian_cylinder_pot:\n')
+            flines.append('V0 = {V0}\nradius = {radius}\nbroadening = {fwhm}\naxial = \"0 0 1\"\ncentre = \"0.5 0.5 0\"\n'.format(**cnt_params))
+            flines.append(':endgaussian_cylinder_pot\n')
             flines.append('%ENDBLOCK DEVEL_CODE\n')
 
             with open(path+'.param', 'a') as f:
