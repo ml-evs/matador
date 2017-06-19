@@ -264,6 +264,7 @@ def display_results(cursor, args=None, argstr=None, hull=False, markdown=False, 
                 if args.get('source') and not markdown:
                     print(source_string[ind])
                 current_formula = substring
+                formula_list.append(substring)
     else:
         for ind, substring in enumerate(struct_string):
             if markdown:
