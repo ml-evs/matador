@@ -28,32 +28,34 @@ class FullRelaxer:
 
     Input:
 
-        ncores        : number of cores for mpirun call
-        nnodes        : number of nodes for mpirun call (DEPCRECATED)
-        node          : node name to run on
         res           : either filename or input structure dict
         param_dict    : dict of castep parameters
         cell_dict     : dict of castep cell input
-        executable    : name of binary to execute (DEFAULT: castep)
-        custom_params : use custom param file for each structure
-        rough         : number of small "rough" calculations (DEFAULT: 4)
-        spin          : set spins in first calculation (DEFAULT: False)
-        conv_cutoff   : read cutoffs from cutoff.conv and run them all
-        conv_kpt      : read kpt spacings kpt.conv and run them all
-        kpts_1D       : treat z-direction as special and create kpt_grid [1 1 n_kz].
-        archer        : use aprun over mpirun
-        bnl           : use srun over mpirun
-        start         : begin calculation immediately or manually call it
-        redirect      : redirect all output to pid.file
+        ncores        : number of cores for mpirun call
+        nnodes        : number of nodes for mpirun call (DEPCRECATED)
+        node          : node name to run on
+
+    Keyword arguments:
+
+        executable    : str, name of binary to execute (DEFAULT: castep)
+        custom_params : bool, use custom param file for each structure
+        rough         : int, number of small "rough" calculations (DEFAULT: 4)
+        spin          : bool, set spins in first calculation (DEFAULT: False)
+        conv_cutoffs  : list(float) of cutoffs to use for SCF convergence test
+        conv_kpts     : list(float) of kpt spacings to use for SCF convergence test
+        kpts_1D       : bool, treat z-direction as special and create kpt_grid [1 1 n_kz].
+        archer        : bool, use aprun over mpirun
+        bnl           : bool, use srun over mpirun
+        start         : bool, begin calculation immediately or manually call it
+        redirect      : bool, redirect all output to pid.file
 
     """
-    def __init__(self, ncores, nnodes, node, res, param_dict, cell_dict,
+    def __init__(self, res, param_dict, cell_dict,
+                 ncores, nnodes, node,
                  executable='castep', rough=None, spin=False,
-                 reopt=True, custom_params=False,
-                 conv_cutoff=None, conv_kpt=None, kpts_1D=False,
-                 archer=False, bnl=False,
-                 start=True, redirect=False,
-                 verbosity=0, debug=False):
+                 reopt=False, custom_params=False,
+                 kpts_1D=False, conv_cutoff=None, conv_kpt=None, archer=False, bnl=False,
+                 start=True, redirect=False, verbosity=0, debug=False):
         """ Make the files to run the calculation and handle
         the calling of CASTEP itself.
         """
@@ -71,13 +73,12 @@ class FullRelaxer:
         self.spin = spin
         self.start = start
         self.kpts_1D = kpts_1D
-        self.conv_cutoff_bool = True if conv_cutoff is not None else False
-        self.conv_kpt_bool = True if conv_kpt is not None else False
-        if self.conv_cutoff_bool:
-            self.conv_cutoff = conv_cutoff
-        if self.conv_kpt_bool:
-            self.conv_kpt = conv_kpt
+        self.conv_cutoff_bool = isinstance(conv_cutoff, list)
+        self.conv_kpt_bool = isinstance(conv_kpt, list)
+        self.conv_cutoff = conv_cutoff
+        self.conv_kpt = conv_kpt
         if self.kpts_1D:
+            assert('kpoints_mp_spacing' in cell_dict)
             self.target_spacing = deepcopy(cell_dict['kpoints_mp_spacing'])
         self.success = None
         if redirect:
@@ -194,7 +195,10 @@ class FullRelaxer:
                 if self.kpts_1D:
                     if self.verbosity > 2:
                         print('Calculating 1D kpt grid...')
-                    calc_doc['kpoints_mp_grid'] = [1, 1, ceil(1 / (calc_doc['lattice_abc'][0][2] * self.target_spacing))]
+                    n_kz = ceil(1 / (calc_doc['lattice_abc'][0][2] * self.target_spacing))
+                    if n_kz % 2 == 1:
+                        n_kz += 1
+                    calc_doc['kpoints_mp_grid'] = [1, 1, n_kz]
                     if 'kpoints_mp_spacing' in calc_doc:
                         del calc_doc['kpoints_mp_spacing']
                 doc2cell(calc_doc, seed, hash_dupe=False, copy_pspots=False, spin=self.spin)
@@ -341,7 +345,7 @@ class FullRelaxer:
         """ Perform only the scf calculation without relaxation.  """
         try:
             if self.verbosity >= 1:
-                print_notify('Calculating SCF ' + self.seed)
+                print_notify('Calculating SCF ' + seed)
             if not self.custom_params:
                 doc2param(calc_doc, seed, hash_dupe=False)
             doc2cell(calc_doc, seed, hash_dupe=False, copy_pspots=False)
@@ -378,8 +382,7 @@ class FullRelaxer:
             return False
 
     def castep(self, seed):
-        """ Calls CASTEP on desired seed with desired number of cores.
-        """
+        """ Calls CASTEP on desired seed with desired number of cores. """
         if self.nnodes is None or self.nnodes == 1:
             if self.ncores == 1 and self.node is None:
                 process = sp.Popen(['nice', '-n', '15', self.executable, seed])
@@ -469,14 +472,18 @@ class FullRelaxer:
                 copy(_file, 'completed')
                 remove(_file)
         else:
-            try:
-                copy('{}.castep'.format(seed), 'completed')
-                copy('{}.res'.format(seed), 'completed')
-                remove('{}.castep'.format(seed))
-                remove('{}.res'.format(seed))
-            except:
-                if self.verbosity > 0:
-                    print_exc()
+            file_exts = ['castep']
+            if self.kpts_1D:
+                file_exts.append('param')
+            if not self.conv_kpt_bool and not self.conv_cutoff_bool:
+                file_exts.append('res')
+            for ext in file_exts:
+                try:
+                    copy('{}.{}'.format(seed, ext), 'completed')
+                    remove('{}.{}'.format(seed, ext))
+                except:
+                    if self.verbosity > 0:
+                        print_exc()
                     pass
         return
 

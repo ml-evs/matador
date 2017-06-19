@@ -36,54 +36,38 @@ class BatchRun:
         """ Check directory has valid contents and prepare log files and directories if
         not already prepared, then begin running calculations.
         """
-        # analyse parallel allocation
-        self.args = kwargs
+        # parse args, then co-opt them for passing directly into FullRelaxer
+        self.args = vars(args[0])
         self.debug = self.args.get('debug')
-        if self.args.get('verbosity') is None:
-            self.verbosity = 0
-        else:
-            self.verbosity = self.args.get('verbosity')
+        self.seed = self.args['seed']
+        del self.args['seed']
         if self.args.get('no_reopt'):
-            self.reopt = False
+            self.args['reopt'] = False
         else:
-            self.reopt = True
-        self.all_cores = mp.cpu_count()
-        self.seed = self.args.get('seed')
+            self.args['reopt'] = True
+        del self.args['no_reopt']
+        self.nprocesses = int(self.args['nprocesses'])
+        del self.args['nprocesses']
         self.limit = self.args.get('limit')
-        self.archer = self.args.get('archer')
-        self.bnl = self.args.get('bnl')
-        self.custom_params = self.args.get('custom_params')
-        self.executable = self.args.get('executable')
-        self.rough = self.args.get('rough')
-        self.spin = self.args.get('spin')
-        self.kpts_1D = self.args.get('kpts_1D')
-        if self.args.get('executable') is None:
-            self.executable = 'castep'
+        del self.args['limit']
+        self.all_cores = mp.cpu_count()
         valid = True
-        if self.args.get('nprocesses') is not None:
-            self.nprocesses = self.args['nprocesses']
-        else:
-            self.nprocesses = 1
-        if self.args.get('ncores') is not None:
-            self.ncores = self.args['ncores']
-        else:
-            self.ncores = int(self.all_cores / self.nprocesses)
-        if self.args.get('nnodes') is not None:
-            self.nnodes = self.args['nnodes']
+        if self.args.get('ncores') is None:
+            self.args['ncores'] = int(self.all_cores / self.nprocesses)
+        if self.args.get('nnodes') != 1:
             print_warning('Attempting to run over multiple nodes, please ensure \
                            that you are using Intel MPI or this will produce \
                            unexpected behaviour!')
-        else:
-            self.nnodes = None
         try:
-            assert (self.nnodes is None or self.nnodes >= 1)
-            assert self.ncores >= 1
+            assert self.args['nnodes'] >= 1
+            assert self.args['ncores'] >= 1
             assert self.nprocesses >= 1
-        except(AssertionError):
+        except AssertionError:
+            print_exc()
             print_failure('Invalid number of cores, nodes or processes.')
             exit()
-        if self.ncores*self.nprocesses > self.all_cores:
-            print_warning('Requested more cores (' + str(self.ncores*self.nprocesses) +
+        if self.args['ncores']*self.nprocesses > self.all_cores:
+            print_warning('Requested more cores (' + str(self.args['ncores']*self.nprocesses) +
                           ') than available (' + str(self.all_cores) + ').' +
                           '(Maybe you are using a queueing system).')
         # scan directory for files to run
@@ -115,24 +99,25 @@ class BatchRun:
                 if isfile('cutoff.conv'):
                     with open('cutoff.conv', 'r') as f:
                         flines = f.readlines()
-                        self.cutoffs = []
+                        self.args['conv_cutoff'] = []
                         for line in flines:
-                            self.cutoffs.append(int(line))
+                            self.args['conv_cutoff'].append(int(line))
                 else:
                     raise RuntimeError
             except:
+                print_exc()
                 valid = False
                 print_failure('Error with cutoff.conv file.')
         else:
-            self.cutoffs = None
+            self.args['conv_cutoff'] = None
         if self.args.get('conv_kpt'):
             try:
                 if isfile('kpt.conv'):
                     with open('kpt.conv', 'r') as f:
                         flines = f.readlines()
-                        self.kpts = []
+                        self.args['conv_kpt'] = []
                         for line in flines:
-                            self.kpts.append(float(line))
+                            self.args['conv_kpt'].append(float(line))
                 else:
                     raise RuntimeError
             except:
@@ -140,7 +125,7 @@ class BatchRun:
                 valid = False
                 print_failure('Error with kpt.conv file.')
         else:
-            self.kpts = None
+            self.args['conv_kpt'] = None
         if not valid:
             exit('Exiting...')
         # delete source from cell and param
@@ -193,31 +178,16 @@ class BatchRun:
             if not running:
                 if self.limit is not None:
                     if job_count == self.limit:
-                        print(self.limit)
                         raise SystemExit
                 with open(paths['jobs_fname'], 'a') as job_file:
                     job_file.write(res+'\n')
                 # create full relaxer object for creation and running of job
                 try:
                     job_count += 1
-                    relaxer = FullRelaxer(ncores=self.ncores,
-                                          nnodes=self.nnodes,
-                                          node=None,
-                                          res=res,
+                    relaxer = FullRelaxer(node=None, res=res,
                                           param_dict=self.param_dict,
                                           cell_dict=self.cell_dict,
-                                          executable=self.executable,
-                                          custom_params=self.custom_params,
-                                          rough=self.rough,
-                                          archer=self.archer,
-                                          bnl=self.bnl,
-                                          debug=self.debug,
-                                          verbosity=self.verbosity,
-                                          reopt=self.reopt,
-                                          spin=self.spin,
-                                          conv_cutoff=self.cutoffs,
-                                          conv_kpt=self.kpts,
-                                          kpts_1D=self.kpts_1D)
+                                          **self.args)
                     if relaxer.success:
                         with open(paths['completed_fname'], 'a') as job_file:
                             job_file.write(res+'\n')
@@ -249,46 +219,42 @@ if __name__ == '__main__':
                         help='cell and param seed to use as template for calculations')
     parser.add_argument('-nc', '--ncores', type=int,
                         help='number of cores CASTEP per job [DEFAULT=cpu_count/nprocesses]')
-    parser.add_argument('-np', '--nprocesses', type=int,
+    parser.add_argument('-np', '--nprocesses', type=int, default=1,
                         help='number of concurrent calculations, i.e. number \
                               of concurrent mpiruns [DEFAULT=1]')
-    parser.add_argument('-nn', '--nnodes', type=int,
+    parser.add_argument('-nn', '--nnodes', type=int, default=1,
                         help='number of nodes per job, i.e. number of nodes \
                               using -nc cores [DEFAULT=1]. REQUIRES Intel MPI as \
                               found on e.g. Darwin HPC.')
-    parser.add_argument('-exec', '--executable', type=str,
+    parser.add_argument('-exec', '--executable', type=str, default='castep',
                         help='specify path to or name of executable')
-    parser.add_argument('--no_reopt', action='store_true',
+    parser.add_argument('--no_reopt', action='store_true', default=False,
                         help='do not run geometry optimisation again after first success')
-    parser.add_argument('-d', '--debug', action='store_true',
+    parser.add_argument('-d', '--debug', action='store_true', default=False,
                         help='debug output')
-    parser.add_argument('-cust', '--custom_params', action='store_true',
+    parser.add_argument('-cust', '--custom_params', action='store_true', default=False,
                         help='use custom param file per structure')
-    parser.add_argument('-v', '--verbosity', type=int,
+    parser.add_argument('-v', '--verbosity', type=int, default=0,
                         help='integer to set level of verbosity')
-    parser.add_argument('--archer', action='store_true',
+    parser.add_argument('--archer', action='store_true', default=False,
                         help='use aprun over mpirun')
-    parser.add_argument('--bnl', action='store_true',
+    parser.add_argument('--bnl', action='store_true', default=False,
                         help='use srun over mpirun')
-    parser.add_argument('--conv_cutoff', action='store_true',
+    parser.add_argument('--conv_cutoff', action='store_true', default=False,
                         help='run all res files at cutoff defined in cutoff.conv file')
-    parser.add_argument('--conv_kpt', action='store_true',
+    parser.add_argument('--conv_kpt', action='store_true', default=False,
                         help='run all res files at kpoint spacings defined in kpt.conv file')
-    parser.add_argument('--kpts_1D', action='store_true',
+    parser.add_argument('--kpts_1D', action='store_true', default=False,
                         help='recalculate a 1D kpoint mesh of spacing specified in template cell')
-    parser.add_argument('--spin', action='store_true',
+    parser.add_argument('--spin', action='store_true', default=False,
                         help='if not specified in .cell file, break spin symmetry on first atom')
-    parser.add_argument('--rough', type=int,
+    parser.add_argument('--rough', type=int, default=4,
                         help='choose how many cycles of 2 geometry optimization iterations \
                               to perform, decrease if lattice is nearly correct. [DEFAULT: 4].')
-    parser.add_argument('-l', '--limit', type=int,
+    parser.add_argument('-l', '--limit', type=int, default=None,
                         help='limit to n structures per run')
     args = parser.parse_args()
-    runner = BatchRun(ncores=args.ncores, nprocesses=args.nprocesses, nnodes=args.nnodes,
-                      debug=args.debug, verbosity=args.verbosity, seed=args.seed,
-                      conv_cutoff=args.conv_cutoff, conv_kpt=args.conv_kpt, kpts_1D=args.kpts_1D,
-                      limit=args.limit, archer=args.archer, bnl=args.bnl, no_reopt=args.no_reopt, custom_params=args.custom_params,
-                      executable=args.executable, rough=args.rough, spin=args.spin)
+    runner = BatchRun(args)
     try:
         runner.spawn()
     except(KeyboardInterrupt, SystemExit):
