@@ -51,7 +51,6 @@ class BatchRun:
         self.limit = self.args.get('limit')
         del self.args['limit']
         self.all_cores = mp.cpu_count()
-        valid = True
         if self.args.get('ncores') is None:
             self.args['ncores'] = int(self.all_cores / self.nprocesses)
         if self.args.get('nnodes') != 1:
@@ -70,30 +69,41 @@ class BatchRun:
             print_warning('Requested more cores (' + str(self.args['ncores']*self.nprocesses) +
                           ') than available (' + str(self.all_cores) + ').' +
                           '(Maybe you are using a queueing system).')
-        # scan directory for files to run
+        # read cell/param files
+        exts = ['cell', 'param']
+        for ext in exts:
+            if not isfile('{}.{}'.format(self.seed, ext)):
+                print_failure('Failed to find {} file, {}.{}'.format(ext, self.seed, ext))
+                exit()
         self.cell_dict, cell_success = cell2dict(self.seed + '.cell', db=False)
         if not cell_success:
-            valid = False
             print_failure('Failed to parse cell file')
+            exit()
         self.param_dict, param_success = param2dict(self.seed + '.param', db=False)
         if not param_success:
-            valid = False
             print_failure('Failed to parse param file')
+            exit()
+
+        # scan directory for files to run
         self.file_lists = defaultdict(list)
         self.file_lists['res'] = glob.glob('*.res')
         if len(self.file_lists['res']) < 1:
-            valid = False
             print_failure('run3 requires at least 1 res file in folder, found' +
                           str(len(self.file_lists['res'])))
+            exit()
+
+        # do some prelim checks of parameters
         if 'geom_max_iter' not in self.param_dict and \
                 self.param_dict['task'].upper() in ['GEOMETRYOPTIMISATION',
                                                     'GEOMETRYOPTIMIZATION']:
-            valid = False
             print_failure('geom_max_iter is unset, please fix this.')
+            exit()
         if 'geom_max_iter' in self.param_dict and int(self.param_dict['geom_max_iter']) < 20:
-            valid = False
             print_failure('geom_max_iter is only ' +
                           str(self.param_dict['geom_max_iter']) + '... quitting.')
+            exit()
+
+        # check if we're doing a conv run
         if self.args.get('conv_cutoff'):
             try:
                 if isfile('cutoff.conv'):
@@ -106,10 +116,11 @@ class BatchRun:
                     raise RuntimeError
             except:
                 print_exc()
-                valid = False
                 print_failure('Error with cutoff.conv file.')
+                exit()
         else:
             self.args['conv_cutoff'] = None
+
         if self.args.get('conv_kpt'):
             try:
                 if isfile('kpt.conv'):
@@ -122,15 +133,15 @@ class BatchRun:
                     raise RuntimeError
             except:
                 print_exc()
-                valid = False
                 print_failure('Error with kpt.conv file.')
+                exit()
         else:
             self.args['conv_kpt'] = None
-        if not valid:
-            exit('Exiting...')
+
         # delete source from cell and param
         del self.cell_dict['source']
         del self.param_dict['source']
+
         # prepare folders and text files
         self.paths = dict()
         self.paths['completed_dir'] = 'completed'
