@@ -904,7 +904,7 @@ class QueryConvexHull(object):
             scale = 20
         else:
             scale = 1
-        fontsize = 18
+        fontsize = 22
         if axis is not None:
             fig, ax = ternary.figure(scale=scale, ax=axis)
         else:
@@ -918,11 +918,11 @@ class QueryConvexHull(object):
         ax.gridlines(color='black', multiple=scale*0.1, linewidth=0.5)
 
         ax.clear_matplotlib_ticks()
-        if scale == 1:
-            ax.ticks(axis='lbr', linewidth=1, multiple=scale*0.2, offset=0.02)
-        else:
-            ax.ticks(axis='lbr', linewidth=1, multiple=scale*0.2, offset=0.02,
-                     ticks=[str(round(num, 1)) for num in np.linspace(0.0, 1.0, 6)])
+        # if scale == 1:
+            # ax.ticks(axis='lbr', linewidth=1, multiple=scale*0.2, offset=0.02, fontsize=fontsize)
+        # else:
+            # ax.ticks(axis='lbr', linewidth=1, multiple=scale*0.2, offset=0.02, fontsize=fontsize,
+                     # ticks=[str(round(num, 1)) for num in np.linspace(0.0, 1.0, 6)])
 
         ax.set_title(''.join(self.elements), fontsize=fontsize)
         ax.left_axis_label(self.elements[2], fontsize=fontsize)
@@ -989,7 +989,7 @@ class QueryConvexHull(object):
             else:
                 colours_list.append(int((Ncolours-1)*(colour_metric[i] / max_cut)))
         colours_list = np.asarray(colours_list)
-        ax.scatter(scale*concs, colormap=cmap, colorbar=True,
+        ax.scatter(scale*concs, colormap=cmap, colorbar=True, cbarlabel='Distance from hull (eV/atom)',
                    c=hull_dist, vmax=max_cut, vmin=min_cut, zorder=1000, s=40, alpha=0)
         ax.scatter(scale*stable, marker='o', color=colours_hull[0], edgecolors='black', zorder=9999999,
                    s=150, lw=1.5)
@@ -1097,7 +1097,7 @@ class QueryConvexHull(object):
         axQ.set_ylabel('Voltage (V)')
         axQ.set_xlabel('Gravimetric cap. (mAh/g)')
         start, end = axQ.get_ylim()
-        axQ.set_ylim(1.1*(start-0.01), 1.1*end)
+        axQ.set_ylim(0, 1.1*end)
         start, end = axQ.get_xlim()
         axQ.set_xlim(0, 1.1*end)
         axQ.grid('off')
