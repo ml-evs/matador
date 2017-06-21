@@ -652,7 +652,6 @@ class QueryConvexHull(object):
                     ax.annotate(get_formula_from_stoich(doc['stoichiometry'], elements=self.elements, tex=True),
                                 xy=(tie_line[ind+2, 0], tie_line[ind+2, 1]),
                                 xytext=position,
-                                fontsize=14,
                                 textcoords='data',
                                 ha='right',
                                 va='bottom',
@@ -673,6 +672,7 @@ class QueryConvexHull(object):
                                          s=self.scale*40, lw=lw, alpha=1, c=np.sort(self.hull_dist)[::-1],
                                          edgecolor='k', zorder=10000, cmap=cmap, norm=colours.LogNorm(0.02, 2))
                     cbar = plt.colorbar(scatter, aspect=30, pad=0.02, ticks=[0, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28])
+                    cbar.ax.tick_params(length=0)
                     cbar.ax.set_yticklabels([0, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28])
                     cbar.set_label('Distance from hull (eV)')
             if self.hull_cutoff != 0:
@@ -721,13 +721,14 @@ class QueryConvexHull(object):
         if self.non_binary:
             ax.set_title(self.chempot_search[0] + '$_\mathrm{x}$(' + self.chempot_search[1] + ')$_\mathrm{1-x}$')
         plt.locator_params(nbins=3)
-        ax.set_xlabel('$\mathrm{x}$')
+        ax.set_xlabel('x in {}$_\mathrm{{x}}${}$_\mathrm{{1-x}}$'.format(x_elem[0], one_minus_x_elem[0]))
         ax.grid(False)
         ax.set_xlim(-0.05, 1.05)
         ax.set_xticks([0, 0.33, 0.5, 0.66, 1])
         ax.set_xticklabels(ax.get_xticks())
         ax.set_yticks([0, -0.2, -0.4])
-        ax.set_ylabel('E$_\mathrm{F}$ (eV/atom)')
+        ax.set_yticklabels(ax.get_yticks())
+        ax.set_ylabel('Formation energy (eV/atom)')
         if self.args.get('pdf'):
             plt.savefig(self.elements[0]+self.elements[1]+'_hull.pdf',
                         dpi=500, bbox_inches='tight')
@@ -1034,11 +1035,13 @@ class QueryConvexHull(object):
                                                        (concs[:, 2] >= float(k)/scale - eps)))
             ax.heatmap(sampling, style="hexagonal", cbarlabel='Number of structures',
                        cmap='afmhot')
+        plt.tight_layout()
         if self.args.get('png'):
             plt.savefig(''.join(self.elements) + '.png', dpi=400, transparent=True, bbox_inches='tight')
         elif self.args.get('pdf'):
             plt.savefig(''.join(self.elements) + '.pdf', dpi=400, transparent=True, bbox_inches='tight')
-        ax.show()
+        else:
+            ax.show()
         return ax
 
     def plot_voltage_curve(self):
@@ -1262,8 +1265,13 @@ class QueryConvexHull(object):
                 pass
         try:
             import seaborn as sns
-            sns.set_style({'axes.facecolor': 'white', 'figure.facecolor': 'white',
-                           'font.sans-serif': ['Linux Biolinum O', 'Helvetica', 'Arial']})
+            sns.set(font_scale=1.2)
+            sns.set_style({
+                'axes.facecolor': 'white', 'figure.facecolor': 'white',
+                'font.sans-serif': ['Linux Biolinum O', 'Helvetica', 'Arial'],
+                'legend.frameon': False,
+                'axes.axisbelow': True})
+                # 'ytick.major.size': 5, 'xtick.major.size': 5})
         except:
             print_exc()
             pass
