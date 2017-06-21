@@ -908,17 +908,20 @@ class QueryConvexHull(object):
             fig, ax = ternary.figure(scale=scale, ax=axis)
         else:
             fig, ax = ternary.figure(scale=scale)
-        fig.set_size_inches(10, 7.5)
+        if self.args.get('capmap') or self.args.get('efmap') or self.args.get('sampmap'):
+            fig.set_size_inches(12.5, 7.5)
+        else:
+            fig.set_size_inches(10, 7.5)
 
         ax.boundary(linewidth=2.0, zorder=99)
         ax.gridlines(color='black', multiple=scale*0.1, linewidth=0.5)
 
         ax.clear_matplotlib_ticks()
         if scale == 1:
-            ax.ticks(axis='lbr', linewidth=1, multiple=scale*0.1)
+            ax.ticks(axis='lbr', linewidth=1, multiple=scale*0.2, offset=0.02)
         else:
-            ax.ticks(axis='lbr', linewidth=1, multiple=scale*0.1,
-                     ticks=[str(round(num, 1)) for num in np.linspace(0.0, 1.0, 11)])
+            ax.ticks(axis='lbr', linewidth=1, multiple=scale*0.2, offset=0.02,
+                     ticks=[str(round(num, 1)) for num in np.linspace(0.0, 1.0, 6)])
 
         ax.set_title(''.join(self.elements), fontsize=fontsize)
         ax.left_axis_label(self.elements[2], fontsize=fontsize)
@@ -935,8 +938,23 @@ class QueryConvexHull(object):
         stable = np.asarray([concs[ind] for ind in self.hull.vertices])
 
         # sort by hull distances so things are plotting the right order
-        concs = concs[np.argsort(self.hull_dist)]
+        concs = concs[np.argsort(self.hull_dist)].tolist()
         hull_dist = np.sort(self.hull_dist)
+
+        filtered_concs = []
+        filtered_hull_dists = []
+        for ind, conc in enumerate(concs):
+            if conc not in filtered_concs:
+                if hull_dist[ind] <= self.hull_cutoff:
+                    filtered_concs.append(conc)
+                    filtered_hull_dists.append(hull_dist[ind])
+
+        concs = np.asarray(filtered_concs)
+        hull_dist = np.asarray(filtered_hull_dists)
+
+        if self.hull_cutoff != 0:
+            concs = concs[np.where(hull_dist <= self.hull_cutoff)]
+            hull_dist = hull_dist[np.where(hull_dist <= self.hull_cutoff)]
 
         Ncolours = 1000
         min_cut = 0.01
@@ -977,9 +995,9 @@ class QueryConvexHull(object):
         for i in range(len(concs)):
             ax.scatter(scale*concs[i].reshape(1, 3),
                        color=colours_hull[colours_list[i]],
-                       marker='s',
+                       marker='o',
                        zorder=10000-colours_list[i],
-                       alpha=1,
+                       # alpha=max(0.1, 1-2*hull_dist[i]),
                        s=70*(1-float(colours_list[i])/Ncolours)+15,
                        lw=1, edgecolors='black')
         if self.args.get('capmap'):
@@ -1017,9 +1035,9 @@ class QueryConvexHull(object):
             ax.heatmap(sampling, style="hexagonal", cbarlabel='Number of structures',
                        cmap='afmhot')
         if self.args.get('png'):
-            plt.savefig('ternary.png', dpi=400)
+            plt.savefig(''.join(self.elements) + '.png', dpi=400, transparent=True, bbox_inches='tight')
         elif self.args.get('pdf'):
-            plt.savefig('ternary.pdf', dpi=400)
+            plt.savefig(''.join(self.elements) + '.pdf', dpi=400, transparent=True, bbox_inches='tight')
         ax.show()
         return ax
 
@@ -1234,18 +1252,28 @@ class QueryConvexHull(object):
         try:
             plt.style.use('bmh')
         except:
+            print_exc()
             pass
         if self.args.get('pdf') or self.args.get('png'):
             try:
                 plt.style.use('article')
             except:
+                print_exc()
                 pass
+        try:
+            import seaborn as sns
+            sns.set_style({'axes.facecolor': 'white', 'figure.facecolor': 'white',
+                           'font.sans-serif': ['Linux Biolinum O', 'Helvetica', 'Arial']})
+        except:
+            print_exc()
+            pass
         self.scale = 1
         try:
             c = plt.cm.viridis(np.linspace(0, 1, 100))
             del c
             self.mpl_new_ver = True
         except:
+            print_exc()
             self.mpl_new_ver = False
         Dark2_8 = ['#1b9e77', '#d95f02', '#7570b3', '#e7298a',
                    '#66a61e', '#e6ab02', '#a6761d', '#666666']
