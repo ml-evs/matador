@@ -85,7 +85,7 @@ def query2files(cursor, *args, **kwargs):
         # write either cell, res or both
         for source in doc['source']:
             source = str(source)
-            if '.res' in source:
+            if '.res' in source or '.castep' in source or '.history' in source:
                 if args['subcmd'] == 'swaps':
                     comp_string = ''
                     comp_list = []
@@ -94,18 +94,6 @@ def query2files(cursor, *args, **kwargs):
                             comp_list.append(atom)
                             comp_string += atom
                     name = comp_string + '-'
-                name += source.split('/')[-1].split('.')[0]
-            elif '.castep' in source:
-                if args['subcmd'] == 'swaps':
-                    comp_string = ''
-                    comp_list = []
-                    for atom in doc['atom_types']:
-                        if atom not in comp_list:
-                            comp_list.append(atom)
-                            comp_string += atom
-                    name = comp_string + '-'
-                name += source.split('/')[-1].split('.')[0]
-            elif '.history' in source:
                 name += source.split('/')[-1].split('.')[0]
             elif 'OQMD' in source:
                 stoich_string = ''
@@ -472,11 +460,11 @@ def doc2res(doc, path, info=True, hash_dupe=True, spoof_titl=False, overwrite=Fa
         flines.append('\n')
         flines.append('CELL ')
         flines.append('1.0 ')
-        if len(doc['lattice_abc']) != 2 or len(doc['lattice_abc'][0]) != 3 or len(doc['lattice_abc'][1]) != 3:
+        if 'lattice_abc' not in doc or len(doc['lattice_abc']) != 2 or len(doc['lattice_abc'][0]) != 3 or len(doc['lattice_abc'][1]) != 3:
             try:
                 doc['lattice_abc'] = cart2abc(doc['lattice_cart'])
             except:
-                raise RuntimeError('Failed to get lattice, something has gone wrong...')
+                raise RuntimeError('Failed to get lattice, something has gone wrong for {}'.format(path))
         for vec in doc['lattice_abc']:
             for coeff in vec:
                 flines.append(' ' + str(round(coeff, 8)))
@@ -516,10 +504,8 @@ def doc2res(doc, path, info=True, hash_dupe=True, spoof_titl=False, overwrite=Fa
 
     except Exception:
         if hash_dupe:
-            print_exc()
             print('Writing res file failed for ', path)
         else:
-            print_exc()
             print('Writing res file failed for ', path, 'this is not necessarily a problem...')
             pass
 
