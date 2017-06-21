@@ -82,7 +82,7 @@ class ChemUtilsTest(unittest.TestCase):
         form = 'LiP9'
         self.assertEqual(form, get_formula_from_stoich(stoich))
         stoich = [['Li', 1], ['P', 9]]
-        form = 'LiP\\textsubscript{9}$'
+        form = 'LiP\\textsubscript{9}'
         self.assertEqual(form, get_formula_from_stoich(stoich, tex=True))
         stoich = [['Li', 1], ['P', 9]]
         form = 'P9Li'
