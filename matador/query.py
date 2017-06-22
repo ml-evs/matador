@@ -42,7 +42,7 @@ class DBQuery(object):
             print(self.args)
         if self.args.get('subcmd') is None:
             self.args['subcmd'] = subcmd
-        if client is not False:
+        if client:
             self.client = client
             self.db = client.crystals
         if collections is not False:
@@ -88,8 +88,8 @@ class DBQuery(object):
         if not self.args.get('testing'):
             # execute the query
             self.perform_query()
-
-        client.close()
+        if not client:
+            self.client.close()
 
     def construct_query(self):
         """ Set up query dict and perform query depending on
