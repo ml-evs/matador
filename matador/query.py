@@ -89,6 +89,8 @@ class DBQuery(object):
             # execute the query
             self.perform_query()
 
+        client.close()
+
     def construct_query(self):
         """ Set up query dict and perform query depending on
         command-line / API arguments.
