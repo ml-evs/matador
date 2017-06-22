@@ -74,7 +74,7 @@ class PDF(object):
         if kwargs.get('max_num_images'):
             self.max_num_images = kwargs.get('max_num_images')
         else:
-            self.max_num_images = 1000
+            self.max_num_images = 30
         self.doc = doc
         self.lattice = np.asarray(doc['lattice_cart'])
         self.poscart = np.asarray(frac2cart(doc['lattice_cart'], doc['positions_frac']))
@@ -274,6 +274,9 @@ class PDF(object):
         e.g. self.image_vec = [[1, 0, 1], [0, 1, 1], [1, 1, 1]].
 
         """
+        if self.debug:
+            import time
+            start = time.time()
         if self.num_images is 'auto':
             self.image_vec = set()
             any_in_sphere = True
@@ -285,8 +288,13 @@ class PDF(object):
                     trans += self.lattice[ind] * multi
                 if np.sqrt(np.sum(trans**2)) > max_trans:
                     max_trans = np.sqrt(np.sum(trans**2))
-            test_num_images = 1
+            if self.debug:
+                print('Max trans = {} A'.format(max_trans))
+            first_attempt = 3
+            test_num_images = deepcopy(first_attempt)
             while any_in_sphere:
+                if self.debug:
+                    print('Up to images: {}'.format(test_num_images))
                 any_in_sphere = False
                 for prod in product(range(-test_num_images, test_num_images+1), repeat=3):
                     if prod in self.image_vec:
@@ -309,6 +317,9 @@ class PDF(object):
                     raise RuntimeError
         else:
             self.image_vec = product(range(-self.num_images, self.num_images+1), repeat=3)
+        if self.debug:
+            end = time.time()
+            print('Set image trans vectors in {} s'.format(end-start))
 
     def get_sim_distance(self, pdf_B, projected=False):
         """ Return the similarity between two PDFs. """
@@ -341,7 +352,10 @@ class PDF(object):
         tuples [(r_space, Gr), ...] of other PDFs.
         """
         import matplotlib.pyplot as plt
-        import seaborn
+        try:
+            import seaborn
+        except:
+            pass
         fig = plt.figure(figsize=(12, 5))
         ax1 = fig.add_subplot(111)
         ax1.plot(self.r_space, self.Gr, lw=2, label=self.label)
@@ -458,7 +472,10 @@ class PDFOverlap(object):
     def plot_diff(self):
         """ Simple plot for comparing two PDF's. """
         import matplotlib.pyplot as plt
-        import seaborn
+        try:
+            import seaborn
+        except:
+            pass
         fig = plt.figure(figsize=(12, 10))
         ax1 = fig.add_subplot(211)
         ax2 = fig.add_subplot(212)
@@ -478,7 +495,10 @@ class PDFOverlap(object):
     def plot_convolution(self):
         """ Plot the convolution of two PDFs. """
         import matplotlib.pyplot as plt
-        import seaborn
+        try:
+            import seaborn
+        except:
+            pass
         fig = plt.figure(figsize=(12, 10))
         ax1 = fig.add_subplot(211)
         ax1.plot(np.arange(len(self.convolution), 0, step=-1) * self.fine_dr / 2.0,
