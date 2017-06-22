@@ -4,7 +4,6 @@ that calls the scrapers and interfaces with the
 MongoDB client.
 """
 
-from __future__ import print_function
 # matador modules
 from .scrapers.castep_scrapers import castep2dict, param2dict, cell2dict
 from .scrapers.castep_scrapers import res2dict, dir2dict
@@ -18,6 +17,7 @@ from random import randint
 from collections import defaultdict
 import datetime
 from os import walk, getcwd, uname, chdir, chmod, rename
+from time import sleep
 from os.path import realpath, abspath, dirname, getmtime, isfile
 from traceback import print_exc
 from copy import deepcopy
@@ -80,6 +80,18 @@ class Spatula(object):
         self.db = self.client.crystals
         if self.args.get('db') is None:
             self.repo = self.db.repo
+            if not getcwd().startswith('/home/users/morris/structure_repository'):
+                print('PERMISSION DENIED... and...')
+                sleep(1)
+                for i in range(100):
+                    print('YOU DIDN\'T SAY THE MAGIC WORD')
+                    sleep(0.01)
+                print(80*'!')
+                print('You shouldn\'t be importing to the main database from this folder!')
+                print('Please use --db <YourDBName> to create a new collection,')
+                print('or copy these files to the correct place!')
+                print(80*'!')
+                exit()
         else:
             if 'oqmd' in self.args['db']:
                 exit('Cannot import directly to oqmd repo')
