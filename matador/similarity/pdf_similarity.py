@@ -74,7 +74,7 @@ class PDF(object):
         if kwargs.get('max_num_images'):
             self.max_num_images = kwargs.get('max_num_images')
         else:
-            self.max_num_images = 30
+            self.max_num_images = 1000
         self.doc = doc
         self.lattice = np.asarray(doc['lattice_cart'])
         self.poscart = np.asarray(frac2cart(doc['lattice_cart'], doc['positions_frac']))
