@@ -918,13 +918,13 @@ class QueryConvexHull(object):
         ax.gridlines(color='black', multiple=scale*0.1, linewidth=0.5)
 
         ax.clear_matplotlib_ticks()
-        # if scale == 1:
-            # ax.ticks(axis='lbr', linewidth=1, multiple=scale*0.2, offset=0.02, fontsize=fontsize)
-        # else:
-            # ax.ticks(axis='lbr', linewidth=1, multiple=scale*0.2, offset=0.02, fontsize=fontsize,
-                     # ticks=[str(round(num, 1)) for num in np.linspace(0.0, 1.0, 6)])
+        if scale == 1:
+            ax.ticks(axis='lbr', linewidth=1, multiple=scale*0.2, offset=0.02, fsize=fontsize-4)
+        else:
+            ax.ticks(axis='lbr', linewidth=1, multiple=scale*0.2, offset=0.02, fsize=fontsize-4,
+                     ticks=[str(round(num, 1)) for num in np.linspace(0.0, 1.0, 6)])
 
-        ax.set_title(''.join(self.elements), fontsize=fontsize)
+        ax.set_title(''.join(self.elements), fontsize=fontsize, y=1.08)
         ax.left_axis_label(self.elements[2], fontsize=fontsize)
         ax.right_axis_label(self.elements[1], fontsize=fontsize)
         ax.bottom_axis_label(self.elements[0], fontsize=fontsize)
@@ -1271,7 +1271,6 @@ class QueryConvexHull(object):
                 'font.sans-serif': ['Linux Biolinum O', 'Helvetica', 'Arial'],
                 'legend.frameon': False,
                 'axes.axisbelow': True})
-                # 'ytick.major.size': 5, 'xtick.major.size': 5})
         except:
             print_exc()
             pass
