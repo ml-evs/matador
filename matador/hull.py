@@ -919,15 +919,15 @@ class QueryConvexHull(object):
 
         ax.clear_matplotlib_ticks()
         if scale == 1:
-            ax.ticks(axis='lbr', linewidth=1, multiple=scale*0.2, offset=0.02, fsize=fontsize-4)
+            ax.ticks(axis='lbr', linewidth=1, multiple=scale*0.2, offset=0.02, fsize=fontsize-6)
         else:
-            ax.ticks(axis='lbr', linewidth=1, multiple=scale*0.2, offset=0.02, fsize=fontsize-4,
+            ax.ticks(axis='lbr', linewidth=1, multiple=scale*0.2, offset=0.02, fsize=fontsize-6,
                      ticks=[str(round(num, 1)) for num in np.linspace(0.0, 1.0, 6)])
 
         ax.set_title(''.join(self.elements), fontsize=fontsize, y=1.08)
-        ax.left_axis_label(self.elements[2], fontsize=fontsize)
-        ax.right_axis_label(self.elements[1], fontsize=fontsize)
-        ax.bottom_axis_label(self.elements[0], fontsize=fontsize)
+        ax.left_axis_label(self.elements[2], fontsize=fontsize+2)
+        ax.right_axis_label(self.elements[1], fontsize=fontsize+2)
+        ax.bottom_axis_label(self.elements[0], fontsize=fontsize+2)
 
         concs = np.zeros((len(self.structures), 3))
 
@@ -950,12 +950,14 @@ class QueryConvexHull(object):
                     filtered_concs.append(conc)
                     filtered_hull_dists.append(hull_dist[ind])
 
-        concs = np.asarray(filtered_concs)
-        hull_dist = np.asarray(filtered_hull_dists)
-
         if self.hull_cutoff != 0:
+            concs = np.asarray(filtered_concs)
+            hull_dist = np.asarray(filtered_hull_dists)
             concs = concs[np.where(hull_dist <= self.hull_cutoff)]
             hull_dist = hull_dist[np.where(hull_dist <= self.hull_cutoff)]
+        else:
+            concs = np.asarray(concs)
+            hull_dist = np.asarray(hull_dist)
 
         Ncolours = 1000
         min_cut = 0.01
