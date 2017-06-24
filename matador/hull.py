@@ -94,8 +94,11 @@ class QueryConvexHull(object):
                     else:
                         self.plot_voltage_curve()
                     self.plot_hull()
-        elif self.args.get('volume') and not self.args.get('no_plot'):
+
+        if self.args.get('volume'):
             self.volume_curve()
+            if not self.args.get('no_plot'):
+                self.plot_volume_curve()
 
         if self.args['subcmd'] == 'hull' and not self.args.get('no_plot'):
             if self.args.get('bokeh'):
@@ -107,8 +110,10 @@ class QueryConvexHull(object):
                     self.plot_ternary_hull()
                 else:
                     self.plot_2d_hull()
-            if self.args.get('volume'):
-                self.plot_volume_curve()
+
+        if not self.args.get('no_plot'):
+            import matplotlib.pyplot as plt
+            plt.show()
 
     def get_chempots(self):
         """ Search for chemical potentials that match
@@ -593,7 +598,7 @@ class QueryConvexHull(object):
         self.vol_per_y = v
         return
 
-    def plot_2d_hull(self, ax=None, dis=False, show=True, plot_points=True, plot_hull_points=True):
+    def plot_2d_hull(self, ax=None, dis=False, show=False, plot_points=True, plot_hull_points=True):
         """ Plot calculated hull, returning ax and fig objects for further editing. """
         import matplotlib.pyplot as plt
         import matplotlib.colors as colours
@@ -887,7 +892,7 @@ class QueryConvexHull(object):
             self.plot_2d_hull()
         return
 
-    def plot_ternary_hull(self, axis=None):
+    def plot_ternary_hull(self, axis=None, show=False):
         """ Plot calculated ternary hull as a 2D projection.
 
         Takes optional matplotlib subplot axis as a parameter, and returns
@@ -1042,11 +1047,11 @@ class QueryConvexHull(object):
             plt.savefig(''.join(self.elements) + '.png', dpi=400, transparent=True, bbox_inches='tight')
         elif self.args.get('pdf'):
             plt.savefig(''.join(self.elements) + '.pdf', dpi=400, transparent=True, bbox_inches='tight')
-        else:
+        elif show:
             ax.show()
         return ax
 
-    def plot_voltage_curve(self):
+    def plot_voltage_curve(self, show=False):
         """ Plot calculated voltage curve. """
         import matplotlib.pyplot as plt
         if self.args.get('pdf') or self.args.get('png'):
@@ -1110,10 +1115,10 @@ class QueryConvexHull(object):
         elif self.args.get('png'):
             plt.savefig(self.elements[0]+self.elements[1]+'_voltage.png',
                         dpi=500)
-        else:
+        elif show:
             plt.show()
 
-    def plot_volume_curve(self):
+    def plot_volume_curve(self, show=False):
         """ Plot calculate volume curve. """
         import matplotlib.pyplot as plt
         if self.args.get('pdf') or self.args.get('png'):
@@ -1160,7 +1165,7 @@ class QueryConvexHull(object):
         elif self.args.get('png'):
             plt.savefig(self.elements[0]+self.elements[1]+'_volume.png',
                         dpi=300, bbox_inches='tight')
-        else:
+        elif show:
             plt.show()
 
     def _subplot_voltage_hull(self, dis=False):
@@ -1169,6 +1174,7 @@ class QueryConvexHull(object):
         DEPRECATED.
 
         """
+        raise DeprecationWarning
         import matplotlib.pyplot as plt
         if self.args.get('pdf') or self.args.get('png'):
             fig = plt.figure(facecolor=None, figsize=(4.5, 1.5))
