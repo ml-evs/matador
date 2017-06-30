@@ -332,10 +332,10 @@ class PDF(object):
         except:
             return (None, None)
 
-    def plot_projected_pdf(self, keys=None):
+    def plot_projected_pdf(self, keys=None, other_pdfs=None):
         """ Plot projected PDFs. """
         import matplotlib.pyplot as plt
-        fig = plt.figure(figsize=(12, 5))
+        fig = plt.figure(figsize=(8, 5))
         ax1 = fig.add_subplot(111)
         ax1.plot(self.r_space, self.Gr, lw=1, ls='--', label='total')
         if keys is None:
@@ -345,6 +345,7 @@ class PDF(object):
         ax1.legend(loc=1)
         ax1.set_ylabel('$g(r)$')
         ax1.set_xlabel('$r$ (Angstrom)')
+        plt.show()
         return
 
     def plot_pdf(self, other_pdfs=None):
@@ -353,10 +354,10 @@ class PDF(object):
         """
         import matplotlib.pyplot as plt
         try:
-            import seaborn
+            import seaborn as sns
         except:
             pass
-        fig = plt.figure(figsize=(12, 5))
+        fig = plt.figure(figsize=(8, 5))
         ax1 = fig.add_subplot(111)
         ax1.plot(self.r_space, self.Gr, lw=2, label=self.label)
         if other_pdfs is not None:
@@ -367,8 +368,13 @@ class PDF(object):
                     ax1.plot(pdf[0], pdf[1], lw=2)
                 else:
                     raise RuntimeError
-        ax1.set_ylabel('$g(r)$')
+        ax1.set_ylabel('Pair distribution function, $g(r)$')
+        ax1.set_xlim(0, self.rmax)
         ax1.set_xlabel('$r$ (Angstrom)')
+        try:
+            sns.despine()
+        except:
+            pass
         plt.legend()
         plt.show()
         return
