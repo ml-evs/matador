@@ -570,17 +570,19 @@ class QueryConvexHull(object):
                     if ind == 0:
                         voltages.append(V)
                     if ind != len(intersections)-1:
-                        voltages.append(V)
                         print(5*(ind+1)*' ' + ' ---> ', end='')
+                    voltages.append(V)
                 self.Q.append(Q)
                 self.x.append(x)
                 self.voltages.append(voltages)
                 print('\n')
-        assert len(self.Q) == len(self.voltages)
+        # assert len(self.Q) == len(self.voltages)
         print('Voltage data:')
         data_str = ''
         for ind, path in enumerate(self.Q):
-            assert len(self.Q[ind]) == len(self.voltages[ind])
+            if ind != 0:
+                data_str += '\n'
+            # assert len(self.Q[ind]) == len(self.voltages[ind])
             if self.ternary:
                 data_str += get_formula_from_stoich(endstoichs[ind]) + '\n'
             else:
