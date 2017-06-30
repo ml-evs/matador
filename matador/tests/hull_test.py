@@ -32,6 +32,7 @@ class VoltageTest(unittest.TestCase):
         with open(REAL_PATH + 'data/elements.json') as f:
             elements = json.load(f)
         bare_hull = QueryConvexHull.__new__(QueryConvexHull)
+        bare_hull.args = {'debug': True}
         bare_hull.cursor = list(hull_cursor)
         bare_hull.ternary = False
         bare_hull.elements = list(elements)
