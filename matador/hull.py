@@ -569,15 +569,31 @@ class QueryConvexHull(object):
                     # double up on first voltage
                     if ind == 0:
                         voltages.append(V)
-                    voltages.append(V)
                     if ind != len(intersections)-1:
+                        voltages.append(V)
                         print(5*(ind+1)*' ' + ' ---> ', end='')
                 self.Q.append(Q)
                 self.x.append(x)
                 self.voltages.append(voltages)
-                if self.args.get('debug'):
-                    print(list(zip(self.Q, self.voltages)))
                 print('\n')
+        assert len(self.Q) == len(self.voltages)
+        print('Voltage data:')
+        data_str = ''
+        for ind, path in enumerate(self.Q):
+            assert len(self.Q[ind]) == len(self.voltages[ind])
+            if self.ternary:
+                data_str += get_formula_from_stoich(endstoichs[ind]) + '\n'
+            else:
+                data_str += ''.join(self.elements) + '\n'
+            data_str += '{:>10},\t{:>10}\n'.format('Q (mAh/g)', 'Voltage (V)')
+            for idx, _ in enumerate(path):
+                data_str += '{:>10.2f},\t{:>10.4f}'.format(self.Q[ind][idx], self.voltages[ind][idx])
+                if idx != len(path) - 1:
+                    data_str += '\n'
+        if self.args.get('csv'):
+            with open(''.join(self.elements) + '_voltage.csv', 'w') as f:
+                f.write(data_str)
+        print('\n' + data_str)
 
         return
 
