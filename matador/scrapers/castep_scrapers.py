@@ -186,6 +186,8 @@ def cell2dict(seed, db=True, outcell=False, positions=False, verbosity=0, **kwar
                             cell['species_pot'][flines[line_no+i].split()[0]].replace(',', '')
                         cell['species_pot'][flines[line_no+i].split()[0]] = \
                             cell['species_pot'][flines[line_no+i].split()[0]].replace('()', '')
+                        cell['species_pot'][flines[line_no+i].split()[0]] = \
+                            cell['species_pot'][flines[line_no+i].split()[0]].replace('[]', '')
                     else:
                         cell['species_pot'][flines[line_no+i].split()[0]] = flines[line_no+i].split()[1]
                     i += 1
@@ -266,29 +268,30 @@ def cell2dict(seed, db=True, outcell=False, positions=False, verbosity=0, **kwar
             print('Error in', seed + '.cell, skipping...')
         return seed + '\t\t' + str(type(oops)) + ' ' + str(oops), False
     try:
-        for species in cell['species_pot']:
-            if 'OTF' in cell['species_pot'][species].upper():
-                pspot_seed = ''
-                for dir in seed.split('/')[:-1]:
-                    pspot_seed += dir + '/'
-                # glob for all .usp files with format species_*OTF.usp
-                pspot_seed += species + '_*OTF.usp'
-                for globbed in glob.glob(pspot_seed):
-                    if isfile(globbed):
-                        with open(globbed, 'r') as f:
-                            flines = f.readlines()
-                            for line_no, line in enumerate(flines):
-                                if 'Pseudopotential Report' in line:
-                                    i = 0
-                                    while i+line_no < len(flines)-3:
-                                        if 'Pseudopotential Report' in flines[line_no+i]:
-                                            i += 2
-                                            elem = flines[line_no+i].split(':')[1].split()[0]
-                                        elif 'core correction' in flines[line_no+i]:
-                                            i += 2
-                                            cell['species_pot'][elem] = \
-                                                flines[line_no+i].split('"')[1]
-                                        i += 1
+        if db:
+            for species in cell['species_pot']:
+                if 'OTF' in cell['species_pot'][species].upper():
+                    pspot_seed = ''
+                    for dir in seed.split('/')[:-1]:
+                        pspot_seed += dir + '/'
+                    # glob for all .usp files with format species_*OTF.usp
+                    pspot_seed += species + '_*OTF.usp'
+                    for globbed in glob.glob(pspot_seed):
+                        if isfile(globbed):
+                            with open(globbed, 'r') as f:
+                                flines = f.readlines()
+                                for line_no, line in enumerate(flines):
+                                    if 'Pseudopotential Report' in line:
+                                        i = 0
+                                        while i+line_no < len(flines)-3:
+                                            if 'Pseudopotential Report' in flines[line_no+i]:
+                                                i += 2
+                                                elem = flines[line_no+i].split(':')[1].split()[0]
+                                            elif 'core correction' in flines[line_no+i]:
+                                                i += 2
+                                                cell['species_pot'][elem] = \
+                                                    flines[line_no+i].split('"')[1]
+                                            i += 1
     except Exception as oops:
         if verbosity > 0:
             print_exc()
