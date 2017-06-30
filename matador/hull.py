@@ -604,7 +604,7 @@ class QueryConvexHull(object):
         import matplotlib.colors as colours
         if ax is None:
             if self.args.get('pdf') or self.args.get('png') or self.args.get('svg'):
-                fig = plt.figure(facecolor=None, figsize=(8, 6), dpi=500)
+                fig = plt.figure(facecolor=None, figsize=(8, 6))
             else:
                 fig = plt.figure(facecolor=None)
             ax = fig.add_subplot(111)
@@ -645,15 +645,13 @@ class QueryConvexHull(object):
                 else:
                     self.label_cursor = self.hull_cursor[1:-1]
                 for ind, doc in enumerate(self.label_cursor):
+                    arrowprops = dict(arrowstyle="-|>", color='k')
                     if (ind+2) < np.argmin(tie_line[:, 1]):
                         position = (0.8*tie_line[ind+2, 0], 1.15*(tie_line[ind+2, 1])-0.05)
-                        arrowprops = dict(arrowstyle="->", color='k')
                     elif (ind+2) == np.argmin(tie_line[:, 1]):
                         position = (tie_line[ind+2, 0], 1.15*(tie_line[ind+2, 1])-0.05)
-                        arrowprops = dict(arrowstyle="->", color='k')
                     else:
                         position = (min(1.1*tie_line[ind+2, 0]+0.15, 0.95), 1.15*(tie_line[ind+2, 1])-0.05)
-                        arrowprops = dict(arrowstyle="->", color='k')
                     ax.annotate(get_formula_from_stoich(doc['stoichiometry'], elements=self.elements, tex=True),
                                 xy=(tie_line[ind+2, 0], tie_line[ind+2, 1]),
                                 xytext=position,
@@ -661,7 +659,7 @@ class QueryConvexHull(object):
                                 ha='right',
                                 va='bottom',
                                 arrowprops=arrowprops,
-                                zorder=99999)
+                                zorder=1)
             lw = self.scale * 0 if self.mpl_new_ver else 1
             # points for off hull structures
             if self.hull_cutoff == 0:
@@ -679,6 +677,9 @@ class QueryConvexHull(object):
                     cbar = plt.colorbar(scatter, aspect=30, pad=0.02, ticks=[0, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28])
                     cbar.ax.tick_params(length=0)
                     cbar.ax.set_yticklabels([0, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28])
+                    cbar.ax.yaxis.set_ticks_position('right')
+                    cbar.ax.set_frame_on(False)
+                    cbar.outline.set_visible(False)
                     cbar.set_label('Distance from hull (eV)')
             if self.hull_cutoff != 0:
                 # if specified hull cutoff, label and colour those below
@@ -734,6 +735,11 @@ class QueryConvexHull(object):
         ax.set_yticks([0, -0.2, -0.4])
         ax.set_yticklabels(ax.get_yticks())
         ax.set_ylabel('Formation energy (eV/atom)')
+        try:
+            import seaborn as sns
+            sns.despine(ax=ax, left=False, bottom=False)
+        except:
+            pass
         if self.args.get('pdf'):
             plt.savefig(self.elements[0]+self.elements[1]+'_hull.pdf',
                         dpi=500, bbox_inches='tight')
@@ -901,7 +907,19 @@ class QueryConvexHull(object):
         """
         import ternary
         import matplotlib.pyplot as plt
+        import matplotlib
         import matplotlib.colors as colours
+        try:
+            import seaborn as sns
+            sns.set_style({
+                'axes.facecolor': 'white', 'figure.facecolor': 'white',
+                'xtick.major.size': 0, 'xtick.minor.size': 0,
+                'ytick.major.size': 0, 'ytick.minor.size': 0,
+                'axes.linewidth': 0.0})
+        except:
+            print_exc()
+            pass
+
         print('Plotting ternary hull...')
         if self.args.get('capmap') or self.args.get('efmap'):
             scale = 100
@@ -909,27 +927,27 @@ class QueryConvexHull(object):
             scale = 20
         else:
             scale = 1
-        fontsize = 22
+        fontsize = matplotlib.rcParams['font.size']
+
         if axis is not None:
             fig, ax = ternary.figure(scale=scale, ax=axis)
         else:
             fig, ax = ternary.figure(scale=scale)
         if self.args.get('capmap') or self.args.get('efmap') or self.args.get('sampmap'):
-            fig.set_size_inches(12.5, 7.5)
+            fig.set_size_inches(8, 5)
         else:
-            fig.set_size_inches(10, 7.5)
-
+            fig.set_size_inches(6.67, 5)
         ax.boundary(linewidth=2.0, zorder=99)
         ax.gridlines(color='black', multiple=scale*0.1, linewidth=0.5)
 
         ax.clear_matplotlib_ticks()
         if scale == 1:
-            ax.ticks(axis='lbr', linewidth=1, multiple=scale*0.2, offset=0.02, fsize=fontsize-6)
+            ax.ticks(axis='lbr', linewidth=1, multiple=scale*0.2, offset=0.02, fsize=fontsize-2)
         else:
-            ax.ticks(axis='lbr', linewidth=1, multiple=scale*0.2, offset=0.02, fsize=fontsize-6,
+            ax.ticks(axis='lbr', linewidth=1, multiple=scale*0.2, offset=0.02, fsize=fontsize-2,
                      ticks=[str(round(num, 1)) for num in np.linspace(0.0, 1.0, 6)])
 
-        ax.set_title(''.join(self.elements), fontsize=fontsize, y=1.08)
+        ax.set_title(''.join(self.elements), fontsize=fontsize+2, y=1.02)
         ax.left_axis_label(self.elements[2], fontsize=fontsize+2)
         ax.right_axis_label(self.elements[1], fontsize=fontsize+2)
         ax.bottom_axis_label(self.elements[0], fontsize=fontsize+2)
@@ -1055,25 +1073,35 @@ class QueryConvexHull(object):
         """ Plot calculated voltage curve. """
         import matplotlib.pyplot as plt
         if self.args.get('pdf') or self.args.get('png'):
-            fig = plt.figure(facecolor=None, figsize=(8, 6))
+            if len(self.voltages) != 1:
+                fig = plt.figure(facecolor=None, figsize=(7, 5))
+            else:
+                fig = plt.figure(facecolor=None, figsize=(4, 3.5))
         else:
             fig = plt.figure(facecolor=None)
         axQ = fig.add_subplot(111)
         if self.args.get('expt') is not None:
             try:
                 expt_data = np.loadtxt(self.args.get('expt'), delimiter=',')
-                axQ.plot(expt_data[:, 0], expt_data[:, 1], c='k', ls='--')
             except:
                 print_exc()
                 pass
+            if self.args.get('expt_label'):
+                axQ.plot(expt_data[:, 0], expt_data[:, 1], c='k', lw=2, ls='-', label=self.args.get('expt_label'))
+            else:
+                axQ.plot(expt_data[:, 0], expt_data[:, 1], c='k', lw=2, ls='-', label='Experiment')
         for ind, voltage in enumerate(self.voltages):
             if len(self.voltages) != 1:
-                axQ.annotate(get_formula_from_stoich(self.endstoichs[ind]),
-                             xy=(self.Q[ind][0]+50, voltage[0]+0.01),
-                             textcoords='data', ha='center', zorder=99999)
+                axQ.annotate(get_formula_from_stoich(self.endstoichs[ind], tex=True),
+                             xy=(self.Q[ind][0]+5, voltage[0]+0.01),
+                             textcoords='data', ha='left', zorder=99999)
             for i in range(len(voltage)-1):
-                axQ.plot([self.Q[ind][i-1], self.Q[ind][i]], [voltage[i], voltage[i]],
-                         lw=2, c=self.colours[ind])
+                if i == 0 and self.args.get('expt'):
+                    axQ.plot([self.Q[ind][i-1], self.Q[ind][i]], [voltage[i], voltage[i]],
+                             lw=2, c=self.colours[ind], label='DFT (this work)')
+                else:
+                    axQ.plot([self.Q[ind][i-1], self.Q[ind][i]], [voltage[i], voltage[i]],
+                             lw=2, c=self.colours[ind])
                 axQ.plot([self.Q[ind][i], self.Q[ind][i]], [voltage[i], voltage[i+1]],
                          lw=2, c=self.colours[ind])
         if self.args.get('labels'):
@@ -1101,7 +1129,9 @@ class QueryConvexHull(object):
                              textcoords='data',
                              ha='left',
                              zorder=9999)
-        axQ.set_ylabel('Voltage (V)')
+        if self.args.get('expt'):
+            axQ.legend(loc=1)
+        axQ.set_ylabel('Voltage (V) vs {}$^+$/{}'.format(self.elements[0], self.elements[0]))
         axQ.set_xlabel('Gravimetric cap. (mAh/g)')
         start, end = axQ.get_ylim()
         axQ.set_ylim(0, 1.1*end)
@@ -1109,6 +1139,15 @@ class QueryConvexHull(object):
         axQ.set_xlim(0, 1.1*end)
         axQ.grid('off')
         plt.tight_layout(pad=0.0, h_pad=1.0, w_pad=0.2)
+        try:
+            import seaborn as sns
+            sns.despine()
+            dark_grey = '#262626'
+            for spine in ['left', 'bottom']:
+                axQ.spines[spine].set_linewidth(0.5)
+                axQ.spines[spine].set_color(dark_grey)
+        except:
+            pass
         if self.args.get('pdf'):
             plt.savefig(self.elements[0]+self.elements[1]+'_voltage.pdf',
                         dpi=500)
@@ -1122,7 +1161,7 @@ class QueryConvexHull(object):
         """ Plot calculate volume curve. """
         import matplotlib.pyplot as plt
         if self.args.get('pdf') or self.args.get('png'):
-            fig = plt.figure(facecolor=None, figsize=(2.7, 2.7))
+            fig = plt.figure(facecolor=None, figsize=(4, 3.5))
         else:
             fig = plt.figure(facecolor=None)
         ax = fig.add_subplot(111)
@@ -1138,26 +1177,46 @@ class QueryConvexHull(object):
                 zorder = 1000
                 markeredgewidth = 1.5
                 c = self.colours[1]
+                alpha = 1
             else:
                 s = 30
                 zorder = 900
-                markeredgewidth = 0.5
+                alpha = 0.3
+                markeredgewidth = 0
                 c = 'grey'
-            ax.scatter(self.x[i], self.vol_per_y[i]/bulk_vol, marker='o', s=s, edgecolor='k', lw=markeredgewidth,
-                       c=c, zorder=zorder)
+            ax.scatter(self.x[i]/(1+self.x[i]), self.vol_per_y[i]/bulk_vol, marker='o', s=s, edgecolor='k', lw=markeredgewidth,
+                       c=c, zorder=zorder, alpha=alpha)
         hull_comps, hull_vols = np.asarray(hull_comps), np.asarray(hull_vols)
-        ax.plot(hull_comps, hull_vols/bulk_vol, marker='o', lw=4,
+        ax.plot(hull_comps/(1+hull_comps), hull_vols/bulk_vol, marker='o', lw=4,
                 c=self.colours[0], zorder=100)
-        ax.set_xlabel('$\mathrm{u}$ in $\mathrm{'+self.elements[0]+'_u'+self.elements[1]+'}$')
+        ax.set_xlabel('$\mathrm{x}$ in $\mathrm{'+self.elements[0]+'_x'+self.elements[1]+'}_{1-x}$')
         ax.set_ylabel('Volume ratio with bulk')
-        start, end = ax.get_xlim()
-        ax.xaxis.set_ticks(range(0, int(end)+1, 1))
-        start, end = ax.get_ylim()
-        ax.yaxis.set_ticks(range(1, int(end)+1, 1))
-        ax.yaxis.tick_right()
-        ax.yaxis.set_label_position('right')
+        ax.set_ylim(0, 5*np.sort(hull_vols)[-2]/bulk_vol)
+        ax.set_xlim(-0.05, 1.05)
+        ax.yaxis.set_label_position('left')
         ax.set_xticklabels(ax.get_xticks())
         ax.grid('off')
+        ax2 = ax.twiny()
+        ax2.set_xlim(ax.get_xlim())
+        tick_locs = np.linspace(0, 1, 6, endpoint=True).tolist()
+        ax2.set_xticks(tick_locs)
+        new_tick_labels = ['{}'.format(int(get_generic_grav_capacity([loc, 1-loc], [self.elements[0], self.elements[1]]))) for loc in tick_locs[:-1]]
+        new_tick_labels.append('$\infty$')
+        ax2.set_xlabel('Gravimetric capacity (mAh/g)')
+        ax2.set_xticklabels(new_tick_labels)
+        ax2.grid('off')
+        try:
+            import seaborn as sns
+            sns.despine(top=False, right=False)
+            dark_grey = '#262626'
+            for spine in ['left', 'top', 'right', 'bottom']:
+                ax.spines[spine].set_color(dark_grey)
+                ax2.spines[spine].set_color(dark_grey)
+                ax.spines[spine].set_linewidth(0.5)
+                ax2.spines[spine].set_linewidth(0.5)
+        except:
+            pass
+        # ax.yaxis.set_ticks(range(0, int(end)+1, 5))
         plt.tight_layout(pad=0.0, h_pad=1.0, w_pad=0.2)
         if self.args.get('pdf'):
             plt.savefig(self.elements[0]+self.elements[1]+'_volume.pdf',
@@ -1274,9 +1333,12 @@ class QueryConvexHull(object):
         try:
             import seaborn as sns
             sns.set(font_scale=1.2)
+            sns.set_style('ticks')
             sns.set_style({
                 'axes.facecolor': 'white', 'figure.facecolor': 'white',
                 'font.sans-serif': ['Linux Biolinum O', 'Helvetica', 'Arial'],
+                'axes.linewidth': 0.5,
+                'axes.grid': False,
                 'legend.frameon': False,
                 'axes.axisbelow': True})
         except:

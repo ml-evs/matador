@@ -62,8 +62,8 @@ class Matador(object):
         # print last spatula report
         self.report = self.client.crystals.spatula
 
-        if (self.args.get('cell') or self.args.get('res') or self.args.get('pdb')
-                or self.args.get('markdown') or self.args.get('latex') or self.args.get('param')):
+        if (self.args.get('cell') or self.args.get('res') or self.args.get('pdb') or
+                self.args.get('markdown') or self.args.get('latex') or self.args.get('param')):
             self.export = True
         else:
             self.export = False
@@ -275,10 +275,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         prog='matador',
         description='MATerial and Atomic Database Of Refined structures.',
-        epilog='Written and maintained by Matthew Evans (me388@cam.ac.uk) 2016-2017, version '
-               + __version__.strip() + '.')
-    parser.add_argument('--version', action='version', version='matador version '
-                        + __version__ + '.')
+        epilog='Written and maintained by Matthew Evans (me388@cam.ac.uk) 2016-2017, version ' +
+               __version__.strip() + '.')
+    parser.add_argument('--version', action='version', version='matador version ' +
+                        __version__ + '.')
 
     # define subparsers for subcommands
     subparsers = parser.add_subparsers(title='subcommands',
@@ -384,6 +384,8 @@ if __name__ == '__main__':
                             help='save pdf rather than showing plot in X')
     plot_flags.add_argument('--png', action='store_true',
                             help='save png rather than showing plot in X')
+    plot_flags.add_argument('--csv', action='store_true',
+                            help='save plotting data to separate csv files')
     plot_flags.add_argument('--labels', action='store_true',
                             help='label hull plots')
     plot_flags.add_argument('--svg', action='store_true',
@@ -404,6 +406,8 @@ if __name__ == '__main__':
                             help='plot line from stable B_x C_y to pure A in ABC ternary.')
     plot_flags.add_argument('--expt', type=str,
                             help='enter experimental voltage curve .csv file for plotting.')
+    plot_flags.add_argument('--expt_label', type=str,
+                            help='label for experimental data on voltage curve.')
 
     spatula_flags = argparse.ArgumentParser(add_help=False)
     spatula_flags.add_argument('-d', '--dryrun', action='store_true',
