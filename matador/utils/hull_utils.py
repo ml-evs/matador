@@ -47,7 +47,13 @@ def vertices2plane(points):
         x = structure[0]
         y = structure[1]
         z = structure[2]
-        assert(normal[2] != 0)
+        try:
+            assert(normal[2] != 0)
+        except:
+            print('Something fishy with height above plane, returning 0...')
+            print(x, y, z)
+            print(normal)
+            return 0
         z_plane = -((x*normal[0] + y*normal[1] + d) / normal[2])
         height = z - z_plane
         return height
