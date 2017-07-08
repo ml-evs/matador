@@ -134,6 +134,8 @@ class Spatula(object):
                 self.repo.create_index([('stoichiometry', pm.ASCENDING)])
                 self.repo.create_index([('cut_off_energy', pm.ASCENDING)])
                 self.repo.create_index([('species_pot', pm.ASCENDING)])
+                self.repo.create_index([('kpoints_mp_spacing', pm.ASCENDING)])
+                self.repo.create_index([('xc_functional', pm.ASCENDING)])
                 # index by source for rebuilds
                 self.repo.create_index([('source', pm.ASCENDING)])
                 print('Done!')

@@ -208,6 +208,10 @@ class DBQuery(object):
             self.query_dict['$and'].append(self.query_sedc())
             self.empty_query = False
 
+        if self.args.get('xc_functional') is not None:
+            self.query_dict['$and'].append(self.query_xc_functional())
+            self.empty_query = False
+
         if self.args.get('mp_spacing') is not None:
             self.query_dict['$and'].append(self.query_kpoints())
             self.empty_query = False
@@ -728,6 +732,17 @@ class DBQuery(object):
 
         return query_dict
 
+    def query_xc_functional(self):
+        """ Query all calculations with specified xc-functional. """
+        query_dict = dict()
+        if isinstance(self.args.get('xc_functional'), list):
+            xc_functional = self.args.get('xc_functional')[0]
+        else:
+            xc_functional = self.args.get('xc_functional')
+        if xc_functional is not None:
+            query_dict['xc_functional'] = xc_functional.upper()
+        return query_dict
+
     def query_kpoints(self):
         """ Query all calculations with finer than the given
         kpoint sampling.
@@ -737,8 +752,15 @@ class DBQuery(object):
             mp_spacing = [self.args.get('mp_spacing')]
         else:
             mp_spacing = self.args.get('mp_spacing')
+        tol = 0.005
+        if self.args.get('kpoint_tolerance') is not None:
+            try:
+                tol = float(self.args.get('kpoint_tolerance'))
+            except:
+                print_warning('Failed to read custom kpoint tolerance.')
         query_dict['kpoints_mp_spacing'] = dict()
-        query_dict['kpoints_mp_spacing']['$lte'] = mp_spacing[0]
+        query_dict['kpoints_mp_spacing']['$lte'] = mp_spacing[0] + tol
+        query_dict['kpoints_mp_spacing']['$gte'] = mp_spacing[0] - tol
         return query_dict
 
     def query_spin(self):
@@ -806,7 +828,7 @@ class DBQuery(object):
                 except:
                     print_warning('Failed to read custom kpoint tolerance.')
             else:
-                tol = 0.01
+                tol = 0.005
             temp_dict['kpoints_mp_spacing']['$gte'] = doc['kpoints_mp_spacing'] - tol
             temp_dict['kpoints_mp_spacing']['$lte'] = doc['kpoints_mp_spacing'] + tol
             query_dict.append(temp_dict)

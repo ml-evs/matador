@@ -348,8 +348,11 @@ if __name__ == '__main__':
                                  help='specify the minimum and optionally maximum planewave cutoff.')
     structure_flags.add_argument('--sedc', type=str,
                                  help='specify the dispersion correction scheme, e.g. TS or null.')
-    structure_flags.add_argument('--mp_spacing', type=float,
-                                 help='specify a minimum MP grid spacing in 2pi/A units, e.g. 0.05.')
+    structure_flags.add_argument('-xc', '--xc_functional', type=str,
+                                 help='specify a particular xc-functional to query (case-insensitive).') 
+    structure_flags.add_argument('-kpts', '--mp_spacing', type=float,
+                                 help='specify an MP grid spacing in 2pi/A units, e.g. 0.05, will \
+                                 return all values structures with value within --kpt_tol of that specified')
     structure_flags.add_argument('--spin', type=str,
                                  help='specifiy whether to query non-spin-polarized (0) calcs or \
                                  spin polarized calcs (!=1).')
