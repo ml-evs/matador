@@ -482,8 +482,10 @@ class QueryConvexHull(object):
             endstoichs = []
             for ind, point in enumerate(points):
                 if point[0] == 0 and point[1] != 0 and point[1] != 1:
-                    endpoints.append(point)
-                    endstoichs.append(stoichs[ind])
+                    print(([point.tolist() == test_point.tolist() for test_point in endpoints]))
+                    if not any([point.tolist() == test_point.tolist() for test_point in endpoints]):
+                        endpoints.append(point)
+                        endstoichs.append(stoichs[ind])
             print('{} starting point(s) found.'.format(len(endstoichs)))
             for endstoich in endstoichs:
                 print(get_formula_from_stoich(endstoich), end=' ')
