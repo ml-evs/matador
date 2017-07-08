@@ -1015,7 +1015,7 @@ class QueryConvexHull(object):
         if self.args.get('pathways'):
             for phase in stable:
                 if phase[0] == 0 and phase[1] != 0 and phase[2] != 0:
-                    ax.plot([scale*phase, [scale, 0, 0]], c='r', alpha=0.2, lw=6, zorder=100000000)
+                    ax.plot([scale*phase, [scale, 0, 0]], c='r', alpha=0.2, lw=6, zorder=99)
 
         cmap_full = plt.cm.get_cmap('Dark2')
         cmap = colours.LinearSegmentedColormap.from_list(
@@ -1092,7 +1092,7 @@ class QueryConvexHull(object):
         import matplotlib.pyplot as plt
         if self.args.get('pdf') or self.args.get('png'):
             if len(self.voltages) != 1:
-                fig = plt.figure(facecolor=None, figsize=(7, 5))
+                fig = plt.figure(facecolor=None, figsize=(4, 3.5))
             else:
                 fig = plt.figure(facecolor=None, figsize=(4, 3.5))
         else:
@@ -1109,14 +1109,17 @@ class QueryConvexHull(object):
             else:
                 axQ.plot(expt_data[:, 0], expt_data[:, 1], c='k', lw=2, ls='-', label='Experiment')
         for ind, voltage in enumerate(self.voltages):
-            if len(self.voltages) != 1:
-                axQ.annotate(get_formula_from_stoich(self.endstoichs[ind], tex=True),
-                             xy=(self.Q[ind][0]+5, voltage[0]+0.01),
-                             textcoords='data', ha='left', zorder=99999)
+            # if len(self.voltages) != 1:
+                # axQ.annotate(get_formula_from_stoich(self.endstoichs[ind], tex=True),
+                             # xy=(self.Q[ind][-1]-100, voltage[-1]+0.01),
+                             # textcoords='data', ha='left', zorder=99999)
             for i in range(len(voltage)-1):
                 if i == 0 and self.args.get('expt'):
                     axQ.plot([self.Q[ind][i-1], self.Q[ind][i]], [voltage[i], voltage[i]],
                              lw=2, c=self.colours[ind], label='DFT (this work)')
+                elif i == 0 and len(self.voltages) != 1:
+                    axQ.plot([self.Q[ind][i-1], self.Q[ind][i]], [voltage[i], voltage[i]],
+                             lw=2, c=self.colours[ind], label=get_formula_from_stoich(self.endstoichs[ind], tex=True))
                 else:
                     axQ.plot([self.Q[ind][i-1], self.Q[ind][i]], [voltage[i], voltage[i]],
                              lw=2, c=self.colours[ind])
@@ -1147,7 +1150,7 @@ class QueryConvexHull(object):
                              textcoords='data',
                              ha='left',
                              zorder=9999)
-        if self.args.get('expt'):
+        if self.args.get('expt') or len(self.voltages) != 1:
             axQ.legend(loc=1)
         axQ.set_ylabel('Voltage (V) vs {}$^+$/{}'.format(self.elements[0], self.elements[0]))
         axQ.set_xlabel('Gravimetric cap. (mAh/g)')
