@@ -30,12 +30,13 @@ class QueryConvexHull(object):
     """ Construct a binary or ternary phase diagram
     from matador.DBQuery object.
     """
-    def __init__(self, query, subcmd='hull', **kwargs):
+    def __init__(self, query=None, cursor=None, subcmd='hull', **kwargs):
         """
 
         Inputs:
 
-            query   : matador.DBQuery object containing structures,
+            query   : matador.DBQuery, object containing structures,
+            cursor  : list(dict), alternatively specify list of matador docs.
             subcmd  : either 'hull' or 'voltage',
             kwargs  : mostly CLI arguments, see matador hull --help for full options.
 
@@ -44,11 +45,22 @@ class QueryConvexHull(object):
         if self.args.get('subcmd') is None:
             self.args['subcmd'] = subcmd
         self.query = query
-        self.cursor = list(query.cursor)
-        self.K2eV = 8.61733e-5
+        if self.query is not None:
+            self.cursor = list(query.cursor)
+        else:
+            self.cursor = cursor
+        if self.cursor is None:
+            raise RuntimeError('Failed to find structures to create hull!')
 
+        elements = set()
+        for doc in self.cursor:
+            for species, _ in doc['stoichiometry']:
+                elements.add(species)
+        self.elements = list(elements)
+
+        K2eV = 8.61733e-5
         if self.args.get('hull_temp') is not None:
-            self.hull_cutoff = float(self.args['hull_temp']*self.K2eV)
+            self.hull_cutoff = float(self.args['hull_temp']*K2eV)
         elif self.args.get('hull_cutoff') is not None:
             self.hull_cutoff = float(self.args['hull_cutoff'])
         else:
@@ -129,10 +141,6 @@ class QueryConvexHull(object):
         else:
             elements = self.chempot_search
         if self.chem_pots is not None:
-            if self.args['subcmd'] == 'voltage':
-                print_warning('WARNING: trying to calculate a voltage ' +
-                              'curve with spoofed chemical potentials: ' +
-                              'this will give you garbage.')
             self.fake_chempots(custom_elem=elements)
         else:
             print(60*'─')
@@ -318,13 +326,14 @@ class QueryConvexHull(object):
 
     def hull_2d(self, dis=False):
         """ Create a convex hull for two elements. """
-        query = self.query
-        self.elements = query.args.get('composition')
-        self.non_binary = False
-        if ':' in self.elements[0]:
-            self.non_binary = True
-            self.chempot_search = self.elements[0].split(':')
-        self.elements = [elem for elem in re.split(r'([A-Z][a-z]*)', self.elements[0]) if elem.isalpha()]
+        if self.query is not None:
+            query = self.query
+            self.elements = query.args.get('composition')
+            self.non_binary = False
+            if ':' in self.elements[0]:
+                self.non_binary = True
+                self.chempot_search = self.elements[0].split(':')
+            self.elements = [elem for elem in re.split(r'([A-Z][a-z]*)', self.elements[0]) if elem.isalpha()]
         assert(len(self.elements) < 4 and len(self.elements) > 1)
         self.ternary = False
         if len(self.elements) == 3 and not self.non_binary:
