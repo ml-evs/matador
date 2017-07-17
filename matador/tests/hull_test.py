@@ -10,7 +10,7 @@ import numpy as np
 import sys
 import os
 import json
-from os.path import realpath, isfile
+from os.path import realpath
 from glob import glob
 import unittest
 
@@ -33,19 +33,6 @@ class HullTest(unittest.TestCase):
         hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn'], no_plot=True)
         self.assertEqual(len(hull.hull_cursor), 5)
 
-    def testTernaryHullPlot(self):
-        res_list = glob(REAL_PATH + 'data/hull-KPSn-KP/*.res')
-        cursor = [res2dict(res)[0] for res in res_list]
-        hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'], no_plot=False, png=True, pdf=True)
-        self.assertTrue(isfile('KSnP.png'))
-        self.assertTrue(isfile('KSnP.pdf'))
-
-    def testBinaryHullPlot(self):
-        res_list = glob(REAL_PATH + 'data/hull-KPSn-KP/*.res')
-        cursor = [res2dict(res)[0] for res in res_list]
-        hull = QueryConvexHull(cursor=cursor, elements=['K', 'P'], no_plot=False, png=True, pdf=True)
-        self.assertTrue(isfile('KP_hull.png'))
-        self.assertTrue(isfile('KP_hull.pdf'))
 
 class VoltageTest(unittest.TestCase):
     """ Test voltage curve functionality. """
