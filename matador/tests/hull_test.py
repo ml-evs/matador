@@ -2,6 +2,7 @@
 # matador modules
 from matador.hull import QueryConvexHull
 from matador.utils.chem_utils import get_generic_grav_capacity
+from matador.scrapers.castep_scrapers import res2dict
 # external libraries
 from scipy.spatial import ConvexHull
 import numpy as np
@@ -9,12 +10,42 @@ import numpy as np
 import sys
 import os
 import json
-from os.path import realpath
+from os.path import realpath, isfile
+from glob import glob
 import unittest
 
 # grab abs path for accessing test data
 REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
 
+
+class HullTest(unittest.TestCase):
+    """ Test Convex hull functionality. """
+    def testHullFromFile(self):
+        res_list = glob(REAL_PATH + 'data/hull-KPSn-KP/*.res')
+        self.assertEqual(len(res_list), 87, 'Could not find test res files, please check installation...')
+        cursor = [res2dict(res)[0] for res in res_list]
+        hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'], no_plot=True)
+        self.assertEqual(len(hull.hull_cursor), 16)
+
+    def testHullFromFileWithExtraneousElements(self):
+        res_list = glob(REAL_PATH + 'data/hull-KPSn-KP/*.res')
+        cursor = [res2dict(res)[0] for res in res_list]
+        hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn'], no_plot=True)
+        self.assertEqual(len(hull.hull_cursor), 5)
+
+    def testTernaryHullPlot(self):
+        res_list = glob(REAL_PATH + 'data/hull-KPSn-KP/*.res')
+        cursor = [res2dict(res)[0] for res in res_list]
+        hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'], no_plot=False, png=True, pdf=True)
+        self.assertTrue(isfile('KSnP.png'))
+        self.assertTrue(isfile('KSnP.pdf'))
+
+    def testBinaryHullPlot(self):
+        res_list = glob(REAL_PATH + 'data/hull-KPSn-KP/*.res')
+        cursor = [res2dict(res)[0] for res in res_list]
+        hull = QueryConvexHull(cursor=cursor, elements=['K', 'P'], no_plot=False, png=True, pdf=True)
+        self.assertTrue(isfile('KP_hull.png'))
+        self.assertTrue(isfile('KP_hull.pdf'))
 
 class VoltageTest(unittest.TestCase):
     """ Test voltage curve functionality. """

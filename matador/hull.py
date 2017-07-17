@@ -30,33 +30,42 @@ class QueryConvexHull(object):
     """ Construct a binary or ternary phase diagram
     from matador.DBQuery object.
     """
-    def __init__(self, query=None, cursor=None, subcmd='hull', **kwargs):
+    def __init__(self, query=None, cursor=None, elements=None, subcmd='hull', **kwargs):
         """
 
         Inputs:
 
-            query   : matador.DBQuery, object containing structures,
-            cursor  : list(dict), alternatively specify list of matador docs.
-            subcmd  : either 'hull' or 'voltage',
-            kwargs  : mostly CLI arguments, see matador hull --help for full options.
+            query    : matador.DBQuery, object containing structures,
+            cursor   : list(dict), alternatively specify list of matador docs.
+            elements : list(str), list of elements to use, used to provide a useful order,
+            subcmd   : either 'hull' or 'voltage',
+            kwargs   : mostly CLI arguments, see matador hull --help for full options.
 
         """
         self.args = kwargs
         if self.args.get('subcmd') is None:
             self.args['subcmd'] = subcmd
         self.query = query
+        self.from_cursor = False
         if self.query is not None:
             self.cursor = list(query.cursor)
         else:
             self.cursor = cursor
+            self.from_cursor = True
+            for ind, doc in enumerate(self.cursor):
+                self.cursor[ind]['text_id'] = ['xxx', 'yyy']
         if self.cursor is None:
             raise RuntimeError('Failed to find structures to create hull!')
-
-        elements = set()
-        for doc in self.cursor:
-            for species, _ in doc['stoichiometry']:
-                elements.add(species)
-        self.elements = list(elements)
+        if elements is None:
+            elements = set()
+            for doc in self.cursor:
+                for species, _ in doc['stoichiometry']:
+                    elements.add(species)
+            self.elements = list(elements)
+        else:
+            self.elements = elements
+            # filter out structures with any elements with missing chem pots
+            self.cursor = [doc for doc in self.cursor if all([atom in self.elements for atom, num in doc['stoichiometry']])]
 
         K2eV = 8.61733e-5
         if self.args.get('hull_temp') is not None:
@@ -123,7 +132,8 @@ class QueryConvexHull(object):
                 else:
                     self.plot_2d_hull()
 
-        if not self.args.get('no_plot'):
+        self.savefig = any([self.args.get('pdf'), self.args.get('png')])
+        if not self.args.get('no_plot') and not self.savefig:
             import matplotlib.pyplot as plt
             plt.show()
 
@@ -142,6 +152,11 @@ class QueryConvexHull(object):
             elements = self.chempot_search
         if self.chem_pots is not None:
             self.fake_chempots(custom_elem=elements)
+        elif self.from_cursor:
+            self.match = [doc for doc in self.cursor if len(doc['stoichiometry']) == 1 and doc['stoichiometry'][0][0] in self.elements]
+            for ind, doc in enumerate(self.match):
+                self.match[ind]['hull_distance'] = 0
+                self.match[ind]['enthalpy_per_b'] = doc['enthalpy_per_atom']
         else:
             print(60*'─')
             self.match = len(elements)*[None]
@@ -198,9 +213,10 @@ class QueryConvexHull(object):
                 self.match[i]['enthalpy_per_b'] = mu['enthalpy_per_atom']
                 self.match[i]['num_a'] = 0
             self.match[0]['num_a'] = float('inf')
-        self.cursor.insert(0, self.match[0])
-        for match in self.match[1:]:
-            self.cursor.append(match)
+        if not self.ternary and not self.from_cursor:
+            self.cursor.insert(0, self.match[0])
+            for match in self.match[1:]:
+                self.cursor.append(match)
         return
 
     def fake_chempots(self, custom_elem=None):
@@ -326,10 +342,10 @@ class QueryConvexHull(object):
 
     def hull_2d(self, dis=False):
         """ Create a convex hull for two elements. """
+        self.non_binary = False
         if self.query is not None:
             query = self.query
             self.elements = query.args.get('composition')
-            self.non_binary = False
             if ':' in self.elements[0]:
                 self.non_binary = True
                 self.chempot_search = self.elements[0].split(':')
@@ -343,7 +359,7 @@ class QueryConvexHull(object):
             print('Contructing hull with non-elemental chemical potentials...')
         elif self.ternary:
             print('Constructing ternary hull...')
-            if not self.args.get('intersection'):
+            if self.query is not None and not self.args.get('intersection'):
                 print_warning('Please query with -int/--intersection when creating ternary hulls.')
                 exit('Exiting...')
         else:
@@ -772,10 +788,10 @@ class QueryConvexHull(object):
         if self.args.get('pdf'):
             plt.savefig(self.elements[0]+self.elements[1]+'_hull.pdf',
                         dpi=500, bbox_inches='tight')
-        elif self.args.get('svg'):
+        if self.args.get('svg'):
             plt.savefig(self.elements[0]+self.elements[1]+'_hull.svg',
                         dpi=500, bbox_inches='tight')
-        elif self.args.get('png'):
+        if self.args.get('png'):
             plt.savefig(self.elements[0]+self.elements[1]+'_hull.png',
                         dpi=500, bbox_inches='tight')
         elif show:
@@ -1092,7 +1108,7 @@ class QueryConvexHull(object):
         plt.tight_layout()
         if self.args.get('png'):
             plt.savefig(''.join(self.elements) + '.png', dpi=400, transparent=True, bbox_inches='tight')
-        elif self.args.get('pdf'):
+        if self.args.get('pdf'):
             plt.savefig(''.join(self.elements) + '.pdf', dpi=400, transparent=True, bbox_inches='tight')
         elif show:
             ax.show()
@@ -1253,7 +1269,7 @@ class QueryConvexHull(object):
         if self.args.get('pdf'):
             plt.savefig(self.elements[0]+self.elements[1]+'_volume.pdf',
                         dpi=300)
-        elif self.args.get('png'):
+        if self.args.get('png'):
             plt.savefig(self.elements[0]+self.elements[1]+'_volume.png',
                         dpi=300, bbox_inches='tight')
         elif show:
