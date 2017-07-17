@@ -130,12 +130,12 @@ class Matador(object):
             print_notify('Filtering for unique structures...')
             if self.args.get('top') is not None:
                 unique_set, _, _, _ = get_uniq_cursor(self.cursor[:self.args.get('top')],
-                                                      debug=self.args.get('debug'), projected=True)
+                                                      debug=self.args.get('debug'), projected=True, sim_tol=self.args.get('uniq'))
                 print('Filtered {} down to {}'.format(min(len(self.cursor),
                                                       self.args.get('top')),
                                                       len(unique_set)))
             else:
-                unique_set, _, _, _ = get_uniq_cursor(self.cursor, debug=self.args.get('debug'), projected=True)
+                unique_set, _, _, _ = get_uniq_cursor(self.cursor, debug=self.args.get('debug'), sim_tol=self.args.get('uniq'), projected=True)
                 print('Filtered {} down to {}'.format(len(self.cursor),
                                                       len(unique_set)))
             self.cursor = [self.cursor[ind] for ind in unique_set]
@@ -322,8 +322,8 @@ if __name__ == '__main__':
                                  help='query a calculations with more than n formula units')
     structure_flags.add_argument('-sg', '--space_group',
                                  help='query a particular space group')
-    structure_flags.add_argument('-u', '--uniq', action='store_true',
-                                 help='return only unique structures, to some tolerance')
+    structure_flags.add_argument('-u', '--uniq', type=float, nargs='?', const=0.05,
+                                 help='float, return only unique structures (filtered by PDF overlap), to this tolerance (DEFAULT: 0.05)')
     structure_flags.add_argument('-p', '--pressure', type=float,
                                  help='specify an isotropic external pressure to search for \
                                        , e.g. 10 (GPa)')
@@ -349,7 +349,7 @@ if __name__ == '__main__':
     structure_flags.add_argument('--sedc', type=str,
                                  help='specify the dispersion correction scheme, e.g. TS or null.')
     structure_flags.add_argument('-xc', '--xc_functional', type=str,
-                                 help='specify a particular xc-functional to query (case-insensitive).') 
+                                 help='specify a particular xc-functional to query (case-insensitive).')
     structure_flags.add_argument('-kpts', '--mp_spacing', type=float,
                                  help='specify an MP grid spacing in 2pi/A units, e.g. 0.05, will \
                                  return all values structures with value within --kpt_tol of that specified')
