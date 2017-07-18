@@ -176,3 +176,54 @@ def get_spacegroup_spg(doc, symprec=0.01):
     from spglib import get_spacegroup
     spg_cell = doc2spg(doc)
     return get_spacegroup(spg_cell, symprec=symprec).split(' ')[0]
+
+
+def create_simple_supercell(doc, extension, standardize=False):
+    """ Return a document with new supercell, given extension vector.
+
+    Input:
+
+        doc        : dict, matador doc to construct cell from.
+        extension  : tuple(int), multiplicity of each lattice vector, e.g. (2,2,1).
+        standardize: bool, whether or not to use spglib to standardize the cell first.
+
+    """
+    from itertools import product
+    from copy import deepcopy
+    assert(all([elem >= 1 for elem in extension]))
+    assert(all([int(elem) for elem in extension]))
+    if extension == (1, 1, 1):
+        raise RuntimeError('Redundant supercell {} requested...'.format(extension))
+
+    # standardize cell with spglib
+    if standardize:
+        doc = standardize_doc_cell(doc)
+
+    # copy new doc and delete data that will not be corrected
+    supercell_doc = deepcopy(doc)
+    if 'positions_abs' in supercell_doc:
+        del supercell_doc['positions_abs']
+    if 'lattice_abc' in supercell_doc:
+        del supercell_doc['lattice_abc']
+
+    images = product(*[list(range(elem)) for elem in extension])
+    for image in images:
+        if image == (0, 0, 0):
+            continue
+        else:
+            new_positions = []
+            for ind, atom in enumerate(doc['atom_types']):
+                new_pos = doc['positions_frac'][ind]
+                for i, elem in enumerate(image):
+                    new_pos[i] += elem
+                new_positions.append(new_pos)
+            supercell_doc['atom_types'].extend(doc['atom_types'])
+            supercell_doc['positions_frac'].extend(doc['positions_frac'])
+
+    supercell_doc['num_atoms'] = len(supercell_doc['atom_types'])
+    for i, elem in enumerate(extension):
+        for k in range(3):
+            supercell_doc['lattice_cart'][i][k] = elem * doc['lattice_cart'][i][k]
+        for ind, atom in enumerate(supercell_doc['positions_frac']):
+            supercell_doc['positions_frac'][ind][i] /= elem
+    return supercell_doc
