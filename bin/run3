@@ -26,6 +26,7 @@ from traceback import print_exc
 import argparse
 import multiprocessing as mp
 import glob
+import fcntl
 
 
 class BatchRun:
@@ -149,6 +150,7 @@ class BatchRun:
         self.paths['jobs_fname'] = 'jobs.txt'
         self.paths['completed_fname'] = 'finished_cleanly.txt'
         self.paths['failures_fname'] = 'failures.txt'
+        self.paths['memory_fname'] = 'memory_exceeded.txt'
         if not isfile(self.paths['jobs_fname']):
             with open(self.paths['jobs_fname'], 'a'):
                 pass
@@ -157,6 +159,9 @@ class BatchRun:
                 pass
         if not isfile(self.paths['failures_fname']):
             with open(self.paths['failures_fname'], 'a'):
+                pass
+        if not isfile(self.paths['memory_fname']):
+            with open(self.paths['memory_fname'], 'a'):
                 pass
 
     def spawn(self):
@@ -180,18 +185,22 @@ class BatchRun:
         job_count = 0
         for res in res_list:
             running = False
-            with open(paths['jobs_fname'], 'r') as job_file:
+            with open(paths['jobs_fname'], 'w+') as job_file:
+                fcntl.flock(job_file, fcntl.LOCK_EX)
                 flines = job_file.readlines()
                 for line in flines:
                     if res in line:
                         running = True
                         break
+                fcntl.flock(job_file, fcntl.LOCK_UN)
             if not running:
                 if self.limit is not None:
                     if job_count == self.limit:
                         raise SystemExit
                 with open(paths['jobs_fname'], 'a') as job_file:
+                    fcntl.flock(job_file, fcntl.LOCK_EX)
                     job_file.write(res+'\n')
+                    fcntl.flock(job_file, fcntl.LOCK_UN)
                 # create full relaxer object for creation and running of job
                 try:
                     job_count += 1
@@ -199,7 +208,19 @@ class BatchRun:
                                           param_dict=self.param_dict,
                                           cell_dict=self.cell_dict,
                                           **self.args)
-                    if relaxer.success:
+                    if not relaxer.enough_memory:
+                        with open(paths['memory_fname'], 'a') as job_file:
+                            job_file.write(res+'\n')
+                        with open(paths['jobs_fname'], 'r+') as job_file:
+                            fcntl.flock(job_file, fcntl.LOCK_EX)
+                            flines = job_file.readlines()
+                            job_file.seek(0)
+                            for ind, line in enumerate(flines):
+                                if res not in line:
+                                    job_file.write(line)
+                            job_file.truncate()
+                            fcntl.flock(job_file, fcntl.LOCK_UN)
+                    elif relaxer.success:
                         with open(paths['completed_fname'], 'a') as job_file:
                             job_file.write(res+'\n')
                     else:
@@ -255,6 +276,10 @@ if __name__ == '__main__':
                         help='run all res files at cutoff defined in cutoff.conv file')
     parser.add_argument('--conv_kpt', action='store_true', default=False,
                         help='run all res files at kpoint spacings defined in kpt.conv file')
+    parser.add_argument('--memcheck', action='store_true', default=False,
+                        help='enable memcheck via castep dryrun')
+    parser.add_argument('--maxmem', type=int,
+                        help='override max memory for memcheck')
     parser.add_argument('--kpts_1D', action='store_true', default=False,
                         help='recalculate a 1D kpoint mesh of spacing specified in template cell')
     parser.add_argument('--spin', action='store_true', default=False,

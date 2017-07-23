@@ -414,6 +414,8 @@ def doc2res(doc, path, info=True, hash_dupe=True, spoof_titl=False, overwrite=Fa
     """ Write .res file for single doc. """
     if path.endswith('.res'):
         path = path.replace('.res', '')
+    if spoof_titl:
+        info = False
     try:
         if isfile(path+'.res'):
             if hash_dupe:
@@ -503,6 +505,7 @@ def doc2res(doc, path, info=True, hash_dupe=True, spoof_titl=False, overwrite=Fa
                 f.write(line)
 
     except Exception:
+        print_exc()
         if hash_dupe:
             print('Writing res file failed for ', path)
         else:

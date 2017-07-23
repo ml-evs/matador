@@ -622,7 +622,8 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
                 castep['task'] != 'geometry optimization':
             raise RuntimeError('CASTEP file does not contain GO calculation')
         else:
-            if castep['task'].strip() == 'geometryoptimization':
+            castep['optimised'] = False
+            if db and castep['task'].strip() == 'geometryoptimization':
                 final = False
                 finish_line = 0
                 castep['optimised'] = False
@@ -802,7 +803,7 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
         # computing metadata, i.e. parallelism, time, memory, version
         for line in flines:
             if 'Release CASTEP version' in line:
-                castep['castep_version'] = line.split()[-2]
+                castep['castep_version'] = line.replace('|', '').split()[-1]
             elif 'Run started:' in line:
                 year = line.split()[5]
                 month = str(strptime(line.split()[4], '%b').tm_mon)
@@ -812,12 +813,14 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
                 castep['total_time_hrs'] = float(line.split()[-2])/3600
             elif 'Peak Memory Use' in line:
                 castep['peak_mem_MB'] = int(float(line.split()[-2])/1024)
+            elif 'total storage required per process' in line:
+                castep['estimated_mem_MB'] = float(line.split()[-5])
         # check that any optimized results were saved and raise errors if not
         if castep.get('optimised') is False:
             castep['optimised'] = False
             raise DFTError('CASTEP GO failed to converge.')
         if 'positions_frac' not in castep:
-            raise RuntimeError('Could not find positions')
+            raise DFTError('Could not find positions')
         if 'enthalpy' not in castep:
             castep['enthalpy'] = 'xxx'
             castep['enthalpy_per_atom'] = 'xxx'

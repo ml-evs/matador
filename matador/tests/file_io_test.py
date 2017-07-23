@@ -65,6 +65,8 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(test_dict['lattice_abc'][1][0], 90, msg='Wrong lattice constants!')
             self.assertEqual(test_dict['lattice_abc'][1][1], 90, msg='Wrong lattice constants!')
             self.assertEqual(test_dict['lattice_abc'][1][2], 59.971185, msg='Wrong lattice constants!')
+            self.assertEqual(test_dict['castep_version'], '16.11')
+            self.assertEqual(test_dict['estimated_mem_MB'], 345.1)
 
     def testRes(self):
         res_fname = REAL_PATH + 'data/LiPZn-r57des.res'

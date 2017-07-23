@@ -15,6 +15,7 @@ from copy import deepcopy
 from traceback import print_exc, format_exception_only
 from sys import exit, exc_info
 from math import ceil
+from psutil import virtual_memory
 import sys
 import subprocess as sp
 import glob
@@ -48,12 +49,15 @@ class FullRelaxer:
         bnl           : bool, use srun over mpirun
         start         : bool, begin calculation immediately or manually call it
         redirect      : bool, redirect all output to pid.file
+        reopt         : bool, whether to optimise one more time after success (DEFAULT: false)
+        memcheck      : bool, perform castep dryrun to estimate memory usage, do not proceed if fails
+        maxmem       : int, maximum memory allowed in MB for memcheck
 
     """
     def __init__(self, res, param_dict, cell_dict,
                  ncores, nnodes, node,
                  executable='castep', rough=None, spin=False,
-                 reopt=False, custom_params=False,
+                 reopt=False, custom_params=False, memcheck=False, maxmem=None,
                  kpts_1D=False, conv_cutoff=None, conv_kpt=None, archer=False, bnl=False,
                  start=True, redirect=False, verbosity=0, debug=False):
         """ Make the files to run the calculation and handle
@@ -66,6 +70,8 @@ class FullRelaxer:
         self.nnodes = nnodes
         self.node = node
         self.verbosity = verbosity
+        self.memcheck = memcheck
+        self.maxmem = maxmem
         self.executable = executable
         self.custom_params = custom_params
         self.reopt = reopt
@@ -144,9 +150,15 @@ class FullRelaxer:
                 self.geom_max_iter_list.extend(num_fine_iter * [fine_iter])
                 self.calc_doc = calc_doc
 
-                # begin relaxation
-                if self.start:
-                    self.success = self.relax()
+                # do memcheck, if desired, and only continue if enough memory is free
+                if self.memcheck:
+                    self.enough_memory = self.do_memcheck(calc_doc, self.seed)
+                else:
+                    self.enough_memory = True
+                if not self.memcheck or self.enough_memory:
+                    # begin relaxation
+                    if self.start:
+                        self.success = self.relax()
 
     def relax(self, output_queue=None):
         """ Set up the calculation to perform 4 sets of two steps,
@@ -154,11 +166,11 @@ class FullRelaxer:
 
         Optional input:
 
-        output_queue : push node and output dict to a multiprocessing queue (optional).
+            output_queue : push node and output dict to a multiprocessing queue (optional).
 
         Returns:
 
-        True iff structure was optimised, false otherwise.
+            True iff structure was optimised, False otherwise.
         """
         seed = self.seed
         calc_doc = self.calc_doc
@@ -213,7 +225,7 @@ class FullRelaxer:
                 process = self.castep(seed)
                 process.communicate()
                 # scrape new structure from castep file
-                opti_dict, success = castep2dict(seed + '.castep', db=False)
+                opti_dict, success = castep2dict(seed + '.castep', db=False, verbosity=0)
                 if self.debug:
                     print_notify('Intermediate calculation finished')
                     print(opti_dict)
@@ -381,8 +393,61 @@ class FullRelaxer:
             self.tidy_up(seed)
             return False
 
+    def do_memcheck(self, calc_doc, seed):
+        """ Perform a CASTEP dryrun to estimate memory usage.
+
+        Returns:
+
+            True if the memory estimate is <90% of node RAM,
+            otherwise False.
+
+        """
+        doc2param(calc_doc, seed, hash_dupe=False)
+        doc2cell(calc_doc, seed, hash_dupe=False, copy_pspots=False)
+        if self.debug:
+            print('Performing memcheck...')
+        free_memory = float(virtual_memory().available) / 1024**2
+        if self.maxmem is None:
+            maxmem = 0.9*free_memory
+        else:
+            maxmem = self.maxmem
+
+        if self.debug:
+            print('{:10}: {:8.0f} MB'.format('Available', maxmem))
+        process = sp.Popen(['nice', '-n', '15', self.executable, '-d', seed])
+        process.communicate()
+        results, success = castep2dict(seed + '.castep', db=False)
+
+        skip = False
+        if 'estimated_mem_MB' not in results:
+            skip = True
+            if self.debug:
+                print('CASTEP dryrun failed, this is probably a bad sign... skipping calculation')
+                print(results)
+
+        for _file in glob.glob(seed+'*'):
+            if _file.endswith('.res'):
+                continue
+            else:
+                remove(_file)
+
+        if self.debug:
+            if 'estimated_mem_MB' in results:
+                print('{:10}: {:8.0f} MB'.format('Estimate', results['estimated_mem_MB']))
+
+        if skip or results['estimated_mem_MB'] > maxmem:
+            if self.debug:
+                print('Not enough!')
+            return False
+        else:
+            if self.debug:
+                print('Enough memory, proceeding...')
+            return True
+
     def castep(self, seed):
         """ Calls CASTEP on desired seed with desired number of cores. """
+        if self.debug:
+            print('Calling CASTEP...')
         if self.nnodes is None or self.nnodes == 1:
             if self.ncores == 1 and self.node is None:
                 process = sp.Popen(['nice', '-n', '15', self.executable, seed])
