@@ -413,6 +413,12 @@ class FullRelaxer:
         else:
             maxmem = self.maxmem
 
+        # check if cell is totally pathological, as CASTEP dryrun will massively underestimate mem
+        if all([angle < 30 for angle in calc_doc['lattice_abc'][1]]):
+            if self.debug:
+                print('Cell is pathological...')
+            return False
+
         if self.debug:
             print('{:10}: {:8.0f} MB'.format('Available', maxmem))
         process = sp.Popen(['nice', '-n', '15', self.executable, '-d', seed])

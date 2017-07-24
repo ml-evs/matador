@@ -622,8 +622,7 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
                 castep['task'] != 'geometry optimization':
             raise RuntimeError('CASTEP file does not contain GO calculation')
         else:
-            castep['optimised'] = False
-            if db and castep['task'].strip() == 'geometryoptimization':
+            if 'task' in castep and castep['task'].strip() == 'geometryoptimization':
                 final = False
                 finish_line = 0
                 castep['optimised'] = False
