@@ -21,12 +21,12 @@ from matador.version import __version__
 
 # standard library
 from os.path import isfile
+from os import remove
 from collections import defaultdict
 from traceback import print_exc
 import argparse
 import multiprocessing as mp
 import glob
-import fcntl
 
 
 class BatchRun:
@@ -160,9 +160,10 @@ class BatchRun:
         if not isfile(self.paths['failures_fname']):
             with open(self.paths['failures_fname'], 'a'):
                 pass
-        if not isfile(self.paths['memory_fname']):
-            with open(self.paths['memory_fname'], 'a'):
-                pass
+        if self.args.get('memcheck'):
+            if not isfile(self.paths['memory_fname']):
+                with open(self.paths['memory_fname'], 'a'):
+                    pass
 
     def spawn(self):
         """ Spawn processes to perform calculations. """
@@ -185,22 +186,28 @@ class BatchRun:
         job_count = 0
         for res in res_list:
             running = False
-            with open(paths['jobs_fname'], 'w+') as job_file:
-                fcntl.flock(job_file, fcntl.LOCK_EX)
-                flines = job_file.readlines()
-                for line in flines:
-                    if res in line:
-                        running = True
-                        break
-                fcntl.flock(job_file, fcntl.LOCK_UN)
+            if isfile(res + '.lock'):
+                running = True
+            else:
+                with open(paths['jobs_fname'], 'r') as job_file:
+                    flines = job_file.readlines()
+                    for line in flines:
+                        if res in line:
+                            running = True
+                            break
             if not running:
                 if self.limit is not None:
                     if job_count == self.limit:
                         raise SystemExit
+                if not isfile(res + '.lock'):
+                    with open(res + '.lock', 'a') as job_file:
+                        pass
+                else:
+                    print('Another node wrote this file when I wanted to, skipping...')
+                    running = True
+                    continue
                 with open(paths['jobs_fname'], 'a') as job_file:
-                    fcntl.flock(job_file, fcntl.LOCK_EX)
                     job_file.write(res+'\n')
-                    fcntl.flock(job_file, fcntl.LOCK_UN)
                 # create full relaxer object for creation and running of job
                 try:
                     job_count += 1
@@ -208,24 +215,27 @@ class BatchRun:
                                           param_dict=self.param_dict,
                                           cell_dict=self.cell_dict,
                                           **self.args)
-                    if not relaxer.enough_memory:
-                        with open(paths['memory_fname'], 'a') as job_file:
-                            job_file.write(res+'\n')
-                        with open(paths['jobs_fname'], 'r+') as job_file:
-                            fcntl.flock(job_file, fcntl.LOCK_EX)
-                            flines = job_file.readlines()
-                            job_file.seek(0)
-                            for ind, line in enumerate(flines):
-                                if res not in line:
-                                    job_file.write(line)
-                            job_file.truncate()
-                            fcntl.flock(job_file, fcntl.LOCK_UN)
-                    elif relaxer.success:
-                        with open(paths['completed_fname'], 'a') as job_file:
-                            job_file.write(res+'\n')
-                    else:
-                        with open(paths['failures_fname'], 'a') as job_file:
-                            job_file.write(res+'\n')
+                    try:
+                        if not relaxer.enough_memory:
+                            with open(paths['memory_fname'], 'a') as job_file:
+                                job_file.write(res+'\n')
+                            remove(res + '.lock')
+                            with open(paths['jobs_fname'], 'r+') as job_file:
+                                flines = job_file.readlines()
+                                job_file.seek(0)
+                                for ind, line in enumerate(flines):
+                                    if res not in line:
+                                        job_file.write(line)
+                                job_file.truncate()
+                        elif relaxer.success:
+                            with open(paths['completed_fname'], 'a') as job_file:
+                                job_file.write(res+'\n')
+                        else:
+                            with open(paths['failures_fname'], 'a') as job_file:
+                                job_file.write(res+'\n')
+                    except:
+                        print_exc()
+                        pass
                 except(KeyboardInterrupt, SystemExit, RuntimeError):
                     print_exc()
                     raise SystemExit

@@ -152,10 +152,11 @@ class FullRelaxer:
 
                 # do memcheck, if desired, and only continue if enough memory is free
                 if self.memcheck:
+                    print('Trying to perform memcheck...')
                     self.enough_memory = self.do_memcheck(calc_doc, self.seed)
                 else:
                     self.enough_memory = True
-                if not self.memcheck or self.enough_memory:
+                if self.enough_memory:
                     # begin relaxation
                     if self.start:
                         self.success = self.relax()
@@ -297,7 +298,7 @@ class FullRelaxer:
                             output_queue.put(self.res_dict)
                             if self.debug:
                                 print('wrote failed dict out to output_queue')
-                        doc2res(opti_dict, seed, hash_dupe=False)
+                        doc2res(opti_dict, seed, info=False, hash_dupe=False)
                         self.mv_to_bad(seed)
                         return False
 

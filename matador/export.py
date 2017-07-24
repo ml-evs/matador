@@ -434,7 +434,7 @@ def doc2res(doc, path, info=True, hash_dupe=True, spoof_titl=False, overwrite=Fa
             try:
                 titl = 'TITL '
                 titl += (path.split('/')[-1] + ' ')
-                if type(doc['pressure']) == str:
+                if 'pressure' not in doc or type(doc['pressure']) == str:
                     titl += '0.00 '
                 else:
                     titl += str(doc['pressure']) + ' '
