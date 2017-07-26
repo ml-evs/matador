@@ -89,6 +89,10 @@ def res2dict(seed, db=True, verbosity=0, **kwargs):
                     res['atom_types'].append(cursor[0])
                     res['positions_frac'].append(list(map(float, cursor[2:5])))
                     i += 1
+        if 'num_atoms' in res:
+            assert len(res['atom_types']) == res['num_atoms']
+        else:
+            res['num_atoms'] = len(res['atom_types'])
         # deal with implicit encapsulation
         if len(remark) > 0:
             if 'NTPROPS' in remark:

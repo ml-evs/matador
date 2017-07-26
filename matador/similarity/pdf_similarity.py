@@ -302,7 +302,7 @@ class PDF(object):
                     trans = np.zeros((3))
                     for ind, multi in enumerate(prod):
                         trans += self.lattice[ind] * multi
-                    if np.sqrt(np.sum(trans**2)) <= self.rmax+self.dr+0.5*max_trans:
+                    if np.sqrt(np.sum(trans**2)) <= self.rmax+self.dr+max_trans:
                         self.image_vec.add(prod)
                         any_in_sphere = True
                 test_num_images += 1

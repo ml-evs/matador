@@ -2,7 +2,7 @@
 import unittest
 from matador.similarity.pdf_similarity import PDF, PDFOverlap
 from matador.scrapers.castep_scrapers import res2dict
-from matador.utils.cell_utils import abc2cart
+from matador.utils.cell_utils import abc2cart, cart2volume
 import numpy as np
 from os.path import realpath
 
@@ -68,6 +68,21 @@ class PDFCalculatorTest(unittest.TestCase):
         doc['pdf_hist'] = PDF(doc, num_images=3, dr=0.1, style='histogram')
         overlap = PDFOverlap(doc['pdf_smear'], doc['pdf_hist'])
         self.assertLessEqual(overlap.similarity_distance, 0.02)
+        self.assertGreater(overlap.similarity_distance, 0.0)
+
+    def testPDFPrimitiveVsSupercell(self):
+        test_doc, success = res2dict(REAL_PATH + 'data/KP_primitive.res', db=False)
+        test_doc['text_id'] = ['primitive', 'cell']
+        test_doc['lattice_cart'] = abc2cart(test_doc['lattice_abc'])
+        test_doc['cell_volume'] = cart2volume(test_doc['lattice_cart'])
+        supercell_doc, success = res2dict(REAL_PATH + 'data/KP_supercell.res', db=False)
+        supercell_doc['text_id'] = ['supercell', 'cell']
+        supercell_doc['lattice_cart'] = abc2cart(supercell_doc['lattice_abc'])
+        supercell_doc['cell_volume'] = cart2volume(supercell_doc['lattice_cart'])
+        test_doc['pdf'] = PDF(test_doc, dr=0.01, low_mem=True, rmax=10, num_images='auto', debug=True)
+        supercell_doc['pdf'] = PDF(supercell_doc, dr=0.01, low_mem=True, rmax=10, num_images='auto', debug=True)
+        overlap = PDFOverlap(test_doc['pdf'], supercell_doc['pdf'])
+        self.assertLessEqual(overlap.similarity_distance, 1e-3)
         self.assertGreater(overlap.similarity_distance, 0.0)
 
 

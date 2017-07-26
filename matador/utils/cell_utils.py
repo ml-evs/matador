@@ -6,6 +6,7 @@ for cell manipulation.
 import numpy as np
 # standard library
 from math import pi, cos, sin, sqrt, acos, log10
+from functools import reduce
 
 
 def abc2cart(lattice_abc):
@@ -178,7 +179,7 @@ def get_spacegroup_spg(doc, symprec=0.01):
     return get_spacegroup(spg_cell, symprec=symprec).split(' ')[0]
 
 
-def create_simple_supercell(doc, extension, standardize=False):
+def create_simple_supercell(seed_doc, extension, standardize=False):
     """ Return a document with new supercell, given extension vector.
 
     Input:
@@ -195,6 +196,8 @@ def create_simple_supercell(doc, extension, standardize=False):
     if extension == (1, 1, 1):
         raise RuntimeError('Redundant supercell {} requested...'.format(extension))
 
+    num_images = reduce(lambda x, y: x*y, extension)
+    doc = deepcopy(seed_doc)
     # standardize cell with spglib
     if standardize:
         doc = standardize_doc_cell(doc)
@@ -206,24 +209,32 @@ def create_simple_supercell(doc, extension, standardize=False):
     if 'lattice_abc' in supercell_doc:
         del supercell_doc['lattice_abc']
 
-    images = product(*[list(range(elem)) for elem in extension])
-    for image in images:
-        if image == (0, 0, 0):
-            continue
-        else:
-            new_positions = []
-            for ind, atom in enumerate(doc['atom_types']):
-                new_pos = doc['positions_frac'][ind]
-                for i, elem in enumerate(image):
-                    new_pos[i] += elem
-                new_positions.append(new_pos)
-            supercell_doc['atom_types'].extend(doc['atom_types'])
-            supercell_doc['positions_frac'].extend(doc['positions_frac'])
-
-    supercell_doc['num_atoms'] = len(supercell_doc['atom_types'])
     for i, elem in enumerate(extension):
         for k in range(3):
             supercell_doc['lattice_cart'][i][k] = elem * doc['lattice_cart'][i][k]
         for ind, atom in enumerate(supercell_doc['positions_frac']):
             supercell_doc['positions_frac'][ind][i] /= elem
+
+    images = product(*[list(range(elem)) for elem in extension])
+    _iter = 0
+    new_positions = []
+    new_atoms = []
+    for image in images:
+        _iter += 1
+        if image == (0, 0, 0):
+            continue
+        else:
+            for ind, atom in enumerate(supercell_doc['atom_types']):
+                new_pos = deepcopy(supercell_doc['positions_frac'][ind])
+                for i, elem in enumerate(image):
+                    new_pos[i] += image[i] / extension[i]
+                new_positions.append(new_pos)
+                new_atoms.append(atom)
+    supercell_doc['atom_types'].extend(new_atoms)
+    supercell_doc['positions_frac'].extend(new_positions)
+    supercell_doc['num_atoms'] = len(supercell_doc['atom_types'])
+    supercell_doc['cell_volume'] = cart2volume(supercell_doc['lattice_cart'])
+    supercell_doc['lattice_abc'] = cart2abc(supercell_doc['lattice_cart'])
+    assert np.isclose(supercell_doc['cell_volume'], num_images*doc['cell_volume'])
+    assert _iter == num_images
     return supercell_doc
