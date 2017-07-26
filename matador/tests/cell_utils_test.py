@@ -1,7 +1,11 @@
 #!/usr/bin/env python
 import unittest
-from matador.utils.cell_utils import abc2cart, cart2abc, cart2volume, create_simple_supercell, standardize_doc_cell
-from matador.scrapers.castep_scrapers import castep2dict
+from matador.utils.cell_utils import abc2cart, cart2abc, cart2volume, create_simple_supercell, doc2spg
+from matador.scrapers.castep_scrapers import castep2dict, res2dict
+from matador.export import doc2res
+from matador.similarity.pdf_similarity import PDF, PDFOverlap
+from functools import reduce
+from spglib import find_primitive
 import numpy as np
 from os.path import realpath
 
@@ -40,6 +44,7 @@ class CellUtilTest(unittest.TestCase):
     def testSupercellCreator(self):
         castep_fname = REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep'
         failed_open = False
+        num_tests = 3
         try:
             f = open(castep_fname, 'r')
         except:
@@ -48,11 +53,21 @@ class CellUtilTest(unittest.TestCase):
         if not failed_open:
             f.close()
             test_doc, s = castep2dict(castep_fname, db=True, verbosity=5)
-            # test simple 2x2x2
-            supercell = create_simple_supercell(test_doc, (2, 2, 2))
-            self.assertEqual(supercell['num_atoms'], 8*test_doc['num_atoms'])
-            self.assertEqual(len(supercell['positions_frac']), 8*len(test_doc['positions_frac']))
-            np.testing.assert_array_equal(np.asarray(supercell['lattice_cart']), 2*np.asarray(test_doc['lattice_cart']))
+            _iter = 0
+            while _iter < num_tests:
+                extension = np.random.randint(low=1, high=5, size=(3)).tolist()
+                if extension == [1, 1, 1]:
+                    extension[np.random.randint(low=0, high=2)] += 1
+                num_images = reduce(lambda x, y: x*y, extension)
+
+                supercell = create_simple_supercell(test_doc, tuple(extension))
+                self.assertEqual(supercell['num_atoms'], num_images*test_doc['num_atoms'])
+                self.assertAlmostEqual(supercell['cell_volume'], num_images*test_doc['cell_volume'], places=3)
+                self.assertEqual(len(supercell['positions_frac']), num_images*len(test_doc['positions_frac']))
+                for i in range(3):
+                    np.testing.assert_array_equal(np.asarray(supercell['lattice_cart'][i]), extension[i]*np.asarray(test_doc['lattice_cart'][i]))
+                self.assertLess(pdf_sim_dist(test_doc, supercell), 1e-3)
+                _iter += 1
 
             # test error for 1x1x1
             try:
@@ -62,23 +77,65 @@ class CellUtilTest(unittest.TestCase):
                 error = True
             self.assertTrue(error)
 
-            # test non-diagonal
-            supercell = create_simple_supercell(test_doc, (2, 1, 2))
-            self.assertEqual(supercell['num_atoms'], 4*test_doc['num_atoms'])
-            self.assertEqual(len(supercell['positions_frac']), 4*len(test_doc['positions_frac']))
-            np.testing.assert_array_equal(np.asarray(supercell['lattice_cart'][0]), 2*np.asarray(test_doc['lattice_cart'][0]))
-            np.testing.assert_array_equal(np.asarray(supercell['lattice_cart'][1]), np.asarray(test_doc['lattice_cart'][1]))
-            np.testing.assert_array_equal(np.asarray(supercell['lattice_cart'][2]), 2*np.asarray(test_doc['lattice_cart'][2]))
+        res_fname = REAL_PATH + 'data/parent2.res'
+        failed_open = False
+        try:
+            f = open(res_fname, 'r')
+        except:
+            failed_open = True
+        if not failed_open:
+            f.close()
+            test_doc, s = res2dict(res_fname, db=False, verbosity=0)
+            while _iter < num_tests:
+                extension = np.random.randint(low=1, high=5, size=(3, 1)).tolist()
+                num_images = reduce(map(lambda x, y: x*y, extension))
 
-            # test cell standardization
-            supercell = create_simple_supercell(test_doc, (2, 1, 2), standardize=True)
-            test_doc = standardize_doc_cell(test_doc)
-            self.assertEqual(supercell['num_atoms'], 4*test_doc['num_atoms'])
-            self.assertEqual(len(supercell['positions_frac']), 4*len(test_doc['positions_frac']))
-            np.testing.assert_array_equal(np.asarray(supercell['lattice_cart'][0]), 2*np.asarray(test_doc['lattice_cart'][0]))
-            np.testing.assert_array_equal(np.asarray(supercell['lattice_cart'][1]), np.asarray(test_doc['lattice_cart'][1]))
-            np.testing.assert_array_equal(np.asarray(supercell['lattice_cart'][2]), 2*np.asarray(test_doc['lattice_cart'][2]))
+                supercell = create_simple_supercell(test_doc, tuple(extension))
+                self.assertEqual(supercell['num_atoms'], num_images*test_doc['num_atoms'])
+                self.assertAlmostEqual(supercell['cell_volume'], num_images*test_doc['cell_volume'], places=3)
+                self.assertEqual(len(supercell['positions_frac']), num_images*len(test_doc['positions_frac']))
+                for i in range(3):
+                    np.testing.assert_array_equal(np.asarray(supercell['lattice_cart'][i]), extension[i]*np.asarray(test_doc['lattice_cart'][i]))
+                self.assertLess(pdf_sim_dist(test_doc, supercell), 1e-3)
+                _iter += 1
 
+            # test error for 1x1x1
+            try:
+                supercell = create_simple_supercell(test_doc, (1, 1, 1))
+                error = False
+            except:
+                error = True
+            self.assertTrue(error)
+
+            # spg_test_doc = doc2spg(test_doc)
+            # spg_supercell = doc2spg(supercell)
+
+            # if spg_supercell is None:
+                # raise RuntimeError('Unable to convert supercell to spg.')
+
+            # doc2res(supercell, '/home/matthew/super_test.res', info=False)
+            # print(supercell['positions_frac'])
+            # print(spg_supercell)
+
+            # primitive_test_doc = find_primitive(spg_test_doc)
+            # primitive_supercell = find_primitive(spg_supercell)
+
+            # if primitive_supercell is None:
+                # raise RuntimeError('Unable to convert supercell to spg.')
+
+            # print('og')
+            # print(primitive_test_doc)
+            # print('sup')
+            # print(primitive_supercell)
+
+
+def pdf_sim_dist(doc_test, doc_supercell):
+    doc_test['text_id'] = ['test', 'cell']
+    doc_supercell['text_id'] = ['super', 'cell']
+    pdf_test = PDF(doc_test, low_mem=True)
+    pdf_supercell = PDF(doc_supercell, low_mem=True)
+    overlap = PDFOverlap(pdf_test, pdf_supercell)
+    return overlap.similarity_distance
 
 if __name__ == '__main__':
     unittest.main()
