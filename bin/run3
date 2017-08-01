@@ -290,6 +290,8 @@ if __name__ == '__main__':
                         help='enable memcheck via castep dryrun')
     parser.add_argument('--maxmem', type=int,
                         help='override max memory for memcheck')
+    parser.add_argument('--killcheck', action='store_true', default=True,
+                        help='check for $seed.kill file and quit job if present')
     parser.add_argument('--kpts_1D', action='store_true', default=False,
                         help='recalculate a 1D kpoint mesh of spacing specified in template cell')
     parser.add_argument('--spin', action='store_true', default=False,

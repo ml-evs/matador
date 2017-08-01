@@ -51,13 +51,14 @@ class FullRelaxer:
         redirect      : bool, redirect all output to pid.file
         reopt         : bool, whether to optimise one more time after success (DEFAULT: false)
         memcheck      : bool, perform castep dryrun to estimate memory usage, do not proceed if fails
-        maxmem       : int, maximum memory allowed in MB for memcheck
+        maxmem        : int, maximum memory allowed in MB for memcheck
+        killcheck     : bool, check for file called $seed.kill during operation, and kill if present
 
     """
     def __init__(self, res, param_dict, cell_dict,
                  ncores, nnodes, node,
                  executable='castep', rough=None, spin=False,
-                 reopt=False, custom_params=False, memcheck=False, maxmem=None,
+                 reopt=False, custom_params=False, memcheck=False, maxmem=None, killcheck=True,
                  kpts_1D=False, conv_cutoff=None, conv_kpt=None, archer=False, bnl=False,
                  start=True, redirect=False, verbosity=0, debug=False):
         """ Make the files to run the calculation and handle
@@ -72,6 +73,7 @@ class FullRelaxer:
         self.verbosity = verbosity
         self.memcheck = memcheck
         self.maxmem = maxmem
+        self.killcheck = killcheck
         self.executable = executable
         self.custom_params = custom_params
         self.reopt = reopt
@@ -185,7 +187,6 @@ class FullRelaxer:
         else:
             self.cp_to_input(self.seed)
             doc2res(self.res_dict, self.seed, info=False, hash_dupe=False, overwrite=True)
-
         self.rerun = False
         for ind, num_iter in enumerate(geom_max_iter_list):
             if self.reopt and self.rerun:
@@ -198,13 +199,24 @@ class FullRelaxer:
                     print_notify('Beginning rough geometry optimisation...')
                 elif ind == self.num_rough_iter:
                     print_notify('Beginning fine geometry optimisation...')
+            if self.killcheck:
+                if isfile(self.seed + '.kill'):
+                    remove(self.seed + '.kill')
+                    if self.verbosity >= 1:
+                        print('Found {}.kill, ending job...'.format(self.seed))
+                    if output_queue is not None:
+                        output_queue.put(self.res_dict)
+                        if self.debug:
+                            print('wrote failed dict out to output_queue')
+                    self.mv_to_bad(seed)
+                    return False
             if ind != 0:
                 self.spin = False
             calc_doc['geom_max_iter'] = num_iter
             try:
                 # delete any existing files and write new ones
                 if isfile(seed + '.cell'):
-                    remove(seed+'.cell')
+                    remove(seed + '.cell')
                 if self.kpts_1D:
                     if self.verbosity > 2:
                         print('Calculating 1D kpt grid...')
@@ -345,6 +357,10 @@ class FullRelaxer:
                 self.tidy_up(seed)
                 if self.verbosity >= 1:
                     print_warning('Done!')
+                if output_queue is not None:
+                    output_queue.put(self.res_dict)
+                    if self.debug:
+                        print('wrote failed dict out to output_queue')
                 return False
             except:
                 if self.verbosity >= 1:
@@ -352,6 +368,10 @@ class FullRelaxer:
                 process.terminate()
                 self.mv_to_bad(seed)
                 self.tidy_up(seed)
+                if output_queue is not None:
+                    output_queue.put(self.res_dict)
+                    if self.debug:
+                        print('wrote failed dict out to output_queue')
                 return False
 
     def scf(self, calc_doc, seed, keep=True):
