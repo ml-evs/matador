@@ -482,7 +482,7 @@ class FullRelaxer:
                 process = sp.Popen(['aprun', '-n', str(self.ncores),
                                     self.executable, seed])
             elif self.bnl:
-                command = ['srun', '-n', str(self.ncores), self.executable, seed]
+                command = ['srun', '--exclusive', '-N', '1', '-n', str(self.ncores), self.executable, seed]
                 if self.debug:
                     print(command)
                 process = sp.Popen(command)
