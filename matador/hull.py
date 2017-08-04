@@ -33,13 +33,13 @@ class QueryConvexHull(object):
     def __init__(self, query=None, cursor=None, elements=None, subcmd='hull', **kwargs):
         """
 
-        Inputs:
+        Args:
 
-            query    : matador.DBQuery, object containing structures,
-            cursor   : list(dict), alternatively specify list of matador docs.
-            elements : list(str), list of elements to use, used to provide a useful order,
-            subcmd   : either 'hull' or 'voltage',
-            kwargs   : mostly CLI arguments, see matador hull --help for full options.
+            | query    : matador.DBQuery, object containing structures,
+            | cursor   : list(dict), alternatively specify list of matador docs.
+            | elements : list(str), list of elements to use, used to provide a useful order,
+            | subcmd   : either 'hull' or 'voltage',
+            | kwargs   : mostly CLI arguments, see matador hull --help for full options.
 
         """
         self.args = kwargs
@@ -103,18 +103,13 @@ class QueryConvexHull(object):
             self.set_plot_param()
 
         if self.args['subcmd'] == 'voltage':
-            if self.args.get('debug'):
-                self.generic_voltage_curve()
-                # self.voltage_curve()
-                # self.metastable_voltage_profile()
-            else:
-                self.voltage_curve(self.hull_cursor)
-                if not self.args.get('no_plot'):
-                    if self.args.get('subplot'):
-                        self._subplot_voltage_hull()
-                    else:
-                        self.plot_voltage_curve()
-                    self.plot_hull()
+            self.voltage_curve(self.hull_cursor)
+            if not self.args.get('no_plot'):
+                if self.args.get('subplot'):
+                    self._subplot_voltage_hull()
+                else:
+                    self.plot_voltage_curve()
+                self.plot_hull()
 
         if self.args.get('volume'):
             self.volume_curve()
@@ -138,8 +133,7 @@ class QueryConvexHull(object):
             plt.show()
 
     def get_chempots(self):
-        """ Search for chemical potentials that match
-        the structures in the query cursor,
+        """ Search for chemical potentials that match the structures in the query cursor,
         and add them to the cursor.
         """
         query = self.query
@@ -220,8 +214,12 @@ class QueryConvexHull(object):
         return
 
     def fake_chempots(self, custom_elem=None):
-        """ Spoof documents for command-line
-        chemical potentials.
+        """ Spoof documents for command-line chemical potentials.
+
+        Args:
+
+            | custom_elem : list(str), list of element symbols to generate chempots for.
+
         """
         self.match = [dict(), dict()]
         if custom_elem is None:
@@ -254,7 +252,24 @@ class QueryConvexHull(object):
         print(len(notify)*'─')
 
     def get_hull_distances(self, structures):
-        """ Returns array of hull distances. """
+        """ Returns array of distances to pre-computed binary or ternary hull, from array
+        containing concentrations and energies.
+
+        Input:
+
+            | structures : [N x n] np.ndarray, concentrations and enthalpies for N structures,
+                           with up to 2 columns of concentrations and the last column containing
+                           the structure's formation enthalpy.
+
+        Returns:
+
+            | hull_dist       : [N x 0] np.ndarray, distances to the hull for N structures,
+            | tie_line_energy : [M x 1] np.ndarray, energies for structures on the precomputed hull,
+                                sorted by concentration of the first element (the active ion).
+            | tie_line_comp   : [M x 1] np.ndarray, sorted concentrations of first element in
+                                structures on the precomputed hull.
+
+        """
         tie_line_comp = self.structure_slice[self.hull.vertices, 0]
         tie_line_energy = self.structure_slice[self.hull.vertices, -1]
         tie_line_comp = np.asarray(tie_line_comp)
@@ -312,36 +327,11 @@ class QueryConvexHull(object):
             self.failed_structures = np.asarray(self.failed_structures)
         return hull_dist, tie_line_energy, tie_line_comp
 
-    def get_text_info(self, cursor=None, hull=False, html=False):
-        """ Grab textual info for plot labels. """
-        info = []
-        if cursor is None:
-            cursor = self.cursor
-        if hull:
-            stoich_strings = []
-        for ind, doc in enumerate(cursor):
-            stoich_string = ''
-            for elem in doc['stoichiometry']:
-                stoich_string += elem[0]
-                stoich_string += '$_{' + str(elem[1]) + '}$' if elem[1] != 1 else ''
-            if hull:
-                if stoich_string not in stoich_strings:
-                    stoich_strings.append(stoich_string)
-            info_string = "{0:^10}\n{1:^24}\n{2:^5s}\n{3:.3f} eV".format(stoich_string,
-                                                                         doc['text_id'][0] + ' ' + doc['text_id'][1],
-                                                                         doc['space_group'],
-                                                                         doc['hull_distance'])
-            if html:
-                for char in ['$', '_', '{', '}']:
-                    info_string = info_string.replace(char, '')
-                info_string = info_string.split('\n')
-            info.append(info_string)
-        if hull:
-            info = stoich_strings
-        return info
-
     def hull_2d(self, dis=False):
-        """ Create a convex hull for two elements. """
+        """ Create a convex hull for a binary system. Sets several pieces of member data,
+        most importantly self.hull and self.hull_cursor, as well as adding hull distances to
+        self.cursor.
+        """
         self.non_binary = False
         if self.query is not None:
             query = self.query
@@ -466,7 +456,15 @@ class QueryConvexHull(object):
             pass
 
     def voltage_curve(self, hull_cursor):
-        """ Take convex hull and calculate voltages. """
+        """ Take a computed convex hull and calculate voltages for either binary or ternary
+        systems. Sets the self.x, self.Q and self.V member data for plotting.
+
+        Input:
+
+            | hull_cursor : list(dict), list of structures to include in the voltage curve.
+
+        """
+
         if not self.ternary:
             print('Generating voltage curve...')
             mu_enthalpy = get_array_from_cursor(self.match, 'enthalpy_per_atom')
@@ -485,6 +483,7 @@ class QueryConvexHull(object):
                           (x[i] - x[i-1]) +
                           (mu_enthalpy[0]))
             V[0] = V[1]
+            V[-1] = 0
             # make V, Q and x available for plotting
             self.voltages = []
             self.voltages.append(V)
@@ -507,7 +506,6 @@ class QueryConvexHull(object):
             endstoichs = []
             for ind, point in enumerate(points):
                 if point[0] == 0 and point[1] != 0 and point[1] != 1:
-                    print(([point.tolist() == test_point.tolist() for test_point in endpoints]))
                     if not any([point.tolist() == test_point.tolist() for test_point in endpoints]):
                         endpoints.append(point)
                         endstoichs.append(stoichs[ind])
@@ -522,6 +520,7 @@ class QueryConvexHull(object):
             self.Q = []
             self.x = []
             for reaction_ind, endpoint in enumerate(endpoints):
+                ratio = endpoint[1] / (1 - endpoint[0] - endpoint[1])
                 print(30*'-')
                 print('Reaction {}, {}:'.format(reaction_ind, get_formula_from_stoich(endstoichs[reaction_ind])))
                 y0 = endpoint[1] / (1 - endpoint[0])
@@ -536,6 +535,7 @@ class QueryConvexHull(object):
                         f = points[simplex[i], 1]
                         g = points[simplex[j], 0] - points[simplex[i], 0]
                         h = points[simplex[j], 1] - points[simplex[i], 1]
+
                         x1 = e
                         y1 = f
                         z1 = 1 - x1 - y1
@@ -558,33 +558,45 @@ class QueryConvexHull(object):
                                     z_cross = c * (tin-x1)/a + z1
                                     # only append unique points
                                     if len(crossover) == 0 or not np.any([np.isclose([x_cross, y_cross, z_cross], crossover[i]) for i in range(len(crossover))]):
-                                        crossover.append([x_cross, y_cross, z_cross])
+                                        if y1 != 0 and y2 != 0 and round(float(z1/y1), 5) == round(float(z2/y2), 5) and round(float(z1/y1), 5) == round(ratio, 5):
+                                            pass
+                                        else:
+                                            crossover.append([x_cross, y_cross, z_cross])
                     if len(tints) != 0:
+                        # print('tints:', tints)
                         temp = [simp_in, np.amin(tints), np.amax(tints)]
                         # condition removes the big triangle and the points which only graze the line of interest
-                        if temp[2] > 0 and temp[1] < 1 and temp[2] - temp[1] > 0:
+                        if temp[2] > 0 and temp[1] < 1 and temp[2] > temp[1] and temp[2] - temp[1] < 1:
                             intersections = np.append(intersections, temp)
                     simp_in += 1
 
                 intersections = intersections.reshape(-1, 3)
-                # dodgy remove first row as corresponds to big triangle
-                intersections = np.delete(intersections, (0), axis=0)
                 intersections = intersections[intersections[:, 1].argsort()]
+                ends_of_rows = []
+                min_values = []
+                rows_to_keep = []
+                # remove row corresponding to largest triangle, i.e. chempots only, and near duplicates (i.e. points with multiple tie-lines)
+                for ind, row in enumerate(intersections):
+                    if not (row[1:].tolist() == [0, 1] or row[1:].tolist() in ends_of_rows or np.any(np.isclose(row.tolist()[1], [val for val in min_values]))):
+                        rows_to_keep.append(ind)
+                        ends_of_rows.append(row[1:].tolist())
+                        min_values.append(row.tolist()[1])
+                intersections = intersections[rows_to_keep]
 
                 voltages = []
+                crossover = sorted(crossover)
                 Q = sorted([get_generic_grav_capacity(point, self.elements) for point in crossover])
-                Q.append(Q.pop(0))
                 x = []
                 reaction = [get_formula_from_stoich(endstoichs[reaction_ind])]
                 for ind, face in enumerate(intersections):
-                    fn = int(face[0])
+                    simplex_index = int(face[0])
                     reaction = []
                     reaction = [get_formula_from_stoich(hull_cursor[idx]['stoichiometry'])
-                                for idx in hull.simplices[fn]
+                                for idx in hull.simplices[simplex_index]
                                 if get_formula_from_stoich(hull_cursor[idx]['stoichiometry']) not in reaction]
                     print('{d[0]} + {d[1]} + {d[2]}'.format(d=reaction))
-                    Evec = points[hull.simplices[fn], 2]
-                    Comp = points[hull.simplices[fn], :]
+                    Evec = points[hull.simplices[simplex_index], 2]
+                    Comp = points[hull.simplices[simplex_index], :]
                     Comp[:, 2] = 1 - Comp[:, 0] - Comp[:, 1]
 
                     Comp = Comp.T
@@ -603,18 +615,22 @@ class QueryConvexHull(object):
                 self.x.append(x)
                 self.voltages.append(voltages)
                 print('\n')
-        # assert len(self.Q) == len(self.voltages)
+            assert len(self.Q) == len(self.voltages)
+            for ind in range(len(self.voltages)):
+                assert len(self.Q[ind]) == len(self.voltages[ind])
+                assert np.isnan(self.Q[ind][-1])
+                assert self.voltages[ind][-1] == 0
+
         print('Voltage data:')
         data_str = ''
         for ind, path in enumerate(self.Q):
             if ind != 0:
                 data_str += '\n'
-            # assert len(self.Q[ind]) == len(self.voltages[ind])
             if self.ternary:
-                data_str += get_formula_from_stoich(endstoichs[ind]) + '\n'
+                data_str += '# ' + get_formula_from_stoich(endstoichs[ind]) + '\n'
             else:
-                data_str += ''.join(self.elements) + '\n'
-            data_str += '{:>10},\t{:>10}\n'.format('Q (mAh/g)', 'Voltage (V)')
+                data_str += '# ' + ''.join(self.elements) + '\n'
+            data_str += '# {:>10},\t{:>10}\n'.format('Q (mAh/g)', 'Voltage (V)')
             for idx, _ in enumerate(path):
                 data_str += '{:>10.2f},\t{:>10.4f}'.format(self.Q[ind][idx], self.voltages[ind][idx])
                 if idx != len(path) - 1:
@@ -644,7 +660,17 @@ class QueryConvexHull(object):
         return
 
     def plot_2d_hull(self, ax=None, dis=False, show=False, plot_points=True, plot_hull_points=True):
-        """ Plot calculated hull, returning ax and fig objects for further editing. """
+        """ Plot calculated hull, returning ax and fig objects for further editing.
+
+        Args:
+
+            | ax               : matplotlib axis object, an existing axis on which to plot,
+            | show             : bool, whether or not to display the plot in an X window,
+            | plot_points      : bool, whether or not to display off-hull structures.
+            | plot_hull_points : bool, whether or not to display on-hull structures.
+
+        """
+
         import matplotlib.pyplot as plt
         import matplotlib.colors as colours
         if ax is None:
@@ -1136,22 +1162,19 @@ class QueryConvexHull(object):
             else:
                 axQ.plot(expt_data[:, 0], expt_data[:, 1], c='k', lw=2, ls='-', label='Experiment')
         for ind, voltage in enumerate(self.voltages):
-            # if len(self.voltages) != 1:
-                # axQ.annotate(get_formula_from_stoich(self.endstoichs[ind], tex=True),
-                             # xy=(self.Q[ind][-1]-100, voltage[-1]+0.01),
-                             # textcoords='data', ha='left', zorder=99999)
             for i in range(len(voltage)-1):
                 if i == 0 and self.args.get('expt'):
-                    axQ.plot([self.Q[ind][i-1], self.Q[ind][i]], [voltage[i], voltage[i]],
+                    axQ.plot([self.Q[ind][i-1], self.Q[ind][i]], [voltage[i], voltage[i]], marker='*',
                              lw=2, c=self.colours[ind], label='DFT (this work)')
                 elif i == 0 and len(self.voltages) != 1:
-                    axQ.plot([self.Q[ind][i-1], self.Q[ind][i]], [voltage[i], voltage[i]],
+                    axQ.plot([self.Q[ind][i-1], self.Q[ind][i]], [voltage[i], voltage[i]], marker='o',
                              lw=2, c=self.colours[ind], label=get_formula_from_stoich(self.endstoichs[ind], tex=True))
                 else:
-                    axQ.plot([self.Q[ind][i-1], self.Q[ind][i]], [voltage[i], voltage[i]],
+                    axQ.plot([self.Q[ind][i-1], self.Q[ind][i]], [voltage[i], voltage[i]], marker='o',
                              lw=2, c=self.colours[ind])
-                axQ.plot([self.Q[ind][i], self.Q[ind][i]], [voltage[i], voltage[i+1]],
-                         lw=2, c=self.colours[ind])
+                    if i != len(voltage)-2:
+                        axQ.plot([self.Q[ind][i], self.Q[ind][i]], [voltage[i], voltage[i+1]], marker='o',
+                                 lw=2, c=self.colours[ind])
         if self.args.get('labels'):
             ion = self.hull_cursor[0]['stoichiometry'][0][0]
             for elem in self.hull_cursor[1]['stoichiometry']:
@@ -1206,7 +1229,7 @@ class QueryConvexHull(object):
             plt.show()
 
     def plot_volume_curve(self, show=False):
-        """ Plot calculate volume curve. """
+        """ Plot calculated volume curve. """
         import matplotlib.pyplot as plt
         if self.args.get('pdf') or self.args.get('png'):
             fig = plt.figure(facecolor=None, figsize=(4, 3.5))
@@ -1362,6 +1385,34 @@ class QueryConvexHull(object):
         else:
             fig.show()
 
+    def get_text_info(self, cursor=None, hull=False, html=False):
+        """ Grab textual info for Bokeh plot labels. """
+        info = []
+        if cursor is None:
+            cursor = self.cursor
+        if hull:
+            stoich_strings = []
+        for ind, doc in enumerate(cursor):
+            stoich_string = ''
+            for elem in doc['stoichiometry']:
+                stoich_string += elem[0]
+                stoich_string += '$_{' + str(elem[1]) + '}$' if elem[1] != 1 else ''
+            if hull:
+                if stoich_string not in stoich_strings:
+                    stoich_strings.append(stoich_string)
+            info_string = "{0:^10}\n{1:^24}\n{2:^5s}\n{3:.3f} eV".format(stoich_string,
+                                                                         doc['text_id'][0] + ' ' + doc['text_id'][1],
+                                                                         doc['space_group'],
+                                                                         doc['hull_distance'])
+            if html:
+                for char in ['$', '_', '{', '}']:
+                    info_string = info_string.replace(char, '')
+                info_string = info_string.split('\n')
+            info.append(info_string)
+        if hull:
+            info = stoich_strings
+        return info
+
     def set_plot_param(self):
         """ Set some plotting options global to
         voltage and hull plots.
@@ -1410,8 +1461,12 @@ class QueryConvexHull(object):
         return
 
     def generic_voltage_curve(self):
-        """ A more generic version of voltage curve. """
+        """ A more generic version of voltage curve.
 
+        DEPCRECATED.
+
+        """
+        raise DeprecationWarning
         import matplotlib.pyplot as plt
 
         def get_voltage_profile_segment(structure_new, structure_old,
