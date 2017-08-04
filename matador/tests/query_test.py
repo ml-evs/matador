@@ -167,7 +167,6 @@ class QueryTest(unittest.TestCase):
         self.assertEqual(elements, ['[VII]', '5', '[Fe,Ru,Os]', '2', '[I]', '[V]', '6', '[VIII]', '2', '[ASDASD]'])
 
     def testHarderCompositions(self):
-        """ Test awkward compositions with macros etc. """
         kwargs = {'composition': ['[I]FeBe'], 'ignore_warnings': True,
                   'testing': True}
         query = DBQuery(**kwargs)
