@@ -38,9 +38,9 @@ class VoltageTest(unittest.TestCase):
     """ Test voltage curve functionality. """
     def testBinaryVoltage(self):
         match, hull_cursor = [], []
-        test_x = np.loadtxt(REAL_PATH + 'data/x.dat')
-        test_Q = np.loadtxt(REAL_PATH + 'data/Q.dat')
-        test_V = np.loadtxt(REAL_PATH + 'data/V.dat')
+        test_x = np.loadtxt(REAL_PATH + 'data/LiAs_x.dat')
+        test_Q = np.loadtxt(REAL_PATH + 'data/LiAs_Q.dat')
+        test_V = np.loadtxt(REAL_PATH + 'data/LiAs_V.dat')
         for i in range(5):
             with open(REAL_PATH + 'data/hull_data' + str(i) + '.json') as f:
                 hull_cursor.append(json.load(f))
@@ -63,6 +63,26 @@ class VoltageTest(unittest.TestCase):
         np.testing.assert_array_equal(bare_hull.voltages[0], test_V, verbose=True)
         np.testing.assert_array_equal(bare_hull.x[0], test_x)
         np.testing.assert_array_equal(bare_hull.Q[0], test_Q)
+        for ind in range(len(bare_hull.voltages)):
+            assert len(bare_hull.Q[ind]) == len(bare_hull.voltages[ind])
+            assert np.isnan(bare_hull.Q[ind][-1])
+            assert bare_hull.voltages[ind][-1] == 0
+
+    def testBinaryVoltageAgain(self):
+        # test LiP voltage curve from Mayo et al, Chem. Mater. (2015) DOI: 10.1021/acs.chemmater.5b04208
+        res_list = glob(REAL_PATH + 'data/hull-LiP-mdm_chem_mater/*.res')
+        cursor = [res2dict(res)[0] for res in res_list]
+        hull = QueryConvexHull(cursor=cursor, elements=['Li', 'P'], no_plot=True, subcmd='voltage')
+        self.assertEqual(len(hull.voltages), len(hull.Q))
+        self.assertEqual(len(hull.voltages), len(hull.Q))
+        LiP_voltage_curve = np.loadtxt(REAL_PATH + 'data/LiP_voltage.csv', delimiter=',')
+        self.assertTrue(len(hull.voltages) == 1)
+        np.testing.assert_allclose(hull.voltages[0], LiP_voltage_curve[:, 1], verbose=True, rtol=1e-4)
+        np.testing.assert_allclose(hull.Q[0], LiP_voltage_curve[:, 0], verbose=True, rtol=1e-4)
+        for ind in range(len(hull.voltages)):
+            assert len(hull.Q[ind]) == len(hull.voltages[ind])
+            assert np.isnan(hull.Q[ind][-1])
+            assert hull.voltages[ind][-1] == 0
 
     def testTernaryVoltage(self):
         # test data from LiSnS
@@ -116,7 +136,72 @@ class VoltageTest(unittest.TestCase):
             print(bare_hull.voltages[0])
             print('data: ', np.shape(voltage_data))
             raise AssertionError
+        for ind in range(len(bare_hull.voltages)):
+            assert len(bare_hull.Q[ind]) == len(bare_hull.voltages[ind])
+            assert np.isnan(bare_hull.Q[ind][-1])
+            assert bare_hull.voltages[ind][-1] == 0
+
+    def testTernaryVoltageWithOneTwoPhaseRegion(self):
+        # load old hull then rejig it to go through a ternary phase
+        res_list = glob(REAL_PATH + 'data/hull-KPSn-KP/*.res')
+        self.assertEqual(len(res_list), 87, 'Could not find test res files, please check installation...')
+        cursor = [res2dict(res)[0] for res in res_list]
+        cursor = [doc for doc in cursor if (doc['stoichiometry'] != [['P', 3], ['Sn', 4]] and
+                                            doc['stoichiometry'] != [['P', 3], ['Sn', 1]] and
+                                            doc['stoichiometry'] != [['K', 3], ['P', 7]] and
+                                            doc['stoichiometry'] != [['K', 1], ['P', 7]] and
+                                            doc['stoichiometry'] != [['K', 2], ['P', 3]] and
+                                            doc['stoichiometry'] != [['K', 8], ['P', 4], ['Sn', 1]] and
+                                            doc['stoichiometry'] != [['K', 1], ['P', 2], ['Sn', 2]] and
+                                            doc['stoichiometry'] != [['K', 1], ['Sn', 1]] and
+                                            doc['stoichiometry'] != [['K', 4], ['Sn', 9]] and
+                                            doc['stoichiometry'] != [['K', 5], ['P', 4]] and
+                                            doc['stoichiometry'] != [['P', 2], ['Sn', 1]])]
+        hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'], no_plot=True, pathways=True, subcmd='voltage')
+        self.assertEqual(len(hull.voltages), len(hull.Q))
+        for ind in range(len(hull.voltages)):
+            assert len(hull.Q[ind]) == len(hull.voltages[ind])
+            assert np.isnan(hull.Q[ind][-1])
+            assert hull.voltages[ind][-1] == 0
+
+    def testTernaryVoltageWithTwoTwoPhaseRegions(self):
+        # load old hull then rejig it to go through a ternary phase
+        res_list = glob(REAL_PATH + 'data/hull-KPSn-KP/*.res')
+        self.assertEqual(len(res_list), 87, 'Could not find test res files, please check installation...')
+        cursor = [res2dict(res)[0] for res in res_list]
+        cursor = [doc for doc in cursor if (doc['stoichiometry'] != [['P', 3], ['Sn', 4]] and
+                                            doc['stoichiometry'] != [['P', 3], ['Sn', 1]] and
+                                            doc['stoichiometry'] != [['K', 3], ['P', 7]] and
+                                            doc['stoichiometry'] != [['K', 1], ['P', 7]] and
+                                            doc['stoichiometry'] != [['K', 2], ['P', 3]] and
+                                            doc['stoichiometry'] != [['K', 8], ['P', 4], ['Sn', 1]] and
+                                            doc['stoichiometry'] != [['K', 1], ['Sn', 1]] and
+                                            doc['stoichiometry'] != [['K', 4], ['Sn', 9]] and
+                                            doc['stoichiometry'] != [['K', 5], ['P', 4]] and
+                                            doc['stoichiometry'] != [['P', 2], ['Sn', 1]])]
+        hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'], no_plot=True, pathways=True, subcmd='voltage')
+        self.assertEqual(len(hull.voltages), len(hull.Q))
+        for ind in range(len(hull.voltages)):
+            self.assertTrue(len(hull.voltages[ind])-1, len(hull.Q[ind]) or len(hull.voltages[ind]) == len(hull.Q[ind]))
+        self.assertAlmostEqual(hull.Q[ind][-2], 425.7847612)
+        for ind in range(len(hull.voltages)):
+            assert len(hull.Q[ind]) == len(hull.voltages[ind])
+            assert np.isnan(hull.Q[ind][-1])
+            assert hull.voltages[ind][-1] == 0
+
+    def testTernaryVoltageWithSinglePhaseRegion(self):
+        # load old hull then rejig it to go through a ternary phase
+        res_list = glob(REAL_PATH + 'data/hull-LiSiP/*.res')
+        cursor = [res2dict(res)[0] for res in res_list]
+        hull = QueryConvexHull(cursor=cursor, elements=['Li', 'Si', 'P'], pathways=True, no_plot=True, subcmd='voltage')
+        self.assertEqual(len(hull.voltages), len(hull.Q))
+        for ind in range(len(hull.voltages)):
+            self.assertTrue(len(hull.voltages[ind])-1, len(hull.Q[ind]) or len(hull.voltages[ind]) == len(hull.Q[ind]))
+        for ind in range(len(hull.voltages)):
+            assert len(hull.Q[ind]) == len(hull.voltages[ind])
+            assert np.isnan(hull.Q[ind][-1])
+            assert hull.voltages[ind][-1] == 0
 
 
 if __name__ == '__main__':
-    unittest.main()
+    unittest.main(buffer=True, verbosity=2)

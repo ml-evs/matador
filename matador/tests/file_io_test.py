@@ -85,6 +85,7 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(test_dict['num_atoms'], 8, msg='Wrong number of atoms!')
             self.assertTrue(['Li', 1] in test_dict['stoichiometry'], msg='Wrong stoichiometry!')
             self.assertTrue(['Zn', 1] in test_dict['stoichiometry'], msg='Wrong stoichiometry!')
+            self.assertTrue(sorted(test_dict['stoichiometry']) == test_dict['stoichiometry'], msg='Wrong stoichiometry!')
             self.assertEqual(test_dict['cell_volume'], 105.918342, msg='Wrong cell volume!')
             self.assertEqual(test_dict['space_group'], 'Pmc2_1', msg='Wrong space group!')
             self.assertEqual(test_dict['lattice_abc'], [[5.057429, 4.93404, 4.244619], [90.0, 90.0, 90.0]], msg='Wrong lattice constants!')
