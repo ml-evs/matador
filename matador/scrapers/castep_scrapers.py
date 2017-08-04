@@ -137,6 +137,7 @@ def res2dict(seed, db=True, verbosity=0, **kwargs):
                 else:
                     temp_stoich.append([key, value/gcd_val])
         res['stoichiometry'] = temp_stoich
+        res['stoichiometry'] = sorted(res['stoichiometry'])
         atoms_per_fu = 0
         for elem in res['stoichiometry']:
             atoms_per_fu += elem[1]
@@ -515,6 +516,7 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
                     else:
                         temp_stoich.append([key, value/gcd_val])
                 castep['stoichiometry'] = temp_stoich
+                castep['stoichiometry'] = sorted(castep['stoichiometry'])
                 atoms_per_fu = 0
                 for elem in castep['stoichiometry']:
                     atoms_per_fu += elem[1]
