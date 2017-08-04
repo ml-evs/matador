@@ -74,7 +74,7 @@ class PDF(object):
         if kwargs.get('max_num_images'):
             self.max_num_images = kwargs.get('max_num_images')
         else:
-            self.max_num_images = 30
+            self.max_num_images = 50
         self.doc = doc
         self.lattice = np.asarray(doc['lattice_cart'])
         self.poscart = np.asarray(frac2cart(doc['lattice_cart'], doc['positions_frac']))
@@ -307,14 +307,15 @@ class PDF(object):
                         any_in_sphere = True
                 test_num_images += 1
                 if test_num_images > self.max_num_images:
-                    print(self.image_vec)
                     print('Something has probably gone wrong; required images reached {}.'.format(self.max_num_images))
+                    print('text_id:')
                     print(self.doc['text_id'])
+                    print('lattice_abc:')
                     if 'lattice_abc' in self.doc:
                         print(self.doc['lattice_abc'])
                     else:
                         print(cart2abc(self.doc['lattice_cart']))
-                    raise RuntimeError
+                    break
         else:
             self.image_vec = product(range(-self.num_images, self.num_images+1), repeat=3)
         if self.debug:
