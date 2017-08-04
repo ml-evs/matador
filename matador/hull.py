@@ -616,10 +616,6 @@ class QueryConvexHull(object):
                 self.voltages.append(voltages)
                 print('\n')
             assert len(self.Q) == len(self.voltages)
-            for ind in range(len(self.voltages)):
-                assert len(self.Q[ind]) == len(self.voltages[ind])
-                assert np.isnan(self.Q[ind][-1])
-                assert self.voltages[ind][-1] == 0
 
         print('Voltage data:')
         data_str = ''
