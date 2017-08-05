@@ -287,6 +287,11 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, spin=Fa
                         str(doc['spectral_kpoints_mp_offset'][0]) + ' ' +
                         str(doc['spectral_kpoints_mp_offset'][1]) + ' ' +
                         str(doc['spectral_kpoints_mp_offset'][2]) + '\n')
+            elif 'spectral_kpoints_mp_grid' in doc:
+                f.write('SPECTRAL_KPOINTS_MP_GRID ' +
+                        str(doc['spectral_kpoints_mp_grid'][0]) + ' ' +
+                        str(doc['spectral_kpoints_mp_grid'][1]) + ' ' +
+                        str(doc['spectral_kpoints_mp_grid'][2]) + '\n')
             if 'spectral_kpoints_mp_spacing' in doc:
                 f.write('SPECTRAL_KPOINTS_MP_SPACING ' +
                         str(doc['spectral_kpoints_mp_spacing']) + '\n')
