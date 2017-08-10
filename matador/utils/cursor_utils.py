@@ -96,11 +96,17 @@ def display_results(cursor, args=None, argstr=None, hull=False, markdown=False, 
         formula_string.append(formula_substring)
         if not markdown:
             if hull and np.abs(doc.get('hull_distance')) <= 0.0 + 1e-12:
-                struct_string.append(
-                    '* ' + "{:^22}".format(doc['text_id'][0]+' '+doc['text_id'][1]))
+                if 'text_id' not in doc:
+                    struct_string.append('* ' + "{:^22}".format('xxx yyy'))
+                else:
+                    struct_string.append(
+                        '* ' + "{:^22}".format(doc['text_id'][0]+' '+doc['text_id'][1]))
             else:
-                struct_string.append(
-                    "{:^24}".format(doc['text_id'][0]+' '+doc['text_id'][1]))
+                if 'text_id' not in doc:
+                    struct_string.append("{:^24}".format('xxx yyy'))
+                else:
+                    struct_string.append(
+                        "{:^24}".format(doc['text_id'][0]+' '+doc['text_id'][1]))
             try:
                 if doc['quality'] == 0:
                     struct_string[-1] += "{:^5}".format('!!!')
