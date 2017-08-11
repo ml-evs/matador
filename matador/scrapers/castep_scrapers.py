@@ -170,7 +170,7 @@ def cell2dict(seed, db=True, outcell=False, positions=False, verbosity=0, **kwar
         for line_no, line in enumerate(flines):
             if line.startswith(('#', '!')):
                 continue
-            elif '%block lattice_cart' in line.lower() and (outcell or not db):
+            elif '%block lattice_cart' in line.lower() and outcell:
                 cell['lattice_cart'] = []
                 i = 1
                 while 'endblock' not in flines[line_no+i].lower():
