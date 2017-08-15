@@ -112,23 +112,26 @@ class VoronoiSimilarityTest(unittest.TestCase):
         plot_doc_strucs(doc)
         self.assertTrue(len(doc['unique_sites']['Li']) == 1)
 
-    def testLi3P(self):
+    def testLi3P_known_phases(self):
         from matador.scrapers.castep_scrapers import res2dict
         rtol = 1e-3
         atol = 2e-1
-        doc, s = res2dict(REAL_PATH + 'data/hull-LiP-mdm_chem_mater/LiP-CollCode165990.res')
+        doc, s = res2dict(REAL_PATH + 'data/hull-LiP-mdm_searches/LiP-CollCode26880.res')
         set_site_array(doc)
         get_unique_sites(doc, rtol=rtol, atol=atol)
         plot_doc_strucs(doc)
-        # self.assertTrue(len(doc['unique_sites']['Li']) == 1)
+        doc, s = res2dict(REAL_PATH + 'data/hull-LiP-mdm_searches/LiP-CollCode81565.res')
+        set_site_array(doc)
+        get_unique_sites(doc, rtol=rtol, atol=atol)
+        plot_doc_strucs(doc)
 
     def testAl5Y3O12Garnet(self):
         from matador.scrapers.castep_scrapers import cell2dict
         # rtol = 1e-3
         # atol = 1e-1
-        doc, s = cell2dict(REAL_PATH + 'data/Al5Y3O12.cell', db=False, positions=True)
+        doc, s = cell2dict(REAL_PATH + 'data/Al5Y3O12.cell', db=False, outcell=True, positions=True)
         set_site_array(doc)
-        get_unique_sites(doc, rtol=rtol, atol=atol)
+        get_unique_sites(doc)
         print(doc['similar_sites'])
         plot_doc_strucs(doc)
         # self.assertTrue(len(doc['unique_sites']['Li']) == 1)
