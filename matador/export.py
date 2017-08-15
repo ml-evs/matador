@@ -165,7 +165,7 @@ def doc2param(doc, path, hash_dupe=True, overwrite=False, *args):
                          'opt_strategy', 'page_wvfns', 'num_dump_cycles', 'bs_write_eigenvalues',
                          'backup_interval', 'fixed_npw', 'mix_cut_off_energy', 'mix_charge_amp',
                          'mixing_scheme', 'mix_charge_gmax', 'geom_force_tol',
-                         'perc_extra_bands', 'nextra_bands',
+                         'perc_extra_bands', 'nextra_bands', 'sedc_apply', 'sedc_scheme',
                          'elec_energy_tol', 'grid_scale', 'spin', 'continuation', 'mix_spin_amp',
                          'spin_treatment', 'spin_fix', 'geom_spin_fix', 'spin_unit',
                          'fine_grid_scale', 'spectral_task', 'write_formatted_density'])
