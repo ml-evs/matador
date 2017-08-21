@@ -103,8 +103,7 @@ class QueryConvexHull(object):
             self.set_plot_param()
 
         if self.args['subcmd'] == 'voltage':
-            if self.hull_cutoff > 0:
-                self.voltage_curve([doc for doc in self.hull_cursor if doc['hull_distance'] <= 1e-9])
+            self.voltage_curve([doc for doc in self.hull_cursor if doc['hull_distance'] <= 1e-9])
             if not self.args.get('no_plot'):
                 if self.args.get('subplot'):
                     self._subplot_voltage_hull()
@@ -1051,10 +1050,10 @@ class QueryConvexHull(object):
             concs = np.asarray(concs)
             hull_dist = np.asarray(hull_dist)
 
-        Ncolours = 100
+        Ncolours = len(self.default_cmap_list)
         min_cut = 0.01
         max_cut = 0.2
-        colours_hull = self.default_cmap(np.linspace(min_cut, max_cut, Ncolours))
+        colours_hull = self.default_cmap_list
 
         cmap = self.default_cmap
         cmap_full = plt.cm.get_cmap('Pastel2')
@@ -1448,7 +1447,8 @@ class QueryConvexHull(object):
             print_exc()
             self.mpl_new_ver = False
         Dark2_8 = plt.cm.get_cmap('Dark2').colors
-        self.default_cmap = get_linear_cmap(Dark2_8[1:4])
+        self.default_cmap_list = get_linear_cmap(Dark2_8[1:4], list_only=True)
+        self.default_cmap = get_linear_cmap(Dark2_8[1:4], list_only=False)
         # first colour reserved for hull
         # penultimate colour reserved for off hull above cutoff
         # last colour reserved for OQMD
@@ -1525,7 +1525,7 @@ class QueryConvexHull(object):
         return
 
 
-def get_linear_cmap(colours, N=100):
+def get_linear_cmap(colours, N=100, list_only=False):
     from matplotlib.colors import LinearSegmentedColormap
     uniq_colours = []
     _colours = [tuple(colour) for colour in colours]
@@ -1542,7 +1542,10 @@ def get_linear_cmap(colours, N=100):
         diff_norm = diff / repeat
         for i in range(repeat):
             linear_cmap.append(np.asarray(colour) + i*diff_norm)
-    return LinearSegmentedColormap.from_list('linear_cmap', linear_cmap)
+    if list_only:
+        return linear_cmap
+    else:
+        return LinearSegmentedColormap.from_list('linear_cmap', linear_cmap, N=N)
 
 
 class FakeHull:
