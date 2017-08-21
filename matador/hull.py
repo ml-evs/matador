@@ -103,7 +103,8 @@ class QueryConvexHull(object):
             self.set_plot_param()
 
         if self.args['subcmd'] == 'voltage':
-            self.voltage_curve(self.hull_cursor)
+            if self.hull_cutoff > 0:
+                self.voltage_curve([doc for doc in self.hull_cursor if doc['hull_distance'] <= 1e-9])
             if not self.args.get('no_plot'):
                 if self.args.get('subplot'):
                     self._subplot_voltage_hull()
@@ -733,9 +734,10 @@ class QueryConvexHull(object):
                 # if no specified hull cutoff, ignore labels and colour
                 # by distance from hull
                 cmap_full = plt.cm.get_cmap('Dark2')
-                cmap = colours.LinearSegmentedColormap.from_list(
-                    'trunc({n},{a:.2f},{b:.2f})'.format(n=cmap_full.name, a=0, b=1),
-                    cmap_full(np.linspace(0.15, 0.4, 100)))
+                cmin = 0.15
+                cmax = 0.5
+                cindmin, cindmax = int(cmin*len(cmap_full.colors)), int(cmax*len(cmap_full.colors))
+                cmap = colours.LinearSegmentedColormap.from_list('Dark2', cmap_full.colors[cindmin:cindmax])
                 if plot_points:
                     scatter = ax.scatter(self.structures[np.argsort(self.hull_dist), 0][::-1],
                                          self.structures[np.argsort(self.hull_dist), -1][::-1],
@@ -1049,12 +1051,14 @@ class QueryConvexHull(object):
             concs = np.asarray(concs)
             hull_dist = np.asarray(hull_dist)
 
-        Ncolours = 1000
+        Ncolours = 100
         min_cut = 0.01
         max_cut = 0.2
-        min_colour = 0.15
-        max_colour = 0.4
-        colours_hull = plt.cm.Dark2(np.linspace(min_colour, max_colour, Ncolours))
+        colours_hull = self.default_cmap(np.linspace(min_cut, max_cut, Ncolours))
+
+        cmap = self.default_cmap
+        cmap_full = plt.cm.get_cmap('Pastel2')
+        pastel_cmap = colours.LinearSegmentedColormap.from_list('Pastel2', cmap_full.colors)
 
         for plane in self.hull.planes:
             plane.append(plane[0])
@@ -1065,11 +1069,6 @@ class QueryConvexHull(object):
             for phase in stable:
                 if phase[0] == 0 and phase[1] != 0 and phase[2] != 0:
                     ax.plot([scale*phase, [scale, 0, 0]], c='r', alpha=0.2, lw=6, zorder=99)
-
-        cmap_full = plt.cm.get_cmap('Dark2')
-        cmap = colours.LinearSegmentedColormap.from_list(
-            'trunc({n},{a:.2f},{b:.2f})'.format(n=cmap_full.name, a=0, b=1),
-            cmap_full(np.linspace(min_colour, max_colour, Ncolours)))
 
         colours_list = []
         colour_metric = hull_dist
@@ -1099,7 +1098,7 @@ class QueryConvexHull(object):
             for (i, j, k) in simplex_iterator(scale):
                 capacities[(i, j, k)] = get_generic_grav_capacity([float(i)/scale, float(j)/scale, float(scale-i-j)/scale], self.elements)
             ax.heatmap(capacities, style="hexagonal", cbarlabel='Gravimetric capacity (maH/g)',
-                       vmin=0, vmax=3000, cmap='Pastel2')
+                       vmin=0, vmax=3000, cmap=pastel_cmap)
         elif self.args.get('efmap'):
             energies = dict()
             fake_structures = []
@@ -1419,6 +1418,7 @@ class QueryConvexHull(object):
         except:
             print_exc()
             pass
+
         if self.args.get('pdf') or self.args.get('png'):
             try:
                 plt.style.use('article')
@@ -1447,12 +1447,14 @@ class QueryConvexHull(object):
         except:
             print_exc()
             self.mpl_new_ver = False
-        Dark2_8 = ['#1b9e77', '#d95f02', '#7570b3', '#e7298a',
-                   '#66a61e', '#e6ab02', '#a6761d', '#666666']
+        Dark2_8 = plt.cm.get_cmap('Dark2').colors
+        self.default_cmap = get_linear_cmap(Dark2_8[1:4])
         # first colour reserved for hull
         # penultimate colour reserved for off hull above cutoff
         # last colour reserved for OQMD
-        self.colours = Dark2_8
+        Dark2_8_hex = ['#1b9e77', '#d95f02', '#7570b3', '#e7298a',
+                       '#66a61e', '#e6ab02', '#a6761d', '#666666']
+        self.colours = Dark2_8_hex
         self.colours.append('#bc80bd')
         return
 
@@ -1521,6 +1523,26 @@ class QueryConvexHull(object):
         ax.set_xlabel('Gravimetric capacity (mAh/g)')
         plt.show()
         return
+
+
+def get_linear_cmap(colours, N=100):
+    from matplotlib.colors import LinearSegmentedColormap
+    uniq_colours = []
+    _colours = [tuple(colour) for colour in colours]
+    for colour in _colours:
+        if colour not in uniq_colours:
+            uniq_colours.append(colour)
+    _colours = uniq_colours
+    linear_cmap = []
+    repeat = int(N/len(_colours))
+    for ind, colour in enumerate(_colours):
+        if ind == len(_colours) - 1:
+            break
+        diff = np.asarray(_colours[ind+1]) - np.asarray(_colours[ind])
+        diff_norm = diff / repeat
+        for i in range(repeat):
+            linear_cmap.append(np.asarray(colour) + i*diff_norm)
+    return LinearSegmentedColormap.from_list('linear_cmap', linear_cmap)
 
 
 class FakeHull:
