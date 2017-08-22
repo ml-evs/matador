@@ -344,6 +344,8 @@ if __name__ == '__main__':
     structure_flags.add_argument('-cntr', '--cnt_radius', type=float,
                                  help='specify the radius of the encapsulating nanotube \
                                        to within 0.01 A')
+    structure_flags.add_argument('-cntv', '--cnt_vector', type=int, nargs='+',
+                                 help='specify the chiral vector of the encapsulating nanotube')
     structure_flags.add_argument('-ecut', '--cutoff', type=float, nargs='+',
                                  help='specify the minimum and optionally maximum planewave cutoff.')
     structure_flags.add_argument('--sedc', type=str,
@@ -436,7 +438,9 @@ if __name__ == '__main__':
     query_flags.add_argument('-s', '--summary', action='store_true',
                              help='show only the ground state for each stoichiometry.')
     query_flags.add_argument('-t', '--top', type=int,
-                             help='number of structures to show (DEFAULT: 10)')
+                             help='number of structures to show/write (DEFAULT: 10)')
+    query_flags.add_argument('-dE', '--delta_E', type=float,
+                             help='maximum distance from ground state structure to show/write in eV/atom')
     query_flags.add_argument('-d', '--details', action='store_true',
                              help='show as much detail about calculation as possible')
     query_flags.add_argument('-pa', '--per_atom', action='store_true',

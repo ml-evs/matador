@@ -79,6 +79,8 @@ class DBQuery(object):
         else:
             self.top = self.args.get('top') if self.args.get('top') is not None else 10
 
+        self.delta_E = self.args.get('delta_E')
+
         # define some periodic table macros
         self.periodic_table = get_periodic_table()
 
@@ -204,6 +206,10 @@ class DBQuery(object):
             self.query_dict['$and'].append(self.query_cnt_radius())
             self.empty_query = False
 
+        if self.args.get('cnt_vector') is not None:
+            self.query_dict['$and'].append(self.query_cnt_vector())
+            self.empty_query = False
+
         if self.args.get('sedc') is not None:
             self.query_dict['$and'].append(self.query_sedc())
             self.empty_query = False
@@ -258,12 +264,31 @@ class DBQuery(object):
                     print(cursor_count, 'results found for query in', collection+'.')
                 if self.args.get('subcmd') != 'hull' and self.args.get('subcmd') != 'voltage' and self.args.get('subcmd') != 'swaps':
                     if cursor_count >= 1:
-                        if self.top == -1:
+                        if self.delta_E is not None:
+                            self.cursor = list(self.cursor)
+                            gs_enthalpy = self.cursor[0]['enthalpy_per_atom']
+                            if self.debug:
+                                print('Filtering by {} eV/atom'.format(self.delta_E))
+                                print('gs_enthalpy = {}'.format(gs_enthalpy))
+                            num_to_display = 1
+                            for doc in self.cursor[1:]:
+                                if self.debug:
+                                    print('dE = {}, {} {}'.format(doc['enthalpy_per_atom'] - gs_enthalpy, doc['text_id'][0], doc['text_id'][1]))
+                                if doc['enthalpy_per_atom'] - gs_enthalpy > self.delta_E:
+                                    break
+                                else:
+                                    num_to_display += 1
+                            self.num_to_display = num_to_display
+                            if self.debug:
+                                print('Displaying top {}'.format(self.num_to_display))
+                        elif self.top == -1:
+                            self.num_to_display = cursor_count
                             self.top = cursor_count
-                        if cursor_count > self.top:
-                            display_results(list(self.cursor)[:self.top], args=self.args)
+                        elif cursor_count > self.top:
+                            self.num_to_display = self.top
                         else:
-                            display_results(list(self.cursor), args=self.args)
+                            self.num_to_display = cursor_count
+                    display_results(list(self.cursor)[:self.num_to_display], args=self.args)
 
             # building hull from just comp, find best structure to calc_match
             if self.args.get('id') is None and (self.args.get('subcmd') == 'hull' or
@@ -698,6 +723,18 @@ class DBQuery(object):
         query_dict['cnt_radius'] = dict()
         query_dict['cnt_radius']['$gt'] = cnt_rad[0] - 0.01
         query_dict['cnt_radius']['$lt'] = cnt_rad[0] + 0.01
+
+        return query_dict
+
+    def query_cnt_vector(self):
+        """ Query structures within a nanotube of given chiral vector. """
+        query_dict = dict()
+        if not isinstance(self.args.get('cnt_vector'), list) or len(self.args.get('cnt_vector')) != 2:
+            exit('CNT vector query needs to be of form [n, m]')
+        else:
+            chiral_vec = self.args.get('cnt_vector')
+        query_dict['cnt_chiral'] = dict()
+        query_dict['cnt_chiral']['$eq'] = chiral_vec
 
         return query_dict
 
