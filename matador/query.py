@@ -288,7 +288,7 @@ class DBQuery(object):
                             self.num_to_display = self.top
                         else:
                             self.num_to_display = cursor_count
-                    display_results(list(self.cursor)[:self.num_to_display], args=self.args)
+                        display_results(list(self.cursor)[:self.num_to_display], args=self.args)
 
             # building hull from just comp, find best structure to calc_match
             if self.args.get('id') is None and (self.args.get('subcmd') == 'hull' or
@@ -924,7 +924,10 @@ def parse_element_string(elements_str, stoich=False):
     if stoich:
         tmp_stoich = elements
         for ind, strng in enumerate(elements):
-            tmp_stoich[ind] = [elem for elem in re.split(r'([0-9]*)', strng) if elem]
+            if not any(char.isdigit() for char in strng):
+                tmp_stoich[ind] = [strng]
+            else:
+                tmp_stoich[ind] = [elem for elem in re.split(r'([0-9]*)', strng) if elem]
         elements = [item for sublist in tmp_stoich for item in sublist]
     # split macros
     while '[' in elements or '][' in elements:
