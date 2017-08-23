@@ -128,6 +128,29 @@ class CellUtilTest(unittest.TestCase):
             # print('sup')
             # print(primitive_supercell)
 
+    def testRecipToReal(self):
+        from matador.utils.cell_utils import real2recip
+        real_lattice = [[5.5902240, 0, 0], [3.7563195, 4.1401290, 0], [-2.9800295, -1.3200288, 8.5321695]]
+        recip_lattice = real2recip(real_lattice)
+        np.testing.assert_array_almost_equal(np.asarray(recip_lattice),
+                                             np.asarray([[1.1239595, -1.0197632, 0.2347956], [0.0, 1.5176303, 0.2347956], [0, 0, 0.7364112]]))
+
+        real_lattice = [[6.0235150, 0, 0], [0.0, 5.6096010, 0], [-5.0202472, 0, 10.0218337]]
+        recip_lattice = real2recip(real_lattice)
+        np.testing.assert_array_almost_equal(np.asarray(recip_lattice),
+                                             np.asarray([[1.0431094, 0, 0.5225256], [0, 1.1200770, 0], [0, 0, 0.6269494]]))
+
+    def testCalcMPSpacing(self):
+        from matador.utils.cell_utils import calc_mp_spacing
+        real_lattice = [[6.0235150, 0, 0], [0.0, 5.6096010, 0], [-5.0202472, 0, 10.0218337]]
+        mp_grid = [4, 4, 2]
+        spacing = calc_mp_spacing(real_lattice, mp_grid, prec=3)
+        self.assertEqual(spacing, 0.05)
+        spacing = calc_mp_spacing(real_lattice, mp_grid, prec=2)
+        self.assertAlmostEqual(spacing, 0.05)
+        spacing = calc_mp_spacing(real_lattice, mp_grid, prec=5)
+        self.assertAlmostEqual(spacing, 0.05, places=3)
+
 
 def pdf_sim_dist(doc_test, doc_supercell):
     doc_test['text_id'] = ['test', 'cell']

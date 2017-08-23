@@ -137,11 +137,9 @@ def calc_mp_spacing(real_lat, mp_grid, prec=2):
     recip_lat = real2recip(real_lat)
     recip_len = np.zeros((3))
     recip_len = np.sqrt(np.sum(np.power(recip_lat, 2), axis=1))
-    max_spacing = 0
-    for j in range(3):
-        spacing = recip_len[j] / (2*pi*mp_grid[j])
-        max_spacing = (spacing if spacing > max_spacing else max_spacing)
-    exponent = round(log10(max_spacing) - 1)
+    spacing = recip_len / (2*pi*np.asarray(mp_grid))
+    max_spacing = np.max(spacing)
+    exponent = round(log10(max_spacing) - prec)
     return round(max_spacing + 0.5*10**exponent, prec)
 
 
