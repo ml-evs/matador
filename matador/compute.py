@@ -85,6 +85,7 @@ class FullRelaxer:
         self.conv_kpt_bool = isinstance(conv_kpt, list)
         self.conv_cutoff = conv_cutoff
         self.conv_kpt = conv_kpt
+        self.enough_memory = True
         if self.kpts_1D:
             assert('kpoints_mp_spacing' in cell_dict)
             self.target_spacing = deepcopy(cell_dict['kpoints_mp_spacing'])
