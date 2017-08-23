@@ -3,10 +3,16 @@ from __future__ import print_function
 from matador.scrapers.castep_scrapers import castep2dict
 from os import walk, chdir
 from os.path import isdir
+from decimal import Decimal, ROUND_UP
 from collections import defaultdict
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')
+
+
+def round(n, prec):
+    """ Replace default (bankers) rounding with "normal" rounding."""
+    return float(Decimal(str(n)).quantize(Decimal('0.05'), rounding=ROUND_UP))
 
 
 def get_files(path):
@@ -91,6 +97,8 @@ def get_kpts(structure_files):
     # print(kpt_chempots_dict)
     # print(kpt_chempots)
 
+    print(kpt_chempots_dict)
+
     kpt_form = defaultdict(list)
     stoich_list = dict()
     for key in structure_files:
@@ -103,7 +111,11 @@ def get_kpts(structure_files):
                 doc['formation_energy_per_atom'] = doc['total_energy_per_atom']
                 print('!', round(doc['kpoints_mp_spacing'], 2), doc['kpoints_mp_spacing'])
                 for atom in doc['atom_types']:
-                    doc['formation_energy_per_atom'] -= kpt_chempots_dict[str(round(doc['kpoints_mp_spacing'], 2))][atom] / len(doc['atom_types'])
+                    try:
+                        doc['formation_energy_per_atom'] -= kpt_chempots_dict[str(round(doc['kpoints_mp_spacing'], 2))][atom] / len(doc['atom_types'])
+                    except:
+                        print('!!!!!!!!!', doc['kpoints_mp_spacing'])
+                        doc['formation_energy_per_atom'] -= kpt_chempots_dict[str(round(doc['kpoints_mp_spacing'], 2))][atom] / len(doc['atom_types'])
                 kpt_form[key].append([num_k, doc['formation_energy_per_atom']])
                 stoich_list[key] = (doc['stoichiometry'][1][0])
                 stoich_list[key] += ('$_\mathrm{' + str(doc['stoichiometry'][1][1]) + '}$') if doc['stoichiometry'][1][1] != 1 else ''
@@ -137,13 +149,13 @@ def plot_both(cutoff_chempots, kpt_chempots,
         ax.plot(-1/cutoff_form[key][:, 0], np.abs(cutoff_form[key][:, 1]-cutoff_form[key][-1, 1])*1000,
                 'o-', markersize=5, alpha=1, label=cutoff_stoich_list[key], lw=1, zorder=1000)
     # for key in cutoff_chempots:
-        # ax_chempots.plot(-1/cutoff_chempots[key][:, 0], np.abs(cutoff_chempots[key][:, 1]-cutoff_chempots[key][-1, 1])*1000, 'o-', markersize=5, alpha=1, label=cutoff_chempot_list[key], lw=1)
+        # print(cutoff_chempots[key][:, 1] - cutoff_chempots[key][-1, 1])
+        # ax.plot(-1/cutoff_chempots[key][:, 0], np.abs(cutoff_chempots[key][:, 1]-cutoff_chempots[key][-1, 1])*1000, 'o-', markersize=5, alpha=1, label=cutoff_chempot_list[key], lw=1)
     ax.set_ylabel('Relative energy difference (meV/atom)')
     ax.set_xlabel('plane wave cutoff (eV)')
     cutoffs = np.loadtxt('cutoff.conv')
     ax.set_xticks(-1/cutoffs)
     ax.set_xticklabels(cutoffs)
-    ax.legend(loc='upper center', fontsize=10, ncol=4, shadow=True, bbox_to_anchor=(1.0, 1.25))
     # ax.set_ylim(-0.002e3, 0.03e3)
     # ax.set_yticklabels(ax.get_yticks())
     ax.grid('off')
@@ -156,6 +168,7 @@ def plot_both(cutoff_chempots, kpt_chempots,
     ax2.set_xticks(kpts)
     ax2.set_xlabel('max k-point spacing (1/A)')
     ax2.grid('off')
+    ax2.legend(loc='upper center', fontsize=10, ncol=4, shadow=True, bbox_to_anchor=(1.0, 1.25))
 
     # subax = plt.axes([.3, .50, .16, .36], axisbg='w')
     # for key in cutoff_form:
