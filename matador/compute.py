@@ -59,7 +59,7 @@ class FullRelaxer:
                  ncores, nnodes, node,
                  executable='castep', rough=None, spin=False,
                  reopt=False, custom_params=False, memcheck=False, maxmem=None, killcheck=True,
-                 kpts_1D=False, conv_cutoff=None, conv_kpt=None, archer=False, bnl=False,
+                 kpts_1D=False, conv_cutoff=None, conv_kpt=None, archer=False, bnl=False, intel_mpi=False,
                  start=True, redirect=False, verbosity=0, debug=False):
         """ Make the files to run the calculation and handle
         the calling of CASTEP itself.
@@ -68,6 +68,7 @@ class FullRelaxer:
         self.res = res
         self.archer = archer
         self.bnl = bnl
+        self.intel_mpi = intel_mpi
         self.nnodes = nnodes
         self.node = node
         self.verbosity = verbosity
