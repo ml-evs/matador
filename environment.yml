@@ -1,0 +1,10 @@
+name: matador
+channels:
+    - conda-forge
+dependencies:
+    - python=3.5
+    - numpy>=1.10
+    - scipy>=0.18
+    - periodictable>=0.14
+    - psutil
+    - spglib>=1.9
