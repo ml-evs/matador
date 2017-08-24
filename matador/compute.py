@@ -155,7 +155,8 @@ class FullRelaxer:
 
                 # do memcheck, if desired, and only continue if enough memory is free
                 if self.memcheck:
-                    print('Trying to perform memcheck...')
+                    if self.verbosity > 1:
+                        print('Trying to perform memcheck...')
                     self.enough_memory = self.do_memcheck(calc_doc, self.seed)
                 else:
                     self.enough_memory = True
@@ -484,6 +485,11 @@ class FullRelaxer:
                                     self.executable, seed])
             elif self.bnl:
                 command = ['srun', '--exclusive', '-N', '1', '-n', str(self.ncores), self.executable, seed]
+                if self.debug:
+                    print(command)
+                process = sp.Popen(command)
+            elif self.intel_mpi:
+                command = ['mpirun', '-n', str(self.ncores), '-ppn', str(self.ncores), self.executable, seed]
                 if self.debug:
                     print(command)
                 process = sp.Popen(command)
