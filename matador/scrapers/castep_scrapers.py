@@ -857,6 +857,49 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
     return castep, True
 
 
+def bands2dict(seed):
+    """ Parse a CASTEP bands file into a dictionary.
+
+    Input:
+
+        | seed: str, path to .bands file.
+
+    """
+    from matador.utils.chem_utils import HARTREE_TO_EV
+    import numpy as np
+    bandstructure = dict()
+
+    with open(seed, 'r') as f:
+        # read whole file into RAM, typically ~ 1 MB
+        flines = f.readlines()
+    header = flines[:9]
+    data = flines[9:]
+
+    bandstructure['num_kpoints'] = int(header[0].split()[-1])
+    bandstructure['num_spins'] = int(header[1].split()[-1])
+    bandstructure['num_electrons'] = float(header[2].split()[-1])
+    bandstructure['num_bands'] = int(header[3].split()[-1])
+    bandstructure['fermi_energy_Ha'] = float(header[4].split()[-1])
+    bandstructure['fermi_energy'] = bandstructure['fermi_energy_Ha'] * HARTREE_TO_EV
+    bandstructure['lattice_cart'] = []
+    for i in range(3):
+        bandstructure['lattice_cart'].append([float(elem) for elem in header[6+i].split()])
+    bandstructure['kpoint_path'] = np.zeros((bandstructure['num_kpoints'], 3))
+    bandstructure['kpoint_weights'] = np.zeros((bandstructure['num_kpoints']))
+    bandstructure['eigenvalues_k_s'] = np.empty((bandstructure['num_spins'], bandstructure['num_bands'], bandstructure['num_kpoints']))
+
+    for nk in range(bandstructure['num_kpoints']):
+        kpt_ind = nk * (bandstructure['num_spins'] + bandstructure['num_bands'] + 1)
+        bandstructure['kpoint_path'][int(data[kpt_ind].split()[1])-1] = np.asarray([float(elem) for elem in data[kpt_ind].split()[-4:-1]])
+        for ns in range(bandstructure['num_spins']):
+            for nb in range(bandstructure['num_bands']):
+                bandstructure['eigenvalues_k_s'][ns][nb][nk] = float(data[kpt_ind+ns+2+nb].strip())
+    bandstructure['eigenvalues_k_s'] -= bandstructure['fermi_energy_Ha']
+    bandstructure['eigenvalues_k_s'] *= HARTREE_TO_EV
+    bandstructure['kpoint_path_spacing'] = np.sqrt(np.sum((bandstructure['kpoint_path'][0] - bandstructure['kpoint_path'][1])**2))
+    return bandstructure, True
+
+
 class DFTError(Exception):
     """ Quick DFT exception class for unconverged or
     non-useful calculations.

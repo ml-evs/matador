@@ -2,9 +2,8 @@
 import unittest
 import json
 import numpy as np
-from matador.scrapers.castep_scrapers import castep2dict, cell2dict, res2dict, param2dict
+from matador.scrapers.castep_scrapers import castep2dict, cell2dict, res2dict, param2dict, bands2dict
 from matador.export import doc2res
-from matador.utils.print_utils import print_warning
 from os.path import realpath
 from os import system
 
@@ -21,7 +20,7 @@ class ScrapeTest(unittest.TestCase):
             f = open(cell_fname, 'r')
         except:
             failed_open = True
-            print_warning('Failed to open test case ' + cell_fname + ' - please check installation.')
+            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(cell_fname))
 
         if not failed_open:
             f.close()
@@ -47,7 +46,7 @@ class ScrapeTest(unittest.TestCase):
             f = open(castep_fname, 'r')
         except:
             failed_open = True
-            print('Failed to open test case', castep_fname, '- please check installation.')
+            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(castep_fname))
         if not failed_open:
             f.close()
             test_dict, s = castep2dict(castep_fname, db=True, verbosity=5)
@@ -75,7 +74,7 @@ class ScrapeTest(unittest.TestCase):
             f = open(res_fname, 'r')
         except:
             failed_open = True
-            print('Failed to open test case', res_fname, '- please check installation.')
+            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(res_fname))
         if not failed_open:
             f.close()
             test_dict, s = res2dict(res_fname)
@@ -97,7 +96,7 @@ class ScrapeTest(unittest.TestCase):
             f = open(param_fname, 'r')
         except:
             failed_open = True
-            print('Failed to open test case', param_fname, '- please check installation.')
+            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(param_fname))
         if not failed_open:
             f.close()
             test_dict, s = param2dict(param_fname, db=True)
@@ -118,6 +117,24 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(test_dict['fixed_npw'], 'false', msg='Wrong db=False fixed_npw!')
             self.assertEqual(test_dict['write_checkpoint'], 'none', msg='Wrong db=False checkpointing!')
             self.assertEqual(test_dict['write_cell_structure'], True, msg='Wrong db=False cell_structure!')
+
+    def testBands(self):
+        bands_fname = REAL_PATH + 'data/KPSn.bands'
+        failed_open = False
+        try:
+            f = open(bands_fname, 'r')
+        except:
+            failed_open = True
+            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(bands_fname))
+        if not failed_open:
+            f.close()
+            bs_dict, s = bands2dict(bands_fname)
+            self.assertEqual(len(bs_dict['kpoint_path']), 518)
+            self.assertEqual(np.shape(bs_dict['eigenvalues_k_s']), (1, 518))
+            self.assertEqual(bs_dict['num_kpoints'], 518)
+            self.assertEqual(bs_dict['num_bands'], 71)
+            self.assertAlmostEqual(bs_dict['fermi_energy'], 4.0781, places=4)
+            self.assertAlmostEqual(bs_dict['kpoint_path_spacing'], 0.01, places=4)
 
 
 class ExportTest(unittest.TestCase):
