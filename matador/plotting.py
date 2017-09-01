@@ -1,9 +1,8 @@
-#!/usr/bin/env python
 from sys import argv
-from matador.utils.cell_utils import get_special_kpoints_for_lattice
+from matador.utils.cell_utils import get_special_kpoints_for_lattice, get_crystal_system
 
 
-def plot_spectral(seed, bandstructure=True, dos=True):
+def plot_spectral(seed, bandstructure=True, dos=False, **kwargs):
     from matador.scrapers.castep_scrapers import bands2dict
     import numpy as np
     import matplotlib.pyplot as plt
@@ -14,12 +13,13 @@ def plot_spectral(seed, bandstructure=True, dos=True):
     valence = colours[0]
     conduction = colours[1]
 
-    plot_window = (-10, 10)
+    if kwargs.get('plot_window') is not None:
+        plot_window = (-kwargs.get('plot_window'), kwargs.get('plot_window'))
+    else:
+        plot_window = (-5, 5)
 
     if bandstructure and not dos:
         fig, ax_bs = plt.subplots(figsize=(5, 5))
-    elif dos and not bandstructure:
-        fig, ax_dos = plt.subplots(figsize=(3, 7))
     elif bandstructure and dos:
         fig, ax_grid = plt.subplots(1, 2, figsize=(6.5, 5),
                                     gridspec_kw={'width_ratios': [5, 1],
@@ -44,7 +44,7 @@ def plot_spectral(seed, bandstructure=True, dos=True):
         ax_bs.set_ylabel('$\epsilon_k$ (eV)')
         ax_bs.set_xlim(0, 1)
         ax_bs.yaxis.grid(False)
-        lattice = 'hexagonal'
+        lattice = get_crystal_system(bs['lattice_cart'])
         special_points = get_special_kpoints_for_lattice(lattice)
         xticks = []
         xticklabels = []
@@ -68,7 +68,6 @@ def plot_spectral(seed, bandstructure=True, dos=True):
         dos = dos_data[:, 1]
         ax_dos.set_ylim(plot_window)
         ax_dos.axvline(0, c='k')
-        # ax_dos.set_xlabel('DOS)')
         ax_dos.set_yticks([])
         max_density = np.max(dos[np.where(energies > plot_window[0])])
         ax_dos.set_xticks([])
@@ -76,13 +75,12 @@ def plot_spectral(seed, bandstructure=True, dos=True):
         ax_dos.axhline(0, c='grey', ls='--', lw=1)
         ax_dos.grid('off')
         ax_dos.plot(dos, energies, lw=1, c='k')
-        # ax_dos.plot(dos[np.where(energies < 0)], energies[np.where(energies < 0)], lw=1.5, c=valence)
-        # ax_dos.plot(dos[np.where(energies >= 0)], energies[np.where(energies >= 0)], lw=1.5, c='k')
         ax_dos.fill_betweenx(energies[np.where(energies < 0)], 0, dos[np.where(energies < 0)], facecolor=valence, alpha=0.5)
         ax_dos.fill_betweenx(energies[np.where(energies >= 0)], 0, dos[np.where(energies >= 0)], facecolor=conduction, alpha=0.5)
 
+    if kwargs.get('pdf'):
+        plt.savefig(seed.replace('.bands', '') + '_spectral.pdf', bbox_inches='tight')
+    if kwargs.get('png'):
+        plt.savefig(seed.replace('.bands', '') + '_spectral.png', bbox_inches='tight', dpi=300)
+
     plt.show()
-
-
-if __name__ == '__main__':
-    plot_spectral(argv[1])

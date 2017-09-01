@@ -8,42 +8,6 @@ import numpy as np
 from math import pi, cos, sin, sqrt, acos, log10
 from functools import reduce
 
-SPECIAL_KPOINTS = {
-    'cubic': {'G': [0, 0, 0],
-              'M': [1 / 2, 1 / 2, 0],
-              'R': [1 / 2, 1 / 2, 1 / 2],
-              'X': [0, 1 / 2, 0]},
-    'fcc': {'G': [0, 0, 0],
-            'K': [3 / 8, 3 / 8, 3 / 4],
-            'L': [1 / 2, 1 / 2, 1 / 2],
-            'U': [5 / 8, 1 / 4, 5 / 8],
-            'W': [1 / 2, 1 / 4, 3 / 4],
-            'X': [1 / 2, 0, 1 / 2]},
-    'bcc': {'G': [0, 0, 0],
-            'H': [1 / 2, -1 / 2, 1 / 2],
-            'P': [1 / 4, 1 / 4, 1 / 4],
-            'N': [0, 0, 1 / 2]},
-    'tetragonal': {'G': [0, 0, 0],
-                   'A': [1 / 2, 1 / 2, 1 / 2],
-                   'M': [1 / 2, 1 / 2, 0],
-                   'R': [0, 1 / 2, 1 / 2],
-                   'X': [0, 1 / 2, 0],
-                   'Z': [0, 0, 1 / 2]},
-    'orthorhombic': {'G': [0, 0, 0],
-                     'R': [1 / 2, 1 / 2, 1 / 2],
-                     'S': [1 / 2, 1 / 2, 0],
-                     'T': [0, 1 / 2, 1 / 2],
-                     'U': [1 / 2, 0, 1 / 2],
-                     'X': [1 / 2, 0, 0],
-                     'Y': [0, 1 / 2, 0],
-                     'Z': [0, 0, 1 / 2]},
-    'hexagonal': {'G': [0, 0, 0],
-                  'A': [0, 0, 1 / 2],
-                  'H': [1 / 3, 1 / 3, 1 / 2],
-                  'K': [1 / 3, 1 / 3, 0],
-                  'L': [1 / 2, 0, 1 / 2],
-                  'M': [1 / 2, 0, 0]}}
-
 
 def abc2cart(lattice_abc):
     """ Convert lattice_abc=[[a,b,c],[alpha,beta,gamma]]
@@ -178,8 +142,38 @@ def calc_mp_spacing(real_lat, mp_grid, prec=2):
     exponent = round(log10(max_spacing) - prec)
     return round(max_spacing + 0.5*10**exponent, prec)
 
+def get_crystal_system(lattice_cart):
+    """ Return the name of the crystal system according to the definitions
+    by Setyawana & Curtarolo in Comp. Mat. Sci. 49(2), 2010:
 
-def get_special_kpoints_for_lattice(lattice):
+    http://dx.doi.org/10.1016/j.commatsci.2010.05.010.
+
+    Input:
+
+        | lattice_cart: list(list(float)), lattice vectors in format
+                        [[a1, a2, a3], [b1, b2, b3], [c1, c2, c3]].
+
+    """
+    abc, angles = cart2abc(lattice_cart)
+    return 'hexagonal'
+
+def get_bs_kpoint_path(lattice_cart):
+    """ Return the conventional kpoint path of the relevant crystal system
+    according to the definitions by Setyawana & Curtarolo in
+    Comp. Mat. Sci. 49(2), 2010:
+
+    http://dx.doi.org/10.1016/j.commatsci.2010.05.010.
+
+    Input:
+
+        | lattice_cart: list(list(float)), lattice vectors in format
+                        [[a1, a2, a3], [b1, b2, b3], [c1, c2, c3]].
+
+    """
+    return SPECIAL_KPOINT_PATHS[get_crystal_system(lattice_cart)]
+
+
+def get_special_kpoints_for_lattice(crystal_system):
     """ High-symmetry points in the IBZ for the different crystal systems.
 
     Taken from ASE,
@@ -189,8 +183,13 @@ def get_special_kpoints_for_lattice(lattice):
     who themselves took it from Setyawana & Curtarolo, Comp. Mat. Sci. 49(2), 2010:
 
     http://dx.doi.org/10.1016/j.commatsci.2010.05.010.
+
+    Input:
+
+        | crystal_system: str, one of e.g. 'hexagonal', 'monoclinic'.
+
     """
-    return SPECIAL_KPOINTS[lattice]
+    return SPECIAL_KPOINTS[crystal_system]
 
 
 def doc2spg(doc):
@@ -286,3 +285,76 @@ def create_simple_supercell(seed_doc, extension, standardize=False):
     assert np.isclose(supercell_doc['cell_volume'], num_images*doc['cell_volume'])
     assert _iter == num_images
     return supercell_doc
+
+
+SPECIAL_KPOINTS = {
+    'cubic': {'G': [0, 0, 0],
+              'M': [1 / 2, 1 / 2, 0],
+              'R': [1 / 2, 1 / 2, 1 / 2],
+              'X': [0, 1 / 2, 0]},
+    'fcc': {'G': [0, 0, 0],
+            'K': [3 / 8, 3 / 8, 3 / 4],
+            'L': [1 / 2, 1 / 2, 1 / 2],
+            'U': [5 / 8, 1 / 4, 5 / 8],
+            'W': [1 / 2, 1 / 4, 3 / 4],
+            'X': [1 / 2, 0, 1 / 2]},
+    'bcc': {'G': [0, 0, 0],
+            'H': [1 / 2, -1 / 2, 1 / 2],
+            'P': [1 / 4, 1 / 4, 1 / 4],
+            'N': [0, 0, 1 / 2]},
+    'tetragonal': {'G': [0, 0, 0],
+                   'A': [1 / 2, 1 / 2, 1 / 2],
+                   'M': [1 / 2, 1 / 2, 0],
+                   'R': [0, 1 / 2, 1 / 2],
+                   'X': [0, 1 / 2, 0],
+                   'Z': [0, 0, 1 / 2]},
+    'orthorhombic': {'G': [0, 0, 0],
+                     'R': [1 / 2, 1 / 2, 1 / 2],
+                     'S': [1 / 2, 1 / 2, 0],
+                     'T': [0, 1 / 2, 1 / 2],
+                     'U': [1 / 2, 0, 1 / 2],
+                     'X': [1 / 2, 0, 0],
+                     'Y': [0, 1 / 2, 0],
+                     'Z': [0, 0, 1 / 2]},
+    'hexagonal': {'G': [0, 0, 0],
+                  'A': [0, 0, 1 / 2],
+                  'H': [1 / 3, 1 / 3, 1 / 2],
+                  'K': [1 / 3, 1 / 3, 0],
+                  'L': [1 / 2, 0, 1 / 2],
+                  'M': [1 / 2, 0, 0]}}
+
+SPECIAL_KPOINT_PATHS = {
+    'cubic': {'G': [0, 0, 0],
+              'M': [1 / 2, 1 / 2, 0],
+              'R': [1 / 2, 1 / 2, 1 / 2],
+              'X': [0, 1 / 2, 0]},
+    'fcc': {'G': [0, 0, 0],
+            'K': [3 / 8, 3 / 8, 3 / 4],
+            'L': [1 / 2, 1 / 2, 1 / 2],
+            'U': [5 / 8, 1 / 4, 5 / 8],
+            'W': [1 / 2, 1 / 4, 3 / 4],
+            'X': [1 / 2, 0, 1 / 2]},
+    'bcc': {'G': [0, 0, 0],
+            'H': [1 / 2, -1 / 2, 1 / 2],
+            'P': [1 / 4, 1 / 4, 1 / 4],
+            'N': [0, 0, 1 / 2]},
+    'tetragonal': {'G': [0, 0, 0],
+                   'A': [1 / 2, 1 / 2, 1 / 2],
+                   'M': [1 / 2, 1 / 2, 0],
+                   'R': [0, 1 / 2, 1 / 2],
+                   'X': [0, 1 / 2, 0],
+                   'Z': [0, 0, 1 / 2]},
+    'orthorhombic': {'G': [0, 0, 0],
+                     'R': [1 / 2, 1 / 2, 1 / 2],
+                     'S': [1 / 2, 1 / 2, 0],
+                     'T': [0, 1 / 2, 1 / 2],
+                     'U': [1 / 2, 0, 1 / 2],
+                     'X': [1 / 2, 0, 0],
+                     'Y': [0, 1 / 2, 0],
+                     'Z': [0, 0, 1 / 2]},
+    'hexagonal': {'G': [0, 0, 0],
+                  'A': [0, 0, 1 / 2],
+                  'H': [1 / 3, 1 / 3, 1 / 2],
+                  'K': [1 / 3, 1 / 3, 0],
+                  'L': [1 / 2, 0, 1 / 2],
+                  'M': [1 / 2, 0, 0]}}
