@@ -157,7 +157,7 @@ def get_crystal_system(lattice_cart):
     abc, angles = cart2abc(lattice_cart)
     return 'hexagonal'
 
-def get_bs_kpoint_path(lattice_cart):
+def get_bs_kpoint_path(lattice_cart, spacing=0.01):
     """ Return the conventional kpoint path of the relevant crystal system
     according to the definitions by Setyawana & Curtarolo in
     Comp. Mat. Sci. 49(2), 2010:
@@ -169,8 +169,15 @@ def get_bs_kpoint_path(lattice_cart):
         | lattice_cart: list(list(float)), lattice vectors in format
                         [[a1, a2, a3], [b1, b2, b3], [c1, c2, c3]].
 
+    Returns:
+
+        | path  : list(list(float)), positions of kpoints.
+
     """
-    return SPECIAL_KPOINT_PATHS[get_crystal_system(lattice_cart)]
+    critical_points = SPECIAL_KPOINT_PATHS[get_crystal_system(lattice_cart)]
+    for point in critical_points:
+        critical_path.append(SPECIAL_KPOINTS[lattice][point])
+    return path
 
 
 def get_special_kpoints_for_lattice(crystal_system):
