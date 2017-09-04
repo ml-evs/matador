@@ -7,8 +7,6 @@ then a combined BS/DOS plot will be created.
 """
 
 from matador.plotting import plot_spectral
-from matador.scrapers.castep_scrapers import bands2dict
-from sys import argv
 from os.path import isfile
 import argparse
 
@@ -19,24 +17,23 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(add_help=True)
     parser.add_argument('--pdf', action='store_true',
-                            help='save pdf rather than showing plot in X')
+                        help='save pdf rather than showing plot in X')
     parser.add_argument('--png', action='store_true',
-                            help='save png rather than showing plot in X')
+                        help='save png rather than showing plot in X')
     parser.add_argument('--plot_window', type=float,
-                            help='energy window to plot either side of E_F (eV)\
-                                  (DEFAULT: 5 eV)')
+                        help='energy window to plot either side of E_F (eV)\
+                             (DEFAULT: 5 eV)')
     parser.add_argument('seed', type=str, nargs='*',
-                            help='seedname or bands file path')
+                        help='seedname or bands file path')
     kwargs = vars(parser.parse_args())
     assert len(kwargs.get('seed')) == 1, 'Seed name needed!'
-    
+
     seed = kwargs.get('seed')[0]
     del kwargs['seed']
     dos_seed = seed.replace('.bands', '')
     dos_seed += '.adaptive.dat'
     if isfile(dos_seed):
         dos = True
-
-
-
+    else:
+        dos = False
     plot = plot_spectral(seed, bandstructure=True, dos=dos, **kwargs)

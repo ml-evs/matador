@@ -1,9 +1,9 @@
-from sys import argv
-from matador.utils.cell_utils import get_special_kpoints_for_lattice, get_crystal_system
-
-
 def plot_spectral(seed, bandstructure=True, dos=False, **kwargs):
+    """ Plot bandstructure and optional DOS from <seed>.bands and
+    <seed>.adaptive.dat file.
+    """
     from matador.scrapers.castep_scrapers import bands2dict
+    from matador.utils.cell_utils import get_special_kpoints_for_lattice, get_crystal_system
     import numpy as np
     import matplotlib.pyplot as plt
     import seaborn as sns
@@ -25,10 +25,10 @@ def plot_spectral(seed, bandstructure=True, dos=False, **kwargs):
                                     gridspec_kw={'width_ratios': [5, 1],
                                                  'wspace': 0.05,
                                                  'left': 0.15})
+        ax_bs = ax_grid[0]
+        ax_dos = ax_grid[1]
 
-    ax_bs = ax_grid[0]
-    ax_dos = ax_grid[1]
-
+    seed = seed.replace('.bands', '')
     if bandstructure:
         bs, s = bands2dict(seed + '.bands')
         path = np.linspace(0, 1, int(bs['num_kpoints']))
@@ -45,22 +45,32 @@ def plot_spectral(seed, bandstructure=True, dos=False, **kwargs):
         ax_bs.set_xlim(0, 1)
         ax_bs.yaxis.grid(False)
         lattice = get_crystal_system(bs['lattice_cart'])
-        special_points = get_special_kpoints_for_lattice(lattice)
+        special_points = get_special_kpoints_for_lattice(lattice, bs['lattice_cart'])
         xticks = []
         xticklabels = []
+        shear_planes = []
         for ind, kpt in enumerate(bs['kpoint_path']):
+            if ind != len(bs['kpoint_path']-1):
+                next_point = bs['kpoint_path'][ind+1]
+            else:
+                next_point = bs['kpoint_path'][ind]
             for label, point in special_points.items():
                 if np.allclose(point, kpt):
                     if label == 'G':
-                        label = '$\Gamma$'
-                    else:
-                        label = '${}$'.format(label)
+                        label = '\Gamma'
+                    if np.sqrt(np.sum((np.asarray(next_point) - np.asarray(point))**2)) > 2*bs['kpoint_path_spacing']:
+                        for new_label, new_point in special_points.items():
+                            if np.allclose(new_point, next_point):
+                                label = '{}|{}'.format(label, new_label)
+                    label = '${}$'.format(label)
                     xticklabels.append(label)
                     xticks.append(path[ind])
+                    shear_planes.append(path[ind])
                     break
 
         ax_bs.set_xticks(xticks)
         ax_bs.set_xticklabels(xticklabels)
+        ax_bs.axvline(path[ind], ls='--', c='k')
 
     if dos:
         dos_data = np.loadtxt(seed + '.adaptive.dat')
