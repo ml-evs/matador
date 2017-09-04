@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import unittest
 from matador.utils.cell_utils import abc2cart, cart2abc, cart2volume, create_simple_supercell, doc2spg
-from matador.scrapers.castep_scrapers import castep2dict, res2dict
+from matador.scrapers.castep_scrapers import castep2dict, res2dict, bands2dict
 from matador.export import doc2res
 from matador.similarity.pdf_similarity import PDF, PDFOverlap
 from functools import reduce
@@ -150,6 +150,21 @@ class CellUtilTest(unittest.TestCase):
         self.assertAlmostEqual(spacing, 0.05)
         spacing = calc_mp_spacing(real_lattice, mp_grid, prec=5)
         self.assertAlmostEqual(spacing, 0.05, places=3)
+
+    def testKPointPath(self):
+        from matador.utils.cell_utils import get_bs_kpoint_path
+        bs, s = bands2dict(REAL_PATH + 'data/KPSn.bands')
+        labels, kpt_path = get_bs_kpoint_path(bs['lattice_cart'], debug=True)
+
+        cell, s = castep2dict(REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep')
+        labels, kpt_path = get_bs_kpoint_path(cell['lattice_cart'], debug=True)
+
+        cell, s = res2dict(REAL_PATH + 'data/KP_primitive.res', db=False)
+        labels, kpt_path = get_bs_kpoint_path(cell['lattice_cart'], debug=True)
+
+        supercell, s = res2dict(REAL_PATH + 'data/KP_supercell.res', db=False)
+        labels, supercell_kpt_path = get_bs_kpoint_path(supercell['lattice_cart'], debug=True)
+        np.testing.assert_almost_equal(kpt_path, supercell_kpt_path)
 
 
 def pdf_sim_dist(doc_test, doc_supercell):

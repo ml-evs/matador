@@ -287,14 +287,20 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, spin=Fa
                         str(doc['spectral_kpoints_mp_offset'][0]) + ' ' +
                         str(doc['spectral_kpoints_mp_offset'][1]) + ' ' +
                         str(doc['spectral_kpoints_mp_offset'][2]) + '\n')
+            if 'spectral_kpoints_mp_spacing' in doc:
+                f.write('SPECTRAL_KPOINTS_MP_SPACING ' +
+                        str(doc['spectral_kpoints_mp_spacing']) + '\n')
             elif 'spectral_kpoints_mp_grid' in doc:
                 f.write('SPECTRAL_KPOINTS_MP_GRID ' +
                         str(doc['spectral_kpoints_mp_grid'][0]) + ' ' +
                         str(doc['spectral_kpoints_mp_grid'][1]) + ' ' +
                         str(doc['spectral_kpoints_mp_grid'][2]) + '\n')
-            if 'spectral_kpoints_mp_spacing' in doc:
-                f.write('SPECTRAL_KPOINTS_MP_SPACING ' +
-                        str(doc['spectral_kpoints_mp_spacing']) + '\n')
+            elif 'spectral_kpoints_list' in doc:
+                f.write('%BLOCK SPECTRAL_KPOINTS_LIST\n')
+                weight = 1.0 / len(doc['spectral_kpoints_list'])
+                for point in doc['spectral_kpoints_list']:
+                    f.write('{p[0]} {p[1]} {p[2]} {w:.16f}\n'.format(p=point, w=weight))
+                f.write('%ENDBLOCK SPECTRAL_KPOINTS_LIST\n')
             if 'cell_constraints' in doc:
                 f.write('\n%BLOCK CELL_CONSTRAINTS\n')
                 f.write((''.join(str(doc['cell_constraints'][0]).strip('[]'))+'\n').replace(',', ''))

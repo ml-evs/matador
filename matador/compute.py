@@ -384,6 +384,16 @@ class FullRelaxer:
                 print_notify('Calculating SCF ' + seed)
             if not self.custom_params:
                 doc2param(calc_doc, seed, hash_dupe=False)
+
+            if 'spectral_task' in calc_doc and calc_doc['spectral_task'] == 'bandstructure':
+                if 'spectral_kpoints_path' not in calc_doc and 'spectral_kpoints_list' not in calc_doc:
+                    from matador.utils.cell_utils import get_bs_kpoint_path
+                    if calc_doc.get('spectral_kpoints_path_spacing') is None:
+                        spacing = 0.02
+                    else:
+                        spacing = calc_doc['spectral_kpoints_path_spacing']
+                    labels, calc_doc['spectral_kpoints_list'] = get_bs_kpoint_path(calc_doc['lattice_cart'], spacing=spacing, debug=True)
+
             doc2cell(calc_doc, seed, hash_dupe=False, copy_pspots=False)
             # run CASTEP
             process = self.castep(seed)

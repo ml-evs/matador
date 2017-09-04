@@ -265,6 +265,24 @@ def cell2dict(seed, db=True, outcell=False, positions=False, verbosity=0, **kwar
                     cell['snap_to_symmetry'] = True
                 elif 'quantisation_axis' in line.lower():
                     cell['quantisation_axis'] = list(map(int, line.split()[1:]))
+                elif 'kpoints_path' in line.lower() or 'kpoint_path' in line.lower():
+                    if 'spectral_kpoints_path_spacing' in line.lower() or 'spectral_kpoint_path_spacing' in line.lower():
+                        cell['spectral_kpoints_path_spacing'] = float(line.split()[-1])
+                    elif 'kpoints_path_spacing' in line.lower() or 'kpoint_path_spacing' in line.lower():
+                        cell['kpoints_path_spacing'] = float(line.split()[-1])
+                elif '%block spectral_kpoints_path' in line.lower() or '%block spectral_kpoint_path' in line.lower():
+                    i = 1
+                    cell['spectral_kpoints_path'] = []
+                    while '%endblock spectral_kpoints_path' not in line.lower() or '%endblock spectral_kpoint_path' not in line.lower():
+                        cell['spectral_kpoints_path'].append(list(map(float, line.split()[:3])))
+                        i += 1
+                elif '%block spectral_kpoints_list' in line.lower() or '%block spectral_kpoint_list' in line.lower():
+                    i = 1
+                    cell['spectral_kpoints_list'] = []
+                    while '%endblock spectral_kpoints_list' not in line.lower() or '%endblock spectral_kpoint_list' not in line.lower():
+                        cell['spectral_kpoints_list'].append(list(map(float, line.split()[:4])))
+                        i += 1
+
         if 'external_pressure' not in cell:
             cell['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0], [0.0]]
     except Exception as oops:
