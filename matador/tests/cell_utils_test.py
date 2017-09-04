@@ -1,11 +1,10 @@
 #!/usr/bin/env python
 import unittest
-from matador.utils.cell_utils import abc2cart, cart2abc, cart2volume, create_simple_supercell, doc2spg
+from matador.utils.cell_utils import abc2cart, cart2abc, cart2volume, create_simple_supercell
+from matador.utils.cell_utils import cart2frac, frac2cart
 from matador.scrapers.castep_scrapers import castep2dict, res2dict, bands2dict
-from matador.export import doc2res
 from matador.similarity.pdf_similarity import PDF, PDFOverlap
 from functools import reduce
-from spglib import find_primitive
 import numpy as np
 from os.path import realpath
 
@@ -35,6 +34,9 @@ class CellUtilTest(unittest.TestCase):
                                        msg='Failed to calculate volume from lattice vectors.', places=5)
                 self.assertIsInstance(test_doc['lattice_abc'], list, msg='Failed abc numpy cast to list')
                 self.assertIsInstance(test_doc['lattice_cart'], list, msg='Failed cartesian numpy cast to list')
+                cart_pos = frac2cart(test_doc['lattice_cart'], test_doc['positions_frac'])
+                back2frac = cart2frac(test_doc['lattice_cart'], cart_pos)
+                np.testing.assert_array_almost_equal(back2frac, test_doc['positions_frac'])
             except(AssertionError):
                 print('cart:', test_doc['lattice_cart'], abc2cart(test_doc['lattice_abc']))
                 print('abc:', test_doc['lattice_abc'], cart2abc(test_doc['lattice_cart']))
@@ -155,16 +157,13 @@ class CellUtilTest(unittest.TestCase):
         from matador.utils.cell_utils import get_bs_kpoint_path
         bs, s = bands2dict(REAL_PATH + 'data/KPSn.bands')
         labels, kpt_path = get_bs_kpoint_path(bs['lattice_cart'], debug=True)
+        # self.assertEqual(len(kpt_path) == 285)
 
         cell, s = castep2dict(REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep')
         labels, kpt_path = get_bs_kpoint_path(cell['lattice_cart'], debug=True)
 
         cell, s = res2dict(REAL_PATH + 'data/KP_primitive.res', db=False)
         labels, kpt_path = get_bs_kpoint_path(cell['lattice_cart'], debug=True)
-
-        supercell, s = res2dict(REAL_PATH + 'data/KP_supercell.res', db=False)
-        labels, supercell_kpt_path = get_bs_kpoint_path(supercell['lattice_cart'], debug=True)
-        np.testing.assert_almost_equal(kpt_path, supercell_kpt_path)
 
 
 def pdf_sim_dist(doc_test, doc_supercell):

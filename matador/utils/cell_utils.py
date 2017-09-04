@@ -115,7 +115,24 @@ def frac2cart(lattice_cart, positions_frac):
     for i in range(len(positions_frac)):
         for j in range(3):
             positions_abs[i] += lattice_cart[j]*positions_frac[i][j]
+    positions_frac = positions_frac.tolist()
     return positions_abs.tolist()
+
+
+def cart2frac(lattice_cart, positions_abs):
+    """ Convert positions_abs block into positions_frac (and equivalent
+    in reciprocal space).
+    """
+    positions_abs = np.asarray(positions_abs)
+    recip_lat = np.asarray(real2recip(lattice_cart))
+    recip_lat = recip_lat.T
+    positions_frac = np.zeros_like(positions_abs)
+    for ni in range(len(positions_frac)):
+        for j in range(3):
+            positions_frac[ni] += recip_lat[j] * positions_abs[ni][j]
+    positions_frac /= 2*pi
+    positions_abs.tolist()
+    return positions_frac.tolist()
 
 
 def real2recip(real_lat):
@@ -243,19 +260,23 @@ def get_bs_kpoint_path(lattice_cart, spacing=0.01, debug=False):
         print('-->'.join(critical_points))
     path = []
     special_points = get_special_kpoints_for_lattice(system, lattice_cart)
+    special_points_abs = dict()
+    for point in special_points:
+        special_points_abs[point] = frac2cart(real2recip(lattice_cart), [[float(val) for val in special_points[point]]])
+
     for i in range(len(critical_points)-1):
         point_label = critical_points[i]
         if point_label is '|':
             continue
         else:
-            point = np.asarray(special_points[point_label])
+            point = np.asarray(special_points_abs[point_label])
 
         next_point_label = critical_points[i+1]
         if next_point_label is '|':
             path.append(point.tolist())
             continue
         else:
-            next_point = np.asarray(special_points[next_point_label])
+            next_point = np.asarray(special_points_abs[next_point_label])
 
         diff = next_point - point
         diff_mag = np.sqrt(np.sum(diff**2))
@@ -266,10 +287,16 @@ def get_bs_kpoint_path(lattice_cart, spacing=0.01, debug=False):
         if i == len(critical_points) - 2:
             path.append(next_point.tolist())
 
+    path = np.reshape(path, (len(path), 3))
+    path = np.asarray(cart2frac(real2recip(lattice_cart), path))
     for point in critical_points:
         if point != '|':
-            assert special_points[point] in path, '{} is missing'.format(point)
-
+            found = False
+            for ind, bs_point in enumerate(path):
+                if np.allclose(bs_point, special_points[point]):
+                    found = True
+                    break
+            assert found, '{} is missing'.format(point)
     return critical_points, path
 
 
@@ -302,7 +329,6 @@ def get_special_kpoints_for_lattice(crystal_system, lattice_cart):
         alpha = lattice_abc[1][0]
         eta = (1 + 4 * cos((pi/180)*alpha)) / (2 + 4 * cos((pi/180)*alpha))
         nu = 0.75 - eta / 2
-        print('nu: ', nu, 'eta:', eta)
     else:
         nu = 0
         eta = 0
