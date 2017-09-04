@@ -49,28 +49,34 @@ def plot_spectral(seed, bandstructure=True, dos=False, **kwargs):
         xticks = []
         xticklabels = []
         shear_planes = []
+        blacklist = []
         for ind, kpt in enumerate(bs['kpoint_path']):
-            if ind != len(bs['kpoint_path']-1):
+            if ind != len(bs['kpoint_path'])-1:
                 next_point = bs['kpoint_path'][ind+1]
+                print(np.sqrt(np.sum((np.asarray(next_point) - np.asarray(kpt))**2)))
             else:
                 next_point = bs['kpoint_path'][ind]
             for label, point in special_points.items():
                 if np.allclose(point, kpt):
+                    if label in blacklist:
+                        continue
                     if label == 'G':
                         label = '\Gamma'
                     if np.sqrt(np.sum((np.asarray(next_point) - np.asarray(point))**2)) > 2*bs['kpoint_path_spacing']:
                         for new_label, new_point in special_points.items():
                             if np.allclose(new_point, next_point):
                                 label = '{}|{}'.format(label, new_label)
+                                shear_planes.append(path[ind])
+                                blacklist = new_label
                     label = '${}$'.format(label)
                     xticklabels.append(label)
                     xticks.append(path[ind])
-                    shear_planes.append(path[ind])
                     break
 
         ax_bs.set_xticks(xticks)
         ax_bs.set_xticklabels(xticklabels)
-        ax_bs.axvline(path[ind], ls='--', c='k')
+        for plane in shear_planes:
+            ax_bs.axvline(plane, ls='-.', lw=1, c='k')
 
     if dos:
         dos_data = np.loadtxt(seed + '.adaptive.dat')
