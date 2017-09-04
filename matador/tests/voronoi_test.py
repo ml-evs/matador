@@ -3,9 +3,9 @@ import unittest
 import numpy as np
 from os.path import realpath
 from json import load
-from matador.similarity.voronoi_similarity import get_unique_sites
+from matador.similarity.voronoi_similarity import get_unique_sites, collect_unique_sites
 from matador.similarity.voronoi_similarity import are_sites_the_same, set_substruc_dict
-from matador.similarity.voronoi_similarity import set_site_array
+from matador.similarity.voronoi_similarity import set_site_array, create_site_array
 
 
 REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
@@ -14,23 +14,45 @@ plot = False
 
 class VoronoiSimilarityTest(unittest.TestCase):
     """ Test Voronoi similarity functionality. """
-    """
     def testVoronoiHull(self):
         with open(REAL_PATH + 'data/voronoi_hull.json', 'r') as f:
             cursor = load(f)
         self.assertEqual(len(cursor), 34)
         site_count = {'K': 0, 'P': 0}
         for ind, doc in enumerate(cursor):
-            get_unique_sites(cursor[ind])
-            for elem in cursor[ind]['unique_sites']:
-                site_count[elem] += len(cursor[ind]['unique_sites'][elem])
+            set_site_array(doc)
 
-        unique_sites = collect_unique_sites(cursor)
-        self.assertIn('P', unique_sites)
-        self.assertIn('K', unique_sites)
-        for elem in unique_sites:
-            self.assertEqual(len(unique_sites[elem]), site_count[elem])
-    """
+        unique_environments = dict()
+        for elem in ['K', 'P']:
+            unique_environments[elem] = []
+            for doc in cursor:
+                get_unique_sites(doc)
+                if elem in doc['unique_substrucs']:
+                    for site in doc['unique_substrucs'][elem]:
+                        unique_environments[elem].append(site)
+                else:
+                    print(doc['stoichiometry'])
+        print(unique_environments['P'][0])
+        unique_environments, max_num_elems = create_site_array(unique_environments)
+        print(max_num_elems)
+        same = 0
+        unique = 0
+        for elem in unique_environments:
+            for i, site in enumerate(unique_environments[elem]):
+                for j in range(i, len(unique_environments[elem])):
+                    test = are_sites_the_same(unique_environments[i], unique_environments[j])
+                    print(i, j, test)
+
+
+            # get_unique_sites(cursor[ind])
+            # for elem in cursor[ind]['unique_sites']:
+                # site_count[elem] += len(cursor[ind]['unique_sites'][elem])
+
+        # unique_sites = collect_unique_sites(cursor)
+        # self.assertIn('P', unique_sites)
+        # self.assertIn('K', unique_sites)
+        # for elem in unique_sites:
+            # self.assertEqual(len(unique_sites[elem]), site_count[elem])
 
     def testOnIndividualDocs(self):
         with open(REAL_PATH + 'data/voronoi_hull.json', 'r') as f:

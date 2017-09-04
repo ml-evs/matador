@@ -1,12 +1,33 @@
 # encoding: utf-8
 """ This file implements lattice-site level measures of similarity, using
 Voronoi decompositions.
+
+Sketch of methodology:
+
+* For a list of structures, take each in turn, compute the Voronoi substructure
+and create normalised padded arrays so that they can be compared.
+
+* For each structure, find the *unique* sites, to some definition of unique, initially
+just a simple np.isclose() on the site arrays.
+
+* Now do an all-to-all comparison of the unique sites in each structure, yielding
+an overall list of unique substructures. This step should have a dial that can be turned
+such that all sites fold onto each other, or all sites become distinct, i.e. sensitivity
+vs specificity.
+
+* [OPTIONAL] The remaining unique sites across the whole list can now be clustered, if desired,
+using e.g. hierarchical clustering.
+
+* Every site in every structure can now be assigned to one of the unique sites above, or
+one of the unique clusters.
+
+* Finally, the structures themselves can be clustered by the sites that are present, if desired.
+
 """
 from collections import defaultdict
 import numpy as np
 
 from matador.utils.cell_utils import frac2cart
-from matador.voronoi_interface import get_voronoi_substructure
 
 
 def are_sites_the_same(site_A, site_B, rtol=1e-2, atol=1e-2):
@@ -107,6 +128,22 @@ def get_max_coordination_of_elem(single_elem_environments):
 
 
 def create_site_array(unique_environments, elems=None):
+    """ Create padded numpy arrays based on unique environments provided.
+
+    Input:
+
+        | unique_environments: dict(list), dict with element keys full of
+                               local substructures.
+
+    Returns:
+
+        | site_array    : dict(np.ndarray), dict with element keys full of
+                          normalised site arrays.
+        | max_num_elems : dict(dict(int)), dict with element keys containing the
+                          highest number of atoms of an element contributing
+                          to a particular site, e.g. {'P': {'K': 10}}.
+
+    """
     site_array = defaultdict(list)
     max_num_elems = dict()
     if elems is None:
@@ -143,6 +180,7 @@ def set_substruc_dict(doc):
 
     """
     if 'voronoi_substruc' not in doc:
+        from matador.voronoi_interface import get_voronoi_substructure
         doc['voronoi_substruc'] = get_voronoi_substructure(doc)
     voronoi_substruc_dict = dict()
     elems = set(doc['atom_types'])
@@ -241,7 +279,7 @@ def get_unique_sites(doc, atol=1e-2, rtol=1e-2):
         unique_sites[elem] = [next(iter(site)) for site in similar_sites[elem]]
         degeneracies[elem] = [len(_set) for _set in similar_sites[elem]]
 
-    doc['unique_sites'] = unique_sites
+    doc['unique_site_inds'] = unique_sites
     doc['unique_substrucs'] = dict()
     doc['unique_site_array'] = dict()
     doc['unique_site_stddev'] = dict()
