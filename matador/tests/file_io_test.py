@@ -2,8 +2,6 @@
 import unittest
 import json
 import numpy as np
-from matador.scrapers.castep_scrapers import castep2dict, cell2dict, res2dict, param2dict, bands2dict
-from matador.export import doc2res
 from os.path import realpath
 from os import system
 
@@ -14,6 +12,7 @@ REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
 class ScrapeTest(unittest.TestCase):
     """ Test scraper functions. """
     def testCellScraper(self):
+        from matador.scrapers.castep_scrapers import cell2dict
         cell_fname = REAL_PATH + 'data/LiP2Zn-0bm995-a_9-out.cell'
         failed_open = False
         try:
@@ -40,6 +39,7 @@ class ScrapeTest(unittest.TestCase):
             self.assertTrue(test_dict.get('lattice_cart') is None)
 
     def testCastep(self):
+        from matador.scrapers.castep_scrapers import castep2dict
         castep_fname = REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep'
         failed_open = False
         try:
@@ -68,6 +68,7 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(test_dict['estimated_mem_MB'], 345.1)
 
     def testRes(self):
+        from matador.scrapers.castep_scrapers import res2dict
         res_fname = REAL_PATH + 'data/LiPZn-r57des.res'
         failed_open = False
         try:
@@ -90,6 +91,7 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(test_dict['lattice_abc'], [[5.057429, 4.93404, 4.244619], [90.0, 90.0, 90.0]], msg='Wrong lattice constants!')
 
     def testParam(self):
+        from matador.scrapers.castep_scrapers import param2dict
         param_fname = REAL_PATH + 'data/KX.param'
         failed_open = False
         try:
@@ -119,6 +121,7 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(test_dict['write_cell_structure'], True, msg='Wrong db=False cell_structure!')
 
     def testBands(self):
+        from matador.scrapers.castep_scrapers import bands2dict
         bands_fname = REAL_PATH + 'data/KPSn.bands'
         failed_open = False
         try:
@@ -136,10 +139,34 @@ class ScrapeTest(unittest.TestCase):
             self.assertAlmostEqual(bs_dict['fermi_energy'], 4.0781, places=4)
             self.assertAlmostEqual(bs_dict['kpoint_path_spacing'], 0.01, places=4)
 
+    def testMagres(self):
+        from matador.scrapers.magres_scrapers import magres2dict
+        magres_fname = REAL_PATH + 'data/NaP.magres'
+        failed_open = False
+        try:
+            f = open(magres_fname, 'r')
+        except:
+            failed_open = True
+            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(magres_fname))
+        if not failed_open:
+            f.close()
+            magres_dict, s = magres2dict(magres_fname)
+            self.assertEqual(len(magres_dict['atom_types']), 4)
+            self.assertTrue(magres_dict['lattice_cart'][0] == [-2.503686, 2.503686, 3.540961])
+            self.assertTrue(magres_dict['lattice_cart'][1] == [2.503686, -2.503686, 3.540961])
+            self.assertTrue(magres_dict['lattice_cart'][2] == [2.503686, 2.503686, -3.540961])
+
+            np.testing.assert_almost_equal(magres_dict['susceptibility_tensor'], [[-2.3100, 0.0000, -0.0000], [-0.0000, -2.3100, -0.0000], [0.0000, -0.0000, 1.4354]])
+            np.testing.assert_almost_equal(magres_dict['chemical_shifts'], [518.15, 467.61, 467.61, 275.34], decimal=2)
+
+            self.assertEqual(magres_dict['calculator'], 'QE-GIPAW')
+
 
 class ExportTest(unittest.TestCase):
     """ Test file export functions. """
     def testDoc2Res(self):
+        from matador.scrapers.castep_scrapers import res2dict
+        from matador.export import doc2res
         res_fname = REAL_PATH + 'data/LiPZn-r57des.res'
         test_fname = REAL_PATH + 'data/doc2res.res'
         failed_open = False
@@ -168,6 +195,8 @@ class ExportTest(unittest.TestCase):
         self.compareJsonWithRes(json_fname, test_fname)
 
     def compareJsonWithRes(self, json_fname, test_fname):
+        from matador.scrapers.castep_scrapers import res2dict
+        from matador.export import doc2res
         failed_open = False
         try:
             f = open(json_fname, 'r')
