@@ -261,9 +261,6 @@ def get_bs_kpoint_path(lattice_cart, spacing=0.01, debug=False):
         diff_mag = np.sqrt(np.sum(diff**2))
         num_kpts = ceil(diff_mag / spacing)
         diff_vec = diff / num_kpts
-        print(diff_vec, diff, num_kpts)
-        print(point_label, next_point_label)
-        print(point, next_point)
         for j in range(num_kpts):
             path.append((point + j*diff_vec).tolist())
         if i == len(critical_points) - 2:
