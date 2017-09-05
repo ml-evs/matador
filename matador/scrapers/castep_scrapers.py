@@ -911,9 +911,10 @@ def bands2dict(seed):
     for nk in range(bandstructure['num_kpoints']):
         kpt_ind = nk * (bandstructure['num_spins'] + bandstructure['num_bands'] + 1)
         bandstructure['kpoint_path'][int(data[kpt_ind].split()[1])-1] = np.asarray([float(elem) for elem in data[kpt_ind].split()[-4:-1]])
+        # bandstructure['kpoint_path'][nk] = np.asarray([float(elem) for elem in data[kpt_ind].split()[-4:-1]])
         for ns in range(bandstructure['num_spins']):
             for nb in range(bandstructure['num_bands']):
-                bandstructure['eigenvalues_k_s'][ns][nb][nk] = float(data[kpt_ind+ns+2+nb].strip())
+                bandstructure['eigenvalues_k_s'][ns][nb][int(data[kpt_ind].split()[1])-1] = float(data[kpt_ind+ns+2+nb].strip())
     bandstructure['eigenvalues_k_s'] -= bandstructure['fermi_energy_Ha']
     bandstructure['eigenvalues_k_s'] *= HARTREE_TO_EV
     bandstructure['kpoint_path_spacing'] = np.sqrt(np.sum((bandstructure['kpoint_path'][0] - bandstructure['kpoint_path'][1])**2))
