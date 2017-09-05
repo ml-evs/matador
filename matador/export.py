@@ -162,7 +162,7 @@ def doc2param(doc, path, hash_dupe=True, overwrite=False, *args):
                          'write_bib', 'finite_basis_corr', 'calculate_stress',
                          'page_wvfns', 'geom_method', 'geom_max_iter', 'write_checkpoint',
                          'fix_occupancy', 'metals_method', 'max_scf_cycles', 'cut_off_energy',
-                         'opt_strategy', 'page_wvfns', 'num_dump_cycles', 'bs_write_eigenvalues',
+                         'opt_strategy', 'page_wvfns', 'num_dump_cycles', 'bs_write_eigenvalues', 'write_orbitals',
                          'backup_interval', 'fixed_npw', 'mix_cut_off_energy', 'mix_charge_amp',
                          'mixing_scheme', 'mix_charge_gmax', 'geom_force_tol',
                          'perc_extra_bands', 'nextra_bands', 'sedc_apply', 'sedc_scheme',
@@ -297,9 +297,8 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, spin=Fa
                         str(doc['spectral_kpoints_mp_grid'][2]) + '\n')
             elif 'spectral_kpoints_list' in doc:
                 f.write('%BLOCK SPECTRAL_KPOINTS_LIST\n')
-                weight = 1.0 / len(doc['spectral_kpoints_list'])
                 for point in doc['spectral_kpoints_list']:
-                    f.write('{p[0]} {p[1]} {p[2]} {w:.16f}\n'.format(p=point, w=weight))
+                    f.write('{p[0]} {p[1]} {p[2]}\n'.format(p=point))
                 f.write('%ENDBLOCK SPECTRAL_KPOINTS_LIST\n')
             if 'cell_constraints' in doc:
                 f.write('\n%BLOCK CELL_CONSTRAINTS\n')
