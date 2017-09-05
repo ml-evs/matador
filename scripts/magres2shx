@@ -1,0 +1,17 @@
+#!/usr/bin/env python
+# coding: utf-8
+from matador.scrapers import magres_scrapers
+from matador.export import doc2res
+from matador.utils.print_utils import print_notify, print_success, print_failure
+from sys import argv
+
+fnames = argv[1:]
+for fname in fnames:
+    print_notify('Reading ' + fname)
+    magres_dict, success = magres_scrapers.magres2dict(fname)
+    if success:
+        doc2res(magres_dict, fname.replace('.magres', ''), hash_dupe=True, info=False, spoof_titl=True)
+        print_success('Wrote .res file to ' + fname.replace('.cell', '') + '.res')
+    else:
+        print_failure('Unable to find final structure in ' + fname + '.')
+print_success('Completed!')

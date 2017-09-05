@@ -4,7 +4,7 @@ NMR-related inputs and outputs.
 """
 
 # matador modules
-from matador.utils.cell_utils import cart2abc
+from matador.utils.cell_utils import cart2abc, cart2frac
 # external libraries
 import bson.json_util as json
 # standard library
@@ -53,6 +53,9 @@ def magres2dict(seed, **kwargs):
                         magres['atom_types'].append(atom[1])
                         magres['positions_abs'].append([float(elem) for elem in atom[-3:]])
                     i += 1
+
+        magres['num_atoms'] = len(magres['atom_types'])
+        magres['positions_frac'] = cart2frac(magres['lattice_cart'], magres['positions_abs'])
 
         for line_no, line in enumerate(flines):
             if '<magres>' in line.lower():
