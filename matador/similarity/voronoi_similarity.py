@@ -127,13 +127,22 @@ def get_max_coordination_of_elem(single_elem_environments):
     return max_num_elem
 
 
-def create_site_array(unique_environments, elems=None):
+def create_site_array(unique_environments, max_num_elems=None, elems=None):
     """ Create padded numpy arrays based on unique environments provided.
 
     Input:
 
         | unique_environments: dict(list), dict with element keys full of
                                local substructures.
+
+    Args:
+
+        | max_num_elems : dict(dict(int)), dict with element keys, containing
+                          sub-dict with element keys that contain the largest
+                          number of each type of element contributing to a site.
+                          If None, this will be calculated based on the input
+                          environments. The site array is padded to this size.
+        | elems         : list(str), custom list of elements to loop over.
 
     Returns:
 
@@ -145,11 +154,12 @@ def create_site_array(unique_environments, elems=None):
 
     """
     site_array = defaultdict(list)
-    max_num_elems = dict()
     if elems is None:
         elems = [elem for elem in unique_environments]
-    for elem in elems:
-        max_num_elems[elem] = get_max_coordination_of_elem(unique_environments[elem])
+    if max_num_elems is None:
+        max_num_elems = dict()
+        for elem in elems:
+            max_num_elems[elem] = get_max_coordination_of_elem(unique_environments[elem])
     for elem in elems:
         for site_ind, site in enumerate(unique_environments[elem]):
             site_array[elem].append(dict())
