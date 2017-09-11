@@ -447,6 +447,7 @@ class QueryConvexHull(object):
                     self.hull_cursor.append(member)
         else:
             self.hull_cursor = hull_cursor
+        self.hull_cursor = sorted(self.hull_cursor, key=lambda k: k['concentration'])
         self.structures = structures
         try:
             self.info = self.get_text_info(html=self.args.get('bokeh'))
@@ -655,15 +656,16 @@ class QueryConvexHull(object):
         self.vol_per_y = v
         return
 
-    def plot_2d_hull(self, ax=None, dis=False, show=False, plot_points=True, plot_hull_points=True):
+    def plot_2d_hull(self, ax=None, dis=False, show=False, plot_points=True, plot_hull_points=True, labels=False):
         """ Plot calculated hull, returning ax and fig objects for further editing.
 
         Args:
 
             | ax               : matplotlib axis object, an existing axis on which to plot,
             | show             : bool, whether or not to display the plot in an X window,
-            | plot_points      : bool, whether or not to display off-hull structures.
-            | plot_hull_points : bool, whether or not to display on-hull structures.
+            | plot_points      : bool, whether or not to display off-hull structures,
+            | plot_hull_points : bool, whether or not to display on-hull structures,
+            | labels           : bool, whether to label formulae of hull structures.
 
         """
 
@@ -693,24 +695,25 @@ class QueryConvexHull(object):
                 ax.plot(np.sort(tie_line[:, 0]), tie_line[np.argsort(tie_line[:, 0]), 1] + self.hull_cutoff,
                         '--', c=self.colours[1], lw=1, alpha=0.5, zorder=1000, label='')
             # annotate hull structures
-            if self.args.get('labels'):
-                ion = self.hull_cursor[0]['stoichiometry'][0][0]
-                for elem in self.hull_cursor[1]['stoichiometry']:
-                    if elem[0] == ion:
-                        num_ion = elem[1]
-                    else:
-                        num_b = elem[1]
-                ratio_A = num_ion / num_b
-                for elem in self.hull_cursor[2]['stoichiometry']:
-                    if elem[0] == ion:
-                        num_ion = elem[1]
-                    else:
-                        num_b = elem[1]
-                ratio_B = num_ion / num_b
-                if ratio_A > ratio_B:
-                    self.label_cursor = reversed(self.hull_cursor[1:-1])
-                else:
-                    self.label_cursor = self.hull_cursor[1:-1]
+            if self.args.get('labels') or labels:
+                self.label_cursor = [doc for doc in self.hull_cursor if doc['hull_distance'] <= 0]
+                # ion = self.label_cursor[0]['stoichiometry'][0][0]
+                # for elem in self.label_cursor[1]['stoichiometry']:
+                    # if elem[0] == ion:
+                        # num_ion = elem[1]
+                    # else:
+                        # num_b = elem[1]
+                # ratio_A = num_ion / num_b
+                # for elem in self.label_cursor[2]['stoichiometry']:
+                    # if elem[0] == ion:
+                        # num_ion = elem[1]
+                    # else:
+                        # num_b = elem[1]
+              # ratio_B = num_ion / num_b
+                # if ratio_A > ratio_B:
+                    # self.label_cursor = reversed(self.label_cursor[1:-1])
+                # else:
+                self.label_cursor = self.label_cursor[1:-1]
                 for ind, doc in enumerate(self.label_cursor):
                     arrowprops = dict(arrowstyle="-|>", color='k')
                     if (ind+2) < np.argmin(tie_line[:, 1]):
