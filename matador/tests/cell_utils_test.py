@@ -156,14 +156,14 @@ class CellUtilTest(unittest.TestCase):
     def testKPointPath(self):
         from matador.utils.cell_utils import get_bs_kpoint_path
         bs, s = bands2dict(REAL_PATH + 'data/KPSn.bands')
-        labels, kpt_path = get_bs_kpoint_path(bs['lattice_cart'], debug=True)
+        labels, kpt_path = get_bs_kpoint_path(bs['lattice_cart'], debug=False)
         # self.assertEqual(len(kpt_path) == 285)
 
         cell, s = castep2dict(REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep')
-        labels, kpt_path = get_bs_kpoint_path(cell['lattice_cart'], debug=True)
+        labels, kpt_path = get_bs_kpoint_path(cell['lattice_cart'], debug=False)
 
         cell, s = res2dict(REAL_PATH + 'data/KP_primitive.res', db=False)
-        labels, kpt_path = get_bs_kpoint_path(cell['lattice_cart'], debug=True)
+        labels, kpt_path = get_bs_kpoint_path(cell['lattice_cart'], debug=False)
 
 
 def pdf_sim_dist(doc_test, doc_supercell):

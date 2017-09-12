@@ -886,6 +886,7 @@ def bands2dict(seed):
 
     """
     from matador.utils.chem_utils import HARTREE_TO_EV
+    from matador.utils.cell_utils import frac2cart, real2recip
     import numpy as np
     bandstructure = dict()
 
@@ -917,7 +918,8 @@ def bands2dict(seed):
                 bandstructure['eigenvalues_k_s'][ns][nb][int(data[kpt_ind].split()[1])-1] = float(data[kpt_ind+ns+2+nb].strip())
     bandstructure['eigenvalues_k_s'] -= bandstructure['fermi_energy_Ha']
     bandstructure['eigenvalues_k_s'] *= HARTREE_TO_EV
-    bandstructure['kpoint_path_spacing'] = np.sqrt(np.sum((bandstructure['kpoint_path'][0] - bandstructure['kpoint_path'][1])**2))
+    cart_kpts = np.asarray(frac2cart(real2recip(bandstructure['lattice_cart']), bandstructure['kpoint_path']))
+    bandstructure['kpoint_path_spacing'] = np.sqrt(np.sum((np.asarray(cart_kpts[0]) - np.asarray(cart_kpts[1]))**2))
     return bandstructure, True
 
 

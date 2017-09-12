@@ -14,34 +14,34 @@ plot = False
 
 class VoronoiSimilarityTest(unittest.TestCase):
     """ Test Voronoi similarity functionality. """
-    def testVoronoiHull(self):
-        with open(REAL_PATH + 'data/voronoi_hull.json', 'r') as f:
-            cursor = load(f)
-        self.assertEqual(len(cursor), 34)
-        site_count = {'K': 0, 'P': 0}
-        for ind, doc in enumerate(cursor):
-            set_site_array(doc)
+    # def testVoronoiHull(self):
+        # with open(REAL_PATH + 'data/voronoi_hull.json', 'r') as f:
+            # cursor = load(f)
+        # self.assertEqual(len(cursor), 34)
+        # site_count = {'K': 0, 'P': 0}
+        # for ind, doc in enumerate(cursor):
+            # set_site_array(doc)
 
-        unique_environments = dict()
-        for elem in ['K', 'P']:
-            unique_environments[elem] = []
-            for doc in cursor:
-                get_unique_sites(doc)
-                if elem in doc['unique_substrucs']:
-                    for site in doc['unique_substrucs'][elem]:
-                        unique_environments[elem].append(site)
-                else:
-                    print(doc['stoichiometry'])
-        print(unique_environments['P'][0])
-        unique_environments, max_num_elems = create_site_array(unique_environments)
-        print(max_num_elems)
-        same = 0
-        unique = 0
-        for elem in unique_environments:
-            for i, site in enumerate(unique_environments[elem]):
-                for j in range(i, len(unique_environments[elem])):
-                    test = are_sites_the_same(unique_environments[i], unique_environments[j])
-                    print(i, j, test)
+        # unique_environments = dict()
+        # for elem in ['K', 'P']:
+            # unique_environments[elem] = []
+            # for doc in cursor:
+                # get_unique_sites(doc)
+                # if elem in doc['unique_substrucs']:
+                    # for site in doc['unique_substrucs'][elem]:
+                        # unique_environments[elem].append(site)
+                # else:
+                    # print(doc['stoichiometry'])
+        # print(unique_environments['P'][0])
+        # unique_environments, max_num_elems = create_site_array(unique_environments)
+        # print(max_num_elems)
+        # same = 0
+        # unique = 0
+        # for elem in unique_environments:
+            # for i, site in enumerate(unique_environments[elem]):
+                # for j in range(i, len(unique_environments[elem])):
+                    # test = are_sites_the_same(unique_environments[i], unique_environments[j])
+                    # print(i, j, test)
 
 
             # get_unique_sites(cursor[ind])
@@ -63,10 +63,10 @@ class VoronoiSimilarityTest(unittest.TestCase):
         # doc = cursor[15]
 
         for doc in cursor:
-            print(40*'-!')
-            print(doc['stoichiometry'])
+            # print(40*'-!')
+            # print(doc['stoichiometry'])
 
-            set_site_array(doc)
+            set_site_array(doc, normalise=True)
 
             for elem in set(doc['atom_types']):
                 self.assertTrue(elem in doc['site_array'])
@@ -117,10 +117,10 @@ class VoronoiSimilarityTest(unittest.TestCase):
         doc, s = res2dict(REAL_PATH + 'data/hull-LiP-mdm_chem_mater/Li-bcc.res')
         set_site_array(doc)
         get_unique_sites(doc, rtol=rtol, atol=atol)
-        self.assertTrue(len(doc['unique_sites']['Li']) == 1)
+        self.assertTrue(len(doc['unique_site_inds']['Li']) == 1)
         self.assertTrue(len(doc['unique_site_array']['Li'][0]['Li']) == 14)
-        print(np.shape(np.where(np.isclose(doc['unique_site_array']['Li'][0]['Li'], np.max(doc['unique_site_array']['Li'][0]['Li'])))))
-        print(np.shape(np.where(np.isclose(doc['unique_site_array']['Li'][0]['Li'], np.min(doc['unique_site_array']['Li'][0]['Li'])))))
+        # print(np.shape(np.where(np.isclose(doc['unique_site_array']['Li'][0]['Li'], np.max(doc['unique_site_array']['Li'][0]['Li'])))))
+        # print(np.shape(np.where(np.isclose(doc['unique_site_array']['Li'][0]['Li'], np.min(doc['unique_site_array']['Li'][0]['Li'])))))
         self.assertTrue(np.shape(np.where(np.isclose(doc['unique_site_array']['Li'][0]['Li'], np.max(doc['unique_site_array']['Li'][0]['Li']))))[-1] == 8)
         self.assertTrue(np.shape(np.where(np.isclose(doc['unique_site_array']['Li'][0]['Li'], np.min(doc['unique_site_array']['Li'][0]['Li']))))[-1] == 6)
 
@@ -131,8 +131,9 @@ class VoronoiSimilarityTest(unittest.TestCase):
         doc, s = res2dict(REAL_PATH + 'data/hull-LiP-mdm_chem_mater/LiP-ColCode23621.res')
         set_site_array(doc)
         get_unique_sites(doc, rtol=rtol, atol=atol)
-        plot_doc_strucs(doc)
-        self.assertTrue(len(doc['unique_sites']['Li']) == 1)
+        if plot:
+            plot_doc_strucs(doc)
+        self.assertTrue(len(doc['unique_site_inds']['Li']) == 1)
 
     def testLi3P_known_phases(self):
         from matador.scrapers.castep_scrapers import res2dict
@@ -141,22 +142,27 @@ class VoronoiSimilarityTest(unittest.TestCase):
         doc, s = res2dict(REAL_PATH + 'data/hull-LiP-mdm_searches/LiP-CollCode26880.res')
         set_site_array(doc)
         get_unique_sites(doc, rtol=rtol, atol=atol)
-        plot_doc_strucs(doc)
+        if plot:
+            plot_doc_strucs(doc)
         doc, s = res2dict(REAL_PATH + 'data/hull-LiP-mdm_searches/LiP-CollCode81565.res')
         set_site_array(doc)
         get_unique_sites(doc, rtol=rtol, atol=atol)
-        plot_doc_strucs(doc)
+        if plot:
+            plot_doc_strucs(doc)
 
     def testAl5Y3O12Garnet(self):
         from matador.scrapers.castep_scrapers import cell2dict
-        # rtol = 1e-3
-        # atol = 1e-1
+        rtol = 5e-2
+        atol = 1e-2
         doc, s = cell2dict(REAL_PATH + 'data/Al5Y3O12.cell', db=False, outcell=True, positions=True)
         set_site_array(doc)
-        get_unique_sites(doc)
-        print(doc['similar_sites'])
-        plot_doc_strucs(doc)
-        # self.assertTrue(len(doc['unique_sites']['Li']) == 1)
+        get_unique_sites(doc, atol=atol, rtol=rtol)
+        # print(doc['similar_sites'])
+        if plot:
+            plot_doc_strucs(doc)
+        self.assertTrue(len(doc['unique_site_inds']['Y']) == 1)
+        self.assertTrue(len(doc['unique_site_inds']['Al']) == 2)
+        self.assertTrue(len(doc['unique_site_inds']['O']) == 1)
 
     def testPairwiseSiteUniqueness(self):
         with open(REAL_PATH + 'data/voronoi_hull.json', 'r') as f:

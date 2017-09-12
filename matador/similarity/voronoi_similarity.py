@@ -127,7 +127,7 @@ def get_max_coordination_of_elem(single_elem_environments):
     return max_num_elem
 
 
-def create_site_array(unique_environments, max_num_elems=None, elems=None):
+def create_site_array(unique_environments, max_num_elems=None, elems=None, normalise=False):
     """ Create padded numpy arrays based on unique environments provided.
 
     Input:
@@ -143,6 +143,7 @@ def create_site_array(unique_environments, max_num_elems=None, elems=None):
                           If None, this will be calculated based on the input
                           environments. The site array is padded to this size.
         | elems         : list(str), custom list of elements to loop over.
+        | normalise     : bool, whether to normalise site array to 1.
 
     Returns:
 
@@ -174,8 +175,9 @@ def create_site_array(unique_environments, max_num_elems=None, elems=None):
                         site_array[elem][-1][_elem][count] = angle
                         count += 1
                         total_angle += angle
-            for _elem in elems:
-                site_array[elem][-1][_elem] /= total_angle
+            if normalise:
+                for _elem in elems:
+                    site_array[elem][-1][_elem] /= total_angle
 
     return site_array, max_num_elems
 
@@ -199,7 +201,7 @@ def set_substruc_dict(doc):
     doc['substruc_dict'] = voronoi_substruc_dict
 
 
-def set_site_array(doc):
+def set_site_array(doc, normalise=False):
     """ Set the 'site_array' entry in the chosen document. Creates
     a dict of numpy arrays of normalised solid angles with element keys
     from the import calculated substructure.
@@ -208,10 +210,14 @@ def set_site_array(doc):
 
         | doc: dict, matador doc containing substruc_dict.
 
+    Args:
+
+        | normalise: bool, whether to normalise site_arrays to total angle.
+
     """
     if 'substruc_dict' not in doc:
         set_substruc_dict(doc)
-    doc['site_array'], doc['max_num_elems'] = create_site_array(doc['substruc_dict'])
+    doc['site_array'], doc['max_num_elems'] = create_site_array(doc['substruc_dict'], normalise=normalise)
 
 
 def get_unique_sites(doc, atol=1e-2, rtol=1e-2):

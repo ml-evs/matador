@@ -127,18 +127,10 @@ class VoltageTest(unittest.TestCase):
         bare_hull.match = [{'enthalpy_per_atom': -380.071/2.0}]
         bare_hull.ternary = True
         bare_hull.voltage_curve(bare_hull.hull_cursor)
-        try:
-            self.assertEqual(len(bare_hull.Q), len(Q_data))
-            for i in range(len(bare_hull.voltages)):
-                np.testing.assert_array_almost_equal(bare_hull.voltages[i], voltage_data[i])
-                np.testing.assert_array_almost_equal(bare_hull.Q[i], Q_data[i], decimal=0)
-        except:
-            print('Q = ', bare_hull.Q[0])
-            print('Q = ', Q_data)
-            print('calculated: ', np.shape(bare_hull.voltages[0]))
-            print(bare_hull.voltages[0])
-            print('data: ', np.shape(voltage_data))
-            raise AssertionError
+        self.assertEqual(len(bare_hull.Q), len(Q_data))
+        for i in range(len(bare_hull.voltages)):
+            np.testing.assert_array_almost_equal(bare_hull.voltages[i], voltage_data[i])
+            np.testing.assert_array_almost_equal(bare_hull.Q[i], Q_data[i], decimal=0)
         for ind in range(len(bare_hull.voltages)):
             assert len(bare_hull.Q[ind]) == len(bare_hull.voltages[ind])
             assert np.isnan(bare_hull.Q[ind][-1])
