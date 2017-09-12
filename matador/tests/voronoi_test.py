@@ -11,7 +11,14 @@ from matador.similarity.voronoi_similarity import set_site_array, create_site_ar
 REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
 plot = False
 
+try:
+    from Vornetclass import VoronoiNetwork
+    imported_vornet = True
+except:
+    imported_vornet = False
 
+
+@unittest.skipIf(not imported_vornet, 'Voronoi code not found in this distribution')
 class VoronoiSimilarityTest(unittest.TestCase):
     """ Test Voronoi similarity functionality. """
     # def testVoronoiHull(self):
