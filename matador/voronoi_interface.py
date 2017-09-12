@@ -9,20 +9,23 @@ Requires Can's code to be on your PYTHONPATH.
 
 from matador.export import doc2res
 from os import remove
-from Vornetclass import VoronoiNetwork
+from os.path import isfile
 
 
 def get_voronoi_substructure(doc):
     """ Run Can's Voronoi analysis on a matador doc. """
     try:
+        from Vornetclass import VoronoiNetwork
         doc2res(doc, 'Vropple.res', hash_dupe=False, overwrite=True, info=False)
         vornet = VoronoiNetwork(filename='Vropple.res')
         vornet.computeSubStrucs()
         doc['voronoi_substruc'] = [vc.getSubStruc(use_area=False) for vc in vornet.VoronoiCells]
-        remove('Vropple.res')
+        if isfile('Vropple.res'):
+            remove('Vropple.res')
         return doc['voronoi_substruc']
     except:
-        remove('Vropple.res')
+        if isfile('Vropple.res'):
+            remove('Vropple.res')
         return False
 
 
@@ -31,6 +34,7 @@ def get_voronoi_points(doc, debug=False):
     and return nodes, face midpoints and edge midpoints.
     """
     try:
+        from Vornetclass import VoronoiNetwork
         doc2res(doc, 'Vropple.res', hash_dupe=False, overwrite=True, info=False)
         vornet = VoronoiNetwork(filename='Vropple.res')
         if debug:
@@ -39,10 +43,12 @@ def get_voronoi_points(doc, debug=False):
         doc['voronoi_nodes'] = vornet.getNodeFracPos()
         doc['voronoi_face_midpoints'] = vornet.getFracFaceMidpoints()
         doc['voronoi_edge_midpoints'] = vornet.getFracEdgeMidpoints()
-        remove('Vropple.res')
+        if isfile('Vropple.res'):
+            remove('Vropple.res')
         return doc['voronoi_nodes']
     except:
-        remove('Vropple.res')
+        if isfile('Vropple.res'):
+            remove('Vropple.res')
         return False
 
 

@@ -133,11 +133,30 @@ class ScrapeTest(unittest.TestCase):
             f.close()
             bs_dict, s = bands2dict(bands_fname)
             self.assertEqual(len(bs_dict['kpoint_path']), 518)
-            self.assertEqual(np.shape(bs_dict['eigenvalues_k_s']), (1, 518))
+            self.assertEqual(np.shape(bs_dict['eigenvalues_k_s']), (1, 71, 518))
             self.assertEqual(bs_dict['num_kpoints'], 518)
             self.assertEqual(bs_dict['num_bands'], 71)
             self.assertAlmostEqual(bs_dict['fermi_energy'], 4.0781, places=4)
-            self.assertAlmostEqual(bs_dict['kpoint_path_spacing'], 0.01, places=4)
+            self.assertLessEqual(bs_dict['kpoint_path_spacing'], 0.01)
+            self.assertGreaterEqual(bs_dict['kpoint_path_spacing'], 0.005)
+
+        bands_fname = REAL_PATH + 'data/KPSn_2.bands'
+        failed_open = False
+        try:
+            f = open(bands_fname, 'r')
+        except:
+            failed_open = True
+            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(bands_fname))
+        if not failed_open:
+            f.close()
+            bs_dict, s = bands2dict(bands_fname)
+            self.assertEqual(len(bs_dict['kpoint_path']), 28)
+            self.assertEqual(np.shape(bs_dict['eigenvalues_k_s']), (1, 71, 28))
+            self.assertEqual(bs_dict['num_kpoints'], 28)
+            self.assertEqual(bs_dict['num_bands'], 71)
+            self.assertAlmostEqual(bs_dict['fermi_energy'], 4.0781, places=4)
+            self.assertLessEqual(bs_dict['kpoint_path_spacing'], 0.2)
+            self.assertGreaterEqual(bs_dict['kpoint_path_spacing'], 0.15)
 
     def testMagres(self):
         from matador.scrapers.magres_scrapers import magres2dict

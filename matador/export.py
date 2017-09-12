@@ -487,10 +487,10 @@ def doc2res(doc, path, info=True, hash_dupe=True, spoof_titl=False, overwrite=Fa
         flines.append('LATT -1\n')
         flines.append('SFAC \t')
 
-        # enforce correct order by elements
+        # enforce correct order by elements, sorting only the atom_types, not the positions inside them
         positions_frac, atom_types = zip(*[(pos, types) for (types, pos) in
-                                           sorted(zip(doc['atom_types'], doc['positions_frac']))])
-
+                                         sorted(zip(doc['atom_types'], doc['positions_frac']),
+                                                key=lambda k: k[0])])
         written_atoms = []
         for elem in atom_types:
             if elem not in written_atoms:

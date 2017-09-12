@@ -147,7 +147,14 @@ class QueryConvexHull(object):
         if self.chem_pots is not None:
             self.fake_chempots(custom_elem=elements)
         elif self.from_cursor:
-            self.match = [doc for doc in self.cursor if len(doc['stoichiometry']) == 1 and doc['stoichiometry'][0][0] in self.elements]
+            chempot_cursor = sorted([doc for doc in self.cursor if len(doc['stoichiometry']) == 1],
+                                    key=lambda k: k['enthalpy_per_atom'])
+            self.match = []
+            for elem in elements:
+                for doc in chempot_cursor:
+                    if doc['stoichiometry'][0][0] == elem:
+                        self.match.append(doc)
+            assert(len(self.match) == len(elements))
             for ind, doc in enumerate(self.match):
                 self.match[ind]['hull_distance'] = 0
                 self.match[ind]['enthalpy_per_b'] = doc['enthalpy_per_atom']
@@ -563,11 +570,11 @@ class QueryConvexHull(object):
                                             pass
                                         else:
                                             crossover.append([x_cross, y_cross, z_cross])
+                    eps = 1e-6
                     if len(tints) != 0:
-                        # print('tints:', tints)
                         temp = [simp_in, np.amin(tints), np.amax(tints)]
                         # condition removes the big triangle and the points which only graze the line of interest
-                        if temp[2] > 0 and temp[1] < 1 and temp[2] > temp[1] and temp[2] - temp[1] < 1:
+                        if all([temp[2] > 0, temp[1] < 1, temp[2] - temp[1] > eps, temp[2] - temp[1] < 1, temp[1] != temp[2]]):
                             intersections = np.append(intersections, temp)
                     simp_in += 1
 
@@ -604,6 +611,7 @@ class QueryConvexHull(object):
                     Compinv = np.linalg.inv(Comp)
 
                     X = [1, 0, 0]
+
                     V = -(Compinv.dot(X)).dot(Evec)
                     V = V + enthalpy_active_ion
                     # double up on first voltage

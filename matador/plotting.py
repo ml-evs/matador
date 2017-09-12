@@ -53,7 +53,6 @@ def plot_spectral(seed, bandstructure=True, dos=False, **kwargs):
         for ind, kpt in enumerate(bs['kpoint_path']):
             if ind != len(bs['kpoint_path'])-1:
                 next_point = bs['kpoint_path'][ind+1]
-                print(np.sqrt(np.sum((np.asarray(next_point) - np.asarray(kpt))**2)))
             else:
                 next_point = bs['kpoint_path'][ind]
             for label, point in special_points.items():

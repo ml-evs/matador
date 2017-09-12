@@ -127,18 +127,10 @@ class VoltageTest(unittest.TestCase):
         bare_hull.match = [{'enthalpy_per_atom': -380.071/2.0}]
         bare_hull.ternary = True
         bare_hull.voltage_curve(bare_hull.hull_cursor)
-        try:
-            self.assertEqual(len(bare_hull.Q), len(Q_data))
-            for i in range(len(bare_hull.voltages)):
-                np.testing.assert_array_almost_equal(bare_hull.voltages[i], voltage_data[i])
-                np.testing.assert_array_almost_equal(bare_hull.Q[i], Q_data[i], decimal=0)
-        except:
-            print('Q = ', bare_hull.Q[0])
-            print('Q = ', Q_data)
-            print('calculated: ', np.shape(bare_hull.voltages[0]))
-            print(bare_hull.voltages[0])
-            print('data: ', np.shape(voltage_data))
-            raise AssertionError
+        self.assertEqual(len(bare_hull.Q), len(Q_data))
+        for i in range(len(bare_hull.voltages)):
+            np.testing.assert_array_almost_equal(bare_hull.voltages[i], voltage_data[i])
+            np.testing.assert_array_almost_equal(bare_hull.Q[i], Q_data[i], decimal=0)
         for ind in range(len(bare_hull.voltages)):
             assert len(bare_hull.Q[ind]) == len(bare_hull.voltages[ind])
             assert np.isnan(bare_hull.Q[ind][-1])
@@ -162,6 +154,7 @@ class VoltageTest(unittest.TestCase):
                                             doc['stoichiometry'] != [['P', 2], ['Sn', 1]])]
         hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'], no_plot=True, pathways=True, subcmd='voltage')
         self.assertEqual(len(hull.voltages), len(hull.Q))
+        np.testing.assert_array_almost_equal(np.asarray(hull.voltages), np.asarray([[1.0229, 1.0229, 0.2676, 0.000]]), decimal=3)
         for ind in range(len(hull.voltages)):
             assert len(hull.Q[ind]) == len(hull.voltages[ind])
             assert np.isnan(hull.Q[ind][-1])
@@ -186,6 +179,7 @@ class VoltageTest(unittest.TestCase):
         self.assertEqual(len(hull.voltages), len(hull.Q))
         for ind in range(len(hull.voltages)):
             self.assertTrue(len(hull.voltages[ind])-1, len(hull.Q[ind]) or len(hull.voltages[ind]) == len(hull.Q[ind]))
+        np.testing.assert_array_almost_equal(np.asarray(hull.voltages[0]), np.asarray([1.1845, 1.1845, 0.8612, 0.2676, 0.000]), decimal=3)
         self.assertAlmostEqual(hull.Q[ind][-2], 425.7847612)
         for ind in range(len(hull.voltages)):
             assert len(hull.Q[ind]) == len(hull.voltages[ind])
@@ -198,6 +192,7 @@ class VoltageTest(unittest.TestCase):
         cursor = [res2dict(res)[0] for res in res_list]
         hull = QueryConvexHull(cursor=cursor, elements=['Li', 'Si', 'P'], pathways=True, no_plot=True, subcmd='voltage')
         self.assertEqual(len(hull.voltages), len(hull.Q))
+        np.testing.assert_array_almost_equal(np.asarray(hull.voltages[0]), np.asarray([1.1683, 1.1683, 1.0759, 0.7983, 0.6447, 0.3726, 0.3394, 0.1995, 0.1570, 0.1113, 0.1041, 0.0000]), decimal=3)
         for ind in range(len(hull.voltages)):
             self.assertTrue(len(hull.voltages[ind])-1, len(hull.Q[ind]) or len(hull.voltages[ind]) == len(hull.Q[ind]))
         for ind in range(len(hull.voltages)):
