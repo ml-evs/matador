@@ -815,6 +815,19 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
                             castep['bulk_modulus'] = float(line.split('=')[-1].split()[0])
                         except:
                             continue
+
+                    elif 'Chemical Shielding and Electric Field Gradient Tensors'.lower() in line.lower():
+                        i = 5
+                        castep['chemical_shifts'] = []
+                        while True:
+                            # break when the line containing just '=' is reached
+                            if len(flines[line_no+i].split()) == 1:
+                                break
+                            castep['chemical_shifts'].append(flines[line_no+i].split()[3])
+                            i += 1
+                        if len(castep['chemical_shifts']) != len(castep['atom_types']):
+                            raise RuntimeError('Found fewer chemical shifts than atoms (or vice versa)!')
+
                 # calculate kpoint spacing if not found
                 if 'kpoints_mp_grid' in castep and 'kpoints_mp_spacing' not in castep and \
                    'lattice_cart' in castep:
