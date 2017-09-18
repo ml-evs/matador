@@ -811,7 +811,7 @@ class QueryConvexHull(object):
         ax.set_xlim(-0.05, 1.05)
         ax.set_xticks([0, 0.33, 0.5, 0.66, 1])
         ax.set_xticklabels(ax.get_xticks())
-        ax.set_yticks([0, -0.2, -0.4])
+        ax.set_yticks(np.arange(0, np.min(self.structure_slice[self.hull.vertices, 1])-0.15, -0.2))
         ax.set_yticklabels(ax.get_yticks())
         ax.set_ylabel('Formation energy (eV/atom)')
         try:
