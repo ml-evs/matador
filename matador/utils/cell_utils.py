@@ -150,6 +150,26 @@ def real2recip(real_lat):
     return recip_lat.tolist()
 
 
+def calc_mp_grid(lattice_cart, spacing):
+    """ Return correct Monkhorst-Pack grid based on lattice
+    vectors and desired spacing.
+
+    Input:
+
+        | lattice_cart : list, lattice vectors in standard form,
+        | spacing      : float, desired maximum grid spacing.
+
+    Returns:
+
+        | mp_grid : list(int), 3 integers corresponding to MP grid.
+    """
+    recip_lat = real2recip(lattice_cart)
+    recip_len = np.zeros((3))
+    recip_len = np.sqrt(np.sum(np.power(recip_lat, 2), axis=1))
+    mp_grid = recip_len / (2 * pi * spacing)
+    return [ceil(elem) for elem in mp_grid]
+
+
 def calc_mp_spacing(real_lat, mp_grid, prec=2):
     """ Convert real lattice in Cartesian basis and the
     kpoint_mp_grid into a grid spacing.

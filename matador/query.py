@@ -286,7 +286,7 @@ class DBQuery(object):
                                 cursor_count = self.num_to_display
                                 if self.debug:
                                     print('Displaying top {}'.format(self.num_to_display))
-                        if self.top == -1:
+                        elif self.top == -1:
                             self.num_to_display = cursor_count
                             self.top = cursor_count
                         elif cursor_count > self.top:

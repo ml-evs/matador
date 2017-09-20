@@ -153,6 +153,12 @@ class CellUtilTest(unittest.TestCase):
         spacing = calc_mp_spacing(real_lattice, mp_grid, prec=5)
         self.assertAlmostEqual(spacing, 0.05, places=3)
 
+    def testCalcMPGrid(self):
+        from matador.utils.cell_utils import calc_mp_grid
+        real_lattice = [[6.0235150, 0, 0], [0.0, 5.6096010, 0], [-5.0202472, 0, 10.0218337]]
+        spacing = 0.05
+        self.assertEqual(calc_mp_grid(real_lattice, spacing), [4, 4, 2])
+
     def testKPointPath(self):
         from matador.utils.cell_utils import get_bs_kpoint_path
         bs, s = bands2dict(REAL_PATH + 'data/KPSn.bands')
@@ -173,6 +179,7 @@ def pdf_sim_dist(doc_test, doc_supercell):
     pdf_supercell = PDF(doc_supercell, low_mem=True)
     overlap = PDFOverlap(pdf_test, pdf_supercell)
     return overlap.similarity_distance
+
 
 if __name__ == '__main__':
     unittest.main()
