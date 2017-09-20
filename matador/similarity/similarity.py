@@ -4,7 +4,7 @@ structural similarity metrics.
 """
 # matador modules
 from matador.similarity.pdf_similarity import PDF
-from matador.utils.cursor_utils import get_array_from_cursor
+from matador.utils.cursor_utils import get_array_from_cursor, get_guess_doc_provenance
 # external libraries
 import numpy as np
 # standard library
@@ -89,17 +89,32 @@ def get_uniq_cursor(cursor, sim_calculator=PDF, sim_tol=5e-2, energy_tol=5e-2,
     distinct_set = set()
     dupe_set = set()
     dupe_dict = defaultdict(list)
+    prov = [get_guess_doc_provenance(doc['source']) for doc in cursor]
     for i in range(len(sim_mat)):
         distinct_set.add(i)
-    for coord in zip(rows, cols):
-        if coord[0] == coord[1]:
-            pass
-        elif coord[0] not in dupe_set:
+    for i, j in zip(rows, cols):
+        if i == j:
+            continue
+        elif i not in dupe_set:
             # distinct_set.add(coord[0])
-            if coord[1] in distinct_set:
-                distinct_set.remove(coord[1])
-            dupe_set.add(coord[1])
-            dupe_dict[coord[0]].append(coord[1])
+            if j in distinct_set:
+                distinct_set.remove(j)
+            dupe_set.add(j)
+            dupe_dict[i].append(j)
+    for i in dupe_dict:
+        to_compare = [i]
+        to_compare.extend(dupe_dict[i])
+        hierarchy = ['ICSD', 'OQMD', 'SWAP', 'AIRSS', 'GA']
+        for provenance in hierarchy:
+            found = False
+            for k in to_compare:
+                if prov[k] is provenance:
+                    distinct_set.remove(i)
+                    distinct_set.add(k)
+                    found = True
+                    break
+            if found:
+                break
     print('Done!')
     return distinct_set, dupe_dict, fingerprint_list, sim_mat
 
