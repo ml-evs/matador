@@ -6,7 +6,7 @@ and calling other functionality. """
 from __future__ import print_function
 # matador modules
 from .utils.print_utils import print_failure, print_warning, print_success
-from .utils.chem_utils import get_periodic_table
+from .utils.chem_utils import get_periodic_table, get_formula_from_stoich
 from .utils.cursor_utils import display_results
 # external libraries
 import pymongo as pm
@@ -264,31 +264,38 @@ class DBQuery(object):
                     print(cursor_count, 'results found for query in', collection+'.')
                 if self.args.get('subcmd') != 'hull' and self.args.get('subcmd') != 'voltage' and self.args.get('subcmd') != 'swaps':
                     if cursor_count >= 1:
+                        self.num_to_display = cursor_count
                         if self.delta_E is not None:
                             self.cursor = list(self.cursor)
-                            gs_enthalpy = self.cursor[0]['enthalpy_per_atom']
-                            if self.debug:
-                                print('Filtering by {} eV/atom'.format(self.delta_E))
-                                print('gs_enthalpy = {}'.format(gs_enthalpy))
-                            num_to_display = 1
-                            for doc in self.cursor[1:]:
+                            if len(set([get_formula_from_stoich(doc['stoichiometry']) for doc in self.cursor])) != 1:
+                                print('Multiple stoichiometries in cursor, unable to filter by energy.')
+                            else:
+                                gs_enthalpy = self.cursor[0]['enthalpy_per_atom']
                                 if self.debug:
-                                    print('dE = {}, {} {}'.format(doc['enthalpy_per_atom'] - gs_enthalpy, doc['text_id'][0], doc['text_id'][1]))
-                                if doc['enthalpy_per_atom'] - gs_enthalpy > self.delta_E:
-                                    break
-                                else:
-                                    num_to_display += 1
-                            self.num_to_display = num_to_display
-                            if self.debug:
-                                print('Displaying top {}'.format(self.num_to_display))
-                        elif self.top == -1:
+                                    print('Filtering by {} eV/atom'.format(self.delta_E))
+                                    print('gs_enthalpy = {}'.format(gs_enthalpy))
+                                num_to_display = 1
+                                for doc in self.cursor[1:]:
+                                    if self.debug:
+                                        print('dE = {}, {} {}'.format(doc['enthalpy_per_atom'] - gs_enthalpy, doc['text_id'][0], doc['text_id'][1]))
+                                    if doc['enthalpy_per_atom'] - gs_enthalpy > self.delta_E:
+                                        break
+                                    else:
+                                        num_to_display += 1
+                                self.num_to_display = num_to_display
+                                cursor_count = self.num_to_display
+                                if self.debug:
+                                    print('Displaying top {}'.format(self.num_to_display))
+                        if self.top == -1:
                             self.num_to_display = cursor_count
                             self.top = cursor_count
                         elif cursor_count > self.top:
                             self.num_to_display = self.top
-                        else:
-                            self.num_to_display = cursor_count
+
                         display_results(list(self.cursor)[:self.num_to_display], args=self.args)
+
+                if self.delta_E is not None:
+                    self.cursor = self.cursor[:self.num_to_display]
 
             # building hull from just comp, find best structure to calc_match
             if self.args.get('id') is None and (self.args.get('subcmd') == 'hull' or
