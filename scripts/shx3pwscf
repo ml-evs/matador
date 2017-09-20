@@ -1,0 +1,27 @@
+#!/usr/bin/env python
+# coding: utf-8
+from matador.scrapers import castep_scrapers
+from matador.export import doc2pwscf
+from matador.utils.print_utils import print_notify, print_success, print_failure
+import argparse
+
+
+parser = argparse.ArgumentParser(prog='shx3cell')
+parser.add_argument('--template', type=str, help='template file to append structure to')
+parser.add_argument('--kpoint_spacing', type=float, help='calculate correct grid (no offset)')
+parser.add_argument('seed', type=str, nargs='*',
+                    help='seednames of res files')
+args = vars(parser.parse_args())
+
+print(args)
+for fname in args.get('seed'):
+    print_notify('Reading ' + fname)
+    res_dict, success = castep_scrapers.res2dict(fname, db=False)
+    if success:
+        doc2pwscf(res_dict, fname.replace('.res', ''),
+                  template=args.get('template'),
+                  spacing=args.get('kpoint_spacing'))
+        print_success('Wrote QE input file to ' + fname.replace('.res', '') + '.in')
+    else:
+        print_failure('Unable to find final structure in ' + fname + '.')
+print_success('Completed!')

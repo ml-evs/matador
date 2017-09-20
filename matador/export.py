@@ -6,6 +6,7 @@ can create a file from a db document.
 from __future__ import print_function
 # matador internals
 from matador.utils.cell_utils import cart2abcstar, frac2cart, cart2abc
+from matador.utils.cell_utils import abc2cart, calc_mp_grid
 from matador.utils.cursor_utils import display_results
 # external libraries
 import numpy as np
@@ -421,6 +422,64 @@ def doc2pdb(doc, path, info=True, hash_dupe=True, *args):
         else:
             print_exc()
             pass
+
+
+def doc2pwscf(doc, path, template=None, spacing=None, *args):
+    """ Write the structural part of QE input file based
+    on the provided matador doc. Will calculate the correct
+    kpoint_mp_grid if spacing is provided.
+
+    Input:
+
+        | doc  : dict, matador document,
+        | path : str, filename to write out to.
+
+    Args:
+
+        | template : str, filename of template to prepend before structure
+                    (with prefix keyword to be replaced),
+        | spacing  : float, kpoint_mp_spacing to use when calculating grid.
+
+    """
+    if path.endswith('.in'):
+        path = path.replace('.in', '')
+
+    if isfile(path + '.in'):
+        print('File already exists, not overwriting...')
+        return
+
+    if 'lattice_cart' not in doc:
+        doc['lattice_cart'] = abc2cart(doc['lattice_abc'])
+
+    if 'kpoints_mp_spacing' in doc or spacing is not None:
+        if 'kpoints_mp_spacing' in doc:
+            spacing = doc['kpoints_mp_spacing']
+        doc['kpoints_mp_grid'] = calc_mp_grid(doc['lattice_cart'], spacing)
+
+    print(doc['kpoints_mp_grid'])
+
+    file_string = ''
+    file_string += 'CELL_PARAMETERS angstrom\n'
+    for i in range(3):
+        file_string += ' {d[0]: 10.10f} {d[1]: 10.10f} {d[2]: 10.10f}\n'.format(d=doc['lattice_cart'][i])
+
+    file_string += '\n ATOMIC_POSITIONS crystal\n'
+    for i in range(len(doc['atom_types'])):
+        file_string += '{:4} {d[0]: 10.10f} {d[1]: 10.10f} {d[2]: 10.10f}\n'.format(doc['atom_types'][i], d=doc['positions_frac'][i])
+    file_string += '\nK_POINTS automatic\n'
+    file_string += '{d[0]} {d[1]} {d[2]} 0 0 0'.format(d=doc['kpoints_mp_grid'])
+
+    if template is not None:
+        if isfile(template):
+            with open(template, 'r') as f:
+                template_string = f.readlines()
+
+    with open(path + '.in', 'w') as f:
+        for line in template_string:
+            if 'prefix' in line:
+                line = '  prefix = \'{}\'\n'.format(path)
+            f.write(line)
+        f.write(file_string)
 
 
 def doc2res(doc, path, info=True, hash_dupe=True, spoof_titl=False, overwrite=False, *args):
