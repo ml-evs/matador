@@ -1,5 +1,6 @@
 from setuptools import setup, find_packages
 from subprocess import check_output
+from glob import glob
 try:
     __version__ = check_output(['git', 'describe', '--tags']).decode('utf-8').strip()
     __version__ += '+' + (check_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD'])
@@ -23,7 +24,7 @@ setup(name='matador',
           'periodictable>=1.4',
           'psutil',
           'spglib>=1.9'],
-      scripts=['bin/matador', 'bin/run3', 'bin/oddjob'],
+      scripts=[glob('bin/*') + glob('scripts/*')],
       dependency_links=['https://github.com/ml-evs/python-ternary/tarball/master#egg=python-ternary-2.0'],
       package_data={'matador.scrapers': ['words', 'nouns'],
                     'matador.scrapers.tests': ['data/*'],

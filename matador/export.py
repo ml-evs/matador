@@ -477,7 +477,11 @@ def doc2pwscf(doc, path, template=None, spacing=None, *args):
     with open(path + '.in', 'w') as f:
         for line in template_string:
             if 'prefix' in line:
-                line = '  prefix = \'{}\'\n'.format(path)
+                line = '  prefix = \'{}\',\n'.format(path)
+            elif 'nat' in line:
+                line = '  nat = {},\n'.format(len(doc['atom_types']))
+            elif 'nat' in line:
+                line = '  ntyp = {},\n'.format(len(set(doc['atom_types'])))
             f.write(line)
         f.write(file_string)
 
