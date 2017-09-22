@@ -8,7 +8,7 @@ from matador.scrapers.castep_scrapers import res2dict, castep2dict
 from matador.utils.print_utils import print_success, print_warning, print_notify
 from matador.export import doc2cell, doc2param, doc2res
 # standard library
-from os import makedirs, remove, devnull, getcwd, getpid
+from os import makedirs, remove, devnull, getcwd
 from os.path import isfile, exists
 from shutil import copy
 from copy import deepcopy
@@ -16,7 +16,6 @@ from traceback import print_exc, format_exception_only
 from sys import exit, exc_info
 from math import ceil
 from psutil import virtual_memory
-import sys
 import subprocess as sp
 import glob
 
@@ -33,12 +32,13 @@ class FullRelaxer:
         param_dict    : dict of castep parameters
         cell_dict     : dict of castep cell input
         ncores        : number of cores for mpirun call
-        nnodes        : number of nodes for mpirun call (DEPCRECATED)
+        nnodes        : number of nodes for mpirun call
         node          : node name to run on
 
     Keyword arguments:
 
         executable    : str, name of binary to execute (DEFAULT: castep)
+        mode          : str, either 'castep' or 'generic' (DEFAULT: castep)
         custom_params : bool, use custom param file for each structure
         rough         : int, number of small "rough" calculations (DEFAULT: 4)
         spin          : bool, set spins in first calculation (DEFAULT: False)
@@ -46,21 +46,23 @@ class FullRelaxer:
         conv_kpts     : list(float) of kpt spacings to use for SCF convergence test
         kpts_1D       : bool, treat z-direction as special and create kpt_grid [1 1 n_kz].
         archer        : bool, use aprun over mpirun
+        redirect      : str, file to redirect stdout to (DEFAULT: /dev/null unless debug).
         bnl           : bool, use srun over mpirun
         start         : bool, begin calculation immediately or manually call it
-        redirect      : bool, redirect all output to pid.file
         reopt         : bool, whether to optimise one more time after success (DEFAULT: false)
         memcheck      : bool, perform castep dryrun to estimate memory usage, do not proceed if fails
         maxmem        : int, maximum memory allowed in MB for memcheck
         killcheck     : bool, check for file called $seed.kill during operation, and kill if present
 
     """
-    def __init__(self, res, param_dict, cell_dict,
+    def __init__(self, res,
                  ncores, nnodes, node,
-                 executable='castep', rough=None, spin=False,
+                 param_dict=None, cell_dict=None,
+                 mode='castep', executable='castep',
+                 rough=None, spin=False, redirect=None,
                  reopt=False, custom_params=False, memcheck=False, maxmem=None, killcheck=True,
                  kpts_1D=False, conv_cutoff=None, conv_kpt=None, archer=False, bnl=False, intel_mpi=False,
-                 start=True, redirect=False, verbosity=0, debug=False):
+                 start=True, verbosity=0, debug=False):
         """ Make the files to run the calculation and handle
         the calling of CASTEP itself.
         """
@@ -76,6 +78,8 @@ class FullRelaxer:
         self.maxmem = maxmem
         self.killcheck = killcheck
         self.executable = executable
+        self.mode = mode
+        self.redirect = redirect
         self.custom_params = custom_params
         self.reopt = reopt
         self.debug = debug
@@ -87,84 +91,95 @@ class FullRelaxer:
         self.conv_cutoff = conv_cutoff
         self.conv_kpt = conv_kpt
         self.enough_memory = True
-        if self.kpts_1D:
-            assert('kpoints_mp_spacing' in cell_dict)
-            self.target_spacing = deepcopy(cell_dict['kpoints_mp_spacing'])
+
         self.success = None
-        if redirect:
-            self.redirect = True
-            sys.stdout = open(str(getpid()) + '.out', 'w')
 
-        # read in initial structure and skip if failed
-        if isinstance(res, str):
-            self.res_dict, success = res2dict(res, db=False)
-            if not success:
-                if self.verbosity >= 1:
-                    print(self.res_dict)
-                    print_warning('Failed to parse res file ' + str(res))
-                self.success = False
-        elif isinstance(res, dict):
-            self.res_dict = res
+        # run through CASTEP specific features
+        if self.mode is 'castep':
+            if self.kpts_1D:
+                assert('kpoints_mp_spacing' in cell_dict)
+                self.target_spacing = deepcopy(cell_dict['kpoints_mp_spacing'])
 
-        if self.success is None:
-            calc_doc = deepcopy(self.res_dict)
+            # read in initial structure and skip if failed
+            if isinstance(res, str):
+                self.res_dict, success = res2dict(res, db=False)
+                if not success:
+                    if self.verbosity >= 1:
+                        print(self.res_dict)
+                        print_warning('Failed to parse res file ' + str(res))
+                    self.success = False
+            elif isinstance(res, dict):
+                self.res_dict = res
 
-            # set seed name
-            assert isinstance(calc_doc['source'], list)
-            self.seed = calc_doc['source'][0].replace('.res', '')
+            if self.success is None:
+                calc_doc = deepcopy(self.res_dict)
 
-            # update global doc with cell and param dicts for folder
-            calc_doc.update(cell_dict)
-            calc_doc.update(param_dict)
+                # set seed name
+                assert isinstance(calc_doc['source'], list)
+                self.seed = calc_doc['source'][0].replace('.res', '')
 
-            # check for pseudos
-            for elem in self.res_dict['stoichiometry']:
-                if '|' not in calc_doc['species_pot'][elem[0]] and\
-                        not isfile(calc_doc['species_pot'][elem[0]]):
-                    exit('You forgot your pseudos, you silly goose!')
+                # update global doc with cell and param dicts for folder
+                calc_doc.update(cell_dict)
+                calc_doc.update(param_dict)
 
-            if self.conv_cutoff_bool:
-                # run series of singlepoints for various cutoffs
-                for cutoff in self.conv_cutoff:
-                    calc_doc.update({'cut_off_energy': cutoff})
-                    seed = self.seed + '_' + str(cutoff) + 'eV'
-                    self.success = self.scf(calc_doc, seed, keep=False)
+                # check for pseudos
+                for elem in self.res_dict['stoichiometry']:
+                    if '|' not in calc_doc['species_pot'][elem[0]] and\
+                            not isfile(calc_doc['species_pot'][elem[0]]):
+                        exit('You forgot your pseudos, you silly goose!')
 
-            elif self.conv_kpt_bool:
-                # run series of singlepoints for various cutoffs
-                for kpt in self.conv_kpt:
-                    calc_doc.update({'kpoints_mp_spacing': kpt})
-                    seed = self.seed + '_' + str(kpt) + 'A'
-                    self.success = self.scf(calc_doc, seed, keep=False)
+                if self.conv_cutoff_bool:
+                    # run series of singlepoints for various cutoffs
+                    for cutoff in self.conv_cutoff:
+                        calc_doc.update({'cut_off_energy': cutoff})
+                        seed = self.seed + '_' + str(cutoff) + 'eV'
+                        self.success = self.scf(calc_doc, seed, keep=False)
 
-            elif calc_doc['task'].upper() in ['SPECTRAL', 'SINGLEPOINT']:
-                # batch run density of states
-                self.success = self.scf(calc_doc, self.seed, keep=True)
-            else:
-                # set up geom opt parameters
-                self.max_iter = calc_doc['geom_max_iter']
-                self.num_rough_iter = rough if rough is not None else 4
-                fine_iter = 20
-                rough_iter = 2
-                if 'geom_method' in calc_doc:
-                    if calc_doc['geom_method'].lower() == 'tpsd':
-                        rough_iter = 3
-                num_fine_iter = int(int(self.max_iter)/fine_iter)
-                self.geom_max_iter_list = (self.num_rough_iter * [rough_iter])
-                self.geom_max_iter_list.extend(num_fine_iter * [fine_iter])
-                self.calc_doc = calc_doc
+                elif self.conv_kpt_bool:
+                    # run series of singlepoints for various cutoffs
+                    for kpt in self.conv_kpt:
+                        calc_doc.update({'kpoints_mp_spacing': kpt})
+                        seed = self.seed + '_' + str(kpt) + 'A'
+                        self.success = self.scf(calc_doc, seed, keep=False)
 
-                # do memcheck, if desired, and only continue if enough memory is free
-                if self.memcheck:
-                    if self.verbosity > 1:
-                        print('Trying to perform memcheck...')
-                    self.enough_memory = self.do_memcheck(calc_doc, self.seed)
+                elif calc_doc['task'].upper() in ['SPECTRAL', 'SINGLEPOINT']:
+                    # batch run density of states
+                    self.success = self.scf(calc_doc, self.seed, keep=True)
                 else:
-                    self.enough_memory = True
-                if self.enough_memory:
-                    # begin relaxation
-                    if self.start:
-                        self.success = self.relax()
+                    # set up geom opt parameters
+                    self.max_iter = calc_doc['geom_max_iter']
+                    self.num_rough_iter = rough if rough is not None else 4
+                    fine_iter = 20
+                    rough_iter = 2
+                    if 'geom_method' in calc_doc:
+                        if calc_doc['geom_method'].lower() == 'tpsd':
+                            rough_iter = 3
+                    num_fine_iter = int(int(self.max_iter)/fine_iter)
+                    self.geom_max_iter_list = (self.num_rough_iter * [rough_iter])
+                    self.geom_max_iter_list.extend(num_fine_iter * [fine_iter])
+                    self.calc_doc = calc_doc
+
+                    # do memcheck, if desired, and only continue if enough memory is free
+                    if self.memcheck:
+                        if self.verbosity > 1:
+                            print('Trying to perform memcheck...')
+                        self.enough_memory = self.do_memcheck(calc_doc, self.seed)
+                    else:
+                        self.enough_memory = True
+                    if self.enough_memory:
+                        # begin relaxation
+                        if self.start:
+                            self.success = self.relax()
+        # otherwise run generic script
+        else:
+            self.seed = res
+            if '.' in self.seed:
+                self.seed = self.seed.split('.')[-2]
+                self.input_ext = self.seed.split('.')[-1]
+            else:
+                self.input_ext = ''
+            assert isinstance(self.seed, str)
+            self.run_generic(self.seed)
 
     def relax(self, output_queue=None):
         """ Set up the calculation to perform 4 sets of two steps,
@@ -183,6 +198,7 @@ class FullRelaxer:
         if self.verbosity >= 1:
             print_notify('Relaxing ' + self.seed)
         geom_max_iter_list = self.geom_max_iter_list
+        self.parse_executable(seed)
         # copy initial res file to seed
         if not isinstance(self.res, str):
             self.cp_to_input(self.seed)
@@ -395,6 +411,7 @@ class FullRelaxer:
                     labels, calc_doc['spectral_kpoints_list'] = get_bs_kpoint_path(calc_doc['lattice_cart'], spacing=spacing, debug=True)
 
             doc2cell(calc_doc, seed, hash_dupe=False, copy_pspots=False)
+            self.parse_executable(seed)
             # run CASTEP
             process = self.castep(seed)
             process.communicate()
@@ -408,7 +425,7 @@ class FullRelaxer:
                     # write final res file to bad_castep
                     self.mv_to_bad(seed)
                     return False
-            self.mv_to_completed(seed, keep)
+            self.mv_to_completed(seed, keep=keep)
             if not keep:
                 self.tidy_up(seed)
             return True
@@ -422,10 +439,77 @@ class FullRelaxer:
         except:
             if self.verbosity >= 1:
                 print_exc()
+            self.mv_to_bad(seed)
             if not keep:
-                self.mv_to_bad(seed)
-            self.tidy_up(seed)
+                self.tidy_up(seed)
             return False
+
+    def run_generic(self, seed):
+        """ Run a generic command on the given seed. """
+        try:
+            self.cp_to_input(seed, ext=self.input_ext, glob_files=True)
+            self.parse_executable(seed)
+            process = self.castep(seed)
+            results = process.communicate()
+            if process.returncode != 0:
+                self.mv_to_bad(seed)
+                return False
+            else:
+                self.mv_to_completed(seed, keep=True)
+                return True
+        except(SystemExit, KeyboardInterrupt):
+            print_exc()
+            self.mv_to_bad(seed)
+            raise SystemExit
+        except:
+            print_exc()
+            self.mv_to_bad(seed)
+            return False
+
+    def parse_executable(self, seed):
+        """ Turn executable list with arguments into
+        command to execute, setting the self.command
+        and self.redirect_file variables.
+
+        e.g.1:
+
+            | self.executable = 'castep17'
+            | seed = 'test'
+
+            | returns
+            | ['castep17', 'test']
+
+        e.g.2:
+
+            | self.executable = 'pw6.x -i $seed.in > $seed.out'
+            | seed = 'test'
+
+            | returns
+            | ['pw6.x', '-i', 'test.in', '>' 'test.out']
+
+        Input:
+
+            seed: str, filename (including extension) to replace $seed with in command.
+
+        """
+        if isinstance(self.executable, str):
+            executable = self.executable.split()
+        command = []
+        found_seed = False
+        for ind, item in enumerate(executable):
+            if '$seed' in item:
+                item = item.replace('$seed', seed)
+                found_seed = True
+            command.append(item)
+        if not found_seed:
+            command.append(seed)
+
+        if self.redirect is not None:
+            self.redirect_filename = self.redirect.replace('$seed', seed)
+        else:
+            self.redirect_filename = None
+
+        self.command = command
 
     def do_memcheck(self, calc_doc, seed):
         """ Perform a CASTEP dryrun to estimate memory usage.
@@ -485,69 +569,54 @@ class FullRelaxer:
             return True
 
     def castep(self, seed):
-        """ Calls CASTEP on desired seed with desired number of cores. """
-        if self.debug:
-            print('Calling CASTEP...')
+        """ Calls executable on desired seed with desired number of cores. """
         if self.nnodes is None or self.nnodes == 1:
             if self.ncores == 1 and self.node is None:
-                process = sp.Popen(['nice', '-n', '15', self.executable, seed])
+                command = ['nice', '-n', '15'] + self.command
             elif self.archer:
-                process = sp.Popen(['aprun', '-n', str(self.ncores),
-                                    self.executable, seed])
+                command = ['aprun', '-n', str(self.ncores)] + self.command
             elif self.bnl:
-                command = ['srun', '--exclusive', '-N', '1', '-n', str(self.ncores), self.executable, seed]
-                if self.debug:
-                    print(command)
-                process = sp.Popen(command)
+                command = ['srun', '--exclusive', '-N', '1', '-n', str(self.ncores)] + self.command
             elif self.intel_mpi:
-                command = ['mpirun', '-n', str(self.ncores), '-ppn', str(self.ncores), self.executable, seed]
-                if self.debug:
-                    print(command)
-                process = sp.Popen(command)
+                command = ['mpirun', '-n', str(self.ncores), '-ppn', str(self.ncores)] + self.command
             elif self.node is not None:
                 cwd = getcwd()
-                if self.debug:
-                    process = sp.Popen(['ssh', '{}'.format(self.node),
-                                        'cd', '{};'.format(cwd),
-                                        'mpirun', '-n', str(self.ncores),
-                                        self.executable, seed],
-                                       shell=False)
-                else:
-                    dev_null = open(devnull, 'w')
-                    process = sp.Popen(['ssh', '{}'.format(self.node),
-                                        'cd', '{};'.format(cwd),
-                                        'mpirun', '-n', str(self.ncores),
-                                        self.executable, seed],
-                                       shell=False, stdout=dev_null, stderr=dev_null)
-                    dev_null.close()
+                command = ['ssh', '{}'.format(self.node), '\'cd', '{};'.format(cwd),
+                           'mpirun', '-n', str(self.ncores)] + self.command + ['\'']
             else:
-                if self.debug:
-                    process = sp.Popen(['nice', '-n', '15', 'mpirun', '-n', str(self.ncores),
-                                        self.executable, seed])
-                else:
-                    dev_null = open(devnull, 'w')
-                    process = sp.Popen(['nice', '-n', '15', 'mpirun', '-n', str(self.ncores),
-                                        self.executable, seed], stdout=dev_null, stderr=dev_null)
-                    dev_null.close()
+                command = ['nice', '-n', '15', 'mpirun', '-n', str(self.ncores)] + self.command
         else:
-            raise NotImplementedError
             if self.archer:
                 command = ['aprun', '-n', str(self.ncores*self.nnodes),
                            '-N', str(self.ncores),
                            '-S', '12',
-                           '-d', '1',
-                           self.executable, seed]
-                if self.verbosity >= 1:
-                    print(command)
-                process = sp.Popen(command)
+                           '-d', '1'] + self.command
+            elif self.bnl:
+                command = ['srun', '--exclusive', '-N', str(self.nnodes), '-n', str(self.ncores*self.nnodes)] + self.command
+            elif self.intel_mpi:
+                command = ['mpirun', '-n', str(self.ncores*self.nnodes),
+                           '-ppn', str(self.ncores)] + self.command
             else:
-                if self.verbosity >= 1:
-                    print(['mpirun', '-n', str(self.ncores*self.nnodes),
-                           '-ppn', str(self.ncores),
-                           self.executable, seed])
-                process = sp.Popen(['mpirun', '-n', str(self.ncores*self.nnodes),
-                                    '-ppn', str(self.ncores),
-                                    self.executable, seed])
+                command = ['mpirun', '-n', str(self.ncores*self.nnodes),
+                           '-npernode', str(self.ncores)] + self.command
+
+        if self.debug:
+            if self.redirect_filename is not None:
+                redirect_file = open(self.redirect_filename, 'w')
+                process = sp.Popen(command, shell=False, stdout=redirect_file)
+                redirect_file.close()
+            else:
+                process = sp.Popen(command, shell=False)
+        else:
+            dev_null = open(devnull, 'w')
+            if self.redirect_filename is not None:
+                redirect_file = open(self.redirect_filename, 'w')
+                process = sp.Popen(command, shell=False, stdout=redirect_file, stderr=dev_null)
+                redirect_file.close()
+            else:
+                process = sp.Popen(command, shell=False, stdout=dev_null, stderr=dev_null)
+            dev_null.close()
+
         return process
 
     def mv_to_bad(self, seed):
@@ -597,13 +666,21 @@ class FullRelaxer:
                     pass
         return
 
-    def cp_to_input(self, seed):
+    def cp_to_input(self, seed, ext='res', glob_files=False):
         """ Copy initial cell and res to input folder. """
         try:
             if not exists('input'):
                 makedirs('input', exist_ok=True)
-            copy('{}.res'.format(seed), 'input')
+            if glob_files:
+                files = glob.glob('{}*'.format(seed))
+                for f in files:
+                    if f.endswith('.lock'):
+                        continue
+                    copy('{}'.format(f), 'input')
+            else:
+                copy('{}.{}'.format(seed, ext), 'input')
         except:
+            print_exc()
             if self.verbosity > 0:
                 print_exc()
             pass

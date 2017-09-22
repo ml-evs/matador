@@ -30,8 +30,8 @@ import glob
 
 
 class BatchRun:
-    """ A class that implements the running of multiple CASTEP jobs from a series
-    of .res files and single cell and param files.
+    """ A class that implements the running of multiple generic jobs on
+    a series of files without collisions with other nodes.
     """
     def __init__(self, *args, **kwargs):
         """ Check directory has valid contents and prepare log files and directories if
@@ -42,6 +42,19 @@ class BatchRun:
         self.debug = self.args.get('debug')
         self.seed = self.args['seed']
         del self.args['seed']
+        # if only one seed, check if it is a file, and if so treat
+        # this run as a generic run, not a CASTEP cell/param run
+        if len(self.seed) == 1:
+            if '*' in self.seed[0]:
+                self.seed = glob.glob(self.seed[0])
+            elif not isfile(self.seed[0]):
+                self.seed = self.seed[0]
+
+        if isinstance(self.seed, str):
+            self.mode = 'castep'
+        else:
+            self.mode = 'generic'
+
         if self.args.get('no_reopt'):
             self.args['reopt'] = False
         else:
@@ -70,6 +83,118 @@ class BatchRun:
             print_warning('Requested more cores (' + str(self.args['ncores']*self.nprocesses) +
                           ') than available (' + str(self.all_cores) + ').' +
                           '(Maybe you are using a queueing system).')
+
+        if self.mode is 'castep':
+            self.castep_setup()
+        else:
+            self.generic_setup()
+
+        # prepare folders and text files
+        self.paths = dict()
+        self.paths['completed_dir'] = 'completed'
+        self.paths['failed_dir'] = 'bad_castep'
+        self.paths['jobs_fname'] = 'jobs.txt'
+        self.paths['completed_fname'] = 'finished_cleanly.txt'
+        self.paths['failures_fname'] = 'failures.txt'
+        self.paths['memory_fname'] = 'memory_exceeded.txt'
+        if not isfile(self.paths['jobs_fname']):
+            with open(self.paths['jobs_fname'], 'a'):
+                pass
+        if not isfile(self.paths['completed_fname']):
+            with open(self.paths['completed_fname'], 'a'):
+                pass
+        if not isfile(self.paths['failures_fname']):
+            with open(self.paths['failures_fname'], 'a'):
+                pass
+        if self.args.get('memcheck'):
+            if not isfile(self.paths['memory_fname']):
+                with open(self.paths['memory_fname'], 'a'):
+                    pass
+
+    def spawn(self):
+        """ Spawn processes to perform calculations. """
+        procs = []
+        for ind in range(self.nprocesses):
+            procs.append(mp.Process(target=self.perform_new_calculations,
+                         args=(self.file_lists['res'] if self.mode is 'castep' else self.seed, self.paths)))
+        try:
+            for proc in procs:
+                proc.start()
+        except(KeyboardInterrupt, SystemExit, RuntimeError):
+            print_exc()
+            for proc in procs:
+                proc.terminate()
+            exit('Killing running jobs and exiting...')
+
+    def perform_new_calculations(self, res_list, paths):
+        """ Perform all calculations that have not already
+        failed or finished to completion. """
+        job_count = 0
+        for res in res_list:
+            running = False
+            if isfile(res + '.lock'):
+                running = True
+            else:
+                with open(paths['jobs_fname'], 'r') as job_file:
+                    flines = job_file.readlines()
+                    for line in flines:
+                        if res in line:
+                            running = True
+                            break
+            if not running:
+                if self.limit is not None:
+                    if job_count == self.limit:
+                        raise SystemExit
+                if not isfile(res + '.lock'):
+                    with open(res + '.lock', 'a') as job_file:
+                        pass
+                else:
+                    print('Another node wrote this file when I wanted to, skipping...')
+                    running = True
+                    continue
+                with open(paths['jobs_fname'], 'a') as job_file:
+                    job_file.write(res+'\n')
+                # create full relaxer object for creation and running of job
+                try:
+                    job_count += 1
+                    relaxer = FullRelaxer(node=None, res=res,
+                                          param_dict=self.param_dict,
+                                          cell_dict=self.cell_dict,
+                                          mode=self.mode,
+                                          **self.args)
+                    try:
+                        if not relaxer.enough_memory:
+                            with open(paths['memory_fname'], 'a') as job_file:
+                                job_file.write(res+'\n')
+                            remove(res + '.lock')
+                            with open(paths['jobs_fname'], 'r+') as job_file:
+                                flines = job_file.readlines()
+                                job_file.seek(0)
+                                for ind, line in enumerate(flines):
+                                    if res not in line:
+                                        job_file.write(line)
+                                job_file.truncate()
+                        elif relaxer.success:
+                            with open(paths['completed_fname'], 'a') as job_file:
+                                job_file.write(res+'\n')
+                        else:
+                            with open(paths['failures_fname'], 'a') as job_file:
+                                job_file.write(res+'\n')
+                    except:
+                        print_exc()
+                        pass
+                except(KeyboardInterrupt, SystemExit, RuntimeError):
+                    print_exc()
+                    raise SystemExit
+        return
+
+    def generic_setup(self):
+        """ Undo things that are set ready for CASTEP jobs... """
+        self.cell_dict = None
+        self.param_dict = None
+
+    def castep_setup(self):
+        """ Set up CASTEP jobs from res files, and $seed.cell/param. """
         # read cell/param files
         exts = ['cell', 'param']
         for ext in exts:
@@ -89,7 +214,7 @@ class BatchRun:
         self.file_lists = defaultdict(list)
         self.file_lists['res'] = glob.glob('*.res')
         if len(self.file_lists['res']) < 1:
-            print_failure('run3 requires at least 1 res file in folder, found' +
+            print_failure('run3 in CASTEP mode requires at least 1 res file in folder, found' +
                           str(len(self.file_lists['res'])))
             exit()
 
@@ -143,104 +268,6 @@ class BatchRun:
         del self.cell_dict['source']
         del self.param_dict['source']
 
-        # prepare folders and text files
-        self.paths = dict()
-        self.paths['completed_dir'] = 'completed'
-        self.paths['failed_dir'] = 'bad_castep'
-        self.paths['jobs_fname'] = 'jobs.txt'
-        self.paths['completed_fname'] = 'finished_cleanly.txt'
-        self.paths['failures_fname'] = 'failures.txt'
-        self.paths['memory_fname'] = 'memory_exceeded.txt'
-        if not isfile(self.paths['jobs_fname']):
-            with open(self.paths['jobs_fname'], 'a'):
-                pass
-        if not isfile(self.paths['completed_fname']):
-            with open(self.paths['completed_fname'], 'a'):
-                pass
-        if not isfile(self.paths['failures_fname']):
-            with open(self.paths['failures_fname'], 'a'):
-                pass
-        if self.args.get('memcheck'):
-            if not isfile(self.paths['memory_fname']):
-                with open(self.paths['memory_fname'], 'a'):
-                    pass
-
-    def spawn(self):
-        """ Spawn processes to perform calculations. """
-        procs = []
-        for ind in range(self.nprocesses):
-            procs.append(mp.Process(target=self.perform_new_calculations,
-                         args=(self.file_lists['res'], self.paths)))
-        try:
-            for proc in procs:
-                proc.start()
-        except(KeyboardInterrupt, SystemExit, RuntimeError):
-            print_exc()
-            for proc in procs:
-                proc.terminate()
-            exit('Killing running jobs and exiting...')
-
-    def perform_new_calculations(self, res_list, paths):
-        """ Perform all calculations that have not already
-        failed or finished to completion. """
-        job_count = 0
-        for res in res_list:
-            running = False
-            if isfile(res + '.lock'):
-                running = True
-            else:
-                with open(paths['jobs_fname'], 'r') as job_file:
-                    flines = job_file.readlines()
-                    for line in flines:
-                        if res in line:
-                            running = True
-                            break
-            if not running:
-                if self.limit is not None:
-                    if job_count == self.limit:
-                        raise SystemExit
-                if not isfile(res + '.lock'):
-                    with open(res + '.lock', 'a') as job_file:
-                        pass
-                else:
-                    print('Another node wrote this file when I wanted to, skipping...')
-                    running = True
-                    continue
-                with open(paths['jobs_fname'], 'a') as job_file:
-                    job_file.write(res+'\n')
-                # create full relaxer object for creation and running of job
-                try:
-                    job_count += 1
-                    relaxer = FullRelaxer(node=None, res=res,
-                                          param_dict=self.param_dict,
-                                          cell_dict=self.cell_dict,
-                                          **self.args)
-                    try:
-                        if not relaxer.enough_memory:
-                            with open(paths['memory_fname'], 'a') as job_file:
-                                job_file.write(res+'\n')
-                            remove(res + '.lock')
-                            with open(paths['jobs_fname'], 'r+') as job_file:
-                                flines = job_file.readlines()
-                                job_file.seek(0)
-                                for ind, line in enumerate(flines):
-                                    if res not in line:
-                                        job_file.write(line)
-                                job_file.truncate()
-                        elif relaxer.success:
-                            with open(paths['completed_fname'], 'a') as job_file:
-                                job_file.write(res+'\n')
-                        else:
-                            with open(paths['failures_fname'], 'a') as job_file:
-                                job_file.write(res+'\n')
-                    except:
-                        print_exc()
-                        pass
-                except(KeyboardInterrupt, SystemExit, RuntimeError):
-                    print_exc()
-                    raise SystemExit
-        return
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
@@ -257,10 +284,11 @@ if __name__ == '__main__':
                 by Chris Pickard and Andrew Morris and PyAIRSS CastepRunner by Jamie Wynn.')
     parser.add_argument('--version', action='version', version='run3 operating from matador version '
                         + __version__ + '.')
-    parser.add_argument('seed', type=str,
-                        help='cell and param seed to use as template for calculations')
+    parser.add_argument('seed', type=str, nargs='*',
+                        help='cell and param seed to use as template for CASTEP calculations OR list of files\
+                              to apply run executable on')
     parser.add_argument('-nc', '--ncores', type=int,
-                        help='number of cores CASTEP per job [DEFAULT=cpu_count/nprocesses]')
+                        help='number of cores per job [DEFAULT=cpu_count/nprocesses]')
     parser.add_argument('-np', '--nprocesses', type=int, default=1,
                         help='number of concurrent calculations, i.e. number \
                               of concurrent mpiruns [DEFAULT=1]')
@@ -272,6 +300,8 @@ if __name__ == '__main__':
                         help='specify path to or name of executable')
     parser.add_argument('--no_reopt', action='store_true', default=False,
                         help='do not run geometry optimisation again after first success')
+    parser.add_argument('--redirect', type=str,
+                        help='filename to redirect output to, can use $seed macro')
     parser.add_argument('-d', '--debug', action='store_true', default=False,
                         help='debug output')
     parser.add_argument('-cust', '--custom_params', action='store_true', default=False,
