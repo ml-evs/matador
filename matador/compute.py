@@ -62,7 +62,7 @@ class FullRelaxer:
                  rough=None, spin=False, redirect=None,
                  reopt=False, custom_params=False, memcheck=False, maxmem=None, killcheck=True,
                  kpts_1D=False, conv_cutoff=None, conv_kpt=None, archer=False, bnl=False, intel_mpi=False,
-                 start=True, verbosity=0, debug=False):
+                 start=True, verbosity=1, debug=False):
         """ Make the files to run the calculation and handle
         the calling of CASTEP itself.
         """
@@ -195,7 +195,7 @@ class FullRelaxer:
         """
         seed = self.seed
         calc_doc = self.calc_doc
-        if self.verbosity >= 1:
+        if self.verbosity > 1:
             print_notify('Relaxing ' + self.seed)
         geom_max_iter_list = self.geom_max_iter_list
         self.parse_executable(seed)
@@ -210,9 +210,9 @@ class FullRelaxer:
         for ind, num_iter in enumerate(geom_max_iter_list):
             if self.reopt and self.rerun:
                 num_iter = 20
-                if self.verbosity >= 1:
+                if self.verbosity > 1:
                     print_notify('Performing one last iteration...')
-            if self.verbosity >= 1:
+            if self.verbosity > 1:
                 if ind == 0:
                     print_notify('custom params: {}'.format(self.custom_params))
                     print_notify('Beginning rough geometry optimisation...')
@@ -221,7 +221,7 @@ class FullRelaxer:
             if self.killcheck:
                 if isfile(self.seed + '.kill'):
                     remove(self.seed + '.kill')
-                    if self.verbosity >= 1:
+                    if self.verbosity > 1:
                         print('Found {}.kill, ending job...'.format(self.seed))
                     if output_queue is not None:
                         output_queue.put(self.res_dict)
@@ -237,7 +237,7 @@ class FullRelaxer:
                 if isfile(seed + '.cell'):
                     remove(seed + '.cell')
                 if self.kpts_1D:
-                    if self.verbosity > 2:
+                    if self.verbosity > 1:
                         print('Calculating 1D kpt grid...')
                     n_kz = ceil(1 / (calc_doc['lattice_abc'][0][2] * self.target_spacing))
                     if n_kz % 2 == 1:
@@ -247,7 +247,7 @@ class FullRelaxer:
                         del calc_doc['kpoints_mp_spacing']
                 doc2cell(calc_doc, seed, hash_dupe=False, copy_pspots=False, spin=self.spin)
                 if self.custom_params:
-                    if self.verbosity > 2:
+                    if self.verbosity > 1:
                         print('Using custom param files...')
                 if not self.custom_params:
                     if isfile(seed + '.param'):
@@ -270,6 +270,8 @@ class FullRelaxer:
                     del opti_dict['kpoints_mp_spacing']
                     del opti_dict['kpoints_mp_grid']
                     del opti_dict['species_pot']
+                    del opti_dict['sedc_apply']
+                    del opti_dict['sedc_scheme']
                 except:
                     pass
                 if self.reopt and self.rerun and not opti_dict['optimised']:
@@ -281,7 +283,7 @@ class FullRelaxer:
                         remove(seed+'.res')
                     doc2res(opti_dict, seed, hash_dupe=False)
                 elif (not self.reopt or self.rerun) and opti_dict['optimised']:
-                    if self.verbosity >= 1:
+                    if self.verbosity > 1:
                         print_success('Successfully relaxed ' + seed)
                     # write res and castep file out to completed folder
                     if isfile(seed+'.res'):
@@ -303,7 +305,7 @@ class FullRelaxer:
                     self.tidy_up(seed)
                     return True
                 elif ind == len(geom_max_iter_list) - 1:
-                    if self.verbosity >= 1:
+                    if self.verbosity > 1:
                         print_warning('Failed to optimise ' + seed)
                     # write final res file to bad_castep
                     if isfile(seed+'.res'):
@@ -319,7 +321,7 @@ class FullRelaxer:
                 err_file = seed + '*.err'
                 for globbed in glob.glob(err_file):
                     if isfile(globbed):
-                        if self.verbosity >= 1:
+                        if self.verbosity > 1:
                             print_warning('Failed to optimise ' + seed + ' CASTEP crashed.')
                         # write final res file to bad_castep
                         if isfile(seed+'.res'):
@@ -358,23 +360,23 @@ class FullRelaxer:
                 calc_doc.update(opti_dict)
 
             except(KeyboardInterrupt, FileNotFoundError, SystemExit):
-                if self.verbosity >= 1:
+                if self.verbosity > 1:
                     print_exc()
                     print_warning('Received exception, attempting to fail gracefully...')
                 etype, evalue, etb = exc_info()
-                if self.verbosity >= 1:
+                if self.verbosity > 1:
                     print(format_exception_only(etype, evalue))
                 if self.debug:
                     print_exc()
-                if self.verbosity >= 1:
+                if self.verbosity > 1:
                     print('Killing CASTEP...')
                 process.terminate()
-                if self.verbosity >= 1:
+                if self.verbosity > 1:
                     print_warning('Done!')
                     print('Tidying up...', end=' ')
                 self.mv_to_bad(seed)
                 self.tidy_up(seed)
-                if self.verbosity >= 1:
+                if self.verbosity > 1:
                     print_warning('Done!')
                 if output_queue is not None:
                     output_queue.put(self.res_dict)
@@ -382,7 +384,7 @@ class FullRelaxer:
                         print('wrote failed dict out to output_queue')
                 return False
             except:
-                if self.verbosity >= 1:
+                if self.verbosity > 1:
                     print_exc()
                 process.terminate()
                 self.mv_to_bad(seed)
@@ -390,13 +392,13 @@ class FullRelaxer:
                 if output_queue is not None:
                     output_queue.put(self.res_dict)
                     if self.debug:
-                        print('wrote failed dict out to output_queue')
+                        print('wrote ll dict out to output_queue')
                 return False
 
     def scf(self, calc_doc, seed, keep=True):
         """ Perform only the scf calculation without relaxation.  """
         try:
-            if self.verbosity >= 1:
+            if self.verbosity > 1:
                 print_notify('Calculating SCF ' + seed)
             if not self.custom_params:
                 doc2param(calc_doc, seed, hash_dupe=False)
@@ -420,7 +422,7 @@ class FullRelaxer:
             err_file = seed + '.*err'
             for globbed in glob.glob(err_file):
                 if isfile(globbed):
-                    if self.verbosity >= 1:
+                    if self.verbosity >  1:
                         print_warning('Failed to optimise ' + seed + ' CASTEP crashed.')
                     # write final res file to bad_castep
                     self.mv_to_bad(seed)
@@ -430,14 +432,14 @@ class FullRelaxer:
                 self.tidy_up(seed)
             return True
         except(SystemExit, KeyboardInterrupt):
-            if self.verbosity >= 1:
+            if self.verbosity > 1:
                 print_exc()
             self.mv_to_bad(seed)
             if not keep:
                 self.tidy_up(seed)
             raise SystemExit
         except:
-            if self.verbosity >= 1:
+            if self.verbosity > 1:
                 print_exc()
             self.mv_to_bad(seed)
             if not keep:
@@ -624,7 +626,7 @@ class FullRelaxer:
         try:
             if not exists('bad_castep'):
                 makedirs('bad_castep', exist_ok=True)
-            if self.verbosity >= 1:
+            if self.verbosity > 1:
                 print('Something went wrong, moving files to bad_castep')
             seed_files = glob.glob(seed + '.*')
             for _file in seed_files:
@@ -632,11 +634,11 @@ class FullRelaxer:
                     copy(_file, 'bad_castep')
                     remove(_file)
                 except:
-                    if self.verbosity > 0:
+                    if self.verbosity > 1:
                         print_exc()
                     pass
         except:
-            if self.verbosity > 0:
+            if self.verbosity > 1:
                 print_exc()
             pass
         return
@@ -661,7 +663,7 @@ class FullRelaxer:
                     copy('{}.{}'.format(seed, ext), 'completed')
                     remove('{}.{}'.format(seed, ext))
                 except:
-                    if self.verbosity > 0:
+                    if self.verbosity > 1:
                         print_exc()
                     pass
         return
@@ -681,7 +683,7 @@ class FullRelaxer:
                 copy('{}.{}'.format(seed, ext), 'input')
         except:
             print_exc()
-            if self.verbosity > 0:
+            if self.verbosity > 1:
                 print_exc()
             pass
         return

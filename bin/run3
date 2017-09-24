@@ -203,10 +203,12 @@ class BatchRun:
                 exit()
         self.cell_dict, cell_success = cell2dict(self.seed + '.cell', db=False)
         if not cell_success:
+            print(self.cell_dict)
             print_failure('Failed to parse cell file')
             exit()
         self.param_dict, param_success = param2dict(self.seed + '.param', db=False)
         if not param_success:
+            print(self.param_dict)
             print_failure('Failed to parse param file')
             exit()
 
@@ -306,7 +308,7 @@ if __name__ == '__main__':
                         help='debug output')
     parser.add_argument('-cust', '--custom_params', action='store_true', default=False,
                         help='use custom param file per structure')
-    parser.add_argument('-v', '--verbosity', type=int, default=0,
+    parser.add_argument('-v', '--verbosity', type=int, default=1,
                         help='integer to set level of verbosity')
     parser.add_argument('--archer', action='store_true', default=False,
                         help='use aprun over mpirun')
