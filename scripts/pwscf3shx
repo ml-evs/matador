@@ -1,0 +1,21 @@
+#!/usr/bin/env python
+# coding: utf-8
+from matador.scrapers import qe_scrapers
+from matador.export import doc2res
+from matador.utils.cell_utils import cart2abc
+from matador.utils.print_utils import print_notify, print_success, print_failure
+from sys import argv
+
+fnames = argv[1:]
+for fname in fnames:
+    print_notify('Reading ' + fname)
+    pw_dict, success = qe_scrapers.pwout2dict(fname)
+    pw_dict['lattice_abc'] = cart2abc(pw_dict['lattice_cart'])
+    pw_dict['num_atoms'] = len(pw_dict['atom_types'])
+    ext = '.' + fname.split('.')[-1]
+    if success:
+        doc2res(pw_dict, fname.replace(ext, ''), hash_dupe=True, info=False, spoof_titl=True)
+        print_success('Wrote .res file to ' + fname.replace(ext, '') + '.res')
+    else:
+        print_failure('Unable to find final structure in ' + fname + '.')
+print_success('Completed!')
