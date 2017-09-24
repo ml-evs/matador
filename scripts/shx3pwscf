@@ -6,7 +6,7 @@ from matador.utils.print_utils import print_notify, print_success, print_failure
 import argparse
 
 
-parser = argparse.ArgumentParser(prog='shx3cell')
+parser = argparse.ArgumentParser(prog='shx3pwscf')
 parser.add_argument('--template', type=str, help='template file to append structure to')
 parser.add_argument('--kpoint_spacing', type=float, help='calculate correct grid (no offset)')
 parser.add_argument('seed', type=str, nargs='*',

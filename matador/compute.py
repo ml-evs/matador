@@ -262,7 +262,7 @@ class FullRelaxer:
                     print_notify('Intermediate calculation finished')
                     print(opti_dict)
                 if not success and isinstance(opti_dict, str):
-                    if self.verbosity >= 1:
+                    if self.verbosity > 1:
                         print_warning('Failed to scrape castep file...')
                     exit()
                 try:
@@ -422,7 +422,7 @@ class FullRelaxer:
             err_file = seed + '.*err'
             for globbed in glob.glob(err_file):
                 if isfile(globbed):
-                    if self.verbosity >  1:
+                    if self.verbosity > 1:
                         print_warning('Failed to optimise ' + seed + ' CASTEP crashed.')
                     # write final res file to bad_castep
                     self.mv_to_bad(seed)
@@ -452,7 +452,7 @@ class FullRelaxer:
             self.cp_to_input(seed, ext=self.input_ext, glob_files=True)
             self.parse_executable(seed)
             process = self.castep(seed)
-            results = process.communicate()
+            process.communicate()
             if process.returncode != 0:
                 self.mv_to_bad(seed)
                 return False
@@ -583,8 +583,8 @@ class FullRelaxer:
                 command = ['mpirun', '-n', str(self.ncores), '-ppn', str(self.ncores)] + self.command
             elif self.node is not None:
                 cwd = getcwd()
-                command = ['ssh', '{}'.format(self.node), '\'cd', '{};'.format(cwd),
-                           'mpirun', '-n', str(self.ncores)] + self.command + ['\'']
+                command = ['ssh', '{}'.format(self.node), 'cd', '{};'.format(cwd),
+                           'mpirun', '-n', str(self.ncores)] + self.command
             else:
                 command = ['nice', '-n', '15', 'mpirun', '-n', str(self.ncores)] + self.command
         else:
