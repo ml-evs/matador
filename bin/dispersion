@@ -46,6 +46,4 @@ if __name__ == '__main__':
     else:
         cell = False
 
-    print(bandstructure, dos, cell)
-
     plot = plot_spectral(seed, bandstructure=bandstructure, dos=dos, cell=cell, **kwargs)

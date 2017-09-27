@@ -5,7 +5,7 @@ inputs and outputs.
 
 from __future__ import print_function
 # matador modules
-from ..utils.cell_utils import abc2cart, calc_mp_spacing
+from ..utils.cell_utils import abc2cart, calc_mp_spacing, cart2volume
 # external libraries
 try:
     import bson.json_util as json
@@ -178,6 +178,7 @@ def cell2dict(seed, db=True, outcell=False, positions=False, verbosity=0, **kwar
                         cell['lattice_cart'].append(list(map(float, flines[line_no+i].split())))
                     i += 1
                 assert(len(cell['lattice_cart']) == 3)
+                cell['cell_volume'] = cart2volume(cell['lattice_cart'])
             elif '%block species_pot' in line.lower():
                 cell['species_pot'] = dict()
                 i = 1
@@ -273,15 +274,13 @@ def cell2dict(seed, db=True, outcell=False, positions=False, verbosity=0, **kwar
                 elif '%block spectral_kpoints_path' in line.lower() or '%block spectral_kpoint_path' in line.lower():
                     i = 1
                     cell['spectral_kpoints_path'] = []
-                    while ('%endblock spectral_kpoints_path' not in flines[line_no+i].lower()
-                            or '%endblock spectral_kpoint_path' not in flines[line_no+i].lower()):
+                    while '%endblock' not in flines[line_no+i].lower():
                         cell['spectral_kpoints_path'].append(list(map(float, flines[line_no+i].split()[:3])))
                         i += 1
                 elif '%block spectral_kpoints_list' in line.lower() or '%block spectral_kpoint_list' in line.lower():
                     i = 1
                     cell['spectral_kpoints_list'] = []
-                    while ('%endblock spectral_kpoints_list' not in flines[line_no+i].lower()
-                            or '%endblock spectral_kpoint_list' not in flines[line_no+i].lower()):
+                    while '%endblock' not in flines[line_no+i].lower():
                         cell['spectral_kpoints_list'].append(list(map(float, flines[line_no+i].split()[:4])))
                         i += 1
 
@@ -884,6 +883,11 @@ def bands2dict(seed):
 
         | seed: str, path to .bands file.
 
+    Returns:
+
+        | bs      : dict, containing info from bands file
+        | success : bool, whether or not the scraping was successful
+
     """
     from matador.utils.chem_utils import HARTREE_TO_EV
     from matador.utils.cell_utils import frac2cart, real2recip
@@ -906,7 +910,6 @@ def bands2dict(seed):
     for i in range(3):
         bandstructure['lattice_cart'].append([float(elem) for elem in header[6+i].split()])
     bandstructure['kpoint_path'] = np.zeros((bandstructure['num_kpoints'], 3))
-    bandstructure['kpoint_weights'] = np.zeros((bandstructure['num_kpoints']))
     bandstructure['eigenvalues_k_s'] = np.empty((bandstructure['num_spins'], bandstructure['num_bands'], bandstructure['num_kpoints']))
 
     for nk in range(bandstructure['num_kpoints']):
@@ -918,8 +921,31 @@ def bands2dict(seed):
                 bandstructure['eigenvalues_k_s'][ns][nb][int(data[kpt_ind].split()[1])-1] = float(data[kpt_ind+ns+2+nb].strip())
     bandstructure['eigenvalues_k_s'] -= bandstructure['fermi_energy_Ha']
     bandstructure['eigenvalues_k_s'] *= HARTREE_TO_EV
+
     cart_kpts = np.asarray(frac2cart(real2recip(bandstructure['lattice_cart']), bandstructure['kpoint_path']))
-    bandstructure['kpoint_path_spacing'] = np.sqrt(np.sum((np.asarray(cart_kpts[0]) - np.asarray(cart_kpts[1]))**2))
+    kpts_diff = np.zeros((len(cart_kpts)-1))
+    kpts_diff_set = set()
+    for i in range(len(cart_kpts)-1):
+        kpts_diff[i] = np.sqrt(np.sum((cart_kpts[i] - cart_kpts[i+1])**2))
+        kpts_diff_set.add(kpts_diff[i])
+    bandstructure['kpoint_path_spacing'] = np.median(kpts_diff)
+
+    # create list containing kpoint indices of discontinuous branches through k-space
+    bandstructure['kpoint_branches'] = []
+    current_branch = []
+    for ind, point in enumerate(cart_kpts):
+        if ind == 0:
+            current_branch.append(ind)
+        elif ind == len(cart_kpts) - 1:
+            bandstructure['kpoint_branches'].append(current_branch)
+            continue
+
+        if np.sqrt(np.sum((point - cart_kpts[ind+1])**2)) < 10*bandstructure['kpoint_path_spacing']:
+            current_branch.append(ind+1)
+        else:
+            bandstructure['kpoint_branches'].append(current_branch)
+            current_branch = [ind+1]
+    assert(sum([len(branch) for branch in bandstructure['kpoint_branches']]) == bandstructure['num_kpoints'])
     return bandstructure, True
 
 
