@@ -30,10 +30,22 @@ if __name__ == '__main__':
 
     seed = kwargs.get('seed')[0]
     del kwargs['seed']
-    dos_seed = seed.replace('.bands', '')
-    dos_seed += '.adaptive.dat'
+    bs_seed = seed.replace('.bands', '') + '.bands'
+    if isfile(bs_seed):
+        bandstructure = True
+    else:
+        bandstructure = False
+    dos_seed = seed.replace('.bands', '') + '.adaptive.dat'
     if isfile(dos_seed):
         dos = True
     else:
         dos = False
-    plot = plot_spectral(seed, bandstructure=True, dos=dos, **kwargs)
+    cell_seed = seed.replace('.bands', '') + '.cell'
+    if isfile(cell_seed):
+        cell = True
+    else:
+        cell = False
+
+    print(bandstructure, dos, cell)
+
+    plot = plot_spectral(seed, bandstructure=bandstructure, dos=dos, cell=cell, **kwargs)
