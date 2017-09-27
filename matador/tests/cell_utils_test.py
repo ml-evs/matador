@@ -2,12 +2,19 @@
 import unittest
 from matador.utils.cell_utils import abc2cart, cart2abc, cart2volume, create_simple_supercell
 from matador.utils.cell_utils import cart2frac, frac2cart
+from matador.utils.cell_utils import doc2spg
 from matador.scrapers.castep_scrapers import castep2dict, res2dict, cell2dict
 from matador.similarity.pdf_similarity import PDF, PDFOverlap
 from matador.export import doc2cell
 from functools import reduce
 import numpy as np
 from os.path import realpath
+try:
+    from matador.utils.cell_utils import get_seekpath_kpoint_path
+    from seekpath import get_path
+    imported_seekpath = True
+except:
+    imported_seekpath = False
 
 # grab abs path for accessing test data
 REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
@@ -133,10 +140,9 @@ class CellUtilTest(unittest.TestCase):
         spacing = calc_mp_spacing(real_lattice, mp_grid, prec=5)
         self.assertAlmostEqual(spacing, 0.05, places=3)
 
+    @unittest.skipIf(not imported_seekpath, 'Seekpath package not found in this distribution')
     def testKPointPath(self):
 
-        from matador.utils.cell_utils import get_seekpath_kpoint_path, doc2spg
-        from seekpath import get_path
         cell, s = castep2dict(REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep')
         std_cell, path, seekpath_results = get_seekpath_kpoint_path(cell, spacing=0.01, debug=True)
         self.assertEqual(539, len(path))
