@@ -3,7 +3,7 @@ import unittest
 from matador.utils.cell_utils import abc2cart, cart2abc, cart2volume, create_simple_supercell
 from matador.utils.cell_utils import cart2frac, frac2cart
 from matador.utils.cell_utils import doc2spg
-from matador.scrapers.castep_scrapers import castep2dict, res2dict, cell2dict
+from matador.scrapers.castep_scrapers import castep2dict, res2dict, cell2dict, bands2dict
 from matador.similarity.pdf_similarity import PDF, PDFOverlap
 from matador.export import doc2cell
 from functools import reduce
@@ -157,12 +157,38 @@ class CellUtilTest(unittest.TestCase):
 
         import glob
         from os import remove
+        from matador.utils.cell_utils import frac2cart, real2recip
         fnames = glob.glob(REAL_PATH + 'data/bs_test/*.res')
+        spacing = 0.01
         for fname in fnames:
             doc, s = res2dict(fname, db=False)
             doc['cell_volume'] = cart2volume(doc['lattice_cart'])
-            std_doc, path, seekpath_results = get_seekpath_kpoint_path(doc, spacing=0.01, debug=True)
+
+            std_doc, path, seekpath_results = get_seekpath_kpoint_path(doc, spacing=spacing, debug=True)
             seekpath_results_path = get_path(doc2spg(doc))
+
+            rel_path = seekpath_results['explicit_kpoints_rel']
+            abs_path = seekpath_results['explicit_kpoints_abs']
+
+            cart_kpts = np.asarray(frac2cart(real2recip(std_doc['lattice_cart']), path))
+            diffs = np.zeros((len(cart_kpts[:-1])))
+            np.testing.assert_array_almost_equal(cart_kpts, abs_path)
+            np.testing.assert_array_almost_equal(path, rel_path)
+            # for ind, kpt in enumerate(cart_kpts[:-1]):
+            for ind, kpt in enumerate(cart_kpts[:-1]):
+                diffs[ind] = np.sqrt(np.sum((kpt - cart_kpts[ind+1])**2))
+            self.assertLess(len(np.where(diffs > 1.1*spacing)[0]), len(seekpath_results['segments']))
+
+            if 'flrys4-1x109' in fname:
+                print('Reading bands...')
+                bs, s = bands2dict(fname.replace('.res', '.bands'))
+                np.testing.assert_array_almost_equal(bs['kpoint_path'], rel_path)
+                np.testing.assert_array_almost_equal(bs['lattice_cart'], std_doc['lattice_cart'])
+                np.testing.assert_array_almost_equal(bs['cart_kpoints'], abs_path)
+                for ind, kpt in enumerate(bs['cart_kpoints'][:-1]):
+                    diffs[ind] = np.sqrt(np.sum((kpt - bs['cart_kpoints'][ind+1])**2))
+            self.assertLess(len(np.where(diffs > 1.1*spacing)[0]), len(seekpath_results['segments']))
+
             cell_path = fname.replace('.res', '.cell')
             doc2cell(std_doc, cell_path)
             new_doc, s = cell2dict(cell_path, outcell=True, positions=True, db=False)

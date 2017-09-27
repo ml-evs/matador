@@ -1,7 +1,9 @@
 """ This file implements several useful plotting routines. """
 
 
-def plot_spectral(seeds, plot_bandstructure=True, plot_dos=False, cell=False, gap=False, **kwargs):
+def plot_spectral(seeds,
+                  plot_bandstructure=True, plot_dos=False,
+                  cell=False, gap=False, colour_by_seed=False, **kwargs):
     """ Plot bandstructure and optional DOS from <seed>.bands and
     <seed>.adaptive.dat file.
 
@@ -13,7 +15,9 @@ def plot_spectral(seeds, plot_bandstructure=True, plot_dos=False, cell=False, ga
 
         | plot_bandstructure : bool, whether to plot bandstructure
         | plot_dos           : bool, whether to plot density of states
-        | cell          : bool, whether to work out correct labels from structure in cell file
+        | cell               : bool, whether to work out correct labels from structure in cell file
+        | gap                : bool, draw on the band gap
+        | colour_by_seed     : bool, plot with a separate colour per bandstructure
 
     """
     from matador.scrapers.castep_scrapers import bands2dict, cell2dict
@@ -22,7 +26,14 @@ def plot_spectral(seeds, plot_bandstructure=True, plot_dos=False, cell=False, ga
     import numpy as np
     import matplotlib.pyplot as plt
     import seaborn as sns
-    sns.set(style='whitegrid', font_scale=1.4)
+    sns.set(style='whitegrid', font_scale=1.2)
+    sns.set_style({
+        'axes.facecolor': 'white', 'figure.facecolor': 'white',
+        'font.sans-serif': ['Linux Biolinum O', 'Helvetica', 'Arial'],
+        'axes.linewidth': 0.5,
+        'axes.grid': False,
+        'legend.frameon': False,
+        'axes.axisbelow': True})
     sns.set_palette('Dark2')
     colours = sns.color_palette()
     valence = colours[0]
@@ -31,15 +42,21 @@ def plot_spectral(seeds, plot_bandstructure=True, plot_dos=False, cell=False, ga
 
     if not isinstance(seeds, list):
         seeds = [seeds]
-    print(seeds)
-    ls = []
-    for i in range(len(seeds)):
-        if i % 3 == 0:
-            ls.append('-')
-        elif i % 3 == 1:
-            ls.append('--')
-        elif i % 3 == 2:
-            ls.append('-.')
+
+    if len(seeds) > 1 and colour_by_seed:
+        seed_colours = colours
+        ls = ['-']*len(seeds)
+    else:
+        ls = []
+        for i in range(len(seeds)):
+            if i % 3 == 0:
+                ls.append('-')
+            elif i % 3 == 1:
+                ls.append('--')
+            elif i % 3 == 2:
+                ls.append('-.')
+    if len(seeds) == 1:
+        colour_by_seed = False
 
     if kwargs.get('plot_window') is not None:
         plot_window = (-kwargs.get('plot_window'), kwargs.get('plot_window'))
@@ -62,18 +79,39 @@ def plot_spectral(seeds, plot_bandstructure=True, plot_dos=False, cell=False, ga
         seed = seed.replace('.bands', '')
         if plot_bandstructure:
             bs, s = bands2dict(seed + '.bands', summary=True)
-            path = np.linspace(0, 1, int(bs['num_kpoints'])-len(bs['kpoint_branches'])+1)
+            path = [0]
+            for branch in bs['kpoint_branches']:
+                for ind, kpt in enumerate(bs['kpoint_path'][branch]):
+                    if ind != len(branch) - 1:
+                        diff = np.sqrt(np.sum((kpt - bs['kpoint_path'][branch[ind+1]])**2))
+                        path.append(path[-1] + diff)
+            path = np.asarray(path)
+            path /= np.max(path)
+            assert len(path) == int(bs['num_kpoints']) - len(bs['kpoint_branches']) + 1
+            # path = np.linspace(0, 1, int(bs['num_kpoints'])-len(bs['kpoint_branches'])+1)
             for branch_ind, branch in enumerate(bs['kpoint_branches']):
                 for ns in range(bs['num_spins']):
                     for nb in range(bs['num_bands']):
                         if np.max(bs['eigenvalues_k_s'][ns][nb][branch]) < 0:
-                            colour = valence
+                            if colour_by_seed:
+                                colour = seed_colours[seed_ind]
+                            else:
+                                colour = valence
                         elif np.min(bs['eigenvalues_k_s'][ns][nb][branch]) > 0:
-                            colour = conduction
+                            if colour_by_seed:
+                                colour = seed_colours[seed_ind]
+                            else:
+                                colour = conduction
                         elif np.min(bs['eigenvalues_k_s'][ns][nb][branch]) < 0 and np.max(bs['eigenvalues_k_s'][ns][nb][branch]) > 0:
-                            colour = crossing
+                            if colour_by_seed:
+                                colour = seed_colours[seed_ind]
+                            else:
+                                colour = crossing
                         else:
-                            colour = 'black'
+                            if colour_by_seed:
+                                colour = seed_colours[seed_ind]
+                            else:
+                                colour = 'black'
                         ax_bs.plot(path[(np.asarray(branch)-branch_ind).tolist()], bs['eigenvalues_k_s'][ns][nb][branch], c=colour, lw=1, marker=None, ls=ls[seed_ind])
                 if branch_ind != len(bs['kpoint_branches'])-1:
                     ax_bs.axvline(path[branch[-1]-branch_ind], ls='-.', lw=1, c='grey')
@@ -93,6 +131,7 @@ def plot_spectral(seeds, plot_bandstructure=True, plot_dos=False, cell=False, ga
                     spg_structure = doc2spg(doc)
                     if spg_structure is not False:
                         seekpath_results = get_path(spg_structure)
+                        print(seekpath_results['bravais_lattice_extended'])
                     path_labels = seekpath_results['point_coords']
 
                 for branch_ind, branch in enumerate(bs['kpoint_branches']):
@@ -112,7 +151,7 @@ def plot_spectral(seeds, plot_bandstructure=True, plot_dos=False, cell=False, ga
                                                 if np.allclose(new_point, next_point):
                                                     label = '{}|{}'.format(label, new_label)
                                                     labelled.append(ind-branch_ind)
-                                                    shear_planes.append(ind-branch_ind)
+                                                    shear_planes.append(ind)
                                     label = '${}$'.format(label)
                                     xticklabels.append(label)
                                     xticks.append(path[ind-branch_ind])
@@ -129,8 +168,18 @@ def plot_spectral(seeds, plot_bandstructure=True, plot_dos=False, cell=False, ga
                 cbm = bs['conduction_band_max']
                 vbm_offset = sum([vbm_pos > ind for ind in shear_planes])
                 cbm_offset = sum([cbm_pos > ind for ind in shear_planes])
-                ax_bs.plot([path[vbm_pos-vbm_offset], path[cbm_pos-cbm_offset]], [vbm, cbm], c='red')
-
+                ax_bs.plot([path[vbm_pos-vbm_offset], path[cbm_pos-cbm_offset]], [vbm, cbm], ls=ls[seed_ind], c='blue', label='indirect gap {:3.3f} eV'.format(cbm-vbm))
+                if cbm_pos != vbm_pos:
+                    vbm_pos = bs['direct_gap_path_inds'][1]
+                    vbm = bs['direct_valence_band_min']
+                    cbm_pos = bs['direct_gap_path_inds'][0]
+                    cbm = bs['direct_conduction_band_max']
+                    vbm_offset = sum([vbm_pos > ind for ind in shear_planes])
+                    cbm_offset = sum([cbm_pos > ind for ind in shear_planes])
+                    ax_bs.plot([path[vbm_pos-vbm_offset], path[cbm_pos-cbm_offset]], [vbm, cbm], ls=ls[seed_ind], c='red', label='direct gap {:3.3f} eV'.format(cbm-vbm))
+                    ax_bs.legend(loc='upper center', bbox_to_anchor=(0.5, 1.1), fancybox=True, shadow=True, ncol=2, handlelength=1)
+                else:
+                    ax_bs.legend(loc='upper center', bbox_to_anchor=(0.5, 1.1), fancybox=True, shadow=True, ncol=1, handlelength=1)
             ax_bs.set_xticks(xticks)
             ax_bs.set_xticklabels(xticklabels)
         if plot_dos:

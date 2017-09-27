@@ -8,6 +8,7 @@ import numpy as np
 FARADAY_CONSTANT_Cpermol = 96.485332e3
 Cperg_to_mAhperg = 2.778e-1
 HARTREE_TO_EV = 27.21139
+BOHR_TO_ANGSTROM = 0.529177211
 
 
 def get_periodic_table():
