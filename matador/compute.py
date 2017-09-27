@@ -350,8 +350,8 @@ class FullRelaxer:
                     print_notify('Restarting calculation with current state:')
                     print(calc_doc)
                 if self.verbosity >= 2:
-                    print(('num_iter: {:3d} | max F: {:5f} eV/A | stress: {: 5f} GPa | '
-                          + 'cell volume: {:5f} A^3 | enthalpy per atom {:5f} eV')
+                    print(('num_iter: {:3d} | max F: {:5f} eV/A | stress: {: 5f} GPa | ' +
+                           'cell volume: {:5f} A^3 | enthalpy per atom {:5f} eV')
                           .format(sum(self.geom_max_iter_list[:ind+1]),
                                   opti_dict['max_force_on_atom'],
                                   opti_dict['pressure'],
@@ -373,7 +373,7 @@ class FullRelaxer:
                 process.terminate()
                 if self.verbosity > 1:
                     print_warning('Done!')
-                    print('Tidying up...', end=' ')
+                    print('Tidying up...')
                 self.mv_to_bad(seed)
                 self.tidy_up(seed)
                 if self.verbosity > 1:
@@ -402,17 +402,30 @@ class FullRelaxer:
                 print_notify('Calculating SCF ' + seed)
             if not self.custom_params:
                 doc2param(calc_doc, seed, hash_dupe=False)
+            self.cp_to_input(self.seed)
 
             if 'spectral_task' in calc_doc and calc_doc['spectral_task'] == 'bandstructure':
                 if 'spectral_kpoints_path' not in calc_doc and 'spectral_kpoints_list' not in calc_doc:
-                    from matador.utils.cell_utils import get_bs_kpoint_path
+                    from matador.utils.cell_utils import get_seekpath_kpoint_path, cart2abc
+                    if self.verbosity >= 2:
+                        print('Old lattice:')
+                        for i in range(3):
+                            print(calc_doc['lattice_cart'][i])
                     if calc_doc.get('spectral_kpoints_path_spacing') is None:
                         spacing = 0.02
                     else:
                         spacing = calc_doc['spectral_kpoints_path_spacing']
-                    labels, calc_doc['spectral_kpoints_list'] = get_bs_kpoint_path(calc_doc['lattice_cart'], spacing=spacing, debug=True)
+                    prim_doc, kpt_path, seekpath_results = get_seekpath_kpoint_path(calc_doc, spacing=spacing, debug=False)
+                    if self.verbosity >= 2:
+                        print('New lattice:')
+                        for i in range(3):
+                            print(prim_doc['lattice_cart'][i])
+                            print(seekpath_results)
+                    calc_doc.update(prim_doc)
+                    calc_doc['lattice_abc'] = cart2abc(calc_doc['lattice_cart'])
+                    calc_doc['spectral_kpoints_list'] = kpt_path
 
-            doc2cell(calc_doc, seed, hash_dupe=False, copy_pspots=False)
+            doc2cell(calc_doc, seed, hash_dupe=False, copy_pspots=False, overwrite=True)
             self.parse_executable(seed)
             # run CASTEP
             process = self.castep(seed)

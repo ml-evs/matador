@@ -5,7 +5,7 @@ inputs and outputs.
 
 from __future__ import print_function
 # matador modules
-from ..utils.cell_utils import abc2cart, calc_mp_spacing
+from ..utils.cell_utils import abc2cart, calc_mp_spacing, cart2volume
 # external libraries
 try:
     import bson.json_util as json
@@ -178,6 +178,7 @@ def cell2dict(seed, db=True, outcell=False, positions=False, verbosity=0, **kwar
                         cell['lattice_cart'].append(list(map(float, flines[line_no+i].split())))
                     i += 1
                 assert(len(cell['lattice_cart']) == 3)
+                cell['cell_volume'] = cart2volume(cell['lattice_cart'])
             elif '%block species_pot' in line.lower():
                 cell['species_pot'] = dict()
                 i = 1
@@ -273,15 +274,13 @@ def cell2dict(seed, db=True, outcell=False, positions=False, verbosity=0, **kwar
                 elif '%block spectral_kpoints_path' in line.lower() or '%block spectral_kpoint_path' in line.lower():
                     i = 1
                     cell['spectral_kpoints_path'] = []
-                    while ('%endblock spectral_kpoints_path' not in flines[line_no+i].lower()
-                            or '%endblock spectral_kpoint_path' not in flines[line_no+i].lower()):
+                    while '%endblock' not in flines[line_no+i].lower():
                         cell['spectral_kpoints_path'].append(list(map(float, flines[line_no+i].split()[:3])))
                         i += 1
                 elif '%block spectral_kpoints_list' in line.lower() or '%block spectral_kpoint_list' in line.lower():
                     i = 1
                     cell['spectral_kpoints_list'] = []
-                    while ('%endblock spectral_kpoints_list' not in flines[line_no+i].lower()
-                            or '%endblock spectral_kpoint_list' not in flines[line_no+i].lower()):
+                    while '%endblock' not in flines[line_no+i].lower():
                         cell['spectral_kpoints_list'].append(list(map(float, flines[line_no+i].split()[:4])))
                         i += 1
 
@@ -890,12 +889,21 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
     return castep, True
 
 
-def bands2dict(seed):
+def bands2dict(seed, summary=False):
     """ Parse a CASTEP bands file into a dictionary.
 
     Input:
 
         | seed: str, path to .bands file.
+
+    Args:
+
+        | summary : bool, print info about bandgap.
+
+    Returns:
+
+        | bs      : dict, containing info from bands file
+        | success : bool, whether or not the scraping was successful
 
     """
     from matador.utils.chem_utils import HARTREE_TO_EV
@@ -919,7 +927,6 @@ def bands2dict(seed):
     for i in range(3):
         bandstructure['lattice_cart'].append([float(elem) for elem in header[6+i].split()])
     bandstructure['kpoint_path'] = np.zeros((bandstructure['num_kpoints'], 3))
-    bandstructure['kpoint_weights'] = np.zeros((bandstructure['num_kpoints']))
     bandstructure['eigenvalues_k_s'] = np.empty((bandstructure['num_spins'], bandstructure['num_bands'], bandstructure['num_kpoints']))
 
     for nk in range(bandstructure['num_kpoints']):
@@ -931,8 +938,94 @@ def bands2dict(seed):
                 bandstructure['eigenvalues_k_s'][ns][nb][int(data[kpt_ind].split()[1])-1] = float(data[kpt_ind+ns+2+nb].strip())
     bandstructure['eigenvalues_k_s'] -= bandstructure['fermi_energy_Ha']
     bandstructure['eigenvalues_k_s'] *= HARTREE_TO_EV
+
     cart_kpts = np.asarray(frac2cart(real2recip(bandstructure['lattice_cart']), bandstructure['kpoint_path']))
-    bandstructure['kpoint_path_spacing'] = np.sqrt(np.sum((np.asarray(cart_kpts[0]) - np.asarray(cart_kpts[1]))**2))
+    kpts_diff = np.zeros((len(cart_kpts)-1))
+    kpts_diff_set = set()
+    for i in range(len(cart_kpts)-1):
+        kpts_diff[i] = np.sqrt(np.sum((cart_kpts[i] - cart_kpts[i+1])**2))
+        kpts_diff_set.add(kpts_diff[i])
+    bandstructure['kpoint_path_spacing'] = np.median(kpts_diff)
+
+    # create list containing kpoint indices of discontinuous branches through k-space
+    bandstructure['kpoint_branches'] = []
+    current_branch = []
+    for ind, point in enumerate(cart_kpts):
+        if ind == 0:
+            current_branch.append(ind)
+        elif ind == len(cart_kpts) - 1:
+            bandstructure['kpoint_branches'].append(current_branch)
+            continue
+
+        if np.sqrt(np.sum((point - cart_kpts[ind+1])**2)) < 10*bandstructure['kpoint_path_spacing']:
+            current_branch.append(ind+1)
+        else:
+            bandstructure['kpoint_branches'].append(current_branch)
+            current_branch = [ind+1]
+    assert(sum([len(branch) for branch in bandstructure['kpoint_branches']]) == bandstructure['num_kpoints'])
+
+    vbm = -1e10
+    cbm = 1e10
+    cbm_pos = 0
+    vbm_pos = 0
+    if bandstructure['num_spins'] == 1:
+        for branch_ind, branch in enumerate(bandstructure['kpoint_branches']):
+            for nb in range(bandstructure['num_bands']):
+                band_branch_min = np.min(bandstructure['eigenvalues_k_s'][0][nb][branch])
+                band_branch_max = np.max(bandstructure['eigenvalues_k_s'][0][nb][branch])
+                band_branch_argmin = np.argmin(bandstructure['eigenvalues_k_s'][0][nb][branch])
+                band_branch_argmax = np.argmax(bandstructure['eigenvalues_k_s'][0][nb][branch])
+                if band_branch_max < 0 and band_branch_max > vbm:
+                    vbm = band_branch_max
+                    vbm_pos = branch[band_branch_argmax]
+                if band_branch_min > 0 and band_branch_min < cbm:
+                    cbm = band_branch_min
+                    cbm_pos = branch[band_branch_argmin]
+                if band_branch_max > 0 and band_branch_min < 0:
+                    vbm = 0
+                    cbm = 0
+                    break
+        direct_cbm = 1e10
+        direct_vbm = -1e10
+        for ind, kpt in enumerate(bandstructure['kpoint_path']):
+            for nb in range(bandstructure['num_bands']):
+                band_min = np.min(bandstructure['eigenvalues_k_s'][0][nb][ind])
+                band_max = np.max(bandstructure['eigenvalues_k_s'][0][nb][ind])
+                if band_max < 0 and band_max > direct_vbm:
+                    direct_vbm = band_max
+                    pos = ind
+                if band_min > 0 and band_min < direct_cbm:
+                    direct_cbm = band_min
+                    pos = ind
+        bandstructure['direct_gap'] = direct_cbm - direct_vbm
+        bandstructure['direct_gap_path'] = [bandstructure['kpoint_path'][cbm_pos], bandstructure['kpoint_path'][vbm_pos]]
+        bandstructure['direct_gap_path_inds'] = [pos, pos]
+
+    bandstructure['valence_band_min'] = vbm
+    bandstructure['conduction_band_max'] = cbm
+    bandstructure['band_gap'] = cbm - vbm
+    bandstructure['band_gap_path'] = [bandstructure['kpoint_path'][cbm_pos], bandstructure['kpoint_path'][vbm_pos]]
+    bandstructure['band_gap_path_inds'] = [cbm_pos, vbm_pos]
+
+    if np.isclose(bandstructure['direct_gap'], bandstructure['band_gap']):
+        bandstructure['valence_band_min'] = direct_vbm
+        bandstructure['conduction_band_max'] = direct_cbm
+        bandstructure['band_gap_path_inds'] = bandstructure['direct_gap_path_inds']
+        bandstructure['band_gap_path'] = bandstructure['direct_gap_path']
+
+    if summary:
+        print('Read bandstructure for {}.'.format(seed))
+        if bandstructure['band_gap'] == 0:
+            print('The structure is metallic.')
+        elif bandstructure['band_gap_path_inds'][0] == bandstructure['band_gap_path_inds'][1]:
+            print('Band gap is direct with size {:5.5f} eV'.format(bandstructure['band_gap']))
+            print('and lies at {}'.format(bandstructure['kpoint_path'][pos]))
+        else:
+            print('Band gap is indirect with size {:5.5f} eV'.format(bandstructure['band_gap']))
+            print('between {} and {}'.format(bandstructure['kpoint_path'][cbm_pos], bandstructure['kpoint_path'][vbm_pos]))
+            print('The smallest direct gap has size {:5.5f} eV'.format(bandstructure['direct_gap']))
+            print('and lies at {}'.format(bandstructure['kpoint_path'][pos]))
+
     return bandstructure, True
 
 

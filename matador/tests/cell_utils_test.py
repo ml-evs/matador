@@ -2,11 +2,19 @@
 import unittest
 from matador.utils.cell_utils import abc2cart, cart2abc, cart2volume, create_simple_supercell
 from matador.utils.cell_utils import cart2frac, frac2cart
-from matador.scrapers.castep_scrapers import castep2dict, res2dict, bands2dict
+from matador.utils.cell_utils import doc2spg
+from matador.scrapers.castep_scrapers import castep2dict, res2dict, cell2dict
 from matador.similarity.pdf_similarity import PDF, PDFOverlap
+from matador.export import doc2cell
 from functools import reduce
 import numpy as np
 from os.path import realpath
+try:
+    from matador.utils.cell_utils import get_seekpath_kpoint_path
+    from seekpath import get_path
+    imported_seekpath = True
+except:
+    imported_seekpath = False
 
 # grab abs path for accessing test data
 REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
@@ -109,27 +117,6 @@ class CellUtilTest(unittest.TestCase):
                 error = True
             self.assertTrue(error)
 
-            # spg_test_doc = doc2spg(test_doc)
-            # spg_supercell = doc2spg(supercell)
-
-            # if spg_supercell is None:
-                # raise RuntimeError('Unable to convert supercell to spg.')
-
-            # doc2res(supercell, '/home/matthew/super_test.res', info=False)
-            # print(supercell['positions_frac'])
-            # print(spg_supercell)
-
-            # primitive_test_doc = find_primitive(spg_test_doc)
-            # primitive_supercell = find_primitive(spg_supercell)
-
-            # if primitive_supercell is None:
-                # raise RuntimeError('Unable to convert supercell to spg.')
-
-            # print('og')
-            # print(primitive_test_doc)
-            # print('sup')
-            # print(primitive_supercell)
-
     def testRecipToReal(self):
         from matador.utils.cell_utils import real2recip
         real_lattice = [[5.5902240, 0, 0], [3.7563195, 4.1401290, 0], [-2.9800295, -1.3200288, 8.5321695]]
@@ -159,17 +146,51 @@ class CellUtilTest(unittest.TestCase):
         spacing = 0.05
         self.assertEqual(calc_mp_grid(real_lattice, spacing), [4, 4, 2])
 
+    @unittest.skipIf(not imported_seekpath, 'Seekpath package not found in this distribution')
     def testKPointPath(self):
-        from matador.utils.cell_utils import get_bs_kpoint_path
-        bs, s = bands2dict(REAL_PATH + 'data/KPSn.bands')
-        labels, kpt_path = get_bs_kpoint_path(bs['lattice_cart'], debug=False)
-        # self.assertEqual(len(kpt_path) == 285)
 
         cell, s = castep2dict(REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep')
-        labels, kpt_path = get_bs_kpoint_path(cell['lattice_cart'], debug=False)
+        std_cell, path, seekpath_results = get_seekpath_kpoint_path(cell, spacing=0.01, debug=True)
+        self.assertEqual(539, len(path))
 
-        cell, s = res2dict(REAL_PATH + 'data/KP_primitive.res', db=False)
-        labels, kpt_path = get_bs_kpoint_path(cell['lattice_cart'], debug=False)
+        self.assertLess(pdf_sim_dist(cell, std_cell), 0.05)
+
+        import glob
+        from os import remove
+        fnames = glob.glob(REAL_PATH + 'data/bs_test/*.res')
+        for fname in fnames:
+            doc, s = res2dict(fname, db=False)
+            doc['cell_volume'] = cart2volume(doc['lattice_cart'])
+            std_doc, path, seekpath_results = get_seekpath_kpoint_path(doc, spacing=0.01, debug=True)
+            seekpath_results_path = get_path(doc2spg(doc))
+            cell_path = fname.replace('.res', '.cell')
+            doc2cell(std_doc, cell_path)
+            new_doc, s = cell2dict(cell_path, outcell=True, positions=True, db=False)
+            assert 'positions_frac' in new_doc
+            remove(cell_path)
+            seekpath_new_results = get_path(doc2spg(new_doc))
+            self.assertEqual(seekpath_new_results['bravais_lattice_extended'], seekpath_results_path['bravais_lattice_extended'])
+
+            dist = pdf_sim_dist(doc, std_doc)
+            self.assertLess(dist, 0.01)
+            dist = pdf_sim_dist(doc, new_doc)
+            self.assertLess(dist, 0.01)
+
+    def testSpgStandardize(self):
+        from matador.utils.cell_utils import standardize_doc_cell
+        import glob
+        doc, s = castep2dict(REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep')
+        std_doc = standardize_doc_cell(doc)
+        dist = pdf_sim_dist(doc, std_doc)
+        self.assertLess(dist, 0.01)
+
+        fnames = glob.glob(REAL_PATH + 'data/bs_test/*.res')
+        for fname in fnames:
+            doc, s = res2dict(fname, db=False)
+            doc['cell_volume'] = cart2volume(doc['lattice_cart'])
+            std_doc = standardize_doc_cell(doc)
+            dist = pdf_sim_dist(doc, std_doc)
+            self.assertLess(dist, 0.01)
 
 
 def pdf_sim_dist(doc_test, doc_supercell):

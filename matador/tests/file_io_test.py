@@ -157,6 +157,7 @@ class ScrapeTest(unittest.TestCase):
             self.assertAlmostEqual(bs_dict['fermi_energy'], 4.0781, places=4)
             self.assertLessEqual(bs_dict['kpoint_path_spacing'], 0.2)
             self.assertGreaterEqual(bs_dict['kpoint_path_spacing'], 0.15)
+            print(bs_dict['kpoint_branches'])
 
     def testMagres(self):
         from matador.scrapers.magres_scrapers import magres2dict

@@ -20,20 +20,36 @@ if __name__ == '__main__':
                         help='save pdf rather than showing plot in X')
     parser.add_argument('--png', action='store_true',
                         help='save png rather than showing plot in X')
+    parser.add_argument('--gap', action='store_true',
+                        help='plot position and size of band gap')
     parser.add_argument('--plot_window', type=float,
                         help='energy window to plot either side of E_F (eV)\
                              (DEFAULT: 5 eV)')
     parser.add_argument('seed', type=str, nargs='*',
                         help='seedname or bands file path')
     kwargs = vars(parser.parse_args())
-    assert len(kwargs.get('seed')) == 1, 'Seed name needed!'
+    if 'gap' in kwargs:
+        gap = kwargs['gap']
+        del kwargs['gap']
+    assert len(kwargs.get('seed')) >= 1, 'Seed name needed!'
 
-    seed = kwargs.get('seed')[0]
+    seed = kwargs.get('seed')
+    test_seed = kwargs.get('seed')[0]
     del kwargs['seed']
-    dos_seed = seed.replace('.bands', '')
-    dos_seed += '.adaptive.dat'
+    bs_seed = test_seed.replace('.bands', '') + '.bands'
+    if isfile(bs_seed):
+        bandstructure = True
+    else:
+        bandstructure = False
+    dos_seed = test_seed.replace('.bands', '') + '.adaptive.dat'
     if isfile(dos_seed):
         dos = True
     else:
         dos = False
-    plot = plot_spectral(seed, bandstructure=True, dos=dos, **kwargs)
+    cell_seed = test_seed.replace('.bands', '') + '.cell'
+    if isfile(cell_seed):
+        cell = True
+    else:
+        cell = False
+
+    plot = plot_spectral(seed, plot_bandstructure=bandstructure, plot_dos=dos, cell=cell, gap=gap, **kwargs)
