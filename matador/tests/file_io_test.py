@@ -138,7 +138,7 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(bs_dict['num_bands'], 71)
             self.assertAlmostEqual(bs_dict['fermi_energy'], 4.0781, places=4)
             self.assertLessEqual(bs_dict['kpoint_path_spacing'], 0.01)
-            self.assertGreaterEqual(bs_dict['kpoint_path_spacing'], 0.005)
+            self.assertGreaterEqual(bs_dict['kpoint_path_spacing'], 0.009)
 
         bands_fname = REAL_PATH + 'data/KPSn_2.bands'
         failed_open = False
@@ -155,9 +155,9 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(bs_dict['num_kpoints'], 28)
             self.assertEqual(bs_dict['num_bands'], 71)
             self.assertAlmostEqual(bs_dict['fermi_energy'], 4.0781, places=4)
-            self.assertLessEqual(bs_dict['kpoint_path_spacing'], 0.2)
-            self.assertGreaterEqual(bs_dict['kpoint_path_spacing'], 0.15)
-            print(bs_dict['kpoint_branches'])
+            self.assertLessEqual(bs_dict['kpoint_path_spacing'], 0.3)
+            self.assertGreaterEqual(bs_dict['kpoint_path_spacing'], 0.29)
+            self.assertEqual(len(bs_dict['kpoint_branches']), 1)
 
     def testMagres(self):
         from matador.scrapers.magres_scrapers import magres2dict
