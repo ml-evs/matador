@@ -2,12 +2,19 @@
 import unittest
 from matador.utils.cell_utils import abc2cart, cart2abc, cart2volume, create_simple_supercell
 from matador.utils.cell_utils import cart2frac, frac2cart
+from matador.utils.cell_utils import doc2spg
 from matador.scrapers.castep_scrapers import castep2dict, res2dict, cell2dict
 from matador.similarity.pdf_similarity import PDF, PDFOverlap
 from matador.export import doc2cell
 from functools import reduce
 import numpy as np
 from os.path import realpath
+try:
+    from matador.utils.cell_utils import get_seekpath_kpoint_path
+    from seekpath import get_path
+    imported_seekpath = True
+except:
+    imported_seekpath = False
 
 # grab abs path for accessing test data
 REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
@@ -133,10 +140,9 @@ class CellUtilTest(unittest.TestCase):
         spacing = calc_mp_spacing(real_lattice, mp_grid, prec=5)
         self.assertAlmostEqual(spacing, 0.05, places=3)
 
+    @unittest.skipIf(not imported_seekpath, 'Seekpath package not found in this distribution')
     def testKPointPath(self):
 
-        from matador.utils.cell_utils import get_seekpath_kpoint_path, doc2spg
-        from seekpath import get_path
         cell, s = castep2dict(REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep')
         std_cell, path, seekpath_results = get_seekpath_kpoint_path(cell, spacing=0.01, debug=True)
         self.assertEqual(539, len(path))
@@ -147,17 +153,17 @@ class CellUtilTest(unittest.TestCase):
         from os import remove
         fnames = glob.glob(REAL_PATH + 'data/bs_test/*.res')
         for fname in fnames:
-            print(fname)
             doc, s = res2dict(fname, db=False)
             doc['cell_volume'] = cart2volume(doc['lattice_cart'])
             std_doc, path, seekpath_results = get_seekpath_kpoint_path(doc, spacing=0.01, debug=True)
+            seekpath_results_path = get_path(doc2spg(doc))
             cell_path = fname.replace('.res', '.cell')
             doc2cell(std_doc, cell_path)
             new_doc, s = cell2dict(cell_path, outcell=True, positions=True, db=False)
             assert 'positions_frac' in new_doc
             remove(cell_path)
             seekpath_new_results = get_path(doc2spg(new_doc))
-            self.assertEqual(seekpath_new_results['bravais_lattice_extended'], seekpath_results['bravais_lattice_extended'])
+            self.assertEqual(seekpath_new_results['bravais_lattice_extended'], seekpath_results_path['bravais_lattice_extended'])
 
             dist = pdf_sim_dist(doc, std_doc)
             self.assertLess(dist, 0.01)

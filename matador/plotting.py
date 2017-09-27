@@ -29,7 +29,6 @@ def plot_spectral(seeds, plot_bandstructure=True, plot_dos=False, cell=False, ga
     conduction = colours[1]
     crossing = colours[2]
 
-
     if not isinstance(seeds, list):
         seeds = [seeds]
     print(seeds)

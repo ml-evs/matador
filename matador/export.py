@@ -225,7 +225,6 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, overwri
     """
     if path.endswith('.cell'):
         path = path.replace('.cell', '')
-        print(path)
     try:
         if isfile(path+'.cell'):
             if hash_dupe:
