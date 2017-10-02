@@ -888,7 +888,7 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
     return castep, True
 
 
-def bands2dict(seed, summary=False, gap=True, **kwargs):
+def bands2dict(seed, summary=False, gap=True, verbosity=0, **kwargs):
     """ Parse a CASTEP bands file into a dictionary.
 
     Input:
@@ -929,7 +929,7 @@ def bands2dict(seed, summary=False, gap=True, **kwargs):
     bandstructure['kpoint_path'] = np.zeros((bandstructure['num_kpoints'], 3))
     bandstructure['eigenvalues_k_s'] = np.empty((bandstructure['num_spins'], bandstructure['num_bands'], bandstructure['num_kpoints']))
 
-    if kwargs.get('verbosity') > 2:
+    if verbosity > 2:
         print('Found {}'.format(bandstructure['num_kpoints']))
 
     for nk in range(bandstructure['num_kpoints']):
@@ -968,7 +968,7 @@ def bands2dict(seed, summary=False, gap=True, **kwargs):
             current_branch = [ind+1]
     assert(sum([len(branch) for branch in bandstructure['kpoint_branches']]) == bandstructure['num_kpoints'])
 
-    if kwargs.get('verbosity') > 2:
+    if verbosity > 2:
         print('Found branch structure', [(branch[0], branch[-1]) for branch in bandstructure['kpoint_branches']])
 
     if gap:
