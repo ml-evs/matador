@@ -3,7 +3,7 @@
 
 def plot_spectral(seeds,
                   plot_bandstructure=True, plot_dos=False,
-                  cell=False, gap=False, colour_by_seed=False, **kwargs):
+                  cell=False, gap=False, colour_by_seed=False, verbosity=0, **kwargs):
     """ Plot bandstructure and optional DOS from <seed>.bands and
     <seed>.adaptive.dat file.
 
@@ -43,6 +43,8 @@ def plot_spectral(seeds,
     if not isinstance(seeds, list):
         seeds = [seeds]
 
+    print(seeds)
+
     if len(seeds) > 1 and colour_by_seed:
         seed_colours = colours
         ls = ['-']*len(seeds)
@@ -78,7 +80,7 @@ def plot_spectral(seeds,
     for seed_ind, seed in enumerate(seeds):
         seed = seed.replace('.bands', '')
         if plot_bandstructure:
-            bs, s = bands2dict(seed + '.bands', summary=True)
+            bs, s = bands2dict(seed + '.bands', summary=True, gap=False, verbosity=verbosity)
             path = [0]
             for branch in bs['kpoint_branches']:
                 for ind, kpt in enumerate(bs['kpoint_path'][branch]):
@@ -126,7 +128,7 @@ def plot_spectral(seeds,
             labelled = []
 
             if cell:
-                doc, success = cell2dict(seed + '.cell', db=False, verbosity=10, outcell=True, positions=True)
+                doc, success = cell2dict(seed + '.cell', db=False, verbosity=verbosity, outcell=True, positions=True)
                 if success:
                     spg_structure = doc2spg(doc)
                     if spg_structure is not False:

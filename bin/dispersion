@@ -20,9 +20,11 @@ if __name__ == '__main__':
                         help='save pdf rather than showing plot in X')
     parser.add_argument('--png', action='store_true',
                         help='save png rather than showing plot in X')
-    parser.add_argument('--gap', action='store_true',
+    parser.add_argument('-g', '--gap', action='store_true',
                         help='plot position and size of band gap')
-    parser.add_argument('--plot_window', type=float,
+    parser.add_argument('-v', '--verbosity', type=int, default=0,
+                        help='control verbosity of output')
+    parser.add_argument('-pw', '--plot_window', type=float,
                         help='energy window to plot either side of E_F (eV)\
                              (DEFAULT: 5 eV)')
     parser.add_argument('seed', type=str, nargs='*',
@@ -35,7 +37,10 @@ if __name__ == '__main__':
 
     seed = kwargs.get('seed')
     test_seed = kwargs.get('seed')[0]
+    verbosity = kwargs.get('verbosity')
+
     del kwargs['seed']
+    del kwargs['verbosity']
     bs_seed = test_seed.replace('.bands', '') + '.bands'
     if isfile(bs_seed):
         bandstructure = True
@@ -52,4 +57,4 @@ if __name__ == '__main__':
     else:
         cell = False
 
-    plot = plot_spectral(seed, plot_bandstructure=bandstructure, plot_dos=dos, cell=cell, gap=gap, **kwargs)
+    plot = plot_spectral(seed, plot_bandstructure=bandstructure, plot_dos=dos, cell=cell, gap=gap, verbosity=verbosity, **kwargs)

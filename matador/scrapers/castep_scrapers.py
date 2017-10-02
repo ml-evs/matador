@@ -888,7 +888,7 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
     return castep, True
 
 
-def bands2dict(seed, summary=False):
+def bands2dict(seed, summary=False, gap=True, **kwargs):
     """ Parse a CASTEP bands file into a dictionary.
 
     Input:
@@ -898,6 +898,7 @@ def bands2dict(seed, summary=False):
     Args:
 
         | summary : bool, print info about bandgap.
+        | gap     : bool, compute bandgap info.
 
     Returns:
 
@@ -927,6 +928,9 @@ def bands2dict(seed, summary=False):
         bandstructure['lattice_cart'].append([BOHR_TO_ANGSTROM * float(elem) for elem in header[6+i].split()])
     bandstructure['kpoint_path'] = np.zeros((bandstructure['num_kpoints'], 3))
     bandstructure['eigenvalues_k_s'] = np.empty((bandstructure['num_spins'], bandstructure['num_bands'], bandstructure['num_kpoints']))
+
+    if kwargs.get('verbosity') > 2:
+        print('Found {}'.format(bandstructure['num_kpoints']))
 
     for nk in range(bandstructure['num_kpoints']):
         kpt_ind = nk * (bandstructure['num_spins'] + bandstructure['num_bands'] + 1)
@@ -964,99 +968,104 @@ def bands2dict(seed, summary=False):
             current_branch = [ind+1]
     assert(sum([len(branch) for branch in bandstructure['kpoint_branches']]) == bandstructure['num_kpoints'])
 
-    vbm = -1e10
-    cbm = 1e10
-    cbm_pos = []
-    vbm_pos = []
-    eps = 1e-6
-    if bandstructure['num_spins'] == 1:
-        # calculate indirect gap
-        for branch_ind, branch in enumerate(bandstructure['kpoint_branches']):
-            for nb in range(bandstructure['num_bands']):
-                band = bandstructure['eigenvalues_k_s'][0][nb][branch]
-                band_branch_min = np.min(band)
-                band_branch_max = np.max(band)
-                band_branch_argmin = np.where(band <= band_branch_min + eps)[0]
-                band_branch_argmax = np.where(band >= band_branch_max - eps)[0]
-                if band_branch_max < 0 and band_branch_max > vbm + eps:
-                    vbm = band_branch_max
-                    vbm_pos = [branch[max_ind] for max_ind in band_branch_argmax]
-                elif band_branch_max < 0 and band_branch_max >= vbm - eps:
-                    vbm = band_branch_max
-                    vbm_pos.extend([branch[val] for val in band_branch_argmax])
-                if band_branch_min > 0 and band_branch_min < cbm - eps:
-                    cbm = band_branch_min
-                    cbm_pos = [branch[min_ind] for min_ind in band_branch_argmin]
-                elif band_branch_min > 0 and band_branch_min <= cbm + eps:
-                    cbm = band_branch_min
-                    cbm_pos.extend([branch[val] for val in band_branch_argmin])
-                if band_branch_max > 0 and band_branch_min < 0:
-                    vbm = 0
-                    cbm = 0
-                    break
-        if vbm != 0 and cbm != 0:
-            smallest_diff = 1e10
-            for _cbm_pos in cbm_pos:
-                for _vbm_pos in vbm_pos:
-                    if abs(_vbm_pos - _cbm_pos) < smallest_diff:
-                        tmp_cbm_pos = _cbm_pos
-                        tmp_vbm_pos = _vbm_pos
-                        smallest_diff = abs(_vbm_pos - _cbm_pos)
-            cbm_pos = tmp_cbm_pos
-            vbm_pos = tmp_vbm_pos
-        bandstructure['valence_band_min'] = vbm
-        bandstructure['conduction_band_max'] = cbm
-        bandstructure['band_gap'] = cbm - vbm
-        bandstructure['band_gap_path'] = [bandstructure['kpoint_path'][cbm_pos], bandstructure['kpoint_path'][vbm_pos]]
-        bandstructure['band_gap_path_inds'] = [cbm_pos, vbm_pos]
-        bandstructure['gap_momentum'] = np.sqrt(np.sum((bandstructure['cart_kpoints'][cbm_pos] - bandstructure['cart_kpoints'][vbm_pos])**2))
+    if kwargs.get('verbosity') > 2:
+        print('Found branch structure', [(branch[0], branch[-1]) for branch in bandstructure['kpoint_branches']])
 
-        # calculate direct gap
-        direct_gaps = np.zeros((len(bandstructure['kpoint_path'])))
-        direct_cbms = np.zeros((len(bandstructure['kpoint_path'])))
-        direct_vbms = np.zeros((len(bandstructure['kpoint_path'])))
-        for ind, kpt in enumerate(bandstructure['kpoint_path']):
-            direct_cbm = 1e10
-            direct_vbm = -1e10
-            for nb in range(bandstructure['num_bands']):
-                band_eig = bandstructure['eigenvalues_k_s'][0][nb][ind]
-                if band_eig < 0 and band_eig >= direct_vbm:
-                    direct_vbm = band_eig
-                if band_eig > 0 and band_eig <= direct_cbm:
-                    direct_cbm = band_eig
-            direct_gaps[ind] = direct_cbm - direct_vbm
-            direct_cbms[ind] = direct_cbm
-            direct_vbms[ind] = direct_vbm
-        bandstructure['direct_gap'] = np.min(direct_gaps)
-        bandstructure['direct_conduction_band_max'] = direct_cbms[np.argmin(direct_gaps)]
-        bandstructure['direct_valence_band_min'] = direct_vbms[np.argmin(direct_gaps)]
-        bandstructure['direct_gap'] = np.min(direct_gaps)
-        bandstructure['direct_gap_path'] = [bandstructure['kpoint_path'][np.argmin(direct_gaps)], bandstructure['kpoint_path'][np.argmin(direct_gaps)]]
-        bandstructure['direct_gap_path_inds'] = [np.argmin(direct_gaps), np.argmin(direct_gaps)]
+    if gap:
 
-    if np.isclose(bandstructure['direct_gap'], bandstructure['band_gap']):
-        bandstructure['valence_band_min'] = direct_vbm
-        bandstructure['conduction_band_max'] = direct_cbm
-        bandstructure['band_gap_path_inds'] = bandstructure['direct_gap_path_inds']
-        cbm_pos = bandstructure['direct_gap_path_inds'][0]
-        vbm_pos = bandstructure['direct_gap_path_inds'][1]
-        bandstructure['band_gap_path'] = bandstructure['direct_gap_path']
-        bandstructure['gap_momentum'] = np.sqrt(np.sum((bandstructure['cart_kpoints'][cbm_pos] - bandstructure['cart_kpoints'][vbm_pos])**2))
-        assert bandstructure['gap_momentum'] == 0
+        vbm = -1e10
+        cbm = 1e10
+        cbm_pos = []
+        vbm_pos = []
+        eps = 1e-6
+        if bandstructure['num_spins'] == 1:
+            # calculate indirect gap
+            for branch_ind, branch in enumerate(bandstructure['kpoint_branches']):
+                for nb in range(bandstructure['num_bands']):
+                    band = bandstructure['eigenvalues_k_s'][0][nb][branch]
+                    band_branch_min = np.min(band)
+                    band_branch_max = np.max(band)
+                    band_branch_argmin = np.where(band <= band_branch_min + eps)[0]
+                    band_branch_argmax = np.where(band >= band_branch_max - eps)[0]
+                    if band_branch_max < 0 and band_branch_max > vbm + eps:
+                        vbm = band_branch_max
+                        vbm_pos = [branch[max_ind] for max_ind in band_branch_argmax]
+                    elif band_branch_max < 0 and band_branch_max >= vbm - eps:
+                        vbm = band_branch_max
+                        vbm_pos.extend([branch[val] for val in band_branch_argmax])
+                    if band_branch_min > 0 and band_branch_min < cbm - eps:
+                        cbm = band_branch_min
+                        cbm_pos = [branch[min_ind] for min_ind in band_branch_argmin]
+                    elif band_branch_min > 0 and band_branch_min <= cbm + eps:
+                        cbm = band_branch_min
+                        cbm_pos.extend([branch[val] for val in band_branch_argmin])
+                    if band_branch_max > 0 and band_branch_min < 0:
+                        vbm = 0
+                        cbm = 0
+                        break
+            if vbm != 0 and cbm != 0:
+                smallest_diff = 1e10
+                for _cbm_pos in cbm_pos:
+                    for _vbm_pos in vbm_pos:
+                        if abs(_vbm_pos - _cbm_pos) < smallest_diff:
+                            tmp_cbm_pos = _cbm_pos
+                            tmp_vbm_pos = _vbm_pos
+                            smallest_diff = abs(_vbm_pos - _cbm_pos)
+                cbm_pos = tmp_cbm_pos
+                vbm_pos = tmp_vbm_pos
+            bandstructure['valence_band_min'] = vbm
+            bandstructure['conduction_band_max'] = cbm
+            bandstructure['band_gap'] = cbm - vbm
+            bandstructure['band_gap_path'] = [bandstructure['kpoint_path'][cbm_pos], bandstructure['kpoint_path'][vbm_pos]]
+            bandstructure['band_gap_path_inds'] = [cbm_pos, vbm_pos]
+            bandstructure['gap_momentum'] = np.sqrt(np.sum((bandstructure['cart_kpoints'][cbm_pos] - bandstructure['cart_kpoints'][vbm_pos])**2))
 
-    if summary:
-        print('Read bandstructure for {}.'.format(seed))
-        if bandstructure['band_gap'] == 0:
-            print('The structure is metallic.')
-        elif bandstructure['band_gap_path_inds'][0] == bandstructure['band_gap_path_inds'][1]:
-            print('Band gap is direct with size {:5.5f} eV'.format(bandstructure['band_gap']), end=' ')
-            print('and lies at {}'.format(bandstructure['direct_gap_path'][0]))
-        else:
-            print('Band gap is indirect with size {:5.5f} eV'.format(bandstructure['band_gap']), end=' ')
-            print('between {} and {}'.format(bandstructure['kpoint_path'][cbm_pos], bandstructure['kpoint_path'][vbm_pos]), end=' ')
-            print('corresponding to a wavenumber of {:5.5f} eV/A'.format(bandstructure['gap_momentum']))
-            print('The smallest direct gap has size {:5.5f} eV'.format(bandstructure['direct_gap']), end=' ')
-            print('and lies at {}'.format(bandstructure['direct_gap_path'][0]))
+            # calculate direct gap
+            direct_gaps = np.zeros((len(bandstructure['kpoint_path'])))
+            direct_cbms = np.zeros((len(bandstructure['kpoint_path'])))
+            direct_vbms = np.zeros((len(bandstructure['kpoint_path'])))
+            for ind, kpt in enumerate(bandstructure['kpoint_path']):
+                direct_cbm = 1e10
+                direct_vbm = -1e10
+                for nb in range(bandstructure['num_bands']):
+                    band_eig = bandstructure['eigenvalues_k_s'][0][nb][ind]
+                    if band_eig < 0 and band_eig >= direct_vbm:
+                        direct_vbm = band_eig
+                    if band_eig > 0 and band_eig <= direct_cbm:
+                        direct_cbm = band_eig
+                direct_gaps[ind] = direct_cbm - direct_vbm
+                direct_cbms[ind] = direct_cbm
+                direct_vbms[ind] = direct_vbm
+            bandstructure['direct_gap'] = np.min(direct_gaps)
+            bandstructure['direct_conduction_band_max'] = direct_cbms[np.argmin(direct_gaps)]
+            bandstructure['direct_valence_band_min'] = direct_vbms[np.argmin(direct_gaps)]
+            bandstructure['direct_gap'] = np.min(direct_gaps)
+            bandstructure['direct_gap_path'] = [bandstructure['kpoint_path'][np.argmin(direct_gaps)], bandstructure['kpoint_path'][np.argmin(direct_gaps)]]
+            bandstructure['direct_gap_path_inds'] = [np.argmin(direct_gaps), np.argmin(direct_gaps)]
+
+        if np.isclose(bandstructure['direct_gap'], bandstructure['band_gap']):
+            bandstructure['valence_band_min'] = direct_vbm
+            bandstructure['conduction_band_max'] = direct_cbm
+            bandstructure['band_gap_path_inds'] = bandstructure['direct_gap_path_inds']
+            cbm_pos = bandstructure['direct_gap_path_inds'][0]
+            vbm_pos = bandstructure['direct_gap_path_inds'][1]
+            bandstructure['band_gap_path'] = bandstructure['direct_gap_path']
+            bandstructure['gap_momentum'] = np.sqrt(np.sum((bandstructure['cart_kpoints'][cbm_pos] - bandstructure['cart_kpoints'][vbm_pos])**2))
+            assert bandstructure['gap_momentum'] == 0
+
+        if summary:
+            print('Read bandstructure for {}.'.format(seed))
+            if bandstructure['band_gap'] == 0:
+                print('The structure is metallic.')
+            elif bandstructure['band_gap_path_inds'][0] == bandstructure['band_gap_path_inds'][1]:
+                print('Band gap is direct with size {:5.5f} eV'.format(bandstructure['band_gap']), end=' ')
+                print('and lies at {}'.format(bandstructure['direct_gap_path'][0]))
+            else:
+                print('Band gap is indirect with size {:5.5f} eV'.format(bandstructure['band_gap']), end=' ')
+                print('between {} and {}'.format(bandstructure['kpoint_path'][cbm_pos], bandstructure['kpoint_path'][vbm_pos]), end=' ')
+                print('corresponding to a wavenumber of {:5.5f} eV/A'.format(bandstructure['gap_momentum']))
+                print('The smallest direct gap has size {:5.5f} eV'.format(bandstructure['direct_gap']), end=' ')
+                print('and lies at {}'.format(bandstructure['direct_gap_path'][0]))
 
     return bandstructure, True
 
