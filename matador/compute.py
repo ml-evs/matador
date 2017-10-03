@@ -28,12 +28,12 @@ class FullRelaxer:
 
     Input:
 
-        res           : either filename or input structure dict
-        param_dict    : dict of castep parameters
-        cell_dict     : dict of castep cell input
-        ncores        : number of cores for mpirun call
-        nnodes        : number of nodes for mpirun call
-        node          : node name to run on
+        res           : str/dict, either filename or input structure dict
+        param_dict    : dict, castep parameters
+        cell_dict     : dict, castep cell input
+        ncores        : int, number of cores for mpirun call
+        nnodes        : int, number of nodes for mpirun call
+        node          : str, node name to run on
 
     Keyword arguments:
 
@@ -45,6 +45,7 @@ class FullRelaxer:
         conv_cutoffs  : list(float) of cutoffs to use for SCF convergence test
         conv_kpts     : list(float) of kpt spacings to use for SCF convergence test
         kpts_1D       : bool, treat z-direction as special and create kpt_grid [1 1 n_kz].
+        paths         : dict, folder names for output sorting
         archer        : bool, use aprun over mpirun
         redirect      : str, file to redirect stdout to (DEFAULT: /dev/null unless debug).
         bnl           : bool, use srun over mpirun
@@ -56,7 +57,7 @@ class FullRelaxer:
 
     """
     def __init__(self, res,
-                 ncores, nnodes, node,
+                 ncores, nnodes, node, paths=None,
                  param_dict=None, cell_dict=None,
                  mode='castep', executable='castep',
                  rough=None, spin=False, redirect=None,
@@ -91,6 +92,11 @@ class FullRelaxer:
         self.conv_cutoff = conv_cutoff
         self.conv_kpt = conv_kpt
         self.enough_memory = True
+        self.paths = paths
+        if self.paths is None:
+            self.paths['completed_dir'] = 'completed'
+        else:
+            assert 'completed_dir' in self.paths
 
         self.success = None
 
@@ -128,23 +134,32 @@ class FullRelaxer:
                             not isfile(calc_doc['species_pot'][elem[0]]):
                         exit('You forgot your pseudos, you silly goose!')
 
-                if self.conv_cutoff_bool:
-                    # run series of singlepoints for various cutoffs
-                    for cutoff in self.conv_cutoff:
-                        calc_doc.update({'cut_off_energy': cutoff})
-                        seed = self.seed + '_' + str(cutoff) + 'eV'
-                        self.success = self.scf(calc_doc, seed, keep=False)
+                # run convergence tests
+                if any([self.conv_cutoff_bool, self.conv_kpt_bool]):
+                    if self.conv_cutoff_bool:
+                        # run series of singlepoints for various cutoffs
+                        for cutoff in self.conv_cutoff:
+                            calc_doc.update({'cut_off_energy': cutoff})
+                            self.paths['completed_dir'] = 'completed_cutoff'
+                            seed = self.seed + '_' + str(cutoff) + 'eV'
+                            self.calc_doc = calc_doc
+                            self.success = self.scf(calc_doc, seed, keep=False)
+                    if self.conv_kpt_bool:
+                        # run series of singlepoints for various cutoffs
+                        for kpt in self.conv_kpt:
+                            calc_doc.update({'kpoints_mp_spacing': kpt})
+                            self.paths['completed_dir'] = 'completed_kpts'
+                            seed = self.seed + '_' + str(kpt) + 'A'
+                            self.calc_doc = calc_doc
+                            self.success = self.scf(calc_doc, seed, keep=False)
 
-                elif self.conv_kpt_bool:
-                    # run series of singlepoints for various cutoffs
-                    for kpt in self.conv_kpt:
-                        calc_doc.update({'kpoints_mp_spacing': kpt})
-                        seed = self.seed + '_' + str(kpt) + 'A'
-                        self.success = self.scf(calc_doc, seed, keep=False)
-
+                # run simple scf
                 elif calc_doc['task'].upper() in ['SPECTRAL', 'SINGLEPOINT']:
                     # batch run density of states
+                    self.calc_doc = calc_doc
                     self.success = self.scf(calc_doc, self.seed, keep=True)
+
+                # perform relaxation
                 else:
                     # set up geom opt parameters
                     self.max_iter = calc_doc['geom_max_iter']
@@ -297,10 +312,7 @@ class FullRelaxer:
                         output_queue.put(self.res_dict)
                         if self.debug:
                             print('wrote relaxed dict out to output_queue')
-                    self.mv_to_completed(seed)
-                    if calc_doc.get('write_cell_structure') and isfile('{}-out.cell'.format(seed)):
-                        copy('{}-out.cell'.format(seed), 'completed', )
-                        remove('{}-out.cell'.format(seed))
+                    self.mv_to_completed(seed, completed_dir=self.paths['completed_dir'])
                     # clean up rest of files
                     self.tidy_up(seed)
                     return True
@@ -440,7 +452,7 @@ class FullRelaxer:
                     # write final res file to bad_castep
                     self.mv_to_bad(seed)
                     return False
-            self.mv_to_completed(seed, keep=keep)
+            self.mv_to_completed(seed, keep=keep, completed_dir=self.paths['completed_dir'])
             if not keep:
                 self.tidy_up(seed)
             return True
@@ -470,7 +482,7 @@ class FullRelaxer:
                 self.mv_to_bad(seed)
                 return False
             else:
-                self.mv_to_completed(seed, keep=True)
+                self.mv_to_completed(seed, keep=True, completed_dir=self.paths['completed_dir'])
                 return True
         except(SystemExit, KeyboardInterrupt):
             print_exc()
@@ -656,25 +668,29 @@ class FullRelaxer:
             pass
         return
 
-    def mv_to_completed(self, seed, keep=False):
+    def mv_to_completed(self, seed, completed_dir='completed', keep=False):
         """ Move all associated files to completed. """
-        if not exists('completed'):
-            makedirs('completed', exist_ok=True)
+        if not exists(completed_dir):
+            makedirs(completed_dir, exist_ok=True)
         if keep:
-            seed_files = glob.glob(seed + '.*')
+            seed_files = glob.glob(seed + '.*') + glob.glob(seed + '-out.cell')
+            if self.debug > 3:
+                print(seed_files)
             for _file in seed_files:
-                copy(_file, 'completed')
+                copy(_file, completed_dir)
                 remove(_file)
         else:
-            file_exts = ['castep']
+            file_exts = ['.castep']
             if self.kpts_1D:
-                file_exts.append('param')
+                file_exts.append('.param')
             if not self.conv_kpt_bool and not self.conv_cutoff_bool:
-                file_exts.append('res')
+                file_exts.append('.res')
+            if self.calc_doc.get('write_cell_structure'):
+                file_exts.append('-out.cell')
             for ext in file_exts:
                 try:
-                    copy('{}.{}'.format(seed, ext), 'completed')
-                    remove('{}.{}'.format(seed, ext))
+                    copy('{}{}'.format(seed, ext), completed_dir)
+                    remove('{}{}'.format(seed, ext))
                 except:
                     if self.verbosity > 1:
                         print_exc()

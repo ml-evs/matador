@@ -14,10 +14,14 @@ import numpy as np
 
 def round(n, prec):
     """ Replace default (bankers) rounding with "normal" rounding."""
-    return float(Decimal(str(n)).quantize(Decimal('0.05'), rounding=ROUND_UP))
+    if prec is None:
+        return n
+    else:
+        return float(Decimal(str(n)).quantize(Decimal('0.05'), rounding=ROUND_UP))
 
 
 def get_files(path):
+    """ Find all CASTEP files in the directory. """
     chdir(path)
     structure_files = defaultdict(list)
     for root, dirs, files in walk('.', topdown=True, followlinks=True):
@@ -35,47 +39,76 @@ def get_files(path):
     return structure_files
 
 
-def get_cutoffs(structure_files):
+def get_data(structure_files, conv_field='cut_off_energy'):
+    """ Parse cutoff energy/kpt spacing convergence calculations from list of files.
 
-    cutoff_chempots_dict = defaultdict(dict)
-    cutoff_chempots = defaultdict(list)
+    Args:
+
+        | conv_field:  str, field for convergence parameter.
+
+    """
+    chempots_dict = defaultdict(dict)
+    chempots = defaultdict(list)
     chempot_list = dict()
+
+    if conv_field is 'kpoints_mp_spacing':
+        rounding = 2
+    else:
+        rounding = None
+
     for key in structure_files:
         for doc in structure_files[key]:
             if len(doc['stoichiometry']) == 1:
                 doc['formation_energy_per_atom'] = 0
-                cutoff_chempots_dict[str(doc['cut_off_energy'])][doc['atom_types'][0]] = doc['total_energy_per_atom']
-                cutoff_chempots[key].append([doc['cut_off_energy'], doc['total_energy_per_atom']])
+                rounded_field = round(doc[conv_field], rounding)
+                chempots_dict[str(rounded_field)][doc['atom_types'][0]] = doc['total_energy_per_atom']
+                chempots[key].append([rounded_field, doc['total_energy_per_atom']])
                 chempot_list[key] = doc['stoichiometry'][0][0]
-    cutoff_form = defaultdict(list)
+
+    form = defaultdict(list)
     stoich_list = dict()
+    elems = set()
+
+    for value in chempots_dict:
+        for elem in chempots_dict[value]:
+            elems.add(elem)
+
+    for value in chempots_dict:
+        for elem in elems:
+            if elem not in chempots_dict[value]:
+                print('WARNING: {} chemical potential missing at {} = {} eV, skipping this value.'.format(elem, conv_field, value))
+
     for key in structure_files:
         for doc in structure_files[key]:
             if len(doc['stoichiometry']) != 1:
-                doc['formation_energy_per_atom'] = doc['total_energy_per_atom']
-                for atom in doc['atom_types']:
-                    doc['formation_energy_per_atom'] -= cutoff_chempots_dict[str(doc['cut_off_energy'])][atom] / len(doc['atom_types'])
-                cutoff_form[key].append([doc['cut_off_energy'], doc['formation_energy_per_atom']])
-                stoich_list[key] = get_formula_from_stoich(doc['stoichiometry'], tex=True)
-    for key in cutoff_form:
-        cutoff_form[key].sort()
-        cutoff_form[key] = np.asarray(cutoff_form[key])
+                try:
+                    doc['formation_energy_per_atom'] = doc['total_energy_per_atom']
+                    rounded_field = round(doc[conv_field], rounding)
+                    for atom in doc['atom_types']:
+                        doc['formation_energy_per_atom'] -= chempots_dict[str(rounded_field)][atom] / len(doc['atom_types'])
+                    form[key].append([doc[conv_field], doc['formation_energy_per_atom']])
+                    stoich_list[key] = get_formula_from_stoich(doc['stoichiometry'], tex=True)
+                except:
+                    pass
+    for key in form:
+        form[key].sort()
+        form[key] = np.asarray(form[key])
 
-    for key in cutoff_chempots:
-        cutoff_chempots[key].sort()
-        cutoff_chempots[key] = np.asarray(cutoff_chempots[key])
+    for key in chempots:
+        chempots[key].sort()
+        chempots[key] = np.asarray(chempots[key])
 
-    cutoff_data = dict()
-    cutoff_data['chempots'] = cutoff_chempots
-    cutoff_data['form'] = cutoff_form
-    cutoff_data['stoich_list'] = stoich_list
-    cutoff_data['chempot_list'] = chempot_list
+    data = dict()
+    data['chempots'] = chempots
+    data['form'] = form
+    data['stoich_list'] = stoich_list
+    data['chempot_list'] = chempot_list
 
-    return cutoff_data
+    return data
 
 
 def get_kpts(structure_files):
-
+    """ Parse kpoint spacing convergence calculations from structure files. """
     kpt_chempots_dict = defaultdict(dict)
     kpt_chempots = defaultdict(list)
     chempot_list = dict()
@@ -94,8 +127,6 @@ def get_kpts(structure_files):
     stoich_list = dict()
     for key in structure_files:
         for doc in structure_files[key]:
-            grid = doc['kpoints_mp_grid']
-            num_k = sum(grid)
             num_k = doc['kpoints_mp_spacing']
             if len(doc['stoichiometry']) == 2:
                 doc['formation_energy_per_atom'] = doc['total_energy_per_atom']
@@ -124,12 +155,14 @@ def get_kpts(structure_files):
     return kpt_data
 
 
-def plot_both(plot_cutoff=False, plot_kpt=False, cutoff_data=None, kpt_data=None):
+def plot_both(plot_cutoff=False, plot_kpt=False, cutoff_data={}, kpt_data={}):
+    """ Plot convergence of either cutoff/kpts or both. """
     import matplotlib.pyplot as plt
     import seaborn as sns
-    # sns.set_style('darkgrid')
-    sns.set_palette('Dark2')
+    sns.set_style('darkgrid')
     sns.set({'font.sans-serif': ['Linux Biolinum O', 'Helvetica', 'Arial'], 'font.family': 'sans-serif', 'text.usetex': True})
+    num_structures = max(len(cutoff_data['stoich_list'] if 'stoich_list' in cutoff_data else [1]), len(kpt_data['stoich_list'] if 'stoich_list' in kpt_data else [1]))
+    sns.set_palette(sns.husl_palette(num_structures, l=0.5))
     if plot_cutoff and plot_kpt:
         fig, ax_list = plt.subplots(1, 2)
         ax_cutoff = ax_list[0]
@@ -153,30 +186,29 @@ def plot_both(plot_cutoff=False, plot_kpt=False, cutoff_data=None, kpt_data=None
             labels.append(cutoff_stoich_list[key])
         # for key in cutoff_chempots:
             # ax_cutoff.plot(-1/cutoff_chempots[key][:, 0], np.abs(cutoff_chempots[key][:, 1]-cutoff_chempots[key][-1, 1])*1000, 'o-', markersize=5, alpha=1, label=cutoff_chempot_list[key], lw=1)
-    ax_cutoff.set_ylabel('Relative energy difference (meV/atom)')
-    ax_cutoff.set_xlabel('1 / plane wave cutoff (eV)')
-    try:
-        min_ = 1e10
-        max_ = 0
-        for key in cutoff_chempots:
-            min_cutoff = np.min(cutoff_chempots[key][:, 0])
-            if min_cutoff < min_:
-                min_ = min_cutoff
-            max_cutoff = np.max(cutoff_chempots[key][:, 0])
-            if max_cutoff > max_:
-                max_ = max_cutoff
-        print(min_, max_)
-        xlabels = np.arange(min_, max_, step=100)
-        print(xlabels)
-        xlabels_str = ['1/{:3.0f}'.format(val[1]) for val in enumerate(xlabels) if val[1] % 2 == 0]
-        for i in range(len(xlabels_str)):
-            if i % 2 == 1:
-                xlabels_str[i] = ''
-        ax_cutoff.set_xticks(-1/xlabels)
-        ax_cutoff.set_xticklabels(xlabels_str)
-    except:
-        print_exc()
-        print('No cutoff.conv file found, axis labels may be ugly...')
+        ax_cutoff.set_ylabel('Relative energy difference (meV/atom)')
+        ax_cutoff.set_xlabel('1 / plane wave cutoff (eV)')
+        try:
+            min_ = 1e10
+            max_ = 0
+            for key in cutoff_chempots:
+                min_cutoff = np.min(cutoff_chempots[key][:, 0])
+                if min_cutoff < min_:
+                    min_ = min_cutoff
+                max_cutoff = np.max(cutoff_chempots[key][:, 0])
+                if max_cutoff > max_:
+                    max_ = max_cutoff
+            xlabels = np.arange(min_, 2*max_, step=100)
+            xlabels_str = ['1/{:3.0f}'.format(val[1]) for val in enumerate(xlabels)]
+            for i in range(len(xlabels_str)):
+                if i % 2 == 1 or xlabels[i] > max_:
+                    xlabels_str[i] = ''
+            ax_cutoff.set_xticks(-1/xlabels)
+            ax_cutoff.set_xticklabels(xlabels_str)
+            ax_cutoff.set_xlim(-1.1*1/min_, -0.9*1/max_)
+        except:
+            print_exc()
+            print('No cutoff.conv file found, axis labels may be ugly...')
 
     if plot_kpt:
         lines = []
@@ -191,17 +223,17 @@ def plot_both(plot_cutoff=False, plot_kpt=False, cutoff_data=None, kpt_data=None
             labels.append(kpt_stoich_list[key])
         # for key in kpt_chempots:
             # ax_kpt.plot(kpt_chempots[key][:, 0], np.abs(kpt_chempots[key][:, 1]-kpt_chempots[key][0, 1])*1000, 'o-', markersize=5, alpha=1, label=kpt_chempot_list[key], lw=1)
-    try:
-        kpts = list(reversed(np.loadtxt('kpt.conv').tolist()))
-        ax_kpt.set_xticks(kpts)
-        ax_kpt.set_xlabel('max k-point spacing (1/A)')
-    except:
-        print('No kpt.conv file found, axis labels may be ugly...')
+        try:
+            kpts = list(reversed(np.loadtxt('kpt.conv').tolist()))
+            ax_kpt.set_xticks(kpts)
+            ax_kpt.set_xlabel('max k-point spacing (1/A)')
+        except:
+            print('No kpt.conv file found, axis labels may be ugly...')
 
-    if plot_cutoff:
-        ax_kpt.yaxis.tick_right()
-        ax_kpt.yaxis.set_label_position('right')
-    ax_kpt.set_ylabel('Relative energy difference (meV/atom)')
+        if plot_cutoff:
+            ax_kpt.yaxis.tick_right()
+            ax_kpt.yaxis.set_label_position('right')
+            ax_kpt.set_ylabel('Relative energy difference (meV/atom)')
     plt.figlegend(lines, labels, loc='upper center', fontsize=10, ncol=4)
     plt.show()
     plt.savefig('conv.png', bbox_inches='tight')
@@ -213,11 +245,11 @@ if __name__ == '__main__':
         kpts = True
         if not isdir('completed_cutoff'):
             cutoff = False
-            cutoff_data = None
+            cutoff_data = {}
             print('Did not find completed_cutoff folder, skipping cutoffs...')
         if not isdir('completed_kpts'):
             kpts = False
-            kpt_data = None
+            kpt_data = {}
             print('Did not find completed_kpts folder, skipping kpts...')
         if not cutoff and not kpts:
             exit('Could not find any completed_$x folders!')
@@ -227,12 +259,12 @@ if __name__ == '__main__':
             print('Parsing cutoffs...')
             cutoff = True
             cutoff_structure_files = get_files('completed_cutoff')
-            cutoff_data = get_cutoffs(cutoff_structure_files)
+            cutoff_data = get_data(cutoff_structure_files, conv_field='cut_off_energy')
         if isdir('completed_kpts'):
             print('Parsing kpts...')
             kpts = True
             kpt_structure_files = get_files('completed_kpts')
-            kpt_data = get_kpts(kpt_structure_files)
+            kpt_data = get_data(kpt_structure_files, conv_field='kpoints_mp_spacing')
         plot_both(plot_cutoff=cutoff, plot_kpt=kpts, cutoff_data=cutoff_data, kpt_data=kpt_data)
     except:
         print_exc()

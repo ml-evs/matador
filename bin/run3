@@ -91,7 +91,12 @@ class BatchRun:
 
         # prepare folders and text files
         self.paths = dict()
-        self.paths['completed_dir'] = 'completed'
+        if self.args.get('conv_cutoff'):
+            self.paths['completed_dir'] = 'completed_cutoff'
+        elif self.args.get('conv_kpt'):
+            self.paths['completed_dir'] = 'completed_kpts'
+        else:
+            self.paths['completed_dir'] = 'completed'
         self.paths['failed_dir'] = 'bad_castep'
         self.paths['jobs_fname'] = 'jobs.txt'
         self.paths['completed_fname'] = 'finished_cleanly.txt'
@@ -160,7 +165,7 @@ class BatchRun:
                     relaxer = FullRelaxer(node=None, res=res,
                                           param_dict=self.param_dict,
                                           cell_dict=self.cell_dict,
-                                          mode=self.mode,
+                                          mode=self.mode, paths=self.paths,
                                           **self.args)
                     try:
                         if not relaxer.enough_memory:

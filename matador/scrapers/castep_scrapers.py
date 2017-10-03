@@ -379,7 +379,7 @@ def param2dict(seed, db=True, verbosity=0, **kwargs):
                         if 'xc_functional' in line:
                             param['xc_functional'] = param['xc_functional'].upper()
                         if 'write_cell_structure' in line:
-                            if param['write_cell_structure'] == 'false':
+                            if param['write_cell_structure'].lower() == 'false':
                                 param['write_cell_structure'] = False
                             else:
                                 param['write_cell_structure'] = True
