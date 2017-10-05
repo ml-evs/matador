@@ -364,10 +364,9 @@ class DBQuery(object):
                             if test_cursor_count[-1] == count:
                                 print('Matched all structures...')
                                 break
-                            if self.args.get('biggest'):
-                                if test_cursor_count[-1] > 2*int(count/3):
-                                    print('Matched at least 2/3 of total number, composing hull...')
-                                    break
+                            if test_cursor_count[-1] > 2*int(count/3):
+                                print('Matched at least 2/3 of total number, composing hull...')
+                                break
                         except(KeyboardInterrupt, SystemExit):
                             print('Received exit signal, exiting...')
                             exit()

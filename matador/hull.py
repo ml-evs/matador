@@ -1048,18 +1048,19 @@ class QueryConvexHull(object):
         filtered_hull_dists = []
         for ind, conc in enumerate(concs):
             if conc not in filtered_concs:
-                if hull_dist[ind] <= self.hull_cutoff:
+                if hull_dist[ind] <= self.hull_cutoff or (self.hull_cutoff == 0 and hull_dist[ind] < 0.1):
                     filtered_concs.append(conc)
                     filtered_hull_dists.append(hull_dist[ind])
+        if self.args.get('debug'):
+            print('Trying to plot {} points...'.format(len(filtered_concs)))
 
-        if self.hull_cutoff != 0:
-            concs = np.asarray(filtered_concs)
-            hull_dist = np.asarray(filtered_hull_dists)
-            concs = concs[np.where(hull_dist <= self.hull_cutoff)]
-            hull_dist = hull_dist[np.where(hull_dist <= self.hull_cutoff)]
-        else:
-            concs = np.asarray(concs)
-            hull_dist = np.asarray(hull_dist)
+        concs = np.asarray(filtered_concs)
+        hull_dist = np.asarray(filtered_hull_dists)
+        # concs = concs[np.where(hull_dist <= self.hull_cutoff)]
+        # hull_dist = hull_dist[np.where(hull_dist <= self.hull_cutoff)]
+        # else:
+            # concs = np.asarray(concs)
+            # hull_dist = np.asarray(hull_dist)
 
         Ncolours = len(self.default_cmap_list)
         min_cut = 0.01
