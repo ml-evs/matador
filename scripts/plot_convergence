@@ -107,54 +107,6 @@ def get_data(structure_files, conv_field='cut_off_energy'):
     return data
 
 
-def get_kpts(structure_files):
-    """ Parse kpoint spacing convergence calculations from structure files. """
-    kpt_chempots_dict = defaultdict(dict)
-    kpt_chempots = defaultdict(list)
-    chempot_list = dict()
-    for key in structure_files:
-        for doc in structure_files[key]:
-            if len(doc['stoichiometry']) == 1:
-                doc['formation_energy_per_atom'] = 0
-                # grid = doc['kpoints_mp_grid']
-                # num_k = sum(grid)
-                num_k = round(doc['kpoints_mp_spacing'], 2)
-                kpt_chempots_dict[str(num_k)][doc['atom_types'][0]] = doc['total_energy_per_atom']
-                kpt_chempots[key].append([num_k, doc['total_energy_per_atom']])
-                chempot_list[key] = doc['stoichiometry'][0][0]
-
-    kpt_form = defaultdict(list)
-    stoich_list = dict()
-    for key in structure_files:
-        for doc in structure_files[key]:
-            num_k = doc['kpoints_mp_spacing']
-            if len(doc['stoichiometry']) == 2:
-                doc['formation_energy_per_atom'] = doc['total_energy_per_atom']
-                for atom in doc['atom_types']:
-                    try:
-                        doc['formation_energy_per_atom'] -= kpt_chempots_dict[str(round(doc['kpoints_mp_spacing'], 2))][atom] / len(doc['atom_types'])
-                    except:
-                        print('!!!!!!!!!', doc['kpoints_mp_spacing'])
-                        doc['formation_energy_per_atom'] -= kpt_chempots_dict[str(round(doc['kpoints_mp_spacing'], 2))][atom] / len(doc['atom_types'])
-                kpt_form[key].append([num_k, doc['formation_energy_per_atom']])
-                stoich_list[key] = get_formula_from_stoich(doc['stoichiometry'], tex=True)
-    for key in kpt_form:
-        kpt_form[key].sort()
-        kpt_form[key] = np.asarray(kpt_form[key])
-
-    for key in kpt_chempots:
-        kpt_chempots[key].sort()
-        kpt_chempots[key] = np.asarray(kpt_chempots[key])
-
-    kpt_data = dict()
-    kpt_data['chempots'] = kpt_chempots
-    kpt_data['form'] = kpt_form
-    kpt_data['stoich_list'] = stoich_list
-    kpt_data['chempot_list'] = chempot_list
-
-    return kpt_data
-
-
 def plot_both(plot_cutoff=False, plot_kpt=False, cutoff_data={}, kpt_data={}):
     """ Plot convergence of either cutoff/kpts or both. """
     import matplotlib.pyplot as plt
