@@ -80,7 +80,7 @@ def plot_spectral(seeds,
     for seed_ind, seed in enumerate(seeds):
         seed = seed.replace('.bands', '')
         if plot_bandstructure:
-            bs, s = bands2dict(seed + '.bands', summary=True, gap=False, verbosity=verbosity)
+            bs, s = bands2dict(seed + '.bands', summary=True, gap=gap, verbosity=verbosity)
             path = [0]
             for branch in bs['kpoint_branches']:
                 for ind, kpt in enumerate(bs['kpoint_path'][branch]):
