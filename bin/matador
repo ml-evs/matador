@@ -580,11 +580,10 @@ if __name__ == '__main__':
     matador = Matador(args, argstr=argv[1:])
     if vars(args).get('profile'):
         pr.disable()
-        with open('matador-' +
-                  str(version_info.major) + '.' +
-                  str(version_info.minor) + '.' +
-                  str(version_info.micro) +
-                  '.cProfile', 'w') as s:
+        fname = 'matador-{}-{}.{}.{}'.format(__version__, version_info.major,
+                                             version_info.minor, version_info.micro)
+        pr.dump_stats(fname + '.prof')
+        with open(fname + '.pstats', 'w') as s:
             sortby = 'cumulative'
             ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
             ps.print_stats()
