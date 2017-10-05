@@ -94,6 +94,7 @@ class FullRelaxer:
         self.enough_memory = True
         self.paths = paths
         if self.paths is None:
+            self.paths = {}
             self.paths['completed_dir'] = 'completed'
         else:
             assert 'completed_dir' in self.paths
