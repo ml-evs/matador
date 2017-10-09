@@ -917,6 +917,8 @@ def bands2dict(seed, summary=False, gap=True, verbosity=0, **kwargs):
     header = flines[:9]
     data = flines[9:]
 
+    bandstructure['source'] = [seed + '.bands']
+
     bandstructure['num_kpoints'] = int(header[0].split()[-1])
     bandstructure['num_spins'] = int(header[1].split()[-1])
     bandstructure['num_electrons'] = float(header[2].split()[-1])
