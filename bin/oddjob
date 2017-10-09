@@ -22,6 +22,7 @@ class Hive:
         self.args = kwargs
         self.command = self.args.get('command')
         self.nodes = self.args.get('nodes')
+        self.prefix = self.args.get('prefix')
         if len(set(self.nodes)) < len(list(self.nodes)):
             print_warning('Skipping duplicate nodes...')
         self.nodes = set(map(int, self.nodes))
@@ -47,8 +48,8 @@ class Hive:
         """ Parse command and run on particular node. """
         cwd = getcwd()
         compute_command = self.command.replace('$ALL_CORES', str(mp.cpu_count()))
-        print_notify('Executing {} on node{}...'.format(compute_command, node))
-        process = sp.Popen(['ssh', 'node{}'.format(node),
+        print_notify('Executing {} on {}{}...'.format(compute_command, self.prefix, node))
+        process = sp.Popen(['ssh', '{}{}'.format(self.prefix, node),
                             'cd', '{};'.format(cwd),
                             compute_command], stdout=stdout, shell=False)
         return process
@@ -67,10 +68,12 @@ if __name__ == '__main__':
     parser.add_argument('-n', '--nodes', type=str, nargs='+',
                         help='list node numbers to run job on with space delimiters, e.g. \
                         -n 3 14 15')
+    parser.add_argument('-p', '--prefix', type=str,
+                        help='prefix for hostname')
     parser.add_argument('-d', '--debug', action='store_true',
                         help='debug output')
     args = parser.parse_args()
-    runner = Hive(command=args.command, nodes=args.nodes, debug=args.debug)
+    runner = Hive(command=args.command, nodes=args.nodes, debug=args.debug, prefix=args.prefix)
     try:
         runner.spawn()
     except(KeyboardInterrupt, SystemExit):
