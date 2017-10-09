@@ -23,6 +23,8 @@ class Hive:
         self.command = self.args.get('command')
         self.nodes = self.args.get('nodes')
         self.prefix = self.args.get('prefix')
+        if self.prefix is None:
+            self.prefix = 'node'
         if len(set(self.nodes)) < len(list(self.nodes)):
             print_warning('Skipping duplicate nodes...')
         self.nodes = set(map(int, self.nodes))
