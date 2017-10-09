@@ -705,22 +705,6 @@ class QueryConvexHull(object):
             # annotate hull structures
             if self.args.get('labels') or labels:
                 self.label_cursor = [doc for doc in self.hull_cursor if doc['hull_distance'] <= 0]
-                # ion = self.label_cursor[0]['stoichiometry'][0][0]
-                # for elem in self.label_cursor[1]['stoichiometry']:
-                    # if elem[0] == ion:
-                        # num_ion = elem[1]
-                    # else:
-                        # num_b = elem[1]
-                # ratio_A = num_ion / num_b
-                # for elem in self.label_cursor[2]['stoichiometry']:
-                    # if elem[0] == ion:
-                        # num_ion = elem[1]
-                    # else:
-                        # num_b = elem[1]
-              # ratio_B = num_ion / num_b
-                # if ratio_A > ratio_B:
-                    # self.label_cursor = reversed(self.label_cursor[1:-1])
-                # else:
                 self.label_cursor = self.label_cursor[1:-1]
                 for ind, doc in enumerate(self.label_cursor):
                     arrowprops = dict(arrowstyle="-|>", color='k')
@@ -1059,8 +1043,8 @@ class QueryConvexHull(object):
         # concs = concs[np.where(hull_dist <= self.hull_cutoff)]
         # hull_dist = hull_dist[np.where(hull_dist <= self.hull_cutoff)]
         # else:
-            # concs = np.asarray(concs)
-            # hull_dist = np.asarray(hull_dist)
+        #   concs = np.asarray(concs)
+        #   hull_dist = np.asarray(hull_dist)
 
         Ncolours = len(self.default_cmap_list)
         min_cut = 0.01
@@ -1182,29 +1166,13 @@ class QueryConvexHull(object):
                         axQ.plot([self.Q[ind][i], self.Q[ind][i]], [voltage[i], voltage[i+1]], marker='o',
                                  lw=2, c=self.colours[ind])
         if self.args.get('labels'):
-            ion = self.hull_cursor[0]['stoichiometry'][0][0]
-            for elem in self.hull_cursor[1]['stoichiometry']:
-                if elem[0] == ion:
-                    num_ion = elem[1]
-                else:
-                    num_b = elem[1]
-            ratio_A = num_ion / num_b
-            for elem in self.hull_cursor[2]['stoichiometry']:
-                if elem[0] == ion:
-                    num_ion = elem[1]
-                else:
-                    num_b = elem[1]
-            ratio_B = num_ion / num_b
-            num_labels = len(self.hull_cursor)-2
-            if ratio_A > ratio_B:
-                self.label_cursor = list(reversed(self.hull_cursor[1:-1]))
-            else:
-                self.label_cursor = self.hull_cursor[1:-1]
-            for i in range(num_labels):
+            self.label_cursor = [doc for doc in self.hull_cursor if doc['hull_distance'] <= 0]
+            self.label_cursor = self.label_cursor[1:-1]
+            for i in range(len(self.label_cursor)):
                 axQ.annotate(get_formula_from_stoich(self.label_cursor[i]['stoichiometry'], elements=self.elements, tex=True),
-                             xy=(self.Q[0][i+1], self.voltages[0][i+1]+0.001),
+                             xy=(self.Q[0][i+1], self.voltages[0][i+1]+0.02*max(self.voltages[0])),
                              textcoords='data',
-                             ha='left',
+                             ha='center',
                              zorder=9999)
         if self.args.get('expt') or len(self.voltages) != 1:
             axQ.legend(loc=1)
