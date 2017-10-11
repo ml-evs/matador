@@ -186,8 +186,6 @@ def cell2dict(seed, db=True, outcell=False, positions=False, verbosity=0, **kwar
                         cell['species_pot'][flines[line_no+i].split()[0]] = \
                             flines[line_no+i].split()[1].split('/')[-1]
                         cell['species_pot'][flines[line_no+i].split()[0]] = \
-                            cell['species_pot'][flines[line_no+i].split()[0]].replace('compat7', '')
-                        cell['species_pot'][flines[line_no+i].split()[0]] = \
                             cell['species_pot'][flines[line_no+i].split()[0]].replace(',', '')
                         cell['species_pot'][flines[line_no+i].split()[0]] = \
                             cell['species_pot'][flines[line_no+i].split()[0]].replace('()', '')
@@ -618,7 +616,7 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
                     elif 'core correction' in flines[line_no+i]:
                         i += 2
                         if not pspot_report_dict[elem]:
-                            castep['species_pot'][elem] = flines[line_no+i].split('"')[1]
+                            castep['species_pot'][elem] = flines[line_no+i].split('"')[1].replace('[]', '')
                             pspot_report_dict[elem] = True
                     i += 1
             elif 'species_pot' not in castep and 'Files used for pseudopotentials' in line:

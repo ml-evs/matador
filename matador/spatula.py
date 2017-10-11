@@ -190,6 +190,12 @@ class Spatula(object):
             # include elem set for faster querying
             if 'elems' not in struct:
                 struct['elems'] = list(set(struct['atom_types']))
+            del_list = []
+            for species in struct['species_pot']:
+                if species not in set(struct['atom_types']):
+                    del_list.append(species)
+            for species in del_list:
+                del struct['species_pot'][species]
             for elem in struct['stoichiometry']:
                 # remove all points for a missing pseudo
                 if elem[0] not in struct['species_pot']:
