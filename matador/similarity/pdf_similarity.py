@@ -71,6 +71,10 @@ class PDF(object):
             self.low_mem = True
         else:
             self.low_mem = False
+        if kwargs.get('projected'):
+            self.projected = True
+        else:
+            self.projected = False
         if kwargs.get('max_num_images'):
             self.max_num_images = kwargs.get('max_num_images')
         else:
