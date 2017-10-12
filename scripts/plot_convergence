@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/u/fs1/me388/.local/conda/envs/matador/bin/python
 """ I hate this script and it should be rewritten, but
 this should read data from a run3 convergence test and plot it.
 """
@@ -55,15 +55,23 @@ def get_data(structure_files, conv_field='cut_off_energy'):
         rounding = 2
     else:
         rounding = None
-
     for key in structure_files:
         for doc in structure_files[key]:
-            if len(doc['stoichiometry']) == 1:
-                doc['formation_energy_per_atom'] = 0
-                rounded_field = round(doc[conv_field], rounding)
-                chempots_dict[str(rounded_field)][doc['atom_types'][0]] = doc['total_energy_per_atom']
-                chempots[key].append([rounded_field, doc['total_energy_per_atom']])
-                chempot_list[key] = doc['stoichiometry'][0][0]
+            try:
+                if len(doc['stoichiometry']) == 1:
+                    doc['formation_energy_per_atom'] = 0
+                    rounded_field = round(doc[conv_field], rounding)
+                    if 'total_energy_per_atom' in doc:
+                        chempots_dict[str(rounded_field)][doc['atom_types'][0]] = doc['total_energy_per_atom']
+                        chempots[key].append([rounded_field, doc['total_energy_per_atom']])
+                    else:
+                        chempots_dict[str(rounded_field)][doc['atom_types'][0]] = doc['enthalpy_per_atom']
+                        chempots[key].append([rounded_field, doc['enthalpy_per_atom']])
+                    chempot_list[key] = doc['stoichiometry'][0][0]
+            except:
+                print('Error with {} and {} = {}'.format(key, conv_field, rounded_field))
+                print_exc()
+                exit()
 
     form = defaultdict(list)
     stoich_list = dict()
@@ -82,7 +90,10 @@ def get_data(structure_files, conv_field='cut_off_energy'):
         for doc in structure_files[key]:
             if len(doc['stoichiometry']) != 1:
                 try:
-                    doc['formation_energy_per_atom'] = doc['total_energy_per_atom']
+                    if 'total_energy_per_atom' in doc:
+                        doc['formation_energy_per_atom'] = doc['total_energy_per_atom']
+                    else:
+                        doc['formation_energy_per_atom'] = doc['enthalpy_per_atom']
                     rounded_field = round(doc[conv_field], rounding)
                     for atom in doc['atom_types']:
                         doc['formation_energy_per_atom'] -= chempots_dict[str(rounded_field)][atom] / len(doc['atom_types'])
