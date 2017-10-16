@@ -220,8 +220,7 @@ class Matador(object):
                         exit('I\'m sorry Dave, I\'m afraid I can\'t do that...')
                     else:
                         print('Deleting collection...'.format(target))
-                        # self.db[target].dropIndexes()
-                        # self.db[target].drop()
+                        self.db[target].drop()
                 else:
                     exit('Nevermind then!')
         else:
