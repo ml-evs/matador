@@ -185,8 +185,8 @@ def cell2dict(seed, db=True, outcell=False, positions=False, verbosity=0, **kwar
                     if db:
                         cell['species_pot'][flines[line_no+i].split()[0]] = \
                             flines[line_no+i].split()[1].split('/')[-1]
-                        cell['species_pot'][flines[line_no+i].split()[0]] = \
-                            cell['species_pot'][flines[line_no+i].split()[0]].replace(',', '')
+                        # cell['species_pot'][flines[line_no+i].split()[0]] = \
+                            # cell['species_pot'][flines[line_no+i].split()[0]].replace(',', '')
                         cell['species_pot'][flines[line_no+i].split()[0]] = \
                             cell['species_pot'][flines[line_no+i].split()[0]].replace('()', '')
                         cell['species_pot'][flines[line_no+i].split()[0]] = \
