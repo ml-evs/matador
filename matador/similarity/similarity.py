@@ -102,7 +102,7 @@ def get_uniq_cursor(cursor, sim_calculator=PDF, sim_tol=5e-2, energy_tol=5e-2,
                 del dupe_dict[j]
             dupe_set.add(j)
             dupe_dict[i].append(j)
-    assert len(cursor) != len([key for key in dupe_dict] + [item for key in dupe_dict for item in dupe_dict[key]])
+    assert len(cursor) == len(set([key for key in dupe_dict] + [item for key in dupe_dict for item in dupe_dict[key]]))
     for i in dupe_dict:
         to_compare = [i]
         to_compare.extend(dupe_dict[i])
