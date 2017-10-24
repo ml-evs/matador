@@ -20,25 +20,25 @@ def get_uniq_cursor(cursor, sim_calculator=PDF, sim_tol=5e-2, energy_tol=5e-2,
 
     Inputs:
 
-        cursor              : matador cursor to be filtered
-        sim_calculator      : fingerprint object type to compare
-        sim_tol             : tolerance in similarity distance for duplicates
-        energy_tol          : compare only structures within a certain energy tolerance (if enforce_same_stoich is False, this is disabled)
-        enforce_same_stoich : compare only structures of the same stoichiometry
-        projected           : use element-projected PDF to calculate similarity
-        debug               : print timings and list similarities
-        sim_calc_args       : dict containing parameters to pass to sim_calculator
+        | cursor              : matador cursor to be filtered
+        | sim_calculator      : fingerprint object type to compare
+        | sim_tol             : tolerance in similarity distance for duplicates
+        | energy_tol          : compare only structures within a certain energy tolerance (if enforce_same_stoich is False, this is disabled)
+        | enforce_same_stoich : compare only structures of the same stoichiometry
+        | projected           : use element-projected PDF to calculate similarity
+        | debug               : print timings and list similarities
+        | sim_calc_args       : dict containing parameters to pass to sim_calculator
 
     Returns:
 
-        distinct_set        : a set of indices of unique documents
-        dupe_dict           : a dict with keys from distinct_set, listing duplicates
-        fingerprint_list    : a list <SimilarityCalculator> objects
-        sim_mat             : the correlation matrix of pair similarity distances
+        | distinct_set        : a set of indices of unique documents
+        | dupe_dict           : a dict with keys from distinct_set, listing duplicates
+        | fingerprint_list    : a list <SimilarityCalculator> objects
+        | sim_mat             : the correlation matrix of pair similarity distances
 
     """
     fingerprint_list = []
-    if enforce_same_stoich:
+    if not enforce_same_stoich:
         energy_tol = 1e20
     if projected:
         sim_calc_args['projected'] = True
@@ -92,15 +92,17 @@ def get_uniq_cursor(cursor, sim_calculator=PDF, sim_tol=5e-2, energy_tol=5e-2,
     prov = [get_guess_doc_provenance(doc['source']) for doc in cursor]
     for i in range(len(sim_mat)):
         distinct_set.add(i)
+        dupe_dict[i] = []
     for i, j in zip(rows, cols):
         if i == j:
             continue
         elif i not in dupe_set:
-            # distinct_set.add(coord[0])
             if j in distinct_set:
                 distinct_set.remove(j)
+                del dupe_dict[j]
             dupe_set.add(j)
             dupe_dict[i].append(j)
+    assert len(cursor) != len([key for key in dupe_dict] + [item for key in dupe_dict for item in dupe_dict[key]])
     for i in dupe_dict:
         to_compare = [i]
         to_compare.extend(dupe_dict[i])
