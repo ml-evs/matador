@@ -185,7 +185,7 @@ def calc_mp_spacing(real_lat, mp_grid, prec=2):
     return round(max_spacing + 0.5*10**exponent, prec)
 
 
-def get_seekpath_kpoint_path(doc, spacing=0.01, debug=False):
+def get_seekpath_kpoint_path(doc, spacing=0.01, threshold=1e-7, debug=False):
     """ Return the conventional kpoint path of the relevant crystal system
     according to the definitions by "HKPOT" in
     Comp. Mat. Sci. 128, 2017:
@@ -198,7 +198,8 @@ def get_seekpath_kpoint_path(doc, spacing=0.01, debug=False):
 
     Args:
 
-        | spacing: float, desired kpoint spacing.
+        | spacing   : float, desired kpoint spacing
+        | threshold : float, internal seekpath threshold
 
     Returns:
 
@@ -209,14 +210,22 @@ def get_seekpath_kpoint_path(doc, spacing=0.01, debug=False):
     """
     from seekpath import get_explicit_k_path
     spg_structure = doc2spg(doc)
-    seekpath_results = get_explicit_k_path(spg_structure, reference_distance=spacing, with_time_reversal=True)
+    seekpath_results = get_explicit_k_path(spg_structure, reference_distance=spacing, with_time_reversal=True, threshold=threshold)
     kpt_path = seekpath_results['explicit_kpoints_rel']
     primitive_doc = dict()
     primitive_doc['lattice_cart'] = seekpath_results['primitive_lattice']
     primitive_doc['positions_frac'] = seekpath_results['primitive_positions']
     primitive_doc['atom_types'] = [str(elements[ind]) for ind in seekpath_results['primitive_types']]
+    primitive_doc['num_atoms'] = len(primitive_doc['atom_types'])
     primitive_doc['lattice_abc'] = cart2abc(primitive_doc['lattice_cart'])
     primitive_doc['cell_volume'] = cart2volume(primitive_doc['lattice_cart'])
+    if debug:
+        print('Found lattice type {}'.format(seekpath_results['bravais_lattice_extended']))
+        print('Old lattice:\n', np.asarray(doc['lattice_cart']))
+        print('Contained {} atoms'.format(doc['num_atoms']))
+        print('New lattice:\n', np.asarray(primitive_doc['lattice_cart']))
+        print('Contains {} atoms'.format(primitive_doc['num_atoms']))
+        print('k-point path contains {} points.'.format(len(kpt_path)))
     return primitive_doc, kpt_path, seekpath_results
 
 
