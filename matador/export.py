@@ -304,6 +304,16 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, overwri
                 for point in doc['spectral_kpoints_list']:
                     f.write('{p[0]} {p[1]} {p[2]}\n'.format(p=point))
                 f.write('%ENDBLOCK SPECTRAL_KPOINTS_LIST\n')
+            if 'phonon_kpoint_list' in doc:
+                f.write('%BLOCK PHONON_KPOINT_LIST\n')
+                for point in doc['phonon_kpoint_list']:
+                    f.write('{p[0]} {p[1]} {p[2]}\n'.format(p=point))
+                f.write('%ENDBLOCK PHONON_KPOINT_LIST\n')
+            if 'phonon_fine_kpoint_list' in doc:
+                f.write('%BLOCK PHONON_FINE_KPOINT_LIST\n')
+                for point in doc['phonon_fine_kpoint_list']:
+                    f.write('{p[0]} {p[1]} {p[2]}\n'.format(p=point))
+                f.write('%ENDBLOCK PHONON_FINE_KPOINT_LIST\n')
             if 'cell_constraints' in doc:
                 f.write('\n%BLOCK CELL_CONSTRAINTS\n')
                 f.write((''.join(str(doc['cell_constraints'][0]).strip('[]'))+'\n').replace(',', ''))
