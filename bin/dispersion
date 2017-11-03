@@ -7,6 +7,7 @@ then a combined BS/DOS plot will be created.
 """
 
 from matador.plotting import plot_spectral
+from matador.utils.print_utils import print_failure
 from os.path import isfile
 import argparse
 
@@ -22,6 +23,8 @@ if __name__ == '__main__':
                         help='save png rather than showing plot in X')
     parser.add_argument('-g', '--gap', action='store_true',
                         help='plot position and size of band gap')
+    parser.add_argument('-ph', '--phonons', action='store_true',
+                        help='plot phonon calculation, rather than electronic')
     parser.add_argument('-v', '--verbosity', type=int, default=0,
                         help='control verbosity of output')
     parser.add_argument('-pw', '--plot_window', type=float,
@@ -38,23 +41,35 @@ if __name__ == '__main__':
     seed = kwargs.get('seed')
     test_seed = kwargs.get('seed')[0]
     verbosity = kwargs.get('verbosity')
+    phonons = kwargs.get('phonons')
 
     del kwargs['seed']
     del kwargs['verbosity']
-    bs_seed = test_seed.replace('.bands', '') + '.bands'
-    if isfile(bs_seed):
-        bandstructure = True
-    else:
-        bandstructure = False
-    dos_seed = test_seed.replace('.bands', '') + '.adaptive.dat'
-    if isfile(dos_seed):
-        dos = True
-    else:
-        dos = False
-    cell_seed = test_seed.replace('.bands', '') + '.cell'
-    if isfile(cell_seed):
-        cell = True
-    else:
-        cell = False
 
-    plot = plot_spectral(seed, plot_bandstructure=bandstructure, plot_dos=dos, cell=cell, gap=gap, verbosity=verbosity, **kwargs)
+    if not phonons:
+        bs_seed = test_seed.replace('.bands', '') + '.bands'
+        bandstructure = isfile(bs_seed)
+        dos_seed = test_seed.replace('.bands', '') + '.adaptive.dat'
+        dos = isfile(dos_seed)
+        cell_seed = test_seed.replace('.bands', '') + '.cell'
+        cell = isfile(cell_seed)
+
+    elif phonons:
+        phonon_seed = test_seed.replace('.phonon', '') + '.phonon'
+        bandstructure = isfile(phonon_seed)
+        dos_seed = test_seed.replace('.phonon', '') + '.phonon_dos'
+        dos = isfile(dos_seed)
+        cell_seed = test_seed.replace('.phonon', '') + '.cell'
+        cell = isfile(cell_seed)
+
+    if not dos and not bandstructure:
+        print_failure('Could not find files for specified seed {}.'.format(test_seed))
+        exit()
+
+    plot = plot_spectral(seed,
+                         plot_bandstructure=bandstructure,
+                         plot_dos=dos,
+                         cell=cell,
+                         gap=gap,
+                         verbosity=verbosity,
+                         **kwargs)
