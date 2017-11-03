@@ -47,6 +47,7 @@ class QueryConvexHull(object):
             self.args['subcmd'] = subcmd
         self.query = query
         self.from_cursor = False
+        self.plot_param = False
         if self.query is not None:
             self.cursor = list(query.cursor)
         else:
@@ -154,7 +155,9 @@ class QueryConvexHull(object):
                 for doc in chempot_cursor:
                     if doc['stoichiometry'][0][0] == elem:
                         self.match.append(doc)
-            assert(len(self.match) == len(elements))
+                        break
+            if len(self.match) != len(elements):
+                raise RuntimeError('Found {} of {} required chemical potentials'.format(len(self.match), len(elements)))
             for ind, doc in enumerate(self.match):
                 self.match[ind]['hull_distance'] = 0
                 self.match[ind]['enthalpy_per_b'] = doc['enthalpy_per_atom']
@@ -346,6 +349,9 @@ class QueryConvexHull(object):
             if ':' in self.elements[0]:
                 self.non_binary = True
                 self.chempot_search = self.elements[0].split(':')
+                if query.args.get('intersection'):
+                    print_failure('Please disable intersection when creating a non-binary hull.')
+                    exit()
             self.elements = [elem for elem in re.split(r'([A-Z][a-z]*)', self.elements[0]) if elem.isalpha()]
         assert(len(self.elements) < 4 and len(self.elements) > 1)
         self.ternary = False
@@ -685,6 +691,8 @@ class QueryConvexHull(object):
             else:
                 fig = plt.figure(facecolor=None)
             ax = fig.add_subplot(111)
+        if not self.plot_params:
+            self.set_plot_param()
         scatter = []
         x_elem = [self.elements[0]]
         one_minus_x_elem = list(self.elements[1:])
@@ -704,7 +712,18 @@ class QueryConvexHull(object):
                         '--', c=self.colours[1], lw=1, alpha=0.5, zorder=1000, label='')
             # annotate hull structures
             if self.args.get('labels') or labels:
-                self.label_cursor = [doc for doc in self.hull_cursor if doc['hull_distance'] <= 0]
+                eps = 1e-9
+                self.label_cursor = [doc for doc in self.hull_cursor if doc['hull_distance'] <= 0+eps]
+                if len(set([get_formula_from_stoich(doc['stoichiometry']) for doc in self.label_cursor])) > len(self.label_cursor):
+                    tmp_cursor = []
+                    for doc in self.label_cursor:
+                        if doc['stoichiometry'] not in [_doc['stoichiometry'] for _doc in tmp_cursor]:
+                            tmp_cursor.append(doc)
+                    if len(tmp_cursor) != len(set([doc['stoichiometry'] for doc in self.label_cursor])):
+                        print_warning('Something has gone wrong with labels...')
+                    else:
+                        self.label_cursor = tmp_cursor
+                # remove chemical potentials
                 self.label_cursor = self.label_cursor[1:-1]
                 for ind, doc in enumerate(self.label_cursor):
                     arrowprops = dict(arrowstyle="-|>", color='k')
@@ -1166,7 +1185,8 @@ class QueryConvexHull(object):
                         axQ.plot([self.Q[ind][i], self.Q[ind][i]], [voltage[i], voltage[i+1]], marker='o',
                                  lw=2, c=self.colours[ind])
         if self.args.get('labels'):
-            self.label_cursor = [doc for doc in self.hull_cursor if doc['hull_distance'] <= 0]
+            eps = 1e-9
+            self.label_cursor = [doc for doc in self.hull_cursor if doc['hull_distance'] <= 0+eps]
             self.label_cursor = self.label_cursor[1:-1]
             for i in range(len(self.label_cursor)):
                 axQ.annotate(get_formula_from_stoich(self.label_cursor[i]['stoichiometry'], elements=self.elements, tex=True),
@@ -1196,7 +1216,7 @@ class QueryConvexHull(object):
         if self.args.get('pdf'):
             plt.savefig(self.elements[0]+self.elements[1]+'_voltage.pdf',
                         dpi=500)
-        elif self.args.get('png'):
+        if self.args.get('png'):
             plt.savefig(self.elements[0]+self.elements[1]+'_voltage.png',
                         dpi=500)
         elif show:
@@ -1436,6 +1456,7 @@ class QueryConvexHull(object):
                        '#66a61e', '#e6ab02', '#a6761d', '#666666']
         self.colours = Dark2_8_hex
         self.colours.append('#bc80bd')
+        self.plot_params = True
         return
 
     def generic_voltage_curve(self):
