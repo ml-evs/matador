@@ -1,0 +1,66 @@
+#!/usr/bin/env python
+""" Add spectral kpoints path of chosen spacing
+to cell file.
+"""
+
+from matador.utils.cell_utils import get_seekpath_kpoint_path
+from matador.scrapers.castep_scrapers import cell2dict
+from matador.export import doc2cell
+import argparse
+
+
+def add_kpoints_to_cells(spacing=0.02, overwrite=False, **kwargs):
+    """ Take list of cell filenames, compute
+    the primitive and correct kpoint path, then write
+    out new file with added kpoints.
+
+    Args:
+
+        | seeds     : list(str), list of filenames
+        | spacing   : float, desired path spacing
+        | phonons   : bool, use phonon keywords over spectral
+        | overwrite : bool, overwrite old cell file or append _prim to filename
+
+    """
+    seeds = kwargs.get('seeds')
+    if isinstance(seeds, str):
+        seeds = [seeds]
+    if seeds is None:
+        exit('Please enter list of cell files')
+    overwrite = kwargs.get('overwrite')
+    for seed in seeds:
+        seed = seed.replace('.cell', '')
+        doc, s = cell2dict(seed + '.cell', db=False, lattice=True, positions=True, verbosity=2)
+        prim_doc, kpt_path, seekpath_results = get_seekpath_kpoint_path(doc, spacing=spacing, debug=True, threshold=1e-7)
+        if overwrite:
+            outfile = seed + '.cell'
+        else:
+            outfile = seed + '_prim.cell'
+        doc.update(prim_doc)
+        if kwargs.get('phonons'):
+            # doc['phonon_kpoint_list'] = kpt_path
+            doc['phonon_fine_kpoint_list'] = kpt_path
+        else:
+            doc['spectral_kpoints_list'] = kpt_path
+        doc2cell(doc, outfile, overwrite=overwrite, hash_dupe=False, copy_pspots=False)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        prog='spectral_cell',
+        description='simple script to convert cell to primitive and add high symmetry kpoint paths,\
+                     writing out a new file')
+    parser.add_argument('-ph', '--phonons', action='store_true',
+                        help='set phonon kpoints rather than electronic')
+    parser.add_argument('-s', '--spacing', type=float, nargs='?', const=0.02,
+                        help='set requested path spacing')
+    parser.add_argument('-ow', '--overwrite', action='store_true',
+                        help='overwrite previous cell file')
+    parser.add_argument('seeds', nargs='?', type=str,
+                        help='cell files to manipulate')
+    parser.add_argument('--debug', action='store_true',
+                        help='print debug output')
+    kwargs = vars(parser.parse_args())
+
+    add_kpoints_to_cells(**kwargs)
+    print('Done!')
