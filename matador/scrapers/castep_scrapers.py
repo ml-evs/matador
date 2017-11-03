@@ -89,6 +89,11 @@ def res2dict(seed, db=True, verbosity=0, **kwargs):
                     res['positions_frac'].append(list(map(float, cursor[2:5])))
                     assert len(res['positions_frac'][-1]) == 3
                     i += 1
+        for ind, pos in enumerate(res['positions_frac']):
+            for k in range(3):
+                if pos[k] > 1 or pos[k] < 0:
+                    res['positions_frac'][ind][k] %= 1
+
         if 'num_atoms' in res:
             assert len(res['atom_types']) == res['num_atoms']
         else:
@@ -267,6 +272,10 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, verb
                         cell['atomic_init_spins'] = atomic_init_spins
                     if positions:
                         cell['num_atoms'] = len(cell['atom_types'])
+                        for ind, pos in enumerate(cell['positions_frac']):
+                            for k in range(3):
+                                if pos[k] > 1 or pos[k] < 0:
+                                    cell['positions_frac'][ind][k] %= 1
                 elif 'fix_com' in line.lower():
                     cell['fix_com'] = line.split()[-1]
                 elif 'symmetry_generate' in line.lower():
@@ -525,6 +534,10 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
                     if 'x------' in flines[line_no+i]:
                         atoms = True
                     i += 1
+                for ind, pos in enumerate(castep['positions_frac']):
+                    for k in range(3):
+                        if pos[k] > 1 or pos[k] < 0:
+                            castep['positions_frac'][ind][k] %= 1
                 castep['num_atoms'] = len(castep['atom_types'])
                 castep['stoichiometry'] = defaultdict(float)
                 for atom in castep['atom_types']:
