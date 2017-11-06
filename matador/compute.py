@@ -5,7 +5,7 @@ restarted geometry optimisations. Previously part of run3.
 # matador modules
 from matador.scrapers.castep_scrapers import cell2dict
 from matador.scrapers.castep_scrapers import res2dict, castep2dict
-from matador.utils.print_utils import print_success, print_warning, print_notify
+from matador.utils.print_utils import print_success, print_warning, print_notify, print_failure
 from matador.export import doc2cell, doc2param, doc2res
 # standard library
 from os import makedirs, remove, devnull, getcwd
@@ -28,84 +28,69 @@ class FullRelaxer:
 
     Input:
 
-        res           : str/dict, either filename or input structure dict
-        param_dict    : dict, castep parameters
-        cell_dict     : dict, castep cell input
-        ncores        : int, number of cores for mpirun call
-        nnodes        : int, number of nodes for mpirun call
-        node          : str, node name to run on
+        | res           : str/dict, either filename or input structure dict
+        | param_dict    : dict, castep parameters
+        | cell_dict     : dict, castep cell input
+        | ncores        : int, number of cores for mpirun call
+        | nnodes        : int, number of nodes for mpirun call
+        | node          : str, node name to run on
 
-    Keyword arguments:
+    Arguments:
 
-        executable    : str, name of binary to execute (DEFAULT: castep)
-        mode          : str, either 'castep' or 'generic' (DEFAULT: castep)
-        custom_params : bool, use custom param file for each structure
-        rough         : int, number of small "rough" calculations (DEFAULT: 4)
-        spin          : bool, set spins in first calculation (DEFAULT: False)
-        conv_cutoffs  : list(float) of cutoffs to use for SCF convergence test
-        conv_kpts     : list(float) of kpt spacings to use for SCF convergence test
-        kpts_1D       : bool, treat z-direction as special and create kpt_grid [1 1 n_kz].
-        paths         : dict, folder names for output sorting
-        archer        : bool, use aprun over mpirun
-        redirect      : str, file to redirect stdout to (DEFAULT: /dev/null unless debug).
-        bnl           : bool, use srun over mpirun
-        start         : bool, begin calculation immediately or manually call it
-        reopt         : bool, whether to optimise one more time after success (DEFAULT: false)
-        memcheck      : bool, perform castep dryrun to estimate memory usage, do not proceed if fails
-        maxmem        : int, maximum memory allowed in MB for memcheck
-        killcheck     : bool, check for file called $seed.kill during operation, and kill if present
+        | executable    : str, name of binary to execute (DEFAULT: castep)
+        | mode          : str, either 'castep' or 'generic' (DEFAULT: castep)
+        | custom_params : bool, use custom param file for each structure (DEFAULT: False)
+        | rough         : int, number of small "rough" calculations (DEFAULT: 4)
+        | spin          : bool, set spins in first calculation (DEFAULT: False)
+        | conv_cutoffs  : list(float) of cutoffs to use for SCF convergence test (DEFAULT: False)
+        | conv_kpts     : list(float) of kpt spacings to use for SCF convergence test (DEFAULT: False)
+        | kpts_1D       : bool, treat z-direction as special and create kpt_grid [1 1 n_kz] (DEFAULT: False)
+        | paths         : dict, folder names for output sorting (DEFAULT: None)
+        | archer        : bool, use aprun over mpirun (DEFAULT: False)
+        | bnl           : bool, use srun over mpirun (DEFAULT: False)
+        | redirect      : str, file to redirect stdout to (DEFAULT: /dev/null unless debug).
+        | exec_test     : bool, test executable before progressing (DEFAULT: True)
+        | start         : bool, begin calculation immediately or manually call it (DEFAULT: True)
+        | reopt         : bool, whether to optimise one more time after success (DEFAULT: False)
+        | memcheck      : bool, perform castep dryrun to estimate memory usage, do not proceed if fails (DEFAULT: False)
+        | maxmem        : int, maximum memory allowed in MB for memcheck (DEFAULT: None)
+        | killcheck     : bool, check for file called $seed.kill during operation, and kill if present (DEFAULT: True)
 
     """
-    def __init__(self, res,
-                 ncores, nnodes, node, paths=None,
-                 param_dict=None, cell_dict=None,
-                 mode='castep', executable='castep',
-                 rough=None, spin=False, redirect=None,
-                 reopt=False, custom_params=False, memcheck=False, maxmem=None, killcheck=True,
-                 kpts_1D=False, conv_cutoff=None, conv_kpt=None, archer=False, bnl=False, intel_mpi=False,
-                 start=True, verbosity=1, debug=False):
+    def __init__(self, res, ncores, nnodes, node, **kwargs):
         """ Make the files to run the calculation and handle
         the calling of CASTEP itself.
         """
+        # set defaults and update class with desired values
+        prop_defaults = {'paths': None,  'param_dict': None, 'cell_dict': None, 'mode': 'castep',     'executable': 'castep', 'memcheck': False,
+                         'rough': 4,     'spin': False,      'redirect': None,  'reopt': False,       'custom_params': False, 'archer': False,
+                         'maxmem': None, 'killcheck': True,  'kpts_1D': False,  'conv_cutoff': False, 'conv_kpt': False,      'debug': False,
+                         'bnl': False,   'intel_mpi': False, 'exec_test': True, 'start': True,        'verbosity': 1}
+        self.__dict__.update(prop_defaults)
+        self.__dict__.update(kwargs)
+
         self.ncores = ncores
         self.res = res
-        self.archer = archer
-        self.bnl = bnl
-        self.intel_mpi = intel_mpi
         self.nnodes = nnodes
         self.node = node
-        self.verbosity = verbosity
-        self.memcheck = memcheck
-        self.maxmem = maxmem
-        self.killcheck = killcheck
-        self.executable = executable
-        self.mode = mode
-        self.redirect = redirect
-        self.custom_params = custom_params
-        self.reopt = reopt
-        self.debug = debug
-        self.spin = spin
-        self.start = start
-        self.kpts_1D = kpts_1D
-        self.conv_cutoff_bool = isinstance(conv_cutoff, list)
-        self.conv_kpt_bool = isinstance(conv_kpt, list)
-        self.conv_cutoff = conv_cutoff
-        self.conv_kpt = conv_kpt
+        self.conv_cutoff_bool = isinstance(self.conv_cutoff, list)
+        self.conv_kpt_bool = isinstance(self.conv_kpt, list)
         self.enough_memory = True
-        self.paths = paths
+        self.success = None
         if self.paths is None:
             self.paths = {}
             self.paths['completed_dir'] = 'completed'
         else:
             assert 'completed_dir' in self.paths
 
-        self.success = None
+        if self.exec_test:
+            self.test_exec()
 
         # run through CASTEP specific features
         if self.mode is 'castep':
             if self.kpts_1D:
-                assert('kpoints_mp_spacing' in cell_dict)
-                self.target_spacing = deepcopy(cell_dict['kpoints_mp_spacing'])
+                assert('kpoints_mp_spacing' in self.cell_dict)
+                self.target_spacing = deepcopy(self.cell_dict['kpoints_mp_spacing'])
 
             # read in initial structure and skip if failed
             if isinstance(res, str):
@@ -126,8 +111,8 @@ class FullRelaxer:
                 self.seed = calc_doc['source'][0].replace('.res', '')
 
                 # update global doc with cell and param dicts for folder
-                calc_doc.update(cell_dict)
-                calc_doc.update(param_dict)
+                calc_doc.update(self.cell_dict)
+                calc_doc.update(self.param_dict)
 
                 # check for pseudos
                 for elem in self.res_dict['stoichiometry']:
@@ -164,7 +149,7 @@ class FullRelaxer:
                 else:
                     # set up geom opt parameters
                     self.max_iter = calc_doc['geom_max_iter']
-                    self.num_rough_iter = rough if rough is not None else 4
+                    self.num_rough_iter = self.rough
                     fine_iter = 20
                     rough_iter = 2
                     if 'geom_method' in calc_doc:
@@ -208,13 +193,13 @@ class FullRelaxer:
         Returns:
 
             True iff structure was optimised, False otherwise.
+
         """
         seed = self.seed
         calc_doc = self.calc_doc
         if self.verbosity > 1:
             print_notify('Relaxing ' + self.seed)
         geom_max_iter_list = self.geom_max_iter_list
-        self.parse_executable(seed)
         # copy initial res file to seed
         if not isinstance(self.res, str):
             doc2res(self.res, self.seed, info=False, hash_dupe=False, overwrite=True)
@@ -273,14 +258,14 @@ class FullRelaxer:
                 process = self.castep(seed)
                 process.communicate()
                 # scrape new structure from castep file
-                opti_dict, success = castep2dict(seed + '.castep', db=False, verbosity=0)
+                if not isfile(seed + '.castep'):
+                    exit('CASTEP file was not created, please check your executable: {}.'.format(self.executable))
+                opti_dict, success = castep2dict(seed + '.castep', db=False, verbosity=self.verbosity)
                 if self.debug:
                     print_notify('Intermediate calculation finished')
                     print(opti_dict)
                 if not success and isinstance(opti_dict, str):
-                    if self.verbosity > 1:
-                        print_warning('Failed to scrape castep file...')
-                    exit()
+                    exit('Failed to scrape CASTEP file...')
                 try:
                     # delete any k-point and pspot information
                     del opti_dict['kpoints_mp_spacing']
@@ -439,7 +424,6 @@ class FullRelaxer:
                     calc_doc['spectral_kpoints_list'] = kpt_path
 
             doc2cell(calc_doc, seed, hash_dupe=False, copy_pspots=False, overwrite=True)
-            self.parse_executable(seed)
             # run CASTEP
             process = self.castep(seed)
             process.communicate()
@@ -476,7 +460,6 @@ class FullRelaxer:
         """ Run a generic command on the given seed. """
         try:
             self.cp_to_input(seed, ext=self.input_ext, glob_files=True)
-            self.parse_executable(seed)
             process = self.castep(seed)
             process.communicate()
             if process.returncode != 0:
@@ -496,7 +479,7 @@ class FullRelaxer:
 
     def parse_executable(self, seed):
         """ Turn executable list with arguments into
-        command to execute, setting the self.command
+        command to execute, setting the command
         and self.redirect_file variables.
 
         e.g.1:
@@ -537,7 +520,22 @@ class FullRelaxer:
         else:
             self.redirect_filename = None
 
-        self.command = command
+        return command
+
+    def test_exec(self):
+        """ Test if <executable> --version returns a valid string.
+
+        Raises:
+
+            SystemExit: if executable not found.
+
+        """
+        proc = self.castep('--version', exec_test=True)
+        out, errs = proc.communicate()
+        if 'version' not in out.decode('utf-8') and errs is not None:
+            err_string = 'Executable {} failed testing. Is it on your PATH?\nError output: {}'.format(self.executable, errs.decode('utf-8'))
+            print_failure(err_string)
+            exit(err_string)
 
     def do_memcheck(self, calc_doc, seed):
         """ Perform a CASTEP dryrun to estimate memory usage.
@@ -596,54 +594,73 @@ class FullRelaxer:
                 print('Enough memory, proceeding...')
             return True
 
-    def castep(self, seed):
-        """ Calls executable on desired seed with desired number of cores. """
+    def castep(self, seed, exec_test=False):
+        """ Calls executable on desired seed with desired number of cores.
+
+        Input:
+
+            | seed : str, seedname to pass append to CASTEP command, e.g. <seed> or --version.
+
+        Args:
+
+            | exec_test: bool, run executable in test mode, with output piped to stdout.
+
+        """
+        command = self.parse_executable(seed)
         if self.nnodes is None or self.nnodes == 1:
             if self.ncores == 1 and self.node is None:
-                command = ['nice', '-n', '15'] + self.command
+                command = ['nice', '-n', '15'] + command
             elif self.archer:
-                command = ['aprun', '-n', str(self.ncores)] + self.command
+                command = ['aprun', '-n', str(self.ncores)] + command
             elif self.bnl:
-                command = ['srun', '--exclusive', '-N', '1', '-n', str(self.ncores)] + self.command
+                command = ['srun', '--exclusive', '-N', '1', '-n', str(self.ncores)] + command
             elif self.intel_mpi:
-                command = ['mpirun', '-n', str(self.ncores), '-ppn', str(self.ncores)] + self.command
+                command = ['mpirun', '-n', str(self.ncores), '-ppn', str(self.ncores)] + command
             elif self.node is not None:
                 cwd = getcwd()
                 command = ['ssh', '{}'.format(self.node), 'cd', '{};'.format(cwd),
-                           'mpirun', '-n', str(self.ncores)] + self.command
+                           'mpirun', '-n', str(self.ncores)] + command
             else:
-                command = ['nice', '-n', '15', 'mpirun', '-n', str(self.ncores)] + self.command
+                command = ['nice', '-n', '15', 'mpirun', '-n', str(self.ncores)] + command
         else:
             if self.archer:
                 command = ['aprun', '-n', str(self.ncores*self.nnodes),
                            '-N', str(self.ncores),
                            '-S', '12',
-                           '-d', '1'] + self.command
+                           '-d', '1'] + command
             elif self.bnl:
-                command = ['srun', '--exclusive', '-N', str(self.nnodes), '-n', str(self.ncores*self.nnodes)] + self.command
+                command = ['srun', '--exclusive', '-N', str(self.nnodes), '-n', str(self.ncores*self.nnodes)] + command
             elif self.intel_mpi:
                 command = ['mpirun', '-n', str(self.ncores*self.nnodes),
-                           '-ppn', str(self.ncores)] + self.command
+                           '-ppn', str(self.ncores)] + command
             else:
                 command = ['mpirun', '-n', str(self.ncores*self.nnodes),
-                           '-npernode', str(self.ncores)] + self.command
+                           '-npernode', str(self.ncores)] + command
 
         if self.debug:
-            if self.redirect_filename is not None:
-                redirect_file = open(self.redirect_filename, 'w')
-                process = sp.Popen(command, shell=False, stdout=redirect_file)
-                redirect_file.close()
-            else:
-                process = sp.Popen(command, shell=False)
+            stdout = None
+            stderr = None
+        elif exec_test:
+            stdout = sp.PIPE
+            stderr = sp.PIPE
         else:
             dev_null = open(devnull, 'w')
-            if self.redirect_filename is not None:
-                redirect_file = open(self.redirect_filename, 'w')
-                process = sp.Popen(command, shell=False, stdout=redirect_file, stderr=dev_null)
-                redirect_file.close()
-            else:
-                process = sp.Popen(command, shell=False, stdout=dev_null, stderr=dev_null)
+            stdout = dev_null
+            stderr = dev_null
+
+        if self.redirect_filename is not None:
+            redirect_file = open(self.redirect_filename, 'w')
+            stdout = redirect_file
+
+        process = sp.Popen(command, shell=False, stdout=stdout, stderr=stderr)
+        try:
+            redirect_file.close()
+        except:
+            pass
+        try:
             dev_null.close()
+        except:
+            pass
 
         return process
 
