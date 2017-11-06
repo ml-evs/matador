@@ -217,8 +217,8 @@ class FullRelaxer:
         self.parse_executable(seed)
         # copy initial res file to seed
         if not isinstance(self.res, str):
-            self.cp_to_input(self.seed)
             doc2res(self.res, self.seed, info=False, hash_dupe=False, overwrite=True)
+            self.cp_to_input(self.seed)
         else:
             self.cp_to_input(self.seed)
             doc2res(self.res_dict, self.seed, info=False, hash_dupe=False, overwrite=True)
