@@ -637,12 +637,12 @@ class FullRelaxer:
                 command = ['mpirun', '-n', str(self.ncores*self.nnodes),
                            '-npernode', str(self.ncores)] + command
 
-        if self.debug:
-            stdout = None
-            stderr = None
-        elif exec_test:
+        if exec_test:
             stdout = sp.PIPE
             stderr = sp.PIPE
+        elif self.debug:
+            stdout = None
+            stderr = None
         else:
             dev_null = open(devnull, 'w')
             stdout = dev_null
@@ -692,7 +692,7 @@ class FullRelaxer:
             makedirs(completed_dir, exist_ok=True)
         if keep:
             seed_files = glob.glob(seed + '.*') + glob.glob(seed + '-out.cell')
-            if self.debug > 3:
+            if self.verbosity > 3:
                 print(seed_files)
             for _file in seed_files:
                 copy(_file, completed_dir)
