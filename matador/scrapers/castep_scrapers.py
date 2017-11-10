@@ -387,7 +387,7 @@ def param2dict(seed, db=True, verbosity=0, **kwargs):
                     if splitter in line:
                         param[line.split(splitter)[0].strip()] = \
                             line.split(splitter)[-1].strip()
-                        if 'spin_polarized' in line:
+                        if 'spin_polarized' in line or 'spin_polarised' in line:
                             if [false for false in false_str
                                     if false in param['spin_polarized']]:
                                 param['spin_polarized'] = False
