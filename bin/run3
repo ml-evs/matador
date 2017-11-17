@@ -118,10 +118,11 @@ class BatchRun:
 
     def spawn(self):
         """ Spawn processes to perform calculations. """
+        from random import sample
         procs = []
         for ind in range(self.nprocesses):
             procs.append(mp.Process(target=self.perform_new_calculations,
-                         args=(self.file_lists['res'] if self.mode is 'castep' else self.seed, self.paths)))
+                         args=(sample(self.file_lists['res'], len(self.file_lists['res'])) if self.mode is 'castep' else self.seed, self.paths)))
         try:
             for proc in procs:
                 proc.start()
