@@ -7,6 +7,7 @@ import numpy as np
 # global consts
 FARADAY_CONSTANT_Cpermol = 96.485332e3
 Cperg_to_mAhperg = 2.778e-1
+C_TO_mAh = Cperg_to_mAhperg
 HARTREE_TO_EV = 27.21139
 BOHR_TO_ANGSTROM = 0.529177211
 
