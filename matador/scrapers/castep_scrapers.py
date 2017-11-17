@@ -195,6 +195,8 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, verb
                     if not flines[line_no+i].strip()[0].isalpha():
                         cell['lattice_cart'].append(list(map(float, flines[line_no+i].split())))
                     i += 1
+                if verbosity > 1:
+                    print(cell['lattice_cart'])
                 assert(len(cell['lattice_cart']) == 3)
                 cell['cell_volume'] = cart2volume(cell['lattice_cart'])
             elif '%block species_pot' in line.lower():
@@ -387,6 +389,8 @@ def param2dict(seed, db=True, verbosity=0, **kwargs):
                     if splitter in line:
                         param[line.split(splitter)[0].strip()] = \
                             line.split(splitter)[-1].strip()
+                        if 'spin_polarised' in line:
+                            param['spin_polarized'] = param['spin_polarised']
                         if 'spin_polarized' in line or 'spin_polarised' in line:
                             if [false for false in false_str
                                     if false in param['spin_polarized']]:
@@ -802,33 +806,6 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
                                 castep['mulliken_charges'].append(
                                     float(final_flines[line_no+i+4].split()[-1]))
                             i += 1
-                    elif 'Bond' and 'Population' in line.split():
-                        try:
-                            castep['bonds'] = []
-                            i = 2
-                            while True:
-                                split = final_flines[line_no+i].split()
-                                split[1] = int(split[1])-1
-                                split[4] = int(split[4])-1
-                                # convert element-wise atom labels to
-                                # appropriate index of atom_types
-                                for q in range(len(castep['atom_types'])):
-                                    if castep['atom_types'][q] == split[0]:
-                                        split[1] += q
-                                        break
-                                for q in range(len(castep['atom_types'])):
-                                    if castep['atom_types'][q] == split[3]:
-                                        split[4] += q
-                                        break
-                                castep['bonds'].append(
-                                    [[split[1], split[4]], float(split[5]), float(split[6])])
-                                i += 1
-                                if '===' in final_flines[line_no+i]:
-                                    break
-                        except:
-                            if kwargs.get('dryrun') or verbosity > 0:
-                                print_exc()
-                            pass
                     elif 'Final Enthalpy' in line:
                         castep['enthalpy'] = float(line.split('=')[-1].split()[0])
                         castep['enthalpy_per_atom'] = (float(line.split('=')[-1].split()[0]) /
@@ -892,9 +869,6 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
         if 'space_group' not in castep:
             castep['space_group'] = 'xxx'
     except Exception as oops:
-        if kwargs.get('dryrun') or verbosity > 0:
-            print_exc()
-            print('Error in .castep file', seed, 'skipping...')
         if type(oops) == DFTError:
             if db:
                 # if importing to db, skip unconverged structure
@@ -907,13 +881,16 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
         else:
             if type(oops) == IOError:
                 print_exc()
+            elif kwargs.get('dryrun') or verbosity > 0:
+                print_exc()
+                print('Error in .castep file', seed, 'skipping...')
             return seed + '\t\t' + str(type(oops)) + ' ' + str(oops)+'\n', False
     if kwargs.get('debug'):
         print(json.dumps(castep, indent=2, ensure_ascii=False))
     return castep, True
 
 
-def bands2dict(seed, summary=False, gap=True, verbosity=0, **kwargs):
+def bands2dict(seed, summary=False, gap=False, verbosity=0, **kwargs):
     """ Parse a CASTEP bands file into a dictionary.
 
     Input:
@@ -961,12 +938,12 @@ def bands2dict(seed, summary=False, gap=True, verbosity=0, **kwargs):
         print('Found {}'.format(bs['num_kpoints']))
 
     for nk in range(bs['num_kpoints']):
-        kpt_ind = nk * (bs['num_spins'] + bs['num_bands'] + 1)
+        kpt_ind = nk * (bs['num_spins'] * bs['num_bands'] + bs['num_spins'] + 1)
         bs['kpoint_path'][int(data[kpt_ind].split()[1])-1] = np.asarray([float(elem) for elem in data[kpt_ind].split()[-4:-1]])
         # bs['kpoint_path'][nk] = np.asarray([float(elem) for elem in data[kpt_ind].split()[-4:-1]])
         for ns in range(bs['num_spins']):
             for nb in range(bs['num_bands']):
-                bs['eigenvalues_k_s'][ns][nb][int(data[kpt_ind].split()[1])-1] = float(data[kpt_ind+ns+2+nb].strip())
+                bs['eigenvalues_k_s'][ns][nb][int(data[kpt_ind].split()[1])-1] = float(data[kpt_ind+2+nb].strip())
     bs['eigenvalues_k_s'] -= bs['fermi_energy_Ha']
     bs['eigenvalues_k_s'] *= HARTREE_TO_EV
 
@@ -999,7 +976,7 @@ def bands2dict(seed, summary=False, gap=True, verbosity=0, **kwargs):
     if verbosity > 2:
         print('Found branch structure', [(branch[0], branch[-1]) for branch in bs['kpoint_branches']])
 
-    if gap:
+    if gap and bs['num_spins'] == 1:
 
         vbm = -1e10
         cbm = 1e10
