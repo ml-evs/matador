@@ -21,6 +21,8 @@ if __name__ == '__main__':
                         help='save pdf rather than showing plot in X')
     parser.add_argument('--png', action='store_true',
                         help='save png rather than showing plot in X')
+    parser.add_argument('--svg', action='store_true',
+                        help='save svg rather than showing plot in X')
     parser.add_argument('-g', '--gap', action='store_true',
                         help='plot position and size of band gap')
     parser.add_argument('-ph', '--phonons', action='store_true',

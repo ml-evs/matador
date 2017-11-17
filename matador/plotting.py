@@ -113,26 +113,32 @@ def plot_spectral(seeds,
                 for ns in range(dispersion[spin_key]):
                     for nb in range(dispersion[band_key]):
                         if not phonons:
-                            if np.max(dispersion[eig_key][ns][nb][branch]) < 0:
-                                if colour_by_seed:
-                                    colour = seed_colours[seed_ind]
+                            if dispersion[spin_key] == 2:
+                                if ns == 0:
+                                    colour = 'red'
                                 else:
-                                    colour = valence
-                            elif np.min(dispersion[eig_key][ns][nb][branch]) > 0:
-                                if colour_by_seed:
-                                    colour = seed_colours[seed_ind]
-                                else:
-                                    colour = conduction
-                            elif np.min(dispersion[eig_key][ns][nb][branch]) < 0 and np.max(dispersion[eig_key][ns][nb][branch]) > 0:
-                                if colour_by_seed:
-                                    colour = seed_colours[seed_ind]
-                                else:
-                                    colour = crossing
+                                    colour = 'blue'
                             else:
-                                if colour_by_seed:
-                                    colour = seed_colours[seed_ind]
+                                if np.max(dispersion[eig_key][ns][nb][branch]) < 0:
+                                    if colour_by_seed:
+                                        colour = seed_colours[seed_ind]
+                                    else:
+                                        colour = valence
+                                elif np.min(dispersion[eig_key][ns][nb][branch]) > 0:
+                                    if colour_by_seed:
+                                        colour = seed_colours[seed_ind]
+                                    else:
+                                        colour = conduction
+                                elif np.min(dispersion[eig_key][ns][nb][branch]) < 0 and np.max(dispersion[eig_key][ns][nb][branch]) > 0:
+                                    if colour_by_seed:
+                                        colour = seed_colours[seed_ind]
+                                    else:
+                                        colour = crossing
                                 else:
-                                    colour = 'black'
+                                    if colour_by_seed:
+                                        colour = seed_colours[seed_ind]
+                                    else:
+                                        colour = 'black'
                         else:
                             colour = 'black'
                         ax_dispersion.plot(path[(np.asarray(branch)-branch_ind).tolist()], dispersion[eig_key][ns][nb][branch], c=colour, lw=1, marker=None, ls=ls[seed_ind], alpha=1)
@@ -300,6 +306,8 @@ def plot_spectral(seeds,
 
     if kwargs.get('pdf'):
         plt.savefig(seed.replace('.bands', '').replace('.phonon', '') + '_spectral.pdf', bbox_inches='tight')
+    if kwargs.get('svg'):
+        plt.savefig(seed.replace('.bands', '').replace('.phonon', '') + '_spectral.svg', bbox_inches='tight', transparent=True)
     if kwargs.get('png'):
         plt.savefig(seed.replace('.bands', '').replace('.phonon', '') + '_spectral.png', bbox_inches='tight', dpi=300)
 

@@ -48,6 +48,7 @@ class QueryConvexHull(object):
         self.query = query
         self.from_cursor = False
         self.plot_param = False
+        self.savefig = any([self.args.get('pdf'), self.args.get('png'), self.args.get('svg')])
         if self.query is not None:
             self.cursor = list(query.cursor)
         else:
@@ -128,7 +129,6 @@ class QueryConvexHull(object):
                 else:
                     self.plot_2d_hull()
 
-        self.savefig = any([self.args.get('pdf'), self.args.get('png')])
         if not self.args.get('no_plot') and not self.savefig:
             import matplotlib.pyplot as plt
             plt.show()
@@ -686,7 +686,7 @@ class QueryConvexHull(object):
         import matplotlib.pyplot as plt
         import matplotlib.colors as colours
         if ax is None:
-            if self.args.get('pdf') or self.args.get('png') or self.args.get('svg'):
+            if self.savefig:
                 fig = plt.figure(facecolor=None, figsize=(8, 6))
             else:
                 fig = plt.figure(facecolor=None)
@@ -824,13 +824,13 @@ class QueryConvexHull(object):
             pass
         if self.args.get('pdf'):
             plt.savefig(self.elements[0]+self.elements[1]+'_hull.pdf',
-                        dpi=500, bbox_inches='tight')
+                        dpi=500, bbox_inches='tight', transparent=True)
         if self.args.get('svg'):
             plt.savefig(self.elements[0]+self.elements[1]+'_hull.svg',
-                        dpi=500, bbox_inches='tight')
+                        dpi=500, bbox_inches='tight', transparent=True)
         if self.args.get('png'):
             plt.savefig(self.elements[0]+self.elements[1]+'_hull.png',
-                        dpi=500, bbox_inches='tight')
+                        dpi=500, bbox_inches='tight', transparent=True)
         elif show:
             plt.show()
 
@@ -1143,6 +1143,8 @@ class QueryConvexHull(object):
         plt.tight_layout()
         if self.args.get('png'):
             plt.savefig(''.join(self.elements) + '.png', dpi=400, transparent=True, bbox_inches='tight')
+        if self.args.get('svg'):
+            plt.savefig(''.join(self.elements) + '.svg', dpi=400, transparent=True, bbox_inches='tight')
         if self.args.get('pdf'):
             plt.savefig(''.join(self.elements) + '.pdf', dpi=400, transparent=True, bbox_inches='tight')
         elif show:
@@ -1152,7 +1154,7 @@ class QueryConvexHull(object):
     def plot_voltage_curve(self, show=False):
         """ Plot calculated voltage curve. """
         import matplotlib.pyplot as plt
-        if self.args.get('pdf') or self.args.get('png'):
+        if self.savefig:
             if len(self.voltages) != 1:
                 fig = plt.figure(facecolor=None, figsize=(4, 3.5))
             else:
@@ -1176,13 +1178,13 @@ class QueryConvexHull(object):
                     axQ.plot([self.Q[ind][i-1], self.Q[ind][i]], [voltage[i], voltage[i]], marker='*',
                              lw=2, c=self.colours[ind], label='DFT (this work)')
                 elif i == 0 and len(self.voltages) != 1:
-                    axQ.plot([self.Q[ind][i-1], self.Q[ind][i]], [voltage[i], voltage[i]], marker='o',
+                    axQ.plot([self.Q[ind][i-1], self.Q[ind][i]], [voltage[i], voltage[i]], marker='o', markersize=5,
                              lw=2, c=self.colours[ind], label=get_formula_from_stoich(self.endstoichs[ind], tex=True))
                 else:
-                    axQ.plot([self.Q[ind][i-1], self.Q[ind][i]], [voltage[i], voltage[i]], marker='o',
+                    axQ.plot([self.Q[ind][i-1], self.Q[ind][i]], [voltage[i], voltage[i]], marker='o', markersize=5,
                              lw=2, c=self.colours[ind])
                     if i != len(voltage)-2:
-                        axQ.plot([self.Q[ind][i], self.Q[ind][i]], [voltage[i], voltage[i+1]], marker='o',
+                        axQ.plot([self.Q[ind][i], self.Q[ind][i]], [voltage[i], voltage[i+1]], marker='o', markersize=5,
                                  lw=2, c=self.colours[ind])
         if self.args.get('labels'):
             eps = 1e-9
@@ -1190,7 +1192,7 @@ class QueryConvexHull(object):
             self.label_cursor = self.label_cursor[1:-1]
             for i in range(len(self.label_cursor)):
                 axQ.annotate(get_formula_from_stoich(self.label_cursor[i]['stoichiometry'], elements=self.elements, tex=True),
-                             xy=(self.Q[0][i+1], self.voltages[0][i+1]+0.02*max(self.voltages[0])),
+                             xy=(self.Q[0][i+1]+100, self.voltages[0][i+1]+0.02*max(self.voltages[0])),
                              textcoords='data',
                              ha='center',
                              zorder=9999)
@@ -1215,17 +1217,20 @@ class QueryConvexHull(object):
             pass
         if self.args.get('pdf'):
             plt.savefig(self.elements[0]+self.elements[1]+'_voltage.pdf',
-                        dpi=500)
+                        dpi=500, transparent=True)
+        if self.args.get('svg'):
+            plt.savefig(self.elements[0]+self.elements[1]+'_voltage.svg',
+                        dpi=500, transparent=True)
         if self.args.get('png'):
             plt.savefig(self.elements[0]+self.elements[1]+'_voltage.png',
-                        dpi=500)
+                        dpi=500, transparent=True)
         elif show:
             plt.show()
 
     def plot_volume_curve(self, show=False):
         """ Plot calculated volume curve. """
         import matplotlib.pyplot as plt
-        if self.args.get('pdf') or self.args.get('png'):
+        if self.savefig:
             fig = plt.figure(facecolor=None, figsize=(4, 3.5))
         else:
             fig = plt.figure(facecolor=None)
@@ -1285,6 +1290,9 @@ class QueryConvexHull(object):
         plt.tight_layout(pad=0.0, h_pad=1.0, w_pad=0.2)
         if self.args.get('pdf'):
             plt.savefig(self.elements[0]+self.elements[1]+'_volume.pdf',
+                        dpi=300)
+        if self.args.get('svg'):
+            plt.savefig(self.elements[0]+self.elements[1]+'_volume.svg',
                         dpi=300)
         if self.args.get('png'):
             plt.savefig(self.elements[0]+self.elements[1]+'_volume.png',
@@ -1418,7 +1426,7 @@ class QueryConvexHull(object):
             print_exc()
             pass
 
-        if self.args.get('pdf') or self.args.get('png'):
+        if self.savefig:
             try:
                 plt.style.use('article')
             except:
