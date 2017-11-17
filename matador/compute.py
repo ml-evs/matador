@@ -65,7 +65,7 @@ class FullRelaxer:
         prop_defaults = {'paths': None,  'param_dict': None, 'cell_dict': None, 'mode': 'castep',     'executable': 'castep', 'memcheck': False,
                          'rough': 4,     'spin': False,      'redirect': None,  'reopt': False,       'custom_params': False, 'archer': False,
                          'maxmem': None, 'killcheck': True,  'kpts_1D': False,  'conv_cutoff': False, 'conv_kpt': False,      'debug': False,
-                         'bnl': False,   'intel_mpi': False, 'exec_test': True, 'start': True,        'verbosity': 1}
+                         'bnl': False,   'intel_mpi': False, 'exec_test': True, 'start': True,        'verbosity': 0}
         self.__dict__.update(prop_defaults)
         self.__dict__.update(kwargs)
 

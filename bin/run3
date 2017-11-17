@@ -313,7 +313,7 @@ if __name__ == '__main__':
                         help='debug output')
     parser.add_argument('-cust', '--custom_params', action='store_true', default=False,
                         help='use custom param file per structure')
-    parser.add_argument('-v', '--verbosity', type=int, default=1,
+    parser.add_argument('-v', '--verbosity', type=int, default=0,
                         help='integer to set level of verbosity')
     parser.add_argument('--archer', action='store_true', default=False,
                         help='use aprun over mpirun')
