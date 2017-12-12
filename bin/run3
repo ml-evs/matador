@@ -233,8 +233,8 @@ class BatchRun:
             print_failure('geom_max_iter is unset, please fix this.')
             exit()
         if 'geom_max_iter' in self.param_dict and int(self.param_dict['geom_max_iter']) < 20:
-            print_failure('geom_max_iter is only ' +
-                          str(self.param_dict['geom_max_iter']) + '... quitting.')
+            print_warning('WARNING: geom_max_iter is only ' +
+                          str(self.param_dict['geom_max_iter']) + '...')
             exit()
 
         # check if we're doing a conv run
@@ -335,8 +335,14 @@ if __name__ == '__main__':
     parser.add_argument('--spin', action='store_true', default=False,
                         help='if not specified in .cell file, break spin symmetry on first atom')
     parser.add_argument('--rough', type=int, default=4,
-                        help='choose how many cycles of 2 geometry optimization iterations \
+                        help='choose how many <rough_iter> geometry optimizations \
                               to perform, decrease if lattice is nearly correct. [DEFAULT: 4].')
+    parser.add_argument('--rough_iter', type=int, default=2,
+                        help='choose how many relaxation steps per rough geometry optimization\
+                              to perform, [DEFAULT: 2].')
+    parser.add_argument('--fine_iter', type=int, default=20,
+                        help='choose how many relaxation steps per fine geometry optimization\
+                              to perform, [DEFAULT: 20].')
     parser.add_argument('-l', '--limit', type=int, default=None,
                         help='limit to n structures per run')
     args = parser.parse_args()

@@ -41,6 +41,8 @@ class FullRelaxer:
         | mode          : str, either 'castep' or 'generic' (DEFAULT: castep)
         | custom_params : bool, use custom param file for each structure (DEFAULT: False)
         | rough         : int, number of small "rough" calculations (DEFAULT: 4)
+        | rough_iter    : int, number of iterations per rough calculation (DEFAULT: 2)
+        | fine_iter     : int, number of iterations per fine calculation (DEFAULT: 20)
         | spin          : bool, set spins in first calculation (DEFAULT: False)
         | conv_cutoffs  : list(float) of cutoffs to use for SCF convergence test (DEFAULT: False)
         | conv_kpts     : list(float) of kpt spacings to use for SCF convergence test (DEFAULT: False)
@@ -62,10 +64,10 @@ class FullRelaxer:
         the calling of CASTEP itself.
         """
         # set defaults and update class with desired values
-        prop_defaults = {'paths': None,  'param_dict': None, 'cell_dict': None, 'mode': 'castep',     'executable': 'castep', 'memcheck': False,
-                         'rough': 4,     'spin': False,      'redirect': None,  'reopt': False,       'custom_params': False, 'archer': False,
-                         'maxmem': None, 'killcheck': True,  'kpts_1D': False,  'conv_cutoff': False, 'conv_kpt': False,      'debug': False,
-                         'bnl': False,   'intel_mpi': False, 'exec_test': True, 'start': True,        'verbosity': 0}
+        prop_defaults = {'paths': None, 'param_dict': None, 'cell_dict': None, 'mode': 'castep', 'executable': 'castep', 'memcheck': False,
+                         'rough': 4, 'rough_iter': 2, 'fine_iter': 20, 'spin': False, 'redirect': None, 'reopt': False,
+                         'custom_params': False, 'archer': False, 'maxmem': None, 'killcheck': True, 'kpts_1D': False, 'conv_cutoff': False, 'conv_kpt': False, 'debug': False,
+                         'bnl': False, 'intel_mpi': False, 'exec_test': True, 'start': True, 'verbosity': 0}
         self.__dict__.update(prop_defaults)
         self.__dict__.update(kwargs)
 
@@ -150,8 +152,8 @@ class FullRelaxer:
                     # set up geom opt parameters
                     self.max_iter = calc_doc['geom_max_iter']
                     self.num_rough_iter = self.rough
-                    fine_iter = 20
-                    rough_iter = 2
+                    fine_iter = self.fine_iter
+                    rough_iter = self.rough_iter
                     if 'geom_method' in calc_doc:
                         if calc_doc['geom_method'].lower() == 'tpsd':
                             rough_iter = 3
@@ -200,6 +202,8 @@ class FullRelaxer:
         if self.verbosity > 1:
             print_notify('Relaxing ' + self.seed)
         geom_max_iter_list = self.geom_max_iter_list
+        if self.debug:
+            print(geom_max_iter_list)
         # copy initial res file to seed
         if not isinstance(self.res, str):
             doc2res(self.res, self.seed, info=False, hash_dupe=False, overwrite=True)
