@@ -795,7 +795,7 @@ class DBQuery(object):
             mp_spacing = [self.args.get('mp_spacing')]
         else:
             mp_spacing = self.args.get('mp_spacing')
-        tol = 0.005
+        tol = 0.01
         if self.args.get('kpoint_tolerance') is not None:
             try:
                 tol = float(self.args.get('kpoint_tolerance'))
