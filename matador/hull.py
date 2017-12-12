@@ -22,7 +22,6 @@ from matador.utils.chem_utils import get_generic_grav_capacity, get_formula_from
 from matador.utils.chem_utils import get_formation_energy, get_concentration
 from matador.utils.cursor_utils import set_cursor_from_array, get_array_from_cursor
 from matador.utils.cursor_utils import display_results
-from matador import plotting
 
 
 class QueryConvexHull(object):
@@ -101,6 +100,7 @@ class QueryConvexHull(object):
         display_results(self.hull_cursor, self.args, hull=True)
 
         if not self.args.get('no_plot'):
+            from matador import plotting
             self.set_plot_param()
 
         if self.args['subcmd'] == 'voltage':
@@ -145,6 +145,7 @@ class QueryConvexHull(object):
         """ Set some plotting options global to
         voltage and hull plots.
         """
+        from matador import plotting
         import matplotlib.pyplot as plt
 
         if self.savefig:
