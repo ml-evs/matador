@@ -106,3 +106,12 @@ def barycentric2cart(structures):
     coords[:, 1] = structures[:, 1] * cos30
     coords[:, 2] = structures[:, -1]
     return coords
+
+
+class FakeHull:
+    """ Implements a thin class to mimic a ConvexHull object
+    that would otherwise be undefined for two points. """
+    def __init__(self):
+        """ Define the used hull properties. """
+        self.vertices = [0, 1]
+        self.simplices = []

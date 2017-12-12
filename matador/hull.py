@@ -4,26 +4,25 @@ from database queries.
 """
 
 from __future__ import print_function
-# matador modules
-from .utils.print_utils import print_failure, print_notify, print_warning
-from .utils.hull_utils import barycentric2cart, vertices2plane, vertices2line
-from .utils.chem_utils import get_binary_grav_capacities, get_molar_mass, get_num_intercalated
-from .utils.chem_utils import get_generic_grav_capacity, get_formula_from_stoich
-from .utils.chem_utils import get_formation_energy, get_concentration
-from .utils.cursor_utils import set_cursor_from_array, get_array_from_cursor, filter_cursor
-from .utils.cursor_utils import display_results
-from .utils.glmol_wrapper import get_glmol_placeholder_string
-from .export import generate_hash, generate_relevant_path
-# external libraries
-from scipy.spatial import ConvexHull
-from bson.son import SON
-import pymongo as pm
-import numpy as np
 # standard library
 from traceback import print_exc
 from bisect import bisect_left
 from sys import exit
 import re
+# external libraries
+from scipy.spatial import ConvexHull
+from bson.son import SON
+import pymongo as pm
+import numpy as np
+# matador modules
+from matador.utils.print_utils import print_failure, print_notify, print_warning
+from matador.utils.hull_utils import barycentric2cart, vertices2plane, vertices2line, FakeHull
+from matador.utils.chem_utils import get_binary_grav_capacities, get_molar_mass, get_num_intercalated
+from matador.utils.chem_utils import get_generic_grav_capacity, get_formula_from_stoich
+from matador.utils.chem_utils import get_formation_energy, get_concentration
+from matador.utils.cursor_utils import set_cursor_from_array, get_array_from_cursor
+from matador.utils.cursor_utils import display_results
+from matador import plotting
 
 
 class QueryConvexHull(object):
@@ -31,7 +30,8 @@ class QueryConvexHull(object):
     from matador.DBQuery object.
     """
     def __init__(self, query=None, cursor=None, elements=None, subcmd='hull', **kwargs):
-        """
+        """ Initialise the class from either a DBQuery or a cursor (list of matador dicts)
+        and construct the appropriate phase diagram.
 
         Args:
 
@@ -48,7 +48,6 @@ class QueryConvexHull(object):
         self.query = query
         self.from_cursor = False
         self.plot_param = False
-        self.savefig = any([self.args.get('pdf'), self.args.get('png'), self.args.get('svg')])
         if self.query is not None:
             self.cursor = list(query.cursor)
         else:
@@ -107,31 +106,87 @@ class QueryConvexHull(object):
         if self.args['subcmd'] == 'voltage':
             self.voltage_curve([doc for doc in self.hull_cursor if doc['hull_distance'] <= 1e-9])
             if not self.args.get('no_plot'):
-                if self.args.get('subplot'):
-                    self._subplot_voltage_hull()
-                else:
-                    self.plot_voltage_curve()
+                plotting.plot_voltage_curve(self)
                 self.plot_hull()
 
         if self.args.get('volume'):
             self.volume_curve()
             if not self.args.get('no_plot'):
-                self.plot_volume_curve()
+                plotting.plot_volume_curve(self, save=self.savefig)
 
         if self.args['subcmd'] == 'hull' and not self.args.get('no_plot'):
             if self.args.get('bokeh'):
-                self.plot_2d_hull_bokeh()
+                plotting.plot_2d_hull_bokeh(self)
             else:
                 if self.args.get('debug') and self.ternary:
-                    self.plot_3d_ternary_hull()
+                    plotting.plot_3d_ternary_hull(self)
                 if self.ternary:
-                    self.plot_ternary_hull()
+                    plotting.plot_ternary_hull(self)
                 else:
-                    self.plot_2d_hull()
+                    plotting.plot_2d_hull(self)
 
         if not self.args.get('no_plot') and not self.savefig:
             import matplotlib.pyplot as plt
             plt.show()
+
+    @property
+    def savefig(self):
+        return any([self.args.get('pdf'), self.args.get('png'), self.args.get('svg')])
+
+    def plot_hull(self):
+        """ Hull plot helper function. """
+        if self.ternary:
+            self.plot_ternary_hull()
+        else:
+            self.plot_2d_hull()
+        return
+
+    def set_plot_param(self):
+        """ Set some plotting options global to
+        voltage and hull plots.
+        """
+        import matplotlib.pyplot as plt
+
+        if self.savefig:
+            try:
+                plt.style.use('article')
+            except:
+                print_exc()
+                pass
+        try:
+            import seaborn as sns
+            sns.set(font_scale=1.2)
+            sns.set_style('ticks')
+            sns.set_style({
+                'axes.facecolor': 'white', 'figure.facecolor': 'white',
+                'font.sans-serif': ['Linux Biolinum O', 'Helvetica', 'Arial'],
+                'axes.linewidth': 0.5,
+                'axes.grid': False,
+                'legend.frameon': False,
+                'axes.axisbelow': True})
+        except:
+            print_exc()
+            pass
+        self.scale = 1
+        try:
+            c = plt.cm.viridis(np.linspace(0, 1, 100))
+            del c
+            self.mpl_new_ver = True
+        except:
+            print_exc()
+            self.mpl_new_ver = False
+        Dark2_8 = plt.cm.get_cmap('Dark2').colors
+        self.default_cmap_list = plotting.get_linear_cmap(Dark2_8[1:4], list_only=True)
+        self.default_cmap = plotting.get_linear_cmap(Dark2_8[1:4], list_only=False)
+        # first colour reserved for hull
+        # penultimate colour reserved for off hull above cutoff
+        # last colour reserved for OQMD
+        Dark2_8_hex = ['#1b9e77', '#d95f02', '#7570b3', '#e7298a',
+                       '#66a61e', '#e6ab02', '#a6761d', '#666666']
+        self.colours = Dark2_8_hex
+        self.colours.append('#bc80bd')
+        self.plot_params = True
+        return
 
     def get_chempots(self):
         """ Search for chemical potentials that match the structures in the query cursor,
@@ -462,12 +517,12 @@ class QueryConvexHull(object):
             self.hull_cursor = hull_cursor
         self.hull_cursor = sorted(self.hull_cursor, key=lambda k: k['concentration'])
         self.structures = structures
-        try:
-            self.info = self.get_text_info(html=self.args.get('bokeh'))
-            self.hull_info = self.get_text_info(cursor=self.cursor, hull=True, html=self.args.get('bokeh'))
-        except:
-            print_exc()
-            pass
+        # try:
+            # self.info = get_text_info(self.cursor, html=self.args.get('bokeh'))
+            # self.hull_info = get_text_info(cursor=self.cursor, hull=True, html=self.args.get('bokeh'))
+        # except:
+            # print_exc()
+            # pass
 
     def voltage_curve(self, hull_cursor):
         """ Take a computed convex hull and calculate voltages for either binary or ternary
@@ -643,7 +698,8 @@ class QueryConvexHull(object):
                 data_str += '# ' + ''.join(self.elements) + '\n'
             data_str += '# {:>10},\t{:>10}\n'.format('Q (mAh/g)', 'Voltage (V)')
             for idx, _ in enumerate(path):
-                data_str += '{:>10.2f},\t{:>10.4f}'.format(self.Q[ind][idx], self.voltages[ind][idx])
+                data_str += '{:>10.2f},\t{:>10.4f}'.format(self.Q[ind][idx],
+                                                           self.voltages[ind][idx])
                 if idx != len(path) - 1:
                     data_str += '\n'
         if self.args.get('csv'):
@@ -660,907 +716,7 @@ class QueryConvexHull(object):
         stable_comp = get_array_from_cursor(self.hull_cursor, 'concentration')
         stable_vol = get_array_from_cursor(self.hull_cursor, 'cell_volume_per_b')
         # here, in A_x B_y
-        x = []
         # and v is the volume per x atom
-        v = []
-        for i in range(len(stable_comp)):
-            x.append(stable_comp[i]/(1-stable_comp[i]))
-            v.append(stable_vol[i])
-        self.x = x
-        self.vol_per_y = v
+        self.x = [comp/(1-comp) for comp in stable_comp]
+        self.vol_per_y = [vol for vol in stable_vol]
         return
-
-    def plot_2d_hull(self, ax=None, dis=False, show=False, plot_points=True, plot_hull_points=True, labels=False):
-        """ Plot calculated hull, returning ax and fig objects for further editing.
-
-        Args:
-
-            | ax               : matplotlib axis object, an existing axis on which to plot,
-            | show             : bool, whether or not to display the plot in an X window,
-            | plot_points      : bool, whether or not to display off-hull structures,
-            | plot_hull_points : bool, whether or not to display on-hull structures,
-            | labels           : bool, whether to label formulae of hull structures.
-
-        """
-
-        import matplotlib.pyplot as plt
-        import matplotlib.colors as colours
-        if ax is None:
-            if self.savefig:
-                fig = plt.figure(facecolor=None, figsize=(8, 6))
-            else:
-                fig = plt.figure(facecolor=None)
-            ax = fig.add_subplot(111)
-        if not self.plot_params:
-            self.set_plot_param()
-        scatter = []
-        x_elem = [self.elements[0]]
-        one_minus_x_elem = list(self.elements[1:])
-        tie_line = self.structure_slice[self.hull.vertices]
-        plt.draw()
-        # star structures on hull
-        if len(self.structure_slice) != 2:
-            if plot_hull_points:
-                ax.scatter(tie_line[:, 0], tie_line[:, 1],
-                           c=self.colours[1],
-                           marker='o', zorder=99999, edgecolor='k',
-                           s=self.scale*40, lw=1.5, alpha=1)
-            ax.plot(np.sort(tie_line[:, 0]), tie_line[np.argsort(tie_line[:, 0]), 1],
-                    c=self.colours[0], lw=2, alpha=1, zorder=1000)
-            if self.hull_cutoff > 0:
-                ax.plot(np.sort(tie_line[:, 0]), tie_line[np.argsort(tie_line[:, 0]), 1] + self.hull_cutoff,
-                        '--', c=self.colours[1], lw=1, alpha=0.5, zorder=1000, label='')
-            # annotate hull structures
-            if self.args.get('labels') or labels:
-                eps = 1e-9
-                self.label_cursor = [doc for doc in self.hull_cursor if doc['hull_distance'] <= 0+eps]
-                if len(set([get_formula_from_stoich(doc['stoichiometry']) for doc in self.label_cursor])) > len(self.label_cursor):
-                    tmp_cursor = []
-                    for doc in self.label_cursor:
-                        if doc['stoichiometry'] not in [_doc['stoichiometry'] for _doc in tmp_cursor]:
-                            tmp_cursor.append(doc)
-                    if len(tmp_cursor) != len(set([doc['stoichiometry'] for doc in self.label_cursor])):
-                        print_warning('Something has gone wrong with labels...')
-                    else:
-                        self.label_cursor = tmp_cursor
-                # remove chemical potentials
-                self.label_cursor = self.label_cursor[1:-1]
-                for ind, doc in enumerate(self.label_cursor):
-                    arrowprops = dict(arrowstyle="-|>", color='k')
-                    if (ind+2) < np.argmin(tie_line[:, 1]):
-                        position = (0.8*tie_line[ind+2, 0], 1.15*(tie_line[ind+2, 1])-0.05)
-                    elif (ind+2) == np.argmin(tie_line[:, 1]):
-                        position = (tie_line[ind+2, 0], 1.15*(tie_line[ind+2, 1])-0.05)
-                    else:
-                        position = (min(1.1*tie_line[ind+2, 0]+0.15, 0.95), 1.15*(tie_line[ind+2, 1])-0.05)
-                    ax.annotate(get_formula_from_stoich(doc['stoichiometry'], elements=self.elements, tex=True),
-                                xy=(tie_line[ind+2, 0], tie_line[ind+2, 1]),
-                                xytext=position,
-                                textcoords='data',
-                                ha='right',
-                                va='bottom',
-                                arrowprops=arrowprops,
-                                zorder=1)
-            lw = self.scale * 0 if self.mpl_new_ver else 1
-            # points for off hull structures
-            if self.hull_cutoff == 0:
-                # if no specified hull cutoff, ignore labels and colour
-                # by distance from hull
-                cmap_full = plt.cm.get_cmap('Dark2')
-                cmin = 0.15
-                cmax = 0.5
-                cindmin, cindmax = int(cmin*len(cmap_full.colors)), int(cmax*len(cmap_full.colors))
-                cmap = colours.LinearSegmentedColormap.from_list('Dark2', cmap_full.colors[cindmin:cindmax])
-                if plot_points:
-                    scatter = ax.scatter(self.structures[np.argsort(self.hull_dist), 0][::-1],
-                                         self.structures[np.argsort(self.hull_dist), -1][::-1],
-                                         s=self.scale*40, lw=lw, alpha=1, c=np.sort(self.hull_dist)[::-1],
-                                         edgecolor='k', zorder=10000, cmap=cmap, norm=colours.LogNorm(0.02, 2))
-                    cbar = plt.colorbar(scatter, aspect=30, pad=0.02, ticks=[0, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28])
-                    cbar.ax.tick_params(length=0)
-                    cbar.ax.set_yticklabels([0, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28])
-                    cbar.ax.yaxis.set_ticks_position('right')
-                    cbar.ax.set_frame_on(False)
-                    cbar.outline.set_visible(False)
-                    cbar.set_label('Distance from hull (eV)')
-            if self.hull_cutoff != 0:
-                # if specified hull cutoff, label and colour those below
-                c = self.colours[1]
-                for ind in range(len(self.structures)):
-                    if self.hull_dist[ind] <= self.hull_cutoff or self.hull_cutoff == 0:
-                        if plot_points:
-                            scatter.append(ax.scatter(self.structures[ind, 0], self.structures[ind, 1],
-                                           s=self.scale*40, lw=lw, alpha=0.9, c=c, edgecolor='k',
-                                           label=self.info[ind], zorder=300))
-                if plot_points:
-                    ax.scatter(self.structures[1:-1, 0], self.structures[1:-1, 1], s=self.scale*30, lw=lw,
-                               alpha=0.3, c=self.colours[-2],
-                               edgecolor='k', zorder=10)
-            # tie lines
-            ax.set_ylim(-0.1 if np.min(self.structure_slice[self.hull.vertices, 1]) > 0
-                        else np.min(self.structure_slice[self.hull.vertices, 1])-0.15,
-                        0.1 if np.max(self.structure_slice[self.hull.vertices, 1]) > 1
-                        else np.max(self.structure_slice[self.hull.vertices, 1])+0.1)
-        else:
-            scatter = []
-            print_exc()
-            c = self.colours[1]
-            lw = self.scale * 0 if self.mpl_new_ver else 1
-            for ind in range(len(self.hull_cursor)):
-                if type(self.hull_cursor[ind]['concentration']) is list:
-                    if plot_points:
-                        scatter.append(ax.scatter(self.hull_cursor[ind]['concentration'][0], self.hull_cursor[ind]['formation_enthalpy_per_atom'],
-                                       s=self.scale*40, lw=1.5, alpha=1, c=c, edgecolor='k',
-                                       zorder=1000))
-                else:
-                    if plot_points:
-                        scatter.append(ax.scatter(self.hull_cursor[ind]['concentration'], self.hull_cursor[ind]['formation_enthalpy_per_atom'],
-                                       s=self.scale*40, lw=1.5, alpha=1, c=c, edgecolor='k',
-                                       zorder=1000))
-                ax.plot([0, 1], [0, 0], lw=2, c=self.colours[0], zorder=900)
-            for ind in range(len(self.structures)):
-                if plot_points:
-                    scatter.append(ax.scatter(self.structures[ind, 0], self.structures[ind, 1],
-                                   s=self.scale*40, lw=lw, alpha=0.9, c=c, edgecolor='k',
-                                   zorder=300))
-
-        if len(one_minus_x_elem) == 1:
-            ax.set_title(x_elem[0] + '$_\mathrm{x}$' + one_minus_x_elem[0] + '$_\mathrm{1-x}$')
-        if self.non_binary:
-            ax.set_title(self.chempot_search[0] + '$_\mathrm{x}$(' + self.chempot_search[1] + ')$_\mathrm{1-x}$')
-        plt.locator_params(nbins=3)
-        ax.set_xlabel('x in {}$_\mathrm{{x}}${}$_\mathrm{{1-x}}$'.format(x_elem[0], one_minus_x_elem[0]))
-        ax.grid(False)
-        ax.set_xlim(-0.05, 1.05)
-        ax.set_xticks([0, 0.33, 0.5, 0.66, 1])
-        ax.set_xticklabels(ax.get_xticks())
-        ax.set_yticks(np.arange(0, np.min(self.structure_slice[self.hull.vertices, 1])-0.15, -0.2))
-        ax.set_yticklabels(ax.get_yticks())
-        ax.set_ylabel('Formation energy (eV/atom)')
-        try:
-            import seaborn as sns
-            sns.despine(ax=ax, left=False, bottom=False)
-        except:
-            pass
-        if self.args.get('pdf'):
-            plt.savefig(self.elements[0]+self.elements[1]+'_hull.pdf',
-                        dpi=500, bbox_inches='tight', transparent=True)
-        if self.args.get('svg'):
-            plt.savefig(self.elements[0]+self.elements[1]+'_hull.svg',
-                        dpi=500, bbox_inches='tight', transparent=True)
-        if self.args.get('png'):
-            plt.savefig(self.elements[0]+self.elements[1]+'_hull.png',
-                        dpi=500, bbox_inches='tight', transparent=True)
-        elif show:
-            plt.show()
-
-        return ax
-
-    def plot_2d_hull_bokeh(self):
-        """ Plot interactive hull with Bokeh. """
-        from bokeh.plotting import figure, save, output_file
-        from bokeh.models import ColumnDataSource, HoverTool, Range1d
-        import matplotlib.pyplot as plt
-        # grab tie-line structures
-        tie_line_data = dict()
-        tie_line_data['composition'] = list()
-        tie_line_data['energy'] = list()
-        for ind in range(len(self.hull.vertices)):
-            if self.structure_slice[self.hull.vertices[ind], 1] <= 0:
-                tie_line_data['composition'].append(self.structure_slice[self.hull.vertices[ind], 0])
-                tie_line_data['energy'].append(self.structure_slice[self.hull.vertices[ind], 1])
-        tie_line_data['energy'] = np.asarray(tie_line_data['energy'])
-        tie_line_data['composition'] = np.asarray(tie_line_data['composition'])
-        tie_line_data['energy'] = tie_line_data['energy'][np.argsort(tie_line_data['composition'])]
-        tie_line_data['composition'] = np.sort(tie_line_data['composition'])
-
-        # points for off hull structures
-        hull_data = dict()
-        hull_data['composition'] = self.structures[:, 0]
-        hull_data['energy'] = self.structures[:, 1]
-        hull_data['hull_distance'] = self.hull_dist
-        hull_data['formula'], hull_data['text_id'] = [], []
-        hull_data['space_group'], hull_data['hull_dist_string'] = [], []
-        for structure in self.info:
-            hull_data['formula'].append(structure[0])
-            hull_data['text_id'].append(structure[1])
-            hull_data['space_group'].append(structure[2])
-            hull_data['hull_dist_string'].append(structure[3])
-        cmap_limits = [0, 0.5]
-        colormap = plt.cm.get_cmap('Dark2')
-        cmap_input = np.interp(hull_data['hull_distance'], cmap_limits, [0.15, 0.4], left=0.15, right=0.4)
-        colours = colormap(cmap_input, 1, True)
-        bokeh_colours = ["#%02x%02x%02x" % (r, g, b) for r, g, b in colours[:, 0:3]]
-        fixed_colours = colormap([0.0, 0.15], 1, True)
-        tie_line_colour, on_hull_colour = ["#%02x%02x%02x" % (r, g, b) for r, g, b in fixed_colours[:, 0:3]]
-
-        tie_line_source = ColumnDataSource(data=tie_line_data)
-        hull_source = ColumnDataSource(data=hull_data)
-
-        hover = HoverTool(tooltips="""
-                          <div>
-                              <div>
-                                  <span style="font-size: 16px; font-family: "Fira Sans", sans-serif">
-                                      Formula: @formula <br>
-                                      ID: @text_id <br>
-                                      Space group: @space_group <br>
-                                      Distance from hull: @hull_dist_string
-                                  </span>
-                              </div>
-                          </div>
-                          """)
-
-        tools = ['pan', 'wheel_zoom', 'reset', 'save']
-        tools.append(hover)
-
-        fig = figure(tools=tools)
-
-        fig.xaxis.axis_label = 'x'
-        fig.yaxis.axis_label = 'Formation energy (eV/atom)'
-        fig.xaxis.axis_label_text_font_size = '20pt'
-        fig.xaxis.axis_label_text_font = "Fira Sans, sans-serif"
-        fig.yaxis.axis_label_text_font_size = '20pt'
-        fig.yaxis.axis_label_text_font = "Fira Sans, sans-serif"
-        fig.yaxis.axis_label_text_font_style = 'normal'
-        fig.xaxis.axis_label_text_font_style = 'normal'
-        fig.background_fill_alpha = 0
-        fig.border_fill_alpha = 0
-        fig.title.text_font_size = '20pt'
-        fig.title.align = 'center'
-
-        ylim = [-0.1 if np.min(self.structure_slice[self.hull.vertices, 1]) > 0
-                else np.min(self.structure_slice[self.hull.vertices, 1])-0.15,
-                0.1 if np.max(self.structure_slice[self.hull.vertices, 1]) > 1
-                else np.max(self.structure_slice[self.hull.vertices, 1])+0.1]
-        fig.x_range = Range1d(-0.1, 1.1)
-        fig.y_range = Range1d(ylim[0], ylim[1])
-
-        fig.line('composition', 'energy',
-                 source=tie_line_source,
-                 line_width=4,
-                 line_color=tie_line_colour)
-        hull_scatter = fig.scatter('composition', 'energy',
-                                   source=hull_source,
-                                   alpha=1,
-                                   size=10,
-                                   fill_color=bokeh_colours,
-                                   line_color=None)
-        fig.tools[0].renderers.append(hull_scatter)
-        fig.square('composition', 'energy',
-                   source=tie_line_source,
-                   line_color='black',
-                   color=on_hull_colour,
-                   line_width=2,
-                   alpha=1,
-                   size=10)
-        fig.plot_width = 800
-        fig.plot_height = 600
-        path = '/u/fs1/me388/data/hulls/'
-        fname = generate_relevant_path(self.args) + '_' + generate_hash() + '.html'
-        output_file(path+fname, title='Convex hull')
-        print('Hull will be available shortly at http://www.tcm.phy.cam.ac.uk/~me388/hulls/' + fname)
-        save(fig)
-        glmol = False
-        if glmol:
-            html_string, js_string = get_glmol_placeholder_string()
-            with open(path+fname) as f:
-                flines = f.readlines()
-                for ind, line in enumerate(flines):
-                    if "<div class=\"bk-root\">" in line:
-                        flines.insert(ind - 1, html_string)
-                        break
-                flines.append(js_string)
-            with open(path+fname, 'w') as f:
-                f.write('\n'.join(map(str, flines)))
-
-    def plot_3d_ternary_hull(self):
-        """ Plot calculated ternary hull in 3D. """
-        from mpl_toolkits.mplot3d import axes3d
-        # avoids annoying flake8 warning
-        del axes3d
-        import matplotlib.pyplot as plt
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-        coords = barycentric2cart(self.structures)
-        stable = coords[np.where(self.hull_dist < 0 + 1e-9)]
-        stable = np.asarray(stable)
-        ax.plot_trisurf(stable[:, 0], stable[:, 1], stable[:, 2], cmap=plt.cm.gnuplot, linewidth=1, color='grey', alpha=0.2)
-        ax.scatter(stable[:, 0], stable[:, 1], stable[:, 2], s=100, c='k', marker='o')
-        if len(self.failed_structures) > 0:
-            ax.scatter(coords[self.failed_structures, 0], coords[self.failed_structures, 1], coords[self.failed_structures, 2], c='r')
-        ax.set_zlim(-1, 1)
-        ax.view_init(-90, 90)
-        plt.show()
-
-    def plot_hull(self):
-        """ Hull plot helper function. """
-        if self.ternary:
-            self.plot_ternary_hull()
-        else:
-            self.plot_2d_hull()
-        return
-
-    def plot_ternary_hull(self, axis=None, show=False):
-        """ Plot calculated ternary hull as a 2D projection.
-
-        Takes optional matplotlib subplot axis as a parameter, and returns
-        python-ternary subplot axis object.
-
-        """
-        import ternary
-        import matplotlib.pyplot as plt
-        import matplotlib
-        import matplotlib.colors as colours
-        try:
-            import seaborn as sns
-            sns.set_style({
-                'axes.facecolor': 'white', 'figure.facecolor': 'white',
-                'xtick.major.size': 0, 'xtick.minor.size': 0,
-                'ytick.major.size': 0, 'ytick.minor.size': 0,
-                'axes.linewidth': 0.0})
-        except:
-            print_exc()
-            pass
-
-        print('Plotting ternary hull...')
-        if self.args.get('capmap') or self.args.get('efmap'):
-            scale = 100
-        elif self.args.get('sampmap'):
-            scale = 20
-        else:
-            scale = 1
-        fontsize = matplotlib.rcParams['font.size']
-
-        if axis is not None:
-            fig, ax = ternary.figure(scale=scale, ax=axis)
-        else:
-            fig, ax = ternary.figure(scale=scale)
-        if self.args.get('capmap') or self.args.get('efmap') or self.args.get('sampmap'):
-            fig.set_size_inches(8, 5)
-        else:
-            fig.set_size_inches(6.67, 5)
-        ax.boundary(linewidth=2.0, zorder=99)
-        ax.gridlines(color='black', multiple=scale*0.1, linewidth=0.5)
-
-        ax.clear_matplotlib_ticks()
-        if scale == 1:
-            ax.ticks(axis='lbr', linewidth=1, multiple=scale*0.2, offset=0.02, fsize=fontsize-2)
-        else:
-            ax.ticks(axis='lbr', linewidth=1, multiple=scale*0.2, offset=0.02, fsize=fontsize-2,
-                     ticks=[str(round(num, 1)) for num in np.linspace(0.0, 1.0, 6)])
-
-        ax.set_title(''.join(self.elements), fontsize=fontsize+2, y=1.02)
-        ax.left_axis_label(self.elements[2], fontsize=fontsize+2)
-        ax.right_axis_label(self.elements[1], fontsize=fontsize+2)
-        ax.bottom_axis_label(self.elements[0], fontsize=fontsize+2)
-
-        concs = np.zeros((len(self.structures), 3))
-
-        concs[:, :-1] = self.structures[:, :-1]
-        for i in range(len(concs)):
-            # set third triangular coordinate
-            concs[i, -1] = 1 - concs[i, 0] - concs[i, 1]
-
-        stable = np.asarray([concs[ind] for ind in self.hull.vertices])
-
-        # sort by hull distances so things are plotting the right order
-        concs = concs[np.argsort(self.hull_dist)].tolist()
-        hull_dist = np.sort(self.hull_dist)
-
-        filtered_concs = []
-        filtered_hull_dists = []
-        for ind, conc in enumerate(concs):
-            if conc not in filtered_concs:
-                if hull_dist[ind] <= self.hull_cutoff or (self.hull_cutoff == 0 and hull_dist[ind] < 0.1):
-                    filtered_concs.append(conc)
-                    filtered_hull_dists.append(hull_dist[ind])
-        if self.args.get('debug'):
-            print('Trying to plot {} points...'.format(len(filtered_concs)))
-
-        concs = np.asarray(filtered_concs)
-        hull_dist = np.asarray(filtered_hull_dists)
-        # concs = concs[np.where(hull_dist <= self.hull_cutoff)]
-        # hull_dist = hull_dist[np.where(hull_dist <= self.hull_cutoff)]
-        # else:
-        #   concs = np.asarray(concs)
-        #   hull_dist = np.asarray(hull_dist)
-
-        Ncolours = len(self.default_cmap_list)
-        min_cut = 0.01
-        max_cut = 0.2
-        colours_hull = self.default_cmap_list
-
-        cmap = self.default_cmap
-        cmap_full = plt.cm.get_cmap('Pastel2')
-        pastel_cmap = colours.LinearSegmentedColormap.from_list('Pastel2', cmap_full.colors)
-
-        for plane in self.hull.planes:
-            plane.append(plane[0])
-            plane = np.asarray(plane)
-            ax.plot(scale*plane, c=self.colours[0], lw=1.5, alpha=1, zorder=98)
-
-        if self.args.get('pathways'):
-            for phase in stable:
-                if phase[0] == 0 and phase[1] != 0 and phase[2] != 0:
-                    ax.plot([scale*phase, [scale, 0, 0]], c='r', alpha=0.2, lw=6, zorder=99)
-
-        colours_list = []
-        colour_metric = hull_dist
-        for i in range(len(colour_metric)):
-            if colour_metric[i] >= max_cut:
-                colours_list.append(Ncolours-1)
-            elif colour_metric[i] <= min_cut:
-                colours_list.append(0)
-            else:
-                colours_list.append(int((Ncolours-1)*(colour_metric[i] / max_cut)))
-        colours_list = np.asarray(colours_list)
-        ax.scatter(scale*concs, colormap=cmap, colorbar=True, cbarlabel='Distance from hull (eV/atom)',
-                   c=hull_dist, vmax=max_cut, vmin=min_cut, zorder=1000, s=40, alpha=0)
-        ax.scatter(scale*stable, marker='o', color=colours_hull[0], edgecolors='black', zorder=9999999,
-                   s=150, lw=1.5)
-        for i in range(len(concs)):
-            ax.scatter(scale*concs[i].reshape(1, 3),
-                       color=colours_hull[colours_list[i]],
-                       marker='o',
-                       zorder=10000-colours_list[i],
-                       # alpha=max(0.1, 1-2*hull_dist[i]),
-                       s=70*(1-float(colours_list[i])/Ncolours)+15,
-                       lw=1, edgecolors='black')
-        if self.args.get('capmap'):
-            capacities = dict()
-            from ternary.helpers import simplex_iterator
-            for (i, j, k) in simplex_iterator(scale):
-                capacities[(i, j, k)] = get_generic_grav_capacity([float(i)/scale, float(j)/scale, float(scale-i-j)/scale], self.elements)
-            ax.heatmap(capacities, style="hexagonal", cbarlabel='Gravimetric capacity (maH/g)',
-                       vmin=0, vmax=3000, cmap=pastel_cmap)
-        elif self.args.get('efmap'):
-            energies = dict()
-            fake_structures = []
-            from ternary.helpers import simplex_iterator
-            for (i, j, k) in simplex_iterator(scale):
-                fake_structures.append([float(i)/scale, float(j)/scale, 0.0])
-            fake_structures = np.asarray(fake_structures)
-            plane_energies, _, _ = self.get_hull_distances(fake_structures)
-            ind = 0
-            for (i, j, k) in simplex_iterator(scale):
-                energies[(i, j, k)] = -1*plane_energies[ind]
-                ind += 1
-            ax.heatmap(energies, style="hexagonal", cbarlabel='Formation energy (eV/atom)',
-                       vmax=0, cmap='bone')
-        elif self.args.get('sampmap'):
-            sampling = dict()
-            from ternary.helpers import simplex_iterator
-            eps = 1.0/float(scale)
-            for (i, j, k) in simplex_iterator(scale):
-                sampling[(i, j, k)] = np.size(np.where((concs[:, 0] <= float(i)/scale + eps) *
-                                                       (concs[:, 0] >= float(i)/scale - eps) *
-                                                       (concs[:, 1] <= float(j)/scale + eps) *
-                                                       (concs[:, 1] >= float(j)/scale - eps) *
-                                                       (concs[:, 2] <= float(k)/scale + eps) *
-                                                       (concs[:, 2] >= float(k)/scale - eps)))
-            ax.heatmap(sampling, style="hexagonal", cbarlabel='Number of structures',
-                       cmap='afmhot')
-        plt.tight_layout()
-        if self.args.get('png'):
-            plt.savefig(''.join(self.elements) + '.png', dpi=400, transparent=True, bbox_inches='tight')
-        if self.args.get('svg'):
-            plt.savefig(''.join(self.elements) + '.svg', dpi=400, transparent=True, bbox_inches='tight')
-        if self.args.get('pdf'):
-            plt.savefig(''.join(self.elements) + '.pdf', dpi=400, transparent=True, bbox_inches='tight')
-        elif show:
-            ax.show()
-        return ax
-
-    def plot_voltage_curve(self, show=False):
-        """ Plot calculated voltage curve. """
-        import matplotlib.pyplot as plt
-        if self.savefig:
-            if len(self.voltages) != 1:
-                fig = plt.figure(facecolor=None, figsize=(4, 3.5))
-            else:
-                fig = plt.figure(facecolor=None, figsize=(4, 3.5))
-        else:
-            fig = plt.figure(facecolor=None)
-        axQ = fig.add_subplot(111)
-        if self.args.get('expt') is not None:
-            try:
-                expt_data = np.loadtxt(self.args.get('expt'), delimiter=',')
-            except:
-                print_exc()
-                pass
-            if self.args.get('expt_label'):
-                axQ.plot(expt_data[:, 0], expt_data[:, 1], c='k', lw=2, ls='-', label=self.args.get('expt_label'))
-            else:
-                axQ.plot(expt_data[:, 0], expt_data[:, 1], c='k', lw=2, ls='-', label='Experiment')
-        for ind, voltage in enumerate(self.voltages):
-            for i in range(len(voltage)-1):
-                if i == 0 and self.args.get('expt'):
-                    axQ.plot([self.Q[ind][i-1], self.Q[ind][i]], [voltage[i], voltage[i]], marker='*',
-                             lw=2, c=self.colours[ind], label='DFT (this work)')
-                elif i == 0 and len(self.voltages) != 1:
-                    axQ.plot([self.Q[ind][i-1], self.Q[ind][i]], [voltage[i], voltage[i]], marker='o', markersize=5,
-                             lw=2, c=self.colours[ind], label=get_formula_from_stoich(self.endstoichs[ind], tex=True))
-                else:
-                    axQ.plot([self.Q[ind][i-1], self.Q[ind][i]], [voltage[i], voltage[i]], marker='o', markersize=5,
-                             lw=2, c=self.colours[ind])
-                    if i != len(voltage)-2:
-                        axQ.plot([self.Q[ind][i], self.Q[ind][i]], [voltage[i], voltage[i+1]], marker='o', markersize=5,
-                                 lw=2, c=self.colours[ind])
-        if self.args.get('labels'):
-            eps = 1e-9
-            self.label_cursor = [doc for doc in self.hull_cursor if doc['hull_distance'] <= 0+eps]
-            self.label_cursor = self.label_cursor[1:-1]
-            for i in range(len(self.label_cursor)):
-                axQ.annotate(get_formula_from_stoich(self.label_cursor[i]['stoichiometry'], elements=self.elements, tex=True),
-                             xy=(self.Q[0][i+1]+100, self.voltages[0][i+1]+0.02*max(self.voltages[0])),
-                             textcoords='data',
-                             ha='center',
-                             zorder=9999)
-        if self.args.get('expt') or len(self.voltages) != 1:
-            axQ.legend(loc=1)
-        axQ.set_ylabel('Voltage (V) vs {}$^+$/{}'.format(self.elements[0], self.elements[0]))
-        axQ.set_xlabel('Gravimetric cap. (mAh/g)')
-        start, end = axQ.get_ylim()
-        axQ.set_ylim(0, 1.1*end)
-        start, end = axQ.get_xlim()
-        axQ.set_xlim(0, 1.1*end)
-        axQ.grid('off')
-        plt.tight_layout(pad=0.0, h_pad=1.0, w_pad=0.2)
-        try:
-            import seaborn as sns
-            sns.despine()
-            dark_grey = '#262626'
-            for spine in ['left', 'bottom']:
-                axQ.spines[spine].set_linewidth(0.5)
-                axQ.spines[spine].set_color(dark_grey)
-        except:
-            pass
-        if self.args.get('pdf'):
-            plt.savefig(self.elements[0]+self.elements[1]+'_voltage.pdf',
-                        dpi=500, transparent=True)
-        if self.args.get('svg'):
-            plt.savefig(self.elements[0]+self.elements[1]+'_voltage.svg',
-                        dpi=500, transparent=True)
-        if self.args.get('png'):
-            plt.savefig(self.elements[0]+self.elements[1]+'_voltage.png',
-                        dpi=500, transparent=True)
-        elif show:
-            plt.show()
-
-    def plot_volume_curve(self, show=False):
-        """ Plot calculated volume curve. """
-        import matplotlib.pyplot as plt
-        if self.savefig:
-            fig = plt.figure(facecolor=None, figsize=(4, 3.5))
-        else:
-            fig = plt.figure(facecolor=None)
-        ax = fig.add_subplot(111)
-        stable_hull_dist = get_array_from_cursor(self.hull_cursor, 'hull_distance')
-        hull_vols = []
-        hull_comps = []
-        bulk_vol = self.vol_per_y[-1]
-        for i in range(len(self.vol_per_y)):
-            if stable_hull_dist[i] <= 0 + 1e-16:
-                hull_vols.append(self.vol_per_y[i])
-                hull_comps.append(self.x[i])
-                s = 40
-                zorder = 1000
-                markeredgewidth = 1.5
-                c = self.colours[1]
-                alpha = 1
-            else:
-                s = 30
-                zorder = 900
-                alpha = 0.3
-                markeredgewidth = 0
-                c = 'grey'
-            ax.scatter(self.x[i]/(1+self.x[i]), self.vol_per_y[i]/bulk_vol, marker='o', s=s, edgecolor='k', lw=markeredgewidth,
-                       c=c, zorder=zorder, alpha=alpha)
-        hull_comps, hull_vols = np.asarray(hull_comps), np.asarray(hull_vols)
-        ax.plot(hull_comps/(1+hull_comps), hull_vols/bulk_vol, marker='o', lw=4,
-                c=self.colours[0], zorder=100)
-        ax.set_xlabel('$\mathrm{x}$ in $\mathrm{'+self.elements[0]+'_x'+self.elements[1]+'}_{1-x}$')
-        ax.set_ylabel('Volume ratio with bulk')
-        ax.set_ylim(0, 5*np.sort(hull_vols)[-2]/bulk_vol)
-        ax.set_xlim(-0.05, 1.05)
-        ax.yaxis.set_label_position('left')
-        ax.set_xticklabels(ax.get_xticks())
-        ax.grid('off')
-        ax2 = ax.twiny()
-        ax2.set_xlim(ax.get_xlim())
-        tick_locs = np.linspace(0, 1, 6, endpoint=True).tolist()
-        ax2.set_xticks(tick_locs)
-        new_tick_labels = ['{}'.format(int(get_generic_grav_capacity([loc, 1-loc], [self.elements[0], self.elements[1]]))) for loc in tick_locs[:-1]]
-        new_tick_labels.append('$\infty$')
-        ax2.set_xlabel('Gravimetric capacity (mAh/g)')
-        ax2.set_xticklabels(new_tick_labels)
-        ax2.grid('off')
-        try:
-            import seaborn as sns
-            sns.despine(top=False, right=False)
-            dark_grey = '#262626'
-            for spine in ['left', 'top', 'right', 'bottom']:
-                ax.spines[spine].set_color(dark_grey)
-                ax2.spines[spine].set_color(dark_grey)
-                ax.spines[spine].set_linewidth(0.5)
-                ax2.spines[spine].set_linewidth(0.5)
-        except:
-            pass
-        # ax.yaxis.set_ticks(range(0, int(end)+1, 5))
-        plt.tight_layout(pad=0.0, h_pad=1.0, w_pad=0.2)
-        if self.args.get('pdf'):
-            plt.savefig(self.elements[0]+self.elements[1]+'_volume.pdf',
-                        dpi=300)
-        if self.args.get('svg'):
-            plt.savefig(self.elements[0]+self.elements[1]+'_volume.svg',
-                        dpi=300)
-        if self.args.get('png'):
-            plt.savefig(self.elements[0]+self.elements[1]+'_volume.png',
-                        dpi=300, bbox_inches='tight')
-        elif show:
-            plt.show()
-
-    def _subplot_voltage_hull(self, dis=False):
-        """ Plot calculated hull with inset voltage curve.
-
-        DEPRECATED.
-
-        """
-        raise DeprecationWarning
-        import matplotlib.pyplot as plt
-        if self.args.get('pdf') or self.args.get('png'):
-            fig = plt.figure(facecolor=None, figsize=(4.5, 1.5))
-        else:
-            fig = plt.figure(facecolor=None, figsize=(4.5, 1.5))
-        ax = plt.subplot2grid((1, 3), (0, 0), colspan=2)
-        ax2 = plt.subplot2grid((1, 3), (0, 2))
-        scatter = []
-        hull_scatter = []
-        x_elem = self.elements[0]
-        one_minus_x_elem = self.elements[1]
-        plt.locator_params(nbins=3)
-        # star structures on hull
-        for ind in range(len(self.hull.vertices)):
-            if self.structure_slice[self.hull.vertices[ind], 1] <= 0:
-                hull_scatter.append(ax.scatter(self.structure_slice[self.hull.vertices[ind], 0],
-                                               self.structure_slice[self.hull.vertices[ind], 1],
-                                               c=self.colours[0],
-                                               marker='*', zorder=99999, edgecolor='k',
-                                               s=self.scale*150, lw=1, alpha=1,
-                                               label=self.info[self.hull.vertices[ind]]))
-        lw = self.scale * 0.05 if self.mpl_new_ver else 1
-        # points for off hull structures
-        for ind in range(len(self.structures)):
-            if self.hull_dist[ind] <= self.hull_cutoff or self.hull_cutoff == 0:
-                c = self.colours[self.source_ind[ind]] \
-                    if self.hull_cutoff == 0 else self.colours[1]
-                scatter.append(ax.scatter(self.structures[ind, 0], self.structures[ind, 1],
-                               s=self.scale*30, lw=lw, alpha=0.9, c=c, edgecolor='k',
-                               label=self.info[ind], zorder=100))
-        if self.hull_cutoff != 0:
-            c = self.colours[self.source_ind[ind]] if self.hull_cutoff == 0 else self.colours[1]
-            ax.scatter(self.structures[1:-1, 0], self.structures[1:-1, 1], s=self.scale*30, lw=lw,
-                       alpha=0.3, c=self.colours[-2],
-                       edgecolor='k', zorder=10)
-        # tie lines
-        for ind in range(len(self.hull_comp)-1):
-            ax.plot([self.hull_comp[ind], self.hull_comp[ind+1]],
-                    [self.hull_energy[ind], self.hull_energy[ind+1]],
-                    c=self.colours[0], lw=2, alpha=1, zorder=1000, label='')
-            if self.hull_cutoff > 0:
-                ax.plot([self.hull_comp[ind], self.hull_comp[ind+1]],
-                        [self.hull_energy[ind]+self.hull_cutoff,
-                         self.hull_energy[ind+1]+self.hull_cutoff],
-                        '--', c=self.colours[1], lw=1, alpha=0.5, zorder=1000, label='')
-        ax.set_xlim(-0.05, 1.05)
-        # data cursor
-        ax.set_ylim(-0.1 if np.min(self.structure_slice[self.hull.vertices, 1]) > 0
-                    else np.min(self.structure_slice[self.hull.vertices, 1]) - 0.05,
-                    0.5 if np.max(self.structures[:, 1]) > 0.5
-                    else np.max(self.structures[:, 1]) + 0.1)
-        ax.set_title('$\mathrm{'+x_elem+'_x'+one_minus_x_elem+'_{1-x}}$')
-        ax.set_xlabel('$x$', labelpad=-3)
-        ax.set_xticks([0, 1])
-        ax.set_yticks([-0.4, 0, 0.4])
-        ax.set_ylabel('$E_\mathrm{F}$ (eV/atom)')
-        # plot voltage
-        for i in range(2, len(self.voltages)):
-            ax2.scatter(self.x[i-1], self.voltages[i-1],
-                        marker='*', s=100, edgecolor='k', c=self.colours[0], zorder=1000)
-            ax2.plot([self.x[i], self.x[i]], [self.voltages[i], self.voltages[i-1]],
-                     lw=2, c=self.colours[0])
-            ax2.plot([self.x[i-1], self.x[i]], [self.voltages[i-1], self.voltages[i-1]],
-                     lw=2, c=self.colours[0])
-        ax2.set_ylabel('Voltage (V)')
-        ax2.yaxis.set_label_position("right")
-        ax2.yaxis.tick_right()
-        ax2.set_xlim(0, np.max(np.asarray(self.x[1:]))+1)
-        ax2.set_ylim(np.min(np.asarray(self.voltages[1:]))-0.1,
-                     np.max(np.asarray(self.voltages[1:]))+0.1)
-        ax2.set_xlabel('$n_\mathrm{Li}$', labelpad=-3)
-        if self.args.get('pdf'):
-            plt.savefig(self.elements[0]+self.elements[1]+'_hull_voltage.pdf',
-                        dpi=300, bbox_inches='tight')
-        elif self.args.get('png'):
-            plt.savefig(self.elements[0]+self.elements[1]+'_hull_voltage.png',
-                        dpi=300, bbox_inches='tight')
-        else:
-            fig.show()
-
-    def get_text_info(self, cursor=None, hull=False, html=False):
-        """ Grab textual info for Bokeh plot labels. """
-        info = []
-        if cursor is None:
-            cursor = self.cursor
-        if hull:
-            stoich_strings = []
-        for ind, doc in enumerate(cursor):
-            stoich_string = ''
-            for elem in doc['stoichiometry']:
-                stoich_string += elem[0]
-                stoich_string += '$_{' + str(elem[1]) + '}$' if elem[1] != 1 else ''
-            if hull:
-                if stoich_string not in stoich_strings:
-                    stoich_strings.append(stoich_string)
-            info_string = "{0:^10}\n{1:^24}\n{2:^5s}\n{3:.3f} eV".format(stoich_string,
-                                                                         doc['text_id'][0] + ' ' + doc['text_id'][1],
-                                                                         doc['space_group'],
-                                                                         doc['hull_distance'])
-            if html:
-                for char in ['$', '_', '{', '}']:
-                    info_string = info_string.replace(char, '')
-                info_string = info_string.split('\n')
-            info.append(info_string)
-        if hull:
-            info = stoich_strings
-        return info
-
-    def set_plot_param(self):
-        """ Set some plotting options global to
-        voltage and hull plots.
-        """
-        import matplotlib.pyplot as plt
-        try:
-            plt.style.use('bmh')
-        except:
-            print_exc()
-            pass
-
-        if self.savefig:
-            try:
-                plt.style.use('article')
-            except:
-                print_exc()
-                pass
-        try:
-            import seaborn as sns
-            sns.set(font_scale=1.2)
-            sns.set_style('ticks')
-            sns.set_style({
-                'axes.facecolor': 'white', 'figure.facecolor': 'white',
-                'font.sans-serif': ['Linux Biolinum O', 'Helvetica', 'Arial'],
-                'axes.linewidth': 0.5,
-                'axes.grid': False,
-                'legend.frameon': False,
-                'axes.axisbelow': True})
-        except:
-            print_exc()
-            pass
-        self.scale = 1
-        try:
-            c = plt.cm.viridis(np.linspace(0, 1, 100))
-            del c
-            self.mpl_new_ver = True
-        except:
-            print_exc()
-            self.mpl_new_ver = False
-        Dark2_8 = plt.cm.get_cmap('Dark2').colors
-        self.default_cmap_list = get_linear_cmap(Dark2_8[1:4], list_only=True)
-        self.default_cmap = get_linear_cmap(Dark2_8[1:4], list_only=False)
-        # first colour reserved for hull
-        # penultimate colour reserved for off hull above cutoff
-        # last colour reserved for OQMD
-        Dark2_8_hex = ['#1b9e77', '#d95f02', '#7570b3', '#e7298a',
-                       '#66a61e', '#e6ab02', '#a6761d', '#666666']
-        self.colours = Dark2_8_hex
-        self.colours.append('#bc80bd')
-        self.plot_params = True
-        return
-
-    def generic_voltage_curve(self):
-        """ A more generic version of voltage curve.
-
-        DEPCRECATED.
-
-        """
-        raise DeprecationWarning
-        import matplotlib.pyplot as plt
-
-        def get_voltage_profile_segment(structure_new, structure_old,
-                                        chempot_Li=self.mu_enthalpy[0]):
-            """ Return voltage between two structures. """
-            if structure_old['num_intercalated'] == float('inf'):
-                V = 0
-            else:
-                V = (-(structure_new['enthalpy_per_b'] - structure_old['enthalpy_per_b']) /
-                     (structure_new['num_intercalated'] - structure_old['num_intercalated']) +
-                     (chempot_Li))
-            return V
-
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        plt.style.use('fivethirtyeight')
-
-        mu_enthalpy = get_array_from_cursor(self.match, 'enthalpy_per_atom')
-        x = get_num_intercalated(self.hull_cursor)
-        stable_enthalpy_per_b = get_array_from_cursor(self.hull_cursor, 'enthalpy_per_b')[np.argsort(x)]
-        set_cursor_from_array(self.hull_cursor, x, 'num_intercalated')
-        for i in range(len(x)):
-            for j in range(len(x)):
-                if(self.hull_cursor[i]['gravimetric_capacity'] > self.hull_cursor[j]['gravimetric_capacity'] and
-                   self.hull_cursor[i]['num_intercalated'] < self.hull_cursor[j]['num_intercalated']+2):
-                    V = get_voltage_profile_segment(self.hull_cursor[i], self.hull_cursor[j], mu_enthalpy[0])
-                    ax.plot([self.hull_cursor[i]['gravimetric_capacity'],
-                            self.hull_cursor[j]['gravimetric_capacity']],
-                            [V, V], alpha=0.05, c='b', lw=4)
-                    ax.scatter((self.hull_cursor[i]['gravimetric_capacity'] + self.hull_cursor[j]['gravimetric_capacity']) / 2,
-                               V, alpha=1, c='b', s=10, marker='o', zorder=10000000)
-        self.hull_cursor = filter_cursor(self.hull_cursor, 'hull_distance', 0, 0.0001)
-        x = get_num_intercalated(self.hull_cursor)
-        Q = get_binary_grav_capacities(x, get_molar_mass(self.elements[1]))
-        stable_enthalpy_per_b = get_array_from_cursor(self.hull_cursor, 'enthalpy_per_b')[np.argsort(x)]
-        Q = Q[np.argsort(x)]
-        x = np.sort(x)
-        x, uniq_idxs = np.unique(x, return_index=True)
-        stable_enthalpy_per_b = stable_enthalpy_per_b[uniq_idxs]
-        Q = Q[uniq_idxs]
-        V = []
-        for i in range(len(x)):
-            V.append(-(stable_enthalpy_per_b[i] - stable_enthalpy_per_b[i-1]) /
-                      (x[i] - x[i-1]) +
-                      (mu_enthalpy[0]))
-        V[0] = V[1]
-        # make V, Q and x available for plotting
-        self.voltages = V
-        self.Q = Q
-        for i in range(len(self.voltages)-1):
-            ax.plot([self.Q[i-1], self.Q[i]], [self.voltages[i], self.voltages[i]],
-                    c='k', zorder=99999, lw=6)
-            ax.plot([self.Q[i], self.Q[i]], [self.voltages[i], self.voltages[i+1]],
-                    c='k', zorder=99999, lw=6)
-        ax.set_ylabel('Voltage (V)')
-        ax.set_xlabel('Gravimetric capacity (mAh/g)')
-        plt.show()
-        return
-
-
-def get_linear_cmap(colours, N=100, list_only=False):
-    from matplotlib.colors import LinearSegmentedColormap
-    uniq_colours = []
-    _colours = [tuple(colour) for colour in colours]
-    for colour in _colours:
-        if colour not in uniq_colours:
-            uniq_colours.append(colour)
-    _colours = uniq_colours
-    linear_cmap = []
-    repeat = int(N/len(_colours))
-    for ind, colour in enumerate(_colours):
-        if ind == len(_colours) - 1:
-            break
-        diff = np.asarray(_colours[ind+1]) - np.asarray(_colours[ind])
-        diff_norm = diff / repeat
-        for i in range(repeat):
-            linear_cmap.append(np.asarray(colour) + i*diff_norm)
-    if list_only:
-        return linear_cmap
-    else:
-        return LinearSegmentedColormap.from_list('linear_cmap', linear_cmap, N=N)
-
-
-class FakeHull:
-    """ Implements a thin class to mimic a ConvexHull object
-    that would otherwise be undefined for two points. """
-    def __init__(self):
-        """ Define the used hull properties. """
-        self.vertices = [0, 1]
-        self.simplices = []
