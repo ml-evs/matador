@@ -10,6 +10,8 @@ Cperg_to_mAhperg = 2.778e-1
 C_TO_mAh = Cperg_to_mAhperg
 HARTREE_TO_EV = 27.21139
 BOHR_TO_ANGSTROM = 0.529177211
+RY_TO_EV = 13.605693009
+KBAR_TO_GPA = 0.1
 
 
 def get_periodic_table():

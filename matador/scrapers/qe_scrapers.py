@@ -5,7 +5,8 @@ Quantum Espresso-related inputs and outputs.
 
 from __future__ import print_function
 # matador modules
-from ..utils.cell_utils import cart2abc
+from matador.utils.cell_utils import cart2abc, cart2volume
+from matador.utils.chem_utils import RY_TO_EV, KBAR_TO_GPA
 # external libraries
 try:
     import bson.json_util as json
@@ -14,7 +15,7 @@ except:
 # standard library
 from collections import defaultdict
 from os import stat
-from fractions import gcd
+from math import gcd
 from pwd import getpwuid
 from traceback import print_exc
 
@@ -45,11 +46,12 @@ def pwout2dict(seed, db=True, **kwargs):
             pwout['icsd'] = seed.split('CollCode')[-1]
         for ind, line in enumerate(reversed(flines)):
             ind = len(flines) - 1 - ind
-            if 'cell_parameters' in line.lower() and 'lattice_cart' not in pwout:
+            if 'cell_parameters (angstrom)' in line.lower() and 'lattice_cart' not in pwout:
                 pwout['lattice_cart'] = []
                 for j in range(3):
                     line = flines[ind+j+1].strip().split()
                     pwout['lattice_cart'].append(list(map(float, line)))
+                pwout['cell_volume'] = cart2volume(pwout['lattice_cart'])
             elif 'atomic_positions' in line.lower() and 'positions_frac' not in pwout:
                 pwout['positions_frac'] = []
                 pwout['atom_types'] = []
@@ -69,7 +71,12 @@ def pwout2dict(seed, db=True, **kwargs):
                             j += 1
                         except:
                             break
-            elif 'lattice_cart' in pwout and 'positions_frac' in pwout:
+                pwout['num_atoms'] = len(pwout['atom_types'])
+            elif 'final enthalpy' in line.lower() and 'enthalpy' not in pwout:
+                pwout['enthalpy'] = RY_TO_EV * float(line.lower().split()[-2])
+            elif 'total   stress' in line.lower() and 'pressure' not in pwout:
+                pwout['pressure'] = KBAR_TO_GPA * float(line.lower().split()[-1])
+            elif all(key in pwout for key in ['enthalpy', 'pressure', 'lattice_cart', 'positions_frac']):
                 break
         # get abc lattice
         pwout['lattice_abc'] = cart2abc(pwout['lattice_cart'])

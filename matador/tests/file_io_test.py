@@ -181,6 +181,29 @@ class ScrapeTest(unittest.TestCase):
 
             self.assertEqual(magres_dict['calculator'], 'QE-GIPAW')
 
+    def testPWSCF(self):
+        from matador.scrapers.qe_scrapers import pwout2dict
+        pwout_fname = REAL_PATH + 'data/NaP.out'
+        failed_open = False
+        try:
+            f = open(pwout_fname, 'r')
+        except:
+            failed_open = True
+            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(pwout_fname))
+        if not failed_open:
+            f.close()
+            pwout_dict, s = pwout2dict(pwout_fname)
+            self.assertEqual(len(pwout_dict['atom_types']), 14)
+            self.assertEqual(pwout_dict['num_atoms'], 14)
+            self.assertTrue(pwout_dict['lattice_cart'][0] == [5.887513122, 0.011925355, 0.011971927])
+            self.assertTrue(pwout_dict['lattice_cart'][1] == [0.605472370, 5.817169640, -0.011329548])
+            self.assertTrue(pwout_dict['lattice_cart'][2] == [-4.543028478, 0.450282751, 10.044268095])
+
+            self.assertEqual(pwout_dict['pressure'], 0)
+            from matador.utils.chem_utils import RY_TO_EV
+            np.testing.assert_equal(pwout_dict['enthalpy'], -RY_TO_EV*97.6314378617)
+            np.testing.assert_array_almost_equal(pwout_dict['positions_frac'][5], [0.779038368, 0.580790316, 0.631222097])
+
 
 class ExportTest(unittest.TestCase):
     """ Test file export functions. """
