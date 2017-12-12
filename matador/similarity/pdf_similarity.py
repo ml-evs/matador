@@ -21,15 +21,15 @@ class PDF(object):
     distribution functions.
 
     Args:
-        doc            : dict, matador document to calculate PDF of
-        dr             : float, bin width for PDF (Angstrom) (DEFAULT: 0.1)
-        gaussian_width : float, width of Gaussian smearing (Angstrom) (DEFAULT: 0.01)
-        num_images     : int/str, number of unit cell images include in PDF calculation (DEFAULT: 'auto')
-        max_num_images : int, cutoff number of unit cells before crashing (DEFAULT: 50)
-        rmax           : float, maximum distance cutoff for PDF (Angstrom) (DEFAULT: 15)
-        projected      : bool, optionally calculate the element-projected PDF
-        standardize    : bool, optionally standardize cell before calculating PDF
-        lazy           : bool, if True, calculator is not called when initializing PDF object
+        | doc            : dict, matador document to calculate PDF of
+        | dr             : float, bin width for PDF (Angstrom) (DEFAULT: 0.1)
+        | gaussian_width : float, width of Gaussian smearing (Angstrom) (DEFAULT: 0.01)
+        | num_images     : int/str, number of unit cell images include in PDF calculation (DEFAULT: 'auto')
+        | max_num_images : int, cutoff number of unit cells before crashing (DEFAULT: 50)
+        | rmax           : float, maximum distance cutoff for PDF (Angstrom) (DEFAULT: 15)
+        | projected      : bool, optionally calculate the element-projected PDF
+        | standardize    : bool, optionally standardize cell before calculating PDF
+        | lazy           : bool, if True, calculator is not called when initializing PDF object
 
     """
     def __init__(self, doc, **kwargs):
@@ -68,14 +68,17 @@ class PDF(object):
 
         Input:
 
-            poscart    : np.array of Cartesian atomic coordinates.
-            poscart_B  : (OPTIONAL) positions of a second type of atoms,
-                         where only A-B distances will be calculated.
+            | poscart    : np.ndarray, of Cartesian atomic coordinates.
+
+        Args:
+
+            | poscart_B  : np.ndarray, positions of a second type of atoms,
+                           where only A-B distances will be calculated.
 
         Returns:
 
-            Sets and returns self.distances to d_ij matrix,
-            with values > rmax < 1e-12 removed.
+            | Sets and returns self.distances to d_ij matrix,
+              with values > rmax < 1e-12 removed.
 
 
         """
@@ -103,7 +106,7 @@ class PDF(object):
 
         Returns:
 
-            Sets self.Gr and self.r_space to G(r) and r respectively.
+            | Sets self.Gr and self.r_space to G(r) and r respectively.
 
         """
         if self.debug:
@@ -129,9 +132,9 @@ class PDF(object):
 
         Input:
 
-            distances      : used to calculate PDF
-            style          : either 'smear' or 'histogram'
-            gaussian_width : smearing width in Angstrom^1/2
+            | distances      : np.ndarray, used to calculate PDF
+            | style          : str, either 'smear' or 'histogram'
+            | gaussian_width : float, smearing width in Angstrom^1/2
 
         Requires:
 
@@ -139,7 +142,7 @@ class PDF(object):
 
         Returns and sets:
 
-            Gr             : G(r), the PDF of supplied distances
+            Gr             : np.ndarray, G(r), the PDF of supplied distances
 
         """
         hist = np.zeros_like(self.r_space, dtype=int)
