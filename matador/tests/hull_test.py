@@ -33,7 +33,6 @@ class HullTest(unittest.TestCase):
         hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn'], no_plot=True)
         self.assertEqual(len(hull.hull_cursor), 5)
 
-    @unittest.skipIf(not False)
     def testHullDistances(self):
         res_list = glob(REAL_PATH + 'data/hull-KPSn-KP/*.res')
         self.assertEqual(len(res_list), 87, 'Could not find test res files, please check installation...')
@@ -47,13 +46,6 @@ class HullTest(unittest.TestCase):
         print('Calculating hull dists')
         hull_dist, energies, comps = hull.get_hull_distances(structures)
         print('Comparing arrays')
-        print(np.max(np.abs(hull_dist_test)-np.abs(hull_dist)))
-        diff = np.abs(hull_dist_test)-np.abs(hull_dist)
-        print(hull_dist)
-        print(structures[np.argmax(diff)])
-        print(hull_dist[np.argmax(diff)])
-        print(hull_dist_test[np.argmax(diff)])
-        np.savetxt(REAL_PATH + 'data/test_hull_dist_2.dat', hull_dist)
         np.testing.assert_array_almost_equal(hull_dist_test, hull_dist, decimal=3)
 
 
