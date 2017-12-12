@@ -146,7 +146,7 @@ class QueryTest(unittest.TestCase):
                 {'encapsulated': {'$exists': True}},
                 {'cnt_radius': {'$gt': 5.20, '$lt': 5.22}},
                 {'sedc_scheme': {'$exists': False}},
-                {'kpoints_mp_spacing': {'$gte': 0.045000000000000005, '$lte': 0.055}},
+                {'kpoints_mp_spacing': {'$gte': 0.04, '$lte': 0.06}},
                 {'spin_polarized': {'$ne': True}},
             ]
         })
