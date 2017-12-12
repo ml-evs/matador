@@ -1,17 +1,12 @@
 # coding: utf-8
 """ This file defines various measures and ways of calculating
 the similarity between two structures.
-
-TO-DO:
-    * implement more similarity distances (a la Oganov)
-    * otf calculation of required num_images
-    * non-diagonal supercells
-    * element-projected Fortran PDF calculator
-
 """
 
 # matador modules
 from matador.utils.cell_utils import frac2cart, cart2abc
+from matador.utils.cell_utils import standardize_doc_cell
+
 # external libraries
 import numpy as np
 from scipy.spatial.distance import cdist
@@ -26,60 +21,32 @@ class PDF(object):
     distribution functions.
 
     Args:
-        doc            : matador document to calculate PDF of.
-        dr             : bin width for PDF (Angstrom) (DEFAULT: 0.1)
-        gaussian_width : width of Gaussian smearing (Angstrom) (DEFAULT: 0.01)
-        num_images     : number of unit cell images include in PDF calculation (DEFAULT: 'auto')
-        rmax           : maximum distance cutoff for PDF (Angstrom) (DEFAULT: 15)
-        calculator     : F or None, for Fortran or Python calculator (DEFAULT: None)
-        projected      : True/False, optionally calculate the element-projected PDF.
+        doc            : dict, matador document to calculate PDF of
+        dr             : float, bin width for PDF (Angstrom) (DEFAULT: 0.1)
+        gaussian_width : float, width of Gaussian smearing (Angstrom) (DEFAULT: 0.01)
+        num_images     : int/str, number of unit cell images include in PDF calculation (DEFAULT: 'auto')
+        max_num_images : int, cutoff number of unit cells before crashing (DEFAULT: 50)
+        rmax           : float, maximum distance cutoff for PDF (Angstrom) (DEFAULT: 15)
+        projected      : bool, optionally calculate the element-projected PDF
+        standardize    : bool, optionally standardize cell before calculating PDF
+        lazy           : bool, if True, calculator is not called when initializing PDF object
 
     """
     def __init__(self, doc, **kwargs):
-        """ Initialise parameters. """
+        """ Initialise parameters and run PDF. """
+        prop_defaults = {'dr': 0.1, 'gaussian_width': 0.01, 'rmax': 15, 'num_images': 'auto',
+                         'style': 'smear', 'debug': False, 'low_mem': False, 'projected': True,
+                         'max_num_images': 50, 'standardize': False}
+
+        self.__dict__.update(prop_defaults)
         if 'sim_calc_args' in kwargs:
             kwargs = kwargs['sim_calc_args']
-        if kwargs.get('dr') is None:
-            self.dr = 0.1
-        else:
-            self.dr = kwargs['dr']
-        if kwargs.get('gaussian_width') is None:
-            self.gaussian_width = 0.01
-        else:
-            self.gaussian_width = kwargs['gaussian_width']
-        if kwargs.get('rmax') is None:
-            self.rmax = 15
-        else:
-            self.rmax = kwargs['rmax']
-        if kwargs.get('num_images') is None:
-            self.num_images = 'auto'
-        else:
-            self.num_images = kwargs['num_images']
-        if kwargs.get('calculator') is None:
-            self._calc_pdf = self._calc_py_pdf
-        else:
-            self._calc_pdf = self._calc_fortran_pdf
-        if kwargs.get('style') is not None:
-            self.style = kwargs.get('style')
-        else:
-            self.style = 'smear'
-        if kwargs.get('debug'):
-            self.debug = True
-        else:
-            self.debug = False
-        if kwargs.get('low_mem'):
-            self.low_mem = True
-        else:
-            self.low_mem = False
-        if kwargs.get('projected'):
-            self.projected = True
-        else:
-            self.projected = False
-        if kwargs.get('max_num_images'):
-            self.max_num_images = kwargs.get('max_num_images')
-        else:
-            self.max_num_images = 50
+        self.__dict__.update(kwargs)
+
         self.doc = doc
+        if kwargs.get('standardize'):
+            self.doc = standardize_doc_cell(self.doc)
+
         self.lattice = np.asarray(doc['lattice_cart'])
         self.poscart = np.asarray(frac2cart(doc['lattice_cart'], doc['positions_frac']))
         self.types = doc['atom_types']
@@ -94,12 +61,7 @@ class PDF(object):
         if not kwargs.get('lazy'):
             self._calc_pdf()
             if kwargs.get('projected'):
-                self._calc_py_projected_pdf()
-
-    def _calc_fortran_pdf(self):
-        """ Calculate PDF of a matador document with Fortran calculator. """
-        # from similarity.pdf.pdf_calculator import pdf_calc
-        raise NotImplementedError
+                self._calc_projected_pdf()
 
     def _calc_distances(self, poscart, poscart_B=None, debug=False):
         """ Calculate PBC distances with cdist.
@@ -135,7 +97,7 @@ class PDF(object):
         self.distances = distances.compressed()
         return self.distances
 
-    def _calc_py_pdf(self, debug=False):
+    def _calc_pdf(self, debug=False):
         """ Wrapper function to calculate distances and output
         a broadened and normalised PDF.
 
@@ -208,7 +170,7 @@ class PDF(object):
                            4*np.pi * (self.r_space + self.dr)**2 * self.num_atoms * self.number_density)
         return Gr
 
-    def _calc_py_projected_pdf(self):
+    def _calc_projected_pdf(self):
         """ Calculate broadened and normalised element-projected PDF of a matador document.
 
         Sets self.elem_Gr of e.g. Li2Zn3 to
@@ -236,35 +198,6 @@ class PDF(object):
 
             self.elem_Gr[elem_type] = self._set_broadened_normalised_pdf(distances[elem_type],
                                                                          gaussian_width=self.gaussian_width)
-
-    def _calc_py_deprecated_projected_pdf(self):
-        """ DEPCRECATED: calculate element-projected PDF of a matador document with Python calculator. """
-        raise DeprecationWarning
-        self.elem_Gr = dict()
-        for comb in combinations_with_replacement(set(self.doc['atom_types']), 2):
-            self.elem_Gr[tuple(set(comb))] = np.zeros((int(self.rmax / self.dr)))
-        self._deprecated_Gr = np.zeros((int(self.rmax / self.dr)))
-        for i in range(self.num_atoms):
-            for j in range(i+1, self.num_atoms):
-                d_ij = np.sqrt(np.sum((self.poscart[i] - self.poscart[j])**2))
-                if d_ij <= self.rmax:
-                    self._deprecated_Gr += 2*np.exp(-(self.r_space - d_ij)**2 / self.gaussian_width) / (self.num_atoms * (self.num_images+1)**3)
-                    self.elem_Gr[tuple(set((self.types[i], self.types[j])))] += 2*np.exp(-(self.r_space - d_ij)**2 / self.gaussian_width) / (self.num_atoms * (self.num_images+1)**3)
-        # iterate over image cells
-        trans = np.zeros((3))
-        for prod in product(range(-self.num_images, self.num_images+1), repeat=3):
-            if prod == (0, 0, 0):
-                continue
-            trans = 0
-            for ind, multi in enumerate(prod):
-                trans += self.lattice[ind] * multi
-            for i in range(self.num_atoms):
-                for j in range(self.num_atoms):
-                    d_ij = np.sqrt(np.sum((self.poscart[i] - self.poscart[j] - trans)**2))
-                    if d_ij <= self.rmax:
-                        self._deprecated_Gr += np.exp(-(self.r_space - d_ij)**2 / self.gaussian_width) / (self.num_atoms * (self.num_images+1)**3)
-                        self.elem_Gr[tuple(set((self.types[i], self.types[j])))] += np.exp(-(self.r_space - d_ij)**2 / self.gaussian_width) / (self.num_atoms * (self.num_images+1)**3)
-        return
 
     def _set_image_trans_vectors(self):
         """ Sets self.image_vec to a list/generator of image translation vectors,
