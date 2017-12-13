@@ -35,7 +35,7 @@ def plot_spectral(seeds, **kwargs):
     # set defaults and update class with desired values
     prop_defaults = {'plot_bandstructure': True, 'plot_dos': False,
                      'phonons': False, 'cell': False, 'gaps': False,
-                     'colour_by_seed': False, 'verbosity': 0}
+                     'colour_by_seed': True, 'verbosity': 0}
     prop_defaults.update(kwargs)
     kwargs = prop_defaults
 
@@ -56,9 +56,10 @@ def plot_spectral(seeds, **kwargs):
     if not isinstance(seeds, list):
         seeds = [seeds]
 
-    if len(seeds) > 1 and kwargs['colour_by_seed']:
+    if len(seeds) > 1 and kwargs.get('colour_by_seed'):
         seed_colours = colours
         ls = ['-']*len(seeds)
+        colour_by_seed = True
     else:
         ls = []
         for i in range(len(seeds)):
