@@ -188,7 +188,9 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, verb
         for line_no, line in enumerate(flines):
             if line.startswith(('#', '!')):
                 continue
-            elif '%block lattice_cart' in line.lower() and lattice:
+            if '#' or '!' in line:
+                line = line.split('#')[0].split('!')[0]
+            if '%block lattice_cart' in line.lower() and lattice:
                 cell['lattice_cart'] = []
                 i = 1
                 while 'endblock' not in flines[line_no+i].lower():
@@ -375,6 +377,8 @@ def param2dict(seed, db=True, verbosity=0, **kwargs):
         false_str = ['False', 'false', '0']
         splitters = [':', '=', '\t', ' ']
         for line_no, line in enumerate(flines):
+            if '#' or '!' in line:
+                line = line.split('#')[0].split('!')[0]
             line = line.lower()
             # skip blank lines and comments
             if line.startswith(('#', '!')) or len(line.strip()) == 0:
@@ -944,7 +948,9 @@ def bands2dict(seed, summary=False, gap=False, verbosity=0, **kwargs):
         for ns in range(bs['num_spins']):
             for nb in range(bs['num_bands']):
                 bs['eigenvalues_k_s'][ns][nb][int(data[kpt_ind].split()[1])-1] = float(data[kpt_ind+2+nb].strip())
-    bs['eigenvalues_k_s'] -= bs['fermi_energy_Ha']
+    # CASTEP 17 changed bandstructures such that they were shifted already
+    if np.min(bs['eigenvalues_k_s']) > 0:
+        bs['eigenvalues_k_s'] -= bs['fermi_energy_Ha']
     bs['eigenvalues_k_s'] *= HARTREE_TO_EV
 
     cart_kpts = np.asarray(frac2cart(real2recip(bs['lattice_cart']), bs['kpoint_path']))
