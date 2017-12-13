@@ -67,22 +67,9 @@ class BatchRun:
         self.all_cores = mp.cpu_count()
         if self.args.get('ncores') is None:
             self.args['ncores'] = int(self.all_cores / self.nprocesses)
-        if self.args.get('nnodes') != 1:
-            print_warning('Attempting to run over multiple nodes, please ensure \
-                           that you are using Intel MPI or this will produce \
-                           unexpected behaviour!')
-        try:
-            assert self.args['nnodes'] >= 1
-            assert self.args['ncores'] >= 1
-            assert self.nprocesses >= 1
-        except AssertionError:
-            print_exc()
+        if self.args['nnodes'] < 1 or self.args['ncores'] < 1 or self.nprocesses < 1:
             print_failure('Invalid number of cores, nodes or processes.')
             exit()
-        if self.args['ncores']*self.nprocesses > self.all_cores:
-            print_warning('Requested more cores (' + str(self.args['ncores']*self.nprocesses) +
-                          ') than available (' + str(self.all_cores) + ').' +
-                          '(Maybe you are using a queueing system).')
 
         if self.mode is 'castep':
             self.castep_setup()
@@ -320,6 +307,10 @@ if __name__ == '__main__':
                         help='use aprun over mpirun')
     parser.add_argument('--bnl', action='store_true', default=False,
                         help='use srun over mpirun')
+    parser.add_argument('--slurm', action='store_true', default=False,
+                        help='use srun over mpirun')
+    parser.add_argument('--intel', action='store_true', default=False,
+                        help='use Intel\'s mpirun')
     parser.add_argument('--conv_cutoff', action='store_true', default=False,
                         help='run all res files at cutoff defined in cutoff.conv file')
     parser.add_argument('--conv_kpt', action='store_true', default=False,
@@ -346,6 +337,8 @@ if __name__ == '__main__':
     parser.add_argument('-l', '--limit', type=int, default=None,
                         help='limit to n structures per run')
     args = parser.parse_args()
+    if sum([vars(args)['bnl'], vars(args)['archer'], vars(args)['intel']]) > 1:
+        exit('Incompatible MPI arguments specified, please use at most one of --archer/--intel/--slurm.')
     runner = BatchRun(args)
     try:
         runner.spawn()
