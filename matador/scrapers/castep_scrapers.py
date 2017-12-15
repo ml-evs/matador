@@ -949,8 +949,8 @@ def bands2dict(seed, summary=False, gap=False, verbosity=0, **kwargs):
             for nb in range(bs['num_bands']):
                 bs['eigenvalues_k_s'][ns][nb][int(data[kpt_ind].split()[1])-1] = float(data[kpt_ind+2+nb].strip())
     # CASTEP 17 changed bandstructures such that they were shifted already
-    if np.min(bs['eigenvalues_k_s']) > 0:
-        bs['eigenvalues_k_s'] -= bs['fermi_energy_Ha']
+    # if np.min(bs['eigenvalues_k_s']) > 0:
+    bs['eigenvalues_k_s'] -= bs['fermi_energy_Ha']
     bs['eigenvalues_k_s'] *= HARTREE_TO_EV
 
     cart_kpts = np.asarray(frac2cart(real2recip(bs['lattice_cart']), bs['kpoint_path']))
