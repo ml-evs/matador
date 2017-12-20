@@ -4,6 +4,19 @@ including parsing user inputs, displaying results
 and calling other functionality. """
 
 from __future__ import print_function
+# standard library
+import re
+from os import uname, devnull
+from sys import exit
+import sys
+from itertools import combinations
+from traceback import print_exc
+try:
+    from math import gcd
+except ImportError:
+    from fractions import gcd
+    print_warning('Use of fractions.gcd is deprecated - '
+                  'Python3 is recommended but will try to proceed.')
 # matador modules
 from .utils.print_utils import print_failure, print_warning, print_success
 from .utils.chem_utils import get_periodic_table, get_formula_from_stoich
@@ -13,25 +26,14 @@ import pymongo as pm
 import numpy as np
 from bson.son import SON
 from bson.json_util import dumps
-# standard library
-import re
-from os import uname
-from itertools import combinations
-from traceback import print_exc
-try:
-    from math import gcd
-except ImportError:
-    from fractions import gcd
-    print_warning('Use of fractions.gcd is deprecated - '
-                  'Python3 is recommended but will try to proceed.')
-from sys import exit
+from bson.objectid import ObjectId
 
 
 class DBQuery(object):
     """ Class that implements queries to MongoDB
     structure database.
     """
-    def __init__(self, client=False, collections=False, subcmd='query', debug=False, **kwargs):
+    def __init__(self, client=False, collections=False, subcmd='query', debug=False, quiet=False, **kwargs):
         """ Parse arguments from matador or API call
         before calling query.
         """
@@ -47,6 +49,10 @@ class DBQuery(object):
             self.db = client.crystals
         if collections is not False:
             self.collections = collections
+
+        if quiet:
+            f = open(devnull, 'w')
+            sys.stdout = f
 
         # if empty collections, assume called from API and read kwargs,
         # also need to connect to db
@@ -93,6 +99,10 @@ class DBQuery(object):
         if not client:
             self.client.close()
 
+        if quiet:
+            f.close()
+            sys.stdout = sys.__stdout__
+
     def construct_query(self):
         """ Set up query dict and perform query depending on
         command-line / API arguments.
@@ -134,7 +144,7 @@ class DBQuery(object):
                 if self.debug:
                     print(dumps(self.cursor[0], indent=1))
 
-            if self.args.get('calc_match') or self.args['subcmd'] == 'hull':
+            if self.args.get('calc_match') or self.args['subcmd'] in ['hull', 'hulldiff']:
                 # save special copy of calc_dict for hulls
                 self.calc_dict = dict()
                 self.calc_dict['$and'] = []
@@ -142,7 +152,7 @@ class DBQuery(object):
                 # don't append, just set
                 self.query_dict['$and'] = self.query_calc(self.cursor[0])
                 self.calc_dict['$and'] = list(self.query_dict['$and'])
-                if self.args['subcmd'] == 'hull' and self.args.get('composition') is None:
+                if self.args['subcmd'] in ['hull', 'hulldiff'] and self.args.get('composition') is None:
                     self.args['composition'] = ''
                     for elem in self.cursor[0]['stoichiometry']:
                         self.args['composition'] += elem[0]
@@ -229,6 +239,10 @@ class DBQuery(object):
         if not self.args.get('ignore_warnings'):
             self.query_dict['$and'].append(self.query_quality())
 
+        if self.args.get('time') is not None:
+            self.query_dict['$and'].append(self.query_time())
+            self.empty_query = False
+
     def perform_query(self):
         """ Find results that match the query_dict
         inside the MongoDB database.
@@ -262,7 +276,7 @@ class DBQuery(object):
                 # if called as script, always print results
                 if self.args.get('id') is None:
                     print(cursor_count, 'results found for query in', collection+'.')
-                if self.args.get('subcmd') != 'hull' and self.args.get('subcmd') != 'voltage' and self.args.get('subcmd') != 'swaps':
+                if self.args.get('subcmd') not in ['hull', 'hulldiff', 'voltage', 'swaps']:
                     if cursor_count >= 1:
                         self.num_to_display = cursor_count
                         if self.delta_E is not None:
@@ -299,6 +313,7 @@ class DBQuery(object):
 
             # building hull from just comp, find best structure to calc_match
             if self.args.get('id') is None and (self.args.get('subcmd') == 'hull' or
+                                                self.args.get('subcmd') == 'hulldiff' or
                                                 self.args.get('subcmd') == 'voltage' or
                                                 self.args.get('hull_cutoff') is not None):
                 if len(self.collections.keys()) == 1:
@@ -889,6 +904,24 @@ class DBQuery(object):
                 query_dict.append(temp_dict)
 
         return query_dict
+
+    def query_time(self, preceding=True):
+        """ Only include structures added before
+        the date given in args['time'].
+        """
+        from datetime import datetime, timedelta
+        from time import mktime
+        query_dict = dict()
+        time_period = timedelta(days=int(self.args.get('time')))
+        time = (datetime.today() - time_period).timetuple()
+        elapsed = str(hex(int(mktime(time))))[2:]
+        cutoff_id = ObjectId(elapsed + '0000000000000000')
+        query_dict['_id'] = dict()
+        if preceding:
+            query_dict['_id']['$lte'] = cutoff_id
+
+        return query_dict
+
 
     def temp_collection(self, cursor):
         """ Create temporary collection

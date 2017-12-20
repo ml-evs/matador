@@ -254,7 +254,7 @@ class QueryTest(unittest.TestCase):
                     ]},
             ]
         })
-        # print(json.dumps(query.query_dict, indent=2))
+        # print(json.dumps(query.query_dict, indent=4))
         self.assertDictEqual(test_dict, query.query_dict)
 
         kwargs = {'composition': ['[Fe,Ru,Os][I]Be'], 'ignore_warnings': True,
@@ -510,6 +510,77 @@ class QueryTest(unittest.TestCase):
         })
         # print(json.dumps(query.query_dict, indent=2))
         self.assertDictEqual(test_dict, query.query_dict)
+
+    def testTimePeriod(self):
+        from bson.objectid import ObjectId
+        from datetime import datetime, timedelta
+        from time import mktime
+        num_days = 5
+        kwargs = {'composition': 'KP', 'testing': True, 'time': num_days}
+        query = DBQuery(**kwargs)
+        days_ago = (datetime.today() - timedelta(days=num_days)).timetuple()
+        time_str = str(hex(int(mktime(days_ago))))[2:]
+        time_str += (24 - len(time_str))*'0'
+        test_dict = ({
+            '$and': [
+                {'$and': [
+                    {'atom_types': {'$in': ['K']}},
+                    {'atom_types': {'$in': ['P']}},
+                    {'stoichiometry': {'$size': 2}}
+                ]},
+                {'$or': [
+                    {'quality': {'$gt': 0}},
+                    {'quality': {'$exists': False}}
+                ]},
+                {'_id': {'$lte': ObjectId(time_str)}}
+            ]})
+        self.assertDictEqual(test_dict, query.query_dict)
+
+        num_days = 3001
+        kwargs = {'composition': 'KP', 'testing': True, 'time': num_days}
+        query = DBQuery(**kwargs)
+        days_ago = (datetime.today() - timedelta(days=num_days)).timetuple()
+        time_str = str(hex(int(mktime(days_ago))))[2:]
+        time_str += (24 - len(time_str))*'0'
+        test_dict = ({
+            '$and': [
+                {'$and': [
+                    {'atom_types': {'$in': ['K']}},
+                    {'atom_types': {'$in': ['P']}},
+                    {'stoichiometry': {'$size': 2}}
+                ]},
+                {'$or': [
+                    {'quality': {'$gt': 0}},
+                    {'quality': {'$exists': False}}
+                ]},
+                {'_id': {'$lte': ObjectId(time_str)}}
+            ]})
+        self.assertDictEqual(test_dict, query.query_dict)
+
+        num_days = -1
+        kwargs = {'composition': 'KP', 'testing': True, 'time': num_days}
+        query = DBQuery(**kwargs)
+        days_ago = (datetime.today() - timedelta(days=num_days)).timetuple()
+        time_str = str(hex(int(mktime(days_ago))))[2:]
+        time_str += (24 - len(time_str))*'0'
+        test_dict = ({
+            '$and': [
+                {'$and': [
+                    {'atom_types': {'$in': ['K']}},
+                    {'atom_types': {'$in': ['P']}},
+                    {'stoichiometry': {'$size': 2}}
+                ]},
+                {'$or': [
+                    {'quality': {'$gt': 0}},
+                    {'quality': {'$exists': False}}
+                ]},
+                {'_id': {'$lte': ObjectId(time_str)}}
+            ]})
+        self.assertDictEqual(test_dict, query.query_dict)
+
+
+if __name__ == '__main__':
+    unittest.main()
 
 
 if __name__ == '__main__':

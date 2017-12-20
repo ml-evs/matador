@@ -125,6 +125,30 @@ class Matador(object):
             self.hull = QueryConvexHull(self.query, **self.args)
             self.cursor = self.hull.hull_cursor
 
+        if self.args['subcmd'] == 'hulldiff':
+            if self.args.get('compare') is None:
+                exit('Please specify which hulls to query with --compare.')
+            diff_args = self.args['compare']
+            from matador.hull_diff import HullDiff
+            del self.args['compare']
+            self.args['no_plot'] = True
+            diff_args = sorted(diff_args)
+            self.args['time'] = diff_args[0]
+            print('Calculating hull {} days ago...'.format(self.args['time']))
+            self.query_old = DBQuery(self.client, self.collections, **self.args)
+            self.hull_old = QueryConvexHull(self.query_old, **self.args)
+            if len(diff_args) == 1 or isinstance(diff_args, str):
+                self.args['time'] = '0'
+            else:
+                self.args['time'] = diff_args[1]
+            if self.args['time'] == '0':
+                print('... to compare with up-to-date hull.')
+            else:
+                print('... to compare with hull {} days ago.'.format(self.args['time']))
+            self.query_new = DBQuery(self.client, self.collections, **self.args)
+            self.hull_new = QueryConvexHull(self.query_new, **self.args)
+            HullDiff(self.hull_old, self.hull_new)
+
         if self.args.get('uniq'):
             from matador.similarity.similarity import get_uniq_cursor
             print_notify('Filtering for unique structures...')
@@ -328,6 +352,8 @@ if __name__ == '__main__':
                               help='test devel code.')
     global_flags.add_argument('--profile', action='store_true',
                               help='run code profiler.')
+    global_flags.add_argument('-q', '--quiet', action='store_true',
+                              help='redirect most output to /dev/null.')
 
     # define all other flags by group
     structure_flags = argparse.ArgumentParser(add_help=False)
@@ -499,7 +525,13 @@ if __name__ == '__main__':
                                   -sw NAs:LiNa will swap all N to As, and all Li to Na, and \
                                   -sw [V]As:[Li,K,Rb]Na will swap all group V elements to As \
                                   and all of Li, K and Rb to Na.')
-
+    diff_flags = argparse.ArgumentParser(add_help=False)
+    diff_flags.add_argument('-cmp', '--compare', type=str, nargs='+',
+                            help='diff phase diagrams between two different times, \
+                                  in standard time format, e.g. `--compare 1y2m5d3h` will \
+                                  compare the present hull with that of 1 year, 2 months, \
+                                  5 days and 3 hours ago, and `--compare 3d 2d` will compare \
+                                  three days ago to two days ago.')
     pdffit_flags = argparse.ArgumentParser(add_help=False)
     pdffit_flags.add_argument('-file', '--file', type=str,
                               help='experimental input file to fit structures to.')
@@ -560,6 +592,10 @@ if __name__ == '__main__':
                                            (currently limited to binaries)',
                                            parents=[global_flags, structure_flags,
                                                     material_flags, plot_flags, query_flags])
+    hull_parser = subparsers.add_parser('hulldiff',
+                                        help='diff two convex hulls with the --compare flag.',
+                                        parents=[global_flags, structure_flags,
+                                                 material_flags, plot_flags, query_flags, diff_flags])
     swaps_parser = subparsers.add_parser('swaps',
                                          help='perform atomic swaps on query results',
                                          parents=[global_flags, collection_flags, query_flags,

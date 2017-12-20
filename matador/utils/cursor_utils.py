@@ -1,13 +1,13 @@
 # coding: utf-8
 """ This file defines some useful generic cursor methods. """
 
-# external libraries
-import numpy as np
-from matador.utils.cell_utils import get_spacegroup_spg
 # standard library
 from traceback import print_exc
 from time import strftime
 from pkg_resources import require
+# external libraries
+import numpy as np
+from matador.utils.cell_utils import get_spacegroup_spg
 try:
     __version__ = require("matador")[0].version
     __version__ = __version__.strip()
@@ -15,9 +15,26 @@ except:
     __version__ = 'xxx'
 
 
-def display_results(cursor, args=None, argstr=None, hull=False, markdown=False, latex=False):
+def display_results(cursor,
+                    args={}, argstr=None, additions=None, deletions=None,
+                    hull=False, markdown=False, latex=False):
     """ Print query results in a cryan-like fashion, optionally
     in a markdown format.
+
+    Input:
+
+        | cursor: list(dict), list of matador documents
+
+    Args:
+
+        | args      : dict, extra keyword arguments
+        | argstr    : str, string to store matador initialisation command
+        | additions : list(str), list of text_ids to be coloured green with a (+)
+        | deletions : list(str), list of text_ids to be coloured red with a (-)
+        | hull      : bool, whether or not to print hull-style (True) or query-style
+        | markdown  : bool, whether or not to write a markdown file containing results
+        | latex     : bool, whether or not to create a LaTeX table
+
     """
     details = args.get('details')
     if args is None:
@@ -28,8 +45,11 @@ def display_results(cursor, args=None, argstr=None, hull=False, markdown=False, 
     source_string = []
     formula_string = []
     last_formula = ''
-    header_string = ''
     units_string = ''
+
+    if len(cursor) == 0:
+        print('No structures to show.')
+        return
 
     if markdown:
         markdown_string = ('GenDate: ' + strftime("%H:%M %d/%m/%Y") + '\n')
@@ -40,10 +60,14 @@ def display_results(cursor, args=None, argstr=None, hull=False, markdown=False, 
     if latex:
         latex_string = ("\\begin{tabular}{l r r c l l}\n"
                         "\\rowcolor{gray!20}\n"
-                        "\\multicolumn{1}{l}{formula} & \\multicolumn{1}{r}{$\Delta E$ from hull (meV/atom)} & "
-                        "\\multicolumn{1}{r}{grav. cap. (mAh/g)} & \multicolumn{1}{c}{sg.} & "
+                        "\\multicolumn{1}{l}{formula} & \\multicolumn{1}{r}{$\\Delta E$ from hull (meV/atom)} & "
+                        "\\multicolumn{1}{r}{grav. cap. (mAh/g)} & \\multicolumn{1}{c}{sg.} & "
                         "\\multicolumn{1}{l}{provenance} & \\multicolumn{1}{l}{description} \\\\\n")
         latex_struct_string = []
+
+    header_string = ''
+    if additions is not None or deletions is not None:
+        header_string += '   '
     if not markdown:
         header_string += "{:^24}".format('ID')
         header_string += "{:^5}".format('!?!')
@@ -107,6 +131,10 @@ def display_results(cursor, args=None, argstr=None, hull=False, markdown=False, 
                 else:
                     struct_string.append(
                         "{:^24}".format(doc['text_id'][0]+' '+doc['text_id'][1]))
+            if additions is not None and doc['text_id'] in additions:
+                struct_string[-1] = '\033[92m\033[1m' + ' + ' + struct_string[-1] + '\033[0m'
+            elif deletions is not None and doc['text_id'] in deletions:
+                struct_string[-1] = '\033[91m\033[1m' + ' - ' + struct_string[-1] + '\033[0m'
             try:
                 if doc['quality'] == 0:
                     struct_string[-1] += "{:^5}".format('!!!')
@@ -116,11 +144,11 @@ def display_results(cursor, args=None, argstr=None, hull=False, markdown=False, 
                 struct_string[-1] += "{:5}".format(' ')
         else:
             struct_string.append("{:40}".format(next(source.split('/')[-1].split('.')[0]
-                                                for source in doc['source']
-                                                if (source.endswith('.res')
-                                                    or source.endswith('.castep')
-                                                    or source.endswith('.history')
-                                                    or source.endswith('.history.gz')))))
+                                                     for source in doc['source']
+                                                     if (source.endswith('.res') or
+                                                         source.endswith('.castep') or
+                                                         source.endswith('.history') or
+                                                         source.endswith('.history.gz')))))
         try:
             struct_string[-1] += "{:^12.3f}".format(doc['pressure'])
         except:
@@ -160,7 +188,7 @@ def display_results(cursor, args=None, argstr=None, hull=False, markdown=False, 
             struct_string[-1] += "{:^8}".format('xxx')
 
         if latex:
-            latex_struct_string.append("{:^20} {:^10} & ".format(formula_substring, '$\star$' if doc['hull_distance'] == 0 else ''))
+            latex_struct_string.append("{:^20} {:^10} & ".format(formula_substring, '$\\star$' if doc['hull_distance'] == 0 else ''))
             latex_struct_string[-1] += "{:^20.0f} & ".format(doc.get('hull_distance')*1000) if doc.get('hull_distance') > 0 else '{:^20} &'.format('-')
             latex_struct_string[-1] += "{:^20.0f} & ".format(doc['gravimetric_capacity']) if doc.get('hull_distance') == 0 else '{:^20} &'.format('-')
             latex_struct_string[-1] += "{:^20} & ".format(get_spacegroup_spg(doc))
@@ -291,16 +319,14 @@ def display_results(cursor, args=None, argstr=None, hull=False, markdown=False, 
     elif latex:
         latex_string += '\\end{tabular}'
         return latex_string
-    else:
-        return
 
 
 def set_cursor_from_array(cursor, array, key):
     """ Updates the key-value pair for documents in
     internal cursor from a numpy array.
     """
-    assert(len(array) == len(cursor) or len(array) - 1 == len(cursor))
-    for ind, doc in enumerate(cursor):
+    assert len(array) == len(cursor) or len(array) - 1 == len(cursor)
+    for ind, _ in enumerate(cursor):
         cursor[ind][key] = array[ind]
     return
 
@@ -316,7 +342,7 @@ def get_array_from_cursor(cursor, key):
     except:
         print_exc()
     array = np.asarray(array)
-    assert(len(array) == len(cursor))
+    assert len(array) == len(cursor)
     return array
 
 
@@ -396,7 +422,7 @@ def get_spg_uniq(cursor, symprec=1e-2, latvecprec=1e-3, posprec=1e-3):
                     else:
                         for dim in range(3):
                             if not rigid_shift(refined_list[i], refined_list[j], dim, posprec):
-                                    break
+                                break
                             elif dim == 3:
                                 same_list.append((i, j))
                                 shift_list.append((i, j, dim))
@@ -409,14 +435,7 @@ def get_spg_uniq(cursor, symprec=1e-2, latvecprec=1e-3, posprec=1e-3):
 
 
 def rigid_shift(structA, structB, dim, posprec):
-    assert(len(structA[2]) == len(structB[2]))
-    shift_array = structA[1][:, dim] - structB[1][:, dim]
-    # if trivial zero shift, return True
-    if np.all((np.abs(shift_array)) < 1e-4):
-        return True
-    shift_array[np.where(shift_array < 0)] += 1
-    # if nontrivial shift, return True
-    return np.all((np.abs(np.diff(shift_array)) < 1e-4))
+    raise DeprecationWarning
 
 
 def filter_cursor(cursor, key, vals):

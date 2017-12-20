@@ -8,7 +8,10 @@ from __future__ import print_function
 from traceback import print_exc
 from bisect import bisect_left
 from sys import exit
+import sys
 import re
+from os import devnull
+from sys import stdout
 # external libraries
 from scipy.spatial import ConvexHull
 from bson.son import SON
@@ -28,7 +31,7 @@ class QueryConvexHull(object):
     """ Construct a binary or ternary phase diagram
     from matador.DBQuery object.
     """
-    def __init__(self, query=None, cursor=None, elements=None, subcmd='hull', **kwargs):
+    def __init__(self, query=None, cursor=None, elements=None, subcmd='hull', quiet=False, **kwargs):
         """ Initialise the class from either a DBQuery or a cursor (list of matador dicts)
         and construct the appropriate phase diagram.
 
@@ -66,6 +69,10 @@ class QueryConvexHull(object):
             self.elements = elements
             # filter out structures with any elements with missing chem pots
             self.cursor = [doc for doc in self.cursor if all([atom in self.elements for atom, num in doc['stoichiometry']])]
+
+        if quiet:
+            f = open(devnull, 'w')
+            sys.stdout = f
 
         K2eV = 8.61733e-5
         if self.args.get('hull_temp') is not None:
@@ -128,6 +135,11 @@ class QueryConvexHull(object):
         if not self.args.get('no_plot') and not self.savefig:
             import matplotlib.pyplot as plt
             plt.show()
+
+        if quiet:
+            f.close()
+            sys.stdout = sys.__stdout__
+
 
     @property
     def savefig(self):
