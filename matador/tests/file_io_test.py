@@ -3,7 +3,7 @@ import unittest
 import json
 import numpy as np
 from os.path import realpath
-from os import system
+from os import system, remove
 
 # grab abs path for accessing test data
 REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
@@ -23,7 +23,7 @@ class ScrapeTest(unittest.TestCase):
 
         if not failed_open:
             f.close()
-            test_dict, s = cell2dict(cell_fname, db=False, outcell=True, verbosity=5)
+            test_dict, s = cell2dict(cell_fname, db=False, outcell=True, verbosity=0)
             self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
             self.assertEqual(test_dict['lattice_cart'][0][0], 9.83262140721165, msg='Failed to read lattice vectors.')
             self.assertEqual(test_dict['lattice_cart'][1][1], 5.96357780025648, msg='Failed to read lattice vectors.')
@@ -35,7 +35,7 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(test_dict['species_pot']['P'], 'P_00PBE.usp', msg='Failed to read pspots.')
             self.assertEqual(test_dict['species_pot']['Zn'], 'Zn_00PBE.usp', msg='Failed to read pspots.')
             # test that lattice_vec only read when outcell is true
-            test_dict, s = cell2dict(cell_fname, db=False, outcell=False, verbosity=5)
+            test_dict, s = cell2dict(cell_fname, db=False, outcell=False, verbosity=0)
             self.assertTrue(test_dict.get('lattice_cart') is None)
 
     def testCastep(self):
@@ -49,7 +49,7 @@ class ScrapeTest(unittest.TestCase):
             self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(castep_fname))
         if not failed_open:
             f.close()
-            test_dict, s = castep2dict(castep_fname, db=True, verbosity=5)
+            test_dict, s = castep2dict(castep_fname, db=True, verbosity=0)
             self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
             self.assertEqual(test_dict['pressure'], 0.0763, msg='Failed to read pressure!')
             self.assertEqual(test_dict['enthalpy'], -2.15036930e4, msg='Failed to read enthalpy!')
@@ -226,6 +226,43 @@ class ExportTest(unittest.TestCase):
             self.assertTrue(s, msg='Failed entirely, oh dear!')
             self.compareResDocwithResDoc(doc, doc_exported)
         system('rm {}'.format(test_fname))
+
+    def testDoc2Param(self):
+        from matador.scrapers.castep_scrapers import param2dict
+        from matador.export import doc2param
+        param_fname = REAL_PATH + 'data/param_test.param'
+        test_fname = REAL_PATH + 'data/dummy.param'
+        failed_open = False
+        try:
+            f = open(param_fname, 'r')
+        except:
+            failed_open = True
+            print('Failed to open test case', param_fname, '- please check installation.')
+        if not failed_open:
+            f.close()
+            doc, s = param2dict(param_fname, db=False)
+            doc2param(doc, test_fname, hash_dupe=False, overwrite=True)
+            doc_exported, s = param2dict(test_fname, db=False)
+            self.assertTrue(s, msg='Failed entirely, oh dear!')
+            self.assertEqual(len(doc_exported), len(doc))
+        remove(test_fname)
+
+        param_fname = REAL_PATH + 'data/nmr.param'
+        test_fname = REAL_PATH + 'data/dummy.param'
+        failed_open = False
+        try:
+            f = open(param_fname, 'r')
+        except:
+            failed_open = True
+            print('Failed to open test case', param_fname, '- please check installation.')
+        if not failed_open:
+            f.close()
+            doc, s = param2dict(param_fname, db=False)
+            doc2param(doc, test_fname, hash_dupe=False, overwrite=True)
+            doc_exported, s = param2dict(test_fname, db=False)
+            self.assertTrue(s, msg='Failed entirely, oh dear!')
+            self.assertEqual(len(doc_exported), len(doc))
+        remove(test_fname)
 
     def testDoc2ResFromJson(self):
         json_fname = REAL_PATH + 'data/doc2res.json'

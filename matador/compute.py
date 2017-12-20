@@ -48,8 +48,10 @@ class FullRelaxer:
         | conv_kpts     : list(float) of kpt spacings to use for SCF convergence test (DEFAULT: False)
         | kpts_1D       : bool, treat z-direction as special and create kpt_grid [1 1 n_kz] (DEFAULT: False)
         | paths         : dict, folder names for output sorting (DEFAULT: None)
-        | archer        : bool, use aprun over mpirun (DEFAULT: False)
-        | bnl           : bool, use srun over mpirun (DEFAULT: False)
+        | archer        : bool, force use of aprun over mpirun (DEFAULT: False)
+        | slurm         : bool, force use of srun over mpirun (DEFAULT: False)
+        | bnl           : bool, deprecated alias for slurm
+        | intel         : bool, force use of Intel mpirun-style calls (DEFAULT: False)
         | redirect      : str, file to redirect stdout to (DEFAULT: /dev/null unless debug).
         | exec_test     : bool, test executable before progressing (DEFAULT: True)
         | start         : bool, begin calculation immediately or manually call it (DEFAULT: True)
@@ -67,9 +69,15 @@ class FullRelaxer:
         prop_defaults = {'paths': None, 'param_dict': None, 'cell_dict': None, 'mode': 'castep', 'executable': 'castep', 'memcheck': False,
                          'rough': 4, 'rough_iter': 2, 'fine_iter': 20, 'spin': False, 'redirect': None, 'reopt': False,
                          'custom_params': False, 'archer': False, 'maxmem': None, 'killcheck': True, 'kpts_1D': False, 'conv_cutoff': False, 'conv_kpt': False, 'debug': False,
-                         'bnl': False, 'intel_mpi': False, 'exec_test': True, 'start': True, 'verbosity': 0}
+                         'bnl': False, 'slurm': False, 'intel': False, 'exec_test': True, 'start': True, 'verbosity': 0}
         self.__dict__.update(prop_defaults)
         self.__dict__.update(kwargs)
+        if self.bnl and not self.slurm:
+            try:
+                raise DeprecationWarning('Please use --slurm rather than --bnl in future.')
+            except Exception as e:
+                print_exc()
+            self.slurm = True
 
         self.ncores = ncores
         self.res = res
@@ -79,17 +87,20 @@ class FullRelaxer:
         self.conv_kpt_bool = isinstance(self.conv_kpt, list)
         self.enough_memory = True
         self.success = None
+        self._mpi_library = None
+
         if self.paths is None:
             self.paths = {}
             self.paths['completed_dir'] = 'completed'
         else:
             assert 'completed_dir' in self.paths
 
-        if self.exec_test:
-            self.test_exec()
-
         # run through CASTEP specific features
         if self.mode is 'castep':
+
+            if self.exec_test:
+                self.test_exec()
+
             if self.kpts_1D:
                 assert('kpoints_mp_spacing' in self.cell_dict)
                 self.target_spacing = deepcopy(self.cell_dict['kpoints_mp_spacing'])
@@ -531,23 +542,83 @@ class FullRelaxer:
 
         Raises:
 
-            SystemExit: if executable not found.
+            | SystemExit: if executable not found.
 
         """
-        proc = self.castep('--version', exec_test=True)
+        try:
+            proc = self.castep('--version', exec_test=True)
+        except FileNotFoundError:
+            print('Unable to call mpirun/aprun/srun, currently selected: {}'.format(self.mpi_library))
+            raise RuntimeError('Please check initialistion of FullRelaxer object/CLI args.')
+
         out, errs = proc.communicate()
         if 'version' not in out.decode('utf-8') and errs is not None:
             err_string = 'Executable {} failed testing. Is it on your PATH?\nError output: {}'.format(self.executable, errs.decode('utf-8'))
             print_failure(err_string)
             exit(err_string)
 
+    @property
+    def mpi_library(self):
+        """ Property to store/compute desired MPI library. """
+        if self._mpi_library is None:
+            self._mpi_library = self.set_mpi_library()
+        return self._mpi_library
+
+    def set_mpi_library(self):
+        """ Combines command-line MPI arguments into string
+        and calls MPI library detection is no args are present.
+        """
+        if sum([self.archer, self.intel, self.slurm]) > 1:
+            raise RuntimeError('Conflicting command-line arguments for MPI library have been supplied, exiting.')
+        elif self.archer:
+            return 'archer'
+        elif self.intel:
+            return 'intel'
+        elif self.slurm:
+            return 'slurm'
+        else:
+            return self.detect_mpi(verbosity=self.verbosity)
+
+    @staticmethod
+    def detect_mpi(verbosity=0):
+        """ Test which mpi library is being used when `mpirun`.
+
+        Returns:
+
+            | mpi_library: str, 'intel', 'archer', or 'default'.
+
+        """
+        # check first for existence of mpirun command, then aprun if that fails
+        try:
+            try:
+                mpi_version_string = str(sp.check_output('mpirun --version', shell=True))
+            except sp.CalledProcessError as e:
+                mpi_version_string = str(sp.check_output('aprun --version', shell=True))
+        except Exception as e:
+            print_exc()
+            raise e
+        if 'Intel' in mpi_version_string:
+            if verbosity > 1:
+                print('Detected Intel MPI library.')
+            return 'intel'
+        elif 'aprun' in mpi_version_string:
+            if verbosity > 2:
+                print('Detected ARCHER MPI library.')
+            return 'archer'
+        else:
+            if verbosity > 1:
+                print('Could not detect MPI library, version string was:')
+                print(mpi_version_string)
+                print('Using default (OpenMPI-style) mpi calls.')
+            return 'default'
+
     def do_memcheck(self, calc_doc, seed):
         """ Perform a CASTEP dryrun to estimate memory usage.
 
         Returns:
 
-            True if the memory estimate is <90% of node RAM,
-            otherwise False.
+            | True if the memory estimate is <90% of node RAM,
+              otherwise False.
 
         """
         doc2param(calc_doc, seed, hash_dupe=False)
@@ -614,11 +685,11 @@ class FullRelaxer:
         if self.nnodes is None or self.nnodes == 1:
             if self.ncores == 1 and self.node is None:
                 command = ['nice', '-n', '15'] + command
-            elif self.archer:
+            elif self.mpi_library is 'archer':
                 command = ['aprun', '-n', str(self.ncores)] + command
-            elif self.bnl:
+            elif self.mpi_library is 'slurm':
                 command = ['srun', '--exclusive', '-N', '1', '-n', str(self.ncores)] + command
-            elif self.intel_mpi:
+            elif self.mpi_library is 'intel':
                 command = ['mpirun', '-n', str(self.ncores), '-ppn', str(self.ncores)] + command
             elif self.node is not None:
                 cwd = getcwd()
@@ -627,19 +698,23 @@ class FullRelaxer:
             else:
                 command = ['nice', '-n', '15', 'mpirun', '-n', str(self.ncores)] + command
         else:
-            if self.archer:
+            if self.mpi_library is 'archer':
                 command = ['aprun', '-n', str(self.ncores*self.nnodes),
                            '-N', str(self.ncores),
                            '-S', '12',
                            '-d', '1'] + command
-            elif self.bnl:
+            elif self.mpi_library is 'slurm':
                 command = ['srun', '--exclusive', '-N', str(self.nnodes), '-n', str(self.ncores*self.nnodes)] + command
-            elif self.intel_mpi:
+            elif self.mpi_library is 'intel':
                 command = ['mpirun', '-n', str(self.ncores*self.nnodes),
                            '-ppn', str(self.ncores)] + command
             else:
                 command = ['mpirun', '-n', str(self.ncores*self.nnodes),
                            '-npernode', str(self.ncores)] + command
+
+        # ensure default stdout is None for generic mpi calls
+        stdout = None
+        stderr = None
 
         if exec_test:
             stdout = sp.PIPE
@@ -719,7 +794,8 @@ class FullRelaxer:
                     pass
         return
 
-    def cp_to_input(self, seed, ext='res', glob_files=False):
+    @staticmethod
+    def cp_to_input(seed, ext='res', glob_files=False):
         """ Copy initial cell and res to input folder. """
         try:
             if not exists('input'):
@@ -734,12 +810,11 @@ class FullRelaxer:
                 copy('{}.{}'.format(seed, ext), 'input')
         except:
             print_exc()
-            if self.verbosity > 1:
-                print_exc()
             pass
         return
 
-    def tidy_up(self, seed):
+    @staticmethod
+    def tidy_up(seed):
         """ Delete all run3 created files before quitting. """
         for f in glob.glob(seed + '.*'):
             if not (f.endswith('.res') or f.endswith('.castep')):
