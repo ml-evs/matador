@@ -829,7 +829,7 @@ def plot_2d_hull(hull, ax=None, dis=False, show=False, plot_points=True, plot_hu
                     if plot_points:
                         scatter.append(ax.scatter(hull.structures[ind, 0], hull.structures[ind, 1],
                                        s=hull.scale*40, lw=lw, alpha=0.9, c=c, edgecolor='k',
-                                       label=hull.info[ind], zorder=300))
+                                       zorder=300))
             if plot_points:
                 ax.scatter(hull.structures[1:-1, 0], hull.structures[1:-1, 1], s=hull.scale*30, lw=lw,
                            alpha=0.3, c=hull.colours[-2],
