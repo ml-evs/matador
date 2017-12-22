@@ -22,6 +22,14 @@ matador\.compute module
     :undoc-members:
     :show-inheritance:
 
+matador\.crystal module
+-----------------------
+
+.. automodule:: matador.crystal
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 matador\.export module
 ----------------------
 
@@ -42,6 +50,14 @@ matador\.pdffit module
 ----------------------
 
 .. automodule:: matador.pdffit
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+matador\.plotting module
+------------------------
+
+.. automodule:: matador.plotting
     :members:
     :undoc-members:
     :show-inheritance:

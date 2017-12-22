@@ -20,6 +20,14 @@ matador\.scrapers\.experiment\_scrapers module
     :undoc-members:
     :show-inheritance:
 
+matador\.scrapers\.magres\_scrapers module
+------------------------------------------
+
+.. automodule:: matador.scrapers.magres_scrapers
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 matador\.scrapers\.qe\_scrapers module
 --------------------------------------
 

@@ -326,20 +326,7 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, verb
                     pspot_seed += species + '_*OTF.usp'
                     for globbed in glob.glob(pspot_seed):
                         if isfile(globbed):
-                            with open(globbed, 'r') as f:
-                                flines = f.readlines()
-                                for line_no, line in enumerate(flines):
-                                    if 'Pseudopotential Report' in line:
-                                        i = 0
-                                        while i+line_no < len(flines)-3:
-                                            if 'Pseudopotential Report' in flines[line_no+i]:
-                                                i += 2
-                                                elem = flines[line_no+i].split(':')[1].split()[0]
-                                            elif 'core correction' in flines[line_no+i]:
-                                                i += 2
-                                                cell['species_pot'][elem] = \
-                                                    flines[line_no+i].split('"')[1]
-                                            i += 1
+                            cell['species_pot'].update(usp2dict(globbed))
     except Exception as oops:
         if verbosity > 0:
             print_exc()
@@ -405,17 +392,19 @@ def param2dict(seed, db=True, verbosity=0, **kwargs):
                             temp_cut_off = (param['cut_off_energy'].replace('ev', ''))
                             temp_cut_off = temp_cut_off.strip()
                             param['cut_off_energy'] = float(temp_cut_off)
-                        if 'xc_functional' in line:
+                        elif 'xc_functional' in line:
                             param['xc_functional'] = param['xc_functional'].upper()
-                        if 'write_cell_structure' in line:
+                        elif 'write_cell_structure' in line:
                             if param['write_cell_structure'].lower() == 'false':
                                 param['write_cell_structure'] = False
                             else:
                                 param['write_cell_structure'] = True
-                        if 'perc_extra_bands' in line:
+                        elif 'perc_extra_bands' in line:
                             param['perc_extra_bands'] = float(param['perc_extra_bands'])
-                        if 'geom_force_tol' in line:
+                        elif 'geom_force_tol' in line:
                             param['geom_force_tol'] = float(param['geom_force_tol'])
+                        elif 'elec_energy_tol' in line:
+                            param['elec_energy_tol'] = float(param['elec_energy_tol'])
                         break
     except Exception as oops:
         if verbosity > 0:
@@ -600,6 +589,10 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
                 castep['kpoints_mp_grid'] = list(map(int, list(line.split('is')[-1].split())))
             elif 'num_kpoints' not in castep and 'Number of kpoints used' in line:
                 castep['num_kpoints'] = int(line.split()[-1])
+            elif 'geom_force_tol' not in castep and 'max ionic |force| tolerance' in line:
+                castep['geom_force_tol'] = float(line.split()[-2])
+            elif 'elec_energy_tol' not in castep and 'total energy / atom convergence tol' in line:
+                castep['elec_energy_tol'] = float(line.split()[-2])
             elif 'sedc_apply' not in castep and \
                     'DFT+D: Semi-empirical dispersion correction    : on' in line:
                 castep['sedc_apply'] = True
@@ -872,6 +865,18 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
             castep['cell_volume'] = 'xxx'
         if 'space_group' not in castep:
             castep['space_group'] = 'xxx'
+        # finally check for pseudopotential files if OTF is present in species_pot
+        if db:
+            for species in castep['species_pot']:
+                if 'OTF' in castep['species_pot'][species].upper():
+                    pspot_seed = ''
+                    for dir in seed.split('/')[:-1]:
+                        pspot_seed += dir + '/'
+                    # glob for all .usp files with format species_*OTF.usp
+                    pspot_seed += species + '_*OTF.usp'
+                    for globbed in glob.glob(pspot_seed):
+                        if isfile(globbed):
+                            castep['species_pot'].update(usp2dict(globbed))
     except Exception as oops:
         if type(oops) == DFTError:
             if db:
@@ -1176,6 +1181,36 @@ def phonon2dict(seed, verbosity=0, **kwargs):
     assert(sum([len(branch) for branch in ph['qpoint_branches']]) == ph['num_qpoints'])
 
     return ph, True
+
+
+def usp2dict(seed):
+    """ Extract pseudopotential string from a CASTEP
+    OTF .USP file.
+
+    Input:
+
+        | seed: str, filename of usp file.
+
+    Returns:
+
+        | species_pot: dict, partial species_pot dict from usp file.
+
+    """
+    species_pot = dict()
+    with open(seed, 'r') as f:
+        flines = f.readlines()
+        for line_no, line in enumerate(flines):
+            if 'Pseudopotential Report' in line:
+                i = 0
+                while i+line_no < len(flines)-3:
+                    if 'Pseudopotential Report' in flines[line_no+i]:
+                        i += 2
+                        elem = flines[line_no+i].split(':')[1].split()[0]
+                    elif 'core correction' in flines[line_no+i]:
+                        i += 2
+                        species_pot[elem] = flines[line_no+i].split('"')[1]
+                    i += 1
+    return species_pot
 
 
 class DFTError(Exception):

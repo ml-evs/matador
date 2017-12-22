@@ -373,7 +373,7 @@ if __name__ == '__main__':
     structure_flags.add_argument('-ac', '--calc_match', action='store_true',
                                  help='display calculations of the same accuracy as specified id')
     structure_flags.add_argument('-kpttol', '--kpoint-tolerance', type=float,
-                                 help='kpoint tolerance for calculation matches (DEFAULT: +/- 0.01 1/A')
+                                 help='kpoint tolerance for calculation matches (DEFAULT: +/- 0.01 1/A)')
     structure_flags.add_argument('-z', '--num_fu', type=int,
                                  help='query a calculations with more than n formula units')
     structure_flags.add_argument('-sg', '--space_group',
@@ -404,6 +404,8 @@ if __name__ == '__main__':
                                  help='specify the chiral vector of the encapsulating nanotube')
     structure_flags.add_argument('-ecut', '--cutoff', type=float, nargs='+',
                                  help='specify the minimum and optionally maximum planewave cutoff.')
+    structure_flags.add_argument('-geom', '--geom_force_tol', type=float, nargs='+',
+                                 help='relaxation force tolerance values in eV/A to query for calculation matches.')
     structure_flags.add_argument('--sedc', type=str,
                                  help='specify the dispersion correction scheme, e.g. TS or null.')
     structure_flags.add_argument('-xc', '--xc_functional', type=str,

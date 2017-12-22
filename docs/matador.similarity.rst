@@ -20,6 +20,14 @@ matador\.similarity\.similarity module
     :undoc-members:
     :show-inheritance:
 
+matador\.similarity\.voronoi\_similarity module
+-----------------------------------------------
+
+.. automodule:: matador.similarity.voronoi_similarity
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 
 Module contents
 ---------------

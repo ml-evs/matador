@@ -38,7 +38,7 @@ class ScrapeTest(unittest.TestCase):
             test_dict, s = cell2dict(cell_fname, db=False, outcell=False, verbosity=0)
             self.assertTrue(test_dict.get('lattice_cart') is None)
 
-    def testCastep(self):
+    def testCastep16(self):
         from matador.scrapers.castep_scrapers import castep2dict
         castep_fname = REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep'
         failed_open = False
@@ -64,8 +64,41 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(test_dict['lattice_abc'][1][0], 90, msg='Wrong lattice constants!')
             self.assertEqual(test_dict['lattice_abc'][1][1], 90, msg='Wrong lattice constants!')
             self.assertEqual(test_dict['lattice_abc'][1][2], 59.971185, msg='Wrong lattice constants!')
+            self.assertEqual(test_dict['geom_force_tol'], 0.05, msg='Wrong geom force tol')
             self.assertEqual(test_dict['castep_version'], '16.11')
             self.assertEqual(test_dict['estimated_mem_MB'], 345.1)
+
+    def testCastep17(self):
+        from matador.scrapers.castep_scrapers import castep2dict
+        castep_fname = REAL_PATH + 'data/KP-castep17.castep'
+        failed_open = False
+        try:
+            f = open(castep_fname, 'r')
+        except:
+            failed_open = True
+            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(castep_fname))
+        if not failed_open:
+            f.close()
+            test_dict, s = castep2dict(castep_fname, db=True, verbosity=0)
+            self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
+            self.assertEqual(test_dict['pressure'], 0.0180, msg='Failed to read pressure!')
+            self.assertEqual(test_dict['enthalpy'], -5.98055077e3, msg='Failed to read enthalpy!')
+            self.assertEqual(test_dict['num_atoms'], 9, msg='Wrong number of atoms!')
+            self.assertTrue(['P', 2] in test_dict['stoichiometry'], msg='Wrong stoichiometry!')
+            self.assertTrue(['K', 7] in test_dict['stoichiometry'], msg='Wrong stoichiometry!')
+            self.assertEqual(test_dict['cell_volume'], 522.226927, msg='Wrong cell volume!')
+            self.assertEqual(test_dict['space_group'], 'Pm', msg='Wrong space group!')
+            self.assertEqual(test_dict['lattice_abc'][0][0], 10.231976, msg='Wrong lattice constants!')
+            self.assertEqual(test_dict['lattice_abc'][0][1], 5.024837, msg='Wrong lattice constants!')
+            self.assertEqual(test_dict['lattice_abc'][0][2], 10.186949, msg='Wrong lattice constants!')
+            self.assertEqual(test_dict['lattice_abc'][1][0], 90.000000, msg='Wrong lattice constants!')
+            self.assertEqual(test_dict['lattice_abc'][1][1], 94.373377, msg='Wrong lattice constants!')
+            self.assertEqual(test_dict['lattice_abc'][1][2], 90.000000, msg='Wrong lattice constants!')
+            self.assertEqual(test_dict['geom_force_tol'], 0.01, msg='Wrong geom force tol')
+            self.assertEqual(test_dict['castep_version'], '17.21')
+            self.assertEqual(test_dict['estimated_mem_MB'], 300.1)
+            self.assertEqual(test_dict['species_pot']['K'], '2|1.5|9|10|11|30U:40:31(qc=6)', msg='Failed to scrape K_OTF.usp file')
+            self.assertEqual(test_dict['species_pot']['P'], '3|1.8|4|4|5|30:31:32', msg='Failed to scrape P_OTF.usp file')
 
     def testRes(self):
         from matador.scrapers.castep_scrapers import res2dict
@@ -203,6 +236,11 @@ class ScrapeTest(unittest.TestCase):
             from matador.utils.chem_utils import RY_TO_EV
             np.testing.assert_equal(pwout_dict['enthalpy'], -RY_TO_EV*97.6314378617)
             np.testing.assert_array_almost_equal(pwout_dict['positions_frac'][5], [0.779038368, 0.580790316, 0.631222097])
+
+    def testUSP(self):
+        from matador.scrapers.castep_scrapers import usp2dict
+        self.assertEqual(usp2dict(REAL_PATH + 'data/K_OTF.usp')['K'], '2|1.5|9|10|11|30U:40:31(qc=6)', msg='Failed to scrape K_OTF.usp file')
+        self.assertEqual(usp2dict(REAL_PATH + 'data/P_OTF.usp')['P'], '3|1.8|4|4|5|30:31:32', msg='Failed to scrape P_OTF.usp file')
 
 
 class ExportTest(unittest.TestCase):

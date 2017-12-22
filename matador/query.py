@@ -11,12 +11,7 @@ from sys import exit
 import sys
 from itertools import combinations
 from traceback import print_exc
-try:
-    from math import gcd
-except ImportError:
-    from fractions import gcd
-    print_warning('Use of fractions.gcd is deprecated - '
-                  'Python3 is recommended but will try to proceed.')
+from math import gcd
 # matador modules
 from .utils.print_utils import print_failure, print_warning, print_success
 from .utils.chem_utils import get_periodic_table, get_formula_from_stoich
@@ -200,6 +195,10 @@ class DBQuery(object):
             self.query_dict['$and'].append(self.query_cutoff())
             self.empty_query = False
 
+        if self.args.get('geom_force_tol') is not None:
+            self.query_dict['$and'].append(self.query_geom_force_tol())
+            self.empty_query = False
+
         if self.args.get('src_str') is not None:
             self.query_dict['$and'].append(self.query_source())
             self.empty_query = False
@@ -375,6 +374,7 @@ class DBQuery(object):
                                   self.cursor[ind]['sedc_scheme'] + '-' if self.cursor[ind].get('sedc_scheme') is not None else '',
                                   self.cursor[ind]['xc_functional'] + ', ',
                                   self.cursor[ind]['cut_off_energy'], ' eV, ',
+                                  self.cursor[ind]['geom_force_tol'] if self.cursor[ind].get('geom_force_tol') is not None else 'xxx', ' eV/A, ',
                                   self.cursor[ind]['kpoints_mp_spacing'] if self.cursor[ind].get('kpoints_mp_spacing') is not None else 'xxx', ' 1/A', sep='')
                             if test_cursor_count[-1] == count:
                                 print('Matched all structures...')
@@ -776,6 +776,23 @@ class DBQuery(object):
             query_dict['cut_off_energy']['$gte'] = cutoffs[0]
         return query_dict
 
+    def query_geom_force_tol(self):
+        """ Query all calculations with the correct relaxed force tolerance. """
+        query_dict = dict()
+        query_dict['geom_force_tol'] = dict()
+        if not isinstance(self.args.get('cutoff'), list):
+            tols = [self.args.get('geom_force_tol')]
+        else:
+            tols = self.args.get('geom_force_tol')
+        if len(tols) == 2:
+            if tols[0] > tols[1]:
+                exit('Force tol needs to be of form [min, max]')
+            query_dict['geom_force_tol']['$lte'] = tols[0]
+            query_dict['geom_force_tol']['$gte'] = tols[1]
+        else:
+            query_dict['geom_force_tol']['$lte'] = tols[0]
+        return query_dict
+
     def query_sedc(self):
         """ Query all calculations using given SEDC scheme.
 
@@ -859,6 +876,9 @@ class DBQuery(object):
             temp_dict['spin_polarized'] = dict()
             temp_dict['spin_polarized']['$ne'] = True
             query_dict.append(temp_dict)
+        if 'geom_force_tol' in doc:
+            temp_dict['geom_force_tol'] = doc['geom_force_tol']
+            query_dict.append(temp_dict)
         if 'sedc_scheme' in doc:
             temp_dict['sedc_scheme'] = doc['sedc_scheme']
             query_dict.append(temp_dict)
@@ -921,7 +941,6 @@ class DBQuery(object):
             query_dict['_id']['$lte'] = cutoff_id
 
         return query_dict
-
 
     def temp_collection(self, cursor):
         """ Create temporary collection
