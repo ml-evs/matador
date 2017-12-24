@@ -24,29 +24,40 @@ class HullTest(unittest.TestCase):
         res_list = glob(REAL_PATH + 'data/hull-KPSn-KP/*.res')
         self.assertEqual(len(res_list), 87, 'Could not find test res files, please check installation...')
         cursor = [res2dict(res)[0] for res in res_list]
-        hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'], no_plot=True)
+        hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'], no_plot=True, quiet=True)
         self.assertEqual(len(hull.hull_cursor), 16)
 
     def testHullFromFileWithExtraneousElements(self):
         res_list = glob(REAL_PATH + 'data/hull-KPSn-KP/*.res')
         cursor = [res2dict(res)[0] for res in res_list]
-        hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn'], no_plot=True)
+        hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn'], no_plot=True, quiet=True)
         self.assertEqual(len(hull.hull_cursor), 5)
 
-    def testHullDistances(self):
+    def testBinaryHullDistances(self):
+        res_list = glob(REAL_PATH + 'data/hull-KP-KSnP_pub/*.res')
+        self.assertEqual(len(res_list), 295, 'Could not find test res files, please check installation...')
+        cursor = [res2dict(res)[0] for res in res_list]
+        hull = QueryConvexHull(cursor=cursor, elements=['K', 'P'], no_plot=True, quiet=True)
+
+        structures = np.loadtxt(REAL_PATH + 'data/test_KP.dat')
+        hull_dist_test = np.loadtxt(REAL_PATH + 'data/test_KP_hull_dist.dat')
+        precomp_hull_dist, energies, comps = hull.get_hull_distances(structures, precompute=True)
+        np.testing.assert_array_almost_equal(hull_dist_test, hull.hull_dist, decimal=3)
+        np.testing.assert_array_almost_equal(hull.hull_dist, precomp_hull_dist, decimal=6)
+
+    def testTernaryHullDistances(self):
         res_list = glob(REAL_PATH + 'data/hull-KPSn-KP/*.res')
         self.assertEqual(len(res_list), 87, 'Could not find test res files, please check installation...')
         cursor = [res2dict(res)[0] for res in res_list]
-        hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'], no_plot=True)
+        hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'], no_plot=True, quiet=True)
         self.assertEqual(len(hull.hull_cursor), 16)
+        self.assertEqual(len(hull.cursor), 87)
 
-        print('Reading in arrays')
         structures = np.loadtxt(REAL_PATH + 'data/test_KSnP.dat')
-        hull_dist_test = np.loadtxt(REAL_PATH + 'data/test_hull_dist.dat')
-        print('Calculating hull dists')
-        hull_dist, energies, comps = hull.get_hull_distances(structures)
-        print('Comparing arrays')
-        np.testing.assert_array_almost_equal(hull_dist_test, hull_dist, decimal=3)
+        hull_dist_test = np.loadtxt(REAL_PATH + 'data/test_KSnP_hull_dist.dat')
+        precomp_hull_dist, energies, comps = hull.get_hull_distances(structures, precompute=True)
+        np.testing.assert_array_almost_equal(hull_dist_test, hull.hull_dist, decimal=3)
+        np.testing.assert_array_almost_equal(hull.hull_dist, precomp_hull_dist, decimal=3)
 
 
 class VoltageTest(unittest.TestCase):
@@ -65,7 +76,7 @@ class VoltageTest(unittest.TestCase):
         with open(REAL_PATH + 'data/elements.json') as f:
             elements = json.load(f)
         bare_hull = QueryConvexHull.__new__(QueryConvexHull)
-        bare_hull.args = {'debug': True}
+        bare_hull.args = {'debug': True, 'quiet': True}
         bare_hull.cursor = list(hull_cursor)
         bare_hull.ternary = False
         bare_hull.elements = list(elements)
@@ -87,20 +98,13 @@ class VoltageTest(unittest.TestCase):
         # test LiP voltage curve from Mayo et al, Chem. Mater. (2015) DOI: 10.1021/acs.chemmater.5b04208
         res_list = glob(REAL_PATH + 'data/hull-LiP-mdm_chem_mater/*.res')
         cursor = [res2dict(res)[0] for res in res_list]
-        hull = QueryConvexHull(cursor=cursor, elements=['Li', 'P'], no_plot=True, subcmd='voltage')
+        hull = QueryConvexHull(cursor=cursor, elements=['Li', 'P'], no_plot=True, subcmd='voltage', quiet=True)
         self.assertEqual(len(hull.voltages), len(hull.Q))
         self.assertEqual(len(hull.voltages), len(hull.Q))
         LiP_voltage_curve = np.loadtxt(REAL_PATH + 'data/LiP_voltage.csv', delimiter=',')
         self.assertTrue(len(hull.voltages) == 1)
-        print(LiP_voltage_curve)
-        print(hull.voltages[0])
-        print(hull.Q[0])
         np.testing.assert_allclose(hull.voltages[0], LiP_voltage_curve[:, 1], verbose=True, rtol=1e-4)
         np.testing.assert_allclose(hull.Q[0], LiP_voltage_curve[:, 0], verbose=True, rtol=1e-4)
-        # for ind in range(len(hull.voltages)):
-            # assert len(hull.Q[ind]) == len(hull.voltages[ind])
-            # assert np.isnan(hull.Q[ind][-1])
-            # assert hull.voltages[ind][-1] == 0
 
     def testTernaryVoltage(self):
         # test data from LiSnS
@@ -136,7 +140,7 @@ class VoltageTest(unittest.TestCase):
 
         bare_hull = QueryConvexHull.__new__(QueryConvexHull)
         bare_hull.hull = ConvexHull(points)
-        bare_hull.args = {'debug': True}
+        bare_hull.args = {'debug': True, 'quiet': True}
         bare_hull.elements = ['Li', 'Sn', 'S']
         bare_hull.hull_cursor = hull_cursor
         bare_hull.match = [{'enthalpy_per_atom': -380.071/2.0}]
@@ -167,7 +171,7 @@ class VoltageTest(unittest.TestCase):
                                             doc['stoichiometry'] != [['K', 4], ['Sn', 9]] and
                                             doc['stoichiometry'] != [['K', 5], ['P', 4]] and
                                             doc['stoichiometry'] != [['P', 2], ['Sn', 1]])]
-        hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'], no_plot=True, pathways=True, subcmd='voltage')
+        hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'], no_plot=True, pathways=True, subcmd='voltage', quiet=True)
         self.assertEqual(len(hull.voltages), len(hull.Q))
         np.testing.assert_array_almost_equal(np.asarray(hull.voltages), np.asarray([[1.0229, 1.0229, 0.2676, 0.000]]), decimal=3)
         for ind in range(len(hull.voltages)):
@@ -190,7 +194,7 @@ class VoltageTest(unittest.TestCase):
                                             doc['stoichiometry'] != [['K', 4], ['Sn', 9]] and
                                             doc['stoichiometry'] != [['K', 5], ['P', 4]] and
                                             doc['stoichiometry'] != [['P', 2], ['Sn', 1]])]
-        hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'], no_plot=True, pathways=True, subcmd='voltage')
+        hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'], no_plot=True, pathways=True, subcmd='voltage', quiet=True)
         self.assertEqual(len(hull.voltages), len(hull.Q))
         for ind in range(len(hull.voltages)):
             self.assertTrue(len(hull.voltages[ind])-1, len(hull.Q[ind]) or len(hull.voltages[ind]) == len(hull.Q[ind]))
@@ -205,7 +209,7 @@ class VoltageTest(unittest.TestCase):
         # load old hull then rejig it to go through a ternary phase
         res_list = glob(REAL_PATH + 'data/hull-LiSiP/*.res')
         cursor = [res2dict(res)[0] for res in res_list]
-        hull = QueryConvexHull(cursor=cursor, elements=['Li', 'Si', 'P'], pathways=True, no_plot=True, subcmd='voltage')
+        hull = QueryConvexHull(cursor=cursor, elements=['Li', 'Si', 'P'], pathways=True, no_plot=True, subcmd='voltage', quiet=True)
         self.assertEqual(len(hull.voltages), len(hull.Q))
         np.testing.assert_array_almost_equal(np.asarray(hull.voltages[0]), np.asarray([1.1683, 1.1683, 1.0759, 0.7983, 0.6447, 0.3726, 0.3394, 0.1995, 0.1570, 0.1113, 0.1041, 0.0000]), decimal=3)
         for ind in range(len(hull.voltages)):

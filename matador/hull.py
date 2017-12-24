@@ -11,9 +11,9 @@ from sys import exit
 import sys
 import re
 from os import devnull
-from sys import stdout
 # external libraries
 from scipy.spatial import ConvexHull
+from scipy.spatial.qhull import QhullError
 from bson.son import SON
 import pymongo as pm
 import numpy as np
@@ -139,7 +139,6 @@ class QueryConvexHull(object):
         if quiet:
             f.close()
             sys.stdout = sys.__stdout__
-
 
     @property
     def savefig(self):
@@ -329,7 +328,7 @@ class QueryConvexHull(object):
         print(notify)
         print(len(notify)*'─')
 
-    def get_hull_distances(self, structures):
+    def get_hull_distances(self, structures, precompute=True):
         """ Returns array of distances to pre-computed binary or ternary hull, from array
         containing concentrations and energies.
 
@@ -338,6 +337,11 @@ class QueryConvexHull(object):
             | structures : [N x n] np.ndarray, concentrations and enthalpies for N structures,
                            with up to 2 columns of concentrations and the last column containing
                            the structure's formation enthalpy.
+
+        Args:
+
+            | precompute: bool, whether or not to bootstrap hull distances from previously computed
+                          values at the same stoichiometry.
 
         Returns:
 
@@ -353,6 +357,11 @@ class QueryConvexHull(object):
         tie_line_comp = np.asarray(tie_line_comp)
         tie_line_energy = tie_line_energy[np.argsort(tie_line_comp)]
         tie_line_comp = tie_line_comp[np.argsort(tie_line_comp)]
+        if precompute:
+            # dict with formula keys, containing tuple of pre-computed enthalpy/atom and hull distance
+            cached_formula_dists = dict()
+            cache_hits = 0
+            cache_misses = 0
         # if only chem pots on hull, dist = energy
         if len(self.structure_slice) == 2:
             hull_dist = np.ones((len(structures)))
@@ -360,49 +369,81 @@ class QueryConvexHull(object):
         # if binary hull, do binary search
         elif len(self.structure_slice[0]) == 2:
             hull_dist = np.ones((len(structures)))
-            for ind in range(len(structures)):
-                i = bisect_left(tie_line_comp, structures[ind, 0])
-                gradient, intercept = vertices2line([[tie_line_comp[i-1], tie_line_energy[i-1]],
-                                                     [tie_line_comp[i], tie_line_energy[i]]])
-                # calculate hull_dist
-                hull_dist[ind] = structures[ind, -1] - (gradient * structures[ind, 0] + intercept)
-        # otherwise, set to zero until proper N-d distance can be implemented
-        else:
+            if precompute:
+                for ind, _ in enumerate(structures):
+                    formula = get_formula_from_stoich(self.cursor[ind]['stoichiometry'], tex=False)
+                    if formula in cached_formula_dists:
+                        hull_dist[ind] = structures[ind, -1] - cached_formula_dists[formula][0] + cached_formula_dists[formula][1]
+                        cache_hits += 1
+                    else:
+                        i = bisect_left(tie_line_comp, structures[ind, 0])
+                        gradient, intercept = vertices2line([[tie_line_comp[i-1], tie_line_energy[i-1]],
+                                                             [tie_line_comp[i], tie_line_energy[i]]])
+                        # calculate hull_dist
+                        hull_dist[ind] = structures[ind, -1] - (gradient * structures[ind, 0] + intercept)
+                        cached_formula_dists[formula] = (structures[ind, -1], hull_dist[ind])
+                        cache_misses += 1
+            else:
+                for ind, _ in enumerate(structures):
+                    i = bisect_left(tie_line_comp, structures[ind, 0])
+                    gradient, intercept = vertices2line([[tie_line_comp[i-1], tie_line_energy[i-1]],
+                                                         [tie_line_comp[i], tie_line_energy[i]]])
+                    # calculate hull_dist
+                    hull_dist[ind] = structures[ind, -1] - (gradient * structures[ind, 0] + intercept)
+        # if ternary, use barycentric coords
+        elif len(self.structure_slice[0]) == 3:
             # for each plane, convert each point into barycentric coordinates
             # for that plane and test for negative values
             self.hull.planes = [[self.structure_slice[vertex] for vertex in simplex] for simplex in self.hull.simplices]
-            self.plane_points = []
-            structures_sorted = [False]*len(structures)
+            structures_finished = [False]*len(structures)
             hull_dist = np.ones((len(structures)+1))
+            planes_R_inv = []
+            planes_height_fn = []
             for ind, plane in enumerate(self.hull.planes):
-                self.plane_points.append([])
                 R = barycentric2cart(plane).T
                 R[-1, :] = 1
                 # if projection of triangle in 2D is a line, do binary search
                 if np.linalg.det(R) == 0:
-                    if self.args.get('debug'):
-                        print('TRANSFORMATION MATRIX IS SINGULAR')
-                    continue
+                    planes_R_inv.append(None)
+                    planes_height_fn.append(None)
                 else:
-                    get_height_above_plane = vertices2plane(plane)
-                    R_inv = np.linalg.inv(R)
-                    for idx, structure in enumerate(structures):
-                        if not structures_sorted[idx]:
-                            barycentric_structure = barycentric2cart(structure.reshape(1, 3)).T
-                            barycentric_structure[-1, :] = 1
-                            plane_barycentric_structure = np.matrix(R_inv) * np.matrix(barycentric_structure)
-                            if (plane_barycentric_structure >= 0-1e-12).all():
-                                self.plane_points[-1].append(idx)
-                                structures_sorted[idx] = True
-                                hull_dist[idx] = get_height_above_plane(structure)
-
-            # for ind in self.hull.vertices:
-                # hull_dist[ind] = 0.0
+                    planes_R_inv.append(np.linalg.inv(R))
+                    planes_height_fn.append(vertices2plane(plane))
+            for idx, structure in enumerate(structures):
+                for ind, plane in enumerate(self.hull.planes):
+                    if structures_finished[idx] or planes_R_inv[ind] is None:
+                        continue
+                    if precompute and get_formula_from_stoich(self.cursor[idx]['stoichiometry'], tex=False) in cached_formula_dists:
+                        formula = get_formula_from_stoich(self.cursor[idx]['stoichiometry'], tex=False)
+                        if formula in cached_formula_dists:
+                            cache_hits += 1
+                            hull_dist[ind] = structures[ind, -1] - cached_formula_dists[formula][0] + cached_formula_dists[formula][1]
+                            structures_finished[idx] = True
+                    else:
+                        barycentric_structure = barycentric2cart(structure.reshape(1, 3)).T
+                        barycentric_structure[-1, :] = 1
+                        plane_barycentric_structure = np.matrix(planes_R_inv[ind]) * np.matrix(barycentric_structure)
+                        if (plane_barycentric_structure >= 0-1e-12).all():
+                            structures_finished[idx] = True
+                            if precompute:
+                                cache_misses += 1
+                            hull_dist[idx] = planes_height_fn[ind](structure)
+                            if precompute:
+                                cached_formula_dists[get_formula_from_stoich(self.cursor[idx]['stoichiometry'], tex=False)] = (structure[-1], hull_dist[idx])
             self.failed_structures = []
-            for ind in range(len(structures_sorted)):
-                if not structures_sorted[ind]:
+            for ind in range(len(structures_finished)):
+                if not structures_finished[ind]:
                     self.failed_structures.append(ind)
             self.failed_structures = np.asarray(self.failed_structures)
+            hull_dist = hull_dist[:-1]
+
+        # otherwise, set to zero until proper N-d distance can be implemented
+        else:
+            for ind in self.hull.vertices:
+                hull_dist[ind] = 0.0
+
+        if precompute:
+            print(cache_hits, '/', cache_misses)
         return hull_dist, tie_line_energy, tie_line_comp
 
     def hull_2d(self, dis=False):
@@ -492,29 +533,27 @@ class QueryConvexHull(object):
         else:
             try:
                 self.hull = ConvexHull(self.structure_slice)
-                # filter out top of hull - ugly
-                if self.ternary:
-                    filtered_vertices = [vertex for vertex in self.hull.vertices if self.structure_slice[vertex, -1] <= 0 + 1e-9]
-                    temp_simplices = self.hull.simplices
-                    bad_simplices = []
-                    for ind, simplex in enumerate(temp_simplices):
-                        for vertex in simplex:
-                            if vertex not in filtered_vertices:
-                                bad_simplices.append(ind)
-                                break
-                    filtered_simplices = [simplex for ind, simplex in enumerate(temp_simplices) if ind not in bad_simplices]
-                    del self.hull
-                    self.hull = FakeHull()
-                    self.hull.vertices = list(filtered_vertices)
-                    self.hull.simplices = list(filtered_simplices)
-
-                self.hull_dist, self.hull_energy, self.hull_comp = self.get_hull_distances(structures)
-                if self.ternary:
-                    self.hull_dist = self.hull_dist[:-1]
-                set_cursor_from_array(self.cursor, self.hull_dist, 'hull_distance')
-            except:
+            except QhullError:
                 print_exc()
                 print('Error with QHull, plotting points only...')
+            # filter out top of hull - ugly
+            if self.ternary:
+                filtered_vertices = [vertex for vertex in self.hull.vertices if self.structure_slice[vertex, -1] <= 0 + 1e-9]
+                temp_simplices = self.hull.simplices
+                bad_simplices = []
+                for ind, simplex in enumerate(temp_simplices):
+                    for vertex in simplex:
+                        if vertex not in filtered_vertices:
+                            bad_simplices.append(ind)
+                            break
+                filtered_simplices = [simplex for ind, simplex in enumerate(temp_simplices) if ind not in bad_simplices]
+                del self.hull
+                self.hull = FakeHull()
+                self.hull.vertices = list(filtered_vertices)
+                self.hull.simplices = list(filtered_simplices)
+
+            self.hull_dist, self.hull_energy, self.hull_comp = self.get_hull_distances(structures)
+            set_cursor_from_array(self.cursor, self.hull_dist, 'hull_distance')
 
         hull_cursor = [self.cursor[idx] for idx in np.where(self.hull_dist <= self.hull_cutoff + 1e-12)[0]]
         # if summary requested, filter for lowest per stoich
@@ -530,12 +569,6 @@ class QueryConvexHull(object):
             self.hull_cursor = hull_cursor
         self.hull_cursor = sorted(self.hull_cursor, key=lambda k: k['concentration'])
         self.structures = structures
-        # try:
-            # self.info = get_text_info(self.cursor, html=self.args.get('bokeh'))
-            # self.hull_info = get_text_info(cursor=self.cursor, hull=True, html=self.args.get('bokeh'))
-        # except:
-            # print_exc()
-            # pass
 
     def voltage_curve(self, hull_cursor):
         """ Take a computed convex hull and calculate voltages for either binary or ternary
