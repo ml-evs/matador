@@ -11,8 +11,8 @@ import numpy as np
 from collections import defaultdict
 
 
-def get_uniq_cursor(cursor, sim_calculator=PDF, sim_tol=5e-2, energy_tol=5e-2,
-                    enforce_same_stoich=True, projected=False,
+def get_uniq_cursor(cursor, sim_calculator=PDF, sim_tol=5e-2, energy_tol=1e-2,
+                    enforce_same_stoich=True, projected=True,
                     debug=False, **sim_calc_args):
     """ Uses sim_calculator to filter cursor into unique structures to some
     tolerance sim_tol,additionally returning a dict of duplicates and the
@@ -106,7 +106,7 @@ def get_uniq_cursor(cursor, sim_calculator=PDF, sim_tol=5e-2, energy_tol=5e-2,
     for i in dupe_dict:
         to_compare = [i]
         to_compare.extend(dupe_dict[i])
-        hierarchy = ['ICSD', 'OQMD', 'SWAP', 'AIRSS', 'GA']
+        hierarchy = ['ICSD', 'OQMD', 'SWAPS', 'AIRSS', 'GA']
         for provenance in hierarchy:
             found = False
             for k in to_compare:
@@ -131,10 +131,10 @@ def plot_similarity_energy_correlation_matrix(cursor, sim_mat, sim_vmin=0.05, si
 
     Inputs:
 
-        cursor   : a matador cursor
-        sim_mat  : matrix where S_{ij} = similarity distance(i, j)
-        sim_vmin : sim distance at which to show minimum colour
-        sim_vmax : "---------------------------" maximum "----"
+        | cursor   : a matador cursor
+        | sim_mat  : matrix where S_{ij} = similarity distance(i, j)
+        | sim_vmin : sim distance at which to show minimum colour
+        | sim_vmax : "---------------------------" maximum "----"
 
     """
     import matplotlib.pyplot as plt
