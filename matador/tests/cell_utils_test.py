@@ -150,7 +150,7 @@ class CellUtilTest(unittest.TestCase):
     def testKPointPath(self):
 
         cell, s = castep2dict(REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep')
-        std_cell, path, seekpath_results = get_seekpath_kpoint_path(cell, spacing=0.01, debug=True)
+        std_cell, path, seekpath_results = get_seekpath_kpoint_path(cell, spacing=0.01, debug=False)
         self.assertEqual(539, len(path))
 
         self.assertLess(pdf_sim_dist(cell, std_cell), 0.05)
@@ -164,7 +164,7 @@ class CellUtilTest(unittest.TestCase):
             doc, s = res2dict(fname, db=False)
             doc['cell_volume'] = cart2volume(doc['lattice_cart'])
 
-            std_doc, path, seekpath_results = get_seekpath_kpoint_path(doc, spacing=spacing, debug=True)
+            std_doc, path, seekpath_results = get_seekpath_kpoint_path(doc, spacing=spacing, debug=False)
             seekpath_results_path = get_path(doc2spg(doc))
 
             rel_path = seekpath_results['explicit_kpoints_rel']
@@ -180,7 +180,6 @@ class CellUtilTest(unittest.TestCase):
             self.assertLess(len(np.where(diffs > 1.1*spacing)[0]), len(seekpath_results['segments']))
 
             if 'flrys4-1x109' in fname:
-                print('Reading bands...')
                 bs, s = bands2dict(fname.replace('.res', '.bands'))
                 np.testing.assert_array_almost_equal(bs['kpoint_path'], rel_path)
                 np.testing.assert_array_almost_equal(bs['lattice_cart'], std_doc['lattice_cart'])
