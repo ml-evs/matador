@@ -9,14 +9,12 @@ from __future__ import print_function
 from matador.query import DBQuery
 from matador.hull import QueryConvexHull
 from matador.utils.print_utils import print_failure, print_warning, print_notify
+from matador.utils.db_utils import make_connection_to_collection
 from matador.utils.cursor_utils import display_results
 from matador.version import __version__
-# import external libraries
-import pymongo as pm
 # import standard library
 import argparse
 from sys import argv
-from os import uname
 from os.path import isfile
 
 
@@ -33,31 +31,10 @@ class Matador(object):
         self.args = vars(args[0])
         self.argstr = kwargs.get('argstr')
 
-        # connect to MonoDB structure repository
-        local = uname()[1]
-        if local == 'cluster2':
-            remote = 'node1'
-        else:
-            remote = None
-        self.client = pm.MongoClient(remote)
-        self.db = self.client.crystals
+        self.client, self.db, self.collections = make_connection_to_collection(self.args.get('db'))
 
-        # choose desired collections
-        self.collections = dict()
         if self.args['subcmd'] not in ['import', 'rebuild']:
-            if self.args['db'] is not None:
-                for database in self.args['db']:
-                    if database == 'all':
-                        self.collections = dict()
-                        self.collections['ajm'] = self.db['repo']
-                        self.collections['oqmd'] = self.db['oqmd']
-                    elif database == 'ajm':
-                        database = 'repo'
-                        self.collections['ajm'] = self.db['repo']
-                    else:
-                        self.collections[database] = self.db[database]
-            else:
-                self.collections['repo'] = self.db['repo']
+            self.collections = dict()
 
         # print last spatula report
         self.report = self.client.crystals.spatula
@@ -126,28 +103,10 @@ class Matador(object):
             self.cursor = self.hull.hull_cursor
 
         if self.args['subcmd'] == 'hulldiff':
+            from matador.hull_diff import diff_hulls
             if self.args.get('compare') is None:
                 exit('Please specify which hulls to query with --compare.')
-            diff_args = self.args['compare']
-            from matador.hull_diff import HullDiff
-            del self.args['compare']
-            self.args['no_plot'] = True
-            diff_args = sorted(diff_args)
-            self.args['time'] = diff_args[0]
-            print('Calculating hull {} days ago...'.format(self.args['time']))
-            self.query_old = DBQuery(self.client, self.collections, **self.args)
-            self.hull_old = QueryConvexHull(self.query_old, **self.args)
-            if len(diff_args) == 1 or isinstance(diff_args, str):
-                self.args['time'] = '0'
-            else:
-                self.args['time'] = diff_args[1]
-            if self.args['time'] == '0':
-                print('... to compare with up-to-date hull.')
-            else:
-                print('... to compare with hull {} days ago.'.format(self.args['time']))
-            self.query_new = DBQuery(self.client, self.collections, **self.args)
-            self.hull_new = QueryConvexHull(self.query_new, **self.args)
-            HullDiff(self.hull_old, self.hull_new)
+            diff_hulls(self.client, self.collections, **self.args)
 
         if self.args.get('uniq'):
             from matador.similarity.similarity import get_uniq_cursor

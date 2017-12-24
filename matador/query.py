@@ -6,7 +6,7 @@ and calling other functionality. """
 from __future__ import print_function
 # standard library
 import re
-from os import uname, devnull
+from os import devnull
 from sys import exit
 import sys
 from itertools import combinations
@@ -16,6 +16,7 @@ from math import gcd
 from .utils.print_utils import print_failure, print_warning, print_success
 from .utils.chem_utils import get_periodic_table, get_formula_from_stoich
 from .utils.cursor_utils import display_results
+from .utils.db_utils import make_connection_to_collection
 # external libraries
 import pymongo as pm
 import numpy as np
@@ -52,28 +53,8 @@ class DBQuery(object):
         # if empty collections, assume called from API and read kwargs,
         # also need to connect to db
         if not collections or not client:
-            local = uname()[1]
-            if local == 'cluster2':
-                remote = 'node1'
-            else:
-                remote = None
-            self.client = pm.MongoClient(remote)
-            self.db = self.client.crystals
-            self.collections = dict()
-            if self.args.get('db') is not None:
-                if type(self.args['db']) is not list:
-                    self.args['db'] = [self.args['db']]
-                for database in self.args['db']:
-                    if database == 'all':
-                        self.collections['ajm'] = self.db['repo']
-                        self.collections['oqmd'] = self.db['oqmd']
-                    elif database == 'ajm':
-                        database = 'repo'
-                        self.collections['ajm'] = self.db['repo']
-                    else:
-                        self.collections[database] = self.db[database]
-            else:
-                self.collections['ajm'] = self.db['repo']
+            self.client, self.db, self.collections = make_connection_to_collection(self.args.get('db'))
+
         # improve this clause at some point
         if self.args.get('summary') or self.args.get('subcmd') in ['swaps', 'polish']:
             self.top = -1
@@ -145,7 +126,7 @@ class DBQuery(object):
                 self.calc_dict['$and'] = []
                 # to avoid deep recursion, and since this is always called first
                 # don't append, just set
-                self.query_dict['$and'] = self.query_calc(self.cursor[0])
+                self.query_dict = self.query_calc(self.cursor[0])
                 self.calc_dict['$and'] = list(self.query_dict['$and'])
                 if self.args['subcmd'] in ['hull', 'hulldiff'] and self.args.get('composition') is None:
                     self.args['composition'] = ''
@@ -355,7 +336,7 @@ class DBQuery(object):
                     else:
                         self.query_dict = dict()
                         try:
-                            self.query_dict['$and'] = self.query_calc(id_cursor[0])
+                            self.query_dict = self.query_calc(id_cursor[0])
                             cutoff.append(id_cursor[0]['cut_off_energy'])
                             calc_dicts.append(dict())
                             calc_dicts[-1]['$and'] = list(self.query_dict['$and'])
@@ -807,13 +788,20 @@ class DBQuery(object):
 
         return query_dict
 
-    def query_xc_functional(self):
-        """ Query all calculations with specified xc-functional. """
+    def query_xc_functional(self, xc_functional=None):
+        """ Query all calculations with specified xc-functional.
+
+        Args:
+
+            | xc_functional: str, CASTEP string for xc-functional to override CLI.
+
+        """
         query_dict = dict()
-        if isinstance(self.args.get('xc_functional'), list):
-            xc_functional = self.args.get('xc_functional')[0]
-        else:
-            xc_functional = self.args.get('xc_functional')
+        if xc_functional is None:
+            if isinstance(self.args.get('xc_functional'), list):
+                xc_functional = self.args.get('xc_functional')[0]
+            else:
+                xc_functional = self.args.get('xc_functional')
         if xc_functional is not None:
             query_dict['xc_functional'] = xc_functional.upper()
         return query_dict
@@ -860,32 +848,29 @@ class DBQuery(object):
         """
         self.gs_enthalpy = doc['enthalpy_per_atom']
 
-        query_dict = []
-        # if missing xc, return dict that will have no matches
-        if 'xc_functional' not in doc:
-            query_dict.append(dict())
-            query_dict[-1]['xc_functional'] = 'missing'
-        temp_dict = dict()
-        temp_dict['xc_functional'] = doc['xc_functional']
-        query_dict.append(temp_dict)
+        query_dict = {}
+        query_dict['$and'] = []
+        query_dict['$and'].append(self.query_xc_functional(xc_functional=doc.get('xc_functional')))
+        if self.args.get('time') is not None:
+            query_dict['$and'].append(self.query_time())
         temp_dict = dict()
         if 'spin_polarized' in doc and doc['spin_polarized']:
             temp_dict['spin_polarized'] = doc['spin_polarized']
-            query_dict.append(temp_dict)
+            query_dict['$and'].append(temp_dict)
         else:
             temp_dict['spin_polarized'] = dict()
             temp_dict['spin_polarized']['$ne'] = True
-            query_dict.append(temp_dict)
+            query_dict['$and'].append(temp_dict)
         if 'geom_force_tol' in doc:
             temp_dict['geom_force_tol'] = doc['geom_force_tol']
-            query_dict.append(temp_dict)
+            query_dict['$and'].append(temp_dict)
         if 'sedc_scheme' in doc:
             temp_dict['sedc_scheme'] = doc['sedc_scheme']
-            query_dict.append(temp_dict)
+            query_dict['$and'].append(temp_dict)
         else:
             temp_dict['sedc_scheme'] = dict()
             temp_dict['sedc_scheme']['$exists'] = False
-            query_dict.append(temp_dict)
+            query_dict['$and'].append(temp_dict)
 
         db = self.args.get('db')
         if db is not None:
@@ -909,9 +894,9 @@ class DBQuery(object):
                 tol = 0.005
             temp_dict['kpoints_mp_spacing']['$gte'] = doc['kpoints_mp_spacing'] - tol
             temp_dict['kpoints_mp_spacing']['$lte'] = doc['kpoints_mp_spacing'] + tol
-            query_dict.append(temp_dict)
-            query_dict.append(dict())
-            query_dict[-1]['cut_off_energy'] = doc['cut_off_energy']
+            query_dict['$and'].append(temp_dict)
+            query_dict['$and'].append(dict())
+            query_dict['$and'][-1]['cut_off_energy'] = doc['cut_off_energy']
         if 'species_pot' in doc:
             for species in doc['species_pot']:
                 temp_dict = dict()
@@ -921,7 +906,7 @@ class DBQuery(object):
                 temp_dict['$or'][-1]['species_pot.'+species]['$exists'] = False
                 temp_dict['$or'].append(dict())
                 temp_dict['$or'][-1]['species_pot.'+species] = doc['species_pot'][species]
-                query_dict.append(temp_dict)
+                query_dict['$and'].append(temp_dict)
 
         return query_dict
 
