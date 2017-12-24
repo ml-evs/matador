@@ -32,6 +32,18 @@ class SimilarityFilterTest(unittest.TestCase):
         uniq_inds, dupe_dict, _, _ = get_uniq_cursor(test_docs)
         self.assertEqual(uniq_inds, {6})
 
+    def testUniqFilterWithHierarchy(self):
+        import glob
+        files = glob.glob(REAL_PATH + 'data/uniqueness_hierarchy/*.res')
+        cursor = [res2dict(f)[0] for f in files]
+        cursor = sorted(cursor, key=lambda x: x['enthalpy_per_atom'])[0:10]
+        uniq_inds, _, _, _ = get_uniq_cursor(cursor, sim_tol=0.1, energy_tol=0.05, projected=True)
+        filtered_cursor = [cursor[ind] for ind in uniq_inds]
+        self.assertEqual(len(uniq_inds), 3)
+        self.assertEqual(len(filtered_cursor), 3)
+        self.assertTrue('KP-NaP-OQMD_2817-CollCode14009' in filtered_cursor[0]['source'][0])
+        self.assertTrue('KP-NaP-CollCode421420' in filtered_cursor[2]['source'][0])
+
 
 if __name__ == '__main__':
     unittest.main()
