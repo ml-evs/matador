@@ -185,8 +185,6 @@ class Spatula(object):
                 struct['tags'] = self.tag_dict['tags']
             struct['quality'] = 5
             # if any missing info at all, score = 0
-            if 'species_pot' not in struct:
-                struct['quality'] = 0
             # include elem set for faster querying
             if 'elems' not in struct:
                 struct['elems'] = list(set(struct['atom_types']))
@@ -196,15 +194,18 @@ class Spatula(object):
                     # del_list.append(species)
             # for species in del_list:
                 # del struct['species_pot'][species]
-            for elem in struct['stoichiometry']:
-                # remove all points for a missing pseudo
-                if elem[0] not in struct['species_pot']:
-                    struct['quality'] = 0
-                    break
-                else:
-                    # remove a point for a generic OTF pspot
-                    if 'OTF' in struct['species_pot'][elem[0]].upper():
-                        struct['quality'] -= 1
+            if 'species_pot' not in struct:
+                struct['quality'] = 0
+            else:
+                for elem in struct['stoichiometry']:
+                    # remove all points for a missing pseudo
+                    if elem[0] not in struct['species_pot']:
+                        struct['quality'] = 0
+                        break
+                    else:
+                        # remove a point for a generic OTF pspot
+                        if 'OTF' in struct['species_pot'][elem[0]].upper():
+                            struct['quality'] -= 1
             if 'xc_functional' not in struct:
                 struct['quality'] = 0
             struct_id = self.repo.insert_one(struct).inserted_id
