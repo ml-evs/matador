@@ -417,7 +417,7 @@ class QueryConvexHull(object):
                         formula = get_formula_from_stoich(self.cursor[idx]['stoichiometry'], tex=False)
                         if formula in cached_formula_dists:
                             cache_hits += 1
-                            hull_dist[ind] = structures[ind, -1] - cached_formula_dists[formula][0] + cached_formula_dists[formula][1]
+                            hull_dist[idx] = structures[idx, -1] - cached_formula_dists[formula][0] + cached_formula_dists[formula][1]
                             structures_finished[idx] = True
                     else:
                         barycentric_structure = barycentric2cart(structure.reshape(1, 3)).T
@@ -425,11 +425,10 @@ class QueryConvexHull(object):
                         plane_barycentric_structure = np.matrix(planes_R_inv[ind]) * np.matrix(barycentric_structure)
                         if (plane_barycentric_structure >= 0-1e-12).all():
                             structures_finished[idx] = True
-                            if precompute:
-                                cache_misses += 1
                             hull_dist[idx] = planes_height_fn[ind](structure)
                             if precompute:
                                 cached_formula_dists[get_formula_from_stoich(self.cursor[idx]['stoichiometry'], tex=False)] = (structure[-1], hull_dist[idx])
+                                cache_misses += 1
             self.failed_structures = []
             for ind in range(len(structures_finished)):
                 if not structures_finished[ind]:
@@ -444,6 +443,7 @@ class QueryConvexHull(object):
 
         if precompute:
             print(cache_hits, '/', cache_misses)
+
         return hull_dist, tie_line_energy, tie_line_comp
 
     def hull_2d(self, dis=False):
