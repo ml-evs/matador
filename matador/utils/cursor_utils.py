@@ -227,6 +227,8 @@ def display_results(cursor,
                                       ' GPa')
             if 'kpoints_mp_spacing' in doc:
                 detail_string[-1] += ', ~' + str(doc['kpoints_mp_spacing']) + ' 1/A'
+            if 'geom_force_tol' in doc:
+                detail_string[-1] += ', {:.2f} eV/A, '.format(doc['geom_force_tol'])
             if 'species_pot' in doc:
                 try:
                     for species in doc['species_pot']:
