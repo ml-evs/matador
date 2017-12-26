@@ -72,6 +72,7 @@ def diff_hulls(client, collections, **args):
     diff_args = args['compare']
     del args['compare']
     args['no_plot'] = True
+    args['quiet'] = True
     diff_args = sorted(diff_args)
     args['time'] = diff_args[0]
     print('Calculating hull {} days ago...'.format(args['time']))
