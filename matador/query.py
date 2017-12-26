@@ -865,7 +865,10 @@ class DBQuery(object):
             temp_dict['geom_force_tol'] = doc['geom_force_tol']
             query_dict['$and'].append(temp_dict)
         else:
-            temp_dict['geom_force_tol'] = {'$exists': False}
+            temp_dict['$or'] = dict()
+            temp_dict['$or'] = []
+            temp_dict['$or'].append({'geom_force_tol': {'$exists': False}})
+            temp_dict['$or'].append({'geom_force_tol': {'$eq': 0.05}})
             query_dict['$and'].append(temp_dict)
         if 'sedc_scheme' in doc:
             temp_dict['sedc_scheme'] = doc['sedc_scheme']
