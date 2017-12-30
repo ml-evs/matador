@@ -284,7 +284,7 @@ class QueryConvexHull(object):
                 self.match[i]['enthalpy_per_b'] = mu['enthalpy_per_atom']
                 self.match[i]['num_a'] = 0
             self.match[0]['num_a'] = float('inf')
-        if not self.ternary and not self.from_cursor:
+        if not self.ternary and not self.from_cursor and not self.args.get('intersection'):
             self.cursor.insert(0, self.match[0])
             for match in self.match[1:]:
                 self.cursor.append(match)
