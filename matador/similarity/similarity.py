@@ -15,7 +15,7 @@ def get_uniq_cursor(cursor, sim_calculator=PDF, sim_tol=5e-2, energy_tol=1e-2,
                     enforce_same_stoich=True, projected=True,
                     debug=False, **sim_calc_args):
     """ Uses sim_calculator to filter cursor into unique structures to some
-    tolerance sim_tol,additionally returning a dict of duplicates and the
+    tolerance sim_tol, additionally returning a dict of duplicates and the
     correlation matrix.
 
     Inputs:
