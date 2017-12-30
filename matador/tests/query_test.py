@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import unittest
 from matador.query import DBQuery, parse_element_string
-import json
 
 
 class QueryTest(unittest.TestCase):
@@ -12,8 +11,8 @@ class QueryTest(unittest.TestCase):
         test_dict = ({
             '$and': [
                 {'$and': [
-                    {'atom_types': {'$in': ['K']}},
-                    {'atom_types': {'$in': ['P']}},
+                    {'elems': {'$in': ['K']}},
+                    {'elems': {'$in': ['P']}},
                     {'stoichiometry': {'$size': 2}}
                     ]},
                 {'$or': [
@@ -134,9 +133,9 @@ class QueryTest(unittest.TestCase):
         test_dict = ({
             '$and': [
                 {'$and': [
-                    {'atom_types': {'$in': ['Li']}},
-                    {'atom_types': {'$in': ['Fe']}},
-                    {'atom_types': {'$in': ['Be']}},
+                    {'elems': {'$in': ['Li']}},
+                    {'elems': {'$in': ['Fe']}},
+                    {'elems': {'$in': ['Be']}},
                     {'stoichiometry': {'$size': 3}}
                     ]},
                 {'icsd': {'$exists': True}},
@@ -174,15 +173,15 @@ class QueryTest(unittest.TestCase):
             '$and': [
                 {'$and': [
                     {'$or': [
-                        {'atom_types': {'$in': ['Li']}},
-                        {'atom_types': {'$in': ['Na']}},
-                        {'atom_types': {'$in': ['K']}},
-                        {'atom_types': {'$in': ['Rb']}},
-                        {'atom_types': {'$in': ['Cs']}},
-                        {'atom_types': {'$in': ['Fr']}},
+                        {'elems': {'$in': ['Li']}},
+                        {'elems': {'$in': ['Na']}},
+                        {'elems': {'$in': ['K']}},
+                        {'elems': {'$in': ['Rb']}},
+                        {'elems': {'$in': ['Cs']}},
+                        {'elems': {'$in': ['Fr']}},
                     ]},
-                    {'atom_types': {'$in': ['Fe']}},
-                    {'atom_types': {'$in': ['Be']}},
+                    {'elems': {'$in': ['Fe']}},
+                    {'elems': {'$in': ['Be']}},
                     {'stoichiometry': {'$size': 3}}
                     ]},
             ]
@@ -198,36 +197,36 @@ class QueryTest(unittest.TestCase):
                 {'$or': [
                     {'$and': [
                         {'stoichiometry': {'$size': 1}},
-                        {'atom_types': {'$in': ['Li']}},
+                        {'elems': {'$in': ['Li']}},
                     ]},
                     {'$and': [
                         {'stoichiometry': {'$size': 1}},
-                        {'atom_types': {'$in': ['Fe']}},
+                        {'elems': {'$in': ['Fe']}},
                     ]},
                     {'$and': [
                         {'stoichiometry': {'$size': 1}},
-                        {'atom_types': {'$in': ['Be']}},
+                        {'elems': {'$in': ['Be']}},
                     ]},
                     {'$and': [
                         {'stoichiometry': {'$size': 2}},
-                        {'atom_types': {'$in': ['Li']}},
-                        {'atom_types': {'$in': ['Fe']}},
+                        {'elems': {'$in': ['Li']}},
+                        {'elems': {'$in': ['Fe']}},
                     ]},
                     {'$and': [
                         {'stoichiometry': {'$size': 2}},
-                        {'atom_types': {'$in': ['Li']}},
-                        {'atom_types': {'$in': ['Be']}},
+                        {'elems': {'$in': ['Li']}},
+                        {'elems': {'$in': ['Be']}},
                     ]},
                     {'$and': [
                         {'stoichiometry': {'$size': 2}},
-                        {'atom_types': {'$in': ['Fe']}},
-                        {'atom_types': {'$in': ['Be']}},
+                        {'elems': {'$in': ['Fe']}},
+                        {'elems': {'$in': ['Be']}},
                     ]},
                     {'$and': [
                         {'stoichiometry': {'$size': 3}},
-                        {'atom_types': {'$in': ['Li']}},
-                        {'atom_types': {'$in': ['Fe']}},
-                        {'atom_types': {'$in': ['Be']}},
+                        {'elems': {'$in': ['Li']}},
+                        {'elems': {'$in': ['Fe']}},
+                        {'elems': {'$in': ['Be']}},
                     ]},
                 ]}
             ]})
@@ -240,16 +239,16 @@ class QueryTest(unittest.TestCase):
         test_dict = ({
             '$and': [
                 {'$and': [
-                    {'atom_types': {'$in': ['Fe']}},
+                    {'elems': {'$in': ['Fe']}},
                     {'$or': [
-                        {'atom_types': {'$in': ['Li']}},
-                        {'atom_types': {'$in': ['Na']}},
-                        {'atom_types': {'$in': ['K']}},
-                        {'atom_types': {'$in': ['Rb']}},
-                        {'atom_types': {'$in': ['Cs']}},
-                        {'atom_types': {'$in': ['Fr']}},
+                        {'elems': {'$in': ['Li']}},
+                        {'elems': {'$in': ['Na']}},
+                        {'elems': {'$in': ['K']}},
+                        {'elems': {'$in': ['Rb']}},
+                        {'elems': {'$in': ['Cs']}},
+                        {'elems': {'$in': ['Fr']}},
                     ]},
-                    {'atom_types': {'$in': ['Be']}},
+                    {'elems': {'$in': ['Be']}},
                     {'stoichiometry': {'$size': 3}}
                     ]},
             ]
@@ -264,19 +263,19 @@ class QueryTest(unittest.TestCase):
             '$and': [
                 {'$and': [
                     {'$or': [
-                        {'atom_types': {'$in': ['Fe']}},
-                        {'atom_types': {'$in': ['Ru']}},
-                        {'atom_types': {'$in': ['Os']}}
+                        {'elems': {'$in': ['Fe']}},
+                        {'elems': {'$in': ['Ru']}},
+                        {'elems': {'$in': ['Os']}}
                     ]},
                     {'$or': [
-                        {'atom_types': {'$in': ['Li']}},
-                        {'atom_types': {'$in': ['Na']}},
-                        {'atom_types': {'$in': ['K']}},
-                        {'atom_types': {'$in': ['Rb']}},
-                        {'atom_types': {'$in': ['Cs']}},
-                        {'atom_types': {'$in': ['Fr']}}
+                        {'elems': {'$in': ['Li']}},
+                        {'elems': {'$in': ['Na']}},
+                        {'elems': {'$in': ['K']}},
+                        {'elems': {'$in': ['Rb']}},
+                        {'elems': {'$in': ['Cs']}},
+                        {'elems': {'$in': ['Fr']}}
                     ]},
-                    {'atom_types': {'$in': ['Be']}},
+                    {'elems': {'$in': ['Be']}},
                     {'stoichiometry': {'$size': 3}}
                     ]},
             ]
@@ -290,19 +289,19 @@ class QueryTest(unittest.TestCase):
         test_dict = ({
             '$and': [
                 {'$and': [
-                    {'atom_types': {'$in': ['Be']}},
+                    {'elems': {'$in': ['Be']}},
                     {'$or': [
-                        {'atom_types': {'$in': ['Fe']}},
-                        {'atom_types': {'$in': ['Ru']}},
-                        {'atom_types': {'$in': ['Os']}}
+                        {'elems': {'$in': ['Fe']}},
+                        {'elems': {'$in': ['Ru']}},
+                        {'elems': {'$in': ['Os']}}
                     ]},
                     {'$or': [
-                        {'atom_types': {'$in': ['Li']}},
-                        {'atom_types': {'$in': ['Na']}},
-                        {'atom_types': {'$in': ['K']}},
-                        {'atom_types': {'$in': ['Rb']}},
-                        {'atom_types': {'$in': ['Cs']}},
-                        {'atom_types': {'$in': ['Fr']}}
+                        {'elems': {'$in': ['Li']}},
+                        {'elems': {'$in': ['Na']}},
+                        {'elems': {'$in': ['K']}},
+                        {'elems': {'$in': ['Rb']}},
+                        {'elems': {'$in': ['Cs']}},
+                        {'elems': {'$in': ['Fr']}}
                     ]},
                     {'stoichiometry': {'$size': 3}}
                     ]},
@@ -318,24 +317,24 @@ class QueryTest(unittest.TestCase):
             '$and': [
                 {'$and': [
                     {'$or': [
-                        {'atom_types': {'$in': ['F']}},
-                        {'atom_types': {'$in': ['Cl']}},
-                        {'atom_types': {'$in': ['Br']}},
-                        {'atom_types': {'$in': ['I']}},
-                        {'atom_types': {'$in': ['At']}},
+                        {'elems': {'$in': ['F']}},
+                        {'elems': {'$in': ['Cl']}},
+                        {'elems': {'$in': ['Br']}},
+                        {'elems': {'$in': ['I']}},
+                        {'elems': {'$in': ['At']}},
                     ]},
                     {'$or': [
-                        {'atom_types': {'$in': ['Fe']}},
-                        {'atom_types': {'$in': ['Ru']}},
-                        {'atom_types': {'$in': ['Os']}}
+                        {'elems': {'$in': ['Fe']}},
+                        {'elems': {'$in': ['Ru']}},
+                        {'elems': {'$in': ['Os']}}
                     ]},
                     {'$or': [
-                        {'atom_types': {'$in': ['Li']}},
-                        {'atom_types': {'$in': ['Na']}},
-                        {'atom_types': {'$in': ['K']}},
-                        {'atom_types': {'$in': ['Rb']}},
-                        {'atom_types': {'$in': ['Cs']}},
-                        {'atom_types': {'$in': ['Fr']}}
+                        {'elems': {'$in': ['Li']}},
+                        {'elems': {'$in': ['Na']}},
+                        {'elems': {'$in': ['K']}},
+                        {'elems': {'$in': ['Rb']}},
+                        {'elems': {'$in': ['Cs']}},
+                        {'elems': {'$in': ['Fr']}}
                     ]},
                     {'stoichiometry': {'$size': 3}}
                     ]},
@@ -351,14 +350,14 @@ class QueryTest(unittest.TestCase):
             '$and': [
                 {'$and': [
                     {'$or': [
-                        {'atom_types': {'$in': ['Si']}},
-                        {'atom_types': {'$in': ['Ge']}},
-                        {'atom_types': {'$in': ['Sn']}}
+                        {'elems': {'$in': ['Si']}},
+                        {'elems': {'$in': ['Ge']}},
+                        {'elems': {'$in': ['Sn']}}
                     ]},
                     {'$or': [
-                        {'atom_types': {'$in': ['Fe']}},
-                        {'atom_types': {'$in': ['Ru']}},
-                        {'atom_types': {'$in': ['Os']}}
+                        {'elems': {'$in': ['Fe']}},
+                        {'elems': {'$in': ['Ru']}},
+                        {'elems': {'$in': ['Os']}}
                     ]},
                     {'stoichiometry': {'$size': 2}}
                     ]},
@@ -440,14 +439,14 @@ class QueryTest(unittest.TestCase):
             '$and': [
                 {'$and': [
                     {'$and': [
-                        {'atom_types': {'$in': ['Li']}},
+                        {'elems': {'$in': ['Li']}},
                     ]},
                     {'ratios.TiP': 0.25},
                     {'$and': [
-                        {'atom_types': {'$in': ['Ti']}},
+                        {'elems': {'$in': ['Ti']}},
                     ]},
                     {'$and': [
-                        {'atom_types': {'$in': ['P']}},
+                        {'elems': {'$in': ['P']}},
                     ]},
                     {'stoichiometry': {'$size': 3}}
                 ]}
@@ -463,17 +462,17 @@ class QueryTest(unittest.TestCase):
             '$and': [
                 {'$and': [
                     {'$and': [
-                        {'atom_types': {'$in': ['Li']}},
+                        {'elems': {'$in': ['Li']}},
                     ]},
                     {'$and': [
-                        {'atom_types': {'$in': ['Mn']}},
+                        {'elems': {'$in': ['Mn']}},
                     ]},
                     {'ratios.MoS': 0.667},
                     {'$and': [
-                        {'atom_types': {'$in': ['Mo']}},
+                        {'elems': {'$in': ['Mo']}},
                     ]},
                     {'$and': [
-                        {'atom_types': {'$in': ['S']}},
+                        {'elems': {'$in': ['S']}},
                     ]},
                     {'stoichiometry': {'$size': 4}}
                 ]}
@@ -489,20 +488,20 @@ class QueryTest(unittest.TestCase):
             '$and': [
                 {'$and': [
                     {'$and': [
-                        {'atom_types': {'$in': ['Li']}},
+                        {'elems': {'$in': ['Li']}},
                     ]},
                     {'$and': [
-                        {'atom_types': {'$in': ['Mn']}},
+                        {'elems': {'$in': ['Mn']}},
                     ]},
                     {'ratios.MoS': 0.667, 'ratios.SB': 0.6, 'ratios.MoB': 0.4},
                     {'$and': [
-                        {'atom_types': {'$in': ['Mo']}},
+                        {'elems': {'$in': ['Mo']}},
                     ]},
                     {'$and': [
-                        {'atom_types': {'$in': ['S']}},
+                        {'elems': {'$in': ['S']}},
                     ]},
                     {'$and': [
-                        {'atom_types': {'$in': ['B']}},
+                        {'elems': {'$in': ['B']}},
                     ]},
                     {'stoichiometry': {'$size': 5}}
                 ]}
@@ -524,8 +523,8 @@ class QueryTest(unittest.TestCase):
         test_dict = ({
             '$and': [
                 {'$and': [
-                    {'atom_types': {'$in': ['K']}},
-                    {'atom_types': {'$in': ['P']}},
+                    {'elems': {'$in': ['K']}},
+                    {'elems': {'$in': ['P']}},
                     {'stoichiometry': {'$size': 2}}
                 ]},
                 {'$or': [
@@ -545,8 +544,8 @@ class QueryTest(unittest.TestCase):
         test_dict = ({
             '$and': [
                 {'$and': [
-                    {'atom_types': {'$in': ['K']}},
-                    {'atom_types': {'$in': ['P']}},
+                    {'elems': {'$in': ['K']}},
+                    {'elems': {'$in': ['P']}},
                     {'stoichiometry': {'$size': 2}}
                 ]},
                 {'$or': [
@@ -566,8 +565,8 @@ class QueryTest(unittest.TestCase):
         test_dict = ({
             '$and': [
                 {'$and': [
-                    {'atom_types': {'$in': ['K']}},
-                    {'atom_types': {'$in': ['P']}},
+                    {'elems': {'$in': ['K']}},
+                    {'elems': {'$in': ['P']}},
                     {'stoichiometry': {'$size': 2}}
                 ]},
                 {'$or': [
