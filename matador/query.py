@@ -1,7 +1,8 @@
 # coding: utf-8
 """ This file implements all queries to the database,
 including parsing user inputs, displaying results
-and calling other functionality. """
+and calling other functionality.
+"""
 
 from __future__ import print_function
 # standard library
@@ -469,11 +470,17 @@ class DBQuery(object):
             query_dict['ratios.' + pair[0]] = pair[1]
         return query_dict
 
-    def query_composition(self, custom_elem=None, partial_formula=None):
-        """ Query DB for all structures containing
-        all the elements taken as input. Passing this
-        function a number is a deprecated feature, replaced
-        by query_num_species.
+    def query_composition(self, custom_elem=None, partial_formula=None, elem_field='elems'):
+        """ Query DB for all structures containing all the elements
+        taken as input. Passing this function a number is a deprecated
+        feature, replaced by query_num_species.
+
+        Args:
+
+            | custom_elem     : str, use to query custom string, rather than CLI args
+            | partial_formula : bool, remove stoich size from query if True
+            | elem_field      : str, which field to query for elems, either `atom_types` or `elems`
+
         """
         if custom_elem is None:
             if isinstance(self.args.get('composition'), str):
@@ -511,8 +518,8 @@ class DBQuery(object):
                     types_dict['$and'][-1]['stoichiometry']['$size'] = len(list_combi)
                     for elem in list_combi:
                         types_dict['$and'].append(dict())
-                        types_dict['$and'][-1]['atom_types'] = dict()
-                        types_dict['$and'][-1]['atom_types']['$in'] = [elem]
+                        types_dict['$and'][-1][elem_field] = dict()
+                        types_dict['$and'][-1][elem_field]['$in'] = [elem]
                     query_dict['$or'].append(types_dict)
         elif non_binary:
             query_dict = dict()
@@ -553,17 +560,17 @@ class DBQuery(object):
                     if elem in self.periodic_table:
                         for group_elem in self.periodic_table[elem]:
                             types_dict['$or'].append(dict())
-                            types_dict['$or'][-1]['atom_types'] = dict()
-                            types_dict['$or'][-1]['atom_types']['$in'] = [group_elem]
+                            types_dict['$or'][-1][elem_field] = dict()
+                            types_dict['$or'][-1][elem_field]['$in'] = [group_elem]
                     elif ',' in elem:
                         for group_elem in elem.split(','):
                             types_dict['$or'].append(dict())
-                            types_dict['$or'][-1]['atom_types'] = dict()
-                            types_dict['$or'][-1]['atom_types']['$in'] = [group_elem]
+                            types_dict['$or'][-1][elem_field] = dict()
+                            types_dict['$or'][-1][elem_field]['$in'] = [group_elem]
                 else:
                     types_dict = dict()
-                    types_dict['atom_types'] = dict()
-                    types_dict['atom_types']['$in'] = [elem]
+                    types_dict[elem_field] = dict()
+                    types_dict[elem_field]['$in'] = [elem]
                 query_dict['$and'].append(types_dict)
         if not partial_formula and not self.args.get('intersection'):
             size_dict = dict()

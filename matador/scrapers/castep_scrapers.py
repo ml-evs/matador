@@ -4,7 +4,7 @@ inputs and outputs.
 """
 
 # matador modules
-from ..utils.cell_utils import abc2cart, calc_mp_spacing, cart2volume
+from ..utils.cell_utils import abc2cart, calc_mp_spacing, cart2volume, wrap_frac_coords
 # external libraries
 try:
     import bson.json_util as json
@@ -89,11 +89,7 @@ def res2dict(seed, db=True, verbosity=0, **kwargs):
                     res['positions_frac'].append(list(map(float, cursor[2:5])))
                     assert len(res['positions_frac'][-1]) == 3
                     i += 1
-        for ind, pos in enumerate(res['positions_frac']):
-            for k in range(3):
-                if pos[k] > 1 or pos[k] < 0:
-                    res['positions_frac'][ind][k] %= 1
-
+        res['positions_frac'] = wrap_frac_coords(res['positions_frac'])
         if 'num_atoms' in res:
             assert len(res['atom_types']) == res['num_atoms']
         else:

@@ -120,6 +120,39 @@ def frac2cart(lattice_cart, positions_frac):
     return positions_abs.tolist()
 
 
+def wrap_frac_coords(positions, remove=False):
+    """ Simply wrap the given coordinate back into the cell.
+
+    Input:
+
+        | positions: list(list(float)), list of list of 3-floats.
+
+    Args:
+
+        | remove: bool, if True, removes points exterior to the cell.
+
+    Returns:
+
+        | wrapped: list(list(float)), list of list of 3 floats in [0, 1).
+
+    """
+    from copy import deepcopy
+    wrapped = deepcopy(positions)
+    if remove:
+        to_remove = len(wrapped)*[False]
+    for ind, pos in enumerate(positions):
+        for k in range(3):
+            if pos[k] >= 1 or pos[k] < 0:
+                if remove:
+                    to_remove[ind] = True
+                    break
+                else:
+                    wrapped[ind][k] %= 1
+    if remove:
+        wrapped = [wrapped[ind] for ind, res in enumerate(to_remove) if not res]
+    return wrapped
+
+
 def cart2frac(lattice_cart, positions_abs):
     """ Convert positions_abs block into positions_frac (and equivalent
     in reciprocal space).
@@ -268,14 +301,22 @@ def get_spacegroup_spg(doc, symprec=0.01):
     return get_spacegroup(spg_cell, symprec=symprec).split(' ')[0]
 
 
-def create_simple_supercell(seed_doc, extension, standardize=False):
+def create_simple_supercell(seed_doc, extension, standardize=False, symmetric=False):
     """ Return a document with new supercell, given extension vector.
 
     Input:
 
-        doc        : dict, matador doc to construct cell from.
-        extension  : tuple(int), multiplicity of each lattice vector, e.g. (2,2,1).
-        standardize: bool, whether or not to use spglib to standardize the cell first.
+        | doc        : dict, matador doc to construct cell from.
+        | extension  : tuple(int), multiplicity of each lattice vector, e.g. (2,2,1).
+
+    Args:
+
+        | standardize: bool, whether or not to use spglib to standardize the cell first.
+        | symmetric: bool, whether or not centre the new cell on the origin.
+
+    Returns:
+
+        | supercell_doc: dict, matador document containing supercell.
 
     """
     from itertools import product
@@ -321,6 +362,10 @@ def create_simple_supercell(seed_doc, extension, standardize=False):
                 new_atoms.append(atom)
     supercell_doc['atom_types'].extend(new_atoms)
     supercell_doc['positions_frac'].extend(new_positions)
+    if symmetric:
+        supercell_doc['positions_frac'] = np.asarray(supercell_doc['positions_frac'])
+        supercell_doc['positions_frac'] -= np.mean(supercell_doc['positions_frac'], axis=0)
+        supercell_doc['positions_frac'] = supercell_doc['positions_frac'].tolist()
     supercell_doc['num_atoms'] = len(supercell_doc['atom_types'])
     supercell_doc['cell_volume'] = cart2volume(supercell_doc['lattice_cart'])
     supercell_doc['lattice_abc'] = cart2abc(supercell_doc['lattice_cart'])
