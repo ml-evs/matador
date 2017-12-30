@@ -142,10 +142,7 @@ class DBQuery(object):
             self.empty_query = False
 
         if self.args.get('composition') is not None:
-            if self.args.get('devel'):
-                self.query_dict['$and'].append(self.__query_composition_compactified())
-            else:
-                self.query_dict['$and'].append(self.query_composition())
+            self.query_dict['$and'].append(self.query_composition())
             self.empty_query = False
 
         if self.args.get('num_species') is not None:
