@@ -16,6 +16,7 @@ from matador.version import __version__
 import argparse
 from sys import argv
 from os.path import isfile
+from traceback import print_exc
 
 
 class Matador(object):
@@ -31,132 +32,151 @@ class Matador(object):
         self.args = vars(args[0])
         self.argstr = kwargs.get('argstr')
 
-        self.client, self.db, self.collections = make_connection_to_collection(self.args.get('db'))
-
-        if self.args['subcmd'] not in ['import', 'rebuild']:
-            self.collections = dict()
-
-        # print last spatula report
-        self.report = self.client.crystals.spatula
-
         if (self.args.get('cell') or self.args.get('res') or self.args.get('pdb') or
                 self.args.get('markdown') or self.args.get('latex') or self.args.get('param')):
             self.export = True
         else:
             self.export = False
 
+        if self.args['subcmd'] not in ['import', 'rebuild']:
+            self.client, self.db, self.collections = make_connection_to_collection(self.args.get('db'))
+
         if self.args['subcmd'] == 'stats':
             self.stats()
 
-        if self.args['subcmd'] in ['import', 'rebuild']:
-            from matador.spatula import Spatula
-            self.importer = Spatula(self.args)
+        try:
 
-        if self.args['subcmd'] == 'query':
-            self.query = DBQuery(self.client, self.collections, **self.args)
-            self.cursor = self.query.cursor
+            if self.args['subcmd'] in ['import', 'rebuild']:
+                from matador.importer import Spatula
+                self.importer = Spatula(self.args)
 
-        if self.args['subcmd'] in ['swaps', 'polish']:
-            from matador.polish import Polisher
-            self.query = DBQuery(self.client, self.collections, **self.args)
-            if self.args.get('hull_cutoff') is not None:
-                self.hull = QueryConvexHull(self.query, **self.args)
-                self.polisher = Polisher(self.hull.hull_cursor, self.args)
-            else:
-                self.polisher = Polisher(self.query.cursor, self.args)
-            self.cursor = self.polisher.cursor
+            if self.args['subcmd'] == 'query':
+                self.query = DBQuery(self.client, self.collections, **self.args)
+                self.cursor = self.query.cursor
 
-        if self.args['subcmd'] == 'refine':
-            from matador.refine import Refiner
-            self.query = DBQuery(self.client, self.collections, **self.args)
-            if self.args.get('hull_cutoff') is not None:
-                self.hull = QueryConvexHull(self.query, **self.args)
-                self.refiner = Refiner(self.hull.cursor, self.query.repo, **self.args)
-            else:
-                self.refiner = Refiner(self.query.cursor, self.query.repo, **self.args)
+            if self.args['subcmd'] in ['swaps', 'polish']:
+                from matador.polish import Polisher
+                self.query = DBQuery(self.client, self.collections, **self.args)
+                if self.args.get('hull_cutoff') is not None:
+                    self.hull = QueryConvexHull(self.query, **self.args)
+                    self.polisher = Polisher(self.hull.hull_cursor, self.args)
+                else:
+                    self.polisher = Polisher(self.query.cursor, self.args)
+                self.cursor = self.polisher.cursor
 
-        if self.args['subcmd'] == 'pdffit':
-            self.query = DBQuery(self.client, self.collections, **self.args)
-            self.cursor = list(self.query.cursor)
-            if self.args.get('hull_cutoff') is not None:
+            if self.args['subcmd'] == 'refine':
+                from matador.refine import Refiner
+                self.query = DBQuery(self.client, self.collections, **self.args)
+                if self.args.get('hull_cutoff') is not None:
+                    self.hull = QueryConvexHull(self.query, **self.args)
+                    self.refiner = Refiner(self.hull.cursor, self.query.repo, **self.args)
+                else:
+                    self.refiner = Refiner(self.query.cursor, self.query.repo, **self.args)
+
+            if self.args['subcmd'] == 'pdffit':
+                self.query = DBQuery(self.client, self.collections, **self.args)
+                self.cursor = list(self.query.cursor)
+                if self.args.get('hull_cutoff') is not None:
+                    self.hull = QueryConvexHull(self.query, **self.args)
+                    self.cursor = self.hull.hull_cursor
+                    self.top = len(self.cursor)
+                if self.args.get('top') is not None:
+                    self.top = self.args.get('top')
+                if len(self.cursor[:self.top]) > 0:
+                    print_notify('Performing PDF fit for ' +
+                                 str(len(self.cursor[:self.top])) +
+                                 ' structures.')
+                    from matador.pdffit import PDFFitter
+                    self.pdffit = PDFFitter(self.cursor[:self.top], **self.args)
+                    try:
+                        self.pdffit.spawn()
+                    except(KeyboardInterrupt, SystemExit):
+                        exit('Exiting top-level...')
+                else:
+                    exit('No structure match query.')
+
+            if self.args['subcmd'] == 'hull' or self.args['subcmd'] == 'voltage':
+                self.query = DBQuery(self.client, self.collections, **self.args)
                 self.hull = QueryConvexHull(self.query, **self.args)
                 self.cursor = self.hull.hull_cursor
-                self.top = len(self.cursor)
-            if self.args.get('top') is not None:
-                self.top = self.args.get('top')
-            if len(self.cursor[:self.top]) > 0:
-                print_notify('Performing PDF fit for ' +
-                             str(len(self.cursor[:self.top])) +
-                             ' structures.')
-                from matador.pdffit import PDFFitter
-                self.pdffit = PDFFitter(self.cursor[:self.top], **self.args)
-                try:
-                    self.pdffit.spawn()
-                except(KeyboardInterrupt, SystemExit):
-                    exit('Exiting top-level...')
-            else:
-                exit('No structure match query.')
 
-        if self.args['subcmd'] == 'hull' or self.args['subcmd'] == 'voltage':
-            self.query = DBQuery(self.client, self.collections, **self.args)
-            self.hull = QueryConvexHull(self.query, **self.args)
-            self.cursor = self.hull.hull_cursor
+            if self.args['subcmd'] == 'changes':
+                from matador.changes import DatabaseChanges
+                if len(self.collections) != 1:
+                    exit('Cannot view changes of more than one collection at once.')
+                if self.args.get('undo'):
+                    action = 'undo'
+                else:
+                    action = 'view'
+                changeset = self.args.get('changeset')
+                if changeset is None:
+                    changeset = 0
+                DatabaseChanges([key for key in self.collections][0], changeset_ind=changeset, action=action)
 
-        if self.args['subcmd'] == 'hulldiff':
-            from matador.hull_diff import diff_hulls
-            if self.args.get('compare') is None:
-                exit('Please specify which hulls to query with --compare.')
-            diff_hulls(self.client, self.collections, **self.args)
+            if self.args['subcmd'] == 'hulldiff':
+                from matador.hull_diff import diff_hulls
+                if self.args.get('compare') is None:
+                    exit('Please specify which hulls to query with --compare.')
+                diff_hulls(self.client, self.collections, **self.args)
 
-        if self.args.get('uniq'):
-            from matador.similarity.similarity import get_uniq_cursor
-            print_notify('Filtering for unique structures...')
-            if self.args.get('top') is not None:
-                unique_set, _, _, _ = get_uniq_cursor(self.cursor[:self.args.get('top')],
-                                                      debug=self.args.get('debug'), projected=True, sim_tol=self.args.get('uniq'))
-                print('Filtered {} down to {}'.format(min(len(self.cursor),
-                                                      self.args.get('top')),
-                                                      len(unique_set)))
-            else:
-                unique_set, _, _, _ = get_uniq_cursor(self.cursor, debug=self.args.get('debug'), sim_tol=self.args.get('uniq'), projected=True)
-                print('Filtered {} down to {}'.format(len(self.cursor),
-                                                      len(unique_set)))
-            self.cursor = [self.cursor[ind] for ind in unique_set]
-            display_results(self.cursor, hull=None if self.args.get('subcmd') != 'hull' else True, args=self.args)
+            if self.args.get('uniq'):
+                from matador.similarity.similarity import get_uniq_cursor
+                print_notify('Filtering for unique structures...')
+                if self.args.get('top') is not None:
+                    unique_set, _, _, _ = get_uniq_cursor(self.cursor[:self.args.get('top')],
+                                                          debug=self.args.get('debug'), projected=True, sim_tol=self.args.get('uniq'))
+                    print('Filtered {} down to {}'.format(min(len(self.cursor),
+                                                          self.args.get('top')),
+                                                          len(unique_set)))
+                else:
+                    unique_set, _, _, _ = get_uniq_cursor(self.cursor, debug=self.args.get('debug'), sim_tol=self.args.get('uniq'), projected=True)
+                    print('Filtered {} down to {}'.format(len(self.cursor),
+                                                          len(unique_set)))
+                self.cursor = [self.cursor[ind] for ind in unique_set]
+                display_results(self.cursor, hull=None if self.args.get('subcmd') != 'hull' else True, args=self.args)
 
-        # perform any extra filtration
-        if self.args.get('filter'):
-            from matador.utils.cursor_utils import filter_cursor
-            self.cursor = filter_cursor(self.cursor,
-                                        self.args.get('filter'),
-                                        self.args.get('values'))
+            # perform any extra filtration
+            if self.args.get('filter'):
+                from matador.utils.cursor_utils import filter_cursor
+                self.cursor = filter_cursor(self.cursor,
+                                            self.args.get('filter'),
+                                            self.args.get('values'))
 
-        if self.export and len(self.cursor) > 0:
-            from matador.export import query2files
-            query2files(self.cursor, self.args, argstr=self.argstr)
+            if self.export and len(self.cursor) > 0:
+                from matador.export import query2files
+                query2files(self.cursor, self.args, argstr=self.argstr)
 
-        if self.args.get('view'):
-            from matador.viz import viz
-            if self.args.get('top') is None:
-                self.top = len(self.cursor)
-            else:
-                self.top = self.args.get('top')
-            if len(self.cursor[:self.top]) > 10:
-                from time import sleep
-                print_warning('WARNING: opening {} files with ase-gui...'.format(len(self.cursor)))
-                print_warning('Please kill script within 3 seconds if undesired...')
-                sleep(3)
-            if len(self.cursor[:self.top]) > 20:
-                print_failure('You will literally be opening that many windows, ' +
-                              'I\'ll give you another 5 seconds to reconsider...')
+            if self.args.get('view'):
+                from matador.viz import viz
+                if self.args.get('top') is None:
+                    self.top = len(self.cursor)
+                else:
+                    self.top = self.args.get('top')
+                if len(self.cursor[:self.top]) > 10:
+                    from time import sleep
+                    print_warning('WARNING: opening {} files with ase-gui...'.format(len(self.cursor)))
+                    print_warning('Please kill script within 3 seconds if undesired...')
+                    sleep(3)
+                if len(self.cursor[:self.top]) > 20:
+                    print_failure('You will literally be opening that many windows, ' +
+                                  'I\'ll give you another 5 seconds to reconsider...')
 
-                sleep(5)
-                print_notify('It\'s your funeral...')
-                sleep(1)
-            for doc in self.cursor[:self.top]:
-                viz(doc)
+                    sleep(5)
+                    print_notify('It\'s your funeral...')
+                    sleep(1)
+                for doc in self.cursor[:self.top]:
+                    viz(doc)
 
-        self.client.close()
+            if self.args.get('subcmd') not in ['rebuild', 'import']:
+                self.client.close()
+
+        except SystemExit as oops:
+            print(oops)
+            print('Trying to nicely close connection...')
+            try:
+                self.client.close()
+            except:
+                pass
 
     def print_report(self):
         """ Print spatula report on current database. """
@@ -204,6 +224,8 @@ class Matador(object):
                     else:
                         print('Deleting collection...'.format(target))
                         self.db[target].drop()
+                        print('and its changelog...'.format(target))
+                        self.db['__changelog_{}'.format(target)].drop()
                 else:
                     exit('Nevermind then!')
         else:
@@ -212,17 +234,19 @@ class Matador(object):
             overall_stats_dict['count'] = 0
             overall_stats_dict['avgObjSize'] = 0
             overall_stats_dict['storageSize'] = 0
+            overall_stats_dict['totalIndexSize'] = 0
             for collection in self.collections:
                 db_stats_dict = self.db.command('collstats', collection)
                 overall_stats_dict['count'] += db_stats_dict['count']
                 overall_stats_dict['avgObjSize'] += db_stats_dict['avgObjSize']
                 overall_stats_dict['storageSize'] += db_stats_dict['storageSize']
-            print('The collection(s) queried in', self.db.name, 'contain',
-                  overall_stats_dict['count'], 'structures at',
-                  "{:.1f}".format(overall_stats_dict['avgObjSize']/(1024*len(self.collections))),
-                  'kB each, totalling',
-                  "{:.1f}".format(overall_stats_dict['storageSize']/(1024**2)),
-                  'MB when padding is included.')
+                overall_stats_dict['totalIndexSize'] += db_stats_dict['totalIndexSize']
+            print(("The collection(s) queried in {} contain {} structures at {:.1f} kB each "
+                   "totalling {:.1f} MB when padding and indices are included.")
+                  .format(self.db.name,
+                          overall_stats_dict['count'],
+                          overall_stats_dict['avgObjSize']/(1024*len(self.collections)),
+                          (overall_stats_dict['totalIndexSize'] + overall_stats_dict['storageSize'])/(1024**2)))
             for collname in self.collections:
                 cursor = self.collections[collname].find()
                 for doc in cursor:
@@ -253,7 +277,7 @@ class Matador(object):
                 from ascii_graph import Pyasciigraph
                 from ascii_graph.colors import Gre, Blu, Red
                 from ascii_graph.colordata import hcolor
-            except:
+            except(ImportError):
                 print_failure('Pyascii graph missing; not printing detailed stats.')
                 exit()
             graph = Pyasciigraph(line_length=80, multivalue=False)
@@ -269,11 +293,8 @@ class Matador(object):
         """ Create temporary collection
         for successive filtering.
         """
-        # check temp doesn't already exist; drop if it does
-        try:
-            self.client.crystals.temp.drop()
-        except:
-            pass
+        # drop temp if it already exists
+        self.client.crystals.temp.drop()
         self.temp = self.client.crystals.temp
         if len(cursor) != 0:
             self.temp.insert(cursor)
@@ -441,6 +462,14 @@ if __name__ == '__main__':
     spatula_flags.add_argument('-s', '--scan', action='store_true',
                                help='only scan the database for new structures, do not dictify')
 
+    changes_flags = argparse.ArgumentParser(add_help=False)
+    changes_flags.add_argument('-c', '--changeset', type=int,
+                               help='changeset number to query')
+    changes_flags.add_argument('-r', '--revert', type=int,
+                               help='revert database to specified changeset')
+    changes_flags.add_argument('-u', '--undo', action='store_true',
+                               help='undo changeset')
+
     collection_flags = argparse.ArgumentParser(add_help=False)
     collection_flags.add_argument('--to', type=str,
                                   help='the text_id of a structure with the desired parameters')
@@ -553,6 +582,9 @@ if __name__ == '__main__':
                                            (currently limited to binaries)',
                                            parents=[global_flags, structure_flags,
                                                     material_flags, plot_flags, query_flags])
+    changes_parser = subparsers.add_parser('changes',
+                                           help='view database changelog or undo additions to database (not deletions!)',
+                                           parents=[global_flags, changes_flags])
     hull_parser = subparsers.add_parser('hulldiff',
                                         help='diff two convex hulls with the --compare flag.',
                                         parents=[global_flags, structure_flags,
