@@ -5,34 +5,35 @@ MongoDB client.
 """
 
 # matador modules
-from .scrapers.castep_scrapers import castep2dict, param2dict, cell2dict
-from .scrapers.castep_scrapers import res2dict, dir2dict
-from .scrapers.experiment_scrapers import expt2dict, synth2dict
-from .utils.cell_utils import calc_mp_spacing
-from .version import __version__
+from matador.scrapers.castep_scrapers import castep2dict, param2dict, cell2dict
+from matador.scrapers.castep_scrapers import res2dict, dir2dict
+from matador.scrapers.experiment_scrapers import expt2dict, synth2dict
+from matador.utils.cell_utils import calc_mp_spacing
+from matador.version import __version__
 # external libraries
 import pymongo as pm
 # standard library
 from random import randint
 from collections import defaultdict
-import datetime
-from os import walk, getcwd, uname, chdir, chmod, rename
+from datetime import datetime
+from os import walk, getcwd, uname, chmod, rename
 from time import sleep
 from os.path import realpath, abspath, dirname, getmtime, isfile
 from traceback import print_exc
 from copy import deepcopy
 
 
-class Spatula(object):
+class Spatula:
     """ The Spatula class implements methods to scrape folders
     and individual files for crystal structures and create a
     MongoDB document for each.
 
     Files types that can be read are:
 
-        * CASTEP output
-        * CASTEP .param, .cell input
-        * airss.pl / pyAIRSS .res output
+        | * CASTEP output
+        | * CASTEP .param, .cell input
+        | * SHELX (from airss.pl / pyAIRSS) .res output
+
     """
     def __init__(self, *args):
         """ Set up arguments and initialise DB client. """
@@ -47,30 +48,37 @@ class Spatula(object):
         self.tag_dict = dict()
         self.tag_dict['tags'] = self.tags
         self.import_count = 0
+        self.struct_list = []
         # I/O files
         if not self.dryrun:
-            logfile_name = 'spatula.log'
+            logfile_name = 'spatula.err'
+            manifest_name = 'spatula.manifest'
             if isfile(logfile_name):
                 mtime = getmtime(logfile_name)
-                mdate = datetime.datetime.fromtimestamp(mtime)
+                mdate = datetime.fromtimestamp(mtime)
                 mdate = str(mdate).split()[0]
                 rename(logfile_name, logfile_name + '.' + str(mdate).split()[0])
-            try:
-                wordfile = open(dirname(realpath(__file__)) + '/scrapers/words', 'r')
-                nounfile = open(dirname(realpath(__file__)) + '/scrapers/nouns', 'r')
-                self.wlines = wordfile.readlines()
-                self.num_words = len(self.wlines)
-                self.nlines = nounfile.readlines()
-                self.num_nouns = len(self.nlines)
-                wordfile.close()
-                nounfile.close()
-            except Exception:
-                print_exc()
-                exit()
+            if isfile(manifest_name):
+                mtime = getmtime(manifest_name)
+                mdate = datetime.fromtimestamp(mtime)
+                mdate = str(mdate).split()[0]
+                rename(manifest_name, manifest_name + '.' + str(mdate).split()[0])
+
+            wordfile = open(dirname(realpath(__file__)) + '/scrapers/words', 'r')
+            nounfile = open(dirname(realpath(__file__)) + '/scrapers/nouns', 'r')
+            self.wlines = wordfile.readlines()
+            self.num_words = len(self.wlines)
+            self.nlines = nounfile.readlines()
+            self.num_nouns = len(self.nlines)
+            wordfile.close()
+            nounfile.close()
+
         elif not self.scan:
-            logfile_name = 'spatula.log.dryrun'
+            logfile_name = 'spatula.err.dryrun'
+            manifest_name = 'spatula.manifest.dryrun'
         if not self.scan:
             self.logfile = open(logfile_name, 'w')
+            self.manifest = open(manifest_name, 'w')
         local = uname()[1]
         if local == 'cluster2':
             remote = 'node1'
@@ -101,10 +109,7 @@ class Spatula(object):
                 self.repo = self.db[self.args.get('db')[0]]
         if not self.dryrun:
             # either drop and recreate or create spatula report collection
-            try:
-                self.db.spatula.drop()
-            except:
-                pass
+            self.db.spatula.drop()
             self.report = self.db.spatula
         # scan directory on init
         self.file_lists = self.scan_dir()
@@ -159,17 +164,10 @@ class Spatula(object):
         if not self.dryrun:
             # construct dictionary in spatula_report collection to hold info
             report_dict = dict()
-            report_dict['last_modified'] = datetime.datetime.utcnow().replace(microsecond=0)
+            report_dict['last_modified'] = datetime.utcnow().replace(microsecond=0)
             report_dict['num_success'] = self.import_count
             report_dict['num_errors'] = errors
-            try:
-                cwd = getcwd()
-                chdir(dirname(realpath(__file__)))
-                report_dict['version'] = __version__
-                chdir(cwd)
-            except:
-                print('Failed to get CVS info.')
-                report_dict['version'] = 'unknown'
+            report_dict['version'] = __version__
             self.report.insert_one(report_dict)
 
     def struct2db(self, struct):
@@ -188,12 +186,12 @@ class Spatula(object):
             # include elem set for faster querying
             if 'elems' not in struct:
                 struct['elems'] = list(set(struct['atom_types']))
-            del_list = []
-            for species in struct['species_pot']:
-                if species not in set(struct['atom_types']):
-                    del_list.append(species)
-            for species in del_list:
-                del struct['species_pot'][species]
+            # del_list = []
+            # for species in struct['species_pot']:
+            # if species not in set(struct['atom_types']):
+            # del_list.append(species)
+            # for species in del_list:
+            # del struct['species_pot'][species]
             if 'species_pot' not in struct:
                 struct['quality'] = 0
             else:
@@ -209,6 +207,10 @@ class Spatula(object):
             if 'xc_functional' not in struct:
                 struct['quality'] = 0
             struct_id = self.repo.insert_one(struct).inserted_id
+            root_src = [src for src in struct['source'] if
+                        (src.endswith('.res') or src.endswith('.castep'))][0]
+            self.struct_list.append((struct_id, root_src))
+            self.manifest.write('+ {}\n'.format(root_src))
             if self.debug:
                 print('Inserted', struct_id)
         except:
@@ -328,16 +330,11 @@ class Spatula(object):
                     else:
                         final_struct = input_dict.copy()
                         final_struct.update(struct_dict)
-                        try:
-                            # calculate kpoint spacing if not found
-                            if 'kpoints_mp_spacing' not in final_struct and \
-                                    'kpoints_mp_grid' in final_struct:
-                                final_struct['kpoints_mp_spacing'] = calc_mp_spacing(
-                                    final_struct['lattice_cart'], final_struct['mp_grid'])
-                        except:
-                            print(struct_dict['source'])
-                            print(input_dict['source'])
-                            pass
+                        # calculate kpoint spacing if not found
+                        if 'kpoints_mp_spacing' not in final_struct and \
+                                'kpoints_mp_grid' in final_struct:
+                            final_struct['kpoints_mp_spacing'] = calc_mp_spacing(
+                                final_struct['lattice_cart'], final_struct['mp_grid'])
                         try:
                             final_struct['source'] = struct_dict['source'] + input_dict['source']
                         except:
@@ -375,7 +372,28 @@ class Spatula(object):
                         if not self.dryrun:
                             expt_dict.update(self.tag_dict)
                             self.import_count += self.exp2db(expt_dict)
+
+        if len(self.struct_list) > 0:
+            self.update_changelog(self.repo.name, self.struct_list)
+
         return
+
+    def update_changelog(self, collection_name: str, struct_list: list):
+        """ Add a list of ObjectIds to a collection called
+        __changelog_{collection_name}, storing "commits" that can be undone
+        or reverted to.
+
+        Input:
+
+            | collection_name: str, the name of the base collection being imported to
+            | struct_list : list((ObjectId, src)), list of (ObjectIds, source) of imported structures
+
+        """
+        changes = {'date': datetime.today(),
+                   'count': len(struct_list),
+                   'id_list': [struct[0] for struct in struct_list],
+                   'src_list': [struct[1] for struct in struct_list]}
+        self.db['__changelog_{}'.format(collection_name)].insert(changes)
 
     def scan_dir(self):
         """ Scans folder topdir recursively, returning list of
