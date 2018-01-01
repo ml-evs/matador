@@ -73,6 +73,7 @@ class DBQuery(object):
         if not self.args.get('testing'):
             # execute the query
             self.perform_query()
+
         if not client:
             self.client.close()
 
@@ -294,11 +295,10 @@ class DBQuery(object):
                                                 self.args.get('subcmd') == 'hulldiff' or
                                                 self.args.get('subcmd') == 'voltage' or
                                                 self.args.get('hull_cutoff') is not None):
-                if len(self.collections.keys()) == 1:
+                if len(self.collections) == 1:
                     self.repo = self.collections[list(self.collections.keys())[0]]
                 else:
-                    exit('Hulls and voltage curves require just one source or --include_oqmd, \
-                          exiting...')
+                    exit('Hulls and voltage curves require just one source or --include_oqmd, exiting...')
                 print('Creating hull from AJM db structures.')
                 self.args['top'] = -1
                 if self.args.get('biggest'):
