@@ -135,6 +135,7 @@ class FullRelaxer:
 
                 # run convergence tests
                 if any([self.conv_cutoff_bool, self.conv_kpt_bool]):
+                    self._cached_cutoff = calc_doc['cut_off_energy']
                     if self.conv_cutoff_bool:
                         # run series of singlepoints for various cutoffs
                         for cutoff in self.conv_cutoff:
@@ -145,6 +146,7 @@ class FullRelaxer:
                             self.success = self.scf(calc_doc, seed, keep=False)
                     if self.conv_kpt_bool:
                         # run series of singlepoints for various cutoffs
+                        calc_doc['cut_off_energy'] = self._cached_cutoff
                         for kpt in self.conv_kpt:
                             calc_doc.update({'kpoints_mp_spacing': kpt})
                             self.paths['completed_dir'] = 'completed_kpts'
