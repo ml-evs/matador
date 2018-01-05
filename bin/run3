@@ -21,7 +21,7 @@ from matador.version import __version__
 
 # standard library
 from os.path import isfile
-from os import remove
+from os import remove, scandir
 from collections import defaultdict
 from traceback import print_exc
 import argparse
@@ -207,7 +207,7 @@ class BatchRun:
 
         # scan directory for files to run
         self.file_lists = defaultdict(list)
-        self.file_lists['res'] = glob.glob('*.res')
+        self.file_lists['res'] = [file.name for file in scandir() if file.endswith('.res')]
         if len(self.file_lists['res']) < 1:
             print_failure('run3 in CASTEP mode requires at least 1 res file in folder, found' +
                           str(len(self.file_lists['res'])))
