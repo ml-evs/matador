@@ -217,6 +217,10 @@ class FullRelaxer:
         if self.compute_dir is not None:
             if not os.path.exists(self.compute_dir):
                 os.makedirs(self.compute_dir)
+                pspots = glob.glob('*.usp')
+                for pspot in pspots:
+                    copy(pspot, self.compute_dir)
+
                 os.chdir(self.compute_dir)
 
         seed = self.seed
@@ -759,14 +763,15 @@ class FullRelaxer:
     def mv_to_bad(self, seed):
         """ Move all associated files to bad_castep. """
         try:
-            if not os.path.exists('bad_castep'):
-                os.makedirs('bad_castep', exist_ok=True)
+            bad_dir = self.root_folder + 'bad_castep'
+            if not os.path.exists(bad_dir):
+                os.makedirs(bad_dir, exist_ok=True)
             if self.verbosity > 1:
                 print('Something went wrong, moving files to bad_castep')
             seed_files = glob.glob(seed + '.*')
             for _file in seed_files:
                 try:
-                    copy(_file, 'bad_castep')
+                    copy(_file, bad_dir)
                     os.remove(_file)
                 except:
                     if self.verbosity > 1:
