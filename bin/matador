@@ -39,7 +39,8 @@ class Matador(object):
             self.export = False
 
         if self.args['subcmd'] not in ['import', 'rebuild']:
-            self.client, self.db, self.collections = make_connection_to_collection(self.args.get('db'))
+            self.client, self.db, self.collections = make_connection_to_collection(self.args.get('db'),
+                                                                                   check_collection=True)
 
         if self.args['subcmd'] == 'stats':
             self.stats()
