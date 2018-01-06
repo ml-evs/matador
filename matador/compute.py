@@ -217,11 +217,11 @@ class FullRelaxer:
         if self.compute_dir is not None:
             if not os.path.exists(self.compute_dir):
                 os.makedirs(self.compute_dir)
-                pspots = glob.glob('*.usp')
-                for pspot in pspots:
-                    copy(pspot, self.compute_dir)
+            pspots = glob.glob('*.usp')
+            for pspot in pspots:
+                copy(pspot, self.compute_dir)
 
-                os.chdir(self.compute_dir)
+            os.chdir(self.compute_dir)
 
         seed = self.seed
         calc_doc = self.calc_doc
@@ -763,7 +763,7 @@ class FullRelaxer:
     def mv_to_bad(self, seed):
         """ Move all associated files to bad_castep. """
         try:
-            bad_dir = self.root_folder + 'bad_castep'
+            bad_dir = self.root_folder + '/bad_castep'
             if not os.path.exists(bad_dir):
                 os.makedirs(bad_dir, exist_ok=True)
             if self.verbosity > 1:
@@ -785,8 +785,8 @@ class FullRelaxer:
 
     def mv_to_completed(self, seed, completed_dir='completed', keep=False):
         """ Move all associated files to completed. """
-        completed_dir = self.root_folder + completed_dir
-        if not os.path.exists(self.root_folder + completed_dir):
+        completed_dir = self.root_folder + '/' + completed_dir
+        if not os.path.exists(completed_dir):
             os.makedirs(completed_dir, exist_ok=True)
         if keep:
             seed_files = glob.glob(seed + '.*') + glob.glob(seed + '-out.cell')
@@ -816,7 +816,7 @@ class FullRelaxer:
     def cp_to_input(self, seed, ext='res', glob_files=False):
         """ Copy initial cell and res to input folder. """
         try:
-            input_dir = self.root_folder + 'input'
+            input_dir = self.root_folder + '/input'
             if not os.path.exists(input_dir):
                 os.makedirs(input_dir, exist_ok=True)
             if glob_files:
