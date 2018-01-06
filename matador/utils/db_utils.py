@@ -4,12 +4,18 @@ from os import uname
 import pymongo as pm
 
 
-def make_connection_to_collection(coll_names, allow_changelog=False):
+def make_connection_to_collection(coll_names, check_collection=False, allow_changelog=False):
     """ Connect to database of choice.
 
     Input:
 
         | coll_names: str, name of collection.
+
+    Args:
+
+        | check_collection: bool, check whether collections exist (forces connection)
+        | allow_changelog : bool, whether or not to allow queries to databases
+                            with names prefixed by __
 
     Returns:
 
@@ -27,13 +33,14 @@ def make_connection_to_collection(coll_names, allow_changelog=False):
 
     client = pm.MongoClient(remote)
     db = client.crystals
-    possible_collections = db.collection_names()
+    if check_collection:
+        possible_collections = db.collection_names()
     collections = dict()
     if coll_names is not None:
         if not isinstance(coll_names, list):
             coll_names = [coll_names]
         for database in coll_names:
-            if database not in possible_collections:
+            if check_collection and database not in possible_collections:
                 client.close()
                 exit('Database {} not found!'.format(database))
             if not allow_changelog and database.startswith('__'):
