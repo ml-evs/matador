@@ -20,8 +20,7 @@ from matador.compute import FullRelaxer
 from matador.version import __version__
 
 # standard library
-from os.path import isfile
-from os import remove, scandir
+import os
 from collections import defaultdict
 from traceback import print_exc
 import argparse
@@ -47,7 +46,7 @@ class BatchRun:
         if len(self.seed) == 1:
             if '*' in self.seed[0]:
                 self.seed = glob.glob(self.seed[0])
-            elif not isfile(self.seed[0]):
+            elif not os.path.isfile(self.seed[0]):
                 self.seed = self.seed[0]
 
         if isinstance(self.seed, str):
@@ -89,17 +88,17 @@ class BatchRun:
         self.paths['completed_fname'] = 'finished_cleanly.txt'
         self.paths['failures_fname'] = 'failures.txt'
         self.paths['memory_fname'] = 'memory_exceeded.txt'
-        if not isfile(self.paths['jobs_fname']):
+        if not os.path.isfile(self.paths['jobs_fname']):
             with open(self.paths['jobs_fname'], 'a'):
                 pass
-        if not isfile(self.paths['completed_fname']):
+        if not os.path.isfile(self.paths['completed_fname']):
             with open(self.paths['completed_fname'], 'a'):
                 pass
-        if not isfile(self.paths['failures_fname']):
+        if not os.path.isfile(self.paths['failures_fname']):
             with open(self.paths['failures_fname'], 'a'):
                 pass
         if self.args.get('memcheck'):
-            if not isfile(self.paths['memory_fname']):
+            if not os.path.isfile(self.paths['memory_fname']):
                 with open(self.paths['memory_fname'], 'a'):
                     pass
 
@@ -125,7 +124,7 @@ class BatchRun:
         job_count = 0
         for res in res_list:
             running = False
-            if isfile(res + '.lock'):
+            if os.path.isfile(res + '.lock'):
                 running = True
             else:
                 with open(paths['jobs_fname'], 'r') as job_file:
@@ -138,7 +137,7 @@ class BatchRun:
                 if self.limit is not None:
                     if job_count == self.limit:
                         raise SystemExit
-                if not isfile(res + '.lock'):
+                if not os.path.isfile(res + '.lock'):
                     with open(res + '.lock', 'a') as job_file:
                         pass
                 else:
@@ -150,16 +149,17 @@ class BatchRun:
                 # create full relaxer object for creation and running of job
                 try:
                     job_count += 1
+                    hostname = os.uname()[1]
                     relaxer = FullRelaxer(node=None, res=res,
                                           param_dict=self.param_dict,
                                           cell_dict=self.cell_dict,
-                                          mode=self.mode, paths=self.paths,
+                                          mode=self.mode, paths=self.paths, compute_dir=hostname,
                                           **self.args)
                     try:
                         if not relaxer.enough_memory:
                             with open(paths['memory_fname'], 'a') as job_file:
                                 job_file.write(res+'\n')
-                            remove(res + '.lock')
+                            os.remove(res + '.lock')
                             with open(paths['jobs_fname'], 'r+') as job_file:
                                 flines = job_file.readlines()
                                 job_file.seek(0)
@@ -191,7 +191,7 @@ class BatchRun:
         # read cell/param files
         exts = ['cell', 'param']
         for ext in exts:
-            if not isfile('{}.{}'.format(self.seed, ext)):
+            if not os.path.isfile('{}.{}'.format(self.seed, ext)):
                 print_failure('Failed to find {} file, {}.{}'.format(ext, self.seed, ext))
                 exit()
         self.cell_dict, cell_success = cell2dict(self.seed + '.cell', db=False)
@@ -207,7 +207,7 @@ class BatchRun:
 
         # scan directory for files to run
         self.file_lists = defaultdict(list)
-        self.file_lists['res'] = [file.name for file in scandir() if file.endswith('.res')]
+        self.file_lists['res'] = [file.name for file in os.scandir() if file.name.endswith('.res')]
         if len(self.file_lists['res']) < 1:
             print_failure('run3 in CASTEP mode requires at least 1 res file in folder, found' +
                           str(len(self.file_lists['res'])))
@@ -227,7 +227,7 @@ class BatchRun:
         # check if we're doing a conv run
         if self.args.get('conv_cutoff'):
             try:
-                if isfile('cutoff.conv'):
+                if os.path.isfile('cutoff.conv'):
                     with open('cutoff.conv', 'r') as f:
                         flines = f.readlines()
                         self.args['conv_cutoff'] = []
@@ -244,7 +244,7 @@ class BatchRun:
 
         if self.args.get('conv_kpt'):
             try:
-                if isfile('kpt.conv'):
+                if os.path.isfile('kpt.conv'):
                     with open('kpt.conv', 'r') as f:
                         flines = f.readlines()
                         self.args['conv_kpt'] = []
@@ -277,8 +277,8 @@ if __name__ == '__main__':
                      in finished_cleanly.txt.',
         epilog='Written by Matthew Evans (2016), based primarily on run.pl and run2.pl \
                 by Chris Pickard and Andrew Morris and PyAIRSS CastepRunner by Jamie Wynn.')
-    parser.add_argument('--version', action='version', version='run3 operating from matador version '
-                        + __version__ + '.')
+    parser.add_argument('--version', action='version', version='run3 operating from matador version ' +
+                        __version__ + '.')
     parser.add_argument('seed', type=str, nargs='*',
                         help='cell and param seed to use as template for CASTEP calculations OR list of files\
                               to apply run executable on')
@@ -336,11 +336,27 @@ if __name__ == '__main__':
                               to perform, [DEFAULT: 20].')
     parser.add_argument('-l', '--limit', type=int, default=None,
                         help='limit to n structures per run')
+    parser.add_argument('--profile', action='store_true',
+                        help='profile code with cProfile')
     args = parser.parse_args()
     if sum([vars(args)['bnl'], vars(args)['archer'], vars(args)['intel']]) > 1:
         exit('Incompatible MPI arguments specified, please use at most one of --archer/--intel/--slurm.')
+
+    if vars(args).get('profile'):
+        import cProfile
+        import pstats
+        from sys import version_info
+        hostname = os.uname()[1]
+        pr = cProfile.Profile()
+        pr.enable()
     runner = BatchRun(args)
-    try:
-        runner.spawn()
-    except(KeyboardInterrupt, SystemExit):
-        exit('Exiting top-level...')
+    runner.spawn()
+    if vars(args).get('profile'):
+        pr.disable()
+        fname = 'run3-{}-{}-{}.{}.{}'.format(__version__, hostname, version_info.major,
+                                             version_info.minor, version_info.micro)
+        pr.dump_stats(fname + '.prof')
+        with open(fname + '.pstats', 'w') as s:
+            sortby = 'cumulative'
+            ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+            ps.print_stats()
