@@ -2,7 +2,7 @@
 import unittest
 from matador.utils.chem_utils import get_concentration
 from matador.utils.chem_utils import get_generic_grav_capacity
-from matador.utils.chem_utils import get_stoich, get_formula_from_stoich
+from matador.utils.chem_utils import get_stoich, get_formula_from_stoich, get_stoich_from_formula
 
 
 class ChemUtilsTest(unittest.TestCase):
@@ -87,6 +87,11 @@ class ChemUtilsTest(unittest.TestCase):
         stoich = [['Li', 1], ['P', 9]]
         form = 'P9Li'
         self.assertEqual(form, get_formula_from_stoich(stoich, elements=['P', 'Li']))
+
+    def testForm2Stoich(self):
+        formula = 'Li12P1N18'
+        stoich = [['Li', 12], ['P', 1], ['N', 18]]
+        self.assertEqual(stoich, get_stoich_from_formula(formula))
 
 
 if __name__ == '__main__':

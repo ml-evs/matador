@@ -17,7 +17,7 @@ except:
 
 def display_results(cursor,
                     args={}, argstr=None, additions=None, deletions=None,
-                    hull=False, markdown=False, latex=False):
+                    hull=False, markdown=False, latex=False, use_source=False):
     """ Print query results in a cryan-like fashion, optionally
     in a markdown format.
 
@@ -27,13 +27,14 @@ def display_results(cursor,
 
     Args:
 
-        | args      : dict, extra keyword arguments
-        | argstr    : str, string to store matador initialisation command
-        | additions : list(str), list of text_ids to be coloured green with a (+)
-        | deletions : list(str), list of text_ids to be coloured red with a (-)
-        | hull      : bool, whether or not to print hull-style (True) or query-style
-        | markdown  : bool, whether or not to write a markdown file containing results
-        | latex     : bool, whether or not to create a LaTeX table
+        | args       : dict, extra keyword arguments
+        | argstr     : str, string to store matador initialisation command
+        | additions  : list(str), list of text_ids to be coloured green with a (+)
+        | deletions  : list(str), list of text_ids to be coloured red with a (-)
+        | hull       : bool, whether or not to print hull-style (True) or query-style
+        | markdown   : bool, whether or not to write a markdown file containing results
+        | latex      : bool, whether or not to create a LaTeX table
+        | use_source : bool, print source instead of text_id
 
     """
     details = args.get('details')
@@ -69,7 +70,10 @@ def display_results(cursor,
     if additions is not None or deletions is not None:
         header_string += '   '
     if not markdown:
-        header_string += "{:^24}".format('ID')
+        if use_source:
+            header_string += "{:^40}".format('ID')
+        else:
+            header_string += "{:^22}".format('ID')
         header_string += "{:^5}".format('!?!')
     else:
         header_string += "{:^40}".format('Root')
@@ -120,17 +124,19 @@ def display_results(cursor,
         formula_string.append(formula_substring)
         if not markdown:
             if hull and np.abs(doc.get('hull_distance')) <= 0.0 + 1e-12:
-                if 'text_id' not in doc:
-                    struct_string.append('* ' + "{:^22}".format('xxx yyy'))
+                if use_source:
+                    src = [src.split('/')[-1] for src in doc['source'] if src.endswith('.res') or src.endswith('.castep')][0].replace('.res', '').replace('.castep', '')
+                    struct_string.append("* {:<40}".format(src))
                 else:
                     struct_string.append(
-                        '* ' + "{:^22}".format(doc['text_id'][0]+' '+doc['text_id'][1]))
+                        "* {:^20}".format(doc['text_id'][0]+' '+doc['text_id'][1]))
             else:
-                if 'text_id' not in doc:
-                    struct_string.append("{:^24}".format('xxx yyy'))
+                if use_source:
+                    src = [src.split('/')[-1] for src in doc['source'] if src.endswith('.res') or src.endswith('.castep')][0].replace('.res', '').replace('.castep', '')
+                    struct_string.append("  {:<40}".format(src))
                 else:
                     struct_string.append(
-                        "{:^24}".format(doc['text_id'][0]+' '+doc['text_id'][1]))
+                        "  {:^20}".format(doc['text_id'][0]+' '+doc['text_id'][1]))
             if additions is not None and doc['text_id'] in additions:
                 struct_string[-1] = '\033[92m\033[1m' + ' + ' + struct_string[-1] + '\033[0m'
             elif deletions is not None and doc['text_id'] in deletions:
@@ -162,8 +168,7 @@ def display_results(cursor,
             struct_string[-1] += "{:^12}".format('xxx')
         try:
             if hull:
-                struct_string[-1] += "{:^18.5f}".format(doc.get('hull_distance'))
-                # struct_string[-1] += "{:^18.5f}".format(doc.get('formation_enthalpy_per_atom'))
+                struct_string[-1] += "{:^18.5f}".format(0 if doc.get('hull_distance') <= 1e-12 else doc.get('hull_distance'))
             elif args.get('per_atom'):
                 struct_string[-1] += "{:^18.5f}".format(doc['enthalpy_per_atom'])
             else:

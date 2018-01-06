@@ -6,18 +6,17 @@ and calling other functionality.
 
 from __future__ import print_function
 # standard library
-import re
 from os import devnull
 from sys import exit
 import sys
 from itertools import combinations
 from traceback import print_exc
-from math import gcd
 # matador modules
-from .utils.print_utils import print_failure, print_warning, print_success
-from .utils.chem_utils import get_periodic_table, get_formula_from_stoich
-from .utils.cursor_utils import display_results
-from .utils.db_utils import make_connection_to_collection
+from matador.utils.print_utils import print_failure, print_warning, print_success
+from matador.utils.chem_utils import get_periodic_table, get_formula_from_stoich
+from matador.utils.chem_utils import parse_element_string, get_stoich_from_formula
+from matador.utils.cursor_utils import display_results
+from matador.utils.db_utils import make_connection_to_collection
 # external libraries
 import pymongo as pm
 import numpy as np
@@ -403,30 +402,14 @@ class DBQuery(object):
         if ':' in stoich[0]:
             exit('Formula cannot contain ":", you probably meant to query composition.')
 
-        stoich = parse_element_string(stoich[0], stoich=True)
-
-        elements = []
-        fraction = []
-        for i in range(0, len(stoich), 1):
-            if not bool(re.search(r'\d', stoich[i])):
-                elements.append(stoich[i])
-                try:
-                    fraction.append(float(stoich[i+1]))
-                except:
-                    fraction.append(1.0)
-        gcd_val = 0
-        for frac in fraction:
-            if gcd_val == 0:
-                gcd_val = frac
-            else:
-                gcd_val = gcd(int(frac), int(gcd_val))
-        fraction = np.asarray(fraction)
-        fraction /= gcd_val
+        stoich = get_stoich_from_formula(stoich[0])
 
         query_dict = dict()
         query_dict['$and'] = []
 
-        for ind, elem in enumerate(elements):
+        for ind, _ in enumerate(stoich):
+            elem = stoich[ind][0]
+            fraction = stoich[ind][1]
             if '[' in elem or ']' in elem:
                 types_dict = dict()
                 types_dict['$or'] = list()
@@ -435,23 +418,23 @@ class DBQuery(object):
                     for group_elem in self.periodic_table[elem]:
                         types_dict['$or'].append(dict())
                         types_dict['$or'][-1]['stoichiometry'] = dict()
-                        types_dict['$or'][-1]['stoichiometry']['$in'] = [[group_elem, fraction[ind]]]
+                        types_dict['$or'][-1]['stoichiometry']['$in'] = [[group_elem, fraction]]
                     query_dict['$and'].append(types_dict)
                 elif ',' in elem:
                     for group_elem in elem.split(','):
                         types_dict['$or'].append(dict())
                         types_dict['$or'][-1]['stoichiometry'] = dict()
-                        types_dict['$or'][-1]['stoichiometry']['$in'] = [[group_elem, fraction[ind]]]
+                        types_dict['$or'][-1]['stoichiometry']['$in'] = [[group_elem, fraction]]
                     query_dict['$and'].append(types_dict)
             else:
                 stoich_dict = dict()
                 stoich_dict['stoichiometry'] = dict()
-                stoich_dict['stoichiometry']['$in'] = [[elem, fraction[ind]]]
+                stoich_dict['stoichiometry']['$in'] = [[elem, fraction]]
                 query_dict['$and'].append(stoich_dict)
         if not partial_formula:
             size_dict = dict()
             size_dict['stoichiometry'] = dict()
-            size_dict['stoichiometry']['$size'] = len(elements)
+            size_dict['stoichiometry']['$size'] = len(stoich)
             query_dict['$and'].append(size_dict)
 
         return query_dict
@@ -954,65 +937,6 @@ class DBQuery(object):
             exit('No structures found.')
 
         return self.temp
-
-
-def parse_element_string(elements_str, stoich=False):
-    """ Parse element query string with macros.
-    e.g.
-        Input: '[VII][Fe,Ru,Os][I]'
-        Returns: ['[VII]', '[Fe,Ru,Os]', '[I]']
-
-    e.g.2
-        Input: '[VII]2[Fe,Ru,Os][I]'
-        Returns: ['[VII]2', '[Fe,Ru,Os]', '[I]']
-    """
-    valid = False
-    for char in elements_str:
-        if char.isupper():
-            valid = True
-    if not valid:
-        print_failure('Composition must contain at least one upper case character.')
-        exit()
-    elements = [elem for elem in re.split(r'([A-Z][a-z]*)', elements_str) if elem]
-    if stoich:
-        tmp_stoich = elements
-        for ind, strng in enumerate(elements):
-            if not any(char.isdigit() for char in strng):
-                tmp_stoich[ind] = [strng]
-            else:
-                tmp_stoich[ind] = [elem for elem in re.split(r'([0-9]*)', strng) if elem]
-        elements = [item for sublist in tmp_stoich for item in sublist]
-    # split macros
-    while '[' in elements or '][' in elements:
-        tmp_stoich = list(elements)
-        cleaned = True
-        while cleaned:
-            for ind, tmp in enumerate(tmp_stoich):
-                if tmp == '][':
-                    del tmp_stoich[ind]
-                    tmp_stoich.insert(ind, '[')
-                    tmp_stoich.insert(ind, ']')
-                    cleaned = True
-                elif ind == len(tmp_stoich)-1:
-                    cleaned = False
-        for ind, tmp in enumerate(tmp_stoich):
-            if tmp == '[':
-                end_bracket = False
-                while not end_bracket:
-                    if tmp_stoich[ind+1] == ']':
-                        end_bracket = True
-                    tmp_stoich[ind] += tmp_stoich[ind+1]
-                    del tmp_stoich[ind+1]
-        try:
-            tmp_stoich.remove(']')
-        except:
-            pass
-        try:
-            tmp_stoich.remove('')
-        except:
-            pass
-        elements = tmp_stoich
-    return elements
 
 
 class EmptyCursor:

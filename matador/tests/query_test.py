@@ -149,7 +149,6 @@ class QueryTest(unittest.TestCase):
                 {'spin_polarized': {'$ne': True}},
             ]
         })
-        # print(json.dumps(query.query_dict, indent=2))
         self.assertDictEqual(test_dict, query.query_dict)
 
     def testParseElementStr(self):
@@ -186,7 +185,6 @@ class QueryTest(unittest.TestCase):
                     ]},
             ]
         })
-        # print(json.dumps(query.query_dict, indent=2))
         self.assertDictEqual(test_dict, query.query_dict)
 
         kwargs = {'composition': ['LiFeBe'], 'ignore_warnings': True, 'intersection': True,
@@ -230,7 +228,6 @@ class QueryTest(unittest.TestCase):
                     ]},
                 ]}
             ]})
-        # print(json.dumps(query.query_dict, indent=2))
         self.assertDictEqual(test_dict, query.query_dict)
 
         kwargs = {'composition': ['Fe[I]Be'], 'ignore_warnings': True,
@@ -253,7 +250,6 @@ class QueryTest(unittest.TestCase):
                     ]},
             ]
         })
-        # print(json.dumps(query.query_dict, indent=4))
         self.assertDictEqual(test_dict, query.query_dict)
 
         kwargs = {'composition': ['[Fe,Ru,Os][I]Be'], 'ignore_warnings': True,
@@ -280,7 +276,6 @@ class QueryTest(unittest.TestCase):
                     ]},
             ]
         })
-        # print(json.dumps(query.query_dict, indent=2))
         self.assertDictEqual(test_dict, query.query_dict)
 
         kwargs = {'composition': ['Be[Fe,Ru,Os][I]'], 'ignore_warnings': True,
@@ -307,7 +302,6 @@ class QueryTest(unittest.TestCase):
                     ]},
             ]
         })
-        # print(json.dumps(query.query_dict, indent=2))
         self.assertDictEqual(test_dict, query.query_dict)
 
         kwargs = {'composition': ['[VII][Fe,Ru,Os][I]'], 'ignore_warnings': True,
@@ -340,7 +334,6 @@ class QueryTest(unittest.TestCase):
                     ]},
             ]
         })
-        # print(json.dumps(query.query_dict, indent=2))
         self.assertDictEqual(test_dict, query.query_dict)
 
         kwargs = {'composition': ['[Si,Ge,Sn][Fe,Ru,Os]'], 'ignore_warnings': True,
@@ -363,7 +356,6 @@ class QueryTest(unittest.TestCase):
                     ]},
             ]
         })
-        # print(json.dumps(query.query_dict, indent=2))
 
         self.assertDictEqual(test_dict, query.query_dict)
 
@@ -398,7 +390,6 @@ class QueryTest(unittest.TestCase):
                     ]},
             ]
         })
-        # print(json.dumps(query.query_dict, indent=2))
         self.assertDictEqual(test_dict, query.query_dict)
 
         kwargs = {'formula': ['[Ag,Cd,In]2[Fe,Ru,Os]3[I]'], 'ignore_warnings': True,
@@ -429,7 +420,7 @@ class QueryTest(unittest.TestCase):
                     ]},
             ]
         })
-        # print(json.dumps(query.query_dict, indent=2))
+        self.assertDictEqual(test_dict, query.query_dict)
 
     def testRatioQuery(self):
         kwargs = {'composition': ['Li:TiP4'], 'ignore_warnings': True,
@@ -452,7 +443,6 @@ class QueryTest(unittest.TestCase):
                 ]}
             ]
         })
-        # print(json.dumps(query.query_dict, indent=2))
         self.assertDictEqual(test_dict, query.query_dict)
 
         kwargs = {'composition': ['LiMn:Mo2S3'], 'ignore_warnings': True,
@@ -478,7 +468,6 @@ class QueryTest(unittest.TestCase):
                 ]}
             ]
         })
-        # print(json.dumps(query.query_dict, indent=2))
         self.assertDictEqual(test_dict, query.query_dict)
 
         kwargs = {'composition': ['LiMn:Mo2S3B5'], 'ignore_warnings': True,
@@ -507,7 +496,6 @@ class QueryTest(unittest.TestCase):
                 ]}
             ]
         })
-        # print(json.dumps(query.query_dict, indent=2))
         self.assertDictEqual(test_dict, query.query_dict)
 
     def testTimePeriod(self):
@@ -576,10 +564,6 @@ class QueryTest(unittest.TestCase):
                 {'_id': {'$lte': ObjectId(time_str)}}
             ]})
         self.assertDictEqual(test_dict, query.query_dict)
-
-
-if __name__ == '__main__':
-    unittest.main()
 
 
 if __name__ == '__main__':

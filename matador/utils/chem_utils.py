@@ -178,6 +178,117 @@ def get_stoich(atom_types):
     return sorted(temp_stoich)
 
 
+def get_stoich_from_formula(formula: str):
+    """ Convert formula string, e.g. Li2TiP4 into a matador-style
+    stoichiometry, e.g. [['Li', 2], ['Ti', 1], ['P', 4]].
+
+    Input:
+
+        | formula: str, chemical formula of compound
+
+    Returns:
+
+        | stoich: list, list of lists containing symbol and amount
+
+    """
+    from math import gcd
+    import re
+
+    parsed_elements = parse_element_string(formula, stoich=True)
+    elements = []
+    fraction = []
+    for i, _ in enumerate(parsed_elements):
+        if not bool(re.search(r'\d', parsed_elements[i])):
+            elements.append(parsed_elements[i])
+            try:
+                fraction.append(float(parsed_elements[i+1]))
+            except:
+                fraction.append(1.0)
+    gcd_val = 0
+    for frac in fraction:
+        if gcd_val == 0:
+            gcd_val = frac
+        else:
+            gcd_val = gcd(int(frac), int(gcd_val))
+    fraction = np.asarray(fraction)
+    fraction /= gcd_val
+    stoich = [[elements[ind], fraction[ind]] for ind, _ in enumerate(elements)]
+    return stoich
+
+
+def parse_element_string(elements_str, stoich=False):
+    """ Parse element query string with macros.
+
+    e.g.
+        Input: '[VII][Fe,Ru,Os][I]'
+        Returns: ['[VII]', '[Fe,Ru,Os]', '[I]']
+
+    e.g.2
+        Input: '[VII]2[Fe,Ru,Os][I]'
+        Returns: ['[VII]2', '[Fe,Ru,Os]', '[I]']
+
+    Input:
+
+        | elements_str: str, chemical formula, including macros.
+
+    Args:
+
+        | stoich: bool, parse as a stoichiometry, i.e. check for numbers
+
+    Returns:
+
+        | elements: list, split list of elements contained in input
+
+    """
+    import re
+    valid = False
+    for char in elements_str:
+        if char.isupper():
+            valid = True
+    if not valid:
+        exit('Composition must contain at least one upper case character.')
+    elements = [elem for elem in re.split(r'([A-Z][a-z]*)', elements_str) if elem]
+    if stoich:
+        tmp_stoich = elements
+        for ind, strng in enumerate(elements):
+            if not any(char.isdigit() for char in strng):
+                tmp_stoich[ind] = [strng]
+            else:
+                tmp_stoich[ind] = [elem for elem in re.split(r'([0-9]*)', strng) if elem]
+        elements = [item for sublist in tmp_stoich for item in sublist]
+    # split macros
+    while '[' in elements or '][' in elements:
+        tmp_stoich = list(elements)
+        cleaned = True
+        while cleaned:
+            for ind, tmp in enumerate(tmp_stoich):
+                if tmp == '][':
+                    del tmp_stoich[ind]
+                    tmp_stoich.insert(ind, '[')
+                    tmp_stoich.insert(ind, ']')
+                    cleaned = True
+                elif ind == len(tmp_stoich)-1:
+                    cleaned = False
+        for ind, tmp in enumerate(tmp_stoich):
+            if tmp == '[':
+                end_bracket = False
+                while not end_bracket:
+                    if tmp_stoich[ind+1] == ']':
+                        end_bracket = True
+                    tmp_stoich[ind] += tmp_stoich[ind+1]
+                    del tmp_stoich[ind+1]
+        try:
+            tmp_stoich.remove(']')
+        except:
+            pass
+        try:
+            tmp_stoich.remove('')
+        except:
+            pass
+        elements = tmp_stoich
+    return elements
+
+
 def get_formula_from_stoich(stoich, elements=None, tex=False):
     """ Get the chemical formula of a structure from
     its matador stoichiometry.

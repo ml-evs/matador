@@ -52,11 +52,11 @@ class QueryConvexHull(object):
         self.plot_param = False
         if self.query is not None:
             self.cursor = list(query.cursor)
+            use_source = False
         else:
             self.cursor = cursor
             self.from_cursor = True
-            for ind, doc in enumerate(self.cursor):
-                self.cursor[ind]['text_id'] = ['xxx', 'yyy']
+            use_source = True
         if self.cursor is None:
             raise RuntimeError('Failed to find structures to create hull!')
         if elements is None:
@@ -104,7 +104,7 @@ class QueryConvexHull(object):
                              str(self.hull_cutoff) +
                              ' eV of the hull with chosen chemical potentials.')
 
-        display_results(self.hull_cursor, self.args, hull=True)
+        display_results(self.hull_cursor, self.args, hull=True, use_source=use_source)
 
         if not self.args.get('no_plot'):
             from matador import plotting
@@ -298,6 +298,7 @@ class QueryConvexHull(object):
             | custom_elem : list(str), list of element symbols to generate chempots for.
 
         """
+        from matador.utils.chem_utils import get_stoich_from_formula
         self.match = [dict(), dict()]
         if custom_elem is None:
             custom_elem = self.elements
@@ -307,10 +308,8 @@ class QueryConvexHull(object):
             self.match[i]['enthalpy'] = self.mu_enthalpy[i]
             self.match[i]['num_fu'] = 1
             self.match[i]['text_id'] = ['command', 'line']
-            # vomit-inducing cludge so that this works for custom chemical potentials for binarys that don't exist, provided
-            # the first element has a two character symbol and the second has a one character symbol, e.g. TiP4...
             if self.non_binary and i == len(self.match)-1:
-                self.match[i]['stoichiometry'] = [[custom_elem[i][:2], 1], [custom_elem[i][2:3], int(custom_elem[i][-1])]]
+                self.match[i]['stoichiometry'] = get_stoich_from_formula(custom_elem)
             else:
                 self.match[i]['stoichiometry'] = [[custom_elem[i], 1]]
             self.match[i]['space_group'] = 'xxx'
@@ -440,9 +439,6 @@ class QueryConvexHull(object):
         else:
             for ind in self.hull.vertices:
                 hull_dist[ind] = 0.0
-
-        if precompute:
-            print(cache_hits, '/', cache_misses)
 
         return hull_dist, tie_line_energy, tie_line_comp
 
