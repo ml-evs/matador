@@ -50,6 +50,7 @@ class FullRelaxer:
         | archer        : bool, force use of aprun over mpirun (DEFAULT: False)
         | slurm         : bool, force use of srun over mpirun (DEFAULT: False)
         | bnl           : bool, deprecated alias for slurm
+        | profile       : bool, use cProfile to profile runtime
         | intel         : bool, force use of Intel mpirun-style calls (DEFAULT: False)
         | redirect      : str, file to redirect stdout to (DEFAULT: /dev/null unless debug).
         | exec_test     : bool, test executable before progressing (DEFAULT: True)
@@ -69,7 +70,7 @@ class FullRelaxer:
         prop_defaults = {'paths': None, 'param_dict': None, 'cell_dict': None, 'mode': 'castep', 'executable': 'castep', 'memcheck': False,
                          'rough': 4, 'rough_iter': 2, 'fine_iter': 20, 'spin': False, 'redirect': None, 'reopt': False, 'compute_dir': None,
                          'custom_params': False, 'archer': False, 'maxmem': None, 'killcheck': True, 'kpts_1D': False,
-                         'conv_cutoff': False, 'conv_kpt': False, 'debug': False,
+                         'conv_cutoff': False, 'conv_kpt': False, 'debug': False, 'profile': False,
                          'bnl': False, 'slurm': False, 'intel': False, 'exec_test': True, 'start': True, 'verbosity': 0}
         self.__dict__.update(prop_defaults)
         self.__dict__.update(kwargs)
@@ -79,6 +80,15 @@ class FullRelaxer:
             except Exception as e:
                 print_exc()
             self.slurm = True
+
+        if self.profile:
+            import cProfile
+            import pstats
+            from sys import version_info
+            from matador.version import __version__
+            hostname = os.uname()[1]
+            pr = cProfile.Profile()
+            pr.enable()
 
         self.ncores = ncores
         self.res = res
@@ -200,6 +210,16 @@ class FullRelaxer:
                 self.input_ext = ''
             assert isinstance(self.seed, str)
             self.run_generic(self.seed)
+
+        if self.profile:
+            pr.disable()
+            fname = 'relaxer-{}-{}-{}.{}.{}'.format(__version__, hostname, version_info.major,
+                                                    version_info.minor, version_info.micro)
+            pr.dump_stats(fname + '.prof')
+            with open(fname + '.pstats', 'w') as s:
+                sortby = 'cumulative'
+                ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+                ps.print_stats()
 
     def relax(self, output_queue=None):
         """ Set up the calculation to perform 4 sets of two steps,
