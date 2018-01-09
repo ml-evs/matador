@@ -748,7 +748,7 @@ class DBQuery(object):
         """ Query all calculations with the correct relaxed force tolerance. """
         query_dict = dict()
         query_dict['geom_force_tol'] = dict()
-        if not isinstance(self.args.get('cutoff'), list):
+        if not isinstance(self.args.get('geom_force_tol'), list):
             tols = [self.args.get('geom_force_tol')]
         else:
             tols = self.args.get('geom_force_tol')
