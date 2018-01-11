@@ -97,6 +97,9 @@ def display_results(cursor,
     header_string += "{:^8}".format('# fu')
     header_string += "{:^8}".format('Prov.')
 
+    # ensure cursor is sorted by enthalpy
+    cursor = sorted(cursor, key=lambda doc: doc['enthalpy_per_atom'], reverse=False)
+
     for ind, doc in enumerate(cursor):
         formula_substring = ''
         if 'phase' in doc:
@@ -286,6 +289,7 @@ def display_results(cursor,
         markdown_string += header_string + '\n'
         markdown_string += units_string + '\n'
         markdown_string += len(header_string)*'-' + '\n'
+
     if args.get('summary'):
         current_formula = ''
         formula_list = []

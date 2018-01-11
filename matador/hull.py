@@ -551,7 +551,9 @@ class QueryConvexHull(object):
             self.hull_dist, self.hull_energy, self.hull_comp = self.get_hull_distances(structures)
             set_cursor_from_array(self.cursor, self.hull_dist, 'hull_distance')
 
-        hull_cursor = [self.cursor[idx] for idx in np.where(self.hull_dist <= self.hull_cutoff + 1e-12)[0]]
+        # ensure hull cursor is sorted by enthalpy_per_atom, as it will be by default if from database
+        hull_cursor = sorted([self.cursor[idx] for idx in np.where(self.hull_dist <= self.hull_cutoff + 1e-12)[0]],
+                             key=lambda doc: doc['enthalpy_per_atom'])
         # if summary requested, filter for lowest per stoich
         if self.args.get('summary'):
             self.hull_cursor = []
