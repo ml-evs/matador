@@ -21,21 +21,24 @@ def plot_spectral(seeds, **kwargs):
 
         | plot_bandstructure : bool, whether to plot bandstructure
         | plot_dos           : bool, whether to plot density of states
+        | dos                : str, separate seed name for pDOS/DOS data
         | phonons            : bool, whether to plot phonon or electronic data
         | cell               : bool, whether to work out correct labels from structure in cell file
         | gap                : bool, draw on the band gap
         | colour_by_seed     : bool, plot with a separate colour per bandstructure
+        | external_efermi    : float, replace scraped Fermi energy with this value (eV)
 
     """
-    from matador.scrapers.castep_scrapers import bands2dict, cell2dict, phonon2dict
+    from matador.scrapers.castep_scrapers import bands2dict, cell2dict, phonon2dict, optados2dict
     from matador.utils.cell_utils import doc2spg
     from seekpath import get_path
     import seaborn as sns
     from os.path import isfile
     # set defaults and update class with desired values
     prop_defaults = {'plot_bandstructure': True, 'plot_dos': False,
-                     'phonons': False, 'cell': False, 'gaps': False,
-                     'colour_by_seed': True, 'verbosity': 0}
+                     'phonons': False, 'cell': False, 'gap': False,
+                     'colour_by_seed': False, 'external_efermi': None,
+                     'verbosity': 0}
     prop_defaults.update(kwargs)
     kwargs = prop_defaults
 
@@ -56,12 +59,13 @@ def plot_spectral(seeds, **kwargs):
     if not isinstance(seeds, list):
         seeds = [seeds]
 
-    if len(seeds) > 1 and kwargs.get('colour_by_seed'):
+    if len(seeds) > 1 or kwargs.get('colour_by_seed'):
         seed_colours = colours
         ls = ['-']*len(seeds)
         colour_by_seed = True
     else:
         ls = []
+        colour_by_seed = False
         for i in range(len(seeds)):
             if i % 3 == 0:
                 ls.append('-')
@@ -69,8 +73,6 @@ def plot_spectral(seeds, **kwargs):
                 ls.append('--')
             elif i % 3 == 2:
                 ls.append('-.')
-    if len(seeds) == 1:
-        colour_by_seed = False
 
     if kwargs.get('plot_window') is not None:
         plot_window = (-kwargs.get('plot_window'), kwargs.get('plot_window'))
@@ -81,7 +83,7 @@ def plot_spectral(seeds, **kwargs):
         fig, ax_dispersion = plt.subplots(figsize=(5, 5))
     elif kwargs['plot_bandstructure'] and kwargs['plot_dos']:
         fig, ax_grid = plt.subplots(1, 2, figsize=(6.5, 5), sharey=True,
-                                    gridspec_kw={'width_ratios': [5, 1],
+                                    gridspec_kw={'width_ratios': [4, 1],
                                                  'wspace': 0.05,
                                                  'left': 0.15})
         ax_dispersion = ax_grid[0]
@@ -93,7 +95,7 @@ def plot_spectral(seeds, **kwargs):
         seed = seed.replace('.bands', '').replace('.phonon', '')
         if kwargs['plot_bandstructure']:
             if kwargs['phonons']:
-                dispersion, s = phonon2dict(seed + '.phonon', verbosity=kwargs['verbosity'])
+                dispersion, s = phonon2dict(seed + '.phonon', verbosity=kwargs.get('verbosity'))
                 branch_key = 'qpoint_branches'
                 num_key = 'num_qpoints'
                 path_key = 'qpoint_path'
@@ -103,7 +105,11 @@ def plot_spectral(seeds, **kwargs):
                 spin_key = 'num_spins'
                 plot_window = [np.min(dispersion[eig_key]), np.max(dispersion[eig_key])]
             else:
-                dispersion, s = bands2dict(seed + '.bands', summary=True, gap=kwargs['gap'], verbosity=kwargs['verbosity'])
+                dispersion, s = bands2dict(seed + '.bands',
+                                           summary=True,
+                                           gap=kwargs.get('gap'),
+                                           external_efermi=kwargs.get('external_efermi'),
+                                           verbosity=kwargs.get('verbosity'))
                 branch_key = 'kpoint_branches'
                 num_key = 'num_kpoints'
                 path_key = 'kpoint_path'
@@ -164,7 +170,7 @@ def plot_spectral(seeds, **kwargs):
             else:
                 ylabel = '$\epsilon_k$ (eV)'
             ax_dispersion.set_ylabel(ylabel)
-            ax_dispersion.set_xlim(0, 1)
+            ax_dispersion.set_xlim(-0.05, 1.05)
             if kwargs['phonons']:
                 dispersion['freq_unit'] = dispersion['freq_unit'].replace('-1', '$^{-1}$')
                 ax_dispersion.axhline(np.min(dispersion['softest_mode_freq']), ls=ls[seed_ind], c='r',
@@ -216,28 +222,33 @@ def plot_spectral(seeds, **kwargs):
                 vbm = dispersion['valence_band_min']
                 cbm_pos = dispersion['band_gap_path_inds'][0]
                 cbm = dispersion['conduction_band_max']
-                vbm_offset = sum([vbm_pos > ind for ind in shear_planes])
-                cbm_offset = sum([cbm_pos > ind for ind in shear_planes])
-                ax_dispersion.plot([path[vbm_pos-vbm_offset], path[cbm_pos-cbm_offset]], [vbm, cbm], ls=ls[seed_ind], c='blue', label='indirect gap {:3.3f} eV'.format(cbm-vbm))
-                if cbm_pos != vbm_pos:
-                    vbm_pos = dispersion['direct_gap_path_inds'][1]
-                    vbm = dispersion['direct_valence_band_min']
-                    cbm_pos = dispersion['direct_gap_path_inds'][0]
-                    cbm = dispersion['direct_conduction_band_max']
+                if vbm_pos != cbm_pos:
                     vbm_offset = sum([vbm_pos > ind for ind in shear_planes])
                     cbm_offset = sum([cbm_pos > ind for ind in shear_planes])
-                    ax_dispersion.plot([path[vbm_pos-vbm_offset], path[cbm_pos-cbm_offset]], [vbm, cbm], ls=ls[seed_ind], c='red', label='direct gap {:3.3f} eV'.format(cbm-vbm))
-                    ax_dispersion.legend(loc='upper center', bbox_to_anchor=(0.5, 1.1), fancybox=True, shadow=True, ncol=2, handlelength=1)
-                else:
-                    ax_dispersion.legend(loc='upper center', bbox_to_anchor=(0.5, 1.1), fancybox=True, shadow=True, ncol=1, handlelength=1)
+                    ax_dispersion.plot([path[vbm_pos-vbm_offset], path[cbm_pos-cbm_offset]], [vbm, cbm], ls=ls[seed_ind], c='blue', label='indirect gap {:3.3f} eV'.format(cbm-vbm))
+                vbm_pos = dispersion['direct_gap_path_inds'][1]
+                vbm = dispersion['direct_valence_band_min']
+                cbm_pos = dispersion['direct_gap_path_inds'][0]
+                cbm = dispersion['direct_conduction_band_max']
+                vbm_offset = sum([vbm_pos > ind for ind in shear_planes])
+                cbm_offset = sum([cbm_pos > ind for ind in shear_planes])
+                ax_dispersion.plot([path[vbm_pos-vbm_offset], path[cbm_pos-cbm_offset]], [vbm, cbm], ls=ls[seed_ind], c='red', label='direct gap {:3.3f} eV'.format(cbm-vbm))
+                ax_dispersion.legend(loc='upper center', bbox_to_anchor=(0.5, 1.1), fancybox=True, shadow=True, ncol=2, handlelength=1)
+                # else:
+                    # ax_dispersion.legend(loc='upper center', bbox_to_anchor=(0.5, 1.1), fancybox=True, shadow=True, ncol=1, handlelength=1)
             ax_dispersion.set_xticks(xticks)
             ax_dispersion.set_xticklabels(xticklabels)
         if kwargs['plot_dos']:
             if not kwargs['phonons']:
-                dos_data = np.loadtxt(seed + '.adaptive.dat')
-                energies = dos_data[:, 0]
-                dos = dos_data[:, 1]
+                if kwargs.get('dos') is None:
+                    dos_data, s = optados2dict(seed + '.adaptive.dat')
+                else:
+                    dos_data, s = optados2dict(kwargs.get('dos'))
+                energies = dos_data['energies']
+                dos = dos_data['dos']
                 max_density = np.max(dos[np.where(energies > plot_window[0])])
+                if 'pdos' in dos_data:
+                    pdos = dos_data['pdos']
             else:
                 if not isfile(seed + '.phonon_dos'):
                     phonon_data, s = phonon2dict(seed + '.phonon')
@@ -299,10 +310,17 @@ def plot_spectral(seeds, **kwargs):
                 ax_dos.set_xlim(0, max_density*1.2)
                 ax_dos.set_ylim(plot_window)
                 ax_dos.axvline(0, c='k')
-                ax_dos.plot(dos, energies, lw=1, c='k', label='matador', ls=ls[seed_ind])
+                ax_dos.plot(dos, energies, lw=1, c='k', ls=ls[seed_ind])
+                if 'pdos' in dos_data:
+                    for ind, projector in enumerate(pdos):
+                        ax_dos.plot(pdos[projector], energies, lw=1, zorder=1000)
+                        ax_dos.fill_betweenx(energies, 0, pdos[projector], alpha=0.3, label=projector)
+                ax_dos.legend()
+
                 if seed_ind == 0 and not kwargs['phonons']:
-                    ax_dos.fill_betweenx(energies[np.where(energies <= 0)], 0, dos[np.where(energies <= 0)], facecolor=valence, alpha=0.5)
-                    ax_dos.fill_betweenx(energies[np.where(energies >= 0)], 0, dos[np.where(energies >= 0)], facecolor=conduction, alpha=0.5)
+                    if 'pdos' not in dos_data:
+                        ax_dos.fill_betweenx(energies[np.where(energies <= 0)], 0, dos[np.where(energies <= 0)], facecolor=valence, alpha=0.5)
+                        ax_dos.fill_betweenx(energies[np.where(energies >= 0)], 0, dos[np.where(energies >= 0)], facecolor=conduction, alpha=0.5)
             else:
                 ax_dos.set_xlabel(xlabel)
                 ax_dos.set_ylabel(ylabel)
@@ -311,9 +329,15 @@ def plot_spectral(seeds, **kwargs):
                 ax_dos.set_xlim(plot_window)
                 ax_dos.axhline(0, c='k')
                 ax_dos.plot(energies, dos, lw=1, c='k', ls=ls[seed_ind])
+                if 'pdos' in dos_data:
+                    for ind, projector in enumerate(pdos):
+                        ax_dos.plot(energies, pdos[projector], lw=1, zorder=1000)
+                        ax_dos.fill_between(energies, 0, pdos[projector], alpha=0.3, label=projector)
+                ax_dos.legend()
                 if seed_ind == 0 and not kwargs['phonons']:
-                    ax_dos.fill_between(energies[np.where(energies <= 0)], 0, dos[np.where(energies <= 0)], facecolor=valence, alpha=0.5)
-                    ax_dos.fill_between(energies[np.where(energies >= 0)], 0, dos[np.where(energies >= 0)], facecolor=conduction, alpha=0.5)
+                    if 'pdos' not in dos_data:
+                        ax_dos.fill_between(energies[np.where(energies <= 0)], 0, dos[np.where(energies <= 0)], facecolor=valence, alpha=0.5)
+                        ax_dos.fill_between(energies[np.where(energies >= 0)], 0, dos[np.where(energies >= 0)], facecolor=conduction, alpha=0.5)
             ax_dos.grid('off')
 
     if kwargs.get('pdf'):
