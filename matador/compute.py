@@ -9,7 +9,7 @@ from matador.utils.print_utils import print_success, print_warning, print_notify
 from matador.export import doc2cell, doc2param, doc2res
 # standard library
 import os
-from shutil import copy
+import shutil
 from copy import deepcopy
 from traceback import print_exc, format_exception_only
 from sys import exit, exc_info
@@ -239,7 +239,7 @@ class FullRelaxer:
                 os.makedirs(self.compute_dir)
             pspots = glob.glob('*.usp')
             for pspot in pspots:
-                copy(pspot, self.compute_dir)
+                shutil.copy(pspot, self.compute_dir)
 
             os.chdir(self.compute_dir)
 
@@ -250,13 +250,11 @@ class FullRelaxer:
         geom_max_iter_list = self.geom_max_iter_list
         if self.debug:
             print(geom_max_iter_list)
+
         # copy initial res file to seed
-        if not isinstance(self.res, str):
-            doc2res(self.res, self.seed, info=False, hash_dupe=False, overwrite=True)
-            self.cp_to_input(self.seed)
-        else:
-            self.cp_to_input(self.seed)
-            doc2res(self.res_dict, self.seed, info=False, hash_dupe=False, overwrite=True)
+        doc2res(self.res_dict, self.seed, info=False, hash_dupe=False, overwrite=True)
+        self.cp_to_input(self.seed)
+
         self.rerun = False
         for ind, num_iter in enumerate(geom_max_iter_list):
             if self.reopt and self.rerun:
@@ -791,7 +789,7 @@ class FullRelaxer:
             seed_files = glob.glob(seed + '.*')
             for _file in seed_files:
                 try:
-                    copy(_file, bad_dir)
+                    shutil.copy(_file, bad_dir)
                     os.remove(_file)
                 except:
                     if self.verbosity > 1:
@@ -813,7 +811,7 @@ class FullRelaxer:
             if self.verbosity > 3:
                 print(seed_files)
             for _file in seed_files:
-                copy(_file, completed_dir)
+                shutil.copy(_file, completed_dir)
                 os.remove(_file)
         else:
             file_exts = ['.castep']
@@ -825,7 +823,7 @@ class FullRelaxer:
                 file_exts.append('-out.cell')
             for ext in file_exts:
                 try:
-                    copy('{}{}'.format(seed, ext), completed_dir)
+                    shutil.copy('{}{}'.format(seed, ext), completed_dir)
                     os.remove('{}{}'.format(seed, ext))
                 except:
                     if self.verbosity > 1:
@@ -844,9 +842,9 @@ class FullRelaxer:
                 for f in files:
                     if f.endswith('.lock'):
                         continue
-                    copy('{}'.format(f), input_dir)
+                    shutil.copy('{}'.format(f), input_dir)
             else:
-                copy('{}.{}'.format(seed, ext), input_dir)
+                shutil.copy('{}.{}'.format(seed, ext), input_dir)
         except:
             print_exc()
             pass
