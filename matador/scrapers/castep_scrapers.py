@@ -895,7 +895,7 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
     return castep, True
 
 
-def bands2dict(seed, summary=False, gap=False, verbosity=0, **kwargs):
+def bands2dict(seed, summary=False, gap=False, external_efermi=None, verbosity=0, **kwargs):
     """ Parse a CASTEP bands file into a dictionary.
 
     Input:
@@ -904,8 +904,9 @@ def bands2dict(seed, summary=False, gap=False, verbosity=0, **kwargs):
 
     Args:
 
-        | summary : bool, print info about bandgap.
-        | gap     : bool, compute bandgap info.
+        | summary         : bool, print info about bandgap.
+        | gap             : bool, compute bandgap info.
+        | external_efermi : float, override the Fermi energy with this value (eV)
 
     Returns:
 
@@ -931,8 +932,11 @@ def bands2dict(seed, summary=False, gap=False, verbosity=0, **kwargs):
     bs['num_spins'] = int(header[1].split()[-1])
     bs['num_electrons'] = float(header[2].split()[-1])
     bs['num_bands'] = int(header[3].split()[-1])
-    bs['fermi_energy_Ha'] = float(header[4].split()[-1])
-    bs['fermi_energy'] = bs['fermi_energy_Ha'] * HARTREE_TO_EV
+    if external_efermi is None:
+        bs['fermi_energy_Ha'] = float(header[4].split()[-1])
+        bs['fermi_energy'] = bs['fermi_energy_Ha'] * HARTREE_TO_EV
+    else:
+        bs['fermi_energy'] = external_efermi
     bs['lattice_cart'] = []
     for i in range(3):
         bs['lattice_cart'].append([BOHR_TO_ANGSTROM * float(elem) for elem in header[6+i].split()])
@@ -949,10 +953,8 @@ def bands2dict(seed, summary=False, gap=False, verbosity=0, **kwargs):
         for ns in range(bs['num_spins']):
             for nb in range(bs['num_bands']):
                 bs['eigenvalues_k_s'][ns][nb][int(data[kpt_ind].split()[1])-1] = float(data[kpt_ind+2+nb].strip())
-    # CASTEP 17 changed bandstructures such that they were shifted already
-    # if np.min(bs['eigenvalues_k_s']) > 0:
-    bs['eigenvalues_k_s'] -= bs['fermi_energy_Ha']
     bs['eigenvalues_k_s'] *= HARTREE_TO_EV
+    bs['eigenvalues_k_s'] -= bs['fermi_energy']
 
     cart_kpts = np.asarray(frac2cart(real2recip(bs['lattice_cart']), bs['kpoint_path']))
     bs['cart_kpoints'] = cart_kpts
@@ -1080,6 +1082,70 @@ def bands2dict(seed, summary=False, gap=False, verbosity=0, **kwargs):
                 print('and lies at {}'.format(bs['direct_gap_path'][0]))
 
     return bs, True
+
+
+def optados2dict(seed, verbosity=0, **kwargs):
+    import numpy as np
+    dos = dict()
+    is_pdos = False
+    with open(seed, 'r') as f:
+        flines = f.readlines()
+
+    header = []
+    for line in flines:
+        if not line.strip().startswith('#'):
+            break
+        if 'Partial' in line:
+            is_pdos = True
+        else:
+            header.append(line)
+
+    data = np.loadtxt(seed, comments='#')
+    num_projectors = len(data.T) - 1
+    if is_pdos:
+        print('Found {} projectors'.format(num_projectors))
+
+    dos['energies'] = data[:, 0]
+    elem_only = []
+    projectors = []
+
+    if is_pdos:
+        # get pdos labels
+        for ind, line in enumerate(header):
+            if 'Projector:' in line:
+                # skip current line and column headings
+                j = 2
+                elements = []
+                angM = []
+                while ind+j+1 < len(header) and 'Projector:' not in header[ind+j+1]:
+                    elements.append(header[ind+j].split()[1])
+                    angM.append(header[ind+j].split()[3])
+                    j += 1
+                projector_label = ''
+                if len(set(elements)) == 1:
+                    projector_label += elements[0] + ' '
+                if len(set(angM)) == 1:
+                    projector_label += '${}$'.format(angM[0])
+                    elem_only.append(False)
+                else:
+                    elem_only.append(True)
+                projector_label = projector_label.strip()
+                projectors.append(projector_label)
+
+        if all(elem_only):
+            for ind, projector in enumerate(projectors):
+                projectors[ind] = projectors[ind].split(' ')[0]
+        # get pdos values
+        dos['pdos'] = dict()
+        dos['dos'] = np.zeros_like(data[:, 0])
+        for i, projector in enumerate(projectors):
+            dos['pdos'][projector] = data[:, i+1]
+            dos['dos'] += data[:, i+1]
+
+    else:
+        dos['dos'] = data[:, 1]
+
+    return dos, True
 
 
 def phonon2dict(seed, verbosity=0, **kwargs):
