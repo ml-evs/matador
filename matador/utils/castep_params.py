@@ -285,7 +285,6 @@ CASTEP_PARAMS = [
                  'spin_fix',
                  'spin_orbit_coupling',
                  'spin_polarised',
-                 'spin_polarized',
                  'spin_treatment',
                  'spin_unit',
                  'stop',
