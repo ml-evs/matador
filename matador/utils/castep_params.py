@@ -284,7 +284,8 @@ CASTEP_PARAMS = [
                  'spin',
                  'spin_fix',
                  'spin_orbit_coupling',
-                 'spin_polarised',
+                 # always scraped as polariZed
+                 # 'spin_polarised',
                  'spin_polarized',
                  'spin_treatment',
                  'spin_unit',
