@@ -1,6 +1,11 @@
 # Installation
 
-Matador is pinned to various versions of its dependencies; the tl;dr way to install is to create a new conda environment, manually install some of the heavier libraries (e.g. numpy and Scipy) directly with conda, then run `pip install .` from inside the top-level matador directory.
+Matador is pinned to various versions of its dependencies. The tl;dr way to install is as follows:
+
+- create a new conda environment
+- manually install some of the heavier libraries (e.g. numpy and Scipy) through conda with `conda install --yes --file requirements.txt`.
+- run `pip install .` from inside the top-level matador directory.
+- this will provide a basic matador installation, if you wish to use e.g. bandstructure/plotting/jupyter notebook visualisation functionality, use `pip install .\[plotting,bandstructure,viz\].
 
 ## Installation on ARCHER (30th October 2017)
 

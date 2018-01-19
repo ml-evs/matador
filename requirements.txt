@@ -1,8 +1,6 @@
 numpy>=1.10
 scipy>=0.18
 pymongo>=3.3.0
-periodictable>=1.4
-spglib>=1.9
-matplotlib>=1.5
-bokeh>=0.12
-https://github.com/marcharper/python-ternary/tarball/master
+matplotlib>=2.0
+psutil
+progressbar2
