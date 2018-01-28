@@ -37,26 +37,10 @@ class HullTest(unittest.TestCase):
         res_list = glob(REAL_PATH + 'data/hull-KP-KSnP_pub/*.res')
         self.assertEqual(len(res_list), 295, 'Could not find test res files, please check installation...')
         cursor = [res2dict(res)[0] for res in res_list]
-        for ind, doc in enumerate(cursor):
-            cursor[ind]['filename'] = doc['source'][0].split('/')[-1]
-
         hull = QueryConvexHull(cursor=cursor, elements=['K', 'P'], no_plot=True, quiet=True)
-        for ind, doc in enumerate(hull.cursor):
-            hull.cursor[ind]['filename'] = doc['source'][0].split('/')[-1]
 
-        assert([doc['filename'] for doc in cursor] == [doc['filename'] for doc in hull.cursor])
-        print([doc['filename'] for doc in cursor])
-        print([doc['filename'] for doc in hull.cursor])
-
-        structures = np.loadtxt(REAL_PATH + 'data/test_KP.dat')
         hull_dist_test = np.loadtxt(REAL_PATH + 'data/test_KP_hull_dist.dat')
-        precomp_hull_dist, energies, comps = hull.get_hull_distances(structures, precompute=True)
-        print('\n\n', [doc['filename'] for doc in hull.cursor])
-        try:
-            np.testing.assert_array_almost_equal(np.sort(hull_dist_test), np.sort(hull.hull_dist), decimal=5)
-            np.testing.assert_array_almost_equal(np.sort(hull.hull_dist), np.sort(precomp_hull_dist), decimal=5)
-        except:
-            print('Failed binary hull distances, even when sorted...')
+        np.testing.assert_array_almost_equal(hull_dist_test, hull.hull_dist, decimal=3)
 
     def testTernaryHullDistances(self):
         res_list = glob(REAL_PATH + 'data/hull-KPSn-KP/*.res')
@@ -71,12 +55,8 @@ class HullTest(unittest.TestCase):
         structures = np.loadtxt(REAL_PATH + 'data/test_KSnP.dat')
         hull_dist_test = np.loadtxt(REAL_PATH + 'data/test_KSnP_hull_dist.dat')
         precomp_hull_dist, energies, comps = hull.get_hull_distances(structures, precompute=True)
-        print('\n\n', [doc['filename'] for doc in hull.cursor])
-        try:
-            np.testing.assert_array_almost_equal(np.sort(hull_dist_test), np.sort(hull.hull_dist), decimal=5)
-            np.testing.assert_array_almost_equal(np.sort(hull.hull_dist), np.sort(precomp_hull_dist), decimal=5)
-        except:
-            print('Failed ternary hull distances, even when sorted...')
+        np.testing.assert_array_almost_equal(hull_dist_test, hull.hull_dist, decimal=3)
+        np.testing.assert_array_almost_equal(np.sort(hull.hull_dist), np.sort(precomp_hull_dist), decimal=3)
 
 
 class VoltageTest(unittest.TestCase):
