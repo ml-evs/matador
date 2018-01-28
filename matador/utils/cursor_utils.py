@@ -17,7 +17,7 @@ except:
 
 def display_results(cursor,
                     args={}, argstr=None, additions=None, deletions=None,
-                    hull=False, markdown=False, latex=False, use_source=False, colour=True):
+                    hull=False, markdown=False, latex=False, use_source=False, colour=False):
     """ Print query results in a cryan-like fashion, optionally
     in a markdown format.
 
