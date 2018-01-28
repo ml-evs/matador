@@ -840,27 +840,32 @@ class DBQuery(object):
         query_dict['$and'].append(self.query_xc_functional(xc_functional=doc.get('xc_functional')))
         if self.args.get('time') is not None:
             query_dict['$and'].append(self.query_time())
-        temp_dict = dict()
         if 'spin_polarized' in doc and doc['spin_polarized']:
+            temp_dict = dict()
             temp_dict['spin_polarized'] = doc['spin_polarized']
             query_dict['$and'].append(temp_dict)
         else:
+            temp_dict = dict()
             temp_dict['spin_polarized'] = dict()
             temp_dict['spin_polarized']['$ne'] = True
             query_dict['$and'].append(temp_dict)
-        if 'geom_force_tol' in doc:
+        if 'geom_force_tol' in doc and doc['geom_force_tol'] != 0.05:
+            temp_dict = dict()
             temp_dict['geom_force_tol'] = doc['geom_force_tol']
             query_dict['$and'].append(temp_dict)
         else:
+            temp_dict = dict()
             temp_dict['$or'] = dict()
             temp_dict['$or'] = []
             temp_dict['$or'].append({'geom_force_tol': {'$exists': False}})
             temp_dict['$or'].append({'geom_force_tol': {'$eq': 0.05}})
             query_dict['$and'].append(temp_dict)
         if 'sedc_scheme' in doc:
+            temp_dict = dict()
             temp_dict['sedc_scheme'] = doc['sedc_scheme']
             query_dict['$and'].append(temp_dict)
         else:
+            temp_dict = dict()
             temp_dict['sedc_scheme'] = dict()
             temp_dict['sedc_scheme']['$exists'] = False
             query_dict['$and'].append(temp_dict)
@@ -884,7 +889,7 @@ class DBQuery(object):
                 except:
                     print_warning('Failed to read custom kpoint tolerance.')
             else:
-                tol = 0.005
+                tol = 0.01
             temp_dict['kpoints_mp_spacing']['$gte'] = doc['kpoints_mp_spacing'] - tol
             temp_dict['kpoints_mp_spacing']['$lte'] = doc['kpoints_mp_spacing'] + tol
             query_dict['$and'].append(temp_dict)
@@ -900,6 +905,10 @@ class DBQuery(object):
                 temp_dict['$or'].append(dict())
                 temp_dict['$or'][-1]['species_pot.'+species] = doc['species_pot'][species]
                 query_dict['$and'].append(temp_dict)
+
+        if self.debug:
+            print('Calc match dict:')
+            print(dumps(query_dict, indent=2))
 
         return query_dict
 
