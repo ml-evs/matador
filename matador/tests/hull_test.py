@@ -40,7 +40,7 @@ class HullTest(unittest.TestCase):
         hull = QueryConvexHull(cursor=cursor, elements=['K', 'P'], no_plot=True, quiet=True)
 
         hull_dist_test = np.loadtxt(REAL_PATH + 'data/test_KP_hull_dist.dat')
-        np.testing.assert_array_almost_equal(hull_dist_test, hull.hull_dist, decimal=3)
+        np.testing.assert_array_almost_equal(np.sort(hull_dist_test), np.sort(hull.hull_dist), decimal=3)
 
     def testTernaryHullDistances(self):
         res_list = glob(REAL_PATH + 'data/hull-KPSn-KP/*.res')
@@ -55,7 +55,7 @@ class HullTest(unittest.TestCase):
         structures = np.loadtxt(REAL_PATH + 'data/test_KSnP.dat')
         hull_dist_test = np.loadtxt(REAL_PATH + 'data/test_KSnP_hull_dist.dat')
         precomp_hull_dist, energies, comps = hull.get_hull_distances(structures, precompute=True)
-        np.testing.assert_array_almost_equal(hull_dist_test, hull.hull_dist, decimal=3)
+        np.testing.assert_array_almost_equal(np.sort(hull_dist_test), np.sort(hull.hull_dist), decimal=3)
         np.testing.assert_array_almost_equal(np.sort(hull.hull_dist), np.sort(precomp_hull_dist), decimal=3)
 
 
