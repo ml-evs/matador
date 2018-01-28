@@ -1,7 +1,9 @@
 # coding: utf-8
 """ This file implements several routines for
 dispersion plots, phase diagrams, as well as
-voltage and volume expansion plots. """
+voltage and volume expansion plots.
+"""
+
 from traceback import print_exc
 import numpy as np
 import matplotlib.pyplot as plt
@@ -27,6 +29,7 @@ def plot_spectral(seeds, **kwargs):
         | gap                : bool, draw on the band gap
         | colour_by_seed     : bool, plot with a separate colour per bandstructure
         | external_efermi    : float, replace scraped Fermi energy with this value (eV)
+        | highlight_bands    : list(int), colour the bands with these indices in red
 
     """
     from matador.scrapers.castep_scrapers import bands2dict, cell2dict, phonon2dict, optados2dict
@@ -38,7 +41,7 @@ def plot_spectral(seeds, **kwargs):
     prop_defaults = {'plot_bandstructure': True, 'plot_dos': False,
                      'phonons': False, 'cell': False, 'gap': False,
                      'colour_by_seed': False, 'external_efermi': None,
-                     'verbosity': 0}
+                     'verbosity': 0, 'highlight_bands': None}
     prop_defaults.update(kwargs)
     kwargs = prop_defaults
 
@@ -75,14 +78,19 @@ def plot_spectral(seeds, **kwargs):
                 ls.append('-.')
 
     if kwargs.get('plot_window') is not None:
-        plot_window = (-kwargs.get('plot_window'), kwargs.get('plot_window'))
+        if isinstance(kwargs.get('plot_window'), list):
+            if len(kwargs.get('plot_window')) != 2:
+                exit('plot_window must have length 2 or be a single number')
+            plot_window = sorted(kwargs.get('plot_window'))
+        else:
+            plot_window = (-kwargs.get('plot_window'), kwargs.get('plot_window'))
     else:
         plot_window = (-5, 5)
 
     if kwargs['plot_bandstructure'] and not kwargs['plot_dos']:
         fig, ax_dispersion = plt.subplots(figsize=(5, 5))
     elif kwargs['plot_bandstructure'] and kwargs['plot_dos']:
-        fig, ax_grid = plt.subplots(1, 2, figsize=(6.5, 5), sharey=True,
+        fig, ax_grid = plt.subplots(1, 2, figsize=(8.5, 5), sharey=True,
                                     gridspec_kw={'width_ratios': [4, 1],
                                                  'wspace': 0.05,
                                                  'left': 0.15})
@@ -137,30 +145,35 @@ def plot_spectral(seeds, **kwargs):
                                 else:
                                     colour = 'blue'
                             else:
-                                if np.max(dispersion[eig_key][ns][nb][branch]) < 0:
-                                    if colour_by_seed:
-                                        colour = seed_colours[seed_ind]
-                                    else:
-                                        colour = valence
-                                elif np.min(dispersion[eig_key][ns][nb][branch]) > 0:
-                                    if colour_by_seed:
-                                        colour = seed_colours[seed_ind]
-                                    else:
-                                        colour = conduction
-                                elif np.min(dispersion[eig_key][ns][nb][branch]) < 0 and np.max(dispersion[eig_key][ns][nb][branch]) > 0:
-                                    if colour_by_seed:
-                                        colour = seed_colours[seed_ind]
-                                    else:
-                                        colour = crossing
+                                # if np.max(dispersion[eig_key][ns][nb][branch]) < 0:
+                                    # if colour_by_seed:
+                                        # colour = seed_colours[seed_ind]
+                                    # else:
+                                        # colour = valence
+                                # elif np.min(dispersion[eig_key][ns][nb][branch]) > 0:
+                                    # if colour_by_seed:
+                                        # colour = seed_colours[seed_ind]
+                                    # else:
+                                        # colour = conduction
+                                # elif np.min(dispersion[eig_key][ns][nb][branch]) < 0 and np.max(dispersion[eig_key][ns][nb][branch]) > 0:
+                                    # if colour_by_seed:
+                                        # colour = seed_colours[seed_ind]
+                                    # else:
+                                        # colour = crossing
+                                # else:
+                                if colour_by_seed:
+                                    colour = seed_colours[seed_ind]
                                 else:
-                                    if colour_by_seed:
-                                        colour = seed_colours[seed_ind]
-                                    else:
-                                        colour = 'black'
+                                    colour = 'black'
                         else:
                             colour = 'black'
-                        ax_dispersion.plot(path[(np.asarray(branch)-branch_ind).tolist()], dispersion[eig_key][ns][nb][branch], c=colour, lw=1, marker=None, ls=ls[seed_ind], alpha=1)
-                        # ax_dispersion.scatter(path[(np.asarray(branch)-branch_ind).tolist()], dispersion[eig_key][ns][nb][branch], c=colour, s=5, marker='o')
+                        if kwargs.get('highlight_bands') is not None and nb in kwargs.get('highlight_bands'):
+                            colour = 'red'
+                            alpha = 0.5
+                        else:
+                            alpha = 1
+                        ax_dispersion.plot(path[(np.asarray(branch)-branch_ind).tolist()], dispersion[eig_key][ns][nb][branch],
+                                           c=colour, lw=1, marker=None, ls=ls[seed_ind], alpha=alpha)
                 if branch_ind != len(dispersion[branch_key])-1:
                     ax_dispersion.axvline(path[branch[-1]-branch_ind], ls='-.', lw=1, c='grey')
             ax_dispersion.axhline(0, ls='--', lw=1, c='grey')
@@ -211,12 +224,6 @@ def plot_spectral(seeds, **kwargs):
                                     xticklabels.append(label)
                                     xticks.append(path[ind-branch_ind])
                                     break
-            # else:
-                # for point in dispersion[branch_key]:
-                    # if np.allclose(next_point, [0, 0, 0]):
-                        # label = '$\Gamma$'
-                        # xticklabels.append(label)
-                        # xticks.append(path[ind-branch_ind])
             if not kwargs['phonons'] and kwargs['gap'] and dispersion['band_gap'] > 0:
                 vbm_pos = dispersion['band_gap_path_inds'][1]
                 vbm = dispersion['valence_band_min']
@@ -282,8 +289,11 @@ def plot_spectral(seeds, **kwargs):
                         flines = f.readlines()
                     for ind, line in enumerate(flines):
                         if 'begin dos' in line.lower():
+                            projector_labels = line.split()[5:]
+                            num_projectors = len(projector_labels)
                             begin = ind+1
                             break
+                    print('Found {} projectors'.format(num_projectors))
                     data_flines = flines[begin:-1]
                     with open(seed + '.phonon_dos_tmp', 'w') as f:
                         for line in data_flines:
@@ -291,7 +301,14 @@ def plot_spectral(seeds, **kwargs):
                     raw_data = np.loadtxt(seed + '.phonon_dos_tmp')
                     energies = raw_data[:, 0]
                     dos = raw_data[:, 1]
+                    dos_data = {}
+                    dos_data['dos'] = dos
                     max_density = np.max(dos)
+                    dos_data['energies'] = energies
+                    dos_data['pdos'] = dict()
+                    for i, label in enumerate(projector_labels):
+                        dos_data['pdos'][label] = raw_data[:, i+2]
+                    pdos = dos_data['pdos']
                     from os import remove
                     remove(seed + '.phonon_dos_tmp')
                     plot_window = [-10, 350]
@@ -429,7 +446,7 @@ def plot_voltage_curve(hull, show=False):
         for i in range(len(hull.label_cursor)):
             axQ.annotate(get_formula_from_stoich(hull.label_cursor[i]['stoichiometry'],
                                                  elements=hull.elements, tex=True),
-                         xy=(hull.Q[0][i+1]+100, hull.voltages[0][i+1]+0.02*max(hull.voltages[0])),
+                         xy=(hull.Q[0][i+1]+0.02*max(hull.Q[0]), hull.voltages[0][i+1]+0.02*max(hull.voltages[0])),
                          textcoords='data',
                          ha='center',
                          zorder=9999)
