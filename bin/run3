@@ -67,6 +67,9 @@ class BatchRun:
         # assign number of cores
         self.all_cores = mp.cpu_count()
         self.slurm_avail_tasks = os.environ.get('SLURM_NTASKS')
+        if self.slurm_avail_tasks is not None:
+            self.slurm_avail_tasks = int(self.slurm_avail_tasks)
+
         if self.args.get('ncores') is None:
             if self.slurm_avail_tasks is None:
                 self.args['ncores'] = int(self.all_cores / self.nprocesses)
