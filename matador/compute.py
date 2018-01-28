@@ -925,21 +925,22 @@ def reset_job_folder_and_count_remaining(debug=False):
                 os.remove('{}.{}'.format(root, ext))
 
     # also remove from jobs file
-    with open('jobs.txt', 'r+') as f:
-        flines = f.readlines()
-        if debug:
-            print('Initially {} jobs in jobs.txt'.format(len(flines)))
-        f.seek(0)
-        for line in flines:
-            line = line.strip()
-            if line in res_list:
-                print('Excluding {}'.format(line))
-                continue
-            else:
-                f.write(line)
-        f.truncate()
-        flines = f.readlines()
-        if debug:
-            print('{} jobs remain in jobs.txt'.format(len(flines)))
+    if os.path.isfile('jobs.txt'):
+        with open('jobs.txt', 'r+') as f:
+            flines = f.readlines()
+            if debug:
+                print('Initially {} jobs in jobs.txt'.format(len(flines)))
+            f.seek(0)
+            for line in flines:
+                line = line.strip()
+                if line in res_list:
+                    print('Excluding {}'.format(line))
+                    continue
+                else:
+                    f.write(line)
+            f.truncate()
+            flines = f.readlines()
+            if debug:
+                print('{} jobs remain in jobs.txt'.format(len(flines)))
 
     return len(res_list)
