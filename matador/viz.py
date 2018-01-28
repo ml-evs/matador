@@ -23,7 +23,7 @@ def nb_viz(doc, repeat=1):
     view.add_spacefill(radius_type='vdw', scale=0.3)
     for elements in set(doc['atom_types']):
         view.add_ball_and_stick(selection='#{}'.format(elements).upper())
-    view.background = '#1C1F28'
+    view.background = '#FFFFFF'
     view.camera = 'orthographic'
     view.center()
     return view
