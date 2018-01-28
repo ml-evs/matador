@@ -200,6 +200,7 @@ class FullRelaxer:
                             self.success = self.relax()
                             # always cd back to root folder
                             os.chdir(self.root_folder)
+                            self.remove_compute_dir_if_finished(self.compute_dir, debug=self.debug)
         # otherwise run generic script
         else:
             self.seed = res
@@ -429,6 +430,7 @@ class FullRelaxer:
                     if self.debug:
                         print('wrote failed dict out to output_queue')
                 os.chdir(self.root_folder)
+                self.remove_compute_dir_if_finished(self.compute_dir, debug=self.debug)
                 return False
             except:
                 if self.verbosity > 1:
@@ -441,6 +443,7 @@ class FullRelaxer:
                     if self.debug:
                         print('wrote ll dict out to output_queue')
                 os.chdir(self.root_folder)
+                self.remove_compute_dir_if_finished(self.compute_dir, debug=self.debug)
                 return False
 
     def scf(self, calc_doc, seed, keep=True):
@@ -857,3 +860,86 @@ class FullRelaxer:
             if not (f.endswith('.res') or f.endswith('.castep')):
                 os.remove(f)
         return
+
+    @staticmethod
+    def remove_compute_dir_if_finished(compute_dir, debug=False):
+        """ Delete the compute directory, provided it contains
+        no calculation data.
+
+        Input:
+
+            | compute_dir: str, path to directory.
+
+        Returns:
+
+            | True if folder was deleted as no res/castep files were found,
+              otherwise False.
+        """
+
+        if not os.path.exists(compute_dir):
+            print('No directory found called {}, so nothing to do...'.format(compute_dir))
+            return False
+
+        files = glob.glob(compute_dir + '/*')
+
+        if debug:
+            print('Checking {}'.format(compute_dir))
+            print('Found {} files:'.format(len(files)))
+            print(files)
+
+        for fname in files:
+            if fname.endswith('.res') or fname.endswith('.castep'):
+                return False
+        # remove files in directory, then delete directory
+        for fname in files:
+            os.remove(fname)
+            if debug:
+                print('Removing {}'.format(fname))
+        os.rmdir(compute_dir)
+        if debug:
+            print('Removed {}'.format(compute_dir))
+        return True
+
+
+def reset_job_folder_and_count_remaining(debug=False):
+    """ Remove all lock files and clean up jobs.txt
+    ready for job restart. This should be not called
+    by a FullRelaxer instance, in case other instances
+    are running.
+
+    Returns:
+
+        | num_remaining: int, number of structures left to relax
+
+    """
+    res_list = glob.glob('*.res')
+    if debug:
+        print(res_list)
+    for f in res_list:
+        root = f.replace('.res', '')
+        exts_to_rm = ['res.lock', 'kill']
+        for ext in exts_to_rm:
+            if os.path.isfile('{}.{}'.format(root, ext)):
+                if debug:
+                    print('Deleting {}.{}'.format(root, ext))
+                os.remove('{}.{}'.format(root, ext))
+
+    # also remove from jobs file
+    with open('jobs.txt', 'r+') as f:
+        flines = f.readlines()
+        if debug:
+            print('Initially {} jobs in jobs.txt'.format(len(flines)))
+        f.seek(0)
+        for line in flines:
+            line = line.strip()
+            if line in res_list:
+                print('Excluding {}'.format(line))
+                continue
+            else:
+                f.write(line)
+        f.truncate()
+        flines = f.readlines()
+        if debug:
+            print('{} jobs remain in jobs.txt'.format(len(flines)))
+
+    return len(res_list)
