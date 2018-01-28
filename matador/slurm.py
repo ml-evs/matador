@@ -23,8 +23,12 @@ def get_slurm_env(fail_loudly=True):
     return slurm_dict
 
 
-def scancel_all_jobs():
+def scancel_all_matching_jobs(name=None):
     """ Cancel all of the user's jobs.
+
+    Args:
+
+        | name: str, optional name to pass to scancel
 
     Returns:
 
@@ -34,7 +38,10 @@ def scancel_all_jobs():
     from os import getlogin
     import subprocess as sp
     user = getlogin()
-    return str(sp.check_output('scancel -u {}'.format(user), shell=True))
+    if name is None:
+        return sp.check_output('scancel -u {}'.format(user), shell=True).decode('utf-8')
+    else:
+        return sp.check_output('scancel -u {} -n {}'.format(user, name), shell=True).decode('utf-8')
 
 
 def submit_slurm_script(slurm_fname, depend_on_job=None, num_array_tasks=None):
@@ -67,7 +74,7 @@ def submit_slurm_script(slurm_fname, depend_on_job=None, num_array_tasks=None):
         if num_array_tasks != 1:
             command += '--array=0-{} '.format(num_array_tasks-1)
     command += '{}'.format(slurm_fname)
-    slurm_output = str(sp.check_output(command, shell=True))
+    slurm_output = sp.check_output(command, shell=True).decode('utf-8')
     slurm_job_id = int(slurm_output.strip().split()[-1])
     return slurm_job_id
 
