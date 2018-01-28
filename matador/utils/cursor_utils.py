@@ -17,7 +17,7 @@ except:
 
 def display_results(cursor,
                     args={}, argstr=None, additions=None, deletions=None,
-                    hull=False, markdown=False, latex=False, use_source=False):
+                    hull=False, markdown=False, latex=False, use_source=False, colour=True):
     """ Print query results in a cryan-like fashion, optionally
     in a markdown format.
 
@@ -35,6 +35,7 @@ def display_results(cursor,
         | markdown   : bool, whether or not to write a markdown file containing results
         | latex      : bool, whether or not to create a LaTeX table
         | use_source : bool, print source instead of text_id
+        | colour     : bool, colour on-hull structures
 
     """
     details = args.get('details')
@@ -72,27 +73,32 @@ def display_results(cursor,
     if not markdown:
         if use_source:
             header_string += "{:^40}".format('ID')
+            units_string += "{:^40}".format('')
         else:
-            header_string += "{:^22}".format('ID')
+            header_string += "{:^28}".format('ID')
+            units_string += "{:^28}".format('')
         header_string += "{:^5}".format('!?!')
+        units_string += "{:^5}".format('')
     else:
         header_string += "{:^40}".format('Root')
         units_string += "{:^40}".format('')
-    header_string += "{:^12}".format('Pressure')
-    units_string += "{:^12}".format('(GPa)')
+    header_string += "{:^10}".format('Pressure')
+    units_string += "{:^10}".format('(GPa)')
     if args.get('per_atom'):
-        header_string += "{:^12}".format('Volume/atom')
+        header_string += "{:^11}".format('Volume/atom')
     else:
-        header_string += "{:^12}".format('Volume/fu')
-    units_string += "{:^12}".format('(Ang^3)')
+        header_string += "{:^11}".format('Volume/fu')
+    units_string += "{:^11}".format('(Ang^3)')
     if hull:
-        header_string += "{:^18}".format('Hull dist./atom')
+        header_string += "{:^13}".format('Hull dist.')
+        units_string += "{:^13}".format('(meV/atom)')
     elif args.get('per_atom'):
-        header_string += "{:^18}".format('Enthalpy/atom')
+        header_string += "{:^18}".format('Enthalpy')
+        units_string += "{:^18}".format('(eV/atom)')
     else:
-        header_string += "{:^18}".format('Enthalpy/fu')
-    units_string += "{:^18}".format('(eV)')
-    header_string += "{:^12}".format('Space group')
+        header_string += "{:^18}".format('Enthalpy')
+        units_string += "{:^18}".format('(meV/fu)')
+    header_string += "{:^13}".format('Space group')
     header_string += "{:^10}".format('Formula')
     header_string += "{:^8}".format('# fu')
     header_string += "{:^8}".format('Prov.')
@@ -129,17 +135,23 @@ def display_results(cursor,
             if hull and np.abs(doc.get('hull_distance')) <= 0.0 + 1e-12:
                 if use_source:
                     src = [src.split('/')[-1] for src in doc['source'] if src.endswith('.res') or src.endswith('.castep')][0].replace('.res', '').replace('.castep', '')
-                    struct_string.append("* {:<40}".format(src))
+                    if colour:
+                        struct_string.append("\033[92m\033[1m* {:<38}\033[0m".format(src))
+                    else:
+                        struct_string.append("* {:<38}".format(src))
                 else:
-                    struct_string.append(
-                        "* {:^20}".format(doc['text_id'][0]+' '+doc['text_id'][1]))
+                    if colour:
+                        struct_string.append(
+                            "\033[92m\033[1m* {:^26}\033[0m".format(doc['text_id'][0]+' '+doc['text_id'][1]))
+                    else:
+                        struct_string.append("* {:<26}".format(src))
             else:
                 if use_source:
                     src = [src.split('/')[-1] for src in doc['source'] if src.endswith('.res') or src.endswith('.castep')][0].replace('.res', '').replace('.castep', '')
-                    struct_string.append("  {:<40}".format(src))
+                    struct_string.append("  {:<38}".format(src))
                 else:
                     struct_string.append(
-                        "  {:^20}".format(doc['text_id'][0]+' '+doc['text_id'][1]))
+                        "  {:^26}".format(doc['text_id'][0]+' '+doc['text_id'][1]))
             if additions is not None and doc['text_id'] in additions:
                 struct_string[-1] = '\033[92m\033[1m' + ' + ' + struct_string[-1] + '\033[0m'
             elif deletions is not None and doc['text_id'] in deletions:
@@ -158,41 +170,42 @@ def display_results(cursor,
                                                          source.endswith('.castep') or
                                                          source.endswith('.history') or
                                                          source.endswith('.history.gz')))))
-        try:
-            struct_string[-1] += "{:^12.3f}".format(doc['pressure'])
-        except:
-            struct_string[-1] += "{:^12}".format('xxx')
-        try:
-            if args.get('per_atom'):
-                struct_string[-1] += "{:^12.3f}".format(doc['cell_volume']/doc['num_atoms'])
-            else:
-                struct_string[-1] += "{:^12.3f}".format(doc['cell_volume']/doc['num_fu'])
-        except:
-            struct_string[-1] += "{:^12}".format('xxx')
+        if 'pressure' in doc:
+            struct_string[-1] += "{: >9.2f}".format(doc['pressure'])
+        else:
+            struct_string[-1] += "{:^10}".format('xxx')
+        if args.get('per_atom') and 'cell_volume' in doc and 'num_atoms' in doc:
+            struct_string[-1] += "{:>11.1f}".format(doc['cell_volume']/doc['num_atoms'])
+        elif 'cell_volume' in doc and 'num_fu' in doc:
+            struct_string[-1] += "{:>11.1f}".format(doc['cell_volume']/doc['num_fu'])
+        else:
+            struct_string[-1] += "{:^11}".format('xxx')
         try:
             if hull:
-                struct_string[-1] += "{:^18.5f}".format(0 if doc.get('hull_distance') <= 1e-12 else doc.get('hull_distance'))
+                struct_string[-1] += "{:>13.1f}".format(0 if doc.get('hull_distance') <= 1e-12 else 1000*doc.get('hull_distance'))
             elif args.get('per_atom'):
-                struct_string[-1] += "{:^18.5f}".format(doc['enthalpy_per_atom'])
+                struct_string[-1] += "{:>18.5f}".format(doc['enthalpy_per_atom'])
             else:
-                struct_string[-1] += "{:^18.5f}".format(doc['enthalpy']/doc['num_fu'] -
+                struct_string[-1] += "{:>18.5f}".format(doc['enthalpy']/doc['num_fu'] -
                                                         gs_enthalpy)
         except:
             struct_string[-1] += "{:^18}".format('xxx')
-        try:
-            struct_string[-1] += "{:^12}".format(doc['space_group'])
-        except:
-            struct_string[-1] += "{:^12}".format('xxx')
+        if 'space_group' in doc:
+            struct_string[-1] += "{:^13}".format(doc['space_group'])
+        else:
+            struct_string[-1] += "{:^13}".format('xxx')
+
         struct_string[-1] += "{:^10}".format(formula_substring)
 
-        try:
+        if 'num_fu' in doc:
             struct_string[-1] += "{:^8}".format(int(doc['num_fu']))
-        except:
+        else:
             struct_string[-1] += "{:^8}".format('xxx')
-        try:
+
+        if 'source' in doc:
             prov = get_guess_doc_provenance(doc['source'], doc.get('icsd'))
             struct_string[-1] += "{:^8}".format(prov)
-        except:
+        else:
             struct_string[-1] += "{:^8}".format('xxx')
 
         if latex:
@@ -283,6 +296,7 @@ def display_results(cursor,
     if not markdown:
         print(len(header_string)*'─')
         print(header_string)
+        print(units_string)
         print(len(header_string)*'─')
     else:
         markdown_string += len(header_string)*'-' + '\n'
