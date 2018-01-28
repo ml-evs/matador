@@ -125,12 +125,7 @@ class QueryConvexHull(object):
             if self.args.get('bokeh'):
                 plotting.plot_2d_hull_bokeh(self)
             else:
-                if self.args.get('debug') and self.ternary:
-                    plotting.plot_3d_ternary_hull(self)
-                if self.ternary:
-                    plotting.plot_ternary_hull(self)
-                else:
-                    plotting.plot_2d_hull(self)
+                self.plot_hull()
 
         if not self.args.get('no_plot') and not self.savefig:
             import matplotlib.pyplot as plt
@@ -146,10 +141,11 @@ class QueryConvexHull(object):
 
     def plot_hull(self):
         """ Hull plot helper function. """
+        from matador import plotting
         if self.ternary:
-            self.plot_ternary_hull()
+            plotting.plot_ternary_hull(self)
         else:
-            self.plot_2d_hull()
+            plotting.plot_2d_hull(self)
         return
 
     def set_plot_param(self):
@@ -244,6 +240,10 @@ class QueryConvexHull(object):
                 # if oqmd, only query composition, not parameters
                 if query.args.get('tags') is not None:
                     query_dict['$and'].append(query.query_tags())
+                if self.args.get('debug'):
+                    print('Chemical potential query:')
+                    from json import dumps
+                    print(dumps(query_dict, indent=2))
                 mu_cursor = query.repo.find(SON(query_dict)).sort('enthalpy_per_atom',
                                                                   pm.ASCENDING)
                 if mu_cursor.count() == 0:
