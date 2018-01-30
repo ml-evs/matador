@@ -4,8 +4,9 @@ the similarity between two structures.
 """
 
 # matador modules
-from matador.utils.cell_utils import frac2cart, cart2abc
+from matador.utils.cell_utils import frac2cart, cart2abc, cart2volume
 from matador.utils.cell_utils import standardize_doc_cell
+from matador.utils.print_utils import print_notify
 
 # external libraries
 import numpy as np
@@ -14,9 +15,10 @@ from scipy.spatial.distance import cdist
 from itertools import product, combinations_with_replacement
 from math import ceil
 from copy import deepcopy
+import time
 
 
-class PDF(object):
+class PDF:
     """ This class implements the calculation and comparison of pair
     distribution functions.
 
@@ -30,12 +32,13 @@ class PDF(object):
         | projected      : bool, optionally calculate the element-projected PDF
         | standardize    : bool, optionally standardize cell before calculating PDF
         | lazy           : bool, if True, calculator is not called when initializing PDF object
+        | timing         : bool, if True, print the total time taken to calculate the PDF
 
     """
     def __init__(self, doc, **kwargs):
         """ Initialise parameters and run PDF. """
         prop_defaults = {'dr': 0.1, 'gaussian_width': 0.01, 'rmax': 15, 'num_images': 'auto',
-                         'style': 'smear', 'debug': False, 'low_mem': False, 'projected': True,
+                         'style': 'smear', 'debug': False, 'timing': False, 'low_mem': False, 'projected': True,
                          'max_num_images': 50, 'standardize': False}
 
         self.__dict__.update(prop_defaults)
@@ -55,11 +58,18 @@ class PDF(object):
         else:
             self.label = 'null'
         self.num_atoms = len(self.poscart)
-        self.volume = doc['cell_volume']
+        if 'cell_volume' not in doc:
+            self.volume = cart2volume(doc['lattice_cart'])
+        else:
+            self.volume = doc['cell_volume']
         self.number_density = self.num_atoms / self.volume
-        self._set_image_trans_vectors()
         if not kwargs.get('lazy'):
-            self._calc_pdf()
+            if self.timing:
+                start = time.time()
+            self.calc_pdf()
+            if self.timing:
+                end = time.time()
+                print('PDF calculated in {:.3f} s'.format(end - start))
             if kwargs.get('projected'):
                 self._calc_projected_pdf()
 
@@ -82,6 +92,8 @@ class PDF(object):
 
 
         """
+        if self.debug:
+            start = time.time()
         distances = np.array([])
         if poscart_B is None:
             poscart_B = deepcopy(poscart)
@@ -98,9 +110,14 @@ class PDF(object):
                                                                  np.ma.count(distances),
                                                                  np.ma.count_masked(distances)))
         self.distances = distances.compressed()
+
+        if self.debug:
+            end = time.time()
+            print('Calculated distances in {} s'.format(end-start))
+
         return self.distances
 
-    def _calc_pdf(self, debug=False):
+    def calc_pdf(self, debug=False):
         """ Wrapper function to calculate distances and output
         a broadened and normalised PDF.
 
@@ -109,22 +126,12 @@ class PDF(object):
             | Sets self.Gr and self.r_space to G(r) and r respectively.
 
         """
-        if self.debug:
-            import time
-            start = time.time()
+        self._set_image_trans_vectors()
         distances = self._calc_distances(self.poscart, debug=self.debug)
-        if self.debug:
-            end = time.time()
-            print('Calculated distances in {} s'.format(end-start))
-        if self.debug:
-            start = time.time()
         self.r_space = np.arange(0, self.rmax+self.dr, self.dr)
         self.Gr = self._set_broadened_normalised_pdf(distances,
                                                      style=self.style,
                                                      gaussian_width=self.gaussian_width)
-        if self.debug:
-            end = time.time()
-            print('Calculated broadening and normalised in {} s'.format(end-start))
 
     def _set_broadened_normalised_pdf(self, distances, style='smear', gaussian_width=0.01):
         """ Broaden the values provided as distances and return
@@ -145,6 +152,10 @@ class PDF(object):
             Gr             : np.ndarray, G(r), the PDF of supplied distances
 
         """
+
+        if self.debug:
+            start = time.time()
+
         hist = np.zeros_like(self.r_space, dtype=int)
         Gr = np.zeros_like(self.r_space)
         for d_ij in self.distances:
@@ -171,6 +182,11 @@ class PDF(object):
             Gr = np.divide(Gr,
                            np.sqrt(np.pi * gaussian_width) *
                            4*np.pi * (self.r_space + self.dr)**2 * self.num_atoms * self.number_density)
+
+        if self.debug:
+            end = time.time()
+            print('Calculated broadening and normalised in {} s'.format(end-start))
+
         return Gr
 
     def _calc_projected_pdf(self):
@@ -215,9 +231,9 @@ class PDF(object):
 
         """
         if self.debug:
-            import time
             start = time.time()
-        if self.num_images is 'auto':
+
+        if self.num_images == 'auto':
             self.image_vec = set()
             any_in_sphere = True
             # find longest combination of single LV's
@@ -228,13 +244,9 @@ class PDF(object):
                     trans += self.lattice[ind] * multi
                 if np.sqrt(np.sum(trans**2)) > max_trans:
                     max_trans = np.sqrt(np.sum(trans**2))
-            if self.debug:
-                print('Max trans = {} A'.format(max_trans))
             first_attempt = 3
             test_num_images = deepcopy(first_attempt)
             while any_in_sphere:
-                if self.debug:
-                    print('Up to images: {}'.format(test_num_images))
                 any_in_sphere = False
                 for prod in product(range(-test_num_images, test_num_images+1), repeat=3):
                     if prod in self.image_vec:
@@ -321,7 +333,130 @@ class PDF(object):
         return
 
 
-class PDFOverlap(object):
+class PDFFactory:
+    """ This class computes PDF objects from a list of structures,
+    as concurrently as possible. The PDFs are stored under the `pdf`
+    key inside each structure dict.
+    """
+    def __init__(self, cursor, debug=False, concurrency='pool', **pdf_args):
+        """ Compute PDFs over n processes, where n is set by either
+        SLURM_NTASKS, OMP_NUM_THREADS or physical core count.
+
+        Input:
+
+            | cursor: list(dict), list of matador structures
+
+        Args:
+
+            | concurrency: str, either 'pool' or 'queue'
+            | pdf_args: dict, arguments to pass to the PDF calculator
+
+        """
+        import multiprocessing as mp
+        import os
+        # create list of empty (lazy) PDF objects
+        if 'lazy' in pdf_args:
+            del pdf_args['lazy']
+        for doc in cursor:
+            doc['pdf'] = PDF(doc, lazy=True, **pdf_args)
+        # how many processes to use? either SLURM_NTASKS, OMP_NUM_THREADS or total num CPUs
+        if os.environ.get('SLURM_NTASKS') is not None:
+            self.nprocs = int(os.environ.get('SLURM_NTASKS'))
+            env = '$SLURM_NTASKS'
+        elif os.environ.get('OMP_NUM_THREADS') is not None:
+            self.nprocs = int(os.environ.get('OMP_NUM_THREADS'))
+            env = '$OMP_NUM_THREADS'
+        else:
+            self.nprocs = mp.cpu_count()
+            env = 'core count'
+        print_notify('Running {} jobs on {} processes in {} mode, set by {}.'.format(len(cursor),
+                                                                                     self.nprocs,
+                                                                                     concurrency,
+                                                                                     env))
+
+        if debug:
+            print('Initialising worker {}...'.format(concurrency))
+
+        import time
+        from copy import deepcopy
+        start = time.time()
+        if concurrency is 'queue':
+            queue = mp.Queue()
+            # split cursor into subcursors
+            pdfs_per_proc = int(round((len(cursor)/self.nprocs)))
+            subcursors = []
+            for i in range(self.nprocs):
+                if i == self.nprocs - 1:
+                    subcursors.append(deepcopy(cursor[i*pdfs_per_proc:]))
+                else:
+                    subcursors.append(deepcopy(cursor[i*pdfs_per_proc:(i+1)*pdfs_per_proc]))
+
+            processes = [mp.Process(target=calc_pdf_queue_wrapper,
+                                    args=(subcursors[i], i, queue))
+                         for i in range(self.nprocs)]
+            for proc in processes:
+                proc.start()
+
+            results_cursor = dict()
+            [results_cursor.update(queue.get()) for i in range(self.nprocs)]
+            assert len(results_cursor) == self.nprocs
+            pdf_cursor = []
+            for i in range(self.nprocs):
+                pdf_cursor.append(results_cursor[i])
+            pdf_cursor = [doc for subcursor in pdf_cursor for doc in subcursor]
+
+        elif concurrency is 'pool':
+            pool = mp.Pool(processes=self.nprocs)
+            pdf_cursor = []
+            pool.map_async(calc_pdf_pool_wrapper, cursor, callback=pdf_cursor.extend)
+            pool.close()
+            pool.join()
+
+        assert len(pdf_cursor) == len(cursor)
+
+        for ind, doc in enumerate(cursor):
+            doc['pdf'] = pdf_cursor[ind]['pdf']
+
+        cursor = pdf_cursor
+        elapsed = time.time() - start
+
+        if debug:
+            print('Compute time: {:.4f} s'.format(elapsed))
+            print('Work complete!')
+
+
+def calc_pdf_queue_wrapper(cursor, i, queue):
+    """ Evaluate PDFs of a cursor where a lazy init of each doc's PDF object has
+    already been made. The result is parcelled into a dictionary with key i
+    and pushed to the queue.
+
+    Input:
+
+        | cursor: list(dict), list of matador structures with empty PDF
+                  objects stored under `pdf`.
+        | i     : int, position of cursor in overall subcursor array
+        | queue : mp.Queue, processing queue.
+
+    """
+    for ind, doc in enumerate(cursor):
+        cursor[ind]['pdf'].calc_pdf()
+    queue.put({i: cursor})
+
+
+def calc_pdf_pool_wrapper(doc):
+    """ Evaluate PDF of a structure where a lazy init of the doc's PDF object has
+    already been made.
+
+    Input:
+
+        | doc: dict, matador structures with empty PDF
+
+    """
+    doc['pdf'].calc_pdf()
+    return {'pdf': doc['pdf']}
+
+
+class PDFOverlap:
     """ Calculate the PDFOverlap between two PDF objects,
     pdf_A and pdf_B, with number density rescaling.
 
