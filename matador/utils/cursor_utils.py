@@ -144,7 +144,7 @@ def display_results(cursor,
                         struct_string.append(
                             "\033[92m\033[1m* {:^26}\033[0m".format(doc['text_id'][0]+' '+doc['text_id'][1]))
                     else:
-                        struct_string.append("* {:<26}".format(src))
+                        struct_string.append("* {:^26}".format(doc['text_id'][0] + ' ' + doc['text_id'][1]))
             else:
                 if use_source:
                     src = [src.split('/')[-1] for src in doc['source'] if src.endswith('.res') or src.endswith('.castep')][0].replace('.res', '').replace('.castep', '')
