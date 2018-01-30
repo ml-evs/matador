@@ -78,6 +78,8 @@ def res2dict(seed, db=True, verbosity=0, **kwargs):
         res['lattice_abc'] = [list(map(float, cell[2:5])), list(map(float, cell[5:8]))]
         # calculate lattice_cart from abc
         res['lattice_cart'] = abc2cart(res['lattice_abc'])
+        if 'cell_volume' not in res:
+            res['cell_volume'] = cart2volume(res['lattice_cart'])
         res['atom_types'] = []
         res['positions_frac'] = []
         for line_no, line in enumerate(flines):
