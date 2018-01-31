@@ -37,8 +37,6 @@ def get_uniq_cursor(cursor, sim_calculator=PDF, sim_tol=5e-2, energy_tol=1e-2,
         | sim_mat             : the correlation matrix of pair similarity distances
 
     """
-    import progressbar
-    bar = progressbar.ProgressBar(term_width=80)
     fingerprint_list = []
     if not enforce_same_stoich:
         energy_tol = 1e20
@@ -49,8 +47,6 @@ def get_uniq_cursor(cursor, sim_calculator=PDF, sim_tol=5e-2, energy_tol=1e-2,
         import time
         start = time.time()
     PDFFactory(cursor, **sim_calc_args)
-    # for doc in bar(cursor):
-        # fingerprint_list.append(sim_calculator(doc, **sim_calc_args))
     if debug:
         completed = time.time() - start
         print('PDFs of {} structures completed in {:0.1f} s'.format(len(cursor), completed))
@@ -58,7 +54,7 @@ def get_uniq_cursor(cursor, sim_calculator=PDF, sim_tol=5e-2, energy_tol=1e-2,
     fingerprint_list = [doc['pdf'] for doc in cursor]
     sim_mat = np.ones((len(fingerprint_list), len(fingerprint_list)))
     print('Assessing similarities...')
-    for i in bar(range(len(fingerprint_list))):
+    for i in range(len(fingerprint_list)):
         sim_mat[i, i] = 0
         for j in range(i+1, len(fingerprint_list)):
             # are we checking stoichiometries, if so, ensure they're the same

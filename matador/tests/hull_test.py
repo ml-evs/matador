@@ -108,7 +108,7 @@ class VoltageTest(unittest.TestCase):
         # with open(os.devnull, 'w') as sys.stdout:
         res_list = glob(REAL_PATH + 'data/hull-LiSnS/*.res')
         cursor = [res2dict(res)[0] for res in res_list]
-        hull = QueryConvexHull(cursor=cursor, elements=['Li', 'Sn', 'S'], no_plot=True, pathways=True, subcmd='voltage', quiet=True)
+        hull = QueryConvexHull(cursor=cursor, elements=['Li', 'Sn', 'S'], no_plot=True, pathways=True, subcmd='voltage', debug=True, quiet=False)
         pin = np.array([[2, 0, 0, -380.071],
                         [0, 2, 4, -1305.0911],
                         [2, 0, 1, -661.985],

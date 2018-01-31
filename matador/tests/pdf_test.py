@@ -56,9 +56,9 @@ class PDFCalculatorTest(unittest.TestCase):
         doc, success = res2dict(REAL_PATH + 'data/LiPZn-r57des.res')
         doc['lattice_cart'] = abc2cart(doc['lattice_abc'])
         doc['text_id'] = ['unprojected', 'test']
-        doc['pdf_unprojected'] = PDF(doc, dr=0.01, **{'debug': True})
+        doc['pdf_unprojected'] = PDF(doc, dr=0.01, **{'debug': False})
         doc['text_id'] = ['projected', 'test']
-        doc['pdf_projected'] = PDF(doc, dr=0.01, **{'debug': True})
+        doc['pdf_projected'] = PDF(doc, dr=0.01, **{'debug': False})
         np.testing.assert_array_almost_equal(doc['pdf_unprojected'].Gr, doc['pdf_projected'].Gr)
 
     def testOverlapPDFSameStructure(self):
@@ -76,7 +76,6 @@ class PDFCalculatorTest(unittest.TestCase):
         doc['pdf_smear'] = PDF(doc, num_images=3, dr=0.001, gaussian_width=0.01, projected=False, style='smear', low_mem=True)
         doc['text_id'] = ['hist', 'test']
         doc['pdf_hist'] = PDF(doc, num_images=3, dr=0.1, projected=False, style='histogram')
-        doc['pdf_smear'].plot_pdf(other_pdfs=doc['pdf_hist'])
         overlap = PDFOverlap(doc['pdf_smear'], doc['pdf_hist'])
         self.assertLessEqual(overlap.similarity_distance, 0.02)
         self.assertGreater(overlap.similarity_distance, 0.0)
