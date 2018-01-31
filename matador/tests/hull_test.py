@@ -62,26 +62,26 @@ class HullTest(unittest.TestCase):
 class VoltageTest(unittest.TestCase):
     """ Test voltage curve functionality. """
     def testBinaryVoltage(self):
-        match, hull_cursor = [], []
-        test_x = np.loadtxt(REAL_PATH + 'data/LiAs_x.dat')
-        test_Q = np.loadtxt(REAL_PATH + 'data/LiAs_Q.dat')
-        test_V = np.loadtxt(REAL_PATH + 'data/LiAs_V.dat')
-        for i in range(5):
-            with open(REAL_PATH + 'data/hull_data' + str(i) + '.json') as f:
-                hull_cursor.append(json.load(f))
-        for i in range(2):
-            with open(REAL_PATH + 'data/mu' + str(i) + '.json') as f:
-                match.append(json.load(f))
-        with open(REAL_PATH + 'data/elements.json') as f:
-            elements = json.load(f)
-        bare_hull = QueryConvexHull.__new__(QueryConvexHull)
-        bare_hull.args = {'debug': True, 'quiet': True}
-        bare_hull.cursor = list(hull_cursor)
-        bare_hull.ternary = False
-        bare_hull.elements = list(elements)
-        bare_hull.hull_cursor = list(hull_cursor)
-        bare_hull.match = list(match)
         with open(os.devnull, 'w') as sys.stdout:
+            match, hull_cursor = [], []
+            test_x = np.loadtxt(REAL_PATH + 'data/LiAs_x.dat')
+            test_Q = np.loadtxt(REAL_PATH + 'data/LiAs_Q.dat')
+            test_V = np.loadtxt(REAL_PATH + 'data/LiAs_V.dat')
+            for i in range(5):
+                with open(REAL_PATH + 'data/hull_data' + str(i) + '.json') as f:
+                    hull_cursor.append(json.load(f))
+            for i in range(2):
+                with open(REAL_PATH + 'data/mu' + str(i) + '.json') as f:
+                    match.append(json.load(f))
+            with open(REAL_PATH + 'data/elements.json') as f:
+                elements = json.load(f)
+            bare_hull = QueryConvexHull.__new__(QueryConvexHull)
+            bare_hull.args = {'debug': True, 'quiet': True}
+            bare_hull.cursor = list(hull_cursor)
+            bare_hull.ternary = False
+            bare_hull.elements = list(elements)
+            bare_hull.hull_cursor = list(hull_cursor)
+            bare_hull.match = list(match)
             bare_hull.voltage_curve(bare_hull.hull_cursor)
         sys.stdout = sys.__stdout__
         self.assertTrue(len(bare_hull.voltages) == 1)
@@ -107,6 +107,10 @@ class VoltageTest(unittest.TestCase):
 
     def testTernaryVoltage(self):
         # test data from LiSnS
+        # with open(os.devnull, 'w') as sys.stdout:
+        res_list = glob(REAL_PATH + 'data/hull-LiSnS/*.res')
+        cursor = [res2dict(res)[0] for res in res_list]
+        hull = QueryConvexHull(cursor=cursor, elements=['Li', 'Sn', 'S'], no_plot=True, pathways=True, subcmd='voltage', quiet=True)
         pin = np.array([[2, 0, 0, -380.071],
                         [0, 2, 4, -1305.0911],
                         [2, 0, 1, -661.985],
@@ -118,16 +122,6 @@ class VoltageTest(unittest.TestCase):
                         [0, 0, 48, -13343.805]])
         tot = pin[:, 0] + pin[:, 1] + pin[:, 2]
         points = pin/tot[:, None]
-        hull_cursor = []
-        for ind, point in enumerate(points):
-            hull_cursor.append(dict())
-            hull_cursor[-1]['gravimetric_capacity'] = get_generic_grav_capacity(point[0:3],
-                                                                                ['Li', 'Sn', 'S'])
-            hull_cursor[-1]['stoichiometry'] = [['Li', int(pin[ind][0])],
-                                                ['Sn', int(pin[ind][1])],
-                                                ['S', int(pin[ind][2])]]
-            hull_cursor[-1]['concentration'] = point[0:2]
-            hull_cursor[-1]['enthalpy_per_atom'] = point[-1]
 
         voltage_data = [np.asarray([1.9415250000000697, 1.9415250000000697, 1.8750000000001705, 1.4878749999999741,
                                     0.63925000000000409, 0.34612500000000068, 0.0]),
@@ -137,22 +131,14 @@ class VoltageTest(unittest.TestCase):
 
         points = np.delete(points, 2, axis=1)
 
-        bare_hull = QueryConvexHull.__new__(QueryConvexHull)
-        bare_hull.hull = ConvexHull(points)
-        bare_hull.args = {'debug': True, 'quiet': True}
-        bare_hull.elements = ['Li', 'Sn', 'S']
-        bare_hull.hull_cursor = hull_cursor
-        bare_hull.match = [{'enthalpy_per_atom': -380.071/2.0}]
-        bare_hull.ternary = True
-        bare_hull.voltage_curve(bare_hull.hull_cursor)
-        self.assertEqual(len(bare_hull.Q), len(Q_data))
-        for i in range(len(bare_hull.voltages)):
-            np.testing.assert_array_almost_equal(bare_hull.voltages[i], voltage_data[i])
-            np.testing.assert_array_almost_equal(bare_hull.Q[i], Q_data[i], decimal=0)
-        for ind in range(len(bare_hull.voltages)):
-            assert len(bare_hull.Q[ind]) == len(bare_hull.voltages[ind])
-            assert np.isnan(bare_hull.Q[ind][-1])
-            assert bare_hull.voltages[ind][-1] == 0
+        self.assertEqual(len(hull.Q), len(Q_data))
+        for i in range(len(hull.voltages)):
+            np.testing.assert_array_almost_equal(hull.voltages[i], voltage_data[i], decimal=3)
+            np.testing.assert_array_almost_equal(hull.Q[i], Q_data[i], decimal=0)
+        for ind in range(len(hull.voltages)):
+            assert len(hull.Q[ind]) == len(hull.voltages[ind])
+            assert np.isnan(hull.Q[ind][-1])
+            assert hull.voltages[ind][-1] == 0
 
     def testTernaryVoltageWithOneTwoPhaseRegion(self):
         # load old hull then rejig it to go through a ternary phase
@@ -204,6 +190,25 @@ class VoltageTest(unittest.TestCase):
             assert np.isnan(hull.Q[ind][-1])
             assert hull.voltages[ind][-1] == 0
 
+
+    def testTernaryVoltageOnlyTwoPhaseRegions(self):
+        # load old hull then rejig it to go through a ternary phase
+        res_list = glob(REAL_PATH + 'data/hull-KPSn-KP/*.res')
+        self.assertEqual(len(res_list), 87, 'Could not find test res files, please check installation...')
+        cursor = [res2dict(res)[0] for res in res_list]
+        cursor = [doc for doc in cursor if (doc['stoichiometry'] == [['P', 1], ['Sn', 1]] or
+                                            doc['stoichiometry'] == [['K', 1], ['P', 1], ['Sn', 1]] or
+                                            doc['stoichiometry'] == [['P', 1]] or
+                                            doc['stoichiometry'] == [['K', 1]] or
+                                            doc['stoichiometry'] == [['Sn', 1]])]
+
+        hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'], no_plot=True, pathways=True, subcmd='voltage', quiet=True)
+        self.assertEqual(len(hull.voltages), len(hull.Q))
+        self.assertEqual(len(hull.voltages), 1)
+        for ind in range(len(hull.voltages)):
+            assert len(hull.Q[ind]) == len(hull.voltages[ind])
+            assert np.isnan(hull.Q[ind][-1])
+
     def testTernaryVoltageWithSinglePhaseRegion(self):
         # load old hull then rejig it to go through a ternary phase
         res_list = glob(REAL_PATH + 'data/hull-LiSiP/*.res')
@@ -221,6 +226,16 @@ class VoltageTest(unittest.TestCase):
             assert len(hull.Q[ind]) == len(hull.voltages[ind])
             assert np.isnan(hull.Q[ind][-1])
             assert hull.voltages[ind][-1] == 0
+
+    def testAngelasAwkwardTernaryVoltage(self):
+        # test data from NaFeP
+        res_list = glob(REAL_PATH + 'data/hull-NaFeP-afh41_new_Na+Fe+P/*.res')
+        self.assertEqual(len(res_list), 16, 'Could not find test res files, please check installation...')
+        cursor = [res2dict(res)[0] for res in res_list]
+        hull = QueryConvexHull(cursor=cursor, elements=['Na', 'Fe', 'P'], no_plot=True, quiet=True, subcmd='voltage')
+        self.assertEqual(len(hull.voltages[0]), 8)
+        self.assertEqual(len(hull.voltages[1]), 5)
+        self.assertEqual(len(hull.voltages[2]), 3)
 
 
 if __name__ == '__main__':

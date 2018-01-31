@@ -26,6 +26,8 @@ from matador.utils.chem_utils import get_formation_energy, get_concentration
 from matador.utils.cursor_utils import set_cursor_from_array, get_array_from_cursor
 from matador.utils.cursor_utils import display_results
 
+EPS = 1e-12
+
 
 class QueryConvexHull(object):
     """ Construct a binary or ternary phase diagram
@@ -640,6 +642,12 @@ class QueryConvexHull(object):
                 simp_in = 0
                 intersections = []
                 crossover = []
+                # put starting point into crossover just in case it is not detected
+                sum_conc = sum([int(species[1]) for species in endstoichs[reaction_ind]])
+                conc = [int(species[1])/sum_conc for species in endstoichs[reaction_ind]]
+                if len(conc) == 2:
+                    conc.insert(0, 0.0)
+                crossover.append(conc)
                 for simplex in hull.simplices:
                     tints = []
                     for i in range(3):
@@ -656,14 +664,14 @@ class QueryConvexHull(object):
                         y2 = points[simplex[j], 1]
                         z2 = 1 - x2 - y2
 
-                        if h + g*y0 != 0:
+                        if np.abs(h + g*y0) > EPS:
                             tin = (e*h + g*y0 - f*g)/(h + g*y0)
                             s2 = (y0 - e*y0 - f) / (h + g*y0)
                             if tin >= 0 and tin <= 1 and s2 >= 0 and s2 <= 1:
                                 tints = np.append(tints, tin)
                                 a = 1
                                 # x1-x2 never == 0 on points we care about
-                                if x1 - x2 != 0:
+                                if np.abs(x1 - x2) > EPS:
                                     b = (y1 - y2)/(x1 - x2)
                                     c = (z1 - z2)/(x1 - x2)
                                     x_cross = tin
@@ -675,14 +683,19 @@ class QueryConvexHull(object):
                                             pass
                                         else:
                                             crossover.append([x_cross, y_cross, z_cross])
-                    eps = 1e-6
                     if len(tints) != 0:
                         temp = [simp_in, np.amin(tints), np.amax(tints)]
                         # condition removes the big triangle and the points which only graze the line of interest
-                        if all([temp[2] > 0, temp[1] < 1, temp[2] - temp[1] > eps, temp[2] - temp[1] < 1, temp[1] != temp[2]]):
+                        if all([temp[2] > EPS, temp[1] < 1, temp[2] - temp[1] > EPS, temp[2] - temp[1] < 1, temp[1] != temp[2]]):
                             intersections = np.append(intersections, temp)
                     simp_in += 1
 
+                # if tie line runs from fully de-lithiated to pure lithium (for example), then print and skip
+                if len(intersections) == 0:
+                    print_warning('No intermediate structures found for starting point {}.'.format(get_formula_from_stoich(endstoichs[reaction_ind])))
+                    continue
+
+                intersections = np.asarray(intersections)
                 intersections = intersections.reshape(-1, 3)
                 intersections = intersections[intersections[:, 1].argsort()]
                 ends_of_rows = []
@@ -725,6 +738,7 @@ class QueryConvexHull(object):
                     if ind != len(intersections)-1:
                         print(5*(ind+1)*' ' + ' ---> ', end='')
                     voltages.append(V)
+
                 self.Q.append(Q)
                 self.x.append(x)
                 self.voltages.append(voltages)
