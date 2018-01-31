@@ -70,10 +70,15 @@ class PDF:
             if self.timing:
                 end = time.time()
                 print('PDF calculated in {:.3f} s'.format(end - start))
-            if kwargs.get('projected'):
-                self._calc_projected_pdf()
 
-    def _calc_distances(self, poscart, poscart_B=None, debug=False):
+    def calc_pdf(self):
+        """ Wrapper to calculate PDF with current settings. """
+        self._set_image_trans_vectors()
+        if self.projected:
+            self._calc_projected_pdf()
+        self._calc_unprojected_pdf()
+
+    def _calc_distances(self, poscart, poscart_B=None):
         """ Calculate PBC distances with cdist.
 
         Input:
@@ -105,7 +110,7 @@ class PDF:
         # mask by rmax/0 and remove masked values
         distances = np.ma.masked_where(distances > self.rmax, distances)
         distances = np.ma.masked_where(distances < 1e-12, distances)
-        if debug:
+        if self.debug:
             print('Calculated: {}, Used: {}, Ignored: {}'.format(len(distances),
                                                                  np.ma.count(distances),
                                                                  np.ma.count_masked(distances)))
@@ -117,7 +122,7 @@ class PDF:
 
         return self.distances
 
-    def calc_pdf(self, debug=False):
+    def _calc_unprojected_pdf(self):
         """ Wrapper function to calculate distances and output
         a broadened and normalised PDF.
 
@@ -126,12 +131,20 @@ class PDF:
             | Sets self.Gr and self.r_space to G(r) and r respectively.
 
         """
-        self._set_image_trans_vectors()
-        distances = self._calc_distances(self.poscart, debug=self.debug)
-        self.r_space = np.arange(0, self.rmax+self.dr, self.dr)
-        self.Gr = self._set_broadened_normalised_pdf(distances,
-                                                     style=self.style,
-                                                     gaussian_width=self.gaussian_width)
+        if 'elem_Gr' in self.__dict__:
+            self._calc_unprojected_pdf_from_projected()
+        else:
+            distances = self._calc_distances(self.poscart)
+            self.r_space = np.arange(0, self.rmax+self.dr, self.dr)
+            self.Gr = self._set_broadened_normalised_pdf(distances,
+                                                         style=self.style,
+                                                         gaussian_width=self.gaussian_width)
+
+    def _calc_unprojected_pdf_from_projected(self):
+        """" Reconstruct full PDF from projected. """
+        self.Gr = np.zeros_like(self.r_space)
+        for key in self.elem_Gr:
+            self.Gr += self.elem_Gr[key]
 
     def _set_broadened_normalised_pdf(self, distances, style='smear', gaussian_width=0.01):
         """ Broaden the values provided as distances and return
@@ -140,6 +153,9 @@ class PDF:
         Input:
 
             | distances      : np.ndarray, used to calculate PDF
+
+        Args:
+
             | style          : str, either 'smear' or 'histogram'
             | gaussian_width : float, smearing width in Angstrom^1/2
 
@@ -162,22 +178,27 @@ class PDF:
             hist[ceil(d_ij/self.dr)] += 1
         if style == 'histogram' or gaussian_width == 0:
             # if hist, normalise G(r) by ideal gas then be done
-            Gr = np.divide(hist,
-                           4*np.pi * (self.r_space + self.dr)**2 * self.dr * self.num_atoms * self.number_density)
-        elif style == 'smear':
-            if not self.low_mem:
+            norm = 4*np.pi * (self.r_space + self.dr)**2 * self.dr * self.num_atoms * self.number_density
+            Gr = np.divide(hist, norm)
+        # otherwise do normal smearing
+        else:
+            if self.low_mem:
+                if self.debug:
+                    print('Using low memory mode...')
+                new_space = np.reshape(self.r_space, (1, len(self.r_space))) - np.reshape(self.distances, (1, len(self.distances))).T
+                Gr = np.sum(np.exp(-(new_space)**2 / gaussian_width), axis=0)
+            else:
                 try:
-                    # otherwise, stack some Gaussians on that PDF
                     new_space = np.reshape(self.r_space, (1, len(self.r_space))) - np.reshape(self.r_space, (1, len(self.r_space))).T
                     Gr = np.sum(hist*np.exp(-(new_space)**2 / gaussian_width), axis=1)
                 except MemoryError:
-                    print('Memory usage too high; consider decreasing dr or turning on low_mem mode.')
-            else:
-                if self.debug:
-                    print('Using low memory mode...')
-                # if run out of memory, use low memory mode
-                new_space = np.reshape(self.r_space, (1, len(self.r_space))) - np.reshape(self.distances, (1, len(self.distances))).T
-                Gr = np.sum(np.exp(-(new_space)**2 / gaussian_width), axis=0)
+                    # if run out of memory, use low memory mode
+                    if self.debug:
+                        print('Ran out of memory, using low memory mode...')
+                    self.low_mem = True
+                    new_space = np.reshape(self.r_space, (1, len(self.r_space))) - np.reshape(self.distances, (1, len(self.distances))).T
+                    Gr = np.sum(np.exp(-(new_space)**2 / gaussian_width), axis=0)
+
             # normalise G(r) by Gaussian integral and then ideal gas
             Gr = np.divide(Gr,
                            np.sqrt(np.pi * gaussian_width) *
@@ -204,19 +225,21 @@ class PDF:
         """
         # initalise dict of element pairs with correct keys
         self.r_space = np.arange(0, self.rmax+self.dr, self.dr)
-        self.elem_Gr = dict()
+        elem_Gr = dict()
         for comb in combinations_with_replacement(set(self.doc['atom_types']), 2):
-            self.elem_Gr[tuple(set(comb))] = np.zeros_like(self.r_space)
+            elem_Gr[tuple(set(comb))] = np.zeros_like(self.r_space)
 
         distances = dict()
-        for elem_type in self.elem_Gr:
+        for elem_type in elem_Gr:
             poscart = [self.poscart[i] for i in range(len(self.poscart)) if self.doc['atom_types'][i] == elem_type[0]]
             poscart_B = ([self.poscart[i] for i in range(len(self.poscart)) if self.doc['atom_types'][i] == elem_type[1]]
                          if len(elem_type) == 2 else None)
             distances[elem_type] = self._calc_distances(poscart, poscart_B=poscart_B)
+            elem_Gr[elem_type] = len(elem_type)* self._set_broadened_normalised_pdf(distances[elem_type],
+                                                                                    style=self.style,
+                                                                                    gaussian_width=self.gaussian_width)
 
-            self.elem_Gr[elem_type] = self._set_broadened_normalised_pdf(distances[elem_type],
-                                                                         gaussian_width=self.gaussian_width)
+        self.elem_Gr = elem_Gr
 
     def _set_image_trans_vectors(self):
         """ Sets self.image_vec to a list/generator of image translation vectors,
@@ -269,9 +292,10 @@ class PDF:
                         print(cart2abc(self.doc['lattice_cart']))
                     break
         else:
-            self.image_vec = product(range(-self.num_images, self.num_images+1), repeat=3)
+            self.image_vec = list(product(range(-self.num_images, self.num_images+1), repeat=3))
         if self.debug:
             end = time.time()
+            print('Image vectors length = {}'.format(len(self.image_vec)))
             print('Set image trans vectors in {} s'.format(end-start))
 
     def get_sim_distance(self, pdf_B, projected=False):
@@ -295,6 +319,16 @@ class PDF:
             keys = [key for key in self.elem_Gr]
         for key in keys:
             ax1.plot(self.r_space, self.elem_Gr[key], label='-'.join(key))
+        if other_pdfs is not None:
+            if isinstance(other_pdfs, PDF):
+                other_pdfs = [other_pdfs]
+            for pdf in other_pdfs:
+                if isinstance(pdf, PDF):
+                    ax1.plot(pdf.r_space, pdf.Gr, lw=2, label=pdf.label, alpha=1, ls='--')
+                elif isinstance(pdf, tuple):
+                    ax1.plot(pdf[0], pdf[1], lw=2, alpha=1, ls='--')
+                else:
+                    raise RuntimeError
         ax1.legend(loc=1)
         ax1.set_ylabel('$g(r)$')
         ax1.set_xlabel('$r$ (Angstrom)')
@@ -302,7 +336,7 @@ class PDF:
         return
 
     def plot_pdf(self, other_pdfs=None):
-        """ Plot projected PDFs, with optional list of
+        """ Plot PDFs, with optional list of
         tuples [(r_space, Gr), ...] of other PDFs.
         """
         import matplotlib.pyplot as plt
@@ -313,16 +347,18 @@ class PDF:
         fig = plt.figure(figsize=(8, 5))
         ax1 = fig.add_subplot(111)
         ax1.plot(self.r_space, self.Gr, lw=2, label=self.label)
-        if other_pdfs is not None:
-            for pdf in other_pdfs:
-                if isinstance(pdf, PDF):
-                    ax1.plot(pdf.r_space, pdf.Gr, lw=2, label=pdf.label)
-                elif isinstance(pdf, tuple):
-                    ax1.plot(pdf[0], pdf[1], lw=2)
-                else:
-                    raise RuntimeError
         ax1.set_ylabel('Pair distribution function, $g(r)$')
         ax1.set_xlim(0, self.rmax)
+        if other_pdfs is not None:
+            if isinstance(other_pdfs, PDF):
+                other_pdfs = [other_pdfs]
+            for pdf in other_pdfs:
+                if isinstance(pdf, PDF):
+                    ax1.plot(pdf.r_space, pdf.Gr, lw=2, label=pdf.label, alpha=1, ls='--')
+                elif isinstance(pdf, tuple):
+                    ax1.plot(pdf[0], pdf[1], lw=2, alpha=1, ls='--')
+                else:
+                    raise RuntimeError
         ax1.set_xlabel('$r$ (Angstrom)')
         try:
             sns.despine()
@@ -359,6 +395,7 @@ class PDFFactory:
             del pdf_args['lazy']
         for doc in cursor:
             doc['pdf'] = PDF(doc, lazy=True, **pdf_args)
+
         # how many processes to use? either SLURM_NTASKS, OMP_NUM_THREADS or total num CPUs
         if os.environ.get('SLURM_NTASKS') is not None:
             self.nprocs = int(os.environ.get('SLURM_NTASKS'))
@@ -413,13 +450,10 @@ class PDFFactory:
             pool.join()
 
         assert len(pdf_cursor) == len(cursor)
-
         for ind, doc in enumerate(cursor):
-            doc['pdf'] = pdf_cursor[ind]['pdf']
+            cursor[ind]['pdf'] = pdf_cursor[ind]['pdf']
 
-        cursor = pdf_cursor
         elapsed = time.time() - start
-
         if debug:
             print('Compute time: {:.4f} s'.format(elapsed))
             print('Work complete!')

@@ -48,9 +48,18 @@ class PDFCalculatorTest(unittest.TestCase):
         doc, success = res2dict(REAL_PATH + 'data/LiPZn-r57des.res')
         doc['lattice_cart'] = abc2cart(doc['lattice_abc'])
         doc['text_id'] = ['pdf', 'test']
-        doc['pdf_num_images'] = PDF(doc, num_images=5, **{'debug': False})
-        doc['pdf_auto_images'] = PDF(doc, num_images='auto', **{'debug': False})
+        doc['pdf_num_images'] = PDF(doc, num_images=5, **{'debug': False, 'projected': False})
+        doc['pdf_auto_images'] = PDF(doc, num_images='auto', **{'debug': False, 'projected': False})
         np.testing.assert_array_almost_equal(doc['pdf_num_images'].Gr, doc['pdf_auto_images'].Gr)
+
+    def testPDFFromProjected(self):
+        doc, success = res2dict(REAL_PATH + 'data/LiPZn-r57des.res')
+        doc['lattice_cart'] = abc2cart(doc['lattice_abc'])
+        doc['text_id'] = ['unprojected', 'test']
+        doc['pdf_unprojected'] = PDF(doc, dr=0.01, **{'debug': True})
+        doc['text_id'] = ['projected', 'test']
+        doc['pdf_projected'] = PDF(doc, dr=0.01, **{'debug': True})
+        np.testing.assert_array_almost_equal(doc['pdf_unprojected'].Gr, doc['pdf_projected'].Gr)
 
     def testOverlapPDFSameStructure(self):
         doc, success = res2dict(REAL_PATH + 'data/LiPZn-r57des.res')
@@ -63,9 +72,11 @@ class PDFCalculatorTest(unittest.TestCase):
     def testOverlapPDFHistVSSmear(self):
         doc, success = res2dict(REAL_PATH + 'data/LiPZn-r57des.res')
         doc['lattice_cart'] = abc2cart(doc['lattice_abc'])
-        doc['text_id'] = ['pdf', 'test']
-        doc['pdf_smear'] = PDF(doc, num_images=3, dr=0.001, gaussian_width=0.01, style='smear', low_mem=True)
-        doc['pdf_hist'] = PDF(doc, num_images=3, dr=0.1, style='histogram')
+        doc['text_id'] = ['smear', 'test']
+        doc['pdf_smear'] = PDF(doc, num_images=3, dr=0.001, gaussian_width=0.01, projected=False, style='smear', low_mem=True)
+        doc['text_id'] = ['hist', 'test']
+        doc['pdf_hist'] = PDF(doc, num_images=3, dr=0.1, projected=False, style='histogram')
+        doc['pdf_smear'].plot_pdf(other_pdfs=doc['pdf_hist'])
         overlap = PDFOverlap(doc['pdf_smear'], doc['pdf_hist'])
         self.assertLessEqual(overlap.similarity_distance, 0.02)
         self.assertGreater(overlap.similarity_distance, 0.0)
@@ -85,27 +96,54 @@ class PDFCalculatorTest(unittest.TestCase):
         self.assertLessEqual(overlap.similarity_distance, 1e-3)
         self.assertGreater(overlap.similarity_distance, 0.0)
 
+
+class PDFFactoryCalculatorTest(unittest.TestCase):
+    """ Test PDFFactory. """
     def testPDFFactoryConcurrentPDFs(self):
         import glob
         import numpy as np
         import time
         from copy import deepcopy
-        files = glob.glob(REAL_PATH + 'data/hull-KPSn-KP/*.res')[0:48]
+        files = glob.glob(REAL_PATH + 'data/hull-KPSn-KP/*.res')[0:24]
         cursor = [res2dict(file, db=False)[0] for file in files]
         serial_cursor = deepcopy(cursor)
-        pdf_args = {'dr': 0.01, 'num_images': 'auto', 'gaussian_width': 0.1, 'lazy': False}
+        pdf_args = {'dr': 0.1, 'num_images': 'auto', 'gaussian_width': 0.1, 'lazy': False, 'projected': False}
         start = time.time()
         pdf_factory = PDFFactory(cursor, concurrency='pool', **pdf_args)
         factory_elapsed = time.time() - start
         start = time.time()
         for doc in serial_cursor:
-                doc['pdf'] = PDF(doc, **pdf_args, timing=False)
+            doc['pdf'] = PDF(doc, **pdf_args, timing=False)
         serial_elapsed = time.time() - start
-        print('{:.2f} s over 6 processes vs {:.2f} s in serial'.format(factory_elapsed, serial_elapsed))
+        print('{:.2f} s over {} processes vs {:.2f} s in serial'.format(factory_elapsed, pdf_factory.nprocs, serial_elapsed))
         print('Corresponding to a speedup of {:.1f} vs ideal {:.1f}'.format(serial_elapsed/factory_elapsed,
                                                                             pdf_factory.nprocs))
         for ind, doc in enumerate(serial_cursor):
             np.testing.assert_array_almost_equal(doc['pdf'].Gr, cursor[ind]['pdf'].Gr, decimal=6)
+
+    def testPDFFactoryConcurrentProjectedPDFs(self):
+        import glob
+        import numpy as np
+        import time
+        from copy import deepcopy
+        files = glob.glob(REAL_PATH + 'data/hull-KPSn-KP/*.res')[0:24]
+        cursor = [res2dict(file, db=False)[0] for file in files]
+        serial_cursor = deepcopy(cursor)
+        pdf_args = {'dr': 0.1, 'num_images': 'auto', 'gaussian_width': 0.1, 'lazy': False, 'projected': True}
+        start = time.time()
+        pdf_factory = PDFFactory(cursor, concurrency='pool', **pdf_args)
+        factory_elapsed = time.time() - start
+        start = time.time()
+        for doc in serial_cursor:
+            doc['pdf'] = PDF(doc, **pdf_args, timing=False)
+        serial_elapsed = time.time() - start
+        print('{:.2f} s over {} processes vs {:.2f} s in serial'.format(factory_elapsed, pdf_factory.nprocs, serial_elapsed))
+        print('Corresponding to a speedup of {:.1f} vs ideal {:.1f}'.format(serial_elapsed/factory_elapsed,
+                                                                            pdf_factory.nprocs))
+        for ind, doc in enumerate(serial_cursor):
+            np.testing.assert_array_almost_equal(doc['pdf'].Gr, cursor[ind]['pdf'].Gr, decimal=6)
+            for key in doc['pdf'].elem_Gr:
+                np.testing.assert_array_almost_equal(doc['pdf'].elem_Gr[key], cursor[ind]['pdf'].elem_Gr[key], decimal=6)
 
 
 if __name__ == '__main__':
