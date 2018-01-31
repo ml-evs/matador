@@ -232,7 +232,9 @@ class QueryConvexHull(object):
             # scan for suitable chem pots in database
             for ind, elem in enumerate(elements):
                 print('Scanning for suitable', elem, 'chemical potential...')
-                query_dict['$and'] = list(query.calc_dict['$and'])
+                from copy import deepcopy
+                query_dict['$and'] = deepcopy(list(query.calc_dict['$and']))
+                print(query.calc_dict)
                 if not self.args.get('ignore_warnings'):
                     query_dict['$and'].append(query.query_quality())
                 if not self.non_binary or ind == 0:
@@ -249,7 +251,7 @@ class QueryConvexHull(object):
                 mu_cursor = query.repo.find(SON(query_dict)).sort('enthalpy_per_atom',
                                                                   pm.ASCENDING)
                 if mu_cursor.count() == 0:
-                    print('Failed... searching without spin polarization field...')
+                    print_notify('Failed... searching without spin polarization field...')
                     scanned = False
                     while not scanned:
                         for idx, dicts in enumerate(query_dict['$and']):
@@ -261,11 +263,14 @@ class QueryConvexHull(object):
                                 scanned = True
                     mu_cursor = query.repo.find(SON(query_dict)).sort('enthalpy_per_atom',
                                                                       pm.ASCENDING)
+                    if mu_cursor.count() == 0:
+                        print('No chemical potential...')
 
                 try:
                     self.match[ind] = mu_cursor[0]
                 except:
                     self.match[ind] = None
+                print(self.match[ind])
                 if self.match[ind] is not None:
                     if ind == 0:
                         self.mu_enthalpy[ind] = float(self.match[ind]['enthalpy_per_atom'])
@@ -286,10 +291,13 @@ class QueryConvexHull(object):
                 self.match[i]['enthalpy_per_b'] = mu['enthalpy_per_atom']
                 self.match[i]['num_a'] = 0
             self.match[0]['num_a'] = float('inf')
-        if not self.ternary and not self.from_cursor and not self.args.get('intersection'):
-            self.cursor.insert(0, self.match[0])
+        if not self.from_cursor:
+            ids = [doc['_id'] for doc in self.cursor]
+            if self.match[0]['_id'] not in ids:
+                self.cursor.insert(0, self.match[0])
             for match in self.match[1:]:
-                self.cursor.append(match)
+                if match['_id'] not in ids:
+                    self.cursor.append(match)
         return
 
     def fake_chempots(self, custom_elem=None):

@@ -211,7 +211,9 @@ class DBQuery(object):
             self.empty_query = False
 
         if self.args.get('spin') is not None:
-            self.query_dict['$and'].append(self.query_spin())
+            tmp_dict = self.query_spin()
+            if len(tmp_dict) != 0:
+                self.query_dict['$and'].append(tmp_dict)
             self.empty_query = False
 
         if not self.args.get('ignore_warnings'):
@@ -813,19 +815,21 @@ class DBQuery(object):
         query_dict['kpoints_mp_spacing']['$gte'] = mp_spacing[0] - tol
         return query_dict
 
-    def query_spin(self):
+    def query_spin(self, override=None):
         """ Query all calculations with spin polarisation,
         i.e. --spin n!=0, or non-spin-polarization, i.e. --spin 0.
         """
         query_dict = dict()
-        if not isinstance(self.args.get('spin'), list):
-            spin = [self.args.get('spin')]
+        if isinstance(self.args.get('spin'), list):
+            spin = self.args.get('spin')[0]
         else:
             spin = self.args.get('spin')
-        if int(spin[0]) == 0:
+        if spin == 'any':
+            query_dict = dict()
+        elif int(spin) == 0:
             query_dict['spin_polarized'] = dict()
             query_dict['spin_polarized']['$ne'] = True
-        else:
+        elif int(spin) > 0:
             query_dict['spin_polarized'] = True
         return query_dict
 
@@ -841,14 +845,16 @@ class DBQuery(object):
         if self.args.get('time') is not None:
             query_dict['$and'].append(self.query_time())
         if 'spin_polarized' in doc and doc['spin_polarized']:
-            temp_dict = dict()
-            temp_dict['spin_polarized'] = doc['spin_polarized']
-            query_dict['$and'].append(temp_dict)
+            if self.args.get('spin') != 'any':
+                temp_dict = dict()
+                temp_dict['spin_polarized'] = doc['spin_polarized']
+                query_dict['$and'].append(temp_dict)
         else:
-            temp_dict = dict()
-            temp_dict['spin_polarized'] = dict()
-            temp_dict['spin_polarized']['$ne'] = True
-            query_dict['$and'].append(temp_dict)
+            if self.args.get('spin') != 'any':
+                temp_dict = dict()
+                temp_dict['spin_polarized'] = dict()
+                temp_dict['spin_polarized']['$ne'] = True
+                query_dict['$and'].append(temp_dict)
         if 'geom_force_tol' in doc and doc['geom_force_tol'] != 0.05:
             temp_dict = dict()
             temp_dict['geom_force_tol'] = doc['geom_force_tol']

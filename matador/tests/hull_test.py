@@ -1,10 +1,8 @@
 #!/usr/bin/env python
 # matador modules
 from matador.hull import QueryConvexHull
-from matador.utils.chem_utils import get_generic_grav_capacity
 from matador.scrapers.castep_scrapers import res2dict
 # external libraries
-from scipy.spatial import ConvexHull
 import numpy as np
 # standard library
 import sys
@@ -189,7 +187,6 @@ class VoltageTest(unittest.TestCase):
             assert len(hull.Q[ind]) == len(hull.voltages[ind])
             assert np.isnan(hull.Q[ind][-1])
             assert hull.voltages[ind][-1] == 0
-
 
     def testTernaryVoltageOnlyTwoPhaseRegions(self):
         # load old hull then rejig it to go through a ternary phase

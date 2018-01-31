@@ -399,7 +399,7 @@ if __name__ == '__main__':
                                  return all values structures with value within --kpt_tol of that specified')
     structure_flags.add_argument('--spin', type=str,
                                  help='specifiy whether to query non-spin-polarized (0) calcs or \
-                                 spin polarized calcs (!=1).')
+                                 spin polarized calcs (!=1), or lump them both together with `any`')
     structure_flags.add_argument('--loose', action='store_true',
                                  help='loosely matches with calc_match, i.e. only matches \
                                        pspot and xc_functional')
