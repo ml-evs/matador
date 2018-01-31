@@ -37,7 +37,7 @@ setup(name='matador',
           'docs': ['sphinx'],
           'viz': ['ase', 'nglview'],
           'plotting': ['matplotlib>=2.0',
-                       'python-ternary==1.0.3'],
+                       'python-ternary==1.0.1'],
           'stats': ['ascii_graph>=1.2'],
           'progressbars': ['progressbar2'],
           'encapsulation': ['pyairss']
