@@ -234,7 +234,6 @@ class QueryConvexHull(object):
                 print('Scanning for suitable', elem, 'chemical potential...')
                 from copy import deepcopy
                 query_dict['$and'] = deepcopy(list(query.calc_dict['$and']))
-                print(query.calc_dict)
                 if not self.args.get('ignore_warnings'):
                     query_dict['$and'].append(query.query_quality())
                 if not self.non_binary or ind == 0:
