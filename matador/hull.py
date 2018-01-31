@@ -270,7 +270,6 @@ class QueryConvexHull(object):
                     self.match[ind] = mu_cursor[0]
                 except:
                     self.match[ind] = None
-                print(self.match[ind])
                 if self.match[ind] is not None:
                     if ind == 0:
                         self.mu_enthalpy[ind] = float(self.match[ind]['enthalpy_per_atom'])
