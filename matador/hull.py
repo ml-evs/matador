@@ -289,7 +289,7 @@ class QueryConvexHull(object):
                 self.match[i]['enthalpy_per_b'] = mu['enthalpy_per_atom']
                 self.match[i]['num_a'] = 0
             self.match[0]['num_a'] = float('inf')
-        if not self.from_cursor:
+        if not self.from_cursor and self.chem_pots is None:
             ids = [doc['_id'] for doc in self.cursor]
             if self.match[0]['_id'] not in ids:
                 self.cursor.insert(0, self.match[0])
