@@ -332,6 +332,7 @@ class FullRelaxer:
                     if os.path.isfile(seed+'.res'):
                         os.remove(seed+'.res')
                     doc2res(opti_dict, seed, hash_dupe=False)
+                    shutil.copy(seed+'.res', self.root_folder)
                 elif (not self.reopt or self.rerun) and opti_dict['optimised']:
                     if self.verbosity > 1:
                         print_success('Successfully relaxed ' + seed)
@@ -339,6 +340,7 @@ class FullRelaxer:
                     if os.path.isfile(seed+'.res'):
                         os.remove(seed+'.res')
                     doc2res(opti_dict, seed, hash_dupe=False)
+                    shutil.copy(seed+'.res', self.root_folder)
                     self.opti_dict = deepcopy(opti_dict)
                     # overwrite old data in res_dict with opti structure
                     # so that custom keys in initial res are still accessible
@@ -358,6 +360,7 @@ class FullRelaxer:
                     if os.path.isfile(seed+'.res'):
                         os.remove(seed+'.res')
                     doc2res(opti_dict, seed, hash_dupe=False)
+                    shutil.copy(seed+'.res', self.root_folder)
                     self.res_dict.update(opti_dict)
                     if output_queue is not None:
                         output_queue.put(self.res_dict)
@@ -379,6 +382,7 @@ class FullRelaxer:
                             if self.debug:
                                 print('wrote failed dict out to output_queue')
                         doc2res(opti_dict, seed, info=False, hash_dupe=False)
+                        shutil.copy(seed+'.res', self.root_folder)
                         self.mv_to_bad(seed)
                         return False
 
@@ -386,6 +390,7 @@ class FullRelaxer:
                 if os.path.isfile(seed+'.res'):
                     os.remove(seed+'.res')
                 doc2res(opti_dict, seed, hash_dupe=False)
+                shutil.copy(seed+'.res', self.root_folder)
                 # remove atomic_init_spins from calc_doc if there
                 if 'atomic_init_spins' in calc_doc:
                     del calc_doc['atomic_init_spins']
