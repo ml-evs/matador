@@ -31,7 +31,7 @@ def add_kpoints_to_cells(spacing=0.02, overwrite=False, **kwargs):
     for seed in seeds:
         seed = seed.replace('.cell', '')
         doc, s = cell2dict(seed + '.cell', db=False, lattice=True, positions=True, verbosity=2)
-        prim_doc, kpt_path, seekpath_results = get_seekpath_kpoint_path(doc, spacing=spacing, debug=True, threshold=1e-7)
+        prim_doc, kpt_path, seekpath_results = get_seekpath_kpoint_path(doc, spacing=spacing, debug=False, threshold=1e-7)
         if overwrite:
             outfile = seed + '.cell'
         else:
