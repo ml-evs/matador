@@ -805,7 +805,9 @@ class FullRelaxer:
         return
 
     def mv_to_completed(self, seed, completed_dir='completed', keep=False):
-        """ Move all associated files to completed. """
+        """ Move all associated files to completed, removing
+        any remaining files in the root_folder and compute_dir.
+        """
         completed_dir = self.root_folder + '/' + completed_dir
         if not os.path.exists(completed_dir):
             os.makedirs(completed_dir, exist_ok=True)
@@ -817,6 +819,7 @@ class FullRelaxer:
                 shutil.copy(_file, completed_dir)
                 os.remove(_file)
         else:
+            # move castep/param/res/out_cell files to completed
             file_exts = ['.castep']
             if self.kpts_1D:
                 file_exts.append('.param')
@@ -832,6 +835,12 @@ class FullRelaxer:
                     if self.verbosity > 1:
                         print_exc()
                     pass
+            # check root folder for any matching files and remove them
+            fname = '{}/{}'.format(self.root_folder, seed)
+            for ext in ['.res', '.res.lock']:
+                if os.path.isfile('{}{}'.format(fname, ext)):
+                    os.remove('{}{}'.format(seed, ext))
+
         return
 
     def cp_to_input(self, seed, ext='res', glob_files=False):
