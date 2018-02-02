@@ -235,9 +235,9 @@ class PDF:
             poscart_B = ([self.poscart[i] for i in range(len(self.poscart)) if self.doc['atom_types'][i] == elem_type[1]]
                          if len(elem_type) == 2 else None)
             distances[elem_type] = self._calc_distances(poscart, poscart_B=poscart_B)
-            elem_Gr[elem_type] = len(elem_type)* self._set_broadened_normalised_pdf(distances[elem_type],
-                                                                                    style=self.style,
-                                                                                    gaussian_width=self.gaussian_width)
+            elem_Gr[elem_type] = len(elem_type) * self._set_broadened_normalised_pdf(distances[elem_type],
+                                                                                     style=self.style,
+                                                                                     gaussian_width=self.gaussian_width)
 
         self.elem_Gr = elem_Gr
 
@@ -261,8 +261,9 @@ class PDF:
             any_in_sphere = True
             # find longest combination of single LV's
             max_trans = 0
+            trans = np.zeros((3))
             for prod in product(range(-1, 2), repeat=3):
-                trans = np.zeros((3))
+                trans = 0
                 for ind, multi in enumerate(prod):
                     trans += self.lattice[ind] * multi
                 if np.sqrt(np.sum(trans**2)) > max_trans:
@@ -274,7 +275,7 @@ class PDF:
                 for prod in product(range(-test_num_images, test_num_images+1), repeat=3):
                     if prod in self.image_vec:
                         continue
-                    trans = np.zeros((3))
+                    trans = 0
                     for ind, multi in enumerate(prod):
                         trans += self.lattice[ind] * multi
                     if np.sqrt(np.sum(trans**2)) <= self.rmax+self.dr+max_trans:
