@@ -803,6 +803,11 @@ class FullRelaxer:
                     if self.verbosity > 1:
                         print_exc()
                     pass
+            # check root folder for any matching files and remove them
+            fname = '{}/{}'.format(self.root_folder, seed)
+            for ext in ['.res', '.res.lock']:
+                if os.path.isfile('{}{}'.format(fname, ext)):
+                    os.remove('{}{}'.format(fname, ext))
         except:
             if self.verbosity > 1:
                 print_exc()
@@ -844,7 +849,7 @@ class FullRelaxer:
             fname = '{}/{}'.format(self.root_folder, seed)
             for ext in ['.res', '.res.lock']:
                 if os.path.isfile('{}{}'.format(fname, ext)):
-                    os.remove('{}{}'.format(seed, ext))
+                    os.remove('{}{}'.format(fname, ext))
 
         return
 
