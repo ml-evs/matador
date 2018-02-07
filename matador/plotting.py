@@ -663,7 +663,7 @@ def get_linear_cmap(colours, N=100, list_only=False):
 
     Args:
 
-        | N: int, number of colours in resulting cmap
+        | N        : int, number of colours in resulting cmap
         | list_only: bool, return only a list of colours
 
     Returns:
@@ -939,7 +939,7 @@ def plot_2d_hull(hull, ax=None, dis=False, show=False, plot_points=True, plot_hu
     return ax
 
 
-def plot_ternary_hull(hull, axis=None, show=False):
+def plot_ternary_hull(hull, axis=None, show=False, plot_points=True, expecting_cbar=True):
     """ Plot calculated ternary hull as a 2D projection.
 
     Takes optional matplotlib subplot axis as a parameter, and returns
@@ -977,17 +977,17 @@ def plot_ternary_hull(hull, axis=None, show=False):
         fig, ax = ternary.figure(scale=scale)
     if hull.args.get('capmap') or hull.args.get('efmap') or hull.args.get('sampmap'):
         fig.set_size_inches(8, 5)
+    elif not expecting_cbar:
+        fig.set_size_inches(5, 5)
     else:
         fig.set_size_inches(6.67, 5)
     ax.boundary(linewidth=2.0, zorder=99)
     ax.gridlines(color='black', multiple=scale*0.1, linewidth=0.5)
 
     ax.clear_matplotlib_ticks()
-    if scale == 1:
-        ax.ticks(axis='lbr', linewidth=1, multiple=scale*0.2, offset=0.02, fsize=fontsize-2)
-    else:
-        ax.ticks(axis='lbr', linewidth=1, multiple=scale*0.2, offset=0.02, fsize=fontsize-2,
-                 ticks=[str(round(num, 1)) for num in np.linspace(0.0, 1.0, 6)])
+    ticks = [float(val) for val in np.linspace(0.0, 1.0, 6)]
+    ax.ticks(axis='lbr', linewidth=1, multiple=scale*0.2, offset=0.02, fontsize=fontsize-2,
+            ticks=ticks, tick_formats='%.1f')
 
     ax.set_title(''.join(hull.elements), fontsize=fontsize+2, y=1.02)
     ax.left_axis_label(hull.elements[2], fontsize=fontsize+2)
@@ -1019,11 +1019,6 @@ def plot_ternary_hull(hull, axis=None, show=False):
 
     concs = np.asarray(filtered_concs)
     hull_dist = np.asarray(filtered_hull_dists)
-    # concs = concs[np.where(hull_dist <= hull.hull_cutoff)]
-    # hull_dist = hull_dist[np.where(hull_dist <= hull.hull_cutoff)]
-    # else:
-    #   concs = np.asarray(concs)
-    #   hull_dist = np.asarray(hull_dist)
 
     Ncolours = len(hull.default_cmap_list)
     min_cut = 0.01
@@ -1044,28 +1039,32 @@ def plot_ternary_hull(hull, axis=None, show=False):
             if phase[0] == 0 and phase[1] != 0 and phase[2] != 0:
                 ax.plot([scale*phase, [scale, 0, 0]], c='r', alpha=0.2, lw=6, zorder=99)
 
-    colours_list = []
-    colour_metric = hull_dist
-    for i in range(len(colour_metric)):
-        if colour_metric[i] >= max_cut:
-            colours_list.append(Ncolours-1)
-        elif colour_metric[i] <= min_cut:
-            colours_list.append(0)
-        else:
-            colours_list.append(int((Ncolours-1)*(colour_metric[i] / max_cut)))
-    colours_list = np.asarray(colours_list)
-    ax.scatter(scale*concs, colormap=cmap, colorbar=True, cbarlabel='Distance from hull (eV/atom)',
-               c=hull_dist, vmax=max_cut, vmin=min_cut, zorder=1000, s=40, alpha=0)
-    ax.scatter(scale*stable, marker='o', color=colours_hull[0], edgecolors='black', zorder=9999999,
-               s=150, lw=1.5)
-    for i in range(len(concs)):
-        ax.scatter(scale*concs[i].reshape(1, 3),
-                   color=colours_hull[colours_list[i]],
-                   marker='o',
-                   zorder=10000-colours_list[i],
-                   # alpha=max(0.1, 1-2*hull_dist[i]),
-                   s=70*(1-float(colours_list[i])/Ncolours)+15,
-                   lw=1, edgecolors='black')
+    # add points
+    if plot_points:
+        colours_list = []
+        colour_metric = hull_dist
+        for i in range(len(colour_metric)):
+            if colour_metric[i] >= max_cut:
+                colours_list.append(Ncolours-1)
+            elif colour_metric[i] <= min_cut:
+                colours_list.append(0)
+            else:
+                colours_list.append(int((Ncolours-1)*(colour_metric[i] / max_cut)))
+        colours_list = np.asarray(colours_list)
+        ax.scatter(scale*stable, marker='o', color=colours_hull[0], edgecolors='black', zorder=9999999,
+                   s=150, lw=1.5)
+        ax.scatter(scale*concs, colormap=cmap, colorbar=True, cbarlabel='Distance from hull (eV/atom)',
+                   c=hull_dist, vmax=max_cut, vmin=min_cut, zorder=1000, s=40, alpha=0)
+        for i in range(len(concs)):
+            ax.scatter(scale*concs[i].reshape(1, 3),
+                       color=colours_hull[colours_list[i]],
+                       marker='o',
+                       zorder=10000-colours_list[i],
+                       # alpha=max(0.1, 1-2*hull_dist[i]),
+                       s=70*(1-float(colours_list[i])/Ncolours)+15,
+                       lw=1, edgecolors='black')
+
+    # add colourmaps
     if hull.args.get('capmap'):
         capacities = dict()
         from ternary.helpers import simplex_iterator
