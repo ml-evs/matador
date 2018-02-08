@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import unittest
 from matador.utils.chem_utils import get_concentration
-from matador.utils.chem_utils import get_generic_grav_capacity
+from matador.utils.chem_utils import get_generic_grav_capacity, get_binary_volumetric_capacity
 from matador.utils.chem_utils import get_stoich, get_formula_from_stoich, get_stoich_from_formula
 
 
@@ -47,6 +47,17 @@ class ChemUtilsTest(unittest.TestCase):
         self.assertEqual(Q[0], Q[1])
         self.assertEqual(round(8*Q[2], 3), round(Q[3], 3))
         self.assertEqual(round(Q[2], 3), round(2*Q[4], 3))
+
+    def testVolumetricCapacity(self):
+        initial_doc = dict()
+        final_doc = dict()
+        initial_doc['stoichiometry'] = [['P', 1]]
+        initial_doc['cell_volume'] = 84.965349
+        initial_doc['num_fu'] = 4
+
+        final_doc['stoichiometry'] = sorted([['Li', 3], ['P', 1]])
+        vol_cap = get_binary_volumetric_capacity(initial_doc, final_doc)
+        self.assertAlmostEqual(vol_cap, 6286, places=0)
 
     def testAtoms2Stoich(self):
         atoms = 5*['Li']

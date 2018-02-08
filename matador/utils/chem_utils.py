@@ -12,6 +12,9 @@ HARTREE_TO_EV = 27.21139
 BOHR_TO_ANGSTROM = 0.529177211
 RY_TO_EV = 13.605693009
 KBAR_TO_GPA = 0.1
+AVOGADROS_NUMBER = 6.022141e23
+ANGSTROM_CUBED_TO_CENTIMETRE_CUBED = 1e-24
+ELECTRON_CHARGE = 1.6021766e-19
 
 
 def get_periodic_table():
@@ -111,6 +114,39 @@ def get_generic_grav_capacity(concs, elements):
             m_B += masses[elem]*tmp_concs[ind]
     Q = get_binary_grav_capacities(x, m_B)
     return Q
+
+
+def get_binary_volumetric_capacity(initial_doc, final_doc):
+    """ For initial (delithiated/sodiated) (single element) structure
+    and final (maximally charged) binary structure, calculate the volumetric capacity.
+
+    Input:
+
+        | initial_doc: dict, matador doc of delithiated phase
+        | final_doc  : dict, matador doc of maximally lithiated phase
+
+    Returns:
+
+       | volumetric_capacity: float, capacity in mAh/cm^3.
+
+    """
+
+    assert len(initial_doc['stoichiometry']) == 1
+    assert len(final_doc['stoichiometry']) == 2
+
+    for _ion in final_doc['stoichiometry']:
+        if _ion[0] != initial_doc['stoichiometry'][0][0]:
+            ion = _ion[0]
+
+    for species in final_doc['stoichiometry']:
+        if species[0] == ion:
+            num_ion = species[1]
+        else:
+            num_B = species[1]
+
+    num_ions_per_initial_fu = num_ion / num_B
+    volume_per_fu_cm3 = initial_doc['cell_volume'] * ANGSTROM_CUBED_TO_CENTIMETRE_CUBED / initial_doc['num_fu']
+    return ((num_ions_per_initial_fu / volume_per_fu_cm3) * (ELECTRON_CHARGE * Cperg_to_mAhperg))
 
 
 def get_atoms_per_fu(doc):
