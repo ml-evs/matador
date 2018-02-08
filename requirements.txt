@@ -2,5 +2,6 @@ numpy>=1.10
 scipy>=0.18
 pymongo>=3.3.0
 matplotlib>=2.0
+seaborn
 psutil
 progressbar2
