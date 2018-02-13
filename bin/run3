@@ -228,7 +228,7 @@ class BatchRun:
                                                     'GEOMETRYOPTIMIZATION']:
             print_failure('geom_max_iter is unset, please fix this.')
             exit()
-        if 'geom_max_iter' in self.param_dict and int(self.param_dict['geom_max_iter']) < 20:
+        if 'geom_max_iter' in self.param_dict and int(self.param_dict['geom_max_iter']) < 0:
             print_warning('WARNING: geom_max_iter is only ' +
                           str(self.param_dict['geom_max_iter']) + '...')
             exit()
