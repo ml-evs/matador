@@ -361,6 +361,8 @@ class FullRelaxer:
                         os.remove(seed+'.res')
                     doc2res(opti_dict, seed, hash_dupe=False)
                     shutil.copy(seed+'.res', self.root_folder)
+                    if os.path.isfile(seed+'.castep'):
+                        shutil.copy(seed+'.castep', self.root_folder)
                     self.res_dict.update(opti_dict)
                     if output_queue is not None:
                         output_queue.put(self.res_dict)
