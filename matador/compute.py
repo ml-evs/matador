@@ -236,7 +236,7 @@ class FullRelaxer:
 
         """
         if self.compute_dir is not None:
-            if not os.path.exists(self.compute_dir):
+            if not os.path.isdir(self.compute_dir):
                 os.makedirs(self.compute_dir)
             pspots = glob.glob('*.usp')
             for pspot in pspots:
