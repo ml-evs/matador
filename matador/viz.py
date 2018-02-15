@@ -2,6 +2,11 @@
 """ This file is a dirty wrapper of ase-gui for
 quick visualisation of structures.
 """
+ELEMENT_COLOURS = {
+    'K': '#66236D',
+    'Sn': '#938CAF',
+    'P': '#D66814'
+}
 
 
 def viz(doc):
