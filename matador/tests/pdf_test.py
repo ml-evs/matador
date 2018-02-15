@@ -120,6 +120,31 @@ class PDFFactoryCalculatorTest(unittest.TestCase):
         for ind, doc in enumerate(serial_cursor):
             np.testing.assert_array_almost_equal(doc['pdf'].Gr, cursor[ind]['pdf'].Gr, decimal=6)
 
+    def testPDFFactoryHull(self):
+        import glob
+        import numpy as np
+        import time
+        from copy import deepcopy
+        from matador.hull import QueryConvexHull
+        files = glob.glob(REAL_PATH + 'data/hull-KPSn-KP/*.res')
+        cursor = [res2dict(file, db=True)[0] for file in files]
+        hull = QueryConvexHull(cursor=cursor, no_plot=True, hull_cutoff=0.5, summary=True, elements=['K', 'Sn', 'P'])
+        serial_cursor = deepcopy(hull.cursor)
+
+        pdf_args = {'dr': 0.1, 'num_images': 'auto', 'gaussian_width': 0.1, 'lazy': False, 'projected': False}
+        start = time.time()
+        pdf_factory = PDFFactory(hull.cursor, concurrency='pool', **pdf_args)
+        factory_elapsed = time.time() - start
+        start = time.time()
+        for doc in serial_cursor:
+            doc['pdf'] = PDF(doc, **pdf_args, timing=False)
+        serial_elapsed = time.time() - start
+        print('{:.2f} s over {} processes vs {:.2f} s in serial'.format(factory_elapsed, pdf_factory.nprocs, serial_elapsed))
+        print('Corresponding to a speedup of {:.1f} vs ideal {:.1f}'.format(serial_elapsed/factory_elapsed,
+                                                                            pdf_factory.nprocs))
+        for ind, doc in enumerate(serial_cursor):
+            np.testing.assert_array_almost_equal(doc['pdf'].Gr, hull.cursor[ind]['pdf'].Gr, decimal=6)
+
     def testPDFFactoryConcurrentProjectedPDFs(self):
         import glob
         import numpy as np

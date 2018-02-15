@@ -51,7 +51,7 @@ class PDF:
             self.doc = standardize_doc_cell(self.doc)
 
         self.lattice = np.asarray(doc['lattice_cart'])
-        self.poscart = np.asarray(frac2cart(doc['lattice_cart'], doc['positions_frac']))
+        self.poscart = np.asarray(frac2cart(doc['lattice_cart'], doc['positions_frac'])).reshape(-1, 3)
         self.types = doc['atom_types']
         if 'text_id' in doc:
             self.label = ' '.join(doc['text_id'])
@@ -446,11 +446,13 @@ class PDFFactory:
         elif concurrency is 'pool':
             pool = mp.Pool(processes=self.nprocs)
             pdf_cursor = []
-            pool.map_async(calc_pdf_pool_wrapper, cursor, callback=pdf_cursor.extend)
+            pool.map_async(calc_pdf_pool_wrapper, cursor, callback=pdf_cursor.extend, error_callback=print)
             pool.close()
             pool.join()
 
-        assert len(pdf_cursor) == len(cursor)
+        if len(pdf_cursor) != len(cursor):
+            raise RuntimeError('There was an error calculating the desired PDFs')
+
         for ind, doc in enumerate(cursor):
             cursor[ind]['pdf'] = pdf_cursor[ind]['pdf']
 
