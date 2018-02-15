@@ -73,6 +73,7 @@ class QueryConvexHull(object):
             self.cursor = [doc for doc in self.cursor if all([atom in self.elements for atom, num in doc['stoichiometry']])]
 
         if quiet:
+            cached_stdout = sys.stdout
             f = open(devnull, 'w')
             sys.stdout = f
 
@@ -135,7 +136,7 @@ class QueryConvexHull(object):
 
         if quiet:
             f.close()
-            sys.stdout = sys.__stdout__
+            sys.stdout = cached_stdout
 
     @property
     def savefig(self):
@@ -451,7 +452,7 @@ class QueryConvexHull(object):
         return hull_dist, tie_line_energy, tie_line_comp
 
     def hull_2d(self, dis=False):
-        """ Create a convex hull for a binary system. Sets several pieces of member data,
+        """ Create a convex hull for a binary or ternary system. Sets several pieces of member data,
         most importantly self.hull and self.hull_cursor, as well as adding hull distances to
         self.cursor.
         """
