@@ -128,7 +128,7 @@ class PDFFactoryCalculatorTest(unittest.TestCase):
         from matador.hull import QueryConvexHull
         files = glob.glob(REAL_PATH + 'data/hull-KPSn-KP/*.res')
         cursor = [res2dict(file, db=True)[0] for file in files]
-        hull = QueryConvexHull(cursor=cursor, no_plot=True, hull_cutoff=0.5, summary=True, elements=['K', 'Sn', 'P'])
+        hull = QueryConvexHull(cursor=cursor, no_plot=True, hull_cutoff=0.5, summary=True, elements=['K', 'Sn', 'P'], quiet=True)
         serial_cursor = deepcopy(hull.cursor)
 
         pdf_args = {'dr': 0.1, 'num_images': 'auto', 'gaussian_width': 0.1, 'lazy': False, 'projected': False}
