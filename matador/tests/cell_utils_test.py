@@ -51,6 +51,16 @@ class CellUtilTest(unittest.TestCase):
                 print('volume:', test_doc['cell_volume'], cart2volume(test_doc['lattice_cart']))
                 raise AssertionError
 
+    def testFrac2Cart(self):
+        lattice_cart = [[2, 0, 0], [0, 2, 0], [0, 0, 2]]
+        positions_frac = [0.5, 0.5, 0.5]
+        np.testing.assert_array_almost_equal(frac2cart(lattice_cart, positions_frac), [1, 1, 1])
+
+    def testCart2Frac(self):
+        lattice_cart = [[2, 0, 0], [0, 2, 0], [0, 0, 2]]
+        positions_abs = [1, 1, 1]
+        np.testing.assert_array_almost_equal(cart2frac(lattice_cart, positions_abs), [0.5, 0.5, 0.5])
+
     def testSupercellCreator(self):
         castep_fname = REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep'
         failed_open = False

@@ -108,15 +108,26 @@ def cart2abc(lattice_cart):
 
 
 def frac2cart(lattice_cart, positions_frac):
-    """ Convert positions_frac block into positions_abs. """
-    positions_frac = np.asarray(positions_frac)
-    lattice_cart = np.asarray(lattice_cart)
-    positions_abs = np.zeros_like(positions_frac)
-    assert(len(lattice_cart) == 3)
-    for i in range(len(positions_frac)):
-        for j in range(3):
-            positions_abs[i] += lattice_cart[j]*positions_frac[i][j]
-    positions_frac = positions_frac.tolist()
+    """ Convert positions_frac block into positions_abs.
+
+    Input:
+
+        | lattice_cart  : list, cartesian lattice vectors
+        | positions_frac: list(list(float)), list of position vectors
+
+    Returns:
+
+        | positions_abs: list, either [x, y, z] or [[x1, y1, z1], ..., [xn, yn, zn]]
+
+    """
+    _positions_frac = np.asarray(positions_frac)
+    if len(np.shape(_positions_frac)) == 1:
+        reshaped = True
+        _positions_frac = _positions_frac.reshape((1, 3))
+    _lattice_cart = np.asarray(lattice_cart)
+    positions_abs = switch_coords(_lattice_cart, _positions_frac)
+    if len(positions_abs) == 1:
+        positions_abs = positions_abs.reshape((3))
     return positions_abs.tolist()
 
 
@@ -153,19 +164,56 @@ def wrap_frac_coords(positions, remove=False):
     return wrapped
 
 
+def switch_coords(lattice, pos, norm=None):
+    """ Act on coordinates with the relevant lattice
+    vectors to switch from fractional to absolute coordinates.
+
+    Input:
+
+        | lattice: np.ndarray(3, 3), either lattice_cart or reciprocal lattice
+        | pos    : np.ndarray(3, -1), input positions to convert
+
+    Args:
+
+        | norm   : float, divide final coordinates by normalisation factor, e.g.
+                   2*pi when lattice is recip and positions are cartesian.
+
+    Returns:
+
+        | new_pos: np.ndarray(3, -1), converted positions
+
+    """
+    new_pos = np.zeros_like(pos)
+    for ni in range(len(pos)):
+        for j in range(3):
+            new_pos[ni] += lattice[j] * pos[ni][j]
+    if norm is not None:
+        new_pos /= norm
+    return new_pos
+
+
 def cart2frac(lattice_cart, positions_abs):
     """ Convert positions_abs block into positions_frac (and equivalent
     in reciprocal space).
+
+    Input:
+
+        | lattice_cart  : list, cartesian lattice vectors
+        | positions_abs : list(list(float)), list of position vectors in absolute coordinates
+
+    Returns:
+
+        | positions_frac: list, either [x, y, z] or [[x1, y1, z1], ..., [xn, yn, zn]]
+
     """
-    positions_abs = np.asarray(positions_abs)
+    _positions_abs = np.asarray(positions_abs, dtype=np.float64)
+    if len(np.shape(_positions_abs)) == 1:
+        _positions_abs = _positions_abs.reshape((1, 3))
     recip_lat = np.asarray(real2recip(lattice_cart))
     recip_lat = recip_lat.T
-    positions_frac = np.zeros_like(positions_abs)
-    for ni in range(len(positions_frac)):
-        for j in range(3):
-            positions_frac[ni] += recip_lat[j] * positions_abs[ni][j]
-    positions_frac /= 2*pi
-    positions_abs.tolist()
+    positions_frac = switch_coords(recip_lat, _positions_abs, norm=2*np.pi)
+    if len(positions_frac) == 1:
+        positions_frac = positions_frac.reshape((3))
     return positions_frac.tolist()
 
 
@@ -296,9 +344,9 @@ def standardize_doc_cell(doc, primitive=True, symprec=1e-5):
 
 def get_spacegroup_spg(doc, symprec=0.01):
     """ Return spglib spacegroup for a cell. """
-    from spglib import get_spacegroup
+    import spglib as spg
     spg_cell = doc2spg(doc)
-    return get_spacegroup(spg_cell, symprec=symprec).split(' ')[0]
+    return spg.get_spacegroup(spg_cell, symprec=symprec).split(' ')[0]
 
 
 def create_simple_supercell(seed_doc, extension, standardize=False, symmetric=False):
