@@ -235,14 +235,6 @@ class FullRelaxer:
             True iff structure was optimised, False otherwise.
 
         """
-        if self.compute_dir is not None:
-            if not os.path.isdir(self.compute_dir):
-                os.makedirs(self.compute_dir)
-            pspots = glob.glob('*.usp')
-            for pspot in pspots:
-                shutil.copy(pspot, self.compute_dir)
-
-            os.chdir(self.compute_dir)
 
         seed = self.seed
         calc_doc = self.calc_doc
@@ -251,6 +243,25 @@ class FullRelaxer:
         geom_max_iter_list = self.geom_max_iter_list
         if self.debug:
             print(geom_max_iter_list)
+            print(self.compute_dir)
+
+        if self.compute_dir is not None:
+            if not os.path.isdir(self.compute_dir):
+                os.makedirs(self.compute_dir)
+
+            # copy pspots and any intermediate calcs to compute_dir
+            pspots = glob.glob('*.usp')
+            for pspot in pspots:
+                shutil.copy(pspot, self.compute_dir)
+
+            if os.path.isfile(self.seed + '.castep'):
+                shutil.copy(self.seed + '.castep', self.compute_dir)
+                # update res file with intermediate calculation
+                castep_dict, success = castep2dict(seed + '.castep', db=False)
+                if success:
+                    self.res_dict.update(castep_dict)
+
+            os.chdir(self.compute_dir)
 
         # copy initial res file to seed
         doc2res(self.res_dict, self.seed, info=False, hash_dupe=False, overwrite=True)
@@ -897,8 +908,9 @@ class FullRelaxer:
               otherwise False.
         """
 
-        if not os.path.exists(compute_dir):
-            print('No directory found called {}, so nothing to do...'.format(compute_dir))
+        if not os.path.isdir(compute_dir):
+            if debug:
+                print('No directory found called {}, so nothing to do...'.format(compute_dir))
             return False
 
         files = glob.glob(compute_dir + '/*')
