@@ -339,7 +339,10 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, overwri
                             if isfile(expanduser('~/pspot/' + doc['species_pot'][elem])):
                                 system('cp ' + expanduser('~/pspot/') + doc['species_pot'][elem] +
                                        ' ' + ''.join(path.split('/')[:-1]))
-                    f.write(elem + '\t' + doc['species_pot'][elem] + '\n')
+                    if elem == 'library':
+                        f.write(doc['species_pot']['library'] + '\n')
+                    else:
+                        f.write(elem + '\t' + doc['species_pot'][elem] + '\n')
                 f.write('%ENDBLOCK SPECIES_POT')
             else:
                 # by default, fill file with 00PBE's in a sensible dir but comment out

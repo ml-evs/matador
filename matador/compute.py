@@ -140,10 +140,11 @@ class FullRelaxer:
                 calc_doc.update(self.param_dict)
 
                 # check for pseudos
-                for elem in self.res_dict['stoichiometry']:
-                    if '|' not in calc_doc['species_pot'][elem[0]] and\
-                            not os.path.isfile(calc_doc['species_pot'][elem[0]]):
-                        exit('You forgot your pseudos, you silly goose!')
+                if 'library' not in calc_doc['species_pot']:
+                    for elem in self.res_dict['stoichiometry']:
+                        if ('|' not in calc_doc['species_pot'][elem[0]] and
+                                not os.path.isfile(calc_doc['species_pot'][elem[0]])):
+                            exit('You forgot your pseudos, you silly goose!')
 
                 # run convergence tests
                 if any([self.conv_cutoff_bool, self.conv_kpt_bool]):
@@ -409,7 +410,7 @@ class FullRelaxer:
                     del calc_doc['atomic_init_spins']
                 # if writing out cell, use it for higher precision lattice_cart
                 if calc_doc.get('write_cell_structure'):
-                    cell_dict, success = cell2dict(seed + '-out.cell', db=False, outcell=True)
+                    cell_dict, success = cell2dict(seed + '-out.cell', verbosity=self.verbosity, db=False, outcell=True)
                     opti_dict['lattice_cart'] = list(cell_dict['lattice_cart'])
                 if self.debug:
                     print_notify('Restarting calculation with current state:')

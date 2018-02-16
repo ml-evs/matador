@@ -211,7 +211,10 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, verb
                         cell['species_pot'][flines[line_no+i].split()[0]] = \
                             cell['species_pot'][flines[line_no+i].split()[0]].replace('[]', '')
                     else:
-                        cell['species_pot'][flines[line_no+i].split()[0]] = flines[line_no+i].split()[1]
+                        if flines[line_no+i].upper().split()[0] in ['C7', 'C8', 'C9', 'MS', 'QC5', 'NCP']:
+                            cell['species_pot']['library'] = flines[line_no+i].upper().split()[0]
+                        else:
+                            cell['species_pot'][flines[line_no+i].split()[0]] = flines[line_no+i].split()[1]
                     i += 1
             elif '%block cell_constraints' in line.lower():
                 cell['cell_constraints'] = []
