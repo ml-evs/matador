@@ -385,22 +385,21 @@ def get_guess_doc_provenance(sources, icsd=None):
         if (fname.endswith('.castep') or fname.endswith('.res') or
                 fname.endswith('.history') or 'OQMD' in fname):
             if 'collcode' in fname.lower() or 'colcode' in fname.lower() or 'collo' in fname.lower():
-                if fname.split('/')[-1].count('-') == 2 + fname.lower().count('oqmd'):
+                if fname.split('/')[-1].count('-') == 2 + fname.split('/')[-1].lower().count('oqmd'):
                     prov = 'SWAPS'
                 else:
                     prov = 'ICSD'
-            elif 'swap' in fname.lower():
+            elif 'swap' in fname.split('/')[-1].lower():
                 prov = 'SWAPS'
-            elif '-ga-' in fname.lower():
+            elif '-ga-' in fname.split('/')[-1].lower():
                 prov = 'GA'
             elif icsd is not None:
                 prov = 'ICSD'
-            elif 'oqmd' in fname.lower():
+            elif 'oqmd' in fname.split('/')[-1].lower():
                 prov = 'OQMD'
-            elif '-icsd' in fname.lower():
+            elif '-icsd' in fname.split('/')[-1].lower():
                 prov = 'ICSD'
     return prov
-
 
 def get_spg_uniq(cursor, symprec=1e-2, latvecprec=1e-3, posprec=1e-3):
     """ Use spglib to find duplicate structures in a cursor.
