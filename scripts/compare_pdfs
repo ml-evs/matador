@@ -32,7 +32,4 @@ for overlap in overlaps:
           .format(overlap.similarity_distance, overlap.pdf_A.label, overlap.pdf_B.label))
 
 print('└' + 7*'─' + '┴' + 42*'─' + '┴' + 41*'─' + '┘')
-
 strucs[0]['pdf'].plot_pdf(other_pdfs=[doc['pdf'] for doc in strucs[1:]])
-for overlap in overlaps:
-    overlap.plot_diff()
