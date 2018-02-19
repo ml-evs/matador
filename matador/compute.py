@@ -482,9 +482,9 @@ class FullRelaxer:
                         for i in range(3):
                             print(calc_doc['lattice_cart'][i])
                     if calc_doc.get('spectral_kpoints_path_spacing') is None:
-                        spacing = 0.02
-                    else:
-                        spacing = calc_doc['spectral_kpoints_path_spacing']
+                        calc_doc['spectral_kpoints_path_spacing'] = 0.02
+
+                    spacing = calc_doc['spectral_kpoints_path_spacing']
                     prim_doc, kpt_path, seekpath_results = get_seekpath_kpoint_path(calc_doc, spacing=spacing, debug=False)
                     if self.verbosity >= 2:
                         print('New lattice:')
