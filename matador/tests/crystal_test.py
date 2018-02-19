@@ -6,10 +6,15 @@ from os.path import realpath
 from matador.crystal import Crystal
 from matador.scrapers.castep_scrapers import castep2dict
 from matador.scrapers.magres_scrapers import magres2dict
-from matador.voronoi_interface import get_voronoi_substructure
 
 # grab abs path for accessing test data
 REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
+
+try:
+    from Vornetclass import VoronoiNetwork
+    imported_vornet = True
+except:
+    imported_vornet = False
 
 
 class CrystalTest(unittest.TestCase):
@@ -31,6 +36,7 @@ class CrystalTest(unittest.TestCase):
         for atom in crystal:
             print(atom, atom.chemical_shift)
 
+    @unittest.skipIf(not imported_vornet, 'Voronoi code not found in this distribution')
     def testCoordination(self):
         doc, s = magres2dict(REAL_PATH + 'data/NaP.magres')
         crystal = Crystal(doc)
@@ -39,11 +45,11 @@ class CrystalTest(unittest.TestCase):
         print(crystal.coordination_lists)
         print(crystal.coordination_stats)
 
+    @unittest.skipIf(not imported_vornet, 'Voronoi code not found in this distribution')
     def testVoronoi(self):
         doc, s = magres2dict(REAL_PATH + 'data/NaP.magres')
         crystal = Crystal(doc)
         print(crystal.unique_sites)
-
 
 
 if __name__ == '__main__':
