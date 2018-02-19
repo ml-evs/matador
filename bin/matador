@@ -203,7 +203,8 @@ class Matador(object):
             collstats_list = sorted(collstats_list, key=lambda k: k['count'], reverse=True)
             print("\t{:^20}\t{:^20}".format('Name', 'Number of structures'))
             for collection in collstats_list:
-                print("\t{:<20}\t{:>20d}".format(collection['name'], collection['count']))
+                if not collection['name'].startswith('__'):
+                    print("\t{:<20}\t{:>20d}".format(collection['name'], collection['count']))
             print('\n')
         elif self.args.get('delete'):
             target = self.args.get('db')
