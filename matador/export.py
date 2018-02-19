@@ -94,8 +94,9 @@ def query2files(cursor, *args, **kwargs):
                         if atom not in comp_list:
                             comp_list.append(atom)
                             comp_string += atom
-                    name = comp_string + '-'
-                name += source.split('/')[-1].split('.')[0]
+                    name = comp_string + '-swap-'
+                root_fname = source.split('/')[-1].split('.')[0].replace('-swap-', '')
+                name += root_fname
             elif 'OQMD' in source:
                 stoich_string = ''
                 # prepend old stoich
