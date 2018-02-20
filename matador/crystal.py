@@ -115,6 +115,18 @@ class Crystal:
             return self._doc['cell_volume']
 
     @property
+    def bond_lengths(self):
+        """ Returns a list of ((species_A, species_B), bond_length)), sorted by bond length,
+        computed from the network structure of the crystal (i.e. first coordination sphere).
+        """
+        if '_bond_lengths' not in self.__dict__:
+            self._bond_lengths = []
+            for i, j, data in self.network.edges.data():
+                self._bond_lengths.append(((self[i].species, self[j].species), data['dist']))
+            self._bond_lengths = sorted(self._bond_lengths, key=lambda bond: bond[1])
+        return self._bond_lengths
+
+    @property
     def voronoi_substructure(self):
         from matador.voronoi_interface import get_voronoi_substructure
         if '_voronoi_substructure' not in self.__dict__:
