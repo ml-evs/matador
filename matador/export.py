@@ -147,13 +147,19 @@ def query2files(cursor, *args, **kwargs):
     print('Done!')
 
 
-def doc2param(doc, path, hash_dupe=True, overwrite=False, *args):
+def doc2param(doc, path, hash_dupe=True, overwrite=False, spin=False, *args):
     """ Write basic .param file from single doc.
 
-    doc       : the document to write out to file
-    path      : the desired path to file
-    hash_dupe : hash duplicate file names, or skip?
-    overwrite : bool, overwrite if file exists.
+    Input:
+
+        | doc       : the document to write out to file
+        | path      : the desired path to file
+
+    Args:
+
+        | hash_dupe : hash duplicate file names, or skip?
+        | overwrite : bool, overwrite if file exists.
+        | spin      : bool, enforce spin symmetry broken to magic number of 5
 
     """
     try:
@@ -178,6 +184,16 @@ def doc2param(doc, path, hash_dupe=True, overwrite=False, *args):
             for param in param_dict:
                 if param != 'source':
                     f.write("{0:30}: {1}\n".format(param, param_dict[param]))
+
+            if doc.get('spin_polarized'):
+                total_spin = None
+                if 'atomic_init_spins' in doc:
+                    total_spin = sum(doc['atomic_init_spins'])
+                elif spin:
+                    total_spin = 5
+
+                if total_spin is not None:
+                    f.write("{0:30}: {1}\n".format('spin', total_spin))
 
         if 'encapsulated' in doc and doc['encapsulated']:
             try:
@@ -206,13 +222,18 @@ def doc2param(doc, path, hash_dupe=True, overwrite=False, *args):
 def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, overwrite=False, spin=False, *args):
     """ Write .cell file for single doc.
 
-    doc         : dict, the document to write to file
-    path        : str, the path to the file
-    pressure    : float, the pressure to write the file at
-    hash_dupe   : bool, hash duplicate file names or skip?
-    copy_pspots : bool, try to copy pspots from ~/pspots?
-    overwrite   : bool, overwrite if file exists
-    spin        : bool, write spins to cell file
+    Input:
+
+        | doc         : dict, the document to write to file
+        | path        : str, the desired path to the file
+
+    Args:
+
+        | pressure    : float, the pressure to write the file at
+        | hash_dupe   : bool, hash duplicate file names or skip?
+        | copy_pspots : bool, try to copy pspots from ~/pspots?
+        | overwrite   : bool, overwrite if file exists
+        | spin        : bool, break spin symmetry with magic number 5 on first atom
 
     """
     if path.endswith('.cell'):
@@ -494,7 +515,21 @@ def doc2pwscf(doc, path, template=None, spacing=None, *args):
 
 
 def doc2res(doc, path, info=True, hash_dupe=True, spoof_titl=False, overwrite=False, *args):
-    """ Write .res file for single doc. """
+    """ Write .res file for single doc.
+
+    Input:
+
+        | doc  : dict, matador document containing structure
+        | path : str, desired filename for res file
+
+    Args:
+
+        | info       : bool, print info in res file header
+        | hash_dupe  : bool, add random hash to colliding filenames
+        | spoof_titl : bool, make up fake info for file header (for use with e.g. cryan)
+        | overwrite  : bool, overwrite files with conflicting filenames
+
+    """
     if path.endswith('.res'):
         path = path.replace('.res', '')
     if spoof_titl:

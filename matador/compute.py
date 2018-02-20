@@ -42,7 +42,7 @@ class FullRelaxer:
         | rough         : int, number of small "rough" calculations (DEFAULT: 4)
         | rough_iter    : int, number of iterations per rough calculation (DEFAULT: 2)
         | fine_iter     : int, number of iterations per fine calculation (DEFAULT: 20)
-        | spin          : bool, set spins in first calculation (DEFAULT: False)
+        | spin          : bool, break spin symmetry in first calculation (DEFAULT: False)
         | conv_cutoffs  : list(float) of cutoffs to use for SCF convergence test (DEFAULT: False)
         | conv_kpts     : list(float) of kpt spacings to use for SCF convergence test (DEFAULT: False)
         | kpts_1D       : bool, treat z-direction as special and create kpt_grid [1 1 n_kz] (DEFAULT: False)
@@ -292,8 +292,6 @@ class FullRelaxer:
                             print('wrote failed dict out to output_queue')
                     self.mv_to_bad(seed)
                     return False
-            if ind != 0:
-                self.spin = False
             calc_doc['geom_max_iter'] = num_iter
             try:
                 # delete any existing files and write new ones
@@ -315,7 +313,7 @@ class FullRelaxer:
                 if not self.custom_params:
                     if os.path.isfile(seed + '.param'):
                         os.remove(seed+'.param')
-                    doc2param(calc_doc, seed, hash_dupe=False)
+                    doc2param(calc_doc, seed, hash_dupe=False, spin=self.spin)
                 # run CASTEP
                 process = self.castep(seed)
                 process.communicate()
@@ -407,9 +405,11 @@ class FullRelaxer:
                 doc2res(opti_dict, seed, hash_dupe=False)
                 if self.compute_dir is not None:
                     shutil.copy(seed+'.res', self.root_folder)
-                # remove atomic_init_spins from calc_doc if there
-                if 'atomic_init_spins' in calc_doc:
-                    del calc_doc['atomic_init_spins']
+
+                # set atomic_init_spins with value from CASTEP file, if it exists
+                if 'mulliken_spins' in calc_doc:
+                    calc_doc['atomic_init_spins'] = calc_doc['mulliken_spins']
+
                 # if writing out cell, use it for higher precision lattice_cart
                 if calc_doc.get('write_cell_structure'):
                     cell_dict, success = cell2dict(seed + '-out.cell', verbosity=self.verbosity, db=False, outcell=True)
