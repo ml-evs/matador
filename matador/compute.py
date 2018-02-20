@@ -199,9 +199,10 @@ class FullRelaxer:
                         # begin relaxation
                         if self.start:
                             self.success = self.relax()
-                            # always cd back to root folder
-                            os.chdir(self.root_folder)
-                            self.remove_compute_dir_if_finished(self.compute_dir, debug=self.debug)
+                            if self.compute_dir is not None:
+                                # always cd back to root folder
+                                os.chdir(self.root_folder)
+                                self.remove_compute_dir_if_finished(self.compute_dir, debug=self.debug)
         # otherwise run generic script
         else:
             self.seed = res
@@ -404,7 +405,8 @@ class FullRelaxer:
                 if os.path.isfile(seed+'.res'):
                     os.remove(seed+'.res')
                 doc2res(opti_dict, seed, hash_dupe=False)
-                shutil.copy(seed+'.res', self.root_folder)
+                if self.compute_dir is not None:
+                    shutil.copy(seed+'.res', self.root_folder)
                 # remove atomic_init_spins from calc_doc if there
                 if 'atomic_init_spins' in calc_doc:
                     del calc_doc['atomic_init_spins']
@@ -448,8 +450,9 @@ class FullRelaxer:
                     output_queue.put(self.res_dict)
                     if self.debug:
                         print('wrote failed dict out to output_queue')
-                os.chdir(self.root_folder)
-                self.remove_compute_dir_if_finished(self.compute_dir, debug=self.debug)
+                if self.compute_dir is not None:
+                    os.chdir(self.root_folder)
+                    self.remove_compute_dir_if_finished(self.compute_dir, debug=self.debug)
                 return False
             except:
                 if self.verbosity > 1:
@@ -461,8 +464,9 @@ class FullRelaxer:
                     output_queue.put(self.res_dict)
                     if self.debug:
                         print('wrote ll dict out to output_queue')
-                os.chdir(self.root_folder)
-                self.remove_compute_dir_if_finished(self.compute_dir, debug=self.debug)
+                if self.compute_dir is not None:
+                    os.chdir(self.root_folder)
+                    self.remove_compute_dir_if_finished(self.compute_dir, debug=self.debug)
                 return False
 
     def scf(self, calc_doc, seed, keep=True):
