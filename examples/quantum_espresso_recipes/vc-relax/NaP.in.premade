@@ -1,0 +1,70 @@
+&CONTROL
+  calculation = 'vc-relax' ,
+  verbosity = 'low' ,
+  restart_mode = 'from_scratch' ,
+  nstep = 200 ,
+  tstress = .true. ,
+  tprnfor = .true. ,
+  outdir = './' ,
+  prefix = 'NaP',
+  max_seconds = 1.0D7 ,
+  pseudo_dir = './pseudos' ,
+  etot_conv_thr = 1.0D-11 ,
+  forc_conv_thr = 2.0D-5 ,
+/
+
+&SYSTEM
+  ibrav = 0 ,
+  nat = 14,
+  ntyp = 2 ,
+! nbnd = xxx , ! No. of bands. 20% added by default for metals
+  ecutwfc = 100 ,
+  ecutrho = 400 ,
+  spline_ps = .true. ,
+  nosym = .true. ,
+  occupations = 'smearing' ,
+  smearing = 'marzari-vanderbilt' ,
+  degauss = 4.0D-3 ,
+! vdw_corr = 'none' ,
+/
+&ELECTRONS
+  electron_maxstep = 200 ,
+  conv_thr = 1.0D-12 ,
+  diagonalization = 'cg' ,
+  diago_thr_init = 1.0D-4 ,
+/
+&IONS
+/
+&CELL
+  cell_dynamics = 'bfgs' ,
+  press = 0.0D0 ,
+  press_conv_thr = 1.0D-2 ,
+/
+
+ATOMIC_SPECIES
+ Na 22.989769 Na.pbe-tm-gipaw-dc.UPF
+ P  30.973762 P.pbe-tm-new-gipaw-dc.UPF
+ 
+CELL_PARAMETERS angstrom
+  5.8875373700  0.0000000000  0.0000000000
+  0.6172296621  5.8159449240  0.0000000000
+ -4.5216733374  0.4377288377  10.0544541199
+
+ ATOMIC_POSITIONS crystal
+Na    0.1338250000  0.9103750000  0.5337590000
+Na    0.2072900000  0.1146240000  0.8381550000
+Na    0.2573940000  0.6434930000  0.0363410000
+Na    0.2652250000  0.4177470000  0.3626040000
+Na    0.7709280000  0.3206550000  0.9544060000
+Na    0.7790380000  0.5807900000  0.6312220000
+Na    0.7863700000  0.9342310000  0.1562610000
+P     0.2653380000  0.1394810000  0.1369270000
+P     0.3344830000  0.6055490000  0.7852640000
+P     0.3568320000  0.3389110000  0.6408470000
+P     0.3796000000  0.9068310000  0.3041610000
+P     0.6643550000  0.8134030000  0.8693420000
+P     0.6779710000  0.0591230000  0.7153700000
+P     0.6872450000  0.6571370000  0.3425700000
+
+K_POINTS automatic
+7 6 4 0 0 0

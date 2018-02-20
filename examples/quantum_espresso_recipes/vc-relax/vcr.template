@@ -1,0 +1,47 @@
+&CONTROL
+  calculation = 'vc-relax' ,
+  verbosity = 'low' ,
+  restart_mode = 'from_scratch' ,
+  nstep = 200 ,
+  tstress = .true. ,
+  tprnfor = .true. ,
+  outdir = './' ,
+  prefix = 'NaP' ,
+  max_seconds = 1.0D7 ,
+  pseudo_dir = './pseudos' ,
+  etot_conv_thr = 1.0D-11 ,
+  forc_conv_thr = 2.0D-5 ,
+/
+
+&SYSTEM
+  ibrav = 0 ,
+  nat = 16 ,
+  ntyp = 2 ,
+! nbnd = xxx , ! No. of bands. 20% added by default for metals
+  ecutwfc = 100 ,
+  ecutrho = 400 ,
+  spline_ps = .true. ,
+  nosym = .true. ,
+  occupations = 'smearing' ,
+  smearing = 'marzari-vanderbilt' ,
+  degauss = 4.0D-3 ,
+! vdw_corr = 'none' ,
+/
+&ELECTRONS
+  electron_maxstep = 200 ,
+  conv_thr = 1.0D-12 ,
+  diagonalization = 'cg' ,
+  diago_thr_init = 1.0D-4 ,
+/
+&IONS
+/
+&CELL
+  cell_dynamics = 'bfgs' ,
+  press = 0.0D0 ,
+  press_conv_thr = 1.0D-2 ,
+/
+
+ATOMIC_SPECIES
+ Na 22.989769 Na.pbe-tm-gipaw-dc.UPF
+ P  30.973762 P.pbe-tm-new-gipaw-dc.UPF
+ 
