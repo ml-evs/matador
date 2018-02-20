@@ -2,7 +2,7 @@
 
 matador is an aggregator and manipulator of the results first-principles calculations, primarily geometry optimisations.
 
-Written by [Matthew Evans](www.tcm.phy.cam.ac.uk/~me388) me388@cam.ac.uk (2016). API documentation: www.tcm.phy.cam.ac.uk/~me388/matador_docs/. Jupyter notebook examples can be found in ``/examples``.
+Written by [Matthew Evans](www.tcm.phy.cam.ac.uk/~me388) me388@cam.ac.uk (2016). [API documentation](www.tcm.phy.cam.ac.uk/~me388/matador/). Jupyter notebook examples can be found in ``/examples``.
 
 ### New in current version (0.7b):**
 * Ternary voltage curves.
@@ -12,12 +12,11 @@ Written by [Matthew Evans](www.tcm.phy.cam.ac.uk/~me388) me388@cam.ac.uk (2016).
 * Many bugfixes and usability changes.
 
 ### New in version (0.6b):
-
 * Intercalation voltage curves, e.g. ```matador voltage -c Li:SnS2```.
 * Ternary phase diagrams with heatmaps for structure prediction sampling, gravimetric capacity and formation enthalpy ```matador hull -c ABC --sampmap --efmap --capmap```.
 * Substructural similarity interface with Can Kocer's code, as proposed by [Yang et al., PRB (2014)](http://journals.aps.org/prb/abstract/10.1103/PhysRevB.90.054102).
 
-![lipzn.png](https://bitbucket.org/repo/j88Er8/images/2370650303-lipzn.png)
+![lipzn.png](https://bitbucket.org/me388/matador/docs/img/lipzn.png)
 
 ### Core functionality: ###
 
