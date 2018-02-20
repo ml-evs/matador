@@ -16,7 +16,7 @@ Written by [Matthew Evans](www.tcm.phy.cam.ac.uk/~me388) me388@cam.ac.uk (2016).
 * Ternary phase diagrams with heatmaps for structure prediction sampling, gravimetric capacity and formation enthalpy ```matador hull -c ABC --sampmap --efmap --capmap```.
 * Substructural similarity interface with Can Kocer's code, as proposed by [Yang et al., PRB (2014)](http://journals.aps.org/prb/abstract/10.1103/PhysRevB.90.054102).
 
-![lipzn.png](https://bitbucket.org/me388/matador/docs/img/lipzn.png)
+![lipzn.png](docs/img/lipzn.png)
 
 ### Core functionality: ###
 
