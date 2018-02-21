@@ -770,7 +770,9 @@ def plot_volume_curve(hull, show=False):
         plt.show()
 
 
-def plot_2d_hull(hull, ax=None, dis=False, show=False, plot_points=True, plot_hull_points=True, labels=False):
+def plot_2d_hull(hull, ax=None, dis=False, show=False, plot_points=True,
+                 plot_hull_points=True, labels=False, colour_by_source=False,
+                 **kwargs):
     """ Plot calculated hull, returning ax and fig objects for further editing.
 
     Args:
@@ -780,6 +782,13 @@ def plot_2d_hull(hull, ax=None, dis=False, show=False, plot_points=True, plot_hu
         | plot_points      : bool, whether or not to display off-hull structures,
         | plot_hull_points : bool, whether or not to display on-hull structures,
         | labels           : bool, whether to label formulae of hull structures.
+        | colour_by_source : bool, plot and label points by their sources
+
+    Other kwargs:
+
+        | alpha            : float, alpha value of points when colour_by_source is True
+        | sources          : list, list of possible provenances to colour when colour_by_source
+                             is True (others will be grey)
 
     """
 
@@ -842,40 +851,72 @@ def plot_2d_hull(hull, ax=None, dis=False, show=False, plot_points=True, plot_hu
                             arrowprops=arrowprops,
                             zorder=1)
         lw = hull.scale * 0 if hull.mpl_new_ver else 1
-        # points for off hull structures
-        if hull.hull_cutoff == 0:
-            # if no specified hull cutoff, ignore labels and colour
-            # by distance from hull
-            cmap_full = plt.cm.get_cmap('Dark2')
-            cmin = 0.15
-            cmax = 0.5
-            cindmin, cindmax = int(cmin*len(cmap_full.colors)), int(cmax*len(cmap_full.colors))
-            cmap = colours.LinearSegmentedColormap.from_list('Dark2', cmap_full.colors[cindmin:cindmax])
-            if plot_points:
-                scatter = ax.scatter(hull.structures[np.argsort(hull.hull_dist), 0][::-1],
-                                     hull.structures[np.argsort(hull.hull_dist), -1][::-1],
-                                     s=hull.scale*40, lw=lw, alpha=1, c=np.sort(hull.hull_dist)[::-1],
-                                     edgecolor='k', zorder=10000, cmap=cmap, norm=colours.LogNorm(0.02, 2))
-                cbar = plt.colorbar(scatter, aspect=30, pad=0.02, ticks=[0, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28])
-                cbar.ax.tick_params(length=0)
-                cbar.ax.set_yticklabels([0, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28])
-                cbar.ax.yaxis.set_ticks_position('right')
-                cbar.ax.set_frame_on(False)
-                cbar.outline.set_visible(False)
-                cbar.set_label('Distance from hull (eV)')
-        if hull.hull_cutoff != 0:
-            # if specified hull cutoff, label and colour those below
-            c = hull.colours[1]
-            for ind in range(len(hull.structures)):
-                if hull.hull_dist[ind] <= hull.hull_cutoff or hull.hull_cutoff == 0:
-                    if plot_points:
-                        scatter.append(ax.scatter(hull.structures[ind, 0], hull.structures[ind, 1],
-                                       s=hull.scale*40, lw=lw, alpha=0.9, c=c, edgecolor='k',
-                                       zorder=300))
-            if plot_points:
-                ax.scatter(hull.structures[1:-1, 0], hull.structures[1:-1, 1], s=hull.scale*30, lw=lw,
-                           alpha=0.3, c=hull.colours[-2],
-                           edgecolor='k', zorder=10)
+        if plot_points and not colour_by_source:
+            # points for off hull structures
+            if hull.hull_cutoff == 0:
+                # if no specified hull cutoff, ignore labels and colour
+                # by distance from hull
+                cmap_full = plt.cm.get_cmap('Dark2')
+                cmin = 0.15
+                cmax = 0.5
+                cindmin, cindmax = int(cmin*len(cmap_full.colors)), int(cmax*len(cmap_full.colors))
+                cmap = colours.LinearSegmentedColormap.from_list('Dark2', cmap_full.colors[cindmin:cindmax])
+                if plot_points:
+                    scatter = ax.scatter(hull.structures[np.argsort(hull.hull_dist), 0][::-1],
+                                         hull.structures[np.argsort(hull.hull_dist), -1][::-1],
+                                         s=hull.scale*40, lw=lw, alpha=1, c=np.sort(hull.hull_dist)[::-1],
+                                         edgecolor='k', zorder=10000, cmap=cmap, norm=colours.LogNorm(0.02, 2))
+                    cbar = plt.colorbar(scatter, aspect=30, pad=0.02, ticks=[0, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28])
+                    cbar.ax.tick_params(length=0)
+                    cbar.ax.set_yticklabels([0, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28])
+                    cbar.ax.yaxis.set_ticks_position('right')
+                    cbar.ax.set_frame_on(False)
+                    cbar.outline.set_visible(False)
+                    cbar.set_label('Distance from hull (eV)')
+            elif hull.hull_cutoff != 0:
+                # if specified hull cutoff, label and colour those below
+                c = hull.colours[1]
+                for ind in range(len(hull.structures)):
+                    if hull.hull_dist[ind] <= hull.hull_cutoff or hull.hull_cutoff == 0:
+                        if plot_points:
+                            scatter.append(ax.scatter(hull.structures[ind, 0], hull.structures[ind, 1],
+                                           s=hull.scale*40, lw=lw, alpha=0.9, c=c, edgecolor='k',
+                                           zorder=300))
+                if plot_points:
+                    ax.scatter(hull.structures[1:-1, 0], hull.structures[1:-1, 1], s=hull.scale*30, lw=lw,
+                               alpha=0.3, c=hull.colours[-2],
+                               edgecolor='k', zorder=10)
+
+        elif colour_by_source:
+            from matador.utils.cursor_utils import get_guess_doc_provenance
+            if kwargs.get('sources') is None:
+                sources = ['AIRSS', 'GA', 'ICSD', 'OQMD', 'SWAPS']
+            else:
+                sources = kwargs.get('sources')
+            colour_choices = {source: hull.colours[ind+1] for ind, source in enumerate(sources)}
+            colours = []
+            concs = []
+            energies = []
+            for doc in hull.cursor:
+                source = get_guess_doc_provenance(doc['source'])
+                if source not in sources:
+                    # use grey for undesired sources
+                    colours.append(hull.colours[-2])
+                else:
+                    colours.append(colour_choices[source])
+                concs.append(doc['concentration'])
+                energies.append(doc['formation_enthalpy_per_atom'])
+
+            alpha = kwargs.get('alpha')
+            if alpha is None:
+                alpha = 0.2
+
+            ax.scatter(concs, energies, c=colours, alpha=alpha, s=hull.scale*20)
+            for source in sources:
+                ax.scatter(1e10, 1e10, c=colour_choices[source], label=source, alpha=alpha)
+            ax.scatter(1e10, 1e10, c=hull.colours[-2], label='Other', alpha=alpha)
+            ax.legend()
+
         # tie lines
         ax.set_ylim(-0.1 if np.min(hull.structure_slice[hull.hull.vertices, 1]) > 0
                     else np.min(hull.structure_slice[hull.hull.vertices, 1])-0.15,
@@ -939,7 +980,7 @@ def plot_2d_hull(hull, ax=None, dis=False, show=False, plot_points=True, plot_hu
     return ax
 
 
-def plot_ternary_hull(hull, axis=None, show=False, plot_points=True, expecting_cbar=True):
+def plot_ternary_hull(hull, axis=None, show=False, plot_points=True, expecting_cbar=True, **kwargs):
     """ Plot calculated ternary hull as a 2D projection.
 
     Takes optional matplotlib subplot axis as a parameter, and returns
@@ -987,7 +1028,7 @@ def plot_ternary_hull(hull, axis=None, show=False, plot_points=True, expecting_c
     ax.clear_matplotlib_ticks()
     ticks = [float(val) for val in np.linspace(0.0, 1.0, 6)]
     ax.ticks(axis='lbr', linewidth=1, multiple=scale*0.2, offset=0.02, fontsize=fontsize-2,
-            ticks=ticks, tick_formats='%.1f')
+             ticks=ticks, tick_formats='%.1f')
 
     ax.set_title(''.join(hull.elements), fontsize=fontsize+2, y=1.02)
     ax.left_axis_label(hull.elements[2], fontsize=fontsize+2)

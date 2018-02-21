@@ -33,17 +33,18 @@ class QueryConvexHull(object):
     """ Construct a binary or ternary phase diagram
     from matador.DBQuery object.
     """
-    def __init__(self, query=None, cursor=None, elements=None, subcmd='hull', quiet=False, **kwargs):
+    def __init__(self, query=None, cursor=None, elements=None, subcmd='hull', quiet=False, plot_kwargs=None, **kwargs):
         """ Initialise the class from either a DBQuery or a cursor (list of matador dicts)
         and construct the appropriate phase diagram.
 
         Args:
 
-            | query    : matador.DBQuery, object containing structures,
-            | cursor   : list(dict), alternatively specify list of matador docs.
-            | elements : list(str), list of elements to use, used to provide a useful order,
-            | subcmd   : either 'hull' or 'voltage',
-            | kwargs   : mostly CLI arguments, see matador hull --help for full options.
+            | query       : matador.DBQuery, object containing structures,
+            | cursor      : list(dict), alternatively specify list of matador docs.
+            | elements    : list(str), list of elements to use, used to provide a useful order,
+            | subcmd      : either 'hull' or 'voltage',
+            | kwargs      : mostly CLI arguments, see matador hull --help for full options.
+            | plot_kwargs : arguments to pass to plot_hull function
 
         """
         self.args = kwargs
@@ -117,7 +118,7 @@ class QueryConvexHull(object):
             self.voltage_curve([doc for doc in self.hull_cursor if doc['hull_distance'] <= 1e-9])
             if not self.args.get('no_plot'):
                 plotting.plot_voltage_curve(self)
-                self.plot_hull()
+                self.plot_hull(**plot_kwargs)
 
         if self.args.get('volume'):
             self.volume_curve()
@@ -128,7 +129,7 @@ class QueryConvexHull(object):
             if self.args.get('bokeh'):
                 plotting.plot_2d_hull_bokeh(self)
             else:
-                self.plot_hull()
+                self.plot_hull(**plot_kwargs)
 
         if not self.args.get('no_plot') and not self.savefig:
             import matplotlib.pyplot as plt
@@ -142,13 +143,13 @@ class QueryConvexHull(object):
     def savefig(self):
         return any([self.args.get('pdf'), self.args.get('png'), self.args.get('svg')])
 
-    def plot_hull(self):
+    def plot_hull(self, **kwargs):
         """ Hull plot helper function. """
         from matador import plotting
         if self.ternary:
-            plotting.plot_ternary_hull(self)
+            plotting.plot_ternary_hull(self, **kwargs)
         else:
-            plotting.plot_2d_hull(self)
+            plotting.plot_2d_hull(self, **kwargs)
         return
 
     def set_plot_param(self):
