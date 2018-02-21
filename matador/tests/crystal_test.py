@@ -51,6 +51,11 @@ class CrystalTest(unittest.TestCase):
         crystal = Crystal(doc)
         print(crystal.unique_sites)
 
+    def testBondLengths(self):
+        doc, s = magres2dict(REAL_PATH + 'data/NaP.magres')
+        crystal = Crystal(doc)
+        print(crystal.bond_lengths)
+
 
 if __name__ == '__main__':
     unittest.main(buffer=False, verbosity=2)
