@@ -292,6 +292,10 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, verb
                     cell['snap_to_symmetry'] = True
                 elif 'quantisation_axis' in line.lower():
                     cell['quantisation_axis'] = list(map(int, line.split()[1:]))
+                elif 'positions_noise' in line.lower():
+                    cell['positions_noise'] = float(line.split()[-1])
+                elif 'cell_noise' in line.lower():
+                    cell['cell_noise'] = float(line.split()[-1])
                 elif 'kpoints_path' in line.lower() or 'kpoint_path' in line.lower():
                     if 'spectral_kpoints_path_spacing' in line.lower() or 'spectral_kpoint_path_spacing' in line.lower():
                         cell['spectral_kpoints_path_spacing'] = float(line.split()[-1])

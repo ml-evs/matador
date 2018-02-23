@@ -352,6 +352,10 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, overwri
                 for integer in doc['quantisation_axis']:
                     f.write(str(integer) + ' ')
                 f.write('\n\n')
+            if 'positions_noise' in doc:
+                f.write('\nPOSITIONS_NOISE : {}\n'.format(doc['positions_noise']))
+            if 'cell_noise' in doc:
+                f.write('\nCELL_NOISE : {}\n'.format(doc['cell_noise']))
             if 'species_pot' in doc:
                 f.write('\n%BLOCK SPECIES_POT\n')
                 for elem in doc['species_pot']:
@@ -514,7 +518,7 @@ def doc2pwscf(doc, path, template=None, spacing=None, *args):
         f.write(file_string)
 
 
-def doc2res(doc, path, info=True, hash_dupe=True, spoof_titl=False, overwrite=False, *args):
+def doc2res(doc, path, info=True, hash_dupe=True, spoof_titl=False, overwrite=False, sort_atoms=True, *args):
     """ Write .res file for single doc.
 
     Input:
@@ -528,6 +532,7 @@ def doc2res(doc, path, info=True, hash_dupe=True, spoof_titl=False, overwrite=Fa
         | hash_dupe  : bool, add random hash to colliding filenames
         | spoof_titl : bool, make up fake info for file header (for use with e.g. cryan)
         | overwrite  : bool, overwrite files with conflicting filenames
+        | sorted     : bool, if False, atoms are not sorted (this will not be a valid res file)
 
     """
     if path.endswith('.res'):
@@ -594,9 +599,14 @@ def doc2res(doc, path, info=True, hash_dupe=True, spoof_titl=False, overwrite=Fa
         flines.append('SFAC \t')
 
         # enforce correct order by elements, sorting only the atom_types, not the positions inside them
-        positions_frac, atom_types = zip(*[(pos, types) for (types, pos) in
-                                         sorted(zip(doc['atom_types'], doc['positions_frac']),
-                                                key=lambda k: k[0])])
+        if sort_atoms:
+            positions_frac, atom_types = zip(*[(pos, types) for (types, pos) in
+                                             sorted(zip(doc['atom_types'], doc['positions_frac']),
+                                                    key=lambda k: k[0])])
+        else:
+            positions_frac = doc['positions_frac']
+            atom_types = doc['atom_types']
+
         written_atoms = []
         for elem in atom_types:
             if elem not in written_atoms:
