@@ -50,6 +50,8 @@ class QueryConvexHull(object):
         self.args = kwargs
         if self.args.get('subcmd') is None:
             self.args['subcmd'] = subcmd
+        if plot_kwargs is None:
+            plot_kwargs = {}
         self.query = query
         self.from_cursor = False
         self.plot_param = False
