@@ -25,6 +25,7 @@ def plot_spectral(seeds, **kwargs):
         | plot_dos           : bool, whether to plot density of states
         | dos                : str, separate seed name for pDOS/DOS data
         | phonons            : bool, whether to plot phonon or electronic data
+        | labels             : list(str), legend labels for multiple bandstructures
         | cell               : bool, whether to work out correct labels from structure in cell file
         | gap                : bool, draw on the band gap
         | colour_by_seed     : bool, plot with a separate colour per bandstructure
@@ -41,6 +42,7 @@ def plot_spectral(seeds, **kwargs):
     prop_defaults = {'plot_bandstructure': True, 'plot_dos': False,
                      'phonons': False, 'cell': False, 'gap': False,
                      'colour_by_seed': False, 'external_efermi': None,
+                     'labels': None,
                      'verbosity': 0, 'highlight_bands': None}
     prop_defaults.update(kwargs)
     kwargs = prop_defaults
@@ -172,10 +174,16 @@ def plot_spectral(seeds, **kwargs):
                             alpha = 0.5
                         else:
                             alpha = 1
+                        if branch_ind == 0 and ns == 0 and nb == 0 and kwargs.get('labels') is not None:
+                            label = kwargs.get('labels')[seed_ind]
+                        else:
+                            label = None
                         ax_dispersion.plot(path[(np.asarray(branch)-branch_ind).tolist()], dispersion[eig_key][ns][nb][branch],
-                                           c=colour, lw=1, marker=None, ls=ls[seed_ind], alpha=alpha)
+                                           c=colour, lw=1, marker=None, ls=ls[seed_ind], alpha=alpha, label=label)
                 if branch_ind != len(dispersion[branch_key])-1:
                     ax_dispersion.axvline(path[branch[-1]-branch_ind], ls='-.', lw=1, c='grey')
+            if kwargs.get('labels') is not None:
+                ax_dispersion.legend()
             ax_dispersion.axhline(0, ls='--', lw=1, c='grey')
             ax_dispersion.set_ylim(plot_window)
             if kwargs['phonons']:

@@ -23,6 +23,8 @@ if __name__ == '__main__':
                         help='save png rather than showing plot in X')
     parser.add_argument('--svg', action='store_true',
                         help='save svg rather than showing plot in X')
+    parser.add_argument('--labels', type=str, nargs='*',
+                        help='list of legend labels')
     parser.add_argument('-g', '--gap', action='store_true',
                         help='plot position and size of band gap')
     parser.add_argument('-ph', '--phonons', action='store_true',
@@ -44,9 +46,11 @@ if __name__ == '__main__':
     test_seed = kwargs.get('seed')[0]
     verbosity = kwargs.get('verbosity')
     phonons = kwargs.get('phonons')
+    labels = kwargs.get('labels')
 
     del kwargs['seed']
     del kwargs['verbosity']
+    del kwargs['labels']
 
     if not phonons:
         bs_seed = test_seed.replace('.bands', '') + '.bands'
@@ -74,4 +78,5 @@ if __name__ == '__main__':
                          cell=cell,
                          gap=gap,
                          verbosity=verbosity,
+                         labels=labels,
                          **kwargs)
