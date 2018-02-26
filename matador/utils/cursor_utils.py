@@ -387,7 +387,7 @@ def get_guess_doc_provenance(sources, icsd=None):
         if (fname.endswith('.castep') or fname.endswith('.res') or
                 fname.endswith('.history') or ('oqmd' in fname and fname.count('.') == 0)):
             if any(substr in fname for substr in ['collcode', 'colcode', 'collo']):
-                if fname.count('-') == 2 + fname.count('oqmd'):
+                if fname.count('-') == 2 + fname.count('oqmd') or 'swap' in fname:
                     prov = 'SWAPS'
                 else:
                     prov = 'ICSD'
