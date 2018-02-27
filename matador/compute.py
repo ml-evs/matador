@@ -482,19 +482,17 @@ class FullRelaxer:
                 if 'spectral_kpoints_path' not in calc_doc and 'spectral_kpoints_list' not in calc_doc:
                     from matador.utils.cell_utils import get_seekpath_kpoint_path, cart2abc
                     if self.verbosity >= 2:
+                        from matador.crystal import Crystal
                         print('Old lattice:')
-                        for i in range(3):
-                            print(calc_doc['lattice_cart'][i])
+                        print(Crystal(calc_doc))
                     if calc_doc.get('spectral_kpoints_path_spacing') is None:
                         calc_doc['spectral_kpoints_path_spacing'] = 0.02
 
                     spacing = calc_doc['spectral_kpoints_path_spacing']
-                    prim_doc, kpt_path, seekpath_results = get_seekpath_kpoint_path(calc_doc, spacing=spacing, debug=False)
+                    prim_doc, kpt_path, seekpath_results = get_seekpath_kpoint_path(calc_doc, spacing=spacing, debug=self.debug)
                     if self.verbosity >= 2:
                         print('New lattice:')
-                        for i in range(3):
-                            print(prim_doc['lattice_cart'][i])
-                            print(seekpath_results)
+                        print(Crystal(calc_doc))
                     calc_doc.update(prim_doc)
                     calc_doc['lattice_abc'] = cart2abc(calc_doc['lattice_cart'])
                     calc_doc['spectral_kpoints_list'] = kpt_path
