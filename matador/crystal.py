@@ -21,8 +21,8 @@ class Crystal:
         self.construct_sites(voronoi=voronoi)
 
         # assume default value for symprec
-        self._doc['space_group'] = {0.01: self._doc['space_group']}
-        self._space_group = self._doc['space_group']
+        if 'space_group' in self._doc:
+            self._space_group = {0.01: self._doc['space_group']}
 
         for src in self._doc['source']:
             if src.endswith('.castep') or src.endswith('.res'):
@@ -39,6 +39,14 @@ class Crystal:
 
     def __setitem__(self, key, item):
         self._doc[key] = item
+
+    def get(self, key):
+        return self._doc.get(key)
+
+    def __contains__(self, key):
+        if key in self._doc:
+            return True
+        return False
 
     def __str__(self):
         return (("{root_source}: {formula}\n"
@@ -177,8 +185,8 @@ class Crystal:
 
     def space_group(self, symprec=0.01):
         if symprec not in self._space_group:
-            self._doc['space_group'][symprec] = cell_utils.get_spacegroup_spg(self._doc, symprec=symprec)
-            self._space_group[symprec] = cell_utils.get_spacegroup_spg(self._doc, symprec=symprec)
+            self._doc['space_group'] = cell_utils.get_spacegroup_spg(self._doc, symprec=symprec)
+            self._space_group[symprec] = self._doc['space_group']
         return self._space_group[symprec]
 
     @property
@@ -242,9 +250,9 @@ class Crystal:
 
     @property
     def network(self):
-        from matador.network import construct_network
+        from matador.network import CrystalGraph
         if '_network' not in self.__dict__:
-            self._network = construct_network(self)
+            self._network = CrystalGraph(self)
         return self._network
 
     @property
