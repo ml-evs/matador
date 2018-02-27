@@ -778,8 +778,8 @@ class QueryConvexHull(object):
             for idx, _ in enumerate(path):
                 data_str += '{:>10.2f},\t{:>10.4f}'.format(self.Q[ind][idx],
                                                            self.voltages[ind][idx])
-            if idx != len(path) - 1:
-                data_str += '\n'
+                if idx != len(path) - 1:
+                    data_str += '\n'
         if self.args.get('csv'):
             with open(''.join(self.elements) + '_voltage.csv', 'w') as f:
                 f.write(data_str)

@@ -964,7 +964,7 @@ def plot_2d_hull(hull, ax=None, dis=False, show=False, plot_points=True,
     ax.set_xticks([0, 0.33, 0.5, 0.66, 1])
     ax.set_xticklabels(ax.get_xticks())
     ax.set_yticks(np.arange(0, np.min(hull.structure_slice[hull.hull.vertices, 1])-0.15, -0.2))
-    ax.set_yticklabels(ax.get_yticks())
+    ax.set_yticklabels(['{:.1f}'.format(val) for val in ax.get_yticks()])
     ax.set_ylabel('Formation energy (eV/atom)')
     try:
         import seaborn as sns
