@@ -12,3 +12,4 @@ f90wrap*
 htmlcov
 _build
 .coverage
+*.ipynb_checkpoints
