@@ -187,7 +187,7 @@ class CellUtilTest(unittest.TestCase):
             # for ind, kpt in enumerate(cart_kpts[:-1]):
             for ind, kpt in enumerate(cart_kpts[:-1]):
                 diffs[ind] = np.sqrt(np.sum((kpt - cart_kpts[ind+1])**2))
-            self.assertLess(len(np.where(diffs > 1.1*spacing)[0]), len(seekpath_results['segments']))
+            self.assertLess(len(np.where(diffs > 1.1*spacing)[0]), len(seekpath_results['explicit_segments']))
 
             if 'flrys4-1x109' in fname:
                 bs, s = bands2dict(fname.replace('.res', '.bands'))
@@ -196,7 +196,7 @@ class CellUtilTest(unittest.TestCase):
                 np.testing.assert_array_almost_equal(bs['cart_kpoints'], abs_path)
                 for ind, kpt in enumerate(bs['cart_kpoints'][:-1]):
                     diffs[ind] = np.sqrt(np.sum((kpt - bs['cart_kpoints'][ind+1])**2))
-            self.assertLess(len(np.where(diffs > 1.1*spacing)[0]), len(seekpath_results['segments']))
+            self.assertLess(len(np.where(diffs > 1.1*spacing)[0]), len(seekpath_results['explicit_segments']))
 
             cell_path = fname.replace('.res', '.cell')
             doc2cell(std_doc, cell_path)
