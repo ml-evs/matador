@@ -54,7 +54,7 @@ class QueryConvexHull(object):
             plot_kwargs = {}
         self.query = query
         self.from_cursor = False
-        self.plot_param = False
+        self.plot_params = False
         if self.query is not None:
             self.cursor = list(query.cursor)
             use_source = False
@@ -580,18 +580,23 @@ class QueryConvexHull(object):
         self.hull_cursor = sorted(self.hull_cursor, key=lambda k: k['concentration'])
         self.structures = structures
 
-    def voltage_curve(self, hull_cursor):
+    def voltage_curve(self, hull_cursor, quiet=False):
         """ Take a computed convex hull and calculate voltages for either binary or ternary
-        systems. Sets the self.x, self.Q and self.V member data for plotting.
+        systems. Sets the self.x, self.Q and self.voltages member data for plotting.
 
         Input:
 
             | hull_cursor : list(dict), list of structures to include in the voltage curve.
 
+        Args:
+
+            | quiet  : bool, if False, print voltage data
+
         """
 
         if not self.ternary:
-            print('Generating voltage curve...')
+            if not quiet:
+                print('Generating voltage curve...')
             mu_enthalpy = get_array_from_cursor(self.match, 'enthalpy_per_atom')
             x = get_num_intercalated(hull_cursor)
             # sort for voltage calculation
@@ -634,10 +639,11 @@ class QueryConvexHull(object):
                     if not any([point.tolist() == test_point.tolist() for test_point in endpoints]):
                         endpoints.append(point)
                         endstoichs.append(stoichs[ind])
-            print('{} starting point(s) found.'.format(len(endstoichs)))
-            for endstoich in endstoichs:
-                print(get_formula_from_stoich(endstoich), end=' ')
-            print('\n')
+            if not quiet:
+                print('{} starting point(s) found.'.format(len(endstoichs)))
+                for endstoich in endstoichs:
+                    print(get_formula_from_stoich(endstoich), end=' ')
+                print('\n')
             self.endstoichs = endstoichs
 
             # iterate over possible endpoints of delithiation
@@ -646,8 +652,9 @@ class QueryConvexHull(object):
             self.x = []
             for reaction_ind, endpoint in enumerate(endpoints):
                 ratio = endpoint[1] / (1 - endpoint[0] - endpoint[1])
-                print(30*'-')
-                print('Reaction {}, {}:'.format(reaction_ind, get_formula_from_stoich(endstoichs[reaction_ind])))
+                if not quiet:
+                    print(30*'-')
+                    print('Reaction {}, {}:'.format(reaction_ind, get_formula_from_stoich(endstoichs[reaction_ind])))
                 y0 = endpoint[1] / (1 - endpoint[0])
                 simp_in = 0
                 intersections = []
@@ -701,9 +708,10 @@ class QueryConvexHull(object):
                     simp_in += 1
 
                 # if tie line runs from fully de-lithiated to pure lithium (for example), then print and skip
-                if len(intersections) == 0:
-                    print_warning('No intermediate structures found for starting point {}.'.format(get_formula_from_stoich(endstoichs[reaction_ind])))
-                    continue
+                if not quiet:
+                    if len(intersections) == 0:
+                        print_warning('No intermediate structures found for starting point {}.'.format(get_formula_from_stoich(endstoichs[reaction_ind])))
+                        continue
 
                 intersections = np.asarray(intersections)
                 intersections = intersections.reshape(-1, 3)
@@ -730,7 +738,8 @@ class QueryConvexHull(object):
                     reaction = [get_formula_from_stoich(hull_cursor[idx]['stoichiometry'])
                                 for idx in hull.simplices[simplex_index]
                                 if get_formula_from_stoich(hull_cursor[idx]['stoichiometry']) not in reaction]
-                    print('{d[0]} + {d[1]} + {d[2]}'.format(d=reaction))
+                    if not quiet:
+                        print('{d[0]} + {d[1]} + {d[2]}'.format(d=reaction))
                     Evec = points[hull.simplices[simplex_index], 2]
                     Comp = points[hull.simplices[simplex_index], :]
                     Comp[:, 2] = 1 - Comp[:, 0] - Comp[:, 1]
@@ -745,17 +754,18 @@ class QueryConvexHull(object):
                     # double up on first voltage
                     if ind == 0:
                         voltages.append(V)
-                    if ind != len(intersections)-1:
-                        print(5*(ind+1)*' ' + ' ---> ', end='')
+                    if not quiet:
+                        if ind != len(intersections)-1:
+                            print(5*(ind+1)*' ' + ' ---> ', end='')
                     voltages.append(V)
 
                 self.Q.append(Q)
                 self.x.append(x)
                 self.voltages.append(voltages)
-                print('\n')
+                if not quiet:
+                    print('\n')
             assert len(self.Q) == len(self.voltages)
 
-        print('Voltage data:')
         data_str = ''
         for ind, path in enumerate(self.Q):
             if ind != 0:
@@ -768,12 +778,14 @@ class QueryConvexHull(object):
             for idx, _ in enumerate(path):
                 data_str += '{:>10.2f},\t{:>10.4f}'.format(self.Q[ind][idx],
                                                            self.voltages[ind][idx])
-                if idx != len(path) - 1:
-                    data_str += '\n'
+            if idx != len(path) - 1:
+                data_str += '\n'
         if self.args.get('csv'):
             with open(''.join(self.elements) + '_voltage.csv', 'w') as f:
                 f.write(data_str)
-        print('\n' + data_str)
+        if not quiet:
+            print('Voltage data:')
+            print('\n' + data_str)
 
         return
 
