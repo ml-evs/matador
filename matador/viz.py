@@ -5,7 +5,10 @@ quick visualisation of structures.
 ELEMENT_COLOURS = {
     'K': '#66236D',
     'Sn': '#938CAF',
-    'P': '#D66814'
+    'P': '#D66814',
+    'Sr': '#00ff27',
+    'Ti': '#78c9ff',
+    'O': '#ff0000',
 }
 
 
