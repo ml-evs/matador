@@ -122,7 +122,6 @@ def frac2cart(lattice_cart, positions_frac):
     """
     _positions_frac = np.asarray(positions_frac)
     if len(np.shape(_positions_frac)) == 1:
-        reshaped = True
         _positions_frac = _positions_frac.reshape((1, 3))
     _lattice_cart = np.asarray(lattice_cart)
     positions_abs = switch_coords(_lattice_cart, _positions_frac)
@@ -349,7 +348,7 @@ def get_spacegroup_spg(doc, symprec=0.01):
     return spg.get_spacegroup(spg_cell, symprec=symprec).split(' ')[0]
 
 
-def create_simple_supercell(seed_doc, extension, standardize=False, symmetric=False):
+def create_simple_supercell(seed_doc, extension, standardize=False, symmetric=False, debug=False):
     """ Return a document with new supercell, given extension vector.
 
     Input:
@@ -381,17 +380,23 @@ def create_simple_supercell(seed_doc, extension, standardize=False, symmetric=Fa
         doc = standardize_doc_cell(doc)
 
     # copy new doc and delete data that will not be corrected
-    supercell_doc = deepcopy(doc)
-    if 'positions_abs' in supercell_doc:
-        del supercell_doc['positions_abs']
-    if 'lattice_abc' in supercell_doc:
-        del supercell_doc['lattice_abc']
+    supercell_doc = {}
+    keys_to_copy = set(['positions_frac', 'lattice_cart', 'atom_types', 'source', 'stoichiometry'])
+    for key in doc:
+        if not isinstance(doc[key], list):
+            keys_to_copy.add(key)
+
+    for key in keys_to_copy:
+        supercell_doc[key] = deepcopy(doc[key])
 
     for i, elem in enumerate(extension):
         for k in range(3):
             supercell_doc['lattice_cart'][i][k] = elem * doc['lattice_cart'][i][k]
         for ind, atom in enumerate(supercell_doc['positions_frac']):
             supercell_doc['positions_frac'][ind][i] /= elem
+
+    print(doc['lattice_cart'])
+    print(supercell_doc['lattice_cart'])
 
     images = product(*[list(range(elem)) for elem in extension])
     _iter = 0
@@ -417,6 +422,12 @@ def create_simple_supercell(seed_doc, extension, standardize=False, symmetric=Fa
     supercell_doc['num_atoms'] = len(supercell_doc['atom_types'])
     supercell_doc['cell_volume'] = cart2volume(supercell_doc['lattice_cart'])
     supercell_doc['lattice_abc'] = cart2abc(supercell_doc['lattice_cart'])
-    assert np.isclose(supercell_doc['cell_volume'], num_images*doc['cell_volume'])
+
+    if debug:
+        from matador.crystal import Crystal
+        print(Crystal(supercell_doc))
+        print(Crystal(doc))
+
+    assert np.isclose(supercell_doc['cell_volume'], num_images * cart2volume(doc['lattice_cart']))
     assert _iter == num_images
     return supercell_doc

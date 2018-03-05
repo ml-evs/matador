@@ -60,9 +60,11 @@ class Crystal:
             position = self._doc['positions_frac'][ind]
             data = {}
             if 'chemical_shifts' in self._doc:
-                data['shift'] = self._doc['chemical_shifts'][ind]
+                if len(self._doc['chemical_shifts']) == len(self._doc['atom_types']):
+                    data['shift'] = self._doc['chemical_shifts'][ind]
             if 'magnetic_shielding_tensor' in self._doc:
-                data['shielding'] = self._doc['magnetic_shielding_tensor'][ind]
+                if len(self._doc['magnetic_shielding_tensor']) == len(self._doc['atom_types']):
+                    data['shielding'] = self._doc['magnetic_shielding_tensor'][ind]
             if 'atomic_spins' in self._doc:
                 data['spin'] = self._doc['atomic_spins'][ind]
             if 'voronoi_substructure' in self._doc:
