@@ -170,7 +170,7 @@ def display_results(cursor,
                                                          source.endswith('.castep') or
                                                          source.endswith('.history') or
                                                          source.endswith('.history.gz')))))
-        if 'pressure' in doc:
+        if 'pressure' in doc and doc['pressure'] != 'xxx':
             struct_string[-1] += "{: >9.2f}".format(doc['pressure'])
         else:
             struct_string[-1] += "{:^10}".format('xxx')
