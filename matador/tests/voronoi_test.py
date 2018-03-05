@@ -6,6 +6,7 @@ from json import load
 from matador.similarity.voronoi_similarity import get_unique_sites, collect_unique_sites
 from matador.similarity.voronoi_similarity import are_sites_the_same, set_substruc_dict
 from matador.similarity.voronoi_similarity import set_site_array, create_site_array
+from matador.voronoi_interface import get_voronoi_substructure
 
 
 REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
@@ -50,7 +51,6 @@ class VoronoiSimilarityTest(unittest.TestCase):
                     # test = are_sites_the_same(unique_environments[i], unique_environments[j])
                     # print(i, j, test)
 
-
             # get_unique_sites(cursor[ind])
             # for elem in cursor[ind]['unique_sites']:
                 # site_count[elem] += len(cursor[ind]['unique_sites'][elem])
@@ -60,6 +60,26 @@ class VoronoiSimilarityTest(unittest.TestCase):
         # self.assertIn('K', unique_sites)
         # for elem in unique_sites:
             # self.assertEqual(len(unique_sites[elem]), site_count[elem])
+
+    def testAtomPermutationsFromMagres(self):
+        from matador.scrapers.magres_scrapers import magres2dict
+        NaP = magres2dict(REAL_PATH + 'data/NaP_atom_permute/NaP.magres')[0]
+        get_voronoi_substructure(NaP)
+
+        NaP_12 = magres2dict(REAL_PATH + 'data/NaP_atom_permute/NaP_12.magres')[0]
+        get_voronoi_substructure(NaP_12)
+
+        NaP_14 = magres2dict(REAL_PATH + 'data/NaP_atom_permute/NaP_14.magres')[0]
+        get_voronoi_substructure(NaP_14)
+
+        NaP['voro_atom_types'] = [atom[0] for atom in NaP['voronoi_substruc']]
+        NaP_12['voro_atom_types'] = [atom[0] for atom in NaP_12['voronoi_substruc']]
+        NaP_14['voro_atom_types'] = [atom[0] for atom in NaP_14['voronoi_substruc']]
+
+        self.assertEqual(NaP_12['voronoi_substruc'][0][0], NaP['voronoi_substruc'][1][0])
+        self.assertEqual(NaP_12['voronoi_substruc'][1][0], NaP['voronoi_substruc'][0][0])
+        self.assertEqual(NaP['voronoi_substruc'][0][0], NaP_14['voronoi_substruc'][-1][0])
+
 
     def testOnIndividualDocs(self):
         with open(REAL_PATH + 'data/voronoi_hull.json', 'r') as f:
