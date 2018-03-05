@@ -280,7 +280,7 @@ def get_unique_sites(doc, atol=1e-2, rtol=1e-2):
                             assert np.shape(site_mean[-1][_elem][-1]) == np.shape(site_array[elem][0][_elem])
                     for j in range(len(index_sites)-1, 0, -1):
                         # let means deviate by twice the amount
-                        if not are_sites_the_same(site_mean[j], site_mean[0], atol=2*atol, rtol=2*rtol):
+                        if not are_sites_the_same(site_mean[j], site_mean[0], atol=5*atol, rtol=5*rtol):
                             raise RuntimeError('Numerical instability: site groups with distinct means were clustered.')
                         [temp_similar_sites[index_sites[0]].add(i) for i in list(temp_similar_sites[index_sites[j]])]
                         del temp_similar_sites[index_sites[j]]
