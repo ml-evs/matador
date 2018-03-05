@@ -16,7 +16,7 @@ def get_voronoi_substructure(doc):
     """ Run Can's Voronoi analysis on a matador doc. """
     try:
         from Vornetclass import VoronoiNetwork
-        doc2res(doc, 'Vropple.res', hash_dupe=False, overwrite=True, info=False)
+        doc2res(doc, 'Vropple.res', hash_dupe=False, overwrite=True, info=False, sort_atoms=False)
         vornet = VoronoiNetwork(filename='Vropple.res')
         vornet.computeSubStrucs()
         doc['voronoi_substruc'] = [vc.getSubStruc(use_area=False) for vc in vornet.VoronoiCells]
@@ -35,7 +35,7 @@ def get_voronoi_points(doc, debug=False):
     """
     try:
         from Vornetclass import VoronoiNetwork
-        doc2res(doc, 'Vropple.res', hash_dupe=False, overwrite=True, info=False)
+        doc2res(doc, 'Vropple.res', hash_dupe=False, overwrite=True, info=False, sort_atoms=False)
         vornet = VoronoiNetwork(filename='Vropple.res')
         if debug:
             print(vornet.struc)
