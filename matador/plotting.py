@@ -434,11 +434,11 @@ def plot_voltage_curve(hull, show=False):
         else:
             axQ.plot(expt_data[:, 0], expt_data[:, 1], c='k', lw=2, ls='-', label='Experiment')
     for ind, voltage in enumerate(hull.voltages):
-        for i in range(len(voltage)-1):
-            if i == 0 and hull.args.get('expt'):
+        for i in range(1, len(voltage)-1):
+            if i == 1 and hull.args.get('expt'):
                 axQ.plot([hull.Q[ind][i-1], hull.Q[ind][i]], [voltage[i], voltage[i]], marker='*',
                          lw=2, c=hull.colours[ind], label='DFT (this work)')
-            elif i == 0 and len(hull.voltages) != 1:
+            elif i == 1 and len(hull.voltages) != 1:
                 axQ.plot([hull.Q[ind][i-1], hull.Q[ind][i]], [voltage[i], voltage[i]], marker='o', markersize=5,
                          lw=2, c=hull.colours[ind], label=get_formula_from_stoich(hull.endstoichs[ind], tex=True))
             else:
