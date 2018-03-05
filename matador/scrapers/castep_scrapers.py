@@ -892,7 +892,7 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
             else:
                 # if not importing to db, return unconverged structure
                 # but notify that it is unconverged
-                return castep, False
+                return castep, True
         else:
             if type(oops) == IOError:
                 print_exc()
