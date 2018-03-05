@@ -395,9 +395,6 @@ def create_simple_supercell(seed_doc, extension, standardize=False, symmetric=Fa
         for ind, atom in enumerate(supercell_doc['positions_frac']):
             supercell_doc['positions_frac'][ind][i] /= elem
 
-    print(doc['lattice_cart'])
-    print(supercell_doc['lattice_cart'])
-
     images = product(*[list(range(elem)) for elem in extension])
     _iter = 0
     new_positions = []
