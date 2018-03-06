@@ -47,44 +47,57 @@ def get_data(structure_files, conv_field='cut_off_energy'):
         | conv_field:  str, field for convergence parameter.
 
     """
-    chempots_dict = defaultdict(dict)
-    chempots = defaultdict(list)
-    chempot_list = dict()
+
+    form_set = set([get_formula_from_stoich(structure_files[structure][0]['stoichiometry']) for structure in structure_files])
+    if len(form_set) == 1:
+        chempot_mode = False
+        print('Working in single stoichiometry mode..')
+
+    else:
+        print('Searching for chemical potentials')
+        chempot_mode = True
+        chempots_dict = defaultdict(dict)
+        chempots = defaultdict(list)
+        chempot_list = dict()
 
     if conv_field is 'kpoints_mp_spacing':
-        rounding = 2
+        rounding = 3
     else:
         rounding = None
-    for key in structure_files:
-        for doc in structure_files[key]:
-            try:
-                if len(doc['stoichiometry']) == 1:
-                    doc['formation_energy_per_atom'] = 0
-                    rounded_field = round(doc[conv_field], rounding)
-                    if 'total_energy_per_atom' in doc:
-                        chempots_dict[str(rounded_field)][doc['atom_types'][0]] = doc['total_energy_per_atom']
-                        chempots[key].append([rounded_field, doc['total_energy_per_atom']])
-                    else:
-                        chempots_dict[str(rounded_field)][doc['atom_types'][0]] = doc['enthalpy_per_atom']
-                        chempots[key].append([rounded_field, doc['enthalpy_per_atom']])
-                    chempot_list[key] = doc['stoichiometry'][0][0]
-            except:
-                print('Error with {} and {} = {}'.format(key, conv_field, rounded_field))
-                print_exc()
-                exit()
+
+    if chempot_mode:
+        for key in structure_files:
+            for doc in structure_files[key]:
+                try:
+                    if len(doc['stoichiometry']) == 1:
+                        doc['formation_energy_per_atom'] = 0
+                        rounded_field = round(doc[conv_field], rounding)
+                        if 'total_energy_per_atom' in doc:
+                            chempots_dict[str(rounded_field)][doc['atom_types'][0]] = doc['total_energy_per_atom']
+                            chempots[key].append([rounded_field, doc['total_energy_per_atom']])
+                        else:
+                            chempots_dict[str(rounded_field)][doc['atom_types'][0]] = doc['enthalpy_per_atom']
+                            chempots[key].append([rounded_field, doc['enthalpy_per_atom']])
+                        chempot_list[key] = doc['stoichiometry'][0][0]
+                except:
+                    print('Error with {} and {} = {}'.format(key, conv_field, rounded_field))
+                    print_exc()
+                    exit()
 
     form = defaultdict(list)
     stoich_list = dict()
     elems = set()
 
-    for value in chempots_dict:
-        for elem in chempots_dict[value]:
-            elems.add(elem)
+    if chempot_mode:
+        
+        for value in chempots_dict:
+            for elem in chempots_dict[value]:
+                elems.add(elem)
 
-    for value in chempots_dict:
-        for elem in elems:
-            if elem not in chempots_dict[value]:
-                print('WARNING: {} chemical potential missing at {} = {} eV, skipping this value.'.format(elem, conv_field, value))
+        for value in chempots_dict:
+            for elem in elems:
+                if elem not in chempots_dict[value]:
+                    print('WARNING: {} chemical potential missing at {} = {} eV, skipping this value.'.format(elem, conv_field, value))
 
     for key in structure_files:
         for doc in structure_files[key]:
@@ -95,25 +108,33 @@ def get_data(structure_files, conv_field='cut_off_energy'):
                     else:
                         doc['formation_energy_per_atom'] = doc['enthalpy_per_atom']
                     rounded_field = round(doc[conv_field], rounding)
-                    for atom in doc['atom_types']:
-                        doc['formation_energy_per_atom'] -= chempots_dict[str(rounded_field)][atom] / len(doc['atom_types'])
+                    if chempot_mode:
+                        for atom in doc['atom_types']:
+                            doc['formation_energy_per_atom'] -= chempots_dict[str(rounded_field)][atom] / len(doc['atom_types'])
                     form[key].append([doc[conv_field], doc['formation_energy_per_atom']])
                     stoich_list[key] = get_formula_from_stoich(doc['stoichiometry'], tex=True)
                 except:
+                    print_exc()
                     pass
+
     for key in form:
         form[key].sort()
         form[key] = np.asarray(form[key])
 
-    for key in chempots:
-        chempots[key].sort()
-        chempots[key] = np.asarray(chempots[key])
+    if chempot_mode:
+        for key in chempots:
+            chempots[key].sort()
+            chempots[key] = np.asarray(chempots[key])
 
     data = dict()
-    data['chempots'] = chempots
     data['form'] = form
     data['stoich_list'] = stoich_list
-    data['chempot_list'] = chempot_list
+    if chempot_mode:
+        data['chempots'] = chempots
+        data['chempot_list'] = chempot_list
+    # else:
+        # for key in data['form']:
+            # data['form'][key][:, -1] -= np.min(data['form'][key][:, -1])
 
     return data
 
@@ -141,8 +162,9 @@ def plot_both(plot_cutoff=False, plot_kpt=False, cutoff_data={}, kpt_data={}, lo
         lines = []
         labels = []
         cutoff_form = cutoff_data['form']
-        cutoff_chempots = cutoff_data['chempots']
         cutoff_stoich_list = cutoff_data['stoich_list']
+        if 'chempots' in cutoff_data:
+            cutoff_chempots = cutoff_data['chempots']
         if log:
             for ind, key in enumerate(cutoff_form):
                 colour = colours[ind]
@@ -152,7 +174,7 @@ def plot_both(plot_cutoff=False, plot_kpt=False, cutoff_data={}, kpt_data={}, lo
                                         '-', alpha=0.2, label=cutoff_stoich_list[key], lw=1, zorder=1000, c=colour)
                 lines.append(line)
                 labels.append(cutoff_stoich_list[key])
-            if show_chempots:
+            if show_chempots and 'chempots' in cutoff_data:
                 for key in cutoff_chempots:
                     ax_cutoff.plot(-1/cutoff_chempots[key][:, 0], np.log10(np.abs(cutoff_chempots[key][:, 1]-cutoff_chempots[key][-1, 1])*1000),
                                    'o-', markersize=5, alpha=1, label=key, lw=1, c='grey')
@@ -165,7 +187,7 @@ def plot_both(plot_cutoff=False, plot_kpt=False, cutoff_data={}, kpt_data={}, lo
                                         '-', alpha=0.2, label=cutoff_stoich_list[key], lw=1, zorder=1000, c=colour)
                 lines.append(line)
                 labels.append(cutoff_stoich_list[key])
-            if show_chempots:
+            if show_chempots and 'chempots' in cutoff_data:
                 for key in cutoff_chempots:
                     ax_cutoff.plot(-1/cutoff_chempots[key][:, 0], np.abs(cutoff_chempots[key][:, 1]-cutoff_chempots[key][-1, 1])*1000,
                                    'o-', markersize=5, alpha=1, label=key, lw=1, c='grey')
@@ -177,11 +199,11 @@ def plot_both(plot_cutoff=False, plot_kpt=False, cutoff_data={}, kpt_data={}, lo
         try:
             min_ = 1e10
             max_ = 0
-            for key in cutoff_chempots:
-                min_cutoff = np.min(cutoff_chempots[key][:, 0])
+            for key in cutoff_form:
+                min_cutoff = np.min(cutoff_form[key][:, 0])
                 if min_cutoff < min_:
                     min_ = min_cutoff
-                max_cutoff = np.max(cutoff_chempots[key][:, 0])
+                max_cutoff = np.max(cutoff_form[key][:, 0])
                 if max_cutoff > max_:
                     max_ = max_cutoff
             xlabels = np.arange(min_, 2*max_, step=100)
@@ -200,8 +222,9 @@ def plot_both(plot_cutoff=False, plot_kpt=False, cutoff_data={}, kpt_data={}, lo
         lines = []
         labels = []
         kpt_form = kpt_data['form']
-        kpt_chempots = kpt_data['chempots']
         kpt_stoich_list = kpt_data['stoich_list']
+        if 'chempots' in kpt_data:
+            kpt_chempots = kpt_data['chempots']
         if log:
             for ind, key in enumerate(kpt_form):
                 colour = colours[ind]
@@ -209,7 +232,7 @@ def plot_both(plot_cutoff=False, plot_kpt=False, cutoff_data={}, kpt_data={}, lo
                 point, = ax_kpt.plot(kpt_form[key][:, 0], np.log10(np.abs(kpt_form[key][:, 1]-kpt_form[key][0, 1])*1000), '-', alpha=0.2, label=kpt_stoich_list[key], lw=1, zorder=1000, c=colour)
                 lines.append(line)
                 labels.append(kpt_stoich_list[key])
-            if show_chempots:
+            if show_chempots and 'chempots' in kpt_data:
                 for key in kpt_chempots:
                     ax_kpt.plot(kpt_chempots[key][:, 0], np.log10(np.abs(kpt_chempots[key][:, 1]-kpt_chempots[key][0, 1])*1000), 'o-', markersize=5, alpha=1, label=key, lw=1)
         else:
@@ -219,16 +242,24 @@ def plot_both(plot_cutoff=False, plot_kpt=False, cutoff_data={}, kpt_data={}, lo
                 point, = ax_kpt.plot(kpt_form[key][:, 0], np.abs(kpt_form[key][:, 1]-kpt_form[key][0, 1])*1000, '-', alpha=0.2, label=kpt_stoich_list[key], lw=1, zorder=1000, c=colour)
                 lines.append(line)
                 labels.append(kpt_stoich_list[key])
-            if show_chempots:
+            if show_chempots and 'chempots' in kpt_data:
                 for key in kpt_chempots:
                     ax_kpt.plot(kpt_chempots[key][:, 0], np.abs(kpt_chempots[key][:, 1]-kpt_chempots[key][0, 1])*1000, 'o-', markersize=5, alpha=1, label=key, lw=1, c='grey')
 
-        try:
-            kpts = list(reversed(np.loadtxt('kpt.conv').tolist()))
-            ax_kpt.set_xticks(kpts)
-            ax_kpt.set_xlabel('max k-point spacing (1/A)')
-        except:
-            print('No kpt.conv file found, axis labels may be ugly...')
+        # try:
+            # kpts = []
+            # with open('kpt.conv', 'r') as f:
+                # flines = f.readlines()
+                # for line in flines:
+                    # kpts.append(float(line.replace('#', '')))
+                # kpts = reversed(sorted(kpts))
+                # kpts = ['{:.3f}'.format(kpt) for kpt in kpts]
+
+            # ax_kpt.set_xticks(kpts)
+            # ax_kpt.set_xlabel('max k-point spacing (1/A)')
+        # except:
+            # print_exc()
+            # print('No kpt.conv file found, axis labels may be ugly...')
 
         if plot_cutoff:
             ax_kpt.set_xlim(ax_kpt.get_xlim()[1], ax_kpt.get_xlim()[0])
@@ -238,7 +269,7 @@ def plot_both(plot_cutoff=False, plot_kpt=False, cutoff_data={}, kpt_data={}, lo
                 ax_kpt.set_ylabel('log(Relative energy difference (meV/atom))')
             else:
                 ax_kpt.set_ylabel('Relative energy difference (meV/atom)')
-    plt.figlegend(lines, labels, loc='upper center', fontsize=10, ncol=num_structures)
+    plt.figlegend(lines, labels, loc='upper center', fontsize=10, ncol=int((num_structures)/2 + num_structures % 2))
     plt.show()
     plt.savefig('conv.png', bbox_inches='tight')
 

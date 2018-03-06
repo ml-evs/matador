@@ -241,7 +241,8 @@ class BatchRun:
                         flines = f.readlines()
                         self.args['conv_cutoff'] = []
                         for line in flines:
-                            self.args['conv_cutoff'].append(int(line))
+                            if not line.startswith('#'):
+                                self.args['conv_cutoff'].append(int(line))
                 else:
                     raise RuntimeError
             except:
@@ -258,7 +259,8 @@ class BatchRun:
                         flines = f.readlines()
                         self.args['conv_kpt'] = []
                         for line in flines:
-                            self.args['conv_kpt'].append(float(line))
+                            if not line.startswith('#'):
+                                self.args['conv_kpt'].append(float(line))
                 else:
                     raise RuntimeError
             except:
