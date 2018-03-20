@@ -343,7 +343,9 @@ class FullRelaxer:
                     if os.path.isfile(seed+'.res'):
                         os.remove(seed+'.res')
                     doc2res(opti_dict, seed, hash_dupe=False)
-                    shutil.copy(seed+'.res', self.root_folder)
+                    if self.compute_dir is not None:
+                        shutil.copy(seed+'.res', self.root_folder)
+
                 elif (not self.reopt or self.rerun) and opti_dict['optimised']:
                     if self.verbosity > 1:
                         print_success('Successfully relaxed ' + seed)
@@ -351,7 +353,9 @@ class FullRelaxer:
                     if os.path.isfile(seed+'.res'):
                         os.remove(seed+'.res')
                     doc2res(opti_dict, seed, hash_dupe=False)
-                    shutil.copy(seed+'.res', self.root_folder)
+                    if self.compute_dir is not None:
+                        shutil.copy(seed+'.res', self.root_folder)
+
                     self.opti_dict = deepcopy(opti_dict)
                     # overwrite old data in res_dict with opti structure
                     # so that custom keys in initial res are still accessible
@@ -371,9 +375,10 @@ class FullRelaxer:
                     if os.path.isfile(seed+'.res'):
                         os.remove(seed+'.res')
                     doc2res(opti_dict, seed, hash_dupe=False)
-                    shutil.copy(seed+'.res', self.root_folder)
-                    if os.path.isfile(seed+'.castep'):
-                        shutil.copy(seed+'.castep', self.root_folder)
+                    if self.compute_dir is not None:
+                        shutil.copy(seed+'.res', self.root_folder)
+                        if os.path.isfile(seed+'.castep'):
+                            shutil.copy(seed+'.castep', self.root_folder)
                     self.res_dict.update(opti_dict)
                     if output_queue is not None:
                         output_queue.put(self.res_dict)
@@ -395,7 +400,8 @@ class FullRelaxer:
                             if self.debug:
                                 print('wrote failed dict out to output_queue')
                         doc2res(opti_dict, seed, info=False, hash_dupe=False)
-                        shutil.copy(seed+'.res', self.root_folder)
+                        if self.compute_dir is not None:
+                            shutil.copy(seed+'.res', self.root_folder)
                         self.mv_to_bad(seed)
                         return False
 
@@ -430,7 +436,7 @@ class FullRelaxer:
             except(KeyboardInterrupt, FileNotFoundError, SystemExit):
                 if self.verbosity > 1:
                     print_exc()
-                    print_warning('Received exception, attempting to fail gracefully... asdfasdfasdfadsfasdasdfasdff')
+                    print_warning('Received exception, attempting to fail gracefully...')
                 etype, evalue, etb = exc_info()
                 if self.verbosity > 1:
                     print(format_exception_only(etype, evalue))
