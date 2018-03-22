@@ -877,10 +877,9 @@ class DBQuery(object):
             query_dict['$and'].append(temp_dict)
 
         db = self.args.get('db')
-        if db is not None:
+        if isinstance(db, list):
             db = db[0]
-        else:
-            db = ''
+
         if self.args.get('loose') or 'oqmd' in db:
             return query_dict
             # temp_dict = dict()
