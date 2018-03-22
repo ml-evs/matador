@@ -3,6 +3,7 @@
 quick visualisation of structures.
 """
 ELEMENT_COLOURS = {
+    'Na': '#f9dc3c',
     'K': '#66236D',
     'Sn': '#938CAF',
     'P': '#D66814',
@@ -19,7 +20,7 @@ def viz(doc):
     return
 
 
-def nb_viz(doc, repeat=1):
+def nb_viz(doc, repeat=1, bonds=None):
     """ Return an ipywidget for nglview visualisation in
     a Jupyter notebook or otherwise.
     """
@@ -28,11 +29,19 @@ def nb_viz(doc, repeat=1):
     atoms = atoms.repeat((repeat, repeat, repeat))
     view = nglview.show_ase(atoms)
     view.add_unitcell()
+    view.remove_ball_and_stick()
     view.add_spacefill(radius_type='vdw', scale=0.3)
-    for elements in set(doc['atom_types']):
-        view.add_ball_and_stick(selection='#{}'.format(elements).upper())
-    view.background = '#FFFFFF'
+    if bonds is None:
+        for elements in set(doc['atom_types']):
+            view.add_ball_and_stick(selection='#{}'.format(elements.upper()))
+    else:
+        if not isinstance(bonds, list):
+            bonds = [bonds]
+        for bond in bonds:
+            view.add_ball_and_stick(selection='#{}'.format(bond.upper()))
+    view.parameters = {'clipDist': 0}
     view.camera = 'orthographic'
+    view.background = '#FFFFFF'
     view.center()
     return view
 
