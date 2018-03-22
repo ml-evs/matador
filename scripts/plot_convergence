@@ -1,4 +1,4 @@
-#!/u/fs1/me388/.local/conda/envs/matador/bin/python
+#!/usr/bin/env python
 """ I hate this script and it should be rewritten, but
 this should read data from a run3 convergence test and plot it.
 """
