@@ -13,12 +13,29 @@ class Crystal:
     """ Class that wraps the MongoDB document, providing useful
     interfaces for cell manipulation and validation.
     """
-    def __init__(self, doc, voronoi=False):
+    def __init__(self, doc, voronoi=False, network_kwargs=None):
+        """ Initialise Crystal object from matador document with Site list
+        and any additional abstractions, e.g. voronoi or CrystalGraph.
+
+        Parameters:
+
+            doc (dict): matador document containing structural information
+
+        Keyword Arguments:
+
+           voronoi (bool): whether to compute Voronoi substructure for each site
+           network_kwargs (dict): keywords to pass to the CrystalGraph initialiser
+
+        """
 
         self._doc = deepcopy(doc)
         self.elems = sorted(list(set(self._doc['atom_types'])))
         self.sites = []
         self.construct_sites(voronoi=voronoi)
+        if network_kwargs is not None:
+            self._network_kwargs = network_kwargs
+        else:
+            self._network_kwargs = {}
 
         # assume default value for symprec
         if 'space_group' in self._doc:
@@ -119,7 +136,7 @@ class Crystal:
 
     @property
     def cell_volume(self):
-        if 'cell_volume' not in self.__dict__:
+        if 'cell_volume' not in self.__dict__ or 'cell_volume' not in self.doc:
             return cell_utils.cart2volume(self._doc['lattice_cart'])
         else:
             return self._doc['cell_volume']
@@ -254,7 +271,7 @@ class Crystal:
     def network(self):
         from matador.network import CrystalGraph
         if '_network' not in self.__dict__:
-            self._network = CrystalGraph(self)
+            self._network = CrystalGraph(self, **self._network_kwargs)
         return self._network
 
     @property
