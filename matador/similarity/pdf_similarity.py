@@ -24,7 +24,7 @@ class PDF:
 
     Args:
         | doc            : dict, matador document to calculate PDF of
-        | dr             : float, bin width for PDF (Angstrom) (DEFAULT: 0.1)
+        | dr             : float, bin width for PDF (Angstrom) (DEFAULT: 0.01)
         | gaussian_width : float, width of Gaussian smearing (Angstrom) (DEFAULT: 0.01)
         | num_images     : int/str, number of unit cell images include in PDF calculation (DEFAULT: 'auto')
         | max_num_images : int, cutoff number of unit cells before crashing (DEFAULT: 50)
@@ -37,7 +37,7 @@ class PDF:
     """
     def __init__(self, doc, **kwargs):
         """ Initialise parameters and run PDF. """
-        prop_defaults = {'dr': 0.1, 'gaussian_width': 0.01, 'rmax': 15, 'num_images': 'auto',
+        prop_defaults = {'dr': 0.01, 'gaussian_width': 0.01, 'rmax': 15, 'num_images': 'auto',
                          'style': 'smear', 'debug': False, 'timing': False, 'low_mem': False, 'projected': True,
                          'max_num_images': 50, 'standardize': False}
 
