@@ -880,7 +880,7 @@ class DBQuery(object):
         if isinstance(db, list):
             db = db[0]
 
-        if self.args.get('loose') or 'oqmd' in db:
+        if self.args.get('loose') or (db is not None and 'oqmd' in db):
             return query_dict
             # temp_dict = dict()
             # query_dict.append(dict())
