@@ -256,12 +256,13 @@ class FullRelaxer:
             for pspot in pspots:
                 shutil.copy(pspot, self.compute_dir)
 
-            if os.path.isfile(self.seed + '.castep'):
-                shutil.copy(self.seed + '.castep', self.compute_dir)
-                # update res file with intermediate calculation
-                castep_dict, success = castep2dict(seed + '.castep', db=False)
-                if success:
-                    self.res_dict.update(castep_dict)
+            # update res file with intermediate calculation if castep file is newer than res
+            if os.path.isfile(self.seed + '.castep') and os.path.isfile(self.seed + '.res'):
+                if os.path.getmtime(self.seed + '.res') < os.path.getmtime(self.seed + '.castep'):
+                    shutil.copy(self.seed + '.castep', self.compute_dir)
+                    castep_dict, success = castep2dict(self.seed + '.castep', db=False)
+                    if success:
+                        self.res_dict.update(castep_dict)
 
             os.chdir(self.compute_dir)
 
@@ -344,6 +345,8 @@ class FullRelaxer:
                         os.remove(seed+'.res')
                     doc2res(opti_dict, seed, hash_dupe=False)
                     if self.compute_dir is not None:
+                        if os.path.isfile(seed+'.castep'):
+                            shutil.copy(seed+'.castep', self.root_folder)
                         shutil.copy(seed+'.res', self.root_folder)
 
                 elif (not self.reopt or self.rerun) and opti_dict['optimised']:
@@ -354,6 +357,8 @@ class FullRelaxer:
                         os.remove(seed+'.res')
                     doc2res(opti_dict, seed, hash_dupe=False)
                     if self.compute_dir is not None:
+                        if os.path.isfile(seed+'.castep'):
+                            shutil.copy(seed+'.castep', self.root_folder)
                         shutil.copy(seed+'.res', self.root_folder)
 
                     self.opti_dict = deepcopy(opti_dict)
@@ -401,6 +406,8 @@ class FullRelaxer:
                                 print('wrote failed dict out to output_queue')
                         doc2res(opti_dict, seed, info=False, hash_dupe=False)
                         if self.compute_dir is not None:
+                            if os.path.isfile(seed+'.castep'):
+                                shutil.copy(seed+'.castep', self.root_folder)
                             shutil.copy(seed+'.res', self.root_folder)
                         self.mv_to_bad(seed)
                         return False
@@ -410,6 +417,8 @@ class FullRelaxer:
                     os.remove(seed+'.res')
                 doc2res(opti_dict, seed, hash_dupe=False)
                 if self.compute_dir is not None:
+                    if os.path.isfile(seed+'.castep'):
+                        shutil.copy(seed+'.castep', self.root_folder)
                     shutil.copy(seed+'.res', self.root_folder)
 
                 # set atomic_init_spins with value from CASTEP file, if it exists
