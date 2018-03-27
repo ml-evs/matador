@@ -427,8 +427,14 @@ class FullRelaxer:
 
                 # if writing out cell, use it for higher precision lattice_cart
                 if calc_doc.get('write_cell_structure'):
-                    cell_dict, success = cell2dict(seed + '-out.cell', verbosity=self.verbosity, db=False, outcell=True)
-                    opti_dict['lattice_cart'] = list(cell_dict['lattice_cart'])
+                    try:
+                        cell_dict, success = cell2dict(seed + '-out.cell', verbosity=self.verbosity, db=False, outcell=True)
+                        if success:
+                            opti_dict['lattice_cart'] = list(cell_dict['lattice_cart'])
+                    except:
+                        if self.verbosity > 1:
+                            print_exc()
+                        pass
                 if self.debug:
                     print_notify('Restarting calculation with current state:')
                     print(calc_doc)
