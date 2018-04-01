@@ -20,7 +20,7 @@ setup(name='matador',
       install_requires=[
           'numpy>=1.10',
           'scipy>=0.18',
-          'pymongo>=3.3.0',
+          'pymongo>=3.4',
           'periodictable>=1.4',
           'psutil',
           'seekpath==1.8.1',
