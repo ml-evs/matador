@@ -16,7 +16,7 @@ from matador.utils.print_utils import print_failure, print_warning, print_succes
 from matador.utils.chem_utils import get_periodic_table, get_formula_from_stoich
 from matador.utils.chem_utils import parse_element_string, get_stoich_from_formula
 from matador.utils.cursor_utils import display_results
-from matador.utils.db_utils import make_connection_to_collection
+from matador.utils.db_utils import make_connection_to_collection, load_custom_settings
 # external libraries
 import pymongo as pm
 import numpy as np
@@ -53,7 +53,8 @@ class DBQuery(object):
         # if empty collections, assume called from API and read kwargs,
         # also need to connect to db
         if not collections or not client:
-            self.client, self.db, self.collections = make_connection_to_collection(self.args.get('db'))
+            self.mongo_settings = load_custom_settings(config_fname=self.args.get('config_fname'))
+            self.client, self.db, self.collections = make_connection_to_collection(self.args.get('db'), mongo_settings=self.mongo_settings)
 
         # improve this clause at some point
         if self.args.get('summary') or self.args.get('subcmd') in ['swaps', 'polish']:
@@ -121,7 +122,7 @@ class DBQuery(object):
                 if self.debug:
                     print(dumps(self.cursor[0], indent=1))
 
-            if self.args.get('calc_match') or self.args['subcmd'] in ['hull', 'hulldiff']:
+            if self.args.get('calc_match') or self.args['subcmd'] in ['hull', 'hulldiff', 'voltage']:
                 # save special copy of calc_dict for hulls
                 self.calc_dict = dict()
                 self.calc_dict['$and'] = []

@@ -2,6 +2,9 @@
 """ This file implements the base class Spatula
 that calls the scrapers and interfaces with the
 MongoDB client.
+
+TO-DO:
+    - refactor
 """
 
 # matador modules
@@ -9,6 +12,7 @@ from matador.scrapers.castep_scrapers import castep2dict, param2dict, cell2dict
 from matador.scrapers.castep_scrapers import res2dict, dir2dict
 from matador.scrapers.experiment_scrapers import expt2dict, synth2dict
 from matador.utils.cell_utils import calc_mp_spacing
+from matador.utils.db_utils import make_connection_to_collection, load_custom_settings
 from matador.version import __version__
 # external libraries
 import pymongo as pm
@@ -16,7 +20,7 @@ import pymongo as pm
 from random import randint
 from collections import defaultdict
 from datetime import datetime
-from os import walk, getcwd, uname, chmod, rename
+from os import walk, getcwd, chmod, rename
 from time import sleep
 from os.path import realpath, abspath, dirname, getmtime, isfile
 from traceback import print_exc
@@ -44,6 +48,7 @@ class Spatula:
             self.dryrun = True
         self.debug = self.args['debug']
         self.verbosity = self.args['verbosity'] if self.args['verbosity'] is not None else 0
+        self.config_fname = self.args.get('config')
         self.tags = self.args['tags']
         self.tag_dict = dict()
         self.tag_dict['tags'] = self.tags
@@ -79,38 +84,42 @@ class Spatula:
         if not self.scan:
             self.logfile = open(logfile_name, 'w')
             self.manifest = open(manifest_name, 'w')
-        local = uname()[1]
-        if local == 'cluster2':
-            remote = 'node1'
-        else:
-            remote = None
-        self.client = pm.MongoClient(remote)
-        self.db = self.client.crystals
+
+        self.settings = load_custom_settings(config_fname=self.config_fname)
+        self.client, self.db, self.collections = make_connection_to_collection(self.args.get('db'),
+                                                                               check_collection=False,
+                                                                               mongo_settings=self.settings)
+
+        # perform some relevant collection-dependent checks
+        assert len(self.collections) == 1, 'Can only import to one collection.'
+        self.repo = list(self.collections.values())[0]
+
         if self.args.get('db') is None:
-            self.repo = self.db.repo
-            if not getcwd().startswith('/home/users/morris/structure_repository'):
-                print('PERMISSION DENIED... and...')
-                sleep(1)
-                for i in range(100):
-                    print('YOU DIDN\'T SAY THE MAGIC WORD')
-                    sleep(0.01)
-                print(80*'!')
-                print('You shouldn\'t be importing to the main database from this folder!')
-                print('Please use --db <YourDBName> to create a new collection,')
-                print('or copy these files to the correct place!')
-                print(80*'!')
-                exit()
+            # if using default collection, check we are in the correct path
+            if 'mongo' in self.settings and 'default_collection_file_path' in self.settings['mongo']:
+                if not getcwd().startswith(self.settings['mongo']['default_collection_file_path']):
+                    print('PERMISSION DENIED... and...')
+                    sleep(3)
+                    for i in range(30):
+                        print('YOU DIDN\'T SAY THE MAGIC WORD')
+                        sleep(0.05)
+                    print(80*'!')
+                    print('You shouldn\'t be importing to the default database from this folder!')
+                    print('Please use --db <YourDBName> to create a new collection,')
+                    print('or copy these files to the correct place!')
+                    print(80*'!')
+                    exit()
         else:
             if 'oqmd' in self.args['db']:
                 exit('Cannot import directly to oqmd repo')
             elif len(self.args.get('db')) > 1:
                 exit('Can only import to one collection.')
-            else:
-                self.repo = self.db[self.args.get('db')[0]]
+
         if not self.dryrun:
             # either drop and recreate or create spatula report collection
             self.db.spatula.drop()
             self.report = self.db.spatula
+
         # scan directory on init
         self.file_lists = self.scan_dir()
         # if import, as opposed to rebuild, scan for duplicates and remove from list

@@ -20,9 +20,11 @@ class DatabaseChanges:
         | action       : str, either 'view' or 'undo'
 
     """
-    def __init__(self, collection_name: str, changeset_ind=0, action='view'):
+    def __init__(self, collection_name: str, changeset_ind=0, action='view', mongo_settings=None):
         self.changelog_name = '__changelog_{}'.format(collection_name)
-        _, _, self.collections = make_connection_to_collection([self.changelog_name], allow_changelog=True)
+        _, _, self.collections = make_connection_to_collection(self.changelog_name,
+                                                               allow_changelog=True,
+                                                               mongo_settings=mongo_settings)
         self.repo = [self.collections[key] for key in self.collections][0]
         curs = list(self.repo.find())
 

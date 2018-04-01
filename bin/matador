@@ -9,7 +9,7 @@ from __future__ import print_function
 from matador.query import DBQuery
 from matador.hull import QueryConvexHull
 from matador.utils.print_utils import print_failure, print_warning, print_notify
-from matador.utils.db_utils import make_connection_to_collection
+from matador.utils.db_utils import make_connection_to_collection, load_custom_settings
 from matador.utils.cursor_utils import display_results
 from matador.version import __version__
 # import standard library
@@ -37,9 +37,12 @@ class Matador(object):
         else:
             self.export = False
 
+        self.settings = load_custom_settings(config_fname=self.args.get('config'))
+
         if self.args['subcmd'] not in ['import', 'rebuild']:
             self.client, self.db, self.collections = make_connection_to_collection(self.args.get('db'),
-                                                                                   check_collection=True)
+                                                                                   check_collection=True,
+                                                                                   mongo_settings=self.settings)
 
         if self.args['subcmd'] == 'stats':
             self.stats()
@@ -111,7 +114,7 @@ class Matador(object):
                 changeset = self.args.get('changeset')
                 if changeset is None:
                     changeset = 0
-                DatabaseChanges([key for key in self.collections][0], changeset_ind=changeset, action=action)
+                DatabaseChanges([key for key in self.collections][0], changeset_ind=changeset, action=action, mongo_settings=self.settings)
 
             if self.args['subcmd'] == 'hulldiff':
                 from matador.hull_diff import diff_hulls
@@ -294,21 +297,6 @@ class Matador(object):
                 print(line)
             print('\n')
 
-    def temp_collection(self, cursor):
-        """ Create temporary collection
-        for successive filtering.
-        """
-        # drop temp if it already exists
-        self.client.crystals.temp.drop()
-        self.temp = self.client.crystals.temp
-        if len(cursor) != 0:
-            self.temp.insert(cursor)
-        else:
-            self.temp.drop()
-            print_failure('No structures found.')
-            exit()
-        return self.temp
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
@@ -328,11 +316,13 @@ if __name__ == '__main__':
     global_flags = argparse.ArgumentParser(add_help=False)
 
     # common arguments to all subcommands
-    global_flags.add_argument('--db',
-                              help='choose which databases to query',
-                              nargs='+')
+    global_flags.add_argument('--db', nargs='+',
+                              help='choose which collection to query')
     global_flags.add_argument('--debug', action='store_true',
                               help='enable debug printing throughout code.')
+    global_flags.add_argument('-conf', '--config', type=str,
+                              help='specify custom location of matador config file. \
+                                    (DEFAULT: $MATADOR_ROOT/config/matador_conf.json)')
     global_flags.add_argument('--devel', action='store_true',
                               help='test devel code.')
     global_flags.add_argument('--profile', action='store_true',
