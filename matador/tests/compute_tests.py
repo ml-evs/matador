@@ -2,11 +2,14 @@
 import unittest
 from os.path import realpath
 import os
-hostname = os.getenv('HOST')
+import shutil
+import glob
+
+hostname = os.uname()[1]
 REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
 
 
-@unittest.skipIf(hostname != 'cluster2')
+@unittest.skipIf(hostname != 'cluster2', 'You probably don\'t have CASTEP!')
 class ComputeTest(unittest.TestCase):
     def testRelaxToQueue(self):
         """ Mimic GA and test Queue relaxations. """
@@ -26,6 +29,12 @@ class ComputeTest(unittest.TestCase):
         verbosity = 10
         executable = 'castep'
         node = 'node1'
+
+        newborn['source'] = [REAL_PATH + '/data/_LiAs_testcase.res']
+
+        shutil.copy(REAL_PATH + 'data/Li_00PBE.usp', '.')
+        shutil.copy(REAL_PATH + 'data/As_00PBE.usp', '.')
+
         relaxer = FullRelaxer(ncores=ncores, nnodes=None, node=node,
                               res=newborn, param_dict=param_dict, cell_dict=cell_dict,
                               debug=False, verbosity=verbosity, killcheck=True,
@@ -44,5 +53,17 @@ class ComputeTest(unittest.TestCase):
 
         print('Process completed!')
 
-        from os.path import isfile
-        assert isfile('completed/LiAs_testcase.res')
+        assert os.path.isfile('completed/LiAs_testcase.res')
+
+        paths = ['completed', 'input', 'bad_castep']
+        for path in paths:
+            if os.path.isdir(path):
+                files = glob.glob(path + '/*')
+                for file in files:
+                    os.remove(file)
+                os.removedirs(path)
+
+        paths = ['Li_00PBE.usp', 'As_00PBE.usp']
+        for path in paths:
+            if os.path.isfile(path):
+                os.remove(path)
