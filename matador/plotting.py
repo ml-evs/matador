@@ -365,14 +365,16 @@ def plot_spectral(seeds, **kwargs):
                         ax_dos.fill_between(energies[np.where(energies >= 0)], 0, dos[np.where(energies >= 0)], facecolor=conduction, alpha=0.5)
             ax_dos.grid('off')
 
-    if kwargs.get('pdf'):
-        plt.savefig(seed.replace('.bands', '').replace('.phonon', '') + '_spectral.pdf', bbox_inches='tight')
-    if kwargs.get('svg'):
-        plt.savefig(seed.replace('.bands', '').replace('.phonon', '') + '_spectral.svg', bbox_inches='tight', transparent=True)
-    if kwargs.get('png'):
-        plt.savefig(seed.replace('.bands', '').replace('.phonon', '') + '_spectral.png', bbox_inches='tight', dpi=300)
+    if any([kwargs.get('pdf'), kwargs.get('svg'), kwargs.get('png')]):
+        if kwargs.get('pdf'):
+            plt.savefig(seed.replace('.bands', '').replace('.phonon', '') + '_spectral.pdf', bbox_inches='tight')
+        if kwargs.get('svg'):
+            plt.savefig(seed.replace('.bands', '').replace('.phonon', '') + '_spectral.svg', bbox_inches='tight', transparent=True)
+        if kwargs.get('png'):
+            plt.savefig(seed.replace('.bands', '').replace('.phonon', '') + '_spectral.png', bbox_inches='tight', dpi=300)
 
-    plt.show()
+    else:
+        plt.show()
 
 
 def modes2bands(phonon_dispersion, path, branches):

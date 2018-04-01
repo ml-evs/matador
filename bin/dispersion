@@ -6,6 +6,9 @@ is created. If a <seed>.adaptive.dat file exists
 then a combined BS/DOS plot will be created.
 """
 
+import matplotlib
+# ensure we can create figures without X
+matplotlib.use('Agg')
 from matador.plotting import plot_spectral
 from matador.utils.print_utils import print_failure
 from os.path import isfile

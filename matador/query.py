@@ -330,7 +330,7 @@ class DBQuery(object):
                         print_warning('WARNING: matched multiple structures with text_id ' +
                                       id_cursor[0]['text_id'][0] + ' ' +
                                       id_cursor[0]['text_id'][1] + '.' +
-                                      'Skipping this set...')
+                                      ' Skipping this set...')
                         rand_sample += 1
                     else:
                         self.query_dict = dict()
