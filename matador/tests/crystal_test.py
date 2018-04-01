@@ -34,12 +34,12 @@ class CrystalTest(unittest.TestCase):
         doc, s = magres2dict(REAL_PATH + 'data/NaP.magres')
         crystal = Crystal(doc)
         for atom in crystal:
-            print(atom, atom.chemical_shift)
+            print(atom, atom.magres_shift)
 
     @unittest.skipIf(not imported_vornet, 'Voronoi code not found in this distribution')
     def testCoordination(self):
         doc, s = magres2dict(REAL_PATH + 'data/NaP.magres')
-        crystal = Crystal(doc)
+        crystal = Crystal(doc, voronoi=True)
         for atom in crystal:
             print(atom, atom.coordination)
         print(crystal.coordination_lists)

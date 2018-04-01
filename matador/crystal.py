@@ -42,9 +42,13 @@ class Crystal:
             self._space_group = {0.01: self._doc['space_group']}
 
         for src in self._doc['source']:
-            if src.endswith('.castep') or src.endswith('.res'):
+            if src.endswith('.castep') or src.endswith('.res') or src.endswith('.history'):
                 self.root_source = src.split('/')[-1] \
-                                      .replace('.res', '').replace('.castep', '')
+                                      .replace('.res', '').replace('.castep', '').replace('.history', '')
+                break
+            elif 'OQMD ' in src:
+                self.root_source = src
+                break
 
     def __getitem__(self, key):
         # if array-style access, e.g. crystal[3], return 3rd site object
@@ -75,27 +79,28 @@ class Crystal:
     def construct_sites(self, voronoi=False):
         for ind, species in enumerate(self.atom_types):
             position = self._doc['positions_frac'][ind]
-            data = {}
+            site_data = {}
             if 'chemical_shifts' in self._doc:
                 if len(self._doc['chemical_shifts']) == len(self._doc['atom_types']):
-                    data['shift'] = self._doc['chemical_shifts'][ind]
+                    site_data['magres_shift'] = self._doc['chemical_shifts'][ind]
             if 'magnetic_shielding_tensor' in self._doc:
                 if len(self._doc['magnetic_shielding_tensor']) == len(self._doc['atom_types']):
-                    data['shielding'] = self._doc['magnetic_shielding_tensor'][ind]
+                    site_data['magres_shielding'] = self._doc['magnetic_shielding_tensor'][ind]
+            if 'chemical_shift_anisos' in self._doc:
+                    site_data['magres_aniso'] = self._doc['chemical_shift_anisos'][ind]
+            if 'chemical_shift_asymmetries' in self._doc:
+                    site_data['magres_asymm'] = self._doc['chemical_shift_asymmetries'][ind]
             if 'atomic_spins' in self._doc:
-                data['spin'] = self._doc['atomic_spins'][ind]
+                site_data['spin'] = self._doc['atomic_spins'][ind]
             if 'voronoi_substructure' in self._doc:
-                data['voronoi'] = self._doc['voronoi_substructure'][ind]
+                site_data['voronoi_substructure'] = self._doc['voronoi_substructure'][ind]
             elif voronoi:
-                data['voronoi'] = self.voronoi_substructure[ind]
+                site_data['voronoi_substructure'] = self.voronoi_substructure[ind]
 
             self.sites.append(Site(species,
                                    position,
                                    self.lattice_cart,
-                                   spin=data.get('spin'),
-                                   voronoi_substructure=data.get('voronoi'),
-                                   chemical_shift=data.get('shift'),
-                                   magnetic_shielding=data.get('shielding')))
+                                   **site_data))
 
     @property
     def atom_types(self):

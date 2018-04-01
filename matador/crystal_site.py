@@ -7,25 +7,42 @@ from matador.utils.cell_utils import cart2frac, frac2cart
 
 class Site:
     def __init__(self, species, position, lattice_cart,
-                 position_unit='fractional',
-                 spin=None, voronoi_substructure=None,
-                 chemical_shift=None, magnetic_shielding=None):
+                 position_unit='fractional', **site_data):
+
         self.lattice = lattice_cart
         self.set_position(position, position_unit)
         self.species = species
-        self.spin = spin
+        self.site_data = {}
 
-        if voronoi_substructure is not None:
-            assert self.species == voronoi_substructure[0]
-            self.voronoi_substructure = voronoi_substructure[1]
-        else:
-            self.voronoi_substructure = None
+        if site_data.get('voronoi_substructure') is not None:
+            assert self.species == site_data['voronoi_substructure'][0]
+            self.site_data['voronoi_substructure'] = site_data['voronoi_substructure'][1]
+            del site_data['voronoi_substructure']
 
-        self.chemical_shift = chemical_shift
-        self.magnetic_shielding = magnetic_shielding
+        self.site_data.update(site_data)
 
     def __str__(self):
-        return '{species:<3} {pos[0]:4.4f} {pos[1]:4.4f} {pos[2]:4.4f}'.format(species=self.species, pos=self.coords)
+        site_str = '{species:<3} {pos[0]:4.4f} {pos[1]:4.4f} {pos[2]:4.4f}'.format(species=self.species, pos=self.coords)
+        for key in self.site_data:
+            site_str += '\n{} = {}'.format(key, self.site_data[key])
+        return site_str
+
+    def __getattr__(self, key):
+        if key in self.__dict__:
+            return self.key
+        if key in self.site_data:
+            return self.site_data[key]
+        if key == '__deepcopy__':
+            return self.__deepcopy__(memo)
+        else:
+            raise AttributeError
+
+    def __deepcopy__(self, memo):
+        from copy import deepcopy
+        species, position, lattice = (deepcopy(x) for x in (self.species, self._coords['fractional'], self.lattice))
+        site_data = deepcopy(self.site_data)
+        return Site(species, position, lattice, position_unit='fractional', **site_data)
+
 
     def set_position(self, position, units):
         if '_coords' not in self.__dict__:
