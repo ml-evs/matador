@@ -39,8 +39,6 @@ class DBQuery(object):
         if self.args.get('testing') is None:
             self.args['testing'] = False
 
-        print(self.args['testing'])
-
         if debug:
             print(self.args)
         if self.args.get('subcmd') is None:
@@ -61,14 +59,6 @@ class DBQuery(object):
             self.mongo_settings = load_custom_settings(config_fname=self.args.get('config_fname'))
             self.client, self.db, self.collections = make_connection_to_collection(self.args.get('db'), mongo_settings=self.mongo_settings)
 
-        # improve this clause at some point
-        if self.args.get('summary') or self.args.get('subcmd') in ['swaps', 'polish']:
-            self.top = -1
-        else:
-            self.top = self.args.get('top') if self.args.get('top') is not None else 10
-
-        self.delta_E = self.args.get('delta_E')
-
         # define some periodic table macros
         self.periodic_table = get_periodic_table()
 
@@ -76,27 +66,36 @@ class DBQuery(object):
         self.construct_query()
 
         if not self.args.get('testing'):
+
+            # improve this clause at some point
+            if self.args.get('summary') or self.args.get('subcmd') in ['swaps', 'polish']:
+                self.top = -1
+            else:
+                self.top = self.args.get('top') if self.args.get('top') is not None else 10
+
+            self.delta_E = self.args.get('delta_E')
+
             # execute the query
             self.perform_query()
 
-        if self.args.get('uniq'):
-            from matador.similarity.similarity import get_uniq_cursor
-            print_notify('Filtering for unique structures...')
-            if self.args.get('top') is not None:
-                unique_set, _, _, _ = get_uniq_cursor(self.cursor[:self.args.get('top')],
-                                                      debug=self.args.get('debug'), projected=True, sim_tol=self.args.get('uniq'))
-                print('Filtered {} down to {}'.format(min(len(self.cursor),
-                                                      self.args.get('top')),
-                                                      len(unique_set)))
-            else:
-                unique_set, _, _, _ = get_uniq_cursor(self.cursor, debug=self.args.get('debug'), sim_tol=self.args.get('uniq'), projected=True)
-                print('Filtered {} down to {}'.format(len(self.cursor),
-                                                      len(unique_set)))
-            self.cursor = [self.cursor[ind] for ind in unique_set]
-            display_results(self.cursor, hull=None, args=self.args)
+            if self.args.get('uniq'):
+                from matador.similarity.similarity import get_uniq_cursor
+                print_notify('Filtering for unique structures...')
+                if self.args.get('top') is not None:
+                    unique_set, _, _, _ = get_uniq_cursor(self.cursor[:self.args.get('top')],
+                                                          debug=self.args.get('debug'), projected=True, sim_tol=self.args.get('uniq'))
+                    print('Filtered {} down to {}'.format(min(len(self.cursor),
+                                                          self.args.get('top')),
+                                                          len(unique_set)))
+                else:
+                    unique_set, _, _, _ = get_uniq_cursor(self.cursor, debug=self.args.get('debug'), sim_tol=self.args.get('uniq'), projected=True)
+                    print('Filtered {} down to {}'.format(len(self.cursor),
+                                                          len(unique_set)))
+                self.cursor = [self.cursor[ind] for ind in unique_set]
+                display_results(self.cursor, hull=None, args=self.args)
 
-        if not client and not self.args.get('testing'):
-            self.client.close()
+            if not client and not self.args.get('testing'):
+                self.client.close()
 
         if quiet:
             f.close()
