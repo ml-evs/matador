@@ -10,7 +10,6 @@ from matador.query import DBQuery
 from matador.hull import QueryConvexHull
 from matador.utils.print_utils import print_failure, print_warning, print_notify
 from matador.utils.db_utils import make_connection_to_collection, load_custom_settings
-from matador.utils.cursor_utils import display_results
 from matador.version import __version__
 # import standard library
 import argparse
@@ -121,22 +120,6 @@ class Matador(object):
                 if self.args.get('compare') is None:
                     exit('Please specify which hulls to query with --compare.')
                 diff_hulls(self.client, self.collections, **self.args)
-
-            if self.args.get('uniq'):
-                from matador.similarity.similarity import get_uniq_cursor
-                print_notify('Filtering for unique structures...')
-                if self.args.get('top') is not None:
-                    unique_set, _, _, _ = get_uniq_cursor(self.cursor[:self.args.get('top')],
-                                                          debug=self.args.get('debug'), projected=True, sim_tol=self.args.get('uniq'))
-                    print('Filtered {} down to {}'.format(min(len(self.cursor),
-                                                          self.args.get('top')),
-                                                          len(unique_set)))
-                else:
-                    unique_set, _, _, _ = get_uniq_cursor(self.cursor, debug=self.args.get('debug'), sim_tol=self.args.get('uniq'), projected=True)
-                    print('Filtered {} down to {}'.format(len(self.cursor),
-                                                          len(unique_set)))
-                self.cursor = [self.cursor[ind] for ind in unique_set]
-                display_results(self.cursor, hull=None if self.args.get('subcmd') != 'hull' else True, args=self.args)
 
             # perform any extra filtration
             if self.args.get('filter'):

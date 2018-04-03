@@ -12,7 +12,7 @@ import sys
 from itertools import combinations
 from traceback import print_exc
 # matador modules
-from matador.utils.print_utils import print_failure, print_warning, print_success
+from matador.utils.print_utils import print_failure, print_warning, print_success, print_notify
 from matador.utils.chem_utils import get_periodic_table, get_formula_from_stoich
 from matador.utils.chem_utils import parse_element_string, get_stoich_from_formula
 from matador.utils.cursor_utils import display_results
@@ -73,6 +73,22 @@ class DBQuery(object):
         if not self.args.get('testing'):
             # execute the query
             self.perform_query()
+
+        if self.args.get('uniq'):
+            from matador.similarity.similarity import get_uniq_cursor
+            print_notify('Filtering for unique structures...')
+            if self.args.get('top') is not None:
+                unique_set, _, _, _ = get_uniq_cursor(self.cursor[:self.args.get('top')],
+                                                      debug=self.args.get('debug'), projected=True, sim_tol=self.args.get('uniq'))
+                print('Filtered {} down to {}'.format(min(len(self.cursor),
+                                                      self.args.get('top')),
+                                                      len(unique_set)))
+            else:
+                unique_set, _, _, _ = get_uniq_cursor(self.cursor, debug=self.args.get('debug'), sim_tol=self.args.get('uniq'), projected=True)
+                print('Filtered {} down to {}'.format(len(self.cursor),
+                                                      len(unique_set)))
+            self.cursor = [self.cursor[ind] for ind in unique_set]
+            display_results(self.cursor, hull=None, args=self.args)
 
         if not client:
             self.client.close()
