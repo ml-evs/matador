@@ -36,6 +36,9 @@ class DBQuery(object):
         # read args
         self.args = kwargs
         self.debug = debug
+        if self.args.get('testing') is None:
+            self.args['testing'] = False
+
         if debug:
             print(self.args)
         if self.args.get('subcmd') is None:
