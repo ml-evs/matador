@@ -52,7 +52,7 @@ class DBQuery(object):
 
         # if empty collections, assume called from API and read kwargs,
         # also need to connect to db
-        if not collections or not client:
+        if not collections or not client and not self.args.get('testing'):
             self.mongo_settings = load_custom_settings(config_fname=self.args.get('config_fname'))
             self.client, self.db, self.collections = make_connection_to_collection(self.args.get('db'), mongo_settings=self.mongo_settings)
 
