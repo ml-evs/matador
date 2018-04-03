@@ -36,6 +36,11 @@ class DBQuery(object):
         # read args
         self.args = kwargs
         self.debug = debug
+        if self.args.get('testing') is None:
+            self.args['testing'] = False
+
+        print(self.args['testing'])
+
         if debug:
             print(self.args)
         if self.args.get('subcmd') is None:
@@ -52,7 +57,7 @@ class DBQuery(object):
 
         # if empty collections, assume called from API and read kwargs,
         # also need to connect to db
-        if not collections or not client and not self.args.get('testing'):
+        if (not collections or not client) and not self.args.get('testing'):
             self.mongo_settings = load_custom_settings(config_fname=self.args.get('config_fname'))
             self.client, self.db, self.collections = make_connection_to_collection(self.args.get('db'), mongo_settings=self.mongo_settings)
 
@@ -90,7 +95,7 @@ class DBQuery(object):
             self.cursor = [self.cursor[ind] for ind in unique_set]
             display_results(self.cursor, hull=None, args=self.args)
 
-        if not client:
+        if not client and not self.args.get('testing'):
             self.client.close()
 
         if quiet:
