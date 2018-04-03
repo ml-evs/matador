@@ -774,8 +774,8 @@ class DBQuery(object):
         if len(tols) == 2:
             if tols[0] > tols[1]:
                 exit('Force tol needs to be of form [min, max]')
-            query_dict['geom_force_tol']['$lte'] = tols[0]
-            query_dict['geom_force_tol']['$gte'] = tols[1]
+            query_dict['geom_force_tol']['$gte'] = tols[0]
+            query_dict['geom_force_tol']['$lte'] = tols[1]
         else:
             query_dict['geom_force_tol']['$lte'] = tols[0]
         return query_dict
