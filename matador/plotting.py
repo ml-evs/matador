@@ -15,22 +15,26 @@ def plot_spectral(seeds, **kwargs):
     """ Plot bandstructure and optional DOS from <seed>.bands and
     <seed>.adaptive.dat file.
 
-    Input:
+    Parameters:
 
-        | seeds: list, list of filenames of bands files
+        seeds (list): list of filenames of bands/phonon files
 
-    Args:
+    Keyword Arguments:
 
-        | plot_bandstructure : bool, whether to plot bandstructure
-        | plot_dos           : bool, whether to plot density of states
-        | dos                : str, separate seed name for pDOS/DOS data
-        | phonons            : bool, whether to plot phonon or electronic data
-        | labels             : list(str), legend labels for multiple bandstructures
-        | cell               : bool, whether to work out correct labels from structure in cell file
-        | gap                : bool, draw on the band gap
-        | colour_by_seed     : bool, plot with a separate colour per bandstructure
-        | external_efermi    : float, replace scraped Fermi energy with this value (eV)
-        | highlight_bands    : list(int), colour the bands with these indices in red
+        plot_bandstructure (bool): whether to plot bandstructure
+        plot_dos (bool): whether to plot density of states
+        dos (str): separate seed name for pDOS/DOS data
+        phonons (bool): whether to plot phonon or electronic data
+        labels (list): list of strings for legend labels for multiple bandstructures
+        cell (bool): whether to work out correct labels from structure in cell file
+        gap (bool): whether to draw on the band gap
+        colour_by_seed (bool): plot with a separate colour per bandstructure
+        external_efermi (float): replace scraped Fermi energy with this value (eV)
+        highlight_bands (list): list of integer indices, colour the bands with these indices in red
+        band_colour (str): if passed "occ", bands will be coloured using cmap depending on whether they lie above
+                           or below the Fermi level. Otherwise, override all colour options with matplotlib-interpretable colour
+                           (e.g. hexcode or html colour name) to use for all bands (DEFAULT: None)
+        cmap (str): matplotlib colourmap name to use for the bands
 
     """
     from matador.scrapers.castep_scrapers import bands2dict, cell2dict, phonon2dict, optados2dict
@@ -42,7 +46,7 @@ def plot_spectral(seeds, **kwargs):
     prop_defaults = {'plot_bandstructure': True, 'plot_dos': False,
                      'phonons': False, 'cell': False, 'gap': False,
                      'colour_by_seed': False, 'external_efermi': None,
-                     'labels': None,
+                     'labels': None, 'cmap': 'Dark2', 'band_colour': None,
                      'verbosity': 0, 'highlight_bands': None}
     prop_defaults.update(kwargs)
     kwargs = prop_defaults
@@ -55,11 +59,11 @@ def plot_spectral(seeds, **kwargs):
         'axes.grid': False,
         'legend.frameon': False,
         'axes.axisbelow': True})
-    sns.set_palette('Dark2')
+    sns.set_palette(kwargs.get('cmap'))
     colours = sns.color_palette()
     valence = colours[0]
-    conduction = colours[1]
-    crossing = colours[2]
+    conduction = colours[-1]
+    crossing = colours[int(len(colours) / 2)]
 
     if not isinstance(seeds, list):
         seeds = [seeds]
@@ -140,6 +144,8 @@ def plot_spectral(seeds, **kwargs):
             for branch_ind, branch in enumerate(dispersion[branch_key]):
                 for ns in range(dispersion[spin_key]):
                     for nb in range(dispersion[band_key]):
+                        # use seaborn palette by default
+                        colour = None
                         if not kwargs['phonons']:
                             if dispersion[spin_key] == 2:
                                 if ns == 0:
@@ -147,28 +153,30 @@ def plot_spectral(seeds, **kwargs):
                                 else:
                                     colour = 'blue'
                             else:
-                                # if np.max(dispersion[eig_key][ns][nb][branch]) < 0:
-                                    # if colour_by_seed:
-                                        # colour = seed_colours[seed_ind]
-                                    # else:
-                                        # colour = valence
-                                # elif np.min(dispersion[eig_key][ns][nb][branch]) > 0:
-                                    # if colour_by_seed:
-                                        # colour = seed_colours[seed_ind]
-                                    # else:
-                                        # colour = conduction
-                                # elif np.min(dispersion[eig_key][ns][nb][branch]) < 0 and np.max(dispersion[eig_key][ns][nb][branch]) > 0:
-                                    # if colour_by_seed:
-                                        # colour = seed_colours[seed_ind]
-                                    # else:
-                                        # colour = crossing
-                                # else:
+                                if kwargs.get('band_colour') == 'occ':
+                                    if np.max(dispersion[eig_key][ns][nb][branch]) < 0:
+                                        if colour_by_seed:
+                                            colour = seed_colours[seed_ind]
+                                        else:
+                                            colour = valence
+                                    elif np.min(dispersion[eig_key][ns][nb][branch]) > 0:
+                                        if colour_by_seed:
+                                            colour = seed_colours[seed_ind]
+                                        else:
+                                            colour = conduction
+                                    elif np.min(dispersion[eig_key][ns][nb][branch]) < 0 and np.max(dispersion[eig_key][ns][nb][branch]) > 0:
+                                        if colour_by_seed:
+                                            colour = seed_colours[seed_ind]
+                                        else:
+                                            colour = crossing
+
                                 if colour_by_seed:
                                     colour = seed_colours[seed_ind]
-                                else:
-                                    colour = 'black'
-                        else:
-                            colour = 'black'
+
+                        if kwargs.get('band_colour') is not None:
+                            if kwargs.get('band_colour') != 'occ':
+                                colour = kwargs.get('band_colour')
+
                         if kwargs.get('highlight_bands') is not None and nb in kwargs.get('highlight_bands'):
                             colour = 'red'
                             alpha = 0.5
@@ -178,8 +186,12 @@ def plot_spectral(seeds, **kwargs):
                             label = kwargs.get('labels')[seed_ind]
                         else:
                             label = None
+                        # if colour is not None:
                         ax_dispersion.plot(path[(np.asarray(branch)-branch_ind).tolist()], dispersion[eig_key][ns][nb][branch],
                                            c=colour, lw=1, marker=None, ls=ls[seed_ind], alpha=alpha, label=label)
+                        # else:
+                            # ax_dispersion.plot(path[(np.asarray(branch)-branch_ind).tolist()], dispersion[eig_key][ns][nb][branch],
+                                               # lw=1, marker=None, ls=ls[seed_ind], alpha=alpha, label=label)
                 if branch_ind != len(dispersion[branch_key])-1:
                     ax_dispersion.axvline(path[branch[-1]-branch_ind], ls='-.', lw=1, c='grey')
             if kwargs.get('labels') is not None:
@@ -374,6 +386,7 @@ def plot_spectral(seeds, **kwargs):
             plt.savefig(seed.replace('.bands', '').replace('.phonon', '') + '_spectral.png', bbox_inches='tight', dpi=300)
 
     else:
+        print('Displaying plot...')
         plt.show()
 
 

@@ -7,10 +7,6 @@ then a combined BS/DOS plot will be created.
 """
 
 import matplotlib
-# ensure we can create figures without X
-matplotlib.use('Agg')
-from matador.plotting import plot_spectral
-from matador.utils.print_utils import print_failure
 from os.path import isfile
 import argparse
 
@@ -18,7 +14,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         prog='dispersion',
         description='simple plotting script for bandstructures/DOS based on matador')
-
     parser = argparse.ArgumentParser(add_help=True)
     parser.add_argument('--pdf', action='store_true',
                         help='save pdf rather than showing plot in X')
@@ -28,6 +23,10 @@ if __name__ == '__main__':
                         help='save svg rather than showing plot in X')
     parser.add_argument('--labels', type=str, nargs='*',
                         help='list of legend labels')
+    parser.add_argument('--cmap', type=str,
+                        help='matplotlib colourmap name to use')
+    parser.add_argument('--band_colour', type=str,
+                        help='override all other colour options with a matploblib-interpretable colour string')
     parser.add_argument('-g', '--gap', action='store_true',
                         help='plot position and size of band gap')
     parser.add_argument('-ph', '--phonons', action='store_true',
@@ -50,10 +49,20 @@ if __name__ == '__main__':
     verbosity = kwargs.get('verbosity')
     phonons = kwargs.get('phonons')
     labels = kwargs.get('labels')
+    cmap = kwargs.get('cmap')
+    band_colour = kwargs.get('band_colour')
 
     del kwargs['seed']
     del kwargs['verbosity']
     del kwargs['labels']
+    del kwargs['cmap']
+    del kwargs['band_colour']
+
+    # ensure we can create figures without X
+    if any([kwargs.get('pdf'), kwargs.get('svg'), kwargs.get('png')]):
+        matplotlib.use('Agg')
+    from matador.plotting import plot_spectral
+    from matador.utils.print_utils import print_failure
 
     if not phonons:
         bs_seed = test_seed.replace('.bands', '') + '.bands'
@@ -82,4 +91,6 @@ if __name__ == '__main__':
                          gap=gap,
                          verbosity=verbosity,
                          labels=labels,
+                         cmap=cmap,
+                         band_colour=band_colour,
                          **kwargs)
