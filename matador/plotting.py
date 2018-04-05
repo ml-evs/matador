@@ -8,9 +8,26 @@ from traceback import print_exc
 import numpy as np
 import matplotlib.pyplot as plt
 from matador.utils.chem_utils import get_formula_from_stoich
-from matador.utils.print_utils import print_warning
+from matador.utils.print_utils import print_warning, print_failure
 
 
+def plotting_function(function):
+    def wrapped_plot_function(*args):
+        try:
+            function(*args)
+        except Exception as exc:
+            if 'TclError' in type(exc).__name__:
+                print_failure('Caught exception: {}'.format(type(exc).__name__))
+                print_warning('Error message was: {}'.format(exc))
+                print_warning('This is probably an X-forwarding error')
+                print_failure('Skipping plot...')
+                pass
+            else:
+                raise exc
+    return wrapped_plot_function
+
+
+@plotting_function
 def plot_spectral(seeds, **kwargs):
     """ Plot bandstructure and optional DOS from <seed>.bands and
     <seed>.adaptive.dat file.
@@ -425,6 +442,7 @@ def modes2bands(phonon_dispersion, path, branches):
     return phonon_dispersion
 
 
+@plotting_function
 def plot_voltage_curve(hull, show=False):
     """ Plot calculated voltage curve. """
     import matplotlib.pyplot as plt
@@ -628,6 +646,7 @@ def plot_2d_hull_bokeh(hull):
             f.write('\n'.join(map(str, flines)))
 
 
+@plotting_function
 def plot_3d_ternary_hull(hull):
     """ Plot calculated ternary hull in 3D. """
     from mpl_toolkits.mplot3d import axes3d
@@ -717,6 +736,7 @@ def get_linear_cmap(colours, N=100, list_only=False):
         return LinearSegmentedColormap.from_list('linear_cmap', linear_cmap, N=N)
 
 
+@plotting_function
 def plot_volume_curve(hull, show=False):
     """ Plot calculated volume curve. """
     from matador.utils.cursor_utils import get_array_from_cursor
@@ -793,6 +813,7 @@ def plot_volume_curve(hull, show=False):
         plt.show()
 
 
+@plotting_function
 def plot_2d_hull(hull, ax=None, dis=False, show=False, plot_points=True,
                  plot_hull_points=True, labels=False, colour_by_source=False,
                  **kwargs):
@@ -1003,6 +1024,7 @@ def plot_2d_hull(hull, ax=None, dis=False, show=False, plot_points=True,
     return ax
 
 
+@plotting_function
 def plot_ternary_hull(hull, axis=None, show=False, plot_points=True, expecting_cbar=True, **kwargs):
     """ Plot calculated ternary hull as a 2D projection.
 
