@@ -62,36 +62,37 @@ class DBQuery(object):
         # define some periodic table macros
         self.periodic_table = get_periodic_table()
 
+        # set default top value to 10
+        if self.args.get('summary') or self.args.get('subcmd') in ['swaps', 'polish']:
+            self.top = None
+        else:
+            self.top = self.args.get('top') if self.args.get('top') is not None else 10
+
         # create the dictionary to pass to MongoDB
         self.construct_query()
 
         if not self.args.get('testing'):
-
-            # improve this clause at some point
-            if self.args.get('summary') or self.args.get('subcmd') in ['swaps', 'polish']:
-                self.top = -1
-            else:
-                self.top = self.args.get('top') if self.args.get('top') is not None else 10
 
             self.delta_E = self.args.get('delta_E')
 
             # execute the query
             self.perform_query()
 
-            if self.args.get('uniq'):
+            # only filter for uniqueness if not eventually making a hull
+            if self.args.get('uniq') and self.args.get('subcmd') not in ['hull', 'hulldiff', 'voltage']:
                 from matador.similarity.similarity import get_uniq_cursor
                 print_notify('Filtering for unique structures...')
-                if self.args.get('top') is not None:
+                if self.top is not None:
                     unique_set, _, _, _ = get_uniq_cursor(self.cursor[:self.args.get('top')],
-                                                          debug=self.args.get('debug'), projected=True, sim_tol=self.args.get('uniq'))
-                    print('Filtered {} down to {}'.format(min(len(self.cursor),
-                                                          self.args.get('top')),
+                                                          debug=self.args.get('debug'), sim_tol=self.args.get('uniq'))
+                    print('Filtered {} down to {}'.format(len(self.cursor[:self.args.get('top')]),
                                                           len(unique_set)))
+                    self.cursor = [self.cursor[:self.args.get('top')][ind] for ind in unique_set]
                 else:
-                    unique_set, _, _, _ = get_uniq_cursor(self.cursor, debug=self.args.get('debug'), sim_tol=self.args.get('uniq'), projected=True)
+                    unique_set, _, _, _ = get_uniq_cursor(self.cursor, debug=self.args.get('debug'), sim_tol=self.args.get('uniq'))
                     print('Filtered {} down to {}'.format(len(self.cursor),
                                                           len(unique_set)))
-                self.cursor = [self.cursor[ind] for ind in unique_set]
+                    self.cursor = [self.cursor[ind] for ind in unique_set]
                 display_results(self.cursor, hull=None, args=self.args)
 
             if not client and not self.args.get('testing'):
@@ -269,8 +270,9 @@ class DBQuery(object):
                 if self.debug:
                     print(dumps(self.query_dict, indent=1))
                 # execute query
-                self.cursor = list(self.repo.find(SON(self.query_dict)).sort('enthalpy_per_atom',
-                                                                             pm.ASCENDING))
+                self.cursor = list(self.repo.find(SON(self.query_dict))
+                                   .sort('enthalpy_per_atom', pm.ASCENDING))
+
                 # self.cursors.append(self.cursor)
                 cursor_count = len(self.cursor)
 
@@ -322,7 +324,6 @@ class DBQuery(object):
                 else:
                     exit('Hulls and voltage curves require just one source or --include_oqmd, exiting...')
                 print('Creating hull from AJM db structures.')
-                self.args['top'] = -1
                 if self.args.get('biggest'):
                     print('\nFinding biggest calculation set for hull...\n')
                 else:

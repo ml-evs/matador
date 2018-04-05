@@ -36,9 +36,8 @@ class Matador(object):
         else:
             self.export = False
 
-        self.settings = load_custom_settings(config_fname=self.args.get('config'))
-
         if self.args['subcmd'] not in ['import', 'rebuild']:
+            self.settings = load_custom_settings(config_fname=self.args.get('config'))
             self.client, self.db, self.collections = make_connection_to_collection(self.args.get('db'),
                                                                                    check_collection=True,
                                                                                    mongo_settings=self.settings)
