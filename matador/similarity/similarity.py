@@ -11,42 +11,45 @@ import numpy as np
 from collections import defaultdict
 
 
-def get_uniq_cursor(cursor, sim_calculator=PDF, sim_tol=5e-2, energy_tol=1e-2,
+def get_uniq_cursor(cursor, fingerprint=PDF, sim_tol=0.1, energy_tol=1e-2,
                     enforce_same_stoich=True, projected=True,
-                    debug=False, **sim_calc_args):
-    """ Uses sim_calculator to filter cursor into unique structures to some
+                    debug=False, **fingerprint_calc_args):
+    """ Uses fingerprint to filter cursor into unique structures to some
     tolerance sim_tol, additionally returning a dict of duplicates and the
     correlation matrix.
 
-    Inputs:
+    Parameters:
 
-        | cursor              : matador cursor to be filtered
-        | sim_calculator      : fingerprint object type to compare
-        | sim_tol             : tolerance in similarity distance for duplicates
-        | energy_tol          : compare only structures within a certain energy tolerance (if enforce_same_stoich is False, this is disabled)
-        | enforce_same_stoich : compare only structures of the same stoichiometry
-        | projected           : use element-projected PDF to calculate similarity
-        | debug               : print timings and list similarities
-        | sim_calc_args       : dict containing parameters to pass to sim_calculator
+        cursor (list) : matador cursor to be filtered
+
+    Keyword Arguments:
+
+        fingerprint (Fingerprint) : fingerprint object type to compare (DEFAULT: PDF)
+        sim_tol (float/bool) : tolerance in similarity distance for duplicates (if True, default value of 0.1 used)
+        energy_tol (float) : compare only structures within a certain energy tolerance (if enforce_same_stoich is False, this is disabled)
+        enforce_same_stoich (bool) : compare only structures of the same stoichiometry
+        projected (bool) : use element-projected PDF to calculate similarity
+        debug (bool) : print timings and list similarities
+        fingerprint_calc_args (dict) : kwargs to pass to fingerprint
 
     Returns:
 
-        | distinct_set        : a set of indices of unique documents
-        | dupe_dict           : a dict with keys from distinct_set, listing duplicates
-        | fingerprint_list    : a list <SimilarityCalculator> objects
-        | sim_mat             : the correlation matrix of pair similarity distances
+        distinct_set (set) : a set of indices of unique documents
+        dupe_dict (dict) : a dict with keys from distinct_set, listing duplicates
+        fingerprint_list (list) : a list of <Fingerprint> objects
+        sim_mat (np.ndarray) : the correlation matrix of pair similarity distances
 
     """
     fingerprint_list = []
     if not enforce_same_stoich:
         energy_tol = 1e20
     if projected:
-        sim_calc_args['projected'] = True
+        fingerprint_calc_args['projected'] = True
     print('Calculating fingerprints...')
     if debug:
         import time
         start = time.time()
-    PDFFactory(cursor, **sim_calc_args)
+    PDFFactory(cursor, **fingerprint_calc_args)
     if debug:
         completed = time.time() - start
         print('PDFs of {} structures completed in {:0.1f} s'.format(len(cursor), completed))

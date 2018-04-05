@@ -44,6 +44,14 @@ class SimilarityFilterTest(unittest.TestCase):
         self.assertTrue('KP-NaP-OQMD_2817-CollCode14009' in filtered_cursor[0]['source'][0])
         self.assertTrue('KP-NaP-CollCode421420' in filtered_cursor[2]['source'][0])
 
+    def testNoUniquenessRetainsAllStructures(self):
+        import glob
+        files = glob.glob(REAL_PATH + 'data/uniqueness_hierarchy/*.res')
+        cursor = [res2dict(f)[0] for f in files]
+        uniq_inds, _, _, _ = get_uniq_cursor(cursor, sim_tol=0, energy_tol=1e20, projected=True)
+        filtered_cursor = [cursor[ind] for ind in uniq_inds]
+        self.assertEqual(len(filtered_cursor), len(cursor))
+
 
 if __name__ == '__main__':
     unittest.main()
