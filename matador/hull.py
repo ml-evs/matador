@@ -71,7 +71,10 @@ class QueryConvexHull(object):
                     elements.add(species)
             self.elements = list(elements)
         else:
-            self.elements = elements
+            if isinstance(elements, str):
+                self.elements = list(elements)
+            else:
+                self.elements = elements
             # filter out structures with any elements with missing chem pots
             self.cursor = [doc for doc in self.cursor if all([atom in self.elements for atom, num in doc['stoichiometry']])]
 
@@ -133,9 +136,15 @@ class QueryConvexHull(object):
             else:
                 self.plot_hull(**plot_kwargs)
 
-        if not self.args.get('no_plot') and not self.savefig:
-            import matplotlib.pyplot as plt
-            plt.show()
+        if self.args.get('uniq'):
+            from matador.similarity.similarity import get_uniq_cursor
+            print_notify('Filtering for unique structures...')
+            unique_set, _, _, _ = get_uniq_cursor(self.hull_cursor,
+                                                  debug=self.args.get('debug'), sim_tol=self.args.get('uniq'))
+            self.hull_cursor = [self.hull_cursor[ind] for ind in unique_set]
+            display_results(self.hull_cursor, hull=True, args=self.args)
+            print('Filtered {} down to {}'.format(len(self.hull_cursor),
+                                                  len(unique_set)))
 
         if quiet:
             f.close()
@@ -462,14 +471,14 @@ class QueryConvexHull(object):
         self.non_binary = False
         if self.query is not None:
             query = self.query
-            self.elements = query.args.get('composition')
-            if ':' in self.elements[0]:
+            elements_str = ''.join(query.args.get('composition'))
+            if ':' in elements_str:
                 self.non_binary = True
-                self.chempot_search = self.elements[0].split(':')
+                self.chempot_search = elements_str.split(':')
                 if query.args.get('intersection'):
                     print_failure('Please disable intersection when creating a non-binary hull.')
                     exit()
-            self.elements = [elem for elem in re.split(r'([A-Z][a-z]*)', self.elements[0]) if elem.isalpha()]
+            self.elements = [elem for elem in re.split(r'([A-Z][a-z]*)', elements_str) if elem.isalpha()]
         assert(len(self.elements) < 4 and len(self.elements) > 1)
         self.ternary = False
         if len(self.elements) == 3 and not self.non_binary:
@@ -647,6 +656,7 @@ class QueryConvexHull(object):
             self.endstoichs = endstoichs
 
             # iterate over possible endpoints of delithiation
+            self.reactions = []
             self.voltages = []
             self.Q = []
             self.x = []
@@ -731,13 +741,16 @@ class QueryConvexHull(object):
                 crossover = sorted(crossover)
                 Q = sorted([get_generic_grav_capacity(point, self.elements) for point in crossover])
                 x = []
+                reactions = []
                 reaction = [get_formula_from_stoich(endstoichs[reaction_ind])]
+                reactions.append(reaction)
                 for ind, face in enumerate(intersections):
                     simplex_index = int(face[0])
                     reaction = []
                     reaction = [get_formula_from_stoich(hull_cursor[idx]['stoichiometry'])
                                 for idx in hull.simplices[simplex_index]
                                 if get_formula_from_stoich(hull_cursor[idx]['stoichiometry']) not in reaction]
+                    reactions.append(reaction)
                     if not quiet:
                         print('{d[0]} + {d[1]} + {d[2]}'.format(d=reaction))
                     Evec = points[hull.simplices[simplex_index], 2]
@@ -759,6 +772,7 @@ class QueryConvexHull(object):
                             print(5*(ind+1)*' ' + ' ---> ', end='')
                     voltages.append(V)
 
+                self.reactions.append(reactions)
                 self.Q.append(Q)
                 self.x.append(x)
                 self.voltages.append(voltages)
