@@ -89,7 +89,6 @@ def get_data(structure_files, conv_field='cut_off_energy'):
     elems = set()
 
     if chempot_mode:
-        
         for value in chempots_dict:
             for elem in chempots_dict[value]:
                 elems.add(elem)
@@ -169,11 +168,11 @@ def plot_both(plot_cutoff=False, plot_kpt=False, cutoff_data={}, kpt_data={}, lo
             for ind, key in enumerate(cutoff_form):
                 colour = colours[ind]
                 line, = ax_cutoff.plot(-1/cutoff_form[key][:, 0], np.log10(np.abs(cutoff_form[key][:, 1]-cutoff_form[key][-1, 1])*1000),
-                                       'o', markersize=5, alpha=1, label=cutoff_stoich_list[key], lw=0, zorder=1000, c=colour)
+                                       'o', markersize=5, alpha=1, label=key, lw=0, zorder=1000, c=colour)
                 point, = ax_cutoff.plot(-1/cutoff_form[key][:, 0], np.log10(np.abs(cutoff_form[key][:, 1]-cutoff_form[key][-1, 1])*1000),
-                                        '-', alpha=0.2, label=cutoff_stoich_list[key], lw=1, zorder=1000, c=colour)
+                                        '-', alpha=0.2, label=key, lw=1, zorder=1000, c=colour)
                 lines.append(line)
-                labels.append(cutoff_stoich_list[key])
+                labels.append(key)
             if show_chempots and 'chempots' in cutoff_data:
                 for key in cutoff_chempots:
                     ax_cutoff.plot(-1/cutoff_chempots[key][:, 0], np.log10(np.abs(cutoff_chempots[key][:, 1]-cutoff_chempots[key][-1, 1])*1000),
@@ -182,11 +181,11 @@ def plot_both(plot_cutoff=False, plot_kpt=False, cutoff_data={}, kpt_data={}, lo
             for ind, key in enumerate(cutoff_form):
                 colour = colours[ind]
                 line, = ax_cutoff.plot(-1/cutoff_form[key][:, 0], (np.abs(cutoff_form[key][:, 1]-cutoff_form[key][-1, 1])*1000),
-                                       'o', markersize=5, alpha=1, lw=0, label=cutoff_stoich_list[key], zorder=1000, c=colour)
+                                       'o', markersize=5, alpha=1, lw=0, label=key, zorder=1000, c=colour)
                 point, = ax_cutoff.plot(-1/cutoff_form[key][:, 0], (np.abs(cutoff_form[key][:, 1]-cutoff_form[key][-1, 1])*1000),
-                                        '-', alpha=0.2, label=cutoff_stoich_list[key], lw=1, zorder=1000, c=colour)
+                                        '-', alpha=0.2, label=key, lw=1, zorder=1000, c=colour)
                 lines.append(line)
-                labels.append(cutoff_stoich_list[key])
+                labels.append(key)
             if show_chempots and 'chempots' in cutoff_data:
                 for key in cutoff_chempots:
                     ax_cutoff.plot(-1/cutoff_chempots[key][:, 0], np.abs(cutoff_chempots[key][:, 1]-cutoff_chempots[key][-1, 1])*1000,
@@ -228,8 +227,8 @@ def plot_both(plot_cutoff=False, plot_kpt=False, cutoff_data={}, kpt_data={}, lo
         if log:
             for ind, key in enumerate(kpt_form):
                 colour = colours[ind]
-                line, = ax_kpt.plot(kpt_form[key][:, 0], np.log10(np.abs(kpt_form[key][:, 1]-kpt_form[key][0, 1])*1000), 'o', markersize=5, alpha=1, label=kpt_stoich_list[key], lw=0, zorder=1000, c=colour)
-                point, = ax_kpt.plot(kpt_form[key][:, 0], np.log10(np.abs(kpt_form[key][:, 1]-kpt_form[key][0, 1])*1000), '-', alpha=0.2, label=kpt_stoich_list[key], lw=1, zorder=1000, c=colour)
+                line, = ax_kpt.plot(kpt_form[key][:, 0], np.log10(np.abs(kpt_form[key][:, 1]-kpt_form[key][0, 1])*1000), 'o', markersize=5, alpha=1, label=key, lw=0, zorder=1000, c=colour)
+                point, = ax_kpt.plot(kpt_form[key][:, 0], np.log10(np.abs(kpt_form[key][:, 1]-kpt_form[key][0, 1])*1000), '-', alpha=0.2, label=key, lw=1, zorder=1000, c=colour)
                 lines.append(line)
                 labels.append(kpt_stoich_list[key])
             if show_chempots and 'chempots' in kpt_data:
@@ -238,28 +237,13 @@ def plot_both(plot_cutoff=False, plot_kpt=False, cutoff_data={}, kpt_data={}, lo
         else:
             for ind, key in enumerate(kpt_form):
                 colour = colours[ind]
-                line, = ax_kpt.plot(kpt_form[key][:, 0], np.abs(kpt_form[key][:, 1]-kpt_form[key][0, 1])*1000, 'o', markersize=5, alpha=1, label=kpt_stoich_list[key], lw=0, zorder=1000, c=colour)
-                point, = ax_kpt.plot(kpt_form[key][:, 0], np.abs(kpt_form[key][:, 1]-kpt_form[key][0, 1])*1000, '-', alpha=0.2, label=kpt_stoich_list[key], lw=1, zorder=1000, c=colour)
+                line, = ax_kpt.plot(kpt_form[key][:, 0], np.abs(kpt_form[key][:, 1]-kpt_form[key][0, 1])*1000, 'o', markersize=5, alpha=1, label=key, lw=0, zorder=1000, c=colour)
+                point, = ax_kpt.plot(kpt_form[key][:, 0], np.abs(kpt_form[key][:, 1]-kpt_form[key][0, 1])*1000, '-', alpha=0.2, label=key, lw=1, zorder=1000, c=colour)
                 lines.append(line)
-                labels.append(kpt_stoich_list[key])
+                labels.append(key)
             if show_chempots and 'chempots' in kpt_data:
                 for key in kpt_chempots:
                     ax_kpt.plot(kpt_chempots[key][:, 0], np.abs(kpt_chempots[key][:, 1]-kpt_chempots[key][0, 1])*1000, 'o-', markersize=5, alpha=1, label=key, lw=1, c='grey')
-
-        # try:
-            # kpts = []
-            # with open('kpt.conv', 'r') as f:
-                # flines = f.readlines()
-                # for line in flines:
-                    # kpts.append(float(line.replace('#', '')))
-                # kpts = reversed(sorted(kpts))
-                # kpts = ['{:.3f}'.format(kpt) for kpt in kpts]
-
-            # ax_kpt.set_xticks(kpts)
-            # ax_kpt.set_xlabel('max k-point spacing (1/A)')
-        # except:
-            # print_exc()
-            # print('No kpt.conv file found, axis labels may be ugly...')
 
         if plot_cutoff:
             ax_kpt.set_xlim(ax_kpt.get_xlim()[1], ax_kpt.get_xlim()[0])
@@ -269,7 +253,7 @@ def plot_both(plot_cutoff=False, plot_kpt=False, cutoff_data={}, kpt_data={}, lo
                 ax_kpt.set_ylabel('log(Relative energy difference (meV/atom))')
             else:
                 ax_kpt.set_ylabel('Relative energy difference (meV/atom)')
-    plt.figlegend(lines, labels, loc='upper center', fontsize=10, ncol=int((num_structures)/2 + num_structures % 2))
+    plt.figlegend(lines, labels, loc='upper center', fontsize=10, ncol=2, frameon=True, fancybox=True, shadow=True)
     plt.show()
     plt.savefig('conv.png', bbox_inches='tight')
 
