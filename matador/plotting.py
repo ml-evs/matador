@@ -12,9 +12,9 @@ from matador.utils.print_utils import print_warning, print_failure
 
 
 def plotting_function(function):
-    def wrapped_plot_function(*args):
+    def wrapped_plot_function(*args, **kwargs):
         try:
-            function(*args)
+            function(*args, **kwargs)
         except Exception as exc:
             if 'TclError' in type(exc).__name__:
                 print_failure('Caught exception: {}'.format(type(exc).__name__))
