@@ -1,7 +1,11 @@
-# coding: utf-8
-""" Contains the FullRelaxer class for continuously
-restarted geometry optimisations. Previously part of run3.
+# -*- coding: utf-8 -*-
+
+""" This module contains the FullRelaxer class for performing continuously
+restarted geometry optimisation and SCF calculations in CASTEP, as well
+as the execution of arbitrary programs with mpirun.
 """
+
+
 # matador modules
 from matador.scrapers.castep_scrapers import cell2dict
 from matador.scrapers.castep_scrapers import res2dict, castep2dict
@@ -20,51 +24,65 @@ import glob
 
 
 class FullRelaxer:
-    """ Perform full relxation of res input by first doing
-    4 rough optimisations with only a few iterations, followed by
-    4 larger optimisations with many iterations,
-    e.g. 4 lots of 2 then 4 lots of geom_max_iter/4.
-
-    Input:
-
-        | res           : str/dict, either filename or input structure dict
-        | param_dict    : dict, castep parameters
-        | cell_dict     : dict, castep cell input
-        | ncores        : int, number of cores for mpirun call
-        | nnodes        : int, number of nodes for mpirun call
-        | node          : str, node name to run on
-
-    Arguments:
-
-        | executable    : str, name of binary to execute (DEFAULT: castep)
-        | mode          : str, either 'castep' or 'generic' (DEFAULT: castep)
-        | custom_params : bool, use custom param file for each structure (DEFAULT: False)
-        | rough         : int, number of small "rough" calculations (DEFAULT: 4)
-        | rough_iter    : int, number of iterations per rough calculation (DEFAULT: 2)
-        | fine_iter     : int, number of iterations per fine calculation (DEFAULT: 20)
-        | spin          : bool, break spin symmetry in first calculation (DEFAULT: False)
-        | conv_cutoffs  : list(float) of cutoffs to use for SCF convergence test (DEFAULT: False)
-        | conv_kpts     : list(float) of kpt spacings to use for SCF convergence test (DEFAULT: False)
-        | kpts_1D       : bool, treat z-direction as special and create kpt_grid [1 1 n_kz] (DEFAULT: False)
-        | paths         : dict, folder names for output sorting (DEFAULT: None)
-        | archer        : bool, force use of aprun over mpirun (DEFAULT: False)
-        | slurm         : bool, force use of srun over mpirun (DEFAULT: False)
-        | bnl           : bool, deprecated alias for slurm
-        | profile       : bool, use cProfile to profile runtime
-        | intel         : bool, force use of Intel mpirun-style calls (DEFAULT: False)
-        | redirect      : str, file to redirect stdout to (DEFAULT: /dev/null unless debug).
-        | exec_test     : bool, test executable before progressing (DEFAULT: True)
-        | start         : bool, begin calculation immediately or manually call it (DEFAULT: True)
-        | reopt         : bool, whether to optimise one more time after success (DEFAULT: False)
-        | memcheck      : bool, perform castep dryrun to estimate memory usage, do not proceed if fails (DEFAULT: False)
-        | maxmem        : int, maximum memory allowed in MB for memcheck (DEFAULT: None)
-        | killcheck     : bool, check for file called $seed.kill during operation, and kill if present (DEFAULT: True)
-        | compute_dir   : str, default None, if not None, prepend paths with this folder
+    """ The main use of this class is to call an executable on a given
+    structure. The various parameters are passed to this class by the
+    common entrypoints, run3 and ilustrado. It is unlikely that you
+    will want to use this class directly.
 
     """
     def __init__(self, res, ncores, nnodes, node, **kwargs):
-        """ Make the files to run the calculation and handle
-        the calling of CASTEP itself.
+        """ Make the files to run the calculation and call the desired program.
+
+        Parameters:
+
+            res (str/dict): filename or input structure dict
+            param_dict (dict): dictionary of CASTEP parameters
+            cell_dict (dict): dictionary of CASTEP cell options
+            ncores (int): number of cores for mpirun call
+            nnodes (int): number of nodes for mpirun call
+            node (str): node name to run on (if None, run on localhost)
+
+        Keyword arguments:
+
+            executable (str): name of binary to execute (DEFAULT: 'castep').
+                Special string $seed will be parsed as the seedname,
+                e.g. executable = 'pw6.x -i $seed.in > $seed.out' (requires mode='generic').
+            mode (str): either 'castep' or 'generic' (DEFAULT: 'castep')
+            custom_params (bool): use custom per-structure param file
+                (DEFAULT: False)
+            rough (int): number of small "rough" calculations (DEFAULT: 4)
+            rough_iter (int): number of iterations per rough calculation
+                (DEFAULT: 2)
+            fine_iter (int): number of iterations per fine calculation
+                (DEFAULT: 20)
+            spin (bool): break spin symmetry in first calculation
+                (DEFAULT: False)
+            conv_cutoffs (:obj:`list` of :obj:`float`): list of cutoffs
+                to use for SCF convergence test
+            conv_kpts (:obj:`list` of :obj:`float`): list of kpt spacings
+                to use for SCF convergence test
+            kpts_1D (bool): treat z-direction as special and create
+                kpt_grid [1 1 n_kz] (DEFAULT: False)
+            archer (bool): force use of aprun over mpirun (DEFAULT: False)
+            slurm (bool): force use of srun over mpirun (DEFAULT: False)
+            intel (bool): force use of Intel mpirun-style calls (DEFAULT: False)
+            profile (bool): use cProfile to profile runtime (DEFAULT: False)
+            redirect (str): file to redirect stdout to (DEFAULT: /dev/null unless debug).
+            exec_test (bool): test executable with `<exec> --version`
+                before progressing (DEFAULT: True)
+            start (bool): begin calculation immediately or manually
+                call it (DEFAULT: True)
+            reopt (bool): whether to optimise one more time after
+                success (DEFAULT: False)
+            memcheck (bool): perform CASTEP dryrun to estimate memory
+                usage, do not proceed if fails (DEFAULT: False)
+            maxmem (int): maximum memory allowed in MB for memcheck
+                (DEFAULT: None)
+            killcheck (bool): check for file called $seed.kill during
+                operation, and kill executable if present (DEFAULT: True)
+            compute_dir (str): folder to run computations in; default is
+                None (i.e. cwd), if not None, prepend paths with this folder
+
         """
         # set defaults and update class with desired values
         prop_defaults = {'paths': None, 'param_dict': None, 'cell_dict': None, 'mode': 'castep', 'executable': 'castep', 'memcheck': False,
@@ -225,19 +243,18 @@ class FullRelaxer:
                 ps.print_stats()
 
     def relax(self, output_queue=None):
-        """ Set up the calculation to perform 4 sets of two steps,
-        then continue with the remainder of steps.
+        """ Set up a structural relaxation that is restarted intermittently
+        in order to re-mesh the kpoint grid. Completed calculations are moved
+        to the "completed" folder, and failures to "bad_castep".
 
-        Optional input:
-
-            output_queue : push node and output dict to a multiprocessing queue (optional).
+        Keyword arguments:
+            output_queue (multiprocessing.Queue): optional queue to push
+                node and output dict data to upon completion.
 
         Returns:
-
-            True iff structure was optimised, False otherwise.
+            bool: True iff structure was optimised, False otherwise.
 
         """
-
         seed = self.seed
         calc_doc = self.calc_doc
         if self.verbosity > 1:
@@ -316,7 +333,7 @@ class FullRelaxer:
                         os.remove(seed+'.param')
                     doc2param(calc_doc, seed, hash_dupe=False, spin=self.spin)
                 # run CASTEP
-                process = self.castep(seed)
+                process = self.run_command(seed)
                 process.communicate()
                 # scrape new structure from castep file
                 if not os.path.isfile(seed + '.castep'):
@@ -491,7 +508,22 @@ class FullRelaxer:
                 return False
 
     def scf(self, calc_doc, seed, keep=True):
-        """ Perform only the scf calculation without relaxation.  """
+        """ Perform an scf/bandstructure calculation with CASTEP. Files
+        from completed runs are moved to "completed" and failed runs to
+        "bad_castep".
+
+        Parameters:
+            calc_doc (dict): dictionary containing parameters and structure
+            seed (str): structure filename
+
+        Keyword arguments:
+            keep (bool): whether to keep intermediate files e.g. .bands
+
+        Returns:
+            bool: True iff SCF completed successfully, False otherwise.
+
+        """
+
         try:
             if self.verbosity > 1:
                 print_notify('Calculating SCF ' + seed)
@@ -520,7 +552,7 @@ class FullRelaxer:
 
             doc2cell(calc_doc, seed, hash_dupe=False, copy_pspots=False, overwrite=True)
             # run CASTEP
-            process = self.castep(seed)
+            process = self.run_command(seed)
             process.communicate()
             # scrape dict
             opti_dict, success = castep2dict(seed + '.castep', db=False)
@@ -552,10 +584,19 @@ class FullRelaxer:
             return False
 
     def run_generic(self, seed):
-        """ Run a generic command on the given seed. """
+        """ Run a generic mpi program on the given seed. Files from
+        completed runs are moved to "completed" and failed runs to "bad_castep".
+
+        Parameters:
+            seed (str): filename of structure
+
+        Returns:
+            bool: True iff no errors occured.
+
+        """
         try:
             self.cp_to_input(seed, ext=self.input_ext, glob_files=True)
-            process = self.castep(seed)
+            process = self.run_command(seed)
             process.communicate()
             if process.returncode != 0:
                 self.mv_to_bad(seed)
@@ -573,9 +614,7 @@ class FullRelaxer:
             return False
 
     def parse_executable(self, seed):
-        """ Turn executable list with arguments into
-        command to execute, setting the command
-        and self.redirect_file variables.
+        """ Turn executable string into list with arguments to be executed.
 
         e.g.1:
 
@@ -593,9 +632,11 @@ class FullRelaxer:
             | returns
             | ['pw6.x', '-i', 'test.in', '>' 'test.out']
 
-        Input:
+        Parameters:
+            seed (str): filename to replace $seed with in command.
 
-            seed: str, filename (including extension) to replace $seed with in command.
+        Returns:
+            :obj:`list` of :obj:`str`: list called by subprocess.POpen.
 
         """
         if isinstance(self.executable, str):
@@ -621,12 +662,11 @@ class FullRelaxer:
         """ Test if <executable> --version returns a valid string.
 
         Raises:
-
-            | SystemExit: if executable not found.
+            SystemExit: if executable not found.
 
         """
         try:
-            proc = self.castep('--version', exec_test=True)
+            proc = self.run_command('--version', exec_test=True)
         except FileNotFoundError:
             print('Unable to call mpirun/aprun/srun, currently selected: {}'.format(self.mpi_library))
             raise RuntimeError('Please check initialistion of FullRelaxer object/CLI args.')
@@ -645,8 +685,8 @@ class FullRelaxer:
         return self._mpi_library
 
     def set_mpi_library(self):
-        """ Combines command-line MPI arguments into string
-        and calls MPI library detection is no args are present.
+        """ Combines command-line MPI arguments into string and calls
+        MPI library detection is no args are present.
         """
         if sum([self.archer, self.intel, self.slurm]) > 1:
             raise RuntimeError('Conflicting command-line arguments for MPI library have been supplied, exiting.')
@@ -664,8 +704,7 @@ class FullRelaxer:
         """ Test which mpi library is being used when `mpirun`.
 
         Returns:
-
-            | mpi_library: str, 'intel', 'archer', or 'default'.
+            mpi_library (str): 'intel', 'archer', or 'default'.
 
         """
         # check first for existence of mpirun command, then aprun if that fails
@@ -695,10 +734,13 @@ class FullRelaxer:
     def do_memcheck(self, calc_doc, seed):
         """ Perform a CASTEP dryrun to estimate memory usage.
 
-        Returns:
+        Parameters:
+            calc_doc (dict): dictionary of structure and CASTEP parameters
+            seed (str): filename for structure
 
-            | True if the memory estimate is <90% of node RAM,
-              otherwise False.
+        Returns:
+            bool: True if the memory estimate is <90% of node RAM or
+                `self.maxmem`, if set
 
         """
         doc2param(calc_doc, seed, hash_dupe=False)
@@ -749,16 +791,16 @@ class FullRelaxer:
                 print('Enough memory, proceeding...')
             return True
 
-    def castep(self, seed, exec_test=False):
-        """ Calls executable on desired seed with desired number of cores.
+    def run_command(self, seed, exec_test=False):
+        """ Calls executable on seed with desired number of cores.
 
-        Input:
+        Parameters:
+            seed (str): seedname to pass append to CASTEP command,
+                e.g. <seed> or --version.
 
-            | seed : str, seedname to pass append to CASTEP command, e.g. <seed> or --version.
-
-        Args:
-
-            | exec_test: bool, run executable in test mode, with output piped to stdout.
+        Keyword arguments:
+            exec_test (bool): run executable in test mode, with output
+                piped to stdout.
 
         """
         command = self.parse_executable(seed)
@@ -824,7 +866,12 @@ class FullRelaxer:
         return process
 
     def mv_to_bad(self, seed):
-        """ Move all associated files to bad_castep. """
+        """ Move all files associated with "seed" to bad_castep.
+
+        Parameters:
+            seed (str): filename of structure.
+
+        """
         try:
             bad_dir = self.root_folder + '/bad_castep'
             if not os.path.exists(bad_dir):
@@ -842,18 +889,26 @@ class FullRelaxer:
                     pass
             # check root folder for any matching files and remove them
             fname = '{}/{}'.format(self.root_folder, seed)
-            for ext in ['.res', '.res.lock']:
+            for ext in ['.res', '.res.lock', '.castep']:
                 if os.path.isfile('{}{}'.format(fname, ext)):
                     os.remove('{}{}'.format(fname, ext))
         except:
             if self.verbosity > 1:
                 print_exc()
             pass
-        return
 
     def mv_to_completed(self, seed, completed_dir='completed', keep=False):
-        """ Move all associated files to completed, removing
-        any remaining files in the root_folder and compute_dir.
+        """ Move all associated files to completed, removing any
+        remaining files in the root_folder and compute_dir.
+
+        Parameters:
+            seed (str): filename for structure.
+
+        Keyword arguments:
+            completed_dir (str): folder for completed jobs.
+            keep (bool): whether to also move intermediate files.
+
+
         """
         completed_dir = self.root_folder + '/' + completed_dir
         if not os.path.exists(completed_dir):
@@ -888,10 +943,17 @@ class FullRelaxer:
                 if os.path.isfile('{}{}'.format(fname, ext)):
                     os.remove('{}{}'.format(fname, ext))
 
-        return
-
     def cp_to_input(self, seed, ext='res', glob_files=False):
-        """ Copy initial cell and res to input folder. """
+        """ Copy initial cell and res to input folder.
+
+        Parameters:
+            seed (str): filename of structure.
+
+        Keyword arguments:
+            ext (str): file extension for structure.
+            glob_files (bool): whether to glob all related seed files.
+
+        """
         try:
             input_dir = self.root_folder + '/input'
             if not os.path.exists(input_dir):
@@ -907,29 +969,31 @@ class FullRelaxer:
         except:
             print_exc()
             pass
-        return
 
     @staticmethod
     def tidy_up(seed):
-        """ Delete all run3 created files before quitting. """
+        """ Delete all created files before quitting.
+
+        Parameters:
+
+            seed (str): filename for structure.
+
+        """
         for f in glob.glob(seed + '.*'):
             if not (f.endswith('.res') or f.endswith('.castep')):
                 os.remove(f)
-        return
 
     @staticmethod
     def remove_compute_dir_if_finished(compute_dir, debug=False):
-        """ Delete the compute directory, provided it contains
-        no calculation data.
+        """ Delete the compute directory, provided it contains no
+        calculation data.
 
-        Input:
-
-            | compute_dir: str, path to directory.
+        Parameters:
+            compute_dir (str): path to compute directory.
 
         Returns:
-
-            | True if folder was deleted as no res/castep files were found,
-              otherwise False.
+            bool: True if folder was deleted as no res/castep files
+                were found, otherwise False.
         """
 
         if not os.path.isdir(compute_dir):
@@ -960,13 +1024,14 @@ class FullRelaxer:
 
 def reset_job_folder_and_count_remaining(debug=False):
     """ Remove all lock files and clean up jobs.txt
-    ready for job restart. This should be not called
-    by a FullRelaxer instance, in case other instances
-    are running.
+    ready for job restart.
+
+    Note:
+        This should be not called by a FullRelaxer instance, in case
+        other instances are running.
 
     Returns:
-
-        | num_remaining: int, number of structures left to relax
+        num_remaining (int): number of structures left to relax
 
     """
     res_list = glob.glob('*.res')
