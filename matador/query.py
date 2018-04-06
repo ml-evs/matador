@@ -257,7 +257,7 @@ class DBQuery(object):
                     if self.debug:
                         print('Empty query, showing all...')
                     self.cursor = self.repo.find().sort('enthalpy_per_atom', pm.ASCENDING)
-                    if self.top == -1:
+                    if self.top == -1 or self.top is None:
                         self.top = self.cursor.count()
                     self.cursor = list(self.cursor)
                     display_results(self.cursor[:self.top], args=self.args)
@@ -303,7 +303,7 @@ class DBQuery(object):
                                 cursor_count = self.num_to_display
                                 if self.debug:
                                     print('Displaying top {}'.format(self.num_to_display))
-                        elif self.top == -1:
+                        elif self.top == -1 or self.top is None:
                             self.num_to_display = cursor_count
                             self.top = cursor_count
                         elif cursor_count > self.top:
