@@ -9,22 +9,36 @@ import glob
 hostname = os.uname()[1]
 REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
 ROOT_DIR = os.getcwd()
+VERBOSITY = 0
 
 try:
     with open('/dev/null', 'w') as f:
         proc = sp.Popen(['castep', '--version'], stdout=f, stderr=f)
         proc.communicate()
-    print('Successfully detected CASTEP')
+    if VERBOSITY > 0:
+        print('Successfully detected CASTEP')
     CASTEP_PRESENT = True
 except FileNotFoundError:
-    print('Failed to detect CASTEP')
+    if VERBOSITY > 0:
+        print('Failed to detect CASTEP')
     CASTEP_PRESENT = False
 
-VERBOSITY = 10
+try:
+    with open('/dev/null', 'w') as f:
+        proc = sp.Popen(['mpirun', '--version'], stdout=f, stderr=f)
+        proc.communicate()
+    if VERBOSITY > 0:
+        print('Successfully detected mpirun')
+    MPI_PRESENT = True
+except FileNotFoundError:
+    if VERBOSITY > 0:
+        print('Failed to detect mpirun')
+    MPI_PRESENT = False
+
 
 
 class ComputeTest(unittest.TestCase):
-    @unittest.skipIf(not CASTEP_PRESENT, 'castep executable not found in PATH')
+    @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
     def testRelaxToQueue(self):
         """ Mimic GA and test Queue relaxations. """
         from matador.compute import FullRelaxer
@@ -97,6 +111,7 @@ class ComputeTest(unittest.TestCase):
         self.assertTrue(success, "couldn't parse output file!")
         self.assertTrue(all([match_dict[key] for key in match_dict]))
 
+    @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
     def testMissingExec(self):
         """ Ensure failure if exec misses. """
         from matador.compute import FullRelaxer
@@ -136,7 +151,7 @@ class ComputeTest(unittest.TestCase):
 
         self.assertTrue(fall_over)
 
-    @unittest.skipIf(not CASTEP_PRESENT, 'castep executable not found in PATH')
+    @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
     def testRelaxToFile(self):
         """ Relax structure from file to file. """
         from matador.compute import FullRelaxer
@@ -184,7 +199,7 @@ class ComputeTest(unittest.TestCase):
         os.chdir(ROOT_DIR)
         self.assertTrue(completed_exists, "couldn't find output file!")
 
-    @unittest.skipIf(not CASTEP_PRESENT, 'castep executable not found in PATH')
+    @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
     def testFailedRelaxation(self):
         """ Set a relaxation up to fail. """
         from matador.compute import FullRelaxer, reset_job_folder_and_count_remaining
@@ -235,7 +250,7 @@ class ComputeTest(unittest.TestCase):
         self.assertTrue(bad_exists, "couldn't find output file!")
         self.assertEqual(num, 0)
 
-    @unittest.skipIf(not CASTEP_PRESENT, 'castep executable not found in PATH')
+    @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
     def testBatchRelax(self):
         """ Relax structure from file to file. """
         from matador.compute import BatchRun, reset_job_folder_and_count_remaining
@@ -279,15 +294,15 @@ class ComputeTest(unittest.TestCase):
         self.assertTrue(completed_exists, "couldn't find output file!")
         self.assertFalse(cruft_doesnt_exist, "found some cruft {}".format(cruft))
 
-    @unittest.skipIf(not CASTEP_PRESENT, 'castep executable not found in PATH')
+    @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
     def testSCF(self):
-        """ Relax structure from file to file. """
+        """ Perform SCF on structure from file. """
         from matador.compute import FullRelaxer
         from matador.scrapers.castep_scrapers import cell2dict, param2dict
 
         os.chdir(REAL_PATH)
         seed = '_LiAs_testcase.res'
-        shutil.copy(REAL_PATH + 'data/LiAs_testcase.res', REAL_PATH + '_LiAs_testcase.res')
+        shutil.copy(REAL_PATH + 'data/LiAs_testcase_bad.res', REAL_PATH + '_LiAs_testcase.res')
         assert os.path.isfile(REAL_PATH + '_LiAs_testcase.res')
 
         cell_dict, s = cell2dict(REAL_PATH + '/data/LiAs_scf.cell', verbosity=VERBOSITY, db=False)
@@ -331,4 +346,4 @@ class ComputeTest(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main(verbosity=3)
+    unittest.main()
