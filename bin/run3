@@ -1,289 +1,24 @@
 #!/usr/bin/env python
-# coding: utf-8
-""" Run many CASTEP calculations from multiple res,
-a single cell and a single param file.
-
-Jobs in progress are listed in jobs.txt, failed
-jobs are moved to bad_castep, completed jobs are
-moved to completed and listed in finished_cleanly.txt.
-
-Based on run.pl, run2.pl and PyAIRSS class CastepRunner.
-
-Matthew Evans 2016
+""" Run calculations in a folder with BatchRun
+such that there are no clashes.
 """
-
-from __future__ import print_function
-# matador modules
-from matador.scrapers.castep_scrapers import cell2dict, param2dict
-from matador.utils.print_utils import print_failure, print_warning
-from matador.compute import FullRelaxer
-from matador.version import __version__
-
-# standard library
 import os
-from collections import defaultdict
-from traceback import print_exc
 import argparse
-import multiprocessing as mp
-import glob
-
-
-class BatchRun:
-    """ A class that implements the running of multiple generic jobs on
-    a series of files without collisions with other nodes.
-    """
-    def __init__(self, *args, **kwargs):
-        """ Check directory has valid contents and prepare log files and directories if
-        not already prepared, then begin running calculations.
-        """
-        # parse args, then co-opt them for passing directly into FullRelaxer
-        self.args = vars(args[0])
-        self.debug = self.args.get('debug')
-        self.seed = self.args['seed']
-        del self.args['seed']
-        # if only one seed, check if it is a file, and if so treat
-        # this run as a generic run, not a CASTEP cell/param run
-        if len(self.seed) == 1:
-            if '*' in self.seed[0]:
-                self.seed = glob.glob(self.seed[0])
-            elif not os.path.isfile(self.seed[0]):
-                self.seed = self.seed[0]
-
-        if isinstance(self.seed, str):
-            self.mode = 'castep'
-        else:
-            self.mode = 'generic'
-
-        if self.args.get('no_reopt'):
-            self.args['reopt'] = False
-        else:
-            self.args['reopt'] = True
-        del self.args['no_reopt']
-        self.nprocesses = int(self.args['nprocesses'])
-        del self.args['nprocesses']
-        self.limit = self.args.get('limit')
-        del self.args['limit']
-
-        # assign number of cores
-        self.all_cores = mp.cpu_count()
-        self.slurm_avail_tasks = os.environ.get('SLURM_NTASKS')
-        if self.slurm_avail_tasks is not None:
-            self.slurm_avail_tasks = int(self.slurm_avail_tasks)
-
-        if self.args.get('ncores') is None:
-            if self.slurm_avail_tasks is None:
-                self.args['ncores'] = int(self.all_cores / self.nprocesses)
-            else:
-                self.args['ncores'] = int(self.slurm_avail_tasks / self.nprocesses)
-        if self.args['nnodes'] < 1 or self.args['ncores'] < 1 or self.nprocesses < 1:
-            print_failure('Invalid number of cores, nodes or processes.')
-            exit()
-
-        if self.mode is 'castep':
-            self.castep_setup()
-        else:
-            self.generic_setup()
-
-        # prepare folders and text files
-        self.paths = dict()
-        if self.args.get('conv_cutoff'):
-            self.paths['completed_dir'] = 'completed_cutoff'
-        elif self.args.get('conv_kpt'):
-            self.paths['completed_dir'] = 'completed_kpts'
-        else:
-            self.paths['completed_dir'] = 'completed'
-        self.paths['failed_dir'] = 'bad_castep'
-        self.paths['jobs_fname'] = 'jobs.txt'
-        self.paths['completed_fname'] = 'finished_cleanly.txt'
-        self.paths['failures_fname'] = 'failures.txt'
-        self.paths['memory_fname'] = 'memory_exceeded.txt'
-        if not os.path.isfile(self.paths['jobs_fname']):
-            with open(self.paths['jobs_fname'], 'a'):
-                pass
-        if not os.path.isfile(self.paths['completed_fname']):
-            with open(self.paths['completed_fname'], 'a'):
-                pass
-        if not os.path.isfile(self.paths['failures_fname']):
-            with open(self.paths['failures_fname'], 'a'):
-                pass
-        if self.args.get('memcheck'):
-            if not os.path.isfile(self.paths['memory_fname']):
-                with open(self.paths['memory_fname'], 'a'):
-                    pass
-
-    def spawn(self):
-        """ Spawn processes to perform calculations. """
-        from random import sample
-        procs = []
-        for ind in range(self.nprocesses):
-            procs.append(mp.Process(target=self.perform_new_calculations,
-                         args=(sample(self.file_lists['res'], len(self.file_lists['res'])) if self.mode is 'castep' else self.seed, self.paths)))
-        try:
-            for proc in procs:
-                proc.start()
-        except(KeyboardInterrupt, SystemExit, RuntimeError):
-            print_exc()
-            for proc in procs:
-                proc.terminate()
-            exit('Killing running jobs and exiting...')
-
-    def perform_new_calculations(self, res_list, paths):
-        """ Perform all calculations that have not already
-        failed or finished to completion. """
-        job_count = 0
-        for res in res_list:
-            running = False
-            if os.path.isfile(res + '.lock'):
-                running = True
-            else:
-                with open(paths['jobs_fname'], 'r') as job_file:
-                    flines = job_file.readlines()
-                    for line in flines:
-                        if res in line:
-                            running = True
-                            break
-            if not running:
-                if self.limit is not None:
-                    if job_count == self.limit:
-                        raise SystemExit
-                if not os.path.isfile(res + '.lock'):
-                    with open(res + '.lock', 'a') as job_file:
-                        pass
-                else:
-                    print('Another node wrote this file when I wanted to, skipping...')
-                    running = True
-                    continue
-                with open(paths['jobs_fname'], 'a') as job_file:
-                    job_file.write(res+'\n')
-                # create full relaxer object for creation and running of job
-                try:
-                    job_count += 1
-                    hostname = os.uname()[1]
-                    relaxer = FullRelaxer(node=None, res=res,
-                                          param_dict=self.param_dict,
-                                          cell_dict=self.cell_dict,
-                                          mode=self.mode, paths=self.paths, compute_dir=hostname,
-                                          **self.args)
-                    try:
-                        if not relaxer.enough_memory:
-                            with open(paths['memory_fname'], 'a') as job_file:
-                                job_file.write(res+'\n')
-                            os.remove(res + '.lock')
-                            with open(paths['jobs_fname'], 'r+') as job_file:
-                                flines = job_file.readlines()
-                                job_file.seek(0)
-                                for ind, line in enumerate(flines):
-                                    if res not in line:
-                                        job_file.write(line)
-                                job_file.truncate()
-                        elif relaxer.success:
-                            with open(paths['completed_fname'], 'a') as job_file:
-                                job_file.write(res+'\n')
-                        else:
-                            with open(paths['failures_fname'], 'a') as job_file:
-                                job_file.write(res+'\n')
-                    except:
-                        print_exc()
-                        pass
-                except(KeyboardInterrupt, SystemExit, RuntimeError):
-                    print_exc()
-                    raise SystemExit
-        return
-
-    def generic_setup(self):
-        """ Undo things that are set ready for CASTEP jobs... """
-        self.cell_dict = None
-        self.param_dict = None
-
-    def castep_setup(self):
-        """ Set up CASTEP jobs from res files, and $seed.cell/param. """
-        # read cell/param files
-        exts = ['cell', 'param']
-        for ext in exts:
-            if not os.path.isfile('{}.{}'.format(self.seed, ext)):
-                print_failure('Failed to find {} file, {}.{}'.format(ext, self.seed, ext))
-                exit()
-        self.cell_dict, cell_success = cell2dict(self.seed + '.cell', db=False)
-        if not cell_success:
-            print(self.cell_dict)
-            print_failure('Failed to parse cell file')
-            exit()
-        self.param_dict, param_success = param2dict(self.seed + '.param', db=False)
-        if not param_success:
-            print(self.param_dict)
-            print_failure('Failed to parse param file')
-            exit()
-
-        # scan directory for files to run
-        self.file_lists = defaultdict(list)
-        self.file_lists['res'] = [file.name for file in os.scandir() if file.name.endswith('.res')]
-        if len(self.file_lists['res']) < 1:
-            print_failure('run3 in CASTEP mode requires at least 1 res file in folder, found' +
-                          str(len(self.file_lists['res'])))
-            exit()
-
-        # do some prelim checks of parameters
-        if 'geom_max_iter' not in self.param_dict and \
-                self.param_dict['task'].upper() in ['GEOMETRYOPTIMISATION',
-                                                    'GEOMETRYOPTIMIZATION']:
-            print_failure('geom_max_iter is unset, please fix this.')
-            exit()
-        if 'geom_max_iter' in self.param_dict and int(self.param_dict['geom_max_iter']) < 0:
-            print_warning('WARNING: geom_max_iter is only ' +
-                          str(self.param_dict['geom_max_iter']) + '...')
-            exit()
-
-        # check if we're doing a conv run
-        if self.args.get('conv_cutoff'):
-            try:
-                if os.path.isfile('cutoff.conv'):
-                    with open('cutoff.conv', 'r') as f:
-                        flines = f.readlines()
-                        self.args['conv_cutoff'] = []
-                        for line in flines:
-                            if not line.startswith('#'):
-                                self.args['conv_cutoff'].append(int(line))
-                else:
-                    raise RuntimeError
-            except:
-                print_exc()
-                print_failure('Error with cutoff.conv file.')
-                exit()
-        else:
-            self.args['conv_cutoff'] = None
-
-        if self.args.get('conv_kpt'):
-            try:
-                if os.path.isfile('kpt.conv'):
-                    with open('kpt.conv', 'r') as f:
-                        flines = f.readlines()
-                        self.args['conv_kpt'] = []
-                        for line in flines:
-                            if not line.startswith('#'):
-                                self.args['conv_kpt'].append(float(line))
-                else:
-                    raise RuntimeError
-            except:
-                print_exc()
-                print_failure('Error with kpt.conv file.')
-                exit()
-        else:
-            self.args['conv_kpt'] = None
-
-        # delete source from cell and param
-        del self.cell_dict['source']
-        del self.param_dict['source']
+from matador.version import __version__
+from matador.compute import BatchRun
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         prog='run3',
-        description='Run multiple CASTEP geometry optmizations from a series of .res \
-                     files and single cell and param files. The geometry optimization will \
-                     be split into four chunks of 2 iteratiosn, followed by chunks of 20 \
+        description='Run multiple calculations from a series of .res \
+                     files and single cell and param files, typically CASTEP geometry \
+                     optimisations. The geometry optimization will \
+                     be split into "--rough" (default: 4) chunks of "--rough_iter" (default: 2) \
+                     iterations, followed by chunks of "--fine_iter" (default: 20) \
                      iterations, until geom_max_iter is reached in the param file. \
-                     Successful runs will be moved to completed, crashes/failures will go to \
-                     bad_castep and initial res files will go into input. Running jobs will \
+                     Successful runs will be moved to "completed", crashes/failures will go to \
+                     "bad_castep" and initial res files will go into "input". Running jobs will \
                      be listed in jobs.txt and those that completed cleanly will be listed \
                      in finished_cleanly.txt.',
         epilog='Written by Matthew Evans (2016), based primarily on run.pl and run2.pl \
@@ -316,8 +51,6 @@ if __name__ == '__main__':
                         help='integer to set level of verbosity')
     parser.add_argument('--archer', action='store_true', default=False,
                         help='use aprun over mpirun')
-    parser.add_argument('--bnl', action='store_true', default=False,
-                        help='use srun over mpirun')
     parser.add_argument('--slurm', action='store_true', default=False,
                         help='use srun over mpirun')
     parser.add_argument('--intel', action='store_true', default=False,
@@ -350,7 +83,12 @@ if __name__ == '__main__':
     parser.add_argument('--profile', action='store_true',
                         help='profile code with cProfile')
     args = parser.parse_args()
-    if sum([vars(args)['bnl'], vars(args)['archer'], vars(args)['intel']]) > 1:
+
+    seed = vars(args)['seed']
+    kwargs = vars(args)
+    del kwargs['seed']
+
+    if sum([vars(args)['slurm'], vars(args)['archer'], vars(args)['intel']]) > 1:
         exit('Incompatible MPI arguments specified, please use at most one of --archer/--intel/--slurm.')
 
     if vars(args).get('profile'):
@@ -360,7 +98,7 @@ if __name__ == '__main__':
         hostname = os.uname()[1]
         pr = cProfile.Profile()
         pr.enable()
-    runner = BatchRun(args)
+    runner = BatchRun(seed, **kwargs)
     runner.spawn()
     if vars(args).get('profile'):
         pr.disable()
