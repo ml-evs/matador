@@ -158,6 +158,8 @@ def plot_spectral(seeds, **kwargs):
             assert len(path) == int(dispersion[num_key]) - len(dispersion[branch_key]) + 1
             if kwargs['phonons']:
                 dispersion[eig_key] = modes2bands(dispersion[eig_key], path, dispersion[branch_key])
+            sns.set_palette(kwargs.get('cmap'), n_colors=dispersion[band_key])
+            colours = sns.color_palette()
             for branch_ind, branch in enumerate(dispersion[branch_key]):
                 for ns in range(dispersion[spin_key]):
                     for nb in range(dispersion[band_key]):
@@ -203,12 +205,8 @@ def plot_spectral(seeds, **kwargs):
                             label = kwargs.get('labels')[seed_ind]
                         else:
                             label = None
-                        # if colour is not None:
                         ax_dispersion.plot(path[(np.asarray(branch)-branch_ind).tolist()], dispersion[eig_key][ns][nb][branch],
-                                           c=colour, lw=1, marker=None, ls=ls[seed_ind], alpha=alpha, label=label)
-                        # else:
-                            # ax_dispersion.plot(path[(np.asarray(branch)-branch_ind).tolist()], dispersion[eig_key][ns][nb][branch],
-                                               # lw=1, marker=None, ls=ls[seed_ind], alpha=alpha, label=label)
+                                           c=colour, lw=1, ls=ls[seed_ind], alpha=alpha, label=label)
                 if branch_ind != len(dispersion[branch_key])-1:
                     ax_dispersion.axvline(path[branch[-1]-branch_ind], ls='-.', lw=1, c='grey')
             if kwargs.get('labels') is not None:
@@ -221,11 +219,6 @@ def plot_spectral(seeds, **kwargs):
                 ylabel = '$\epsilon_k$ (eV)'
             ax_dispersion.set_ylabel(ylabel)
             ax_dispersion.set_xlim(-0.05, 1.05)
-            if kwargs['phonons']:
-                dispersion['freq_unit'] = dispersion['freq_unit'].replace('-1', '$^{-1}$')
-                ax_dispersion.axhline(np.min(dispersion['softest_mode_freq']), ls=ls[seed_ind], c='r',
-                                      label='$\omega_\mathrm{{min}} = {:5.3f}$ {}'.format(np.min(dispersion['softest_mode_freq']), dispersion['freq_unit']))
-                ax_dispersion.legend()
             xticks = []
             xticklabels = []
             shear_planes = []
@@ -348,7 +341,6 @@ def plot_spectral(seeds, **kwargs):
                     pdos = dos_data['pdos']
                     from os import remove
                     remove(seed + '.phonon_dos_tmp')
-                    plot_window = [-10, 350]
 
             if kwargs['phonons']:
                 ylabel = 'Phonon DOS'
@@ -357,6 +349,8 @@ def plot_spectral(seeds, **kwargs):
             else:
                 ylabel = 'DOS'
                 xlabel = 'Energy (eV)'
+            sns.set_palette(kwargs.get('cmap'), n_colors=num_projectors)
+            colours = sns.color_palette()
             if kwargs['plot_bandstructure']:
                 ax_dos.set_xticks([0.6*max_density])
                 ax_dos.set_xticklabels([ylabel])
@@ -368,7 +362,7 @@ def plot_spectral(seeds, **kwargs):
                 if 'pdos' in dos_data:
                     for ind, projector in enumerate(pdos):
                         ax_dos.plot(pdos[projector], energies, lw=1, zorder=1000)
-                        ax_dos.fill_betweenx(energies, 0, pdos[projector], alpha=0.3, label=projector)
+                        ax_dos.fill_betweenx(energies, 0, pdos[projector], alpha=0.3, label=projector, facecolor=colours[ind])
                 ax_dos.legend()
 
                 if seed_ind == 0 and not kwargs['phonons']:
@@ -408,42 +402,44 @@ def plot_spectral(seeds, **kwargs):
 
 
 def modes2bands(phonon_dispersion, path, branches):
-    """ Reorder phonon eigenvalues such that bands join up correctly,
+    """ Recursively reorder phonon eigenvalues such that bands join up correctly,
     based on local gradients.
 
-    Input:
+    Parameters:
 
-        | phonon_dispersion : np.ndarray, containing eigenvalues as function of q
-        | path              : np.ndarray, containing q-point path
-        | branches          : list(int), containing branch start/end points of q-point path
+        phonon_dispersion (np.ndarray): array containing eigenvalues as function of q
+        path (np.ndarray): array containing q-point path
+        branches (`obj`:list: of `obj`:int:): list containing branch start/end points of q-point path
 
     """
     import numpy as np
-    return phonon_dispersion
+    # return phonon_dispersion
     eigs = phonon_dispersion[0]
-    for branch_ind, branch in enumerate(branches[:1]):
-        eigs_branch = eigs[:, branch]
-        for i in range(1, len(branch)-1):
-            guess = 2*eigs_branch[:, i] - eigs_branch[:, i-1]
-            if np.any(np.argsort(guess) != np.argsort(eigs_branch[:, i])):
-                print(i)
-                print('Actuals:')
-                print(eigs_branch[:, i+1])
-                print('Guesses:')
-                print(guess)
-                print('!!!!!')
-                print(np.argsort(guess))
-                for j in range(i+1, len(branch)):
-                    eigs_branch[:, j] = eigs_branch[np.argsort(guess), j]
-        eigs[:, branch] = eigs_branch
 
-    phonon_dispersion[0] = eigs
+    from copy import deepcopy
+    for branch_ind, branch in enumerate(branches):
+        f, ax = plt.subplots()
+        eigs_branch = eigs[:, branch]
+        converged = False
+        while not converged:
+            for i in range(1, len(branch)-1):
+                guess = (2 * eigs_branch[:, i] - eigs_branch[:, i-1])
+                if np.any(np.argsort(guess) != np.argsort(eigs_branch[:, i+1])):
+                    tmp_eigs_branch = deepcopy(eigs_branch)
+                    for ind, mode in enumerate(np.argsort(eigs_branch[:, i]).tolist()):
+                        eigs_branch[mode, i+1:] = deepcopy(tmp_eigs_branch[np.argsort(guess)[ind], i+1:])
+                    break
+            if i == len(branch)-2:
+                converged = True
+            eigs[:, branch] = eigs_branch
+
+    phonon_dispersion = eigs.reshape(1, len(eigs), len(eigs[0]))
 
     return phonon_dispersion
 
 
 @plotting_function
-def plot_voltage_curve(hull, show=False):
+def plot_voltage_curve(hull, show=True):
     """ Plot calculated voltage curve. """
     import matplotlib.pyplot as plt
     import numpy as np
@@ -737,7 +733,7 @@ def get_linear_cmap(colours, N=100, list_only=False):
 
 
 @plotting_function
-def plot_volume_curve(hull, show=False):
+def plot_volume_curve(hull, show=True):
     """ Plot calculated volume curve. """
     from matador.utils.cursor_utils import get_array_from_cursor
     from matador.utils.chem_utils import get_generic_grav_capacity
@@ -814,7 +810,7 @@ def plot_volume_curve(hull, show=False):
 
 
 @plotting_function
-def plot_2d_hull(hull, ax=None, dis=False, show=False, plot_points=True,
+def plot_2d_hull(hull, ax=None, dis=False, show=True, plot_points=True,
                  plot_hull_points=True, labels=False, colour_by_source=False,
                  **kwargs):
     """ Plot calculated hull, returning ax and fig objects for further editing.
@@ -835,7 +831,6 @@ def plot_2d_hull(hull, ax=None, dis=False, show=False, plot_points=True,
                              is True (others will be grey)
 
     """
-
     import matplotlib.pyplot as plt
     import matplotlib.colors as colours
     if ax is None:
@@ -1025,7 +1020,7 @@ def plot_2d_hull(hull, ax=None, dis=False, show=False, plot_points=True,
 
 
 @plotting_function
-def plot_ternary_hull(hull, axis=None, show=False, plot_points=True, expecting_cbar=True, **kwargs):
+def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, expecting_cbar=True, **kwargs):
     """ Plot calculated ternary hull as a 2D projection.
 
     Takes optional matplotlib subplot axis as a parameter, and returns

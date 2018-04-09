@@ -38,6 +38,30 @@ class ScrapeTest(unittest.TestCase):
             test_dict, s = cell2dict(cell_fname, db=False, outcell=False, verbosity=0)
             self.assertTrue(test_dict.get('lattice_cart') is None)
 
+        cell_fname = REAL_PATH + 'data/K5P4-phonon.cell'
+        failed_open = False
+        try:
+            f = open(cell_fname, 'r')
+        except:
+            failed_open = True
+        if not failed_open:
+            f.close()
+            test_dict, s = cell2dict(cell_fname, db=False, outcell=True, verbosity=0)
+            self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
+            self.assertEqual(test_dict['lattice_cart'][0][0], 11.4518745146637, msg='Failed to read lattice vectors.')
+            self.assertEqual(test_dict['lattice_cart'][1][1], 5.09448137301246, msg='Failed to read lattice vectors.')
+            self.assertEqual(test_dict['lattice_cart'][2][2], 9.18378851243459, msg='Failed to read lattice vectors.')
+            self.assertEqual(test_dict['lattice_cart'][1][0], 0.0, msg='Failed to read lattice vectors.')
+            self.assertEqual(test_dict['symmetry_tol'], 0.0001, msg='Failed to read symmetry tolerance.')
+            self.assertEqual(test_dict['kpoints_mp_spacing'], 0.03, msg='Failed to read kpoint grid {}'.format(test_dict['kpoints_mp_spacing']))
+            self.assertEqual(test_dict['phonon_kpoints_mp_grid'], [2, 2, 2], msg='Failed to read kpoint grid {}'.format(test_dict['phonon_kpoints_mp_grid']))
+            self.assertEqual(test_dict['phonon_kpoints_mp_offset'], [0.25, 0.25, 0.25], msg='Failed to read kpoint grid {}'.format(test_dict['phonon_kpoints_mp_offset']))
+            self.assertEqual(test_dict['phonon_fine_kpoints_mp_spacing'], 0.02, msg='Failed to read kpoint {}'.format(test_dict['phonon_fine_kpoints_mp_spacing']))
+            self.assertEqual(test_dict['species_pot']['K'], '2|1.5|9|10|11|30U:40:31(qc=6)', msg='Failed to read pspots.')
+            self.assertEqual(test_dict['species_pot']['P'], '3|1.8|4|4|5|30:31:32', msg='Failed to read pspots.')
+            self.assertTrue(test_dict['snap_to_symmetry'])
+            self.assertTrue(test_dict['symmetry_generate'])
+
     def testCastep16(self):
         from matador.scrapers.castep_scrapers import castep2dict
         castep_fname = REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep'
@@ -241,6 +265,7 @@ class ScrapeTest(unittest.TestCase):
         from matador.scrapers.castep_scrapers import usp2dict
         self.assertEqual(usp2dict(REAL_PATH + 'data/K_OTF.usp')['K'], '2|1.5|9|10|11|30U:40:31(qc=6)', msg='Failed to scrape K_OTF.usp file')
         self.assertEqual(usp2dict(REAL_PATH + 'data/P_OTF.usp')['P'], '3|1.8|4|4|5|30:31:32', msg='Failed to scrape P_OTF.usp file')
+        self.assertEqual(usp2dict(REAL_PATH + 'data/Sn_OTF.usp')['Sn'], '2|2|2|1.6|9.6|10.8|11.7|50U=-0.395U=+0.25:51U=-0.14U=+0.25', msg='Failed to scrape Sn_OTF.usp file')
 
 
 class ExportTest(unittest.TestCase):
@@ -281,9 +306,9 @@ class ExportTest(unittest.TestCase):
             doc, s = param2dict(param_fname, db=False)
             doc2param(doc, test_fname, hash_dupe=False, overwrite=True)
             doc_exported, s = param2dict(test_fname, db=False)
+            remove(test_fname)
             self.assertTrue(s, msg='Failed entirely, oh dear!')
             self.assertEqual(len(doc_exported), len(doc))
-        remove(test_fname)
 
         param_fname = REAL_PATH + 'data/nmr.param'
         test_fname = REAL_PATH + 'data/dummy.param'
@@ -298,9 +323,41 @@ class ExportTest(unittest.TestCase):
             doc, s = param2dict(param_fname, db=False)
             doc2param(doc, test_fname, hash_dupe=False, overwrite=True)
             doc_exported, s = param2dict(test_fname, db=False)
+            remove(test_fname)
             self.assertTrue(s, msg='Failed entirely, oh dear!')
             self.assertEqual(len(doc_exported), len(doc))
-        remove(test_fname)
+
+    def testDoc2Cell(self):
+        from matador.scrapers.castep_scrapers import cell2dict
+        from matador.export import doc2cell
+        cell_fname = REAL_PATH + 'data/K5P4-phonon.cell'
+        test_fname = REAL_PATH + 'data/dummy.cell'
+        failed_open = False
+        try:
+            f = open(cell_fname, 'r')
+        except:
+            failed_open = True
+        if not failed_open:
+            f.close()
+            doc, s = cell2dict(cell_fname, db=False, outcell=True, verbosity=0, positions=False)
+            doc2cell(doc, test_fname)
+            test_dict, s = cell2dict(test_fname, db=False, outcell=True, positions=False)
+            remove(test_fname)
+            self.assertTrue(s)
+            self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
+            self.assertEqual(test_dict['lattice_cart'][0][0], 11.4518745146637, msg='Failed to read lattice vectors.')
+            self.assertEqual(test_dict['lattice_cart'][1][1], 5.09448137301246, msg='Failed to read lattice vectors.')
+            self.assertEqual(test_dict['lattice_cart'][2][2], 9.18378851243459, msg='Failed to read lattice vectors.')
+            self.assertEqual(test_dict['lattice_cart'][1][0], 0.0, msg='Failed to read lattice vectors.')
+            self.assertEqual(test_dict['symmetry_tol'], 0.0001, msg='Failed to read symmetry tolerance.')
+            self.assertEqual(test_dict['kpoints_mp_spacing'], 0.03, msg='Failed to read kpoint grid {}'.format(test_dict['kpoints_mp_spacing']))
+            self.assertEqual(test_dict['phonon_kpoints_mp_grid'], [2, 2, 2], msg='Failed to read kpoint grid {}'.format(test_dict['phonon_kpoints_mp_grid']))
+            self.assertEqual(test_dict['phonon_kpoints_mp_offset'], [0.25, 0.25, 0.25], msg='Failed to read kpoint grid {}'.format(test_dict['phonon_kpoints_mp_offset']))
+            self.assertEqual(test_dict['phonon_fine_kpoints_mp_spacing'], 0.02)
+            self.assertEqual(test_dict['species_pot']['K'], '2|1.5|9|10|11|30U:40:31(qc=6)', msg='Failed to read pspots.')
+            self.assertEqual(test_dict['species_pot']['P'], '3|1.8|4|4|5|30:31:32', msg='Failed to read pspots.')
+            self.assertTrue(test_dict['snap_to_symmetry'])
+            self.assertTrue(test_dict['symmetry_generate'])
 
     def testDoc2ResFromJson(self):
         json_fname = REAL_PATH + 'data/doc2res.json'

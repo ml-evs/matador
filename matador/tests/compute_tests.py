@@ -36,7 +36,6 @@ except FileNotFoundError:
     MPI_PRESENT = False
 
 
-
 class ComputeTest(unittest.TestCase):
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
     def testRelaxToQueue(self):

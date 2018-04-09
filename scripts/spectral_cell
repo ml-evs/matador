@@ -38,7 +38,6 @@ def add_kpoints_to_cells(spacing=0.02, overwrite=False, **kwargs):
             outfile = seed + '_prim.cell'
         doc.update(prim_doc)
         if kwargs.get('phonons'):
-            # doc['phonon_kpoint_list'] = kpt_path
             doc['phonon_fine_kpoint_list'] = kpt_path
         else:
             doc['spectral_kpoints_list'] = kpt_path

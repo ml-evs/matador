@@ -28,6 +28,17 @@ import gzip
 def res2dict(seed, db=True, verbosity=0, **kwargs):
     """ Extract available information from .res file; preferably
     used in conjunction with cell or param file.
+
+    Parameters:
+        seed (str): filename of res file (with or without extension).
+
+    Keyword arguments:
+        db (bool): whether to fail if unable to scrape energies.
+
+    Returns:
+        (dict/str, bool): if successful, a dictionary containing scraped data and True,
+            if not, then an error string and False.
+
     """
     res = dict()
     try:
@@ -161,15 +172,17 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, verb
     """ Extract available information from .cell file; probably
     to be merged with another dict from a .param or .res file.
 
-    Input:
+    Parameters:
+        seed (str): filename of cell file to scrape, with or without extension
 
-        | seed: str, filename of cell file to scrape
+    Keyword arguments:
+        db (bool): scrape database quality file
+        lattice (bool): scrape lattice vectors
+        positions (bool): scrape positions
 
-    Args:
-
-        | db        : bool, scrape database quality file
-        | lattice   : bool, scrape lattice vectors
-        | positions : bool, scrape positions
+    Returns:
+        (dict/str, bool): if successful, a dictionary containing scraped data and True,
+            if not, then an error string and False.
 
     """
     cell = dict()
@@ -193,7 +206,12 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, verb
                 i = 1
                 while 'endblock' not in flines[line_no+i].lower():
                     if not flines[line_no+i].strip()[0].isalpha():
-                        cell['lattice_cart'].append(list(map(float, flines[line_no+i].split())))
+                        try:
+                            cell['lattice_cart'].append(list(map(float, flines[line_no+i].split())))
+                        except:
+                            print(seed)
+                            print(line)
+                            print(flines)
                     i += 1
                 if verbosity > 1:
                     print(cell['lattice_cart'])
@@ -242,21 +260,53 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, verb
                 for j in range(3):
                     flines[line_no+j+1] = flines[line_no+j+1].replace(',', '')
                     cell['external_pressure'].append(list(map(float, flines[line_no+j+1].split())))
+            # parse kpoints
             elif 'kpoints_mp_spacing' in line.lower() or 'kpoint_mp_spacing' in line.lower():
                 if 'spectral_kpoints_mp_spacing' in line.lower() or 'spectral_kpoint_mp_spacing' in line.lower():
                     cell['spectral_kpoints_mp_spacing'] = float(line.split()[-1])
+                elif 'phonon_kpoints_mp_spacing' in line.lower() or 'phonon_kpoint_mp_spacing' in line.lower():
+                    cell['phonon_kpoint_mp_spacing'] = float(line.split()[-1])
+                elif 'phonon_fine_kpoints_mp_spacing' in line.lower() or 'phonon_fine_kpoint_mp_spacing' in line.lower():
+                    cell['phonon_fine_kpoint_mp_spacing'] = float(line.split()[-1])
                 else:
                     cell['kpoints_mp_spacing'] = float(line.split()[-1])
             elif 'kpoints_mp_grid' in line.lower() or 'kpoint_mp_grid' in line.lower():
                 if 'spectral_kpoints_mp_grid' in line.lower() or 'spectral_kpoint_mp_grid' in line.lower():
                     cell['spectral_kpoints_mp_grid'] = list(map(int, line.split()[-3:]))
+                elif 'phonon_kpoints_mp_grid' in line.lower() or 'phonon_kpoint_mp_grid' in line.lower():
+                    cell['phonon_kpoint_mp_grid'] = list(map(int, line.split()[-3:]))
+                elif 'phonon_fine_kpoints_mp_grid' in line.lower() or 'phonon_fine_kpoint_mp_grid' in line.lower():
+                    cell['phonon_fine_kpoint_mp_grid'] = list(map(int, line.split()[-3:]))
                 else:
                     cell['kpoints_mp_grid'] = list(map(int, line.split()[-3:]))
             elif 'kpoints_mp_offset' in line.lower() or 'kpoint_mp_offset' in line.lower():
                 if 'spectral_kpoints_mp_offset' in line.lower() or 'spectral_kpoint_mp_offset' in line.lower():
                     cell['spectral_kpoints_mp_offset'] = list(map(float, line.split()[-3:]))
+                elif 'phonon_kpoints_mp_offset' in line.lower() or 'phonon_kpoint_mp_offset' in line.lower():
+                    # this is a special case where phonon_kpointS_mp_offset doesn't exist
+                    cell['phonon_kpoint_mp_offset'] = list(map(float, line.split()[-3:]))
+                elif 'phonon_fine_kpoints_mp_offset' in line.lower() or 'phonon_fine_kpoint_mp_offset' in line.lower():
+                    cell['phonon_fine_kpoint_mp_offset'] = list(map(float, line.split()[-3:]))
                 else:
                     cell['kpoints_mp_offset'] = list(map(float, line.split()[-3:]))
+            elif '%block spectral_kpoints_path' in line.lower() or '%block spectral_kpoint_path' in line.lower():
+                i = 1
+                cell['spectral_kpoints_path'] = []
+                while '%endblock' not in flines[line_no+i].lower():
+                    cell['spectral_kpoints_path'].append(list(map(float, flines[line_no+i].split()[:3])))
+                    i += 1
+            elif '%block spectral_kpoints_list' in line.lower() or '%block spectral_kpoint_list' in line.lower():
+                i = 1
+                cell['spectral_kpoints_list'] = []
+                while '%endblock' not in flines[line_no+i].lower():
+                    cell['spectral_kpoints_list'].append(list(map(float, flines[line_no+i].split()[:4])))
+                    i += 1
+            elif '%block phonon_fine_kpoints_list' in line.lower() or '%block phonon_fine_kpoint_list' in line.lower():
+                i = 1
+                # this is a special case where phonon_fine_kpointS_list doesn't exist
+                cell['phonon_fine_kpoint_list'] = []
+                while '%endblock' not in flines[line_no+i].lower():
+                    cell['phonon_fine_kpoint_list'].append(list(map(float, flines[line_no+i].split()[:4])))
             elif not db:
                 if '%block positions_frac' in line.lower():
                     atomic_init_spins = defaultdict(list)
@@ -301,18 +351,6 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, verb
                         cell['spectral_kpoints_path_spacing'] = float(line.split()[-1])
                     elif 'kpoints_path_spacing' in line.lower() or 'kpoint_path_spacing' in line.lower():
                         cell['kpoints_path_spacing'] = float(line.split()[-1])
-                elif '%block spectral_kpoints_path' in line.lower() or '%block spectral_kpoint_path' in line.lower():
-                    i = 1
-                    cell['spectral_kpoints_path'] = []
-                    while '%endblock' not in flines[line_no+i].lower():
-                        cell['spectral_kpoints_path'].append(list(map(float, flines[line_no+i].split()[:3])))
-                        i += 1
-                elif '%block spectral_kpoints_list' in line.lower() or '%block spectral_kpoint_list' in line.lower():
-                    i = 1
-                    cell['spectral_kpoints_list'] = []
-                    while '%endblock' not in flines[line_no+i].lower():
-                        cell['spectral_kpoints_list'].append(list(map(float, flines[line_no+i].split()[:4])))
-                        i += 1
 
         if 'external_pressure' not in cell:
             cell['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0], [0.0]]
@@ -349,8 +387,14 @@ def param2dict(seed, db=True, verbosity=0, **kwargs):
     """ Extract available information from .param file; probably
     to be merged with other dicts from other files.
 
-    seed  : filename with or without file extension
-    db    : if True, only scrape relevant info, otherwise scrape all
+    Parameters:
+        seed (str): param filename with or without file extension
+    Keyword arguments:
+        db (bool): if True, only scrape relevant info, otherwise scrape all
+
+    Returns:
+        (dict/str, bool): if successful, a dictionary containing scraped data and True,
+            if not, then an error string and False.
 
     """
     try:
@@ -427,6 +471,14 @@ def param2dict(seed, db=True, verbosity=0, **kwargs):
 def dir2dict(seed, verbosity=0, **kwargs):
     """ Try to extract information from directory name; last hope
     if no param file has been found.
+
+    Parameters:
+        seed (str): dir name to scrape.
+
+    Returns:
+        (dict/str, bool): if successful, a dictionary containing scraped data and True,
+            if not, then an error string and False.
+
     """
     try:
         dir_dict = defaultdict(list)
@@ -495,6 +547,17 @@ def dir2dict(seed, verbosity=0, **kwargs):
 def castep2dict(seed, db=True, verbosity=0, **kwargs):
     """ From seed filename, create dict of the most relevant
     information about a calculation.
+
+    Parameters:
+        seed (str): filename of castep file
+
+    Keyword arguments:
+        db (bool): whether to error on missing relaxation info
+
+    Returns:
+        (dict/str, bool): if successful, a dictionary containing scraped data and True,
+            if not, then an error string and False.
+
     """
     # use defaultdict to allow for easy appending
     castep = dict()
@@ -908,20 +971,17 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
 def bands2dict(seed, summary=False, gap=False, external_efermi=None, verbosity=0, **kwargs):
     """ Parse a CASTEP bands file into a dictionary.
 
-    Input:
+    Parameters:
+        seed (str): path to .bands file.
 
-        | seed: str, path to .bands file.
-
-    Args:
-
-        | summary         : bool, print info about bandgap.
-        | gap             : bool, compute bandgap info.
-        | external_efermi : float, override the Fermi energy with this value (eV)
+    Keyword arguments:
+        summary (bool): print info about bandgap.
+        gap (bool): re-compute bandgap info.
+        external_efermi (float): override the Fermi energy with this value (eV)
 
     Returns:
-
-        | bs      : dict, containing info from bands file
-        | success : bool, whether or not the scraping was successful
+        (dict/str, bool): if successful, a dictionary containing scraped data and True,
+            if not, then an error string and False.
 
     """
     from matador.utils.chem_utils import HARTREE_TO_EV, BOHR_TO_ANGSTROM
@@ -1095,6 +1155,18 @@ def bands2dict(seed, summary=False, gap=False, external_efermi=None, verbosity=0
 
 
 def optados2dict(seed, verbosity=0, **kwargs):
+    """ Scrape optados output file (*.adaptive.dat) or (*.pdos.adaptive.dat)
+    for DOS, projectors and projected DOS.
+
+    Parameters:
+        seed (str): optados filename.
+
+    Returns:
+        (dict/str, bool): if successful, a dictionary containing scraped data and True,
+            if not, then an error string and False.
+
+    """
+
     import numpy as np
     dos = dict()
     is_pdos = False
@@ -1161,14 +1233,12 @@ def optados2dict(seed, verbosity=0, **kwargs):
 def phonon2dict(seed, verbosity=0, **kwargs):
     """ Parse a CASTEP phonon file into a dictionary.
 
-    Input:
-
-        | seed: str, path to .bands file.
+    Parameters:
+        seed (str), path to .phonon file.
 
     Returns:
-
-        | ph      : dict, containing info from bands file
-        | success : bool, whether or not the scraping was successful
+        (dict/str, bool): if successful, a dictionary containing scraped data and True,
+            if not, then an error string and False.
 
     """
     import numpy as np
@@ -1260,12 +1330,10 @@ def usp2dict(seed):
     OTF .USP file.
 
     Input:
-
-        | seed: str, filename of usp file.
+        seed (str): filename of usp file.
 
     Returns:
-
-        | species_pot: dict, partial species_pot dict from usp file.
+        species_pot (dict): partial species_pot dict from usp file.
 
     """
     species_pot = dict()
@@ -1280,8 +1348,15 @@ def usp2dict(seed):
                         elem = flines[line_no+i].split(':')[1].split()[0]
                     elif 'core correction' in flines[line_no+i]:
                         i += 2
-                        species_pot[elem] = flines[line_no+i].split('"')[1]
+                        species_pot[elem] = flines[line_no+i].strip().split()[1]
+                        # check next line for wrapped definition
+                        if flines[line_no+i+1].strip().startswith('--------'):
+                            break
+                        else:
+                            species_pot[elem] += flines[line_no+i+1].strip().split()[1]
+                            break
                     i += 1
+    species_pot[elem] = species_pot[elem].replace('"', '')
     return species_pot
 
 

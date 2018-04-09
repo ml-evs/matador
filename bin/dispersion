@@ -50,6 +50,8 @@ if __name__ == '__main__':
     phonons = kwargs.get('phonons')
     labels = kwargs.get('labels')
     cmap = kwargs.get('cmap')
+    if cmap is None:
+        cmap = 'Dark2'
     band_colour = kwargs.get('band_colour')
 
     del kwargs['seed']
