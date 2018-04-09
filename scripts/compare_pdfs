@@ -29,7 +29,7 @@ width = 92
 print('┌' + 7*'─' + '┬' + 42*'─' + '┬' + 41*'─' + '┐')
 for overlap in overlaps:
     print('│{:>6.4f} │ {:^40} │ {:^40}│'
-          .format(overlap.similarity_distance, overlap.pdf_A.label, overlap.pdf_B.label))
+          .format(overlap.similarity_distance, overlap.pdf_A._label, overlap.pdf_B._label))
 
 print('└' + 7*'─' + '┴' + 42*'─' + '┴' + 41*'─' + '┘')
 strucs[0]['pdf'].plot_pdf(other_pdfs=[doc['pdf'] for doc in strucs[1:]])

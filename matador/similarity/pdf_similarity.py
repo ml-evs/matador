@@ -301,8 +301,6 @@ class PDF(Fingerprint):
                 test_num_images += 1
                 if test_num_images > self.kwargs.get('max_num_images'):
                     print('Something has probably gone wrong; required images reached {}.'.format(self.kwargs.get('max_num_images')))
-                    print('text_id:')
-                    print(self._label)
                     print('lattice_abc:')
                     print('Continuing with num_images = 1')
                     self._num_images = 1
