@@ -17,7 +17,7 @@ except:
 
 def display_results(cursor,
                     args={}, argstr=None, additions=None, deletions=None,
-                    hull=False, markdown=False, latex=False, use_source=False, colour=False):
+                    hull=False, markdown=False, latex=False, use_source=False, colour=True):
     """ Print query results in a cryan-like fashion, optionally
     in a markdown format.
 
@@ -107,6 +107,7 @@ def display_results(cursor,
     cursor = sorted(cursor, key=lambda doc: doc['enthalpy_per_atom'], reverse=False)
 
     for ind, doc in enumerate(cursor):
+        postfix = ''
         formula_substring = ''
         if 'phase' in doc:
             if 'alpha' in doc['phase']:
@@ -136,13 +137,15 @@ def display_results(cursor,
                 if use_source:
                     src = [src.split('/')[-1] for src in doc['source'] if src.endswith('.res') or src.endswith('.castep')][0].replace('.res', '').replace('.castep', '')
                     if colour:
-                        struct_string.append("\033[92m\033[1m* {:<38}\033[0m".format(src))
+                        struct_string.append("\033[92m\033[1m* {:<38}".format(src))
+                        postfix = '\033[0m'
                     else:
                         struct_string.append("* {:<38}".format(src))
                 else:
                     if colour:
                         struct_string.append(
-                            "\033[92m\033[1m* {:^26}\033[0m".format(doc['text_id'][0]+' '+doc['text_id'][1]))
+                            "\033[92m\033[1m* {:^26}".format(doc['text_id'][0]+' '+doc['text_id'][1]))
+                        postfix = '\033[0m'
                     else:
                         struct_string.append("* {:^26}".format(doc['text_id'][0] + ' ' + doc['text_id'][1]))
             else:
@@ -153,9 +156,11 @@ def display_results(cursor,
                     struct_string.append(
                         "  {:^26}".format(doc['text_id'][0]+' '+doc['text_id'][1]))
             if additions is not None and doc['text_id'] in additions:
-                struct_string[-1] = '\033[92m\033[1m' + ' + ' + struct_string[-1] + '\033[0m'
+                struct_string[-1] = '\033[92m\033[1m' + ' + ' + struct_string[-1]
+                postfix = '\033[0m'
             elif deletions is not None and doc['text_id'] in deletions:
-                struct_string[-1] = '\033[91m\033[1m' + ' - ' + struct_string[-1] + '\033[0m'
+                struct_string[-1] = '\033[91m\033[1m' + ' - ' + struct_string[-1]
+                postfix = '\033[0m'
             try:
                 if doc['quality'] == 0:
                     struct_string[-1] += "{:^5}".format('!!!')
@@ -190,6 +195,7 @@ def display_results(cursor,
                                                         gs_enthalpy)
         except:
             struct_string[-1] += "{:^18}".format('xxx')
+
         if 'space_group' in doc:
             struct_string[-1] += "{:^13}".format(doc['space_group'])
         else:
@@ -207,6 +213,8 @@ def display_results(cursor,
             struct_string[-1] += "{:^8}".format(prov)
         else:
             struct_string[-1] += "{:^8}".format('xxx')
+
+        struct_string[-1] += postfix
 
         if latex:
             latex_struct_string.append("{:^20} {:^10} & ".format(formula_substring, '$\\star$' if doc['hull_distance'] == 0 else ''))
