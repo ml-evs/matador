@@ -89,6 +89,8 @@ def plot_spectral(seeds, **kwargs):
         seed_colours = colours
         ls = ['-']*len(seeds)
         colour_by_seed = True
+        if kwargs.get('labels') is None:
+            kwargs['labels'] = [seed.split('/')[-1].split('.')[0] for seed in seeds]
     else:
         ls = []
         colour_by_seed = False
@@ -174,23 +176,14 @@ def plot_spectral(seeds, **kwargs):
                             else:
                                 if kwargs.get('band_colour') == 'occ':
                                     if np.max(dispersion[eig_key][ns][nb][branch]) < 0:
-                                        if colour_by_seed:
-                                            colour = seed_colours[seed_ind]
-                                        else:
-                                            colour = valence
+                                        colour = valence
                                     elif np.min(dispersion[eig_key][ns][nb][branch]) > 0:
-                                        if colour_by_seed:
-                                            colour = seed_colours[seed_ind]
-                                        else:
-                                            colour = conduction
+                                        colour = conduction
                                     elif np.min(dispersion[eig_key][ns][nb][branch]) < 0 and np.max(dispersion[eig_key][ns][nb][branch]) > 0:
-                                        if colour_by_seed:
-                                            colour = seed_colours[seed_ind]
-                                        else:
-                                            colour = crossing
+                                        colour = crossing
 
-                                if colour_by_seed:
-                                    colour = seed_colours[seed_ind]
+                        if colour_by_seed:
+                            colour = seed_colours[seed_ind]
 
                         if kwargs.get('band_colour') is not None:
                             if kwargs.get('band_colour') != 'occ':
@@ -209,7 +202,7 @@ def plot_spectral(seeds, **kwargs):
                                            c=colour, lw=1, ls=ls[seed_ind], alpha=alpha, label=label)
                 if branch_ind != len(dispersion[branch_key])-1:
                     ax_dispersion.axvline(path[branch[-1]-branch_ind], ls='-.', lw=1, c='grey')
-            if kwargs.get('labels') is not None:
+            if len(seeds) > 1:
                 ax_dispersion.legend()
             ax_dispersion.axhline(0, ls='--', lw=1, c='grey')
             ax_dispersion.set_ylim(plot_window)
@@ -362,7 +355,7 @@ def plot_spectral(seeds, **kwargs):
                 if 'pdos' in dos_data:
                     for ind, projector in enumerate(pdos):
                         ax_dos.plot(pdos[projector], energies, lw=1, zorder=1000)
-                        ax_dos.fill_betweenx(energies, 0, pdos[projector], alpha=0.3, label=projector, facecolor=colours[ind])
+                        ax_dos.fill_betweenx(energies, 0, pdos[projector], alpha=0.3, label=projector)
                 ax_dos.legend()
 
                 if seed_ind == 0 and not kwargs['phonons']:
@@ -413,12 +406,11 @@ def modes2bands(phonon_dispersion, path, branches):
 
     """
     import numpy as np
-    # return phonon_dispersion
+    from copy import deepcopy
+
     eigs = phonon_dispersion[0]
 
-    from copy import deepcopy
     for branch_ind, branch in enumerate(branches):
-        f, ax = plt.subplots()
         eigs_branch = eigs[:, branch]
         converged = False
         while not converged:
