@@ -204,6 +204,10 @@ class DBQuery(object):
             self.query_dict['$and'].append(self.query_source())
             self.empty_query = False
 
+        if self.args.get('root_src') is not None:
+            self.query_dict['$and'].append(self.query_root_source())
+            self.empty_query = False
+
         if self.args.get('pressure') is not None:
             self.query_dict['$and'].append(self.query_pressure())
             self.empty_query = False
@@ -676,13 +680,25 @@ class DBQuery(object):
         return query_dict
 
     def query_source(self):
-        """ Find all structures with partial source string from args. """
+        """ Find all structures with source string from args. """
         src_str = self.args.get('src_str')
         if not isinstance(src_str, list):
             src_str = [src_str]
         query_dict = dict()
         query_dict['source'] = dict()
         query_dict['source']['$in'] = src_str
+        return query_dict
+
+    def query_root_source(self):
+        """ Find all structures with root source string from args. """
+        root_src = self.args.get('root_src')
+        if not isinstance(root_src, list):
+            root_src = [root_src]
+        query_dict = dict()
+        for src in root_src:
+            query_dict['$or'] = []
+            query_dict['$or'].append(dict())
+            query_dict['$or'][-1]['root_source'] = src
         return query_dict
 
     def query_quality(self):

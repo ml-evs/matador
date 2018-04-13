@@ -30,7 +30,8 @@ class Refiner(object):
                           'elem_set',
                           'ratios',
                           'tag',
-                          'doi']
+                          'doi',
+                          'source']
         possible_modes = ['display', 'overwrite', 'set']
         if mode not in possible_modes:
             print('Mode not understood, defaulting to "display".')
@@ -83,6 +84,10 @@ class Refiner(object):
                 print_warning('No new DOI defined, nothing will be done.')
             else:
                 self.add_doi()
+        elif task == 'source':
+            self.field = 'root_source'
+            self.add_root_source()
+
         print(self.changed_count, '/', len(self.cursor), 'to be changed.')
         print(self.failed_count, '/', len(self.cursor), 'failed.')
 
@@ -234,3 +239,24 @@ class Refiner(object):
                 print(repr(error))
                 self.failed_count += 1
                 pass
+
+    def add_root_source(self):
+        """ Add the "root_source" key to a document in the database,
+        i.e. the name of the structure, minus file extension.
+        """
+        for ind, doc in enumerate(self.cursor):
+            try:
+                if 'root_source' in doc:
+                    continue
+                else:
+                    src_list = []
+                    for src in doc['source']:
+                        if src.endswith('.res') or src.endswith('.castep') or src.endswith('.history'):
+                            src_list.append(''.join(src.split('/')[-1].split('.')[0:-1]))
+                    assert len(set(src_list)) == 1
+                    doc['root_source'] = src_list[0]
+                    self.diff_cursor.append(doc)
+                    self.changed_count += 1
+            except Exception as error:
+                print(repr(error))
+                self.failed_count += 1

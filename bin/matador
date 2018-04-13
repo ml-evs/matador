@@ -352,6 +352,8 @@ if __name__ == '__main__':
                                  help=('search for an ICSD CollCode'))
     structure_flags.add_argument('-ss', '--src_str', type=str,
                                  help=('search for a string inside the structure sources'))
+    structure_flags.add_argument('-root', '--root_src', type=str,
+                                 help=('search for a root_source string of the structure'))
     structure_flags.add_argument('-encap', '--encapsulated', action='store_true',
                                  help='query only structures encapsulated in a carbon nanotube.')
     structure_flags.add_argument('-cntr', '--cnt_radius', type=float,
