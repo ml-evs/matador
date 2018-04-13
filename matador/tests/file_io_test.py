@@ -54,9 +54,9 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(test_dict['lattice_cart'][1][0], 0.0, msg='Failed to read lattice vectors.')
             self.assertEqual(test_dict['symmetry_tol'], 0.0001, msg='Failed to read symmetry tolerance.')
             self.assertEqual(test_dict['kpoints_mp_spacing'], 0.03, msg='Failed to read kpoint grid {}'.format(test_dict['kpoints_mp_spacing']))
-            self.assertEqual(test_dict['phonon_kpoints_mp_grid'], [2, 2, 2], msg='Failed to read kpoint grid {}'.format(test_dict['phonon_kpoints_mp_grid']))
-            self.assertEqual(test_dict['phonon_kpoints_mp_offset'], [0.25, 0.25, 0.25], msg='Failed to read kpoint grid {}'.format(test_dict['phonon_kpoints_mp_offset']))
-            self.assertEqual(test_dict['phonon_fine_kpoints_mp_spacing'], 0.02, msg='Failed to read kpoint {}'.format(test_dict['phonon_fine_kpoints_mp_spacing']))
+            self.assertEqual(test_dict['phonon_kpoint_mp_grid'], [2, 2, 2], msg='Failed to read kpoint grid {}'.format(test_dict['phonon_kpoint_mp_grid']))
+            self.assertEqual(test_dict['phonon_kpoint_mp_offset'], [0.25, 0.25, 0.25], msg='Failed to read kpoint grid {}'.format(test_dict['phonon_kpoint_mp_offset']))
+            self.assertEqual(test_dict['phonon_fine_kpoint_mp_spacing'], 0.02, msg='Failed to read kpoint {}'.format(test_dict['phonon_fine_kpoint_mp_spacing']))
             self.assertEqual(test_dict['species_pot']['K'], '2|1.5|9|10|11|30U:40:31(qc=6)', msg='Failed to read pspots.')
             self.assertEqual(test_dict['species_pot']['P'], '3|1.8|4|4|5|30:31:32', msg='Failed to read pspots.')
             self.assertTrue(test_dict['snap_to_symmetry'])
@@ -123,6 +123,130 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(test_dict['estimated_mem_MB'], 300.1)
             self.assertEqual(test_dict['species_pot']['K'], '2|1.5|9|10|11|30U:40:31(qc=6)', msg='Failed to scrape K_OTF.usp file')
             self.assertEqual(test_dict['species_pot']['P'], '3|1.8|4|4|5|30:31:32', msg='Failed to scrape P_OTF.usp file')
+
+    def testCastepSingleAtomEdgeCase(self):
+        from matador.scrapers.castep_scrapers import castep2dict
+        castep_fname = REAL_PATH + 'data/Na-edgecase.castep'
+        failed_open = False
+        try:
+            f = open(castep_fname, 'r')
+        except:
+            failed_open = True
+            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(castep_fname))
+        if not failed_open:
+            f.close()
+            test_dict, s = castep2dict(castep_fname, db=True, verbosity=0)
+            self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
+            self.assertEqual(test_dict['pressure'], -0.0966, msg='Failed to read pressure!')
+            self.assertEqual(test_dict['enthalpy'], -1.30423371e3, msg='Failed to read enthalpy!')
+            self.assertEqual(test_dict['positions_frac'], [[0, 0, 0]])
+            self.assertEqual(test_dict['forces'], [[0, 0, 0]])
+            self.assertEqual(test_dict['enthalpy'], -1.30423371e3, msg='Failed to read enthalpy!')
+            self.assertEqual(test_dict['total_energy'], -1304.223019263, msg='Failed to read total energy!')
+            self.assertEqual(test_dict['total_energy_per_atom'], -1304.223019263, msg='Failed to read total energy!')
+            self.assertEqual(test_dict['free_energy'], -1304.233706274, msg='Failed to read free energy!')
+            self.assertEqual(test_dict['num_atoms'], 1, msg='Wrong number of atoms!')
+            self.assertTrue(['Na', 1] in test_dict['stoichiometry'], msg='Wrong stoichiometry!')
+            self.assertEqual(len(test_dict['stoichiometry']), 1, msg='Wrong stoichiometry!')
+            self.assertEqual(test_dict['cell_volume'], 36.761902, msg='Wrong cell volume!')
+            self.assertEqual(test_dict['space_group'], 'Im-3m', msg='Wrong space group!')
+            self.assertEqual(test_dict['lattice_abc'][0][0], 3.628050, msg='Wrong lattice constants!')
+            self.assertEqual(test_dict['lattice_abc'][0][1], 3.628050, msg='Wrong lattice constants!')
+            self.assertEqual(test_dict['lattice_abc'][0][2], 3.628050, msg='Wrong lattice constants!')
+            self.assertEqual(test_dict['lattice_abc'][1][0], 109.471221, msg='Wrong lattice constants!')
+            self.assertEqual(test_dict['lattice_abc'][1][1], 109.471221, msg='Wrong lattice constants!')
+            self.assertEqual(test_dict['lattice_abc'][1][2], 109.471221, msg='Wrong lattice constants!')
+            self.assertEqual(test_dict['geom_force_tol'], 0.05, msg='Wrong geom force tol')
+            self.assertEqual(test_dict['castep_version'], '16.1')
+            self.assertEqual(test_dict['species_pot']['Na'], 'Na_00PBE.usp')
+
+            int_dict, s = castep2dict(castep_fname, db=False, intermediates=True, verbosity=10)
+            for key in test_dict:
+                self.assertEqual(test_dict[key], int_dict[key])
+
+            self.assertEqual(len(int_dict['intermediates']), 45)
+            for i in range(45):
+                self.assertEqual(int_dict['intermediates'][i]['forces'], [[0, 0, 0]])
+                self.assertEqual(int_dict['intermediates'][i]['positions_frac'], [[0, 0, 0]])
+                self.assertEqual(int_dict['intermediates'][i]['atom_types'], ['Na'])
+            self.assertEqual(int_dict['intermediates'][-1]['total_energy'], -1304.223019263)
+            self.assertEqual(int_dict['intermediates'][-1]['free_energy'], -1304.233706274)
+            self.assertEqual(int_dict['intermediates'][-7]['total_energy'], -1304.222982442)
+            self.assertEqual(int_dict['intermediates'][-7]['free_energy'], -1304.233677344)
+            self.assertEqual(int_dict['intermediates'][-1]['total_energy_per_atom'], -1304.223019263)
+            self.assertEqual(int_dict['intermediates'][-1]['free_energy_per_atom'], -1304.233706274)
+            self.assertEqual(int_dict['intermediates'][-7]['total_energy_per_atom'], -1304.222982442)
+            self.assertEqual(int_dict['intermediates'][-7]['free_energy_per_atom'], -1304.233677344)
+
+    def testCastepUnoptimised(self):
+        from matador.scrapers.castep_scrapers import castep2dict
+        castep_fname = REAL_PATH + 'data/TiO2_unconverged.castep'
+        failed_open = False
+        try:
+            f = open(castep_fname, 'r')
+        except:
+            failed_open = True
+            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(castep_fname))
+        if not failed_open:
+            f.close()
+            test_dict, s = castep2dict(castep_fname, db=True, verbosity=0)
+            self.assertFalse(s, msg='Should have failed with db=True, but didn\'t!')
+            self.assertTrue(isinstance(test_dict, str), msg='Should have returned error message!')
+            test_dict, s = castep2dict(castep_fname, db=False, verbosity=0)
+            self.assertTrue(s, msg='Should have succeeded with db=False, but didn\'t!')
+            self.assertTrue(isinstance(test_dict, dict), msg='Should have returned dict!')
+            self.assertEqual(test_dict['total_energy'], -12479.86611705)
+            self.assertEqual(test_dict['num_atoms'], 12)
+            self.assertEqual(test_dict['pressure'], 0.9455, msg='Failed to read pressure!')
+            self.assertTrue(['Ti', 1] in test_dict['stoichiometry'], msg='Wrong stoichiometry!')
+            self.assertTrue(['O', 2] in test_dict['stoichiometry'], msg='Wrong stoichiometry!')
+            self.assertEqual(test_dict['cell_volume'], 127.269750, msg='Wrong cell volume!')
+            self.assertEqual(test_dict['space_group'], 'Pmmm')
+            self.assertEqual(test_dict['lattice_abc'][0][0], 4.026041, msg='Wrong lattice constants!')
+            self.assertEqual(test_dict['lattice_abc'][0][1], 7.906524, msg='Wrong lattice constants!')
+            self.assertEqual(test_dict['lattice_abc'][0][2], 3.998172, msg='Wrong lattice constants!')
+            self.assertEqual(test_dict['lattice_abc'][1][0], 90.000000, msg='Wrong lattice constants!')
+            self.assertEqual(test_dict['lattice_abc'][1][1], 90.000000, msg='Wrong lattice constants!')
+            self.assertEqual(test_dict['lattice_abc'][1][2], 90.000000, msg='Wrong lattice constants!')
+            self.assertEqual(test_dict['optimised'], False)
+            self.assertEqual(test_dict['geom_force_tol'], 0.05)
+            self.assertEqual(test_dict['castep_version'], '18.1')
+            self.assertEqual(test_dict['species_pot']['Ti'], '3|1.9|8|9|10|30U:40:31:32(qc=5)')
+            self.assertEqual(test_dict['species_pot']['O'], '2|1.5|12|13|15|20:21(qc=5)')
+
+    def testCastepIntermediates(self):
+        from matador.scrapers.castep_scrapers import castep2dict
+        castep_fname = REAL_PATH + 'data/NaP_intermediates.castep'
+        failed_open = False
+        try:
+            f = open(castep_fname, 'r')
+        except:
+            failed_open = True
+            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(castep_fname))
+        if not failed_open:
+            f.close()
+            fallover = False
+            try:
+                test_dict, s = castep2dict(castep_fname, db=True, intermediates=True, verbosity=0)
+            except:
+                fallover = True
+            self.assertTrue(fallover, msg='Didn\'t fallover when using db and intermediates')
+
+            test_dict, s = castep2dict(castep_fname, db=False, intermediates=True, verbosity=10)
+            self.assertTrue(s, msg='Should have succeeded with db=False, but didn\'t!')
+            final_dict, s = castep2dict(castep_fname, db=True, intermediates=False, verbosity=10)
+            self.assertTrue(s)
+            for key in final_dict:
+                self.assertEqual(final_dict[key], test_dict[key], msg='{} didn\'t match'.format(key))
+            self.assertEqual(test_dict['intermediates'][0]['total_energy'], -8537.190779552)
+            self.assertEqual(test_dict['intermediates'][1]['total_energy'], -8538.161269966)
+            self.assertEqual(test_dict['intermediates'][-1]['total_energy'], -8546.922111847)
+            self.assertEqual(test_dict['intermediates'][0]['free_energy'], -8537.247551883)
+            self.assertEqual(test_dict['intermediates'][1]['free_energy'], -8538.215032441)
+            self.assertEqual(test_dict['intermediates'][-1]['free_energy'], -8546.922614706)
+            self.assertEqual(len(test_dict['intermediates']), 141)
+            self.assertEqual(test_dict['free_energy'], -8546.922614706)
+            self.assertEqual(final_dict['free_energy'], -8546.922614706)
 
     def testRes(self):
         from matador.scrapers.castep_scrapers import res2dict
@@ -351,9 +475,9 @@ class ExportTest(unittest.TestCase):
             self.assertEqual(test_dict['lattice_cart'][1][0], 0.0, msg='Failed to read lattice vectors.')
             self.assertEqual(test_dict['symmetry_tol'], 0.0001, msg='Failed to read symmetry tolerance.')
             self.assertEqual(test_dict['kpoints_mp_spacing'], 0.03, msg='Failed to read kpoint grid {}'.format(test_dict['kpoints_mp_spacing']))
-            self.assertEqual(test_dict['phonon_kpoints_mp_grid'], [2, 2, 2], msg='Failed to read kpoint grid {}'.format(test_dict['phonon_kpoints_mp_grid']))
-            self.assertEqual(test_dict['phonon_kpoints_mp_offset'], [0.25, 0.25, 0.25], msg='Failed to read kpoint grid {}'.format(test_dict['phonon_kpoints_mp_offset']))
-            self.assertEqual(test_dict['phonon_fine_kpoints_mp_spacing'], 0.02)
+            self.assertEqual(test_dict['phonon_kpoint_mp_grid'], [2, 2, 2], msg='Failed to read kpoint grid {}'.format(test_dict['phonon_kpoint_mp_grid']))
+            self.assertEqual(test_dict['phonon_kpoint_mp_offset'], [0.25, 0.25, 0.25], msg='Failed to read kpoint grid {}'.format(test_dict['phonon_kpoint_mp_offset']))
+            self.assertEqual(round(test_dict['phonon_fine_kpoint_mp_spacing'], 2), 0.02)
             self.assertEqual(test_dict['species_pot']['K'], '2|1.5|9|10|11|30U:40:31(qc=6)', msg='Failed to read pspots.')
             self.assertEqual(test_dict['species_pot']['P'], '3|1.8|4|4|5|30:31:32', msg='Failed to read pspots.')
             self.assertTrue(test_dict['snap_to_symmetry'])

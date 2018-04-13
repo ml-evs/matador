@@ -3,26 +3,18 @@
 inputs and outputs.
 """
 
-# matador modules
-from ..utils.cell_utils import abc2cart, calc_mp_spacing, cart2volume, wrap_frac_coords
-# external libraries
-try:
-    import bson.json_util as json
-except:
-    pass
-# standard library
 from collections import defaultdict
 from os import getcwd, stat
 from os.path import isfile
 from time import strptime
-try:
-    from math import gcd
-except:
-    from fractions import gcd
 from pwd import getpwuid
 from traceback import print_exc
 import glob
 import gzip
+
+import bson.json_util as json
+from matador.utils.cell_utils import abc2cart, calc_mp_spacing, cart2volume, wrap_frac_coords
+from matador.utils.chem_utils import get_stoich
 
 
 def res2dict(seed, db=True, verbosity=0, **kwargs):
@@ -84,8 +76,6 @@ def res2dict(seed, db=True, verbosity=0, **kwargs):
             res['num_atoms'] = int(titl[7])
             res['space_group'] = titl[8].strip('()')
             res['enthalpy_per_atom'] = res['enthalpy'] / res['num_atoms']
-            res['total_energy'] = res['enthalpy'] - res['pressure']*res['cell_volume']
-            res['total_energy_per_atom'] = res['total_energy'] / res['num_atoms']
         res['lattice_abc'] = [list(map(float, cell[2:5])), list(map(float, cell[5:8]))]
         # calculate lattice_cart from abc
         res['lattice_cart'] = abc2cart(res['lattice_abc'])
@@ -124,38 +114,9 @@ def res2dict(seed, db=True, verbosity=0, **kwargs):
                         temp_length = temp_length.replace('\n', '')
                         temp_length = temp_length.replace('}', '')
                         res['cnt_length'] = float(temp_length)
-        # calculate stoichiometry
-        res['stoichiometry'] = defaultdict(float)
-        for atom in res['atom_types']:
-            if atom not in res['stoichiometry']:
-                res['stoichiometry'][atom] = 0
-            res['stoichiometry'][atom] += 1
-        gcd_val = 0
-        for atom in res['atom_types']:
-            if gcd_val == 0:
-                gcd_val = res['stoichiometry'][atom]
-            else:
-                gcd_val = gcd(res['stoichiometry'][atom], gcd_val)
-        # convert stoichiometry to tuple for fryan
-        temp_stoich = []
-        try:
-            for key, value in res['stoichiometry'].items():
-                if float(value)/gcd_val % 1 != 0:
-                    temp_stoich.append([key, float(value)/gcd_val])
-                else:
-                    temp_stoich.append([key, value/gcd_val])
-        except AttributeError:
-            for key, value in res['stoichiometry'].iteritems():
-                if float(value)/gcd_val % 1 != 0:
-                    temp_stoich.append([key, float(value)/gcd_val])
-                else:
-                    temp_stoich.append([key, value/gcd_val])
-        res['stoichiometry'] = temp_stoich
-        res['stoichiometry'] = sorted(res['stoichiometry'])
-        atoms_per_fu = 0
-        for elem in res['stoichiometry']:
-            atoms_per_fu += elem[1]
-        res['num_fu'] = len(res['atom_types']) / atoms_per_fu
+
+        res['stoichiometry'] = get_stoich(res['atom_types'])
+        res['num_fu'] = len(res['atom_types']) / sum([elem[1] for elem in res['stoichiometry']])
     except Exception as oops:
         if verbosity > 0:
             print_exc()
@@ -307,6 +268,7 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, verb
                 cell['phonon_fine_kpoint_list'] = []
                 while '%endblock' not in flines[line_no+i].lower():
                     cell['phonon_fine_kpoint_list'].append(list(map(float, flines[line_no+i].split()[:4])))
+                    i += 1
             elif not db:
                 if '%block positions_frac' in line.lower():
                     atomic_init_spins = defaultdict(list)
@@ -389,6 +351,7 @@ def param2dict(seed, db=True, verbosity=0, **kwargs):
 
     Parameters:
         seed (str): param filename with or without file extension
+
     Keyword arguments:
         db (bool): if True, only scrape relevant info, otherwise scrape all
 
@@ -428,8 +391,10 @@ def param2dict(seed, db=True, verbosity=0, **kwargs):
                 # read all other parameters in
                 for splitter in splitters:
                     if splitter in line:
-                        param[line.split(splitter)[0].strip()] = \
-                            line.split(splitter)[-1].strip()
+                        keyword = line.split(splitter)[0].strip()
+                        value = line.split(splitter)[-1].strip()
+                        param[keyword] = value
+                        # deal with edge cases
                         if 'spin_polarised' in line:
                             param['spin_polarized'] = param['spin_polarised']
                         if 'spin_polarized' in line or 'spin_polarised' in line:
@@ -544,7 +509,7 @@ def dir2dict(seed, verbosity=0, **kwargs):
     return dir_dict, True
 
 
-def castep2dict(seed, db=True, verbosity=0, **kwargs):
+def castep2dict(seed, db=True, verbosity=0, intermediates=False, **kwargs):
     """ From seed filename, create dict of the most relevant
     information about a calculation.
 
@@ -553,14 +518,17 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
 
     Keyword arguments:
         db (bool): whether to error on missing relaxation info
+        intermediates (bool): instead of a single dict containing the relaxed structure
+            return a list of snapshots found in .castep file
 
     Returns:
-        (dict/str, bool): if successful, a dictionary containing scraped data and True,
-            if not, then an error string and False.
+        (dict/str/list, bool): if successful, a dictionary or list of dictionaries
+            containing scraped data and True, if not, then an error string and False.
 
     """
-    # use defaultdict to allow for easy appending
     castep = dict()
+    if db and intermediates:
+        raise RuntimeError('db and intermediates cannot both be True')
     try:
         # read .castep, .history or .history.gz file
         if '.gz' in seed:
@@ -572,7 +540,6 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
         # set source tag to castep file
         castep['source'] = []
         castep['source'].append(seed)
-        pspot_report_dict = dict()
         # grab file owner
         castep['user'] = getpwuid(stat(seed).st_uid).pw_name
         if 'CollCode' in seed:
@@ -580,347 +547,23 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
             castep['icsd'] = temp_icsd
         # wrangle castep file for parameters in 3 passes:
         # once forwards to get number and types of atoms
+        castep.update(_castep_scrape_atoms(flines, castep, db=db, verbosity=verbosity, **kwargs))
         # once backwards to get the final parameter set for the calculation
+        castep.update(_castep_scrape_final_parameters(flines, castep, verbosity=verbosity, **kwargs))
         # once more forwards, from the final step, to get the final structure
-        for line_no, line in enumerate(flines):
-            if 'atom types' not in castep and 'Cell Contents' in line:
-                castep['atom_types'] = []
-                castep['positions_frac'] = []
-                i = 1
-                atoms = False
-                while True:
-                    if atoms:
-                        if 'xxxxxxxxx' in flines[line_no+i]:
-                            atoms = False
-                            break
-                        else:
-                            castep['atom_types'].append(flines[line_no+i].split()[1])
-                            castep['positions_frac'].append(list(map(float,
-                                                            (flines[line_no+i].split()[3:6]))))
-                    if 'x------' in flines[line_no+i]:
-                        atoms = True
-                    i += 1
-                for ind, pos in enumerate(castep['positions_frac']):
-                    for k in range(3):
-                        if pos[k] > 1 or pos[k] < 0:
-                            castep['positions_frac'][ind][k] %= 1
-                castep['num_atoms'] = len(castep['atom_types'])
-                castep['stoichiometry'] = defaultdict(float)
-                for atom in castep['atom_types']:
-                    if atom not in castep['stoichiometry']:
-                        castep['stoichiometry'][atom] = 0
-                    castep['stoichiometry'][atom] += 1
-                gcd_val = 0
-                for atom in castep['atom_types']:
-                    if gcd_val == 0:
-                        gcd_val = castep['stoichiometry'][atom]
-                    else:
-                        gcd_val = gcd(castep['stoichiometry'][atom], gcd_val)
-                # convert stoichiometry to tuple for fryan
-                temp_stoich = []
-                for key in castep['stoichiometry']:
-                    value = castep['stoichiometry'][key]
-                    if float(value)/gcd_val % 1 != 0:
-                        temp_stoich.append([key, float(value)/gcd_val])
-                    else:
-                        temp_stoich.append([key, value/gcd_val])
-                castep['stoichiometry'] = temp_stoich
-                castep['stoichiometry'] = sorted(castep['stoichiometry'])
-                atoms_per_fu = 0
-                for elem in castep['stoichiometry']:
-                    atoms_per_fu += elem[1]
-                castep['num_fu'] = castep['num_atoms'] / atoms_per_fu
-                break
-        for line_no, line in enumerate(reversed(flines)):
-            line_no = len(flines) - 1 - line_no
-            if 'task' not in castep and 'type of calculation' in line:
-                castep['task'] = line.split(':')[-1].strip().replace(" ", "")
-            elif 'xc_functional' not in castep and 'functional' in line:
-                # convert from .castep file xc_functional to param style
-                xc_string = line.split(':')[-1].strip()
-                if 'Local Density Approximation' in xc_string:
-                    castep['xc_functional'] = 'LDA'
-                elif 'Perdew Burke Ernzerhof' in xc_string:
-                    castep['xc_functional'] = 'PBE'
-                elif 'PBE for solids' in xc_string:
-                    castep['xc_functional'] = 'PBESol'
-                elif 'hybrid B3LYP' in xc_string:
-                    castep['xc_functional'] = 'B3LYP'
-                elif 'hybrid HSE03' in xc_string:
-                    castep['xc_functional'] = 'HSE03'
-                elif 'hybrid HSE06' in xc_string:
-                    castep['xc_functional'] = 'HSE06'
-            elif 'cut_off_energy' not in castep and 'plane wave basis set' in line:
-                castep['cut_off_energy'] = float(line.split(':')[-1].split()[0])
-            elif 'finite_basis_corr' not in castep and 'finite basis set correction  ' in line:
-                castep['finite_basis_corr'] = line.split(':')[-1].strip()
-            elif 'kpoints_mp_grid' not in castep and 'MP grid size for SCF' in line:
-                castep['kpoints_mp_grid'] = list(map(int, list(line.split('is')[-1].split())))
-            elif 'num_kpoints' not in castep and 'Number of kpoints used' in line:
-                castep['num_kpoints'] = int(line.split()[-1])
-            elif 'geom_force_tol' not in castep and 'max ionic |force| tolerance' in line:
-                castep['geom_force_tol'] = float(line.split()[-2])
-            elif 'elec_energy_tol' not in castep and 'total energy / atom convergence tol' in line:
-                castep['elec_energy_tol'] = float(line.split()[-2])
-            elif 'sedc_apply' not in castep and \
-                    'DFT+D: Semi-empirical dispersion correction    : on' in line:
-                castep['sedc_apply'] = True
-                castep['sedc_scheme'] = flines[line_no+1].split(':')[1].split()[0]
-            elif 'space_group' not in castep and 'Space group of crystal' in line:
-                castep['space_group'] = line.split(':')[-1].split(',')[0].strip().replace(" ", "")
-            elif 'external_pressure' not in castep and 'External pressure/stress' in line:
-                try:
-                    castep['external_pressure'] = []
-                    castep['external_pressure'].append(list(map(float, flines[line_no+1].split())))
-                    castep['external_pressure'].append(list(map(float, flines[line_no+2].split())))
-                    castep['external_pressure'].append(list(map(float, flines[line_no+3].split())))
-                except:
-                    if kwargs.get('dryrun') or verbosity > 0:
-                        print_exc()
-                    castep['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
-            elif 'spin_polarized' not in castep and 'treating system as spin-polarized' in line:
-                castep['spin_polarized'] = True
-            elif 'hubbard_u' not in castep and 'Hubbard U values are eV' in line:
-                castep['hubbard_u'] = defaultdict(list)
-                i = 5
-                while i < castep['num_atoms']:
-                    line = flines[line_no+i].strip()
-                    atom = line.split()[0].replace('|', '')
-                    shifts = list(map(float, line.split()[-5:-1]))
-                    for ind, shift in enumerate(shifts):
-                        if shift != 0:
-                            if atom not in castep['hubbard_u']:
-                                castep['hubbard_u'][atom] = dict()
-                            if ind == 0:
-                                orbital = 's'
-                            elif ind == 1:
-                                orbital = 'p'
-                            elif ind == 2:
-                                orbital = 'd'
-                            elif ind == 3:
-                                orbital = 'f'
-                            castep['hubbard_u'][atom][orbital] = shift
-                    i += 1
-            elif 'Pseudopotential Report' in line:
-                if 'species_pot' not in castep:
-                    castep['species_pot'] = dict()
-                i = 0
-                while i+line_no < len(flines)-3:
-                    if 'Pseudopotential Report' in flines[line_no+i]:
-                        i += 2
-                        elem = flines[line_no+i].split(':')[1].split()[0]
 
-                    elif 'core correction' in flines[line_no+i]:
-                        i += 2
-                        if not pspot_report_dict[elem]:
-                            castep['species_pot'][elem] = flines[line_no+i].split('"')[1].replace('[]', '')
-                            pspot_report_dict[elem] = True
-                    i += 1
-            elif 'species_pot' not in castep and 'Files used for pseudopotentials' in line:
-                if 'species_pot' not in castep:
-                    castep['species_pot'] = dict()
-                i = 1
-                while True:
-                    if len(flines[line_no+i].strip()) == 0:
-                        break
-                    else:
-                        elem = flines[line_no+i].split()[0].strip()
-                        if not pspot_report_dict.get(elem):
-                            castep['species_pot'][elem] = flines[line_no+i].split()[1].split('/')[-1]
-                            if castep['species_pot'][elem] == 'Pseudopotential':
-                                castep['species_pot'][elem] = flines[line_no+i].split()[0].strip()+'_OTF.usp'
-                            pspot_report_dict[elem] = False
-                    i += 1
-        # write zero pressure if not found in file
-        if 'external_pressure' not in castep:
-            castep['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0], [0.0]]
-        if 'spin_polarized' not in castep:
-            castep['spin_polarized'] = False
         # task specific options
-        if db and castep['task'] != 'geometryoptimization' and \
-                castep['task'] != 'geometry optimization':
+        if db and 'geometry' not in castep['task']:
             raise RuntimeError('CASTEP file does not contain GO calculation')
-        else:
-            if 'task' in castep and castep['task'].strip() == 'geometryoptimization':
-                final = False
-                finish_line = 0
-                castep['optimised'] = False
-                success_string = 'Geometry optimization completed successfully'
-                failure_string = 'Geometry optimization failed to converge after'
-                for line_no, line in enumerate(flines):
-                    if any(finished in line for finished in [success_string, failure_string]):
-                        for line_next in range(line_no, len(flines)):
-                            if any(finished in flines[line_next] for
-                                    finished in [success_string, failure_string]):
-                                finish_line = line_next
-                                if success_string in flines[line_next]:
-                                    castep['optimised'] = True
-                                elif failure_string in flines[line_next]:
-                                    castep['optimised'] = False
-                        final = True
-            elif not db:
-                final = True
-                finish_line = 0
-            if final:
-                final_flines = flines[finish_line+1:]
-                for line_no, line in enumerate(final_flines):
-                    if 'Real Lattice' in line:
-                        castep['lattice_cart'] = []
-                        i = 1
-                        while True:
-                            if len(final_flines[line_no+i].strip()) == 0:
-                                break
-                            else:
-                                temp_line = final_flines[line_no+i].split()[0:3]
-                                castep['lattice_cart'].append(list(map(float, temp_line)))
-                            i += 1
-                    elif 'Lattice parameters' in line:
-                        castep['lattice_abc'] = []
-                        i = 1
-                        castep['lattice_abc'].append(
-                            list(map(float,
-                                     [final_flines[line_no+i].split('=')[1].strip().split(' ')[0],
-                                      final_flines[line_no+i+1].split('=')[1].strip().split(' ')[0],
-                                      final_flines[line_no+i+2].split('=')[1].strip().split(' ')[0]])))
-                        castep['lattice_abc'].append(
-                            list(map(float,
-                                     [final_flines[line_no+i].split('=')[-1].strip(),
-                                      final_flines[line_no+i+1].split('=')[-1].strip(),
-                                      final_flines[line_no+i+2].split('=')[-1].strip()])))
-                    elif 'Current cell volume' in line:
-                        castep['cell_volume'] = float(line.split('=')[1].split()[0].strip())
-                    elif 'Cell Contents' in line:
-                        castep['positions_frac'] = []
-                        i = 1
-                        atoms = False
-                        while True:
-                            if atoms:
-                                if 'xxxxxxxxx' in final_flines[line_no+i]:
-                                    atoms = False
-                                    break
-                                else:
-                                    temp_frac = final_flines[line_no+i].split()[3:6]
-                                    castep['positions_frac'].append(list(map(float, temp_frac)))
-                            if 'x------' in final_flines[line_no+i]:
-                                atoms = True
-                            i += 1
-                    # don't check if final_energy exists, as this will update for each GO step
-                    elif 'Final energy, E' in line:
-                        castep['total_energy'] = float(line.split('=')[1].split()[0])
-                        castep['total_energy_per_atom'] = castep['total_energy'] / castep['num_atoms']
-                    elif 'Final free energy' in line:
-                        castep['free_energy'] = float(line.split('=')[1].split()[0])
-                        castep['free_energy_per_atom'] = castep['free_energy'] / castep['num_atoms']
-                    elif '0K energy' in line:
-                        castep['0K_energy'] = float(line.split('=')[1].split()[0])
-                        castep['0K_energy_per_atom'] = castep['0K_energy'] / castep['num_atoms']
-                    elif 'Forces' in line:
-                        i = 1
-                        max_force = 0
-                        forces = False
-                        while True:
-                            if forces:
-                                if '*' in final_flines[line_no+i].split()[1]:
-                                    forces = False
-                                    break
-                                else:
-                                    force_on_atom = 0
-                                    for j in range(3):
-                                        temp = final_flines[line_no+i].replace('(cons\'d)', '')
-                                        force_on_atom += float(temp.split()[3+j])**2
-                                    if force_on_atom > max_force:
-                                        max_force = force_on_atom
-                            elif 'x' in final_flines[line_no+i]:
-                                i += 1                      # skip next blank line
-                                forces = True
-                            i += 1
-                        castep['max_force_on_atom'] = pow(max_force, 0.5)
-                    elif 'Stress Tensor' in line:
-                        i = 1
-                        while i < 20:
-                            if 'Cartesian components' in final_flines[line_no+i]:
-                                castep['stress'] = []
-                                for j in range(3):
-                                    castep['stress'].append(list(map(
-                                        float, (final_flines[line_no+i+j+4].split()[2:5]))))
-                            elif 'Pressure' in final_flines[line_no+i]:
-                                try:
-                                    castep['pressure'] = float(final_flines[line_no+i].split()[-2])
-                                except:
-                                    if kwargs.get('dryrun') or verbosity > 0:
-                                        print_exc()
-                                    pass
-                                break
-                            i += 1
-                    elif 'Atomic Populations (Mulliken)' in line:
-                        if castep['spin_polarized']:
-                            castep['mulliken_spins'] = []
-                            castep['mulliken_net_spin'] = 0.0
-                            castep['mulliken_abs_spin'] = 0.0
-                        castep['mulliken_charges'] = []
-                        castep['mulliken_spins'] = []
-                        i = 0
-                        while i < len(castep['atom_types']):
-                            if castep['spin_polarized']:
-                                castep['mulliken_charges'].append(
-                                    float(final_flines[line_no+i+4].split()[-2]))
-                                castep['mulliken_spins'].append(
-                                    float(final_flines[line_no+i+4].split()[-1]))
-                                castep['mulliken_net_spin'] += castep['mulliken_spins'][-1]
-                                castep['mulliken_abs_spin'] += abs(castep['mulliken_spins'][-1])
-                            else:
-                                castep['mulliken_charges'].append(
-                                    float(final_flines[line_no+i+4].split()[-1]))
-                            i += 1
-                    elif 'Final Enthalpy' in line:
-                        castep['enthalpy'] = float(line.split('=')[-1].split()[0])
-                        castep['enthalpy_per_atom'] = (float(line.split('=')[-1].split()[0]) /
-                                                       castep['num_atoms'])
-                    elif 'Final bulk modulus' in line:
-                        try:
-                            castep['bulk_modulus'] = float(line.split('=')[-1].split()[0])
-                        except:
-                            continue
 
-                    elif 'Chemical Shielding and Electric Field Gradient Tensors'.lower() in line.lower():
-                        i = 5
-                        castep['chemical_shifts'] = []
-                        while True:
-                            # break when the line containing just '=' is reached
-                            if len(flines[line_no+i].split()) == 1:
-                                break
-                            castep['chemical_shifts'].append(flines[line_no+i].split()[3])
-                            i += 1
-                        if len(castep['chemical_shifts']) != len(castep['atom_types']):
-                            raise RuntimeError('Found fewer chemical shifts than atoms (or vice versa)!')
+        if intermediates:
+            castep['intermediates'] = _castep_scrape_all_snapshots(flines)
 
-                # calculate kpoint spacing if not found
-                if 'kpoints_mp_grid' in castep and 'kpoints_mp_spacing' not in castep and \
-                   'lattice_cart' in castep:
-                    if db:
-                        prec = 2
-                    else:
-                        prec = 3
-                    castep['kpoints_mp_spacing'] = calc_mp_spacing(castep['lattice_cart'],
-                                                                   castep['kpoints_mp_grid'],
-                                                                   prec)
-        # computing metadata, i.e. parallelism, time, memory, version
-        for line in flines:
-            if 'Release CASTEP version' in line:
-                castep['castep_version'] = line.replace('|', '').split()[-1]
-            elif 'Run started:' in line:
-                year = line.split()[5]
-                month = str(strptime(line.split()[4], '%b').tm_mon)
-                day = line.split()[3]
-                castep['date'] = day+'-'+month+'-'+year
-            elif 'Total time' in line:
-                castep['total_time_hrs'] = float(line.split()[-2])/3600
-            elif 'Peak Memory Use' in line:
-                castep['peak_mem_MB'] = int(float(line.split()[-2])/1024)
-            elif 'total storage required per process' in line:
-                castep['estimated_mem_MB'] = float(line.split()[-5])
+        castep.update(_castep_scrape_final_structure(flines, castep, db=db, verbosity=verbosity, **kwargs))
+        castep.update(_castep_scrape_metadata(flines, castep, verbosity=verbosity, **kwargs))
+
         # check that any optimized results were saved and raise errors if not
-        if castep.get('optimised') is False:
+        if not castep.get('optimised'):
             castep['optimised'] = False
             raise DFTError('CASTEP GO failed to converge.')
         if 'positions_frac' not in castep:
@@ -928,6 +571,11 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
         if 'enthalpy' not in castep:
             castep['enthalpy'] = 'xxx'
             castep['enthalpy_per_atom'] = 'xxx'
+        if 'forces' not in castep and castep['num_atoms'] == 1 and 'geometry' in castep['task']:
+            castep['forces'] = [[0, 0, 0]]
+        if 'total_energy' not in castep:
+            castep['total_energy'] = 'xxx'
+            castep['total_energy_per_atom'] = 'xxx'
         if 'pressure' not in castep:
             castep['pressure'] = 'xxx'
         if 'cell_volume' not in castep:
@@ -954,7 +602,8 @@ def castep2dict(seed, db=True, verbosity=0, **kwargs):
                 return seed + '\t\t' + str(type(oops)) + ' ' + str(oops)+'\n', False
             else:
                 # if not importing to db, return unconverged structure
-                # but notify that it is unconverged
+                if verbosity > 1:
+                    print(oops)
                 return castep, True
         else:
             if type(oops) == IOError:
@@ -1329,11 +978,11 @@ def usp2dict(seed):
     """ Extract pseudopotential string from a CASTEP
     OTF .USP file.
 
-    Input:
+    Parameters:
         seed (str): filename of usp file.
 
     Returns:
-        species_pot (dict): partial species_pot dict from usp file.
+        dict: partial species_pot dict from usp file.
 
     """
     species_pot = dict()
@@ -1358,6 +1007,513 @@ def usp2dict(seed):
                     i += 1
     species_pot[elem] = species_pot[elem].replace('"', '')
     return species_pot
+
+
+def _castep_scrape_atoms(flines, castep, verbosity=0, **kwargs):
+    """ Iterate forwards through flines to scrape atomic types and
+    initial positions.
+
+    Parameters:
+        flines (list): list of lines in file
+        castep (dict): dictionary to update with scraped data
+
+    Returns:
+        dict: dictionary updated with scraped data
+
+    """
+    for line_no, line in enumerate(flines):
+        if 'atom types' not in castep and 'Cell Contents' in line:
+            castep['atom_types'] = []
+            castep['positions_frac'] = []
+            i = 1
+            atoms = False
+            while True:
+                if atoms:
+                    if 'xxxxxxxxx' in flines[line_no+i]:
+                        atoms = False
+                        break
+                    else:
+                        castep['atom_types'].append(flines[line_no+i].split()[1])
+                        castep['positions_frac'].append(list(map(float,
+                                                        (flines[line_no+i].split()[3:6]))))
+                if 'x------' in flines[line_no+i]:
+                    atoms = True
+                i += 1
+            for ind, pos in enumerate(castep['positions_frac']):
+                for k in range(3):
+                    if pos[k] > 1 or pos[k] < 0:
+                        castep['positions_frac'][ind][k] %= 1
+            castep['num_atoms'] = len(castep['atom_types'])
+            castep['stoichiometry'] = get_stoich(castep['atom_types'])
+            castep['num_fu'] = castep['num_atoms'] / sum([elem[1] for elem in castep['stoichiometry']])
+            return castep
+
+
+def _castep_scrape_final_parameters(flines, castep, verbosity=0, **kwargs):
+    """ Scrape the DFT parameters from a CASTEP file, using those listed
+    last in the file (i.e. those used to make the final structure).
+
+    Parameters:
+        flines (list): list of lines in the file
+        castep (dict): dictionary in which to put scraped data
+
+    Returns:
+        dict: dictionary updated with scraped data
+
+    """
+
+    pspot_report_dict = dict()
+    for line_no, line in enumerate(reversed(flines)):
+        line_no = len(flines) - 1 - line_no
+        if 'task' not in castep and 'type of calculation' in line:
+            castep['task'] = line.split(':')[-1].strip().replace(" ", "")
+        elif 'xc_functional' not in castep and 'functional' in line:
+            # convert from .castep file xc_functional to param style
+            xc_string = line.split(':')[-1].strip()
+            if 'Local Density Approximation' in xc_string:
+                castep['xc_functional'] = 'LDA'
+            elif 'Perdew Burke Ernzerhof' in xc_string:
+                castep['xc_functional'] = 'PBE'
+            elif 'PBE for solids' in xc_string:
+                castep['xc_functional'] = 'PBESol'
+            elif 'hybrid B3LYP' in xc_string:
+                castep['xc_functional'] = 'B3LYP'
+            elif 'hybrid HSE03' in xc_string:
+                castep['xc_functional'] = 'HSE03'
+            elif 'hybrid HSE06' in xc_string:
+                castep['xc_functional'] = 'HSE06'
+        elif 'cut_off_energy' not in castep and 'plane wave basis set' in line:
+            castep['cut_off_energy'] = float(line.split(':')[-1].split()[0])
+        elif 'finite_basis_corr' not in castep and 'finite basis set correction  ' in line:
+            castep['finite_basis_corr'] = line.split(':')[-1].strip()
+        elif 'kpoints_mp_grid' not in castep and 'MP grid size for SCF' in line:
+            castep['kpoints_mp_grid'] = list(map(int, list(line.split('is')[-1].split())))
+        elif 'num_kpoints' not in castep and 'Number of kpoints used' in line:
+            castep['num_kpoints'] = int(line.split()[-1])
+        elif 'geom_force_tol' not in castep and 'max ionic |force| tolerance' in line:
+            castep['geom_force_tol'] = float(line.split()[-2])
+        elif 'elec_energy_tol' not in castep and 'total energy / atom convergence tol' in line:
+            castep['elec_energy_tol'] = float(line.split()[-2])
+        elif 'sedc_apply' not in castep and \
+                'DFT+D: Semi-empirical dispersion correction    : on' in line:
+            castep['sedc_apply'] = True
+            castep['sedc_scheme'] = flines[line_no+1].split(':')[1].split()[0]
+        elif 'space_group' not in castep and 'Space group of crystal' in line:
+            castep['space_group'] = line.split(':')[-1].split(',')[0].strip().replace(" ", "")
+        elif 'external_pressure' not in castep and 'External pressure/stress' in line:
+            try:
+                castep['external_pressure'] = []
+                castep['external_pressure'].append(list(map(float, flines[line_no+1].split())))
+                castep['external_pressure'].append(list(map(float, flines[line_no+2].split())))
+                castep['external_pressure'].append(list(map(float, flines[line_no+3].split())))
+            except:
+                if kwargs.get('dryrun') or verbosity > 0:
+                    print_exc()
+                castep['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
+        elif 'spin_polarized' not in castep and 'treating system as spin-polarized' in line:
+            castep['spin_polarized'] = True
+        elif 'hubbard_u' not in castep and 'Hubbard U values are eV' in line:
+            castep['hubbard_u'] = defaultdict(list)
+            i = 5
+            while i < castep['num_atoms']:
+                line = flines[line_no+i].strip()
+                atom = line.split()[0].replace('|', '')
+                shifts = list(map(float, line.split()[-5:-1]))
+                for ind, shift in enumerate(shifts):
+                    if shift != 0:
+                        if atom not in castep['hubbard_u']:
+                            castep['hubbard_u'][atom] = dict()
+                        if ind == 0:
+                            orbital = 's'
+                        elif ind == 1:
+                            orbital = 'p'
+                        elif ind == 2:
+                            orbital = 'd'
+                        elif ind == 3:
+                            orbital = 'f'
+                        castep['hubbard_u'][atom][orbital] = shift
+                i += 1
+        elif 'Pseudopotential Report' in line:
+            if 'species_pot' not in castep:
+                castep['species_pot'] = dict()
+            i = 0
+            while i+line_no < len(flines)-3:
+                if 'Pseudopotential Report' in flines[line_no+i]:
+                    i += 2
+                    elem = flines[line_no+i].split(':')[1].split()[0]
+
+                elif 'core correction' in flines[line_no+i]:
+                    i += 2
+                    if not pspot_report_dict[elem]:
+                        castep['species_pot'][elem] = flines[line_no+i].split('"')[1].replace('[]', '')
+                        pspot_report_dict[elem] = True
+                i += 1
+        elif 'species_pot' not in castep and 'Files used for pseudopotentials' in line:
+            if 'species_pot' not in castep:
+                castep['species_pot'] = dict()
+            i = 1
+            while True:
+                if len(flines[line_no+i].strip()) == 0:
+                    break
+                else:
+                    elem = flines[line_no+i].split()[0].strip()
+                    if not pspot_report_dict.get(elem):
+                        castep['species_pot'][elem] = flines[line_no+i].split()[1].split('/')[-1]
+                        if castep['species_pot'][elem] == 'Pseudopotential':
+                            castep['species_pot'][elem] = flines[line_no+i].split()[0].strip()+'_OTF.usp'
+                        pspot_report_dict[elem] = False
+                i += 1
+    # write zero pressure if not found in file
+    if 'external_pressure' not in castep:
+        castep['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0], [0.0]]
+    if 'spin_polarized' not in castep:
+        castep['spin_polarized'] = False
+    return castep
+
+
+def _castep_scrape_final_structure(flines, castep, db=True, verbosity=0, **kwargs):
+    """ Scrape final structure from CASTEP file.
+
+    Parameters:
+        flines (list): list of lines contained in file
+        castep (dict): dictionary to update with data
+
+    Keyword arguments:
+        db (bool): whether to enforce database style, e.g. geometry optimisation only
+
+    Returns:
+        dict: dictionary updated with scraped data
+
+    """
+    if 'task' in castep and castep['task'].strip() == 'geometryoptimization':
+        castep['optimised'] = False
+        finish_line, castep['optimised'] = _castep_find_final_structure(flines)
+    elif not db:
+        finish_line = 0
+
+    final_flines = flines[finish_line+1:]
+    for line_no, line in enumerate(final_flines):
+        if 'Real Lattice' in line:
+            castep['lattice_cart'] = []
+            i = 1
+            while True:
+                if len(final_flines[line_no+i].strip()) == 0:
+                    break
+                else:
+                    temp_line = final_flines[line_no+i].split()[0:3]
+                    castep['lattice_cart'].append(list(map(float, temp_line)))
+                i += 1
+        elif 'Lattice parameters' in line:
+            castep['lattice_abc'] = []
+            i = 1
+            castep['lattice_abc'].append(
+                list(map(float,
+                         [final_flines[line_no+i].split('=')[1].strip().split(' ')[0],
+                          final_flines[line_no+i+1].split('=')[1].strip().split(' ')[0],
+                          final_flines[line_no+i+2].split('=')[1].strip().split(' ')[0]])))
+            castep['lattice_abc'].append(
+                list(map(float,
+                         [final_flines[line_no+i].split('=')[-1].strip(),
+                          final_flines[line_no+i+1].split('=')[-1].strip(),
+                          final_flines[line_no+i+2].split('=')[-1].strip()])))
+        elif 'Current cell volume' in line:
+            castep['cell_volume'] = float(line.split('=')[1].split()[0].strip())
+        elif 'Cell Contents' in line:
+            castep['positions_frac'] = []
+            i = 1
+            atoms = False
+            while True:
+                if atoms:
+                    if 'xxxxxxxxx' in final_flines[line_no+i]:
+                        atoms = False
+                        break
+                    else:
+                        temp_frac = final_flines[line_no+i].split()[3:6]
+                        castep['positions_frac'].append(list(map(float, temp_frac)))
+                if 'x------' in final_flines[line_no+i]:
+                    atoms = True
+                i += 1
+        # don't check if final_energy exists, as this will update for each GO step
+        elif 'Final energy, E' in line:
+            castep['total_energy'] = float(line.split('=')[1].split()[0])
+            castep['total_energy_per_atom'] = castep['total_energy'] / castep['num_atoms']
+        elif 'Final free energy' in line:
+            castep['free_energy'] = float(line.split('=')[1].split()[0])
+            castep['free_energy_per_atom'] = castep['free_energy'] / castep['num_atoms']
+        elif '0K energy' in line:
+            castep['0K_energy'] = float(line.split('=')[1].split()[0])
+            castep['0K_energy_per_atom'] = castep['0K_energy'] / castep['num_atoms']
+        elif 'Forces' in line:
+            castep['forces'] = []
+            i = 1
+            max_force = 0
+            forces = False
+            while True:
+                if forces:
+                    if '*' in final_flines[line_no+i].split()[1]:
+                        forces = False
+                        break
+                    else:
+                        force_on_atom = 0
+                        castep['forces'].append([])
+                        for j in range(3):
+                            temp = final_flines[line_no+i].replace('(cons\'d)', '')
+                            force_on_atom += float(temp.split()[3+j])**2
+                            castep['forces'][-1].append(float(temp.split()[3+j]))
+                        if force_on_atom > max_force:
+                            max_force = force_on_atom
+                elif 'x' in final_flines[line_no+i]:
+                    i += 1                      # skip next blank line
+                    forces = True
+                i += 1
+            castep['max_force_on_atom'] = pow(max_force, 0.5)
+        elif 'Stress Tensor' in line:
+            i = 1
+            while i < 20:
+                if 'Cartesian components' in final_flines[line_no+i]:
+                    castep['stress'] = []
+                    for j in range(3):
+                        castep['stress'].append(list(map(
+                            float, (final_flines[line_no+i+j+4].split()[2:5]))))
+                elif 'Pressure' in final_flines[line_no+i]:
+                    try:
+                        castep['pressure'] = float(final_flines[line_no+i].split()[-2])
+                    except:
+                        if kwargs.get('dryrun') or verbosity > 0:
+                            print_exc()
+                        pass
+                    break
+                i += 1
+        elif 'Atomic Populations (Mulliken)' in line:
+            if castep['spin_polarized']:
+                castep['mulliken_spins'] = []
+                castep['mulliken_net_spin'] = 0.0
+                castep['mulliken_abs_spin'] = 0.0
+            castep['mulliken_charges'] = []
+            castep['mulliken_spins'] = []
+            i = 0
+            while i < len(castep['atom_types']):
+                if castep['spin_polarized']:
+                    castep['mulliken_charges'].append(
+                        float(final_flines[line_no+i+4].split()[-2]))
+                    castep['mulliken_spins'].append(
+                        float(final_flines[line_no+i+4].split()[-1]))
+                    castep['mulliken_net_spin'] += castep['mulliken_spins'][-1]
+                    castep['mulliken_abs_spin'] += abs(castep['mulliken_spins'][-1])
+                else:
+                    castep['mulliken_charges'].append(
+                        float(final_flines[line_no+i+4].split()[-1]))
+                i += 1
+        elif 'Final Enthalpy' in line:
+            castep['enthalpy'] = float(line.split('=')[-1].split()[0])
+            castep['enthalpy_per_atom'] = (float(line.split('=')[-1].split()[0]) /
+                                           castep['num_atoms'])
+        elif 'Final bulk modulus' in line:
+            try:
+                castep['bulk_modulus'] = float(line.split('=')[-1].split()[0])
+            except:
+                continue
+
+        elif 'Chemical Shielding and Electric Field Gradient Tensors'.lower() in line.lower():
+            i = 5
+            castep['chemical_shifts'] = []
+            while True:
+                # break when the line containing just '=' is reached
+                if len(flines[line_no+i].split()) == 1:
+                    break
+                castep['chemical_shifts'].append(flines[line_no+i].split()[3])
+                i += 1
+            if len(castep['chemical_shifts']) != len(castep['atom_types']):
+                raise RuntimeError('Found fewer chemical shifts than atoms (or vice versa)!')
+
+    # calculate kpoint spacing if not found
+    if 'kpoints_mp_grid' in castep and 'kpoints_mp_spacing' not in castep and 'lattice_cart' in castep:
+        castep['kpoints_mp_spacing'] = calc_mp_spacing(castep['lattice_cart'],
+                                                       castep['kpoints_mp_grid'],
+                                                       prec=4)
+    return castep
+
+
+def _castep_scrape_metadata(flines, castep, verbosity=0, **kwargs):
+    """ Scrape metadata from CASTEP file.
+
+    Parameters:
+        flines (list): list of lines contained in file
+        castep (dict): dictionary to update with data
+
+    Returns:
+        dict: dictionary updated with scraped data
+
+    """
+    # computing metadata, i.e. parallelism, time, memory, version
+    for line in flines:
+        if 'Release CASTEP version' in line:
+            castep['castep_version'] = line.replace('|', '').split()[-1]
+        elif 'Run started:' in line:
+            year = line.split()[5]
+            month = str(strptime(line.split()[4], '%b').tm_mon)
+            day = line.split()[3]
+            castep['date'] = day+'-'+month+'-'+year
+        elif 'Total time' in line:
+            castep['total_time_hrs'] = float(line.split()[-2])/3600
+        elif 'Peak Memory Use' in line:
+            castep['peak_mem_MB'] = int(float(line.split()[-2])/1024)
+        elif 'total storage required per process' in line:
+            castep['estimated_mem_MB'] = float(line.split()[-5])
+
+    return castep
+
+
+def _castep_find_final_structure(flines):
+    """ Search for info on final structure in .castep file.
+
+    Parameters:
+        flines (list): list of lines in file.
+
+    Returns:
+        int: line number in file where total energy of final structure is printed.
+
+    """
+    optimised = False
+    finish_line = 0
+    success_string = 'Geometry optimization completed successfully'
+    failure_string = 'Geometry optimization failed to converge after'
+    for line_no, line in enumerate(flines):
+        if any(finished in line for finished in [success_string, failure_string]):
+            for line_next in range(line_no, len(flines)):
+                if any(finished in flines[line_next] for
+                        finished in [success_string, failure_string]):
+                    finish_line = line_next
+                    if success_string in flines[line_next]:
+                        optimised = True
+                    elif failure_string in flines[line_next]:
+                        optimised = False
+
+    # now wind back to get final total energies and non-symmetrised forces
+    for count, line in enumerate(reversed(flines[:finish_line])):
+        if 'Final energy, E' in line:
+            finish_line -= count + 2
+            break
+
+    return finish_line, optimised
+
+
+def _castep_scrape_all_snapshots(flines):
+    """ Scrape all intermediate structures from a CASTEP file.
+
+    Parameters:
+        flines (list): list of lines of file.
+
+    Returns:
+        :obj:`list` of :obj:`dict`: list of dictionaries containing
+            intermediate snapshots.
+
+    """
+    intermediates = []
+    snapshot = dict()
+    for line_no, line in enumerate(flines):
+        # use the "Real Lattice" line as the start of a new snapshot / end of old one
+        if 'Real Lattice' in line:
+            # add the last snapshot only if it isn't a repeat
+            if 'total_energy' in snapshot:
+                # if positions frac didn't change (and thus weren't printed, use the last value)
+                if 'positions_frac' not in snapshot:
+                    snapshot['positions_frac'] = intermediates[-1]['positions_frac']
+                    snapshot['atom_types'] = intermediates[-1]['atom_types']
+                    snapshot['num_atoms'] = len(snapshot['positions_frac'])
+                snapshot['free_energy_per_atom'] = snapshot['free_energy'] / snapshot['num_atoms']
+                snapshot['total_energy_per_atom'] = snapshot['total_energy'] / snapshot['num_atoms']
+                snapshot['0K_energy_per_atom'] = snapshot['0K_energy'] / snapshot['num_atoms']
+                # handle single atom forces edge-case
+                if snapshot['num_atoms'] == 1:
+                    snapshot['forces'] = [[0, 0, 0]]
+                if len(intermediates) == 0:
+                    intermediates.append(snapshot)
+                elif snapshot['lattice_cart'] != intermediates[-1]['lattice_cart'] \
+                        and snapshot['total_energy'] != intermediates[-1]['total_energy']:
+                        intermediates.append(snapshot)
+
+            snapshot = dict()
+            snapshot['lattice_cart'] = []
+            i = 1
+            while True:
+                if len(flines[line_no+i].strip()) == 0:
+                    break
+                else:
+                    temp_line = flines[line_no+i].split()[0:3]
+                    snapshot['lattice_cart'].append(list(map(float, temp_line)))
+                i += 1
+        elif 'Current cell volume' in line:
+            snapshot['cell_volume'] = float(line.split('=')[1].split()[0].strip())
+        elif 'Cell Contents' in line:
+            snapshot['positions_frac'] = []
+            snapshot['atom_types'] = []
+            i = 1
+            atoms = False
+            while True:
+                if atoms:
+                    if 'xxxxxxxxx' in flines[line_no+i]:
+                        atoms = False
+                        break
+                    else:
+                        temp_frac = flines[line_no+i].split()[3:6]
+                        snapshot['positions_frac'].append(list(map(float, temp_frac)))
+                        snapshot['atom_types'].append(flines[line_no+i].split()[1])
+                if 'x------' in flines[line_no+i]:
+                    atoms = True
+                i += 1
+            for ind, pos in enumerate(snapshot['positions_frac']):
+                for k in range(3):
+                    if pos[k] > 1 or pos[k] < 0:
+                        snapshot['positions_frac'][ind][k] %= 1
+
+            snapshot['num_atoms'] = len(snapshot['positions_frac'])
+            snapshot['stoichiometry'] = get_stoich(snapshot['atom_types'])
+
+        # don't check if final_energy exists, as this will update for each GO step
+        elif 'Final energy, E' in line:
+            snapshot['total_energy'] = float(line.split('=')[1].split()[0])
+        elif 'Final free energy' in line:
+            snapshot['free_energy'] = float(line.split('=')[1].split()[0])
+        elif '0K energy' in line:
+            snapshot['0K_energy'] = float(line.split('=')[1].split()[0])
+        elif 'Forces' in line:
+            snapshot['forces'] = []
+            i = 1
+            max_force = 0
+            forces = False
+            while True:
+                if forces:
+                    if '*' in flines[line_no+i].split()[1]:
+                        forces = False
+                        break
+                    else:
+                        force_on_atom = 0
+                        snapshot['forces'].append([])
+                        for j in range(3):
+                            temp = flines[line_no+i].replace('(cons\'d)', '')
+                            force_on_atom += float(temp.split()[3+j])**2
+                            snapshot['forces'][-1].append(float(temp.split()[3+j]))
+                        if force_on_atom > max_force:
+                            max_force = force_on_atom
+                elif 'x' in flines[line_no+i]:
+                    i += 1                      # skip next blank line
+                    forces = True
+                i += 1
+            snapshot['max_force_on_atom'] = pow(max_force, 0.5)
+        elif 'Stress Tensor' in line:
+            i = 1
+            while i < 20:
+                if 'Cartesian components' in flines[line_no+i]:
+                    snapshot['stress'] = []
+                    for j in range(3):
+                        snapshot['stress'].append(list(map(float, (flines[line_no+i+j+4].split()[2:5]))))
+                elif 'Pressure' in flines[line_no+i]:
+                    snapshot['pressure'] = float(flines[line_no+i].split()[-2])
+                    break
+                i += 1
+
+    return intermediates
 
 
 class DFTError(Exception):
