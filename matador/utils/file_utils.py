@@ -4,7 +4,18 @@ parsing/writing of files. """
 
 
 def scrape_castep_params(executable):
-    """ Scan CASTEP help system for parameter file keywords. """
+    """ Scan CASTEP help system for parameter file keywords.
+
+    Parameters:
+        executable (str): name of CASTEP executable
+
+    Returns:
+        list: list of cell keyword strings
+        list: list of cell blocks names
+        list: list of param keyword strings
+        str: castep version number used
+
+    """
     import string
     import subprocess
     params = set()
@@ -23,19 +34,33 @@ def scrape_castep_params(executable):
                     cell.add(str(keyword.split()[0]))
             except:
                 pass
-    params = list(params)
-    cell = list(cell)
-    params = sorted(params)
-    cell = sorted(cell)
-    params = list(params)
-    cell = list(cell)
+
+    output = str(subprocess.check_output('{} -s block'.format(executable), shell=True))
+    blocks = set()
+    for keyword in output.split('PARAMETERS')[0].split('\\n')[1:]:
+        try:
+            if len(keyword) > 1:
+                blocks.add(str(keyword.split()[0]))
+        except:
+            pass
+
+    params = list(sorted(list(params)))
+    cell = list(sorted(list(cell)))
+    blocks = list(sorted(list(blocks)))
+    cell = [keyword for keyword in cell if keyword not in blocks]
+
     version_string = str(subprocess.check_output('{} --version'.format(executable), shell=True)).split('\\n')[0].split()[-1].strip()
-    return cell, params, version_string
+    return cell, blocks, params, version_string
 
 
 def update_castep_param_list(executable):
-    """ Update the param list file. """
-    cell, params, version = scrape_castep_params(executable)
+    """ Update the castep_params.py file.
+
+    Parameters:
+        executable (str): name of CASTEP executable
+
+    """
+    cell, blocks, params, version = scrape_castep_params(executable)
     with open('castep_params.py', 'w') as f:
         f.write('""" This file contains a Python list of all CASTEP parameters,\n')
         f.write('automatically generated with file_utils.scrape_castep_params().\n"""')
@@ -46,6 +71,12 @@ def update_castep_param_list(executable):
         for keyword in cell:
             f.write('                 \'{}\',\n'.format(keyword.lower()))
         f.write('                ]\n')
+
+        f.write('CASTEP_CELL_BLOCKS = [\n')
+        for keyword in blocks:
+            f.write('                 \'{}\',\n'.format(keyword.lower()))
+        f.write('                ]\n')
+
         f.write('CASTEP_PARAMS = [\n')
         for param in params:
             f.write('                 \'{}\',\n'.format(param.lower()))
