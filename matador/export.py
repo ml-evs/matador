@@ -3,19 +3,17 @@
 """ This file implements functions that
 can create a file from a db document.
 """
-from __future__ import print_function
-# matador internals
+
+import string
+import os
+import sys
+from traceback import print_exc
+
+import numpy as np
+
 from matador.utils.cell_utils import cart2abcstar, frac2cart, cart2abc
 from matador.utils.cell_utils import abc2cart, calc_mp_grid
 from matador.utils.cursor_utils import display_results
-# external libraries
-import numpy as np
-# standard library
-import string
-from os.path import exists, isfile, expanduser
-from os import system, makedirs, remove
-from traceback import print_exc
-from sys import exit
 
 
 def query2files(cursor, *args, **kwargs):
@@ -75,8 +73,8 @@ def query2files(cursor, *args, **kwargs):
             directory = dirname + str(dir_counter)
         else:
             directory = dirname
-        if not exists(directory):
-            makedirs(directory)
+        if not os.path.exists(directory):
+            os.makedirs(directory)
             dir = True
         else:
             dir_counter += 1
@@ -170,9 +168,9 @@ def doc2param(doc, path, hash_dupe=True, overwrite=False, spin=False, *args):
         param_dict = dict()
         for param in [param for param in param_set if param in doc]:
             param_dict[param] = doc[param]
-        if isfile(path+'.param'):
+        if os.path.isfile(path+'.param'):
             if overwrite:
-                remove(path + '.param')
+                os.remove(path + '.param')
             elif hash_dupe:
                 print('File name already exists, generating hash...')
                 path += '-' + generate_hash()
@@ -199,7 +197,7 @@ def doc2param(doc, path, hash_dupe=True, overwrite=False, spin=False, *args):
             try:
                 from implicit_cnts import implicit_cnt_params
             except ImportError:
-                exit('Failed to import implicit_cnt_params, please ensure pyairss is on your PYTHONPATH!')
+                sys.exit('Failed to import implicit_cnt_params, please ensure pyairss is on your PYTHONPATH!')
             cnt_params = implicit_cnt_params(doc['cnt_radius'])
             flines = []
             flines.append('%BLOCK DEVEL_CODE\n')
@@ -238,12 +236,12 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, overwri
     if path.endswith('.cell'):
         path = path.replace('.cell', '')
     try:
-        if isfile(path+'.cell'):
+        if os.path.isfile(path+'.cell'):
             if hash_dupe:
                 print('File already exists, generating hash...')
                 path += '-' + generate_hash()
             elif overwrite:
-                remove(path+'.cell')
+                os.remove(path+'.cell')
             else:
                 raise RuntimeError('Skipping duplicate structure...')
         with open(path+'.cell', 'w') as f:
@@ -304,7 +302,7 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, overwri
                         str(doc['spectral_kpoints_mp_offset'][0]) + ' ' +
                         str(doc['spectral_kpoints_mp_offset'][1]) + ' ' +
                         str(doc['spectral_kpoints_mp_offset'][2]) + '\n')
-            if 'phonon_kpoints_mp_offset' in doc:
+            if 'phonon_kpoint_mp_offset' in doc:
                 f.write('PHONON_KPOINT_MP_OFFSET ' +
                         str(doc['phonon_kpoint_mp_offset'][0]) + ' ' +
                         str(doc['phonon_kpoint_mp_offset'][1]) + ' ' +
@@ -327,10 +325,10 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, overwri
                 for point in doc['phonon_kpoint_list']:
                     f.write('{p[0]} {p[1]} {p[2]}\n'.format(p=point))
                 f.write('%ENDBLOCK PHONON_KPOINT_LIST\n')
-            elif 'phonon_kpoints_mp_spacing' in doc:
+            elif 'phonon_kpoint_mp_spacing' in doc:
                 f.write('PHONON_KPOINT_MP_SPACING ' +
                         str(doc['phonon_kpoint_mp_spacing']) + '\n')
-            elif 'phonon_kpoints_mp_grid' in doc:
+            elif 'phonon_kpoint_mp_grid' in doc:
                 f.write('PHONON_KPOINT_MP_GRID ' +
                         str(doc['phonon_kpoint_mp_grid'][0]) + ' ' +
                         str(doc['phonon_kpoint_mp_grid'][1]) + ' ' +
@@ -339,8 +337,8 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, overwri
                 f.write('%BLOCK PHONON_FINE_KPOINT_LIST\n')
                 for point in doc['phonon_fine_kpoint_list']:
                     f.write('{p[0]} {p[1]} {p[2]}\n'.format(p=point))
-                f.write('%ENDBLOCK PHONON_FINE_KPOINTS_LIST\n')
-            if 'phonon_fine_kpoints_mp_spacing' in doc:
+                f.write('%ENDBLOCK PHONON_FINE_KPOINT_LIST\n')
+            if 'phonon_fine_kpoint_mp_spacing' in doc:
                 f.write('PHONON_FINE_KPOINT_MP_SPACING {}\n'
                         .format(doc['phonon_fine_kpoint_mp_spacing']))
             if 'cell_constraints' in doc:
@@ -378,10 +376,10 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, overwri
                 for elem in doc['species_pot']:
                     if copy_pspots:
                         # copy across pspots if they exist
-                        if not isfile(''.join(path.split('/')[:-1])+'/'+doc['species_pot'][elem]):
-                            if isfile(expanduser('~/pspot/' + doc['species_pot'][elem])):
-                                system('cp ' + expanduser('~/pspot/') + doc['species_pot'][elem] +
-                                       ' ' + ''.join(path.split('/')[:-1]))
+                        if not os.path.isfile(''.join(path.split('/')[:-1])+'/'+doc['species_pot'][elem]):
+                            if os.path.isfile(os.path.expanduser('~/pspot/' + doc['species_pot'][elem])):
+                                os.system('cp ' + os.path.expanduser('~/pspot/') + doc['species_pot'][elem] +
+                                          ' ' + ''.join(path.split('/')[:-1]))
                     if elem == 'library':
                         f.write(doc['species_pot']['library'] + '\n')
                     else:
@@ -404,7 +402,7 @@ def doc2pdb(doc, path, info=True, hash_dupe=True, *args):
     if path.endswith('.pdb'):
         path = path.replace('.pdb', '')
     try:
-        if isfile(path+'.pdb'):
+        if os.path.isfile(path+'.pdb'):
             if hash_dupe:
                 print('File already exists, generating hash...')
                 path += '-' + generate_hash()
@@ -493,7 +491,7 @@ def doc2pwscf(doc, path, template=None, spacing=None, *args):
     if path.endswith('.in'):
         path = path.replace('.in', '')
 
-    if isfile(path + '.in'):
+    if os.path.isfile(path + '.in'):
         print('File already exists, not overwriting...')
         return
 
@@ -519,7 +517,7 @@ def doc2pwscf(doc, path, template=None, spacing=None, *args):
     file_string += '{d[0]} {d[1]} {d[2]} 0 0 0'.format(d=doc['kpoints_mp_grid'])
 
     if template is not None:
-        if isfile(template):
+        if os.path.isfile(template):
             with open(template, 'r') as f:
                 template_string = f.readlines()
 
@@ -557,12 +555,12 @@ def doc2res(doc, path, info=True, hash_dupe=True, spoof_titl=False, overwrite=Fa
     if spoof_titl:
         info = False
     try:
-        if isfile(path+'.res'):
+        if os.path.isfile(path+'.res'):
             if hash_dupe:
                 print('File already exists, generating hash...')
                 path += '-' + generate_hash()
             elif overwrite:
-                remove(path+'.res')
+                os.remove(path+'.res')
             else:
                 raise RuntimeError('Skipping duplicate structure...')
         if not info:
@@ -657,6 +655,63 @@ def doc2res(doc, path, info=True, hash_dupe=True, spoof_titl=False, overwrite=Fa
         else:
             print('Writing res file failed for ', path, 'this is not necessarily a problem...')
             pass
+
+
+def doc2xsf(doc, path, write_energy=False, write_forces=False, overwrite=False):
+    """ Write an .xsf file for a matador document, with positions in
+    Cartesian coordinates. Optionally, write the energy in a comment
+    at the top of the file for use with aenet.
+
+    Parameters:
+        doc (dict): matador document containing structure.
+        path (str): desired path of xsf file.
+
+    Keyword arguments:
+        write_energy (bool): whether or not to write total energy in a comment
+            as the first line of the file.
+        write_forces (bool): whether or not to write the forces on each atom.
+        overwrite (bool): overwrite if file exists.
+
+    """
+    if path.endswith('.xsf'):
+        path = path.replace('.xsf', '')
+
+    flines = []
+    if write_energy:
+        if 'total_energy' in doc:
+            flines.append('# total energy = {:10.8f} eV\n'.format(doc['total_energy']))
+        else:
+            raise RuntimeError("Failed to write energy in xsf file: key 'total_energy' missing from input.")
+
+    flines.append('CRYSTAL')
+    flines.append('PRIMVEC')
+    if 'lattice_cart' in doc:
+        for i in range(3):
+            flines.append('\t\t{lat[0]: 10.8f}\t{lat[1]: 10.8f}\t{lat[2]: 10.8f}'.format(lat=doc['lattice_cart'][i]))
+    else:
+        raise RuntimeError("Failed to write lattice in xsf file: key 'lattice_cart' missing from input.")
+    flines.append('PRIMCOORD')
+    flines.append('{} {}'.format(doc['num_atoms'], 1))
+    if 'positions_abs' not in doc:
+        doc['positions_abs'] = frac2cart(doc['lattice_cart'], doc['positions_frac'])
+    for ind, (atom, position) in enumerate(zip(doc['atom_types'], doc['positions_abs'])):
+        flines.append('{:2}\t{pos[0]: 16.8f}\t{pos[1]: 16.8f}\t{pos[2]: 16.8f}'.format(atom, pos=position))
+        if write_forces:
+            if 'forces' in doc:
+                flines[-1] += ('\t{f[0]: 16.8f}\t{f[1]: 16.8f}\t{f[2]: 16.8f}'.format(f=doc['forces'][ind]))
+            else:
+                raise RuntimeError("Failed to write forces in xsf file: key 'forces' missing from input.")
+
+    if os.path.isfile(path + '.xsf'):
+        if overwrite:
+            os.remove(path + '.xsf')
+        else:
+            print('File name already exists! Skipping!')
+            raise RuntimeError('Duplicate file!')
+
+    with open(path + '.xsf', 'w') as f:
+        for line in flines:
+            f.write(line + '\n')
 
 
 def generate_hash(hashLen=6):
