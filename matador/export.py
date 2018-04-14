@@ -26,10 +26,11 @@ def query2files(cursor, *args, **kwargs):
     param = args.get('param')
     res = args.get('res')
     pdb = args.get('pdb')
+    xsf = args.get('xsf')
     md = args.get('markdown')
     tex = args.get('latex')
     argstr = kwargs.get('argstr')
-    multiple_files = cell or param or res or pdb
+    multiple_files = cell or param or res or pdb or xsf
     prefix = (args.get('prefix') + '-') if args.get('prefix') is not None else ''
     pressure = args.get('write_pressure')
     if args['subcmd'] == 'polish' or args['subcmd'] == 'swaps':
@@ -126,6 +127,8 @@ def query2files(cursor, *args, **kwargs):
             doc2res(doc, path, info=info, hash_dupe=hash)
         if pdb:
             doc2pdb(doc, path, hash_dupe=hash)
+        if xsf:
+            doc2xsf(doc, path)
 
     if md:
         md_path = path.split('/')[0] + '/' + path.split('/')[0] + '.md'

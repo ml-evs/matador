@@ -1,291 +1,24 @@
 #!/usr/bin/env python
 # coding: utf-8
-""" This file calls all matador functionality,
-parses user inputs and implements the stats submodule.
+""" This file implements the matador command line functionality,
+parsing user inputs and passing them to the CommandLine object.
+
 """
 
-from __future__ import print_function
-# matador modules
-from matador.query import DBQuery
-from matador.hull import QueryConvexHull
-from matador.utils.print_utils import print_failure, print_warning, print_notify
-from matador.utils.db_utils import make_connection_to_collection, load_custom_settings
-from matador.version import __version__
-# import standard library
 import argparse
+import os
 from sys import argv
-from os.path import isfile
+from matador.version import __version__
+from matador.cli import MatadorCommandLine
 
 
-class Matador(object):
-    """ Class that implements the interface
-    to MongoDB structure repository.
-    """
-    def __init__(self, *args, **kwargs):
-        """ Initialise the query with command line
-        arguments and return results.
-        """
-        # read args
-        self.kwargs = kwargs
-        self.args = vars(args[0])
-        self.argstr = kwargs.get('argstr')
-
-        if (self.args.get('cell') or self.args.get('res') or self.args.get('pdb') or
-                self.args.get('markdown') or self.args.get('latex') or self.args.get('param')):
-            self.export = True
-        else:
-            self.export = False
-
-        if self.args['subcmd'] not in ['import', 'rebuild']:
-            self.settings = load_custom_settings(config_fname=self.args.get('config'))
-            self.client, self.db, self.collections = make_connection_to_collection(self.args.get('db'),
-                                                                                   check_collection=True,
-                                                                                   mongo_settings=self.settings)
-
-        if self.args['subcmd'] == 'stats':
-            self.stats()
-
-        try:
-
-            if self.args['subcmd'] in ['import', 'rebuild']:
-                from matador.importer import Spatula
-                self.importer = Spatula(self.args)
-
-            if self.args['subcmd'] == 'query':
-                self.query = DBQuery(self.client, self.collections, **self.args)
-                self.cursor = self.query.cursor
-
-            if self.args['subcmd'] in ['swaps', 'polish']:
-                from matador.polish import Polisher
-                self.query = DBQuery(self.client, self.collections, **self.args)
-                if self.args.get('hull_cutoff') is not None:
-                    self.hull = QueryConvexHull(self.query, **self.args)
-                    self.polisher = Polisher(self.hull.hull_cursor, self.args)
-                else:
-                    self.polisher = Polisher(self.query.cursor, self.args)
-                self.cursor = self.polisher.cursor
-
-            if self.args['subcmd'] == 'refine':
-                from matador.refine import Refiner
-                self.query = DBQuery(self.client, self.collections, **self.args)
-                if self.args.get('hull_cutoff') is not None:
-                    self.hull = QueryConvexHull(self.query, **self.args)
-                    self.refiner = Refiner(self.hull.cursor, self.query.repo, **self.args)
-                else:
-                    self.refiner = Refiner(self.query.cursor, self.query.repo, **self.args)
-
-            if self.args['subcmd'] == 'pdffit':
-                self.query = DBQuery(self.client, self.collections, **self.args)
-                self.cursor = list(self.query.cursor)
-                if self.args.get('hull_cutoff') is not None:
-                    self.hull = QueryConvexHull(self.query, **self.args)
-                    self.cursor = self.hull.hull_cursor
-                    self.top = len(self.cursor)
-                if self.args.get('top') is not None:
-                    self.top = self.args.get('top')
-                if len(self.cursor[:self.top]) > 0:
-                    print_notify('Performing PDF fit for ' +
-                                 str(len(self.cursor[:self.top])) +
-                                 ' structures.')
-                    from matador.pdffit import PDFFitter
-                    self.pdffit = PDFFitter(self.cursor[:self.top], **self.args)
-                    try:
-                        self.pdffit.spawn()
-                    except(KeyboardInterrupt, SystemExit):
-                        exit('Exiting top-level...')
-                else:
-                    exit('No structure match query.')
-
-            if self.args['subcmd'] == 'hull' or self.args['subcmd'] == 'voltage':
-                self.query = DBQuery(self.client, self.collections, **self.args)
-                self.hull = QueryConvexHull(self.query, **self.args)
-                self.cursor = self.hull.hull_cursor
-
-            if self.args['subcmd'] == 'changes':
-                from matador.changes import DatabaseChanges
-                if len(self.collections) != 1:
-                    exit('Cannot view changes of more than one collection at once.')
-                if self.args.get('undo'):
-                    action = 'undo'
-                else:
-                    action = 'view'
-                changeset = self.args.get('changeset')
-                if changeset is None:
-                    changeset = 0
-                DatabaseChanges([key for key in self.collections][0], changeset_ind=changeset, action=action, mongo_settings=self.settings)
-
-            if self.args['subcmd'] == 'hulldiff':
-                from matador.hull_diff import diff_hulls
-                if self.args.get('compare') is None:
-                    exit('Please specify which hulls to query with --compare.')
-                diff_hulls(self.client, self.collections, **self.args)
-
-            # perform any extra filtration
-            if self.args.get('filter'):
-                from matador.utils.cursor_utils import filter_cursor
-                self.cursor = filter_cursor(self.cursor,
-                                            self.args.get('filter'),
-                                            self.args.get('values'))
-
-            if self.export and len(self.cursor) > 0:
-                from matador.export import query2files
-                if self.args.get('write_n') is not None:
-                    self.cursor = [doc for doc in self.cursor if len(doc['stoichiometry']) == self.args.get('write_n')]
-                if len(self.cursor) < 1:
-                    print_failure('No structures left to export.')
-                query2files(self.cursor, self.args, argstr=self.argstr)
-
-            if self.args.get('view'):
-                from matador.viz import viz
-                if self.args.get('top') is None:
-                    self.top = len(self.cursor)
-                else:
-                    self.top = self.args.get('top')
-                if len(self.cursor[:self.top]) > 10:
-                    from time import sleep
-                    print_warning('WARNING: opening {} files with ase-gui...'.format(len(self.cursor)))
-                    print_warning('Please kill script within 3 seconds if undesired...')
-                    sleep(3)
-                if len(self.cursor[:self.top]) > 20:
-                    print_failure('You will literally be opening that many windows, ' +
-                                  'I\'ll give you another 5 seconds to reconsider...')
-
-                    sleep(5)
-                    print_notify('It\'s your funeral...')
-                    sleep(1)
-                for doc in self.cursor[:self.top]:
-                    viz(doc)
-
-            if self.args.get('subcmd') not in ['rebuild', 'import']:
-                self.client.close()
-
-        except SystemExit as oops:
-            print(oops)
-            print('Trying to nicely close connection...')
-            try:
-                self.client.close()
-            except:
-                pass
-
-    def print_report(self):
-        """ Print spatula report on current database. """
-        try:
-            report = self.report.find_one()
-            print('Database last modified on', report['last_modified'], 'with matador',
-                  report['version'] + '.')
-        except:
-            print_warning('Failed to print database report: spatula is probably running!')
-
-    def stats(self):
-        """ Print some useful stats about the database. """
-        if self.args.get('list'):
-            print_notify(str(len(self.db.collection_names())) +
-                         ' collections found in database:\n')
-            collstats_list = []
-            for name in self.db.collection_names():
-                collstats_list.append(self.db.command('collstats', name))
-                collstats_list[-1]['name'] = name
-            collstats_list = sorted(collstats_list, key=lambda k: k['count'], reverse=True)
-            print("\t{:^20}\t{:^20}".format('Name', 'Number of structures'))
-            for collection in collstats_list:
-                if not collection['name'].startswith('__'):
-                    print("\t{:<20}\t{:>20d}".format(collection['name'], collection['count']))
-            print('\n')
-        elif self.args.get('delete'):
-            target = self.args.get('db')
-            if isinstance(target, list) and len(target) == 1:
-                target = target[0]
-            else:
-                exit('I will only delete one collection at a time...')
-            if target is None:
-                exit('Please specify a collection to delete.')
-            elif target not in self.db.collection_names():
-                exit('No collection named {} was found'.format(target))
-            else:
-                from getpass import getuser
-                user = getuser()
-                if user not in target:
-                    exit('I cannot delete a collection that\'s name does not start with your CRSId, {}'.format(user))
-                stats = self.db.command('collstats', target)
-                answer = input('Are you sure you want to delete collection {} containing {} structures? [y/n])'.format(target, stats['count']))
-                if answer.lower() == 'y':
-                    if target == 'repo':
-                        exit('I\'m sorry Dave, I\'m afraid I can\'t do that...')
-                    else:
-                        print('Deleting collection...'.format(target))
-                        self.db[target].drop()
-                        print('and its changelog...'.format(target))
-                        self.db['__changelog_{}'.format(target)].drop()
-                else:
-                    exit('Nevermind then!')
-        else:
-            comp_list = dict()
-            overall_stats_dict = dict()
-            overall_stats_dict['count'] = 0
-            overall_stats_dict['avgObjSize'] = 0
-            overall_stats_dict['storageSize'] = 0
-            overall_stats_dict['totalIndexSize'] = 0
-            for collection in self.collections:
-                db_stats_dict = self.db.command('collstats', collection)
-                overall_stats_dict['count'] += db_stats_dict['count']
-                overall_stats_dict['avgObjSize'] += db_stats_dict['avgObjSize']
-                overall_stats_dict['storageSize'] += db_stats_dict['storageSize']
-                overall_stats_dict['totalIndexSize'] += db_stats_dict['totalIndexSize']
-            print(("The collection(s) queried in {} contain {} structures at {:.1f} kB each "
-                   "totalling {:.1f} MB when padding and indices are included.")
-                  .format(self.db.name,
-                          overall_stats_dict['count'],
-                          overall_stats_dict['avgObjSize']/(1024*len(self.collections)),
-                          (overall_stats_dict['totalIndexSize'] + overall_stats_dict['storageSize'])/(1024**2)))
-            for collname in self.collections:
-                cursor = self.collections[collname].find()
-                for doc in cursor:
-                    temp = ''
-                    for ind, elem in enumerate(doc['stoichiometry']):
-                        temp += str(elem[0])
-                        if ind != len(doc['stoichiometry']) - 1:
-                            temp += '+'
-                    if temp not in comp_list:
-                        comp_list[temp] = 0
-                    comp_list[temp] += 1
-            keys = list(comp_list.keys())
-            vals = list(comp_list.values())
-            comp_list = list(zip(keys, vals))
-            comp_list.sort(key=lambda t: t[1], reverse=True)
-            small_count = 0
-            first_ind = 1000
-            cutoff = 100
-            for ind, comp in enumerate(comp_list):
-                if comp[1] < cutoff:
-                    if ind < first_ind:
-                        first_ind = ind
-                    small_count += comp[1]
-            comp_list = comp_list[:first_ind]
-            comp_list.append(['others < ' + str(cutoff), small_count])
-            comp_list.sort(key=lambda t: t[1], reverse=True)
-            try:
-                from ascii_graph import Pyasciigraph
-                from ascii_graph.colors import Gre, Blu, Red
-                from ascii_graph.colordata import hcolor
-            except(ImportError):
-                print_failure('Pyascii graph missing; not printing detailed stats.')
-                exit()
-            graph = Pyasciigraph(line_length=80, multivalue=False)
-            thresholds = {int(overall_stats_dict['count'] / 40): Gre,
-                          int(overall_stats_dict['count'] / 10): Blu,
-                          int(overall_stats_dict['count'] / 4): Red}
-            data = hcolor(comp_list, thresholds)
-            for line in graph.graph(label=None, data=data):
-                print(line)
-            print('\n')
-
-
-if __name__ == '__main__':
+def main():
+    """ Parse all user args and construct a MatadorCommandLine object. """
     parser = argparse.ArgumentParser(
         prog='matador',
         description='MATerial and Atomic Database Of Refined structures.',
-        epilog='Written and maintained by Matthew Evans (me388@cam.ac.uk) 2016-2017, version ' +
-               __version__.strip() + '.')
+        epilog='Written and maintained by Matthew Evans (me388@cam.ac.uk) 2016-2017, version {}.'
+        .format(__version__.strip()))
     parser.add_argument('--version', action='version', version='matador version ' +
                         __version__ + '.')
 
@@ -315,31 +48,33 @@ if __name__ == '__main__':
     # define all other flags by group
     structure_flags = argparse.ArgumentParser(add_help=False)
     structure_flags.add_argument('-c', '--composition', type=str, nargs='+',
-                                 help='find all structures containing exclusively the given elements, \
-                                       e.g. LiSi. Macros defined for groups [I]-[VII], [Tran] \
-                                       [Lan] and [Act], used with square brackets.')
+                                 help='find all structures containing exclusively the given \
+                                       elements, e.g. LiSi. Macros defined for groups [I]-[VII], \
+                                       [Tran] [Lan] and [Act], used with square brackets.')
     structure_flags.add_argument('-int', '--intersection', action='store_true',
                                  help='query the intersection of compositions instead of the union \
                                        e.g. -c LiSnS -int queries Li, Sn, S, LiSn, LiS & LiSnS.')
-    structure_flags.add_argument('-n', '--num_species', type=int, nargs='+',
-                                 help='find all structures containing a certain \
-                                       number of species.')
+    structure_flags.add_argument('-n', '--num_species', type=int,
+                                 help='find all structures containing a certain number of species.')
     structure_flags.add_argument('-f', '--formula', type=str, nargs='+',
                                  help='query a particular chemical formula, e.g. GeTeSi3')
-    structure_flags.add_argument('-i', '--id', type=str, nargs='+', help='specify a particular structure by its text_id')
+    structure_flags.add_argument('-i', '--id', type=str, nargs='+',
+                                 help='specify a particular structure by its text_id')
     structure_flags.add_argument('-ac', '--calc_match', action='store_true',
                                  help='display calculations of the same accuracy as specified id')
     structure_flags.add_argument('-kpttol', '--kpoint-tolerance', type=float,
-                                 help='kpoint tolerance for calculation matches (DEFAULT: +/- 0.01 1/A)')
+                                 help='kpoint tolerance for calculation matches (DEFAULT: +/- \
+                                       0.01 1/A)')
     structure_flags.add_argument('-z', '--num_fu', type=int,
                                  help='query a calculations with more than n formula units')
     structure_flags.add_argument('-sg', '--space_group',
                                  help='query a particular space group')
     structure_flags.add_argument('-u', '--uniq', type=float, nargs='?', const=0.05,
-                                 help='float, return only unique structures (filtered by PDF overlap), to this tolerance (DEFAULT: 0.05)')
+                                 help='float, return only unique structures (filtered by PDF \
+                                       overlap), to this tolerance (DEFAULT: 0.05)')
     structure_flags.add_argument('-p', '--pressure', type=float,
-                                 help='specify an isotropic external pressure to search for \
-                                       , e.g. 10 (GPa)')
+                                 help='specify an isotropic external pressure to search for, \
+                                       e.g. 10 (GPa)')
     structure_flags.add_argument('-pf', '--partial-formula', action='store_true',
                                  help='stoichiometry/composition queries will include other \
                                        unspecified species, e.g. -pf search for Li will query \
@@ -362,16 +97,16 @@ if __name__ == '__main__':
     structure_flags.add_argument('-cntv', '--cnt_vector', type=int, nargs='+',
                                  help='specify the chiral vector of the encapsulating nanotube')
     structure_flags.add_argument('-ecut', '--cutoff', type=float, nargs='+',
-                                 help='specify the minimum and optionally maximum planewave cutoff.')
+                                 help='specify the min. and optionally max. planewave cutoff.')
     structure_flags.add_argument('-geom', '--geom_force_tol', type=float, nargs='+',
-                                 help='relaxation force tolerance values in eV/A to query for calculation matches.')
+                                 help='force tolerance in eV/A to query for calc matches.')
     structure_flags.add_argument('--sedc', type=str,
                                  help='specify the dispersion correction scheme, e.g. TS or null.')
     structure_flags.add_argument('-xc', '--xc_functional', type=str,
-                                 help='specify a particular xc-functional to query (case-insensitive).')
+                                 help='specify an xc-functional to query (case-insensitive).')
     structure_flags.add_argument('-kpts', '--mp_spacing', type=float,
                                  help='specify an MP grid spacing in 2pi/A units, e.g. 0.05, will \
-                                 return all values structures with value within --kpt_tol of that specified')
+                                 return all values structures with value within --kpt_tol')
     structure_flags.add_argument('--spin', type=str,
                                  help='specifiy whether to query non-spin-polarized (0) calcs or \
                                  spin polarized calcs (!=1), or lump them both together with `any`')
@@ -460,12 +195,14 @@ if __name__ == '__main__':
                                         with an underscore')
 
     query_flags = argparse.ArgumentParser(add_help=False)
+
     query_flags.add_argument('-s', '--summary', action='store_true',
                              help='show only the ground state for each stoichiometry.')
     query_flags.add_argument('-t', '--top', type=int,
                              help='number of structures to show/write (DEFAULT: 10)')
     query_flags.add_argument('-dE', '--delta_E', type=float,
-                             help='maximum distance from ground state structure to show/write in eV/atom')
+                             help='maximum distance from ground state structure to show/write in \
+                                   eV/atom')
     query_flags.add_argument('-d', '--details', action='store_true',
                              help='show as much detail about calculation as possible')
     query_flags.add_argument('-pa', '--per_atom', action='store_true',
@@ -482,6 +219,8 @@ if __name__ == '__main__':
                              help='export query to .res files in folder name from query string')
     query_flags.add_argument('--pdb', action='store_true',
                              help='export query to .pdb files in folder name from query string')
+    query_flags.add_argument('--xsf', action='store_true',
+                             help='export query to .xsf files in folder name from query string')
     query_flags.add_argument('--markdown', action='store_true',
                              help='export query summary to a markdown file')
     query_flags.add_argument('--latex', action='store_true',
@@ -536,98 +275,108 @@ if __name__ == '__main__':
                              help='try to delete collection specified by --db')
 
     # define subcommand parsers and their arguments
-    stat_parser = subparsers.add_parser('stats',
-                                        help='print some stats about the database.',
-                                        parents=[global_flags, stats_flags])
-    query_parser = subparsers.add_parser('query',
-                                         help='query and extract structures from the database',
-                                         parents=[global_flags, query_flags, structure_flags])
-    import_parser = subparsers.add_parser('import',
-                                          help='import new structures in folder into database',
-                                          parents=[global_flags, spatula_flags])
-    rebuild_parser = subparsers.add_parser('rebuild',
-                                           help='rebuild whole database.',
-                                           parents=[spatula_flags])
-    pdffit_parser = subparsers.add_parser('pdffit',
-                                          help='provide experimental .gr file and fit to calculated \
-                                                PDF of structures in query',
-                                          parents=[global_flags, query_flags, material_flags,
-                                                   structure_flags, pdffit_flags])
-    hull_parser = subparsers.add_parser('hull',
-                                        help='create a convex hull from query results \
-                                        (currently limited to binaries)',
-                                        parents=[global_flags, structure_flags,
-                                                 material_flags, plot_flags, query_flags])
-    voltage_parser = subparsers.add_parser('voltage',
-                                           help='plot a voltage curve from query results \
-                                           (currently limited to binaries)',
-                                           parents=[global_flags, structure_flags,
-                                                    material_flags, plot_flags, query_flags])
-    changes_parser = subparsers.add_parser('changes',
-                                           help='view database changelog or undo additions to database (not deletions!)',
-                                           parents=[global_flags, changes_flags])
-    hull_parser = subparsers.add_parser('hulldiff',
-                                        help='diff two convex hulls with the --compare flag.',
-                                        parents=[global_flags, structure_flags,
-                                                 material_flags, plot_flags, query_flags, diff_flags])
-    swaps_parser = subparsers.add_parser('swaps',
-                                         help='perform atomic swaps on query results',
-                                         parents=[global_flags, collection_flags, query_flags,
-                                                  structure_flags, material_flags, swap_flags])
-    polish_parser = subparsers.add_parser('polish',
-                                          help='re-relax a series of structures with \
-                                          new parameters.',
-                                          parents=[global_flags, collection_flags,
-                                                   structure_flags, material_flags,
-                                                   query_flags])
-    refine_parser = subparsers.add_parser('refine',
-                                          help='refine database structures',
-                                          parents=[global_flags, query_flags, structure_flags,
-                                                   refine_flags, material_flags])
 
-    args = parser.parse_args()
+    # matador stats
+    subparsers.add_parser('stats',
+                          help='print some stats about the database.',
+                          parents=[global_flags, stats_flags])
+
+    # matador query
+    subparsers.add_parser('query',
+                          help='query and extract structures from the database',
+                          parents=[global_flags, query_flags, structure_flags])
+
+    # matador import
+    subparsers.add_parser('import',
+                          help='import new structures in folder into database',
+                          parents=[global_flags, spatula_flags])
+
+    # matador pdffit
+    subparsers.add_parser('pdffit',
+                          help='provide experimental .gr file and fit to calculated \
+                          PDF of structures in query',
+                          parents=[global_flags, query_flags, material_flags,
+                                   structure_flags, pdffit_flags])
+
+    # matador hull
+    subparsers.add_parser('hull',
+                          help='create a convex hull from query results \
+                          (currently limited to binaries and ternaries)',
+                          parents=[global_flags, structure_flags,
+                                   material_flags, plot_flags, query_flags])
+
+    # matador voltage
+    subparsers.add_parser('voltage',
+                          help='plot a voltage curve from query results \
+                          (currently limited to binaries and ternaries)',
+                          parents=[global_flags, structure_flags,
+                                   material_flags, plot_flags, query_flags])
+
+    # matador changes
+    subparsers.add_parser('changes',
+                          help='view database changelog or undo additions to database \
+                          (NB: not deletions!)',
+                          parents=[global_flags, changes_flags])
+
+    # matador hulldiff
+    subparsers.add_parser('hulldiff',
+                          help='diff two convex hulls with the --compare flag.',
+                          parents=[global_flags, structure_flags,
+                                   material_flags, plot_flags, query_flags, diff_flags])
+
+    # matador swaps
+    subparsers.add_parser('swaps',
+                          help='perform atomic swaps on query results',
+                          parents=[global_flags, collection_flags, query_flags,
+                                   structure_flags, material_flags, swap_flags])
+
+    # matador refine
+    subparsers.add_parser('refine',
+                          help='update structures in the database according to specified --task',
+                          parents=[global_flags, query_flags, structure_flags,
+                                   refine_flags, material_flags])
+
+    parsed_args = parser.parse_args()
 
     # check for inconsistent argument combinations
-    if vars(args).get('include_oqmd'):
-        print_failure('--include_oqmd is currently disabled, please try again soon...')
-        exit()
-    if vars(args).get('intersection') and vars(args).get('composition') is None:
-        print_failure('--intersection requires --composition.')
-        exit()
-    if vars(args).get('filter') and vars(args).get('values') is None:
-        print_failure('--filter requires --values.')
-        exit()
-    if vars(args).get('values') and vars(args).get('filter') is None:
-        print_warning('Ignoring redundant supplied values...')
-    if vars(args).get('subcmd') == 'hull' and vars(args).get('composition') is None:
-        print_failure('hull requires --composition')
-        exit()
-    if vars(args).get('subcmd') == 'pdffit':
-        if vars(args).get('file') is None:
-            print_failure('pdffit requires specified --file, exiting...')
-            exit()
-        if not isfile(vars(args).get('file')):
-            print_failure('specified --file does not exist, exiting...')
-            exit()
-    if vars(args).get('hull_cutoff') and vars(args).get('hull_temp'):
-        print_failure('hull_cutoff and hull_temp both specified, exiting...')
-        exit()
-    if vars(args).get('calc_match') and vars(args).get('id') is None:
-        print_failure('calc_match requires specification of a text_id with -i, exiting...')
-        exit()
-    if vars(args).get('profile'):
+    if vars(parsed_args).get('include_oqmd'):
+        exit('--include_oqmd is currently disabled, please try again soon...')
+    if vars(parsed_args).get('intersection') and vars(parsed_args).get('composition') is None:
+        exit('--intersection requires --composition.')
+    if vars(parsed_args).get('filter') and vars(parsed_args).get('values') is None:
+        exit('--filter requires --values.')
+    if vars(parsed_args).get('values') and vars(parsed_args).get('filter') is None:
+        print('Ignoring redundant supplied values...')
+    if vars(parsed_args).get('subcmd') == 'hull' and vars(parsed_args).get('composition') is None:
+        exit('hull requires --composition')
+    if vars(parsed_args).get('subcmd') == 'pdffit':
+        if vars(parsed_args).get('file') is None:
+            exit('pdffit requires specified --file, exiting...')
+        if not os.path.isfile(vars(parsed_args).get('file')):
+            exit('specified --file does not exist, exiting...')
+    if vars(parsed_args).get('hull_cutoff') and vars(parsed_args).get('hull_temp'):
+        exit('hull_cutoff and hull_temp both specified, exiting...')
+    if vars(parsed_args).get('calc_match') and vars(parsed_args).get('id') is None:
+        exit(
+            'calc_match requires specification of a text_id with -i, exiting...')
+    if vars(parsed_args).get('profile'):
         import cProfile
         import pstats
         from sys import version_info
-        pr = cProfile.Profile()
-        pr.enable()
-    matador = Matador(args, argstr=argv[1:])
-    if vars(args).get('profile'):
-        pr.disable()
+        profiler = cProfile.Profile()
+        profiler.enable()
+
+    MatadorCommandLine(parsed_args, argstr=argv[1:])
+
+    if vars(parsed_args).get('profile'):
+        profiler.disable()
         fname = 'matador-{}-{}.{}.{}'.format(__version__, version_info.major,
                                              version_info.minor, version_info.micro)
-        pr.dump_stats(fname + '.prof')
-        with open(fname + '.pstats', 'w') as s:
-            sortby = 'cumulative'
-            ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-            ps.print_stats()
+        profiler.dump_stats(fname + '.prof')
+        with open(fname + '.pstats', 'w') as fp:
+            stats = pstats.Stats(profiler, stream=fp).sort_stats('cumulative')
+            stats.print_stats()
+
+
+if __name__ == '__main__':
+    main()
