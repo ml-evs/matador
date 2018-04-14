@@ -45,7 +45,7 @@ class ComputeTest(unittest.TestCase):
         import multiprocessing as mp
         from time import sleep
 
-        newborn, s = res2dict(REAL_PATH + '/data/LiAs_testcase.res', verbosity=VERBOSITY, db=False)
+        newborn, s = res2dict(REAL_PATH + '/data/structures/LiAs_testcase.res', verbosity=VERBOSITY, db=False)
         assert s
         cell_dict, s = cell2dict(REAL_PATH + '/data/LiAs.cell', verbosity=VERBOSITY, db=False)
         assert s
@@ -58,10 +58,8 @@ class ComputeTest(unittest.TestCase):
         newborn['source'] = [REAL_PATH + '/data/_LiAs_testcase.res']
 
         os.chdir(REAL_PATH)
-        shutil.copy(REAL_PATH + 'data/Li_00PBE.usp', '.')
-        shutil.copy(REAL_PATH + 'data/As_00PBE.usp', '.')
-
-        os.chdir(REAL_PATH)
+        shutil.copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
+        shutil.copy(REAL_PATH + 'data/pspots/As_00PBE.usp', '.')
 
         relaxer = FullRelaxer(ncores=ncores, nnodes=None, node=node,
                               res=newborn, param_dict=param_dict, cell_dict=cell_dict,
@@ -130,7 +128,7 @@ class ComputeTest(unittest.TestCase):
             FullRelaxer(ncores=4, nnodes=nnodes, node=node,
                         res=seed, param_dict=param_dict, cell_dict=cell_dict,
                         debug=False, verbosity=VERBOSITY, killcheck=True,
-                        reopt=False, executable='definitely_fake_executable',
+                        reopt=False, executable='THIS WAS MEANT TO FAIL, DON\'T WORRY',
                         start=True)
         except SystemExit:
             fall_over = True
@@ -158,7 +156,7 @@ class ComputeTest(unittest.TestCase):
 
         os.chdir(REAL_PATH)
         seed = '_LiAs_testcase.res'
-        shutil.copy(REAL_PATH + 'data/LiAs_testcase.res', REAL_PATH + '_LiAs_testcase.res')
+        shutil.copy(REAL_PATH + 'data/structures/LiAs_testcase.res', REAL_PATH + '_LiAs_testcase.res')
         assert os.path.isfile(REAL_PATH + '_LiAs_testcase.res')
 
         cell_dict, s = cell2dict(REAL_PATH + '/data/LiAs.cell', verbosity=VERBOSITY, db=False)
@@ -169,8 +167,8 @@ class ComputeTest(unittest.TestCase):
         executable = 'castep'
         node = None
 
-        shutil.copy(REAL_PATH + 'data/Li_00PBE.usp', '.')
-        shutil.copy(REAL_PATH + 'data/As_00PBE.usp', '.')
+        shutil.copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
+        shutil.copy(REAL_PATH + 'data/pspots/As_00PBE.usp', '.')
 
         FullRelaxer(ncores=ncores, nnodes=None, node=node,
                     res=seed, param_dict=param_dict, cell_dict=cell_dict,
@@ -206,7 +204,7 @@ class ComputeTest(unittest.TestCase):
 
         seed = '_LiAs_testcase.res'
         os.chdir(REAL_PATH)
-        shutil.copy(REAL_PATH + 'data/LiAs_testcase_bad.res', REAL_PATH + '_LiAs_testcase.res')
+        shutil.copy(REAL_PATH + 'data/structures/LiAs_testcase_bad.res', REAL_PATH + '_LiAs_testcase.res')
 
         cell_dict, s = cell2dict(REAL_PATH + '/data/LiAs.cell', verbosity=VERBOSITY, db=False)
         assert s
@@ -217,8 +215,8 @@ class ComputeTest(unittest.TestCase):
         executable = 'castep'
         node = None
 
-        shutil.copy(REAL_PATH + 'data/Li_00PBE.usp', '.')
-        shutil.copy(REAL_PATH + 'data/As_00PBE.usp', '.')
+        shutil.copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
+        shutil.copy(REAL_PATH + 'data/pspots/As_00PBE.usp', '.')
 
         FullRelaxer(ncores=ncores, nnodes=None, node=node,
                     res=seed, param_dict=param_dict, cell_dict=cell_dict,
@@ -254,12 +252,12 @@ class ComputeTest(unittest.TestCase):
         """ Relax structure from file to file. """
         from matador.compute import BatchRun, reset_job_folder_and_count_remaining
 
-        shutil.copy(REAL_PATH + 'data/LiAs_testcase.res', REAL_PATH + '_LiAs_testcase.res')
+        shutil.copy(REAL_PATH + 'data/structures/LiAs_testcase.res', REAL_PATH + '_LiAs_testcase.res')
         shutil.copy(REAL_PATH + 'data/LiAs.cell', REAL_PATH + 'LiAs.cell')
         shutil.copy(REAL_PATH + 'data/LiAs.param', REAL_PATH + 'LiAs.param')
 
-        shutil.copy(REAL_PATH + 'data/Li_00PBE.usp', REAL_PATH + 'Li_00PBE.usp')
-        shutil.copy(REAL_PATH + 'data/As_00PBE.usp', REAL_PATH + 'As_00PBE.usp')
+        shutil.copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', REAL_PATH + 'Li_00PBE.usp')
+        shutil.copy(REAL_PATH + 'data/pspots/As_00PBE.usp', REAL_PATH + 'As_00PBE.usp')
 
         os.chdir(REAL_PATH)
         runner = BatchRun(seed=['LiAs'], debug=False, no_reopt=True, verbosity=VERBOSITY, ncores=4)
@@ -301,7 +299,7 @@ class ComputeTest(unittest.TestCase):
 
         os.chdir(REAL_PATH)
         seed = '_LiAs_testcase.res'
-        shutil.copy(REAL_PATH + 'data/LiAs_testcase_bad.res', REAL_PATH + '_LiAs_testcase.res')
+        shutil.copy(REAL_PATH + 'data/structures/LiAs_testcase_bad.res', REAL_PATH + '_LiAs_testcase.res')
         assert os.path.isfile(REAL_PATH + '_LiAs_testcase.res')
 
         cell_dict, s = cell2dict(REAL_PATH + '/data/LiAs_scf.cell', verbosity=VERBOSITY, db=False)
@@ -312,8 +310,8 @@ class ComputeTest(unittest.TestCase):
         executable = 'castep'
         node = None
 
-        shutil.copy(REAL_PATH + 'data/Li_00PBE.usp', '.')
-        shutil.copy(REAL_PATH + 'data/As_00PBE.usp', '.')
+        shutil.copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
+        shutil.copy(REAL_PATH + 'data/pspots/As_00PBE.usp', '.')
 
         FullRelaxer(ncores=ncores, nnodes=None, node=node,
                     res=seed, param_dict=param_dict, cell_dict=cell_dict,
@@ -342,6 +340,54 @@ class ComputeTest(unittest.TestCase):
 
         os.chdir(ROOT_DIR)
         self.assertTrue(all(completed_exists), "couldn't find output files!")
+
+    @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
+    def testBatchFailedSCF(self):
+        """ Relax structure from file to file. """
+        from matador.compute import BatchRun, reset_job_folder_and_count_remaining
+
+        os.chdir(REAL_PATH + 'data/fail_scf')
+        shutil.copy(REAL_PATH + 'data/structures/LiAs_testcase_bad.res', REAL_PATH + 'data/fail_scf/' + 'LiAs_testcase_bad.res')
+        shutil.copy(REAL_PATH + 'data/structures/LiAs_testcase.res', REAL_PATH + 'data/fail_scf/' + 'LiAs_testcase.res')
+        shutil.copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
+        shutil.copy(REAL_PATH + 'data/pspots/As_00PBE.usp', '.')
+        runner = BatchRun(seed=['LiAs_scf'], debug=False, no_reopt=True, verbosity=VERBOSITY, ncores=4)
+        runner.spawn(join=True)
+
+        completed_folder_exists = os.path.isdir('completed')
+        bad_castep_folder_exists = os.path.isdir('bad_castep')
+
+        seeds = ['LiAs_testcase.res', 'LiAs_testcase_bad.res']
+        output_files_exist = all([os.path.isfile('bad_castep/{}'.format(seed)) for seed in seeds])
+
+        cruft = glob.glob('LiAs_testcase*')
+        cruft_doesnt_exist = bool(len(cruft))
+
+        paths = ['completed', 'input', 'bad_castep']
+        for path in paths:
+            if os.path.isdir(path):
+                files = glob.glob(path + '/*')
+                for file in files:
+                    os.remove(file)
+                os.removedirs(path)
+
+        paths = ['Li_00PBE.usp', 'As_00PBE.usp',
+                 REAL_PATH + '/LiAs.cell',
+                 REAL_PATH + '/LiAs.param',
+                 'jobs.txt', 'finished_cleanly.txt', 'failures.txt']
+
+        for path in paths:
+            if os.path.isfile(path):
+                os.remove(path)
+
+        num = reset_job_folder_and_count_remaining()
+        os.chdir(ROOT_DIR)
+
+        self.assertEqual(num, 0)
+        self.assertFalse(completed_folder_exists, "couldn't find output file!")
+        self.assertTrue(bad_castep_folder_exists, "couldn't find bad_castep")
+        self.assertTrue(output_files_exist, "couldn't find both outputs")
+        self.assertFalse(cruft_doesnt_exist, "found some cruft {}".format(cruft))
 
 
 if __name__ == '__main__':

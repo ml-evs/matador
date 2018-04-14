@@ -16,9 +16,9 @@ import shutil
 import subprocess as sp
 import glob
 import multiprocessing as mp
+import sys
 from copy import deepcopy
 from traceback import print_exc, format_exception_only
-from sys import exit, exc_info
 from math import ceil
 from collections import defaultdict
 from psutil import virtual_memory
@@ -100,24 +100,17 @@ class FullRelaxer:
                          'rough': 4, 'rough_iter': 2, 'fine_iter': 20, 'spin': False, 'redirect': None, 'reopt': False, 'compute_dir': None,
                          'custom_params': False, 'archer': False, 'maxmem': None, 'killcheck': True, 'kpts_1D': False,
                          'conv_cutoff': False, 'conv_kpt': False, 'debug': False, 'profile': False,
-                         'bnl': False, 'slurm': False, 'intel': False, 'exec_test': True, 'start': True, 'verbosity': 0}
+                         'slurm': False, 'intel': False, 'exec_test': True, 'start': True, 'verbosity': 0}
         self.__dict__.update(prop_defaults)
         self.__dict__.update(kwargs)
-        if self.bnl and not self.slurm:
-            try:
-                raise DeprecationWarning('Please use --slurm rather than --bnl in future.')
-            except Exception as e:
-                print_exc()
-            self.slurm = True
 
         if self.profile:
             import cProfile
             import pstats
             from sys import version_info
             from matador.version import __version__
-            hostname = os.uname()[1]
-            pr = cProfile.Profile()
-            pr.enable()
+            profile = cProfile.Profile()
+            profile.enable()
 
         self.ncores = ncores
         self.res = res
@@ -137,125 +130,156 @@ class FullRelaxer:
             assert 'completed_dir' in self.paths
 
         # run through CASTEP specific features
-        if self.mode is 'castep':
-
-            if self.exec_test:
-                self.test_exec()
-
-            if self.kpts_1D:
-                assert('kpoints_mp_spacing' in self.cell_dict)
-                self.target_spacing = deepcopy(self.cell_dict['kpoints_mp_spacing'])
-
-            # read in initial structure and skip if failed
-            if isinstance(res, str):
-                self.res_dict, success = res2dict(res, db=False)
-                if not success:
-                    if self.verbosity >= 1:
-                        print(self.res_dict)
-                        print_warning('Failed to parse res file ' + str(res))
-                    self.success = False
-            elif isinstance(res, dict):
-                self.res_dict = res
-
-            if self.success is None:
-                calc_doc = deepcopy(self.res_dict)
-
-                # set seed name
-                assert isinstance(calc_doc['source'], list)
-                self.seed = calc_doc['source'][0].replace('.res', '')
-
-                # update global doc with cell and param dicts for folder
-                calc_doc.update(self.cell_dict)
-                calc_doc.update(self.param_dict)
-
-                # check for pseudos
-                if 'library' not in calc_doc['species_pot']:
-                    for elem in self.res_dict['stoichiometry']:
-                        if ('|' not in calc_doc['species_pot'][elem[0]] and
-                                not os.path.isfile(calc_doc['species_pot'][elem[0]])):
-                            exit('You forgot your pseudos, you silly goose!')
-
-                # run convergence tests
-                if any([self.conv_cutoff_bool, self.conv_kpt_bool]):
-                    self._cached_cutoff = calc_doc['cut_off_energy']
-                    if self.conv_cutoff_bool:
-                        # run series of singlepoints for various cutoffs
-                        for cutoff in self.conv_cutoff:
-                            calc_doc.update({'cut_off_energy': cutoff})
-                            self.paths['completed_dir'] = 'completed_cutoff'
-                            seed = self.seed + '_' + str(cutoff) + 'eV'
-                            self.calc_doc = calc_doc
-                            self.success = self.scf(calc_doc, seed, keep=False)
-                    if self.conv_kpt_bool:
-                        # run series of singlepoints for various cutoffs
-                        calc_doc['cut_off_energy'] = self._cached_cutoff
-                        for kpt in self.conv_kpt:
-                            calc_doc.update({'kpoints_mp_spacing': kpt})
-                            self.paths['completed_dir'] = 'completed_kpts'
-                            seed = self.seed + '_' + str(kpt) + 'A'
-                            self.calc_doc = calc_doc
-                            self.success = self.scf(calc_doc, seed, keep=False)
-
-                # run simple scf
-                elif calc_doc['task'].upper() in ['SPECTRAL', 'SINGLEPOINT']:
-                    # batch run density of states
-                    self.calc_doc = calc_doc
-                    self.success = self.scf(calc_doc, self.seed, keep=True)
-
-                # perform relaxation
-                else:
-                    # set up geom opt parameters
-                    self.max_iter = calc_doc['geom_max_iter']
-                    self.num_rough_iter = self.rough
-                    fine_iter = self.fine_iter
-                    rough_iter = self.rough_iter
-                    if 'geom_method' in calc_doc:
-                        if calc_doc['geom_method'].lower() == 'tpsd' and rough_iter < 3:
-                            rough_iter = 3
-                    num_fine_iter = int(int(self.max_iter)/fine_iter)
-                    self.geom_max_iter_list = (self.num_rough_iter * [rough_iter])
-                    self.geom_max_iter_list.extend(num_fine_iter * [fine_iter])
-                    assert len(self.geom_max_iter_list) > 0, 'Could not divide up relaxation; consider increasing geom_max_iter'
-                    self.calc_doc = calc_doc
-
-                    # do memcheck, if desired, and only continue if enough memory is free
-                    if self.memcheck:
-                        self.enough_memory = self.do_memcheck(calc_doc, self.seed)
-                    else:
-                        self.enough_memory = True
-                    if self.enough_memory:
-                        # begin relaxation
-                        if self.start:
-                            self.success = self.relax()
-                            if self.compute_dir is not None:
-                                # always cd back to root folder
-                                os.chdir(self.root_folder)
-                                self.remove_compute_dir_if_finished(self.compute_dir, debug=self.debug)
+        if self.mode == 'castep':
+            self.run_castep(res)
         # otherwise run generic script
         else:
-            self.seed = res
+            self.run_generic(res)
+
+        if self.profile:
+            profile.disable()
+            fname = 'relaxer-{}-{}-{}.{}.{}'.format(__version__, os.hostname()[1], version_info.major,
+                                                    version_info.minor, version_info.micro)
+            profile.dump_stats(fname + '.prof')
+            with open(fname + '.pstats', 'w') as fp:
+                stats = pstats.Stats(profile, stream=fp).sort_stats('cumulative')
+                stats.print_stats()
+
+    def run_castep(self, res):
+        """ Set up and run CASTEP calculation.
+
+        Parameters:
+            res (str/dict): either the filename or a dict
+                containing the structure.
+
+        Returns:
+            bool: True if calculations were successful, False otherwise.
+                In the case of convergence tests, this is always True
+                unless every calculation fails.
+
+        """
+        if self.exec_test:
+            self.test_exec()
+
+        if self.kpts_1D:
+            if 'kpoints_mp_spacing' not in self.cell_dict:
+                raise RuntimeError('kpoints_mp_spacing not found, but kpts_1D requested...')
+            self._target_spacing = deepcopy(self.cell_dict['kpoints_mp_spacing'])
+
+        # read in initial structure and skip if failed
+        if isinstance(res, str):
+            self.res_dict, success = res2dict(res, db=False)
+            if not success:
+                if self.verbosity >= 1:
+                    print(self.res_dict)
+                    print_warning('Failed to parse res file {}'.format(res))
+                return success
+        elif isinstance(res, dict):
+            self.res_dict = res
+
+        calc_doc = deepcopy(self.res_dict)
+
+        # set seed name
+        assert isinstance(calc_doc['source'], list)
+        self.seed = calc_doc['source'][0].replace('.res', '')
+
+        # update global doc with cell and param dicts for folder
+        calc_doc.update(self.cell_dict)
+        calc_doc.update(self.param_dict)
+
+        # check for pseudos
+        if 'library' not in calc_doc['species_pot']:
+            for elem in self.res_dict['stoichiometry']:
+                if ('|' not in calc_doc['species_pot'][elem[0]] and
+                        not os.path.isfile(calc_doc['species_pot'][elem[0]])):
+                    raise RuntimeError('You forgot your pseudos, you silly goose!')
+
+        # do memcheck, if desired, and only continue if enough memory is free
+        if self.memcheck:
+            self.enough_memory = self.do_memcheck(calc_doc, self.seed)
+        else:
+            self.enough_memory = True
+        if not self.enough_memory:
+            return False
+
+        # run convergence tests
+        if any([self.conv_cutoff_bool, self.conv_kpt_bool]):
+            return self.run_convergence_tests(calc_doc)
+
+        # perform relaxation
+        elif 'GEOMETRY' in calc_doc['task'].upper():
+            # set up geom opt paramete
+            self.max_iter = calc_doc['geom_max_iter']
+            self.num_rough_iter = self.rough
+            fine_iter = self.fine_iter
+            rough_iter = self.rough_iter
+            if 'geom_method' in calc_doc:
+                if calc_doc['geom_method'].lower() == 'tpsd' and rough_iter < 3:
+                    rough_iter = 3
+            num_fine_iter = int(int(self.max_iter)/fine_iter)
+            self.geom_max_iter_list = (self.num_rough_iter * [rough_iter])
+            self.geom_max_iter_list.extend(num_fine_iter * [fine_iter])
+            if not self.geom_max_iter_list:
+                raise RuntimeError('Could not divide up relaxation; \
+                                    consider increasing geom_max_iter')
+            self.calc_doc = calc_doc
+
+            # begin relaxation
+            if self.start:
+                success = self.relax()
+                if self.compute_dir is not None:
+                    # always cd back to root folder
+                    os.chdir(self.root_folder)
+                    self.remove_compute_dir_if_finished(self.compute_dir, debug=self.debug)
+                return success
+
+        # run in SCF mode, i.e. just call CASTEP on the seeds
+        else:
+            return self.scf(calc_doc, self.seed, keep=True)
+
+    def run_generic(self, seed):
+        """ Run a generic mpi program on the given seed. Files from
+        completed runs are moved to "completed" and failed runs to "bad_castep".
+
+        Parameters:
+            seed (str): filename of structure
+
+        Returns:
+            bool: True if calculations progressed without error.
+
+        """
+        try:
+            self.seed = seed
             if '.' in self.seed:
                 self.seed = self.seed.split('.')[-2]
                 self.input_ext = self.seed.split('.')[-1]
             else:
                 self.input_ext = ''
             assert isinstance(self.seed, str)
-            self.run_generic(self.seed)
+            self.cp_to_input(seed, ext=self.input_ext, glob_files=True)
+            process = self.run_command(seed)
+            process.communicate()
+            if process.returncode != 0:
+                self.mv_to_bad(seed)
+                return False
 
-        if self.profile:
-            pr.disable()
-            fname = 'relaxer-{}-{}-{}.{}.{}'.format(__version__, hostname, version_info.major,
-                                                    version_info.minor, version_info.micro)
-            pr.dump_stats(fname + '.prof')
-            with open(fname + '.pstats', 'w') as s:
-                sortby = 'cumulative'
-                ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-                ps.print_stats()
+            self.mv_to_completed(seed, keep=True, completed_dir=self.paths['completed_dir'])
+            return True
+
+        except(SystemExit, KeyboardInterrupt):
+            print_exc()
+            self.mv_to_bad(seed)
+            raise SystemExit
+        except Exception:
+            print_exc()
+            self.mv_to_bad(seed)
+            return False
 
     def relax(self, output_queue=None):
         """ Set up a structural relaxation that is restarted intermittently
         in order to re-mesh the kpoint grid. Completed calculations are moved
         to the "completed" folder, and failures to "bad_castep".
+            calc_doc (dict): structure to optimise.
 
         Keyword arguments:
             output_queue (multiprocessing.Queue): optional queue to push
@@ -329,7 +353,7 @@ class FullRelaxer:
                 if self.kpts_1D:
                     if self.verbosity > 1:
                         print('Calculating 1D kpt grid...')
-                    n_kz = ceil(1 / (calc_doc['lattice_abc'][0][2] * self.target_spacing))
+                    n_kz = ceil(1 / (calc_doc['lattice_abc'][0][2] * self._target_spacing))
                     if n_kz % 2 == 1:
                         n_kz += 1
                     calc_doc['kpoints_mp_grid'] = [1, 1, n_kz]
@@ -343,27 +367,28 @@ class FullRelaxer:
                     if os.path.isfile(seed + '.param'):
                         os.remove(seed+'.param')
                     doc2param(calc_doc, seed, hash_dupe=False, spin=self.spin)
+
                 # run CASTEP
                 process = self.run_command(seed)
                 process.communicate()
+
                 # scrape new structure from castep file
                 if not os.path.isfile(seed + '.castep'):
-                    exit('CASTEP file was not created, please check your executable: {}.'.format(self.executable))
+                    sys.exit('CASTEP file was not created, please check your executable: {}.'.format(self.executable))
                 opti_dict, success = castep2dict(seed + '.castep', db=False, verbosity=self.verbosity)
                 if self.debug:
                     print_notify('Intermediate calculation finished')
                     print(opti_dict)
                 if not success and isinstance(opti_dict, str):
-                    exit('Failed to scrape CASTEP file...')
-                try:
-                    # delete any k-point and pspot information
-                    del opti_dict['kpoints_mp_spacing']
-                    del opti_dict['kpoints_mp_grid']
-                    del opti_dict['species_pot']
-                    del opti_dict['sedc_apply']
-                    del opti_dict['sedc_scheme']
-                except:
-                    pass
+                    sys.exit('Failed to scrape CASTEP file...')
+
+                # scrub keys that need to be rescraped
+                keys_to_remove = ['kpoints_mp_spacing', 'kpoints_mp_grid',
+                                  'species_pot', 'sedc_apply', 'sedc_scheme']
+                for key in keys_to_remove:
+                    if key in opti_dict:
+                        del opti_dict[key]
+
                 if self.reopt and self.rerun and not opti_dict['optimised']:
                     self.rerun = False
                 if self.reopt and not self.rerun and opti_dict['optimised']:
@@ -389,7 +414,6 @@ class FullRelaxer:
                             shutil.copy(seed+'.castep', self.root_folder)
                         shutil.copy(seed+'.res', self.root_folder)
 
-                    self.opti_dict = deepcopy(opti_dict)
                     # overwrite old data in res_dict with opti structure
                     # so that custom keys in initial res are still accessible
                     self.res_dict.update(opti_dict)
@@ -419,31 +443,19 @@ class FullRelaxer:
                             print('wrote failed dict out to output_queue')
                     self.mv_to_bad(seed)
                     return False
-                err_file = seed + '*.err'
-                for globbed in glob.glob(err_file):
-                    if os.path.isfile(globbed):
-                        if self.verbosity > 1:
-                            print_warning('Failed to optimise ' + seed + ' CASTEP crashed.')
-                        # write final res file to bad_castep
-                        if os.path.isfile(seed+'.res'):
-                            os.remove(seed+'.res')
-                        self.res_dict.update(opti_dict)
-                        if output_queue is not None:
-                            output_queue.put(self.res_dict)
-                            if self.debug:
-                                print('wrote failed dict out to output_queue')
-                        doc2res(opti_dict, seed, info=False, hash_dupe=False)
-                        if self.compute_dir is not None:
-                            if os.path.isfile(seed+'.castep'):
-                                shutil.copy(seed+'.castep', self.root_folder)
-                            shutil.copy(seed+'.res', self.root_folder)
-                        self.mv_to_bad(seed)
-                        return False
+
+                if self._catch_castep_errors(seed, opti_dict, mode='relax'):
+                    if output_queue is not None:
+                        output_queue.put(self.res_dict)
+                        if self.debug:
+                            print('wrote failed dict out to output_queue')
+                    return False
 
                 # update res file to latest step for restarts
                 if os.path.isfile(seed+'.res'):
                     os.remove(seed+'.res')
                 doc2res(opti_dict, seed, hash_dupe=False)
+
                 if self.compute_dir is not None:
                     if os.path.isfile(seed+'.castep'):
                         shutil.copy(seed+'.castep', self.root_folder)
@@ -459,10 +471,10 @@ class FullRelaxer:
                         cell_dict, success = cell2dict(seed + '-out.cell', verbosity=self.verbosity, db=False, outcell=True)
                         if success:
                             opti_dict['lattice_cart'] = list(cell_dict['lattice_cart'])
-                    except:
+                    except Exception:
                         if self.verbosity > 1:
                             print_exc()
-                        pass
+
                 if self.debug:
                     print_notify('Restarting calculation with current state:')
                     print(calc_doc)
@@ -480,7 +492,7 @@ class FullRelaxer:
                 if self.verbosity > 1:
                     print_exc()
                     print_warning('Received exception, attempting to fail gracefully...')
-                etype, evalue, etb = exc_info()
+                etype, evalue, etb = sys.exc_info()
                 if self.verbosity > 1:
                     print(format_exception_only(etype, evalue))
                 if self.debug:
@@ -503,7 +515,8 @@ class FullRelaxer:
                     os.chdir(self.root_folder)
                     self.remove_compute_dir_if_finished(self.compute_dir, debug=self.debug)
                 return False
-            except:
+
+            except Exception:
                 if self.verbosity > 1:
                     print_exc()
                 process.terminate()
@@ -567,18 +580,17 @@ class FullRelaxer:
             process.communicate()
             # scrape dict
             opti_dict, success = castep2dict(seed + '.castep', db=False)
-            err_file = seed + '.*err'
-            for globbed in glob.glob(err_file):
-                if os.path.isfile(globbed):
-                    if self.verbosity > 1:
-                        print_warning('Failed to optimise ' + seed + ' CASTEP crashed.')
-                    # write final res file to bad_castep
-                    self.mv_to_bad(seed)
-                    return False
+            # check for errors
+            if self._catch_castep_errors(seed, opti_dict, mode='scf'):
+                return False
+            if not success:
+                return False
+
             self.mv_to_completed(seed, keep=keep, completed_dir=self.paths['completed_dir'])
             if not keep:
                 self.tidy_up(seed)
             return True
+
         except(SystemExit, KeyboardInterrupt):
             if self.verbosity > 1:
                 print_exc()
@@ -586,7 +598,7 @@ class FullRelaxer:
             if not keep:
                 self.tidy_up(seed)
             raise SystemExit
-        except:
+        except Exception:
             if self.verbosity > 1:
                 print_exc()
             self.mv_to_bad(seed)
@@ -594,35 +606,38 @@ class FullRelaxer:
                 self.tidy_up(seed)
             return False
 
-    def run_generic(self, seed):
-        """ Run a generic mpi program on the given seed. Files from
-        completed runs are moved to "completed" and failed runs to "bad_castep".
+    def run_convergence_tests(self, calc_doc):
+        """ Run kpoint and cutoff_energy convergence tests based on
+        options passed to FullRelaxer.
 
         Parameters:
-            seed (str): filename of structure
+            calc_doc (dict): the structure to converge.
 
         Returns:
-            bool: True iff no errors occured.
+            bool: True unless every single calculation failed.
 
         """
-        try:
-            self.cp_to_input(seed, ext=self.input_ext, glob_files=True)
-            process = self.run_command(seed)
-            process.communicate()
-            if process.returncode != 0:
-                self.mv_to_bad(seed)
-                return False
-            else:
-                self.mv_to_completed(seed, keep=True, completed_dir=self.paths['completed_dir'])
-                return True
-        except(SystemExit, KeyboardInterrupt):
-            print_exc()
-            self.mv_to_bad(seed)
-            raise SystemExit
-        except:
-            print_exc()
-            self.mv_to_bad(seed)
-            return False
+        successes = []
+        self.run_convergence_tests(calc_doc)
+        self._cached_cutoff = calc_doc['cut_off_energy']
+        if self.conv_cutoff_bool:
+            # run series of singlepoints for various cutoffs
+            for cutoff in self.conv_cutoff:
+                calc_doc.update({'cut_off_energy': cutoff})
+                self.paths['completed_dir'] = 'completed_cutoff'
+                seed = self.seed + '_' + str(cutoff) + 'eV'
+                success = self.scf(calc_doc, seed, keep=False)
+                successes.append(success)
+        if self.conv_kpt_bool:
+            # run series of singlepoints for various cutoffs
+            calc_doc['cut_off_energy'] = self._cached_cutoff
+            for kpt in self.conv_kpt:
+                calc_doc.update({'kpoints_mp_spacing': kpt})
+                self.paths['completed_dir'] = 'completed_kpts'
+                seed = self.seed + '_' + str(kpt) + 'A'
+                success = self.scf(calc_doc, seed, keep=False)
+                successes.append(success)
+        return any(successes)
 
     def parse_executable(self, seed):
         """ Turn executable string into list with arguments to be executed.
@@ -654,7 +669,7 @@ class FullRelaxer:
             executable = self.executable.split()
         command = []
         found_seed = False
-        for ind, item in enumerate(executable):
+        for item in executable:
             if '$seed' in item:
                 item = item.replace('$seed', seed)
                 found_seed = True
@@ -684,9 +699,10 @@ class FullRelaxer:
 
         out, errs = proc.communicate()
         if 'version' not in out.decode('utf-8') and errs is not None:
-            err_string = 'Executable {} failed testing. Is it on your PATH?\nError output: {}'.format(self.executable, errs.decode('utf-8'))
+            err_string = 'Executable {} failed testing. Is it on your PATH?\n'
+            err_string += 'Error output: {}'.format(self.executable, errs.decode('utf-8'))
             print_failure(err_string)
-            exit(err_string)
+            raise SystemExit(err_string)
 
     @property
     def mpi_library(self):
@@ -774,9 +790,12 @@ class FullRelaxer:
             print('{:10}: {:8.0f} MB'.format('Available', maxmem))
         process = sp.Popen(['nice', '-n', '15', self.executable, '-d', seed])
         process.communicate()
-        results, success = castep2dict(seed + '.castep', db=False)
 
         skip = False
+        results, success = castep2dict(seed + '.castep', db=False)
+        if not success:
+            skip = True
+
         if 'estimated_mem_MB' not in results:
             skip = True
             if self.debug:
@@ -818,11 +837,11 @@ class FullRelaxer:
         if self.nnodes is None or self.nnodes == 1:
             if self.ncores == 1 and self.node is None:
                 command = ['nice', '-n', '15'] + command
-            elif self.mpi_library is 'archer':
+            elif self.mpi_library == 'archer':
                 command = ['aprun', '-n', str(self.ncores)] + command
-            elif self.mpi_library is 'slurm':
+            elif self.mpi_library == 'slurm':
                 command = ['srun', '--exclusive', '-N', '1', '-n', str(self.ncores)] + command
-            elif self.mpi_library is 'intel':
+            elif self.mpi_library == 'intel':
                 command = ['mpirun', '-n', str(self.ncores), '-ppn', str(self.ncores)] + command
             elif self.node is not None:
                 cwd = os.getcwd()
@@ -831,14 +850,14 @@ class FullRelaxer:
             else:
                 command = ['nice', '-n', '15', 'mpirun', '-n', str(self.ncores)] + command
         else:
-            if self.mpi_library is 'archer':
+            if self.mpi_library == 'archer':
                 command = ['aprun', '-n', str(self.ncores*self.nnodes),
                            '-N', str(self.ncores),
                            '-S', '12',
                            '-d', '1'] + command
-            elif self.mpi_library is 'slurm':
+            elif self.mpi_library == 'slurm':
                 command = ['srun', '--exclusive', '-N', str(self.nnodes), '-n', str(self.ncores*self.nnodes)] + command
-            elif self.mpi_library is 'intel':
+            elif self.mpi_library == 'intel':
                 command = ['mpirun', '-n', str(self.ncores*self.nnodes),
                            '-ppn', str(self.ncores)] + command
             else:
@@ -867,14 +886,52 @@ class FullRelaxer:
         process = sp.Popen(command, shell=False, stdout=stdout, stderr=stderr)
         try:
             redirect_file.close()
-        except:
+        except Exception:
             pass
         try:
             dev_null.close()
-        except:
+        except Exception:
             pass
 
         return process
+
+    def _catch_castep_errors(self, seed, opti_dict, mode='relax'):
+        """ Look for CASTEP error files and fallover appropriately.
+
+        Paramters:
+            seed (str): seedname of structure.
+
+        Keyword arguments:
+            mode (str): either `relax` or `scf`.
+
+        Returns:
+            bool: True if error files were found, otherwise False.
+
+        """
+        err_file = '{}*err'.format(seed)
+        for globbed in glob.glob(err_file):
+            if os.path.isfile(globbed):
+                if self.verbosity > 1:
+                    print_warning('Failed to optimise {} as CASTEP crashed with error:')
+                    with open(globbed, 'r') as f:
+                        print(f.readline())
+
+                if mode == 'relax':
+                    # write final res file for bad_castep
+                    if os.path.isfile(seed+'.res'):
+                        os.remove(seed+'.res')
+                    self.res_dict.update(opti_dict)
+                    doc2res(opti_dict, seed, info=False, hash_dupe=False)
+
+                    if self.compute_dir is not None:
+                        if os.path.isfile(seed+'.castep'):
+                            shutil.copy(seed+'.castep', self.root_folder)
+                        shutil.copy(seed+'.res', self.root_folder)
+
+                self.mv_to_bad(seed)
+                return True
+
+        return False
 
     def mv_to_bad(self, seed):
         """ Move all files associated with "seed" to bad_castep.
@@ -894,19 +951,17 @@ class FullRelaxer:
                 try:
                     shutil.copy(_file, bad_dir)
                     os.remove(_file)
-                except:
+                except Exception:
                     if self.verbosity > 1:
                         print_exc()
-                    pass
             # check root folder for any matching files and remove them
             fname = '{}/{}'.format(self.root_folder, seed)
             for ext in ['.res', '.res.lock', '.castep']:
                 if os.path.isfile('{}{}'.format(fname, ext)):
                     os.remove('{}{}'.format(fname, ext))
-        except:
+        except Exception:
             if self.verbosity > 1:
                 print_exc()
-            pass
 
     def mv_to_completed(self, seed, completed_dir='completed', keep=False):
         """ Move all associated files to completed, removing any
@@ -944,10 +999,9 @@ class FullRelaxer:
                 try:
                     shutil.copy('{}{}'.format(seed, ext), completed_dir)
                     os.remove('{}{}'.format(seed, ext))
-                except:
+                except Exception:
                     if self.verbosity > 1:
                         print_exc()
-                    pass
             # check root folder for any matching files and remove them
             fname = '{}/{}'.format(self.root_folder, seed)
             for ext in ['.res', '.res.lock', '.castep', '.param', '.cell', '-out.cell']:
@@ -977,9 +1031,8 @@ class FullRelaxer:
                     shutil.copy('{}'.format(f), input_dir)
             else:
                 shutil.copy('{}.{}'.format(seed, ext), input_dir)
-        except:
+        except Exception:
             print_exc()
-            pass
 
     @staticmethod
     def tidy_up(seed):
@@ -1112,9 +1165,9 @@ class BatchRun:
             else:
                 self.args['ncores'] = int(self.slurm_avail_tasks / self.nprocesses)
         if self.args['nnodes'] < 1 or self.args['ncores'] < 1 or self.nprocesses < 1:
-            exit('Invalid number of cores, nodes or processes.')
+            sys.exit('Invalid number of cores, nodes or processes.')
 
-        if self.mode is 'castep':
+        if self.mode == 'castep':
             self.castep_setup()
         else:
             self.generic_setup()
@@ -1156,9 +1209,11 @@ class BatchRun:
         """
         from random import sample
         procs = []
-        for ind in range(self.nprocesses):
+        for _ in range(self.nprocesses):
             procs.append(mp.Process(target=self.perform_new_calculations,
-                         args=(sample(self.file_lists['res'], len(self.file_lists['res'])) if self.mode is 'castep' else self.seed, )))
+                                    args=(sample(self.file_lists['res'],
+                                                 len(self.file_lists['res']))
+                                          if self.mode == 'castep' else self.seed, )))
         try:
             for proc in procs:
                 proc.start()
@@ -1168,7 +1223,7 @@ class BatchRun:
             print_exc()
             for proc in procs:
                 proc.terminate()
-            exit('Killing running jobs and exiting...')
+            sys.exit('Killing running jobs and exiting...')
 
     def perform_new_calculations(self, res_list):
         """ Perform all calculations that have not already
@@ -1179,33 +1234,30 @@ class BatchRun:
 
         """
         job_count = 0
-        paths = self.paths
         if isinstance(res_list, str):
             res_list = [res_list]
         for res in res_list:
-            running = False
-            if os.path.isfile(res + '.lock'):
-                running = True
-            else:
-                with open(paths['jobs_fname'], 'r') as job_file:
-                    flines = job_file.readlines()
-                    for line in flines:
-                        if res in line:
-                            running = True
-                            break
+            locked = os.path.isfile('{}.lock'.format(res))
+            listed = self._check_jobs_file(res)
+            running = any([listed, locked])
             if not running:
-                if self.limit is not None:
-                    if job_count == self.limit:
-                        raise SystemExit
-                if not os.path.isfile(res + '.lock'):
+
+                # check we haven't reached job limit
+                if job_count == self.limit:
+                    raise SystemExit
+
+                # write lock file
+                if not os.path.isfile('{}.lock'.format(res)):
                     with open(res + '.lock', 'a') as job_file:
                         pass
                 else:
                     print('Another node wrote this file when I wanted to, skipping...')
-                    running = True
                     continue
-                with open(paths['jobs_fname'], 'a') as job_file:
+
+                # write to jobs file
+                with open(self.paths['jobs_fname'], 'a') as job_file:
                     job_file.write(res+'\n')
+
                 # create full relaxer object for creation and running of job
                 try:
                     job_count += 1
@@ -1215,27 +1267,26 @@ class BatchRun:
                                           cell_dict=self.cell_dict,
                                           mode=self.mode, paths=self.paths, compute_dir=hostname,
                                           **self.args)
-                    try:
-                        if not relaxer.enough_memory:
-                            with open(paths['memory_fname'], 'a') as job_file:
-                                job_file.write(res+'\n')
-                            os.remove(res + '.lock')
-                            with open(paths['jobs_fname'], 'r+') as job_file:
-                                flines = job_file.readlines()
-                                job_file.seek(0)
-                                for ind, line in enumerate(flines):
-                                    if res not in line:
-                                        job_file.write(line)
-                                job_file.truncate()
-                        elif relaxer.success:
-                            with open(paths['completed_fname'], 'a') as job_file:
-                                job_file.write(res+'\n')
-                        else:
-                            with open(paths['failures_fname'], 'a') as job_file:
-                                job_file.write(res+'\n')
-                    except:
-                        print_exc()
-                        pass
+                    # if memory check failed, let other nodes have a go
+                    if not relaxer.enough_memory:
+                        with open(self.paths['memory_fname'], 'a') as job_file:
+                            job_file.write(res+'\n')
+                        if os.path.isfile('{}.lock'.format(res)):
+                            os.remove('{}.lock'.format(res))
+                        with open(self.paths['jobs_fname'], 'r+') as job_file:
+                            flines = job_file.readlines()
+                            job_file.seek(0)
+                            for line in flines:
+                                if res not in line:
+                                    job_file.write(line)
+                            job_file.truncate()
+
+                    elif relaxer.success:
+                        with open(self.paths['completed_fname'], 'a') as job_file:
+                            job_file.write(res+'\n')
+                    else:
+                        with open(self.paths['failures_fname'], 'a') as job_file:
+                            job_file.write(res+'\n')
                 except(KeyboardInterrupt, SystemExit, RuntimeError):
                     print_exc()
                     raise SystemExit
@@ -1251,15 +1302,15 @@ class BatchRun:
         exts = ['cell', 'param']
         for ext in exts:
             if not os.path.isfile('{}.{}'.format(self.seed, ext)):
-                exit('Failed to find {} file, {}.{}'.format(ext, self.seed, ext))
+                sys.exit('Failed to find {} file, {}.{}'.format(ext, self.seed, ext))
         self.cell_dict, cell_success = cell2dict(self.seed + '.cell', db=False)
         if not cell_success:
             print(self.cell_dict)
-            exit('Failed to parse cell file')
+            sys.exit('Failed to parse cell file')
         self.param_dict, param_success = param2dict(self.seed + '.param', db=False)
         if not param_success:
             print(self.param_dict)
-            exit('Failed to parse param file')
+            sys.exit('Failed to parse param file')
 
         # scan directory for files to run
         self.file_lists = defaultdict(list)
@@ -1267,54 +1318,68 @@ class BatchRun:
         if len(self.file_lists['res']) < 1:
             error = ('run3 in CASTEP mode requires at least 1 res file in folder, found {}'
                      .format(len(self.file_lists['res'])))
-            exit(error)
+            sys.exit(error)
 
         # do some prelim checks of parameters
-        if 'geom_max_iter' not in self.param_dict and \
-                self.param_dict['task'].upper() in ['GEOMETRYOPTIMISATION',
-                                                    'GEOMETRYOPTIMIZATION']:
-            exit('geom_max_iter is unset, please fix this.')
-        if 'geom_max_iter' in self.param_dict and int(self.param_dict['geom_max_iter']) < 0:
-            exit('WARNING: geom_max_iter is only {} ...'.format(self.param_dict['geom_max_iter']))
+        if 'GEOMETRY' in self.param_dict['task'].upper():
+            if 'geom_max_iter' not in self.param_dict:
+                raise RuntimeError('geom_max_iter is unset, please fix this.')
+            elif int(self.param_dict['geom_max_iter']) <= 0:
+                raise RuntimeError('geom_max_iter is only {}!'
+                                   .format(self.param_dict['geom_max_iter']))
 
-        # check if we're doing a conv run
-        if self.args.get('conv_cutoff'):
-            try:
-                if os.path.isfile('cutoff.conv'):
-                    with open('cutoff.conv', 'r') as f:
-                        flines = f.readlines()
-                        self.args['conv_cutoff'] = []
-                        for line in flines:
-                            if not line.startswith('#'):
-                                self.args['conv_cutoff'].append(int(line))
-                else:
-                    raise RuntimeError
-            except:
-                print_exc()
-                exit('Error with cutoff.conv file.')
-        else:
-            self.args['conv_cutoff'] = None
-
-        if self.args.get('conv_kpt'):
-            try:
-                if os.path.isfile('kpt.conv'):
-                    with open('kpt.conv', 'r') as f:
-                        flines = f.readlines()
-                        self.args['conv_kpt'] = []
-                        for line in flines:
-                            if not line.startswith('#'):
-                                self.args['conv_kpt'].append(float(line))
-                else:
-                    raise RuntimeError
-            except:
-                print_exc()
-                exit('Error with kpt.conv file.')
-        else:
-            self.args['conv_kpt'] = None
+        # parse convergence args and set them up
+        self.convergence_run_setup()
 
         # delete source from cell and param
         del self.cell_dict['source']
         del self.param_dict['source']
+
+    def convergence_run_setup(self):
+        """ Set the correct args for a convergence run. """
+        # check if we're doing a conv run
+        if self.args.get('conv_cutoff'):
+            if os.path.isfile('cutoff.conv'):
+                with open('cutoff.conv', 'r') as f:
+                    flines = f.readlines()
+                    self.args['conv_cutoff'] = []
+                    for line in flines:
+                        if not line.startswith('#'):
+                            self.args['conv_cutoff'].append(int(line))
+            else:
+                raise RuntimeError('Missing cutoff.conv file')
+        else:
+            self.args['conv_cutoff'] = None
+
+        if self.args.get('conv_kpt'):
+            if os.path.isfile('kpt.conv'):
+                with open('kpt.conv', 'r') as f:
+                    flines = f.readlines()
+                    self.args['conv_kpt'] = []
+                    for line in flines:
+                        if not line.startswith('#'):
+                            self.args['conv_kpt'].append(float(line))
+            else:
+                raise RuntimeError('Missing with conv.kpt file')
+        else:
+            self.args['conv_kpt'] = None
+
+    def _check_jobs_file(self, res):
+        """ Check if structure is listed in jobs.txt file.
+
+        Parameters:
+            res (str): structure name.
+
+        Returns:
+            bool: True if already listed in jobs file.
+
+        """
+        with open(self.paths['jobs_fname'], 'r') as job_file:
+            flines = job_file.readlines()
+            for line in flines:
+                if res in line:
+                    return True
+        return False
 
 
 def reset_job_folder_and_count_remaining(debug=False):
