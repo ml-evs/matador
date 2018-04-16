@@ -98,7 +98,7 @@ def res2dict(seed, db=True, verbosity=0, **kwargs):
         else:
             res['num_atoms'] = len(res['atom_types'])
         # deal with implicit encapsulation
-        if len(remark) > 0:
+        if remark:
             if 'NTPROPS' in remark:
                 res['cnt_chiral'] = [0, 0]
                 res['encapsulated'] = True
@@ -1160,7 +1160,8 @@ def _castep_scrape_final_parameters(flines, castep, verbosity=0, **kwargs):
                     if not pspot_report_dict.get(elem):
                         castep['species_pot'][elem] = flines[line_no+i].split()[1].split('/')[-1]
                         if castep['species_pot'][elem] == 'Pseudopotential':
-                            castep['species_pot'][elem] = flines[line_no+i].split()[0].strip()+'_OTF.usp'
+                            castep['species_pot'][elem] = flines[line_no+i].split()[0].strip()
+                            castep['species_pot'][elem] += '_OTF.usp'
                         pspot_report_dict[elem] = False
                 i += 1
     # write zero pressure if not found in file
