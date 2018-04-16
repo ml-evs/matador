@@ -556,8 +556,8 @@ def castep2dict(seed, db=True, verbosity=0, intermediates=False, **kwargs):
         if db and 'geometry' not in castep['task']:
             raise RuntimeError('CASTEP file does not contain GO calculation')
 	
-	if not db and 'Thermo' in castep['task']:
-	    castep.update(_castep_scrape_thermo_data(flines,castep,verbosity, **kwargs))
+        if not db and 'thermo' in castep['task'].lower():
+            castep.update(_castep_scrape_thermo_data(flines,castep,verbosity, **kwargs))
 
         if intermediates:
             castep['intermediates'] = _castep_scrape_all_snapshots(flines)
