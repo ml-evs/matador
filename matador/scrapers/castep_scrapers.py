@@ -555,6 +555,9 @@ def castep2dict(seed, db=True, verbosity=0, intermediates=False, **kwargs):
         # task specific options
         if db and 'geometry' not in castep['task']:
             raise RuntimeError('CASTEP file does not contain GO calculation')
+	
+	if not db and 'Thermo' in castep['task']:
+	    castep.update(_castep_scrape_thermo_data(flines,castep,verbosity, **kwargs))
 
         if intermediates:
             castep['intermediates'] = _castep_scrape_all_snapshots(flines)
@@ -1008,6 +1011,52 @@ def usp2dict(seed):
     species_pot[elem] = species_pot[elem].replace('"', '')
     return species_pot
 
+def _castep_scrape_thermo_data(flines,castep,verbosity=0, **kwargs):
+    """ Scrape the data from a CASTEP Thermodynamics claculation.
+    
+    Parameters:
+        flines (list): list of lines contained in file
+        castep (dict): dictionary to update with data
+        
+    Keyword arguments:
+        N/A
+        
+    Returns:
+        dict: dictionary updated with scraped thermodynamics data
+        
+        ***note this only scrapes from Thermodynamics section
+        currently, NOT Atomic Displacement Parameters***
+    
+    """
+    for line_no, line in enumerate(flines):
+        if 'Number of temperature values' in line:
+            castep['num_temp_vals'] = int(line.split(':')[-1].strip())
+        elif 'Initial temperature' in line:
+            castep['temp_init'] = float(line.split(':')[1].strip().split(' ')[0])
+        elif 'Final temperature' in line:
+            castep['temp_final'] = float(line.split(':')[1].strip().split(' ')[0])
+        elif 'Spacing between temperature values' in line:
+            castep['temp_spacing'] = float(line.split(':')[1].strip().split(' ')[0])
+        elif 'T(K)' and 'E(eV)' in line:
+            castep['thermo_temps'] = [] #temperatures calculation was done at
+            castep['thermo_enthalpy_E'] = [] # enthalpy E(eV)
+            castep['thermo_free_energy_F'] = [] # free energy F(eV)
+            castep['thermo_entropy_S'] = [] # entropy S(J/mol/K)
+            castep['thermo_heat_cap_Cv'] = [] # heat capacity Cv(J/mol/K)
+            i = 2
+            while True:
+                if len(flines[line_no+i+1].strip()) == 0:
+                    break
+                else:
+                    temp_line = flines[line_no+i].split()
+                    castep['thermo_temps'].append(float(temp_line[0]))
+                    castep['thermo_enthalpy_E'].append(float(temp_line[1]))
+                    castep['thermo_free_energy_F'].append(float(temp_line[2]))
+                    castep['thermo_entropy_S'].append(float(temp_line[3]))
+                    castep['thermo_heat_cap_Cv'].append(float(temp_line[4]))
+                i += 1
+        
+    return castep
 
 def _castep_scrape_atoms(flines, castep, verbosity=0, **kwargs):
     """ Iterate forwards through flines to scrape atomic types and
