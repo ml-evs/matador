@@ -1,20 +1,19 @@
 #!/usr/bin/env python
 import unittest
+import numpy as np
+from os.path import realpath
 from matador.utils.cell_utils import abc2cart, cart2abc, cart2volume, create_simple_supercell
 from matador.utils.cell_utils import cart2frac, frac2cart
-from matador.utils.cell_utils import doc2spg
+from matador.utils.cell_utils import doc2spg, cart2abcstar, real2recip
 from matador.scrapers.castep_scrapers import castep2dict, res2dict, cell2dict, bands2dict
 from matador.similarity.pdf_similarity import PDF, PDFOverlap
 from matador.export import doc2cell
-from functools import reduce
-import numpy as np
-from os.path import realpath
 try:
     from matador.utils.cell_utils import get_seekpath_kpoint_path
     from seekpath import get_path
-    imported_seekpath = True
+    IMPORTED_SEEKPATH = True
 except:
-    imported_seekpath = False
+    IMPORTED_SEEKPATH = False
 
 # grab abs path for accessing test data
 REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
@@ -45,11 +44,27 @@ class CellUtilTest(unittest.TestCase):
                 cart_pos = frac2cart(test_doc['lattice_cart'], test_doc['positions_frac'])
                 back2frac = cart2frac(test_doc['lattice_cart'], cart_pos)
                 np.testing.assert_array_almost_equal(back2frac, test_doc['positions_frac'])
-            except(AssertionError):
+            except AssertionError:
                 print('cart:', test_doc['lattice_cart'], abc2cart(test_doc['lattice_abc']))
                 print('abc:', test_doc['lattice_abc'], cart2abc(test_doc['lattice_cart']))
                 print('volume:', test_doc['cell_volume'], cart2volume(test_doc['lattice_cart']))
                 raise AssertionError
+
+    def testCart2AbcStar(self):
+        castep_fname = REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep'
+        failed_open = False
+        try:
+            with open(castep_fname, 'r'):
+                pass
+        except FileNotFoundError:
+            failed_open = True
+        self.assertFalse(failed_open,
+                         msg='Failed to open test case {} - please check installation'
+                         .format(castep_fname))
+        test_doc, success = castep2dict(castep_fname, db=True, verbosity=5)
+        self.assertTrue(success)
+        self.assertTrue(np.allclose(real2recip(test_doc['lattice_cart']), 2*np.pi*np.asarray(cart2abcstar(test_doc['lattice_cart']))),
+                        msg='Conversion cart2abc failed.')
 
     def testFrac2Cart(self):
         lattice_cart = [[2, 0, 0], [0, 2, 0], [0, 0, 2]]
@@ -78,14 +93,20 @@ class CellUtilTest(unittest.TestCase):
                 extension = np.random.randint(low=1, high=5, size=(3)).tolist()
                 if extension == [1, 1, 1]:
                     extension[np.random.randint(low=0, high=2)] += 1
-                num_images = reduce(lambda x, y: x*y, extension)
+                num_images = np.prod(extension)
 
-                supercell = create_simple_supercell(test_doc, tuple(extension))
+                standardize = bool(_iter % 2)
+                symmetric = bool(_iter % 2)
+
+                supercell = create_simple_supercell(test_doc, tuple(extension),
+                                                    standardize=standardize,
+                                                    symmetric=symmetric)
                 self.assertEqual(supercell['num_atoms'], num_images*test_doc['num_atoms'])
                 self.assertAlmostEqual(supercell['cell_volume'], num_images*test_doc['cell_volume'], places=3)
                 self.assertEqual(len(supercell['positions_frac']), num_images*len(test_doc['positions_frac']))
                 for i in range(3):
-                    np.testing.assert_array_equal(np.asarray(supercell['lattice_cart'][i]), extension[i]*np.asarray(test_doc['lattice_cart'][i]))
+                    if not standardize:
+                        np.testing.assert_array_equal(np.asarray(supercell['lattice_cart'][i]), extension[i]*np.asarray(test_doc['lattice_cart'][i]))
                 self.assertLess(pdf_sim_dist(test_doc, supercell), 1e-3)
                 _iter += 1
 
@@ -108,7 +129,7 @@ class CellUtilTest(unittest.TestCase):
             test_doc, s = res2dict(res_fname, db=False, verbosity=0)
             while _iter < num_tests:
                 extension = np.random.randint(low=1, high=5, size=(3, 1)).tolist()
-                num_images = reduce(map(lambda x, y: x*y, extension))
+                num_images = np.prod(extension)
 
                 supercell = create_simple_supercell(test_doc, tuple(extension))
                 self.assertEqual(supercell['num_atoms'], num_images*test_doc['num_atoms'])
@@ -128,7 +149,6 @@ class CellUtilTest(unittest.TestCase):
             self.assertTrue(error)
 
     def testRecipToReal(self):
-        from matador.utils.cell_utils import real2recip
         real_lattice = [[5.5902240, 0, 0], [3.7563195, 4.1401290, 0], [-2.9800295, -1.3200288, 8.5321695]]
         recip_lattice = real2recip(real_lattice)
         np.testing.assert_array_almost_equal(np.asarray(recip_lattice),
@@ -156,7 +176,7 @@ class CellUtilTest(unittest.TestCase):
         spacing = 0.05
         self.assertEqual(calc_mp_grid(real_lattice, spacing), [4, 4, 2])
 
-    @unittest.skipIf(not imported_seekpath, 'Seekpath package not found in this distribution')
+    @unittest.skipIf(not IMPORTED_SEEKPATH, 'Seekpath package not found in this distribution')
     def testKPointPath(self):
 
         cell, s = castep2dict(REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep')
@@ -167,7 +187,7 @@ class CellUtilTest(unittest.TestCase):
 
         import glob
         from os import remove
-        from matador.utils.cell_utils import frac2cart, real2recip
+        from matador.utils.cell_utils import frac2cart
         fnames = glob.glob(REAL_PATH + 'data/bs_test/*.res')
         spacing = 0.01
         for fname in fnames:
