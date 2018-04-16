@@ -4,63 +4,83 @@ including parsing user inputs, displaying results
 and calling other functionality.
 """
 
-from __future__ import print_function
-# standard library
 from os import devnull
-from sys import exit
 import sys
 from itertools import combinations
 from traceback import print_exc
-# matador modules
-from matador.utils.print_utils import print_failure, print_warning, print_success, print_notify
-from matador.utils.chem_utils import get_periodic_table, get_formula_from_stoich
-from matador.utils.chem_utils import parse_element_string, get_stoich_from_formula
-from matador.utils.cursor_utils import display_results
-from matador.utils.db_utils import make_connection_to_collection, load_custom_settings
-# external libraries
+
 import pymongo as pm
 import numpy as np
 from bson.son import SON
 from bson.json_util import dumps
 from bson.objectid import ObjectId
 
+from matador.utils.print_utils import print_failure, print_warning, print_success, print_notify
+from matador.utils.chem_utils import get_periodic_table, get_formula_from_stoich
+from matador.utils.chem_utils import parse_element_string, get_stoich_from_formula
+from matador.utils.cursor_utils import display_results
+from matador.utils.db_utils import make_connection_to_collection, load_custom_settings
 
-class DBQuery(object):
+
+class DBQuery:
     """ Class that implements queries to MongoDB
     structure database.
+
+    Attributes:
+        cursor (list of dict): list of structures matching query.
+        args (dict): contains all keyword arguments used to construct
+            the query (see matador query --help) for list.
+        query_dict (dict): dictionary passed to database for query
+        calc_dict (dict): if performing a matching query (e.g. self.args['subcmd'] = 'hull'), this
+            dictionary contains the parameters used to match to other structures
+        repo (pymongo.collection.Collection): the pymongo collection that is being queried.
+        top (int): number of structures to print/export set by self.args.get('top') (DEFAULT: 10).
+
     """
     def __init__(self, client=False, collections=False, subcmd='query', debug=False, quiet=False, **kwargs):
         """ Parse arguments from matador or API call
         before calling query.
         """
-        # read args
+        # read args and set housekeeping
         self.args = kwargs
         self.debug = debug
+        if self.args.get('subcmd') is None:
+            self.args['subcmd'] = subcmd
         if self.args.get('testing') is None:
             self.args['testing'] = False
 
+        # public attributes
+        self.cursor = EmptyCursor()
+        self.query_dict = None
+        self.calc_dict = None
+        self.repo = None
+
+        # private attributes to be set later
+        self._empty_query = None
+        self._gs_enthalpy = None
+
         if debug:
             print(self.args)
-        if self.args.get('subcmd') is None:
-            self.args['subcmd'] = subcmd
-        if client:
-            self.client = client
-            self.db = client.crystals
-        if collections is not False:
-            self.collections = collections
 
         if quiet:
             f = open(devnull, 'w')
             sys.stdout = f
 
-        # if empty collections, assume called from API and read kwargs,
-        # also need to connect to db
+        # connect to db or use passed client
+        if client:
+            self._client = client
+            self._db = client.crystals
+        if collections is not False:
+            self._collections = collections
+
         if (not collections or not client) and not self.args.get('testing'):
             self.mongo_settings = load_custom_settings(config_fname=self.args.get('config_fname'))
-            self.client, self.db, self.collections = make_connection_to_collection(self.args.get('db'), mongo_settings=self.mongo_settings)
+            result = make_connection_to_collection(self.args.get('db'),
+                                                   mongo_settings=self.mongo_settings)
+            self._client, self._db, self._collections = result
 
         # define some periodic table macros
-        self.periodic_table = get_periodic_table()
+        self._periodic_table = get_periodic_table()
 
         # set default top value to 10
         if self.args.get('summary') or self.args.get('subcmd') in ['swaps', 'polish']:
@@ -69,11 +89,9 @@ class DBQuery(object):
             self.top = self.args.get('top') if self.args.get('top') is not None else 10
 
         # create the dictionary to pass to MongoDB
-        self.construct_query()
+        self._construct_query()
 
         if not self.args.get('testing'):
-
-            self.delta_E = self.args.get('delta_E')
 
             # execute the query
             self.perform_query()
@@ -83,58 +101,64 @@ class DBQuery(object):
                 from matador.similarity.similarity import get_uniq_cursor
                 print_notify('Filtering for unique structures...')
                 if self.top is not None:
+                    # filter for uniqueness
                     unique_set, _, _, _ = get_uniq_cursor(self.cursor[:self.args.get('top')],
-                                                          debug=self.args.get('debug'), sim_tol=self.args.get('uniq'))
+                                                          debug=self.args.get('debug'),
+                                                          sim_tol=self.args.get('uniq'))
                     print('Filtered {} down to {}'.format(len(self.cursor[:self.args.get('top')]),
                                                           len(unique_set)))
                     self.cursor = [self.cursor[:self.args.get('top')][ind] for ind in unique_set]
                 else:
-                    unique_set, _, _, _ = get_uniq_cursor(self.cursor, debug=self.args.get('debug'), sim_tol=self.args.get('uniq'))
+                    unique_set, _, _, _ = get_uniq_cursor(self.cursor,
+                                                          debug=self.args.get('debug'),
+                                                          sim_tol=self.args.get('uniq'))
                     print('Filtered {} down to {}'.format(len(self.cursor),
                                                           len(unique_set)))
                     self.cursor = [self.cursor[ind] for ind in unique_set]
+
                 display_results(self.cursor, hull=None, args=self.args)
 
             if not client and not self.args.get('testing'):
-                self.client.close()
+                self._client.close()
 
         if quiet:
             f.close()
             sys.stdout = sys.__stdout__
 
-    def construct_query(self):
+    def _construct_query(self):
         """ Set up query dict and perform query depending on
         command-line / API arguments.
         """
-        self.cursor = EmptyCursor()
 
+        self.cursor = EmptyCursor()
         # initalize query_dict to '$and' all queries
         self.query_dict = dict()
         self.query_dict['$and'] = []
-        self.empty_query = True
+        self._empty_query = True
 
         # benchmark enthalpy to display (set by calc_match)
-        self.gs_enthalpy = 0.0
+        self._gs_enthalpy = 0.0
 
         # operate on one structure and related others
         if self.args.get('id') is not None:
-            if type(self.args.get('id')) == str:
+            if isinstance(self.args.get('id'), str):
                 self.args['id'] = self.args['id'].strip().split(' ')
-            self.cursor = []
 
-            for collection in self.collections:
+            for collection in self._collections:
                 query_dict = dict()
                 query_dict['$and'] = []
-                query_dict['$and'].append(self.query_id())
+                query_dict['$and'].append(self._query_id())
                 if not self.args.get('ignore_warnings'):
-                    query_dict['$and'].append(self.query_quality())
-                self.repo = self.collections[collection]
+                    query_dict['$and'].append(self._query_quality())
+                self.repo = self._collections[collection]
                 temp_cursor = self.repo.find(query_dict)
                 for doc in temp_cursor:
                     self.cursor.append(doc)
 
             if len(self.cursor) < 1:
-                exit('Could not find a match with ' + str(self.args.get('id')) + ' try widening your search.')
+                sys.exit('Could not find a match with {} try widening your search.'
+                         .format(self.args.get('id')))
+
             elif len(self.cursor) >= 1:
                 display_results(list(self.cursor)[:self.top], args=self.args)
                 if len(self.cursor) > 1:
@@ -143,121 +167,123 @@ class DBQuery(object):
                 if self.debug:
                     print(dumps(self.cursor[0], indent=1))
 
-            if self.args.get('calc_match') or self.args['subcmd'] in ['hull', 'hulldiff', 'voltage']:
+            if self.args.get('calc_match') or \
+                    self.args['subcmd'] in ['hull', 'hulldiff', 'voltage']:
                 # save special copy of calc_dict for hulls
                 self.calc_dict = dict()
                 self.calc_dict['$and'] = []
                 # to avoid deep recursion, and since this is always called first
                 # don't append, just set
-                self.query_dict = self.query_calc(self.cursor[0])
+                self.query_dict = self._query_calc(self.cursor[0])
                 self.calc_dict['$and'] = list(self.query_dict['$and'])
-                if self.args['subcmd'] in ['hull', 'hulldiff'] and self.args.get('composition') is None:
+                if self.args['subcmd'] in ['hull', 'hulldiff'] and \
+                        self.args.get('composition') is None:
                     self.args['composition'] = ''
                     for elem in self.cursor[0]['stoichiometry']:
                         self.args['composition'] += elem[0]
                     self.args['composition'] = [self.args['composition']]
-                self.empty_query = False
+                self._empty_query = False
 
         # create alias for formula for backwards-compatibility
         self.args['stoichiometry'] = self.args.get('formula')
         if self.args.get('stoichiometry') is not None:
-            self.query_dict['$and'].append(self.query_stoichiometry())
-            self.empty_query = False
+            self.query_dict['$and'].append(self._query_stoichiometry())
+            self._empty_query = False
 
         if self.args.get('composition') is not None:
-            self.query_dict['$and'].append(self.query_composition())
-            self.empty_query = False
+            self.query_dict['$and'].append(self._query_composition())
+            self._empty_query = False
 
         if self.args.get('num_species') is not None:
-            self.query_dict['$and'].append(self.query_num_species())
-            self.empty_query = False
+            self.query_dict['$and'].append(self._query_num_species())
+            self._empty_query = False
 
         if self.args.get('space_group') is not None:
-            self.query_dict['$and'].append(self.query_space_group())
-            self.empty_query = False
+            self.query_dict['$and'].append(self._query_space_group())
+            self._empty_query = False
 
         if self.args.get('num_fu') is not None:
-            self.query_dict['$and'].append(self.query_num_fu())
-            self.empty_query = False
+            self.query_dict['$and'].append(self._query_num_fu())
+            self._empty_query = False
 
         if self.args.get('tags') is not None:
-            self.query_dict['$and'].append(self.query_tags())
-            self.empty_query = False
+            self.query_dict['$and'].append(self._query_tags())
+            self._empty_query = False
 
         if self.args.get('doi') is not None:
-            self.query_dict['$and'].append(self.query_doi())
-            self.empty_query = False
+            self.query_dict['$and'].append(self._query_doi())
+            self._empty_query = False
 
         if self.args.get('icsd') is not None:
-            self.query_dict['$and'].append(self.query_icsd())
-            self.empty_query = False
+            self.query_dict['$and'].append(self._query_icsd())
+            self._empty_query = False
 
         if self.args.get('cutoff') is not None:
-            self.query_dict['$and'].append(self.query_cutoff())
-            self.empty_query = False
+            self.query_dict['$and'].append(self._query_cutoff())
+            self._empty_query = False
 
         if self.args.get('geom_force_tol') is not None:
-            self.query_dict['$and'].append(self.query_geom_force_tol())
-            self.empty_query = False
+            self.query_dict['$and'].append(self._query_geom_force_tol())
+            self._empty_query = False
 
         if self.args.get('src_str') is not None:
-            self.query_dict['$and'].append(self.query_source())
-            self.empty_query = False
+            self.query_dict['$and'].append(self._query_source())
+            self._empty_query = False
 
         if self.args.get('root_src') is not None:
-            self.query_dict['$and'].append(self.query_root_source())
-            self.empty_query = False
+            self.query_dict['$and'].append(self._query_root_source())
+            self._empty_query = False
 
         if self.args.get('pressure') is not None:
-            self.query_dict['$and'].append(self.query_pressure())
-            self.empty_query = False
+            self.query_dict['$and'].append(self._query_pressure())
+            self._empty_query = False
 
         if self.args.get('encapsulated') is True:
-            self.query_dict['$and'].append(self.query_encap())
-            self.empty_query = False
+            self.query_dict['$and'].append(self._query_encap())
+            self._empty_query = False
 
         if self.args.get('cnt_radius') is not None:
-            self.query_dict['$and'].append(self.query_cnt_radius())
-            self.empty_query = False
+            self.query_dict['$and'].append(self._query_cnt_radius())
+            self._empty_query = False
 
         if self.args.get('cnt_vector') is not None:
-            self.query_dict['$and'].append(self.query_cnt_vector())
-            self.empty_query = False
+            self.query_dict['$and'].append(self._query_cnt_vector())
+            self._empty_query = False
 
         if self.args.get('sedc') is not None:
-            self.query_dict['$and'].append(self.query_sedc())
-            self.empty_query = False
+            self.query_dict['$and'].append(self._query_sedc())
+            self._empty_query = False
 
         if self.args.get('xc_functional') is not None:
-            self.query_dict['$and'].append(self.query_xc_functional())
-            self.empty_query = False
+            self.query_dict['$and'].append(self._query_xc_functional())
+            self._empty_query = False
 
         if self.args.get('mp_spacing') is not None:
-            self.query_dict['$and'].append(self.query_kpoints())
-            self.empty_query = False
+            self.query_dict['$and'].append(self._query_kpoints())
+            self._empty_query = False
 
         if self.args.get('spin') is not None:
-            tmp_dict = self.query_spin()
-            if len(tmp_dict) != 0:
+            tmp_dict = self._query_spin()
+            if tmp_dict:
                 self.query_dict['$and'].append(tmp_dict)
-            self.empty_query = False
+            self._empty_query = False
 
         if not self.args.get('ignore_warnings'):
-            self.query_dict['$and'].append(self.query_quality())
+            self.query_dict['$and'].append(self._query_quality())
 
         if self.args.get('time') is not None:
-            self.query_dict['$and'].append(self.query_time())
-            self.empty_query = False
+            self.query_dict['$and'].append(self._query_time())
+            self._empty_query = False
 
     def perform_query(self):
         """ Find results that match the query_dict
         inside the MongoDB database.
         """
         # if no query submitted, find all
-        if self.empty_query:
+        if self._empty_query:
             if self.args.get('id') is None:
-                for collection in self.collections:
-                    self.repo = self.collections[collection]
+                for collection in self._collections:
+                    self.repo = self._collections[collection]
                     if self.debug:
                         print('Empty query, showing all...')
                     self.cursor = self.repo.find().sort('enthalpy_per_atom', pm.ASCENDING)
@@ -267,10 +293,9 @@ class DBQuery(object):
                     display_results(self.cursor[:self.top], args=self.args)
 
         # if no special query has been made already, begin executing the query
-        if not self.empty_query:
-            # self.cursors = []
-            for collection in self.collections:
-                self.repo = self.collections[collection]
+        if not self._empty_query:
+            for collection in self._collections:
+                self.repo = self._collections[collection]
                 if self.debug:
                     print(dumps(self.query_dict, indent=1))
                 # execute query
@@ -285,48 +310,46 @@ class DBQuery(object):
                     print(cursor_count, 'results found for query in', collection+'.')
                 if self.args.get('subcmd') not in ['hull', 'hulldiff', 'voltage', 'swaps']:
                     if cursor_count >= 1:
-                        self.num_to_display = cursor_count
-                        if self.delta_E is not None:
+                        self._num_to_display = cursor_count
+                        if self.args.get('delta_E') is not None:
                             self.cursor = list(self.cursor)
                             if len(set([get_formula_from_stoich(doc['stoichiometry']) for doc in self.cursor])) != 1:
                                 print('Multiple stoichiometries in cursor, unable to filter by energy.')
                             else:
                                 gs_enthalpy = self.cursor[0]['enthalpy_per_atom']
                                 if self.debug:
-                                    print('Filtering by {} eV/atom'.format(self.delta_E))
+                                    print('Filtering by {} eV/atom'.format(self.args.get('delta_E')))
                                     print('gs_enthalpy = {}'.format(gs_enthalpy))
                                 num_to_display = 1
                                 for doc in self.cursor[1:]:
-                                    if self.debug:
-                                        print('dE = {}, {} {}'.format(doc['enthalpy_per_atom'] - gs_enthalpy, doc['text_id'][0], doc['text_id'][1]))
-                                    if doc['enthalpy_per_atom'] - gs_enthalpy > self.delta_E:
+                                    if doc['enthalpy_per_atom'] - gs_enthalpy > self.args.get('delta_E'):
                                         break
                                     else:
                                         num_to_display += 1
-                                self.num_to_display = num_to_display
-                                cursor_count = self.num_to_display
+                                self._num_to_display = num_to_display
+                                cursor_count = self._num_to_display
                                 if self.debug:
-                                    print('Displaying top {}'.format(self.num_to_display))
+                                    print('Displaying top {}'.format(self._num_to_display))
                         elif self.top == -1 or self.top is None:
-                            self.num_to_display = cursor_count
+                            self._num_to_display = cursor_count
                             self.top = cursor_count
                         elif cursor_count > self.top:
-                            self.num_to_display = self.top
+                            self._num_to_display = self.top
 
-                        display_results(list(self.cursor)[:self.num_to_display], args=self.args)
+                        display_results(list(self.cursor)[:self._num_to_display], args=self.args)
 
-                if self.delta_E is not None:
-                    self.cursor = self.cursor[:self.num_to_display]
+                if self.args.get('delta_E') is not None:
+                    self.cursor = self.cursor[:self._num_to_display]
 
             # building hull from just comp, find best structure to calc_match
             if self.args.get('id') is None and (self.args.get('subcmd') == 'hull' or
                                                 self.args.get('subcmd') == 'hulldiff' or
                                                 self.args.get('subcmd') == 'voltage' or
                                                 self.args.get('hull_cutoff') is not None):
-                if len(self.collections) == 1:
-                    self.repo = self.collections[list(self.collections.keys())[0]]
+                if len(self._collections) == 1:
+                    self.repo = self._collections[list(self._collections.keys())[0]]
                 else:
-                    exit('Hulls and voltage curves require just one source or --include_oqmd, exiting...')
+                    sys.exit('Hulls and voltage curves require just one source or --include_oqmd, exiting...')
                 print('Creating hull from AJM db structures.')
                 if self.args.get('biggest'):
                     print('\nFinding biggest calculation set for hull...\n')
@@ -343,7 +366,7 @@ class DBQuery(object):
                 i = 0
                 count = len(self.cursor)
                 if count <= 0:
-                    exit('No structures found for hull.')
+                    sys.exit('No structures found for hull.')
                 while i < sample+rand_sample:
                     # start with sample/2 lowest enthalpy structures
                     if i < int(sample):
@@ -361,13 +384,13 @@ class DBQuery(object):
                     else:
                         self.query_dict = dict()
                         try:
-                            self.query_dict = self.query_calc(id_cursor[0])
+                            self.query_dict = self._query_calc(id_cursor[0])
                             cutoff.append(id_cursor[0]['cut_off_energy'])
                             calc_dicts.append(dict())
                             calc_dicts[-1]['$and'] = list(self.query_dict['$and'])
-                            self.query_dict['$and'].append(self.query_composition())
+                            self.query_dict['$and'].append(self._query_composition())
                             if not self.args.get('ignore_warnings'):
-                                self.query_dict['$and'].append(self.query_quality())
+                                self.query_dict['$and'].append(self._query_quality())
                             test_query_dict.append(self.query_dict)
                             test_cursors.append(
                                 list(self.repo.find(SON(test_query_dict[-1])).sort('enthalpy_per_atom',
@@ -390,8 +413,8 @@ class DBQuery(object):
                                 break
                         except(KeyboardInterrupt, SystemExit):
                             print('Received exit signal, exiting...')
-                            exit()
-                        except:
+                            sys.exit()
+                        except Exception:
                             print_exc()
                             print_warning('Error with ' + id_cursor[0]['text_id'][0] + ' ' + id_cursor[0]['text_id'][1])
                             rand_sample += 1
@@ -407,16 +430,7 @@ class DBQuery(object):
                               self.cursor[0]['text_id'][0] + ' ' + self.cursor[0]['text_id'][1])
                 self.calc_dict = calc_dicts[choice]
 
-    def __del__(self):
-        """ Clean up any temporary databases on garbage
-        collection of DBQuery object.
-        """
-        try:
-            self.temp.drop()
-        except:
-            pass
-
-    def query_stoichiometry(self, custom_stoich=None, partial_formula=None):
+    def _query_stoichiometry(self, custom_stoich=None, partial_formula=None):
         """ Query DB for particular stoichiometry. """
         # alias stoichiometry
         if custom_stoich is None:
@@ -428,7 +442,7 @@ class DBQuery(object):
         if partial_formula is None:
             partial_formula = self.args.get('partial_formula')
         if ':' in stoich[0]:
-            exit('Formula cannot contain ":", you probably meant to query composition.')
+            sys.exit('Formula cannot contain ":", you probably meant to query composition.')
 
         stoich = get_stoich_from_formula(stoich[0])
 
@@ -442,8 +456,8 @@ class DBQuery(object):
                 types_dict = dict()
                 types_dict['$or'] = list()
                 elem = elem.strip('[').strip(']')
-                if elem in self.periodic_table:
-                    for group_elem in self.periodic_table[elem]:
+                if elem in self._periodic_table:
+                    for group_elem in self._periodic_table[elem]:
                         types_dict['$or'].append(dict())
                         types_dict['$or'][-1]['stoichiometry'] = dict()
                         types_dict['$or'][-1]['stoichiometry']['$in'] = [[group_elem, fraction]]
@@ -467,7 +481,7 @@ class DBQuery(object):
 
         return query_dict
 
-    def query_ratio(self, ratios):
+    def _query_ratio(self, ratios):
         """ Query DB for ratio of two elements.
 
         Input, e.g.:
@@ -481,7 +495,7 @@ class DBQuery(object):
             query_dict['ratios.' + pair[0]] = pair[1]
         return query_dict
 
-    def query_composition(self, custom_elem=None, partial_formula=None, elem_field='elems'):
+    def _query_composition(self, custom_elem=None, partial_formula=None, elem_field='elems'):
         """ Query DB for all structures containing all the elements
         taken as input. Passing this function a number is a deprecated
         feature, replaced by query_num_species.
@@ -510,7 +524,7 @@ class DBQuery(object):
             for char in elements[0]:
                 if char.isdigit():
                     print_failure('Composition cannot contain a number.')
-                    exit()
+                    sys.exit()
 
         elements = parse_element_string(elements[0])
 
@@ -538,25 +552,28 @@ class DBQuery(object):
             size = 0
             for ind, elem in enumerate(elements):
                 if elem != ':' and not elem.isdigit():
-                    query_dict['$and'].append(self.query_composition(custom_elem=[elem], partial_formula=True))
+                    query_dict['$and'].append(self._query_composition(custom_elem=[elem], partial_formula=True))
                     size += 1
                 if elem == ':':
                     # convert e.g. MoS2 to [['MoS', 2]]
                     # or LiMoS2 to [['LiMo', 1], ['MoS', '2], ['LiS', 2]]
                     ratio_elements = elements[ind+1:]
-                    for ind in range(len(ratio_elements)):
-                        if ind < len(ratio_elements)-1:
-                            if not ratio_elements[ind].isdigit() and not ratio_elements[ind+1].isdigit():
-                                ratio_elements.insert(ind+1, '1')
+                    for _ind, _ in enumerate(ratio_elements):
+                        if _ind < len(ratio_elements)-1:
+                            if not ratio_elements[_ind].isdigit() and \
+                                    not ratio_elements[_ind+1].isdigit():
+                                ratio_elements.insert(_ind+1, '1')
                     if not ratio_elements[-1].isdigit():
                         ratio_elements.append('1')
                     ratios = []
-                    for ind in range(0, len(ratio_elements), 2):
-                        for jind in range(ind, len(ratio_elements), 2):
-                            if ratio_elements[ind] != ratio_elements[jind]:
-                                ratios.append([ratio_elements[ind]+ratio_elements[jind],
-                                               round(float(ratio_elements[ind+1])/float(ratio_elements[jind+1]), 3)])
-                    query_dict['$and'].append(self.query_ratio(ratios))
+                    for _ind in range(0, len(ratio_elements), 2):
+                        for _jind in range(_ind, len(ratio_elements), 2):
+                            if ratio_elements[_ind] != ratio_elements[_jind]:
+                                ratios.append([ratio_elements[_ind] + ratio_elements[_jind],
+                                               round(float(ratio_elements[_ind+1]) /
+                                                     float(ratio_elements[_jind+1]),
+                                                     3)])
+                    query_dict['$and'].append(self._query_ratio(ratios))
         else:
             # expand group macros
             query_dict = dict()
@@ -568,8 +585,8 @@ class DBQuery(object):
                     types_dict = dict()
                     types_dict['$or'] = list()
                     elem = elem.strip('[').strip(']')
-                    if elem in self.periodic_table:
-                        for group_elem in self.periodic_table[elem]:
+                    if elem in self._periodic_table:
+                        for group_elem in self._periodic_table[elem]:
                             types_dict['$or'].append(dict())
                             types_dict['$or'][-1][elem_field] = dict()
                             types_dict['$or'][-1][elem_field]['$in'] = [group_elem]
@@ -591,7 +608,7 @@ class DBQuery(object):
 
         return query_dict
 
-    def query_num_species(self):
+    def _query_num_species(self):
         """ Query database for all structures with a
         given number of elements, e.g. binaries, ternaries etc.
         """
@@ -601,14 +618,14 @@ class DBQuery(object):
         elif isinstance(num, list):
             num = num[0]
         else:
-            exit('--num_species takes a single integer or list containing a single integer')
+            sys.exit('--num_species takes a single integer or list containing a single integer')
         query_dict = dict()
         query_dict['stoichiometry'] = dict()
         query_dict['stoichiometry']['$size'] = num
 
         return query_dict
 
-    def query_space_group(self):
+    def _query_space_group(self):
         """ Query DB for all structures with given
         space group.
         """
@@ -621,7 +638,7 @@ class DBQuery(object):
 
         return query_dict
 
-    def query_num_fu(self):
+    def _query_num_fu(self):
         """ Query DB for all structures with more than a
         given number of formula units in the simulation.
         """
@@ -634,7 +651,7 @@ class DBQuery(object):
 
         return query_dict
 
-    def query_tags(self):
+    def _query_tags(self):
         """ Find all structures matching given tags. """
         query_dict = dict()
         query_dict['$and'] = []
@@ -646,7 +663,7 @@ class DBQuery(object):
 
         return query_dict
 
-    def query_doi(self):
+    def _query_doi(self):
         """ Find all structures matching given DOI,
         in format xxxx/xxxx.
         """
@@ -659,13 +676,13 @@ class DBQuery(object):
 
         return query_dict
 
-    def query_id(self):
+    def _query_id(self):
         """ Find all structures matching given tags. """
         query_dict = dict()
         query_dict['text_id'] = self.args.get('id')
         return query_dict
 
-    def query_icsd(self):
+    def _query_icsd(self):
         """ Find all structures matching given ICSD CollCode. """
         if not isinstance(self.args.get('icsd'), list):
             icsd = [self.args.get('icsd')]
@@ -679,17 +696,18 @@ class DBQuery(object):
             query_dict['icsd']['$eq'] = str(icsd[0])
         return query_dict
 
-    def query_source(self):
+    def _query_source(self):
         """ Find all structures with source string from args. """
+        import re
         src_str = self.args.get('src_str')
         if not isinstance(src_str, list):
             src_str = [src_str]
         query_dict = dict()
         query_dict['source'] = dict()
-        query_dict['source']['$in'] = src_str
+        query_dict['source']['$in'] = [re.compile(src) for src in src_str]
         return query_dict
 
-    def query_root_source(self):
+    def _query_root_source(self):
         """ Find all structures with root source string from args. """
         root_src = self.args.get('root_src')
         if not isinstance(root_src, list):
@@ -701,7 +719,7 @@ class DBQuery(object):
             query_dict['$or'][-1]['root_source'] = src
         return query_dict
 
-    def query_quality(self):
+    def _query_quality(self):
         """ Find all structures with non-zero or
         non-existent (e.g. OQMD) quality. """
         query_dict = dict()
@@ -715,7 +733,7 @@ class DBQuery(object):
 
         return query_dict
 
-    def query_pressure(self):
+    def _query_pressure(self):
         """ Query pressure, either by an exact match on external_pressure
         or an approximate match on the pressure on the cell, with tolerance
         of either 0.05 GPa or 10%.
@@ -734,7 +752,7 @@ class DBQuery(object):
 
         return query_dict
 
-    def query_encap(self):
+    def _query_encap(self):
         """ Query only CNT encapsulated structures. """
         query_dict = dict()
         query_dict['encapsulated'] = dict()
@@ -742,7 +760,7 @@ class DBQuery(object):
 
         return query_dict
 
-    def query_cnt_radius(self):
+    def _query_cnt_radius(self):
         """ Query structures within a nanotube of given radius
         to within a tolerance of 0.01 A.
         """
@@ -755,11 +773,11 @@ class DBQuery(object):
 
         return query_dict
 
-    def query_cnt_vector(self):
+    def _query_cnt_vector(self):
         """ Query structures within a nanotube of given chiral vector. """
         query_dict = dict()
         if not isinstance(self.args.get('cnt_vector'), list) or len(self.args.get('cnt_vector')) != 2:
-            exit('CNT vector query needs to be of form [n, m]')
+            sys.exit('CNT vector query needs to be of form [n, m]')
         else:
             chiral_vec = self.args.get('cnt_vector')
         query_dict['cnt_chiral'] = dict()
@@ -767,7 +785,7 @@ class DBQuery(object):
 
         return query_dict
 
-    def query_cutoff(self):
+    def _query_cutoff(self):
         """ Query all calculations above given plane-wave cutoff. """
         query_dict = dict()
         query_dict['cut_off_energy'] = dict()
@@ -777,14 +795,14 @@ class DBQuery(object):
             cutoffs = self.args.get('cutoff')
         if len(cutoffs) == 2:
             if cutoffs[0] > cutoffs[1]:
-                exit('Cutoff query needs to be of form [min, max]')
+                sys.exit('Cutoff query needs to be of form [min, max]')
             query_dict['cut_off_energy']['$gte'] = cutoffs[0]
             query_dict['cut_off_energy']['$lte'] = cutoffs[1]
         else:
             query_dict['cut_off_energy']['$gte'] = cutoffs[0]
         return query_dict
 
-    def query_geom_force_tol(self):
+    def _query_geom_force_tol(self):
         """ Query all calculations with the correct relaxed force tolerance. """
         query_dict = dict()
         query_dict['geom_force_tol'] = dict()
@@ -794,14 +812,14 @@ class DBQuery(object):
             tols = self.args.get('geom_force_tol')
         if len(tols) == 2:
             if tols[0] > tols[1]:
-                exit('Force tol needs to be of form [min, max]')
+                sys.exit('Force tol needs to be of form [min, max]')
             query_dict['geom_force_tol']['$gte'] = tols[0]
             query_dict['geom_force_tol']['$lte'] = tols[1]
         else:
             query_dict['geom_force_tol']['$lte'] = tols[0]
         return query_dict
 
-    def query_sedc(self):
+    def _query_sedc(self):
         """ Query all calculations using given SEDC scheme.
 
         Use --sedc null to query for no dispersion correction.
@@ -815,7 +833,7 @@ class DBQuery(object):
 
         return query_dict
 
-    def query_xc_functional(self, xc_functional=None):
+    def _query_xc_functional(self, xc_functional=None):
         """ Query all calculations with specified xc-functional.
 
         Args:
@@ -833,7 +851,7 @@ class DBQuery(object):
             query_dict['xc_functional'] = xc_functional.upper()
         return query_dict
 
-    def query_kpoints(self):
+    def _query_kpoints(self):
         """ Query all calculations with finer than the given
         kpoint sampling.
         """
@@ -846,14 +864,14 @@ class DBQuery(object):
         if self.args.get('kpoint_tolerance') is not None:
             try:
                 tol = float(self.args.get('kpoint_tolerance'))
-            except:
+            except Exception:
                 print_warning('Failed to read custom kpoint tolerance.')
         query_dict['kpoints_mp_spacing'] = dict()
         query_dict['kpoints_mp_spacing']['$lte'] = mp_spacing[0] + tol
         query_dict['kpoints_mp_spacing']['$gte'] = mp_spacing[0] - tol
         return query_dict
 
-    def query_spin(self, override=None):
+    def _query_spin(self):
         """ Query all calculations with spin polarisation,
         i.e. --spin n!=0, or non-spin-polarization, i.e. --spin 0.
         """
@@ -871,17 +889,17 @@ class DBQuery(object):
             query_dict['spin_polarized'] = True
         return query_dict
 
-    def query_calc(self, doc):
+    def _query_calc(self, doc):
         """ Find all structures with matching
         accuracy to specified structure.
         """
-        self.gs_enthalpy = doc['enthalpy_per_atom']
+        self._gs_enthalpy = doc['enthalpy_per_atom']
 
         query_dict = {}
         query_dict['$and'] = []
-        query_dict['$and'].append(self.query_xc_functional(xc_functional=doc.get('xc_functional')))
+        query_dict['$and'].append(self._query_xc_functional(xc_functional=doc.get('xc_functional')))
         if self.args.get('time') is not None:
-            query_dict['$and'].append(self.query_time())
+            query_dict['$and'].append(self._query_time())
         if 'spin_polarized' in doc and doc['spin_polarized']:
             if self.args.get('spin') != 'any':
                 temp_dict = dict()
@@ -927,10 +945,7 @@ class DBQuery(object):
             temp_dict = dict()
             temp_dict['kpoints_mp_spacing'] = dict()
             if self.args.get('kpoint_tolerance') is not None:
-                try:
-                    tol = float(self.args.get('kpoint_tolerance'))
-                except:
-                    print_warning('Failed to read custom kpoint tolerance.')
+                tol = float(self.args.get('kpoint_tolerance'))
             else:
                 tol = 0.01
             temp_dict['kpoints_mp_spacing']['$gte'] = doc['kpoints_mp_spacing'] - tol
@@ -955,7 +970,7 @@ class DBQuery(object):
 
         return query_dict
 
-    def query_time(self, preceding=True):
+    def _query_time(self, preceding=True):
         """ Only include structures added before
         the date given in args['time'].
         """
@@ -971,24 +986,6 @@ class DBQuery(object):
             query_dict['_id']['$lte'] = cutoff_id
 
         return query_dict
-
-    def temp_collection(self, cursor):
-        """ Create temporary collection
-        for successive filtering.
-        """
-        # check temp doesn't already exist; drop if it does
-        try:
-            self.client.crystals.temp.drop()
-        except:
-            pass
-        self.temp = self.client.crystals.temp
-        if len(cursor) != 0:
-            self.temp.insert(cursor)
-        else:
-            self.temp.drop()
-            exit('No structures found.')
-
-        return self.temp
 
 
 class EmptyCursor:

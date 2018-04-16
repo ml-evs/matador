@@ -129,6 +129,7 @@ class QueryTest(unittest.TestCase):
                   'sedc': 'null', 'mp_spacing': [0.05], 'spin': 0,
                   'testing': True}
         query = DBQuery(**kwargs)
+        import re
         test_dict = ({
             '$and': [
                 {'$and': [
@@ -139,7 +140,7 @@ class QueryTest(unittest.TestCase):
                 ]},
                 {'icsd': {'$exists': True}},
                 {'cut_off_energy': {'$gte': 300, '$lte': 400}},
-                {'source': {'$in': ['/Foo/bar/foo/Bar.res']}},
+                {'source': {'$in': [re.compile('/Foo/bar/foo/Bar.res')]}},
                 {'pressure': {'$lt': 5.55, '$gt': 4.45}},
                 {'encapsulated': {'$exists': True}},
                 {'cnt_radius': {'$gt': 5.20, '$lt': 5.22}},
@@ -156,6 +157,7 @@ class QueryTest(unittest.TestCase):
                   'sedc': 'null', 'mp_spacing': [0.05], 'spin': 'any',
                   'testing': True}
         query = DBQuery(**kwargs)
+        import re
         test_dict = ({
             '$and': [
                 {'$and': [
@@ -166,7 +168,7 @@ class QueryTest(unittest.TestCase):
                 ]},
                 {'icsd': {'$exists': True}},
                 {'cut_off_energy': {'$gte': 300, '$lte': 400}},
-                {'source': {'$in': ['/Foo/bar/foo/Bar.res']}},
+                {'source': {'$in': [re.compile('/Foo/bar/foo/Bar.res')]}},
                 {'pressure': {'$lt': 5.55, '$gt': 4.45}},
                 {'encapsulated': {'$exists': True}},
                 {'cnt_radius': {'$gt': 5.20, '$lt': 5.22}},
@@ -186,7 +188,7 @@ class QueryTest(unittest.TestCase):
         self.assertEqual(elements, ['[VII]', '[Fe,Ru,Os]', '[I]', '[V]', '[VIII]', '[ASDASD]'])
 
         arg = '[VII]5[Fe,Ru,Os]2[I][V]6[VIII]2[ASDASD]'
-        elements = parse_element_string(arg, stoich=True)
+        elements = parse_element_string(arg)
         self.assertEqual(elements, ['[VII]', '5', '[Fe,Ru,Os]', '2', '[I]', '[V]', '6', '[VIII]', '2', '[ASDASD]'])
 
     def testHarderCompositions(self):
