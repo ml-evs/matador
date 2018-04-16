@@ -1037,6 +1037,8 @@ def _castep_scrape_thermo_data(flines,castep,verbosity=0, **kwargs):
             castep['temp_final'] = float(line.split(':')[1].strip().split(' ')[0])
         elif 'Spacing between temperature values' in line:
             castep['temp_spacing'] = float(line.split(':')[1].strip().split(' ')[0])
+        elif 'Zero-point energy' in line:
+            castep['zero_point_E'] = float(line.split("=")[1].strip().split(' ')[0])
         elif 'T(K)' and 'E(eV)' in line:
             castep['thermo_temps'] = [] #temperatures calculation was done at
             castep['thermo_enthalpy_E'] = [] # enthalpy E(eV)
