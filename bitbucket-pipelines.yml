@@ -11,4 +11,5 @@ pipelines:
         script: # Modify the commands below to build your repository.
           - pip install .
           - coverage run setup.py test
+          - coverage combine
           - coverage report

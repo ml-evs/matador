@@ -1,6 +1,8 @@
 # .coveragerc to control coverage.py
 [run]
 branch = True
+concurrency = multiprocessing
+parallel = True
 
 [report]
 # Regexes for lines to exclude from consideration
@@ -10,4 +12,3 @@ omit =
     setup.py
     */__init__.py
     matador/plotting.py
-
