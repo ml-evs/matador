@@ -7,24 +7,20 @@ TO-DO:
     - refactor
 """
 
-# matador modules
+import os
+import random
+import datetime
+import copy
+import traceback as tb
+
+import pymongo as pm
+
 from matador.scrapers.castep_scrapers import castep2dict, param2dict, cell2dict
 from matador.scrapers.castep_scrapers import res2dict, dir2dict
 from matador.scrapers.experiment_scrapers import expt2dict, synth2dict
 from matador.utils.cell_utils import calc_mp_spacing
 from matador.utils.db_utils import make_connection_to_collection, load_custom_settings
 from matador.version import __version__
-# external libraries
-import pymongo as pm
-# standard library
-from random import randint
-from collections import defaultdict
-from datetime import datetime
-from os import walk, getcwd, chmod, rename
-from time import sleep
-from os.path import realpath, abspath, dirname, getmtime, isfile
-from traceback import print_exc
-from copy import deepcopy
 
 
 class Spatula:
@@ -58,19 +54,19 @@ class Spatula:
         if not self.dryrun:
             logfile_name = 'spatula.err'
             manifest_name = 'spatula.manifest'
-            if isfile(logfile_name):
-                mtime = getmtime(logfile_name)
-                mdate = datetime.fromtimestamp(mtime)
+            if os.path.isfile(logfile_name):
+                mtime = os.path.getmtime(logfile_name)
+                mdate = datetime.datetime.fromtimestamp(mtime)
                 mdate = str(mdate).split()[0]
-                rename(logfile_name, logfile_name + '.' + str(mdate).split()[0])
-            if isfile(manifest_name):
-                mtime = getmtime(manifest_name)
-                mdate = datetime.fromtimestamp(mtime)
+                os.rename(logfile_name, logfile_name + '.' + str(mdate).split()[0])
+            if os.path.isfile(manifest_name):
+                mtime = os.path.getmtime(manifest_name)
+                mdate = datetime.datetime.fromtimestamp(mtime)
                 mdate = str(mdate).split()[0]
-                rename(manifest_name, manifest_name + '.' + str(mdate).split()[0])
+                os.rename(manifest_name, manifest_name + '.' + str(mdate).split()[0])
 
-            wordfile = open(dirname(realpath(__file__)) + '/scrapers/words', 'r')
-            nounfile = open(dirname(realpath(__file__)) + '/scrapers/nouns', 'r')
+            wordfile = open(os.path.dirname(os.path.realpath(__file__)) + '/scrapers/words', 'r')
+            nounfile = open(os.path.dirname(os.path.realpath(__file__)) + '/scrapers/nouns', 'r')
             self.wlines = wordfile.readlines()
             self.num_words = len(self.wlines)
             self.nlines = nounfile.readlines()
@@ -81,15 +77,17 @@ class Spatula:
         elif not self.scan:
             logfile_name = 'spatula.err.dryrun'
             manifest_name = 'spatula.manifest.dryrun'
+
         if not self.scan:
             self.logfile = open(logfile_name, 'w')
             self.manifest = open(manifest_name, 'w')
 
         self.settings = load_custom_settings(config_fname=self.config_fname)
-        self.client, self.db, self.collections = make_connection_to_collection(self.args.get('db'),
-                                                                               check_collection=False,
-                                                                               mongo_settings=self.settings)
+        result = make_connection_to_collection(self.args.get('db'),
+                                               check_collection=False,
+                                               mongo_settings=self.settings)
 
+        self.client, self.db, self.collections = result
         # perform some relevant collection-dependent checks
         assert len(self.collections) == 1, 'Can only import to one collection.'
         self.repo = list(self.collections.values())[0]
@@ -97,18 +95,19 @@ class Spatula:
         if self.args.get('db') is None:
             # if using default collection, check we are in the correct path
             if 'mongo' in self.settings and 'default_collection_file_path' in self.settings['mongo']:
-                if not getcwd().startswith(self.settings['mongo']['default_collection_file_path']):
+                if not os.getcwd().startswith(self.settings['mongo']['default_collection_file_path']):
+                    import time
                     print('PERMISSION DENIED... and...')
-                    sleep(3)
-                    for i in range(30):
+                    time.sleep(3)
+                    for _ in range(30):
                         print('YOU DIDN\'T SAY THE MAGIC WORD')
-                        sleep(0.05)
+                        time.sleep(0.05)
                     print(80*'!')
                     print('You shouldn\'t be importing to the default database from this folder!')
                     print('Please use --db <YourDBName> to create a new collection,')
                     print('or copy these files to the correct place!')
                     print(80*'!')
-                    exit()
+                    raise RuntimeError('Failed to import')
         else:
             if 'oqmd' in self.args['db']:
                 exit('Cannot import directly to oqmd repo')
@@ -125,7 +124,10 @@ class Spatula:
         # if import, as opposed to rebuild, scan for duplicates and remove from list
         if self.args['subcmd'] == 'import':
             self.file_lists = self.scan_dupes(self.file_lists)
-        self.display_import(self.file_lists)
+
+        # print number of files found
+        _display_import(self.file_lists)
+
         # only create dicts if not just scanning
         if not self.scan:
             # convert to dict and db if required
@@ -136,7 +138,7 @@ class Spatula:
             print('Successfully imported', self.import_count, 'structures!')
             # index by enthalpy for faster/larger queries
             count = 0
-            for entry in self.repo.list_indexes():
+            for _ in self.repo.list_indexes():
                 count += 1
             # ignore default id index
             if count > 1:
@@ -159,7 +161,7 @@ class Spatula:
             self.logfile.close()
         if not self.dryrun:
             # set log file to read only
-            chmod(logfile_name, 0o550)
+            os.chmod(logfile_name, 0o550)
         if not self.scan:
             self.logfile = open(logfile_name, 'r')
             errors = sum(1 for line in self.logfile)
@@ -173,7 +175,7 @@ class Spatula:
         if not self.dryrun:
             # construct dictionary in spatula_report collection to hold info
             report_dict = dict()
-            report_dict['last_modified'] = datetime.utcnow().replace(microsecond=0)
+            report_dict['last_modified'] = datetime.datetime.utcnow().replace(microsecond=0)
             report_dict['num_success'] = self.import_count
             report_dict['num_errors'] = errors
             report_dict['version'] = __version__
@@ -185,8 +187,8 @@ class Spatula:
         for any missing data.
         """
         try:
-            plain_text_id = [self.wlines[randint(0, self.num_words-1)].strip(),
-                             self.nlines[randint(0, self.num_nouns-1)].strip()]
+            plain_text_id = [self.wlines[random.randint(0, self.num_words-1)].strip(),
+                             self.nlines[random.randint(0, self.num_nouns-1)].strip()]
             struct['text_id'] = plain_text_id
             if 'tags' in self.tag_dict:
                 struct['tags'] = self.tag_dict['tags']
@@ -222,9 +224,9 @@ class Spatula:
             self.manifest.write('+ {}\n'.format(root_src))
             if self.debug:
                 print('Inserted', struct_id)
-        except:
+        except Exception:
             # this shouldn't fail, but if it does, fail loudly but cleanly
-            print_exc()
+            tb.print_exc()
             return 0
         return 1
 
@@ -234,14 +236,13 @@ class Spatula:
         """
         print('\n{:^52}'.format('###### RUNNING IMPORTER ######') + '\n')
         multi = False
-        for root_ind, root in enumerate(file_lists):
-            if root == '.':
-                root_str = getcwd().split('/')[-1]
-            else:
-                root_str = root
+        for _, root in enumerate(file_lists):
+            root_str = root
+            if root_str == '.':
+                root_str = os.getcwd().split('/')[-1]
             if self.verbosity > 0:
                 print('Dictifying', root_str, '...')
-            airss, cell, param, dir = 4*[False]
+            airss, cell, param, directory = 4*[False]
             if file_lists[root]['res_count'] > 0:
                 if file_lists[root]['castep_count'] < file_lists[root]['res_count']:
                     if file_lists[root]['cell_count'] <= file_lists[root]['res_count']:
@@ -289,23 +290,23 @@ class Spatula:
                                 if self.verbosity > 0:
                                     print('Found matching cell and param files:', param_name)
                                 break
-                # always try to scrape dir
+                # always try to scrape directory
                 dir_dict, success = dir2dict(root)
                 if not success:
                     self.logfile.write(dir_dict)
-                dir = success
+                directory = success
                 # combine cell and param dicts for folder
                 input_dict = dict()
-                if dir:
+                if directory:
                     input_dict = dir_dict.copy()
                 if cell and param:
                     input_dict.update(cell_dict)
                     input_dict.update(param_dict)
                     input_dict['source'] = cell_dict['source'] + param_dict['source']
-                    if dir:
+                    if directory:
                         input_dict['source'] = input_dict['source'] + dir_dict['source']
                 else:
-                    if dir:
+                    if directory:
                         input_dict = dir_dict.copy()
                         if cell:
                             input_dict.update(cell_dict)
@@ -314,7 +315,7 @@ class Spatula:
                             input_dict.update(param_dict)
                             input_dict['source'] = param_dict['source'] + dir_dict['source']
                 # create res dicts and combine them with input_dict
-                for ind, file in enumerate(file_lists[root]['res']):
+                for _, file in enumerate(file_lists[root]['res']):
                     if file.replace('.res', '.castep') in file_lists[root]['castep']:
                         struct_dict, success = castep2dict(file.replace('.res', '.castep'),
                                                            debug=self.debug,
@@ -346,13 +347,13 @@ class Spatula:
                                 final_struct['lattice_cart'], final_struct['mp_grid'])
                         try:
                             final_struct['source'] = struct_dict['source'] + input_dict['source']
-                        except:
+                        except Exception:
                             pass
                         if not self.dryrun:
                             final_struct.update(self.tag_dict)
                             self.import_count += self.struct2db(final_struct)
             else:
-                for ind, file in enumerate(file_lists[root]['castep']):
+                for _, file in enumerate(file_lists[root]['castep']):
                     castep_dict, success = castep2dict(file,
                                                        debug=self.debug,
                                                        verbosity=self.verbosity)
@@ -363,7 +364,7 @@ class Spatula:
                         if not self.dryrun:
                             final_struct.update(self.tag_dict)
                             self.import_count += self.struct2db(final_struct)
-        for ind, file in enumerate(file_lists[root]['synth']):
+                for _, file in enumerate(file_lists[root]['synth']):
                     synth_dict, success = synth2dict(file,
                                                      debug=self.debug,
                                                      verbosity=self.verbosity)
@@ -373,7 +374,7 @@ class Spatula:
                         if not self.dryrun:
                             synth_dict.update(self.tag_dict)
                             self.import_count += self.exp2db(synth_dict)
-        for ind, file in enumerate(file_lists[root]['expt']):
+                for _, file in enumerate(file_lists[root]['expt']):
                     expt_dict, success = expt2dict(file, debug=self.debug)
                     if not success:
                         self.logfile.write(expt_dict)
@@ -382,7 +383,7 @@ class Spatula:
                             expt_dict.update(self.tag_dict)
                             self.import_count += self.exp2db(expt_dict)
 
-        if len(self.struct_list) > 0:
+        if self.struct_list:
             self.update_changelog(self.repo.name, self.struct_list)
 
         return
@@ -398,7 +399,7 @@ class Spatula:
             | struct_list : list((ObjectId, src)), list of (ObjectIds, source) of imported structures
 
         """
-        changes = {'date': datetime.today(),
+        changes = {'date': datetime.datetime.today(),
                    'count': len(struct_list),
                    'id_list': [struct[0] for struct in struct_list],
                    'src_list': [struct[1] for struct in struct_list]}
@@ -408,15 +409,17 @@ class Spatula:
         """ Scans folder topdir recursively, returning list of
         CASTEP/AIRSS input/output files.
         """
+
+        import collections
         file_lists = dict()
         topdir = '.'
-        topdir_string = getcwd().split('/')[-1]
+        topdir_string = os.getcwd().split('/')[-1]
         print('Scanning', topdir_string, 'for CASTEP/AIRSS output files... ',
               end='')
-        for root, dirs, files in walk(topdir, followlinks=True, topdown=True):
+        for root, _, files in os.walk(topdir, followlinks=True, topdown=True):
             # get absolute path for rebuilds
-            root = abspath(root)
-            file_lists[root] = defaultdict(list)
+            root = os.path.abspath(root)
+            file_lists[root] = collections.defaultdict(list)
             file_lists[root]['res_count'] = 0
             file_lists[root]['cell_count'] = 0
             file_lists[root]['param_count'] = 0
@@ -456,8 +459,8 @@ class Spatula:
         """ Scan the file_lists made by scan_dir and remove
         structures already in the database by matching sources.
         """
-        new_file_lists = deepcopy(file_lists)
-        for root_ind, root in enumerate(file_lists):
+        new_file_lists = copy.deepcopy(file_lists)
+        for _, root in enumerate(file_lists):
             # per folder delete list
             # do not import castep or res if seed name in db already
             castep_delete_list = []
@@ -486,7 +489,7 @@ class Spatula:
                 'castep count does not match'
             # now delete just .res file names if already in db
             res_delete_list = []
-            for file_ind, file in enumerate(new_file_lists[root]['res']):
+            for _, file in enumerate(new_file_lists[root]['res']):
                 count = self.repo.find({'source': {'$in': [file]}}).count()
                 if self.debug:
                     print(count, file)
@@ -500,31 +503,21 @@ class Spatula:
                 del new_file_lists[root]['res'][new_file_lists[root]['res'].index(file)]
         return new_file_lists
 
-    def display_import(self, file_lists):
-        """ Display number of files to be imported and
-        a breakdown of their types.
-        """
-        prefix = '\t\t'
-        ResCount, CellCount, CastepCount, ParamCount = 4*[0]
-        SynthCount, ExptCount = 2*[0]
-        print('\n')
-        for root in file_lists:
-            RootResCount = file_lists[root]['res_count']
-            RootCastepCount = file_lists[root]['castep_count']
-            if RootResCount + RootCastepCount > 0 and self.debug:
-                print(str(RootResCount+RootCastepCount), 'new structures found in', root)
-            ResCount += RootResCount
-            CastepCount += RootCastepCount
-            CellCount += file_lists[root]['cell_count']
-            ParamCount += file_lists[root]['param_count']
-            CellCount += file_lists[root]['cell_count']
-            ExptCount += file_lists[root]['expt_count']
-            SynthCount += file_lists[root]['synth_count']
-        print('\n\n')
-        print(prefix, "{:8d}".format(ResCount), '\t\t.res files')
-        print(prefix, "{:8d}".format(CastepCount), '\t\t.castep, .history or .history.gz files')
-        print(prefix, "{:8d}".format(CellCount), '\t\t.cell files')
-        print(prefix, "{:8d}".format(ParamCount), '\t\t.param files')
-        print(prefix, "{:8d}".format(SynthCount), '\t\t.synth files')
-        print(prefix, "{:8d}".format(ExptCount), '\t\t.expt files\n')
-        return
+
+def _display_import(file_lists):
+    """ Display number of files to be imported and
+    a breakdown of their types.
+
+    Parameters:
+        file_lists (dict): containing keys `<extension>_count`.
+
+    """
+    exts = ['res', 'cell', 'castep', 'param', 'synth', 'expt']
+    counts = {ext: 0 for ext in exts}
+    for root in file_lists:
+        for ext in exts:
+            counts[ext] += file_lists[root]['{}_count'.format(ext)]
+
+    print('\n\n')
+    for ext in exts:
+        print('\t\t{:8d}\t\t.{} files'.format(counts[ext], ext))

@@ -91,8 +91,8 @@ class MatadorCommandLine(object):
                         self.cursor[:self.top], **self.args)
                     try:
                         self.pdffit.spawn()
-                    except(KeyboardInterrupt, SystemExit):
-                        exit('Exiting top-level...')
+                    except(KeyboardInterrupt, RuntimeError, SystemExit) as oops:
+                        raise oops('Exiting top-level...')
                 else:
                     exit('No structure match query.')
 
@@ -169,7 +169,10 @@ class MatadorCommandLine(object):
         except SystemExit as oops:
             print(oops)
             print('Trying to nicely close connection...')
-            self.client.close()
+            try:
+                self.client.close()
+            except AttributeError:
+                pass
 
     def print_report(self):
         """ Print spatula report on current database. """
