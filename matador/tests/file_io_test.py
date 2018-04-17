@@ -529,7 +529,48 @@ class ExportTest(unittest.TestCase):
                 np.testing.assert_almost_equal(doc['lattice_abc'], doc_exported['lattice_abc'])
             elif key == 'lattice_cart':
                 np.testing.assert_almost_equal(doc['lattice_cart'], doc_exported['lattice_cart'])
+    
+    def testThermoCastep(self):
+        from matador.scrapers.castep_scrapers import castep2dict
+        castep_fname = REAL_PATH + 'data/CuP-thermo-test.castep'
+        failed_open = False
+        try:
+            f = open(castep_fname, 'r')
+        except:
+            failed_open = True
+            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(castep_fname))
+        if not failed_open:
+            f.close()
+            test_dict, s = castep2dict(castep_fname, db=False, verbosity=0)
+            self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
+            self.assertEqual(test_dict['task'].lower(),'thermodynamicscalculation',msg='This is not a Thermodynamics calculation...')
+            self.assertEqual(test_dict['temp_final'],1000.0,msg='Wrong final temp!')
+            self.assertEqual(test_dict['temp_init'],50.0,msg='Wrong initial temp!')
+            self.assertEqual(test_dict['temp_spacing'],100.0,msg='Wrong temp spacing!')
+            self.assertEqual(test_dict['num_temp_vals'],11,msg='Wrong number of temps!')
+            self.assertEqual(test_dict['zero_point_E'],0.093412,msg='Wrong zero point energy!')
 
+            thermo_db_compare = {'thermo_temps': [50.0, 145.0, 240.0, 335.0, 430.0, 525.0, 620.0, 715.0, 810.0, 905.0, 1000.0],
+                                 'thermo_enthalpy_E': [0.098557, 0.142535, 0.204959, 0.273022, 0.343308, 0.414672, 0.486634, 0.558962, 0.63153, 0.704262, 0.777113],
+                                 'thermo_free_energy_F': [0.089968, 0.050865, -0.025747, -0.128941, -0.252035, -0.390909, -0.542824, -0.705838, -0.878507, -1.059717, -1.248581], 
+                                 'thermo_entropy_S': [16.573, 60.998, 92.749, 115.772, 133.586, 148.051, 160.206, 170.678, 179.872, 188.064, 195.45], 
+                                 'thermo_heat_cap_Cv': [24.686, 57.799, 67.215, 70.549, 72.047, 72.836, 73.301, 73.596, 73.795, 73.936, 74.039]}
+            
+            for i in range(test_dict['num_temp_vals']):
+                self.assertEqual(test_dict['thermo_temps'][i],thermo_db_compare['thermo_temps'][i],msg='Wrong temperature %f' % test_dict['thermo_temps'][i])
+                self.assertEqual(test_dict['thermo_enthalpy_E'][i],thermo_db_compare['thermo_enthalpy_E'][i],msg='Wrong enthalpy %f' % test_dict['thermo_enthalpy_E'][i])
+                self.assertEqual(test_dict['thermo_free_energy_F'][i],thermo_db_compare['thermo_free_energy_F'][i],msg='Wrong free energy %f' % test_dict['thermo_free_energy_F'][i])
+                self.assertEqual(test_dict['thermo_entropy_S'][i],thermo_db_compare['thermo_entropy_S'][i],msg='Wrong entropy %f' % test_dict['thermo_entropy_S'][i])
+                self.assertEqual(test_dict['thermo_heat_cap_Cv'][i],thermo_db_compare['thermo_heat_cap_Cv'][i],msg='Wrong heat capacity %f' % test_dict['thermo_heat_cap_Cv'][i])
+
+
+
+
+
+
+
+
+           
 
 if __name__ == '__main__':
     unittest.main()

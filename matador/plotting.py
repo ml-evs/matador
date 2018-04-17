@@ -520,6 +520,93 @@ def plot_voltage_curve(hull, show=True):
     elif show:
         plt.show()
 
+def plot_thermo_curves(seed,show=True, **kwargs):
+    """ Plot Temperature vs. Energy and Temperature versus heat
+    capacity from Thermodynamics <seed>.castep file as shown in 
+    http://www.tcm.phy.cam.ac.uk/castep/documentation/WebHelp
+    /content/modules/castep/tskcastepdispthermo.html
+    
+    Parameters:
+    
+        seed (str): filename of thermodynamics <seed>.castep file
+        
+    Keyword Arguments:
+    
+        plot_energy (bool): whether to plot T vs Energy
+        plot_heat_cap (bool): whether to plot T vs Cv
+        
+    
+    """
+    from matador.scrapers.castep_scrapers import castep2dict
+    import seaborn as sns
+    from os.path import isfile
+    from scipy.constants import N_A
+    from scipy.constants import physical_constants
+
+    #set defaults
+    prop_defaults = {'plot_energy':False, 'plot_heat_cap':False}
+    prop_defaults.update(kwargs)
+    kwargs = prop_defaults
+
+    sns.set(style='whitegrid',font_scale=1.2)
+    sns.set_style({
+        'axes.facecolor': 'white', 'figure.facecolor': 'white',
+        'font.sans-serif': ['Linux Biolinum O', 'Helvetica', 'Arial'],
+        'axes.linewidth': 0.5,
+        'axes.grid': False,
+        'legend.frameon': False,
+        'axes.axisbelow': True
+    })
+    
+    if kwargs['plot_energy'] and not kwargs['plot_heat_cap']:
+        fig, ax_energy = plt.subplots(figsize=(5, 5))
+    elif kwargs['plot_energy'] and kwargs['plot_heat_cap']:
+        fig, ax_grid = plt.subplots(1, 2, figsize=(10, 5), sharey=False,
+                                    gridspec_kw={'width_ratios': [1, 1],
+                                                 'wspace': 0.15,
+                                                 'left': 0.15})
+        ax_energy = ax_grid[0]
+        ax_Cv = ax_grid[1]
+    elif not kwargs['plot_energy'] and kwargs['plot_heat_cap']:
+        fig, ax_Cv = plt.subplots(figsize=(5, 5))
+    
+    data, s = castep2dict(seed,db=False)
+
+    temps = data['thermo_temps']
+    Cv = data['thermo_heat_cap_Cv']
+    free_energy = data['thermo_free_energy_F']
+    entropy = data['thermo_entropy_S']
+    enthalpy = data['thermo_enthalpy_E']
+    E0 = data['zero_point_E']
+    
+    # multiply entropy by T for comparison and convert J/mol to eV
+    eVJ = physical_constants['electron volt-joule relationship'][0]
+    entropyT = []
+    for i,val in enumerate(entropy):
+        entropyT.append(temps[i]*val*(1/eVJ)*(1/N_A)) # J/mol/K --> eV
+    
+    if kwargs['plot_energy']:
+        ax_energy.plot(temps, free_energy, c='r', lw=1, ls='-', alpha=1, label='Free Energy')
+        ax_energy.plot(temps,entropyT,c='g',lw=1,ls='-',alpha=1,label='Entropy*T')
+        ax_energy.plot(temps,enthalpy,c='b',lw=1,ls='-',alpha=1,label='Enthalpy')
+        ax_energy.set_xlabel('Temperature (K)')
+        ax_energy.set_title('Energy (eV)')
+        ax_energy.legend()
+        
+    if kwargs['plot_heat_cap']:
+        ax_Cv.plot(temps,Cv,c='r',lw=1,ls='-',alpha=1,label='Heat Capacity (J/mol/K)')
+        ax_Cv.set_title('Heat Capacity (J/mol/K)')
+        ax_Cv.set_xlabel('Temperature (K)')
+    
+    if any([kwargs.get('pdf'),kwargs.get('svg'),kwargs.get('png')]):
+        if kwargs.get('pdf'):
+            plt.savefig(seed.replace('.castep','')+'_thermoplots.pdf',dpi=300,transparent=True)
+        if kwargs.get('svg'):
+            plt.savefig(seed.replace('.castep','')+'_thermoplots.svg',dpi=300,transparent=True)
+        if kwargs.get('png'):
+            plt.savefig(seed.replace('.castep','')+'_thermoplots.png',dpi=300,transparent=True)
+            
+    plt.show()
 
 def plot_2d_hull_bokeh(hull):
     """ Plot interactive hull with Bokeh. """
