@@ -316,7 +316,6 @@ def plot_spectral(seeds, **kwargs):
                             num_projectors = len(projector_labels)
                             begin = ind+1
                             break
-                    print('Found {} projectors'.format(num_projectors))
                     data_flines = flines[begin:-1]
                     with open(seed + '.phonon_dos_tmp', 'w') as f:
                         for line in data_flines:
@@ -351,12 +350,17 @@ def plot_spectral(seeds, **kwargs):
                 ax_dos.set_xlim(0, max_density*1.2)
                 ax_dos.set_ylim(plot_window)
                 ax_dos.axvline(0, c='k')
-                ax_dos.plot(dos, energies, lw=1, c='k', ls=ls[seed_ind])
-                if 'pdos' in dos_data:
+                if len(seeds) > 1:
+                    colour = seed_colours[seed_ind]
+                else:
+                    colour = 'k'
+                ax_dos.plot(dos, energies, lw=1, ls=ls[seed_ind], color=colour)
+                if 'pdos' in dos_data and len(seeds) == 1:
                     for ind, projector in enumerate(pdos):
                         ax_dos.plot(pdos[projector], energies, lw=1, zorder=1000)
                         ax_dos.fill_betweenx(energies, 0, pdos[projector], alpha=0.3, label=projector)
-                ax_dos.legend()
+                if len(seeds) > 1:
+                    ax_dos.legend()
 
                 if seed_ind == 0 and not kwargs['phonons']:
                     if 'pdos' not in dos_data:
@@ -369,8 +373,12 @@ def plot_spectral(seeds, **kwargs):
                 ax_dos.set_ylim(0, max_density*1.2)
                 ax_dos.set_xlim(plot_window)
                 ax_dos.axhline(0, c='k')
-                ax_dos.plot(energies, dos, lw=1, c='k', ls=ls[seed_ind])
-                if 'pdos' in dos_data:
+                if len(seeds) > 1:
+                    colour = seed_colours[seed_ind]
+                else:
+                    colour = 'k'
+                ax_dos.plot(energies, dos, lw=1, c='k', ls=ls[seed_ind], color=colour)
+                if 'pdos' in dos_data and len(seeds) == 1:
                     for ind, projector in enumerate(pdos):
                         ax_dos.plot(energies, pdos[projector], lw=1, zorder=1000)
                         ax_dos.fill_between(energies, 0, pdos[projector], alpha=0.3, label=projector)
