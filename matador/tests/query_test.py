@@ -188,7 +188,7 @@ class QueryTest(unittest.TestCase):
         self.assertEqual(elements, ['[VII]', '[Fe,Ru,Os]', '[I]', '[V]', '[VIII]', '[ASDASD]'])
 
         arg = '[VII]5[Fe,Ru,Os]2[I][V]6[VIII]2[ASDASD]'
-        elements = parse_element_string(arg)
+        elements = parse_element_string(arg, stoich=True)
         self.assertEqual(elements, ['[VII]', '5', '[Fe,Ru,Os]', '2', '[I]', '[V]', '6', '[VIII]', '2', '[ASDASD]'])
 
     def testHarderCompositions(self):
