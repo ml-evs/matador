@@ -224,10 +224,12 @@ class Spatula:
             self.manifest.write('+ {}\n'.format(root_src))
             if self.debug:
                 print('Inserted', struct_id)
+
         except Exception:
             # this shouldn't fail, but if it does, fail loudly but cleanly
             tb.print_exc()
             return 0
+
         return 1
 
     def files2db(self, file_lists):
@@ -332,9 +334,7 @@ class Spatula:
                                                            dryrun=self.args.get('dryrun'),
                                                            verbosity=self.verbosity)
                     else:
-                        struct_dict, success = res2dict(file,
-                                                        debug=self.debug,
-                                                        verbosity=self.verbosity)
+                        struct_dict, success = res2dict(file, verbosity=self.verbosity)
                     if not success:
                         self.logfile.write(struct_dict)
                     else:

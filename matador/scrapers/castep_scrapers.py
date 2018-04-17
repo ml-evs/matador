@@ -17,7 +17,7 @@ from matador.utils.cell_utils import abc2cart, calc_mp_spacing, cart2volume, wra
 from matador.utils.chem_utils import get_stoich
 
 
-def res2dict(seed, db=True, verbosity=0, **kwargs):
+def res2dict(seed, db=True, verbosity=0):
     """ Extract available information from .res file; preferably
     used in conjunction with cell or param file.
 
@@ -43,12 +43,8 @@ def res2dict(seed, db=True, verbosity=0, **kwargs):
         res['source'] = []
         res['source'].append(seed+'.res')
         # grab file owner username
-        try:
-            res['user'] = getpwuid(stat(seed+'.res').st_uid).pw_name
-        except:
-            if kwargs.get('debug'):
-                print(seed+'.res has no owner.')
-            res['user'] == 'xxx'
+        res['user'] = getpwuid(stat(seed+'.res').st_uid).pw_name
+        # try to grab ICSD CollCode
         if 'CollCode' in seed:
             res['icsd'] = seed.split('CollCode')[-1]
         # alias special lines in res file
@@ -121,7 +117,7 @@ def res2dict(seed, db=True, verbosity=0, **kwargs):
         if verbosity > 0:
             print_exc()
             print('Error in .res file', seed + '.res, skipping...')
-        if type(oops) == IOError:
+        if isinstance(oops, IOError):
             print_exc()
         return seed+'.res\t\t' + str(type(oops)) + ' ' + str(oops) + '\n', False
     if verbosity > 4:
@@ -169,14 +165,14 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, verb
                     if not flines[line_no+i].strip()[0].isalpha():
                         try:
                             cell['lattice_cart'].append(list(map(float, flines[line_no+i].split())))
-                        except:
+                        except Exception:
                             print(seed)
                             print(line)
                             print(flines)
                     i += 1
                 if verbosity > 1:
                     print(cell['lattice_cart'])
-                assert(len(cell['lattice_cart']) == 3)
+                assert len(cell['lattice_cart']) == 3
                 cell['cell_volume'] = cart2volume(cell['lattice_cart'])
             elif '%block species_pot' in line.lower():
                 cell['species_pot'] = dict()
@@ -190,7 +186,8 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, verb
                         cell['species_pot'][flines[line_no+i].split()[0]] = \
                             cell['species_pot'][flines[line_no+i].split()[0]].replace('[]', '')
                     else:
-                        pspot_libs = ['C7', 'C8', 'C9', 'C17', 'C18', 'MS', 'HARD', 'QC5', 'NCP', 'NCP18', 'NCP17', 'NCP9']
+                        pspot_libs = ['C7', 'C8', 'C9', 'C17', 'C18', 'MS', 'HARD',
+                                      'QC5', 'NCP', 'NCP18', 'NCP17', 'NCP9']
                         if flines[line_no+i].upper().split()[0] in pspot_libs:
                             cell['species_pot']['library'] = flines[line_no+i].upper().split()[0]
                         else:
@@ -326,8 +323,8 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, verb
             for species in cell['species_pot']:
                 if 'OTF' in cell['species_pot'][species].upper():
                     pspot_seed = ''
-                    for dir in seed.split('/')[:-1]:
-                        pspot_seed += dir + '/'
+                    for directory in seed.split('/')[:-1]:
+                        pspot_seed += directory + '/'
                     # glob for all .usp files with format species_*OTF.usp
                     pspot_seed += species + '_*OTF.usp'
                     for globbed in glob.glob(pspot_seed):
@@ -337,7 +334,7 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, verb
         if verbosity > 0:
             print_exc()
             print('Error in', seed + '.cell, skipping...')
-        if type(oops) == IOError:
+        if isinstance(oops, IOError):
             print_exc()
         return seed + '.cell\t\t' + str(type(oops)) + ' ' + str(oops), False
     if kwargs.get('debug'):
@@ -376,12 +373,12 @@ def param2dict(seed, db=True, verbosity=0, **kwargs):
                       'calculate_stress', 'opt_strategy', 'max_scf_cycles']
         false_str = ['False', 'false', '0']
         splitters = [':', '=', '\t', ' ']
-        for line_no, line in enumerate(flines):
+        for _, line in enumerate(flines):
             if '#' or '!' in line:
                 line = line.split('#')[0].split('!')[0]
             line = line.lower()
             # skip blank lines and comments
-            if line.startswith(('#', '!')) or len(line.strip()) == 0:
+            if line.startswith(('#', '!')) or not line.strip():
                 continue
             else:
                 # if scraping to db, ignore "rubbish"
@@ -425,7 +422,7 @@ def param2dict(seed, db=True, verbosity=0, **kwargs):
         if verbosity > 0:
             print_exc()
             print('Error in', seed+'.param, skipping...')
-        if type(oops) == IOError:
+        if isinstance(oops, IOError):
             print_exc()
         return seed + '.param\t\t' + str(type(oops)) + ' ' + str(oops), False
     if kwargs.get('debug'):
@@ -454,42 +451,42 @@ def dir2dict(seed, verbosity=0, **kwargs):
         task_list = ['GO', 'NMR', 'OPTICS']
         phase_list = ['alpha', 'beta', 'gamma', 'theta']
         defect_list = ['vacancy', 'interstitial']
-        for dir in dirs_as_list:
-            if dir == '.':
-                dir = getcwd().split('/')[-1]
-            if len(dir.split('-')) > 3:
-                if dir[0].isalpha():
+        for directory in dirs_as_list:
+            if directory == '.':
+                directory = getcwd().split('/')[-1]
+            if len(directory.split('-')) > 3:
+                if directory[0].isalpha():
                     offset = 1
                 else:
                     offset = 0
                 try:
-                    dir_dict['cut_off_energy'] = float(dir.split('-')[offset])
-                    dir_dict['kpoints_mp_spacing'] = float(dir.split('-')[offset+1])
-                    dir_dict['xc_functional'] = dir.split('-')[offset+4].upper()
-                except:
+                    dir_dict['cut_off_energy'] = float(directory.split('-')[offset])
+                    dir_dict['kpoints_mp_spacing'] = float(directory.split('-')[offset+1])
+                    dir_dict['xc_functional'] = directory.split('-')[offset+4].upper()
+                except Exception:
                     pass
                 if dir_dict['xc_functional'][0] == 'S':
                     dir_dict['xc_functional'] = dir_dict['xc_functional'][1:]
                     dir_dict['spin_polarized'] = True
-                if [task for task in task_list if task in dir.split('-')[offset+5]]:
-                    dir_dict['task'] = dir.split('-')[offset+5]
+                if [task for task in task_list if task in directory.split('-')[offset+5]]:
+                    dir_dict['task'] = directory.split('-')[offset+5]
                 info = True
-            elif 'GPa' in dir:
+            elif 'GPa' in directory:
                 try:
-                    dir_dict['external_pressure'].append([float(dir.split('_')[0]), 0.0, 0.0])
-                    dir_dict['external_pressure'].append([float(dir.split('_')[0]), 0.0])
-                    dir_dict['external_pressure'].append([float(dir.split('_')[0])])
+                    dir_dict['external_pressure'].append([float(directory.split('_')[0]), 0.0, 0.0])
+                    dir_dict['external_pressure'].append([float(directory.split('_')[0]), 0.0])
+                    dir_dict['external_pressure'].append([float(directory.split('_')[0])])
                     info = True
-                except:
+                except Exception:
                     pass
-            if [phase for phase in phase_list if phase in dir]:
+            if [phase for phase in phase_list if phase in directory]:
                 for phase in phase_list:
-                    if phase in dir:
+                    if phase in directory:
                         dir_dict['phase'] = phase
                         info = True
-            if [defect for defect in defect_list if defect in dir]:
+            if [defect for defect in defect_list if defect in directory]:
                 for defect in defect_list:
-                    if defect in dir:
+                    if defect in directory:
                         dir_dict['defect'] = defect
                         info = True
         if 'external_pressure' not in dir_dict:
@@ -547,23 +544,23 @@ def castep2dict(seed, db=True, verbosity=0, intermediates=False, **kwargs):
             castep['icsd'] = temp_icsd
         # wrangle castep file for parameters in 3 passes:
         # once forwards to get number and types of atoms
-        castep.update(_castep_scrape_atoms(flines, castep, db=db, verbosity=verbosity, **kwargs))
+        castep.update(_castep_scrape_atoms(flines, castep))
         # once backwards to get the final parameter set for the calculation
-        castep.update(_castep_scrape_final_parameters(flines, castep, verbosity=verbosity, **kwargs))
+        castep.update(_castep_scrape_final_parameters(flines, castep))
         # once more forwards, from the final step, to get the final structure
 
         # task specific options
         if db and 'geometry' not in castep['task']:
             raise RuntimeError('CASTEP file does not contain GO calculation')
-	
+
         if not db and 'thermo' in castep['task'].lower():
-            castep.update(_castep_scrape_thermo_data(flines,castep,verbosity, **kwargs))
+            castep.update(_castep_scrape_thermo_data(flines, castep))
 
         if intermediates:
             castep['intermediates'] = _castep_scrape_all_snapshots(flines)
 
-        castep.update(_castep_scrape_final_structure(flines, castep, db=db, verbosity=verbosity, **kwargs))
-        castep.update(_castep_scrape_metadata(flines, castep, verbosity=verbosity, **kwargs))
+        castep.update(_castep_scrape_final_structure(flines, castep, db=db))
+        castep.update(_castep_scrape_metadata(flines, castep))
 
         # check that any optimized results were saved and raise errors if not
         if not castep.get('optimised'):
@@ -590,15 +587,15 @@ def castep2dict(seed, db=True, verbosity=0, intermediates=False, **kwargs):
             for species in castep['species_pot']:
                 if 'OTF' in castep['species_pot'][species].upper():
                     pspot_seed = ''
-                    for dir in seed.split('/')[:-1]:
-                        pspot_seed += dir + '/'
+                    for directory in seed.split('/')[:-1]:
+                        pspot_seed += directory + '/'
                     # glob for all .usp files with format species_*OTF.usp
                     pspot_seed += species + '_*OTF.usp'
                     for globbed in glob.glob(pspot_seed):
                         if isfile(globbed):
                             castep['species_pot'].update(usp2dict(globbed))
     except Exception as oops:
-        if type(oops) == DFTError:
+        if isinstance(oops, DFTError):
             if db:
                 # if importing to db, skip unconverged structure
                 # and report in log file
@@ -609,7 +606,7 @@ def castep2dict(seed, db=True, verbosity=0, intermediates=False, **kwargs):
                     print(oops)
                 return castep, True
         else:
-            if type(oops) == IOError:
+            if isinstance(oops, IOError):
                 print_exc()
             elif kwargs.get('dryrun') or verbosity > 0:
                 print_exc()
@@ -620,7 +617,7 @@ def castep2dict(seed, db=True, verbosity=0, intermediates=False, **kwargs):
     return castep, True
 
 
-def bands2dict(seed, summary=False, gap=False, external_efermi=None, verbosity=0, **kwargs):
+def bands2dict(seed, summary=False, gap=False, external_efermi=None, verbosity=0):
     """ Parse a CASTEP bands file into a dictionary.
 
     Parameters:
@@ -702,7 +699,7 @@ def bands2dict(seed, summary=False, gap=False, external_efermi=None, verbosity=0
         else:
             bs['kpoint_branches'].append(current_branch)
             current_branch = [ind+1]
-    assert(sum([len(branch) for branch in bs['kpoint_branches']]) == bs['num_kpoints'])
+    assert sum([len(branch) for branch in bs['kpoint_branches']]) == bs['num_kpoints']
 
     if verbosity > 2:
         print('Found branch structure', [(branch[0], branch[-1]) for branch in bs['kpoint_branches']])
@@ -716,7 +713,7 @@ def bands2dict(seed, summary=False, gap=False, external_efermi=None, verbosity=0
         eps = 1e-6
         if bs['num_spins'] == 1:
             # calculate indirect gap
-            for branch_ind, branch in enumerate(bs['kpoint_branches']):
+            for _, branch in enumerate(bs['kpoint_branches']):
                 for nb in range(bs['num_bands']):
                     band = bs['eigenvalues_k_s'][0][nb][branch]
                     band_branch_min = np.min(band)
@@ -754,13 +751,14 @@ def bands2dict(seed, summary=False, gap=False, external_efermi=None, verbosity=0
             bs['band_gap'] = cbm - vbm
             bs['band_gap_path'] = [bs['kpoint_path'][cbm_pos], bs['kpoint_path'][vbm_pos]]
             bs['band_gap_path_inds'] = [cbm_pos, vbm_pos]
-            bs['gap_momentum'] = np.sqrt(np.sum((bs['cart_kpoints'][cbm_pos] - bs['cart_kpoints'][vbm_pos])**2))
+            bs['gap_momentum'] = np.sqrt(np.sum((bs['cart_kpoints'][cbm_pos] -
+                                                 bs['cart_kpoints'][vbm_pos])**2))
 
             # calculate direct gap
             direct_gaps = np.zeros((len(bs['kpoint_path'])))
             direct_cbms = np.zeros((len(bs['kpoint_path'])))
             direct_vbms = np.zeros((len(bs['kpoint_path'])))
-            for ind, kpt in enumerate(bs['kpoint_path']):
+            for ind, _ in enumerate(bs['kpoint_path']):
                 direct_cbm = 1e10
                 direct_vbm = -1e10
                 for nb in range(bs['num_bands']):
@@ -776,7 +774,8 @@ def bands2dict(seed, summary=False, gap=False, external_efermi=None, verbosity=0
             bs['direct_conduction_band_max'] = direct_cbms[np.argmin(direct_gaps)]
             bs['direct_valence_band_min'] = direct_vbms[np.argmin(direct_gaps)]
             bs['direct_gap'] = np.min(direct_gaps)
-            bs['direct_gap_path'] = [bs['kpoint_path'][np.argmin(direct_gaps)], bs['kpoint_path'][np.argmin(direct_gaps)]]
+            bs['direct_gap_path'] = [bs['kpoint_path'][np.argmin(direct_gaps)],
+                                     bs['kpoint_path'][np.argmin(direct_gaps)]]
             bs['direct_gap_path_inds'] = [np.argmin(direct_gaps), np.argmin(direct_gaps)]
 
         if np.isclose(bs['direct_gap'], bs['band_gap']):
@@ -786,7 +785,8 @@ def bands2dict(seed, summary=False, gap=False, external_efermi=None, verbosity=0
             cbm_pos = bs['direct_gap_path_inds'][0]
             vbm_pos = bs['direct_gap_path_inds'][1]
             bs['band_gap_path'] = bs['direct_gap_path']
-            bs['gap_momentum'] = np.sqrt(np.sum((bs['cart_kpoints'][cbm_pos] - bs['cart_kpoints'][vbm_pos])**2))
+            bs['gap_momentum'] = np.sqrt(np.sum((bs['cart_kpoints'][cbm_pos] -
+                                                 bs['cart_kpoints'][vbm_pos])**2))
             assert bs['gap_momentum'] == 0
 
         if summary:
@@ -798,7 +798,8 @@ def bands2dict(seed, summary=False, gap=False, external_efermi=None, verbosity=0
                 print('and lies at {}'.format(bs['direct_gap_path'][0]))
             else:
                 print('Band gap is indirect with size {:5.5f} eV'.format(bs['band_gap']), end=' ')
-                print('between {} and {}'.format(bs['kpoint_path'][cbm_pos], bs['kpoint_path'][vbm_pos]), end=' ')
+                print('between {} and {}'.format(bs['kpoint_path'][cbm_pos],
+                                                 bs['kpoint_path'][vbm_pos]), end=' ')
                 print('corresponding to a wavenumber of {:5.5f} eV/A'.format(bs['gap_momentum']))
                 print('The smallest direct gap has size {:5.5f} eV'.format(bs['direct_gap']), end=' ')
                 print('and lies at {}'.format(bs['direct_gap_path'][0]))
@@ -806,7 +807,7 @@ def bands2dict(seed, summary=False, gap=False, external_efermi=None, verbosity=0
     return bs, True
 
 
-def optados2dict(seed, verbosity=0, **kwargs):
+def optados2dict(seed):
     """ Scrape optados output file (*.adaptive.dat) or (*.pdos.adaptive.dat)
     for DOS, projectors and projected DOS.
 
@@ -850,16 +851,16 @@ def optados2dict(seed, verbosity=0, **kwargs):
                 # skip current line and column headings
                 j = 2
                 elements = []
-                angM = []
+                ang_mom_channels = []
                 while ind+j+1 < len(header) and 'Projector:' not in header[ind+j+1]:
                     elements.append(header[ind+j].split()[1])
-                    angM.append(header[ind+j].split()[3])
+                    ang_mom_channels.append(header[ind+j].split()[3])
                     j += 1
                 projector_label = ''
                 if len(set(elements)) == 1:
                     projector_label += elements[0] + ' '
-                if len(set(angM)) == 1:
-                    projector_label += '${}$'.format(angM[0])
+                if len(set(ang_mom_channels)) == 1:
+                    projector_label += '${}$'.format(ang_mom_channels[0])
                     elem_only.append(False)
                 else:
                     elem_only.append(True)
@@ -882,7 +883,7 @@ def optados2dict(seed, verbosity=0, **kwargs):
     return dos, True
 
 
-def phonon2dict(seed, verbosity=0, **kwargs):
+def phonon2dict(seed, verbosity=0):
     """ Parse a CASTEP phonon file into a dictionary.
 
     Parameters:
@@ -972,7 +973,11 @@ def phonon2dict(seed, verbosity=0, **kwargs):
         else:
             ph['qpoint_branches'].append(current_branch)
             current_branch = [ind+1]
-    assert(sum([len(branch) for branch in ph['qpoint_branches']]) == ph['num_qpoints'])
+
+    assert sum([len(branch) for branch in ph['qpoint_branches']]) == ph['num_qpoints']
+
+    if verbosity > 0:
+        print('{} sucessfully scraped with {} q-points.'.format(seed, ph['num_qpoints']))
 
     return ph, True
 
@@ -1011,22 +1016,21 @@ def usp2dict(seed):
     species_pot[elem] = species_pot[elem].replace('"', '')
     return species_pot
 
-def _castep_scrape_thermo_data(flines,castep,verbosity=0, **kwargs):
+
+def _castep_scrape_thermo_data(flines, castep):
     """ Scrape the data from a CASTEP Thermodynamics claculation.
-    
+
+    Note:
+        This only scrapes from Thermodynamics section currently,
+        NOT Atomic Displacement Parameters
+
     Parameters:
         flines (list): list of lines contained in file
         castep (dict): dictionary to update with data
-        
-    Keyword arguments:
-        N/A
-        
+
     Returns:
         dict: dictionary updated with scraped thermodynamics data
-        
-        ***note this only scrapes from Thermodynamics section
-        currently, NOT Atomic Displacement Parameters***
-    
+
     """
     for line_no, line in enumerate(flines):
         if 'Number of temperature values' in line:
@@ -1040,14 +1044,14 @@ def _castep_scrape_thermo_data(flines,castep,verbosity=0, **kwargs):
         elif 'Zero-point energy' in line:
             castep['zero_point_E'] = float(line.split("=")[1].strip().split(' ')[0])
         elif 'T(K)' and 'E(eV)' in line:
-            castep['thermo_temps'] = [] #temperatures calculation was done at
-            castep['thermo_enthalpy_E'] = [] # enthalpy E(eV)
-            castep['thermo_free_energy_F'] = [] # free energy F(eV)
-            castep['thermo_entropy_S'] = [] # entropy S(J/mol/K)
-            castep['thermo_heat_cap_Cv'] = [] # heat capacity Cv(J/mol/K)
+            castep['thermo_temps'] = []          # temperatures calculation was done at
+            castep['thermo_enthalpy_E'] = []     # enthalpy E(eV)
+            castep['thermo_free_energy_F'] = []  # free energy F(eV)
+            castep['thermo_entropy_S'] = []      # entropy S(J/mol/K)
+            castep['thermo_heat_cap_Cv'] = []    # heat capacity Cv(J/mol/K)
             i = 2
             while True:
-                if len(flines[line_no+i+1].strip()) == 0:
+                if not flines[line_no+i+1].strip():
                     break
                 else:
                     temp_line = flines[line_no+i].split()
@@ -1057,10 +1061,11 @@ def _castep_scrape_thermo_data(flines,castep,verbosity=0, **kwargs):
                     castep['thermo_entropy_S'].append(float(temp_line[3]))
                     castep['thermo_heat_cap_Cv'].append(float(temp_line[4]))
                 i += 1
-        
+
     return castep
 
-def _castep_scrape_atoms(flines, castep, verbosity=0, **kwargs):
+
+def _castep_scrape_atoms(flines, castep):
     """ Iterate forwards through flines to scrape atomic types and
     initial positions.
 
@@ -1086,7 +1091,7 @@ def _castep_scrape_atoms(flines, castep, verbosity=0, **kwargs):
                     else:
                         castep['atom_types'].append(flines[line_no+i].split()[1])
                         castep['positions_frac'].append(list(map(float,
-                                                        (flines[line_no+i].split()[3:6]))))
+                                                                 (flines[line_no+i].split()[3:6]))))
                 if 'x------' in flines[line_no+i]:
                     atoms = True
                 i += 1
@@ -1100,7 +1105,7 @@ def _castep_scrape_atoms(flines, castep, verbosity=0, **kwargs):
             return castep
 
 
-def _castep_scrape_final_parameters(flines, castep, verbosity=0, **kwargs):
+def _castep_scrape_final_parameters(flines, castep):
     """ Scrape the DFT parameters from a CASTEP file, using those listed
     last in the file (i.e. those used to make the final structure).
 
@@ -1157,9 +1162,7 @@ def _castep_scrape_final_parameters(flines, castep, verbosity=0, **kwargs):
                 castep['external_pressure'].append(list(map(float, flines[line_no+1].split())))
                 castep['external_pressure'].append(list(map(float, flines[line_no+2].split())))
                 castep['external_pressure'].append(list(map(float, flines[line_no+3].split())))
-            except:
-                if kwargs.get('dryrun') or verbosity > 0:
-                    print_exc()
+            except ValueError:
                 castep['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
         elif 'spin_polarized' not in castep and 'treating system as spin-polarized' in line:
             castep['spin_polarized'] = True
@@ -1204,7 +1207,7 @@ def _castep_scrape_final_parameters(flines, castep, verbosity=0, **kwargs):
                 castep['species_pot'] = dict()
             i = 1
             while True:
-                if len(flines[line_no+i].strip()) == 0:
+                if not flines[line_no+i].strip():
                     break
                 else:
                     elem = flines[line_no+i].split()[0].strip()
@@ -1223,7 +1226,7 @@ def _castep_scrape_final_parameters(flines, castep, verbosity=0, **kwargs):
     return castep
 
 
-def _castep_scrape_final_structure(flines, castep, db=True, verbosity=0, **kwargs):
+def _castep_scrape_final_structure(flines, castep, db=True):
     """ Scrape final structure from CASTEP file.
 
     Parameters:
@@ -1249,7 +1252,7 @@ def _castep_scrape_final_structure(flines, castep, db=True, verbosity=0, **kwarg
             castep['lattice_cart'] = []
             i = 1
             while True:
-                if len(final_flines[line_no+i].strip()) == 0:
+                if not final_flines[line_no+i].strip():
                     break
                 else:
                     temp_line = final_flines[line_no+i].split()[0:3]
@@ -1330,9 +1333,7 @@ def _castep_scrape_final_structure(flines, castep, db=True, verbosity=0, **kwarg
                 elif 'Pressure' in final_flines[line_no+i]:
                     try:
                         castep['pressure'] = float(final_flines[line_no+i].split()[-2])
-                    except:
-                        if kwargs.get('dryrun') or verbosity > 0:
-                            print_exc()
+                    except ValueError:
                         pass
                     break
                 i += 1
@@ -1363,8 +1364,9 @@ def _castep_scrape_final_structure(flines, castep, db=True, verbosity=0, **kwarg
         elif 'Final bulk modulus' in line:
             try:
                 castep['bulk_modulus'] = float(line.split('=')[-1].split()[0])
-            except:
-                continue
+            except ValueError:
+                # the above will fail if bulk modulus was not printed (i.e. if it was unchanged)
+                pass
 
         elif 'Chemical Shielding and Electric Field Gradient Tensors'.lower() in line.lower():
             i = 5
@@ -1386,7 +1388,7 @@ def _castep_scrape_final_structure(flines, castep, db=True, verbosity=0, **kwarg
     return castep
 
 
-def _castep_scrape_metadata(flines, castep, verbosity=0, **kwargs):
+def _castep_scrape_metadata(flines, castep):
     """ Scrape metadata from CASTEP file.
 
     Parameters:
@@ -1434,7 +1436,7 @@ def _castep_find_final_structure(flines):
         if any(finished in line for finished in [success_string, failure_string]):
             for line_next in range(line_no, len(flines)):
                 if any(finished in flines[line_next] for
-                        finished in [success_string, failure_string]):
+                       finished in [success_string, failure_string]):
                     finish_line = line_next
                     if success_string in flines[line_next]:
                         optimised = True
@@ -1479,17 +1481,16 @@ def _castep_scrape_all_snapshots(flines):
                 # handle single atom forces edge-case
                 if snapshot['num_atoms'] == 1:
                     snapshot['forces'] = [[0, 0, 0]]
-                if len(intermediates) == 0:
+                if not intermediates:
                     intermediates.append(snapshot)
-                elif snapshot['lattice_cart'] != intermediates[-1]['lattice_cart'] \
-                        and snapshot['total_energy'] != intermediates[-1]['total_energy']:
-                        intermediates.append(snapshot)
+                elif snapshot['lattice_cart'] != intermediates[-1]['lattice_cart'] and snapshot['total_energy'] != intermediates[-1]['total_energy']:
+                    intermediates.append(snapshot)
 
             snapshot = dict()
             snapshot['lattice_cart'] = []
             i = 1
             while True:
-                if len(flines[line_no+i].strip()) == 0:
+                if not flines[line_no+i].strip():
                     break
                 else:
                     temp_line = flines[line_no+i].split()[0:3]
@@ -1573,6 +1574,7 @@ class DFTError(Exception):
     non-useful calculations.
     """
     def __init__(self, value):
+        super().__init__(value)
         self.value = value
 
     def __str__(self):

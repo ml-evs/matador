@@ -12,18 +12,19 @@ from matador.utils.print_utils import print_warning, print_failure
 
 
 def plotting_function(function):
+    """ Wrapper for plotting functions to safely fail on
+    X-forwarding errors.
+    """
     def wrapped_plot_function(*args, **kwargs):
+        """ Wrap and return the plotting function. """
+        from tkinter import TclError
         try:
             function(*args, **kwargs)
-        except Exception as exc:
-            if 'TclError' in type(exc).__name__:
-                print_failure('Caught exception: {}'.format(type(exc).__name__))
-                print_warning('Error message was: {}'.format(exc))
-                print_warning('This is probably an X-forwarding error')
-                print_failure('Skipping plot...')
-                pass
-            else:
-                raise exc
+        except TclError as exc:
+            print_failure('Caught exception: {}'.format(type(exc).__name__))
+            print_warning('Error message was: {}'.format(exc))
+            print_warning('This is probably an X-forwarding error')
+            print_failure('Skipping plot...')
     return wrapped_plot_function
 
 
@@ -33,11 +34,9 @@ def plot_spectral(seeds, **kwargs):
     <seed>.adaptive.dat file.
 
     Parameters:
-
         seeds (list): list of filenames of bands/phonon files
 
     Keyword Arguments:
-
         plot_bandstructure (bool): whether to plot bandstructure
         plot_dos (bool): whether to plot density of states
         dos (str): separate seed name for pDOS/DOS data
@@ -48,9 +47,10 @@ def plot_spectral(seeds, **kwargs):
         colour_by_seed (bool): plot with a separate colour per bandstructure
         external_efermi (float): replace scraped Fermi energy with this value (eV)
         highlight_bands (list): list of integer indices, colour the bands with these indices in red
-        band_colour (str): if passed "occ", bands will be coloured using cmap depending on whether they lie above
-                           or below the Fermi level. Otherwise, override all colour options with matplotlib-interpretable colour
-                           (e.g. hexcode or html colour name) to use for all bands (DEFAULT: None)
+        band_colour (str): if passed "occ", bands will be coloured using cmap depending on whether
+                           they lie above or below the Fermi level. Otherwise, override all colour
+                           options with matplotlib-interpretable colour (e.g. hexcode or html
+                           colour name) to use for all bands (DEFAULT: None)
         cmap (str): matplotlib colourmap name to use for the bands
 
     """
@@ -159,7 +159,7 @@ def plot_spectral(seeds, **kwargs):
             path /= np.max(path)
             assert len(path) == int(dispersion[num_key]) - len(dispersion[branch_key]) + 1
             if kwargs['phonons']:
-                dispersion[eig_key] = modes2bands(dispersion[eig_key], path, dispersion[branch_key])
+                dispersion[eig_key] = modes2bands(dispersion[eig_key], dispersion[branch_key])
             sns.set_palette(kwargs.get('cmap'), n_colors=dispersion[band_key])
             colours = sns.color_palette()
             for branch_ind, branch in enumerate(dispersion[branch_key]):
@@ -175,11 +175,13 @@ def plot_spectral(seeds, **kwargs):
                                     colour = 'blue'
                             else:
                                 if kwargs.get('band_colour') == 'occ':
-                                    if np.max(dispersion[eig_key][ns][nb][branch]) < 0:
+                                    band_min = np.min(dispersion[eig_key][ns][nb][branch])
+                                    band_max = np.max(dispersion[eig_key][ns][nb][branch])
+                                    if band_max < 0:
                                         colour = valence
-                                    elif np.min(dispersion[eig_key][ns][nb][branch]) > 0:
+                                    elif band_min > 0:
                                         colour = conduction
-                                    elif np.min(dispersion[eig_key][ns][nb][branch]) < 0 and np.max(dispersion[eig_key][ns][nb][branch]) > 0:
+                                    elif band_min < 0 and band_max > 0:
                                         colour = crossing
 
                         if colour_by_seed:
@@ -189,7 +191,8 @@ def plot_spectral(seeds, **kwargs):
                             if kwargs.get('band_colour') != 'occ':
                                 colour = kwargs.get('band_colour')
 
-                        if kwargs.get('highlight_bands') is not None and nb in kwargs.get('highlight_bands'):
+                        if kwargs.get('highlight_bands') is not None and \
+                                nb in kwargs.get('highlight_bands'):
                             colour = 'red'
                             alpha = 0.5
                         else:
@@ -198,7 +201,8 @@ def plot_spectral(seeds, **kwargs):
                             label = kwargs.get('labels')[seed_ind]
                         else:
                             label = None
-                        ax_dispersion.plot(path[(np.asarray(branch)-branch_ind).tolist()], dispersion[eig_key][ns][nb][branch],
+                        ax_dispersion.plot(path[(np.asarray(branch)-branch_ind).tolist()],
+                                           dispersion[eig_key][ns][nb][branch],
                                            c=colour, lw=1, ls=ls[seed_ind], alpha=alpha, label=label)
                 if branch_ind != len(dispersion[branch_key])-1:
                     ax_dispersion.axvline(path[branch[-1]-branch_ind], ls='-.', lw=1, c='grey')
@@ -209,7 +213,7 @@ def plot_spectral(seeds, **kwargs):
             if kwargs['phonons']:
                 ylabel = 'Wavenumber (cm$^{-1}$)'
             else:
-                ylabel = '$\epsilon_k$ (eV)'
+                ylabel = r'$\epsilon_k$ (eV)'
             ax_dispersion.set_ylabel(ylabel)
             ax_dispersion.set_xlim(-0.05, 1.05)
             xticks = []
@@ -218,7 +222,9 @@ def plot_spectral(seeds, **kwargs):
             labelled = []
 
             if kwargs['cell']:
-                doc, success = cell2dict(seed + '.cell', db=False, verbosity=kwargs['verbosity'], outcell=True, positions=True)
+                doc, success = cell2dict(seed + '.cell',
+                                         db=False, verbosity=kwargs['verbosity'],
+                                         outcell=True, positions=True)
                 if success:
                     spg_structure = doc2spg(doc)
                     if spg_structure is not False:
@@ -231,14 +237,14 @@ def plot_spectral(seeds, **kwargs):
                         for label, point in path_labels.items():
                             if np.allclose(point, kpt):
                                 if ind-branch_ind not in labelled:
-                                    label = label.replace('GAMMA', '\Gamma')
-                                    label = label.replace('SIGMA', '\Sigma')
+                                    label = label.replace('GAMMA', r'\Gamma')
+                                    label = label.replace('SIGMA', r'\Sigma')
                                     if sub_ind == len(branch)-1:
                                         if branch_ind < len(dispersion[branch_key])-1:
                                             next_point = dispersion[path_key][dispersion[branch_key][branch_ind+1][0]]
                                             for new_label, new_point in path_labels.items():
-                                                new_label = new_label.replace('GAMMA', '\Gamma')
-                                                new_label = new_label.replace('SIGMA', '\Sigma')
+                                                new_label = new_label.replace('GAMMA', r'\Gamma')
+                                                new_label = new_label.replace('SIGMA', r'\Sigma')
                                                 if np.allclose(new_point, next_point):
                                                     label = '{}|{}'.format(label, new_label)
                                                     labelled.append(ind-branch_ind)
@@ -255,19 +261,28 @@ def plot_spectral(seeds, **kwargs):
                 if vbm_pos != cbm_pos:
                     vbm_offset = sum([vbm_pos > ind for ind in shear_planes])
                     cbm_offset = sum([cbm_pos > ind for ind in shear_planes])
-                    ax_dispersion.plot([path[vbm_pos-vbm_offset], path[cbm_pos-cbm_offset]], [vbm, cbm], ls=ls[seed_ind], c='blue', label='indirect gap {:3.3f} eV'.format(cbm-vbm))
+                    ax_dispersion.plot([path[vbm_pos-vbm_offset], path[cbm_pos-cbm_offset]],
+                                       [vbm, cbm],
+                                       ls=ls[seed_ind], c='blue',
+                                       label='indirect gap {:3.3f} eV'.format(cbm-vbm))
+
                 vbm_pos = dispersion['direct_gap_path_inds'][1]
                 vbm = dispersion['direct_valence_band_min']
                 cbm_pos = dispersion['direct_gap_path_inds'][0]
                 cbm = dispersion['direct_conduction_band_max']
                 vbm_offset = sum([vbm_pos > ind for ind in shear_planes])
                 cbm_offset = sum([cbm_pos > ind for ind in shear_planes])
-                ax_dispersion.plot([path[vbm_pos-vbm_offset], path[cbm_pos-cbm_offset]], [vbm, cbm], ls=ls[seed_ind], c='red', label='direct gap {:3.3f} eV'.format(cbm-vbm))
-                ax_dispersion.legend(loc='upper center', bbox_to_anchor=(0.5, 1.1), fancybox=True, shadow=True, ncol=2, handlelength=1)
-                # else:
-                    # ax_dispersion.legend(loc='upper center', bbox_to_anchor=(0.5, 1.1), fancybox=True, shadow=True, ncol=1, handlelength=1)
+                ax_dispersion.plot([path[vbm_pos-vbm_offset], path[cbm_pos-cbm_offset]],
+                                   [vbm, cbm], ls=ls[seed_ind],
+                                   c='red', label='direct gap {:3.3f} eV'.format(cbm-vbm))
+                ax_dispersion.legend(loc='upper center',
+                                     bbox_to_anchor=(0.5, 1.1),
+                                     fancybox=True, shadow=True,
+                                     ncol=2, handlelength=1)
+
             ax_dispersion.set_xticks(xticks)
             ax_dispersion.set_xticklabels(xticklabels)
+
         if kwargs['plot_dos']:
             if not kwargs['phonons']:
                 if kwargs.get('dos') is None:
@@ -282,7 +297,8 @@ def plot_spectral(seeds, **kwargs):
             else:
                 if not isfile(seed + '.phonon_dos'):
                     phonon_data, s = phonon2dict(seed + '.phonon')
-                    plot_window = [np.min(phonon_data['eigenvalues_q'])-10, np.max(phonon_data['eigenvalues_q'])]
+                    plot_window = [np.min(phonon_data['eigenvalues_q'])-10,
+                                   np.max(phonon_data['eigenvalues_q'])]
                     if s:
                         space_size = 1000
                         gaussian_width = 10
@@ -293,17 +309,22 @@ def plot_spectral(seeds, **kwargs):
                             for eig in qpt:
                                 raw_weights.append(weight)
                                 raw_eigenvalues.append(eig)
-                        hist, energies = np.histogram(raw_eigenvalues, weights=raw_weights, bins=space_size)
+                        hist, energies = np.histogram(raw_eigenvalues,
+                                                      weights=raw_weights,
+                                                      bins=space_size)
                         # shift bin edges to bin centres
                         energies -= energies[1] - energies[0]
                         energies = energies[:-1]
-                        new_energies = np.reshape(energies, (1, len(energies))) - np.reshape(energies, (1, len(energies))).T
+                        new_energies = np.reshape(energies, (1, len(energies)))
+                        new_energies -= np.reshape(energies, (1, len(energies))).T
                         dos = np.sum(hist*np.exp(-(new_energies)**2 / gaussian_width), axis=1)
                         dos = np.divide(dos, np.sqrt(2 * np.pi * gaussian_width**2))
                         max_density = np.max(dos)
                         phonon_data['freq_unit'] = phonon_data['freq_unit'].replace('-1', '$^{-1}$')
                         ax_dos.axvline(phonon_data['softest_mode_freq'], ls='--', c='r',
-                                       label='$\omega_\mathrm{{min}} = {:5.3f}$ {}'.format(phonon_data['softest_mode_freq'], phonon_data['freq_unit']))
+                                       label=(r'$\omega_\mathrm{{min}} = {:5.3f}$ {}'
+                                              .format(phonon_data['softest_mode_freq'],
+                                                      phonon_data['freq_unit'])))
                         ax_dos.legend()
                     else:
                         exit('Failed to read .phonon file')
@@ -364,8 +385,12 @@ def plot_spectral(seeds, **kwargs):
 
                 if seed_ind == 0 and not kwargs['phonons']:
                     if 'pdos' not in dos_data:
-                        ax_dos.fill_betweenx(energies[np.where(energies <= 0)], 0, dos[np.where(energies <= 0)], facecolor=valence, alpha=0.5)
-                        ax_dos.fill_betweenx(energies[np.where(energies >= 0)], 0, dos[np.where(energies >= 0)], facecolor=conduction, alpha=0.5)
+                        ax_dos.fill_betweenx(energies[np.where(energies <= 0)], 0,
+                                             dos[np.where(energies <= 0)],
+                                             facecolor=valence, alpha=0.5)
+                        ax_dos.fill_betweenx(energies[np.where(energies >= 0)], 0,
+                                             dos[np.where(energies >= 0)],
+                                             facecolor=conduction, alpha=0.5)
             else:
                 ax_dos.set_xlabel(xlabel)
                 ax_dos.set_ylabel(ylabel)
@@ -385,40 +410,47 @@ def plot_spectral(seeds, **kwargs):
                 ax_dos.legend()
                 if seed_ind == 0 and not kwargs['phonons']:
                     if 'pdos' not in dos_data:
-                        ax_dos.fill_between(energies[np.where(energies <= 0)], 0, dos[np.where(energies <= 0)], facecolor=valence, alpha=0.5)
-                        ax_dos.fill_between(energies[np.where(energies >= 0)], 0, dos[np.where(energies >= 0)], facecolor=conduction, alpha=0.5)
-            ax_dos.grid('off')
+                        ax_dos.fill_between(energies[np.where(energies <= 0)], 0,
+                                            dos[np.where(energies <= 0)],
+                                            facecolor=valence, alpha=0.5)
+                        ax_dos.fill_between(energies[np.where(energies >= 0)], 0,
+                                            dos[np.where(energies >= 0)],
+                                            facecolor=conduction, alpha=0.5)
+            ax_dos.grid(False)
 
     if any([kwargs.get('pdf'), kwargs.get('svg'), kwargs.get('png')]):
         if kwargs.get('pdf'):
-            plt.savefig(seed.replace('.bands', '').replace('.phonon', '') + '_spectral.pdf', bbox_inches='tight')
+            plt.savefig(seeds[0].replace('.bands', '').replace('.phonon', '') + '_spectral.pdf',
+                        bbox_inches='tight')
         if kwargs.get('svg'):
-            plt.savefig(seed.replace('.bands', '').replace('.phonon', '') + '_spectral.svg', bbox_inches='tight', transparent=True)
+            plt.savefig(seeds[0].replace('.bands', '').replace('.phonon', '') + '_spectral.svg',
+                        bbox_inches='tight', transparent=True)
         if kwargs.get('png'):
-            plt.savefig(seed.replace('.bands', '').replace('.phonon', '') + '_spectral.png', bbox_inches='tight', dpi=300)
+            plt.savefig(seeds[0].replace('.bands', '').replace('.phonon', '') + '_spectral.png',
+                        bbox_inches='tight', dpi=300)
 
     else:
         print('Displaying plot...')
         plt.show()
 
 
-def modes2bands(phonon_dispersion, path, branches):
+def modes2bands(phonon_dispersion, branches):
     """ Recursively reorder phonon eigenvalues such that bands join up correctly,
     based on local gradients.
 
     Parameters:
-
         phonon_dispersion (np.ndarray): array containing eigenvalues as function of q
-        path (np.ndarray): array containing q-point path
-        branches (`obj`:list: of `obj`:int:): list containing branch start/end points of q-point path
+        branches (`obj`:list: of `obj`:int:): list containing branches of q-point path
+
+    Returns:
+        np.ndarray: reordered phonon branches.
 
     """
-    import numpy as np
     from copy import deepcopy
 
     eigs = phonon_dispersion[0]
 
-    for branch_ind, branch in enumerate(branches):
+    for _, branch in enumerate(branches):
         eigs_branch = eigs[:, branch]
         converged = False
         while not converged:
@@ -440,10 +472,15 @@ def modes2bands(phonon_dispersion, path, branches):
 
 @plotting_function
 def plot_voltage_curve(hull, show=True):
-    """ Plot calculated voltage curve. """
-    import matplotlib.pyplot as plt
-    import numpy as np
-    from traceback import print_exc
+    """ Plot calculated voltage curve.
+
+    Parameters:
+        hull (:class:`QueryConvexHull`): matador hull object.
+
+    Keyword arguments:
+        show (bool): whether to show plot in an X window.
+
+    """
     if hull.savefig:
         if len(hull.voltages) != 1:
             fig = plt.figure(facecolor=None, figsize=(4, 3.5))
@@ -453,13 +490,10 @@ def plot_voltage_curve(hull, show=True):
         fig = plt.figure(facecolor=None)
     axQ = fig.add_subplot(111)
     if hull.args.get('expt') is not None:
-        try:
-            expt_data = np.loadtxt(hull.args.get('expt'), delimiter=',')
-        except:
-            print_exc()
-            pass
+        expt_data = np.loadtxt(hull.args.get('expt'), delimiter=',')
         if hull.args.get('expt_label'):
-            axQ.plot(expt_data[:, 0], expt_data[:, 1], c='k', lw=2, ls='-', label=hull.args.get('expt_label'))
+            axQ.plot(expt_data[:, 0], expt_data[:, 1], c='k', lw=2, ls='-',
+                     label=hull.args.get('expt_label'))
         else:
             axQ.plot(expt_data[:, 0], expt_data[:, 1], c='k', lw=2, ls='-', label='Experiment')
     for ind, voltage in enumerate(hull.voltages):
@@ -468,13 +502,17 @@ def plot_voltage_curve(hull, show=True):
                 axQ.plot([hull.Q[ind][i-1], hull.Q[ind][i]], [voltage[i], voltage[i]], marker='*',
                          lw=2, c=hull.colours[ind], label='DFT (this work)')
             elif i == 1 and len(hull.voltages) != 1:
-                axQ.plot([hull.Q[ind][i-1], hull.Q[ind][i]], [voltage[i], voltage[i]], marker='o', markersize=5,
-                         lw=2, c=hull.colours[ind], label=get_formula_from_stoich(hull.endstoichs[ind], tex=True))
+                axQ.plot([hull.Q[ind][i-1], hull.Q[ind][i]], [voltage[i], voltage[i]],
+                         marker='o', markersize=5,
+                         lw=2, c=hull.colours[ind],
+                         label=get_formula_from_stoich(hull.endstoichs[ind], tex=True))
             else:
-                axQ.plot([hull.Q[ind][i-1], hull.Q[ind][i]], [voltage[i], voltage[i]], marker='o', markersize=5,
+                axQ.plot([hull.Q[ind][i-1], hull.Q[ind][i]], [voltage[i], voltage[i]],
+                         marker='o', markersize=5,
                          lw=2, c=hull.colours[ind])
             if i != len(voltage)-2:
-                axQ.plot([hull.Q[ind][i], hull.Q[ind][i]], [voltage[i], voltage[i+1]], marker='o', markersize=5,
+                axQ.plot([hull.Q[ind][i], hull.Q[ind][i]], [voltage[i], voltage[i+1]],
+                         marker='o', markersize=5,
                          lw=2, c=hull.colours[ind])
     if hull.args.get('labels'):
         eps = 1e-9
@@ -483,7 +521,8 @@ def plot_voltage_curve(hull, show=True):
         for i in range(len(hull.label_cursor)):
             axQ.annotate(get_formula_from_stoich(hull.label_cursor[i]['stoichiometry'],
                                                  elements=hull.elements, tex=True),
-                         xy=(hull.Q[0][i+1]+0.02*max(hull.Q[0]), hull.voltages[0][i+1]+0.02*max(hull.voltages[0])),
+                         xy=(hull.Q[0][i+1]+0.02*max(hull.Q[0]),
+                             hull.voltages[0][i+1]+0.02*max(hull.voltages[0])),
                          textcoords='data',
                          ha='center',
                          zorder=9999)
@@ -491,9 +530,9 @@ def plot_voltage_curve(hull, show=True):
         axQ.legend(loc=1)
     axQ.set_ylabel('Voltage (V) vs {}$^+$/{}'.format(hull.elements[0], hull.elements[0]))
     axQ.set_xlabel('Gravimetric cap. (mAh/g)')
-    start, end = axQ.get_ylim()
+    _, end = axQ.get_ylim()
     axQ.set_ylim(0, 1.1*end)
-    start, end = axQ.get_xlim()
+    _, end = axQ.get_xlim()
     axQ.set_xlim(0, 1.1*end)
     axQ.grid('off')
     plt.tight_layout(pad=0.0, h_pad=1.0, w_pad=0.2)
@@ -504,7 +543,7 @@ def plot_voltage_curve(hull, show=True):
         for spine in ['left', 'bottom']:
             axQ.spines[spine].set_linewidth(0.5)
             axQ.spines[spine].set_color(dark_grey)
-    except:
+    except ImportError:
         pass
 
     if hull.savefig:
@@ -520,35 +559,33 @@ def plot_voltage_curve(hull, show=True):
     elif show:
         plt.show()
 
-def plot_thermo_curves(seed,show=True, **kwargs):
+
+@plotting_function
+def plot_thermo_curves(seed, show=True, **kwargs):
     """ Plot Temperature vs. Energy and Temperature versus heat
-    capacity from Thermodynamics <seed>.castep file as shown in 
+    capacity from Thermodynamics <seed>.castep file as shown in
     http://www.tcm.phy.cam.ac.uk/castep/documentation/WebHelp
     /content/modules/castep/tskcastepdispthermo.html
-    
+
     Parameters:
-    
         seed (str): filename of thermodynamics <seed>.castep file
-        
+
     Keyword Arguments:
-    
         plot_energy (bool): whether to plot T vs Energy
         plot_heat_cap (bool): whether to plot T vs Cv
-        
-    
+
     """
     from matador.scrapers.castep_scrapers import castep2dict
     import seaborn as sns
-    from os.path import isfile
-    from scipy.constants import N_A
+    from matador.utils.chem_utils import AVOGADROS_NUMBER
     from scipy.constants import physical_constants
 
-    #set defaults
+    # set defaults
     prop_defaults = {'plot_energy':False, 'plot_heat_cap':False}
     prop_defaults.update(kwargs)
     kwargs = prop_defaults
 
-    sns.set(style='whitegrid',font_scale=1.2)
+    sns.set(style='whitegrid', font_scale=1.2)
     sns.set_style({
         'axes.facecolor': 'white', 'figure.facecolor': 'white',
         'font.sans-serif': ['Linux Biolinum O', 'Helvetica', 'Arial'],
@@ -557,7 +594,7 @@ def plot_thermo_curves(seed,show=True, **kwargs):
         'legend.frameon': False,
         'axes.axisbelow': True
     })
-    
+
     if kwargs['plot_energy'] and not kwargs['plot_heat_cap']:
         fig, ax_energy = plt.subplots(figsize=(5, 5))
     elif kwargs['plot_energy'] and kwargs['plot_heat_cap']:
@@ -569,53 +606,60 @@ def plot_thermo_curves(seed,show=True, **kwargs):
         ax_Cv = ax_grid[1]
     elif not kwargs['plot_energy'] and kwargs['plot_heat_cap']:
         fig, ax_Cv = plt.subplots(figsize=(5, 5))
-    
-    data, s = castep2dict(seed,db=False)
+
+    data, success = castep2dict(seed, db=False)
+    if not success:
+        raise RuntimeError('Failed to read {}: {}'.format(seed, data))
 
     temps = data['thermo_temps']
     Cv = data['thermo_heat_cap_Cv']
     free_energy = data['thermo_free_energy_F']
     entropy = data['thermo_entropy_S']
     enthalpy = data['thermo_enthalpy_E']
-    E0 = data['zero_point_E']
-    
+    # E0 = data['zero_point_E']
+
     # multiply entropy by T for comparison and convert J/mol to eV
     eVJ = physical_constants['electron volt-joule relationship'][0]
     entropyT = []
-    for i,val in enumerate(entropy):
-        entropyT.append(temps[i]*val*(1/eVJ)*(1/N_A)) # J/mol/K --> eV
-    
+    for i, val in enumerate(entropy):
+        entropyT.append(temps[i] * val * (1./eVJ) * (1./AVOGADROS_NUMBER))  # J/mol/K --> eV
+
     if kwargs['plot_energy']:
         ax_energy.plot(temps, free_energy, c='r', lw=1, ls='-', alpha=1, label='Free Energy')
-        ax_energy.plot(temps,entropyT,c='g',lw=1,ls='-',alpha=1,label='Entropy*T')
-        ax_energy.plot(temps,enthalpy,c='b',lw=1,ls='-',alpha=1,label='Enthalpy')
+        ax_energy.plot(temps, entropyT, c='g', lw=1, ls='-', alpha=1, label='Entropy*T')
+        ax_energy.plot(temps, enthalpy, c='b', lw=1, ls='-', alpha=1, label='Enthalpy')
         ax_energy.set_xlabel('Temperature (K)')
         ax_energy.set_title('Energy (eV)')
         ax_energy.legend()
-        
+
     if kwargs['plot_heat_cap']:
-        ax_Cv.plot(temps,Cv,c='r',lw=1,ls='-',alpha=1,label='Heat Capacity (J/mol/K)')
+        ax_Cv.plot(temps, Cv, c='r', lw=1, ls='-', alpha=1, label='Heat Capacity (J/mol/K)')
         ax_Cv.set_title('Heat Capacity (J/mol/K)')
         ax_Cv.set_xlabel('Temperature (K)')
-    
-    if any([kwargs.get('pdf'),kwargs.get('svg'),kwargs.get('png')]):
+
+    if any([kwargs.get('pdf'), kwargs.get('svg'), kwargs.get('png')]):
         if kwargs.get('pdf'):
-            plt.savefig(seed.replace('.castep','')+'_thermoplots.pdf',dpi=300,transparent=True)
+            plt.savefig(seed.replace('.castep', '')+'_thermoplots.pdf', dpi=300, transparent=True)
         if kwargs.get('svg'):
-            plt.savefig(seed.replace('.castep','')+'_thermoplots.svg',dpi=300,transparent=True)
+            plt.savefig(seed.replace('.castep', '')+'_thermoplots.svg', dpi=300, transparent=True)
         if kwargs.get('png'):
-            plt.savefig(seed.replace('.castep','')+'_thermoplots.png',dpi=300,transparent=True)
-            
-    plt.show()
+            plt.savefig(seed.replace('.castep', '')+'_thermoplots.png', dpi=300, transparent=True)
+
+    elif show:
+        plt.show()
+
 
 def plot_2d_hull_bokeh(hull):
-    """ Plot interactive hull with Bokeh. """
+    """ Plot interactive hull with Bokeh. Writes an html file in cwd.
+
+    Parameters:
+        hull (:class:`QueryConvexHull`): matador hull object.
+
+    """
     from bokeh.plotting import figure, save, output_file
     from bokeh.models import ColumnDataSource, HoverTool, Range1d
-    import matplotlib.pyplot as plt
-    import numpy as np
-    from .utils.glmol_wrapper import get_glmol_placeholder_string
-    from .export import generate_hash, generate_relevant_path
+    from matador.utils.glmol_wrapper import get_glmol_placeholder_string
+    from matador.export import generate_hash, generate_relevant_path
     # grab tie-line structures
     tie_line_data = dict()
     tie_line_data['composition'] = list()
@@ -729,74 +773,20 @@ def plot_2d_hull_bokeh(hull):
             f.write('\n'.join(map(str, flines)))
 
 
-@plotting_function
-def plot_3d_ternary_hull(hull):
-    """ Plot calculated ternary hull in 3D. """
-    from mpl_toolkits.mplot3d import axes3d
-    import numpy as np
-    from matador.utils.hull_utils import barycentric2cart
-    # avoids annoying flake8 warning
-    del axes3d
-    print('WARNING: deprecated')
-    import matplotlib.pyplot as plt
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    coords = barycentric2cart(hull.structures)
-    stable = coords[np.where(hull.hull_dist < 0 + 1e-9)]
-    stable = np.asarray(stable)
-    ax.plot_trisurf(stable[:, 0], stable[:, 1], stable[:, 2], cmap=plt.cm.gnuplot, linewidth=1, color='grey', alpha=0.2)
-    ax.scatter(stable[:, 0], stable[:, 1], stable[:, 2], s=100, c='k', marker='o')
-    if len(hull.failed_structures) > 0:
-        ax.scatter(coords[hull.failed_structures, 0], coords[hull.failed_structures, 1], coords[hull.failed_structures, 2], c='r')
-    ax.set_zlim(-1, 1)
-    ax.view_init(-90, 90)
-
-
-def get_text_info(cursor, hull=False, html=False):
-    """ Grab textual info for Bokeh plot labels. """
-    info = []
-    if hull:
-        stoich_strings = []
-    for ind, doc in enumerate(cursor):
-        stoich_string = ''
-        for elem in doc['stoichiometry']:
-            stoich_string += elem[0]
-            stoich_string += '$_{' + str(elem[1]) + '}$' if elem[1] != 1 else ''
-        if hull:
-            if stoich_string not in stoich_strings:
-                stoich_strings.append(stoich_string)
-        info_string = "{0:^10}\n{1:^24}\n{2:^5s}\n{3:.3f} eV".format(stoich_string,
-                                                                     doc['text_id'][0] + ' ' + doc['text_id'][1],
-                                                                     doc['space_group'],
-                                                                     doc['hull_distance'])
-        if html:
-            for char in ['$', '_', '{', '}']:
-                info_string = info_string.replace(char, '')
-            info_string = info_string.split('\n')
-        info.append(info_string)
-    if hull:
-        info = stoich_strings
-        return info
-
-
-def get_linear_cmap(colours, N=100, list_only=False):
+def get_linear_cmap(colours, num_colours=100, list_only=False):
     """ Create a linear colormap from a list of colours.
 
-    Input:
+    Parameters:
+        colours (list(str)): list of fractional RGB values of colours
 
-        | colours: list(str), list of fractional RGB values of colours
-
-    Args:
-
-        | N        : int, number of colours in resulting cmap
-        | list_only: bool, return only a list of colours
+    Keyword arguments:
+        num_colours (int): number of colours in resulting cmap
+        list_only (bool): return only a list of colours
 
     Returns:
-
-        | cmap: LinearSegmentedColormap or list if list_only.
+        LinearSegmentedColormap or list: if list_only.
 
     """
-    import numpy as np
     from matplotlib.colors import LinearSegmentedColormap
     uniq_colours = []
     _colours = [tuple(colour) for colour in colours]
@@ -805,7 +795,7 @@ def get_linear_cmap(colours, N=100, list_only=False):
             uniq_colours.append(colour)
     _colours = uniq_colours
     linear_cmap = []
-    repeat = int(N/len(_colours))
+    repeat = int(num_colours / len(_colours))
     for ind, colour in enumerate(_colours):
         if ind == len(_colours) - 1:
             break
@@ -815,13 +805,21 @@ def get_linear_cmap(colours, N=100, list_only=False):
             linear_cmap.append(np.asarray(colour) + i*diff_norm)
     if list_only:
         return linear_cmap
-    else:
-        return LinearSegmentedColormap.from_list('linear_cmap', linear_cmap, N=N)
+
+    return LinearSegmentedColormap.from_list('linear_cmap', linear_cmap, N=num_colours)
 
 
 @plotting_function
 def plot_volume_curve(hull, show=True):
-    """ Plot calculated volume curve. """
+    """ Plot calculated volume curve.
+
+    Parameters:
+        hull (:class:`QueryConvexHull`): matador hull object.
+
+    Keyword arguments:
+        show (bool): whether or not to display plot in X-window.
+
+    """
     from matador.utils.cursor_utils import get_array_from_cursor
     from matador.utils.chem_utils import get_generic_grav_capacity
     if hull.savefig:
@@ -848,12 +846,13 @@ def plot_volume_curve(hull, show=True):
             alpha = 0.3
             markeredgewidth = 0
             c = 'grey'
-        ax.scatter(hull.x[i]/(1+hull.x[i]), hull.vol_per_y[i]/bulk_vol, marker='o', s=s, edgecolor='k', lw=markeredgewidth,
-                   c=c, zorder=zorder, alpha=alpha)
+        ax.scatter(hull.x[i] / (1 + hull.x[i]), hull.vol_per_y[i] / bulk_vol,
+                   marker='o', s=s, edgecolor='k',
+                   lw=markeredgewidth, c=c, zorder=zorder, alpha=alpha)
     hull_comps, hull_vols = np.asarray(hull_comps), np.asarray(hull_vols)
     ax.plot(hull_comps/(1+hull_comps), hull_vols/bulk_vol, marker='o', lw=4,
             c=hull.colours[0], zorder=100)
-    ax.set_xlabel('$\mathrm{x}$ in $\mathrm{'+hull.elements[0]+'_x'+hull.elements[1]+'}_{1-x}$')
+    ax.set_xlabel(r'$\mathrm{x}$ in $\mathrm{'+hull.elements[0]+'_x'+hull.elements[1]+'}_{1-x}$')
     ax.set_ylabel('Volume ratio with bulk')
     ax.set_ylim(0, 5*np.sort(hull_vols)[-2]/bulk_vol)
     ax.set_xlim(-0.05, 1.05)
@@ -864,8 +863,9 @@ def plot_volume_curve(hull, show=True):
     ax2.set_xlim(ax.get_xlim())
     tick_locs = np.linspace(0, 1, 6, endpoint=True).tolist()
     ax2.set_xticks(tick_locs)
-    new_tick_labels = ['{}'.format(int(get_generic_grav_capacity([loc, 1-loc], [hull.elements[0], hull.elements[1]]))) for loc in tick_locs[:-1]]
-    new_tick_labels.append('$\infty$')
+    new_tick_labels = [int(get_generic_grav_capacity([loc, 1-loc], [hull.elements[0], hull.elements[1]]))
+                       for loc in tick_locs[:-1]]
+    new_tick_labels.append(r'$\infty$')
     ax2.set_xlabel('Gravimetric capacity (mAh/g)')
     ax2.set_xticklabels(new_tick_labels)
     ax2.grid('off')
@@ -878,7 +878,7 @@ def plot_volume_curve(hull, show=True):
             ax2.spines[spine].set_color(dark_grey)
             ax.spines[spine].set_linewidth(0.5)
             ax2.spines[spine].set_linewidth(0.5)
-    except:
+    except ImportError:
         pass
     # ax.yaxis.set_ticks(range(0, int(end)+1, 5))
     plt.tight_layout(pad=0.0, h_pad=1.0, w_pad=0.2)
@@ -897,28 +897,29 @@ def plot_volume_curve(hull, show=True):
 
 
 @plotting_function
-def plot_2d_hull(hull, ax=None, dis=False, show=True, plot_points=True,
+def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
                  plot_hull_points=True, labels=False, colour_by_source=False,
                  **kwargs):
     """ Plot calculated hull, returning ax and fig objects for further editing.
 
-    Args:
+    Parameters:
+        hull (:class:`QueryConvexHull`): matador hull object.
 
-        | ax               : matplotlib axis object, an existing axis on which to plot,
-        | show             : bool, whether or not to display the plot in an X window,
-        | plot_points      : bool, whether or not to display off-hull structures,
-        | plot_hull_points : bool, whether or not to display on-hull structures,
-        | labels           : bool, whether to label formulae of hull structures.
-        | colour_by_source : bool, plot and label points by their sources
+    Keyword arguments:
+        ax (Axes): an existing axis on which to plot,
+        show (bool): whether or not to display the plot in an X window,
+        plot_points (bool): whether or not to display off-hull structures,
+        plot_hull_points (bool): whether or not to display on-hull structures,
+        labels (bool): whether to label formulae of hull structures.
+        colour_by_source (bool): plot and label points by their sources
+        alpha (float): alpha value of points when colour_by_source is True
+        sources (list): list of possible provenances to colour when colour_by_source
+            is True (others will be grey)
 
-    Other kwargs:
-
-        | alpha            : float, alpha value of points when colour_by_source is True
-        | sources          : list, list of possible provenances to colour when colour_by_source
-                             is True (others will be grey)
+    Returns:
+        Axes: matplotlib axis with plot.
 
     """
-    import matplotlib.pyplot as plt
     import matplotlib.colors as colours
     if ax is None:
         if hull.savefig:
@@ -949,7 +950,9 @@ def plot_2d_hull(hull, ax=None, dis=False, show=True, plot_points=True,
         if hull.args.get('labels') or labels:
             eps = 1e-9
             hull.label_cursor = [doc for doc in hull.hull_cursor if doc['hull_distance'] <= 0+eps]
-            if len(set([get_formula_from_stoich(doc['stoichiometry']) for doc in hull.label_cursor])) > len(hull.label_cursor):
+            num_labels = len(set([get_formula_from_stoich(doc['stoichiometry'])
+                                  for doc in hull.label_cursor]))
+            if num_labels < len(hull.label_cursor):
                 tmp_cursor = []
                 for doc in hull.label_cursor:
                     if doc['stoichiometry'] not in [_doc['stoichiometry'] for _doc in tmp_cursor]:
@@ -967,8 +970,10 @@ def plot_2d_hull(hull, ax=None, dis=False, show=True, plot_points=True,
                 elif (ind+2) == np.argmin(tie_line[:, 1]):
                     position = (tie_line[ind+2, 0], 1.15*(tie_line[ind+2, 1])-0.05)
                 else:
-                    position = (min(1.1*tie_line[ind+2, 0]+0.15, 0.95), 1.15*(tie_line[ind+2, 1])-0.05)
-                ax.annotate(get_formula_from_stoich(doc['stoichiometry'], elements=hull.elements, tex=True),
+                    position = (min(1.1*tie_line[ind+2, 0]+0.15, 0.95),
+                                1.15*(tie_line[ind+2, 1])-0.05)
+                ax.annotate(get_formula_from_stoich(doc['stoichiometry'],
+                                                    elements=hull.elements, tex=True),
                             xy=(tie_line[ind+2, 0], tie_line[ind+2, 1]),
                             xytext=position,
                             textcoords='data',
@@ -986,19 +991,26 @@ def plot_2d_hull(hull, ax=None, dis=False, show=True, plot_points=True,
                 cmin = 0.15
                 cmax = 0.5
                 cindmin, cindmax = int(cmin*len(cmap_full.colors)), int(cmax*len(cmap_full.colors))
-                cmap = colours.LinearSegmentedColormap.from_list('Dark2', cmap_full.colors[cindmin:cindmax])
+                cmap = colours.LinearSegmentedColormap.from_list('Dark2',
+                                                                 cmap_full.colors[cindmin:cindmax])
+
                 if plot_points:
                     scatter = ax.scatter(hull.structures[np.argsort(hull.hull_dist), 0][::-1],
                                          hull.structures[np.argsort(hull.hull_dist), -1][::-1],
-                                         s=hull.scale*40, lw=lw, alpha=1, c=np.sort(hull.hull_dist)[::-1],
-                                         edgecolor='k', zorder=10000, cmap=cmap, norm=colours.LogNorm(0.02, 2))
-                    cbar = plt.colorbar(scatter, aspect=30, pad=0.02, ticks=[0, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28])
+                                         s=hull.scale*40, lw=lw, alpha=1,
+                                         c=np.sort(hull.hull_dist)[::-1],
+                                         edgecolor='k', zorder=10000,
+                                         cmap=cmap, norm=colours.LogNorm(0.02, 2))
+
+                    cbar = plt.colorbar(scatter, aspect=30, pad=0.02,
+                                        ticks=[0, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28])
                     cbar.ax.tick_params(length=0)
                     cbar.ax.set_yticklabels([0, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28])
                     cbar.ax.yaxis.set_ticks_position('right')
                     cbar.ax.set_frame_on(False)
                     cbar.outline.set_visible(False)
                     cbar.set_label('Distance from hull (eV)')
+
             elif hull.hull_cutoff != 0:
                 # if specified hull cutoff, label and colour those below
                 c = hull.colours[1]
@@ -1006,10 +1018,12 @@ def plot_2d_hull(hull, ax=None, dis=False, show=True, plot_points=True,
                     if hull.hull_dist[ind] <= hull.hull_cutoff or hull.hull_cutoff == 0:
                         if plot_points:
                             scatter.append(ax.scatter(hull.structures[ind, 0], hull.structures[ind, 1],
-                                           s=hull.scale*40, lw=lw, alpha=0.9, c=c, edgecolor='k',
-                                           zorder=300))
+                                                      s=hull.scale*40, lw=lw,
+                                                      alpha=0.9, c=c, edgecolor='k',
+                                                      zorder=300))
                 if plot_points:
-                    ax.scatter(hull.structures[1:-1, 0], hull.structures[1:-1, 1], s=hull.scale*30, lw=lw,
+                    ax.scatter(hull.structures[1:-1, 0], hull.structures[1:-1, 1],
+                               s=hull.scale*30, lw=lw,
                                alpha=0.3, c=hull.colours[-2],
                                edgecolor='k', zorder=10)
 
@@ -1053,30 +1067,30 @@ def plot_2d_hull(hull, ax=None, dis=False, show=True, plot_points=True,
         print_exc()
         c = hull.colours[1]
         lw = hull.scale * 0 if hull.mpl_new_ver else 1
-        for ind in range(len(hull.hull_cursor)):
-            if type(hull.hull_cursor[ind]['concentration']) is list:
-                if plot_points:
-                    scatter.append(ax.scatter(hull.hull_cursor[ind]['concentration'][0], hull.hull_cursor[ind]['formation_enthalpy_per_atom'],
-                                   s=hull.scale*40, lw=1.5, alpha=1, c=c, edgecolor='k',
-                                   zorder=1000))
-            else:
-                if plot_points:
-                    scatter.append(ax.scatter(hull.hull_cursor[ind]['concentration'], hull.hull_cursor[ind]['formation_enthalpy_per_atom'],
-                                   s=hull.scale*40, lw=1.5, alpha=1, c=c, edgecolor='k',
-                                   zorder=1000))
-            ax.plot([0, 1], [0, 0], lw=2, c=hull.colours[0], zorder=900)
+        if plot_points:
+            for ind, _ in enumerate(hull.hull_cursor):
+                if isinstance(hull.hull_cursor[ind]['concentration'], list):
+                    concs = hull.hull_cursor[ind]['concentration'][0]
+                else:
+                    concs = hull.hull_cursor[ind]['concentration']
+                scatter.append(ax.scatter(concs,
+                                          hull.hull_cursor[ind]['formation_enthalpy_per_atom'],
+                                          s=hull.scale*40, lw=1.5, alpha=1, c=c, edgecolor='k',
+                                          zorder=1000))
+
+        ax.plot([0, 1], [0, 0], lw=2, c=hull.colours[0], zorder=900)
         for ind in range(len(hull.structures)):
             if plot_points:
                 scatter.append(ax.scatter(hull.structures[ind, 0], hull.structures[ind, 1],
-                               s=hull.scale*40, lw=lw, alpha=0.9, c=c, edgecolor='k',
-                               zorder=300))
+                                          s=hull.scale*40, lw=lw, alpha=0.9, c=c, edgecolor='k',
+                                          zorder=300))
 
     if len(one_minus_x_elem) == 1:
-        ax.set_title(x_elem[0] + '$_\mathrm{x}$' + one_minus_x_elem[0] + '$_\mathrm{1-x}$')
+        ax.set_title(x_elem[0] + r'$_\mathrm{x}$' + one_minus_x_elem[0] + 'r$_\mathrm{1-x}$')
     if hull.non_binary:
-        ax.set_title(hull.chempot_search[0] + '$_\mathrm{x}$(' + hull.chempot_search[1] + ')$_\mathrm{1-x}$')
+        ax.set_title(r'{d[0]}$_\mathrm{{x}}$({d[1]})$_\mathrm{{1-x}}$'.format(d=hull.chempot_search))
     plt.locator_params(nbins=3)
-    ax.set_xlabel('x in {}$_\mathrm{{x}}${}$_\mathrm{{1-x}}$'.format(x_elem[0], one_minus_x_elem[0]))
+    ax.set_xlabel(r'x in {}$_\mathrm{{x}}${}$_\mathrm{{1-x}}$'.format(x_elem[0], one_minus_x_elem[0]))
     ax.grid(False)
     ax.set_xlim(-0.05, 1.05)
     ax.set_xticks([0, 0.33, 0.5, 0.66, 1])
@@ -1087,7 +1101,7 @@ def plot_2d_hull(hull, ax=None, dis=False, show=True, plot_points=True,
     try:
         import seaborn as sns
         sns.despine(ax=ax, left=False, bottom=False)
-    except:
+    except ImportError:
         pass
 
     if hull.savefig:
@@ -1107,15 +1121,24 @@ def plot_2d_hull(hull, ax=None, dis=False, show=True, plot_points=True,
 
 
 @plotting_function
-def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, expecting_cbar=True, **kwargs):
+def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, expecting_cbar=True):
     """ Plot calculated ternary hull as a 2D projection.
 
-    Takes optional matplotlib subplot axis as a parameter, and returns
-    python-ternary subplot axis object.
+    Parameters:
+        hull (:class:`QueryConvexHull`): matador hull object.
+
+    Keyword arguments:
+        axis (Axes): matplotlib axis object on which to plot.
+        show (bool): whether or not to show plot in X window.
+        plot_points (bool): whether or not to plot each structure as a point.
+        expecting_cbar (bool): whether or not to space out the plot to preserve
+            aspect ratio if a colourbar is present.
+
+    Returns:
+        Axes: matplotlib axis with plot.
 
     """
     import ternary
-    import matplotlib.pyplot as plt
     import matplotlib
     import matplotlib.colors as colours
     from matador.utils.chem_utils import get_generic_grav_capacity
@@ -1126,9 +1149,8 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, expecting_cb
             'xtick.major.size': 0, 'xtick.minor.size': 0,
             'ytick.major.size': 0, 'ytick.minor.size': 0,
             'axes.linewidth': 0.0})
-    except:
+    except ImportError:
         print_exc()
-        pass
 
     print('Plotting ternary hull...')
     if hull.args.get('capmap') or hull.args.get('efmap'):
@@ -1188,7 +1210,7 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, expecting_cb
     concs = np.asarray(filtered_concs)
     hull_dist = np.asarray(filtered_hull_dists)
 
-    Ncolours = len(hull.default_cmap_list)
+    n_colours = len(hull.default_cmap_list)
     min_cut = 0.01
     max_cut = 0.2
     colours_hull = hull.default_cmap_list
@@ -1211,25 +1233,25 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, expecting_cb
     if plot_points:
         colours_list = []
         colour_metric = hull_dist
-        for i in range(len(colour_metric)):
+        for i, _ in enumerate(colour_metric):
             if colour_metric[i] >= max_cut:
-                colours_list.append(Ncolours-1)
+                colours_list.append(n_colours-1)
             elif colour_metric[i] <= min_cut:
                 colours_list.append(0)
             else:
-                colours_list.append(int((Ncolours-1)*(colour_metric[i] / max_cut)))
+                colours_list.append(int((n_colours-1)*(colour_metric[i] / max_cut)))
         colours_list = np.asarray(colours_list)
         ax.scatter(scale*stable, marker='o', color=colours_hull[0], edgecolors='black', zorder=9999999,
                    s=150, lw=1.5)
         ax.scatter(scale*concs, colormap=cmap, colorbar=True, cbarlabel='Distance from hull (eV/atom)',
                    c=hull_dist, vmax=max_cut, vmin=min_cut, zorder=1000, s=40, alpha=0)
-        for i in range(len(concs)):
-            ax.scatter(scale*concs[i].reshape(1, 3),
+        for i, _ in enumerate(concs):
+            ax.scatter(scale * concs[i].reshape(1, 3),
                        color=colours_hull[colours_list[i]],
                        marker='o',
                        zorder=10000-colours_list[i],
                        # alpha=max(0.1, 1-2*hull_dist[i]),
-                       s=70*(1-float(colours_list[i])/Ncolours)+15,
+                       s=70*(1-float(colours_list[i])/n_colours)+15,
                        lw=1, edgecolors='black')
 
     # add colourmaps
@@ -1237,7 +1259,10 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, expecting_cb
         capacities = dict()
         from ternary.helpers import simplex_iterator
         for (i, j, k) in simplex_iterator(scale):
-            capacities[(i, j, k)] = get_generic_grav_capacity([float(i)/scale, float(j)/scale, float(scale-i-j)/scale], hull.elements)
+            capacities[(i, j, k)] = get_generic_grav_capacity([float(i)/scale,
+                                                               float(j)/scale,
+                                                               float(scale-i-j)/scale],
+                                                              hull.elements)
         ax.heatmap(capacities, style="hexagonal", cbarlabel='Gravimetric capacity (maH/g)',
                    vmin=0, vmax=3000, cmap=pastel_cmap)
     elif hull.args.get('efmap'):
@@ -1271,11 +1296,14 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, expecting_cb
 
     if hull.savefig:
         if hull.args.get('png'):
-            plt.savefig(''.join(hull.elements) + '_hull.png', dpi=400, transparent=True, bbox_inches='tight')
+            plt.savefig(''.join(hull.elements) + '_hull.png',
+                        dpi=400, transparent=True, bbox_inches='tight')
         if hull.args.get('svg'):
-            plt.savefig(''.join(hull.elements) + '_hull.svg', dpi=400, transparent=True, bbox_inches='tight')
+            plt.savefig(''.join(hull.elements) + '_hull.svg',
+                        dpi=400, transparent=True, bbox_inches='tight')
         if hull.args.get('pdf'):
-            plt.savefig(''.join(hull.elements) + '_hull.pdf', dpi=400, transparent=True, bbox_inches='tight')
+            plt.savefig(''.join(hull.elements) + '_hull.pdf',
+                        dpi=400, transparent=True, bbox_inches='tight')
     elif show:
         ax.show()
 

@@ -1,12 +1,14 @@
 #!/usr/bin/env python
+""" Test file scraping and writing functionality. """
 import unittest
 import json
-import numpy as np
 from os.path import realpath
 from os import system, remove
 
+import numpy as np
 # grab abs path for accessing test data
 REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
+VERBOSITY = 0
 
 
 class ScrapeTest(unittest.TestCase):
@@ -17,13 +19,13 @@ class ScrapeTest(unittest.TestCase):
         failed_open = False
         try:
             f = open(cell_fname, 'r')
-        except:
+        except Exception:
             failed_open = True
             self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(cell_fname))
 
         if not failed_open:
             f.close()
-            test_dict, s = cell2dict(cell_fname, db=False, outcell=True, verbosity=0)
+            test_dict, s = cell2dict(cell_fname, db=False, outcell=True, verbosity=VERBOSITY)
             self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
             self.assertEqual(test_dict['lattice_cart'][0][0], 9.83262140721165, msg='Failed to read lattice vectors.')
             self.assertEqual(test_dict['lattice_cart'][1][1], 5.96357780025648, msg='Failed to read lattice vectors.')
@@ -35,18 +37,18 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(test_dict['species_pot']['P'], 'P_00PBE.usp', msg='Failed to read pspots.')
             self.assertEqual(test_dict['species_pot']['Zn'], 'Zn_00PBE.usp', msg='Failed to read pspots.')
             # test that lattice_vec only read when outcell is true
-            test_dict, s = cell2dict(cell_fname, db=False, outcell=False, verbosity=0)
+            test_dict, s = cell2dict(cell_fname, db=False, outcell=False, verbosity=VERBOSITY)
             self.assertTrue(test_dict.get('lattice_cart') is None)
 
         cell_fname = REAL_PATH + 'data/K5P4-phonon.cell'
         failed_open = False
         try:
             f = open(cell_fname, 'r')
-        except:
+        except Exception:
             failed_open = True
         if not failed_open:
             f.close()
-            test_dict, s = cell2dict(cell_fname, db=False, outcell=True, verbosity=0)
+            test_dict, s = cell2dict(cell_fname, db=False, outcell=True, verbosity=VERBOSITY)
             self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
             self.assertEqual(test_dict['lattice_cart'][0][0], 11.4518745146637, msg='Failed to read lattice vectors.')
             self.assertEqual(test_dict['lattice_cart'][1][1], 5.09448137301246, msg='Failed to read lattice vectors.')
@@ -68,12 +70,12 @@ class ScrapeTest(unittest.TestCase):
         failed_open = False
         try:
             f = open(castep_fname, 'r')
-        except:
+        except Exception:
             failed_open = True
             self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(castep_fname))
         if not failed_open:
             f.close()
-            test_dict, s = castep2dict(castep_fname, db=True, verbosity=0)
+            test_dict, s = castep2dict(castep_fname, db=True, verbosity=VERBOSITY)
             self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
             self.assertEqual(test_dict['pressure'], 0.0763, msg='Failed to read pressure!')
             self.assertEqual(test_dict['enthalpy'], -2.15036930e4, msg='Failed to read enthalpy!')
@@ -98,12 +100,12 @@ class ScrapeTest(unittest.TestCase):
         failed_open = False
         try:
             f = open(castep_fname, 'r')
-        except:
+        except Exception:
             failed_open = True
             self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(castep_fname))
         if not failed_open:
             f.close()
-            test_dict, s = castep2dict(castep_fname, db=True, verbosity=0)
+            test_dict, s = castep2dict(castep_fname, db=True, verbosity=VERBOSITY)
             self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
             self.assertEqual(test_dict['pressure'], 0.0180, msg='Failed to read pressure!')
             self.assertEqual(test_dict['enthalpy'], -5.98055077e3, msg='Failed to read enthalpy!')
@@ -130,12 +132,12 @@ class ScrapeTest(unittest.TestCase):
         failed_open = False
         try:
             f = open(castep_fname, 'r')
-        except:
+        except Exception:
             failed_open = True
             self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(castep_fname))
         if not failed_open:
             f.close()
-            test_dict, s = castep2dict(castep_fname, db=True, verbosity=0)
+            test_dict, s = castep2dict(castep_fname, db=True, verbosity=VERBOSITY)
             self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
             self.assertEqual(test_dict['pressure'], -0.0966, msg='Failed to read pressure!')
             self.assertEqual(test_dict['enthalpy'], -1.30423371e3, msg='Failed to read enthalpy!')
@@ -160,7 +162,7 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(test_dict['castep_version'], '16.1')
             self.assertEqual(test_dict['species_pot']['Na'], 'Na_00PBE.usp')
 
-            int_dict, s = castep2dict(castep_fname, db=False, intermediates=True, verbosity=10)
+            int_dict, s = castep2dict(castep_fname, db=False, intermediates=True, verbosity=VERBOSITY)
             for key in test_dict:
                 self.assertEqual(test_dict[key], int_dict[key])
 
@@ -184,15 +186,15 @@ class ScrapeTest(unittest.TestCase):
         failed_open = False
         try:
             f = open(castep_fname, 'r')
-        except:
+        except Exception:
             failed_open = True
             self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(castep_fname))
         if not failed_open:
             f.close()
-            test_dict, s = castep2dict(castep_fname, db=True, verbosity=0)
+            test_dict, s = castep2dict(castep_fname, db=True, verbosity=VERBOSITY)
             self.assertFalse(s, msg='Should have failed with db=True, but didn\'t!')
             self.assertTrue(isinstance(test_dict, str), msg='Should have returned error message!')
-            test_dict, s = castep2dict(castep_fname, db=False, verbosity=0)
+            test_dict, s = castep2dict(castep_fname, db=False, verbosity=VERBOSITY)
             self.assertTrue(s, msg='Should have succeeded with db=False, but didn\'t!')
             self.assertTrue(isinstance(test_dict, dict), msg='Should have returned dict!')
             self.assertEqual(test_dict['total_energy'], -12479.86611705)
@@ -220,21 +222,21 @@ class ScrapeTest(unittest.TestCase):
         failed_open = False
         try:
             f = open(castep_fname, 'r')
-        except:
+        except Exception:
             failed_open = True
             self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(castep_fname))
         if not failed_open:
             f.close()
             fallover = False
             try:
-                test_dict, s = castep2dict(castep_fname, db=True, intermediates=True, verbosity=0)
-            except:
+                test_dict, s = castep2dict(castep_fname, db=True, intermediates=True, verbosity=VERBOSITY)
+            except Exception:
                 fallover = True
             self.assertTrue(fallover, msg='Didn\'t fallover when using db and intermediates')
 
-            test_dict, s = castep2dict(castep_fname, db=False, intermediates=True, verbosity=10)
+            test_dict, s = castep2dict(castep_fname, db=False, intermediates=True, verbosity=VERBOSITY)
             self.assertTrue(s, msg='Should have succeeded with db=False, but didn\'t!')
-            final_dict, s = castep2dict(castep_fname, db=True, intermediates=False, verbosity=10)
+            final_dict, s = castep2dict(castep_fname, db=True, intermediates=False, verbosity=VERBOSITY)
             self.assertTrue(s)
             for key in final_dict:
                 self.assertEqual(final_dict[key], test_dict[key], msg='{} didn\'t match'.format(key))
@@ -254,7 +256,7 @@ class ScrapeTest(unittest.TestCase):
         failed_open = False
         try:
             f = open(res_fname, 'r')
-        except:
+        except Exception:
             failed_open = True
             self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(res_fname))
         if not failed_open:
@@ -277,7 +279,7 @@ class ScrapeTest(unittest.TestCase):
         failed_open = False
         try:
             f = open(param_fname, 'r')
-        except:
+        except Exception:
             failed_open = True
             self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(param_fname))
         if not failed_open:
@@ -307,12 +309,13 @@ class ScrapeTest(unittest.TestCase):
         failed_open = False
         try:
             f = open(bands_fname, 'r')
-        except:
+        except Exception:
             failed_open = True
             self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(bands_fname))
         if not failed_open:
             f.close()
             bs_dict, s = bands2dict(bands_fname)
+            self.assertTrue(s)
             self.assertEqual(len(bs_dict['kpoint_path']), 518)
             self.assertEqual(np.shape(bs_dict['eigenvalues_k_s']), (1, 71, 518))
             self.assertEqual(bs_dict['num_kpoints'], 518)
@@ -325,7 +328,7 @@ class ScrapeTest(unittest.TestCase):
         failed_open = False
         try:
             f = open(bands_fname, 'r')
-        except:
+        except Exception:
             failed_open = True
             self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(bands_fname))
         if not failed_open:
@@ -346,12 +349,13 @@ class ScrapeTest(unittest.TestCase):
         failed_open = False
         try:
             f = open(magres_fname, 'r')
-        except:
+        except Exception:
             failed_open = True
             self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(magres_fname))
         if not failed_open:
             f.close()
             magres_dict, s = magres2dict(magres_fname)
+            self.assertTrue(s)
             self.assertEqual(len(magres_dict['atom_types']), 4)
             self.assertTrue(magres_dict['lattice_cart'][0] == [-2.503686, 2.503686, 3.540961])
             self.assertTrue(magres_dict['lattice_cart'][1] == [2.503686, -2.503686, 3.540961])
@@ -368,12 +372,13 @@ class ScrapeTest(unittest.TestCase):
         failed_open = False
         try:
             f = open(pwout_fname, 'r')
-        except:
+        except Exception:
             failed_open = True
             self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(pwout_fname))
         if not failed_open:
             f.close()
             pwout_dict, s = pwout2dict(pwout_fname)
+            self.assertTrue(s)
             self.assertEqual(len(pwout_dict['atom_types']), 14)
             self.assertEqual(pwout_dict['num_atoms'], 14)
             self.assertTrue(pwout_dict['lattice_cart'][0] == [5.887513122, 0.011925355, 0.011971927])
@@ -402,7 +407,7 @@ class ExportTest(unittest.TestCase):
         failed_open = False
         try:
             f = open(res_fname, 'r')
-        except:
+        except Exception:
             failed_open = True
             print('Failed to open test case', res_fname, '- please check installation.')
         if not failed_open:
@@ -422,7 +427,7 @@ class ExportTest(unittest.TestCase):
         failed_open = False
         try:
             f = open(param_fname, 'r')
-        except:
+        except Exception:
             failed_open = True
             print('Failed to open test case', param_fname, '- please check installation.')
         if not failed_open:
@@ -439,7 +444,7 @@ class ExportTest(unittest.TestCase):
         failed_open = False
         try:
             f = open(param_fname, 'r')
-        except:
+        except Exception:
             failed_open = True
             print('Failed to open test case', param_fname, '- please check installation.')
         if not failed_open:
@@ -459,11 +464,11 @@ class ExportTest(unittest.TestCase):
         failed_open = False
         try:
             f = open(cell_fname, 'r')
-        except:
+        except Exception:
             failed_open = True
         if not failed_open:
             f.close()
-            doc, s = cell2dict(cell_fname, db=False, outcell=True, verbosity=0, positions=False)
+            doc, s = cell2dict(cell_fname, db=False, outcell=True, verbosity=VERBOSITY, positions=False)
             doc2cell(doc, test_fname)
             test_dict, s = cell2dict(test_fname, db=False, outcell=True, positions=False)
             remove(test_fname)
@@ -499,7 +504,7 @@ class ExportTest(unittest.TestCase):
         failed_open = False
         try:
             f = open(json_fname, 'r')
-        except:
+        except Exception:
             failed_open = True
             print('Failed to open test case', json_fname, '- please check installation.')
             raise AssertionError
@@ -529,48 +534,45 @@ class ExportTest(unittest.TestCase):
                 np.testing.assert_almost_equal(doc['lattice_abc'], doc_exported['lattice_abc'])
             elif key == 'lattice_cart':
                 np.testing.assert_almost_equal(doc['lattice_cart'], doc_exported['lattice_cart'])
-    
+
     def testThermoCastep(self):
         from matador.scrapers.castep_scrapers import castep2dict
         castep_fname = REAL_PATH + 'data/CuP-thermo-test.castep'
         failed_open = False
         try:
             f = open(castep_fname, 'r')
-        except:
+        except Exception:
             failed_open = True
             self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(castep_fname))
         if not failed_open:
             f.close()
-            test_dict, s = castep2dict(castep_fname, db=False, verbosity=0)
+            test_dict, s = castep2dict(castep_fname, db=False, verbosity=VERBOSITY)
             self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
-            self.assertEqual(test_dict['task'].lower(),'thermodynamicscalculation',msg='This is not a Thermodynamics calculation...')
-            self.assertEqual(test_dict['temp_final'],1000.0,msg='Wrong final temp!')
-            self.assertEqual(test_dict['temp_init'],50.0,msg='Wrong initial temp!')
-            self.assertEqual(test_dict['temp_spacing'],100.0,msg='Wrong temp spacing!')
-            self.assertEqual(test_dict['num_temp_vals'],11,msg='Wrong number of temps!')
-            self.assertEqual(test_dict['zero_point_E'],0.093412,msg='Wrong zero point energy!')
+            self.assertEqual(test_dict['task'].lower(), 'thermodynamicscalculation', msg='This is not a Thermodynamics calculation...')
+            self.assertEqual(test_dict['temp_final'], 1000.0, msg='Wrong final temp!')
+            self.assertEqual(test_dict['temp_init'], 50.0, msg='Wrong initial temp!')
+            self.assertEqual(test_dict['temp_spacing'], 100.0, msg='Wrong temp spacing!')
+            self.assertEqual(test_dict['num_temp_vals'], 11, msg='Wrong number of temps!')
+            self.assertEqual(test_dict['zero_point_E'], 0.093412, msg='Wrong zero point energy!')
 
             thermo_db_compare = {'thermo_temps': [50.0, 145.0, 240.0, 335.0, 430.0, 525.0, 620.0, 715.0, 810.0, 905.0, 1000.0],
                                  'thermo_enthalpy_E': [0.098557, 0.142535, 0.204959, 0.273022, 0.343308, 0.414672, 0.486634, 0.558962, 0.63153, 0.704262, 0.777113],
-                                 'thermo_free_energy_F': [0.089968, 0.050865, -0.025747, -0.128941, -0.252035, -0.390909, -0.542824, -0.705838, -0.878507, -1.059717, -1.248581], 
-                                 'thermo_entropy_S': [16.573, 60.998, 92.749, 115.772, 133.586, 148.051, 160.206, 170.678, 179.872, 188.064, 195.45], 
+                                 'thermo_free_energy_F': [0.089968, 0.050865, -0.025747, -0.128941, -0.252035, -0.390909, -0.542824, -0.705838, -0.878507, -1.059717, -1.248581],
+                                 'thermo_entropy_S': [16.573, 60.998, 92.749, 115.772, 133.586, 148.051, 160.206, 170.678, 179.872, 188.064, 195.45],
                                  'thermo_heat_cap_Cv': [24.686, 57.799, 67.215, 70.549, 72.047, 72.836, 73.301, 73.596, 73.795, 73.936, 74.039]}
-            
+
             for i in range(test_dict['num_temp_vals']):
-                self.assertEqual(test_dict['thermo_temps'][i],thermo_db_compare['thermo_temps'][i],msg='Wrong temperature %f' % test_dict['thermo_temps'][i])
-                self.assertEqual(test_dict['thermo_enthalpy_E'][i],thermo_db_compare['thermo_enthalpy_E'][i],msg='Wrong enthalpy %f' % test_dict['thermo_enthalpy_E'][i])
-                self.assertEqual(test_dict['thermo_free_energy_F'][i],thermo_db_compare['thermo_free_energy_F'][i],msg='Wrong free energy %f' % test_dict['thermo_free_energy_F'][i])
-                self.assertEqual(test_dict['thermo_entropy_S'][i],thermo_db_compare['thermo_entropy_S'][i],msg='Wrong entropy %f' % test_dict['thermo_entropy_S'][i])
-                self.assertEqual(test_dict['thermo_heat_cap_Cv'][i],thermo_db_compare['thermo_heat_cap_Cv'][i],msg='Wrong heat capacity %f' % test_dict['thermo_heat_cap_Cv'][i])
+                self.assertEqual(test_dict['thermo_temps'][i], thermo_db_compare['thermo_temps'][i],
+                                 msg='Wrong temperature %f' % test_dict['thermo_temps'][i])
+                self.assertEqual(test_dict['thermo_enthalpy_E'][i], thermo_db_compare['thermo_enthalpy_E'][i],
+                                 msg='Wrong enthalpy %f' % test_dict['thermo_enthalpy_E'][i])
+                self.assertEqual(test_dict['thermo_free_energy_F'][i], thermo_db_compare['thermo_free_energy_F'][i],
+                                 msg='Wrong free energy %f' % test_dict['thermo_free_energy_F'][i])
+                self.assertEqual(test_dict['thermo_entropy_S'][i], thermo_db_compare['thermo_entropy_S'][i],
+                                 msg='Wrong entropy %f' % test_dict['thermo_entropy_S'][i])
+                self.assertEqual(test_dict['thermo_heat_cap_Cv'][i], thermo_db_compare['thermo_heat_cap_Cv'][i],
+                                 msg='Wrong heat capacity %f' % test_dict['thermo_heat_cap_Cv'][i])
 
-
-
-
-
-
-
-
-           
 
 if __name__ == '__main__':
     unittest.main()
