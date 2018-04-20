@@ -5,9 +5,9 @@ import sys
 
 
 def print_warning(string):
-    print('\033[93m', end='', file=sys.stdout)
-    print(string, end='', file=sys.stdout)
-    print('\033[0m', file=sys.stdout)
+    print('\033[93m', end='', file=sys.stderr)
+    print(string, end='', file=sys.stderr)
+    print('\033[0m', file=sys.stderr)
 
 
 def print_failure(string):
