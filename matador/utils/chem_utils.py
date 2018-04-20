@@ -34,7 +34,8 @@ def get_periodic_table():
                              'Dy', 'Ho', 'Er', 'Tm', 'Yb', 'Lu']
     periodic_table['Act'] = ['Ac', 'Th', 'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk',
                              'Cf', 'Es', 'Fm', 'Md', 'No', 'Lr']
-    periodic_table['X'] = [elem for group in periodic_table.keys() for elem in periodic_table[group]]
+    periodic_table[
+        'X'] = [elem for group in periodic_table.keys() for elem in periodic_table[group]]
     return periodic_table
 
 
@@ -59,10 +60,10 @@ def get_atomic_symbol(atomic_number):
 def get_concentration(doc, elements):
     """ Returns x for A_x B_{1-x}
     or x,y for A_x B_y C_z, (x+y+z=1). """
-    concs = [0.0] * (len(elements)-1)
+    concs = [0.0] * (len(elements) - 1)
     for ind, elem in enumerate(doc['stoichiometry']):
         if elem[0] in elements[:-1]:
-            concs[elements.index(elem[0])] = elem[1]/float(get_atoms_per_fu(doc))
+            concs[elements.index(elem[0])] = elem[1] / float(get_atoms_per_fu(doc))
     return concs
 
 
@@ -75,10 +76,10 @@ def get_num_intercalated(cursor):
     for idx, comp in enumerate(comps):
         if len(comp) > 1:
             comp = comp[0]
-        if 1-comp == 0:
+        if 1 - comp == 0:
             x[idx] = np.NaN
         else:
-            x[idx] = comp/(1-comp)
+            x[idx] = comp / (1 - comp)
     return x
 
 
@@ -111,7 +112,7 @@ def get_generic_grav_capacity(concs, elements):
         if ind == 0:
             continue
         else:
-            m_B += masses[elem]*tmp_concs[ind]
+            m_B += masses[elem] * tmp_concs[ind]
     Q = get_binary_grav_capacities(x, m_B)
     return Q
 
@@ -145,7 +146,8 @@ def get_binary_volumetric_capacity(initial_doc, final_doc):
             num_B = species[1]
 
     num_ions_per_initial_fu = num_ion / num_B
-    volume_per_fu_cm3 = initial_doc['cell_volume'] * ANGSTROM_CUBED_TO_CENTIMETRE_CUBED / initial_doc['num_fu']
+    volume_per_fu_cm3 = initial_doc[
+        'cell_volume'] * ANGSTROM_CUBED_TO_CENTIMETRE_CUBED / initial_doc['num_fu']
     return ((num_ions_per_initial_fu / volume_per_fu_cm3) * (ELECTRON_CHARGE * Cperg_to_mAhperg))
 
 
@@ -167,8 +169,8 @@ def get_formation_energy(chempots, doc):
         for j in range(len(doc['stoichiometry'])):
             for i in range(len(mu['stoichiometry'])):
                 if mu['stoichiometry'][i][0] == doc['stoichiometry'][j][0]:
-                    formation -= (mu['enthalpy_per_atom'] * doc['stoichiometry'][j][1] /
-                                  num_atoms_per_fu)
+                    formation -= (
+                        mu['enthalpy_per_atom'] * doc['stoichiometry'][j][1] / num_atoms_per_fu)
     return formation
 
 
@@ -201,17 +203,38 @@ def get_stoich(atom_types):
     temp_stoich = []
     try:
         for key, value in stoich.items():
-            if float(value)/gcd_val % 1 != 0:
-                temp_stoich.append([key, float(value)/gcd_val])
+            if float(value) / gcd_val % 1 != 0:
+                temp_stoich.append([key, float(value) / gcd_val])
             else:
-                temp_stoich.append([key, value/gcd_val])
+                temp_stoich.append([key, value / gcd_val])
     except AttributeError:
         for key, value in stoich.iteritems():
-            if float(value)/gcd_val % 1 != 0:
-                temp_stoich.append([key, float(value)/gcd_val])
+            if float(value) / gcd_val % 1 != 0:
+                temp_stoich.append([key, float(value) / gcd_val])
             else:
-                temp_stoich.append([key, value/gcd_val])
+                temp_stoich.append([key, value / gcd_val])
     return sorted(temp_stoich)
+
+
+def get_ratios_from_stoichiometry(stoichiometry):
+    """ Get a dictionary of pairwise atomic ratios.
+
+    Parameters:
+        stoichiometry (list): matador-style stoichiometry.
+
+    Returns:
+        dict: dictionary of pairwise ratios, e.g. for K8SnP4,
+            ratio_dict = {'KSn': 8, 'KP': 2, 'SnP': 0.25,
+                          'SnK': 0.125, 'PSn': 4, 'PK': 0.5}.
+
+    """
+    ratio_dict = dict()
+    for i, elem_i in enumerate(stoichiometry):
+        for j, elem_j in enumerate(stoichiometry):
+            if elem_j != elem_i:
+                ratio_dict[stoichiometry[i][0] + stoichiometry[j]
+                           [0]] = round(float(stoichiometry[i][1]) / stoichiometry[j][1], 3)
+    return ratio_dict
 
 
 def get_stoich_from_formula(formula: str):
@@ -237,7 +260,7 @@ def get_stoich_from_formula(formula: str):
         if not bool(re.search(r'\d', parsed_elements[i])):
             elements.append(parsed_elements[i])
             try:
-                fraction.append(float(parsed_elements[i+1]))
+                fraction.append(float(parsed_elements[i + 1]))
             except:
                 fraction.append(1.0)
     gcd_val = 0
@@ -303,16 +326,16 @@ def parse_element_string(elements_str, stoich=False):
                     tmp_stoich.insert(ind, '[')
                     tmp_stoich.insert(ind, ']')
                     cleaned = True
-                elif ind == len(tmp_stoich)-1:
+                elif ind == len(tmp_stoich) - 1:
                     cleaned = False
         for ind, tmp in enumerate(tmp_stoich):
             if tmp == '[':
                 end_bracket = False
                 while not end_bracket:
-                    if tmp_stoich[ind+1] == ']':
+                    if tmp_stoich[ind + 1] == ']':
                         end_bracket = True
-                    tmp_stoich[ind] += tmp_stoich[ind+1]
-                    del tmp_stoich[ind+1]
+                    tmp_stoich[ind] += tmp_stoich[ind + 1]
+                    del tmp_stoich[ind + 1]
         try:
             tmp_stoich.remove(']')
         except:
@@ -323,6 +346,30 @@ def parse_element_string(elements_str, stoich=False):
             pass
         elements = tmp_stoich
     return elements
+
+
+def get_root_source(source):
+    """ Get the main file source from a doc's source list.
+
+    Parameters:
+        source (list): contents of doc['source'].
+
+    Returns:
+        str: "root" filename, e.g. if source = ['KP.cell', 'KP.param',
+            'KP_specific_structure.res'] then root = 'KP_specific_structure'.
+
+    """
+    src_list = set()
+    for src in source:
+        if src.endswith('.res') or src.endswith('.castep') or src.endswith('.history'):
+            src_list.add('.'.join(src.split('/')[-1].split('.')[0:-1]))
+        elif 'OQMD' in src.upper():
+            src_list.add(src)
+
+    if len(src_list) > 1:
+        raise RuntimeError('Ambiguous root source')
+
+    return list(src_list)[0]
 
 
 def get_formula_from_stoich(stoich, elements=None, tex=False):

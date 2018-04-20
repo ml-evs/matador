@@ -3,6 +3,7 @@ import unittest
 from matador.utils.chem_utils import get_concentration
 from matador.utils.chem_utils import get_generic_grav_capacity, get_binary_volumetric_capacity
 from matador.utils.chem_utils import get_stoich, get_formula_from_stoich, get_stoich_from_formula
+from matador.utils.chem_utils import get_ratios_from_stoichiometry, get_root_source
 
 
 class ChemUtilsTest(unittest.TestCase):
@@ -103,6 +104,39 @@ class ChemUtilsTest(unittest.TestCase):
         formula = 'Li12P1N18'
         stoich = [['Li', 12], ['P', 1], ['N', 18]]
         self.assertEqual(stoich, get_stoich_from_formula(formula))
+
+    def testRatiosFromStoich(self):
+        stoich = [['Li', 12], ['N', 18], ['P', 1]]
+        ratios = {'LiN': round(12./18, 3), 'LiP': 12, 'NP': 18,
+                  'NLi': round(18./12, 3), 'PLi': round(1./12, 3), 'PN': round(1./18, 3)}
+        self.assertEqual(ratios, get_ratios_from_stoichiometry(stoich))
+
+        stoich = [['K', 8], ['Sn', 1], ['P', 4]]
+        ratios = {'KSn': 8, 'KP': 2, 'SnP': 0.25,
+                  'SnK': round(1./8, 3), 'PK': 0.5, 'PSn': 4}
+        self.assertEqual(ratios, get_ratios_from_stoichiometry(stoich))
+
+    def testRootSrc(self):
+        source = ['KP.cell', 'KP.param', 'KP.castep']
+        src = 'KP'
+        self.assertEqual(src, get_root_source(source))
+
+        source = ['KP.cell', 'KP.param', 'KP-1234-abcd.castep']
+        src = 'KP-1234-abcd'
+        self.assertEqual(src, get_root_source(source))
+
+        source = ['KP.cell', 'KP.param', 'abcd-123.fdasf/efgf/KP-0.02.-1234-abcd.castep', 'KP-0.02.-1234-abcd.res']
+        src = 'KP-0.02.-1234-abcd'
+        self.assertEqual(src, get_root_source(source))
+
+        source = ['KP.cell', 'KP.param', 'abcd-123.fdasf/efgf/KP-0.02.-1234-abcd.castep', 'KP-1234-abcde.res']
+        failed = False
+        try:
+            src = get_root_source(source)
+        except RuntimeError:
+            failed = True
+        self.assertTrue(failed)
+
 
 
 if __name__ == '__main__':
