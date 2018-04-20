@@ -30,12 +30,9 @@ def get_periodic_table():
     periodic_table['Tran'] = ['Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn',
                               'Y', 'Zr', 'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd',
                               'Hf', 'Ta', 'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg']
-    periodic_table['Lan'] = ['La', 'Ce', 'Pr', 'Nd', 'Pm', 'Sm', 'Eu', 'Gd', 'Tb',
-                             'Dy', 'Ho', 'Er', 'Tm', 'Yb', 'Lu']
-    periodic_table['Act'] = ['Ac', 'Th', 'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk',
-                             'Cf', 'Es', 'Fm', 'Md', 'No', 'Lr']
-    periodic_table[
-        'X'] = [elem for group in periodic_table.keys() for elem in periodic_table[group]]
+    periodic_table['Lan'] = ['La', 'Ce', 'Pr', 'Nd', 'Pm', 'Sm', 'Eu', 'Gd', 'Tb', 'Dy', 'Ho', 'Er', 'Tm', 'Yb', 'Lu']
+    periodic_table['Act'] = ['Ac', 'Th', 'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk', 'Cf', 'Es', 'Fm', 'Md', 'No', 'Lr']
+    periodic_table['X'] = [elem for group in periodic_table for elem in periodic_table[group]]
     return periodic_table
 
 
@@ -59,9 +56,18 @@ def get_atomic_symbol(atomic_number):
 
 def get_concentration(doc, elements):
     """ Returns x for A_x B_{1-x}
-    or x,y for A_x B_y C_z, (x+y+z=1). """
+    or x,y for A_x B_y C_z, (x+y+z=1).
+
+    Parameters:
+        doc (dict): structure to evaluate.
+        elements (list): list of element symbols to enforce ordering.
+
+    Returns:
+        list of float: concentrations of elements in given order.
+
+    """
     concs = [0.0] * (len(elements) - 1)
-    for ind, elem in enumerate(doc['stoichiometry']):
+    for _, elem in enumerate(doc['stoichiometry']):
         if elem[0] in elements[:-1]:
             concs[elements.index(elem[0])] = elem[1] / float(get_atoms_per_fu(doc))
     return concs
@@ -69,7 +75,16 @@ def get_concentration(doc, elements):
 
 def get_num_intercalated(cursor):
     """ Return array of the number of intercalated atoms
-    per host atom from a list of structures. """
+    per host atom from a list of structures, of type defined by
+    the first entry in the structures' concentration vectors.
+
+    Parameters:
+        cursor (list of dict): structures to evaluate.
+
+    Returns:
+        ndarray: number of intercalated ions in each structure.
+
+    """
     from .cursor_utils import get_array_from_cursor
     x = np.zeros((len(cursor)))
     comps = get_array_from_cursor(cursor, 'concentration')
@@ -121,14 +136,12 @@ def get_binary_volumetric_capacity(initial_doc, final_doc):
     """ For initial (delithiated/sodiated) (single element) structure
     and final (maximally charged) binary structure, calculate the volumetric capacity.
 
-    Input:
-
-        | initial_doc: dict, matador doc of delithiated phase
-        | final_doc  : dict, matador doc of maximally lithiated phase
+    Parameters:
+        initial_doc (dict): matador doc of delithiated phase
+        final_doc (dict): matador doc of maximally lithiated phase
 
     Returns:
-
-       | volumetric_capacity: float, capacity in mAh/cm^3.
+       volumetric_capacity (float): capacity in mAh/cm^3.
 
     """
 
@@ -146,22 +159,26 @@ def get_binary_volumetric_capacity(initial_doc, final_doc):
             num_B = species[1]
 
     num_ions_per_initial_fu = num_ion / num_B
-    volume_per_fu_cm3 = initial_doc[
-        'cell_volume'] * ANGSTROM_CUBED_TO_CENTIMETRE_CUBED / initial_doc['num_fu']
+    volume_per_fu_cm3 = initial_doc['cell_volume'] * ANGSTROM_CUBED_TO_CENTIMETRE_CUBED / initial_doc['num_fu']
     return ((num_ions_per_initial_fu / volume_per_fu_cm3) * (ELECTRON_CHARGE * Cperg_to_mAhperg))
 
 
 def get_atoms_per_fu(doc):
-    """ Calculate the number of atoms per formula unit. """
-    atoms_per_fu = 0
-    for j in range(len(doc['stoichiometry'])):
-        atoms_per_fu += doc['stoichiometry'][j][1]
-    return atoms_per_fu
+    """ Calculate and return the number of atoms per formula unit. """
+    return sum([elem[1] for elem in doc['stoichiometry']])
 
 
 def get_formation_energy(chempots, doc):
     """ From given chemical potentials, calculate the simplest
     formation energy per atom of the desired document.
+
+    Parameters:
+        chempots (list of dict): list of chempot structures.
+        doc (dict): structure to evaluate.
+
+    Returns:
+        float: formation energy per atom.
+
     """
     formation = doc['enthalpy_per_atom']
     num_atoms_per_fu = get_atoms_per_fu(doc)
@@ -169,21 +186,18 @@ def get_formation_energy(chempots, doc):
         for j in range(len(doc['stoichiometry'])):
             for i in range(len(mu['stoichiometry'])):
                 if mu['stoichiometry'][i][0] == doc['stoichiometry'][j][0]:
-                    formation -= (
-                        mu['enthalpy_per_atom'] * doc['stoichiometry'][j][1] / num_atoms_per_fu)
+                    formation -= (mu['enthalpy_per_atom'] * doc['stoichiometry'][j][1] / num_atoms_per_fu)
     return formation
 
 
 def get_stoich(atom_types):
     """ Return integer stoichiometry from atom_types list.
 
-    Input:
-
-        atom_types: list of elements, e.g. ['Li', 'P', 'P']
+    Parameters:
+        atom_types (list): list of element symbols of each atom.
 
     Returns:
-
-        stoich : [['Li', 1], ['P', 2]]
+        list: matador-style stoichiometry, e.g. [['Li', 1], ['P', 2]].
 
     """
     from collections import defaultdict
@@ -232,8 +246,8 @@ def get_ratios_from_stoichiometry(stoichiometry):
     for i, elem_i in enumerate(stoichiometry):
         for j, elem_j in enumerate(stoichiometry):
             if elem_j != elem_i:
-                ratio_dict[stoichiometry[i][0] + stoichiometry[j]
-                           [0]] = round(float(stoichiometry[i][1]) / stoichiometry[j][1], 3)
+                ratio_dict[stoichiometry[i][0]
+                           + stoichiometry[j][0]] = round(float(stoichiometry[i][1]) / stoichiometry[j][1], 3)
     return ratio_dict
 
 
@@ -241,13 +255,11 @@ def get_stoich_from_formula(formula: str):
     """ Convert formula string, e.g. Li2TiP4 into a matador-style
     stoichiometry, e.g. [['Li', 2], ['Ti', 1], ['P', 4]].
 
-    Input:
-
-        | formula: str, chemical formula of compound
+    Parameters:
+        formula (str): chemical formula of compound
 
     Returns:
-
-        | stoich: list, list of lists containing symbol and amount
+        stoich (list): matador-style stoichiometry.
 
     """
     from math import gcd
@@ -261,7 +273,7 @@ def get_stoich_from_formula(formula: str):
             elements.append(parsed_elements[i])
             try:
                 fraction.append(float(parsed_elements[i + 1]))
-            except:
+            except IndexError:
                 fraction.append(1.0)
     gcd_val = 0
     for frac in fraction:
@@ -279,24 +291,21 @@ def parse_element_string(elements_str, stoich=False):
     """ Parse element query string with macros.
 
     e.g.
-        Input: '[VII][Fe,Ru,Os][I]'
+        Parameters: '[VII][Fe,Ru,Os][I]'
         Returns: ['[VII]', '[Fe,Ru,Os]', '[I]']
 
     e.g.2
-        Input: '[VII]2[Fe,Ru,Os][I]'
+        Parameters: '[VII]2[Fe,Ru,Os][I]'
         Returns: ['[VII]2', '[Fe,Ru,Os]', '[I]']
 
-    Input:
+    Parameters:
+        elements_str: str, chemical formula, including macros.
 
-        | elements_str: str, chemical formula, including macros.
-
-    Args:
-
-        | stoich: bool, parse as a stoichiometry, i.e. check for numbers
+    Keyword arguments:
+        stoich: bool, parse as a stoichiometry, i.e. check for numbers
 
     Returns:
-
-        | elements: list, split list of elements contained in input
+        elements: list, split list of elements contained in input
 
     """
     import re
@@ -336,15 +345,12 @@ def parse_element_string(elements_str, stoich=False):
                         end_bracket = True
                     tmp_stoich[ind] += tmp_stoich[ind + 1]
                     del tmp_stoich[ind + 1]
-        try:
+        if ']' in tmp_stoich:
             tmp_stoich.remove(']')
-        except:
-            pass
-        try:
+        if '' in tmp_stoich:
             tmp_stoich.remove('')
-        except:
-            pass
         elements = tmp_stoich
+
     return elements
 
 
@@ -368,6 +374,8 @@ def get_root_source(source):
 
     if len(src_list) > 1:
         raise RuntimeError('Ambiguous root source')
+    if len(src_list) < 1:
+        raise RuntimeError('Unable to find root source')
 
     return list(src_list)[0]
 
@@ -376,8 +384,15 @@ def get_formula_from_stoich(stoich, elements=None, tex=False):
     """ Get the chemical formula of a structure from
     its matador stoichiometry.
 
-    Input: stoich = [['Li', 3.0], ['P', 2.0]]
-    Output: 'Li3P2'
+    Parameters:
+        stoich (list): matador-style stoichiometry.
+
+    Keyword arguments:
+        elements (list): list of element symbols to enforce order.
+        tex (bool): whether to print a LaTeX-compatibile string.
+
+    Returns:
+        str: chemical formula.
 
     """
     form = ''

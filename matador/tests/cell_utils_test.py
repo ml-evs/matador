@@ -21,6 +21,7 @@ REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
 
 class CellUtilTest(unittest.TestCase):
     """ Tests cell util functions. """
+
     def testCart2AbcConversions(self):
         castep_fname = REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep'
         failed_open = False
@@ -101,9 +102,9 @@ class CellUtilTest(unittest.TestCase):
                 supercell = create_simple_supercell(test_doc, tuple(extension),
                                                     standardize=standardize,
                                                     symmetric=symmetric)
-                self.assertEqual(supercell['num_atoms'], num_images*test_doc['num_atoms'])
-                self.assertAlmostEqual(supercell['cell_volume'], num_images*test_doc['cell_volume'], places=3)
-                self.assertEqual(len(supercell['positions_frac']), num_images*len(test_doc['positions_frac']))
+                self.assertEqual(supercell['num_atoms'], num_images * test_doc['num_atoms'])
+                self.assertAlmostEqual(supercell['cell_volume'], num_images * test_doc['cell_volume'], places=3)
+                self.assertEqual(len(supercell['positions_frac']), num_images * len(test_doc['positions_frac']))
                 for i in range(3):
                     if not standardize:
                         np.testing.assert_array_equal(np.asarray(supercell['lattice_cart'][i]), extension[i]*np.asarray(test_doc['lattice_cart'][i]))
@@ -132,9 +133,9 @@ class CellUtilTest(unittest.TestCase):
                 num_images = np.prod(extension)
 
                 supercell = create_simple_supercell(test_doc, tuple(extension))
-                self.assertEqual(supercell['num_atoms'], num_images*test_doc['num_atoms'])
-                self.assertAlmostEqual(supercell['cell_volume'], num_images*test_doc['cell_volume'], places=3)
-                self.assertEqual(len(supercell['positions_frac']), num_images*len(test_doc['positions_frac']))
+                self.assertEqual(supercell['num_atoms'], num_images * test_doc['num_atoms'])
+                self.assertAlmostEqual(supercell['cell_volume'], num_images * test_doc['cell_volume'], places=3)
+                self.assertEqual(len(supercell['positions_frac']), num_images * len(test_doc['positions_frac']))
                 for i in range(3):
                     np.testing.assert_array_equal(np.asarray(supercell['lattice_cart'][i]), extension[i]*np.asarray(test_doc['lattice_cart'][i]))
                 self.assertLess(pdf_sim_dist(test_doc, supercell), 1e-3)
@@ -206,8 +207,8 @@ class CellUtilTest(unittest.TestCase):
             np.testing.assert_array_almost_equal(path, rel_path)
             # for ind, kpt in enumerate(cart_kpts[:-1]):
             for ind, kpt in enumerate(cart_kpts[:-1]):
-                diffs[ind] = np.sqrt(np.sum((kpt - cart_kpts[ind+1])**2))
-            self.assertLess(len(np.where(diffs > 1.1*spacing)[0]), len(seekpath_results['explicit_segments']))
+                diffs[ind] = np.sqrt(np.sum((kpt - cart_kpts[ind + 1])**2))
+            self.assertLess(len(np.where(diffs > 1.1 * spacing)[0]), len(seekpath_results['explicit_segments']))
 
             if 'flrys4-1x109' in fname:
                 bs, s = bands2dict(fname.replace('.res', '.bands'))
@@ -215,8 +216,8 @@ class CellUtilTest(unittest.TestCase):
                 np.testing.assert_array_almost_equal(bs['lattice_cart'], std_doc['lattice_cart'])
                 np.testing.assert_array_almost_equal(bs['cart_kpoints'], abs_path)
                 for ind, kpt in enumerate(bs['cart_kpoints'][:-1]):
-                    diffs[ind] = np.sqrt(np.sum((kpt - bs['cart_kpoints'][ind+1])**2))
-            self.assertLess(len(np.where(diffs > 1.1*spacing)[0]), len(seekpath_results['explicit_segments']))
+                    diffs[ind] = np.sqrt(np.sum((kpt - bs['cart_kpoints'][ind + 1])**2))
+            self.assertLess(len(np.where(diffs > 1.1 * spacing)[0]), len(seekpath_results['explicit_segments']))
 
             cell_path = fname.replace('.res', '.cell')
             doc2cell(std_doc, cell_path)

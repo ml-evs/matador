@@ -1,13 +1,12 @@
 # encoding: utf-8
 """ Some simple utilities for DB connections. """
+
 import os
-import pymongo as pm
 from traceback import print_exc
 
-MONGO_DEFAULTS = {'mongo': {'db': 'crystals',
-                            'host': 'node1',
-                            'port': 27017,
-                            'default_collection': 'repo'}}
+import pymongo as pm
+
+MONGO_DEFAULTS = {'mongo': {'db': 'crystals', 'host': 'node1', 'port': 27017, 'default_collection': 'repo'}}
 
 
 def load_custom_settings(config_fname=None):
@@ -28,9 +27,9 @@ def load_custom_settings(config_fname=None):
         try:
             with open(config_fname, 'r') as fp:
                 custom_settings = json.load(fp)
-        except:
+        except (FileNotFoundError, json.decoder.JSONDecodeError):
             print_exc()
-            exit('Failed to read custom settings file {}'.format(config_fname))
+            raise SystemExit('Failed to read custom settings file {}'.format(config_fname))
 
     settings = {}
     settings.update(MONGO_DEFAULTS)
@@ -66,22 +65,21 @@ def make_connection_to_collection(coll_names, check_collection=False, allow_chan
 
     print('Trying to connect to {host}:{port}/{db}'.format(**settings['mongo']))
 
-    client = pm.MongoClient(host=settings['mongo']['host'],
-                            port=settings['mongo']['port'],
-                            connect=False,
-                            maxIdleTimeMS=600000,           # disconnect after 10 minutes idle
-                            socketTimeoutMS=20000,          # give up on database after 20 seconds without results
-                            serverSelectionTimeoutMS=2000,  # give up on server after 2 seconds without results
-                            connectTimeoutMS=2000)          # give up trying to connect to new database after 2 seconds
+    client = pm.MongoClient(
+        host=settings['mongo']['host'],
+        port=settings['mongo']['port'],
+        connect=False,
+        maxIdleTimeMS=600000,  # disconnect after 10 minutes idle
+        socketTimeoutMS=10000,  # give up on database after 20 seconds without results
+        serverSelectionTimeoutMS=10000,  # give up on server after 2 seconds without results
+        connectTimeoutMS=10000)  # give up trying to connect to new database after 2 seconds
 
     try:
         if settings['mongo']['db'] not in client.database_names():
-            exit('Database {db} does not exist at {host}:{port}/{db}, exiting...'
-                 .format(**settings['mongo']))
+            exit('Database {db} does not exist at {host}:{port}/{db}, exiting...'.format(**settings['mongo']))
     except pm.errors.ServerSelectionTimeoutError as exc:
         print('{}: {}'.format(type(exc).__name__, exc))
-        exit('Unable to connect to {host}:{port}/{db}, exiting...'
-             .format(**settings['mongo'])),
+        raise SystemExit('Unable to connect to {host}:{port}/{db}, exiting...'.format(**settings['mongo']))
 
     db = client[settings['mongo']['db']]
     possible_collections = db.collection_names()

@@ -37,6 +37,7 @@ class DBQuery:
         top (int): number of structures to print/export set by self.args.get('top') (DEFAULT: 10).
 
     """
+
     def __init__(self, client=False, collections=False, subcmd='query', debug=False, quiet=False, **kwargs):
         """ Parse arguments from matador or API call
         before calling query.
@@ -75,8 +76,7 @@ class DBQuery:
 
         if (not collections or not client) and not self.args.get('testing'):
             self.mongo_settings = load_custom_settings(config_fname=self.args.get('config_fname'))
-            result = make_connection_to_collection(self.args.get('db'),
-                                                   mongo_settings=self.mongo_settings)
+            result = make_connection_to_collection(self.args.get('db'), mongo_settings=self.mongo_settings)
             self._client, self._db, self._collections = result
 
         # define some periodic table macros
@@ -105,19 +105,16 @@ class DBQuery:
                     unique_set, _, _, _ = get_uniq_cursor(self.cursor[:self.args.get('top')],
                                                           debug=self.args.get('debug'),
                                                           sim_tol=self.args.get('uniq'))
-                    print('Filtered {} down to {}'.format(len(self.cursor[:self.args.get('top')]),
-                                                          len(unique_set)))
+                    print('Filtered {} down to {}'.format(len(self.cursor[:self.args.get('top')]), len(unique_set)))
                     self.cursor = [self.cursor[:self.args.get('top')][ind] for ind in unique_set]
                 else:
                     unique_set, _, _, _ = get_uniq_cursor(self.cursor,
                                                           debug=self.args.get('debug'),
                                                           sim_tol=self.args.get('uniq'))
-                    print('Filtered {} down to {}'.format(len(self.cursor),
-                                                          len(unique_set)))
+                    print('Filtered {} down to {}'.format(len(self.cursor), len(unique_set)))
                     self.cursor = [self.cursor[ind] for ind in unique_set]
 
                 display_results(self.cursor, hull=None, args=self.args)
-
             if not client and not self.args.get('testing'):
                 self._client.close()
 
@@ -156,16 +153,12 @@ class DBQuery:
                     self.cursor.append(doc)
 
             if len(self.cursor) < 1:
-                sys.exit('Could not find a match with {} try widening your search.'
-                         .format(self.args.get('id')))
+                sys.exit('Could not find a match with {} try widening your search.'.format(self.args.get('id')))
 
             elif len(self.cursor) >= 1:
                 display_results(list(self.cursor)[:self.top], args=self.args)
                 if len(self.cursor) > 1:
-                    print_warning('WARNING: matched multiple structures with same text_id. ' +
-                                  'The first one will be used.')
-                if self.debug:
-                    print(dumps(self.cursor[0], indent=1))
+                    print_warning('Matched multiple structures with same text_id. The first one will be used.')
 
             if self.args.get('calc_match') or \
                     self.args['subcmd'] in ['hull', 'hulldiff', 'voltage']:
@@ -297,17 +290,17 @@ class DBQuery:
             for collection in self._collections:
                 self.repo = self._collections[collection]
                 if self.debug:
+                    print('Query dict:')
                     print(dumps(self.query_dict, indent=1))
                 # execute query
-                self.cursor = list(self.repo.find(SON(self.query_dict))
-                                   .sort('enthalpy_per_atom', pm.ASCENDING))
+                self.cursor = list(self.repo.find(SON(self.query_dict)).sort('enthalpy_per_atom', pm.ASCENDING))
 
                 # self.cursors.append(self.cursor)
                 cursor_count = len(self.cursor)
 
                 # if called as script, always print results
                 if self.args.get('id') is None:
-                    print(cursor_count, 'results found for query in', collection+'.')
+                    print(cursor_count, 'results found for query in', collection + '.')
                 if self.args.get('subcmd') not in ['hull', 'hulldiff', 'voltage', 'swaps']:
                     if cursor_count >= 1:
                         self._num_to_display = cursor_count
@@ -342,9 +335,7 @@ class DBQuery:
                     self.cursor = self.cursor[:self._num_to_display]
 
             # building hull from just comp, find best structure to calc_match
-            if self.args.get('id') is None and (self.args.get('subcmd') == 'hull' or
-                                                self.args.get('subcmd') == 'hulldiff' or
-                                                self.args.get('subcmd') == 'voltage' or
+            if self.args.get('id') is None and (self.args.get('subcmd') in ['hull', 'hulldiff', 'voltage'] or
                                                 self.args.get('hull_cutoff') is not None):
                 if len(self._collections) == 1:
                     self.repo = self._collections[list(self._collections.keys())[0]]
@@ -367,19 +358,18 @@ class DBQuery:
                 count = len(self.cursor)
                 if count <= 0:
                     sys.exit('No structures found for hull.')
-                while i < sample+rand_sample:
+                while i < sample + rand_sample:
                     # start with sample/2 lowest enthalpy structures
                     if i < int(sample):
                         ind = i
                     # then do some random samples
                     else:
-                        ind = np.random.randint(rand_sample if rand_sample < count-1 else 0, count-1)
+                        ind = np.random.randint(rand_sample if rand_sample < count - 1 else 0, count - 1)
                     id_cursor = list(self.repo.find({'text_id': self.cursor[ind]['text_id']}))
                     if len(id_cursor) > 1:
-                        print_warning('WARNING: matched multiple structures with text_id ' +
-                                      id_cursor[0]['text_id'][0] + ' ' +
-                                      id_cursor[0]['text_id'][1] + '.' +
-                                      ' Skipping this set...')
+                        print_warning(
+                            'WARNING: matched multiple structures with text_id ' + id_cursor[0]['text_id'][0] + ' ' +
+                            id_cursor[0]['text_id'][1] + '.' + ' Skipping this set...')
                         rand_sample += 1
                     else:
                         self.query_dict = dict()
@@ -408,15 +398,16 @@ class DBQuery:
                             if test_cursor_count[-1] == count:
                                 print('Matched all structures...')
                                 break
-                            if test_cursor_count[-1] > 2*int(count/3):
+                            if test_cursor_count[-1] > 2 * int(count / 3):
                                 print('Matched at least 2/3 of total number, composing hull...')
                                 break
-                        except(KeyboardInterrupt, SystemExit):
+                        except (KeyboardInterrupt, SystemExit):
                             print('Received exit signal, exiting...')
                             sys.exit()
                         except Exception:
                             print_exc()
-                            print_warning('Error with ' + id_cursor[0]['text_id'][0] + ' ' + id_cursor[0]['text_id'][1])
+                            print_warning(
+                                'Error with ' + id_cursor[0]['text_id'][0] + ' ' + id_cursor[0]['text_id'][1])
                             rand_sample += 1
                     i += 1
 
@@ -426,8 +417,9 @@ class DBQuery:
                     # by default, find highest cutoff hull as first proxy for quality
                     choice = np.argmax(np.asarray(cutoff))
                 self.cursor = test_cursors[choice]
-                print_success('Composing hull from set containing ' +
-                              self.cursor[0]['text_id'][0] + ' ' + self.cursor[0]['text_id'][1])
+                print_success(
+                    'Composing hull from set containing ' + self.cursor[0]['text_id'][0] + ' ' +
+                    self.cursor[0]['text_id'][1])
                 self.calc_dict = calc_dicts[choice]
 
     def _query_stoichiometry(self, custom_stoich=None, partial_formula=None):
@@ -481,13 +473,12 @@ class DBQuery:
 
         return query_dict
 
-    def _query_ratio(self, ratios):
+    @staticmethod
+    def _query_ratio(ratios):
         """ Query DB for ratio of two elements.
 
-        Input, e.g.:
-
-            ratios = [['MoS', 2],
-                      ['LiS', 1]]
+        Parameters:
+            ratios (list): e.g.  ratios = [['MoS', 2], ['LiS', 1]]
 
         """
         query_dict = dict()
@@ -500,11 +491,11 @@ class DBQuery:
         taken as input. Passing this function a number is a deprecated
         feature, replaced by query_num_species.
 
-        Args:
+        Keyword arguments:
 
-            | custom_elem     : str, use to query custom string, rather than CLI args
-            | partial_formula : bool, remove stoich size from query if True
-            | elem_field      : str, which field to query for elems, either `atom_types` or `elems`
+            custom_elem     : str, use to query custom string, rather than CLI args
+            partial_formula : bool, remove stoich size from query if True
+            elem_field      : str, which field to query for elems, either `atom_types` or `elems`
 
         """
         if custom_elem is None:
@@ -533,7 +524,7 @@ class DBQuery:
             query_dict['$or'] = []
             size = len(elements)
             # iterate over all combinations
-            for rlen in range(1, len(elements)+1):
+            for rlen in range(1, len(elements) + 1):
                 for combi in combinations(elements, r=rlen):
                     list_combi = list(combi)
                     types_dict = dict()
@@ -557,12 +548,12 @@ class DBQuery:
                 if elem == ':':
                     # convert e.g. MoS2 to [['MoS', 2]]
                     # or LiMoS2 to [['LiMo', 1], ['MoS', '2], ['LiS', 2]]
-                    ratio_elements = elements[ind+1:]
+                    ratio_elements = elements[ind + 1:]
                     for _ind, _ in enumerate(ratio_elements):
-                        if _ind < len(ratio_elements)-1:
+                        if _ind < len(ratio_elements) - 1:
                             if not ratio_elements[_ind].isdigit() and \
                                     not ratio_elements[_ind+1].isdigit():
-                                ratio_elements.insert(_ind+1, '1')
+                                ratio_elements.insert(_ind + 1, '1')
                     if not ratio_elements[-1].isdigit():
                         ratio_elements.append('1')
                     ratios = []
@@ -719,9 +710,12 @@ class DBQuery:
             query_dict['$or'][-1]['root_source'] = src
         return query_dict
 
-    def _query_quality(self):
-        """ Find all structures with non-zero or
-        non-existent (e.g. OQMD) quality. """
+    @staticmethod
+    def _query_quality():
+        """ Find all structures with non-zero or non-existent (e.g.
+        OQMD) quality.
+
+        """
         query_dict = dict()
         query_dict['$or'] = []
         query_dict['$or'].append(dict())
@@ -741,9 +735,9 @@ class DBQuery:
         input_pressure = self.args.get('pressure')
 
         if input_pressure < 0:
-            approx_pressure = [1.1*input_pressure-0.05, 0.9*input_pressure+0.05]
+            approx_pressure = [1.1 * input_pressure - 0.05, 0.9 * input_pressure + 0.05]
         else:
-            approx_pressure = [0.9*input_pressure-0.05, 1.1*input_pressure+0.05]
+            approx_pressure = [0.9 * input_pressure - 0.05, 1.1 * input_pressure + 0.05]
 
         query_dict = dict()
         query_dict['pressure'] = dict()
@@ -752,7 +746,8 @@ class DBQuery:
 
         return query_dict
 
-    def _query_encap(self):
+    @staticmethod
+    def _query_encap():
         """ Query only CNT encapsulated structures. """
         query_dict = dict()
         query_dict['encapsulated'] = dict()
@@ -799,7 +794,7 @@ class DBQuery:
             query_dict['cut_off_energy']['$gte'] = cutoffs[0]
             query_dict['cut_off_energy']['$lte'] = cutoffs[1]
         else:
-            query_dict['cut_off_energy']['$gte'] = cutoffs[0]
+            query_dict['cut_off_energy']['$eq'] = cutoffs[0]
         return query_dict
 
     def _query_geom_force_tol(self):
@@ -836,9 +831,10 @@ class DBQuery:
     def _query_xc_functional(self, xc_functional=None):
         """ Query all calculations with specified xc-functional.
 
-        Args:
+        Keyword arguments:
 
-            | xc_functional: str, CASTEP string for xc-functional to override CLI.
+            xc_functional (str): CASTEP string for xc-functional to
+                override CLI.
 
         """
         query_dict = dict()
@@ -854,6 +850,7 @@ class DBQuery:
     def _query_kpoints(self):
         """ Query all calculations with finer than the given
         kpoint sampling.
+
         """
         query_dict = dict()
         if not isinstance(self.args.get('mp_spacing'), list):
@@ -874,6 +871,7 @@ class DBQuery:
     def _query_spin(self):
         """ Query all calculations with spin polarisation,
         i.e. --spin n!=0, or non-spin-polarization, i.e. --spin 0.
+
         """
         query_dict = dict()
         if isinstance(self.args.get('spin'), list):
@@ -958,10 +956,10 @@ class DBQuery:
                 temp_dict = dict()
                 temp_dict['$or'] = []
                 temp_dict['$or'].append(dict())
-                temp_dict['$or'][-1]['species_pot.'+species] = dict()
-                temp_dict['$or'][-1]['species_pot.'+species]['$exists'] = False
+                temp_dict['$or'][-1]['species_pot.' + species] = dict()
+                temp_dict['$or'][-1]['species_pot.' + species]['$exists'] = False
                 temp_dict['$or'].append(dict())
-                temp_dict['$or'][-1]['species_pot.'+species] = doc['species_pot'][species]
+                temp_dict['$or'][-1]['species_pot.' + species] = doc['species_pot'][species]
                 query_dict['$and'].append(temp_dict)
 
         if self.debug:
@@ -990,5 +988,8 @@ class DBQuery:
 
 class EmptyCursor:
     """ Empty cursor class for failures. """
-    def count(self):
+
+    @staticmethod
+    def count():
+        """ Dummy function always returns 0. """
         return 0

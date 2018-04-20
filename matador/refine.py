@@ -5,17 +5,14 @@ e.g. symmetry and substructure analysis.
 
 """
 
-from __future__ import print_function
-# matador modules
-from .utils.print_utils import print_notify, print_warning, print_failure
-# external library
-import pymongo as pm
-# standard library
-from sys import exit
 from traceback import print_exc
 
+import pymongo as pm
 
-class Refiner(object):
+from matador.utils.print_utils import print_notify, print_warning, print_failure
+
+
+class Refiner:
     """ Refiner implements methods to alter certain parts of the
     database in place, either in overwrite, set or compare/display mode.
     Current modifiables are space groups, substructures, atomic ratios,
@@ -24,28 +21,32 @@ class Refiner(object):
     """
 
     def __init__(self, cursor, collection=None, task=None, mode='display', **kwargs):
-        """ Parses args and initiates modification. """
-        possible_tasks = ['sym', 'spg',
-                          'substruc', 'sub',
-                          'elem_set',
-                          'ratios',
-                          'tag',
-                          'doi',
-                          'source']
+        """ Parses args and initiates modification.
+
+        Parameters:
+            cursor (list of dicts): matador cursor to refine.
+
+        Keyword arguments:
+            collection (Collection): mongodb collection to query/edit.
+            task (str): one of 'sym', 'spg', 'substruc', 'sub', 'elem_set', 'ratios',
+                'tag', 'doi' or 'source'.
+            mode (str): one of 'display', 'overwrite', 'set'.
+
+        """
+        possible_tasks = ['sym', 'spg', 'substruc', 'sub', 'elem_set', 'ratios', 'tag', 'doi', 'source']
         possible_modes = ['display', 'overwrite', 'set']
+
         if mode not in possible_modes:
             print('Mode not understood, defaulting to "display".')
             mode = 'display'
         if collection is None and mode in ['overwrite', 'set']:
-            exit('Impossible to overwite or set without db collection, exiting...')
+            raise SystemExit('Impossible to overwite or set without db collection, exiting...')
         if task is None:
-            exit('No specified task, exiting...')
+            raise SystemExit('No specified task, exiting...')
         elif task not in possible_tasks:
-            exit('Did not understand task, please choose one of ' + ', '.join(possible_tasks))
+            raise SystemExit('Did not understand task, please choose one of ' + ', '.join(possible_tasks))
         if task == 'tag' and mode == 'set':
-            print_notify('Task \'tags\' and mode \'set\' will not alter the database, ' +
-                         'please use mode \'overwrite\'.')
-            exit()
+            raise SystemExit('Task "tags" and mode "set" will not alter the database, please use mode "overwrite".')
 
         self.cursor = list(cursor)
         self.diff_cursor = []
@@ -99,11 +100,12 @@ class Refiner(object):
         requests = []
         # if in "set" mode, do not overwrite, just apply
         if self.mode == 'set':
-            for ind, doc in enumerate(self.diff_cursor):
-                requests.append(pm.UpdateOne({'_id': doc['_id'], self.field: {'$exists': False}}, {'$set': {self.field: doc[self.field]}}))
+            for _, doc in enumerate(self.diff_cursor):
+                requests.append(pm.UpdateOne({'_id': doc['_id'], self.field: {'$exists': False}},
+                                             {'$set': {self.field: doc[self.field]}}))
         # else if in overwrite mode, overwrite previous field
         elif self.mode == 'overwrite':
-            for ind, doc in enumerate(self.diff_cursor):
+            for _, doc in enumerate(self.diff_cursor):
                 requests.append(pm.UpdateOne({'_id': doc['_id']}, {'$set': {self.field: doc[self.field]}}))
         if self.args.get('debug'):
             for request in requests:
@@ -116,18 +118,16 @@ class Refiner(object):
         """ Compute substructure with Can's Voronoi code. """
         from .voronoi_interface import get_voronoi_substructure
         print('Performing substructure analysis...')
-        for ind, doc in enumerate(self.cursor):
+        for _, doc in enumerate(self.cursor):
             try:
                 self.changed_count += 1
                 doc['substruc'] = get_voronoi_substructure(doc)
                 self.diff_cursor.append(doc)
-            except:
+            except Exception:
                 print_exc()
                 self.failed_count += 1
                 if self.args.get('debug'):
-                    print_exc()
                     print_failure('Failed for' + ' '.join(doc['text_id']))
-                pass
         if self.mode == 'display':
             for doc in self.diff_cursor:
                 print(doc['substruc'])
@@ -140,7 +140,7 @@ class Refiner(object):
         if self.mode == 'display':
             print_warning('{}'.format('At symprec: ' + str(symprec)))
             print_warning("{:^36}{:^16}{:^16}".format('text_id', 'new sg', 'old sg'))
-        for ind, doc in enumerate(self.cursor):
+        for _, doc in enumerate(self.cursor):
             try:
                 spg_cell = doc2spg(doc)
                 sg = spg.get_spacegroup(spg_cell, symprec=symprec).split(' ')[0]
@@ -148,17 +148,18 @@ class Refiner(object):
                     self.changed_count += 1
                     self.diff_cursor.append(doc)
                     if self.mode == 'display':
-                        print_notify("{:^36}{:^16}{:^16}".format(doc['text_id'][0]+' '+doc['text_id'][1], sg, doc['space_group']))
+                        print_notify("{:^36}{:^16}{:^16}"
+                                     .format(doc['text_id'][0]+' '+doc['text_id'][1], sg, doc['space_group']))
                     doc['space_group'] = sg
                 else:
                     if self.mode == 'display':
-                        print("{:^36}{:^16}{:^16}".format(doc['text_id'][0]+' '+doc['text_id'][1], sg, doc['space_group']))
-            except:
+                        print("{:^36}{:^16}{:^16}"
+                              .format(doc['text_id'][0]+' '+doc['text_id'][1], sg, doc['space_group']))
+            except Exception:
                 self.failed_count += 1
                 if self.args.get('debug'):
                     print_exc()
                     print_failure('Failed for' + ' '.join(doc['text_id']))
-                pass
 
     def ratios(self):
         """ Precompute stoichiometric ratios for use in
@@ -172,21 +173,17 @@ class Refiner(object):
             'AsP' : 1.0, 'LiP' : 2.0, 'PLi': 0.5}
 
         """
-        for ind, doc in enumerate(self.cursor):
+        from matador.utils.chem_utils import get_ratios_from_stoichiometry
+        for _, doc in enumerate(self.cursor):
             try:
-                ratio_dict = dict()
-                for i, elem_i in enumerate(doc['stoichiometry']):
-                    for j, elem_j in enumerate(doc['stoichiometry']):
-                        if elem_j != elem_i:
-                            ratio_dict[doc['stoichiometry'][i][0]+doc['stoichiometry'][j][0]] = round(float(doc['stoichiometry'][i][1]) / doc['stoichiometry'][j][1], 3)
+                ratio_dict = get_ratios_from_stoichiometry(doc['stoichiometry'])
                 if self.args.get('debug'):
                     print(ratio_dict)
                 doc['ratios'] = ratio_dict
                 self.diff_cursor.append(doc)
                 self.changed_count += 1
-            except:
+            except Exception:
                 self.failed_count += 1
-                pass
 
     def elem_set(self):
         """ Imbue documents with the set of elements,
@@ -201,11 +198,10 @@ class Refiner(object):
                 if self.args.get('debug'):
                     print(repr(oops))
                 self.failed_count += 1
-                pass
 
     def add_tag(self):
         """ Add a tag to each document. """
-        for ind, doc in enumerate(self.cursor):
+        for _, doc in enumerate(self.cursor):
             try:
                 if 'tags' in doc:
                     if doc['tags'] is None:
@@ -220,14 +216,12 @@ class Refiner(object):
             except Exception as error:
                 print(repr(error))
                 self.failed_count += 1
-                pass
 
     def add_doi(self):
         """ Add a doi to each document. """
         if self.doi.count('/') != 1:
-            print_warning('Malformed DOI... please use xxxxx/xxxxx format.')
-            exit()
-        for ind, doc in enumerate(self.cursor):
+            raise SystemExit('Malformed DOI... please use xxxxx/xxxxx format.')
+        for _, doc in enumerate(self.cursor):
             try:
                 if 'doi' in doc:
                     doc['doi'].append(self.doi)
@@ -238,23 +232,18 @@ class Refiner(object):
             except Exception as error:
                 print(repr(error))
                 self.failed_count += 1
-                pass
 
     def add_root_source(self):
         """ Add the "root_source" key to a document in the database,
         i.e. the name of the structure, minus file extension.
         """
-        for ind, doc in enumerate(self.cursor):
+        from matador.utils.chem_utils import get_root_source
+        for _, doc in enumerate(self.cursor):
             try:
                 if 'root_source' in doc:
                     continue
                 else:
-                    src_list = []
-                    for src in doc['source']:
-                        if src.endswith('.res') or src.endswith('.castep') or src.endswith('.history'):
-                            src_list.append(''.join(src.split('/')[-1].split('.')[0:-1]))
-                    assert len(set(src_list)) == 1
-                    doc['root_source'] = src_list[0]
+                    doc['root_source'] = get_root_source(doc['source'])
                     self.diff_cursor.append(doc)
                     self.changed_count += 1
             except Exception as error:

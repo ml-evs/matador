@@ -54,7 +54,10 @@ class Crystal:
 
         # set root source to structure filename
         from matador.utils.chem_utils import get_root_source
-        self.root_source = get_root_source(self._doc['source'])
+        try:
+            self.root_source = get_root_source(self._doc['source'])
+        except:
+            self.root_source = 'xxx'
 
     def __getitem__(self, key):
         # if array-style access, e.g. crystal[3], return 3rd site object

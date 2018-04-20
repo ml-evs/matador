@@ -1,46 +1,45 @@
 # coding: utf-8
 """ This file defines some useful generic cursor methods. """
 
-# standard library
 from traceback import print_exc
 from time import strftime
-from pkg_resources import require
-# external libraries
+
 import numpy as np
 from matador.utils.cell_utils import get_spacegroup_spg
-try:
-    __version__ = require("matador")[0].version
-    __version__ = __version__.strip()
-except:
-    __version__ = 'xxx'
+from matador.version import __version__
 
 
 def display_results(cursor,
-                    args={}, argstr=None, additions=None, deletions=None,
+                    args=None, argstr=None, additions=None, deletions=None,
                     hull=False, markdown=False, latex=False, use_source=False, colour=True):
     """ Print query results in a cryan-like fashion, optionally
     in a markdown format.
 
-    Input:
+    Parameters:
+        cursor (list of dict): list of matador documents
 
-        | cursor: list(dict), list of matador documents
+    Keyword arguments:
+        args (dict): extra keyword arguments
+        argstr (str): string to store matador initialisation command
+        additions (list): list of string text_ids to be coloured green with a (+)
+        deletions (list): list of string text_ids to be coloured red with a (-)
+        hull (bool): whether or not to print hull-style (True) or query-style
+        markdown (bool): whether or not to write a markdown file containing results
+        latex (bool): whether or not to create a LaTeX table
+        use_source (bool): print source instead of text_id
+        colour (bool): colour on-hull structures
 
-    Args:
-
-        | args       : dict, extra keyword arguments
-        | argstr     : str, string to store matador initialisation command
-        | additions  : list(str), list of text_ids to be coloured green with a (+)
-        | deletions  : list(str), list of text_ids to be coloured red with a (-)
-        | hull       : bool, whether or not to print hull-style (True) or query-style
-        | markdown   : bool, whether or not to write a markdown file containing results
-        | latex      : bool, whether or not to create a LaTeX table
-        | use_source : bool, print source instead of text_id
-        | colour     : bool, colour on-hull structures
+    Returns:
+        str or None: markdown or latex string, if markdown or latex is True, else None.
 
     """
     details = args.get('details')
     if args is None:
         args = dict()
+
+    if markdown and latex:
+        raise RuntimeError('Cannot specify both latex and markdown output at once.')
+
     struct_string = []
     detail_string = []
     detail_substring = []
@@ -49,9 +48,8 @@ def display_results(cursor,
     last_formula = ''
     units_string = ''
 
-    if len(cursor) == 0:
-        print('No structures to show.')
-        return
+    if not cursor:
+        raise RuntimeError('No structures found in cursor.')
 
     if markdown:
         markdown_string = ('GenDate: ' + strftime("%H:%M %d/%m/%Y") + '\n')
@@ -60,11 +58,12 @@ def display_results(cursor,
         markdown_string += ('Version: ' + __version__ + '\n\n')
 
     if latex:
-        latex_string = ("\\begin{tabular}{l r r c l l}\n"
-                        "\\rowcolor{gray!20}\n"
-                        "\\multicolumn{1}{l}{formula} & \\multicolumn{1}{r}{$\\Delta E$ from hull (meV/atom)} & "
-                        "\\multicolumn{1}{r}{grav. cap. (mAh/g)} & \\multicolumn{1}{c}{sg.} & "
-                        "\\multicolumn{1}{l}{provenance} & \\multicolumn{1}{l}{description} \\\\\n")
+        latex_string = (
+            "\\begin{tabular}{l r r c l l}\n"
+            "\\rowcolor{gray!20}\n"
+            "\\multicolumn{1}{l}{formula} & \\multicolumn{1}{r}{$\\Delta E$ from hull (meV/atom)} & "
+            "\\multicolumn{1}{r}{grav. cap. (mAh/g)} & \\multicolumn{1}{c}{sg.} & "
+            "\\multicolumn{1}{l}{provenance} & \\multicolumn{1}{l}{description} \\\\\n")
         latex_struct_string = []
 
     header_string = ''
@@ -165,8 +164,8 @@ def display_results(cursor,
                 if doc['quality'] == 0:
                     struct_string[-1] += "{:^5}".format('!!!')
                 else:
-                    struct_string[-1] += "{:^5}".format((5-doc['quality'])*'?')
-            except:
+                    struct_string[-1] += "{:^5}".format((5 - doc['quality']) * '?')
+            except KeyError:
                 struct_string[-1] += "{:5}".format(' ')
         else:
             struct_string.append("{:40}".format(next(source.split('/')[-1].split('.')[0]
@@ -180,20 +179,21 @@ def display_results(cursor,
         else:
             struct_string[-1] += "{:^10}".format('xxx')
         if args.get('per_atom') and 'cell_volume' in doc and 'num_atoms' in doc:
-            struct_string[-1] += "{:>11.1f}".format(doc['cell_volume']/doc['num_atoms'])
+            struct_string[-1] += "{:>11.1f}".format(doc['cell_volume'] / doc['num_atoms'])
         elif 'cell_volume' in doc and 'num_fu' in doc:
-            struct_string[-1] += "{:>11.1f}".format(doc['cell_volume']/doc['num_fu'])
+            struct_string[-1] += "{:>11.1f}".format(doc['cell_volume'] / doc['num_fu'])
         else:
             struct_string[-1] += "{:^11}".format('xxx')
         try:
             if hull:
-                struct_string[-1] += "{:>13.1f}".format(0 if doc.get('hull_distance') <= 1e-12 else 1000*doc.get('hull_distance'))
+                struct_string[-1] += "{:>13.1f}".format(
+                    0 if doc.get('hull_distance') <= 1e-12 else 1000 * doc.get('hull_distance'))
             elif args.get('per_atom'):
                 struct_string[-1] += "{:>18.5f}".format(doc['enthalpy_per_atom'])
             else:
-                struct_string[-1] += "{:>18.5f}".format(doc['enthalpy']/doc['num_fu'] -
-                                                        gs_enthalpy)
-        except:
+                struct_string[-1] += "{:>18.5f}".format(
+                    doc['enthalpy'] / doc['num_fu'] - gs_enthalpy)
+        except KeyError:
             struct_string[-1] += "{:^18}".format('xxx')
 
         if 'space_group' in doc:
@@ -218,8 +218,12 @@ def display_results(cursor,
 
         if latex:
             latex_struct_string.append("{:^20} {:^10} & ".format(formula_substring, '$\\star$' if doc['hull_distance'] == 0 else ''))
-            latex_struct_string[-1] += "{:^20.0f} & ".format(doc.get('hull_distance')*1000) if doc.get('hull_distance') > 0 else '{:^20} &'.format('-')
-            latex_struct_string[-1] += "{:^20.0f} & ".format(doc['gravimetric_capacity']) if doc.get('hull_distance') == 0 else '{:^20} &'.format('-')
+            latex_struct_string[-1] += "{:^20.0f} & ".format(doc.get(
+                'hull_distance') * 1000) if doc.get('hull_distance') > 0 else '{:^20} &'.format(
+                    '-')
+            latex_struct_string[-1] += "{:^20.0f} & ".format(doc[
+                'gravimetric_capacity']) if doc.get('hull_distance') == 0 else '{:^20} &'.format(
+                    '-')
             latex_struct_string[-1] += "{:^20} & ".format(get_spacegroup_spg(doc))
             prov = get_guess_doc_provenance(doc['source'], doc.get('icsd'))
             if doc.get('icsd'):
@@ -241,7 +245,7 @@ def display_results(cursor,
                 if doc['spin_polarized']:
                     detail_string[-1] += 'S-'
             if 'sedc_scheme' in doc:
-                detail_string[-1] += doc['sedc_scheme'].upper()+'+'
+                detail_string[-1] += doc['sedc_scheme'].upper() + '+'
             if 'xc_functional' in doc:
                 detail_string[-1] += doc['xc_functional']
             else:
@@ -251,9 +255,8 @@ def display_results(cursor,
             else:
                 detail_string[-1] += 'cutoff unknown'
             if 'external_pressure' in doc:
-                detail_string[-1] += (', ' +
-                                      "{:4.2f}".format(doc['external_pressure'][0][0]) +
-                                      ' GPa')
+                detail_string[-1] += (
+                    ', ' + "{:4.2f}".format(doc['external_pressure'][0][0]) + ' GPa')
             if 'kpoints_mp_spacing' in doc:
                 detail_string[-1] += ', ~' + str(doc['kpoints_mp_spacing']) + ' 1/A'
             if 'geom_force_tol' in doc:
@@ -262,55 +265,58 @@ def display_results(cursor,
                 try:
                     for species in doc['species_pot']:
                         detail_substring[-1] += doc['species_pot'][species] + ', '
-                except:
+                except KeyError:
                     pass
             if 'icsd' in doc:
                 detail_substring[-1] += 'ICSD-CollCode' + doc['icsd'] + ', '
             if 'tags' in doc:
                 try:
-                    for tag in doc['tags']:
-                        detail_substring[-1] += tag + ', '
-                except:
+                    if isinstance(doc['tags'], list):
+                        for tag in doc['tags']:
+                            detail_substring[-1] += tag + ', '
+                except KeyError:
                     pass
             if 'user' in doc:
                 detail_substring[-1] += doc['user']
             if 'encapsulated' in doc:
                 try:
-                    detail_string[-1] += (', (n,m)=(' + str(doc['cnt_chiral'][0]) +
-                                          ',' + str(doc['cnt_chiral'][1]) + ')')
+                    detail_string[-1] += (
+                        ', (n,m)=(' + str(doc['cnt_chiral'][0]) + ',' + str(doc['cnt_chiral'][1]) +
+                        ')')
                     detail_string[-1] += ', r=' + "{:4.2f}".format(doc['cnt_radius']) + ' A'
                     detail_string[-1] += ', z=' + "{:4.2f}".format(doc['cnt_length']) + ' A'
-                except:
+                except KeyError:
                     pass
-            detail_string[-1] += ' ' + (len(header_string)-len(detail_string[-1])-1)*u"╌"
-            detail_substring[-1] += ' ' + (len(header_string)-len(detail_substring[-1])-1)*u"╌"
+            detail_string[-1] += ' ' + (len(header_string) - len(detail_string[-1]) - 1) * u"╌"
+            detail_substring[
+                -1] += ' ' + (len(header_string) - len(detail_substring[-1]) - 1) * u"╌"
 
         if args.get('source'):
             if len(doc['source']) == 1:
-                source_string.append(11*' ' + u"└──────────────────")
+                source_string.append(11 * ' ' + u"└──────────────────")
             else:
-                source_string.append(11*' ' + u"└───────────────┬──")
+                source_string.append(11 * ' ' + u"└───────────────┬──")
             for num, file in enumerate(doc['source']):
                 if len(doc['source']) == 1:
                     source_string[-1] += ''
-                elif num == len(doc['source'])-1:
-                    source_string[-1] += (len(u"└────────────── ")+11)*' ' + u'└──'
+                elif num == len(doc['source']) - 1:
+                    source_string[-1] += (len(u"└────────────── ") + 11) * ' ' + u'└──'
                 elif num != 0:
-                    source_string[-1] += (len(u"└────────────── ")+11)*' ' + u'├──'
+                    source_string[-1] += (len(u"└────────────── ") + 11) * ' ' + u'├──'
                 source_string[-1] += ' ' + file.split('structure_repository')[-1]
-                if num != len(doc['source'])-1:
+                if num != len(doc['source']) - 1:
                     source_string[-1] += '\n'
 
     if not markdown:
-        print(len(header_string)*'─')
+        print(len(header_string) * '─')
         print(header_string)
         print(units_string)
-        print(len(header_string)*'─')
+        print(len(header_string) * '─')
     else:
-        markdown_string += len(header_string)*'-' + '\n'
+        markdown_string += len(header_string) * '-' + '\n'
         markdown_string += header_string + '\n'
         markdown_string += units_string + '\n'
-        markdown_string += len(header_string)*'-' + '\n'
+        markdown_string += len(header_string) * '-' + '\n'
 
     if args.get('summary'):
         current_formula = ''
@@ -353,6 +359,8 @@ def display_results(cursor,
         latex_string += '\\end{tabular}'
         return latex_string
 
+    return None
+
 
 def set_cursor_from_array(cursor, array, key):
     """ Updates the key-value pair for documents in
@@ -372,10 +380,11 @@ def get_array_from_cursor(cursor, key):
     try:
         for doc in cursor:
             array.append(doc[key])
-    except:
+    except KeyError:
         print_exc()
     array = np.asarray(array)
-    assert len(array) == len(cursor)
+    if len(array) != len(cursor):
+        raise RuntimeError('Some keys were missing.')
     return array
 
 
@@ -392,8 +401,8 @@ def get_guess_doc_provenance(sources, icsd=None):
     for fname in sources:
         fname_with_folder = fname
         fname = fname.split('/')[-1].lower()
-        if (fname.endswith('.castep') or fname.endswith('.res') or
-                fname.endswith('.history') or ('oqmd' in fname and fname.count('.') == 0)):
+        if (fname.endswith('.castep') or fname.endswith('.res') or fname.endswith('.history') or
+            ('oqmd' in fname and fname.count('.') == 0)):
             if any(substr in fname for substr in ['collcode', 'colcode', 'collo']):
                 if fname.count('-') == 2 + fname.count('oqmd') or 'swap' in fname:
                     prov = 'SWAPS'
@@ -439,17 +448,17 @@ def get_spg_uniq(cursor, symprec=1e-2, latvecprec=1e-3, posprec=1e-3):
     for i in range(len(refined_list)):
         for j in range(len(refined_list[i][1])):
             for k in range(len(refined_list[i][1][j])):
-                if refined_list[i][1][j][k] > 1-1e-10:
+                if refined_list[i][1][j][k] > 1 - 1e-10:
                     refined_list[i][1][j][k] = 0.0
     for i in range(len(refined_list)):
-        refined_list[i] = (refined_list[i][0],
-                           refined_list[i][1][np.argsort(refined_list[i][1][:, 0])],
-                           refined_list[i][2][np.argsort(refined_list[i][1][:, 0])])
+        refined_list[i] = (
+            refined_list[i][0], refined_list[i][1][np.argsort(refined_list[i][1][:, 0])],
+            refined_list[i][2][np.argsort(refined_list[i][1][:, 0])])
     uniq_list = np.arange(0, len(spg_cursor))
     same_list = []
     shift_list = []
     for i in range(len(spg_cursor)):
-        for j in range(i+1, len(spg_cursor)):
+        for j in range(i + 1, len(spg_cursor)):
             if sorted(cursor[i]['stoichiometry']) == sorted(cursor[j]['stoichiometry']):
                 if np.allclose(refined_list[i][0], refined_list[j][0], atol=latvecprec, rtol=0):
                     if np.allclose(refined_list[i][1], refined_list[j][1], atol=posprec, rtol=0):

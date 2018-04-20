@@ -28,8 +28,7 @@ class MatadorCommandLine(object):
         self.export = any([self.args.get(ext) for ext in file_exts])
 
         if self.args['subcmd'] != 'import':
-            self.settings = load_custom_settings(
-                config_fname=self.args.get('config'))
+            self.settings = load_custom_settings(config_fname=self.args.get('config'))
             result = make_connection_to_collection(self.args.get('db'),
                                                    check_collection=True,
                                                    mongo_settings=self.settings)
@@ -45,14 +44,12 @@ class MatadorCommandLine(object):
                 self.importer = Spatula(self.args)
 
             if self.args['subcmd'] == 'query':
-                self.query = DBQuery(
-                    self.client, self.collections, **self.args)
+                self.query = DBQuery(self.client, self.collections, **self.args)
                 self.cursor = self.query.cursor
 
             if self.args['subcmd'] in ['swaps']:
                 from matador.polish import Polisher
-                self.query = DBQuery(
-                    self.client, self.collections, **self.args)
+                self.query = DBQuery(self.client, self.collections, **self.args)
                 if self.args.get('hull_cutoff') is not None:
                     self.hull = QueryConvexHull(self.query, **self.args)
                     self.polisher = Polisher(self.hull.hull_cursor, self.args)
@@ -62,19 +59,15 @@ class MatadorCommandLine(object):
 
             if self.args['subcmd'] == 'refine':
                 from matador.refine import Refiner
-                self.query = DBQuery(
-                    self.client, self.collections, **self.args)
+                self.query = DBQuery(self.client, self.collections, **self.args)
                 if self.args.get('hull_cutoff') is not None:
                     self.hull = QueryConvexHull(self.query, **self.args)
-                    self.refiner = Refiner(
-                        self.hull.cursor, self.query.repo, **self.args)
+                    self.refiner = Refiner(self.hull.cursor, self.query.repo, **self.args)
                 else:
-                    self.refiner = Refiner(
-                        self.query.cursor, self.query.repo, **self.args)
+                    self.refiner = Refiner(self.query.cursor, self.query.repo, **self.args)
 
             if self.args['subcmd'] == 'pdffit':
-                self.query = DBQuery(
-                    self.client, self.collections, **self.args)
+                self.query = DBQuery(self.client, self.collections, **self.args)
                 self.cursor = list(self.query.cursor)
                 if self.args.get('hull_cutoff') is not None:
                     self.hull = QueryConvexHull(self.query, **self.args)
@@ -83,22 +76,18 @@ class MatadorCommandLine(object):
                 if self.args.get('top') is not None:
                     self.top = self.args.get('top')
                 if not self.cursor[:self.top]:
-                    print_notify('Performing PDF fit for ' +
-                                 str(len(self.cursor[:self.top])) +
-                                 ' structures.')
+                    print_notify('Performing PDF fit for ' + str(len(self.cursor[:self.top])) + ' structures.')
                     from matador.pdffit import PDFFitter
-                    self.pdffit = PDFFitter(
-                        self.cursor[:self.top], **self.args)
+                    self.pdffit = PDFFitter(self.cursor[:self.top], **self.args)
                     try:
                         self.pdffit.spawn()
-                    except(KeyboardInterrupt, RuntimeError, SystemExit) as oops:
+                    except (KeyboardInterrupt, RuntimeError, SystemExit) as oops:
                         raise oops('Exiting top-level...')
                 else:
                     exit('No structure match query.')
 
             if self.args['subcmd'] == 'hull' or self.args['subcmd'] == 'voltage':
-                self.query = DBQuery(
-                    self.client, self.collections, **self.args)
+                self.query = DBQuery(self.client, self.collections, **self.args)
                 self.hull = QueryConvexHull(self.query, **self.args)
                 self.cursor = self.hull.hull_cursor
 
@@ -127,15 +116,12 @@ class MatadorCommandLine(object):
             # perform any extra filtration
             if self.args.get('filter'):
                 from matador.utils.cursor_utils import filter_cursor
-                self.cursor = filter_cursor(self.cursor,
-                                            self.args.get('filter'),
-                                            self.args.get('values'))
+                self.cursor = filter_cursor(self.cursor, self.args.get('filter'), self.args.get('values'))
 
             if self.export and self.cursor:
                 from matador.export import query2files
                 if self.args.get('write_n') is not None:
-                    self.cursor = [doc for doc in self.cursor if len(
-                        doc['stoichiometry']) == self.args.get('write_n')]
+                    self.cursor = [doc for doc in self.cursor if len(doc['stoichiometry']) == self.args.get('write_n')]
                 if len(self.cursor) < 1:
                     print_failure('No structures left to export.')
                 query2files(self.cursor, self.args, argstr=self.argstr)
@@ -148,14 +134,13 @@ class MatadorCommandLine(object):
                     self.top = self.args.get('top')
                 if len(self.cursor[:self.top]) > 10:
                     from time import sleep
-                    print_warning(
-                        'WARNING: opening {} files with ase-gui...'.format(len(self.cursor)))
-                    print_warning(
-                        'Please kill script within 3 seconds if undesired...')
+                    print_warning('WARNING: opening {} files with ase-gui...'.format(len(self.cursor)))
+                    print_warning('Please kill script within 3 seconds if undesired...')
                     sleep(3)
                 if len(self.cursor[:self.top]) > 20:
-                    print_failure('You will literally be opening that many windows, ' +
-                                  'I\'ll give you another 5 seconds to reconsider...')
+                    print_failure(
+                        'You will literally be opening that many windows, ' +
+                        'I\'ll give you another 5 seconds to reconsider...')
 
                     sleep(5)
                     print_notify('It\'s your funeral...')
@@ -178,27 +163,23 @@ class MatadorCommandLine(object):
         """ Print spatula report on current database. """
         try:
             report = self.report.find_one()
-            print('Database last modified on', report['last_modified'], 'with matador',
-                  report['version'] + '.')
+            print('Database last modified on', report['last_modified'], 'with matador', report['version'] + '.')
         except Exception:
             print_warning('Failed to print database report: spatula is probably running!')
 
     def stats(self):
         """ Print some useful stats about the database. """
         if self.args.get('list'):
-            print_notify(str(len(self.db.collection_names())) +
-                         ' collections found in database:\n')
+            print_notify(str(len(self.db.collection_names())) + ' collections found in database:\n')
             collstats_list = []
             for name in self.db.collection_names():
                 collstats_list.append(self.db.command('collstats', name))
                 collstats_list[-1]['name'] = name
-            collstats_list = sorted(
-                collstats_list, key=lambda k: k['count'], reverse=True)
+            collstats_list = sorted(collstats_list, key=lambda k: k['count'], reverse=True)
             print("\t{:^20}\t{:^20}".format('Name', 'Number of structures'))
             for collection in collstats_list:
                 if not collection['name'].startswith('__'):
-                    print("\t{:<20}\t{:>20d}".format(
-                        collection['name'], collection['count']))
+                    print("\t{:<20}\t{:>20d}".format(collection['name'], collection['count']))
             print('\n')
         elif self.args.get('delete'):
             target = self.args.get('db')
@@ -214,11 +195,11 @@ class MatadorCommandLine(object):
                 from getpass import getuser
                 user = getuser()
                 if user not in target:
-                    exit('I cannot delete a collection that\'s name does not start with \
-                         your username, {}'.format(user))
+                    exit('I cannot delete a collection that\'s name does not start with '
+                         'your username, {}'.format(user))
                 stats = self.db.command('collstats', target)
-                answer = input('Are you sure you want to delete collection {} containing {} \
-                               structures? [y/n])'.format(target, stats['count']))
+                answer = input('Are you sure you want to delete collection {} containing {} '
+                               'structures? [y/n]\n'.format(target, stats['count']))
                 if answer.lower() == 'y':
                     if target == 'repo':
                         exit('I\'m sorry Dave, I\'m afraid I can\'t do that...')

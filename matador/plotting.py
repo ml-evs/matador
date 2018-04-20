@@ -15,6 +15,7 @@ def plotting_function(function):
     """ Wrapper for plotting functions to safely fail on
     X-forwarding errors.
     """
+
     def wrapped_plot_function(*args, **kwargs):
         """ Wrap and return the plotting function. """
         from tkinter import TclError
@@ -25,6 +26,7 @@ def plotting_function(function):
             print_warning('Error message was: {}'.format(exc))
             print_warning('This is probably an X-forwarding error')
             print_failure('Skipping plot...')
+
     return wrapped_plot_function
 
 
@@ -87,7 +89,7 @@ def plot_spectral(seeds, **kwargs):
 
     if len(seeds) > 1 or kwargs.get('colour_by_seed'):
         seed_colours = colours
-        ls = ['-']*len(seeds)
+        ls = ['-'] * len(seeds)
         colour_by_seed = True
         if kwargs.get('labels') is None:
             kwargs['labels'] = [seed.split('/')[-1].split('.')[0] for seed in seeds]
@@ -153,7 +155,7 @@ def plot_spectral(seeds, **kwargs):
             for branch in dispersion[branch_key]:
                 for ind, kpt in enumerate(dispersion[path_key][branch]):
                     if ind != len(branch) - 1:
-                        diff = np.sqrt(np.sum((kpt - dispersion[path_key][branch[ind+1]])**2))
+                        diff = np.sqrt(np.sum((kpt - dispersion[path_key][branch[ind + 1]])**2))
                         path.append(path[-1] + diff)
             path = np.asarray(path)
             path /= np.max(path)
@@ -204,8 +206,8 @@ def plot_spectral(seeds, **kwargs):
                         ax_dispersion.plot(path[(np.asarray(branch)-branch_ind).tolist()],
                                            dispersion[eig_key][ns][nb][branch],
                                            c=colour, lw=1, ls=ls[seed_ind], alpha=alpha, label=label)
-                if branch_ind != len(dispersion[branch_key])-1:
-                    ax_dispersion.axvline(path[branch[-1]-branch_ind], ls='-.', lw=1, c='grey')
+                if branch_ind != len(dispersion[branch_key]) - 1:
+                    ax_dispersion.axvline(path[branch[-1] - branch_ind], ls='-.', lw=1, c='grey')
             if len(seeds) > 1:
                 ax_dispersion.legend()
             ax_dispersion.axhline(0, ls='--', lw=1, c='grey')
@@ -236,22 +238,23 @@ def plot_spectral(seeds, **kwargs):
                         kpt = dispersion[path_key][ind]
                         for label, point in path_labels.items():
                             if np.allclose(point, kpt):
-                                if ind-branch_ind not in labelled:
+                                if ind - branch_ind not in labelled:
                                     label = label.replace('GAMMA', r'\Gamma')
                                     label = label.replace('SIGMA', r'\Sigma')
-                                    if sub_ind == len(branch)-1:
-                                        if branch_ind < len(dispersion[branch_key])-1:
-                                            next_point = dispersion[path_key][dispersion[branch_key][branch_ind+1][0]]
+                                    if sub_ind == len(branch) - 1:
+                                        if branch_ind < len(dispersion[branch_key]) - 1:
+                                            _tmp = dispersion[path_key]
+                                            next_point = _tmp[dispersion[branch_key][branch_ind + 1][0]]
                                             for new_label, new_point in path_labels.items():
                                                 new_label = new_label.replace('GAMMA', r'\Gamma')
                                                 new_label = new_label.replace('SIGMA', r'\Sigma')
                                                 if np.allclose(new_point, next_point):
                                                     label = '{}|{}'.format(label, new_label)
-                                                    labelled.append(ind-branch_ind)
+                                                    labelled.append(ind - branch_ind)
                                                     shear_planes.append(ind)
                                     label = '${}$'.format(label)
                                     xticklabels.append(label)
-                                    xticks.append(path[ind-branch_ind])
+                                    xticks.append(path[ind - branch_ind])
                                     break
             if not kwargs['phonons'] and kwargs['gap'] and dispersion['band_gap'] > 0:
                 vbm_pos = dispersion['band_gap_path_inds'][1]
@@ -261,10 +264,10 @@ def plot_spectral(seeds, **kwargs):
                 if vbm_pos != cbm_pos:
                     vbm_offset = sum([vbm_pos > ind for ind in shear_planes])
                     cbm_offset = sum([cbm_pos > ind for ind in shear_planes])
-                    ax_dispersion.plot([path[vbm_pos-vbm_offset], path[cbm_pos-cbm_offset]],
-                                       [vbm, cbm],
-                                       ls=ls[seed_ind], c='blue',
-                                       label='indirect gap {:3.3f} eV'.format(cbm-vbm))
+                    ax_dispersion.plot([path[vbm_pos - vbm_offset], path[cbm_pos - cbm_offset]], [vbm, cbm],
+                                       ls=ls[seed_ind],
+                                       c='blue',
+                                       label='indirect gap {:3.3f} eV'.format(cbm - vbm))
 
                 vbm_pos = dispersion['direct_gap_path_inds'][1]
                 vbm = dispersion['direct_valence_band_min']
@@ -272,9 +275,10 @@ def plot_spectral(seeds, **kwargs):
                 cbm = dispersion['direct_conduction_band_max']
                 vbm_offset = sum([vbm_pos > ind for ind in shear_planes])
                 cbm_offset = sum([cbm_pos > ind for ind in shear_planes])
-                ax_dispersion.plot([path[vbm_pos-vbm_offset], path[cbm_pos-cbm_offset]],
-                                   [vbm, cbm], ls=ls[seed_ind],
-                                   c='red', label='direct gap {:3.3f} eV'.format(cbm-vbm))
+                ax_dispersion.plot([path[vbm_pos - vbm_offset], path[cbm_pos - cbm_offset]], [vbm, cbm],
+                                   ls=ls[seed_ind],
+                                   c='red',
+                                   label='direct gap {:3.3f} eV'.format(cbm - vbm))
                 ax_dispersion.legend(loc='upper center',
                                      bbox_to_anchor=(0.5, 1.1),
                                      fancybox=True, shadow=True,
@@ -297,8 +301,7 @@ def plot_spectral(seeds, **kwargs):
             else:
                 if not isfile(seed + '.phonon_dos'):
                     phonon_data, s = phonon2dict(seed + '.phonon')
-                    plot_window = [np.min(phonon_data['eigenvalues_q'])-10,
-                                   np.max(phonon_data['eigenvalues_q'])]
+                    plot_window = [np.min(phonon_data['eigenvalues_q']) - 10, np.max(phonon_data['eigenvalues_q'])]
                     if s:
                         space_size = 1000
                         gaussian_width = 10
@@ -309,15 +312,13 @@ def plot_spectral(seeds, **kwargs):
                             for eig in qpt:
                                 raw_weights.append(weight)
                                 raw_eigenvalues.append(eig)
-                        hist, energies = np.histogram(raw_eigenvalues,
-                                                      weights=raw_weights,
-                                                      bins=space_size)
+                        hist, energies = np.histogram(raw_eigenvalues, weights=raw_weights, bins=space_size)
                         # shift bin edges to bin centres
                         energies -= energies[1] - energies[0]
                         energies = energies[:-1]
                         new_energies = np.reshape(energies, (1, len(energies)))
                         new_energies -= np.reshape(energies, (1, len(energies))).T
-                        dos = np.sum(hist*np.exp(-(new_energies)**2 / gaussian_width), axis=1)
+                        dos = np.sum(hist * np.exp(-(new_energies)**2 / gaussian_width), axis=1)
                         dos = np.divide(dos, np.sqrt(2 * np.pi * gaussian_width**2))
                         max_density = np.max(dos)
                         phonon_data['freq_unit'] = phonon_data['freq_unit'].replace('-1', '$^{-1}$')
@@ -335,7 +336,7 @@ def plot_spectral(seeds, **kwargs):
                         if 'begin dos' in line.lower():
                             projector_labels = line.split()[5:]
                             num_projectors = len(projector_labels)
-                            begin = ind+1
+                            begin = ind + 1
                             break
                     data_flines = flines[begin:-1]
                     with open(seed + '.phonon_dos_tmp', 'w') as f:
@@ -350,7 +351,7 @@ def plot_spectral(seeds, **kwargs):
                     dos_data['energies'] = energies
                     dos_data['pdos'] = dict()
                     for i, label in enumerate(projector_labels):
-                        dos_data['pdos'][label] = raw_data[:, i+2]
+                        dos_data['pdos'][label] = raw_data[:, i + 2]
                     pdos = dos_data['pdos']
                     from os import remove
                     remove(seed + '.phonon_dos_tmp')
@@ -365,10 +366,10 @@ def plot_spectral(seeds, **kwargs):
             sns.set_palette(kwargs.get('cmap'), n_colors=num_projectors)
             colours = sns.color_palette()
             if kwargs['plot_bandstructure']:
-                ax_dos.set_xticks([0.6*max_density])
+                ax_dos.set_xticks([0.6 * max_density])
                 ax_dos.set_xticklabels([ylabel])
                 ax_dos.axhline(0, c='grey', ls='--', lw=1)
-                ax_dos.set_xlim(0, max_density*1.2)
+                ax_dos.set_xlim(0, max_density * 1.2)
                 ax_dos.set_ylim(plot_window)
                 ax_dos.axvline(0, c='k')
                 if len(seeds) > 1:
@@ -395,7 +396,7 @@ def plot_spectral(seeds, **kwargs):
                 ax_dos.set_xlabel(xlabel)
                 ax_dos.set_ylabel(ylabel)
                 ax_dos.axvline(0, c='grey', ls='--', lw=1)
-                ax_dos.set_ylim(0, max_density*1.2)
+                ax_dos.set_ylim(0, max_density * 1.2)
                 ax_dos.set_xlim(plot_window)
                 ax_dos.axhline(0, c='k')
                 if len(seeds) > 1:
@@ -420,8 +421,7 @@ def plot_spectral(seeds, **kwargs):
 
     if any([kwargs.get('pdf'), kwargs.get('svg'), kwargs.get('png')]):
         if kwargs.get('pdf'):
-            plt.savefig(seeds[0].replace('.bands', '').replace('.phonon', '') + '_spectral.pdf',
-                        bbox_inches='tight')
+            plt.savefig(seeds[0].replace('.bands', '').replace('.phonon', '') + '_spectral.pdf', bbox_inches='tight')
         if kwargs.get('svg'):
             plt.savefig(seeds[0].replace('.bands', '').replace('.phonon', '') + '_spectral.svg',
                         bbox_inches='tight', transparent=True)
@@ -454,14 +454,14 @@ def modes2bands(phonon_dispersion, branches):
         eigs_branch = eigs[:, branch]
         converged = False
         while not converged:
-            for i in range(1, len(branch)-1):
-                guess = (2 * eigs_branch[:, i] - eigs_branch[:, i-1])
-                if np.any(np.argsort(guess) != np.argsort(eigs_branch[:, i+1])):
+            for i in range(1, len(branch) - 1):
+                guess = (2 * eigs_branch[:, i] - eigs_branch[:, i - 1])
+                if np.any(np.argsort(guess) != np.argsort(eigs_branch[:, i + 1])):
                     tmp_eigs_branch = deepcopy(eigs_branch)
                     for ind, mode in enumerate(np.argsort(eigs_branch[:, i]).tolist()):
-                        eigs_branch[mode, i+1:] = deepcopy(tmp_eigs_branch[np.argsort(guess)[ind], i+1:])
+                        eigs_branch[mode, i + 1:] = deepcopy(tmp_eigs_branch[np.argsort(guess)[ind], i + 1:])
                     break
-            if i == len(branch)-2:
+            if i == len(branch) - 2:
                 converged = True
             eigs[:, branch] = eigs_branch
 
@@ -492,31 +492,39 @@ def plot_voltage_curve(hull, show=True):
     if hull.args.get('expt') is not None:
         expt_data = np.loadtxt(hull.args.get('expt'), delimiter=',')
         if hull.args.get('expt_label'):
-            axQ.plot(expt_data[:, 0], expt_data[:, 1], c='k', lw=2, ls='-',
-                     label=hull.args.get('expt_label'))
+            axQ.plot(expt_data[:, 0], expt_data[:, 1], c='k', lw=2, ls='-', label=hull.args.get('expt_label'))
         else:
             axQ.plot(expt_data[:, 0], expt_data[:, 1], c='k', lw=2, ls='-', label='Experiment')
     for ind, voltage in enumerate(hull.voltages):
-        for i in range(1, len(voltage)-1):
+        for i in range(1, len(voltage) - 1):
             if i == 1 and hull.args.get('expt'):
-                axQ.plot([hull.Q[ind][i-1], hull.Q[ind][i]], [voltage[i], voltage[i]], marker='*',
-                         lw=2, c=hull.colours[ind], label='DFT (this work)')
+                axQ.plot([hull.Q[ind][i - 1], hull.Q[ind][i]], [voltage[i], voltage[i]],
+                         marker='*',
+                         lw=2,
+                         c=hull.colours[ind],
+                         label='DFT (this work)')
             elif i == 1 and len(hull.voltages) != 1:
-                axQ.plot([hull.Q[ind][i-1], hull.Q[ind][i]], [voltage[i], voltage[i]],
-                         marker='o', markersize=5,
-                         lw=2, c=hull.colours[ind],
+                axQ.plot([hull.Q[ind][i - 1], hull.Q[ind][i]], [voltage[i], voltage[i]],
+                         marker='o',
+                         markersize=5,
+                         lw=2,
+                         c=hull.colours[ind],
                          label=get_formula_from_stoich(hull.endstoichs[ind], tex=True))
             else:
-                axQ.plot([hull.Q[ind][i-1], hull.Q[ind][i]], [voltage[i], voltage[i]],
-                         marker='o', markersize=5,
-                         lw=2, c=hull.colours[ind])
-            if i != len(voltage)-2:
-                axQ.plot([hull.Q[ind][i], hull.Q[ind][i]], [voltage[i], voltage[i+1]],
-                         marker='o', markersize=5,
-                         lw=2, c=hull.colours[ind])
+                axQ.plot([hull.Q[ind][i - 1], hull.Q[ind][i]], [voltage[i], voltage[i]],
+                         marker='o',
+                         markersize=5,
+                         lw=2,
+                         c=hull.colours[ind])
+            if i != len(voltage) - 2:
+                axQ.plot([hull.Q[ind][i], hull.Q[ind][i]], [voltage[i], voltage[i + 1]],
+                         marker='o',
+                         markersize=5,
+                         lw=2,
+                         c=hull.colours[ind])
     if hull.args.get('labels'):
         eps = 1e-9
-        hull.label_cursor = [doc for doc in hull.hull_cursor if doc['hull_distance'] <= 0+eps]
+        hull.label_cursor = [doc for doc in hull.hull_cursor if doc['hull_distance'] <= 0 + eps]
         hull.label_cursor = hull.label_cursor[1:-1]
         for i in range(len(hull.label_cursor)):
             axQ.annotate(get_formula_from_stoich(hull.label_cursor[i]['stoichiometry'],
@@ -531,9 +539,9 @@ def plot_voltage_curve(hull, show=True):
     axQ.set_ylabel('Voltage (V) vs {}$^+$/{}'.format(hull.elements[0], hull.elements[0]))
     axQ.set_xlabel('Gravimetric cap. (mAh/g)')
     _, end = axQ.get_ylim()
-    axQ.set_ylim(0, 1.1*end)
+    axQ.set_ylim(0, 1.1 * end)
     _, end = axQ.get_xlim()
-    axQ.set_xlim(0, 1.1*end)
+    axQ.set_xlim(0, 1.1 * end)
     axQ.grid('off')
     plt.tight_layout(pad=0.0, h_pad=1.0, w_pad=0.2)
     try:
@@ -548,14 +556,11 @@ def plot_voltage_curve(hull, show=True):
 
     if hull.savefig:
         if hull.args.get('pdf'):
-            plt.savefig(hull.elements[0]+hull.elements[1]+'_voltage.pdf',
-                        dpi=500, transparent=True)
+            plt.savefig(hull.elements[0] + hull.elements[1] + '_voltage.pdf', dpi=500, transparent=True)
         if hull.args.get('svg'):
-            plt.savefig(hull.elements[0]+hull.elements[1]+'_voltage.svg',
-                        dpi=500, transparent=True)
+            plt.savefig(hull.elements[0] + hull.elements[1] + '_voltage.svg', dpi=500, transparent=True)
         if hull.args.get('png'):
-            plt.savefig(hull.elements[0]+hull.elements[1]+'_voltage.png',
-                        dpi=500, transparent=True)
+            plt.savefig(hull.elements[0] + hull.elements[1] + '_voltage.png', dpi=500, transparent=True)
     elif show:
         plt.show()
 
@@ -581,7 +586,7 @@ def plot_thermo_curves(seed, show=True, **kwargs):
     from scipy.constants import physical_constants
 
     # set defaults
-    prop_defaults = {'plot_energy':False, 'plot_heat_cap':False}
+    prop_defaults = {'plot_energy': False, 'plot_heat_cap': False}
     prop_defaults.update(kwargs)
     kwargs = prop_defaults
 
@@ -622,7 +627,7 @@ def plot_thermo_curves(seed, show=True, **kwargs):
     eVJ = physical_constants['electron volt-joule relationship'][0]
     entropyT = []
     for i, val in enumerate(entropy):
-        entropyT.append(temps[i] * val * (1./eVJ) * (1./AVOGADROS_NUMBER))  # J/mol/K --> eV
+        entropyT.append(temps[i] * val * (1. / eVJ) * (1. / AVOGADROS_NUMBER))  # J/mol/K --> eV
 
     if kwargs['plot_energy']:
         ax_energy.plot(temps, free_energy, c='r', lw=1, ls='-', alpha=1, label='Free Energy')
@@ -639,11 +644,11 @@ def plot_thermo_curves(seed, show=True, **kwargs):
 
     if any([kwargs.get('pdf'), kwargs.get('svg'), kwargs.get('png')]):
         if kwargs.get('pdf'):
-            plt.savefig(seed.replace('.castep', '')+'_thermoplots.pdf', dpi=300, transparent=True)
+            plt.savefig(seed.replace('.castep', '') + '_thermoplots.pdf', dpi=300, transparent=True)
         if kwargs.get('svg'):
-            plt.savefig(seed.replace('.castep', '')+'_thermoplots.svg', dpi=300, transparent=True)
+            plt.savefig(seed.replace('.castep', '') + '_thermoplots.svg', dpi=300, transparent=True)
         if kwargs.get('png'):
-            plt.savefig(seed.replace('.castep', '')+'_thermoplots.png', dpi=300, transparent=True)
+            plt.savefig(seed.replace('.castep', '') + '_thermoplots.png', dpi=300, transparent=True)
 
     elif show:
         plt.show()
@@ -696,7 +701,8 @@ def plot_2d_hull_bokeh(hull):
     tie_line_source = ColumnDataSource(data=tie_line_data)
     hull_source = ColumnDataSource(data=hull_data)
 
-    hover = HoverTool(tooltips="""
+    hover = HoverTool(
+        tooltips="""
                       <div>
                           <div>
                               <span style="font-size: 16px; font-family: "Fira Sans", sans-serif">
@@ -734,10 +740,7 @@ def plot_2d_hull_bokeh(hull):
     fig.x_range = Range1d(-0.1, 1.1)
     fig.y_range = Range1d(ylim[0], ylim[1])
 
-    fig.line('composition', 'energy',
-             source=tie_line_source,
-             line_width=4,
-             line_color=tie_line_colour)
+    fig.line('composition', 'energy', source=tie_line_source, line_width=4, line_color=tie_line_colour)
     hull_scatter = fig.scatter('composition', 'energy',
                                source=hull_source,
                                alpha=1,
@@ -756,20 +759,20 @@ def plot_2d_hull_bokeh(hull):
     fig.plot_height = 600
     path = '/u/fs1/me388/data/hulls/'
     fname = generate_relevant_path(hull.args) + '_' + generate_hash() + '.html'
-    output_file(path+fname, title='Convex hull')
+    output_file(path + fname, title='Convex hull')
     print('Hull will be available shortly at http://www.tcm.phy.cam.ac.uk/~me388/hulls/' + fname)
     save(fig)
     glmol = False
     if glmol:
         html_string, js_string = get_glmol_placeholder_string()
-        with open(path+fname) as f:
+        with open(path + fname) as f:
             flines = f.readlines()
             for ind, line in enumerate(flines):
                 if "<div class=\"bk-root\">" in line:
                     flines.insert(ind - 1, html_string)
                     break
             flines.append(js_string)
-        with open(path+fname, 'w') as f:
+        with open(path + fname, 'w') as f:
             f.write('\n'.join(map(str, flines)))
 
 
@@ -799,10 +802,10 @@ def get_linear_cmap(colours, num_colours=100, list_only=False):
     for ind, colour in enumerate(_colours):
         if ind == len(_colours) - 1:
             break
-        diff = np.asarray(_colours[ind+1]) - np.asarray(_colours[ind])
+        diff = np.asarray(_colours[ind + 1]) - np.asarray(_colours[ind])
         diff_norm = diff / repeat
         for i in range(repeat):
-            linear_cmap.append(np.asarray(colour) + i*diff_norm)
+            linear_cmap.append(np.asarray(colour) + i * diff_norm)
     if list_only:
         return linear_cmap
 
@@ -850,11 +853,10 @@ def plot_volume_curve(hull, show=True):
                    marker='o', s=s, edgecolor='k',
                    lw=markeredgewidth, c=c, zorder=zorder, alpha=alpha)
     hull_comps, hull_vols = np.asarray(hull_comps), np.asarray(hull_vols)
-    ax.plot(hull_comps/(1+hull_comps), hull_vols/bulk_vol, marker='o', lw=4,
-            c=hull.colours[0], zorder=100)
-    ax.set_xlabel(r'$\mathrm{x}$ in $\mathrm{'+hull.elements[0]+'_x'+hull.elements[1]+'}_{1-x}$')
+    ax.plot(hull_comps / (1 + hull_comps), hull_vols / bulk_vol, marker='o', lw=4, c=hull.colours[0], zorder=100)
+    ax.set_xlabel(r'$\mathrm{x}$ in $\mathrm{' + hull.elements[0] + '_x' + hull.elements[1] + '}_{1-x}$')
     ax.set_ylabel('Volume ratio with bulk')
-    ax.set_ylim(0, 5*np.sort(hull_vols)[-2]/bulk_vol)
+    ax.set_ylim(0, 5 * np.sort(hull_vols)[-2] / bulk_vol)
     ax.set_xlim(-0.05, 1.05)
     ax.yaxis.set_label_position('left')
     ax.set_xticklabels(ax.get_xticks())
@@ -884,14 +886,11 @@ def plot_volume_curve(hull, show=True):
     plt.tight_layout(pad=0.0, h_pad=1.0, w_pad=0.2)
     if hull.savefig:
         if hull.args.get('pdf'):
-            plt.savefig(hull.elements[0]+hull.elements[1]+'_volume.pdf',
-                        dpi=300)
+            plt.savefig(hull.elements[0] + hull.elements[1] + '_volume.pdf', dpi=300)
         if hull.args.get('svg'):
-            plt.savefig(hull.elements[0]+hull.elements[1]+'_volume.svg',
-                        dpi=300)
+            plt.savefig(hull.elements[0] + hull.elements[1] + '_volume.svg', dpi=300)
         if hull.args.get('png'):
-            plt.savefig(hull.elements[0]+hull.elements[1]+'_volume.png',
-                        dpi=300, bbox_inches='tight')
+            plt.savefig(hull.elements[0] + hull.elements[1] + '_volume.png', dpi=300, bbox_inches='tight')
     elif show:
         plt.show()
 
@@ -949,9 +948,8 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
         # annotate hull structures
         if hull.args.get('labels') or labels:
             eps = 1e-9
-            hull.label_cursor = [doc for doc in hull.hull_cursor if doc['hull_distance'] <= 0+eps]
-            num_labels = len(set([get_formula_from_stoich(doc['stoichiometry'])
-                                  for doc in hull.label_cursor]))
+            hull.label_cursor = [doc for doc in hull.hull_cursor if doc['hull_distance'] <= 0 + eps]
+            num_labels = len(set([get_formula_from_stoich(doc['stoichiometry']) for doc in hull.label_cursor]))
             if num_labels < len(hull.label_cursor):
                 tmp_cursor = []
                 for doc in hull.label_cursor:
@@ -965,13 +963,12 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
             hull.label_cursor = hull.label_cursor[1:-1]
             for ind, doc in enumerate(hull.label_cursor):
                 arrowprops = dict(arrowstyle="-|>", color='k')
-                if (ind+2) < np.argmin(tie_line[:, 1]):
-                    position = (0.8*tie_line[ind+2, 0], 1.15*(tie_line[ind+2, 1])-0.05)
-                elif (ind+2) == np.argmin(tie_line[:, 1]):
-                    position = (tie_line[ind+2, 0], 1.15*(tie_line[ind+2, 1])-0.05)
+                if (ind + 2) < np.argmin(tie_line[:, 1]):
+                    position = (0.8 * tie_line[ind + 2, 0], 1.15 * (tie_line[ind + 2, 1]) - 0.05)
+                elif (ind + 2) == np.argmin(tie_line[:, 1]):
+                    position = (tie_line[ind + 2, 0], 1.15 * (tie_line[ind + 2, 1]) - 0.05)
                 else:
-                    position = (min(1.1*tie_line[ind+2, 0]+0.15, 0.95),
-                                1.15*(tie_line[ind+2, 1])-0.05)
+                    position = (min(1.1 * tie_line[ind + 2, 0] + 0.15, 0.95), 1.15 * (tie_line[ind + 2, 1]) - 0.05)
                 ax.annotate(get_formula_from_stoich(doc['stoichiometry'],
                                                     elements=hull.elements, tex=True),
                             xy=(tie_line[ind+2, 0], tie_line[ind+2, 1]),
@@ -990,9 +987,8 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
                 cmap_full = plt.cm.get_cmap('Dark2')
                 cmin = 0.15
                 cmax = 0.5
-                cindmin, cindmax = int(cmin*len(cmap_full.colors)), int(cmax*len(cmap_full.colors))
-                cmap = colours.LinearSegmentedColormap.from_list('Dark2',
-                                                                 cmap_full.colors[cindmin:cindmax])
+                cindmin, cindmax = int(cmin * len(cmap_full.colors)), int(cmax * len(cmap_full.colors))
+                cmap = colours.LinearSegmentedColormap.from_list('Dark2', cmap_full.colors[cindmin:cindmax])
 
                 if plot_points:
                     scatter = ax.scatter(hull.structures[np.argsort(hull.hull_dist), 0][::-1],
@@ -1033,7 +1029,7 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
                 sources = ['AIRSS', 'GA', 'ICSD', 'OQMD', 'SWAPS']
             else:
                 sources = kwargs.get('sources')
-            colour_choices = {source: hull.colours[ind+1] for ind, source in enumerate(sources)}
+            colour_choices = {source: hull.colours[ind + 1] for ind, source in enumerate(sources)}
             colours = []
             concs = []
             energies = []
@@ -1051,7 +1047,7 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
             if alpha is None:
                 alpha = 0.2
 
-            ax.scatter(concs, energies, c=colours, alpha=alpha, s=hull.scale*20)
+            ax.scatter(concs, energies, c=colours, alpha=alpha, s=hull.scale * 20)
             for source in sources:
                 ax.scatter(1e10, 1e10, c=colour_choices[source], label=source, alpha=alpha)
             ax.scatter(1e10, 1e10, c=hull.colours[-2], label='Other', alpha=alpha)
@@ -1086,7 +1082,7 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
                                           zorder=300))
 
     if len(one_minus_x_elem) == 1:
-        ax.set_title(x_elem[0] + r'$_\mathrm{x}$' + one_minus_x_elem[0] + 'r$_\mathrm{1-x}$')
+        ax.set_title(x_elem[0] + r'$_\mathrm{x}$' + one_minus_x_elem[0] + r'$_\mathrm{1-x}$')
     if hull.non_binary:
         ax.set_title(r'{d[0]}$_\mathrm{{x}}$({d[1]})$_\mathrm{{1-x}}$'.format(d=hull.chempot_search))
     plt.locator_params(nbins=3)
@@ -1095,7 +1091,7 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
     ax.set_xlim(-0.05, 1.05)
     ax.set_xticks([0, 0.33, 0.5, 0.66, 1])
     ax.set_xticklabels(ax.get_xticks())
-    ax.set_yticks(np.arange(0, np.min(hull.structure_slice[hull.hull.vertices, 1])-0.15, -0.2))
+    ax.set_yticks(np.arange(0, np.min(hull.structure_slice[hull.hull.vertices, 1]) - 0.15, -0.2))
     ax.set_yticklabels(['{:.1f}'.format(val) for val in ax.get_yticks()])
     ax.set_ylabel('Formation energy (eV/atom)')
     try:
@@ -1172,17 +1168,17 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, expecting_cb
     else:
         fig.set_size_inches(6.67, 5)
     ax.boundary(linewidth=2.0, zorder=99)
-    ax.gridlines(color='black', multiple=scale*0.1, linewidth=0.5)
+    ax.gridlines(color='black', multiple=scale * 0.1, linewidth=0.5)
 
     ax.clear_matplotlib_ticks()
     ticks = [float(val) for val in np.linspace(0.0, 1.0, 6)]
     ax.ticks(axis='lbr', linewidth=1, multiple=scale*0.2, offset=0.02, fontsize=fontsize-2,
              ticks=ticks, tick_formats='%.1f')
 
-    ax.set_title(''.join(hull.elements), fontsize=fontsize+2, y=1.02)
-    ax.left_axis_label(hull.elements[2], fontsize=fontsize+2)
-    ax.right_axis_label(hull.elements[1], fontsize=fontsize+2)
-    ax.bottom_axis_label(hull.elements[0], fontsize=fontsize+2)
+    ax.set_title(''.join(hull.elements), fontsize=fontsize + 2, y=1.02)
+    ax.left_axis_label(hull.elements[2], fontsize=fontsize + 2)
+    ax.right_axis_label(hull.elements[1], fontsize=fontsize + 2)
+    ax.bottom_axis_label(hull.elements[0], fontsize=fontsize + 2)
 
     concs = np.zeros((len(hull.structures), 3))
 
@@ -1222,12 +1218,12 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, expecting_cb
     for plane in hull.hull.planes:
         plane.append(plane[0])
         plane = np.asarray(plane)
-        ax.plot(scale*plane, c=hull.colours[0], lw=1.5, alpha=1, zorder=98)
+        ax.plot(scale * plane, c=hull.colours[0], lw=1.5, alpha=1, zorder=98)
 
     if hull.args.get('pathways'):
         for phase in stable:
             if phase[0] == 0 and phase[1] != 0 and phase[2] != 0:
-                ax.plot([scale*phase, [scale, 0, 0]], c='r', alpha=0.2, lw=6, zorder=99)
+                ax.plot([scale * phase, [scale, 0, 0]], c='r', alpha=0.2, lw=6, zorder=99)
 
     # add points
     if plot_points:
@@ -1235,34 +1231,35 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, expecting_cb
         colour_metric = hull_dist
         for i, _ in enumerate(colour_metric):
             if colour_metric[i] >= max_cut:
-                colours_list.append(n_colours-1)
+                colours_list.append(n_colours - 1)
             elif colour_metric[i] <= min_cut:
                 colours_list.append(0)
             else:
-                colours_list.append(int((n_colours-1)*(colour_metric[i] / max_cut)))
+                colours_list.append(int((n_colours - 1) * (colour_metric[i] / max_cut)))
         colours_list = np.asarray(colours_list)
         ax.scatter(scale*stable, marker='o', color=colours_hull[0], edgecolors='black', zorder=9999999,
                    s=150, lw=1.5)
         ax.scatter(scale*concs, colormap=cmap, colorbar=True, cbarlabel='Distance from hull (eV/atom)',
                    c=hull_dist, vmax=max_cut, vmin=min_cut, zorder=1000, s=40, alpha=0)
         for i, _ in enumerate(concs):
-            ax.scatter(scale * concs[i].reshape(1, 3),
-                       color=colours_hull[colours_list[i]],
-                       marker='o',
-                       zorder=10000-colours_list[i],
-                       # alpha=max(0.1, 1-2*hull_dist[i]),
-                       s=70*(1-float(colours_list[i])/n_colours)+15,
-                       lw=1, edgecolors='black')
+            ax.scatter(
+                scale * concs[i].reshape(1, 3),
+                color=colours_hull[colours_list[i]],
+                marker='o',
+                zorder=10000 - colours_list[i],
+                # alpha=max(0.1, 1-2*hull_dist[i]),
+                s=70 * (1 - float(colours_list[i]) / n_colours) + 15,
+                lw=1,
+                edgecolors='black')
 
     # add colourmaps
     if hull.args.get('capmap'):
         capacities = dict()
         from ternary.helpers import simplex_iterator
         for (i, j, k) in simplex_iterator(scale):
-            capacities[(i, j, k)] = get_generic_grav_capacity([float(i)/scale,
-                                                               float(j)/scale,
-                                                               float(scale-i-j)/scale],
-                                                              hull.elements)
+            capacities[(i, j, k)] = get_generic_grav_capacity([
+                float(i) / scale, float(j) / scale, float(scale - i - j) / scale
+            ], hull.elements)
         ax.heatmap(capacities, style="hexagonal", cbarlabel='Gravimetric capacity (maH/g)',
                    vmin=0, vmax=3000, cmap=pastel_cmap)
     elif hull.args.get('efmap'):
@@ -1270,19 +1267,18 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, expecting_cb
         fake_structures = []
         from ternary.helpers import simplex_iterator
         for (i, j, k) in simplex_iterator(scale):
-            fake_structures.append([float(i)/scale, float(j)/scale, 0.0])
+            fake_structures.append([float(i) / scale, float(j) / scale, 0.0])
         fake_structures = np.asarray(fake_structures)
         plane_energies, _, _ = hull.get_hull_distances(fake_structures)
         ind = 0
         for (i, j, k) in simplex_iterator(scale):
-            energies[(i, j, k)] = -1*plane_energies[ind]
+            energies[(i, j, k)] = -1 * plane_energies[ind]
             ind += 1
-        ax.heatmap(energies, style="hexagonal", cbarlabel='Formation energy (eV/atom)',
-                   vmax=0, cmap='bone')
+        ax.heatmap(energies, style="hexagonal", cbarlabel='Formation energy (eV/atom)', vmax=0, cmap='bone')
     elif hull.args.get('sampmap'):
         sampling = dict()
         from ternary.helpers import simplex_iterator
-        eps = 1.0/float(scale)
+        eps = 1.0 / float(scale)
         for (i, j, k) in simplex_iterator(scale):
             sampling[(i, j, k)] = np.size(np.where((concs[:, 0] <= float(i)/scale + eps) *
                                                    (concs[:, 0] >= float(i)/scale - eps) *
@@ -1290,20 +1286,16 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, expecting_cb
                                                    (concs[:, 1] >= float(j)/scale - eps) *
                                                    (concs[:, 2] <= float(k)/scale + eps) *
                                                    (concs[:, 2] >= float(k)/scale - eps)))
-        ax.heatmap(sampling, style="hexagonal", cbarlabel='Number of structures',
-                   cmap='afmhot')
+        ax.heatmap(sampling, style="hexagonal", cbarlabel='Number of structures', cmap='afmhot')
     plt.tight_layout()
 
     if hull.savefig:
         if hull.args.get('png'):
-            plt.savefig(''.join(hull.elements) + '_hull.png',
-                        dpi=400, transparent=True, bbox_inches='tight')
+            plt.savefig(''.join(hull.elements) + '_hull.png', dpi=400, transparent=True, bbox_inches='tight')
         if hull.args.get('svg'):
-            plt.savefig(''.join(hull.elements) + '_hull.svg',
-                        dpi=400, transparent=True, bbox_inches='tight')
+            plt.savefig(''.join(hull.elements) + '_hull.svg', dpi=400, transparent=True, bbox_inches='tight')
         if hull.args.get('pdf'):
-            plt.savefig(''.join(hull.elements) + '_hull.pdf',
-                        dpi=400, transparent=True, bbox_inches='tight')
+            plt.savefig(''.join(hull.elements) + '_hull.pdf', dpi=400, transparent=True, bbox_inches='tight')
     elif show:
         ax.show()
 

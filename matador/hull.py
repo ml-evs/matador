@@ -7,7 +7,6 @@ from __future__ import print_function
 # standard library
 from traceback import print_exc
 from bisect import bisect_left
-from sys import exit
 import sys
 import re
 from os import devnull
@@ -33,6 +32,7 @@ class QueryConvexHull(object):
     """ Construct a binary or ternary phase diagram
     from matador.DBQuery object.
     """
+
     def __init__(self, query=None, cursor=None, elements=None, subcmd='hull', quiet=False, plot_kwargs=None, **kwargs):
         """ Initialise the class from either a DBQuery or a cursor (list of matador dicts)
         and construct the appropriate phase diagram.
@@ -85,7 +85,7 @@ class QueryConvexHull(object):
 
         K2eV = 8.61733e-5
         if self.args.get('hull_temp') is not None:
-            self.hull_cutoff = float(self.args['hull_temp']*K2eV)
+            self.hull_cutoff = float(self.args['hull_temp'] * K2eV)
         elif self.args.get('hull_cutoff') is not None:
             self.hull_cutoff = float(self.args['hull_cutoff'])
         else:
@@ -95,7 +95,7 @@ class QueryConvexHull(object):
             self.chem_pots = self.args.get('chempots')
             for ind, pot in enumerate(self.chem_pots):
                 if pot > 0:
-                    self.chem_pots[ind] = -1*self.chem_pots[ind]
+                    self.chem_pots[ind] = -1 * self.chem_pots[ind]
         else:
             self.chem_pots = None
 
@@ -105,13 +105,13 @@ class QueryConvexHull(object):
             print_warning('No structures on hull with chosen chemical potentials.')
         else:
             if self.args.get('hull_temp'):
-                print_notify(str(len(self.hull_cursor)) + ' structures within ' +
-                             str(self.args.get('hull_temp')) +
-                             ' K of the hull with chosen chemical potentials.')
+                print_notify(
+                    str(len(self.hull_cursor)) + ' structures within ' + str(self.args.get('hull_temp')) +
+                    ' K of the hull with chosen chemical potentials.')
             else:
-                print_notify(str(len(self.hull_cursor)) + ' structures within ' +
-                             str(self.hull_cutoff) +
-                             ' eV of the hull with chosen chemical potentials.')
+                print_notify(
+                    str(len(self.hull_cursor)) + ' structures within ' + str(self.hull_cutoff) +
+                    ' eV of the hull with chosen chemical potentials.')
 
         display_results(self.hull_cursor, self.args, hull=True, use_source=use_source)
 
@@ -128,7 +128,7 @@ class QueryConvexHull(object):
         if self.args.get('volume'):
             self.volume_curve()
             if not self.args.get('no_plot'):
-                plotting.plot_volume_curve(self, save=self.savefig)
+                plotting.plot_volume_curve(self)
 
         if self.args['subcmd'] == 'hull' and not self.args.get('no_plot'):
             if self.args.get('bokeh'):
@@ -138,13 +138,16 @@ class QueryConvexHull(object):
 
         if self.args.get('uniq'):
             from matador.similarity.similarity import get_uniq_cursor
+            if self.args.get('uniq') is True:
+                sim_tol = 0.1
+            else:
+                sim_tol = self.args.get('uniq')
             print_notify('Filtering for unique structures...')
-            unique_set, _, _, _ = get_uniq_cursor(self.hull_cursor,
-                                                  debug=self.args.get('debug'), sim_tol=self.args.get('uniq'))
+            unique_set, _, _, _ = get_uniq_cursor(self.hull_cursor, debug=self.args.get('debug'), sim_tol=sim_tol)
+            old_cursor_len = len(self.hull_cursor)
             self.hull_cursor = [self.hull_cursor[ind] for ind in unique_set]
             display_results(self.hull_cursor, hull=True, args=self.args)
-            print('Filtered {} down to {}'.format(len(self.hull_cursor),
-                                                  len(unique_set)))
+            print('Filtered {} down to {}'.format(old_cursor_len, len(unique_set)))
 
         if quiet:
             f.close()
@@ -152,6 +155,7 @@ class QueryConvexHull(object):
 
     @property
     def savefig(self):
+        """ True if any figure type argument was passed. """
         return any([self.args.get('pdf'), self.args.get('png'), self.args.get('svg')])
 
     def plot_hull(self, **kwargs):
@@ -204,8 +208,7 @@ class QueryConvexHull(object):
         # first colour reserved for hull
         # penultimate colour reserved for off hull above cutoff
         # last colour reserved for OQMD
-        Dark2_8_hex = ['#1b9e77', '#d95f02', '#7570b3', '#e7298a',
-                       '#66a61e', '#e6ab02', '#a6761d', '#666666']
+        Dark2_8_hex = ['#1b9e77', '#d95f02', '#7570b3', '#e7298a', '#66a61e', '#e6ab02', '#a6761d', '#666666']
         self.colours = Dark2_8_hex
         self.colours.append('#bc80bd')
         self.plot_params = True
@@ -240,8 +243,8 @@ class QueryConvexHull(object):
                 self.match[ind]['hull_distance'] = 0
                 self.match[ind]['enthalpy_per_b'] = doc['enthalpy_per_atom']
         else:
-            print(60*'─')
-            self.match = len(elements)*[None]
+            print(60 * '─')
+            self.match = len(elements) * [None]
             # scan for suitable chem pots in database
             for ind, elem in enumerate(elements):
                 print('Scanning for suitable', elem, 'chemical potential...')
@@ -256,12 +259,11 @@ class QueryConvexHull(object):
                 # if oqmd, only query composition, not parameters
                 if query.args.get('tags') is not None:
                     query_dict['$and'].append(query._query_tags())
-                if self.args.get('debug'):
-                    print('Chemical potential query:')
-                    from json import dumps
-                    print(dumps(query_dict, indent=2))
-                mu_cursor = query.repo.find(SON(query_dict)).sort('enthalpy_per_atom',
-                                                                  pm.ASCENDING)
+                # if self.args.get('debug'):
+                # print('Chemical potential query:')
+                # from json import dumps
+                # print(dumps(query_dict, indent=2))
+                mu_cursor = query.repo.find(SON(query_dict)).sort('enthalpy_per_atom', pm.ASCENDING)
                 if mu_cursor.count() == 0:
                     print_notify('Failed... searching without spin polarization field...')
                     scanned = False
@@ -271,10 +273,9 @@ class QueryConvexHull(object):
                                 if key == 'spin_polarized':
                                     del query_dict['$and'][idx][key]
                                     break
-                            if idx == len(query_dict['$and'])-1:
+                            if idx == len(query_dict['$and']) - 1:
                                 scanned = True
-                    mu_cursor = query.repo.find(SON(query_dict)).sort('enthalpy_per_atom',
-                                                                      pm.ASCENDING)
+                    mu_cursor = query.repo.find(SON(query_dict)).sort('enthalpy_per_atom', pm.ASCENDING)
                     if mu_cursor.count() == 0:
                         print('No chemical potential...')
 
@@ -285,18 +286,16 @@ class QueryConvexHull(object):
                 if self.match[ind] is not None:
                     if ind == 0:
                         self.mu_enthalpy[ind] = float(self.match[ind]['enthalpy_per_atom'])
-                        self.mu_volume[ind] = float(self.match[ind]['cell_volume'] /
-                                                    self.match[ind]['num_atoms'])
+                        self.mu_volume[ind] = float(self.match[ind]['cell_volume'] / self.match[ind]['num_atoms'])
                     else:
                         self.mu_enthalpy[1] += float(self.match[ind]['enthalpy_per_atom'])
-                        self.mu_volume[1] = float(self.match[ind]['cell_volume'] /
-                                                  self.match[ind]['num_atoms'])
+                        self.mu_volume[1] = float(self.match[ind]['cell_volume'] / self.match[ind]['num_atoms'])
                     print('Using', ''.join([self.match[ind]['text_id'][0], ' ',
                           self.match[ind]['text_id'][1]]), 'as chem pot for', elem)
-                    print(60*'─')
+                    print(60 * '─')
                 else:
                     print_failure('No possible chem pots found for ' + elem + '.')
-                    exit()
+                    raise SystemExit('Exiting...')
             for i, mu in enumerate(self.match):
                 self.match[i]['hull_distance'] = 0.0
                 self.match[i]['enthalpy_per_b'] = mu['enthalpy_per_atom']
@@ -329,7 +328,7 @@ class QueryConvexHull(object):
             self.match[i]['enthalpy'] = self.mu_enthalpy[i]
             self.match[i]['num_fu'] = 1
             self.match[i]['text_id'] = ['command', 'line']
-            if self.non_binary and i == len(self.match)-1:
+            if self.non_binary and i == len(self.match) - 1:
                 self.match[i]['stoichiometry'] = get_stoich_from_formula(custom_elem)
             else:
                 self.match[i]['stoichiometry'] = [[custom_elem[i], 1]]
@@ -339,14 +338,15 @@ class QueryConvexHull(object):
             self.match[i]['num_a'] = 0
             self.match[i]['cell_volume'] = 1
         self.match[0]['num_a'] = float('inf')
-        notify = ('Using custom energies of ' + str(self.mu_enthalpy[0]) + ' eV/atom ' +
-                  'and ' + str(self.mu_enthalpy[1]) + ' eV/atom as chemical potentials.')
+        notify = (
+            'Using custom energies of ' + str(self.mu_enthalpy[0]) + ' eV/atom ' + 'and ' + str(self.mu_enthalpy[1]) +
+            ' eV/atom as chemical potentials.')
         if self.args.get('debug'):
             for match in self.match:
                 print(match)
-        print(len(notify)*'─')
+        print(len(notify) * '─')
         print(notify)
-        print(len(notify)*'─')
+        print(len(notify) * '─')
 
     def get_hull_distances(self, structures, precompute=True):
         """ Returns array of distances to pre-computed binary or ternary hull, from array
@@ -393,11 +393,13 @@ class QueryConvexHull(object):
                 for ind, _ in enumerate(structures):
                     formula = get_formula_from_stoich(self.cursor[ind]['stoichiometry'], tex=False)
                     if formula in cached_formula_dists:
-                        hull_dist[ind] = structures[ind, -1] - cached_formula_dists[formula][0] + cached_formula_dists[formula][1]
+                        hull_dist[
+                            ind] = structures[ind,
+                                              -1] - cached_formula_dists[formula][0] + cached_formula_dists[formula][1]
                         cache_hits += 1
                     else:
                         i = bisect_left(tie_line_comp, structures[ind, 0])
-                        gradient, intercept = vertices2line([[tie_line_comp[i-1], tie_line_energy[i-1]],
+                        gradient, intercept = vertices2line([[tie_line_comp[i - 1], tie_line_energy[i - 1]],
                                                              [tie_line_comp[i], tie_line_energy[i]]])
                         # calculate hull_dist
                         hull_dist[ind] = structures[ind, -1] - (gradient * structures[ind, 0] + intercept)
@@ -406,7 +408,7 @@ class QueryConvexHull(object):
             else:
                 for ind, _ in enumerate(structures):
                     i = bisect_left(tie_line_comp, structures[ind, 0])
-                    gradient, intercept = vertices2line([[tie_line_comp[i-1], tie_line_energy[i-1]],
+                    gradient, intercept = vertices2line([[tie_line_comp[i - 1], tie_line_energy[i - 1]],
                                                          [tie_line_comp[i], tie_line_energy[i]]])
                     # calculate hull_dist
                     hull_dist[ind] = structures[ind, -1] - (gradient * structures[ind, 0] + intercept)
@@ -414,9 +416,10 @@ class QueryConvexHull(object):
         elif len(self.structure_slice[0]) == 3:
             # for each plane, convert each point into barycentric coordinates
             # for that plane and test for negative values
-            self.hull.planes = [[self.structure_slice[vertex] for vertex in simplex] for simplex in self.hull.simplices]
-            structures_finished = [False]*len(structures)
-            hull_dist = np.ones((len(structures)+1))
+            self.hull.planes = [[self.structure_slice[vertex] for vertex in simplex]
+                                for simplex in self.hull.simplices]
+            structures_finished = [False] * len(structures)
+            hull_dist = np.ones((len(structures) + 1))
             planes_R_inv = []
             planes_height_fn = []
             for ind, plane in enumerate(self.hull.planes):
@@ -433,21 +436,26 @@ class QueryConvexHull(object):
                 for ind, plane in enumerate(self.hull.planes):
                     if structures_finished[idx] or planes_R_inv[ind] is None:
                         continue
-                    if precompute and get_formula_from_stoich(self.cursor[idx]['stoichiometry'], tex=False) in cached_formula_dists:
+                    if precompute and get_formula_from_stoich(self.cursor[idx]['stoichiometry'],
+                                                              tex=False) in cached_formula_dists:
                         formula = get_formula_from_stoich(self.cursor[idx]['stoichiometry'], tex=False)
                         if formula in cached_formula_dists:
                             cache_hits += 1
-                            hull_dist[idx] = structures[idx, -1] - cached_formula_dists[formula][0] + cached_formula_dists[formula][1]
+                            hull_dist[
+                                idx] = structures[idx,
+                                                  -1] - cached_formula_dists[formula][0] + cached_formula_dists[formula][1]
                             structures_finished[idx] = True
                     else:
                         barycentric_structure = barycentric2cart(structure.reshape(1, 3)).T
                         barycentric_structure[-1, :] = 1
                         plane_barycentric_structure = np.matrix(planes_R_inv[ind]) * np.matrix(barycentric_structure)
-                        if (plane_barycentric_structure >= 0-1e-12).all():
+                        if (plane_barycentric_structure >= 0 - 1e-12).all():
                             structures_finished[idx] = True
                             hull_dist[idx] = planes_height_fn[ind](structure)
                             if precompute:
-                                cached_formula_dists[get_formula_from_stoich(self.cursor[idx]['stoichiometry'], tex=False)] = (structure[-1], hull_dist[idx])
+                                cached_formula_dists[
+                                    get_formula_from_stoich(self.cursor[idx]['stoichiometry'],
+                                                            tex=False)] = (structure[-1], hull_dist[idx])
                                 cache_misses += 1
             self.failed_structures = []
             for ind in range(len(structures_finished)):
@@ -477,9 +485,9 @@ class QueryConvexHull(object):
                 self.chempot_search = elements_str.split(':')
                 if query.args.get('intersection'):
                     print_failure('Please disable intersection when creating a non-binary hull.')
-                    exit()
+                    raise SystemExit('Exiting...')
             self.elements = [elem for elem in re.split(r'([A-Z][a-z]*)', elements_str) if elem.isalpha()]
-        assert(len(self.elements) < 4 and len(self.elements) > 1)
+        assert (len(self.elements) < 4 and len(self.elements) > 1)
         self.ternary = False
         if len(self.elements) == 3 and not self.non_binary:
             self.ternary = True
@@ -490,7 +498,7 @@ class QueryConvexHull(object):
             print('Constructing ternary hull...')
             if self.query is not None and not self.args.get('intersection'):
                 print_warning('Please query with -int/--intersection when creating ternary hulls.')
-                exit('Exiting...')
+                raise SystemExit('Exiting...')
         else:
             print('Constructing binary hull...')
         # define hull by order in command-line arguments
@@ -501,7 +509,7 @@ class QueryConvexHull(object):
         for ind, doc in enumerate(self.cursor):
             if not self.ternary:
                 # calculate number of atoms of type B per formula unit
-                nums_b = len(one_minus_x_elem)*[0]
+                nums_b = len(one_minus_x_elem) * [0]
                 for elem in doc['stoichiometry']:
                     for chem_pot_ind, chem_pot in enumerate(one_minus_x_elem):
                         if elem[0] == chem_pot:
@@ -513,13 +521,14 @@ class QueryConvexHull(object):
                     self.cursor[ind]['enthalpy_per_b'] = 12345e5
                     self.cursor[ind]['cell_volume_per_b'] = 12345e5
                 else:
-                    self.cursor[ind]['enthalpy_per_b'] = doc['enthalpy'] / (num_b*num_fu)
-                    self.cursor[ind]['cell_volume_per_b'] = doc['cell_volume'] / (num_b*num_fu)
+                    self.cursor[ind]['enthalpy_per_b'] = doc['enthalpy'] / (num_b * num_fu)
+                    self.cursor[ind]['cell_volume_per_b'] = doc['cell_volume'] / (num_b * num_fu)
             self.cursor[ind]['formation_enthalpy_per_atom'] = get_formation_energy(self.match, doc)
             self.cursor[ind]['concentration'] = get_concentration(doc, self.elements)
         # create stacked array of hull data
-        structures = np.hstack((get_array_from_cursor(self.cursor, 'concentration'),
-                                get_array_from_cursor(self.cursor, 'formation_enthalpy_per_atom').reshape(len(self.cursor), 1)))
+        structures = np.hstack((
+            get_array_from_cursor(self.cursor, 'concentration'),
+            get_array_from_cursor(self.cursor, 'formation_enthalpy_per_atom').reshape(len(self.cursor), 1)))
         if not self.ternary and not self.non_binary:
             Q = get_binary_grav_capacities(get_num_intercalated(self.cursor), get_molar_mass(self.elements[1]))
             set_cursor_from_array(self.cursor, Q, 'gravimetric_capacity')
@@ -527,7 +536,7 @@ class QueryConvexHull(object):
             Q = np.zeros((len(self.cursor)))
             for i in range(len(self.cursor)):
                 concs = structures[i, 0:-1].tolist()
-                concs.append(1-concs[0]-concs[1])
+                concs.append(1 - concs[0] - concs[1])
                 Q[i] = get_generic_grav_capacity(concs, self.elements)
             set_cursor_from_array(self.cursor, Q, 'gravimetric_capacity')
         # create hull with SciPy routine, including only points with formation energy < 0
@@ -572,21 +581,12 @@ class QueryConvexHull(object):
             self.hull_dist, self.hull_energy, self.hull_comp = self.get_hull_distances(structures)
             set_cursor_from_array(self.cursor, self.hull_dist, 'hull_distance')
 
-        # ensure hull cursor is sorted by enthalpy_per_atom, as it will be by default if from database
-        hull_cursor = sorted([self.cursor[idx] for idx in np.where(self.hull_dist <= self.hull_cutoff + 1e-12)[0]],
-                             key=lambda doc: doc['enthalpy_per_atom'])
-        # if summary requested, filter for lowest per stoich
-        if self.args.get('summary'):
-            self.hull_cursor = []
-            compositions = set()
-            for ind, member in enumerate(hull_cursor):
-                formula = get_formula_from_stoich(sorted(member['stoichiometry']))
-                if formula not in compositions:
-                    compositions.add(formula)
-                    self.hull_cursor.append(member)
-        else:
-            self.hull_cursor = hull_cursor
-        self.hull_cursor = sorted(self.hull_cursor, key=lambda k: k['concentration'])
+        # ensure hull cursor is sorted by enthalpy_per_atom, then by concentration, as it will be by default if from database
+        hull_cursor = [self.cursor[idx] for idx in np.where(self.hull_dist <= self.hull_cutoff + 1e-12)[0]]
+        hull_cursor = sorted(hull_cursor, key=lambda doc: doc['enthalpy_per_atom'])
+        hull_cursor = sorted(hull_cursor, key=lambda k: k['concentration'])
+
+        self.hull_cursor = hull_cursor
         self.structures = structures
 
     def voltage_curve(self, hull_cursor, quiet=False):
@@ -618,9 +618,8 @@ class QueryConvexHull(object):
             Q = Q[uniq_idxs]
             V = []
             for i in range(len(x)):
-                V.append(-(stable_enthalpy_per_b[i] - stable_enthalpy_per_b[i-1]) /
-                          (x[i] - x[i-1]) +
-                          (mu_enthalpy[0]))
+                V.append(
+                    -(stable_enthalpy_per_b[i] - stable_enthalpy_per_b[i - 1]) / (x[i] - x[i - 1]) + (mu_enthalpy[0]))
             V[0] = V[1]
             V[-1] = 0
             # make V, Q and x available for plotting
@@ -633,8 +632,9 @@ class QueryConvexHull(object):
 
         elif self.ternary:
             """ Written by James Darby, jpd47@cam.ac.uk. """
-            points = np.hstack((get_array_from_cursor(hull_cursor, 'concentration'),
-                                get_array_from_cursor(hull_cursor, 'enthalpy_per_atom').reshape(len(hull_cursor), 1)))
+            points = np.hstack((
+                get_array_from_cursor(hull_cursor, 'concentration'),
+                get_array_from_cursor(hull_cursor, 'enthalpy_per_atom').reshape(len(hull_cursor), 1)))
             stoichs = get_array_from_cursor(hull_cursor, 'stoichiometry')
             mu_enthalpy = get_array_from_cursor(self.match, 'enthalpy_per_atom')
             enthalpy_active_ion = mu_enthalpy[0]
@@ -663,7 +663,7 @@ class QueryConvexHull(object):
             for reaction_ind, endpoint in enumerate(endpoints):
                 ratio = endpoint[1] / (1 - endpoint[0] - endpoint[1])
                 if not quiet:
-                    print(30*'-')
+                    print(30 * '-')
                     print('Reaction {}, {}:'.format(reaction_ind, get_formula_from_stoich(endstoichs[reaction_ind])))
                 y0 = endpoint[1] / (1 - endpoint[0])
                 simp_in = 0
@@ -671,7 +671,7 @@ class QueryConvexHull(object):
                 crossover = []
                 # put starting point into crossover just in case it is not detected
                 sum_conc = sum([int(species[1]) for species in endstoichs[reaction_ind]])
-                conc = [int(species[1])/sum_conc for species in endstoichs[reaction_ind]]
+                conc = [int(species[1]) / sum_conc for species in endstoichs[reaction_ind]]
                 if len(conc) == 2:
                     conc.insert(0, 0.0)
                 crossover.append(conc)
@@ -691,29 +691,32 @@ class QueryConvexHull(object):
                         y2 = points[simplex[j], 1]
                         z2 = 1 - x2 - y2
 
-                        if np.abs(h + g*y0) > EPS:
-                            tin = (e*h + g*y0 - f*g)/(h + g*y0)
-                            s2 = (y0 - e*y0 - f) / (h + g*y0)
+                        if np.abs(h + g * y0) > EPS:
+                            tin = (e * h + g * y0 - f * g) / (h + g * y0)
+                            s2 = (y0 - e * y0 - f) / (h + g * y0)
                             if tin >= 0 and tin <= 1 and s2 >= 0 and s2 <= 1:
                                 tints = np.append(tints, tin)
                                 a = 1
                                 # x1-x2 never == 0 on points we care about
                                 if np.abs(x1 - x2) > EPS:
-                                    b = (y1 - y2)/(x1 - x2)
-                                    c = (z1 - z2)/(x1 - x2)
+                                    b = (y1 - y2) / (x1 - x2)
+                                    c = (z1 - z2) / (x1 - x2)
                                     x_cross = tin
-                                    y_cross = b * (tin-x1)/a + y1
-                                    z_cross = c * (tin-x1)/a + z1
+                                    y_cross = b * (tin - x1) / a + y1
+                                    z_cross = c * (tin - x1) / a + z1
                                     # only append unique points
-                                    if len(crossover) == 0 or not np.any([np.isclose([x_cross, y_cross, z_cross], crossover[i]) for i in range(len(crossover))]):
-                                        if y1 != 0 and y2 != 0 and round(float(z1/y1), 5) == round(float(z2/y2), 5) and round(float(z1/y1), 5) == round(ratio, 5):
+                                    if (len(crossover) == 0 or not np.any([np.isclose([x_cross, y_cross, z_cross], val)
+                                                                           for val in crossover])):
+                                        if y1 != 0 and y2 != 0 and round(float(z1 / y1), 5) == round(float(
+                                                z2 / y2), 5) and round(float(z1 / y1), 5) == round(ratio, 5):
                                             pass
                                         else:
                                             crossover.append([x_cross, y_cross, z_cross])
                     if len(tints) != 0:
                         temp = [simp_in, np.amin(tints), np.amax(tints)]
                         # condition removes the big triangle and the points which only graze the line of interest
-                        if all([temp[2] > EPS, temp[1] < 1, temp[2] - temp[1] > EPS, temp[2] - temp[1] < 1, temp[1] != temp[2]]):
+                        if all([temp[2] > EPS, temp[1] < 1, temp[2] - temp[1] > EPS, temp[2] - temp[1] < 1,
+                                temp[1] != temp[2]]):
                             intersections = np.append(intersections, temp)
                     simp_in += 1
 
@@ -731,7 +734,8 @@ class QueryConvexHull(object):
                 rows_to_keep = []
                 # remove row corresponding to largest triangle, i.e. chempots only, and near duplicates (i.e. points with multiple tie-lines)
                 for ind, row in enumerate(intersections):
-                    if not (row[1:].tolist() == [0, 1] or row[1:].tolist() in ends_of_rows or np.any(np.isclose(row.tolist()[1], [val for val in min_values]))):
+                    if not (row[1:].tolist() == [0, 1] or row[1:].tolist() in ends_of_rows or
+                            np.any(np.isclose(row.tolist()[1], [val for val in min_values]))):
                         rows_to_keep.append(ind)
                         ends_of_rows.append(row[1:].tolist())
                         min_values.append(row.tolist()[1])
@@ -768,8 +772,8 @@ class QueryConvexHull(object):
                     if ind == 0:
                         voltages.append(V)
                     if not quiet:
-                        if ind != len(intersections)-1:
-                            print(5*(ind+1)*' ' + ' ---> ', end='')
+                        if ind != len(intersections) - 1:
+                            print(5 * (ind + 1) * ' ' + ' ---> ', end='')
                     voltages.append(V)
 
                 self.reactions.append(reactions)
@@ -790,8 +794,7 @@ class QueryConvexHull(object):
                 data_str += '# ' + ''.join(self.elements) + '\n'
             data_str += '# {:>10},\t{:>10}\n'.format('Q (mAh/g)', 'Voltage (V)')
             for idx, _ in enumerate(path):
-                data_str += '{:>10.2f},\t{:>10.4f}'.format(self.Q[ind][idx],
-                                                           self.voltages[ind][idx])
+                data_str += '{:>10.2f},\t{:>10.4f}'.format(self.Q[ind][idx], self.voltages[ind][idx])
                 if idx != len(path) - 1:
                     data_str += '\n'
         if self.args.get('csv'):
@@ -811,6 +814,6 @@ class QueryConvexHull(object):
         stable_vol = get_array_from_cursor(self.hull_cursor, 'cell_volume_per_b')
         # here, in A_x B_y
         # and v is the volume per x atom
-        self.x = [comp/(1-comp) for comp in stable_comp]
+        self.x = [comp / (1 - comp) for comp in stable_comp]
         self.vol_per_y = [vol for vol in stable_vol]
         return
