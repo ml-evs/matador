@@ -10,10 +10,11 @@ hostname = os.uname()[1]
 REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
 ROOT_DIR = os.getcwd()
 VERBOSITY = 0
+EXECUTABLE = 'castep17'
 
 try:
     with open('/dev/null', 'w') as f:
-        proc = sp.Popen(['castep', '--version'], stdout=f, stderr=f)
+        proc = sp.Popen([EXECUTABLE, '--version'], stdout=f, stderr=f)
         proc.communicate()
     if VERBOSITY > 0:
         print('Successfully detected CASTEP')
@@ -68,11 +69,7 @@ class ComputeTest(unittest.TestCase):
                               start=False)
         queue = mp.Queue()
         # store proc object with structure ID, node name, output queue and number of cores
-        proc = (1,
-                node,
-                mp.Process(target=relaxer.relax,
-                           args=(queue,)),
-                ncores)
+        proc = (1, node, mp.Process(target=relaxer.relax, args=(queue, )), ncores)
         proc[2].start()
         while proc[2].is_alive():
             sleep(1)
@@ -260,7 +257,7 @@ class ComputeTest(unittest.TestCase):
         shutil.copy(REAL_PATH + 'data/pspots/As_00PBE.usp', REAL_PATH + 'As_00PBE.usp')
 
         os.chdir(REAL_PATH)
-        runner = BatchRun(seed=['LiAs'], debug=False, no_reopt=True, verbosity=VERBOSITY, ncores=4)
+        runner = BatchRun(seed=['LiAs'], debug=False, no_reopt=True, verbosity=VERBOSITY, ncores=4, executable=EXECUTABLE)
         runner.spawn(join=True)
 
         completed_exists = os.path.isfile('completed/_LiAs_testcase.res')
@@ -351,7 +348,7 @@ class ComputeTest(unittest.TestCase):
         shutil.copy(REAL_PATH + 'data/structures/LiAs_testcase.res', REAL_PATH + 'data/fail_scf/' + 'LiAs_testcase.res')
         shutil.copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
         shutil.copy(REAL_PATH + 'data/pspots/As_00PBE.usp', '.')
-        runner = BatchRun(seed=['LiAs_scf'], debug=False, no_reopt=True, verbosity=VERBOSITY, ncores=4)
+        runner = BatchRun(seed=['LiAs_scf'], debug=False, no_reopt=True, verbosity=VERBOSITY, ncores=4, executable=EXECUTABLE)
         runner.spawn(join=True)
 
         completed_folder_exists = os.path.isdir('completed')
