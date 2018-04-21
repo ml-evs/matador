@@ -56,7 +56,7 @@ class Crystal:
         from matador.utils.chem_utils import get_root_source
         try:
             self.root_source = get_root_source(self._doc['source'])
-        except:
+        except RuntimeError:
             self.root_source = 'xxx'
 
     def __getitem__(self, key):
@@ -77,7 +77,8 @@ class Crystal:
 
     def __str__(self):
         repr_string = "{root_source}: {formula}\n".format(root_source=self.root_source, formula=self.formula)
-        repr_string += "{num_atoms:<3} atoms\n".format(num_atoms=self.num_atoms)
+        repr_string += "{num_atoms:<3} atoms. {space_group:<8}\n".format(num_atoms=self.num_atoms,
+                                                                         space_group=self._doc['space_group'])
 
         if 'formation_enthalpy_per_atom' in self._doc:
             repr_string += ("Formation enthalpy = {:6.6f} eV/atom\n".format(self._doc['formation_enthalpy_per_atom']))
