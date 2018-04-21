@@ -1,10 +1,13 @@
 #!/usr/bin/env python
 import unittest
+import re
+
 from matador.query import DBQuery, parse_element_string
 
 
 class QueryTest(unittest.TestCase):
     """ Test query functionality. """
+
     def testBasicQueries(self):
         kwargs = {'composition': 'KP', 'testing': True}
         query = DBQuery(**kwargs)
@@ -14,12 +17,12 @@ class QueryTest(unittest.TestCase):
                     {'elems': {'$in': ['K']}},
                     {'elems': {'$in': ['P']}},
                     {'stoichiometry': {'$size': 2}}
-                    ]},
+                ]},
                 {'$or': [
                     {'quality': {'$gt': 0}},
                     {'quality': {'$exists': False}}
-                    ]},
-                ]
+                ]},
+            ]
         })
         self.assertDictEqual(test_dict, query.query_dict)
 
@@ -31,12 +34,12 @@ class QueryTest(unittest.TestCase):
                     {'stoichiometry': {'$in': [['K', 3.0]]}},
                     {'stoichiometry': {'$in': [['P', 4.0]]}},
                     {'stoichiometry': {'$size': 2}}
-                    ]},
+                ]},
                 {'$or': [
                     {'quality': {'$gt': 0}},
                     {'quality': {'$exists': False}}
-                    ]},
-                ]
+                ]},
+            ]
         })
         self.assertDictEqual(test_dict, query.query_dict)
 
@@ -48,12 +51,12 @@ class QueryTest(unittest.TestCase):
                     {'stoichiometry': {'$in': [['K', 1.0]]}},
                     {'stoichiometry': {'$in': [['P', 2.0]]}},
                     {'stoichiometry': {'$size': 2}}
-                    ]},
+                ]},
                 {'$or': [
                     {'quality': {'$gt': 0}},
                     {'quality': {'$exists': False}}
-                    ]},
-                ]
+                ]},
+            ]
         })
         self.assertDictEqual(test_dict, query.query_dict)
 
@@ -64,12 +67,12 @@ class QueryTest(unittest.TestCase):
                 {'$and': [
                     {'stoichiometry': {'$in': [['K', 3]]}},
                     {'stoichiometry': {'$in': [['P', 1]]}}
-                    ]},
+                ]},
                 {'$or': [
                     {'quality': {'$gt': 0}},
                     {'quality': {'$exists': False}}
-                    ]},
-                ]
+                ]},
+            ]
         })
         self.assertDictEqual(test_dict, query.query_dict)
 
@@ -80,12 +83,12 @@ class QueryTest(unittest.TestCase):
                 {'$and': [
                     {'stoichiometry': {'$in': [['K', 3]]}},
                     {'stoichiometry': {'$in': [['P', 1]]}}
-                    ]},
+                ]},
                 {'$or': [
                     {'quality': {'$gt': 0}},
                     {'quality': {'$exists': False}}
-                    ]},
-                ]
+                ]},
+            ]
         })
         self.assertDictEqual(test_dict, query.query_dict)
 
@@ -114,7 +117,7 @@ class QueryTest(unittest.TestCase):
                 ]},
                 {'doi': {'$in': ['1001/4001']}},
                 {'icsd': {'$eq': '100020'}},
-                {'cut_off_energy': {'$gte': 300}},
+                {'cut_off_energy': {'$eq': 300}},
                 {'spin_polarized': True},
                 {'$or': [
                     {'quality': {'$gt': 0}},
@@ -129,7 +132,6 @@ class QueryTest(unittest.TestCase):
                   'sedc': 'null', 'mp_spacing': [0.05], 'spin': 0,
                   'testing': True}
         query = DBQuery(**kwargs)
-        import re
         test_dict = ({
             '$and': [
                 {'$and': [
@@ -157,7 +159,6 @@ class QueryTest(unittest.TestCase):
                   'sedc': 'null', 'mp_spacing': [0.05], 'spin': 'any',
                   'testing': True}
         query = DBQuery(**kwargs)
-        import re
         test_dict = ({
             '$and': [
                 {'$and': [
@@ -192,8 +193,7 @@ class QueryTest(unittest.TestCase):
         self.assertEqual(elements, ['[VII]', '5', '[Fe,Ru,Os]', '2', '[I]', '[V]', '6', '[VIII]', '2', '[ASDASD]'])
 
     def testHarderCompositions(self):
-        kwargs = {'composition': ['[I]FeBe'], 'ignore_warnings': True,
-                  'testing': True}
+        kwargs = {'composition': ['[I]FeBe'], 'ignore_warnings': True, 'testing': True}
         query = DBQuery(**kwargs)
         test_dict = ({
             '$and': [
@@ -209,13 +209,12 @@ class QueryTest(unittest.TestCase):
                     {'elems': {'$in': ['Fe']}},
                     {'elems': {'$in': ['Be']}},
                     {'stoichiometry': {'$size': 3}}
-                    ]},
+                ]},
             ]
         })
         self.assertDictEqual(test_dict, query.query_dict)
 
-        kwargs = {'composition': ['LiFeBe'], 'ignore_warnings': True, 'intersection': True,
-                  'testing': True}
+        kwargs = {'composition': ['LiFeBe'], 'ignore_warnings': True, 'intersection': True, 'testing': True}
         query = DBQuery(**kwargs)
         test_dict = ({
             '$and': [
@@ -257,8 +256,7 @@ class QueryTest(unittest.TestCase):
             ]})
         self.assertDictEqual(test_dict, query.query_dict)
 
-        kwargs = {'composition': ['Fe[I]Be'], 'ignore_warnings': True,
-                  'testing': True}
+        kwargs = {'composition': ['Fe[I]Be'], 'ignore_warnings': True, 'testing': True}
         query = DBQuery(**kwargs)
         test_dict = ({
             '$and': [
@@ -274,13 +272,12 @@ class QueryTest(unittest.TestCase):
                     ]},
                     {'elems': {'$in': ['Be']}},
                     {'stoichiometry': {'$size': 3}}
-                    ]},
+                ]},
             ]
         })
         self.assertDictEqual(test_dict, query.query_dict)
 
-        kwargs = {'composition': ['[Fe,Ru,Os][I]Be'], 'ignore_warnings': True,
-                  'testing': True}
+        kwargs = {'composition': ['[Fe,Ru,Os][I]Be'], 'ignore_warnings': True, 'testing': True}
         query = DBQuery(**kwargs)
         test_dict = ({
             '$and': [
@@ -300,13 +297,12 @@ class QueryTest(unittest.TestCase):
                     ]},
                     {'elems': {'$in': ['Be']}},
                     {'stoichiometry': {'$size': 3}}
-                    ]},
+                ]},
             ]
         })
         self.assertDictEqual(test_dict, query.query_dict)
 
-        kwargs = {'composition': ['Be[Fe,Ru,Os][I]'], 'ignore_warnings': True,
-                  'testing': True}
+        kwargs = {'composition': ['Be[Fe,Ru,Os][I]'], 'ignore_warnings': True, 'testing': True}
         query = DBQuery(**kwargs)
         test_dict = ({
             '$and': [
@@ -326,13 +322,12 @@ class QueryTest(unittest.TestCase):
                         {'elems': {'$in': ['Fr']}}
                     ]},
                     {'stoichiometry': {'$size': 3}}
-                    ]},
+                ]},
             ]
         })
         self.assertDictEqual(test_dict, query.query_dict)
 
-        kwargs = {'composition': ['[VII][Fe,Ru,Os][I]'], 'ignore_warnings': True,
-                  'testing': True}
+        kwargs = {'composition': ['[VII][Fe,Ru,Os][I]'], 'ignore_warnings': True, 'testing': True}
         query = DBQuery(**kwargs)
         test_dict = ({
             '$and': [
@@ -358,13 +353,12 @@ class QueryTest(unittest.TestCase):
                         {'elems': {'$in': ['Fr']}}
                     ]},
                     {'stoichiometry': {'$size': 3}}
-                    ]},
+                ]},
             ]
         })
         self.assertDictEqual(test_dict, query.query_dict)
 
-        kwargs = {'composition': ['[Si,Ge,Sn][Fe,Ru,Os]'], 'ignore_warnings': True,
-                  'testing': True}
+        kwargs = {'composition': ['[Si,Ge,Sn][Fe,Ru,Os]'], 'ignore_warnings': True, 'testing': True}
         query = DBQuery(**kwargs)
         test_dict = ({
             '$and': [
@@ -380,15 +374,14 @@ class QueryTest(unittest.TestCase):
                         {'elems': {'$in': ['Os']}}
                     ]},
                     {'stoichiometry': {'$size': 2}}
-                    ]},
+                ]},
             ]
         })
 
         self.assertDictEqual(test_dict, query.query_dict)
 
     def testTrickyStoichs(self):
-        kwargs = {'formula': ['[VII]2[Fe,Ru,Os]3[I]'], 'ignore_warnings': True,
-                  'testing': True}
+        kwargs = {'formula': ['[VII]2[Fe,Ru,Os]3[I]'], 'ignore_warnings': True, 'testing': True}
         query = DBQuery(**kwargs)
         test_dict = ({
             '$and': [
@@ -414,13 +407,12 @@ class QueryTest(unittest.TestCase):
                         {'stoichiometry': {'$in': [['Fr', 1.0]]}}
                     ]},
                     {'stoichiometry': {'$size': 3}}
-                    ]},
+                ]},
             ]
         })
         self.assertDictEqual(test_dict, query.query_dict)
 
-        kwargs = {'formula': ['[Ag,Cd,In]2[Fe,Ru,Os]3[I]'], 'ignore_warnings': True,
-                  'testing': True}
+        kwargs = {'formula': ['[Ag,Cd,In]2[Fe,Ru,Os]3[I]'], 'ignore_warnings': True, 'testing': True}
         query = DBQuery(**kwargs)
         test_dict = ({
             '$and': [
@@ -444,14 +436,13 @@ class QueryTest(unittest.TestCase):
                         {'stoichiometry': {'$in': [['Fr', 1.0]]}}
                     ]},
                     {'stoichiometry': {'$size': 3}}
-                    ]},
+                ]},
             ]
         })
         self.assertDictEqual(test_dict, query.query_dict)
 
     def testRatioQuery(self):
-        kwargs = {'composition': ['Li:TiP4'], 'ignore_warnings': True,
-                  'testing': True}
+        kwargs = {'composition': ['Li:TiP4'], 'ignore_warnings': True, 'testing': True}
         query = DBQuery(**kwargs)
         test_dict = ({
             '$and': [
@@ -472,8 +463,7 @@ class QueryTest(unittest.TestCase):
         })
         self.assertDictEqual(test_dict, query.query_dict)
 
-        kwargs = {'composition': ['LiMn:Mo2S3'], 'ignore_warnings': True,
-                  'testing': True}
+        kwargs = {'composition': ['LiMn:Mo2S3'], 'ignore_warnings': True, 'testing': True}
         query = DBQuery(**kwargs)
         test_dict = ({
             '$and': [
@@ -497,8 +487,7 @@ class QueryTest(unittest.TestCase):
         })
         self.assertDictEqual(test_dict, query.query_dict)
 
-        kwargs = {'composition': ['LiMn:Mo2S3B5'], 'ignore_warnings': True,
-                  'testing': True}
+        kwargs = {'composition': ['LiMn:Mo2S3B5'], 'ignore_warnings': True, 'testing': True}
         query = DBQuery(**kwargs)
         test_dict = ({
             '$and': [
@@ -534,7 +523,7 @@ class QueryTest(unittest.TestCase):
         query = DBQuery(**kwargs)
         days_ago = (datetime.today() - timedelta(days=num_days)).timetuple()
         time_str = str(hex(int(mktime(days_ago))))[2:]
-        time_str += (24 - len(time_str))*'0'
+        time_str += (24 - len(time_str)) * '0'
         test_dict = ({
             '$and': [
                 {'$and': [
@@ -555,7 +544,7 @@ class QueryTest(unittest.TestCase):
         query = DBQuery(**kwargs)
         days_ago = (datetime.today() - timedelta(days=num_days)).timetuple()
         time_str = str(hex(int(mktime(days_ago))))[2:]
-        time_str += (24 - len(time_str))*'0'
+        time_str += (24 - len(time_str)) * '0'
         test_dict = ({
             '$and': [
                 {'$and': [
@@ -576,7 +565,7 @@ class QueryTest(unittest.TestCase):
         query = DBQuery(**kwargs)
         days_ago = (datetime.today() - timedelta(days=num_days)).timetuple()
         time_str = str(hex(int(mktime(days_ago))))[2:]
-        time_str += (24 - len(time_str))*'0'
+        time_str += (24 - len(time_str)) * '0'
         test_dict = ({
             '$and': [
                 {'$and': [
