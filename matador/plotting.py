@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matador.utils.chem_utils import get_formula_from_stoich
 from matador.utils.print_utils import print_warning, print_failure
+from matador.viz import ELEMENT_COLOURS
 
 
 def plotting_function(function):
@@ -28,6 +29,29 @@ def plotting_function(function):
             print_failure('Skipping plot...')
 
     return wrapped_plot_function
+
+
+def set_seaborn_style(cmap='Dark2'):
+    """ Set the default seaborn style, returning the colour palette.
+
+    Keyword arguments:
+        cmap (str): named seaborn colourmap.
+
+    Returns:
+        list: list of RGB tuples of seaborn colour palette.
+
+    """
+    import seaborn as sns
+    sns.set(style='whitegrid', font_scale=1.2)
+    sns.set_style({
+        'axes.facecolor': 'white', 'figure.facecolor': 'white',
+        'font.sans-serif': ['Linux Biolinum O', 'Helvetica', 'Arial'],
+        'axes.linewidth': 0.5,
+        'axes.grid': False,
+        'legend.frameon': False,
+        'axes.axisbelow': True})
+    sns.set_palette(cmap)
+    return sns.color_palette()
 
 
 @plotting_function
@@ -50,10 +74,15 @@ def plot_spectral(seeds, **kwargs):
         external_efermi (float): replace scraped Fermi energy with this value (eV)
         highlight_bands (list): list of integer indices, colour the bands with these indices in red
         band_colour (str): if passed "occ", bands will be coloured using cmap depending on whether
-                           they lie above or below the Fermi level. Otherwise, override all colour
-                           options with matplotlib-interpretable colour (e.g. hexcode or html
-                           colour name) to use for all bands (DEFAULT: None)
+            they lie above or below the Fermi level. If passed 'random', colour bands randomly from
+            the cmap. Otherwise, override all colour options with matplotlib-interpretable colour
+            (e.g. hexcode or html colour name) to use for all bands (DEFAULT: 'occ').
         cmap (str): matplotlib colourmap name to use for the bands
+        no_stacked_pdos (bool): whether to plot projected DOS as stack or overlapping.
+        preserve_kspace_distance (bool): whether to preserve distances in reciprocal space when
+            linearising the kpoint path. If False, bandstructures of different lattice parameters
+            with the same Bravais lattice can be more easily compared. If True, bandstructures may
+            appear rarefied or compressed in particular regions.
 
     """
     from matador.scrapers.castep_scrapers import bands2dict, cell2dict, phonon2dict, optados2dict
@@ -65,24 +94,26 @@ def plot_spectral(seeds, **kwargs):
     prop_defaults = {'plot_bandstructure': True, 'plot_dos': False,
                      'phonons': False, 'cell': False, 'gap': False,
                      'colour_by_seed': False, 'external_efermi': None,
-                     'labels': None, 'cmap': 'Dark2', 'band_colour': None,
+                     'labels': None, 'cmap': 'Dark2', 'band_colour': 'occ',
+                     'no_stacked_pdos': False, 'preserve_kspace_distance': False,
                      'verbosity': 0, 'highlight_bands': None}
     prop_defaults.update(kwargs)
-    kwargs = prop_defaults
 
-    sns.set(style='whitegrid', font_scale=1.2)
-    sns.set_style({
-        'axes.facecolor': 'white', 'figure.facecolor': 'white',
-        'font.sans-serif': ['Linux Biolinum O', 'Helvetica', 'Arial'],
-        'axes.linewidth': 0.5,
-        'axes.grid': False,
-        'legend.frameon': False,
-        'axes.axisbelow': True})
-    sns.set_palette(kwargs.get('cmap'))
-    colours = sns.color_palette()
-    valence = colours[0]
-    conduction = colours[-1]
-    crossing = colours[int(len(colours) / 2)]
+    kwargs = prop_defaults
+    if (kwargs.get('phonons') and kwargs['band_colour'] == 'occ') or kwargs['band_colour'] == 'random':
+        kwargs['band_colour'] = None
+
+    colours = set_seaborn_style(cmap=kwargs.get('cmap'))
+    if kwargs.get('cmap') == 'Dark2':
+        valence = colours[0]
+        conduction = colours[1]
+        crossing = colours[2]
+    else:
+        valence = colours[0]
+        conduction = colours[-1]
+        crossing = colours[int(len(colours) / 2)]
+
+    dos_legend = None
 
     if not isinstance(seeds, list):
         seeds = [seeds]
@@ -115,16 +146,17 @@ def plot_spectral(seeds, **kwargs):
         plot_window = (-5, 5)
 
     if kwargs['plot_bandstructure'] and not kwargs['plot_dos']:
-        fig, ax_dispersion = plt.subplots(figsize=(5, 5))
+        fig, ax_dispersion = plt.subplots(figsize=(7, 6))
     elif kwargs['plot_bandstructure'] and kwargs['plot_dos']:
-        fig, ax_grid = plt.subplots(1, 2, figsize=(8.5, 5), sharey=True,
-                                    gridspec_kw={'width_ratios': [4, 1],
+        fig, ax_grid = plt.subplots(1, 3, figsize=(8, 6), sharey=True,
+                                    gridspec_kw={'width_ratios': [4, 1, 1],
                                                  'wspace': 0.05,
                                                  'left': 0.15})
         ax_dispersion = ax_grid[0]
         ax_dos = ax_grid[1]
+        ax_grid[2].axis('off')
     elif not kwargs['plot_bandstructure'] and kwargs['plot_dos']:
-        fig, ax_dos = plt.subplots(figsize=(7, 5))
+        fig, ax_dos = plt.subplots(1, figsize=(8, 4))
 
     for seed_ind, seed in enumerate(seeds):
         seed = seed.replace('.bands', '').replace('.phonon', '')
@@ -155,13 +187,15 @@ def plot_spectral(seeds, **kwargs):
             for branch in dispersion[branch_key]:
                 for ind, kpt in enumerate(dispersion[path_key][branch]):
                     if ind != len(branch) - 1:
-                        diff = np.sqrt(np.sum((kpt - dispersion[path_key][branch[ind + 1]])**2))
+                        if kwargs['preserve_kspace_distance']:
+                            diff = np.sqrt(np.sum((kpt - dispersion[path_key][branch[ind + 1]])**2))
+                        else:
+                            diff = 1.
                         path.append(path[-1] + diff)
             path = np.asarray(path)
             path /= np.max(path)
             assert len(path) == int(dispersion[num_key]) - len(dispersion[branch_key]) + 1
-            if kwargs['phonons']:
-                dispersion[eig_key] = modes2bands(dispersion[eig_key], dispersion[branch_key])
+            dispersion[eig_key] = modes2bands(dispersion[eig_key], dispersion[branch_key])
             sns.set_palette(kwargs.get('cmap'), n_colors=dispersion[band_key])
             colours = sns.color_palette()
             for branch_ind, branch in enumerate(dispersion[branch_key]):
@@ -206,8 +240,8 @@ def plot_spectral(seeds, **kwargs):
                         ax_dispersion.plot(path[(np.asarray(branch)-branch_ind).tolist()],
                                            dispersion[eig_key][ns][nb][branch],
                                            c=colour, lw=1, ls=ls[seed_ind], alpha=alpha, label=label)
-                if branch_ind != len(dispersion[branch_key]) - 1:
-                    ax_dispersion.axvline(path[branch[-1] - branch_ind], ls='-.', lw=1, c='grey')
+                # if branch_ind != len(dispersion[branch_key]) - 1:
+                    # ax_dispersion.axvline(path[branch[-1] - branch_ind], ls='-.', lw=1, c='grey')
             if len(seeds) > 1:
                 ax_dispersion.legend()
             ax_dispersion.axhline(0, ls='--', lw=1, c='grey')
@@ -215,9 +249,10 @@ def plot_spectral(seeds, **kwargs):
             if kwargs['phonons']:
                 ylabel = 'Wavenumber (cm$^{-1}$)'
             else:
-                ylabel = r'$\epsilon_k$ (eV)'
+                ylabel = r'Energy (eV)'
             ax_dispersion.set_ylabel(ylabel)
-            ax_dispersion.set_xlim(-0.05, 1.05)
+            ax_dispersion.set_xlim(0, 1)
+            # ax_dispersion.set_xlim(-0.05, 1.05)
             xticks = []
             xticklabels = []
             shear_planes = []
@@ -252,7 +287,8 @@ def plot_spectral(seeds, **kwargs):
                                                     label = '{}|{}'.format(label, new_label)
                                                     labelled.append(ind - branch_ind)
                                                     shear_planes.append(ind)
-                                    label = '${}$'.format(label)
+                                    label = '$\\phantom{{|}}{}$'.format(label)
+                                    ax_dispersion.axvline(path[ind - branch_ind], ls='-.', c='grey', zorder=0, lw=0.5)
                                     xticklabels.append(label)
                                     xticks.append(path[ind - branch_ind])
                                     break
@@ -288,6 +324,7 @@ def plot_spectral(seeds, **kwargs):
             ax_dispersion.set_xticklabels(xticklabels)
 
         if kwargs['plot_dos']:
+            num_projectors = 1
             if not kwargs['phonons']:
                 if kwargs.get('dos') is None:
                     dos_data, s = optados2dict(seed + '.adaptive.dat')
@@ -298,6 +335,7 @@ def plot_spectral(seeds, **kwargs):
                 max_density = np.max(dos[np.where(energies > plot_window[0])])
                 if 'pdos' in dos_data:
                     pdos = dos_data['pdos']
+                    num_projectors = dos_data['num_projectors']
             else:
                 if not isfile(seed + '.phonon_dos'):
                     phonon_data, s = phonon2dict(seed + '.phonon')
@@ -326,15 +364,15 @@ def plot_spectral(seeds, **kwargs):
                                        label=(r'$\omega_\mathrm{{min}} = {:5.3f}$ {}'
                                               .format(phonon_data['softest_mode_freq'],
                                                       phonon_data['freq_unit'])))
-                        ax_dos.legend()
                     else:
-                        exit('Failed to read .phonon file')
+                        raise SystemExit('Failed to read .phonon file')
                 else:
                     with open(seed + '.phonon_dos', 'r') as f:
                         flines = f.readlines()
                     for ind, line in enumerate(flines):
                         if 'begin dos' in line.lower():
                             projector_labels = line.split()[5:]
+                            projector_labels = [(label, None) for label in projector_labels]
                             num_projectors = len(projector_labels)
                             begin = ind + 1
                             break
@@ -349,6 +387,7 @@ def plot_spectral(seeds, **kwargs):
                     dos_data['dos'] = dos
                     max_density = np.max(dos)
                     dos_data['energies'] = energies
+                    plot_window = [np.min(energies[np.where(dos > 0)]) - 10, np.max(energies[np.where(dos > 0)])]
                     dos_data['pdos'] = dict()
                     for i, label in enumerate(projector_labels):
                         dos_data['pdos'][label] = raw_data[:, i + 2]
@@ -359,12 +398,23 @@ def plot_spectral(seeds, **kwargs):
             if kwargs['phonons']:
                 ylabel = 'Phonon DOS'
                 xlabel = 'Wavenumber (cm$^{{-1}}$)'
-                # xlabel = 'Wavenumber ({})'.format(phonon_data['freq_unit'])
             else:
-                ylabel = 'DOS'
+                if kwargs['plot_bandstructure']:
+                    ylabel = 'DOS'
+                else:
+                    ylabel = 'DOS (eV$^{{-1}}$\\AA$^{{-3}}$)'
                 xlabel = 'Energy (eV)'
+
             sns.set_palette(kwargs.get('cmap'), n_colors=num_projectors)
             colours = sns.color_palette()
+
+            if len(seeds) > 1:
+                colour = seed_colours[seed_ind]
+            else:
+                colour = 'k'
+
+            ax_dos.grid(False)
+
             if kwargs['plot_bandstructure']:
                 ax_dos.set_xticks([0.6 * max_density])
                 ax_dos.set_xticklabels([ylabel])
@@ -372,26 +422,9 @@ def plot_spectral(seeds, **kwargs):
                 ax_dos.set_xlim(0, max_density * 1.2)
                 ax_dos.set_ylim(plot_window)
                 ax_dos.axvline(0, c='k')
-                if len(seeds) > 1:
-                    colour = seed_colours[seed_ind]
-                else:
-                    colour = 'k'
-                ax_dos.plot(dos, energies, lw=1, ls=ls[seed_ind], color=colour)
-                if 'pdos' in dos_data and len(seeds) == 1:
-                    for ind, projector in enumerate(pdos):
-                        ax_dos.plot(pdos[projector], energies, lw=1, zorder=1000)
-                        ax_dos.fill_betweenx(energies, 0, pdos[projector], alpha=0.3, label=projector)
-                if len(seeds) > 1:
-                    ax_dos.legend()
 
-                if seed_ind == 0 and not kwargs['phonons']:
-                    if 'pdos' not in dos_data:
-                        ax_dos.fill_betweenx(energies[np.where(energies <= 0)], 0,
-                                             dos[np.where(energies <= 0)],
-                                             facecolor=valence, alpha=0.5)
-                        ax_dos.fill_betweenx(energies[np.where(energies >= 0)], 0,
-                                             dos[np.where(energies >= 0)],
-                                             facecolor=conduction, alpha=0.5)
+                ax_dos.plot(dos, energies, lw=1, ls=ls[seed_ind], color=colour, zorder=1e10, label='Total DOS')
+
             else:
                 ax_dos.set_xlabel(xlabel)
                 ax_dos.set_ylabel(ylabel)
@@ -399,35 +432,67 @@ def plot_spectral(seeds, **kwargs):
                 ax_dos.set_ylim(0, max_density * 1.2)
                 ax_dos.set_xlim(plot_window)
                 ax_dos.axhline(0, c='k')
-                if len(seeds) > 1:
-                    colour = seed_colours[seed_ind]
-                else:
-                    colour = 'k'
-                ax_dos.plot(energies, dos, lw=1, c='k', ls=ls[seed_ind], color=colour)
-                if 'pdos' in dos_data and len(seeds) == 1:
-                    for ind, projector in enumerate(pdos):
-                        ax_dos.plot(energies, pdos[projector], lw=1, zorder=1000)
-                        ax_dos.fill_between(energies, 0, pdos[projector], alpha=0.3, label=projector)
-                ax_dos.legend()
-                if seed_ind == 0 and not kwargs['phonons']:
-                    if 'pdos' not in dos_data:
-                        ax_dos.fill_between(energies[np.where(energies <= 0)], 0,
-                                            dos[np.where(energies <= 0)],
-                                            facecolor=valence, alpha=0.5)
-                        ax_dos.fill_between(energies[np.where(energies >= 0)], 0,
-                                            dos[np.where(energies >= 0)],
-                                            facecolor=conduction, alpha=0.5)
-            ax_dos.grid(False)
+
+                ax_dos.plot(energies, dos, lw=1, ls=ls[seed_ind], color=colour, zorder=1e10, label='Total DOS')
+
+            if 'pdos' in dos_data and len(seeds) == 1:
+                dos_colours = []
+                for ind, projector in enumerate(pdos):
+                    if ind == 0:
+                        stack = np.zeros_like(pdos[projector])
+
+                    if projector[0] is None:
+                        projector_label = projector[1]
+                    elif projector[1] is None:
+                        projector_label = projector[0]
+                    else:
+                        projector_label = '{p[0]} ({p[1]})'.format(p=projector)
+
+                    # if species-projected only, then use VESTA colours
+                    if projector[0] is not None and projector[1] is None:
+                        dos_colours.append(ELEMENT_COLOURS.get(projector[0]))
+                    # if species_ang-projected only, then use VESTA colours but lightened
+                    elif projector[0] is not None and projector[1] is not None:
+                        from copy import deepcopy
+                        dos_colour = deepcopy(ELEMENT_COLOURS.get(projector[0]))
+                        multi = ['s', 'p', 'd', 'f'].index(projector[1]) - 1
+                        for jind, _ in enumerate(dos_colour):
+                            dos_colour[jind] = max(min(dos_colour[jind]+multi*0.2, 1), 0)
+                        dos_colours.append(dos_colour)
+                    else:
+                        dos_colours.append(None)
+
+                    if not kwargs['no_stacked_pdos']:
+                        alpha = 0.9
+                    else:
+                        alpha = 0.7
+
+                    if kwargs['plot_bandstructure']:
+                        ax_dos.plot(stack+pdos[projector], energies, lw=1, zorder=1000,
+                                    color=dos_colours[-1])
+                        ax_dos.fill_betweenx(energies, stack, stack+pdos[projector], alpha=alpha, label=projector_label,
+                                             color=dos_colours[-1])
+                    else:
+                        ax_dos.plot(energies, stack+pdos[projector], lw=1, zorder=1000,
+                                    color=dos_colours[-1])
+                        ax_dos.fill_between(energies, stack, stack+pdos[projector], alpha=alpha, label=projector_label,
+                                            color=dos_colours[-1])
+
+                    if not kwargs['no_stacked_pdos']:
+                        stack += pdos[projector]
+
+            dos_legend = ax_dos.legend(bbox_to_anchor=(1, 1))
 
     if any([kwargs.get('pdf'), kwargs.get('svg'), kwargs.get('png')]):
         if kwargs.get('pdf'):
-            plt.savefig(seeds[0].replace('.bands', '').replace('.phonon', '') + '_spectral.pdf', bbox_inches='tight')
+            plt.savefig(seeds[0].replace('.bands', '').replace('.phonon', '') + '_spectral.pdf',
+                        bbox_inches='tight', transparent=True, bbox_extra_artists=(dos_legend, ))
         if kwargs.get('svg'):
             plt.savefig(seeds[0].replace('.bands', '').replace('.phonon', '') + '_spectral.svg',
-                        bbox_inches='tight', transparent=True)
+                        bbox_inches='tight', transparent=True, bbox_extra_artists=(dos_legend, ))
         if kwargs.get('png'):
             plt.savefig(seeds[0].replace('.bands', '').replace('.phonon', '') + '_spectral.png',
-                        bbox_inches='tight', dpi=300)
+                        bbox_inches='tight', transparent=True, bbox_extra_artists=(dos_legend, ))
 
     else:
         print('Displaying plot...')
@@ -713,7 +778,8 @@ def plot_2d_hull_bokeh(hull):
                               </span>
                           </div>
                       </div>
-                      """)
+                      """
+    )
 
     tools = ['pan', 'wheel_zoom', 'reset', 'save']
     tools.append(hover)
@@ -1250,7 +1316,8 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, expecting_cb
                 # alpha=max(0.1, 1-2*hull_dist[i]),
                 s=70 * (1 - float(colours_list[i]) / n_colours) + 15,
                 lw=1,
-                edgecolors='black')
+                edgecolors='black'
+            )
 
     # add colourmaps
     if hull.args.get('capmap'):
@@ -1287,7 +1354,8 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, expecting_cb
                                                    (concs[:, 2] <= float(k)/scale + eps) *
                                                    (concs[:, 2] >= float(k)/scale - eps)))
         ax.heatmap(sampling, style="hexagonal", cbarlabel='Number of structures', cmap='afmhot')
-    plt.tight_layout()
+
+    plt.tight_layout(w_pad=0.2)
 
     if hull.savefig:
         if hull.args.get('png'):

@@ -2,15 +2,6 @@
 """ This file is a dirty wrapper of ase-gui for
 quick visualisation of structures.
 """
-ELEMENT_COLOURS = {
-    'Na': '#f9dc3c',
-    'K': '#66236D',
-    'Sn': '#938CAF',
-    'P': '#D66814',
-    'Sr': '#00ff27',
-    'Ti': '#78c9ff',
-    'O': '#ff0000',
-}
 
 
 def viz(doc):
@@ -18,6 +9,21 @@ def viz(doc):
     from ase.visualize import view
     view(doc2ase(doc))
     return
+
+
+def get_element_colours():
+    """ Read element colours from VESTA file. """
+    import os
+    colours_fname = '/'.join(os.path.realpath(__file__).split('/')[:-1]) + '/../config/vesta_elements.ini'
+    with open(colours_fname, 'r') as f:
+        flines = f.readlines()
+    element_colours = dict()
+    for line in flines:
+        line = line.split()
+        elem = line[1]
+        colour = list(map(float, line[-3:]))
+        element_colours[elem] = colour
+    return element_colours
 
 
 def nb_viz(doc, repeat=1, bonds=None):
@@ -53,3 +59,6 @@ def doc2ase(doc):
                  scaled_positions=doc['positions_frac'],
                  cell=doc['lattice_cart'],
                  pbc=True)
+
+
+ELEMENT_COLOURS = get_element_colours()

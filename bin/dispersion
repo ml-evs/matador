@@ -6,9 +6,9 @@ is created. If a <seed>.adaptive.dat file exists
 then a combined BS/DOS plot will be created.
 """
 
-import matplotlib
 from os.path import isfile
 import argparse
+import matplotlib
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
@@ -23,13 +23,20 @@ if __name__ == '__main__':
                         help='save svg rather than showing plot in X')
     parser.add_argument('--labels', type=str, nargs='*',
                         help='list of legend labels')
+    parser.add_argument('--dos_only', action='store_true', help='only plot DOS')
+    parser.add_argument('--bs_only', action='store_true', help='only plot dispersion')
+    parser.add_argument('--preserve_kspace_distance', action='store_true',
+                        help='when linearising kpoint path, ensure distance in reciprocal space is conserved')
     parser.add_argument('--cmap', type=str,
                         help='matplotlib colourmap name to use')
+    parser.add_argument('--no_stacked_pdos', action='store_true',
+                        help='plot PDOS as overlap rather than stack')
     parser.add_argument('--band_colour', type=str,
-                        help='override all other colour options with a matploblib-interpretable colour string')
+                        help='override all other colour options with a matploblib-interpretable colour string, '
+                             'or choose one of "occ" or "random".')
     parser.add_argument('-g', '--gap', action='store_true',
                         help='plot position and size of band gap')
-    parser.add_argument('-ph', '--phonons', action='store_true',
+    parser.add_argument('-ph', '--phonons', action='store_true', default=False,
                         help='plot phonon calculation, rather than electronic')
     parser.add_argument('-v', '--verbosity', type=int, default=0,
                         help='control verbosity of output')
@@ -53,6 +60,8 @@ if __name__ == '__main__':
     if cmap is None:
         cmap = 'Dark2'
     band_colour = kwargs.get('band_colour')
+    if band_colour is None:
+        band_colour = 'occ'
 
     del kwargs['seed']
     del kwargs['verbosity']
@@ -86,13 +95,19 @@ if __name__ == '__main__':
         print_failure('Could not find files for specified seed {}.'.format(test_seed))
         exit()
 
-    plot = plot_spectral(seed,
-                         plot_bandstructure=bandstructure,
-                         plot_dos=dos,
-                         cell=cell,
-                         gap=gap,
-                         verbosity=verbosity,
-                         labels=labels,
-                         cmap=cmap,
-                         band_colour=band_colour,
-                         **kwargs)
+    if kwargs.get('dos_only') and dos:
+        bandstructure = False
+
+    if kwargs.get('bs_only') and bandstructure:
+        dos = False
+
+    plot_spectral(seed,
+                  plot_bandstructure=bandstructure,
+                  plot_dos=dos,
+                  cell=cell,
+                  gap=gap,
+                  verbosity=verbosity,
+                  labels=labels,
+                  cmap=cmap,
+                  band_colour=band_colour,
+                  **kwargs)
