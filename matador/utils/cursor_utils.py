@@ -63,7 +63,8 @@ def display_results(cursor,
             "\\rowcolor{gray!20}\n"
             "\\multicolumn{1}{l}{formula} & \\multicolumn{1}{r}{$\\Delta E$ from hull (meV/atom)} & "
             "\\multicolumn{1}{r}{grav. cap. (mAh/g)} & \\multicolumn{1}{c}{sg.} & "
-            "\\multicolumn{1}{l}{provenance} & \\multicolumn{1}{l}{description} \\\\\n")
+            "\\multicolumn{1}{l}{provenance} & \\multicolumn{1}{l}{description} \\\\\n"
+        )
         latex_struct_string = []
 
     header_string = ''
@@ -152,8 +153,7 @@ def display_results(cursor,
                     src = [src.split('/')[-1] for src in doc['source'] if src.endswith('.res') or src.endswith('.castep')][0].replace('.res', '').replace('.castep', '')
                     struct_string.append("  {:<38}".format(src))
                 else:
-                    struct_string.append(
-                        "  {:^26}".format(doc['text_id'][0]+' '+doc['text_id'][1]))
+                    struct_string.append("  {:^26}".format(doc['text_id'][0] + ' ' + doc['text_id'][1]))
             if additions is not None and doc['text_id'] in additions:
                 struct_string[-1] = '\033[92m\033[1m' + ' + ' + struct_string[-1]
                 postfix = '\033[0m'
@@ -187,12 +187,12 @@ def display_results(cursor,
         try:
             if hull:
                 struct_string[-1] += "{:>13.1f}".format(
-                    0 if doc.get('hull_distance') <= 1e-12 else 1000 * doc.get('hull_distance'))
+                    0 if doc.get('hull_distance') <= 1e-12 else 1000 * doc.get('hull_distance')
+                )
             elif args.get('per_atom'):
-                struct_string[-1] += "{:>18.5f}".format(doc['enthalpy_per_atom'])
+                struct_string[-1] += "{:>18.5f}".format(doc['enthalpy_per_atom'] - gs_enthalpy)
             else:
-                struct_string[-1] += "{:>18.5f}".format(
-                    doc['enthalpy'] / doc['num_fu'] - gs_enthalpy)
+                struct_string[-1] += "{:>18.5f}".format(doc['enthalpy'] / doc['num_fu'] - gs_enthalpy)
         except KeyError:
             struct_string[-1] += "{:^18}".format('xxx')
 
@@ -218,12 +218,12 @@ def display_results(cursor,
 
         if latex:
             latex_struct_string.append("{:^20} {:^10} & ".format(formula_substring, '$\\star$' if doc['hull_distance'] == 0 else ''))
-            latex_struct_string[-1] += "{:^20.0f} & ".format(doc.get(
-                'hull_distance') * 1000) if doc.get('hull_distance') > 0 else '{:^20} &'.format(
-                    '-')
-            latex_struct_string[-1] += "{:^20.0f} & ".format(doc[
-                'gravimetric_capacity']) if doc.get('hull_distance') == 0 else '{:^20} &'.format(
-                    '-')
+            latex_struct_string[-1] += "{:^20.0f} & ".format(doc.get('hull_distance') * 1000
+                                                             ) if doc.get('hull_distance'
+                                                                          ) > 0 else '{:^20} &'.format('-')
+            latex_struct_string[-1] += "{:^20.0f} & ".format(doc['gravimetric_capacity']
+                                                             ) if doc.get('hull_distance'
+                                                                          ) == 0 else '{:^20} &'.format('-')
             latex_struct_string[-1] += "{:^20} & ".format(get_spacegroup_spg(doc))
             prov = get_guess_doc_provenance(doc['source'], doc.get('icsd'))
             if doc.get('icsd'):
@@ -232,7 +232,11 @@ def display_results(cursor,
             latex_struct_string[-1] += "{:^30} \\\\ \n".format('')
 
         if last_formula != formula_substring:
-            gs_enthalpy = doc['enthalpy'] / doc['num_fu']
+            if args.get('per_atom'):
+                gs_enthalpy = doc['enthalpy'] / doc['num_atoms']
+            else:
+                gs_enthalpy = doc['enthalpy'] / doc['num_fu']
+
         last_formula = formula_substring
 
         if details:
@@ -255,8 +259,7 @@ def display_results(cursor,
             else:
                 detail_string[-1] += 'cutoff unknown'
             if 'external_pressure' in doc:
-                detail_string[-1] += (
-                    ', ' + "{:4.2f}".format(doc['external_pressure'][0][0]) + ' GPa')
+                detail_string[-1] += (', ' + "{:4.2f}".format(doc['external_pressure'][0][0]) + ' GPa')
             if 'kpoints_mp_spacing' in doc:
                 detail_string[-1] += ', ~' + str(doc['kpoints_mp_spacing']) + ' 1/A'
             if 'geom_force_tol' in doc:
@@ -281,15 +284,14 @@ def display_results(cursor,
             if 'encapsulated' in doc:
                 try:
                     detail_string[-1] += (
-                        ', (n,m)=(' + str(doc['cnt_chiral'][0]) + ',' + str(doc['cnt_chiral'][1]) +
-                        ')')
+                        ', (n,m)=(' + str(doc['cnt_chiral'][0]) + ',' + str(doc['cnt_chiral'][1]) + ')'
+                    )
                     detail_string[-1] += ', r=' + "{:4.2f}".format(doc['cnt_radius']) + ' A'
                     detail_string[-1] += ', z=' + "{:4.2f}".format(doc['cnt_length']) + ' A'
                 except KeyError:
                     pass
             detail_string[-1] += ' ' + (len(header_string) - len(detail_string[-1]) - 1) * u"╌"
-            detail_substring[
-                -1] += ' ' + (len(header_string) - len(detail_substring[-1]) - 1) * u"╌"
+            detail_substring[-1] += ' ' + (len(header_string) - len(detail_substring[-1]) - 1) * u"╌"
 
         if args.get('source'):
             if len(doc['source']) == 1:
@@ -441,10 +443,7 @@ def get_spg_uniq(cursor, symprec=1e-2, latvecprec=1e-3, posprec=1e-3):
 
     refined_list = []
     for crystal in spg_cursor:
-        refined_list.append(spg.standardize_cell(crystal,
-                                                 to_primitive=False,
-                                                 no_idealize=False,
-                                                 symprec=symprec))
+        refined_list.append(spg.standardize_cell(crystal, to_primitive=False, no_idealize=False, symprec=symprec))
     for i in range(len(refined_list)):
         for j in range(len(refined_list[i][1])):
             for k in range(len(refined_list[i][1][j])):
@@ -453,7 +452,8 @@ def get_spg_uniq(cursor, symprec=1e-2, latvecprec=1e-3, posprec=1e-3):
     for i in range(len(refined_list)):
         refined_list[i] = (
             refined_list[i][0], refined_list[i][1][np.argsort(refined_list[i][1][:, 0])],
-            refined_list[i][2][np.argsort(refined_list[i][1][:, 0])])
+            refined_list[i][2][np.argsort(refined_list[i][1][:, 0])]
+        )
     uniq_list = np.arange(0, len(spg_cursor))
     same_list = []
     shift_list = []
