@@ -11,6 +11,7 @@ REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
 
 class PDFCalculatorTest(unittest.TestCase):
     """ Test PDF calculator. """
+
     def testIdealGasPDF(self, retry=0):
         # create fake matador doc
         doc = dict()
@@ -26,23 +27,23 @@ class PDFCalculatorTest(unittest.TestCase):
         doc['lattice_cart'] = np.asarray([[box_size, 0, 0], [0, box_size, 0], [0, 0, box_size]])
         doc['cell_volume'] = box_size**3
         doc['text_id'] = ['ideal', 'gas']
-        doc['Gr_smear'] = np.zeros_like(np.arange(0, rmax+dr, dr))
-        doc['Gr_hist'] = np.zeros_like(doc['Gr_smear'])
+        doc['gr_smear'] = np.zeros_like(np.arange(0, rmax + dr, dr))
+        doc['gr_hist'] = np.zeros_like(doc['gr_smear'])
         while i < num_samples:
             doc['positions_frac'] = np.random.rand(num_atoms, 3)
             doc['pdf'] = PDF(doc, num_images=1, dr=dr, rmax=rmax, lazy=True, style='histogram')
             doc['pdf'].calc_pdf()
             doc['pdf_smear'] = PDF(doc, num_images=1, gaussian_width=0.01, dr=dr, rmax=rmax, lazy=True, style='smear')
             doc['pdf_smear'].calc_pdf()
-            doc['Gr_smear'] += doc['pdf_smear'].Gr / num_samples
-            doc['Gr_hist'] += doc['pdf'].Gr / num_samples
+            doc['gr_smear'] += doc['pdf_smear'].gr / num_samples
+            doc['gr_hist'] += doc['pdf'].gr / num_samples
             i += 1
         try:
-            self.assertAlmostEqual(np.mean(doc['Gr_smear']), np.mean(doc['Gr_hist']), places=1)
-            self.assertAlmostEqual(np.mean(doc['Gr_smear']), 1.0, places=1)
-            self.assertAlmostEqual(np.mean(doc['Gr_hist']), 1.0, places=1)
+            self.assertAlmostEqual(np.mean(doc['gr_smear']), np.mean(doc['gr_hist']), places=1)
+            self.assertAlmostEqual(np.mean(doc['gr_smear']), 1.0, places=1)
+            self.assertAlmostEqual(np.mean(doc['gr_hist']), 1.0, places=1)
         except:
-            self.testIdealGasPDF(retry=retry+1)
+            self.testIdealGasPDF(retry=retry + 1)
 
     def testPDFAutoImageNumber(self):
         doc, success = res2dict(REAL_PATH + 'data/LiPZn-r57des.res')
@@ -50,7 +51,7 @@ class PDFCalculatorTest(unittest.TestCase):
         doc['text_id'] = ['pdf', 'test']
         doc['pdf_num_images'] = PDF(doc, num_images=5, **{'debug': False, 'projected': False})
         doc['pdf_auto_images'] = PDF(doc, num_images='auto', **{'debug': False, 'projected': False})
-        np.testing.assert_array_almost_equal(doc['pdf_num_images'].Gr, doc['pdf_auto_images'].Gr)
+        np.testing.assert_array_almost_equal(doc['pdf_num_images'].gr, doc['pdf_auto_images'].gr)
 
     def testPDFFromProjected(self):
         doc, success = res2dict(REAL_PATH + 'data/LiPZn-r57des.res')
@@ -59,7 +60,7 @@ class PDFCalculatorTest(unittest.TestCase):
         doc['pdf_unprojected'] = PDF(doc, dr=0.01, **{'debug': False})
         doc['text_id'] = ['projected', 'test']
         doc['pdf_projected'] = PDF(doc, dr=0.01, **{'debug': False})
-        np.testing.assert_array_almost_equal(doc['pdf_unprojected'].Gr, doc['pdf_projected'].Gr)
+        np.testing.assert_array_almost_equal(doc['pdf_unprojected'].gr, doc['pdf_projected'].gr)
 
     def testOverlapPDFSameStructure(self):
         doc, success = res2dict(REAL_PATH + 'data/LiPZn-r57des.res')
@@ -98,6 +99,7 @@ class PDFCalculatorTest(unittest.TestCase):
 
 class PDFFactoryCalculatorTest(unittest.TestCase):
     """ Test PDFFactory. """
+
     def testPDFFactoryConcurrentPDFs(self):
         import glob
         import numpy as np
@@ -118,7 +120,7 @@ class PDFFactoryCalculatorTest(unittest.TestCase):
         print('Corresponding to a speedup of {:.1f} vs ideal {:.1f}'.format(serial_elapsed/factory_elapsed,
                                                                             pdf_factory.nprocs))
         for ind, doc in enumerate(serial_cursor):
-            np.testing.assert_array_almost_equal(doc['pdf'].Gr, cursor[ind]['pdf'].Gr, decimal=6)
+            np.testing.assert_array_almost_equal(doc['pdf'].gr, cursor[ind]['pdf'].gr, decimal=6)
 
     def testPDFFactoryHull(self):
         import glob
@@ -143,7 +145,7 @@ class PDFFactoryCalculatorTest(unittest.TestCase):
         print('Corresponding to a speedup of {:.1f} vs ideal {:.1f}'.format(serial_elapsed/factory_elapsed,
                                                                             pdf_factory.nprocs))
         for ind, doc in enumerate(serial_cursor):
-            np.testing.assert_array_almost_equal(doc['pdf'].Gr, hull.cursor[ind]['pdf'].Gr, decimal=6)
+            np.testing.assert_array_almost_equal(doc['pdf'].gr, hull.cursor[ind]['pdf'].gr, decimal=6)
 
     def testPDFFactoryConcurrentProjectedPDFs(self):
         import glob
@@ -165,9 +167,9 @@ class PDFFactoryCalculatorTest(unittest.TestCase):
         print('Corresponding to a speedup of {:.1f} vs ideal {:.1f}'.format(serial_elapsed/factory_elapsed,
                                                                             pdf_factory.nprocs))
         for ind, doc in enumerate(serial_cursor):
-            np.testing.assert_array_almost_equal(doc['pdf'].Gr, cursor[ind]['pdf'].Gr, decimal=6)
-            for key in doc['pdf'].elem_Gr:
-                np.testing.assert_array_almost_equal(doc['pdf'].elem_Gr[key], cursor[ind]['pdf'].elem_Gr[key], decimal=6)
+            np.testing.assert_array_almost_equal(doc['pdf'].gr, cursor[ind]['pdf'].gr, decimal=6)
+            for key in doc['pdf'].elem_gr:
+                np.testing.assert_array_almost_equal(doc['pdf'].elem_gr[key], cursor[ind]['pdf'].elem_gr[key], decimal=6)
 
 
 if __name__ == '__main__':

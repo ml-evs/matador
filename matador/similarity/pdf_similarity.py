@@ -15,6 +15,7 @@ from matador.utils.cell_utils import frac2cart, cart2abc, cart2volume
 from matador.utils.cell_utils import standardize_doc_cell
 from matador.utils.print_utils import print_notify
 from matador.similarity.fingerprint import Fingerprint
+from matador.plotting import plotting_function
 
 
 class PDF(Fingerprint):
@@ -155,7 +156,7 @@ class PDF(Fingerprint):
         to G(r) and r respectively.
 
         """
-        if self.elem_gr is None:
+        if self.elem_gr is not None:
             self._calc_unprojected_pdf_from_projected()
         else:
             distances = self._calc_distances(self._poscart)
@@ -248,14 +249,16 @@ class PDF(Fingerprint):
         for comb in combinations_with_replacement(set(self._types), 2):
             elem_gr[tuple(set(comb))] = np.zeros_like(self.r_space)
 
-        distances = dict()
         for elem_type in elem_gr:
             poscart = [self._poscart[i] for i in range(len(self._poscart)) if self._types[i] == elem_type[0]]
             poscart_b = ([self._poscart[i] for i in range(len(self._poscart)) if self._types[i] == elem_type[1]]
                          if len(elem_type) == 2 else None)
-            distances[elem_type] = self._calc_distances(poscart, poscart_b=poscart_b)
-            elem_gr[elem_type] = len(elem_type) * self._set_broadened_normalised_pdf(
-                distances[elem_type], style=self.kwargs.get('style'), gaussian_width=self.kwargs.get('gaussian_width'))
+            distances = self._calc_distances(poscart, poscart_b=poscart_b)
+            style = self.kwargs.get('style')
+            gw = self.kwargs.get('gaussian_width')
+            elem_gr[elem_type] = (
+                len(elem_type) * self._set_broadened_normalised_pdf(distances, style=style, gaussian_width=gw)
+            )
 
         self.elem_gr = elem_gr
 
@@ -327,22 +330,36 @@ class PDF(Fingerprint):
         except AttributeError:
             return (None, None)
 
-    def plot_projected_pdf(self, keys=None, other_pdfs=None):
-        """ Plot projected PDFs. """
+    @plotting_function
+    def plot_projected_pdf(self, keys=None, other_pdfs=None, cmap='Dark2'):
+        """ Plot projected PDFs.
+
+        Keyword arguments:
+            keys (list): plot only a subset of projections, e.g. [('K', )].
+            other_pdfs (list of PDF): other PDFs to plot.
+            cmap (str): name of matplotlib colourmap.
+
+        """
         import matplotlib.pyplot as plt
+        from matador.plotting import set_seaborn_style
+        set_seaborn_style(cmap=cmap)
         fig = plt.figure(figsize=(8, 5))
         ax1 = fig.add_subplot(111)
-        ax1.plot(self.r_space, self.gr, lw=1, ls='--', label='total')
+        ax1.plot(self.r_space, self.gr, lw=1, zorder=100000, ls='-', label='total {}'.format(self.label), c='k')
         if keys is None:
             keys = [key for key in self.elem_gr]
         for key in keys:
-            ax1.plot(self.r_space, self.elem_gr[key], label='-'.join(key))
+            ax1.plot(self.r_space, self.elem_gr[key], label='-'.join(key) + ' {}'.format(self.label))
         if other_pdfs is not None:
             if isinstance(other_pdfs, PDF):
                 other_pdfs = [other_pdfs]
             for pdf in other_pdfs:
                 if isinstance(pdf, PDF):
-                    ax1.plot(pdf.r_space, pdf.gr, lw=2, label=pdf.label, alpha=1, ls='--')
+                    ax1.plot(pdf.r_space, pdf.gr, lw=1, zorder=99999, ls='--',
+                             label='total {}'.format(pdf.label), c='k')
+                    for key in keys:
+                        ax1.plot(self.r_space, pdf.elem_gr[key], ls='--',
+                                 label='-'.join(key) + ' {}'.format(pdf.label))
                 elif isinstance(pdf, tuple):
                     ax1.plot(pdf[0], pdf[1], lw=2, alpha=1, ls='--')
                 else:
@@ -353,18 +370,22 @@ class PDF(Fingerprint):
         plt.show()
         return
 
-    def plot_pdf(self, other_pdfs=None):
-        """ Plot PDFs, with optional list of
-        tuples [(r_space, gr), ...] of other PDFs.
+    @plotting_function
+    def plot_pdf(self, other_pdfs=None, cmap='Dark2'):
+        """ Plot PDFs.
+
+        Keyword arguments:
+            other_pdfs (list of PDF): other PDFs to add to the plot.
+            cmap (str): name of matplotlib colourmap.
+
+
         """
         import matplotlib.pyplot as plt
-        try:
-            import seaborn as sns
-        except ImportError:
-            pass
+        from matador.plotting import set_seaborn_style
+        set_seaborn_style(cmap=cmap)
         fig = plt.figure(figsize=(8, 5))
         ax1 = fig.add_subplot(111)
-        ax1.plot(self.r_space, self.gr, lw=2, label=self.label)
+        ax1.plot(self.r_space, self.gr, lw=2, label=self.label, c='k')
         ax1.set_ylabel('Pair distribution function, $g(r)$')
         ax1.set_xlim(0, self.rmax)
         if other_pdfs is not None:
@@ -378,11 +399,7 @@ class PDF(Fingerprint):
                 else:
                     raise RuntimeError
         ax1.set_xlabel('$r$ (Angstrom)')
-        try:
-            sns.despine()
-        except Exception:
-            pass
-        plt.legend()
+        ax1.legend()
         plt.show()
         return
 
@@ -546,7 +563,7 @@ class PDFOverlap:
                 self.projected_pdf_overlap()
             else:
                 print('Projected PDFs missing, continuing with total.')
-                self.pdf_overlap()
+            self.pdf_overlap()
         else:
             self.pdf_overlap()
 
@@ -567,11 +584,11 @@ class PDFOverlap:
         self.fine_gr_a = self.fine_gr_a[:int(len(self.fine_space) * 0.75)]
         self.fine_gr_b = self.fine_gr_b[:int(len(self.fine_space) * 0.75)]
         self.fine_space = self.fine_space[:int(len(self.fine_space) * 0.75)]
-        self.overlap_fn = self.fine_gr_a - self.fine_gr_b
-        self.worst_case_overlap_int = np.trapz(np.abs(self.fine_gr_a), dx=self.pdf_a.dr/2.0) + \
+        overlap_fn = self.fine_gr_a - self.fine_gr_b
+        worst_case_overlap_int = np.trapz(np.abs(self.fine_gr_a), dx=self.pdf_a.dr/2.0) + \
             np.trapz(np.abs(self.fine_gr_b), dx=self.pdf_b.dr/2.0)
-        self.overlap_int = np.trapz(np.abs(self.overlap_fn), dx=self.pdf_a.dr / 2.0)
-        self.similarity_distance = self.overlap_int / self.worst_case_overlap_int
+        self.overlap_int = np.trapz(np.abs(overlap_fn), dx=self.pdf_a.dr / 2.0)
+        self.similarity_distance = self.overlap_int / worst_case_overlap_int
 
     def projected_pdf_overlap(self):
         """ Calculate the overlap of two projected PDFs via
@@ -599,43 +616,91 @@ class PDFOverlap:
         density_rescaling_factor = pow((self.pdf_b.number_density) / (self.pdf_a.number_density), 1 / 3)
         rescale_factor = density_rescaling_factor
         for key in elems:
-            self.fine_elem_gr_a[
-                key] = np.interp(self.fine_space, rescale_factor * self.fine_space, self.fine_elem_gr_a[key])
+            self.fine_elem_gr_a[key] = (
+                np.interp(self.fine_space, rescale_factor * self.fine_space, self.fine_elem_gr_a[key])
+            )
         for key in elems:
             self.fine_elem_gr_a[key] = self.fine_elem_gr_a[key][:int(len(self.fine_space) * 0.75)]
             self.fine_elem_gr_b[key] = self.fine_elem_gr_b[key][:int(len(self.fine_space) * 0.75)]
         self.fine_space = self.fine_space[:int(len(self.fine_space) * 0.75)]
-        self.overlap_fn = dict()
+
         for key in elems:
-            self.overlap_fn[key] = self.fine_elem_gr_a[key] - self.fine_elem_gr_b[key]
-        self.worst_case_overlap_int = dict()
-        for key in elems:
-            self.worst_case_overlap_int[key] = np.trapz(np.abs(self.fine_elem_gr_a[key]), dx=self.pdf_a.dr/2.0) + \
-                np.trapz(np.abs(self.fine_elem_gr_b[key]), dx=self.pdf_b.dr/2.0)
-        for key in elems:
-            self.overlap_int += np.trapz(
-                np.abs(self.overlap_fn[key]), dx=self.pdf_a.dr / 2.0) / self.worst_case_overlap_int[key]
+            overlap_fn = self.fine_elem_gr_a[key] - self.fine_elem_gr_b[key]
+            worst_case_a = np.trapz(np.abs(self.fine_elem_gr_a[key]), dx=self.pdf_a.dr / 2.0)
+            worst_case_b = np.trapz(np.abs(self.fine_elem_gr_b[key]), dx=self.pdf_b.dr / 2.0)
+            worst_case_overlap = worst_case_a + worst_case_b
+            overlap = np.trapz(np.abs(overlap_fn), dx=self.pdf_a.dr / 2.0)
+            self.overlap_int += overlap / worst_case_overlap
+
         self.similarity_distance = self.overlap_int / len(elems)
 
-    def plot_diff(self):
+    @plotting_function
+    def plot_diff(self, cmap='Dark2'):
         """ Simple plot for comparing two PDF's. """
         import matplotlib.pyplot as plt
-        try:
-            import seaborn
-        except ImportError:
-            pass
-        fig = plt.figure(figsize=(12, 10))
-        ax1 = fig.add_subplot(211)
-        ax2 = fig.add_subplot(212)
-        ax1.plot(self.fine_space, self.fine_gr_a, label=self.pdf_a.label)
-        ax1.plot(self.fine_space, self.fine_gr_b, label=self.pdf_b.label)
-        ax1.legend(loc=1)
-        ax1.set_xlabel('$r$ (Angstrom)')
+        import matplotlib.gridspec as gridspec
+        from matador.plotting import set_seaborn_style
+        colours = set_seaborn_style(cmap=cmap)
+
+        plt.figure(figsize=(8, 6))
+        gs = gridspec.GridSpec(2, 1, height_ratios=[2, 1])
+        gs.update(hspace=0)
+
+        ax1 = plt.subplot(gs[0])
+        ax2 = plt.subplot(gs[1], sharex=ax1)
+
+        ax2.set_xlabel('$r$ (\\AA)')
         ax1.set_ylabel('$g(r)$')
+        ax2.set_ylabel('$g_a(r) - g_b(r)$')
         ax2.axhline(0, ls='--', c='k', lw=0.5)
-        ax2.plot(self.fine_space, self.overlap_fn, ls='-')
+        ax1.set_xlim(0, np.max(self.fine_space))
+
+        ax1.plot(self.fine_space, self.fine_gr_a, label=self.pdf_a.label, c=colours[0])
+        ax1.plot(self.fine_space, self.fine_gr_b, label=self.pdf_b.label, c=colours[1])
+
+        plt.setp(ax1.get_xticklabels(), visible=False)
         ax2.set_ylim(-0.5 * ax1.get_ylim()[1], 0.5 * ax1.get_ylim()[1])
-        ax2.set_xlabel('$r$ (Angstrom)')
-        ax2.set_ylabel('$g(r)$')
+
+        ax1.legend(loc=0)
+        ax2.plot(self.fine_space, self.overlap_fn, ls='-', c=colours[2])
+        ax2.set_ylim(-0.5 * ax1.get_ylim()[1], 0.5 * ax1.get_ylim()[1])
+        plt.tight_layout()
+        plt.show()
+        return
+
+    @plotting_function
+    def plot_projected_diff(self, cmap='Dark2'):
+        """ Simple plot for comparing two PDF's. """
+        import matplotlib.pyplot as plt
+        import matplotlib.gridspec as gridspec
+        from matador.plotting import set_seaborn_style
+        colours = set_seaborn_style(cmap=cmap)
+
+        plt.figure(figsize=(8, 6))
+        gs = gridspec.GridSpec(2, 1, height_ratios=[2, 1])
+        gs.update(hspace=0)
+
+        ax1 = plt.subplot(gs[0])
+        ax2 = plt.subplot(gs[1], sharex=ax1)
+        ax2.set_xlabel('$r$ (\\AA)')
+        ax1.set_ylabel('$g(r)$')
+        ax2.set_ylabel('$g_a(r) - g_b(r)$')
+        ax2.axhline(0, ls='--', c='k', lw=0.5)
+        ax1.set_xlim(0, np.max(self.fine_space))
+        for ind, key in enumerate(self.fine_elem_gr_a):
+            ax1.plot(self.fine_space, self.fine_elem_gr_a[key],
+                     label='-'.join(key) + ' {}'.format(self.pdf_a.label),
+                     c=colours[ind])
+            ax1.plot(self.fine_space, self.fine_elem_gr_b[key],
+                     label='-'.join(key) + ' {}'.format(self.pdf_b.label),
+                     ls='--', c=colours[ind])
+            ax2.plot(self.fine_space, self.fine_elem_gr_a[key] - self.fine_elem_gr_b[key],
+                     label='-'.join(key) + ' diff',
+                     c=colours[ind], ls='-')
+        plt.setp(ax1.get_xticklabels(), visible=False)
+        ax2.set_ylim(-0.5 * ax1.get_ylim()[1], 0.5 * ax1.get_ylim()[1])
+        ax1.legend(loc=0)
+        ax2.legend(loc=2)
+        plt.tight_layout()
         plt.show()
         return
