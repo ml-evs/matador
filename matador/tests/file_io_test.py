@@ -296,10 +296,10 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(test_dict['source'][0].split('/')[-1], 'KX.param', msg='Wrong db=False source!')
             self.assertEqual(test_dict['task'], 'geometryoptimization', msg='Failed to read db=False task!')
             self.assertEqual(test_dict['xc_functional'], 'PBE', msg='Failed to read db=False xc!')
-            self.assertEqual(test_dict['fix_occupancy'], 'false', msg='Failed to read db=False occupancy!')
+            self.assertEqual(test_dict['fix_occupancy'], False, msg='Failed to read db=False occupancy!')
             self.assertEqual(test_dict['perc_extra_bands'], 40.0, msg='Failed to read db=False extra bands!')
             self.assertEqual(test_dict['geom_max_iter'], '200', msg='Wrong db=False geom_max_iter!')
-            self.assertEqual(test_dict['fixed_npw'], 'false', msg='Wrong db=False fixed_npw!')
+            self.assertEqual(test_dict['fixed_npw'], False, msg='Wrong db=False fixed_npw!')
             self.assertEqual(test_dict['write_checkpoint'], 'none', msg='Wrong db=False checkpointing!')
             self.assertEqual(test_dict['write_cell_structure'], True, msg='Wrong db=False cell_structure!')
 

@@ -29,7 +29,8 @@ class SimilarityFilterTest(unittest.TestCase):
         test_docs[6]['icsd'] = 999999
         test_docs[6]['text_id'] = ['keep', 'this']
 
-        uniq_inds, dupe_dict, _, _ = get_uniq_cursor(test_docs)
+        uniq_inds, dupe_dict, _, _ = get_uniq_cursor(test_docs,
+                                                     **{'dr': 0.1, 'gaussian_width': 0.1})
         self.assertEqual(uniq_inds, {6})
 
     def testUniqFilterWithHierarchy(self):
@@ -37,18 +38,20 @@ class SimilarityFilterTest(unittest.TestCase):
         files = glob.glob(REAL_PATH + 'data/uniqueness_hierarchy/*.res')
         cursor = [res2dict(f)[0] for f in files]
         cursor = sorted(cursor, key=lambda x: x['enthalpy_per_atom'])[0:10]
-        uniq_inds, _, _, _ = get_uniq_cursor(cursor, sim_tol=0.1, energy_tol=0.05, projected=True)
+        uniq_inds, _, _, _ = get_uniq_cursor(cursor, sim_tol=0.08, energy_tol=0.05, projected=True,
+                                             **{'dr': 0.01, 'gaussian_width': 0.01})
         filtered_cursor = [cursor[ind] for ind in uniq_inds]
-        self.assertEqual(len(uniq_inds), 3)
-        self.assertEqual(len(filtered_cursor), 3)
+        self.assertEqual(len(uniq_inds), 2)
+        self.assertEqual(len(filtered_cursor), 2)
         self.assertTrue('KP-NaP-OQMD_2817-CollCode14009' in filtered_cursor[0]['source'][0])
-        self.assertTrue('KP-NaP-CollCode421420' in filtered_cursor[2]['source'][0])
+        self.assertTrue('KP-NaP-CollCode421420' in filtered_cursor[1]['source'][0])
 
     def testNoUniquenessRetainsAllStructures(self):
         import glob
         files = glob.glob(REAL_PATH + 'data/uniqueness_hierarchy/*.res')
         cursor = [res2dict(f)[0] for f in files]
-        uniq_inds, _, _, _ = get_uniq_cursor(cursor, sim_tol=0, energy_tol=1e20, projected=True)
+        uniq_inds, _, _, _ = get_uniq_cursor(cursor, sim_tol=0, energy_tol=1e20, projected=True,
+                                             **{'dr': 0.1, 'gaussian_width': 0.1})
         filtered_cursor = [cursor[ind] for ind in uniq_inds]
         self.assertEqual(len(filtered_cursor), len(cursor))
 
