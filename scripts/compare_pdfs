@@ -36,7 +36,6 @@ def compare_pdfs(**kwargs):
     print('Similarity distances between PDFs:\n')
     for i, _ in enumerate(strucs):
         for j in range(i + 1, len(strucs)):
-            print(strucs[i]['pdf'].label, strucs[j]['pdf'].label)
             overlaps.append(PDFOverlap(strucs[i]['pdf'], strucs[j]['pdf'], projected=True))
 
     # overlaps = sorted(overlaps, key=lambda x: x.similarity_distance)
