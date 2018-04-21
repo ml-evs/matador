@@ -10,7 +10,7 @@ hostname = os.uname()[1]
 REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
 ROOT_DIR = os.getcwd()
 VERBOSITY = 0
-EXECUTABLE = 'castep17'
+EXECUTABLE = 'castep'
 
 try:
     with open('/dev/null', 'w') as f:
@@ -246,7 +246,7 @@ class ComputeTest(unittest.TestCase):
 
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
     def testBatchRelax(self):
-        """ Relax structure from file to file. """
+        """ Batch relax structures from file to file. """
         from matador.compute import BatchRun, reset_job_folder_and_count_remaining
 
         shutil.copy(REAL_PATH + 'data/structures/LiAs_testcase.res', REAL_PATH + '_LiAs_testcase.res')
@@ -340,7 +340,7 @@ class ComputeTest(unittest.TestCase):
 
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
     def testBatchFailedSCF(self):
-        """ Relax structure from file to file. """
+        """ Check that SCF failures don't kill everything... """
         from matador.compute import BatchRun, reset_job_folder_and_count_remaining
 
         os.chdir(REAL_PATH + 'data/fail_scf')
