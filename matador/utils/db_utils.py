@@ -6,6 +6,8 @@ from traceback import print_exc
 
 import pymongo as pm
 
+from matador.utils.print_utils import print_warning
+
 MONGO_DEFAULTS = {'mongo': {'db': 'crystals', 'host': 'node1', 'port': 27017, 'default_collection': 'repo'}}
 
 
@@ -19,7 +21,7 @@ def load_custom_settings(config_fname=None):
     """
     import json
     if config_fname is None:
-        config_fname = '/'.join(__file__.split('/')[:-1]) + '/../../config/matador_conf.json'
+        config_fname = '/'.join(__file__.split('/')[:-1]) + '/../config/matador_conf.json'
         print('Loading settings from {}'.format(config_fname))
 
     custom_settings = {}
@@ -30,6 +32,8 @@ def load_custom_settings(config_fname=None):
         except (FileNotFoundError, json.decoder.JSONDecodeError):
             print_exc()
             raise SystemExit('Failed to read custom settings file {}'.format(config_fname))
+    else:
+        print_warning('Could not find {}, loading default settings...'.format(config_fname))
 
     settings = {}
     settings.update(MONGO_DEFAULTS)
