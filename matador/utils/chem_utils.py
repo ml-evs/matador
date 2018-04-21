@@ -273,7 +273,7 @@ def get_stoich_from_formula(formula: str):
             elements.append(parsed_elements[i])
             try:
                 fraction.append(float(parsed_elements[i + 1]))
-            except IndexError:
+            except(ValueError, IndexError):
                 fraction.append(1.0)
     gcd_val = 0
     for frac in fraction:

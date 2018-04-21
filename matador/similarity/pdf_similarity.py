@@ -15,7 +15,6 @@ from matador.utils.cell_utils import frac2cart, cart2abc, cart2volume
 from matador.utils.cell_utils import standardize_doc_cell
 from matador.utils.print_utils import print_notify
 from matador.similarity.fingerprint import Fingerprint
-from matador.plotting import plotting_function
 
 
 class PDF(Fingerprint):
@@ -330,7 +329,6 @@ class PDF(Fingerprint):
         except AttributeError:
             return (None, None)
 
-    @plotting_function
     def plot_projected_pdf(self, keys=None, other_pdfs=None, cmap='Dark2'):
         """ Plot projected PDFs.
 
@@ -368,9 +366,7 @@ class PDF(Fingerprint):
         ax1.set_ylabel('$g(r)$')
         ax1.set_xlabel('$r$ (Angstrom)')
         plt.show()
-        return
 
-    @plotting_function
     def plot_pdf(self, other_pdfs=None, cmap='Dark2'):
         """ Plot PDFs.
 
@@ -401,7 +397,6 @@ class PDF(Fingerprint):
         ax1.set_xlabel('$r$ (Angstrom)')
         ax1.legend()
         plt.show()
-        return
 
 
 class PDFFactory:
@@ -634,7 +629,6 @@ class PDFOverlap:
 
         self.similarity_distance = self.overlap_int / len(elems)
 
-    @plotting_function
     def plot_diff(self, cmap='Dark2'):
         """ Simple plot for comparing two PDF's. """
         import matplotlib.pyplot as plt
@@ -666,9 +660,7 @@ class PDFOverlap:
         ax2.set_ylim(-0.5 * ax1.get_ylim()[1], 0.5 * ax1.get_ylim()[1])
         plt.tight_layout()
         plt.show()
-        return
 
-    @plotting_function
     def plot_projected_diff(self, cmap='Dark2'):
         """ Simple plot for comparing two PDF's. """
         import matplotlib.pyplot as plt
@@ -703,4 +695,3 @@ class PDFOverlap:
         ax2.legend(loc=2)
         plt.tight_layout()
         plt.show()
-        return
