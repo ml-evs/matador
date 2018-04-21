@@ -31,18 +31,19 @@ def plotting_function(function):
     return wrapped_plot_function
 
 
-def set_seaborn_style(cmap='Dark2'):
+def set_seaborn_style(cmap='Dark2', font_scale=1.2):
     """ Set the default seaborn style, returning the colour palette.
 
     Keyword arguments:
         cmap (str): named seaborn colourmap.
+        font_scale (float): seaborn font scale.
 
     Returns:
         list: list of RGB tuples of seaborn colour palette.
 
     """
     import seaborn as sns
-    sns.set(style='whitegrid', font_scale=1.2)
+    sns.set(style='whitegrid', font_scale=font_scale)
     sns.set_style({
         'axes.facecolor': 'white', 'figure.facecolor': 'white',
         'font.sans-serif': ['Linux Biolinum O', 'Helvetica', 'Arial'],
@@ -146,17 +147,17 @@ def plot_spectral(seeds, **kwargs):
         plot_window = (-5, 5)
 
     if kwargs['plot_bandstructure'] and not kwargs['plot_dos']:
-        fig, ax_dispersion = plt.subplots(figsize=(7, 6))
+        _, ax_dispersion = plt.subplots(figsize=(7, 6))
     elif kwargs['plot_bandstructure'] and kwargs['plot_dos']:
-        fig, ax_grid = plt.subplots(1, 3, figsize=(8, 6), sharey=True,
-                                    gridspec_kw={'width_ratios': [4, 1, 1],
-                                                 'wspace': 0.05,
-                                                 'left': 0.15})
+        _, ax_grid = plt.subplots(1, 3, figsize=(8, 6), sharey=True,
+                                  gridspec_kw={'width_ratios': [4, 1, 1],
+                                               'wspace': 0.05,
+                                               'left': 0.15})
         ax_dispersion = ax_grid[0]
         ax_dos = ax_grid[1]
         ax_grid[2].axis('off')
     elif not kwargs['plot_bandstructure'] and kwargs['plot_dos']:
-        fig, ax_dos = plt.subplots(1, figsize=(8, 4))
+        _, ax_dos = plt.subplots(1, figsize=(8, 4))
 
     for seed_ind, seed in enumerate(seeds):
         seed = seed.replace('.bands', '').replace('.phonon', '')
@@ -240,8 +241,6 @@ def plot_spectral(seeds, **kwargs):
                         ax_dispersion.plot(path[(np.asarray(branch)-branch_ind).tolist()],
                                            dispersion[eig_key][ns][nb][branch],
                                            c=colour, lw=1, ls=ls[seed_ind], alpha=alpha, label=label)
-                # if branch_ind != len(dispersion[branch_key]) - 1:
-                    # ax_dispersion.axvline(path[branch[-1] - branch_ind], ls='-.', lw=1, c='grey')
             if len(seeds) > 1:
                 ax_dispersion.legend()
             ax_dispersion.axhline(0, ls='--', lw=1, c='grey')
@@ -468,13 +467,11 @@ def plot_spectral(seeds, **kwargs):
                         alpha = 0.7
 
                     if kwargs['plot_bandstructure']:
-                        ax_dos.plot(stack+pdos[projector], energies, lw=1, zorder=1000,
-                                    color=dos_colours[-1])
+                        ax_dos.plot(stack+pdos[projector], energies, lw=1, zorder=1000, color=dos_colours[-1])
                         ax_dos.fill_betweenx(energies, stack, stack+pdos[projector], alpha=alpha, label=projector_label,
                                              color=dos_colours[-1])
                     else:
-                        ax_dos.plot(energies, stack+pdos[projector], lw=1, zorder=1000,
-                                    color=dos_colours[-1])
+                        ax_dos.plot(energies, stack+pdos[projector], lw=1, zorder=1000, color=dos_colours[-1])
                         ax_dos.fill_between(energies, stack, stack+pdos[projector], alpha=alpha, label=projector_label,
                                             color=dos_colours[-1])
 
@@ -646,7 +643,6 @@ def plot_thermo_curves(seed, show=True, **kwargs):
 
     """
     from matador.scrapers.castep_scrapers import castep2dict
-    import seaborn as sns
     from matador.utils.chem_utils import AVOGADROS_NUMBER
     from scipy.constants import physical_constants
 
@@ -655,23 +651,15 @@ def plot_thermo_curves(seed, show=True, **kwargs):
     prop_defaults.update(kwargs)
     kwargs = prop_defaults
 
-    sns.set(style='whitegrid', font_scale=1.2)
-    sns.set_style({
-        'axes.facecolor': 'white', 'figure.facecolor': 'white',
-        'font.sans-serif': ['Linux Biolinum O', 'Helvetica', 'Arial'],
-        'axes.linewidth': 0.5,
-        'axes.grid': False,
-        'legend.frameon': False,
-        'axes.axisbelow': True
-    })
+    set_seaborn_style()
 
     if kwargs['plot_energy'] and not kwargs['plot_heat_cap']:
-        fig, ax_energy = plt.subplots(figsize=(5, 5))
+        _, ax_energy = plt.subplots(figsize=(5, 5))
     elif kwargs['plot_energy'] and kwargs['plot_heat_cap']:
-        fig, ax_grid = plt.subplots(1, 2, figsize=(10, 5), sharey=False,
-                                    gridspec_kw={'width_ratios': [1, 1],
-                                                 'wspace': 0.15,
-                                                 'left': 0.15})
+        _, ax_grid = plt.subplots(1, 2, figsize=(10, 5), sharey=False,
+                                  gridspec_kw={'width_ratios': [1, 1],
+                                               'wspace': 0.15,
+                                               'left': 0.15})
         ax_energy = ax_grid[0]
         ax_Cv = ax_grid[1]
     elif not kwargs['plot_energy'] and kwargs['plot_heat_cap']:
@@ -695,15 +683,15 @@ def plot_thermo_curves(seed, show=True, **kwargs):
         entropyT.append(temps[i] * val * (1. / eVJ) * (1. / AVOGADROS_NUMBER))  # J/mol/K --> eV
 
     if kwargs['plot_energy']:
-        ax_energy.plot(temps, free_energy, c='r', lw=1, ls='-', alpha=1, label='Free Energy')
-        ax_energy.plot(temps, entropyT, c='g', lw=1, ls='-', alpha=1, label='Entropy*T')
-        ax_energy.plot(temps, enthalpy, c='b', lw=1, ls='-', alpha=1, label='Enthalpy')
+        ax_energy.plot(temps, free_energy, lw=1, ls='-', alpha=1, label='Free Energy')
+        ax_energy.plot(temps, entropyT, lw=1, ls='-', alpha=1, label='Entropy*T')
+        ax_energy.plot(temps, enthalpy, lw=1, ls='-', alpha=1, label='Enthalpy')
         ax_energy.set_xlabel('Temperature (K)')
         ax_energy.set_title('Energy (eV)')
         ax_energy.legend()
 
     if kwargs['plot_heat_cap']:
-        ax_Cv.plot(temps, Cv, c='r', lw=1, ls='-', alpha=1, label='Heat Capacity (J/mol/K)')
+        ax_Cv.plot(temps, Cv, lw=1, ls='-', alpha=1, label='Heat Capacity (J/mol/K)')
         ax_Cv.set_title('Heat Capacity (J/mol/K)')
         ax_Cv.set_xlabel('Temperature (K)')
 
@@ -985,7 +973,11 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
         Axes: matplotlib axis with plot.
 
     """
+
     import matplotlib.colors as colours
+    import seaborn as sns
+    set_seaborn_style()
+    sns.set_style('ticks')
     if ax is None:
         if hull.savefig:
             fig = plt.figure(facecolor=None, figsize=(8, 6))
@@ -1160,11 +1152,8 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
     ax.set_yticks(np.arange(0, np.min(hull.structure_slice[hull.hull.vertices, 1]) - 0.15, -0.2))
     ax.set_yticklabels(['{:.1f}'.format(val) for val in ax.get_yticks()])
     ax.set_ylabel('Formation energy (eV/atom)')
-    try:
-        import seaborn as sns
-        sns.despine(ax=ax, left=False, bottom=False)
-    except ImportError:
-        pass
+
+    sns.despine(ax=ax, left=False, bottom=False)
 
     if hull.savefig:
         if hull.args.get('pdf'):
@@ -1204,15 +1193,14 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, expecting_cb
     import matplotlib
     import matplotlib.colors as colours
     from matador.utils.chem_utils import get_generic_grav_capacity
-    try:
-        import seaborn as sns
-        sns.set_style({
-            'axes.facecolor': 'white', 'figure.facecolor': 'white',
-            'xtick.major.size': 0, 'xtick.minor.size': 0,
-            'ytick.major.size': 0, 'ytick.minor.size': 0,
-            'axes.linewidth': 0.0})
-    except ImportError:
-        print_exc()
+    import seaborn as sns
+
+    set_seaborn_style()
+    sns.set_style({
+        'axes.facecolor': 'white', 'figure.facecolor': 'white',
+        'xtick.major.size': 0, 'xtick.minor.size': 0,
+        'ytick.major.size': 0, 'ytick.minor.size': 0,
+        'axes.linewidth': 0.0})
 
     print('Plotting ternary hull...')
     if hull.args.get('capmap') or hull.args.get('efmap'):
