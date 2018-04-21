@@ -30,16 +30,11 @@ def standardize_cell(symtol=0.01, **kwargs):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(prog='standardize_cell',
-                                     description='standardize res file with spglig')
-    parser.add_argument('-sym', '--symtol', type=float, nargs='?', const=0.01,
-                        help='spglib symtol (default: 0.0)')
-    parser.add_argument('-prim', '--primitive', action='store_true',
-                        help='reduce cell to primitive')
-    parser.add_argument('seeds', nargs='?', type=str,
-                        help='res files to manipulate')
-    parser.add_argument('--debug', action='store_true',
-                        help='print debug output')
+    parser = argparse.ArgumentParser(prog='standardize_cell', description='standardize res file with spglig')
+    parser.add_argument('-sym', '--symtol', type=float, nargs='?', const=0.01, help='spglib symtol (default: 0.0)')
+    parser.add_argument('-prim', '--primitive', action='store_true', help='reduce cell to primitive')
+    parser.add_argument('seeds', nargs='+', type=str, help='res files to manipulate')
+    parser.add_argument('--debug', action='store_true', help='print debug output')
     kwargs = vars(parser.parse_args())
 
     standardize_cell(**kwargs)

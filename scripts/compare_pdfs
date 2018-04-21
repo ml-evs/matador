@@ -1,35 +1,71 @@
 #!/usr/bin/env python
 """ Quick script to compute overlap and plot PDFs from CLI. """
-from sys import argv
+import argparse
 from matador.scrapers.castep_scrapers import res2dict
 from matador.similarity.pdf_similarity import PDF, PDFOverlap
 
-strucs = []
-overlaps = []
-for res in argv[1:]:
-    struc, success = res2dict(res, db=False)
-    if not success:
-        print(struc)
-        exit()
+
+def compare_pdfs(**kwargs):
+    """ Take res files from command-line, calculate PDF overlap,
+    print and plot.
+
+    """
+    strucs = []
+    overlaps = []
+    seeds = kwargs.get('seeds')
+    if isinstance(seeds, str):
+        seeds = [seeds]
+    dr = kwargs.get('dr')
+    if dr is None:
+        dr = 0.01
+    gaussian_width = kwargs.get('gaussian_width')
+    if gaussian_width is None:
+        gaussian_width = 0.01
+    for res in seeds:
+        struc, success = res2dict(res, db=False)
+        if not success:
+            print(struc)
+            exit()
+        else:
+            strucs.append(struc)
+
+    for i, _ in enumerate(strucs):
+        strucs[i]['text_id'] = [strucs[i]['source'][0].split('/')[-1].replace('_', ' ').replace('.res', ''), '']
+        strucs[i]['pdf'] = PDF(strucs[i], dr=dr, gaussian_width=gaussian_width, debug=False, verbosity=0)
+
+    print('Similarity distances between PDFs:\n')
+    for i, _ in enumerate(strucs):
+        for j in range(i + 1, len(strucs)):
+            print(strucs[i]['pdf'].label, strucs[j]['pdf'].label)
+            overlaps.append(PDFOverlap(strucs[i]['pdf'], strucs[j]['pdf'], projected=True))
+
+    # overlaps = sorted(overlaps, key=lambda x: x.similarity_distance)
+    print('┌' + 7 * '─' + '┬' + 42 * '─' + '┬' + 41 * '─' + '┐')
+    for overlap in overlaps:
+        print('│{:>6.4f} │ {:^40} │ {:^40}│'
+              .format(overlap.similarity_distance, overlap.pdf_a.label, overlap.pdf_b.label))
+
+    print('└' + 7 * '─' + '┴' + 42 * '─' + '┴' + 41 * '─' + '┘')
+    if kwargs.get('diff'):
+        if kwargs.get('total'):
+            for overlap in overlaps:
+                overlap.plot_diff(cmap=kwargs.get('cmap'))
+        else:
+            for overlap in overlaps:
+                overlap.plot_projected_diff(cmap=kwargs.get('cmap'))
     else:
-        strucs.append(struc)
+        strucs[0]['pdf'].plot_projected_pdf(other_pdfs=[doc['pdf'] for doc in strucs[1:]])
 
-for i in range(len(strucs)):
-    strucs[i]['text_id'] = [strucs[i]['source'][0].split('/')[-1].replace('_', ' ').replace('.res', ''), '']
-    strucs[i]['pdf'] = PDF(strucs[i], dr=0.01, debug=False, verbosity=0)
 
-print('Similarity distances between PDFs:\n')
-for i in range(len(strucs)):
-    for j in range(i+1, len(strucs)):
-        overlaps.append(PDFOverlap(strucs[i]['pdf'], strucs[j]['pdf'], projected=False))
-
-overlaps = sorted(overlaps, key=lambda x: x.similarity_distance)
-
-width = 92
-print('┌' + 7*'─' + '┬' + 42*'─' + '┬' + 41*'─' + '┐')
-for overlap in overlaps:
-    print('│{:>6.4f} │ {:^40} │ {:^40}│'
-          .format(overlap.similarity_distance, overlap.pdf_A._label, overlap.pdf_B._label))
-
-print('└' + 7*'─' + '┴' + 42*'─' + '┴' + 41*'─' + '┘')
-strucs[0]['pdf'].plot_pdf(other_pdfs=[doc['pdf'] for doc in strucs[1:]])
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-dr', '--dr', type=float)
+    parser.add_argument('-gw', '--gaussian_width', type=float)
+    parser.add_argument('seeds', nargs='+', type=str, help='structures to compare')
+    parser.add_argument('--diff', action='store_true', help='plot diff')
+    parser.add_argument('--total', action='store_true', help='plot total pdf overlap only')
+    parser.add_argument('--cmap', type=str, help='named seaborn colourmap')
+    parser.add_argument('--debug', action='store_true', help='print debug output')
+    parsed_kwargs = vars(parser.parse_args())
+    compare_pdfs(**parsed_kwargs)
+    print('Done!')
