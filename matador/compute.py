@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-
 """ This module contains two classes:
 
 * the FullRelaxer class for performing continuously restarted
@@ -41,6 +40,7 @@ class FullRelaxer:
         load on parallel file systems such as Lustre.
 
     """
+
     def __init__(self, res, ncores, nnodes, node, **kwargs):
         """ Make the files to run the calculation and call the desired program.
 
@@ -216,12 +216,11 @@ class FullRelaxer:
             if 'geom_method' in calc_doc:
                 if calc_doc['geom_method'].lower() == 'tpsd' and rough_iter < 3:
                     rough_iter = 3
-            num_fine_iter = int(int(self.max_iter)/fine_iter)
+            num_fine_iter = int(int(self.max_iter) / fine_iter)
             self.geom_max_iter_list = (self.num_rough_iter * [rough_iter])
             self.geom_max_iter_list.extend(num_fine_iter * [fine_iter])
             if not self.geom_max_iter_list:
-                raise RuntimeError('Could not divide up relaxation; \
-                                    consider increasing geom_max_iter')
+                raise RuntimeError('Could not divide up relaxation; consider increasing geom_max_iter')
             self.calc_doc = calc_doc
 
             # begin relaxation
@@ -266,7 +265,7 @@ class FullRelaxer:
             self.mv_to_completed(seed, keep=True, completed_dir=self.paths['completed_dir'])
             return True
 
-        except(SystemExit, KeyboardInterrupt):
+        except (SystemExit, KeyboardInterrupt):
             print_exc()
             self.mv_to_bad(seed)
             raise SystemExit
@@ -365,7 +364,7 @@ class FullRelaxer:
                         print('Using custom param files...')
                 if not self.custom_params:
                     if os.path.isfile(seed + '.param'):
-                        os.remove(seed+'.param')
+                        os.remove(seed + '.param')
                     doc2param(calc_doc, seed, hash_dupe=False, spin=self.spin)
 
                 # run CASTEP
@@ -383,8 +382,7 @@ class FullRelaxer:
                     sys.exit('Failed to scrape CASTEP file...')
 
                 # scrub keys that need to be rescraped
-                keys_to_remove = ['kpoints_mp_spacing', 'kpoints_mp_grid',
-                                  'species_pot', 'sedc_apply', 'sedc_scheme']
+                keys_to_remove = ['kpoints_mp_spacing', 'kpoints_mp_grid', 'species_pot', 'sedc_apply', 'sedc_scheme']
                 for key in keys_to_remove:
                     if key in opti_dict:
                         del opti_dict[key]
@@ -394,25 +392,25 @@ class FullRelaxer:
                 if self.reopt and not self.rerun and opti_dict['optimised']:
                     # run once more to get correct symmetry
                     self.rerun = True
-                    if os.path.isfile(seed+'.res'):
-                        os.remove(seed+'.res')
+                    if os.path.isfile(seed + '.res'):
+                        os.remove(seed + '.res')
                     doc2res(opti_dict, seed, hash_dupe=False)
                     if self.compute_dir is not None:
-                        if os.path.isfile(seed+'.castep'):
-                            shutil.copy(seed+'.castep', self.root_folder)
-                        shutil.copy(seed+'.res', self.root_folder)
+                        if os.path.isfile(seed + '.castep'):
+                            shutil.copy(seed + '.castep', self.root_folder)
+                        shutil.copy(seed + '.res', self.root_folder)
 
                 elif (not self.reopt or self.rerun) and opti_dict['optimised']:
                     if self.verbosity > 1:
                         print_success('Successfully relaxed ' + seed)
                     # write res and castep file out to completed folder
-                    if os.path.isfile(seed+'.res'):
-                        os.remove(seed+'.res')
+                    if os.path.isfile(seed + '.res'):
+                        os.remove(seed + '.res')
                     doc2res(opti_dict, seed, hash_dupe=False)
                     if self.compute_dir is not None:
-                        if os.path.isfile(seed+'.castep'):
-                            shutil.copy(seed+'.castep', self.root_folder)
-                        shutil.copy(seed+'.res', self.root_folder)
+                        if os.path.isfile(seed + '.castep'):
+                            shutil.copy(seed + '.castep', self.root_folder)
+                        shutil.copy(seed + '.res', self.root_folder)
 
                     # overwrite old data in res_dict with opti structure
                     # so that custom keys in initial res are still accessible
@@ -429,13 +427,13 @@ class FullRelaxer:
                     if self.verbosity > 1:
                         print_warning('Failed to optimise ' + seed)
                     # write final res file to bad_castep
-                    if os.path.isfile(seed+'.res'):
-                        os.remove(seed+'.res')
+                    if os.path.isfile(seed + '.res'):
+                        os.remove(seed + '.res')
                     doc2res(opti_dict, seed, hash_dupe=False)
                     if self.compute_dir is not None:
-                        shutil.copy(seed+'.res', self.root_folder)
-                        if os.path.isfile(seed+'.castep'):
-                            shutil.copy(seed+'.castep', self.root_folder)
+                        shutil.copy(seed + '.res', self.root_folder)
+                        if os.path.isfile(seed + '.castep'):
+                            shutil.copy(seed + '.castep', self.root_folder)
                     self.res_dict.update(opti_dict)
                     if output_queue is not None:
                         output_queue.put(self.res_dict)
@@ -452,14 +450,14 @@ class FullRelaxer:
                     return False
 
                 # update res file to latest step for restarts
-                if os.path.isfile(seed+'.res'):
-                    os.remove(seed+'.res')
+                if os.path.isfile(seed + '.res'):
+                    os.remove(seed + '.res')
                 doc2res(opti_dict, seed, hash_dupe=False)
 
                 if self.compute_dir is not None:
-                    if os.path.isfile(seed+'.castep'):
-                        shutil.copy(seed+'.castep', self.root_folder)
-                    shutil.copy(seed+'.res', self.root_folder)
+                    if os.path.isfile(seed + '.castep'):
+                        shutil.copy(seed + '.castep', self.root_folder)
+                    shutil.copy(seed + '.res', self.root_folder)
 
                 # set atomic_init_spins with value from CASTEP file, if it exists
                 if 'mulliken_spins' in calc_doc:
@@ -488,7 +486,7 @@ class FullRelaxer:
                                   opti_dict['enthalpy_per_atom']))
                 calc_doc.update(opti_dict)
 
-            except(KeyboardInterrupt, FileNotFoundError, SystemExit):
+            except (KeyboardInterrupt, FileNotFoundError, SystemExit):
                 if self.verbosity > 1:
                     print_exc()
                     print_warning('Received exception, attempting to fail gracefully...')
@@ -591,7 +589,7 @@ class FullRelaxer:
                 self.tidy_up(seed)
             return True
 
-        except(SystemExit, KeyboardInterrupt):
+        except (SystemExit, KeyboardInterrupt):
             if self.verbosity > 1:
                 print_exc()
             self.mv_to_bad(seed)
@@ -776,7 +774,7 @@ class FullRelaxer:
             print('Performing memcheck...')
         free_memory = float(virtual_memory().available) / 1024**2
         if self.maxmem is None:
-            maxmem = 0.9*free_memory
+            maxmem = 0.9 * free_memory
         else:
             maxmem = self.maxmem
 
@@ -802,7 +800,7 @@ class FullRelaxer:
                 print('CASTEP dryrun failed, this is probably a bad sign... skipping calculation')
                 print(results)
 
-        for _file in glob.glob(seed+'*'):
+        for _file in glob.glob(seed + '*'):
             if _file.endswith('.res'):
                 continue
             else:
@@ -845,24 +843,25 @@ class FullRelaxer:
                 command = ['mpirun', '-n', str(self.ncores), '-ppn', str(self.ncores)] + command
             elif self.node is not None:
                 cwd = os.getcwd()
-                command = ['ssh', '{}'.format(self.node), 'cd', '{};'.format(cwd),
-                           'mpirun', '-n', str(self.ncores)] + command
+                command = ['ssh', '{}'.format(self.node), 'cd', '{};'.format(cwd), 'mpirun', '-n',
+                           str(self.ncores)] + command
             else:
                 command = ['nice', '-n', '15', 'mpirun', '-n', str(self.ncores)] + command
         else:
             if self.mpi_library == 'archer':
-                command = ['aprun', '-n', str(self.ncores*self.nnodes),
-                           '-N', str(self.ncores),
-                           '-S', '12',
-                           '-d', '1'] + command
+                command = [
+                    'aprun', '-n',
+                    str(self.ncores * self.nnodes), '-N',
+                    str(self.ncores), '-S', '12', '-d', '1'
+                ] + command
             elif self.mpi_library == 'slurm':
-                command = ['srun', '--exclusive', '-N', str(self.nnodes), '-n', str(self.ncores*self.nnodes)] + command
+                command = ['srun', '--exclusive', '-N',
+                           str(self.nnodes), '-n',
+                           str(self.ncores * self.nnodes)] + command
             elif self.mpi_library == 'intel':
-                command = ['mpirun', '-n', str(self.ncores*self.nnodes),
-                           '-ppn', str(self.ncores)] + command
+                command = ['mpirun', '-n', str(self.ncores * self.nnodes), '-ppn', str(self.ncores)] + command
             else:
-                command = ['mpirun', '-n', str(self.ncores*self.nnodes),
-                           '-npernode', str(self.ncores)] + command
+                command = ['mpirun', '-n', str(self.ncores * self.nnodes), '-npernode', str(self.ncores)] + command
 
         # ensure default stdout is None for generic mpi calls
         stdout = None
@@ -918,15 +917,15 @@ class FullRelaxer:
 
                 if mode == 'relax':
                     # write final res file for bad_castep
-                    if os.path.isfile(seed+'.res'):
-                        os.remove(seed+'.res')
+                    if os.path.isfile(seed + '.res'):
+                        os.remove(seed + '.res')
                     self.res_dict.update(opti_dict)
                     doc2res(opti_dict, seed, info=False, hash_dupe=False)
 
                     if self.compute_dir is not None:
-                        if os.path.isfile(seed+'.castep'):
-                            shutil.copy(seed+'.castep', self.root_folder)
-                        shutil.copy(seed+'.res', self.root_folder)
+                        if os.path.isfile(seed + '.castep'):
+                            shutil.copy(seed + '.castep', self.root_folder)
+                        shutil.copy(seed + '.res', self.root_folder)
 
                 self.mv_to_bad(seed)
                 return True
@@ -995,6 +994,8 @@ class FullRelaxer:
                 file_exts.append('.res')
             if self.calc_doc.get('write_cell_structure'):
                 file_exts.append('-out.cell')
+            if self.calc_doc.get('write_formatted_density'):
+                file_exts.append('.den_fmt')
             for ext in file_exts:
                 try:
                     shutil.copy('{}{}'.format(seed, ext), completed_dir)
@@ -1004,7 +1005,7 @@ class FullRelaxer:
                         print_exc()
             # check root folder for any matching files and remove them
             fname = '{}/{}'.format(self.root_folder, seed)
-            for ext in ['.res', '.res.lock', '.castep', '.param', '.cell', '-out.cell']:
+            for ext in file_exts + ['.res.lock']:
                 if os.path.isfile('{}{}'.format(fname, ext)):
                     os.remove('{}{}'.format(fname, ext))
 
@@ -1096,6 +1097,7 @@ class BatchRun:
     Based on run.pl, run2.pl and PyAIRSS class CastepRunner.
 
     """
+
     def __init__(self, seed, **kwargs):
         """ Check directory has valid contents and prepare log files
         and directories if not already prepared, then begin running
@@ -1219,7 +1221,7 @@ class BatchRun:
                 proc.start()
                 if join:
                     proc.join()
-        except(KeyboardInterrupt, SystemExit, RuntimeError):
+        except (KeyboardInterrupt, SystemExit, RuntimeError):
             print_exc()
             for proc in procs:
                 proc.terminate()
@@ -1256,7 +1258,7 @@ class BatchRun:
 
                 # write to jobs file
                 with open(self.paths['jobs_fname'], 'a') as job_file:
-                    job_file.write(res+'\n')
+                    job_file.write(res + '\n')
 
                 # create full relaxer object for creation and running of job
                 try:
@@ -1270,7 +1272,7 @@ class BatchRun:
                     # if memory check failed, let other nodes have a go
                     if not relaxer.enough_memory:
                         with open(self.paths['memory_fname'], 'a') as job_file:
-                            job_file.write(res+'\n')
+                            job_file.write(res + '\n')
                         if os.path.isfile('{}.lock'.format(res)):
                             os.remove('{}.lock'.format(res))
                         with open(self.paths['jobs_fname'], 'r+') as job_file:
@@ -1283,11 +1285,11 @@ class BatchRun:
 
                     elif relaxer.success:
                         with open(self.paths['completed_fname'], 'a') as job_file:
-                            job_file.write(res+'\n')
+                            job_file.write(res + '\n')
                     else:
                         with open(self.paths['failures_fname'], 'a') as job_file:
-                            job_file.write(res+'\n')
-                except(KeyboardInterrupt, SystemExit, RuntimeError):
+                            job_file.write(res + '\n')
+                except (KeyboardInterrupt, SystemExit, RuntimeError):
                     print_exc()
                     raise SystemExit
 
@@ -1316,8 +1318,10 @@ class BatchRun:
         self.file_lists = defaultdict(list)
         self.file_lists['res'] = [file.name for file in os.scandir() if file.name.endswith('.res')]
         if len(self.file_lists['res']) < 1:
-            error = ('run3 in CASTEP mode requires at least 1 res file in folder, found {}'
-                     .format(len(self.file_lists['res'])))
+            error = (
+                'run3 in CASTEP mode requires at least 1 res file in folder, found {}'
+                .format(len(self.file_lists['res']))
+            )
             sys.exit(error)
 
         # do some prelim checks of parameters
@@ -1325,8 +1329,7 @@ class BatchRun:
             if 'geom_max_iter' not in self.param_dict:
                 raise RuntimeError('geom_max_iter is unset, please fix this.')
             elif int(self.param_dict['geom_max_iter']) <= 0:
-                raise RuntimeError('geom_max_iter is only {}!'
-                                   .format(self.param_dict['geom_max_iter']))
+                raise RuntimeError('geom_max_iter is only {}!'.format(self.param_dict['geom_max_iter']))
 
         # parse convergence args and set them up
         self.convergence_run_setup()

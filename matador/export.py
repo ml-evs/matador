@@ -35,14 +35,16 @@ def query2files(cursor, *args, **kwargs):
     pressure = args.get('write_pressure')
     if args['subcmd'] == 'polish' or args['subcmd'] == 'swaps':
         info = False
-        hash = False
+        hash_dupe = False
     else:
         info = True
-        hash = False
-    try:
+        hash_dupe = False
+
+    if isinstance(cursor, list):
         num = len(cursor)
-    except:
+    else:
         num = cursor.count()
+
     if top is not None:
         if top < num:
             cursor = cursor[:top]
@@ -120,13 +122,13 @@ def query2files(cursor, *args, **kwargs):
                     name += '-CollCode' + doc['icsd']
         path += name
         if param:
-            doc2param(doc, path, hash_dupe=hash)
+            doc2param(doc, path, hash_dupe=hash_dupe)
         if cell:
-            doc2cell(doc, path, pressure, hash_dupe=hash)
+            doc2cell(doc, path, pressure, hash_dupe=hash_dupe)
         if res:
-            doc2res(doc, path, info=info, hash_dupe=hash)
+            doc2res(doc, path, info=info, hash_dupe=hash_dupe)
         if pdb:
-            doc2pdb(doc, path, hash_dupe=hash)
+            doc2pdb(doc, path, hash_dupe=hash_dupe)
         if xsf:
             doc2xsf(doc, path)
 
@@ -717,13 +719,18 @@ def doc2xsf(doc, path, write_energy=False, write_forces=False, overwrite=False):
             f.write(line + '\n')
 
 
-def generate_hash(hashLen=6):
-    """ Quick hash generator, based on implementation in PyAIRSS by J. Wynn. """
-    hashChars = hashChars = [str(x) for x in range(0, 10)]+[x for x in string.ascii_lowercase]
-    hash = ''
-    for i in range(hashLen):
-        hash += np.random.choice(hashChars)
-    return hash
+def generate_hash(hash_len=6):
+    """ Quick hash generator, based on implementation in PyAIRSS by J. Wynn.
+
+    Keyword arguments:
+        hash_len (int): desired length of hash.
+
+    """
+    hash_chars = [str(x) for x in range(0, 10)]+[x for x in string.ascii_lowercase]
+    _hash = ''
+    for i in range(hash_len):
+        _hash += np.random.choice(hash_chars)
+    return _hash
 
 
 def generate_relevant_path(args):
