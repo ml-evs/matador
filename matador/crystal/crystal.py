@@ -6,7 +6,7 @@ manipulation and analysis of the lattice.
 from copy import deepcopy
 from matador.similarity.pdf_similarity import PDF
 import matador.utils.cell_utils as cell_utils
-from matador.crystal_site import Site
+from matador.crystal.site import Site
 
 
 class Crystal:
@@ -51,6 +51,8 @@ class Crystal:
         # assume default value for symprec
         if 'space_group' in self._doc:
             self._space_group = {0.01: self._doc['space_group']}
+        else:
+            self._space_group = {}
 
         # set root source to structure filename
         from matador.utils.chem_utils import get_root_source
@@ -78,7 +80,7 @@ class Crystal:
     def __str__(self):
         repr_string = "{root_source}: {formula}\n".format(root_source=self.root_source, formula=self.formula)
         repr_string += "{num_atoms:<3} atoms. {space_group:<8}\n".format(num_atoms=self.num_atoms,
-                                                                         space_group=self._doc['space_group'])
+                                                                         space_group=self.space_group)
 
         if 'formation_enthalpy_per_atom' in self._doc:
             repr_string += ("Formation enthalpy = {:6.6f} eV/atom\n".format(self._doc['formation_enthalpy_per_atom']))
@@ -258,7 +260,12 @@ class Crystal:
 
         return concentration
 
-    def space_group(self, symprec=0.01):
+    @property
+    def space_group(self):
+        """ Return the space group symbol at the last-used symprec. """
+        return self.get_space_group(symprec=self._doc.get('symprec', 0.01))
+
+    def get_space_group(self, symprec=0.01):
         """ Return the space group of the structure at the desired
         symprec. Stores the space group in a dictionary
         `self._space_group` under symprec keys. Updates
@@ -339,7 +346,7 @@ class Crystal:
     @property
     def network(self):
         """ Returns/constructs a CrystalGraph object of the structure. """
-        from matador.network import CrystalGraph
+        from matador.crystal.network import CrystalGraph
         if self._network is None:
             self._network = CrystalGraph(self, **self._network_kwargs)
         return self._network

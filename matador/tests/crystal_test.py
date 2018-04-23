@@ -27,8 +27,8 @@ class CrystalTest(unittest.TestCase):
     def testSpg(self):
         doc, s = castep2dict(REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep')
         crystal = Crystal(doc)
-        print(crystal.space_group(symprec=0.001))
-        print(crystal.space_group(symprec=0.001))
+        print(crystal.get_space_group(symprec=0.01))
+        print(crystal.get_space_group(symprec=0.001))
 
     def testFromMagres(self):
         doc, s = magres2dict(REAL_PATH + 'data/NaP.magres')

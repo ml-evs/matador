@@ -1,7 +1,8 @@
-#!/usr/bin/python
 # coding: utf-8
-""" This file implements functions that
-can create a file from a db document.
+# Distributed under the terms of the MIT License.
+
+""" This file implements functions that can create a file from a matador
+document or Crystal object.
 """
 
 import string

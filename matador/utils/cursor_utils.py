@@ -6,7 +6,7 @@ from time import strftime
 
 import numpy as np
 from matador.utils.cell_utils import get_spacegroup_spg
-from matador.version import __version__
+from matador import __version__
 
 
 def display_results(cursor,

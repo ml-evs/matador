@@ -1,14 +1,10 @@
-# -*- coding: utf-8 -*-
-""" This module contains two classes:
+# coding: utf-8
+# Distributed under the terms of the MIT license.
 
-* the FullRelaxer class for performing continuously restarted
-geometry optimisation and SCF calculations in CASTEP, as well
-as the execution of arbitrary programs with mpirun.
-
-* the BatchRun class for running several independent FullRelaxer instances
-on a folder of structures, without clashes.
-
+""" This file implements the FullRelaxer and BatchRun classes for
+performining high-throughput calculations.
 """
+
 
 import os
 import shutil

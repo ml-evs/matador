@@ -1,3 +1,4 @@
+# coding: utf-8
 """ This file implements a simple interface
 to creating and submitting slurm scripts.
 """
