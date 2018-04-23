@@ -406,7 +406,7 @@ def get_formula_from_stoich(stoich, elements=None, tex=False):
                         form += elem[0]
                     elif int(elem[1]) != 0:
                         if tex:
-                            form += elem[0] + '$_\\mathrm{' + str(int(elem[1])) + '}$'
+                            form += elem[0] + '$_{' + str(int(elem[1])) + '}$'
                         else:
                             form += elem[0] + str(int(elem[1]))
         assert form != ''
@@ -416,7 +416,7 @@ def get_formula_from_stoich(stoich, elements=None, tex=False):
                 form += elem[0]
             elif int(elem[1]) != 0:
                 if tex:
-                    form += elem[0] + '$_\\mathrm{' + str(int(elem[1])) + '}$'
+                    form += elem[0] + '$_{' + str(int(elem[1])) + '}$'
                 else:
                     form += elem[0] + str(int(elem[1]))
     return form

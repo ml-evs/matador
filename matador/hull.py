@@ -3,7 +3,6 @@
 from database queries.
 """
 
-from __future__ import print_function
 # standard library
 from traceback import print_exc
 from bisect import bisect_left
@@ -117,7 +116,6 @@ class QueryConvexHull(object):
 
         if not self.args.get('no_plot'):
             from matador import plotting
-            self.set_plot_param()
 
         if self.args['subcmd'] == 'voltage':
             self.voltage_curve([doc for doc in self.hull_cursor if doc['hull_distance'] <= 1e-9])

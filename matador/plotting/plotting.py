@@ -1,27 +1,41 @@
 # coding: utf-8
-""" This file implements several routines for
-dispersion plots, phase diagrams, as well as
-voltage and volume expansion plots.
+# Distributed under the terms of the MIT License.
+
+""" This file implements several routines for dispersion plots, phase
+diagrams, as well as voltage and volume expansion plots.
 """
 
 from traceback import print_exc
 import numpy as np
-import matplotlib.pyplot as plt
 from matador.utils.chem_utils import get_formula_from_stoich
-from matador.utils.print_utils import print_warning, print_failure
 from matador.viz import ELEMENT_COLOURS
 
 
 def plotting_function(function):
-    """ Wrapper for plotting functions to safely fail on
-    X-forwarding errors.
+    """ Wrapper for plotting functions to safely fail on X-forwarding
+    errors.
     """
+
     from functools import wraps
+    from matador.utils.print_utils import print_warning, print_failure
 
     @wraps(function)
     def wrapped_plot_function(*args, **kwargs):
         """ Wrap and return the plotting function. """
         from tkinter import TclError
+        # if we're going to be saving a figure, switch to Agg to avoid X-forwarding
+        saving = False
+        for arg in args:
+            if arg.savefig:
+                import matplotlib
+                matplotlib.use('Agg')
+                saving = True
+                break
+        if not saving:
+            if any([kwargs.get('pdf'), kwargs.get('svg'), kwargs.get('png')]):
+                import matplotlib
+                matplotlib.use('Agg')
+                saving = True
         try:
             function(*args, **kwargs)
         except TclError as exc:
@@ -88,6 +102,7 @@ def plot_spectral(seeds, **kwargs):
             appear rarefied or compressed in particular regions.
 
     """
+    import matplotlib.pyplot as plt
     from matador.scrapers.castep_scrapers import bands2dict, cell2dict, phonon2dict, optados2dict
     from matador.utils.cell_utils import doc2spg
     from seekpath import get_path
@@ -551,6 +566,7 @@ def plot_voltage_curve(hull, show=True):
         show (bool): whether to show plot in an X window.
 
     """
+    import matplotlib.pyplot as plt
     if hull.savefig:
         if len(hull.voltages) != 1:
             fig = plt.figure(facecolor=None, figsize=(4, 3.5))
@@ -648,6 +664,7 @@ def plot_thermo_curves(seed, show=True, **kwargs):
         plot_heat_cap (bool): whether to plot T vs Cv
 
     """
+    import matplotlib.pyplot as plt
     from matador.scrapers.castep_scrapers import castep2dict
     from matador.utils.chem_utils import AVOGADROS_NUMBER
     from scipy.constants import physical_constants
@@ -763,6 +780,7 @@ def plot_volume_curve(hull, show=True):
         show (bool): whether or not to display plot in X-window.
 
     """
+    import matplotlib.pyplot as plt
     from matador.utils.cursor_utils import get_array_from_cursor
     from matador.utils.chem_utils import get_generic_grav_capacity
     if hull.savefig:
@@ -794,7 +812,7 @@ def plot_volume_curve(hull, show=True):
                    lw=markeredgewidth, c=c, zorder=zorder, alpha=alpha)
     hull_comps, hull_vols = np.asarray(hull_comps), np.asarray(hull_vols)
     ax.plot(hull_comps / (1 + hull_comps), hull_vols / bulk_vol, marker='o', lw=4, c=hull.colours[0], zorder=100)
-    ax.set_xlabel(r'$\mathrm{x}$ in $\mathrm{' + hull.elements[0] + '_x' + hull.elements[1] + '}_{1-x}$')
+    ax.set_xlabel(r'$x$ in ${' + hull.elements[0] + '_x' + hull.elements[1] + '}_{1-x}$')
     ax.set_ylabel('Volume ratio with bulk')
     ax.set_ylim(0, 5 * np.sort(hull_vols)[-2] / bulk_vol)
     ax.set_xlim(-0.05, 1.05)
@@ -860,15 +878,14 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
 
     """
 
+    import matplotlib.pyplot as plt
     import matplotlib.colors as colours
     import seaborn as sns
+    hull.set_plot_param()
     set_seaborn_style()
     sns.set_style('ticks')
     if ax is None:
-        if hull.savefig:
-            fig = plt.figure(facecolor=None, figsize=(8, 6))
-        else:
-            fig = plt.figure(facecolor=None)
+        fig = plt.figure(facecolor=None, figsize=(8, 6))
         ax = fig.add_subplot(111)
     if not hull.plot_params:
         hull.set_plot_param()
@@ -900,7 +917,7 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
                     if doc['stoichiometry'] not in [_doc['stoichiometry'] for _doc in tmp_cursor]:
                         tmp_cursor.append(doc)
                 if len(tmp_cursor) != len(set([doc['stoichiometry'] for doc in hull.label_cursor])):
-                    print_warning('Something has gone wrong with labels...')
+                    print('Something has gone wrong with labels...')
                 else:
                     hull.label_cursor = tmp_cursor
             # remove chemical potentials
@@ -1042,15 +1059,13 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
     sns.despine(ax=ax, left=False, bottom=False)
 
     if hull.savefig:
-        if hull.args.get('pdf'):
-            plt.savefig(hull.elements[0]+hull.elements[1]+'_hull.pdf',
-                        dpi=500, bbox_inches='tight', transparent=True)
-        if hull.args.get('svg'):
-            plt.savefig(hull.elements[0]+hull.elements[1]+'_hull.svg',
-                        dpi=500, bbox_inches='tight', transparent=True)
-        if hull.args.get('png'):
-            plt.savefig(hull.elements[0]+hull.elements[1]+'_hull.png',
-                        dpi=500, bbox_inches='tight', transparent=True)
+        fname = ''.join(hull.elements) + '_hull'
+        exts = ['pdf', 'svg', 'png']
+        for ext in exts:
+            if hull.args.get(ext):
+                plt.savefig('{}.{}'.format(fname, ext),
+                            dpi=500, bbox_inches='tight', transparent=True)
+                print('Wrote {}.{}'.format(fname, ext))
     elif show:
         plt.show()
 
@@ -1077,9 +1092,12 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, expecting_cb
     """
     import ternary
     import matplotlib
+    import matplotlib.pyplot as plt
     import matplotlib.colors as colours
     from matador.utils.chem_utils import get_generic_grav_capacity
     import seaborn as sns
+
+    hull.set_plot_param()
 
     set_seaborn_style()
     sns.set_style({
