@@ -96,11 +96,12 @@ class FullRelaxer:
 
         """
         # set defaults and update class with desired values
-        prop_defaults = {'paths': None, 'param_dict': None, 'cell_dict': None, 'mode': 'castep', 'executable': 'castep', 'memcheck': False,
-                         'rough': 4, 'rough_iter': 2, 'fine_iter': 20, 'spin': False, 'redirect': None, 'reopt': False, 'compute_dir': None,
-                         'custom_params': False, 'archer': False, 'maxmem': None, 'killcheck': True, 'kpts_1D': False,
-                         'conv_cutoff': False, 'conv_kpt': False, 'debug': False, 'profile': False,
-                         'slurm': False, 'intel': False, 'exec_test': True, 'start': True, 'verbosity': 0}
+        prop_defaults = {'paths': None, 'param_dict': None, 'cell_dict': None, 'mode': 'castep', 'executable': 'castep',
+                         'memcheck': False, 'rough': 4, 'rough_iter': 2, 'fine_iter': 20, 'spin': False,
+                         'redirect': None, 'reopt': False, 'compute_dir': None, 'custom_params': False, 'archer': False,
+                         'maxmem': None, 'killcheck': True, 'kpts_1D': False, 'conv_cutoff': False, 'conv_kpt': False,
+                         'debug': False, 'profile': False, 'slurm': False, 'intel': False, 'exec_test': True,
+                         'start': True, 'verbosity': 0}
         self.__dict__.update(prop_defaults)
         self.__dict__.update(kwargs)
 
@@ -122,6 +123,8 @@ class FullRelaxer:
         self.success = None
         self._mpi_library = None
         self.root_folder = os.getcwd()
+
+        self._redirect_filename = None
 
         if self.paths is None:
             self.paths = {}
@@ -200,7 +203,7 @@ class FullRelaxer:
         else:
             self.enough_memory = True
         if not self.enough_memory:
-            return False
+            return self.enough_memory
 
         # run convergence tests
         if any([self.conv_cutoff_bool, self.conv_kpt_bool]):
@@ -308,8 +311,8 @@ class FullRelaxer:
 
             # update res file with intermediate calculation if castep file is newer than res
             if os.path.isfile(self.seed + '.castep') and os.path.isfile(self.seed + '.res'):
+                shutil.copy(self.seed + '.castep', self.compute_dir)
                 if os.path.getmtime(self.seed + '.res') < os.path.getmtime(self.seed + '.castep'):
-                    shutil.copy(self.seed + '.castep', self.compute_dir)
                     castep_dict, success = castep2dict(self.seed + '.castep', db=False)
                     if success:
                         self.res_dict.update(castep_dict)
@@ -320,9 +323,9 @@ class FullRelaxer:
         doc2res(self.res_dict, self.seed, info=False, hash_dupe=False, overwrite=True)
         self.cp_to_input(self.seed)
 
-        self.rerun = False
+        rerun = False
         for ind, num_iter in enumerate(geom_max_iter_list):
-            if self.reopt and self.rerun:
+            if self.reopt and rerun:
                 num_iter = 20
                 if self.verbosity > 1:
                     print_notify('Performing one last iteration...')
@@ -387,11 +390,11 @@ class FullRelaxer:
                     if key in opti_dict:
                         del opti_dict[key]
 
-                if self.reopt and self.rerun and not opti_dict['optimised']:
-                    self.rerun = False
-                if self.reopt and not self.rerun and opti_dict['optimised']:
+                if self.reopt and rerun and not opti_dict['optimised']:
+                    rerun = False
+                if self.reopt and not rerun and opti_dict['optimised']:
                     # run once more to get correct symmetry
-                    self.rerun = True
+                    rerun = True
                     if os.path.isfile(seed + '.res'):
                         os.remove(seed + '.res')
                     doc2res(opti_dict, seed, hash_dupe=False)
@@ -400,7 +403,7 @@ class FullRelaxer:
                             shutil.copy(seed + '.castep', self.root_folder)
                         shutil.copy(seed + '.res', self.root_folder)
 
-                elif (not self.reopt or self.rerun) and opti_dict['optimised']:
+                elif (not self.reopt or rerun) and opti_dict['optimised']:
                     if self.verbosity > 1:
                         print_success('Successfully relaxed ' + seed)
                     # write res and castep file out to completed folder
@@ -466,7 +469,9 @@ class FullRelaxer:
                 # if writing out cell, use it for higher precision lattice_cart
                 if calc_doc.get('write_cell_structure'):
                     try:
-                        cell_dict, success = cell2dict(seed + '-out.cell', verbosity=self.verbosity, db=False, outcell=True)
+                        cell_dict, success = cell2dict(seed + '-out.cell',
+                                                       verbosity=self.verbosity,
+                                                       db=False, outcell=True)
                         if success:
                             opti_dict['lattice_cart'] = list(cell_dict['lattice_cart'])
                     except Exception:
@@ -490,7 +495,7 @@ class FullRelaxer:
                 if self.verbosity > 1:
                     print_exc()
                     print_warning('Received exception, attempting to fail gracefully...')
-                etype, evalue, etb = sys.exc_info()
+                etype, evalue, _ = sys.exc_info()
                 if self.verbosity > 1:
                     print(format_exception_only(etype, evalue))
                 if self.debug:
@@ -530,7 +535,7 @@ class FullRelaxer:
                 return False
 
     def scf(self, calc_doc, seed, keep=True):
-        """ Perform an scf/bandstructure calculation with CASTEP. Files
+        """ Perform a single-shot (e.g. scf) calculation with CASTEP. Files
         from completed runs are moved to "completed" and failed runs to
         "bad_castep".
 
@@ -553,24 +558,57 @@ class FullRelaxer:
                 doc2param(calc_doc, seed, hash_dupe=False)
             self.cp_to_input(self.seed)
 
+            # try to add a k/q-point path to cell, for spectral/phonon tasks
+            elec_dispersion = False
+            phon_dispersion = False
             if 'spectral_task' in calc_doc and calc_doc['spectral_task'] == 'bandstructure':
                 if 'spectral_kpoints_path' not in calc_doc and 'spectral_kpoints_list' not in calc_doc:
-                    from matador.utils.cell_utils import get_seekpath_kpoint_path, cart2abc
-                    if self.verbosity >= 2:
-                        from matador.crystal import Crystal
-                        print('Old lattice:')
-                        print(Crystal(calc_doc))
+                    elec_dispersion = True
+
+            if calc_doc.get('task').lower() in ['phonon', 'thermodynamics']:
+                if 'phonon_fine_kpoint_path' not in calc_doc and 'phonon_fine_kpoint_list' not in calc_doc:
+                    phon_dispersion = True
+
+            if phon_dispersion or elec_dispersion:
+                from matador.utils.cell_utils import get_seekpath_kpoint_path, cart2abc
+                if self.verbosity >= 2:
+                    from matador.crystal import Crystal
+                    print('Old lattice:')
+                    print(Crystal(calc_doc))
+
+                if elec_dispersion:
                     if calc_doc.get('spectral_kpoints_path_spacing') is None:
                         calc_doc['spectral_kpoints_path_spacing'] = 0.02
-
                     spacing = calc_doc['spectral_kpoints_path_spacing']
-                    prim_doc, kpt_path, seekpath_results = get_seekpath_kpoint_path(calc_doc, spacing=spacing, debug=self.debug)
-                    if self.verbosity >= 2:
-                        print('New lattice:')
-                        print(Crystal(calc_doc))
-                    calc_doc.update(prim_doc)
-                    calc_doc['lattice_abc'] = cart2abc(calc_doc['lattice_cart'])
+
+                elif phon_dispersion:
+                    if calc_doc.get('phonon_fine_kpoint_path_spacing') is None:
+                        calc_doc['phonon_fine_kpoint_path_spacing'] = 0.02
+                    spacing = calc_doc['phonon_fine_kpoint_path_spacing']
+
+                prim_doc, kpt_path, _ = get_seekpath_kpoint_path(calc_doc,
+                                                                 spacing=spacing,
+                                                                 debug=self.debug)
+
+                if self.verbosity >= 2:
+                    print('New lattice:')
+                    print(Crystal(calc_doc))
+                calc_doc.update(prim_doc)
+                calc_doc['lattice_abc'] = cart2abc(calc_doc['lattice_cart'])
+
+                if elec_dispersion:
                     calc_doc['spectral_kpoints_list'] = kpt_path
+
+                elif phon_dispersion:
+                    calc_doc['phonon_fine_kpoint_list'] = kpt_path
+                    if 'phonon_kpoint_mp_spacing' in calc_doc:
+                        from matador.utils.cell_utils import calc_mp_grid, shift_to_include_gamma
+                        grid = calc_mp_grid(calc_doc['lattice_cart'], calc_doc['phonon_kpoint_mp_spacing'])
+                        offset = shift_to_include_gamma(grid)
+                        if offset != [0, 0, 0]:
+                            calc_doc['phonon_kpoint_mp_offset'] = offset
+                            if self.verbosity >= 2:
+                                print('Set phonon MP grid offset to {}'.format(offset))
 
             doc2cell(calc_doc, seed, hash_dupe=False, copy_pspots=False, overwrite=True)
             # run CASTEP
@@ -617,7 +655,7 @@ class FullRelaxer:
         """
         successes = []
         self.run_convergence_tests(calc_doc)
-        self._cached_cutoff = calc_doc['cut_off_energy']
+        cached_cutoff = calc_doc['cut_off_energy']
         if self.conv_cutoff_bool:
             # run series of singlepoints for various cutoffs
             for cutoff in self.conv_cutoff:
@@ -628,7 +666,7 @@ class FullRelaxer:
                 successes.append(success)
         if self.conv_kpt_bool:
             # run series of singlepoints for various cutoffs
-            calc_doc['cut_off_energy'] = self._cached_cutoff
+            calc_doc['cut_off_energy'] = cached_cutoff
             for kpt in self.conv_kpt:
                 calc_doc.update({'kpoints_mp_spacing': kpt})
                 self.paths['completed_dir'] = 'completed_kpts'
@@ -676,9 +714,9 @@ class FullRelaxer:
             command.append(seed)
 
         if self.redirect is not None:
-            self.redirect_filename = self.redirect.replace('$seed', seed)
+            self._redirect_filename = self.redirect.replace('$seed', seed)
         else:
-            self.redirect_filename = None
+            self._redirect_filename = None
 
         return command
 
@@ -697,8 +735,8 @@ class FullRelaxer:
 
         out, errs = proc.communicate()
         if 'version' not in out.decode('utf-8') and errs is not None:
-            err_string = 'Executable {} failed testing. Is it on your PATH?\n'
-            err_string += 'Error output: {}'.format(self.executable, errs.decode('utf-8'))
+            err_string = 'Executable {} failed testing. Is it on your PATH?\n'.format(self.executable)
+            err_string += 'Error output: {}'.format(errs.decode('utf-8'))
             print_failure(err_string)
             raise SystemExit(err_string)
 
@@ -736,11 +774,11 @@ class FullRelaxer:
         try:
             try:
                 mpi_version_string = str(sp.check_output('mpirun --version', shell=True))
-            except sp.CalledProcessError as e:
+            except sp.CalledProcessError:
                 mpi_version_string = str(sp.check_output('aprun --version', shell=True))
-        except Exception as e:
+        except Exception as exc:
             print_exc()
-            raise e
+            raise exc
         if 'Intel' in mpi_version_string:
             if verbosity > 1:
                 print('Detected Intel MPI library.')
@@ -878,8 +916,8 @@ class FullRelaxer:
             stdout = dev_null
             stderr = dev_null
 
-        if self.redirect_filename is not None:
-            redirect_file = open(self.redirect_filename, 'w')
+        if self._redirect_filename is not None:
+            redirect_file = open(self._redirect_filename, 'w')
             stdout = redirect_file
 
         process = sp.Popen(command, shell=False, stdout=stdout, stderr=stderr)
