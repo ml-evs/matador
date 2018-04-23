@@ -1,6 +1,6 @@
 FROM continuumio/miniconda3
 
-RUN conda install numpy scipy pymongo psutil coverage \
-    && conda install -c conda-forge spglib=1.9.9.18 \
-    && pip install periodictable \ 
+RUN conda install numpy scipy>=1 networkx>=2 pymongo psutil coverage \
+    && conda install -c conda-forge spglib \
+    && pip install periodictable seekpath \ 
     && conda clean --all
