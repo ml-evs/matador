@@ -511,23 +511,23 @@ class Spatula:
                     # if duplicate found, don't reimport
                     if structure_count >= 1:
                         for _type in types:
-                            fname_trial = file.replace(file.split('.')[-1], '.{}'.format(_type))
+                            fname_trial = file.replace('.{}'.format(file.split('.')[-1]), '.{}'.format(_type))
                             if fname_trial in new_file_lists[root][_type]:
                                 delete_list[_type].append(fname_trial)
-                            new_file_lists[root][structure_type] -= 1
+                                new_file_lists[root][_type + '_count'] -= 1
 
                 if structure_count > 1:
                     if self.debug:
                         print('Found double in database, this needs to be dealt with manually')
 
             for _type in types:
-                for file in delete_list[_type]:
-                    del new_file_lists[root][_type][new_file_lists[root][_type].index(file)]
+                for _file in delete_list[_type]:
+                    index_to_del = new_file_lists[root][_type].index(_file)
+                    del new_file_lists[root][_type][index_to_del]
 
-            assert len(new_file_lists[root]['res']) == new_file_lists[root][
-                'res_count'], 'res count does not match'
-            assert len(new_file_lists[root]['castep']) == new_file_lists[root][
-                'castep_count'], 'castep count does not match'
+            for file_type in types:
+                if len(new_file_lists[root][file_type]) != new_file_lists[root][file_type + '_count']:
+                    raise RuntimeError('{} count does not match number of files'.format(file_type))
 
         return new_file_lists
 

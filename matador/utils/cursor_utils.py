@@ -33,9 +33,10 @@ def display_results(cursor,
         str or None: markdown or latex string, if markdown or latex is True, else None.
 
     """
-    details = args.get('details')
     if args is None:
         args = dict()
+
+    details = args.get('details')
 
     if markdown and latex:
         raise RuntimeError('Cannot specify both latex and markdown output at once.')
