@@ -4,7 +4,7 @@ such that there are no clashes.
 """
 import os
 import argparse
-from matador.version import __version__
+from matador import __version__
 from matador.compute import BatchRun
 
 

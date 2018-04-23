@@ -13,9 +13,9 @@ on a folder of structures, without clashes.
 """
 
 
-__all__ = ['FullRelaxer', 'BatchRun']
+__all__ = ['FullRelaxer', 'BatchRun', 'reset_job_folder_and_count_remaining']
 __author__ = 'Matthew Evans'
 __maintainer__ = 'Matthew Evans'
 
 
-from matador.compute.compute import FullRelaxer, BatchRun
+from matador.compute.compute import FullRelaxer, BatchRun, reset_job_folder_and_count_remaining
