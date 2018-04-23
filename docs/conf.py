@@ -20,9 +20,10 @@
 import os
 import sys
 import sphinx_rtd_theme
-sys.path.insert(0, os.path.abspath('../matador'))
-sys.path.insert(0, os.path.abspath('../matador/similarity'))
-sys.path.insert(0, os.path.abspath('../matador/utils'))
+# sys.path.insert(0, os.path.abspath('../matador'))
+# sys.path.insert(0, os.path.abspath('../matador/similarity'))
+# sys.path.insert(0, os.path.abspath('../matador/similarity'))
+# sys.path.insert(0, os.path.abspath('../matador/utils'))
 
 
 # -- General configuration ------------------------------------------------
@@ -35,10 +36,17 @@ sys.path.insert(0, os.path.abspath('../matador/utils'))
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = ['sphinx.ext.autodoc',
+              # 'm2r',
+              'sphinxcontrib.napoleon',
+              'sphinxarg.ext',
+              'sphinx.ext.todo',
+              'sphinx.ext.viewcode',
+              'sphinx.ext.intersphinx',
               'sphinx.ext.mathjax']
-
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
+
+autodoc_member_order = 'bysource'
 
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
@@ -81,6 +89,23 @@ pygments_style = 'sphinx'
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = False
 
+# -- Napolean options -----------------------------------------------------
+
+# Napoleon settings
+#
+# napoleon_google_docstring = True
+# napoleon_numpy_docstring = True
+# napoleon_include_init_with_doc = False
+# napoleon_include_private_with_doc = False
+# napoleon_include_special_with_doc = False
+# napoleon_use_admonition_for_examples = False
+# napoleon_use_admonition_for_notes = False
+# napoleon_use_admonition_for_references = False
+# napoleon_use_ivar = False
+# napoleon_use_param = False
+# napoleon_use_rtype = False
+# napoleon_use_keyword = False
+
 
 # -- Options for HTML output ----------------------------------------------
 
@@ -88,8 +113,7 @@ todo_include_todos = False
 # a list of builtin themes.
 #
 html_theme = 'sphinx_rtd_theme'
-html_them_path = [sphinx_rtd_theme.get_html_theme_path()]
-html_them_path = [sphinx_rtd_theme.get_html_theme_path()]
+html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -147,6 +171,10 @@ man_pages = [
      [author], 1)
 ]
 
+intersphinx_mapping = intersphinx_mapping = {'python': ('https://docs.python.org/3.6', None),
+                                             'numpy': ('http://docs.scipy.org/doc/numpy/', None),
+                                             'np': ('http://docs.scipy.org/doc/numpy/', None),
+                                             'matplotlib': ('http://matplotlib.org', None)}
 
 # -- Options for Texinfo output -------------------------------------------
 
