@@ -583,7 +583,20 @@ class QueryConvexHull(object):
         hull_cursor = sorted(hull_cursor, key=lambda doc: doc['enthalpy_per_atom'])
         hull_cursor = sorted(hull_cursor, key=lambda k: k['concentration'])
 
-        self.hull_cursor = hull_cursor
+        # if summary requested and we're in hulldiff mode, filter hull_cursor for lowest per stoich
+        if self.args.get('summary') and self.args['subcmd'] == 'hulldiff':
+            self.hull_cursor = []
+            compositions = set()
+            for ind, member in enumerate(hull_cursor):
+                formula = get_formula_from_stoich(sorted(member['stoichiometry']))
+                if formula not in compositions:
+                    compositions.add(formula)
+                    self.hull_cursor.append(member)
+
+        # otherwise, hull cursor includes all structures within hull_cutoff
+        else:
+            self.hull_cursor = hull_cursor
+
         self.structures = structures
 
     def voltage_curve(self, hull_cursor, quiet=False):
