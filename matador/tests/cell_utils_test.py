@@ -177,6 +177,22 @@ class CellUtilTest(unittest.TestCase):
         spacing = 0.05
         self.assertEqual(calc_mp_grid(real_lattice, spacing), [4, 4, 2])
 
+    def testShiftGrid(self):
+        from matador.utils.cell_utils import calc_mp_grid, shift_to_include_gamma, abc2cart
+        lattice_abc = [[5.57068, 10.222092, 10.222039], [90.0, 90.0, 90.0]]
+        lattice_cart = abc2cart(lattice_abc)
+        spacing = 0.1
+        mp_grid = calc_mp_grid(lattice_cart, spacing)
+        self.assertEqual(mp_grid, [2, 1, 1])
+        self.assertEqual(shift_to_include_gamma(mp_grid), [0.25, 0, 0])
+
+        lattice_abc = [[5.57068, 10.222092, 10.222039], [90.0, 90.0, 90.0]]
+        lattice_cart = abc2cart(lattice_abc)
+        spacing = 0.05
+        mp_grid = calc_mp_grid(lattice_cart, spacing)
+        self.assertEqual(mp_grid, [4, 2, 2])
+        self.assertEqual(shift_to_include_gamma(mp_grid), [0.125, 0.25, 0.25])
+
     @unittest.skipIf(not IMPORTED_SEEKPATH, 'Seekpath package not found in this distribution')
     def testKPointPath(self):
 

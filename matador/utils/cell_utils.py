@@ -241,7 +241,26 @@ def calc_mp_grid(lattice_cart, spacing):
     recip_len = np.zeros((3))
     recip_len = np.sqrt(np.sum(np.power(recip_lat, 2), axis=1))
     mp_grid = recip_len / (2 * np.pi * spacing)
-    return [np.ceil(elem) for elem in mp_grid]
+    return [int(np.ceil(elem)) for elem in mp_grid]
+
+
+def shift_to_include_gamma(mp_grid):
+    """ Calculate the shift required to include $\\Gamma$.
+    in the Monkhorst-Pack grid.
+
+    Parameters:
+        mp_grid (:obj:`list` of :obj:`int`): number of grid points
+            in each reciprocal space direction.
+
+    Returns:
+        :obj:`list` of :obj:`float`: shift required to include $\\Gamma$.
+
+    """
+    shift = [0, 0, 0]
+    for ind, val in enumerate(mp_grid):
+        if val % 2 == 0:
+            shift[ind] = 1.0/(val*2)
+    return shift
 
 
 def calc_mp_spacing(real_lat, mp_grid, prec=3):
