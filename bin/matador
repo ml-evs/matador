@@ -120,7 +120,6 @@ def main():
     plot_flags.add_argument('--labels', action='store_true', help='label hull plots')
     plot_flags.add_argument('--svg', action='store_true', help='save svg rather than showing plot in X')
     plot_flags.add_argument('--subplot', action='store_true', help='plot combined hull and voltage graph')
-    plot_flags.add_argument('--bokeh', action='store_true', help='plot using bokeh')
     plot_flags.add_argument('--no_plot', action='store_true', help='suppress plotting')
     plot_flags.add_argument('--capmap', action='store_true', help='plot heat map of gravimetric capacity')
     plot_flags.add_argument('--sampmap', action='store_true', help='plot heat map of concentration sampling')

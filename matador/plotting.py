@@ -16,7 +16,9 @@ def plotting_function(function):
     """ Wrapper for plotting functions to safely fail on
     X-forwarding errors.
     """
+    from functools import wraps
 
+    @wraps(function)
     def wrapped_plot_function(*args, **kwargs):
         """ Wrap and return the plotting function. """
         from tkinter import TclError
@@ -57,8 +59,8 @@ def set_seaborn_style(cmap='Dark2', font_scale=1.2):
 
 @plotting_function
 def plot_spectral(seeds, **kwargs):
-    """ Plot bandstructure and optional DOS from <seed>.bands and
-    <seed>.adaptive.dat file.
+    """ Plot bandstructure and/or optional DOS from `<seed>.bands` and
+    `<seed>.adaptive.dat` file.
 
     Parameters:
         seeds (list): list of filenames of bands/phonon files
@@ -196,7 +198,7 @@ def plot_spectral(seeds, **kwargs):
             path = np.asarray(path)
             path /= np.max(path)
             assert len(path) == int(dispersion[num_key]) - len(dispersion[branch_key]) + 1
-            dispersion[eig_key] = modes2bands(dispersion[eig_key], dispersion[branch_key])
+            dispersion[eig_key] = match_bands(dispersion[eig_key], dispersion[branch_key])
             sns.set_palette(kwargs.get('cmap'), n_colors=dispersion[band_key])
             colours = sns.color_palette()
             for branch_ind, branch in enumerate(dispersion[branch_key]):
@@ -496,21 +498,23 @@ def plot_spectral(seeds, **kwargs):
         plt.show()
 
 
-def modes2bands(phonon_dispersion, branches):
-    """ Recursively reorder phonon eigenvalues such that bands join up correctly,
+def match_bands(dispersion, branches):
+    """ Recursively reorder eigenvalues such that bands join up correctly,
     based on local gradients.
 
     Parameters:
-        phonon_dispersion (np.ndarray): array containing eigenvalues as function of q
-        branches (`obj`:list: of `obj`:int:): list containing branches of q-point path
+        dispersion (numpy.ndarray): array containing eigenvalues as a
+            function of q/k
+        branches (:obj:`list` of :obj:`int`): list containing branches of
+            k/q-point path
 
     Returns:
-        np.ndarray: reordered phonon branches.
+        numpy.ndarray: reordered branches.
 
     """
     from copy import deepcopy
 
-    eigs = phonon_dispersion[0]
+    eigs = dispersion[0]
 
     for _, branch in enumerate(branches):
         eigs_branch = eigs[:, branch]
@@ -527,17 +531,21 @@ def modes2bands(phonon_dispersion, branches):
                 converged = True
             eigs[:, branch] = eigs_branch
 
-    phonon_dispersion = eigs.reshape(1, len(eigs), len(eigs[0]))
+    dispersion = eigs.reshape(1, len(eigs), len(eigs[0]))
 
-    return phonon_dispersion
+    return dispersion
+
+
+def flatten_branches(dispersion, branches):
+    raise NotImplementedError
 
 
 @plotting_function
 def plot_voltage_curve(hull, show=True):
-    """ Plot calculated voltage curve.
+    """ Plot voltage curve calculated for phase diagram.
 
     Parameters:
-        hull (:class:`QueryConvexHull`): matador hull object.
+        hull (matador.hull.QueryConvexHull): matador hull object.
 
     Keyword arguments:
         show (bool): whether to show plot in an X window.
@@ -629,10 +637,8 @@ def plot_voltage_curve(hull, show=True):
 
 @plotting_function
 def plot_thermo_curves(seed, show=True, **kwargs):
-    """ Plot Temperature vs. Energy and Temperature versus heat
-    capacity from Thermodynamics <seed>.castep file as shown in
-    http://www.tcm.phy.cam.ac.uk/castep/documentation/WebHelp
-    /content/modules/castep/tskcastepdispthermo.html
+    """ Plot free energies and heat capacity as a function of temperature, as
+    calculated from a CASTEP thermodynamics run in <seed>.castep.
 
     Parameters:
         seed (str): filename of thermodynamics <seed>.castep file
@@ -663,7 +669,7 @@ def plot_thermo_curves(seed, show=True, **kwargs):
         ax_energy = ax_grid[0]
         ax_Cv = ax_grid[1]
     elif not kwargs['plot_energy'] and kwargs['plot_heat_cap']:
-        fig, ax_Cv = plt.subplots(figsize=(5, 5))
+        _, ax_Cv = plt.subplots(figsize=(5, 5))
 
     data, success = castep2dict(seed, db=False)
     if not success:
@@ -707,141 +713,21 @@ def plot_thermo_curves(seed, show=True, **kwargs):
         plt.show()
 
 
-def plot_2d_hull_bokeh(hull):
-    """ Plot interactive hull with Bokeh. Writes an html file in cwd.
-
-    Parameters:
-        hull (:class:`QueryConvexHull`): matador hull object.
-
-    """
-    from bokeh.plotting import figure, save, output_file
-    from bokeh.models import ColumnDataSource, HoverTool, Range1d
-    from matador.utils.glmol_wrapper import get_glmol_placeholder_string
-    from matador.export import generate_hash, generate_relevant_path
-    # grab tie-line structures
-    tie_line_data = dict()
-    tie_line_data['composition'] = list()
-    tie_line_data['energy'] = list()
-    for ind in range(len(hull.hull.vertices)):
-        if hull.structure_slice[hull.hull.vertices[ind], 1] <= 0:
-            tie_line_data['composition'].append(hull.structure_slice[hull.hull.vertices[ind], 0])
-            tie_line_data['energy'].append(hull.structure_slice[hull.hull.vertices[ind], 1])
-    tie_line_data['energy'] = np.asarray(tie_line_data['energy'])
-    tie_line_data['composition'] = np.asarray(tie_line_data['composition'])
-    tie_line_data['energy'] = tie_line_data['energy'][np.argsort(tie_line_data['composition'])]
-    tie_line_data['composition'] = np.sort(tie_line_data['composition'])
-
-    # points for off hull structures
-    hull_data = dict()
-    hull_data['composition'] = hull.structures[:, 0]
-    hull_data['energy'] = hull.structures[:, 1]
-    hull_data['hull_distance'] = hull.hull_dist
-    hull_data['formula'], hull_data['text_id'] = [], []
-    hull_data['space_group'], hull_data['hull_dist_string'] = [], []
-    for structure in hull.info:
-        hull_data['formula'].append(structure[0])
-        hull_data['text_id'].append(structure[1])
-        hull_data['space_group'].append(structure[2])
-        hull_data['hull_dist_string'].append(structure[3])
-    cmap_limits = [0, 0.5]
-    colormap = plt.cm.get_cmap('Dark2')
-    cmap_input = np.interp(hull_data['hull_distance'], cmap_limits, [0.15, 0.4], left=0.15, right=0.4)
-    colours = colormap(cmap_input, 1, True)
-    bokeh_colours = ["#%02x%02x%02x" % (r, g, b) for r, g, b in colours[:, 0:3]]
-    fixed_colours = colormap([0.0, 0.15], 1, True)
-    tie_line_colour, on_hull_colour = ["#%02x%02x%02x" % (r, g, b) for r, g, b in fixed_colours[:, 0:3]]
-
-    tie_line_source = ColumnDataSource(data=tie_line_data)
-    hull_source = ColumnDataSource(data=hull_data)
-
-    hover = HoverTool(
-        tooltips="""
-                      <div>
-                          <div>
-                              <span style="font-size: 16px; font-family: "Fira Sans", sans-serif">
-                                  Formula: @formula <br>
-                                  ID: @text_id <br>
-                                  Space group: @space_group <br>
-                                  Distance from hull: @hull_dist_string
-                              </span>
-                          </div>
-                      </div>
-                      """
-    )
-
-    tools = ['pan', 'wheel_zoom', 'reset', 'save']
-    tools.append(hover)
-
-    fig = figure(tools=tools)
-
-    fig.xaxis.axis_label = 'x'
-    fig.yaxis.axis_label = 'Formation energy (eV/atom)'
-    fig.xaxis.axis_label_text_font_size = '20pt'
-    fig.xaxis.axis_label_text_font = "Fira Sans, sans-serif"
-    fig.yaxis.axis_label_text_font_size = '20pt'
-    fig.yaxis.axis_label_text_font = "Fira Sans, sans-serif"
-    fig.yaxis.axis_label_text_font_style = 'normal'
-    fig.xaxis.axis_label_text_font_style = 'normal'
-    fig.background_fill_alpha = 0
-    fig.border_fill_alpha = 0
-    fig.title.text_font_size = '20pt'
-    fig.title.align = 'center'
-
-    ylim = [-0.1 if np.min(hull.structure_slice[hull.hull.vertices, 1]) > 0
-            else np.min(hull.structure_slice[hull.hull.vertices, 1])-0.15,
-            0.1 if np.max(hull.structure_slice[hull.hull.vertices, 1]) > 1
-            else np.max(hull.structure_slice[hull.hull.vertices, 1])+0.1]
-    fig.x_range = Range1d(-0.1, 1.1)
-    fig.y_range = Range1d(ylim[0], ylim[1])
-
-    fig.line('composition', 'energy', source=tie_line_source, line_width=4, line_color=tie_line_colour)
-    hull_scatter = fig.scatter('composition', 'energy',
-                               source=hull_source,
-                               alpha=1,
-                               size=10,
-                               fill_color=bokeh_colours,
-                               line_color=None)
-    fig.tools[0].renderers.append(hull_scatter)
-    fig.square('composition', 'energy',
-               source=tie_line_source,
-               line_color='black',
-               color=on_hull_colour,
-               line_width=2,
-               alpha=1,
-               size=10)
-    fig.plot_width = 800
-    fig.plot_height = 600
-    path = '/u/fs1/me388/data/hulls/'
-    fname = generate_relevant_path(hull.args) + '_' + generate_hash() + '.html'
-    output_file(path + fname, title='Convex hull')
-    print('Hull will be available shortly at http://www.tcm.phy.cam.ac.uk/~me388/hulls/' + fname)
-    save(fig)
-    glmol = False
-    if glmol:
-        html_string, js_string = get_glmol_placeholder_string()
-        with open(path + fname) as f:
-            flines = f.readlines()
-            for ind, line in enumerate(flines):
-                if "<div class=\"bk-root\">" in line:
-                    flines.insert(ind - 1, html_string)
-                    break
-            flines.append(js_string)
-        with open(path + fname, 'w') as f:
-            f.write('\n'.join(map(str, flines)))
-
-
 def get_linear_cmap(colours, num_colours=100, list_only=False):
     """ Create a linear colormap from a list of colours.
 
     Parameters:
-        colours (list(str)): list of fractional RGB values of colours
+        colours (:obj:`list` of :obj:`str`): list of fractional RGB
+            values of colours
 
     Keyword arguments:
         num_colours (int): number of colours in resulting cmap
         list_only (bool): return only a list of colours
 
     Returns:
-        LinearSegmentedColormap or list: if list_only.
+        :obj:`matplotlib.colors.LinearSegmentedColormap` or :obj:`list`:
+            returns list of colours if `list_only` is True, otherwise
+            :obj:`matplotlib.colors.LinearSegmentedColormap`.
 
     """
     from matplotlib.colors import LinearSegmentedColormap
@@ -868,10 +754,10 @@ def get_linear_cmap(colours, num_colours=100, list_only=False):
 
 @plotting_function
 def plot_volume_curve(hull, show=True):
-    """ Plot calculated volume curve.
+    """ Plot volume curve calculated for phase diagram.
 
     Parameters:
-        hull (:class:`QueryConvexHull`): matador hull object.
+        hull (matador.hull.QueryConvexHull): matador hull object.
 
     Keyword arguments:
         show (bool): whether or not to display plot in X-window.
@@ -956,10 +842,10 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
     """ Plot calculated hull, returning ax and fig objects for further editing.
 
     Parameters:
-        hull (:class:`QueryConvexHull`): matador hull object.
+        hull (matador.hull.QueryConvexHull): matador hull object.
 
     Keyword arguments:
-        ax (Axes): an existing axis on which to plot,
+        ax (matplotlib.axes.Axes): an existing axis on which to plot,
         show (bool): whether or not to display the plot in an X window,
         plot_points (bool): whether or not to display off-hull structures,
         plot_hull_points (bool): whether or not to display on-hull structures,
@@ -970,7 +856,7 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
             is True (others will be grey)
 
     Returns:
-        Axes: matplotlib axis with plot.
+        matplotlib.axes.Axes: matplotlib axis with plot.
 
     """
 
@@ -1176,17 +1062,17 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, expecting_cb
     """ Plot calculated ternary hull as a 2D projection.
 
     Parameters:
-        hull (:class:`QueryConvexHull`): matador hull object.
+        hull (matador.hull.QueryConvexHull): matador hull object.
 
     Keyword arguments:
-        axis (Axes): matplotlib axis object on which to plot.
+        axis (matplotlib.axes.Axes): matplotlib axis object on which to plot.
         show (bool): whether or not to show plot in X window.
         plot_points (bool): whether or not to plot each structure as a point.
         expecting_cbar (bool): whether or not to space out the plot to preserve
             aspect ratio if a colourbar is present.
 
     Returns:
-        Axes: matplotlib axis with plot.
+        matplotlib.axes.Axes: matplotlib axis with plot.
 
     """
     import ternary
