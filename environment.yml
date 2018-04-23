@@ -1,10 +1,14 @@
 name: matador
 channels:
     - conda-forge
+    - matsci
 dependencies:
-    - python=3.5
+    - python==3.6
     - numpy>=1.10
-    - scipy>=0.18
-    - periodictable>=0.14
+    - scipy>=1.0
+    - periodictable
+    - seekpath
+    - python-ternary==1.0.3
     - psutil
-    - spglib>=1.9
+    - spglib
+    - matplotlib>=2.0
