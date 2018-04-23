@@ -131,10 +131,7 @@ class QueryConvexHull(object):
                 plotting.plot_volume_curve(self)
 
         if self.args['subcmd'] == 'hull' and not self.args.get('no_plot'):
-            if self.args.get('bokeh'):
-                plotting.plot_2d_hull_bokeh(self)
-            else:
-                self.plot_hull(**plot_kwargs)
+            self.plot_hull(**plot_kwargs)
 
         if self.args.get('uniq'):
             from matador.similarity.similarity import get_uniq_cursor
