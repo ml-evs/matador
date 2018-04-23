@@ -8,7 +8,7 @@ parsing user inputs and passing them to the CommandLine object.
 import argparse
 import os
 from sys import argv
-from matador.version import __version__
+from matador import __version__
 from matador.cli import MatadorCommandLine
 
 

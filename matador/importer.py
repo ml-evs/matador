@@ -19,7 +19,7 @@ from matador.scrapers.castep_scrapers import castep2dict, param2dict, cell2dict
 from matador.scrapers.castep_scrapers import res2dict, dir2dict
 from matador.utils.cell_utils import calc_mp_spacing
 from matador.utils.db_utils import make_connection_to_collection, load_custom_settings
-from matador.version import __version__
+from matador import __version__
 
 
 class Spatula:
