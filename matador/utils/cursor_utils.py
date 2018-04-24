@@ -6,6 +6,7 @@ from time import strftime
 
 import numpy as np
 from matador.utils.cell_utils import get_spacegroup_spg
+from matador.utils.chem_utils import get_formula_from_stoich, get_root_source
 from matador import __version__
 
 
@@ -62,9 +63,8 @@ def display_results(cursor,
         latex_string = (
             "\\begin{tabular}{l r r c l l}\n"
             "\\rowcolor{gray!20}\n"
-            "\\multicolumn{1}{l}{formula} & \\multicolumn{1}{r}{$\\Delta E$ from hull (meV/atom)} & "
-            "\\multicolumn{1}{r}{grav. cap. (mAh/g)} & \\multicolumn{1}{c}{sg.} & "
-            "\\multicolumn{1}{l}{provenance} & \\multicolumn{1}{l}{description} \\\\\n"
+            "formula & \\thead{$\\Delta E$\\\\(meV/atom)} & \\thead{$Q_m$\\\\(mAh/g)} & "
+            "spacegroup & provenance & description \\\\ \n\n"
         )
         latex_struct_string = []
 
@@ -107,6 +107,11 @@ def display_results(cursor,
     # ensure cursor is sorted by enthalpy
     cursor = sorted(cursor, key=lambda doc: doc['enthalpy_per_atom'], reverse=False)
 
+    if latex:
+        latex_sub_style = r'\text'
+    else:
+        latex_sub_style = ''
+
     for ind, doc in enumerate(cursor):
         postfix = ''
         formula_substring = ''
@@ -119,15 +124,11 @@ def display_results(cursor,
                 formula_substring += 'γ-'
             elif 'theta' in doc['phase']:
                 formula_substring += 'θ-'
-        atom_per_fu = 0
-        for item in sorted(doc['stoichiometry']):
-            for item_ind, subitem in enumerate(item):
-                if item_ind == 0:
-                    formula_substring += str(subitem)
-                if item_ind == 1:
-                    if subitem != 1:
-                        formula_substring += str(int(subitem))
-                    atom_per_fu += subitem
+
+        formula_substring = get_formula_from_stoich(doc['stoichiometry'],
+                                                    tex=latex,
+                                                    latex_sub_style=latex_sub_style)
+
         if 'encapsulated' in doc:
             formula_substring += '+CNT'
         if last_formula != formula_substring:
@@ -136,7 +137,7 @@ def display_results(cursor,
         if not markdown:
             if hull and np.abs(doc.get('hull_distance')) <= 0.0 + 1e-12:
                 if use_source:
-                    src = [src.split('/')[-1] for src in doc['source'] if src.endswith('.res') or src.endswith('.castep')][0].replace('.res', '').replace('.castep', '')
+                    src = get_root_source(doc['source'])
                     if colour:
                         struct_string.append("\033[92m\033[1m* {:<38}".format(src))
                         postfix = '\033[0m'
@@ -151,7 +152,7 @@ def display_results(cursor,
                         struct_string.append("* {:^26}".format(doc['text_id'][0] + ' ' + doc['text_id'][1]))
             else:
                 if use_source:
-                    src = [src.split('/')[-1] for src in doc['source'] if src.endswith('.res') or src.endswith('.castep')][0].replace('.res', '').replace('.castep', '')
+                    src = get_root_source(doc['source'])
                     struct_string.append("  {:<38}".format(src))
                 else:
                     struct_string.append("  {:^26}".format(doc['text_id'][0] + ' ' + doc['text_id'][1]))
@@ -169,12 +170,8 @@ def display_results(cursor,
             except KeyError:
                 struct_string[-1] += "{:5}".format(' ')
         else:
-            struct_string.append("{:40}".format(next(source.split('/')[-1].split('.')[0]
-                                                     for source in doc['source']
-                                                     if (source.endswith('.res') or
-                                                         source.endswith('.castep') or
-                                                         source.endswith('.history') or
-                                                         source.endswith('.history.gz')))))
+            struct_string.append("{:40}".format(get_root_source(doc['source'])))
+
         if 'pressure' in doc and doc['pressure'] != 'xxx':
             struct_string[-1] += "{: >9.2f}".format(doc['pressure'])
         else:
@@ -218,7 +215,7 @@ def display_results(cursor,
         struct_string[-1] += postfix
 
         if latex:
-            latex_struct_string.append("{:^20} {:^10} & ".format(formula_substring, '$\\star$' if doc['hull_distance'] == 0 else ''))
+            latex_struct_string.append("{:^30} {:^10} & ".format(formula_substring, '$\\star$' if doc['hull_distance'] == 0 else ''))
             latex_struct_string[-1] += "{:^20.0f} & ".format(doc.get('hull_distance') * 1000
                                                              ) if doc.get('hull_distance'
                                                                           ) > 0 else '{:^20} &'.format('-')
@@ -229,8 +226,8 @@ def display_results(cursor,
             prov = get_guess_doc_provenance(doc['source'], doc.get('icsd'))
             if doc.get('icsd'):
                 prov += ' {}'.format(doc['icsd'])
-            latex_struct_string[-1] += "{:^25} & ".format(prov)
-            latex_struct_string[-1] += "{:^30} \\\\ \n".format('')
+            latex_struct_string[-1] += "{:^30} & ".format(prov)
+            latex_struct_string[-1] += "{:^30} \\\\".format('')
 
         if last_formula != formula_substring:
             if args.get('per_atom'):
@@ -310,12 +307,13 @@ def display_results(cursor,
                 if num != len(doc['source']) - 1:
                     source_string[-1] += '\n'
 
-    if not markdown:
+    if not markdown or latex:
         print(len(header_string) * '─')
         print(header_string)
         print(units_string)
         print(len(header_string) * '─')
-    else:
+
+    if markdown:
         markdown_string += len(header_string) * '-' + '\n'
         markdown_string += header_string + '\n'
         markdown_string += units_string + '\n'

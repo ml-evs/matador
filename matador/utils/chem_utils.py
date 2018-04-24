@@ -380,7 +380,7 @@ def get_root_source(source):
     return list(src_list)[0]
 
 
-def get_formula_from_stoich(stoich, elements=None, tex=False):
+def get_formula_from_stoich(stoich, elements=None, tex=False, latex_sub_style=''):
     """ Get the chemical formula of a structure from
     its matador stoichiometry.
 
@@ -390,9 +390,11 @@ def get_formula_from_stoich(stoich, elements=None, tex=False):
     Keyword arguments:
         elements (list): list of element symbols to enforce order.
         tex (bool): whether to print a LaTeX-compatibile string.
+        latex_sub_style (str): a string to wrap subscripts in, e.g.
+            r"\mathrm" or r"\text" (default is blank).
 
     Returns:
-        str: chemical formula.
+        str: the string representation of the chemical formula.
 
     """
     form = ''
@@ -406,7 +408,9 @@ def get_formula_from_stoich(stoich, elements=None, tex=False):
                         form += elem[0]
                     elif int(elem[1]) != 0:
                         if tex:
-                            form += elem[0] + '$_{' + str(int(elem[1])) + '}$'
+                            if elem[1] % 1 == 0:
+                                elem[1] = int(elem[1])
+                            form += r'{}$_{}{{{}}}$'.format(elem[0], latex_sub_style, elem[1])
                         else:
                             form += elem[0] + str(int(elem[1]))
         assert form != ''
@@ -416,7 +420,9 @@ def get_formula_from_stoich(stoich, elements=None, tex=False):
                 form += elem[0]
             elif int(elem[1]) != 0:
                 if tex:
-                    form += elem[0] + '$_{' + str(int(elem[1])) + '}$'
+                    if elem[1] % 1 == 0:
+                        elem[1] = int(elem[1])
+                    form += '{}$_{}{{{}}}$'.format(elem[0], latex_sub_style, elem[1])
                 else:
                     form += elem[0] + str(int(elem[1]))
     return form
