@@ -1012,7 +1012,7 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
             for source in sources:
                 ax.scatter(1e10, 1e10, c=colour_choices[source], label=source, alpha=alpha)
             ax.scatter(1e10, 1e10, c=hull.colours[-2], label='Other', alpha=alpha)
-            ax.legend()
+            ax.legend(loc=9)
 
         # tie lines
         ax.set_ylim(-0.1 if np.min(hull.structure_slice[hull.hull.vertices, 1]) > 0
