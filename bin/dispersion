@@ -31,6 +31,8 @@ if __name__ == '__main__':
                         help='matplotlib colourmap name to use')
     parser.add_argument('--no_stacked_pdos', action='store_true',
                         help='plot PDOS as overlap rather than stack')
+    parser.add_argument('--pdos_hide_tot', action='store_true',
+                        help='plot PDOS without total DOS, i.e. if PDOS is negative in parts')
     parser.add_argument('--band_colour', type=str,
                         help='override all other colour options with a matploblib-interpretable colour string, '
                              'or choose one of "occ" or "random".')

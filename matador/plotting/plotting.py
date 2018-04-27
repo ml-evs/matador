@@ -25,12 +25,15 @@ def plotting_function(function):
         from tkinter import TclError
         # if we're going to be saving a figure, switch to Agg to avoid X-forwarding
         saving = False
-        for arg in args:
-            if arg.savefig:
-                import matplotlib
-                matplotlib.use('Agg')
-                saving = True
-                break
+        try:
+            for arg in args:
+                if arg.savefig:
+                    import matplotlib
+                    matplotlib.use('Agg')
+                    saving = True
+                    break
+        except:
+            pass
         if not saving:
             if any([kwargs.get('pdf'), kwargs.get('svg'), kwargs.get('png')]):
                 import matplotlib
@@ -45,30 +48,6 @@ def plotting_function(function):
             print_failure('Skipping plot...')
 
     return wrapped_plot_function
-
-
-def set_seaborn_style(cmap='Dark2', font_scale=1.2):
-    """ Set the default seaborn style, returning the colour palette.
-
-    Keyword arguments:
-        cmap (str): named seaborn colourmap.
-        font_scale (float): seaborn font scale.
-
-    Returns:
-        list: list of RGB tuples of seaborn colour palette.
-
-    """
-    import seaborn as sns
-    sns.set(style='whitegrid', font_scale=font_scale)
-    sns.set_style({
-        'axes.facecolor': 'white', 'figure.facecolor': 'white',
-        'font.sans-serif': ['Linux Biolinum O', 'Helvetica', 'Arial'],
-        'axes.linewidth': 0.5,
-        'axes.grid': False,
-        'legend.frameon': False,
-        'axes.axisbelow': True})
-    sns.set_palette(cmap)
-    return sns.color_palette()
 
 
 @plotting_function
@@ -100,58 +79,34 @@ def plot_spectral(seeds, **kwargs):
             linearising the kpoint path. If False, bandstructures of different lattice parameters
             with the same Bravais lattice can be more easily compared. If True, bandstructures may
             appear rarefied or compressed in particular regions.
+        pdos_hide_tot (bool): whether or not to plot the total DOS on a PDOS plot; this is to hide
+            regions where the PDOS is negative (leading to total DOS lower than stacked PDOS) (DEFAULT: False).
 
     """
     import matplotlib.pyplot as plt
     from matador.scrapers.castep_scrapers import bands2dict, cell2dict, phonon2dict, optados2dict
     from matador.utils.cell_utils import doc2spg
     from seekpath import get_path
-    import seaborn as sns
     from os.path import isfile
+    import seaborn as sns
+    sns.set(style='whitegrid', font_scale=1.2)
     # set defaults and update class with desired values
     prop_defaults = {'plot_bandstructure': True, 'plot_dos': False,
                      'phonons': False, 'cell': False, 'gap': False,
                      'colour_by_seed': False, 'external_efermi': None,
                      'labels': None, 'cmap': 'Dark2', 'band_colour': 'occ',
                      'no_stacked_pdos': False, 'preserve_kspace_distance': False,
-                     'verbosity': 0, 'highlight_bands': None}
+                     'verbosity': 0, 'highlight_bands': None, 'pdos_hide_tot': False}
     prop_defaults.update(kwargs)
 
     kwargs = prop_defaults
     if (kwargs.get('phonons') and kwargs['band_colour'] == 'occ') or kwargs['band_colour'] == 'random':
         kwargs['band_colour'] = None
 
-    colours = set_seaborn_style(cmap=kwargs.get('cmap'))
-    if kwargs.get('cmap') == 'Dark2':
-        valence = colours[0]
-        conduction = colours[1]
-        crossing = colours[2]
-    else:
-        valence = colours[0]
-        conduction = colours[-1]
-        crossing = colours[int(len(colours) / 2)]
-
     dos_legend = None
 
     if not isinstance(seeds, list):
         seeds = [seeds]
-
-    if len(seeds) > 1 or kwargs.get('colour_by_seed'):
-        seed_colours = colours
-        ls = ['-'] * len(seeds)
-        colour_by_seed = True
-        if kwargs.get('labels') is None:
-            kwargs['labels'] = [seed.split('/')[-1].split('.')[0] for seed in seeds]
-    else:
-        ls = []
-        colour_by_seed = False
-        for i in range(len(seeds)):
-            if i % 3 == 0:
-                ls.append('-')
-            elif i % 3 == 1:
-                ls.append('--')
-            elif i % 3 == 2:
-                ls.append('-.')
 
     if kwargs.get('plot_window') is not None:
         if isinstance(kwargs.get('plot_window'), list):
@@ -175,6 +130,35 @@ def plot_spectral(seeds, **kwargs):
         ax_grid[2].axis('off')
     elif not kwargs['plot_bandstructure'] and kwargs['plot_dos']:
         _, ax_dos = plt.subplots(1, figsize=(8, 4))
+
+    sns.set_palette(kwargs.get('cmap'))
+    colours = sns.color_palette()
+
+    if kwargs.get('cmap') == 'Dark2':
+        valence = colours[0]
+        conduction = colours[1]
+        crossing = colours[2]
+    else:
+        valence = colours[0]
+        conduction = colours[-1]
+        crossing = colours[int(len(colours) / 2)]
+
+    if len(seeds) > 1 or kwargs.get('colour_by_seed'):
+        seed_colours = colours
+        ls = ['-'] * len(seeds)
+        colour_by_seed = True
+        if kwargs.get('labels') is None:
+            kwargs['labels'] = [seed.split('/')[-1].split('.')[0] for seed in seeds]
+    else:
+        ls = []
+        colour_by_seed = False
+        for i in range(len(seeds)):
+            if i % 3 == 0:
+                ls.append('-')
+            elif i % 3 == 1:
+                ls.append('--')
+            elif i % 3 == 2:
+                ls.append('-.')
 
     for seed_ind, seed in enumerate(seeds):
         seed = seed.replace('.bands', '').replace('.phonon', '')
@@ -214,8 +198,8 @@ def plot_spectral(seeds, **kwargs):
             path /= np.max(path)
             assert len(path) == int(dispersion[num_key]) - len(dispersion[branch_key]) + 1
             dispersion[eig_key] = match_bands(dispersion[eig_key], dispersion[branch_key])
-            sns.set_palette(kwargs.get('cmap'), n_colors=dispersion[band_key])
-            colours = sns.color_palette()
+            # sns.set_palette(kwargs.get('cmap'), n_colors=dispersion[band_key])
+            # colours = sns.color_palette()
             for branch_ind, branch in enumerate(dispersion[branch_key]):
                 for ns in range(dispersion[spin_key]):
                     for nb in range(dispersion[band_key]):
@@ -303,7 +287,7 @@ def plot_spectral(seeds, **kwargs):
                                                     label = '{}|{}'.format(label, new_label)
                                                     labelled.append(ind - branch_ind)
                                                     shear_planes.append(ind)
-                                    label = '$\\phantom{{|}}{}$'.format(label)
+                                    label = '${}$'.format(label)
                                     ax_dispersion.axvline(path[ind - branch_ind], ls='-.', c='grey', zorder=0, lw=0.5)
                                     xticklabels.append(label)
                                     xticks.append(path[ind - branch_ind])
@@ -340,7 +324,6 @@ def plot_spectral(seeds, **kwargs):
             ax_dispersion.set_xticklabels(xticklabels)
 
         if kwargs['plot_dos']:
-            num_projectors = 1
             if not kwargs['phonons']:
                 if kwargs.get('dos') is None:
                     dos_data, s = optados2dict(seed + '.adaptive.dat')
@@ -351,7 +334,6 @@ def plot_spectral(seeds, **kwargs):
                 max_density = np.max(dos[np.where(energies > plot_window[0])])
                 if 'pdos' in dos_data:
                     pdos = dos_data['pdos']
-                    num_projectors = dos_data['num_projectors']
             else:
                 if not isfile(seed + '.phonon_dos'):
                     phonon_data, s = phonon2dict(seed + '.phonon')
@@ -389,7 +371,6 @@ def plot_spectral(seeds, **kwargs):
                         if 'begin dos' in line.lower():
                             projector_labels = line.split()[5:]
                             projector_labels = [(label, None) for label in projector_labels]
-                            num_projectors = len(projector_labels)
                             begin = ind + 1
                             break
                     data_flines = flines[begin:-1]
@@ -418,11 +399,11 @@ def plot_spectral(seeds, **kwargs):
                 if kwargs['plot_bandstructure']:
                     ylabel = 'DOS'
                 else:
-                    ylabel = 'DOS (eV$^{{-1}}$\\AA$^{{-3}}$)'
+                    ylabel = 'DOS (eV$^{{-1}}$Å$^{{-3}}$)'
                 xlabel = 'Energy (eV)'
 
-            sns.set_palette(kwargs.get('cmap'), n_colors=num_projectors)
-            colours = sns.color_palette()
+            # sns.set_palette(kwargs.get('cmap'), n_colors=num_projectors)
+            # colours = sns.color_palette()
 
             if len(seeds) > 1:
                 colour = seed_colours[seed_ind]
@@ -439,7 +420,8 @@ def plot_spectral(seeds, **kwargs):
                 ax_dos.set_ylim(plot_window)
                 ax_dos.axvline(0, c='k')
 
-                ax_dos.plot(dos, energies, lw=1, ls=ls[seed_ind], color=colour, zorder=1e10, label='Total DOS')
+                if not kwargs['pdos_hide_tot']:
+                    ax_dos.plot(dos, energies, lw=1, ls=ls[seed_ind], color=colour, zorder=1e10, label='Total DOS')
 
             else:
                 ax_dos.set_xlabel(xlabel)
@@ -449,7 +431,8 @@ def plot_spectral(seeds, **kwargs):
                 ax_dos.set_xlim(plot_window)
                 ax_dos.axhline(0, c='k')
 
-                ax_dos.plot(energies, dos, lw=1, ls=ls[seed_ind], color=colour, zorder=1e10, label='Total DOS')
+                if not kwargs['pdos_hide_tot']:
+                    ax_dos.plot(energies, dos, lw=1, ls=ls[seed_ind], color=colour, zorder=1e10, label='Total DOS')
 
             if 'pdos' in dos_data and len(seeds) == 1:
                 dos_colours = []
@@ -479,23 +462,30 @@ def plot_spectral(seeds, **kwargs):
                         dos_colours.append(None)
 
                     if not kwargs['no_stacked_pdos']:
-                        alpha = 0.9
+                        alpha = 0.8
                     else:
                         alpha = 0.7
 
+                    # mask negative contributions with 0
+                    pdos[projector] = np.ma.masked_where(pdos[projector] < 0, pdos[projector], copy=True)
+                    np.ma.set_fill_value(pdos[projector], 0)
+                    pdos[projector] = np.ma.filled(pdos[projector])
+
                     if kwargs['plot_bandstructure']:
-                        ax_dos.plot(stack+pdos[projector], energies, lw=1, zorder=1000, color=dos_colours[-1])
+                        ax_dos.plot(stack+pdos[projector], energies, lw=1, zorder=1000, color=dos_colour)
                         ax_dos.fill_betweenx(energies, stack, stack+pdos[projector], alpha=alpha, label=projector_label,
                                              color=dos_colours[-1])
                     else:
-                        ax_dos.plot(energies, stack+pdos[projector], lw=1, zorder=1000, color=dos_colours[-1])
+                        ax_dos.plot(energies, stack+pdos[projector], lw=1, zorder=1000, color=dos_colour)
                         ax_dos.fill_between(energies, stack, stack+pdos[projector], alpha=alpha, label=projector_label,
                                             color=dos_colours[-1])
 
                     if not kwargs['no_stacked_pdos']:
+                        # pdos[projector] = np.ma.masked_where(pdos[projector] < 0, pdos[projector], copy=True)
+                        # np.ma.set_fill_value(pdos[projector], 0)
                         stack += pdos[projector]
 
-            dos_legend = ax_dos.legend(bbox_to_anchor=(1, 1))
+            dos_legend = ax_dos.legend(bbox_to_anchor=(1, 1), facecolor='w', frameon=True, fancybox=False, shadow=False)
 
     if any([kwargs.get('pdf'), kwargs.get('svg'), kwargs.get('png')]):
         if kwargs.get('pdf'):
@@ -665,6 +655,7 @@ def plot_thermo_curves(seed, show=True, **kwargs):
 
     """
     import matplotlib.pyplot as plt
+    import seaborn as sns
     from matador.scrapers.castep_scrapers import castep2dict
     from matador.utils.chem_utils import AVOGADROS_NUMBER
     from scipy.constants import physical_constants
@@ -674,7 +665,7 @@ def plot_thermo_curves(seed, show=True, **kwargs):
     prop_defaults.update(kwargs)
     kwargs = prop_defaults
 
-    set_seaborn_style()
+    sns.set(style='whitegrid', font_scale=1.2)
 
     if kwargs['plot_energy'] and not kwargs['plot_heat_cap']:
         _, ax_energy = plt.subplots(figsize=(5, 5))
@@ -882,8 +873,7 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
     import matplotlib.colors as colours
     import seaborn as sns
     hull.set_plot_param()
-    set_seaborn_style()
-    sns.set_style('ticks')
+    sns.set(style='ticks', font_scale=1.2)
     if ax is None:
         fig = plt.figure(facecolor=None, figsize=(8, 6))
         ax = fig.add_subplot(111)
@@ -1099,9 +1089,9 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, expecting_cb
 
     hull.set_plot_param()
 
-    set_seaborn_style()
+    sns.set(style='whitegrid', font_scale=1.2)
     sns.set_style({
-        'axes.facecolor': 'white', 'figure.facecolor': 'white',
+        # 'axes.facecolor': 'white',
         'xtick.major.size': 0, 'xtick.minor.size': 0,
         'ytick.major.size': 0, 'ytick.minor.size': 0,
         'axes.linewidth': 0.0})

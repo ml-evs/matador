@@ -17,11 +17,11 @@ Recommended settings:
 
 
 __all__ = ['plot_spectral', 'plot_voltage_curve', 'plot_thermo_curves', 'plot_volume_curve',
-           'plot_2d_hull', 'plot_ternary_hull', 'get_linear_cmap', 'set_seaborn_style']
+           'plot_2d_hull', 'plot_ternary_hull', 'get_linear_cmap']
 __author__ = 'Matthew Evans'
 __maintainer__ = 'Matthew Evans'
 
 
-from matador.plotting.plotting import get_linear_cmap, set_seaborn_style
+from matador.plotting.plotting import get_linear_cmap
 from matador.plotting.plotting import plot_spectral, plot_voltage_curve, plot_volume_curve
 from matador.plotting.plotting import plot_thermo_curves, plot_2d_hull, plot_ternary_hull
