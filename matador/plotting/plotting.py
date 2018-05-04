@@ -74,6 +74,7 @@ def plot_spectral(seeds, **kwargs):
             the cmap. Otherwise, override all colour options with matplotlib-interpretable colour
             (e.g. hexcode or html colour name) to use for all bands (DEFAULT: 'occ').
         cmap (str): matplotlib colourmap name to use for the bands
+        n_colours (int): number of colours to use from cmap (DEFAULT: 4).
         no_stacked_pdos (bool): whether to plot projected DOS as stack or overlapping.
         preserve_kspace_distance (bool): whether to preserve distances in reciprocal space when
             linearising the kpoint path. If False, bandstructures of different lattice parameters
@@ -95,15 +96,15 @@ def plot_spectral(seeds, **kwargs):
                      'phonons': False, 'cell': False, 'gap': False,
                      'colour_by_seed': False, 'external_efermi': None,
                      'labels': None, 'cmap': 'Dark2', 'band_colour': 'occ',
+                     'n_colours': 4,
                      'no_stacked_pdos': False, 'preserve_kspace_distance': False,
+                     'no_band_reorder': False,
                      'verbosity': 0, 'highlight_bands': None, 'pdos_hide_tot': False}
     prop_defaults.update(kwargs)
 
     kwargs = prop_defaults
     if (kwargs.get('phonons') and kwargs['band_colour'] == 'occ') or kwargs['band_colour'] == 'random':
         kwargs['band_colour'] = None
-
-    dos_legend = None
 
     if not isinstance(seeds, list):
         seeds = [seeds]
@@ -131,7 +132,7 @@ def plot_spectral(seeds, **kwargs):
     elif not kwargs['plot_bandstructure'] and kwargs['plot_dos']:
         _, ax_dos = plt.subplots(1, figsize=(8, 4))
 
-    sns.set_palette(kwargs.get('cmap'))
+    sns.set_palette(kwargs.get('cmap'), n_colors=kwargs.get('n_colours'))
     colours = sns.color_palette()
 
     if kwargs.get('cmap') == 'Dark2':
@@ -172,7 +173,7 @@ def plot_spectral(seeds, **kwargs):
                 band_key = 'num_branches'
                 dispersion['num_spins'] = 1
                 spin_key = 'num_spins'
-                plot_window = [np.min(dispersion[eig_key]), np.max(dispersion[eig_key])]
+                plot_window = [np.min(dispersion[eig_key])-10, np.max(dispersion[eig_key])]
             else:
                 dispersion, s = bands2dict(seed + '.bands',
                                            summary=True,
@@ -185,6 +186,7 @@ def plot_spectral(seeds, **kwargs):
                 eig_key = 'eigenvalues_k_s'
                 band_key = 'num_bands'
                 spin_key = 'num_spins'
+
             path = [0]
             for branch in dispersion[branch_key]:
                 for ind, kpt in enumerate(dispersion[path_key][branch]):
@@ -197,14 +199,19 @@ def plot_spectral(seeds, **kwargs):
             path = np.asarray(path)
             path /= np.max(path)
             assert len(path) == int(dispersion[num_key]) - len(dispersion[branch_key]) + 1
-            dispersion[eig_key] = match_bands(dispersion[eig_key], dispersion[branch_key])
-            # sns.set_palette(kwargs.get('cmap'), n_colors=dispersion[band_key])
-            # colours = sns.color_palette()
+            if not kwargs['no_band_reorder']:
+                dispersion[eig_key] = match_bands(dispersion[eig_key], dispersion[branch_key])
+
+            sns.set_palette(kwargs.get('cmap'), n_colors=kwargs.get('n_colours'))
+            # seem to have to reset this here for some reason
             for branch_ind, branch in enumerate(dispersion[branch_key]):
+                plt.gca().set_prop_cycle(None)
                 for ns in range(dispersion[spin_key]):
                     for nb in range(dispersion[band_key]):
                         # use seaborn palette by default
                         colour = None
+                        alpha = 1
+                        label = None
                         if not kwargs['phonons']:
                             if dispersion[spin_key] == 2:
                                 if ns == 0:
@@ -229,19 +236,17 @@ def plot_spectral(seeds, **kwargs):
                             if kwargs.get('band_colour') != 'occ':
                                 colour = kwargs.get('band_colour')
 
-                        if kwargs.get('highlight_bands') is not None and \
-                                nb in kwargs.get('highlight_bands'):
-                            colour = 'red'
-                            alpha = 0.5
-                        else:
-                            alpha = 1
+                        if kwargs.get('highlight_bands') is not None:
+                            if nb in kwargs.get('highlight_bands'):
+                                colour = 'red'
+                            else:
+                                alpha = 0.5
                         if branch_ind == 0 and ns == 0 and nb == 0 and kwargs.get('labels') is not None:
                             label = kwargs.get('labels')[seed_ind]
-                        else:
-                            label = None
+
                         ax_dispersion.plot(path[(np.asarray(branch)-branch_ind).tolist()],
-                                           dispersion[eig_key][ns][nb][branch],
-                                           c=colour, lw=1, ls=ls[seed_ind], alpha=alpha, label=label)
+                                           dispersion[eig_key][ns][nb][branch], c=colour,
+                                           lw=1, ls=ls[seed_ind], alpha=alpha, label=label)
             if len(seeds) > 1:
                 ax_dispersion.legend()
             ax_dispersion.axhline(0, ls='--', lw=1, c='grey')
@@ -267,6 +272,8 @@ def plot_spectral(seeds, **kwargs):
                     if spg_structure is not False:
                         seekpath_results = get_path(spg_structure)
                     path_labels = seekpath_results['point_coords']
+                else:
+                    raise RuntimeError(doc)
 
                 for branch_ind, branch in enumerate(dispersion[branch_key]):
                     for sub_ind, ind in enumerate(branch):
@@ -285,10 +292,11 @@ def plot_spectral(seeds, **kwargs):
                                                 new_label = new_label.replace('SIGMA', r'\Sigma')
                                                 if np.allclose(new_point, next_point):
                                                     label = '{}|{}'.format(label, new_label)
+                                                    ax_dispersion.axvline(path[ind - branch_ind], ls='-', c='grey', zorder=1, lw=0.5)
                                                     labelled.append(ind - branch_ind)
                                                     shear_planes.append(ind)
                                     label = '${}$'.format(label)
-                                    ax_dispersion.axvline(path[ind - branch_ind], ls='-.', c='grey', zorder=0, lw=0.5)
+                                    ax_dispersion.axvline(path[ind - branch_ind], ls='--', c='grey', zorder=0, lw=0.5)
                                     xticklabels.append(label)
                                     xticks.append(path[ind - branch_ind])
                                     break
@@ -322,6 +330,7 @@ def plot_spectral(seeds, **kwargs):
 
             ax_dispersion.set_xticks(xticks)
             ax_dispersion.set_xticklabels(xticklabels)
+            ax_dispersion.grid(False)
 
         if kwargs['plot_dos']:
             if not kwargs['phonons']:
@@ -337,8 +346,10 @@ def plot_spectral(seeds, **kwargs):
             else:
                 if not isfile(seed + '.phonon_dos'):
                     phonon_data, s = phonon2dict(seed + '.phonon')
-                    plot_window = [np.min(phonon_data['eigenvalues_q']) - 10, np.max(phonon_data['eigenvalues_q'])]
-                    if s:
+                    if not s:
+                        raise RuntimeError(phonon_data)
+                    else:
+                        plot_window = [np.min(phonon_data['eigenvalues_q']) - 10, np.max(phonon_data['eigenvalues_q'])]
                         space_size = 1000
                         gaussian_width = 10
                         raw_weights = []
@@ -362,8 +373,6 @@ def plot_spectral(seeds, **kwargs):
                                        label=(r'$\omega_\mathrm{{min}} = {:5.3f}$ {}'
                                               .format(phonon_data['softest_mode_freq'],
                                                       phonon_data['freq_unit'])))
-                    else:
-                        raise SystemExit('Failed to read .phonon file')
                 else:
                     with open(seed + '.phonon_dos', 'r') as f:
                         flines = f.readlines()
@@ -384,7 +393,7 @@ def plot_spectral(seeds, **kwargs):
                     dos_data['dos'] = dos
                     max_density = np.max(dos)
                     dos_data['energies'] = energies
-                    plot_window = [np.min(energies[np.where(dos > 0)]) - 10, np.max(energies[np.where(dos > 0)])]
+                    plot_window = [np.min(energies[np.where(dos > 1e-3)]) - 10, np.max(energies[np.where(dos > 1e-3)])]
                     dos_data['pdos'] = dict()
                     for i, label in enumerate(projector_labels):
                         dos_data['pdos'][label] = raw_data[:, i + 2]
@@ -402,9 +411,6 @@ def plot_spectral(seeds, **kwargs):
                     ylabel = 'DOS (eV$^{{-1}}$Å$^{{-3}}$)'
                 xlabel = 'Energy (eV)'
 
-            # sns.set_palette(kwargs.get('cmap'), n_colors=num_projectors)
-            # colours = sns.color_palette()
-
             if len(seeds) > 1:
                 colour = seed_colours[seed_ind]
             else:
@@ -415,7 +421,7 @@ def plot_spectral(seeds, **kwargs):
             if kwargs['plot_bandstructure']:
                 ax_dos.set_xticks([0.6 * max_density])
                 ax_dos.set_xticklabels([ylabel])
-                ax_dos.axhline(0, c='grey', ls='--', lw=1)
+                ax_dos.axhline(0, c='grey', ls='-', lw=0.5)
                 ax_dos.set_xlim(0, max_density * 1.2)
                 ax_dos.set_ylim(plot_window)
                 ax_dos.axvline(0, c='k')
@@ -426,10 +432,10 @@ def plot_spectral(seeds, **kwargs):
             else:
                 ax_dos.set_xlabel(xlabel)
                 ax_dos.set_ylabel(ylabel)
-                ax_dos.axvline(0, c='grey', ls='--', lw=1)
+                ax_dos.axvline(0, c='grey', lw=0.5)
                 ax_dos.set_ylim(0, max_density * 1.2)
                 ax_dos.set_xlim(plot_window)
-                ax_dos.axhline(0, c='k')
+                ax_dos.axhline(0, c='grey', lw=0.5)
 
                 if not kwargs['pdos_hide_tot']:
                     ax_dos.plot(energies, dos, lw=1, ls=ls[seed_ind], color=colour, zorder=1e10, label='Total DOS')
@@ -472,17 +478,15 @@ def plot_spectral(seeds, **kwargs):
                     pdos[projector] = np.ma.filled(pdos[projector])
 
                     if kwargs['plot_bandstructure']:
-                        ax_dos.plot(stack+pdos[projector], energies, lw=1, zorder=1000, color=dos_colour)
+                        ax_dos.plot(stack+pdos[projector], energies, lw=1, zorder=1000, color=dos_colours[-1])
                         ax_dos.fill_betweenx(energies, stack, stack+pdos[projector], alpha=alpha, label=projector_label,
                                              color=dos_colours[-1])
                     else:
-                        ax_dos.plot(energies, stack+pdos[projector], lw=1, zorder=1000, color=dos_colour)
+                        ax_dos.plot(energies, stack+pdos[projector], lw=1, zorder=1000, color=dos_colours[-1])
                         ax_dos.fill_between(energies, stack, stack+pdos[projector], alpha=alpha, label=projector_label,
                                             color=dos_colours[-1])
 
                     if not kwargs['no_stacked_pdos']:
-                        # pdos[projector] = np.ma.masked_where(pdos[projector] < 0, pdos[projector], copy=True)
-                        # np.ma.set_fill_value(pdos[projector], 0)
                         stack += pdos[projector]
 
             dos_legend = ax_dos.legend(bbox_to_anchor=(1, 1), facecolor='w', frameon=True, fancybox=False, shadow=False)
@@ -519,30 +523,37 @@ def match_bands(dispersion, branches):
     """
     from copy import deepcopy
 
-    eigs = dispersion[0]
+    for channel_ind, channel in enumerate(dispersion):
+        eigs = channel
+        for branch_ind, branch in enumerate(branches):
+            eigs_branch = eigs[:, branch]
+            converged = False
+            counter = 0
+            i_cached = 0
+            while not converged and counter < len(branch):
+                counter += 1
+                for i in range(i_cached+1, len(branch) - 1):
+                    guess = (2 * eigs_branch[:, i] - eigs_branch[:, i-1])
+                    argsort_guess = np.argsort(guess)
+                    if np.any(np.argsort(guess) != np.argsort(eigs_branch[:, i+1])):
+                        tmp_copy = deepcopy(eigs)
+                        for ind, mode in enumerate(np.argsort(eigs_branch[:, i]).tolist()):
+                            eigs_branch[mode, i+1:] = tmp_copy[:, branch][argsort_guess[ind], i+1:]
+                        for other_branch in branches[branch_ind:]:
+                            eigs_other_branch = eigs[:, other_branch]
+                            for ind, mode in enumerate(np.argsort(eigs_branch[:, i]).tolist()):
+                                eigs_other_branch[mode] = tmp_copy[:, other_branch][argsort_guess[ind]]
+                            eigs[:, other_branch] = eigs_other_branch
+                        eigs[:, branch] = eigs_branch
+                        i_cached = i
+                        break
 
-    for _, branch in enumerate(branches):
-        eigs_branch = eigs[:, branch]
-        converged = False
-        while not converged:
-            for i in range(1, len(branch) - 1):
-                guess = (2 * eigs_branch[:, i] - eigs_branch[:, i - 1])
-                if np.any(np.argsort(guess) != np.argsort(eigs_branch[:, i + 1])):
-                    tmp_eigs_branch = deepcopy(eigs_branch)
-                    for ind, mode in enumerate(np.argsort(eigs_branch[:, i]).tolist()):
-                        eigs_branch[mode, i + 1:] = deepcopy(tmp_eigs_branch[np.argsort(guess)[ind], i + 1:])
-                    break
-            if i == len(branch) - 2:
-                converged = True
-            eigs[:, branch] = eigs_branch
+                    if i == len(branch) - 2:
+                        converged = True
 
-    dispersion = eigs.reshape(1, len(eigs), len(eigs[0]))
+        dispersion[channel_ind] = eigs.reshape(1, len(eigs), len(eigs[0]))
 
     return dispersion
-
-
-def flatten_branches(dispersion, branches):
-    raise NotImplementedError
 
 
 @plotting_function
