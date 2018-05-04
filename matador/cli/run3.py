@@ -1,4 +1,6 @@
-#!/usr/bin/env python
+# coding: utf-8
+# Distributed under the terms of the MIT License.
+
 """ Run calculations in a folder with BatchRun
 such that there are no clashes.
 """
@@ -8,7 +10,8 @@ from matador import __version__
 from matador.compute import BatchRun
 
 
-if __name__ == '__main__':
+def main():
+    """ Parse args and run any remaining jobs. """
     parser = argparse.ArgumentParser(
         prog='run3',
         description='Run multiple calculations from a series of .res \
@@ -109,3 +112,7 @@ if __name__ == '__main__':
             sortby = 'cumulative'
             ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
             ps.print_stats()
+
+
+if __name__ == '__main__':
+    main()

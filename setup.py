@@ -37,4 +37,7 @@ setup(name='matador',
           'viz': ['ase', 'nglview'],
           'plotting': ['matplotlib>=2.0', 'python-ternary==1.0.3', 'seaborn']
       },
+      entry_points={'console_scripts': ['matador = matador.cli.matador_cli:main',
+                                        'dispersion = matador.cli.dispersion:main',
+                                        'run3 = matador.cli.run3:main']},
       zip_safe=False)

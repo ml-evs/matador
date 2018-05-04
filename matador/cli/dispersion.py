@@ -1,5 +1,6 @@
-#!/usr/bin/env python
 # coding: utf-8
+# Distributed under the terms of the MIT License.
+
 """ This script mimics the dispersion.pl script bundled
 with CASTEP. For the given bands file, a bandstructure
 is created. If a <seed>.adaptive.dat file exists
@@ -8,9 +9,10 @@ then a combined BS/DOS plot will be created.
 
 from os.path import isfile
 import argparse
-import matplotlib
 
-if __name__ == '__main__':
+
+def main():
+    """ Parse args and run the script. """
     parser = argparse.ArgumentParser(
         prog='dispersion',
         description='simple plotting script for bandstructures/DOS based on matador')
@@ -29,8 +31,12 @@ if __name__ == '__main__':
                         help='when linearising kpoint path, ensure distance in reciprocal space is conserved')
     parser.add_argument('--cmap', type=str,
                         help='matplotlib colourmap name to use')
+    parser.add_argument('--n_colours', type=int,
+                        help='number of colours to use from colourmap (DEFAULT: 6)')
     parser.add_argument('--no_stacked_pdos', action='store_true',
                         help='plot PDOS as overlap rather than stack')
+    parser.add_argument('--no_band_reorder', action='store_true',
+                        help='don\'t resorder bands based on local gradients')
     parser.add_argument('--pdos_hide_tot', action='store_true',
                         help='plot PDOS without total DOS, i.e. if PDOS is negative in parts')
     parser.add_argument('--band_colour', type=str,
@@ -40,6 +46,8 @@ if __name__ == '__main__':
                         help='plot position and size of band gap')
     parser.add_argument('-ph', '--phonons', action='store_true', default=False,
                         help='plot phonon calculation, rather than electronic')
+    parser.add_argument('--highlight_bands', nargs='+', type=int,
+                        help='specify band numbres to highlight in plot')
     parser.add_argument('-v', '--verbosity', type=int, default=0,
                         help='control verbosity of output')
     parser.add_argument('-pw', '--plot_window', type=float,
@@ -71,17 +79,15 @@ if __name__ == '__main__':
     del kwargs['cmap']
     del kwargs['band_colour']
 
-    # ensure we can create figures without X
-    if any([kwargs.get('pdf'), kwargs.get('svg'), kwargs.get('png')]):
-        matplotlib.use('Agg')
     from matador.plotting import plot_spectral
     from matador.utils.print_utils import print_failure
 
     if not phonons:
         bs_seed = test_seed.replace('.bands', '') + '.bands'
         bandstructure = isfile(bs_seed)
-        dos_seed = test_seed.replace('.bands', '') + '.adaptive.dat'
-        dos = isfile(dos_seed)
+        dos_seeds = [test_seed.replace('.bands', '') + '.adaptive.dat',
+                     test_seed.replace('.bands', '') + '.pdos.adaptive.dat']
+        dos = any([isfile(dos_seed) for dos_seed in dos_seeds])
         cell_seed = test_seed.replace('.bands', '') + '.cell'
         cell = isfile(cell_seed)
 
@@ -113,3 +119,7 @@ if __name__ == '__main__':
                   cmap=cmap,
                   band_colour=band_colour,
                   **kwargs)
+
+
+if __name__ == '__main__':
+    main()

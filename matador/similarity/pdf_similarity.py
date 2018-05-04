@@ -339,8 +339,8 @@ class PDF(Fingerprint):
 
         """
         import matplotlib.pyplot as plt
-        from matador.plotting import set_seaborn_style
-        set_seaborn_style(cmap=cmap)
+        import seaborn as sns
+        sns.set(style='whitegrid', font_scale=1.2)
         fig = plt.figure(figsize=(8, 5))
         ax1 = fig.add_subplot(111)
         ax1.plot(self.r_space, self.gr, lw=1, zorder=100000, ls='-', label='total {}'.format(self.label), c='k')
@@ -377,8 +377,8 @@ class PDF(Fingerprint):
 
         """
         import matplotlib.pyplot as plt
-        from matador.plotting import set_seaborn_style
-        set_seaborn_style(cmap=cmap)
+        import seaborn as sns
+        sns.set(style='whitegrid', font_scale=1.2)
         fig = plt.figure(figsize=(8, 5))
         ax1 = fig.add_subplot(111)
         ax1.plot(self.r_space, self.gr, lw=2, label=self.label, c='k')
@@ -633,8 +633,8 @@ class PDFOverlap:
         """ Simple plot for comparing two PDF's. """
         import matplotlib.pyplot as plt
         import matplotlib.gridspec as gridspec
-        from matador.plotting import set_seaborn_style
-        colours = set_seaborn_style(cmap=cmap)
+        import seaborn as sns
+        sns.set(style='whitegrid', font_scale=1.2)
 
         plt.figure(figsize=(8, 6))
         gs = gridspec.GridSpec(2, 1, height_ratios=[2, 1])
@@ -665,8 +665,8 @@ class PDFOverlap:
         """ Simple plot for comparing two PDF's. """
         import matplotlib.pyplot as plt
         import matplotlib.gridspec as gridspec
-        from matador.plotting import set_seaborn_style
-        colours = set_seaborn_style(cmap=cmap)
+        import seaborn as sns
+        sns.set(style='whitegrid', font_scale=1.2)
 
         plt.figure(figsize=(8, 6))
         gs = gridspec.GridSpec(2, 1, height_ratios=[2, 1])
