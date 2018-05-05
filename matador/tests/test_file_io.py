@@ -40,6 +40,19 @@ class ScrapeTest(unittest.TestCase):
             test_dict, s = cell2dict(cell_fname, db=False, outcell=False, verbosity=VERBOSITY)
             self.assertTrue(test_dict.get('lattice_cart') is None)
 
+        cell_fname = REAL_PATH + 'data/Li2C2-out.cell'
+        failed_open = False
+        try:
+            f = open(cell_fname, 'r')
+        except Exception:
+            failed_open = True
+            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(cell_fname))
+
+        if not failed_open:
+            f.close()
+            test_dict, s = cell2dict(cell_fname, db=False, outcell=True, verbosity=VERBOSITY)
+            self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(test_dict))
+
         cell_fname = REAL_PATH + 'data/K5P4-phonon.cell'
         failed_open = False
         try:
@@ -472,8 +485,7 @@ class ExportTest(unittest.TestCase):
             doc2cell(doc, test_fname)
             test_dict, s = cell2dict(test_fname, db=False, outcell=True, positions=False)
             remove(test_fname)
-            self.assertTrue(s)
-            self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
+            self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(test_dict))
             self.assertEqual(test_dict['lattice_cart'][0][0], 11.4518745146637, msg='Failed to read lattice vectors.')
             self.assertEqual(test_dict['lattice_cart'][1][1], 5.09448137301246, msg='Failed to read lattice vectors.')
             self.assertEqual(test_dict['lattice_cart'][2][2], 9.18378851243459, msg='Failed to read lattice vectors.')

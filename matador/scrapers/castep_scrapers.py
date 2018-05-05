@@ -163,12 +163,7 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, verb
                 i = 1
                 while 'endblock' not in flines[line_no + i].lower():
                     if not flines[line_no + i].strip()[0].isalpha():
-                        try:
-                            cell['lattice_cart'].append(list(map(float, flines[line_no + i].split())))
-                        except Exception:
-                            print(seed)
-                            print(line)
-                            print(flines)
+                        cell['lattice_cart'].append(list(map(float, flines[line_no + i].split())))
                     i += 1
                 if verbosity > 1:
                     print(cell['lattice_cart'])
@@ -214,10 +209,13 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, verb
                         cell['hubbard_u'][atom][orbital] = shift
                         i += 1
             elif '%block external_pressure' in line.lower():
-                cell['external_pressure'] = list()
-                for j in range(3):
-                    flines[line_no + j + 1] = flines[line_no + j + 1].replace(',', '')
-                    cell['external_pressure'].append(list(map(float, flines[line_no + j + 1].split())))
+                cell['external_pressure'] = []
+                i = 1
+                while 'endblock' not in flines[line_no + i].lower():
+                    if not flines[line_no + i].strip()[0].isalpha():
+                        flines[line_no+i] = flines[line_no+i].replace(',', '')
+                        cell['external_pressure'].append(list(map(float, flines[line_no+i].split())))
+                    i += 1
             # parse kpoints
             elif 'kpoints_mp_spacing' in line.lower() or 'kpoint_mp_spacing' in line.lower():
                 if 'spectral_kpoints_mp_spacing' in line.lower() or 'spectral_kpoint_mp_spacing' in line.lower():
@@ -313,7 +311,7 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, verb
                     elif 'kpoints_path_spacing' in line.lower() or 'kpoint_path_spacing' in line.lower():
                         cell['kpoints_path_spacing'] = float(line.split()[-1])
 
-        if 'external_pressure' not in cell:
+        if 'external_pressure' not in cell or not cell['external_pressure']:
             cell['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0], [0.0]]
     except Exception as oops:
         if verbosity > 0:
