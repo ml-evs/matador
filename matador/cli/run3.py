@@ -40,12 +40,16 @@ def main():
                         help='number of nodes per job, i.e. number of nodes \
                               using -nc cores [DEFAULT=1]. REQUIRES Intel MPI as \
                               found on e.g. Darwin HPC.')
+    parser.add_argument('-t', '--max_walltime', type=int,
+                        help='maximum walltime in seconds (job will quit early to clean up if specified)')
     parser.add_argument('-exec', '--executable', type=str, default='castep',
                         help='specify path to or name of executable')
     parser.add_argument('--no_reopt', action='store_true', default=False,
                         help='do not run geometry optimisation again after first success')
     parser.add_argument('--redirect', type=str,
                         help='filename to redirect output to, can use $seed macro')
+    parser.add_argument('--ignore_jobs_file', action='store_true',
+                        help='whether to use the jobs.txt file to avoid clashes')
     parser.add_argument('-d', '--debug', action='store_true', default=False,
                         help='debug output')
     parser.add_argument('-cust', '--custom_params', action='store_true', default=False,

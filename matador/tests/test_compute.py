@@ -386,6 +386,77 @@ class ComputeTest(unittest.TestCase):
         self.assertTrue(output_files_exist, "couldn't find both outputs")
         self.assertFalse(cruft_doesnt_exist, "found some cruft {}".format(cruft))
 
+    @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
+    def testBatchMaxWallTimeThreaded(self):
+        """ Check that WallTimeErrors do kill everything... """
+        from matador.compute import BatchRun, reset_job_folder_and_count_remaining
+        from matador.compute.compute import WalltimeError
+
+        os.chdir(REAL_PATH + 'data/max_walltime')
+        shutil.copy(REAL_PATH + 'data/structures/LiAs_testcase.res', REAL_PATH + 'data/max_walltime/' + 'LiAs_testcase.res')
+        shutil.copy(REAL_PATH + 'data/structures/LiAs_testcase_bad.res', REAL_PATH + 'data/max_walltime/' + 'LiAs_testcase_bad.res')
+        shutil.copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
+        shutil.copy(REAL_PATH + 'data/pspots/As_00PBE.usp', '.')
+        walltime_error = False
+        runner = BatchRun(seed=['LiAs'], debug=False, no_reopt=True,
+                          verbosity=VERBOSITY, ncores=2, nprocesses=2, executable=EXECUTABLE,
+                          max_walltime=5, polltime=1)
+        try:
+            runner.spawn()
+        except WalltimeError as err:
+            walltime_error = True
+        except Exception as err:
+            from traceback import print_exc
+            print('!!!!!!!!!!!!!!!!!!')
+            print_exc()
+            print('!!!!!!!!!!!!!!!!!!')
+
+        castep_exists = os.path.isfile('LiAs_testcase.castep')
+        bad_castep_exists = os.path.isfile('LiAs_testcase_bad.castep')
+        res_exists = os.path.isfile('LiAs_testcase.res') and os.path.isfile('LiAs_testcase_bad.res')
+        lock_exists = os.path.isfile('LiAs_testcase.res.lock') and os.path.isfile('LiAs_testcase_bad.res.lock')
+
+        paths = ['completed', 'input', 'bad_castep']
+        for path in paths:
+            if os.path.isdir(path):
+                files = glob.glob(path + '/*')
+                for file in files:
+                    os.remove(file)
+                os.removedirs(path)
+
+        paths = ['Li_00PBE.usp', 'As_00PBE.usp',
+                 'jobs.txt', 'finished_cleanly.txt', 'failures.txt']
+
+        paths += glob.glob('LiAs_testcase.*')
+        paths += glob.glob('LiAs_testcase_bad.*')
+
+        for path in paths:
+            if os.path.isfile(path):
+                os.remove(path)
+
+        os.chdir(ROOT_DIR)
+
+        self.assertTrue(walltime_error, 'Walltime error was not raised')
+        self.assertTrue(castep_exists, 'Could not find castep file!')
+        self.assertTrue(bad_castep_exists, 'Could not find bad castep file!')
+        self.assertTrue(res_exists, 'Could not find res file!')
+        self.assertFalse(lock_exists, 'Lock file was not deleted!')
+
+
+    @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
+    def testBatchNothingToDo(self):
+        """ Check that WallTimeErrors do kill everything... """
+        from matador.compute import BatchRun
+        import time
+
+        os.chdir(REAL_PATH + 'data/nothing_to_do')
+        runner = BatchRun(seed=['LiAs'], debug=False, no_reopt=True,
+                          verbosity=VERBOSITY, ncores=2, nprocesses=2, executable=EXECUTABLE)
+        start = time.time()
+        runner.spawn()
+        elapsed = time.time() - start
+        self.assertTrue(elapsed < 10, 'Sluggish to quit!')
+
 
 if __name__ == '__main__':
     unittest.main()

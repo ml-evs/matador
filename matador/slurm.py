@@ -1,4 +1,6 @@
 # coding: utf-8
+# Distributed under the terms of the MIT License.
+
 """ This file implements a simple interface
 to creating and submitting slurm scripts.
 """
@@ -8,32 +10,58 @@ def get_slurm_env(fail_loudly=True):
     """ Scrape SLURM environment variables from current env.
     This function can be used when called inside an active slurm job.
 
-    Args:
-
-        | fail_loudly: bool, raise SystemExit if SLURM not detected.
+    Keyword arguments:
+        fail_loudly (bool): option to raise SystemExit if SLURM not detected.
 
     Returns:
-
-        | slurm_dict: dict, dictionary containing all the currently set SLURM environment variables.
+        dict: dictionary containing all the currently set SLURM environment variables.
 
     """
     from os import environ
     slurm_dict = {key: environ[key] for key in environ if 'slurm' in key.lower()}
-    if len(slurm_dict) == 0 and fail_loudly:
+    if not slurm_dict and fail_loudly:
         exit('Requested SLURM array mode, yet no SLURM settings were found. Was this process submitted as a job?')
     return slurm_dict
+
+
+def get_slurm_walltime(slurm_dict):
+    """ Query available walltime with scontrol on the current job.
+
+    Parameters:
+        slurm_dict (dict): slurm env parameters to query.
+
+    Raises:
+        RuntimeError: if SLURM_JOB_ID not present in slurm env.
+        subprocess.CalledProcessError: if unable to use scontrol.
+
+    Returns:
+        int: maximum allowed walltime time in seconds.
+
+    """
+    import subprocess as sp
+    job_id = slurm_dict.get('SLURM_JOB_ID')
+    if job_id is not None:
+        output = sp.check_output('scontrol show job={}'.format(job_id), shell=True).decode('utf-8')
+
+    output_dict = {line.split('=')[0].lower(): line.split('=')[-1] for line in output.split()}
+
+    walltime = output_dict.get('timelimit')
+    hrs = int(walltime.split(':')[0])
+    mins = int(walltime.split(':')[1])
+    secs = int(walltime.split(':')[2])
+    walltime_in_seconds = (60 * hrs + mins) * 60 + secs
+
+    return walltime_in_seconds
 
 
 def scancel_all_matching_jobs(name=None):
     """ Cancel all of the user's jobs.
 
-    Args:
-
-        | name: str, optional name to pass to scancel
+    Keyword arguments:
+        name (str): optional name to pass to scancel
 
     Returns:
-
-        | slurm_output: str, output from scancel.
+        str: output from scancel.
 
     """
     from os import getlogin
@@ -41,29 +69,25 @@ def scancel_all_matching_jobs(name=None):
     user = getlogin()
     if name is None:
         return sp.check_output('scancel -u {}'.format(user), shell=True).decode('utf-8')
-    else:
-        return sp.check_output('scancel -u {} -n {}'.format(user, name), shell=True).decode('utf-8')
+
+    return sp.check_output('scancel -u {} -n {}'.format(user, name), shell=True).decode('utf-8')
 
 
 def submit_slurm_script(slurm_fname, depend_on_job=None, num_array_tasks=None):
     """ Submit a SLURM job.
 
-    Input:
+    Parameters:
+        slurm_fname (str): SLURM job file to submit.
 
-        | slurm_fname: str, SLURM job file to submit.
-
-    Args:
-
-        | depend_on_job: int, job ID to make current job depend on.
-        | num_array_tasks  : int, number of array tasks to submit.
+    Keyword arguments:
+        depend_on_job (int): job ID to make current job depend on.
+        num_array_tasks (int): number of array tasks to submit.
 
     Raises:
-
-        | subprocess.CalledProcessError: if jobfile doesn't exist or has failed.
+        subprocess.CalledProcessError: if jobfile doesn't exist or has failed.
 
     Return:
-
-        | slurm_job_id: int, submitted SLURM job ID.
+        int: submitted SLURM job ID.
 
     """
     import subprocess as sp
@@ -83,18 +107,15 @@ def submit_slurm_script(slurm_fname, depend_on_job=None, num_array_tasks=None):
 def get_slurm_header(slurm_dict, walltime_hrs, num_nodes=None):
     """ Write a SLURM script header from a set of slurm parameters.
 
-    Input:
+    Parameters:
+        slurm_dict (dict): dictionary of SLURM environment variables.
+        walltime_hrs (int): allowed walltime in hours
 
-        | slurm_dict: dict, dictionary of SLURM environment variables.
-        | walltime_hrs: int, allowed walltime in hours
-
-    Args:
-
-        | num_nodes: int, overrides $SLURM_JOB_NUM_NODES with a custom value.
+    Keyword arguments:
+        num_nodes (int): overrides $SLURM_JOB_NUM_NODES with a custom value.
 
     Returns:
-
-        | header: str, the SLURM file header.
+        header (str): the SLURM file header.
 
     """
 
@@ -118,22 +139,18 @@ def get_slurm_header(slurm_dict, walltime_hrs, num_nodes=None):
     return header
 
 
-def write_slurm_submission_script(slurm_fname, slurm_dict, compute_string, walltime_hrs,
-                                  template=None, num_nodes=None):
+def write_slurm_submission_script(slurm_fname, slurm_dict, compute_string, walltime_hrs, template=None):
     """ Write a full slurm submission script based on the
     input settings.
 
-    Input:
+    Parameters:
+        slurm_fname (str): the desired filename for the submission script
+        slurm_dict (dict): dictionary of SLURM environment variables
+        compute_string (str): the compute commands to run
+        walltime_hrs (int): maximum walltime in hours
 
-        | slurm_fname    : str, the desired filename for the submission script
-        | slurm_dict     : dict, dictionary of SLURM environment variables
-        | compute_string : str, the compute commands to run
-        | walltime_hrs   : int, maximum walltime in hours
-
-    Args:
-
-        | template: str, filename containing job preamble, e.g. module loads
-        | num_nodes: int, override SLURM settings for maximum number of nodes per job
+    Keyword arguments:
+        template (str): filename containing job preamble, e.g. module loads
 
     """
     header = get_slurm_header(slurm_dict, walltime_hrs)

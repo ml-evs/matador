@@ -11,9 +11,9 @@ import shutil
 import subprocess as sp
 import glob
 import multiprocessing as mp
-import sys
+import time
 from copy import deepcopy
-from traceback import print_exc, format_exception_only
+from traceback import print_exc
 from math import ceil
 from collections import defaultdict
 from psutil import virtual_memory
@@ -22,6 +22,7 @@ from matador.scrapers.castep_scrapers import cell2dict, param2dict
 from matador.scrapers.castep_scrapers import res2dict, castep2dict
 from matador.utils.print_utils import print_success, print_warning, print_notify, print_failure
 from matador.export import doc2cell, doc2param, doc2res
+from matador.slurm import get_slurm_env, get_slurm_walltime
 
 
 class FullRelaxer:
@@ -89,6 +90,7 @@ class FullRelaxer:
                 operation, and kill executable if present (DEFAULT: True)
             compute_dir (str): folder to run computations in; default is
                 None (i.e. cwd), if not None, prepend paths with this folder
+            timings (`obj`:tuple: of `obj`:int:): tuple containing max and elapsed time in seconds
 
         """
         # set defaults and update class with desired values
@@ -96,8 +98,8 @@ class FullRelaxer:
                          'memcheck': False, 'rough': 4, 'rough_iter': 2, 'fine_iter': 20, 'spin': False,
                          'redirect': None, 'reopt': False, 'compute_dir': None, 'custom_params': False, 'archer': False,
                          'maxmem': None, 'killcheck': True, 'kpts_1D': False, 'conv_cutoff': False, 'conv_kpt': False,
-                         'debug': False, 'profile': False, 'slurm': False, 'intel': False, 'exec_test': True,
-                         'start': True, 'verbosity': 0}
+                         'debug': False, 'profile': False, 'slurm': False, 'intel': False, 'exec_test': True, 'timings': (None, None),
+                         'start': True, 'verbosity': 0, 'polltime': 30}
         self.__dict__.update(prop_defaults)
         self.__dict__.update(kwargs)
 
@@ -105,7 +107,7 @@ class FullRelaxer:
             import cProfile
             import pstats
             from sys import version_info
-            from matador.version import __version__
+            from matador import __version__
             profile = cProfile.Profile()
             profile.enable()
 
@@ -119,6 +121,13 @@ class FullRelaxer:
         self.success = None
         self._mpi_library = None
         self.root_folder = os.getcwd()
+
+        if self.timings is not None:
+            self.max_walltime = self.timings[0]
+            self.start_time = self.timings[1]
+
+        if self.verbosity > 5:
+            print('Timing data: ', self.timings)
 
         self._redirect_filename = None
 
@@ -150,6 +159,9 @@ class FullRelaxer:
         Parameters:
             res (str/dict): either the filename or a dict
                 containing the structure.
+
+        Raises:
+            WalltimeError: if max_walltime is exceeded.
 
         Returns:
             bool: True if calculations were successful, False otherwise.
@@ -224,11 +236,20 @@ class FullRelaxer:
 
             # begin relaxation
             if self.start:
-                success = self.relax()
+                timeout = False
+                try:
+                    success = self.relax()
+                except WalltimeError as oops:
+                    walltime_err = oops
+                    timeout = True
+
                 if self.compute_dir is not None:
                     # always cd back to root folder
                     os.chdir(self.root_folder)
                     self.remove_compute_dir_if_finished(self.compute_dir, debug=self.debug)
+
+                if timeout:
+                    raise walltime_err
                 return success
 
         # run in SCF mode, i.e. just call CASTEP on the seeds
@@ -255,9 +276,9 @@ class FullRelaxer:
                 self.input_ext = ''
             assert isinstance(self.seed, str)
             self.cp_to_input(seed, ext=self.input_ext, glob_files=True)
-            process = self.run_command(seed)
-            process.communicate()
-            if process.returncode != 0:
+            self.process = self.run_command(seed)
+            self.process.communicate()
+            if self.process.returncode != 0:
                 self.mv_to_bad(seed)
                 return False
 
@@ -367,18 +388,38 @@ class FullRelaxer:
                     doc2param(calc_doc, seed, hash_dupe=False, spin=self.spin)
 
                 # run CASTEP
-                process = self.run_command(seed)
-                process.communicate()
+                self.process = self.run_command(seed)
+
+                # if specified max_walltime (or found through SLURM), then monitor job
+                if self.max_walltime is not None:
+                    if self.start_time is None:
+                        raise RuntimeError('Somehow initial start time was not found')
+
+                    if self.debug:
+                        print('Polling process every {} s'.format(self.polltime))
+
+                    while self.process.poll() is None:
+                        elapsed = time.time() - self.start_time
+                        if self.debug:
+                            print('Elapsed time: {:>10.1f} s'.format(elapsed))
+
+                        # leave 1 minute to clean up
+                        if elapsed > abs(self.max_walltime):  # - 60):
+                            self.times_up(self.process)
+                            raise WalltimeError('Ran out of time on seed {}'.format(self.seed))
+                        time.sleep(self.polltime)
+
+                self.process.communicate()
 
                 # scrape new structure from castep file
                 if not os.path.isfile(seed + '.castep'):
-                    sys.exit('CASTEP file was not created, please check your executable: {}.'.format(self.executable))
+                    raise SystemExit('CASTEP file was not created, please check your executable: {}.'.format(self.executable))
                 opti_dict, success = castep2dict(seed + '.castep', db=False, verbosity=self.verbosity)
                 if self.debug:
                     print_notify('Intermediate calculation finished')
                     print(opti_dict)
                 if not success and isinstance(opti_dict, str):
-                    sys.exit('Failed to scrape CASTEP file...')
+                    raise SystemExit('Failed to scrape CASTEP file...')
 
                 # scrub keys that need to be rescraped
                 keys_to_remove = ['kpoints_mp_spacing', 'kpoints_mp_grid', 'species_pot', 'sedc_apply', 'sedc_scheme']
@@ -487,44 +528,21 @@ class FullRelaxer:
                                   opti_dict['enthalpy_per_atom']))
                 calc_doc.update(opti_dict)
 
-            except (KeyboardInterrupt, FileNotFoundError, SystemExit):
+            # push any WalltimeErrors to the top-level
+            except WalltimeError as err:
+                raise err
+
+            # any other exceptions shouldn't block future calculations
+            except Exception:
                 if self.verbosity > 1:
                     print_exc()
-                    print_warning('Received exception, attempting to fail gracefully...')
-                etype, evalue, _ = sys.exc_info()
-                if self.verbosity > 1:
-                    print(format_exception_only(etype, evalue))
-                if self.debug:
-                    print_exc()
-                if self.verbosity > 1:
-                    print('Killing CASTEP...')
-                process.terminate()
-                if self.verbosity > 1:
-                    print_warning('Done!')
-                    print('Tidying up...')
+                self.process.terminate()
                 self.mv_to_bad(seed)
                 self.tidy_up(seed)
-                if self.verbosity > 1:
-                    print_warning('Done!')
                 if output_queue is not None:
                     output_queue.put(self.res_dict)
                     if self.debug:
                         print('wrote failed dict out to output_queue')
-                if self.compute_dir is not None:
-                    os.chdir(self.root_folder)
-                    self.remove_compute_dir_if_finished(self.compute_dir, debug=self.debug)
-                return False
-
-            except Exception:
-                if self.verbosity > 1:
-                    print_exc()
-                process.terminate()
-                self.mv_to_bad(seed)
-                self.tidy_up(seed)
-                if output_queue is not None:
-                    output_queue.put(self.res_dict)
-                    if self.debug:
-                        print('wrote ll dict out to output_queue')
                 if self.compute_dir is not None:
                     os.chdir(self.root_folder)
                     self.remove_compute_dir_if_finished(self.compute_dir, debug=self.debug)
@@ -608,8 +626,8 @@ class FullRelaxer:
 
             doc2cell(calc_doc, seed, hash_dupe=False, copy_pspots=False, overwrite=True)
             # run CASTEP
-            process = self.run_command(seed)
-            process.communicate()
+            self.process = self.run_command(seed)
+            self.process.communicate()
             # scrape dict
             opti_dict, success = castep2dict(seed + '.castep', db=False)
             # check for errors
@@ -864,6 +882,9 @@ class FullRelaxer:
             exec_test (bool): run executable in test mode, with output
                 piped to stdout.
 
+        Returns:
+            subprocess.Popen: process to run.
+
         """
         command = self.parse_executable(seed)
         if self.nnodes is None or self.nnodes == 1:
@@ -1063,9 +1084,11 @@ class FullRelaxer:
                 for f in files:
                     if f.endswith('.lock'):
                         continue
-                    shutil.copy('{}'.format(f), input_dir)
+                    if not os.path.isfile(f):
+                        shutil.copy('{}'.format(f), input_dir)
             else:
-                shutil.copy('{}.{}'.format(seed, ext), input_dir)
+                if not os.path.isfile('{}.{}'.format(seed, ext)):
+                    shutil.copy('{}.{}'.format(seed, ext), input_dir)
         except Exception:
             print_exc()
 
@@ -1074,7 +1097,6 @@ class FullRelaxer:
         """ Delete all created files before quitting.
 
         Parameters:
-
             seed (str): filename for structure.
 
         """
@@ -1082,8 +1104,27 @@ class FullRelaxer:
             if not (f.endswith('.res') or f.endswith('.castep')):
                 os.remove(f)
 
+    def times_up(self, process):
+        """ If walltime has nearly expired, run this function
+        to kill the process and unlock it for restarted calculations.
+
+        Parameters:
+            subprocess.Popen: running process to be killed.
+
+        """
+        if self.verbosity > 5:
+            print('Ending process early for seed {}'.format(self.seed))
+        process.terminate()
+        if self.compute_dir is not None:
+            for f in glob.glob('{}.*'.format(self.seed)):
+                shutil.copy(f, self.root_folder)
+                os.remove(f)
+
+        if os.path.isfile('{}/{}{}'.format(self.root_folder, self.seed, '.res.lock')):
+            os.remove('{}/{}{}'.format(self.root_folder, self.seed, '.res.lock'))
+
     @staticmethod
-    def remove_compute_dir_if_finished(compute_dir, debug=False):
+    def remove_compute_dir_if_finished(compute_dir, debug=True):
         """ Delete the compute directory, provided it contains no
         calculation data.
 
@@ -1096,8 +1137,6 @@ class FullRelaxer:
         """
 
         if not os.path.isdir(compute_dir):
-            if debug:
-                print('No directory found called {}, so nothing to do...'.format(compute_dir))
             return False
 
         files = glob.glob(compute_dir + '/*')
@@ -1110,12 +1149,20 @@ class FullRelaxer:
         for fname in files:
             if fname.endswith('.res') or fname.endswith('.castep'):
                 return False
+
         # remove files in directory, then delete directory
         for fname in files:
-            os.remove(fname)
-            if debug:
-                print('Removing {}'.format(fname))
-        os.rmdir(compute_dir)
+            if os.path.isfile(fname):
+                try:
+                    os.remove(fname)
+                    if debug:
+                        print('Removing {}'.format(fname))
+                except FileNotFoundError:
+                    if debug:
+                        print('Failed to remove {}'.format(fname))
+
+        if os.path.isdir(compute_dir):
+            os.rmdir(compute_dir)
         if debug:
             print('Removed {}'.format(compute_dir))
         return True
@@ -1149,6 +1196,9 @@ class BatchRun:
                 exist in cwd full of res files, e.g.2. ['LiAs_1', 'LiAs_2']
                 if LiAs_1.in/LiAs_2.in exist, and executable = 'pw6.x < $seed.in'.
 
+        Keyword arguments:
+            Exhaustive list found in argparse parser inside `matador/cli/run3.py`.
+
         """
         # parse args, then co-opt them for passing directly into FullRelaxer
         prop_defaults = {'ncores': None, 'nprocesses': 1, 'nnodes': 1,
@@ -1157,9 +1207,9 @@ class BatchRun:
                          'verbosity': 0, 'archer': False, 'slurm': False,
                          'intel': False, 'conv_cutoff': False, 'conv_kpt': False,
                          'memcheck': False, 'maxmem': None, 'killcheck': True,
-                         'kpts_1D': False, 'spin': False,
-                         'rough': 4, 'rough_iter': 2, 'fine_iter': 20,
-                         'limit': None, 'profile': False}
+                         'kpts_1D': False, 'spin': False, 'ignore_jobs_file': False,
+                         'rough': 4, 'rough_iter': 2, 'fine_iter': 20, 'max_walltime': None,
+                         'limit': None, 'profile': False, 'polltime': 30}
         self.args = {}
         self.args.update(prop_defaults)
         self.args.update(kwargs)
@@ -1192,8 +1242,26 @@ class BatchRun:
         # assign number of cores
         self.all_cores = mp.cpu_count()
         self.slurm_avail_tasks = os.environ.get('SLURM_NTASKS')
+        self.slurm_env = None
+        self.slurm_walltime = None
         if self.slurm_avail_tasks is not None:
             self.slurm_avail_tasks = int(self.slurm_avail_tasks)
+            self.slurm_env = get_slurm_env()
+
+        if self.slurm_env is not None:
+            self.slurm_walltime = get_slurm_walltime(self.slurm_env)
+
+        if self.args.get('max_walltime') is not None:
+            self.max_walltime = self.args.get('max_walltime')
+        elif self.slurm_walltime is not None:
+            self.max_walltime = self.slurm_walltime
+        else:
+            self.max_walltime = None
+
+        if self.max_walltime is not None:
+            self.start_time = time.time()
+        else:
+            self.start_time = None
 
         if self.args.get('ncores') is None:
             if self.slurm_avail_tasks is None:
@@ -1201,7 +1269,7 @@ class BatchRun:
             else:
                 self.args['ncores'] = int(self.slurm_avail_tasks / self.nprocesses)
         if self.args['nnodes'] < 1 or self.args['ncores'] < 1 or self.nprocesses < 1:
-            sys.exit('Invalid number of cores, nodes or processes.')
+            raise SystemExit('Invalid number of cores, nodes or processes.')
 
         if self.mode == 'castep':
             self.castep_setup()
@@ -1245,28 +1313,54 @@ class BatchRun:
         """
         from random import sample
         procs = []
-        for _ in range(self.nprocesses):
+        error_queue = mp.Queue()
+        for proc_id in range(self.nprocesses):
             procs.append(mp.Process(target=self.perform_new_calculations,
                                     args=(sample(self.file_lists['res'],
                                                  len(self.file_lists['res']))
-                                          if self.mode == 'castep' else self.seed, )))
+                                          if self.mode == 'castep' else self.seed, error_queue, proc_id)))
         try:
             for proc in procs:
                 proc.start()
                 if join:
                     proc.join()
+
+            errors = []
+            # wait for each proc to write to error queue
+            for proc in procs:
+                result = error_queue.get()
+                if isinstance(result[1], Exception):
+                    print('Process {} raised error: {}'.format(result[0], result[1]))
+                    errors.append(result)
+
+            if errors:
+                error_message = ''
+                for error in errors:
+                    error_message += 'Process {} raised error {}'.format(error[0], error[1])
+                if len(set([type(error[1]) for error in errors])) == 1:
+                    raise type(errors[0][1])(error_message)
+                raise BundledErrors(error_message)
+
         except (KeyboardInterrupt, SystemExit, RuntimeError):
             print_exc()
             for proc in procs:
                 proc.terminate()
-            sys.exit('Killing running jobs and exiting...')
+            raise SystemExit('Killing running jobs and exiting...')
 
-    def perform_new_calculations(self, res_list):
+        except BundledErrors as err:
+            raise err
+
+        except Exception as err:
+            raise err
+
+    def perform_new_calculations(self, res_list, error_queue, proc_id):
         """ Perform all calculations that have not already
         failed or finished to completion.
 
         Parameters:
             res_list (:obj:`list` of :obj:`str`): list of structure filenames.
+            error_queue (multiprocessing.Queue): queue to push exceptions to
+            proc_id (int): process id for logging
 
         """
         job_count = 0
@@ -1274,7 +1368,10 @@ class BatchRun:
             res_list = [res_list]
         for res in res_list:
             locked = os.path.isfile('{}.lock'.format(res))
-            listed = self._check_jobs_file(res)
+            if not self.args.get('ignore_jobs_file'):
+                listed = self._check_jobs_file(res)
+            else:
+                listed = []
             running = any([listed, locked])
             if not running:
 
@@ -1302,6 +1399,7 @@ class BatchRun:
                                           param_dict=self.param_dict,
                                           cell_dict=self.cell_dict,
                                           mode=self.mode, paths=self.paths, compute_dir=hostname,
+                                          timings=(self.max_walltime, self.start_time),
                                           **self.args)
                     # if memory check failed, let other nodes have a go
                     if not relaxer.enough_memory:
@@ -1312,9 +1410,9 @@ class BatchRun:
                         with open(self.paths['jobs_fname'], 'r+') as job_file:
                             flines = job_file.readlines()
                             job_file.seek(0)
-                            for line in flines:
-                                if res not in line:
-                                    job_file.write(line)
+                        for line in flines:
+                            if res not in line:
+                                job_file.write(line)
                             job_file.truncate()
 
                     elif relaxer.success:
@@ -1323,9 +1421,12 @@ class BatchRun:
                     else:
                         with open(self.paths['failures_fname'], 'a') as job_file:
                             job_file.write(res + '\n')
-                except (KeyboardInterrupt, SystemExit, RuntimeError):
-                    print_exc()
-                    raise SystemExit
+
+                except (KeyboardInterrupt, SystemExit, RuntimeError, WalltimeError) as err:
+                    error_queue.put((proc_id, err))
+                    raise err
+
+        error_queue.put((proc_id, job_count))
 
     def generic_setup(self):
         """ Undo things that are set ready for CASTEP jobs... """
@@ -1338,15 +1439,15 @@ class BatchRun:
         exts = ['cell', 'param']
         for ext in exts:
             if not os.path.isfile('{}.{}'.format(self.seed, ext)):
-                sys.exit('Failed to find {} file, {}.{}'.format(ext, self.seed, ext))
+                raise SystemExit('Failed to find {} file, {}.{}'.format(ext, self.seed, ext))
         self.cell_dict, cell_success = cell2dict(self.seed + '.cell', db=False)
         if not cell_success:
             print(self.cell_dict)
-            sys.exit('Failed to parse cell file')
+            raise SystemExit('Failed to parse cell file')
         self.param_dict, param_success = param2dict(self.seed + '.param', db=False)
         if not param_success:
             print(self.param_dict)
-            sys.exit('Failed to parse param file')
+            raise SystemExit('Failed to parse param file')
 
         # scan directory for files to run
         self.file_lists = defaultdict(list)
@@ -1356,7 +1457,7 @@ class BatchRun:
                 'run3 in CASTEP mode requires at least 1 res file in folder, found {}'
                 .format(len(self.file_lists['res']))
             )
-            sys.exit(error)
+            raise SystemExit(error)
 
         # do some prelim checks of parameters
         if 'GEOMETRY' in self.param_dict['task'].upper():
@@ -1417,6 +1518,21 @@ class BatchRun:
                 if res in line:
                     return True
         return False
+
+
+class WalltimeError(Exception):
+    """ Raise this when you don't want any more jobs to run
+    because they're about to exceed the max walltime.
+
+    """
+    pass
+
+
+class BundledErrors(Exception):
+    """ Raise this after collecting all exceptions from
+    processes.
+    """
+    pass
 
 
 def reset_job_folder_and_count_remaining(debug=False):

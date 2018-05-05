@@ -1,0 +1,2 @@
+LiAs_testcase_bad.res
+LiAs_testcase.res
