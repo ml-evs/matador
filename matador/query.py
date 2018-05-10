@@ -149,6 +149,7 @@ class DBQuery:
                     query_dict['$and'].append(self._query_quality())
                 self.repo = self._collections[collection]
                 temp_cursor = self.repo.find(query_dict)
+                self.cursor = []
                 for doc in temp_cursor:
                     self.cursor.append(doc)
 

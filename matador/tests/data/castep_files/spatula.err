@@ -1,0 +1,2 @@
+/home/matthew/src/matador/matador/tests/data/castep_files/CuP-thermo-test.castep		<class 'RuntimeError'> CASTEP file does not contain GO calculation
+/home/matthew/src/matador/matador/tests/data/castep_files/TiO2_unconverged.castep		<class 'matador.scrapers.castep_scrapers.DFTError'> CASTEP GO failed to converge.

@@ -13,3 +13,10 @@ pipelines:
           - coverage run setup.py test
           - coverage combine
           - coverage report
+        services:
+          - mongo
+
+definitions: 
+  services: 
+    mongo: 
+      image: mongo
