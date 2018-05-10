@@ -161,6 +161,7 @@ class Spatula:
             print('Dryrun complete!')
         if not self.scan:
             self.logfile.close()
+            self.manifest.close()
         if not self.dryrun:
             # set log file to read only
             os.chmod(logfile_name, 0o550)
@@ -168,7 +169,7 @@ class Spatula:
             self.logfile = open(logfile_name, 'r')
             errors = sum(1 for line in self.logfile)
             if errors == 1:
-                print('There is', errors, 'error to view in', logfile_name)
+                print('There is 1 error to view in', logfile_name)
             elif errors == 0:
                 print('There were no errors.')
             elif errors > 1:
@@ -505,8 +506,9 @@ class Spatula:
                     for ext in structure_exts:
                         if file.endswith(ext):
                             structure_count += self.repo.find({'source': {'$in': [file.replace(ext, '.res')]}}).count()
+                            structure_count += self.repo.find({'source': {'$in': [file.replace(ext, '.castep')]}}).count()
                     if self.debug:
-                        print(structure_count, file)
+                        print('Duplicates', structure_count, file)
 
                     # if duplicate found, don't reimport
                     if structure_count >= 1:
