@@ -22,6 +22,7 @@ class MatadorCommandLine(object):
         # read args
         self.kwargs = kwargs
         self.args = vars(args[0])
+        self.args['testing'] = self.kwargs.get('testing')
         self.argstr = kwargs.get('argstr')
 
         file_exts = ['cell', 'res', 'pdb', 'markdown', 'latex', 'param', 'xsf']

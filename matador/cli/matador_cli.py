@@ -12,7 +12,7 @@ from matador import __version__
 from matador.cli import MatadorCommandLine
 
 
-def main():
+def main(testing=False):
     """ Parse all user args and construct a MatadorCommandLine object. """
     parser = argparse.ArgumentParser(
         prog='matador',
@@ -300,7 +300,7 @@ def main():
         profiler = cProfile.Profile()
         profiler.enable()
 
-    MatadorCommandLine(parsed_args, argstr=argv[1:])
+    MatadorCommandLine(parsed_args, argstr=argv[1:], testing=testing)
 
     if vars(parsed_args).get('profile'):
         profiler.disable()

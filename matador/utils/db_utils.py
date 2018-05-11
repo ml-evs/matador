@@ -41,7 +41,7 @@ def load_custom_settings(config_fname=None):
     return settings
 
 
-def make_connection_to_collection(coll_names, check_collection=False, allow_changelog=False, mongo_settings=None):
+def make_connection_to_collection(coll_names, check_collection=False, allow_changelog=False, mongo_settings=None, testing=False):
     """ Connect to database of choice.
 
     Parameters:
@@ -53,6 +53,7 @@ def make_connection_to_collection(coll_names, check_collection=False, allow_chan
         check_collection (bool): check whether collections exist (forces connection)
         allow_changelog (bool): allow queries to collections with names prefixed by __
         mongo_settings (dict): dict containing mongo and related config
+        testing (bool): if testing, then don't ask for user input from stdin
 
     Returns:
 
@@ -80,7 +81,10 @@ def make_connection_to_collection(coll_names, check_collection=False, allow_chan
 
     try:
         if settings['mongo']['db'] not in client.database_names():
-            response = input('Database {db} does not exist at {host}:{port}/{db}, would you like to create it? (y/n) '.format(**settings['mongo']))
+            if testing:
+                response = 'y'
+            else:
+                response = input('Database {db} does not exist at {host}:{port}/{db}, would you like to create it? (y/n) '.format(**settings['mongo']))
             if response.lower() != 'y':
                 exit('Exiting...')
             else:
