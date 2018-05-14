@@ -1,0 +1,49 @@
+#!/usr/bin/env python
+# coding: utf8
+
+""" Rip-off of cryan for displaying .res file summaries. """
+
+
+def main(**kwargs):
+    from matador.hull import QueryConvexHull
+    from matador.scrapers.castep_scrapers import res2dict
+    from matador.utils.cursor_utils import display_results
+    from matador.utils.chem_utils import get_formula_from_stoich
+
+    import glob
+
+    res_list = glob.glob('*.res')
+    cursor = [res2dict(f) for f in res_list]
+    to_display = []
+    for doc in cursor:
+        if not doc[1]:
+            print(doc[0])
+            raise RuntimeError
+        else:
+            print(doc[0]['stoichiometry'])
+            to_display.append(doc[0])
+
+    if kwargs.get('hull'):
+        QueryConvexHull(cursor=[doc[0] for doc in cursor], hull_cutoff=10)
+
+    else:
+
+        if kwargs.get('formula'):
+            to_display = [doc for doc in to_display
+                          if get_formula_from_stoich(sorted(doc['stoichiometry'])) == kwargs.get('formula')]
+
+        to_display = sorted(to_display, key=lambda x: x['enthalpy_per_atom'])
+        if kwargs.get('top'):
+            to_display = to_display[:kwargs.get('top')]
+            print(len(to_display))
+
+        display_results(to_display, use_source=True)
+
+if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-f', '--formula', type=str)
+    parser.add_argument('-m', '--hull', action='store_true')
+    parser.add_argument('-t', '--top', type=int)
+    parsed_kwargs = vars(parser.parse_args())
+    main(**parsed_kwargs)
