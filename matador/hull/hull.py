@@ -1,9 +1,11 @@
 # coding: utf-8
+# Distributed under the terms of the MIT License.
+
 """ This file implements convex hull functionality
 from database queries.
 """
 
-# standard library
+
 from traceback import print_exc
 from bisect import bisect_left
 import sys
@@ -20,7 +22,7 @@ from matador.utils.print_utils import print_failure, print_notify, print_warning
 from matador.utils.hull_utils import barycentric2cart, vertices2plane, vertices2line, FakeHull
 from matador.utils.chem_utils import get_binary_grav_capacities, get_molar_mass, get_num_intercalated
 from matador.utils.chem_utils import get_generic_grav_capacity, get_formula_from_stoich
-from matador.utils.chem_utils import get_formation_energy, get_concentration
+from matador.utils.chem_utils import get_formation_energy, get_concentration, KELVIN_TO_EV
 from matador.utils.cursor_utils import set_cursor_from_array, get_array_from_cursor
 from matador.utils.cursor_utils import display_results
 
@@ -29,21 +31,22 @@ EPS = 1e-12
 
 class QueryConvexHull(object):
     """ Construct a binary or ternary phase diagram
-    from matador.DBQuery object.
+    from a matador.query.DBQuery object, or a list
+    of structures.
     """
 
-    def __init__(self, query=None, cursor=None, elements=None, subcmd='hull', quiet=False, plot_kwargs=None, **kwargs):
+    def __init__(self, query=None, cursor=None, elements=None, subcmd='hull', quiet=False,
+                 plot_kwargs=None, **kwargs):
         """ Initialise the class from either a DBQuery or a cursor (list of matador dicts)
         and construct the appropriate phase diagram.
 
-        Args:
-
-            | query       : matador.DBQuery, object containing structures,
-            | cursor      : list(dict), alternatively specify list of matador docs.
-            | elements    : list(str), list of elements to use, used to provide a useful order,
-            | subcmd      : either 'hull' or 'voltage',
-            | kwargs      : mostly CLI arguments, see matador hull --help for full options.
-            | plot_kwargs : arguments to pass to plot_hull function
+        Keyword arguments:
+            query (matador.query.DBQuery): object containing structures,
+            cursor (list(dict)): alternatively specify list of matador docs.
+            elements (list(str)): list of elements to use, used to provide a useful order,
+            subcmd (str): either 'hull' or 'voltage',
+            kwargs (dict): mostly CLI arguments, see matador hull --help for full options.
+            plot_kwargs (dict): arguments to pass to plot_hull function
 
         """
         self.args = kwargs
@@ -74,17 +77,25 @@ class QueryConvexHull(object):
                 self.elements = list(elements)
             else:
                 self.elements = elements
+
             # filter out structures with any elements with missing chem pots
-            self.cursor = [doc for doc in self.cursor if all([atom in self.elements for atom, num in doc['stoichiometry']])]
+            self.cursor = [doc for doc in self.cursor if
+                           all([atom in self.elements for atom, num in doc['stoichiometry']])]
 
         if quiet:
             cached_stdout = sys.stdout
             f = open(devnull, 'w')
             sys.stdout = f
 
-        K2eV = 8.61733e-5
+        if self.args.get('energy_key') is not None:
+            self.energy_key = energy_key
+        else:
+            self.energy_key = 'enthalpy_per_atom'
+
+        self.temperature = self.args.get('temperature')
+
         if self.args.get('hull_temp') is not None:
-            self.hull_cutoff = float(self.args['hull_temp'] * K2eV)
+            self.hull_cutoff = float(self.args['hull_temp'] * KELVIN_TO_EV)
         elif self.args.get('hull_cutoff') is not None:
             self.hull_cutoff = float(self.args['hull_cutoff'])
         else:
@@ -100,7 +111,7 @@ class QueryConvexHull(object):
 
         self.hull_2d()
 
-        if len(self.hull_cursor) == 0:
+        if not self.hull_cursor:
             print_warning('No structures on hull with chosen chemical potentials.')
         else:
             if self.args.get('hull_temp'):
@@ -225,7 +236,7 @@ class QueryConvexHull(object):
             self.fake_chempots(custom_elem=elements)
         elif self.from_cursor:
             chempot_cursor = sorted([doc for doc in self.cursor if len(doc['stoichiometry']) == 1],
-                                    key=lambda k: k['enthalpy_per_atom'])
+                                    key=lambda k: k[self.energy_key])
             self.match = []
             for elem in elements:
                 for doc in chempot_cursor:
@@ -236,7 +247,7 @@ class QueryConvexHull(object):
                 raise RuntimeError('Found {} of {} required chemical potentials'.format(len(self.match), len(elements)))
             for ind, doc in enumerate(self.match):
                 self.match[ind]['hull_distance'] = 0
-                self.match[ind]['enthalpy_per_b'] = doc['enthalpy_per_atom']
+                self.match[ind]['enthalpy_per_b'] = doc[self.energy_key]
         else:
             print(60 * '─')
             self.match = len(elements) * [None]
@@ -258,7 +269,7 @@ class QueryConvexHull(object):
                 # print('Chemical potential query:')
                 # from json import dumps
                 # print(dumps(query_dict, indent=2))
-                mu_cursor = query.repo.find(SON(query_dict)).sort('enthalpy_per_atom', pm.ASCENDING)
+                mu_cursor = query.repo.find(SON(query_dict)).sort(self.energy_key, pm.ASCENDING)
                 if mu_cursor.count() == 0:
                     print_notify('Failed... searching without spin polarization field...')
                     scanned = False
@@ -270,7 +281,7 @@ class QueryConvexHull(object):
                                     break
                             if idx == len(query_dict['$and']) - 1:
                                 scanned = True
-                    mu_cursor = query.repo.find(SON(query_dict)).sort('enthalpy_per_atom', pm.ASCENDING)
+                    mu_cursor = query.repo.find(SON(query_dict)).sort(self.energy_key, pm.ASCENDING)
                     if mu_cursor.count() == 0:
                         print('No chemical potential...')
 
@@ -280,10 +291,10 @@ class QueryConvexHull(object):
                     self.match[ind] = None
                 if self.match[ind] is not None:
                     if ind == 0:
-                        self.mu_enthalpy[ind] = float(self.match[ind]['enthalpy_per_atom'])
+                        self.mu_enthalpy[ind] = float(self.match[ind][self.energy_key])
                         self.mu_volume[ind] = float(self.match[ind]['cell_volume'] / self.match[ind]['num_atoms'])
                     else:
-                        self.mu_enthalpy[1] += float(self.match[ind]['enthalpy_per_atom'])
+                        self.mu_enthalpy[1] += float(self.match[ind][self.energy_key])
                         self.mu_volume[1] = float(self.match[ind]['cell_volume'] / self.match[ind]['num_atoms'])
                     print('Using', ''.join([self.match[ind]['text_id'][0], ' ',
                           self.match[ind]['text_id'][1]]), 'as chem pot for', elem)
@@ -293,7 +304,7 @@ class QueryConvexHull(object):
                     raise SystemExit('Exiting...')
             for i, mu in enumerate(self.match):
                 self.match[i]['hull_distance'] = 0.0
-                self.match[i]['enthalpy_per_b'] = mu['enthalpy_per_atom']
+                self.match[i]['enthalpy_per_b'] = mu[self.energy_key]
                 self.match[i]['num_a'] = 0
             self.match[0]['num_a'] = float('inf')
         if not self.from_cursor and self.chem_pots is None:
@@ -308,9 +319,9 @@ class QueryConvexHull(object):
     def fake_chempots(self, custom_elem=None):
         """ Spoof documents for command-line chemical potentials.
 
-        Args:
+        Parameters:
 
-            | custom_elem : list(str), list of element symbols to generate chempots for.
+            custom_elem : list(str), list of element symbols to generate chempots for.
 
         """
         from matador.utils.chem_utils import get_stoich_from_formula
@@ -349,21 +360,21 @@ class QueryConvexHull(object):
 
         Input:
 
-            | structures : [N x n] np.ndarray, concentrations and enthalpies for N structures,
+            structures : [N x n] np.ndarray, concentrations and enthalpies for N structures,
                            with up to 2 columns of concentrations and the last column containing
                            the structure's formation enthalpy.
 
-        Args:
+        Parameters:
 
-            | precompute: bool, whether or not to bootstrap hull distances from previously computed
+            precompute: bool, whether or not to bootstrap hull distances from previously computed
                           values at the same stoichiometry.
 
         Returns:
 
-            | hull_dist       : [N x 0] np.ndarray, distances to the hull for N structures,
-            | tie_line_energy : [M x 1] np.ndarray, energies for structures on the precomputed hull,
+            hull_dist       : [N x 0] np.ndarray, distances to the hull for N structures,
+            tie_line_energy : [M x 1] np.ndarray, energies for structures on the precomputed hull,
                                 sorted by concentration of the first element (the active ion).
-            | tie_line_comp   : [M x 1] np.ndarray, sorted concentrations of first element in
+            tie_line_comp   : [M x 1] np.ndarray, sorted concentrations of first element in
                                 structures on the precomputed hull.
 
         """
@@ -500,6 +511,7 @@ class QueryConvexHull(object):
         self.x_elem = [self.elements[0]]
         self.one_minus_x_elem = list(self.elements[1:])
         one_minus_x_elem = self.one_minus_x_elem
+        formation_key = 'formation_' + self.energy_key
         # grab relevant information from query results; also make function?
         for ind, doc in enumerate(self.cursor):
             if not self.ternary:
@@ -518,12 +530,12 @@ class QueryConvexHull(object):
                 else:
                     self.cursor[ind]['enthalpy_per_b'] = doc['enthalpy'] / (num_b * num_fu)
                     self.cursor[ind]['cell_volume_per_b'] = doc['cell_volume'] / (num_b * num_fu)
-            self.cursor[ind]['formation_enthalpy_per_atom'] = get_formation_energy(self.match, doc)
+            self.cursor[ind][formation_key] = get_formation_energy(self.match, doc, energy_key=self.energy_key, temperature=self.temperature)
             self.cursor[ind]['concentration'] = get_concentration(doc, self.elements)
         # create stacked array of hull data
         structures = np.hstack((
             get_array_from_cursor(self.cursor, 'concentration'),
-            get_array_from_cursor(self.cursor, 'formation_enthalpy_per_atom').reshape(len(self.cursor), 1)))
+            get_array_from_cursor(self.cursor, formation_key).reshape(len(self.cursor), 1)))
         if not self.ternary and not self.non_binary:
             Q = get_binary_grav_capacities(get_num_intercalated(self.cursor), get_molar_mass(self.elements[1]))
             set_cursor_from_array(self.cursor, Q, 'gravimetric_capacity')
@@ -578,7 +590,7 @@ class QueryConvexHull(object):
 
         # ensure hull cursor is sorted by enthalpy_per_atom, then by concentration, as it will be by default if from database
         hull_cursor = [self.cursor[idx] for idx in np.where(self.hull_dist <= self.hull_cutoff + 1e-12)[0]]
-        hull_cursor = sorted(hull_cursor, key=lambda doc: doc['enthalpy_per_atom'])
+        hull_cursor = sorted(hull_cursor, key=lambda doc: doc[self.energy_key])
         hull_cursor = sorted(hull_cursor, key=lambda k: k['concentration'])
 
         # if summary requested and we're in hulldiff mode, filter hull_cursor for lowest per stoich
@@ -603,11 +615,11 @@ class QueryConvexHull(object):
 
         Input:
 
-            | hull_cursor : list(dict), list of structures to include in the voltage curve.
+            hull_cursor : list(dict), list of structures to include in the voltage curve.
 
-        Args:
+        Parameters:
 
-            | quiet  : bool, if False, print voltage data
+            quiet  : bool, if False, print voltage data
 
         """
 

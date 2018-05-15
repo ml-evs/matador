@@ -1,6 +1,8 @@
 # coding: utf-8
-""" This file implements the diffing of phase
-diagrams as new structures are added.
+# Distributed under the terms of the MIT License.
+
+""" This file implements the diffing of phase diagrams as new structures
+are added.
 
 Intended usage:
 
@@ -13,6 +15,8 @@ Intended usage:
     matador hulldiff -c KSnP -int --compare 30 2
 
 """
+
+
 from matador.utils.cursor_utils import display_results
 
 

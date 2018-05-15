@@ -15,6 +15,7 @@ KBAR_TO_GPA = 0.1
 AVOGADROS_NUMBER = 6.022141e23
 ANGSTROM_CUBED_TO_CENTIMETRE_CUBED = 1e-24
 ELECTRON_CHARGE = 1.6021766e-19
+KELVIN_TO_EV = 8.61733e-5
 
 
 def get_periodic_table():
@@ -168,7 +169,7 @@ def get_atoms_per_fu(doc):
     return sum([elem[1] for elem in doc['stoichiometry']])
 
 
-def get_formation_energy(chempots, doc):
+def get_formation_energy(chempots, doc, energy_key='enthalpy_per_atom', temperature=None):
     """ From given chemical potentials, calculate the simplest
     formation energy per atom of the desired document.
 
@@ -176,17 +177,27 @@ def get_formation_energy(chempots, doc):
         chempots (list of dict): list of chempot structures.
         doc (dict): structure to evaluate.
 
+    Keyword arguments:
+        energy_key (str): name of energy field to use to calculate formation energy.
+        temperature (float): if not None, use doc[energy_key][temperature] to calculate formation energy.
+
     Returns:
         float: formation energy per atom.
 
     """
-    formation = doc['enthalpy_per_atom']
+    if temperature is not None:
+        formation = doc[energy_key][temperature]
+    else:
+        formation = doc[energy_key]
     num_atoms_per_fu = get_atoms_per_fu(doc)
     for mu in chempots:
         for j in range(len(doc['stoichiometry'])):
             for i in range(len(mu['stoichiometry'])):
                 if mu['stoichiometry'][i][0] == doc['stoichiometry'][j][0]:
-                    formation -= (mu['enthalpy_per_atom'] * doc['stoichiometry'][j][1] / num_atoms_per_fu)
+                    if temperature is not None:
+                        formation -= (mu[energy_key][temperature] * doc['stoichiometry'][j][1] / num_atoms_per_fu)
+                    else:
+                        formation -= (mu[energy_key] * doc['stoichiometry'][j][1] / num_atoms_per_fu)
     return formation
 
 

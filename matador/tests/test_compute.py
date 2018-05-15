@@ -442,7 +442,6 @@ class ComputeTest(unittest.TestCase):
         self.assertTrue(res_exists, 'Could not find res file!')
         self.assertFalse(lock_exists, 'Lock file was not deleted!')
 
-
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
     def testBatchNothingToDo(self):
         """ Check that WallTimeErrors do kill everything... """

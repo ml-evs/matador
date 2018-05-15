@@ -668,15 +668,15 @@ def plot_thermo_curves(seed, show=True, **kwargs):
     import matplotlib.pyplot as plt
     import seaborn as sns
     from matador.scrapers.castep_scrapers import castep2dict
-    from matador.utils.chem_utils import AVOGADROS_NUMBER
-    from scipy.constants import physical_constants
+    from matador.utils.chem_utils import AVOGADROS_NUMBER, ELECTRON_CHARGE
 
     # set defaults
-    prop_defaults = {'plot_energy': False, 'plot_heat_cap': False}
+    prop_defaults = {'plot_energy': True, 'plot_heat_cap': True}
     prop_defaults.update(kwargs)
     kwargs = prop_defaults
 
     sns.set(style='whitegrid', font_scale=1.2)
+    sns.set_palette('Dark2')
 
     if kwargs['plot_energy'] and not kwargs['plot_heat_cap']:
         _, ax_energy = plt.subplots(figsize=(5, 5))
@@ -701,22 +701,20 @@ def plot_thermo_curves(seed, show=True, **kwargs):
     enthalpy = data['thermo_enthalpy_E']
     # E0 = data['zero_point_E']
 
-    # multiply entropy by T for comparison and convert J/mol to eV
-    eVJ = physical_constants['electron volt-joule relationship'][0]
     entropyT = []
     for i, val in enumerate(entropy):
-        entropyT.append(temps[i] * val * (1. / eVJ) * (1. / AVOGADROS_NUMBER))  # J/mol/K --> eV
+        entropyT.append(temps[i] * val * (1. / ELECTRON_CHARGE) * (1. / AVOGADROS_NUMBER))  # J/mol/K --> eV
 
     if kwargs['plot_energy']:
-        ax_energy.plot(temps, free_energy, lw=1, ls='-', alpha=1, label='Free Energy')
-        ax_energy.plot(temps, entropyT, lw=1, ls='-', alpha=1, label='Entropy*T')
-        ax_energy.plot(temps, enthalpy, lw=1, ls='-', alpha=1, label='Enthalpy')
+        ax_energy.plot(temps, free_energy, marker='o', lw=1, ls='-', alpha=1, label='Free Energy')
+        ax_energy.plot(temps, entropyT, marker='o', lw=1, ls='-', alpha=1, label='Entropy*T')
+        ax_energy.plot(temps, enthalpy, marker='o', lw=1, ls='-', alpha=1, label='Enthalpy')
         ax_energy.set_xlabel('Temperature (K)')
         ax_energy.set_title('Energy (eV)')
         ax_energy.legend()
 
     if kwargs['plot_heat_cap']:
-        ax_Cv.plot(temps, Cv, lw=1, ls='-', alpha=1, label='Heat Capacity (J/mol/K)')
+        ax_Cv.plot(temps, Cv, marker='o', lw=1, ls='-', alpha=1, label='Heat Capacity (J/mol/K)')
         ax_Cv.set_title('Heat Capacity (J/mol/K)')
         ax_Cv.set_xlabel('Temperature (K)')
 

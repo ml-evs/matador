@@ -109,7 +109,7 @@ class MatadorCommandLine(object):
                                 mongo_settings=self.settings)
 
             if self.args['subcmd'] == 'hulldiff':
-                from matador.hull_diff import diff_hulls
+                from matador.hull.hull_diff import diff_hulls
                 if self.args.get('compare') is None:
                     exit('Please specify which hulls to query with --compare.')
                 diff_hulls(self.client, self.collections, **self.args)
