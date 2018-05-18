@@ -231,6 +231,8 @@ class DBQuery:
         if self.args.get('pressure') is not None:
             self.query_dict['$and'].append(self._query_pressure())
             self._empty_query = False
+        else:
+            self.query_dict['$and'].append(self._query_pressure(custom_pressure=0))
 
         if self.args.get('encapsulated') is True:
             self.query_dict['$and'].append(self._query_encap())
@@ -361,7 +363,7 @@ class DBQuery:
                     sys.exit('No structures found for hull.')
                 while i < sample + rand_sample:
                     # start with sample/2 lowest enthalpy structures
-                    if i < int(sample):
+                    if i < int(sample) and not self.args.get('intersection'):
                         ind = i
                     # then do some random samples
                     else:
@@ -728,17 +730,21 @@ class DBQuery:
 
         return query_dict
 
-    def _query_pressure(self):
-        """ Query pressure, either by an exact match on external_pressure
-        or an approximate match on the pressure on the cell, with tolerance
-        of either 0.05 GPa or 10%.
-        """
-        input_pressure = self.args.get('pressure')
+    def _query_pressure(self, custom_pressure=None):
+        """ Query pressure, by an approximate match on the stress
+        of the cell, with tolerance the default CASTEP geom_stress_tol,
+        +/-0.1 GPa, with convenience rounding to nearest GPa.
 
-        if input_pressure < 0:
-            approx_pressure = [1.1 * input_pressure - 0.05, 0.9 * input_pressure + 0.05]
+        Keyword arguments:
+            custom_pressure (float): override cmdline value with this in GPa.
+
+        """
+        if custom_pressure is None:
+            input_pressure = self.args.get('pressure')
         else:
-            approx_pressure = [0.9 * input_pressure - 0.05, 1.1 * input_pressure + 0.05]
+            input_pressure = custom_pressure
+
+        approx_pressure = [round(input_pressure, 0) - 0.2, round(input_pressure, 0) + 0.2]
 
         query_dict = dict()
         query_dict['pressure'] = dict()
@@ -812,7 +818,7 @@ class DBQuery:
             query_dict['geom_force_tol']['$gte'] = tols[0]
             query_dict['geom_force_tol']['$lte'] = tols[1]
         else:
-            query_dict['geom_force_tol']['$lte'] = tols[0]
+            query_dict['geom_force_tol']['$eq'] = tols[0]
         return query_dict
 
     def _query_sedc(self):
@@ -897,6 +903,7 @@ class DBQuery:
         query_dict = {}
         query_dict['$and'] = []
         query_dict['$and'].append(self._query_xc_functional(xc_functional=doc.get('xc_functional')))
+        query_dict['$and'].append(self._query_pressure(custom_pressure=doc.get('pressure')))
         if self.args.get('time') is not None:
             query_dict['$and'].append(self._query_time())
         if 'spin_polarized' in doc and doc['spin_polarized']:
