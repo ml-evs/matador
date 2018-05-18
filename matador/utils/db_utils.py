@@ -1,5 +1,8 @@
-# encoding: utf-8
+# coding: utf-8
+# Distributed under the terms of the MIT License.
+
 """ Some simple utilities for DB connections. """
+
 
 import os
 from traceback import print_exc
@@ -8,14 +11,15 @@ import pymongo as pm
 
 from matador.utils.print_utils import print_warning
 
-MONGO_DEFAULTS = {'mongo': {'db': 'crystals', 'host': 'node1', 'port': 27017, 'default_collection': 'repo'}}
+MONGO_DEFAULTS = {'mongo': {'db': 'crystals', 'host': 'localhost',
+                  'port': 27017, 'default_collection': 'repo'}}
 
 
 def load_custom_settings(config_fname=None):
-    """ Load mongodb settings dict from file given by fname, or from defaults.
+    """ Load mongodb settings dict from file given by fname, or from
+    defaults.
 
     Keyword Arguments:
-
         fname (str): filename of custom settings file.
 
     """
@@ -41,22 +45,20 @@ def load_custom_settings(config_fname=None):
     return settings
 
 
-def make_connection_to_collection(coll_names, check_collection=False, allow_changelog=False, mongo_settings=None, testing=False):
+def make_connection_to_collection(coll_names, check_collection=False, allow_changelog=False,
+                                  mongo_settings=None, testing=False):
     """ Connect to database of choice.
 
     Parameters:
-
         coll_names (str): name of collection.
 
     Keyword Arguments:
-
         check_collection (bool): check whether collections exist (forces connection)
         allow_changelog (bool): allow queries to collections with names prefixed by __
         mongo_settings (dict): dict containing mongo and related config
         testing (bool): if testing, then don't ask for user input from stdin
 
     Returns:
-
         client (MongoClient): the connection to the database
         db (Database): the database to query
         collections (dict): Collection objects indexed by name

@@ -1,3 +1,7 @@
+# coding: utf-8
+# Distributed under the terms of the MIT License.
+
+
 from setuptools import setup, find_packages
 from subprocess import check_output
 from glob import glob
