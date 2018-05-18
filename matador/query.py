@@ -1,8 +1,11 @@
 # coding: utf-8
-""" This file implements all queries to the database,
-including parsing user inputs, displaying results
-and calling other functionality.
+# Distributed under the terms of the MIT License.
+
+""" This file implements all queries to the database, including parsing
+user inputs, displaying results and calling other functionality.
+
 """
+
 
 from os import devnull
 import sys
@@ -41,6 +44,10 @@ class DBQuery:
     def __init__(self, client=False, collections=False, subcmd='query', debug=False, quiet=False, **kwargs):
         """ Parse arguments from matador or API call
         before calling query.
+
+        Keyword arguments:
+            client (pm.MongoClient): the MongoClient to connect to.
+            collections (pm.Mongo.coll
         """
         # read args and set housekeeping
         self.args = kwargs
@@ -231,7 +238,7 @@ class DBQuery:
         if self.args.get('pressure') is not None:
             self.query_dict['$and'].append(self._query_pressure())
             self._empty_query = False
-        else:
+        elif self.args['subcmd'] in ['hull', 'hulldiff', 'voltage']:
             self.query_dict['$and'].append(self._query_pressure(custom_pressure=0))
 
         if self.args.get('encapsulated') is True:
@@ -744,7 +751,7 @@ class DBQuery:
         else:
             input_pressure = custom_pressure
 
-        approx_pressure = [round(input_pressure, 0) - 0.2, round(input_pressure, 0) + 0.2]
+        approx_pressure = [round(input_pressure, 0) - 0.15, round(input_pressure, 0) + 0.15]
 
         query_dict = dict()
         query_dict['pressure'] = dict()
