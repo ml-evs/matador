@@ -40,12 +40,14 @@ def plotting_function(function):
                 matplotlib.use('Agg')
                 saving = True
         try:
-            function(*args, **kwargs)
+            result = function(*args, **kwargs)
         except TclError as exc:
             print_failure('Caught exception: {}'.format(type(exc).__name__))
             print_warning('Error message was: {}'.format(exc))
             print_warning('This is probably an X-forwarding error')
             print_failure('Skipping plot...')
+
+        return result
 
     return wrapped_plot_function
 
