@@ -382,6 +382,8 @@ def get_root_source(source):
             src_list.add('.'.join(src.split('/')[-1].split('.')[0:-1]))
         elif 'OQMD' in src.upper():
             src_list.add(src)
+        elif src == 'command_line':
+            src_list.add('command line')
 
     if len(src_list) > 1:
         raise RuntimeError('Ambiguous root source')

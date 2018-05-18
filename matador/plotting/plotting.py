@@ -3,7 +3,9 @@
 
 """ This file implements several routines for dispersion plots, phase
 diagrams, as well as voltage and volume expansion plots.
+
 """
+
 
 from traceback import print_exc
 import numpy as np
@@ -32,7 +34,7 @@ def plotting_function(function):
                     matplotlib.use('Agg')
                     saving = True
                     break
-        except:
+        except AttributeError:
             pass
         if not saving:
             if any([kwargs.get('pdf'), kwargs.get('svg'), kwargs.get('png')]):
@@ -130,7 +132,7 @@ def plot_spectral(seeds, **kwargs):
                                                'left': 0.15})
         ax_dispersion = ax_grid[0]
         ax_dos = ax_grid[1]
-        ax_grid[2].axis('off')
+        ax_grid[2].axis(False)
     elif not kwargs['plot_bandstructure'] and kwargs['plot_dos']:
         _, ax_dos = plt.subplots(1, figsize=(8, 4))
 
@@ -563,15 +565,18 @@ def plot_voltage_curve(hull, show=True):
     """ Plot voltage curve calculated for phase diagram.
 
     Parameters:
-        hull (matador.hull.QueryConvexHull): matador hull object.
+        hull (matador.hull.voltage_data['Q']ueryConvexHull): matador hull object.
 
     Keyword arguments:
         show (bool): whether to show plot in an X window.
 
     """
     import matplotlib.pyplot as plt
+    import seaborn as sns
+    hull.set_plot_param()
+    sns.set(style='ticks', font_scale=1.2)
     if hull.savefig:
-        if len(hull.voltages) != 1:
+        if len(hull.voltage_data['voltages']) != 1:
             fig = plt.figure(facecolor=None, figsize=(4, 3.5))
         else:
             fig = plt.figure(facecolor=None, figsize=(4, 3.5))
@@ -584,29 +589,29 @@ def plot_voltage_curve(hull, show=True):
             axQ.plot(expt_data[:, 0], expt_data[:, 1], c='k', lw=2, ls='-', label=hull.args.get('expt_label'))
         else:
             axQ.plot(expt_data[:, 0], expt_data[:, 1], c='k', lw=2, ls='-', label='Experiment')
-    for ind, voltage in enumerate(hull.voltages):
+    for ind, voltage in enumerate(hull.voltage_data['voltages']):
         for i in range(1, len(voltage) - 1):
             if i == 1 and hull.args.get('expt'):
-                axQ.plot([hull.Q[ind][i - 1], hull.Q[ind][i]], [voltage[i], voltage[i]],
+                axQ.plot([hull.voltage_data['Q'][ind][i - 1], hull.voltage_data['Q'][ind][i]], [voltage[i], voltage[i]],
                          marker='*',
                          lw=2,
                          c=hull.colours[ind],
                          label='DFT (this work)')
-            elif i == 1 and len(hull.voltages) != 1:
-                axQ.plot([hull.Q[ind][i - 1], hull.Q[ind][i]], [voltage[i], voltage[i]],
+            elif i == 1 and len(hull.voltage_data['voltages']) != 1:
+                axQ.plot([hull.voltage_data['Q'][ind][i - 1], hull.voltage_data['Q'][ind][i]], [voltage[i], voltage[i]],
                          marker='o',
                          markersize=5,
                          lw=2,
                          c=hull.colours[ind],
                          label=get_formula_from_stoich(hull.endstoichs[ind], tex=True))
             else:
-                axQ.plot([hull.Q[ind][i - 1], hull.Q[ind][i]], [voltage[i], voltage[i]],
+                axQ.plot([hull.voltage_data['Q'][ind][i - 1], hull.voltage_data['Q'][ind][i]], [voltage[i], voltage[i]],
                          marker='o',
                          markersize=5,
                          lw=2,
                          c=hull.colours[ind])
             if i != len(voltage) - 2:
-                axQ.plot([hull.Q[ind][i], hull.Q[ind][i]], [voltage[i], voltage[i + 1]],
+                axQ.plot([hull.voltage_data['Q'][ind][i], hull.voltage_data['Q'][ind][i]], [voltage[i], voltage[i + 1]],
                          marker='o',
                          markersize=5,
                          lw=2,
@@ -618,12 +623,12 @@ def plot_voltage_curve(hull, show=True):
         for i in range(len(hull.label_cursor)):
             axQ.annotate(get_formula_from_stoich(hull.label_cursor[i]['stoichiometry'],
                                                  elements=hull.elements, tex=True),
-                         xy=(hull.Q[0][i+1]+0.02*max(hull.Q[0]),
-                             hull.voltages[0][i+1]+0.02*max(hull.voltages[0])),
+                         xy=(hull.voltage_data['Q'][0][i+1]+0.02*max(hull.voltage_data['Q'][0]),
+                             hull.voltage_data['voltages'][0][i+1]+0.02*max(hull.voltage_data['voltages'][0])),
                          textcoords='data',
                          ha='center',
                          zorder=9999)
-    if hull.args.get('expt') or len(hull.voltages) != 1:
+    if hull.args.get('expt') or len(hull.voltage_data['voltages']) != 1:
         axQ.legend(loc=1)
     axQ.set_ylabel('Voltage (V) vs {}$^+$/{}'.format(hull.elements[0], hull.elements[0]))
     axQ.set_xlabel('Gravimetric cap. (mAh/g)')
@@ -631,7 +636,7 @@ def plot_voltage_curve(hull, show=True):
     axQ.set_ylim(0, 1.1 * end)
     _, end = axQ.get_xlim()
     axQ.set_xlim(0, 1.1 * end)
-    axQ.grid('off')
+    axQ.grid(False)
     plt.tight_layout(pad=0.0, h_pad=1.0, w_pad=0.2)
     try:
         import seaborn as sns
@@ -776,28 +781,31 @@ def plot_volume_curve(hull, show=True):
     """ Plot volume curve calculated for phase diagram.
 
     Parameters:
-        hull (matador.hull.QueryConvexHull): matador hull object.
+        hull (matador.hull.voltage_data['Q']ueryConvexHull): matador hull object.
 
     Keyword arguments:
         show (bool): whether or not to display plot in X-window.
 
     """
     import matplotlib.pyplot as plt
+    import seaborn as sns
     from matador.utils.cursor_utils import get_array_from_cursor
     from matador.utils.chem_utils import get_generic_grav_capacity
+    hull.set_plot_param()
+    sns.set(style='ticks', font_scale=1.2)
     if hull.savefig:
         fig = plt.figure(facecolor=None, figsize=(4, 3.5))
     else:
         fig = plt.figure(facecolor=None)
     ax = fig.add_subplot(111)
     stable_hull_dist = get_array_from_cursor(hull.hull_cursor, 'hull_distance')
+
     hull_vols = []
     hull_comps = []
-    bulk_vol = hull.vol_per_y[-1]
-    for i in range(len(hull.vol_per_y)):
+    for i in range(len(hull.volume_data['vol_per_y'])):
         if stable_hull_dist[i] <= 0 + 1e-16:
-            hull_vols.append(hull.vol_per_y[i])
-            hull_comps.append(hull.x[i])
+            hull_vols.append(hull.volume_data['volume_ratio_with_bulk'][i])
+            hull_comps.append(hull.volume_data['x'][i])
             s = 40
             zorder = 1000
             markeredgewidth = 1.5
@@ -809,39 +817,39 @@ def plot_volume_curve(hull, show=True):
             alpha = 0.3
             markeredgewidth = 0
             c = 'grey'
-        ax.scatter(hull.x[i] / (1 + hull.x[i]), hull.vol_per_y[i] / bulk_vol,
+
+        ax.scatter(hull.volume_data['x'][i] / (1 + hull.volume_data['x'][i]),
+                   hull.volume_data['volume_ratio_with_bulk'][i],
                    marker='o', s=s, edgecolor='k',
                    lw=markeredgewidth, c=c, zorder=zorder, alpha=alpha)
+
     hull_comps, hull_vols = np.asarray(hull_comps), np.asarray(hull_vols)
-    ax.plot(hull_comps / (1 + hull_comps), hull_vols / bulk_vol, marker='o', lw=4, c=hull.colours[0], zorder=100)
-    ax.set_xlabel(r'$x$ in ${' + hull.elements[0] + '_x' + hull.elements[1] + '}_{1-x}$')
-    ax.set_ylabel('Volume ratio with bulk')
-    ax.set_ylim(0, 5 * np.sort(hull_vols)[-2] / bulk_vol)
+    ax.plot(hull_comps / (1 + hull_comps), hull_vols, marker='o', lw=4, c=hull.colours[0], zorder=100)
+
+    ax.set_xlabel(r'$x$ in ' + hull.elements[0] + '$_x$' + hull.elements[1] + '$_{1-x}$')
+    ax.set_ylabel('Volume ratio with bulk {}'.format(hull.volume_data['bulk_species']))
+    ax.set_ylim(0, np.max(hull.volume_data['volume_ratio_with_bulk']))
     ax.set_xlim(-0.05, 1.05)
     ax.yaxis.set_label_position('left')
-    ax.set_xticklabels(ax.get_xticks())
-    ax.grid('off')
+    ax.grid(False)
     ax2 = ax.twiny()
     ax2.set_xlim(ax.get_xlim())
-    tick_locs = np.linspace(0, 1, 6, endpoint=True).tolist()
+    tick_locs = [0, 0.2, 0.4, 0.6, 0.8, 1]
     ax2.set_xticks(tick_locs)
     new_tick_labels = [int(get_generic_grav_capacity([loc, 1-loc], [hull.elements[0], hull.elements[1]]))
                        for loc in tick_locs[:-1]]
+    new_tick_labels[0] = 0
     new_tick_labels.append(r'$\infty$')
     ax2.set_xlabel('Gravimetric capacity (mAh/g)')
     ax2.set_xticklabels(new_tick_labels)
-    ax2.grid('off')
-    try:
-        import seaborn as sns
-        sns.despine(top=False, right=False)
-        dark_grey = '#262626'
-        for spine in ['left', 'top', 'right', 'bottom']:
-            ax.spines[spine].set_color(dark_grey)
-            ax2.spines[spine].set_color(dark_grey)
-            ax.spines[spine].set_linewidth(0.5)
-            ax2.spines[spine].set_linewidth(0.5)
-    except ImportError:
-        pass
+    ax2.grid(False)
+    sns.despine(top=False, right=False)
+    dark_grey = '#262626'
+    for spine in ['left', 'top', 'right', 'bottom']:
+        ax.spines[spine].set_color(dark_grey)
+        ax2.spines[spine].set_color(dark_grey)
+        ax.spines[spine].set_linewidth(0.5)
+        ax2.spines[spine].set_linewidth(0.5)
     # ax.yaxis.set_ticks(range(0, int(end)+1, 5))
     plt.tight_layout(pad=0.0, h_pad=1.0, w_pad=0.2)
     if hull.savefig:
@@ -862,7 +870,7 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
     """ Plot calculated hull, returning ax and fig objects for further editing.
 
     Parameters:
-        hull (matador.hull.QueryConvexHull): matador hull object.
+        hull (matador.hull.voltage_data['Q']ueryConvexHull): matador hull object.
 
     Keyword arguments:
         ax (matplotlib.axes.Axes): an existing axis on which to plot,
@@ -888,8 +896,9 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
     if ax is None:
         fig = plt.figure(facecolor=None, figsize=(8, 6))
         ax = fig.add_subplot(111)
-    if not hull.plot_params:
-        hull.set_plot_param()
+
+    scale = 1
+
     scatter = []
     x_elem = [hull.elements[0]]
     one_minus_x_elem = list(hull.elements[1:])
@@ -901,7 +910,7 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
             ax.scatter(tie_line[:, 0], tie_line[:, 1],
                        c=hull.colours[1],
                        marker='o', zorder=99999, edgecolor='k',
-                       s=hull.scale*40, lw=1.5, alpha=1)
+                       s=scale*40, lw=1.5, alpha=1)
         ax.plot(np.sort(tie_line[:, 0]), tie_line[np.argsort(tie_line[:, 0]), 1],
                 c=hull.colours[0], lw=2, alpha=1, zorder=1000)
         if hull.hull_cutoff > 0:
@@ -940,7 +949,6 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
                             va='bottom',
                             arrowprops=arrowprops,
                             zorder=1)
-        lw = hull.scale * 0 if hull.mpl_new_ver else 1
         if plot_points and not colour_by_source:
             # points for off hull structures
             if hull.hull_cutoff == 0:
@@ -955,7 +963,7 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
                 if plot_points:
                     scatter = ax.scatter(hull.structures[np.argsort(hull.hull_dist), 0][::-1],
                                          hull.structures[np.argsort(hull.hull_dist), -1][::-1],
-                                         s=hull.scale*40, lw=lw, alpha=1,
+                                         s=scale*40, lw=1, alpha=1,
                                          c=np.sort(hull.hull_dist)[::-1],
                                          edgecolor='k', zorder=10000,
                                          cmap=cmap, norm=colours.LogNorm(0.02, 2))
@@ -976,12 +984,12 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
                     if hull.hull_dist[ind] <= hull.hull_cutoff or hull.hull_cutoff == 0:
                         if plot_points:
                             scatter.append(ax.scatter(hull.structures[ind, 0], hull.structures[ind, 1],
-                                                      s=hull.scale*40, lw=lw,
+                                                      s=scale*40, lw=1,
                                                       alpha=0.9, c=c, edgecolor='k',
                                                       zorder=300))
                 if plot_points:
                     ax.scatter(hull.structures[1:-1, 0], hull.structures[1:-1, 1],
-                               s=hull.scale*30, lw=lw,
+                               s=scale*30, lw=1,
                                alpha=0.3, c=hull.colours[-2],
                                edgecolor='k', zorder=10)
 
@@ -1009,7 +1017,7 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
             if alpha is None:
                 alpha = 0.2
 
-            ax.scatter(concs, energies, c=colours, alpha=alpha, s=hull.scale * 20)
+            ax.scatter(concs, energies, c=colours, alpha=alpha, s=scale * 20)
             for source in sources:
                 ax.scatter(1e10, 1e10, c=colour_choices[source], label=source, alpha=alpha)
             ax.scatter(1e10, 1e10, c=hull.colours[-2], label='Other', alpha=alpha)
@@ -1024,7 +1032,6 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
         scatter = []
         print_exc()
         c = hull.colours[1]
-        lw = hull.scale * 0 if hull.mpl_new_ver else 1
         if plot_points:
             for ind, _ in enumerate(hull.hull_cursor):
                 if isinstance(hull.hull_cursor[ind]['concentration'], list):
@@ -1033,19 +1040,19 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
                     concs = hull.hull_cursor[ind]['concentration']
                 scatter.append(ax.scatter(concs,
                                           hull.hull_cursor[ind]['formation_enthalpy_per_atom'],
-                                          s=hull.scale*40, lw=1.5, alpha=1, c=c, edgecolor='k',
+                                          s=scale*40, lw=1.5, alpha=1, c=c, edgecolor='k',
                                           zorder=1000))
 
         ax.plot([0, 1], [0, 0], lw=2, c=hull.colours[0], zorder=900)
         for ind in range(len(hull.structures)):
             if plot_points:
                 scatter.append(ax.scatter(hull.structures[ind, 0], hull.structures[ind, 1],
-                                          s=hull.scale*40, lw=lw, alpha=0.9, c=c, edgecolor='k',
+                                          s=scale*40, lw=1, alpha=0.9, c=c, edgecolor='k',
                                           zorder=300))
 
     if len(one_minus_x_elem) == 1:
         ax.set_title(x_elem[0] + r'$_\mathrm{x}$' + one_minus_x_elem[0] + r'$_\mathrm{1-x}$')
-    if hull.non_binary:
+    if hull._non_binary:
         ax.set_title(r'{d[0]}$_\mathrm{{x}}$({d[1]})$_\mathrm{{1-x}}$'.format(d=hull.chempot_search))
     plt.locator_params(nbins=3)
     ax.set_xlabel(r'x in {}$_\mathrm{{x}}${}$_\mathrm{{1-x}}$'.format(x_elem[0], one_minus_x_elem[0]))
@@ -1078,7 +1085,7 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, expecting_cb
     """ Plot calculated ternary hull as a 2D projection.
 
     Parameters:
-        hull (matador.hull.QueryConvexHull): matador hull object.
+        hull (matador.hull.voltage_data['Q']ueryConvexHull): matador hull object.
 
     Keyword arguments:
         axis (matplotlib.axes.Axes): matplotlib axis object on which to plot.
