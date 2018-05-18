@@ -1,8 +1,10 @@
 # coding: utf-8
 # Distributed under the terms of the MIT License.
 
-""" This file implements a simple interface
-to creating and submitting slurm scripts.
+""" This file implements a simple interface to basic SLURM
+functionality, including creating and submitting slurm scripts and
+cancelling jobs.
+
 """
 
 

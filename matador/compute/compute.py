@@ -22,7 +22,7 @@ from matador.scrapers.castep_scrapers import cell2dict, param2dict
 from matador.scrapers.castep_scrapers import res2dict, castep2dict
 from matador.utils.print_utils import print_success, print_warning, print_notify, print_failure
 from matador.export import doc2cell, doc2param, doc2res
-from matador.slurm import get_slurm_env, get_slurm_walltime
+from matador.compute.slurm import get_slurm_env, get_slurm_walltime
 
 
 class FullRelaxer:
