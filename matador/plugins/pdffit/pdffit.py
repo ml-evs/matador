@@ -7,9 +7,9 @@ in the database with the diffpy package.
 
 from __future__ import print_function
 # matador modules
-from .utils.print_utils import print_failure, print_notify
-from .utils.cell_utils import abc2cart
-from .utils.chem_utils import get_atomic_number
+from matador.utils.print_utils import print_failure, print_notify
+from matador.utils.cell_utils import abc2cart
+from matador.utils.chem_utils import get_atomic_number
 # external libraries
 from scipy.optimize import leastsq
 import matplotlib.pyplot as plt

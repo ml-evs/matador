@@ -210,7 +210,7 @@ class Crystal:
 
         """
         if 'voronoi_substructure' not in self._doc:
-            from matador.voronoi_interface import get_voronoi_substructure
+            from matador.plugins.voronoi_interface.voronoi_interface import get_voronoi_substructure
             self._doc['voronoi_substructure'] = get_voronoi_substructure(self._doc)
         return self._doc['voronoi_substructure']
 

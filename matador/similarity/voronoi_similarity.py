@@ -192,7 +192,7 @@ def set_substruc_dict(doc):
 
     """
     if 'voronoi_substruc' not in doc:
-        from matador.voronoi_interface import get_voronoi_substructure
+        from matador.plugins.voronoi_interface.voronoi_interface import get_voronoi_substructure
         doc['voronoi_substruc'] = get_voronoi_substructure(doc)
     voronoi_substruc_dict = dict()
     elems = set(doc['atom_types'])

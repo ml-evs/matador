@@ -6,7 +6,7 @@ from json import load
 from matador.similarity.voronoi_similarity import get_unique_sites, collect_unique_sites
 from matador.similarity.voronoi_similarity import are_sites_the_same, set_substruc_dict
 from matador.similarity.voronoi_similarity import set_site_array, create_site_array
-from matador.voronoi_interface import get_voronoi_substructure
+from matador.plugins.voronoi_interface.voronoi_interface import get_voronoi_substructure
 
 
 REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
