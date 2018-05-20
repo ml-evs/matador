@@ -42,12 +42,16 @@ class DBQuery:
     """
 
     def __init__(self, client=False, collections=False, subcmd='query', debug=False, quiet=False, **kwargs):
-        """ Parse arguments from matador or API call
-        before calling query.
+        """ Parse arguments from matador or API call before calling
+        query.
 
         Keyword arguments:
             client (pm.MongoClient): the MongoClient to connect to.
-            collections (pm.Mongo.coll
+            collections (dict): dictionary of pymongo Collections.
+            subcmd (str): either 'query' or 'hull', 'voltage', 'hulldiff'.
+                These will decide whether calcuation accuracies are matched
+                in the final results.
+
         """
         # read args and set housekeeping
         self.args = kwargs

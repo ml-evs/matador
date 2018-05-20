@@ -25,6 +25,7 @@ def plotting_function(function):
     def wrapped_plot_function(*args, **kwargs):
         """ Wrap and return the plotting function. """
         from tkinter import TclError
+        result = None
         # if we're going to be saving a figure, switch to Agg to avoid X-forwarding
         saving = False
         try:
@@ -560,6 +561,36 @@ def match_bands(dispersion, branches):
     return dispersion
 
 
+def get_hull_labels(hull, num_species=2):
+    """ Return list of structures to labels on phase diagram.
+
+    Parameters:
+        hull (matador.hull.QueryConvexHull): phase diagram to plot.
+
+    Keyword arguments:
+        num_species (int): structures containing this number of species
+            will be labelled.
+
+    Returns:
+        label_cursor (list(dict)): list of matador documents to label.
+
+    """
+    eps = 1e-9
+    label_cursor = [doc for doc in hull.hull_cursor if doc['hull_distance'] <= 0 + eps]
+    num_labels = len(set([get_formula_from_stoich(doc['stoichiometry']) for doc in label_cursor]))
+    if num_labels < len(label_cursor):
+        tmp_cursor = []
+        for doc in label_cursor:
+            if doc['stoichiometry'] not in [_doc['stoichiometry'] for _doc in tmp_cursor]:
+                tmp_cursor.append(doc)
+            else:
+                label_cursor = tmp_cursor
+    # remove chemical potentials
+    label_cursor = [doc for doc in label_cursor if len(doc['stoichiometry']) == num_species]
+
+    return label_cursor
+
+
 @plotting_function
 def plot_voltage_curve(hull, show=True):
     """ Plot voltage curve calculated for phase diagram.
@@ -617,11 +648,9 @@ def plot_voltage_curve(hull, show=True):
                          lw=2,
                          c=hull.colours[ind])
     if hull.args.get('labels'):
-        eps = 1e-9
-        hull.label_cursor = [doc for doc in hull.hull_cursor if doc['hull_distance'] <= 0 + eps]
-        hull.label_cursor = hull.label_cursor[1:-1]
-        for i in range(len(hull.label_cursor)):
-            axQ.annotate(get_formula_from_stoich(hull.label_cursor[i]['stoichiometry'],
+        label_cursor = get_hull_labels(hull, num_species=2)
+        for i in range(len(label_cursor)):
+            axQ.annotate(get_formula_from_stoich(label_cursor[i]['stoichiometry'],
                                                  elements=hull.elements, tex=True),
                          xy=(hull.voltage_data['Q'][0][i+1]+0.02*max(hull.voltage_data['Q'][0]),
                              hull.voltage_data['voltages'][0][i+1]+0.02*max(hull.voltage_data['voltages'][0])),
@@ -918,21 +947,8 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
                     '--', c=hull.colours[1], lw=1, alpha=0.5, zorder=1000, label='')
         # annotate hull structures
         if hull.args.get('labels') or labels:
-            eps = 1e-9
-            hull.label_cursor = [doc for doc in hull.hull_cursor if doc['hull_distance'] <= 0 + eps]
-            num_labels = len(set([get_formula_from_stoich(doc['stoichiometry']) for doc in hull.label_cursor]))
-            if num_labels < len(hull.label_cursor):
-                tmp_cursor = []
-                for doc in hull.label_cursor:
-                    if doc['stoichiometry'] not in [_doc['stoichiometry'] for _doc in tmp_cursor]:
-                        tmp_cursor.append(doc)
-                if len(tmp_cursor) != len(set([doc['stoichiometry'] for doc in hull.label_cursor])):
-                    print('Something has gone wrong with labels...')
-                else:
-                    hull.label_cursor = tmp_cursor
-            # remove chemical potentials
-            hull.label_cursor = hull.label_cursor[1:-1]
-            for ind, doc in enumerate(hull.label_cursor):
+            label_cursor = get_hull_labels(hull, num_species=2)
+            for ind, doc in enumerate(label_cursor):
                 arrowprops = dict(arrowstyle="-|>", color='k')
                 if (ind + 2) < np.argmin(tie_line[:, 1]):
                     position = (0.8 * tie_line[ind + 2, 0], 1.15 * (tie_line[ind + 2, 1]) - 0.05)
@@ -1081,7 +1097,7 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
 
 
 @plotting_function
-def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, expecting_cbar=True):
+def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, expecting_cbar=True, labels=False):
     """ Plot calculated ternary hull as a 2D projection.
 
     Parameters:
@@ -1093,6 +1109,7 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, expecting_cb
         plot_points (bool): whether or not to plot each structure as a point.
         expecting_cbar (bool): whether or not to space out the plot to preserve
             aspect ratio if a colourbar is present.
+        labels (bool): whether or not to label on-hull structures
 
     Returns:
         matplotlib.axes.Axes: matplotlib axis with plot.
@@ -1254,6 +1271,32 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, expecting_cb
                                                    (concs[:, 2] <= float(k)/scale + eps) *
                                                    (concs[:, 2] >= float(k)/scale - eps)))
         ax.heatmap(sampling, style="hexagonal", cbarlabel='Number of structures', cmap='afmhot')
+
+    # add labels
+    if hull.args.get('labels') or labels:
+        label_cursor = get_hull_labels(hull, num_species=3)
+        label_coords = [[0.1+(val-0.5)*0.3, val] for val in np.linspace(0.5, 0.8, int(round(len(label_cursor)/2.)))]
+        label_coords += [[0.9-(val-0.5)*0.3, val] for val in np.linspace(0.5, 0.8, int(round(len(label_cursor)/2.)))]
+        from matador.utils.hull_utils import barycentric2cart
+        for ind, doc in enumerate(label_cursor):
+            conc = np.asarray(doc['concentration'] + [1 - sum(doc['concentration'])])
+            formula = get_formula_from_stoich(doc['stoichiometry'], tex=True, elements=hull.elements)
+            arrowprops = dict(arrowstyle="-|>", color='k', lw=2)
+            cart = barycentric2cart([doc['concentration'] + [0]])[0][:2]
+            min_dist = 1e20
+            closest_label = 0
+            for coord_ind, coord in enumerate(label_coords):
+                dist = np.sqrt((cart[0] - coord[0])**2 + (cart[1] - coord[1])**2)
+                if dist < min_dist:
+                    min_dist = dist
+                    closest_label = coord_ind
+            ax.annotate(formula, scale*conc, zorder=1e10,
+                        textcoords='data',
+                        xytext=[scale*val for val in label_coords[closest_label]],
+                        ha='right',
+                        va='bottom',
+                        arrowprops=arrowprops)
+            del label_coords[closest_label]
 
     plt.tight_layout(w_pad=0.2)
 

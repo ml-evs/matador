@@ -274,16 +274,10 @@ class QueryConvexHull(object):
                                 scanned = True
                     mu_cursor = query.repo.find(SON(query_dict)).sort(self._energy_key, pm.ASCENDING)
                     if mu_cursor.count() == 0:
-                        print('No chemical potential...')
+                        raise RuntimeError('No chemical potentials found...')
 
                 self.chempot_cursor[ind] = mu_cursor[0]
                 if self.chempot_cursor[ind] is not None:
-                    # if ind == 0:
-                        # self._mu_enthalpy[ind] = float(self.chempot_cursor[ind][self._energy_key])
-                        # self._mu_volume[ind] = float(self.chempot_cursor[ind]['cell_volume'] / self.chempot_cursor[ind]['num_atoms'])
-                    # else:
-                        # self._mu_enthalpy[1] += float(self.chempot_cursor[ind][self._energy_key])
-                        # self._mu_volume[1] = float(self.chempot_cursor[ind]['cell_volume'] / self.chempot_cursor[ind]['num_atoms'])
                     print('Using', ''.join([self.chempot_cursor[ind]['text_id'][0], ' ',
                           self.chempot_cursor[ind]['text_id'][1]]), 'as chem pot for', elem)
                     print(60 * '─')
