@@ -203,7 +203,7 @@ def are_graphs_the_same(g1, g2, edge_match=None):
 
 def draw_network(structure, layout=None, edge_labels=False, node_index=False, curved_edges=True, node_colour='elem', partition=None, ax=None):
     import networkx as nx
-    from matador.viz import ELEMENT_COLOURS
+    from matador.utils.viz_utils import ELEMENT_COLOURS
     import matplotlib.pyplot as plt
     try:
         network = structure.network

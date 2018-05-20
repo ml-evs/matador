@@ -128,7 +128,7 @@ class MatadorCommandLine(object):
                 query2files(self.cursor, self.args, argstr=self.argstr)
 
             if self.args.get('view'):
-                from matador.viz import viz
+                from matador.utils.viz_utils import viz
                 if self.args.get('top') is None:
                     self.top = len(self.cursor)
                 else:

@@ -10,7 +10,7 @@ diagrams, as well as voltage and volume expansion plots.
 from traceback import print_exc
 import numpy as np
 from matador.utils.chem_utils import get_formula_from_stoich
-from matador.viz import ELEMENT_COLOURS
+from matador.utils.viz_utils import ELEMENT_COLOURS
 
 
 def plotting_function(function):

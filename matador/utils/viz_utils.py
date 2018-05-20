@@ -1,4 +1,6 @@
-# encoding: utf-8
+# coding: utf-8
+# Distributed under the terms of the MIT License.
+
 """ This file is a dirty wrapper of ase-gui for
 quick visualisation of structures.
 """
