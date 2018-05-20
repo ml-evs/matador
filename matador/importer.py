@@ -94,7 +94,7 @@ class Spatula:
         assert len(self.collections) == 1, 'Can only import to one collection.'
         self.repo = list(self.collections.values())[0]
 
-        if self.args.get('db') is None:
+        if self.args.get('db') is None and not self.dryrun:
             # if using default collection, check we are in the correct path
             if 'mongo' in self.settings and 'default_collection_file_path' in self.settings['mongo']:
                 if not os.getcwd().startswith(
@@ -112,10 +112,11 @@ class Spatula:
                     print(80 * '!')
                     raise RuntimeError('Failed to import')
         else:
-            if 'oqmd' in self.args['db']:
-                exit('Cannot import directly to oqmd repo')
-            elif len(self.args.get('db')) > 1:
-                exit('Can only import to one collection.')
+            if self.args['db'] is not None:
+                if any(['oqmd' in db for db in self.args['db']]):
+                    exit('Cannot import directly to oqmd repo')
+                elif len(self.args.get('db')) > 1:
+                    exit('Can only import to one collection.')
 
         if not self.dryrun:
             # either drop and recreate or create spatula report collection
@@ -355,7 +356,7 @@ class Spatula:
                 for ext in exts_with_precedence:
                     if file.replace('.res', ext) in file_lists[root]['castep']:
                         struct_dict, success = castep2dict(file.replace('.res', ext),
-                                                           debug=self.debug,
+                                                           debug=False,
                                                            dryrun=self.args.get('dryrun'),
                                                            verbosity=self.verbosity)
                         break
@@ -398,7 +399,7 @@ class Spatula:
 
         import_count = 0
         for _, file in enumerate(file_lists[root]['castep']):
-            castep_dict, success = castep2dict(file, debug=self.debug, verbosity=self.verbosity)
+            castep_dict, success = castep2dict(file, debug=False, verbosity=self.verbosity)
             if not success:
                 self.logfile.write(castep_dict)
             else:
@@ -496,37 +497,41 @@ class Spatula:
             # per folder delete list
             # do not import castep or res if seed name in db already
             delete_list = {}
-            delete_list['castep'] = []
-            delete_list['res'] = []
+            delete_list['castep'] = set()
+            delete_list['res'] = set()
             types = ['castep', 'res']
             for structure_type in types:
-                for file in new_file_lists[root][structure_type]:
+                assert len(set(new_file_lists[root][structure_type])) == len(new_file_lists[root][structure_type])
+                for _, _file in enumerate(new_file_lists[root][structure_type]):
                     # find number of entries with same root filename in database
                     structure_exts = ['.castep', '.res', '.history', '.history.gz']
                     structure_count = 0
                     for ext in structure_exts:
-                        if file.endswith(ext):
-                            structure_count += self.repo.find({'source': {'$in': [file.replace(ext, '.res')]}}).count()
-                            structure_count += self.repo.find({'source': {'$in': [file.replace(ext, '.castep')]}}).count()
-                    if self.debug:
-                        print('Duplicates', structure_count, file)
+                        if _file.endswith(ext):
+                            structure_count += self.repo.find(
+                                {'source': {'$in': [_file.replace(ext, '.res')]}}
+                            ).count()
+                            structure_count += self.repo.find(
+                                {'source': {'$in': [_file.replace(ext, '.castep')]}}
+                            ).count()
+                    if structure_count > 1 and self.debug:
+                        print('Duplicates', structure_count, _file)
 
                     # if duplicate found, don't reimport
                     if structure_count >= 1:
                         for _type in types:
-                            fname_trial = file.replace('.{}'.format(file.split('.')[-1]), '.{}'.format(_type))
-                            if fname_trial in new_file_lists[root][_type]:
-                                delete_list[_type].append(fname_trial)
+                            fname_trial = _file.replace('.{}'.format(_file.split('.')[-1]), '.{}'.format(_type))
+                            if fname_trial in new_file_lists[root][_type] and fname_trial not in delete_list[_type]:
+                                delete_list[_type].add(fname_trial)
                                 new_file_lists[root][_type + '_count'] -= 1
 
-                if structure_count > 1:
-                    if self.debug:
+                    if structure_count > 1:
                         print('Found double in database, this needs to be dealt with manually')
+                        print(_file)
 
             for _type in types:
-                for _file in delete_list[_type]:
-                    index_to_del = new_file_lists[root][_type].index(_file)
-                    del new_file_lists[root][_type][index_to_del]
+                new_file_lists[root][_type] = [_file for _file in new_file_lists[root][_type]
+                                               if _file not in delete_list[_type]]
 
             for file_type in types:
                 if len(new_file_lists[root][file_type]) != new_file_lists[root][file_type + '_count']:
