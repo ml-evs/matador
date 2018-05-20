@@ -2,7 +2,8 @@
 import unittest
 import re
 
-from matador.query import DBQuery, parse_element_string
+from matador.query import DBQuery
+from matador.utils.chem_utils import parse_element_string
 
 
 class QueryTest(unittest.TestCase):
