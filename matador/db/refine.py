@@ -1,14 +1,14 @@
 # coding: utf-8
-""" This module contains functionality to update
-and overwrite database entries with specific tasks,
-e.g. symmetry and substructure analysis.
+# Distributed under the terms of the MIT License.
+
+""" This module contains functionality to update and overwrite database
+entries with specific tasks, e.g. symmetry and substructure analysis.
 
 """
 
+
 from traceback import print_exc
-
 import pymongo as pm
-
 from matador.utils.print_utils import print_notify, print_warning, print_failure
 
 
@@ -19,7 +19,6 @@ class Refiner:
     the set of elements, tags and DOIs.
 
     """
-
     def __init__(self, cursor, collection=None, task=None, mode='display', **kwargs):
         """ Parses args and initiates modification.
 
@@ -116,7 +115,7 @@ class Refiner:
 
     def substruc(self):
         """ Compute substructure with Can's Voronoi code. """
-        from .voronoi_interface import get_voronoi_substructure
+        from matador.plugins.voronoi_interface.voronoi_interface import get_voronoi_substructure
         print('Performing substructure analysis...')
         for _, doc in enumerate(self.cursor):
             try:
@@ -134,7 +133,7 @@ class Refiner:
 
     def symmetry(self, symprec=1e-3):
         """ Compute space group with spglib. """
-        from .utils.cell_utils import doc2spg
+        from matador.utils.cell_utils import doc2spg
         import spglib as spg
         print('Refining symmetries...')
         if self.mode == 'display':
@@ -188,6 +187,7 @@ class Refiner:
     def elem_set(self):
         """ Imbue documents with the set of elements,
         i.e. set(doc['atom_types']), for quicker look-up.
+
         """
         for doc in self.cursor:
             try:
@@ -236,6 +236,7 @@ class Refiner:
     def add_root_source(self):
         """ Add the "root_source" key to a document in the database,
         i.e. the name of the structure, minus file extension.
+
         """
         from matador.utils.chem_utils import get_root_source
         for _, doc in enumerate(self.cursor):

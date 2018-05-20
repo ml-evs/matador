@@ -41,25 +41,25 @@ class MatadorCommandLine(object):
 
         try:
             if self.args['subcmd'] == 'import':
-                from matador.importer import Spatula
+                from matador.db import Spatula
                 self.importer = Spatula(self.args)
 
             if self.args['subcmd'] == 'query':
                 self.query = DBQuery(self.client, self.collections, **self.args)
                 self.cursor = self.query.cursor
 
-            if self.args['subcmd'] in ['swaps']:
-                from matador.polish import Polisher
+            if self.args['subcmd'] == 'swaps':
+                from matador.swaps import AtomicSwapper
                 self.query = DBQuery(self.client, self.collections, **self.args)
                 if self.args.get('hull_cutoff') is not None:
                     self.hull = QueryConvexHull(self.query, **self.args)
-                    self.polisher = Polisher(self.hull.hull_cursor, self.args)
+                    self.swapper = AtomicSwapper(self.hull.hull_cursor, self.args)
                 else:
-                    self.polisher = Polisher(self.query.cursor, self.args)
-                self.cursor = self.polisher.cursor
+                    self.swapper = AtomicSwapper(self.query.cursor, self.args)
+                self.cursor = self.swapper.cursor
 
             if self.args['subcmd'] == 'refine':
-                from matador.refine import Refiner
+                from matador.db import Refiner
                 self.query = DBQuery(self.client, self.collections, **self.args)
                 if self.args.get('hull_cutoff') is not None:
                     self.hull = QueryConvexHull(self.query, **self.args)
@@ -93,7 +93,7 @@ class MatadorCommandLine(object):
                 self.cursor = self.hull.hull_cursor
 
             if self.args['subcmd'] == 'changes':
-                from matador.changes import DatabaseChanges
+                from matador.db import DatabaseChanges
                 if len(self.collections) != 1:
                     exit('Cannot view changes of more than one collection at once.')
                 if self.args.get('undo'):
@@ -415,7 +415,7 @@ def main(testing=False):
     collection_flags.add_argument('--to', type=str, help='the text_id of a structure with the desired parameters')
     collection_flags.add_argument('--with', type=str,
                                   help=('the seedname (must be within pwd) of cell and param ' +
-                                        'files to use for polishing/swaps'))
+                                        'files to use for swaps'))
     collection_flags.add_argument('--prefix', type=str,
                                   help='add a prefix to all file names to write out (auto-appended with an underscore')
 

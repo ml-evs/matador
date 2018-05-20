@@ -1,11 +1,11 @@
 # coding: utf-8
-""" This file implements the base class Spatula
-that calls the scrapers and interfaces with the
-MongoDB client.
+# Distributed under the terms of the MIT License.
 
-TO-DO:
-    - refactor
+""" This file implements the base class Spatula that calls the scrapers
+and interfaces with the MongoDB client.
+
 """
+
 
 import os
 import random
@@ -23,9 +23,9 @@ from matador import __version__
 
 
 class Spatula:
-    """ The Spatula class implements methods to scrape folders
-    and individual files for crystal structures and create a
-    MongoDB document for each.
+    """ The Spatula class implements methods to scrape folders and
+    individual files for crystal structures and create a MongoDB
+    document for each.
 
     Files types that can be read are:
 
@@ -34,10 +34,8 @@ class Spatula:
         * SHELX (from airss.pl / pyAIRSS) .res output
 
     """
-
     def __init__(self, *args):
         """ Set up arguments and initialise DB client. """
-
         self.args = args[0]
         self.dryrun = self.args['dryrun']
         self.scan = self.args['scan']
@@ -66,8 +64,8 @@ class Spatula:
                 mdate = str(mdate).split()[0]
                 os.rename(manifest_name, manifest_name + '.' + str(mdate).split()[0])
 
-            wordfile = open(os.path.dirname(os.path.realpath(__file__)) + '/scrapers/words', 'r')
-            nounfile = open(os.path.dirname(os.path.realpath(__file__)) + '/scrapers/nouns', 'r')
+            wordfile = open(os.path.dirname(os.path.realpath(__file__)) + '/../scrapers/words', 'r')
+            nounfile = open(os.path.dirname(os.path.realpath(__file__)) + '/../scrapers/nouns', 'r')
             self.wlines = wordfile.readlines()
             self.num_words = len(self.wlines)
             self.nlines = nounfile.readlines()
@@ -198,7 +196,6 @@ class Spatula:
             int: 1 if successfully inputted into database, 0 otherwise.
 
         """
-
         try:
             plain_text_id = [self.wlines[random.randint(0, self.num_words-1)].strip(),
                              self.nlines[random.randint(0, self.num_nouns-1)].strip()]
@@ -247,7 +244,6 @@ class Spatula:
             file_lists (dict): filenames and filetype counts stored by directory name key.
 
         """
-
         print('\n{:^52}'.format('###### RUNNING IMPORTER ######') + '\n')
         for _, root in enumerate(file_lists):
             root_str = root
@@ -284,7 +280,6 @@ class Spatula:
             int: number of structures successfully imported.
 
         """
-
         multi = False  # are there multiple param/cell files?
         cell = False  # was the cell file successfully scraped?
         param = False  # was the param file successfully scraped?
@@ -396,7 +391,6 @@ class Spatula:
             int: number of successfully structures imported to database.
 
         """
-
         import_count = 0
         for _, file in enumerate(file_lists[root]['castep']):
             castep_dict, success = castep2dict(file, debug=False, verbosity=self.verbosity)
@@ -419,7 +413,6 @@ class Spatula:
             struct_list (list of (ObjectId, str)): list of Ids and sources of imported structures
 
         """
-
         changes = {'date': datetime.datetime.today(),
                    'count': len(struct_list),
                    'id_list': [struct[0] for struct in struct_list],
@@ -435,7 +428,6 @@ class Spatula:
                 and filetype counts.
 
         """
-
         import collections
         file_lists = dict()
         topdir = '.'
@@ -491,7 +483,6 @@ class Spatula:
             dict: the input dict minus duplicates.
 
         """
-
         new_file_lists = copy.deepcopy(file_lists)
         for _, root in enumerate(file_lists):
             # per folder delete list
@@ -548,7 +539,6 @@ def _display_import(file_lists):
         file_lists (dict): containing keys `<extension>_count`.
 
     """
-
     exts = ['res', 'cell', 'castep', 'param', 'synth', 'expt']
     counts = {ext: 0 for ext in exts}
     for root in file_lists:
