@@ -1,6 +1,11 @@
 #!/usr/bin/env python
-""" This file implements some simple utitlies to do with
-parsing/writing of files. """
+# coding: utf-8
+# Distributed under the terms of the MIT License.
+
+""" This submodule is essentially a script to scrape CASTEP help strings
+for all possible CASTEP parameters.
+
+"""
 
 
 def scrape_castep_params(executable):

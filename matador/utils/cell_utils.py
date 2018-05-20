@@ -1,5 +1,9 @@
-""" This file implements some useful functions
-for real/reciprocal cell manipulation and sampling.
+# coding: utf-8
+# Distributed under the terms of the MIT License.
+
+""" This submodule implements some useful functions for real/reciprocal
+cell manipulation, symmetry checking and sampling (e.g. grids and paths.)
+
 """
 
 import numpy as np

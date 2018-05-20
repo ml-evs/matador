@@ -1,5 +1,11 @@
 # coding: utf-8
-""" This file defines some useful generic cursor methods. """
+# Distributed under the terms of the MIT License.
+
+""" This submodule defines some useful generic cursor methods for
+displaying, extracting and refining results from a Mongo cursor/list.
+
+"""
+
 
 from traceback import print_exc
 from time import strftime

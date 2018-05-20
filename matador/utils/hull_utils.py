@@ -1,9 +1,12 @@
-# encoding: utf-8
-""" This file implements some useful geometric functions
-for the construction and manipulation of convex hulls.
+# coding: utf-8
+# Distributed under the terms of the MIT License.
+
+""" This file implements some useful geometric functions for the
+construction and manipulation of convex hulls.
+
 """
 
-# external libraries
+
 import numpy as np
 
 

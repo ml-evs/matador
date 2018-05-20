@@ -1,8 +1,10 @@
 # coding: utf-8
 # Distributed under the terms of the MIT License.
 
-""" This file is a dirty wrapper of ase-gui for
-quick visualisation of structures.
+""" This submodule contains a dirty wrapper of ase-gui for quick
+visualisation, and nglview wrapper for JupyterNotebook visualisation,
+and some colour definitions scraped from VESTA configs.
+
 """
 
 

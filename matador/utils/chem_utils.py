@@ -1,5 +1,11 @@
 # coding: utf-8
-""" This file defines some useful chemistry. """
+# Distributed under the terms of the MIT License.
+
+""" This submodule defines some useful chemical functions and
+constants, with a focus on battery materials.
+
+"""
+
 
 # external libraries
 import numpy as np

@@ -1,6 +1,12 @@
-""" This file implements some useful
-wrappers to the print function.
+# coding: utf-8
+# Distributed under the terms of the MIT License.
+
+""" This file implements some useful wrappers to the print function for
+writing errors and warnings to stderr.
+
 """
+
+
 import sys
 
 
