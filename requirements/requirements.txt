@@ -1,0 +1,7 @@
+# This requirements file gives a barebones matador installation that
+# does not include plotting, network analysis, or creation/querying of databases.
+numpy>=1.10
+scipy>=1.0
+periodictable
+spglib
+psutil

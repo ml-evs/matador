@@ -1,3 +1,11 @@
-Matthew Evans
-James Darby
-Angela Harper
+Primary author and maintainer:
+    Matthew Evans <https://www.bitbucket.org/me388> or <https://www.github.com/ml-evs>
+
+Project conception and supervision:
+    Andrew J Morris <www.andrewjmorris.org>
+
+First pass at ternary voltages:
+    James Darby <https://www.bitbucket.org/jpd47>
+
+Temperature-dependent hulls and thermodynamics scraping:
+    Angela Harper <https://www.bitbucket.org/harperaf13>

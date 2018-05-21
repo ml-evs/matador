@@ -11,5 +11,4 @@ f90wrap*
 *pdf_calculator_funcs*
 htmlcov
 _build
-.coverage
 *.ipynb_checkpoints

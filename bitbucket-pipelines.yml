@@ -9,11 +9,13 @@ options:
 pipelines:
   default:
     - step:
-        script: # Modify the commands below to build your repository.
-          - pip install .
-          - coverage run setup.py test
-          - coverage combine
-          - coverage report
+        script:
+          - python -c 'import numpy; print(numpy.__version__)'
+          - conda list
+          - pip install .[test]
+          - pip install .[db]
+          - pip install .[network]
+          - py.test --cov-config .coveragerc --cov=matador
         services:
           - mongo
 

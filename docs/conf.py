@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
 # matador documentation build configuration file, created by
@@ -36,7 +36,6 @@ import sphinx_rtd_theme
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = ['sphinx.ext.autodoc',
-              # 'm2r',
               'sphinxcontrib.napoleon',
               'sphinxarg.ext',
               'sphinx.ext.todo',
