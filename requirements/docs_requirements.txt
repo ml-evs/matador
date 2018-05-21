@@ -1,4 +1,4 @@
 sphinx
 sphinx-argparse
 sphinx-rtd-theme
-sphinxcontrib-napeoleon
+sphinxcontrib-napoleon
