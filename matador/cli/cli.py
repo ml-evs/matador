@@ -78,7 +78,7 @@ class MatadorCommandLine(object):
                     self.top = self.args.get('top')
                 if not self.cursor[:self.top]:
                     print_notify('Performing PDF fit for ' + str(len(self.cursor[:self.top])) + ' structures.')
-                    from matador.pdffit import PDFFitter
+                    from matador.plugins.pdffit.pdffit import PDFFitter
                     self.pdffit = PDFFitter(self.cursor[:self.top], **self.args)
                     try:
                         self.pdffit.spawn()
@@ -429,6 +429,7 @@ def main(testing=False):
     query_flags.add_argument('-d', '--details', action='store_true',
                              help='show as much detail about calculation as possible')
     query_flags.add_argument('-pa', '--per_atom', action='store_true', help='show quantities per atom not per fu.')
+    query_flags.add_argument('-dt', '--time', type=int, help='query only structures added before this time in days')
     query_flags.add_argument('--source', action='store_true',
                              help='print filenames from which structures were wrangled')
     query_flags.add_argument('-v', '--view', action='store_true',
