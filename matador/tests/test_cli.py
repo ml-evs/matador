@@ -34,7 +34,7 @@ class CLITest(unittest.TestCase):
         """ Test import and query. """
         from matador.query import DBQuery
         os.chdir(REAL_PATH + '/data/castep_files')
-        sys.argv = ['/home/matthew/.local/conda/bin/matador', 'import', '--db', DB_NAME, '--config', CONFIG_FNAME]
+        sys.argv = ['matador', 'import', '--db', DB_NAME, '--config', CONFIG_FNAME]
 
         matador.cli.cli.main(testing=True)
 

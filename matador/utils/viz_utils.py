@@ -18,7 +18,7 @@ def viz(doc):
 def get_element_colours():
     """ Read element colours from VESTA file. """
     import os
-    colours_fname = '/'.join(os.path.realpath(__file__).split('/')[:-1]) + '/config/vesta_elements.ini'
+    colours_fname = '/'.join(os.path.realpath(__file__).split('/')[:-1]) + '/../config/vesta_elements.ini'
     with open(colours_fname, 'r') as f:
         flines = f.readlines()
     element_colours = dict()
