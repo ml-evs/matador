@@ -19,12 +19,16 @@ ROOT_DIR = os.getcwd()
 SETTINGS = load_custom_settings(CONFIG_FNAME)
 
 MONGO_PRESENT = True
-print(SETTINGS)
 try:
     cli = pm.MongoClient(SETTINGS['mongo']['host'], serverSelectionTimeoutMS=1000)
     dbs = cli.database_names()
 except pm.errors.ServerSelectionTimeoutError:
     MONGO_PRESENT = False
+
+try:
+    cli.crystals[DB_NAME].drop()
+except:
+    pass
 
 
 @unittest.skipIf(not MONGO_PRESENT, 'MongoDB instance not found, skipping tests...')

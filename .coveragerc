@@ -11,4 +11,6 @@ omit =
     */tests/*
     setup.py
     */__init__.py
-    matador/plotting.py
+    *matador/plotting*
+    *matador/compute*
+    *matador/plugins*
