@@ -576,7 +576,7 @@ def get_hull_labels(hull, num_species=2):
 
     """
     eps = 1e-9
-    label_cursor = [doc for doc in hull.hull_cursor if doc['hull_distance'] <= 0 + eps]
+    label_cursor = [doc for doc in hull.hull_cursor if doc['hull_distance'] <= hull.args.get('label_cutoff') + eps]
     num_labels = len(set([get_formula_from_stoich(doc['stoichiometry']) for doc in label_cursor]))
     if num_labels < len(label_cursor):
         tmp_cursor = []
@@ -647,7 +647,7 @@ def plot_voltage_curve(hull, show=True):
                          markersize=5,
                          lw=2,
                          c=hull.colours[ind])
-    if hull.args.get('labels'):
+    if hull.args.get('labels') or hull.args.get('label_cutoff') is not None:
         label_cursor = get_hull_labels(hull, num_species=2)
         for i in range(len(label_cursor)):
             axQ.annotate(get_formula_from_stoich(label_cursor[i]['stoichiometry'],
@@ -946,10 +946,10 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
             ax.plot(np.sort(tie_line[:, 0]), tie_line[np.argsort(tie_line[:, 0]), 1] + hull.hull_cutoff,
                     '--', c=hull.colours[1], lw=1, alpha=0.5, zorder=1000, label='')
         # annotate hull structures
-        if hull.args.get('labels') or labels:
+        if hull.args.get('labels') or labels or hull.args.get('label_cutoff') is not None:
             label_cursor = get_hull_labels(hull, num_species=2)
             for ind, doc in enumerate(label_cursor):
-                arrowprops = dict(arrowstyle="-|>", color='k')
+                arrowprops = dict(arrowstyle="-|>", color='k', alpha=0.5)
                 if (ind + 2) < np.argmin(tie_line[:, 1]):
                     position = (0.8 * tie_line[ind + 2, 0], 1.15 * (tie_line[ind + 2, 1]) - 0.05)
                 elif (ind + 2) == np.argmin(tie_line[:, 1]):
@@ -1035,8 +1035,8 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
 
             ax.scatter(concs, energies, c=colours, alpha=alpha, s=scale * 20)
             for source in sources:
-                ax.scatter(1e10, 1e10, c=colour_choices[source], label=source, alpha=alpha)
-            ax.scatter(1e10, 1e10, c=hull.colours[-2], label='Other', alpha=alpha)
+                ax.scatter(1e10, 1e10, c=colour_choices[source], label=source, alpha=alpha, lw=1)
+            ax.scatter(1e10, 1e10, c=hull.colours[-2], label='Other', alpha=alpha, lw=1)
             ax.legend(loc=9)
 
         # tie lines
@@ -1273,7 +1273,7 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, expecting_cb
         ax.heatmap(sampling, style="hexagonal", cbarlabel='Number of structures', cmap='afmhot')
 
     # add labels
-    if hull.args.get('labels') or labels:
+    if hull.args.get('labels') or labels or hull.args.get('label_cutoff') is not None:
         label_cursor = get_hull_labels(hull, num_species=3)
         label_coords = [[0.1+(val-0.5)*0.3, val] for val in np.linspace(0.5, 0.8, int(round(len(label_cursor)/2.)))]
         label_coords += [[0.9-(val-0.5)*0.3, val] for val in np.linspace(0.5, 0.8, int(round(len(label_cursor)/2.)))]
@@ -1281,7 +1281,7 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, expecting_cb
         for ind, doc in enumerate(label_cursor):
             conc = np.asarray(doc['concentration'] + [1 - sum(doc['concentration'])])
             formula = get_formula_from_stoich(doc['stoichiometry'], tex=True, elements=hull.elements)
-            arrowprops = dict(arrowstyle="-|>", color='k', lw=2)
+            arrowprops = dict(arrowstyle="-|>", color='k', lw=2, alpha=0.5, zorder=1, shrinkA=2, shrinkB=4)
             cart = barycentric2cart([doc['concentration'] + [0]])[0][:2]
             min_dist = 1e20
             closest_label = 0
@@ -1290,7 +1290,7 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, expecting_cb
                 if dist < min_dist:
                     min_dist = dist
                     closest_label = coord_ind
-            ax.annotate(formula, scale*conc, zorder=1e10,
+            ax.annotate(formula, scale*conc,
                         textcoords='data',
                         xytext=[scale*val for val in label_coords[closest_label]],
                         ha='right',

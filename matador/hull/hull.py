@@ -364,7 +364,7 @@ class QueryConvexHull(object):
                 stoichiometry.
 
         Returns:
-            hull_dist (numpy.ndarray): N-dim array storing distances to
+            numpy.ndarray: N-dim array storing distances to
                 the hull for N structures,
 
         """

@@ -373,6 +373,8 @@ def main(testing=False):
     material_flags = argparse.ArgumentParser(add_help=False)
     material_flags.add_argument('-hc', '--hull_cutoff', type=float,
                                 help='return only structures within a certain distance from hull in eV/atom')
+    material_flags.add_argument('-lc', '--label_cutoff', type=float,
+                                help='label only structures within a certain distance from hull in eV/atom')
     material_flags.add_argument('-hT', '--hull_temp', type=float,
                                 help='return only structures within a certain distance from hull in K')
     material_flags.add_argument('--biggest', action='store_true',
