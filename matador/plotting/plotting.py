@@ -576,7 +576,7 @@ def get_hull_labels(hull, num_species=2):
 
     """
     eps = 1e-9
-    label_cursor = [doc for doc in hull.hull_cursor if doc['hull_distance'] <= hull.args.get('label_cutoff') + eps]
+    label_cursor = [doc for doc in hull.hull_cursor if doc['hull_distance'] <= hull.args.get('label_cutoff', 0.0) + eps]
     num_labels = len(set([get_formula_from_stoich(doc['stoichiometry']) for doc in label_cursor]))
     if num_labels < len(label_cursor):
         tmp_cursor = []
