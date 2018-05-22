@@ -1,7 +1,11 @@
+.. include:: readme.rst
+
 .. toctree::
     :hidden:
     :maxdepth: 2
-    readme
-    examples
+    
+    install
+    getting_started
     changelog
+    examples
     Python API <modules>

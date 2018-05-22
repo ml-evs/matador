@@ -2,4 +2,3 @@ sphinx
 sphinx-argparse
 sphinx-rtd-theme
 sphinxcontrib-napoleon
-recommonmark
