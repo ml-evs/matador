@@ -20,10 +20,6 @@
 import os
 import sys
 import sphinx_rtd_theme
-# sys.path.insert(0, os.path.abspath('../matador'))
-# sys.path.insert(0, os.path.abspath('../matador/similarity'))
-# sys.path.insert(0, os.path.abspath('../matador/similarity'))
-# sys.path.insert(0, os.path.abspath('../matador/utils'))
 
 
 # -- General configuration ------------------------------------------------
@@ -50,8 +46,9 @@ autodoc_member_order = 'bysource'
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
 #
-# source_suffix = ['.rst', '.md']
-source_suffix = '.rst'
+
+source_parsers = {'.md': 'recommonmark.parser.CommonMarkParser'}
+source_suffix = ['.rst', '.md']
 
 # The master toctree document.
 master_doc = 'index'
@@ -87,6 +84,24 @@ pygments_style = 'sphinx'
 
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = False
+
+# run apidoc automatically on RTD: https://github.com/rtfd/readthedocs.org/issues/1139
+def run_apidoc(_):
+    import subprocess
+    modules = ['../matador']
+    excludes = ['../setup.py', '../matador/tests/*']
+    for module in modules:
+        cur_dir = os.path.abspath(os.path.dirname(__file__))
+        # os.chdir('..')
+        output_path = cur_dir
+        cmd_path = 'sphinx-apidoc'
+        command = [cmd_path, '-o', cur_dir, module, ' '.join(excludes)]
+        print(command)
+        subprocess.check_call(command)
+        # os.chdir(cur_dir)
+
+def setup(app):
+    app.connect('builder-inited', run_apidoc)
 
 # -- Napolean options -----------------------------------------------------
 
@@ -172,6 +187,7 @@ man_pages = [
 
 intersphinx_mapping = intersphinx_mapping = {'python': ('https://docs.python.org/3.6', None),
                                              'numpy': ('http://docs.scipy.org/doc/numpy/', None),
+                                             'pymongo': ('https://api.mongodb.com/python/current/', None),
                                              'np': ('http://docs.scipy.org/doc/numpy/', None),
                                              'matplotlib': ('http://matplotlib.org', None)}
 
