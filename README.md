@@ -1,4 +1,8 @@
 # **matador**
+----
+[![Bitbucket Pipelines](https://img.shields.io/bitbucket/pipelines/me388/matador/master.svg)](https://bitbucket.org/me388/matador/addon/pipelines/home)
+[![Coverage Status](https://coveralls.io/repos/bitbucket/me388/matador/badge.svg?branch=master)](https://coveralls.io/bitbucket/me388/matador?branch=master)
+[![Documentation Status](https://readthedocs.org/projects/matador-database/badge/?version=latest)](https://matador-database.readthedocs.io/en/latest/?badge=latest)
 
 matador is an aggregator and manipulator of the results first-principles calculations, primarily geometry optimisations.
 
