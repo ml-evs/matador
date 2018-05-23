@@ -92,7 +92,7 @@ def run_apidoc(_):
     module = os.path.join(src_dir, '../../matador')
     cmd_path = 'sphinx-apidoc'
     print(excludes)
-    command = [cmd_path, '-o', src_dir, module, ' '.join(excludes)]
+    command = [cmd_path, '-M', '-o', src_dir, module, ' '.join(excludes)]
     print(command)
     subprocess.check_call(command)
 
