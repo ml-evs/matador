@@ -258,7 +258,7 @@ class ComputeTest(unittest.TestCase):
 
         os.chdir(REAL_PATH)
         runner = BatchRun(seed=['LiAs'], debug=False, no_reopt=True, verbosity=VERBOSITY, ncores=4, executable=EXECUTABLE)
-        runner.spawn(join=True)
+        runner.spawn(join=False)
 
         completed_exists = os.path.isfile('completed/_LiAs_testcase.res')
         cruft = glob.glob('_LiAs_testcase*')
@@ -339,6 +339,51 @@ class ComputeTest(unittest.TestCase):
         self.assertTrue(all(completed_exists), "couldn't find output files!")
 
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
+    def testConvergenceRunner(self):
+        """ Check that convergence tests run to completion. """
+        from matador.compute import BatchRun
+        shutil.copy(REAL_PATH + 'data/structures/LiAs_testcase.res', REAL_PATH + '_LiAs_testcase.res')
+        shutil.copy(REAL_PATH + 'data/LiAs_scf.cell', REAL_PATH + 'LiAs_scf.cell')
+        shutil.copy(REAL_PATH + 'data/LiAs_scf.param', REAL_PATH + 'LiAs_scf.param')
+        shutil.copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
+        shutil.copy(REAL_PATH + 'data/pspots/As_00PBE.usp', '.')
+
+        with open('kpt.conv', 'w') as f:
+            f.write('0.08\n')
+            f.write('0.07')
+
+        with open('cutoff.conv', 'w') as f:
+            f.write('300\n')
+            f.write('400')
+
+        runner = BatchRun(seed=['LiAs_scf'], debug=False,
+                          conv_cutoff=True, conv_kpt=True,
+                          verbosity=VERBOSITY, ncores=4, executable=EXECUTABLE)
+        runner.spawn(join=False)
+
+        dirs_exist = [os.path.isdir(_dir) for _dir in ['completed_kpts', 'completed_cutoff']]
+        bad_castep_exist = os.path.isdir('bad_castep')
+
+        results = ['completed_cutoff/_LiAs_testcase_{}eV.castep'.format(cutoff) for cutoff in [300, 400]]
+        results += ['completed_kpts/_LiAs_testcase_{}A.castep'.format(kpts) for kpts in [0.08, 0.07]]
+        files_exist = [os.path.isfile(_file) for _file in results]
+
+        to_clean = ['jobs.txt', 'failures.txt', 'finished_cleanly.txt', 'kpt.conv', 'cutoff.conv',
+                    'Li_00PBE.usp', 'As_00PBE.usp', '_LiAs_testcase.res', '_LiAs_testcase.res.lock',
+                    'LiAs_scf.cell', 'LiAs_scf.param']
+
+        for _file in to_clean:
+            if os.path.isfile(_file):
+                os.remove(_file)
+
+        shutil.rmtree('completed_cutoff')
+        shutil.rmtree('completed_kpts')
+
+        self.assertTrue(all(dirs_exist))
+        self.assertFalse(bad_castep_exist)
+        self.assertTrue(all(files_exist))
+
+    @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
     def testBatchFailedSCF(self):
         """ Check that SCF failures don't kill everything... """
         from matador.compute import BatchRun, reset_job_folder_and_count_remaining
@@ -349,7 +394,7 @@ class ComputeTest(unittest.TestCase):
         shutil.copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
         shutil.copy(REAL_PATH + 'data/pspots/As_00PBE.usp', '.')
         runner = BatchRun(seed=['LiAs_scf'], debug=False, no_reopt=True, verbosity=VERBOSITY, ncores=4, executable=EXECUTABLE)
-        runner.spawn(join=True)
+        runner.spawn(join=False)
 
         completed_folder_exists = os.path.isdir('completed')
         bad_castep_folder_exists = os.path.isdir('bad_castep')
@@ -407,9 +452,6 @@ class ComputeTest(unittest.TestCase):
             walltime_error = True
         except Exception as err:
             from traceback import print_exc
-            print('!!!!!!!!!!!!!!!!!!')
-            print_exc()
-            print('!!!!!!!!!!!!!!!!!!')
 
         castep_exists = os.path.isfile('LiAs_testcase.castep')
         bad_castep_exists = os.path.isfile('LiAs_testcase_bad.castep')

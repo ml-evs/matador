@@ -205,6 +205,9 @@ class FullRelaxer:
                         not os.path.isfile(calc_doc['species_pot'][elem[0]])):
                     raise RuntimeError('You forgot your pseudos, you silly goose!')
 
+        # this is now a dict containing the exact calculation we are going to run
+        self.calc_doc = calc_doc
+
         # do memcheck, if desired, and only continue if enough memory is free
         if self.memcheck:
             self.enough_memory = self.do_memcheck(calc_doc, self.seed)
@@ -215,6 +218,8 @@ class FullRelaxer:
 
         # run convergence tests
         if any([self.conv_cutoff_bool, self.conv_kpt_bool]):
+            if self.verbosity >= 1:
+                print('Running convergence tests...')
             return self.run_convergence_tests(calc_doc)
 
         # perform relaxation
@@ -232,11 +237,11 @@ class FullRelaxer:
             self.geom_max_iter_list.extend(num_fine_iter * [fine_iter])
             if not self.geom_max_iter_list:
                 raise RuntimeError('Could not divide up relaxation; consider increasing geom_max_iter')
-            self.calc_doc = calc_doc
 
             # begin relaxation
             if self.start:
                 timeout = False
+                success = False
                 try:
                     success = self.relax()
                 except WalltimeError as oops:
@@ -308,8 +313,8 @@ class FullRelaxer:
             bool: True iff structure was optimised, False otherwise.
 
         """
-        seed = self.seed
         calc_doc = self.calc_doc
+        seed = self.seed
         if self.verbosity > 1:
             print_notify('Relaxing ' + self.seed)
         geom_max_iter_list = self.geom_max_iter_list
@@ -668,11 +673,14 @@ class FullRelaxer:
 
         """
         successes = []
-        self.run_convergence_tests(calc_doc)
         cached_cutoff = calc_doc['cut_off_energy']
         if self.conv_cutoff_bool:
             # run series of singlepoints for various cutoffs
+            if self.verbosity > 1:
+                print('Running cutoff convergence tests...')
             for cutoff in self.conv_cutoff:
+                if self.verbosity > 1:
+                    print('{} eV... '.format(cutoff), end='')
                 calc_doc.update({'cut_off_energy': cutoff})
                 self.paths['completed_dir'] = 'completed_cutoff'
                 seed = self.seed + '_' + str(cutoff) + 'eV'
@@ -680,8 +688,12 @@ class FullRelaxer:
                 successes.append(success)
         if self.conv_kpt_bool:
             # run series of singlepoints for various cutoffs
+            if self.verbosity > 1:
+                print('Running cutoff convergence tests...')
             calc_doc['cut_off_energy'] = cached_cutoff
             for kpt in self.conv_kpt:
+                if self.verbosity > 1:
+                    print('{} 1/A... '.format(kpt), end='')
                 calc_doc.update({'kpoints_mp_spacing': kpt})
                 self.paths['completed_dir'] = 'completed_kpts'
                 seed = self.seed + '_' + str(kpt) + 'A'
@@ -1336,7 +1348,7 @@ class BatchRun:
             if errors:
                 error_message = ''
                 for error in errors:
-                    error_message += 'Process {} raised error {}'.format(error[0], error[1])
+                    error_message += 'Process {} raised error {}. '.format(error[0], error[1])
                 if len(set([type(error[1]) for error in errors])) == 1:
                     raise type(errors[0][1])(error_message)
                 raise BundledErrors(error_message)
@@ -1347,10 +1359,9 @@ class BatchRun:
                 proc.terminate()
             raise SystemExit('Killing running jobs and exiting...')
 
-        except BundledErrors as err:
-            raise err
-
         except Exception as err:
+            _ = [proc.join(timeout=10) for proc in procs]
+            _ = [proc.terminate() for proc in procs if proc.is_alive()]
             raise err
 
     def perform_new_calculations(self, res_list, error_queue, proc_id):
@@ -1374,25 +1385,24 @@ class BatchRun:
                 listed = []
             running = any([listed, locked])
             if not running:
-
-                # check we haven't reached job limit
-                if job_count == self.limit:
-                    raise SystemExit
-
-                # write lock file
-                if not os.path.isfile('{}.lock'.format(res)):
-                    with open(res + '.lock', 'a') as job_file:
-                        pass
-                else:
-                    print('Another node wrote this file when I wanted to, skipping...')
-                    continue
-
-                # write to jobs file
-                with open(self.paths['jobs_fname'], 'a') as job_file:
-                    job_file.write(res + '\n')
-
-                # create full relaxer object for creation and running of job
                 try:
+                    # check we haven't reached job limit
+                    if job_count == self.limit:
+                        raise SystemExit
+
+                    # write lock file
+                    if not os.path.isfile('{}.lock'.format(res)):
+                        with open(res + '.lock', 'a') as job_file:
+                            pass
+                    else:
+                        print('Another node wrote this file when I wanted to, skipping...')
+                        continue
+
+                    # write to jobs file
+                    with open(self.paths['jobs_fname'], 'a') as job_file:
+                        job_file.write(res + '\n')
+
+                    # create full relaxer object for creation and running of job
                     job_count += 1
                     hostname = os.uname()[1]
                     relaxer = FullRelaxer(node=None, res=res,
@@ -1422,7 +1432,8 @@ class BatchRun:
                         with open(self.paths['failures_fname'], 'a') as job_file:
                             job_file.write(res + '\n')
 
-                except (KeyboardInterrupt, SystemExit, RuntimeError, WalltimeError) as err:
+                # push errors to error queue and raise
+                except Exception as err:
                     error_queue.put((proc_id, err))
                     raise err
 
