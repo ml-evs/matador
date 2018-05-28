@@ -8,7 +8,7 @@ of particular database changes.
 """
 
 
-from matador.utils.db_utils import make_connection_to_collection
+from matador.db import make_connection_to_collection
 from matador.utils.print_utils import print_warning, print_notify
 
 

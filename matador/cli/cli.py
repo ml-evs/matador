@@ -7,7 +7,7 @@
 from matador.query import DBQuery
 from matador.hull import QueryConvexHull
 from matador.utils.print_utils import print_failure, print_warning, print_notify
-from matador.utils.db_utils import make_connection_to_collection
+from matador.db import make_connection_to_collection
 from matador.config import load_custom_settings
 
 
@@ -31,7 +31,8 @@ class MatadorCommandLine(object):
         self.export = any([self.args.get(ext) for ext in file_exts])
 
         if self.args['subcmd'] != 'import':
-            self.settings = load_custom_settings(config_fname=self.args.get('config'))
+            self.settings = load_custom_settings(config_fname=self.args.get('config'),
+                                                 debug=self.args.get('debug'))
             result = make_connection_to_collection(self.args.get('db'),
                                                    check_collection=True,
                                                    mongo_settings=self.settings)

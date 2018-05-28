@@ -1,0 +1,9 @@
+mongo:
+    host: blah
+    port: 666
+
+plotting:
+    style: matador
+
+this_is_a_test:
+    yes: it is

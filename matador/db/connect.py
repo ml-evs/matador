@@ -45,21 +45,24 @@ def make_connection_to_collection(coll_names, check_collection=False, allow_chan
         connectTimeoutMS=10000)  # give up trying to connect to new database after 2 seconds
 
     try:
-        if settings['mongo']['db'] not in client.database_names():
-            if testing:
-                response = 'y'
-            else:
-                response = input('Database {db} does not exist at {host}:{port}/{db}, '
-                                 'would you like to create it? (y/n) '
-                                 .format(**settings['mongo']))
-
-            if response.lower() != 'y':
-                exit('Exiting...')
-            else:
-                print('Creating database {}'.format(settings['mongo']['db']))
+        database_names = client.database_names()
+        print('Success!')
     except pm.errors.ServerSelectionTimeoutError as exc:
         print('{}: {}'.format(type(exc).__name__, exc))
         raise SystemExit('Unable to connect to {host}:{port}/{db}, exiting...'.format(**settings['mongo']))
+
+    if settings['mongo']['db'] not in database_names:
+        if testing:
+            response = 'y'
+        else:
+            response = input('Database {db} does not exist at {host}:{port}/{db}, '
+                             'would you like to create it? (y/n) '
+                             .format(**settings['mongo']))
+
+        if response.lower() != 'y':
+            exit('Exiting...')
+        else:
+            print('Creating database {}'.format(settings['mongo']['db']))
 
     db = client[settings['mongo']['db']]
     possible_collections = db.collection_names()

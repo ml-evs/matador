@@ -12,7 +12,7 @@ from traceback import print_exc
 from matador.utils.print_utils import print_warning
 
 
-DEFAULTS = {
+DEFAULT_SETTINGS = {
     "mongo": {
         "db": "crystals",
         "host": "localhost",
@@ -26,25 +26,24 @@ DEFAULTS = {
 }
 
 
-def load_custom_settings(config_fname=None):
+def load_custom_settings(config_fname=None, debug=False):
     """ Load mongodb settings dict from file given by fname, or from
     defaults. Hierarchy of filenames to check:
 
         1. ~/.matadorrc
         2. ~/.config/matadorrc
-        3. ../config/matadorrc.yml
 
     Keyword Arguments:
         fname (str): filename of custom settings file.
+        debug (bool): print settings on loading.
 
     """
     import yaml
 
     if config_fname is None:
         trial_user_fnames = [
-            "$HOME/.matadorrc",
-            "$HOME/matadorrc.yml",
-            "$HOME/matador_conf.yml",
+            os.path.expanduser("~/.matadorrc"),
+            os.path.expanduser("~/.config/matadorrc")
         ]
         if sum([os.path.isfile(fname) for fname in trial_user_fnames]) > 1:
             print_warning("Found multiple user config files {}"
@@ -58,7 +57,7 @@ def load_custom_settings(config_fname=None):
         else:
             # otherwise load default
             config_fname = (
-                "/".join(__file__.split("/")[:-1]) + "/../config/matadorrc.yml"
+                "/".join(__file__.split("/")[:-1]) + "/matadorrc.yml"
             )
 
         print("Loading settings from {}".format(config_fname))
@@ -66,7 +65,8 @@ def load_custom_settings(config_fname=None):
     custom_settings = {}
     if os.path.isfile(config_fname):
         try:
-            custom_settings = yaml.load(open(config_fname))
+            with open(config_fname, 'r') as f:
+                custom_settings = yaml.load(f)
         except Exception:
             print_exc()
             raise SystemExit(
@@ -78,6 +78,11 @@ def load_custom_settings(config_fname=None):
         )
 
     settings = {}
-    settings.update(DEFAULTS)
+    settings.update(DEFAULT_SETTINGS)
     settings.update(custom_settings)
+
+    if debug:
+        import json
+        print(json.dumps(settings, indent=2))
+
     return settings

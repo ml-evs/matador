@@ -18,7 +18,7 @@ import pymongo as pm
 from matador.scrapers.castep_scrapers import castep2dict, param2dict, cell2dict
 from matador.scrapers.castep_scrapers import res2dict, dir2dict
 from matador.utils.cell_utils import calc_mp_spacing
-from matador.utils.db_utils import make_connection_to_collection
+from matador.db import make_connection_to_collection
 from matador.config import load_custom_settings
 from matador import __version__
 
@@ -82,7 +82,7 @@ class Spatula:
             self.logfile = open(logfile_name, 'w')
             self.manifest = open(manifest_name, 'w')
 
-        self.settings = load_custom_settings(config_fname=self.config_fname)
+        self.settings = load_custom_settings(config_fname=self.config_fname, debug=self.debug)
         result = make_connection_to_collection(self.args.get('db'),
                                                check_collection=False,
                                                testing=self.args.get('testing'),
@@ -97,7 +97,7 @@ class Spatula:
             # if using default collection, check we are in the correct path
             if 'mongo' in self.settings and 'default_collection_file_path' in self.settings['mongo']:
                 if not os.getcwd().startswith(
-                        self.settings['mongo']['default_collection_file_path']):
+                        os.path.expanduser(self.settings['mongo']['default_collection_file_path'])):
                     import time
                     print('PERMISSION DENIED... and...')
                     time.sleep(3)

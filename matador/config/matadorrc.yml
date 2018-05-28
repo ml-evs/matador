@@ -3,7 +3,7 @@ mongo:
     port: 27017
     db: crystals
     default_collection: repo
-    default_collection_file_path: $HOME/matador-db
+    default_collection_file_path: ~/matador-db
 
 plotting:
     default_style: matador
