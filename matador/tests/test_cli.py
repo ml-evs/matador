@@ -10,12 +10,12 @@ from matador.config import load_custom_settings
 
 REAL_PATH = '/'.join(os.path.realpath(__file__).split('/')[:-1]) + '/'
 if os.uname()[1] == 'cluster2':
-    CONFIG_FNAME = REAL_PATH + '../config/matadorrc.yml'
+    CONFIG_FNAME = None
 else:
     CONFIG_FNAME = REAL_PATH + 'data/matador_pipelines_conf.yml'
 DB_NAME = 'ci_test'
 ROOT_DIR = os.getcwd()
-SETTINGS = load_custom_settings(CONFIG_FNAME)
+SETTINGS = load_custom_settings(config_fname=CONFIG_FNAME)
 
 MONGO_PRESENT = True
 try:
@@ -29,6 +29,10 @@ try:
 except:
     pass
 
+files_to_delete = glob.glob('*spatula*')
+for f in files_to_delete:
+    os.remove(f)
+
 
 @unittest.skipIf(not MONGO_PRESENT, 'MongoDB instance not found, skipping tests...')
 class CLITest(unittest.TestCase):
@@ -37,7 +41,10 @@ class CLITest(unittest.TestCase):
         """ Test import and query. """
         from matador.query import DBQuery
         os.chdir(REAL_PATH + '/data/castep_files')
-        sys.argv = ['matador', 'import', '--db', DB_NAME, '--config', CONFIG_FNAME]
+        sys.argv = ['matador', 'import', '--db', DB_NAME]
+
+        if CONFIG_FNAME is not None:
+            sys.argv += ['--config', CONFIG_FNAME]
 
         matador.cli.cli.main(testing=True)
 

@@ -345,14 +345,14 @@ class ComputeTest(unittest.TestCase):
         shutil.copy(REAL_PATH + 'data/structures/LiAs_testcase.res', REAL_PATH + '_LiAs_testcase.res')
         shutil.copy(REAL_PATH + 'data/LiAs_scf.cell', REAL_PATH + 'LiAs_scf.cell')
         shutil.copy(REAL_PATH + 'data/LiAs_scf.param', REAL_PATH + 'LiAs_scf.param')
-        shutil.copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
-        shutil.copy(REAL_PATH + 'data/pspots/As_00PBE.usp', '.')
+        shutil.copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', REAL_PATH + 'Li_00PBE.usp')
+        shutil.copy(REAL_PATH + 'data/pspots/As_00PBE.usp', REAL_PATH + 'As_00PBE.usp')
 
-        with open('kpt.conv', 'w') as f:
+        with open(REAL_PATH + 'kpt.conv', 'w') as f:
             f.write('0.08\n')
             f.write('0.07')
 
-        with open('cutoff.conv', 'w') as f:
+        with open(REAL_PATH + 'cutoff.conv', 'w') as f:
             f.write('300\n')
             f.write('400')
 
@@ -373,11 +373,12 @@ class ComputeTest(unittest.TestCase):
                     'LiAs_scf.cell', 'LiAs_scf.param']
 
         for _file in to_clean:
-            if os.path.isfile(_file):
-                os.remove(_file)
+            if os.path.isfile(REAL_PATH + _file):
+                os.remove(REAL_PATH + _file)
 
         shutil.rmtree('completed_cutoff')
         shutil.rmtree('completed_kpts')
+        shutil.rmtree('input')
 
         self.assertTrue(all(dirs_exist))
         self.assertFalse(bad_castep_exist)
