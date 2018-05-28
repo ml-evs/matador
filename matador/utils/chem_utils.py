@@ -375,13 +375,15 @@ def get_root_source(source):
     """ Get the main file source from a doc's source list.
 
     Parameters:
-        source (list): contents of doc['source'].
+        source (list/dict): contents of doc['source'] or the doc itself.
 
     Returns:
         str: "root" filename, e.g. if source = ['KP.cell', 'KP.param',
             'KP_specific_structure.res'] then root = 'KP_specific_structure'.
 
     """
+    if isinstance(source, dict):
+        source = source['source']
     src_list = set()
     for src in source:
         if src.endswith('.res') or src.endswith('.castep') or src.endswith('.history'):
