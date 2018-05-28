@@ -1,5 +1,9 @@
-include matador/config/*
-include matador/config/*
-include matador/tests/data/*
+recursive-include matador/config *
+recursive-include docs *
+recursive-include matador/tests/data *
 include matador/scrapers/words
 include matador/scrapers/nouns
+include README
+include CHANGELOG
+include LICENSE
+include contributors.txt

@@ -11,33 +11,66 @@ import pymongo as pm
 
 from matador.utils.print_utils import print_warning
 
-MONGO_DEFAULTS = {'mongo': {'db': 'crystals', 'host': 'localhost',
-                  'port': 27017, 'default_collection': 'repo'}}
+MONGO_DEFAULTS = {
+    "mongo": {
+        "db": "crystals",
+        "host": "localhost",
+        "port": 27017,
+        "default_collection": "repo",
+    }
+}
 
 
 def load_custom_settings(config_fname=None):
     """ Load mongodb settings dict from file given by fname, or from
-    defaults.
+    defaults. Hierarchy of filenames to check:
+
+        1. ~/.matadorrc
+        2. ~/.config/matadorrc
+        3. ../config/matadorrc.yml
 
     Keyword Arguments:
         fname (str): filename of custom settings file.
 
     """
-    import json
+    import yaml
+
     if config_fname is None:
-        config_fname = '/'.join(__file__.split('/')[:-1]) + '/../config/matador_conf.json'
-        print('Loading settings from {}'.format(config_fname))
+        trial_user_fnames = [
+            "$HOME/.matadorrc",
+            "$HOME/matadorrc.yml",
+            "$HOME/matador_conf.yml",
+        ]
+        if sum([os.path.isfile(fname) for fname in trial_user_fnames]) > 1:
+            print_warning("Found multiple user config files {}"
+                          .format([val for val in trial_user_fnames if os.path.isfile(val)]))
+
+        # use first file that exists in hierarchy
+        for fname in trial_user_fnames:
+            if os.path.isfile(fname):
+                config_fname = fname
+                break
+        else:
+            # otherwise load default
+            config_fname = (
+                "/".join(__file__.split("/")[:-1]) + "/../config/matadorrc.yml"
+            )
+
+        print("Loading settings from {}".format(config_fname))
 
     custom_settings = {}
     if os.path.isfile(config_fname):
         try:
-            with open(config_fname, 'r') as fp:
-                custom_settings = json.load(fp)
-        except (FileNotFoundError, json.decoder.JSONDecodeError):
+            custom_settings = yaml.load(open(config_fname))
+        except Exception:
             print_exc()
-            raise SystemExit('Failed to read custom settings file {}'.format(config_fname))
+            raise SystemExit(
+                "Failed to read custom settings file {} as YAML".format(config_fname)
+            )
     else:
-        print_warning('Could not find {}, loading default settings...'.format(config_fname))
+        print_warning(
+            "Could not find {}, loading default settings...".format(config_fname)
+        )
 
     settings = {}
     settings.update(MONGO_DEFAULTS)
@@ -86,7 +119,10 @@ def make_connection_to_collection(coll_names, check_collection=False, allow_chan
             if testing:
                 response = 'y'
             else:
-                response = input('Database {db} does not exist at {host}:{port}/{db}, would you like to create it? (y/n) '.format(**settings['mongo']))
+                response = input('Database {db} does not exist at {host}:{port}/{db}, '
+                                 'would you like to create it? (y/n) '
+                                 .format(**settings['mongo']))
+
             if response.lower() != 'y':
                 exit('Exiting...')
             else:
