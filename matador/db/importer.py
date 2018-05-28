@@ -92,7 +92,7 @@ class Spatula:
         assert len(self.collections) == 1, 'Can only import to one collection.'
         self.repo = list(self.collections.values())[0]
 
-        if self.args.get('db') is None and not self.dryrun:
+        if self.args.get('db') is None and not self.dryrun and not self.args.get('force'):
             # if using default collection, check we are in the correct path
             if 'mongo' in self.settings and 'default_collection_file_path' in self.settings['mongo']:
                 if not os.getcwd().startswith(

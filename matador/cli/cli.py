@@ -404,6 +404,7 @@ def main(testing=False):
     spatula_flags.add_argument('-d', '--dryrun', action='store_true',
                                help='run the importer without connecting to the database')
     spatula_flags.add_argument('-v', '--verbosity', action='count', help='enable verbose output')
+    spatula_flags.add_argument('-f', '--force', action='store_true', help='override main database protection')
     spatula_flags.add_argument('-t', '--tags', nargs='+', type=str, help='set user tags, e.g. nanotube, project name')
     spatula_flags.add_argument('-s', '--scan', action='store_true',
                                help='only scan the database for new structures, do not dictify')
