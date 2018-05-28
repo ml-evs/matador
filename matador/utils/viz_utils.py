@@ -16,9 +16,22 @@ def viz(doc):
 
 
 def get_element_colours():
-    """ Read element colours from VESTA file. """
+    """ Read element colours from VESTA file. The colours file can be
+    specified in the matadorrc. If unspecified, the default
+    ../config/vesta_elements.ini will be used.
+
+    """
     import os
-    colours_fname = '/'.join(os.path.realpath(__file__).split('/')[:-1]) + '/../config/vesta_elements.ini'
+    from matador.config import load_custom_settings
+    # check if element_colours has been given as an absolute path
+    colours_fname = load_custom_settings().get('plotting').get('element_colours')
+    # if element_colours is not specified or doesn't exist, try relative path
+    if not os.path.isfile(colours_fname):
+        colours_fname = '/'.join(os.path.realpath(__file__).split('/')[:-1]) + '/../config/{}'.format(colours_fname)
+    # otherwise fallback to ../config/vesta_elements.ini
+    if not os.path.isfile(colours_fname):
+        colours_fname = '/'.join(os.path.realpath(__file__).split('/')[:-1]) + '/../config/vesta_elements.ini'
+
     with open(colours_fname, 'r') as f:
         flines = f.readlines()
     element_colours = dict()
@@ -33,6 +46,14 @@ def get_element_colours():
 def nb_viz(doc, repeat=1, bonds=None):
     """ Return an ipywidget for nglview visualisation in
     a Jupyter notebook or otherwise.
+
+    Parameters:
+        doc (matador.crystal.Crystal / dict): matador document to show.
+
+    Keyword arguments:
+        repeat (int): number of periodic images to include.
+        bonds (str): custom bond selection.
+
     """
     import nglview
     atoms = doc2ase(doc)

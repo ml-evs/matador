@@ -6,7 +6,7 @@ import glob
 import pymongo as pm
 
 import matador.cli.cli
-from matador.utils.db_utils import load_custom_settings
+from matador.config import load_custom_settings
 
 REAL_PATH = '/'.join(os.path.realpath(__file__).split('/')[:-1]) + '/'
 if os.uname()[1] == 'cluster2':

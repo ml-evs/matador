@@ -7,7 +7,8 @@
 from matador.query import DBQuery
 from matador.hull import QueryConvexHull
 from matador.utils.print_utils import print_failure, print_warning, print_notify
-from matador.utils.db_utils import make_connection_to_collection, load_custom_settings
+from matador.utils.db_utils import make_connection_to_collection
+from matador.config import load_custom_settings
 
 
 class MatadorCommandLine(object):

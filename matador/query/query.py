@@ -22,7 +22,8 @@ from matador.utils.print_utils import print_failure, print_warning, print_succes
 from matador.utils.chem_utils import get_periodic_table, get_formula_from_stoich
 from matador.utils.chem_utils import parse_element_string, get_stoich_from_formula
 from matador.utils.cursor_utils import display_results
-from matador.utils.db_utils import make_connection_to_collection, load_custom_settings
+from matador.utils.db_utils import make_connection_to_collection
+from matador.config import load_custom_settings
 
 
 class DBQuery:

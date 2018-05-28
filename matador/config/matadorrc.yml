@@ -1,9 +1,9 @@
 mongo:
-    host: node1
+    host: localhost 
     port: 27017
     db: crystals
     default_collection: repo
-    default_collection_file_path: /home/morris/shared/structure_repository
+    default_collection_file_path: $HOME/matador-db
 
 plotting:
     default_style: matador
