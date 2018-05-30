@@ -745,7 +745,7 @@ class DBQuery:
     def _query_pressure(self, custom_pressure=None):
         """ Query pressure, by an approximate match on the stress
         of the cell, with tolerance the default CASTEP geom_stress_tol,
-        +/-0.1 GPa, with convenience rounding to nearest GPa.
+        +/-0.5 GPa, with convenience rounding to nearest GPa.
 
         Keyword arguments:
             custom_pressure (float): override cmdline value with this in GPa.
@@ -756,7 +756,7 @@ class DBQuery:
         else:
             input_pressure = custom_pressure
 
-        approx_pressure = [round(input_pressure, 0) - 0.15, round(input_pressure, 0) + 0.15]
+        approx_pressure = [round(input_pressure, 0) - 0.5, round(input_pressure, 0) + 0.5]
 
         query_dict = dict()
         query_dict['pressure'] = dict()
