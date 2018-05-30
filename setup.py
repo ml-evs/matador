@@ -24,7 +24,7 @@ for subreq in ['docs', 'test', 'plotting', 'viz', 'db', 'network']:
 setup(name='matador',
       version=__version__,
       description='MATerial and Atomic Database Of Refined structures.',
-      long_description=open('README').read(),
+      long_description=open('README.rst').read(),
       url='https://bitbucket.org/ml-evs/matador',
       author='Matthew Evans',
       author_email='me388@cam.ac.uk',
