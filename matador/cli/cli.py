@@ -69,6 +69,8 @@ class MatadorCommandLine(object):
                 else:
                     self.refiner = Refiner(self.query.cursor, self.query.repo, **self.args)
 
+                self.cursor = self.refiner.cursor
+
             if self.args['subcmd'] == 'pdffit':
                 self.query = DBQuery(self.client, self.collections, **self.args)
                 self.cursor = list(self.query.cursor)
