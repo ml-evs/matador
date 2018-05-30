@@ -1,5 +1,5 @@
 Primary author and maintainer:
-    Matthew Evans <https://www.bitbucket.org/me388> or <https://www.github.com/ml-evs>
+    Matthew Evans <https://www.bitbucket.org/ml-evs> or <https://www.github.com/ml-evs>
 
 Project conception and supervision:
     Andrew J Morris <www.andrewjmorris.org>

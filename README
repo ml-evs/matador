@@ -6,7 +6,7 @@ matador
 matador is an aggregator and manipulator of the results first-principles
 calculations, primarily geometry optimisations.
 
-The source can be found on `Bitbucket <https://bitbucket.org/me388/matador>`_.
+The source can be found on `Bitbucket <https://bitbucket.org/ml-evs/matador>`_.
 
 Written by `Matthew Evans <https://www.ml-evs.github.io>`_ (2016-). 
 
@@ -41,9 +41,9 @@ Core functionality
 Usage
 ------
 
-For basic command-line usage, please explore the help system for each sub-command, and check `Tutorials <https://matador-database.readthedocs.io/en/latest/tutorials.html>`_ tutorials for common workflows.
+For basic command-line usage, please explore the help system for each sub-command, and check `Tutorials <https://matador-db.readthedocs.io/en/latest/tutorials.html>`_ tutorials for common workflows.
 
-The full Python API documentation is `available online <http://matador-database.readthedocs.io/en/latest/modules.html>`_.
+The full Python API documentation is `available online <http://matador-db.readthedocs.io/en/latest/modules.html>`_.
 
 .. code-block:: text
 
@@ -78,11 +78,11 @@ The full Python API documentation is `available online <http://matador-database.
 License
 --------
 
-matador is available under the `MIT License <https://bitbucket.org/me388/matador/src/master/LICENSE>`_.
+matador is available under the `MIT License <https://bitbucket.org/ml-evs/matador/src/master/LICENSE>`_.
 
-.. |Bitbucket Pipelines| image:: https://img.shields.io/bitbucket/pipelines/me388/matador/master.svg
-   :target: https://bitbucket.org/me388/matador/addon/pipelines/home
-.. |Coverage Status| image:: https://coveralls.io/repos/bitbucket/me388/matador/badge.svg?branch=master
-   :target: https://coveralls.io/bitbucket/me388/matador?branch=master
-.. |Documentation Status| image:: https://readthedocs.org/projects/matador-database/badge/?version=latest
-   :target: https://matador-database.readthedocs.io/en/latest/?badge=latest
+.. |Bitbucket Pipelines| image:: https://img.shields.io/bitbucket/pipelines/ml-evs/matador/master.svg
+   :target: https://bitbucket.org/ml-evs/matador/addon/pipelines/home
+.. |Coverage Status| image:: https://coveralls.io/repos/bitbucket/ml-evs/matador/badge.svg?branch=master
+   :target: https://coveralls.io/bitbucket/ml-evs/matador?branch=master
+.. |Documentation Status| image:: https://readthedocs.org/projects/matador-db/badge/?version=latest
+   :target: https://matador-db.readthedocs.io/en/latest/?badge=latest
