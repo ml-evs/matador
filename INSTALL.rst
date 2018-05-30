@@ -16,7 +16,7 @@ The tl;dr way to install matador, on e.g. a computing cluster, is as follows:
    functionality, use ``pip install .[plotting,bandstructure,viz]``.
 
 Esoteric installation on ARCHER (30th October 2017)
-------------------------------------------
+---------------------------------------------------
 
 These steps assume you have your ``work`` directory symlinked inside
 ``$HOME``.
@@ -24,7 +24,7 @@ These steps assume you have your ``work`` directory symlinked inside
 1. ``module load anaconda-compute/2.2.0-python3``
 2. ``conda create -p $HOME/work/.conda/matador-env python=3.6 numpy scipy``
 3. ``source activate $HOME/work/.conda/matador-env``
-4. ``git clone git@bitbucket.org:me388/matador.git``
+4. ``git clone git@bitbucket.org:ml-evs/matador.git``
 5. ``cd matador``
 6. Due to some weird permissions on ARCHER, we must move the git folder
    so that ``pip`` works...
