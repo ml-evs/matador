@@ -28,7 +28,7 @@ class AtomicSwapper:
             self.cursor = self.cursor[:self.args.get('top')]
 
         # parse new parameters
-        self.cell_dict, self.param_dict = self.get_accuracy()
+        self.cell_dict, self.param_dict = {}, {}
         if self.args['subcmd'] == 'swaps':
             self.swap_counter = 0
             self.parse_swaps()
@@ -43,11 +43,6 @@ class AtomicSwapper:
                 print_success('Performed ' + str(self.swap_counter) + ' swaps.')
             else:
                 print_warning('No swaps performed.')
-
-        polish_cursor = []
-        for doc in self.cursor[:]:
-            polish_cursor.append(self.change_accuracy(doc))
-        self.cursor = polish_cursor
 
     def parse_swaps(self, swap_args=None):
         """ Parse command line options into valid atomic species swaps.
@@ -90,7 +85,8 @@ class AtomicSwapper:
                 tmp_list = [x for x in re.split(r'([A-Z][a-z]*)', swap) if x != '']
             for ind, tmp in enumerate(tmp_list):
                 tmp_list[ind] = self._atoms_to_list(tmp)
-            assert len(tmp_list) == 2
+            if len(tmp_list) != 2:
+                raise RuntimeError('Unable to parse swap! {} should contain only two entries'.format(tmp_list))
             self.swap_pairs.append(tmp_list)
             self.construct_swap_options()
 
