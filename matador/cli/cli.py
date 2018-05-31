@@ -404,14 +404,16 @@ def main(testing=False):
     plot_flags.add_argument('--expt', type=str, help='enter experimental voltage curve .csv file for plotting.')
     plot_flags.add_argument('--expt_label', type=str, help='label for experimental data on voltage curve.')
 
-    spatula_flags = argparse.ArgumentParser(add_help=False)
-    spatula_flags.add_argument('-d', '--dryrun', action='store_true',
-                               help='run the importer without connecting to the database')
-    spatula_flags.add_argument('-v', '--verbosity', action='count', help='enable verbose output')
-    spatula_flags.add_argument('-f', '--force', action='store_true', help='override main database protection')
-    spatula_flags.add_argument('-t', '--tags', nargs='+', type=str, help='set user tags, e.g. nanotube, project name')
-    spatula_flags.add_argument('-s', '--scan', action='store_true',
-                               help='only scan the database for new structures, do not dictify')
+    import_flags = argparse.ArgumentParser(add_help=False)
+    import_flags.add_argument('-d', '--dryrun', action='store_true',
+                              help='run the importer without connecting to the database')
+    import_flags.add_argument('-v', '--verbosity', action='count', help='enable verbose output')
+    import_flags.add_argument('-f', '--force', action='store_true', help='override main database protection')
+    import_flags.add_argument('-t', '--tags', nargs='+', type=str, help='set user tags, e.g. nanotube, project name')
+    import_flags.add_argument('-s', '--scan', action='store_true',
+                              help='only scan the database for new structures, do not dictify')
+    import_flags.add_argument('-p', '--prototype', action='store_true',
+                              help='create a database of prototype structures that contain no DFT calculations')
 
     changes_flags = argparse.ArgumentParser(add_help=False)
     changes_flags.add_argument('-c', '--changeset', type=int, help='changeset number to query')
@@ -502,7 +504,7 @@ def main(testing=False):
     # matador import
     subparsers.add_parser('import',
                           help='import new structures in folder into database',
-                          parents=[global_flags, spatula_flags])
+                          parents=[global_flags, import_flags])
 
     # matador pdffit
     subparsers.add_parser('pdffit',

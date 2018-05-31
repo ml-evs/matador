@@ -18,6 +18,7 @@ import pymongo as pm
 from matador.scrapers.castep_scrapers import castep2dict, param2dict, cell2dict
 from matador.scrapers.castep_scrapers import res2dict, dir2dict
 from matador.utils.cell_utils import calc_mp_spacing
+from matador.utils.chem_utils import get_root_source
 from matador.db import make_connection_to_collection
 from matador.config import load_custom_settings
 from matador import __version__
@@ -46,6 +47,7 @@ class Spatula:
         self.verbosity = self.args['verbosity'] if self.args['verbosity'] is not None else 0
         self.config_fname = self.args.get('config')
         self.tags = self.args['tags']
+        self.prototype = self.args['prototype']
         self.tag_dict = dict()
         self.tag_dict['tags'] = self.tags
         self.import_count = 0
@@ -116,6 +118,15 @@ class Spatula:
                     exit('Cannot import directly to oqmd repo')
                 elif len(self.args.get('db')) > 1:
                     exit('Can only import to one collection.')
+
+        num_prototypes_in_db = self.repo.find({'prototype': True}, projection=[]).count()
+        num_objects_in_db = self.repo.count()
+        if self.args.get('prototype'):
+            if num_prototypes_in_db != num_objects_in_db:
+                raise SystemExit('I will not import prototypes to a non-prototype database!')
+        else:
+            if num_prototypes_in_db != 0:
+                raise SystemExit('I will not import DFT calculations into a prototype database!')
 
         if not self.dryrun:
             # either drop and recreate or create spatula report collection
@@ -208,23 +219,33 @@ class Spatula:
             # include elem set for faster querying
             if 'elems' not in struct:
                 struct['elems'] = list(set(struct['atom_types']))
-            if 'species_pot' not in struct:
-                struct['quality'] = 0
+
+            # check basic DFT params if we're not in a prototype DB
+            if not self.args.get('prototype'):
+                if 'species_pot' not in struct:
+                    struct['quality'] = 0
+                else:
+                    for elem in struct['stoichiometry']:
+                        # remove all points for a missing pseudo
+                        if 'species_pot' not in struct or elem[0] not in struct['species_pot']:
+                            struct['quality'] = 0
+                            break
+                        else:
+                            # remove a point for a generic OTF pspot
+                            if 'OTF' in struct['species_pot'][elem[0]].upper():
+                                struct['quality'] -= 1
+                if 'xc_functional' not in struct:
+                    struct['quality'] = 0
             else:
-                for elem in struct['stoichiometry']:
-                    # remove all points for a missing pseudo
-                    if 'species_pot' not in struct or elem[0] not in struct['species_pot']:
-                        struct['quality'] = 0
-                        break
-                    else:
-                        # remove a point for a generic OTF pspot
-                        if 'OTF' in struct['species_pot'][elem[0]].upper():
-                            struct['quality'] -= 1
-            if 'xc_functional' not in struct:
-                struct['quality'] = 0
+                struct['prototype'] = True
+                struct['xc_functional'] = 'xxx'
+                struct['enthalpy_per_atom'] = 0
+                struct['enthalpy'] = 0
+                struct['pressure'] = 0
+                struct['species_pot'] = {}
+
             struct_id = self.repo.insert_one(struct).inserted_id
-            root_src = [src for src in struct['source'] if
-                        (src.endswith('.res') or src.endswith('.castep'))][0]
+            root_src = get_root_source(struct)
             self.struct_list.append((struct_id, root_src))
             self.manifest.write('+ {}\n'.format(root_src))
             if self.debug:
@@ -239,7 +260,15 @@ class Spatula:
 
     def _files2db(self, file_lists):
         """ Take all files found by scan and appropriately create dicts
-        holding all available data; optionally push to database.
+        holding all available data; optionally push to database. There are
+        three possible routes this function will take:
+
+            - AIRSS-style results, e.g. folder of res files, cell and param,
+                will be scraped into a single dictionary per structure.
+            - Straight CASTEP results will be scraped into one structure per
+                .castep file.
+            - Prototype-style results will take res files and turn them
+                into simple structural data entries, without DFT parameters.
 
         Parameters:
             file_lists (dict): filenames and filetype counts stored by directory name key.
@@ -252,17 +281,24 @@ class Spatula:
                 root_str = os.getcwd().split('/')[-1]
             if self.verbosity > 0:
                 print('Dictifying', root_str, '...')
-            airss = False
-            # if there are multiple res files, per cell, assume we are working in "airss" mode
-            if file_lists[root]['res_count'] > 0:
-                if (file_lists[root]['castep_count'] < file_lists[root]['res_count'] and
-                        file_lists[root]['cell_count'] <= file_lists[root]['res_count']):
-                    airss = True
-            if airss:
-                self.import_count += self._scrape_multi_file_results(file_lists, root)
-            # otherwise, we are just in a folder of CASTEP files
+
+            if self.args.get('prototype'):
+                self.import_count += self._scrape_prototypes(file_lists, root)
+
             else:
-                self.import_count += self._scrape_single_file_structures(file_lists, root)
+
+                # default to only scraping castep files
+                style = 'castep'
+                # if there are multiple res files, per cell, assume we are working in "airss" mode
+                if file_lists[root]['res_count'] > 0:
+                    if (file_lists[root]['castep_count'] < file_lists[root]['res_count'] and
+                            file_lists[root]['cell_count'] <= file_lists[root]['res_count']):
+                        style = 'airss'
+                if style == 'airss':
+                    self.import_count += self._scrape_multi_file_results(file_lists, root)
+                # otherwise, we are just in a folder of CASTEP files
+                elif style == 'castep':
+                    self.import_count += self._scrape_single_file_structures(file_lists, root)
 
         if self.struct_list:
             self._update_changelog(self.repo.name, self.struct_list)
@@ -399,6 +435,31 @@ class Spatula:
                 self.logfile.write(castep_dict)
             else:
                 final_struct = castep_dict
+                if not self.dryrun:
+                    final_struct.update(self.tag_dict)
+                    import_count += self._struct2db(final_struct)
+
+        return import_count
+
+    def _scrape_prototypes(self, file_lists, root):
+        """ Scrape prototype data, i.e. structures with no DFT data, and push
+        to database.
+
+        Parameters:
+            file_lists (dict): filenames and filetype counts stored by directory name key.
+            root (str): directory name to scrape.
+
+        Returns:
+            int: number of successfully structures imported to database.
+
+        """
+        import_count = 0
+        for _, file in enumerate(file_lists[root]['res']):
+            res_dict, success = res2dict(file, db=False, verbosity=self.verbosity)
+            if not success:
+                self.logfile.write(res_dict)
+            else:
+                final_struct = res_dict
                 if not self.dryrun:
                     final_struct.update(self.tag_dict)
                     import_count += self._struct2db(final_struct)

@@ -106,7 +106,7 @@ def display_results(cursor,
         header_string += "{:^18}".format('Enthalpy')
         units_string += "{:^18}".format('(meV/fu)')
     header_string += "{:^13}".format('Space group')
-    header_string += "{:^10}".format('Formula')
+    header_string += "{:^15}".format('Formula')
     header_string += "{:^8}".format('# fu')
     header_string += "{:^8}".format('Prov.')
 
@@ -169,7 +169,9 @@ def display_results(cursor,
                 struct_string[-1] = '\033[91m\033[1m' + ' - ' + struct_string[-1]
                 postfix = '\033[0m'
             try:
-                if doc['quality'] == 0:
+                if doc.get('prototype'):
+                    struct_string[-1] += "{:^5}".format('*p*')
+                elif doc['quality'] == 0:
                     struct_string[-1] += "{:^5}".format('!!!')
                 else:
                     struct_string[-1] += "{:^5}".format((5 - doc['quality']) * '?')
@@ -205,7 +207,7 @@ def display_results(cursor,
         else:
             struct_string[-1] += "{:^13}".format('xxx')
 
-        struct_string[-1] += "{:^10}".format(formula_substring)
+        struct_string[-1] += "{:^15}".format(formula_substring)
 
         if 'num_fu' in doc:
             struct_string[-1] += "{:^8}".format(int(doc['num_fu']))
