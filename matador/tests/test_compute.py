@@ -6,7 +6,7 @@ import os
 import shutil
 import glob
 
-hostname = os.uname()[1]
+HOSTNAME = os.uname()[1]
 REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
 ROOT_DIR = os.getcwd()
 VERBOSITY = 0
@@ -62,14 +62,14 @@ class ComputeTest(unittest.TestCase):
         shutil.copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
         shutil.copy(REAL_PATH + 'data/pspots/As_00PBE.usp', '.')
 
+        queue = mp.Queue()
         relaxer = FullRelaxer(ncores=ncores, nnodes=None, node=node,
                               res=newborn, param_dict=param_dict, cell_dict=cell_dict,
                               debug=False, verbosity=VERBOSITY, killcheck=True,
-                              reopt=False, executable=executable,
+                              reopt=False, executable=executable, output_queue=queue,
                               start=False)
-        queue = mp.Queue()
         # store proc object with structure ID, node name, output queue and number of cores
-        proc = (1, node, mp.Process(target=relaxer.relax, args=(queue, )), ncores)
+        proc = (1, node, mp.Process(target=relaxer.relax), ncores)
         proc[2].start()
         while proc[2].is_alive():
             sleep(1)
@@ -86,6 +86,7 @@ class ComputeTest(unittest.TestCase):
         print('Process completed!')
 
         completed_exists = os.path.isfile('completed/_LiAs_testcase.res')
+        input_exists = os.path.isfile('input/_LiAs_testcase.res')
 
         paths = ['completed', 'input', 'bad_castep']
         for path in paths:
@@ -102,6 +103,7 @@ class ComputeTest(unittest.TestCase):
 
         os.chdir(ROOT_DIR)
         self.assertTrue(completed_exists, "couldn't find output file!")
+        self.assertTrue(input_exists, "couldn't find copy of input file!")
         self.assertTrue(success, "couldn't parse output file!")
         self.assertTrue(all([match_dict[key] for key in match_dict]))
 
@@ -342,11 +344,13 @@ class ComputeTest(unittest.TestCase):
     def testConvergenceRunner(self):
         """ Check that convergence tests run to completion. """
         from matador.compute import BatchRun
+        os.chdir(REAL_PATH)
         shutil.copy(REAL_PATH + 'data/structures/LiAs_testcase.res', REAL_PATH + '_LiAs_testcase.res')
         shutil.copy(REAL_PATH + 'data/LiAs_scf.cell', REAL_PATH + 'LiAs_scf.cell')
         shutil.copy(REAL_PATH + 'data/LiAs_scf.param', REAL_PATH + 'LiAs_scf.param')
         shutil.copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', REAL_PATH + 'Li_00PBE.usp')
         shutil.copy(REAL_PATH + 'data/pspots/As_00PBE.usp', REAL_PATH + 'As_00PBE.usp')
+
 
         with open(REAL_PATH + 'kpt.conv', 'w') as f:
             f.write('0.08\n')
@@ -358,7 +362,7 @@ class ComputeTest(unittest.TestCase):
 
         runner = BatchRun(seed=['LiAs_scf'], debug=False,
                           conv_cutoff=True, conv_kpt=True,
-                          verbosity=VERBOSITY, ncores=4, executable=EXECUTABLE)
+                          verbosity=VERBOSITY, ncores=4, nprocesses=2, executable=EXECUTABLE)
         runner.spawn(join=False)
 
         dirs_exist = [os.path.isdir(_dir) for _dir in ['completed_kpts', 'completed_cutoff']]
@@ -379,6 +383,8 @@ class ComputeTest(unittest.TestCase):
         shutil.rmtree('completed_cutoff')
         shutil.rmtree('completed_kpts')
         shutil.rmtree('input')
+
+        os.chdir(ROOT_DIR)
 
         self.assertTrue(all(dirs_exist))
         self.assertFalse(bad_castep_exist)
@@ -435,7 +441,7 @@ class ComputeTest(unittest.TestCase):
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
     def testBatchMaxWallTimeThreaded(self):
         """ Check that WallTimeErrors do kill everything... """
-        from matador.compute import BatchRun, reset_job_folder_and_count_remaining
+        from matador.compute import BatchRun
         from matador.compute.compute import WalltimeError
 
         os.chdir(REAL_PATH + 'data/max_walltime')
@@ -451,15 +457,14 @@ class ComputeTest(unittest.TestCase):
             runner.spawn()
         except WalltimeError as err:
             walltime_error = True
-        except Exception as err:
-            from traceback import print_exc
 
         castep_exists = os.path.isfile('LiAs_testcase.castep')
         bad_castep_exists = os.path.isfile('LiAs_testcase_bad.castep')
         res_exists = os.path.isfile('LiAs_testcase.res') and os.path.isfile('LiAs_testcase_bad.res')
         lock_exists = os.path.isfile('LiAs_testcase.res.lock') and os.path.isfile('LiAs_testcase_bad.res.lock')
+        compute_dir_doesnt_exist = os.path.isdir(HOSTNAME)
 
-        paths = ['completed', 'input', 'bad_castep']
+        paths = ['completed', 'input', 'bad_castep', HOSTNAME]
         for path in paths:
             if os.path.isdir(path):
                 files = glob.glob(path + '/*')
@@ -487,7 +492,7 @@ class ComputeTest(unittest.TestCase):
 
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
     def testBatchNothingToDo(self):
-        """ Check that WallTimeErrors do kill everything... """
+        """ Check that nothing is done when there's nothing to do... """
         from matador.compute import BatchRun
         import time
 

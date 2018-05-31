@@ -572,22 +572,27 @@ def castep2dict(seed, db=True, verbosity=0, intermediates=False, **kwargs):
         if not castep.get('optimised'):
             castep['optimised'] = False
             raise DFTError('CASTEP GO failed to converge.')
-        if 'positions_frac' not in castep:
-            raise DFTError('Could not find positions')
-        if 'enthalpy' not in castep:
-            castep['enthalpy'] = 'xxx'
-            castep['enthalpy_per_atom'] = 'xxx'
+        if 'positions_frac' not in castep or not castep['positions_frac']:
+            raise CalculationError('Could not find positions')
+
+        # unfortunately CASTEP does not write forces when there is only one atom
         if 'forces' not in castep and castep['num_atoms'] == 1 and 'geometry' in castep['task']:
             castep['forces'] = [[0, 0, 0]]
+
+        # fill in any missing fields with filler
         if 'total_energy' not in castep:
             castep['total_energy'] = 'xxx'
             castep['total_energy_per_atom'] = 'xxx'
+        if 'enthalpy' not in castep:
+            castep['enthalpy'] = 'xxx'
+            castep['enthalpy_per_atom'] = 'xxx'
         if 'pressure' not in castep:
             castep['pressure'] = 'xxx'
         if 'cell_volume' not in castep:
             castep['cell_volume'] = 'xxx'
         if 'space_group' not in castep:
             castep['space_group'] = 'xxx'
+
         # finally check for pseudopotential files if OTF is present in species_pot
         if db:
             for species in castep['species_pot']:
@@ -600,24 +605,24 @@ def castep2dict(seed, db=True, verbosity=0, intermediates=False, **kwargs):
                     for globbed in glob.glob(pspot_seed):
                         if isfile(globbed):
                             castep['species_pot'].update(usp2dict(globbed))
-    except Exception as oops:
-        if isinstance(oops, DFTError):
-            if db:
-                # if importing to db, skip unconverged structure
-                # and report in log file
-                return seed + '\t\t' + str(type(oops)) + ' ' + str(oops) + '\n', False
-            else:
-                # if not importing to db, return unconverged structure
-                if verbosity > 1:
-                    print(oops)
-                return castep, True
-        else:
-            if isinstance(oops, IOError):
-                print_exc()
-            elif kwargs.get('dryrun') or verbosity > 0:
-                print_exc()
-                print('Error in .castep file', seed, 'skipping...')
+
+    except DFTError as oops:
+        if db:
+            # if importing to db, skip unconverged structure
+            # and report in log file
             return seed + '\t\t' + str(type(oops)) + ' ' + str(oops) + '\n', False
+        else:
+            # if not importing to db, return unconverged structure
+            if verbosity > 1:
+                print(oops)
+            return castep, True
+
+    except Exception as oops:
+        if kwargs.get('dryrun') or verbosity > 0:
+            print_exc()
+            print('Error in .castep file', seed, 'skipping...')
+        return seed + '\t\t' + str(type(oops)) + ' ' + str(oops) + '\n', False
+
     if kwargs.get('debug'):
         print(json.dumps(castep, indent=2, ensure_ascii=False))
     return castep, True
@@ -1105,7 +1110,11 @@ def _castep_scrape_atoms(flines, castep):
             castep['num_atoms'] = len(castep['atom_types'])
             castep['stoichiometry'] = get_stoich(castep['atom_types'])
             castep['num_fu'] = castep['num_atoms'] / sum([elem[1] for elem in castep['stoichiometry']])
-            return castep
+            break
+    else:
+        raise CalculationError('Unable to find atoms in CASTEP file.')
+
+    return castep
 
 
 def _castep_scrape_final_parameters(flines, castep):
@@ -1568,5 +1577,16 @@ def _castep_scrape_all_snapshots(flines):
 class DFTError(Exception):
     """ Quick DFT exception class for unconverged or
     non-useful calculations.
+
+    """
+    pass
+
+
+class CalculationError(Exception):
+    """ Raised when the calculation fails to do the DFT.
+    Distinct from DFTError as this is an issue of numerics
+    or chemistry, where this is raised for technical issues,
+    e.g. CASTEP crashes.
+
     """
     pass
