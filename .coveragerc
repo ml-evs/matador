@@ -14,3 +14,5 @@ omit =
     *matador/plotting*
     *matador/compute*
     *matador/plugins*
+    *matador/cli/dispersion.py
+    *matador/cli/run3.py
