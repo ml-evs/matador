@@ -198,7 +198,7 @@ class ComputeTest(unittest.TestCase):
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
     def testFailedRelaxation(self):
         """ Set a relaxation up to fail. """
-        from matador.compute import FullRelaxer, reset_job_folder_and_count_remaining
+        from matador.compute import FullRelaxer, reset_job_folder
         from matador.scrapers.castep_scrapers import cell2dict, param2dict
 
         seed = '_LiAs_testcase.res'
@@ -227,7 +227,7 @@ class ComputeTest(unittest.TestCase):
 
         bad_exists = os.path.isfile('bad_castep/_LiAs_testcase.res')
 
-        num = reset_job_folder_and_count_remaining()
+        num = reset_job_folder()
 
         paths = ['completed', 'input', 'bad_castep']
         for path in paths:
@@ -249,7 +249,7 @@ class ComputeTest(unittest.TestCase):
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
     def testBatchRelax(self):
         """ Batch relax structures from file to file. """
-        from matador.compute import BatchRun, reset_job_folder_and_count_remaining
+        from matador.compute import BatchRun, reset_job_folder
 
         shutil.copy(REAL_PATH + 'data/structures/LiAs_testcase.res', REAL_PATH + '_LiAs_testcase.res')
         shutil.copy(REAL_PATH + 'data/LiAs.cell', REAL_PATH + 'LiAs.cell')
@@ -283,7 +283,7 @@ class ComputeTest(unittest.TestCase):
             if os.path.isfile(path):
                 os.remove(path)
 
-        num = reset_job_folder_and_count_remaining()
+        num = reset_job_folder()
         os.chdir(ROOT_DIR)
 
         self.assertEqual(num, 0)
@@ -393,7 +393,7 @@ class ComputeTest(unittest.TestCase):
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
     def testBatchFailedSCF(self):
         """ Check that SCF failures don't kill everything... """
-        from matador.compute import BatchRun, reset_job_folder_and_count_remaining
+        from matador.compute import BatchRun, reset_job_folder
 
         os.chdir(REAL_PATH + 'data/fail_scf')
         shutil.copy(REAL_PATH + 'data/structures/LiAs_testcase_bad.res', REAL_PATH + 'data/fail_scf/' + 'LiAs_testcase_bad.res')
@@ -429,7 +429,7 @@ class ComputeTest(unittest.TestCase):
             if os.path.isfile(path):
                 os.remove(path)
 
-        num = reset_job_folder_and_count_remaining()
+        num = reset_job_folder()
         os.chdir(ROOT_DIR)
 
         self.assertEqual(num, 0)
