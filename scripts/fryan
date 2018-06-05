@@ -17,10 +17,8 @@ def main(**kwargs):
     to_display = []
     for doc in cursor:
         if not doc[1]:
-            print(doc[0])
             raise RuntimeError
         else:
-            print(doc[0]['stoichiometry'])
             to_display.append(doc[0])
 
     if kwargs.get('hull'):
@@ -35,9 +33,9 @@ def main(**kwargs):
         to_display = sorted(to_display, key=lambda x: x['enthalpy_per_atom'])
         if kwargs.get('top'):
             to_display = to_display[:kwargs.get('top')]
-            print(len(to_display))
 
         display_results(to_display, use_source=True)
+
 
 if __name__ == '__main__':
     import argparse
