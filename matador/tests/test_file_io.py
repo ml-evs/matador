@@ -72,6 +72,7 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(test_dict['phonon_kpoint_mp_grid'], [2, 2, 2], msg='Failed to read kpoint grid {}'.format(test_dict['phonon_kpoint_mp_grid']))
             self.assertEqual(test_dict['phonon_kpoint_mp_offset'], [0.25, 0.25, 0.25], msg='Failed to read kpoint grid {}'.format(test_dict['phonon_kpoint_mp_offset']))
             self.assertEqual(test_dict['phonon_fine_kpoint_mp_spacing'], 0.02, msg='Failed to read kpoint {}'.format(test_dict['phonon_fine_kpoint_mp_spacing']))
+            self.assertEqual(test_dict['phonon_fine_kpoint_path_spacing'], 0.01, msg='Failed to read kpoint {}'.format(test_dict['phonon_fine_kpoint_path_spacing']))
             self.assertEqual(test_dict['species_pot']['K'], '2|1.5|9|10|11|30U:40:31(qc=6)', msg='Failed to read pspots.')
             self.assertEqual(test_dict['species_pot']['P'], '3|1.8|4|4|5|30:31:32', msg='Failed to read pspots.')
             self.assertTrue(test_dict['snap_to_symmetry'])

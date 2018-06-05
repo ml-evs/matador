@@ -222,8 +222,7 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, verb
                     cell['spectral_kpoints_mp_spacing'] = float(line.split()[-1])
                 elif 'phonon_kpoints_mp_spacing' in line.lower() or 'phonon_kpoint_mp_spacing' in line.lower():
                     cell['phonon_kpoint_mp_spacing'] = float(line.split()[-1])
-                elif 'phonon_fine_kpoints_mp_spacing' in line.lower() or 'phonon_fine_kpoint_mp_spacing' in line.lower(
-                ):
+                elif 'phonon_fine_kpoints_mp_spacing' in line.lower() or 'phonon_fine_kpoint_mp_spacing' in line.lower():
                     cell['phonon_fine_kpoint_mp_spacing'] = float(line.split()[-1])
                 else:
                     cell['kpoints_mp_spacing'] = float(line.split()[-1])
@@ -305,9 +304,10 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, verb
                 elif 'cell_noise' in line.lower():
                     cell['cell_noise'] = float(line.split()[-1])
                 elif 'kpoints_path' in line.lower() or 'kpoint_path' in line.lower():
-                    if 'spectral_kpoints_path_spacing' in line.lower() or 'spectral_kpoint_path_spacing' in line.lower(
-                    ):
+                    if 'spectral_kpoints_path_spacing' in line.lower() or 'spectral_kpoint_path_spacing' in line.lower():
                         cell['spectral_kpoints_path_spacing'] = float(line.split()[-1])
+                    elif 'phonon_fine_kpoints_path_spacing' in line.lower() or 'phonon_fine_kpoint_path_spacing' in line.lower():
+                        cell['phonon_fine_kpoint_path_spacing'] = float(line.split()[-1])
                     elif 'kpoints_path_spacing' in line.lower() or 'kpoint_path_spacing' in line.lower():
                         cell['kpoints_path_spacing'] = float(line.split()[-1])
 
