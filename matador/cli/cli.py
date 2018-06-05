@@ -24,7 +24,7 @@ class MatadorCommandLine(object):
         # read args
         self.kwargs = kwargs
         self.args = vars(args[0])
-        self.args['testing'] = self.kwargs.get('testing')
+        self.args['override'] = self.kwargs.get('override')
         self.argstr = kwargs.get('argstr')
 
         file_exts = ['cell', 'res', 'pdb', 'markdown', 'latex', 'param', 'xsf']
@@ -279,9 +279,13 @@ class MatadorCommandLine(object):
             print('\n')
 
 
-def main(testing=False):
-    """ Parse all user args and construct a MatadorCommandLine object. """
+def main(override=False):
+    """ Parse all user args and construct a MatadorCommandLine object.
 
+    Keyword arguments:
+        override: override all stdin with sensible defaults.
+
+    """
     import argparse
     import os
     from sys import argv
@@ -579,7 +583,7 @@ def main(testing=False):
         profiler = cProfile.Profile()
         profiler.enable()
 
-    MatadorCommandLine(parsed_args, argstr=argv[1:], testing=testing)
+    MatadorCommandLine(parsed_args, argstr=argv[1:], override=override)
 
     if vars(parsed_args).get('profile'):
         profiler.disable()

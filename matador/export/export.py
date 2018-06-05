@@ -614,7 +614,7 @@ def doc2res(doc, path, info=True, hash_dupe=True, spoof_titl=False, overwrite=Fa
                 raise RuntimeError('Failed to get lattice, something has gone wrong for {}'.format(path))
         for vec in doc['lattice_abc']:
             for coeff in vec:
-                flines.append(' ' + str(round(coeff, 8)))
+                flines.append(' ' + str(round(coeff, 12)))
         flines.append('\n')
         flines.append('LATT -1\n')
         flines.append('SFAC \t')
