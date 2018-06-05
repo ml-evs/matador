@@ -43,7 +43,8 @@ def load_custom_settings(config_fname=None, debug=False):
     if config_fname is None:
         trial_user_fnames = [
             os.path.expanduser("~/.matadorrc"),
-            os.path.expanduser("~/.config/matadorrc")
+            os.path.expanduser("~/.config/matadorrc"),
+            '/'.join(__file__.split('/')[:-1]) + 'matadorrc.yml'
         ]
         if sum([os.path.isfile(fname) for fname in trial_user_fnames]) > 1:
             print_warning("Found multiple user config files {}"
