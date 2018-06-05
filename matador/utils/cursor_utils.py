@@ -427,6 +427,8 @@ def get_guess_doc_provenance(sources, icsd=None):
                 prov = 'OQMD'
             elif '-icsd' in fname:
                 prov = 'ICSD'
+            elif '-mp-' in fname:
+                prov = 'MP'
     return prov
 
 
