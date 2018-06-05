@@ -46,7 +46,7 @@ class CLIIntegrationTest(unittest.TestCase):
         if CONFIG_FNAME is not None:
             sys.argv += ['--config', CONFIG_FNAME]
 
-        matador.cli.cli.main(testing=True)
+        matador.cli.cli.main(override=True)
 
         query = DBQuery(db='ci_test', config=CONFIG_FNAME)
         self.assertEqual(len(query.cursor), 4)

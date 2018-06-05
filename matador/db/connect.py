@@ -9,7 +9,7 @@ from matador.config import load_custom_settings
 
 
 def make_connection_to_collection(coll_names, check_collection=False, allow_changelog=False,
-                                  mongo_settings=None, testing=False):
+                                  mongo_settings=None, override=False):
     """ Connect to database of choice.
 
     Parameters:
@@ -19,7 +19,7 @@ def make_connection_to_collection(coll_names, check_collection=False, allow_chan
         check_collection (bool): check whether collections exist (forces connection)
         allow_changelog (bool): allow queries to collections with names prefixed by __
         mongo_settings (dict): dict containing mongo and related config
-        testing (bool): if testing, then don't ask for user input from stdin
+        override (bool): don't ask for user input from stdin and assume all is well
 
     Returns:
         client (MongoClient): the connection to the database
@@ -52,7 +52,7 @@ def make_connection_to_collection(coll_names, check_collection=False, allow_chan
         raise SystemExit('Unable to connect to {host}:{port}/{db}, exiting...'.format(**settings['mongo']))
 
     if settings['mongo']['db'] not in database_names:
-        if testing:
+        if override:
             response = 'y'
         else:
             response = input('Database {db} does not exist at {host}:{port}/{db}, '
@@ -74,22 +74,33 @@ def make_connection_to_collection(coll_names, check_collection=False, allow_chan
             coll_names = [coll_names]
         for collection in coll_names:
             if collection not in possible_collections:
-                if check_collection:
-                    options = fuzzy_collname_match(collection, possible_collections)
-                    if not options:
-                        client.close()
-                        raise SystemExit('Collection {} not found!'.format(collection))
-                    else:
-                        print('Collection not found, did you mean one of these?')
-                        for ind, value in enumerate(options[:20]):
-                            print('({}):\t{}'.format(ind, value))
+                options = fuzzy_collname_match(collection, possible_collections)
+                if not options and check_collection:
+                    client.close()
+                    raise SystemExit('Collection {} not found!'.format(collection))
+                else:
+                    print('Collection not found, did you mean one of these?')
+                    for ind, value in enumerate(options[:10]):
+                        print('({}):\t{}'.format(ind, value))
+                    if check_collection:
                         try:
                             choice = int(input('Please enter your choice: '))
                             collection = options[choice]
                         except:
                             raise SystemExit('Invalid choice. Exiting...')
-                else:
-                    print('Creating new collection {}...'.format(collection))
+                    else:
+                        if override:
+                            choice = 'y'
+                        else:
+                            choice = input('Are you sure you want to make a new collection called {}? (y/n) '
+                                           .format(collection))
+                        if choice.lower() != 'y' and choice.lower != 'yes':
+                            try:
+                                choice = int(input('Then please enter your choice from above: '))
+                                collection = options[choice]
+                            except:
+                                raise SystemExit('Invalid choice. Exiting...')
+
             if not allow_changelog and collection.startswith('__'):
                 raise SystemExit('Queries to collections prefixed with __ are VERBOTEN!')
             collections[collection] = db[collection]
