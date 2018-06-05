@@ -109,7 +109,7 @@ class DBQuery:
             self.perform_query()
 
             # only filter for uniqueness if not eventually making a hull
-            if self.args.get('uniq') and self.args.get('subcmd') not in ['hull', 'hulldiff', 'voltage']:
+            if self.args.get('uniq') and self.args.get('subcmd') not in ['hull', 'hulldiff', 'voltage', 'swaps']:
                 from matador.similarity.similarity import get_uniq_cursor
                 print_notify('Filtering for unique structures...')
                 if self.top is not None:
