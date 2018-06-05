@@ -9,7 +9,7 @@ from matador.config import load_custom_settings
 
 
 def make_connection_to_collection(coll_names, check_collection=False, allow_changelog=False,
-                                  mongo_settings=None, override=False):
+                                  mongo_settings=None, override=False, import_mode=False, debug=False):
     """ Connect to database of choice.
 
     Parameters:
@@ -73,36 +73,39 @@ def make_connection_to_collection(coll_names, check_collection=False, allow_chan
         if not isinstance(coll_names, list):
             coll_names = [coll_names]
         for collection in coll_names:
-            if collection not in possible_collections:
-                options = fuzzy_collname_match(collection, possible_collections)
-                if not options and check_collection:
-                    client.close()
-                    raise SystemExit('Collection {} not found!'.format(collection))
-                else:
-                    print('Collection not found, did you mean one of these?')
-                    for ind, value in enumerate(options[:10]):
-                        print('({}):\t{}'.format(ind, value))
-                    if check_collection:
-                        try:
-                            choice = int(input('Please enter your choice: '))
-                            collection = options[choice]
-                        except:
-                            raise SystemExit('Invalid choice. Exiting...')
+
+            if not allow_changelog:
+                if collection.startswith('__'):
+                    raise SystemExit('Queries to collections prefixed with __ are VERBOTEN!')
+
+                if collection not in possible_collections:
+                    options = fuzzy_collname_match(collection, possible_collections)
+                    if not options and check_collection:
+                        client.close()
+                        raise SystemExit('Collection {} not found!'.format(collection))
                     else:
-                        if override:
-                            choice = 'y'
-                        else:
-                            choice = input('Are you sure you want to make a new collection called {}? (y/n) '
-                                           .format(collection))
-                        if choice.lower() != 'y' and choice.lower != 'yes':
+                        print('Collection not found, did you mean one of these?')
+                        for ind, value in enumerate(options[:10]):
+                            print('({}):\t{}'.format(ind, value))
+                        if check_collection:
                             try:
-                                choice = int(input('Then please enter your choice from above: '))
+                                choice = int(input('Please enter your choice: '))
                                 collection = options[choice]
                             except:
                                 raise SystemExit('Invalid choice. Exiting...')
+                        elif import_mode:
+                            if override:
+                                choice = 'y'
+                            else:
+                                choice = input('Are you sure you want to make a new collection called {}? (y/n) '
+                                               .format(collection))
+                            if choice.lower() != 'y' and choice.lower != 'yes':
+                                try:
+                                    choice = int(input('Then please enter your choice from above: '))
+                                    collection = options[choice]
+                                except:
+                                    raise SystemExit('Invalid choice. Exiting...')
 
-            if not allow_changelog and collection.startswith('__'):
-                raise SystemExit('Queries to collections prefixed with __ are VERBOTEN!')
             collections[collection] = db[collection]
     else:
         default_collection = settings['mongo']['default_collection']

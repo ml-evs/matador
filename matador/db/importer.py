@@ -87,6 +87,7 @@ class Spatula:
         self.settings = load_custom_settings(config_fname=self.config_fname, debug=self.debug)
         result = make_connection_to_collection(self.args.get('db'),
                                                check_collection=False,
+                                               import_mode=True,
                                                override=self.args.get('override'),
                                                mongo_settings=self.settings)
 
