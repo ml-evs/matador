@@ -564,7 +564,11 @@ class FullRelaxer:
                     calc_doc['phonon_calculate_dos'] = False
                     cached = {}
                     cached['phonon_fine_kpoint_mp_spacing'] = calc_doc['phonon_fine_kpoint_mp_spacing']
-                    del calc_doc['phonon_fine_kpoint_mp_spacing']
+                    try:
+                        del calc_doc['phonon_fine_kpoint_mp_spacing']
+                        del calc_doc['phonon_fine_kpoint_path_spacing']
+                    except KeyError:
+                        pass
 
             if self.verbosity >= 1:
                 if elec_dispersion:
@@ -620,10 +624,11 @@ class FullRelaxer:
                     fine_keys = [key for key in calc_doc if key.startswith('phonon_fine')]
                     for key in fine_keys:
                         del calc_doc[key]
+                    calc_doc['phonon_fine_kpoint_mp_spacing'] = cached['phonon_fine_kpoint_mp_spacing']
                     if self.verbosity >= 1:
                         print('Now performing phonon DOS...')
 
-                    success = self.scf(calc_doc, seed, keep=True, recursion_depth=recursion_depth)
+                    success = self.scf(calc_doc, seed, keep=keep, recursion_depth=recursion_depth)
 
             return success
 
