@@ -40,6 +40,8 @@ class CLIIntegrationTest(unittest.TestCase):
         """ Test import and query. """
         from matador.query import DBQuery
         from matador.scrapers.castep_scrapers import cell2dict, res2dict
+
+        # import from CASTEP files only
         os.chdir(REAL_PATH + '/data/castep_files')
         sys.argv = ['matador', 'import', '--db', DB_NAME]
 
@@ -49,6 +51,27 @@ class CLIIntegrationTest(unittest.TestCase):
         matador.cli.cli.main(override=True)
 
         query = DBQuery(db='ci_test', config=CONFIG_FNAME)
+        self.assertEqual(len(query.cursor), 4)
+
+        files_to_delete = glob.glob('*spatula*')
+        self.assertEqual(len(files_to_delete), 2)
+        for f in files_to_delete:
+            os.remove(f)
+
+        # import from combined res/cell/param files
+        os.chdir(REAL_PATH + '/data/res_files')
+
+        sys.argv = ['matador', 'import', '--db', DB_NAME]
+
+        if CONFIG_FNAME is not None:
+            sys.argv += ['--config', CONFIG_FNAME]
+
+        matador.cli.cli.main(override=True)
+
+        query = DBQuery(db='ci_test', config=CONFIG_FNAME)
+        self.assertEqual(len(query.cursor), 8)
+
+        query = DBQuery(db='ci_test', composition='KSnP', config=CONFIG_FNAME)
         self.assertEqual(len(query.cursor), 4)
 
         files_to_delete = glob.glob('*spatula*')

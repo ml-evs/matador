@@ -245,6 +245,11 @@ class Spatula:
                 struct['pressure'] = 0
                 struct['species_pot'] = {}
 
+            if self.debug:
+                from json import dumps
+                print('Trying to insert')
+                print(dumps(struct, indent=2))
+
             struct_id = self.repo.insert_one(struct).inserted_id
             root_src = get_root_source(struct)
             self.struct_list.append((struct_id, root_src))
@@ -376,9 +381,14 @@ class Spatula:
             input_dict = dir_dict.copy()
         if cell:
             input_dict.update(cell_dict)
-            input_dict['source'].append(cell_dict['source'])
+            input_dict['source'].extend(cell_dict['source'])
         if param:
-            input_dict['source'].append(param_dict['source'])
+            input_dict.update(param_dict)
+            input_dict['source'].extend(param_dict['source'])
+
+        if self.debug:
+            from matador.utils.print_utils import print_notify, print_warning
+            print_notify(cell, param)
 
         # create res dicts and combine them with input_dict
         for _, file in enumerate(file_lists[root]['res']):
@@ -480,7 +490,7 @@ class Spatula:
                    'count': len(struct_list),
                    'id_list': [struct[0] for struct in struct_list],
                    'src_list': [struct[1] for struct in struct_list]}
-        self.db['__changelog_{}'.format(collection_name)].insert(changes)
+        self.db['__changelog_{}'.format(collection_name)].insert_one(changes)
 
     def _scan_dir(self):
         """ Scans folder topdir recursively, returning list of
