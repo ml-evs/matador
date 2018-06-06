@@ -223,20 +223,24 @@ class Spatula:
 
             # check basic DFT params if we're not in a prototype DB
             if not self.args.get('prototype'):
+                failed_checks = []
                 if 'species_pot' not in struct:
                     struct['quality'] = 0
+                    failed_checks.append('missing all pspots')
                 else:
                     for elem in struct['stoichiometry']:
                         # remove all points for a missing pseudo
                         if 'species_pot' not in struct or elem[0] not in struct['species_pot']:
                             struct['quality'] = 0
-                            break
+                            failed_checks.append('missing pspot for {}'.format(elem[0]))
                         else:
                             # remove a point for a generic OTF pspot
                             if 'OTF' in struct['species_pot'][elem[0]].upper():
                                 struct['quality'] -= 1
+                                failed_checks.append('pspot not fully specified for {}'.format(elem[0]))
                 if 'xc_functional' not in struct:
                     struct['quality'] = 0
+                    failed_checks.append('missing xc functional')
             else:
                 struct['prototype'] = True
                 struct['xc_functional'] = 'xxx'
@@ -245,17 +249,25 @@ class Spatula:
                 struct['pressure'] = 0
                 struct['species_pot'] = {}
 
-            if self.debug:
-                from json import dumps
-                print('Trying to insert')
-                print(dumps(struct, indent=2))
-
-            struct_id = self.repo.insert_one(struct).inserted_id
             root_src = get_root_source(struct)
-            self.struct_list.append((struct_id, root_src))
-            self.manifest.write('+ {}\n'.format(root_src))
-            if self.debug:
-                print('Inserted', struct_id)
+
+            if struct['quality'] == 5:
+                struct_id = self.repo.insert_one(struct).inserted_id
+                self.struct_list.append((struct_id, root_src))
+                self.manifest.write('+ {}\n'.format(root_src))
+                if self.debug:
+                    print('Inserted', struct_id)
+            else:
+                exts = ['.castep', '.res', '.history', '.history.gz']
+                for ext in exts:
+                    for src in struct['source']:
+                        if src.endswith(ext):
+                            expanded_root_src = src
+                            print(expanded_root_src)
+                self.logfile.write('? {} failed quality checks: {}'.format(expanded_root_src, failed_checks))
+                if self.debug:
+                    print('Error with', root_src)
+                return 0
 
         except Exception:
             # this shouldn't fail, but if it does, fail loudly but cleanly
@@ -386,10 +398,6 @@ class Spatula:
             input_dict.update(param_dict)
             input_dict['source'].extend(param_dict['source'])
 
-        if self.debug:
-            from matador.utils.print_utils import print_notify, print_warning
-            print_notify(cell, param)
-
         # create res dicts and combine them with input_dict
         for _, file in enumerate(file_lists[root]['res']):
             exts_with_precedence = ['.castep', '.history', 'history.gz']
@@ -408,7 +416,7 @@ class Spatula:
                 struct_dict, success = res2dict(file, verbosity=self.verbosity)
 
             if not success:
-                self.logfile.write(struct_dict)
+                self.logfile.write('! {} failed to scrape: {}'.format(file, struct_dict))
             else:
                 final_struct = input_dict.copy()
                 final_struct.update(struct_dict)
@@ -443,7 +451,7 @@ class Spatula:
         for _, file in enumerate(file_lists[root]['castep']):
             castep_dict, success = castep2dict(file, debug=False, verbosity=self.verbosity)
             if not success:
-                self.logfile.write(castep_dict)
+                self.logfile.write('! {} failed to scrape: {}'.format(file, castep_dict))
             else:
                 final_struct = castep_dict
                 if not self.dryrun:
@@ -468,7 +476,7 @@ class Spatula:
         for _, file in enumerate(file_lists[root]['res']):
             res_dict, success = res2dict(file, db=False, verbosity=self.verbosity)
             if not success:
-                self.logfile.write(res_dict)
+                self.logfile.write('! {} failed to scrape: {}'.format(file, res_dict))
             else:
                 final_struct = res_dict
                 if not self.dryrun:

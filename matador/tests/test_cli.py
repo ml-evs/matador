@@ -51,10 +51,17 @@ class CLIIntegrationTest(unittest.TestCase):
         matador.cli.cli.main(override=True)
 
         query = DBQuery(db='ci_test', config=CONFIG_FNAME)
-        self.assertEqual(len(query.cursor), 4)
+        self.assertEqual(len(query.cursor), 3)
+
+        with open('spatula.err', 'r') as err_file:
+            err_flines = err_file.readlines()
+        with open('spatula.manifest', 'r') as manifest_file:
+            manifest_flines = manifest_file.readlines()
 
         files_to_delete = glob.glob('*spatula*')
         self.assertEqual(len(files_to_delete), 2)
+        self.assertEqual(len(err_flines), 3)
+        self.assertEqual(len(manifest_flines), 3)
         for f in files_to_delete:
             os.remove(f)
 
@@ -69,7 +76,7 @@ class CLIIntegrationTest(unittest.TestCase):
         matador.cli.cli.main(override=True)
 
         query = DBQuery(db='ci_test', config=CONFIG_FNAME)
-        self.assertEqual(len(query.cursor), 8)
+        self.assertEqual(len(query.cursor), 7)
 
         query = DBQuery(db='ci_test', composition='KSnP', config=CONFIG_FNAME)
         self.assertEqual(len(query.cursor), 4)
