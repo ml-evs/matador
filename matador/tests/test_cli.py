@@ -48,6 +48,8 @@ class IntegrationTest(unittest.TestCase):
         """ Test import and query. """
         query, files_to_delete, err_flines, manifest_flines = test_import_castep()
         self.assertEqual(len(files_to_delete), 2, msg='Failed to write spatula files')
+        print(err_flines)
+        print(manifest_flines)
         self.assertEqual(len(err_flines), 3, msg='Failed to report errors correctly')
         self.assertEqual(len(manifest_flines), 3, msg='Failed to report successes correctly')
         self.assertEqual(len(query.cursor), 3, msg='Failed to import structures correctly')

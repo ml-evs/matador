@@ -12,25 +12,62 @@ import json
 
 
 def scraper_function(function):
-    """ Wrapper for scraper functions to handle exceptions. """
+    """ Wrapper for scraper functions to handle exceptions and
+    template the scraper functions to work for multiples files
+    at once.
+
+    """
 
     from functools import wraps
 
     @wraps(function)
     def wrapped_scraper_function(*args, **kwargs):
-        """ Wrap and return the plotting function. """
+        """ Wrap and return the scraper function, handling the
+        multiplicity of file names.
+
+        """
         result = None
         seed = args[0]
+        if isinstance(seed, list):
+            failures = []
+            cursor = []
+            for _seed in seed:
+                # we can get away with this as each
+                # scraper function only has one arg
+                try:
+                    result, success = function(_seed, **kwargs)
+                except FileNotFoundError as oops:
+                    raise oops
+                except Exception as oops:
+                    success = False
+                    if kwargs.get('verbosity', 0) > 0:
+                        print_exc()
+                        print('Error in file', _seed, 'skipping...')
+
+                if not success:
+                    failures += [_seed]
+                else:
+                    cursor.append(result)
+            if len(cursor) != len(seed):
+                print('Scraped {}/{} structures.'.format(len(cursor), len(seed)))
+
+            return cursor, failures
+
         try:
             result = function(*args, **kwargs)
+        except FileNotFoundError as oops:
+            raise oops
         except Exception as oops:
             if kwargs.get('verbosity', 0) > 0:
                 print_exc()
                 print('Error in file', seed, 'skipping...')
-            return '{} {}: {}'.format(seed, type(oops), str(oops)), False
+            return '{} {}: {}\n'.format(seed, type(oops), str(oops)), False
 
         if kwargs.get('verbosity', 0) > 4:
-            print(json.dumps(result[0], indent=2))
+            try:
+                print(json.dumps(result[0], indent=2))
+            except TypeError:
+                pass
 
         return result
 

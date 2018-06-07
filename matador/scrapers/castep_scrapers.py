@@ -20,12 +20,13 @@ from matador.scrapers.utils import DFTError, CalculationError, scraper_function
 
 
 @scraper_function
-def res2dict(seed, db=True, verbosity=0):
+def res2dict(seed, db=True, **kwargs):
     """ Extract available information from .res file; preferably
     used in conjunction with cell or param file.
 
     Parameters:
-        seed (str): filename of res file (with or without extension).
+        seed (str/list): filename or list of filenames of res file(s)
+            (with or without extension).
 
     Keyword arguments:
         db (bool): whether to fail if unable to scrape energies.
@@ -122,12 +123,13 @@ def res2dict(seed, db=True, verbosity=0):
 
 
 @scraper_function
-def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, verbosity=0):
+def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, **kwargs):
     """ Extract available information from .cell file; probably
     to be merged with another dict from a .param or .res file.
 
     Parameters:
-        seed (str): filename of cell file to scrape, with or without extension
+        seed (str/list): filename or list of filenames of cell file(s)
+            to scrape, with or without extension.
 
     Keyword arguments:
         db (bool): scrape database quality file
@@ -135,8 +137,8 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, verb
         positions (bool): scrape positions
 
     Returns:
-        (dict/str, bool): if successful, a dictionary containing scraped data and True,
-            if not, then an error string and False.
+        (dict/str, bool): if successful, a dictionary containing scraped
+            data and True, if not, then an error string and False.
 
     """
     cell = dict()
@@ -326,12 +328,13 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, verb
 
 
 @scraper_function
-def param2dict(seed, db=True, verbosity=0):
+def param2dict(seed, db=True, **kwargs):
     """ Extract available information from .param file; probably
     to be merged with other dicts from other files.
 
     Parameters:
-        seed (str): param filename with or without file extension
+        seed (str/list): param filename or list of filenames with or
+            without file extension
 
     Keyword arguments:
         db (bool): if True, only scrape relevant info, otherwise scrape all
@@ -415,12 +418,12 @@ def param2dict(seed, db=True, verbosity=0):
 
 
 @scraper_function
-def castep2dict(seed, db=True, verbosity=0, intermediates=False):
+def castep2dict(seed, db=True, intermediates=False, **kwargs):
     """ From seed filename, create dict of the most relevant
     information about a calculation.
 
     Parameters:
-        seed (str): filename of castep file
+        seed (str/list): filename or list of filenames of castep file(s)
 
     Keyword arguments:
         db (bool): whether to error on missing relaxation info
@@ -515,11 +518,11 @@ def castep2dict(seed, db=True, verbosity=0, intermediates=False):
 
 
 @scraper_function
-def bands2dict(seed, summary=False, gap=False, external_efermi=None, verbosity=0):
+def bands2dict(seed, summary=False, gap=False, external_efermi=None, **kwargs):
     """ Parse a CASTEP bands file into a dictionary.
 
     Parameters:
-        seed (str): path to .bands file.
+        seed (str/list): filename of list of filenames to be scraped.
 
     Keyword arguments:
         summary (bool): print info about bandgap.
@@ -534,8 +537,10 @@ def bands2dict(seed, summary=False, gap=False, external_efermi=None, verbosity=0
     from matador.utils.chem_utils import HARTREE_TO_EV, BOHR_TO_ANGSTROM
     from matador.utils.cell_utils import frac2cart, real2recip
     import numpy as np
-    bs = dict()
 
+    verbosity = kwargs.get('verbosity', 0)
+
+    bs = dict()
     with open(seed, 'r') as f:
         # read whole file into RAM, typically ~ 1 MB
         flines = f.readlines()
@@ -706,12 +711,12 @@ def bands2dict(seed, summary=False, gap=False, external_efermi=None, verbosity=0
 
 
 @scraper_function
-def optados2dict(seed, verbosity=0):
+def optados2dict(seed, **kwargs):
     """ Scrape optados output file (*.adaptive.dat) or (*.pdos.adaptive.dat)
     for DOS, projectors and projected DOS.
 
     Parameters:
-        seed (str): optados filename.
+        seed (str/list): optados filename or list of filenames.
 
     Returns:
         (dict/str, bool): if successful, a dictionary containing scraped data and True,
@@ -780,11 +785,11 @@ def optados2dict(seed, verbosity=0):
 
 
 @scraper_function
-def phonon2dict(seed, verbosity=0):
+def phonon2dict(seed, **kwargs):
     """ Parse a CASTEP phonon file into a dictionary.
 
     Parameters:
-        seed (str), path to .phonon file.
+        seed (str/list): phonon filename or list of filenames.
 
     Returns:
         (dict/str, bool): if successful, a dictionary containing scraped data and True,
@@ -797,6 +802,8 @@ def phonon2dict(seed, verbosity=0):
     with open(seed, 'r') as f:
         # read whole file into RAM, typically <~ 1 MB
         flines = f.readlines()
+
+    verbosity = kwargs.get('verbosity')
 
     ph = dict()
     seed = seed.replace('.phonon', '')
@@ -882,12 +889,12 @@ def phonon2dict(seed, verbosity=0):
 
 
 @scraper_function
-def usp2dict(seed, verbosity=0):
+def usp2dict(seed, **kwargs):
     """ Extract pseudopotential string from a CASTEP
     OTF .USP file.
 
     Parameters:
-        seed (str): filename of usp file.
+        seed (str/list): filename of usp file, or list of filenames.
 
     Returns:
         dict: partial species_pot dict from usp file.

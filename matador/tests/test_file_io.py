@@ -244,6 +244,52 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(test_dict['species_pot']['Ti'], '3|1.9|8|9|10|30U:40:31:32(qc=5)')
             self.assertEqual(test_dict['species_pot']['O'], '2|1.5|12|13|15|20:21(qc=5)')
 
+    def testFileNotFound(self):
+        """ Ensure that FileNotFound errors fail gracefully. """
+        from matador.scrapers.castep_scrapers import res2dict, castep2dict
+        error = False
+        try:
+            res, s = res2dict('___not_a_file')
+        except FileNotFoundError:
+            error = True
+        self.assertTrue(error)
+
+        castep_fname = []
+        castep_fname += [REAL_PATH + 'data/NaP_intermediates.castep']
+        castep_fname += [REAL_PATH + 'data/___not_a_file']
+        castep_fname += [REAL_PATH + 'data/KP-castep17.castep']
+        castep_fname += [REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep']
+
+        error = False
+        try:
+            cursor, failures = castep2dict(castep_fname, db=True)
+        except FileNotFoundError:
+            error = True
+
+    def testBatchLoading(self):
+        """ Test passing a list of files to scraper function, which
+        should be handled by decorator.
+
+        """
+        from matador.scrapers.castep_scrapers import castep2dict, res2dict
+        castep_fname = []
+        castep_fname += [REAL_PATH + 'data/NaP_intermediates.castep']
+        castep_fname += [REAL_PATH + 'data/Na-edgecase.castep']
+        castep_fname += [REAL_PATH + 'data/KP-castep17.castep']
+        castep_fname += [REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep']
+        castep_fname += [REAL_PATH + 'data/TiO2_unconverged.castep']
+
+        cursor, failures = castep2dict(castep_fname, db=True)
+        self.assertEqual(len(cursor), 4)
+        self.assertEqual(len(failures), 1)
+
+        res_fname = []
+        res_fname += [REAL_PATH + 'data/LiPZn-r57des.res']
+        res_fname += [REAL_PATH + 'data/LiPZn-r57des_bodged.res']
+        cursor, failures = res2dict(res_fname, db=True)
+        self.assertEqual(len(cursor), 1)
+        self.assertEqual(len(failures), 1)
+
     def testCastepIntermediates(self):
         from matador.scrapers.castep_scrapers import castep2dict
         castep_fname = REAL_PATH + 'data/NaP_intermediates.castep'
@@ -273,8 +319,8 @@ class ScrapeTest(unittest.TestCase):
 
     def testRes(self):
         from matador.scrapers.castep_scrapers import res2dict
-        res_fname = REAL_PATH + 'data/LiPZn-r57des.res'
         failed_open = False
+        res_fname = REAL_PATH + 'data/LiPZn-r57des.res'
         try:
             f = open(res_fname, 'r')
         except Exception:
@@ -347,7 +393,7 @@ class ScrapeTest(unittest.TestCase):
             self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(phonon_fname))
         if not failed_open:
             f.close()
-            ph_dict, s = phonon2dict(phonon_fname)
+            ph_dict, s = phonon2dict(phonon_fname, verbosity=VERBOSITY)
             self.assertTrue(s, msg='Failed to read phonon file')
             self.assertEqual(ph_dict['num_atoms'], 26)
             self.assertEqual(ph_dict['num_branches'], 78)
@@ -661,8 +707,6 @@ class ExportTest(unittest.TestCase):
         if not failed_open:
             f.close()
             test_dict, s = castep2dict(castep_fname, db=False, verbosity=VERBOSITY)
-            print(test_dict)
-            print(s)
             self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
             self.assertEqual(test_dict['task'].lower(), 'thermodynamicscalculation', msg='This is not a Thermodynamics calculation...')
             self.assertEqual(test_dict['temp_final'], 1000.0, msg='Wrong final temp!')

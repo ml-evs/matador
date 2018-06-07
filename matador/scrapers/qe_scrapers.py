@@ -21,7 +21,8 @@ def pwout2dict(seed):
     """ Extract available information from pw.x .out file.
 
     Parameters:
-        seed (str): filename to scrape as a QE output.
+        seed (str/list): filename or list of filenames to scrape as a
+            QuantumEspresso pw.x output.
 
     """
     pwout = defaultdict(list)
