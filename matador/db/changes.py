@@ -17,7 +17,7 @@ class DatabaseChanges:
     database changesets.
 
     """
-    def __init__(self, collection_name: str, changeset_ind=0, action='view', mongo_settings=None):
+    def __init__(self, collection_name: str, changeset_ind=0, action='view', override=False, mongo_settings=None):
         """ Parse arguments and run changes interface.
 
         Parameters:
@@ -26,6 +26,8 @@ class DatabaseChanges:
         Keyword arguments:
             changset_ind (int): the number of the changset to act upon (1 is oldest)
             action (str): either 'view' or 'undo'
+            override (bool): override all options to positive answers for testing
+            mongo_settings (dict): dictionary of already-sources mongo settings
 
         """
         self.changelog_name = '__changelog_{}'.format(collection_name)
@@ -35,7 +37,7 @@ class DatabaseChanges:
         self.repo = [self.collections[key] for key in self.collections][0]
         curs = list(self.repo.find())
 
-        if len(curs) == 0:
+        if not curs:
             exit('No changesets found for {}'.format(collection_name))
 
         # if no changeset specified, print summary
@@ -48,13 +50,20 @@ class DatabaseChanges:
             self.view_changeset(self.change, changeset_ind-1)
             if action == 'undo':
                 count = curs[changeset_ind-1]['count']
-                print_warning('An attempt will now be made to remove {} structures from {}.'.format(count, collection_name))
+                print_warning('An attempt will now be made to remove {} structures from {}.'
+                              .format(count, collection_name))
                 print_notify('Are you sure you want to do that? (y/n)')
-                response = input()
+                if override:
+                    response = 'y'
+                else:
+                    response = input()
                 if response.lower() == 'y':
                     print_notify('You don\'t have any doubts at all? (y/n)')
-                    reponse = input()
-                    if reponse.lower() == 'n':
+                    if override:
+                        next_response = 'n'
+                    else:
+                        next_response = input()
+                    if next_response.lower() == 'n':
                         print('You\'re the boss, deleting structures now...')
                     else:
                         exit('As I thought...')
@@ -62,7 +71,7 @@ class DatabaseChanges:
                     return
 
                 # proceed with deletion
-                client, _, collections = make_connection_to_collection(collection_name, allow_changelog=False)
+                _, _, collections = make_connection_to_collection(collection_name, allow_changelog=False)
                 collection_to_delete_from = [collections[key] for key in collections][0]
                 result = collection_to_delete_from.remove({'_id': {'$in': self.change['id_list']}})
                 print('Deleted {}/{} successfully.'.format(result['n'], self.change['count']))
@@ -74,7 +83,8 @@ class DatabaseChanges:
                     self.repo.drop()
                 print('Success!')
 
-    def view_changeset(self, changeset, index):
+    @staticmethod
+    def view_changeset(changeset, index):
         """ Prints all details about a particular changeset.
 
         Parameters:
@@ -87,7 +97,8 @@ class DatabaseChanges:
             print('(+) {}'.format(src))
         print('({}) {} {:>7d} additions'.format(index+1, changeset['date'], changeset['count']))
 
-    def print_change_summary(self, curs):
+    @staticmethod
+    def print_change_summary(curs):
         """ Prints a summary of changes.
 
         Parameters:

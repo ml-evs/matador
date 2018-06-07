@@ -110,7 +110,8 @@ class MatadorCommandLine(object):
                 DatabaseChanges([key for key in self.collections][0],
                                 changeset_ind=changeset,
                                 action=action,
-                                mongo_settings=self.settings)
+                                mongo_settings=self.settings,
+                                override=self.args.get('override'))
 
             if self.args['subcmd'] == 'hulldiff':
                 from matador.hull.hull_diff import diff_hulls
