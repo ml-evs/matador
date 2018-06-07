@@ -469,7 +469,7 @@ class FullRelaxer:
             self._finalise_result()
             raise err
 
-    def scf(self, calc_doc, seed, keep=True, prerelax=False, recursion_depth=0):
+    def scf(self, calc_doc, seed, keep=True, prerelaxing=False, recursion_depth=0):
         """ Perform a single-shot (e.g. scf) calculation with CASTEP.
         Files from completed runs are moved to "completed" and failed
         runs to `bad_castep`. If both phonon DOS and dispersion are
@@ -485,7 +485,7 @@ class FullRelaxer:
             keep (bool): whether to keep intermediate files e.g. .bands
             recursion_depth (int): internal kwarg to count the recursion
                 depth; function will quit if this exceeds 2.
-            prerelax (bool): internal flag; whether or not we are
+            prerelaxing (bool): internal flag; whether or not we are
                 currently performing a singleshot relaxation
 
         Returns:
@@ -579,12 +579,16 @@ class FullRelaxer:
                     print_notify('Calculating phonon dispersion ' + seed)
                 elif phon_dos:
                     print_notify('Calculating phonon DOS ' + seed)
-                elif prerelax:
+                elif prerelaxing:
                     print_notify('Performing pre-relaxation ' + seed)
                 else:
                     print_notify('Calculating SCF ' + seed)
 
-            if phon_dispersion or phon_dos and not prerelax:
+            attempt_prerelax = True
+            if prerelaxing or os.path.isfile(seed + '.check'):
+                attempt_prerelax = False
+
+            if phon_dispersion or phon_dos and attempt_prerelax:
                 self._phonon_prerelax(calc_doc, seed)
 
                 print_notify('Relxation complete, now performing phonon calculation.')
@@ -612,7 +616,7 @@ class FullRelaxer:
 
             success = True
 
-            if not prerelax:
+            if not prerelaxing:
                 self.mv_to_completed(seed, keep=keep, completed_dir=self.paths['completed_dir'])
                 if not keep:
                     self.tidy_up(seed)
@@ -654,7 +658,7 @@ class FullRelaxer:
         relax_doc['write_checkpoint'] = 'ALL'
         relax_doc['geom_max_iter'] = 20
         relax_doc['task'] = 'geometryoptimisation'
-        self.scf(relax_doc, seed, prerelax=True, recursion_depth=1)
+        self.scf(relax_doc, seed, prerelaxing=True, recursion_depth=1)
 
     def run_convergence_tests(self, calc_doc):
         """ Run kpoint and cutoff_energy convergence tests based on
