@@ -440,82 +440,6 @@ def param2dict(seed, db=True, verbosity=0, **kwargs):
     return param, True
 
 
-def dir2dict(seed, verbosity=0, **kwargs):
-    """ Try to extract information from directory name; last hope
-    if no param file has been found.
-
-    Parameters:
-        seed (str): dir name to scrape.
-
-    Returns:
-        (dict/str, bool): if successful, a dictionary containing scraped data and True,
-            if not, then an error string and False.
-
-    """
-    try:
-        dir_dict = defaultdict(list)
-        info = False
-        if seed == '.':
-            seed = getcwd().split('/')[-1]
-        dirs_as_list = seed.split('/')
-        task_list = ['GO', 'NMR', 'OPTICS']
-        phase_list = ['alpha', 'beta', 'gamma', 'theta']
-        defect_list = ['vacancy', 'interstitial']
-        for directory in dirs_as_list:
-            if directory == '.':
-                directory = getcwd().split('/')[-1]
-            if len(directory.split('-')) > 3:
-                if directory[0].isalpha():
-                    offset = 1
-                else:
-                    offset = 0
-                try:
-                    dir_dict['cut_off_energy'] = float(directory.split('-')[offset])
-                    dir_dict['kpoints_mp_spacing'] = float(directory.split('-')[offset + 1])
-                    dir_dict['xc_functional'] = directory.split('-')[offset + 4].upper()
-                except Exception:
-                    pass
-                if dir_dict['xc_functional'][0] == 'S':
-                    dir_dict['xc_functional'] = dir_dict['xc_functional'][1:]
-                    dir_dict['spin_polarized'] = True
-                if [task for task in task_list if task in directory.split('-')[offset + 5]]:
-                    dir_dict['task'] = directory.split('-')[offset + 5]
-                info = True
-            elif 'GPa' in directory:
-                try:
-                    dir_dict['external_pressure'].append([float(directory.split('_')[0]), 0.0, 0.0])
-                    dir_dict['external_pressure'].append([float(directory.split('_')[0]), 0.0])
-                    dir_dict['external_pressure'].append([float(directory.split('_')[0])])
-                    info = True
-                except Exception:
-                    pass
-            if [phase for phase in phase_list if phase in directory]:
-                for phase in phase_list:
-                    if phase in directory:
-                        dir_dict['phase'] = phase
-                        info = True
-            if [defect for defect in defect_list if defect in directory]:
-                for defect in defect_list:
-                    if defect in directory:
-                        dir_dict['defect'] = defect
-                        info = True
-        if 'external_pressure' not in dir_dict:
-            dir_dict['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0], [0.0]]
-        if info:
-            dir_dict['source'].append(seed)
-        else:
-            if verbosity > 0:
-                print('No information found in dirname', seed)
-    except Exception as oops:
-        if verbosity > 0:
-            print_exc()
-            print('Error wrangling dir name', seed)
-        return seed + '\t\t' + str(type(oops)) + ' ' + str(oops), False
-    if kwargs.get('debug'):
-        print(json.dumps(dir_dict, indent=2))
-    return dir_dict, True
-
-
 def castep2dict(seed, db=True, verbosity=0, intermediates=False, **kwargs):
     """ From seed filename, create dict of the most relevant
     information about a calculation.
@@ -797,7 +721,7 @@ def bands2dict(seed, summary=False, gap=False, external_efermi=None, verbosity=0
             bs['direct_gap_path'] = 2 * [bs['kpoint_path'][np.argmin(direct_gaps)]]
             bs['direct_gap_path_inds'] = 2 * [np.argmin(direct_gaps)]
 
-        if np.isclose(bs['direct_gap'], bs['band_gap']):
+        if np.abs(bs['direct_gap'] - bs['band_gap']) < 1e-5:
             bs['valence_band_min'] = direct_vbm
             bs['conduction_band_max'] = direct_cbm
             bs['band_gap_path_inds'] = bs['direct_gap_path_inds']
@@ -853,10 +777,8 @@ def optados2dict(seed):
             header.append(line)
 
     data = np.loadtxt(seed, comments='#')
-    dos['num_projectors'] = len(data.T) - 1
 
     dos['energies'] = data[:, 0]
-    elem_only = []
     projectors = []
 
     if is_pdos:
@@ -891,6 +813,7 @@ def optados2dict(seed):
         for i, projector in enumerate(projectors):
             dos['pdos'][projector] = data[:, i + 1]
             dos['dos'] += data[:, i + 1]
+        dos['num_projectors'] = len(projectors)
 
     else:
         dos['dos'] = data[:, 1]
@@ -938,10 +861,12 @@ def phonon2dict(seed, verbosity=0):
         elif 'fractional co-ordinates' in line:
             ph['positions_frac'] = []
             ph['atom_types'] = []
+            ph['atom_masses'] = []
             i = 1
             while 'END header' not in flines[line_no + i]:
                 ph['positions_frac'].append([float(elem) for elem in flines[line_no + i].split()[1:4]])
                 ph['atom_types'].append(flines[line_no + i].split()[-2])
+                ph['atom_masses'].append(float(flines[line_no + i].split()[-1]))
                 assert len(ph['positions_frac'][-1]) == 3
                 i += 1
             assert len(ph['positions_frac']) == ph['num_atoms']
@@ -962,7 +887,7 @@ def phonon2dict(seed, verbosity=0):
 
     ph['qpoint_path'] = np.asarray([qpt[0:3] for qpt in ph['phonon_kpoint_list']])
     ph['qpoint_weights'] = [qpt[3] for qpt in ph['phonon_kpoint_list']]
-    ph['softest_mode_freq'] = min(ph['eigenvalues_q'])
+    ph['softest_mode_freq'] = np.min(ph['eigenvalues_q'])
 
     cart_kpts = np.asarray(frac2cart(real2recip(ph['lattice_cart']), ph['qpoint_path']))
     ph['cart_qpoints'] = cart_kpts

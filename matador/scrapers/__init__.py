@@ -17,14 +17,14 @@ Currently supported filetypes:
 """
 
 
-__all__ = ['res2dict', 'cell2dict', 'param2dict', 'dir2dict', 'castep2dict', 'bands2dict',
+__all__ = ['res2dict', 'cell2dict', 'param2dict', 'castep2dict', 'bands2dict',
            'phonon2dict', 'optados2dict', 'usp2dict', 'pwout2dict', 'magres2dict', 'cif2dict']
 __author__ = 'Matthew Evans'
 __maintainer__ = 'Matthew Evans'
 
 
 from matador.scrapers.castep_scrapers import res2dict, cell2dict, param2dict
-from matador.scrapers.castep_scrapers import dir2dict, castep2dict, bands2dict
+from matador.scrapers.castep_scrapers import castep2dict, bands2dict
 from matador.scrapers.castep_scrapers import phonon2dict, optados2dict, usp2dict
 from matador.scrapers.qe_scrapers import pwout2dict
 from matador.scrapers.magres_scrapers import magres2dict

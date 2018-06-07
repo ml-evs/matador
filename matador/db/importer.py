@@ -16,7 +16,7 @@ import traceback as tb
 import pymongo as pm
 
 from matador.scrapers.castep_scrapers import castep2dict, param2dict, cell2dict
-from matador.scrapers.castep_scrapers import res2dict, dir2dict
+from matador.scrapers.castep_scrapers import res2dict
 from matador.utils.cell_utils import calc_mp_spacing
 from matador.utils.chem_utils import get_root_source
 from matador.db import make_connection_to_collection
@@ -292,8 +292,7 @@ class Spatula:
 
         """
         print('\n{:^52}'.format('###### RUNNING IMPORTER ######') + '\n')
-        total = len(file_lists)
-        for ind, root in enumerate(file_lists):
+        for _, root in enumerate(file_lists):
             root_str = root
             if root_str == '.':
                 root_str = os.getcwd().split('/')[-1]
@@ -338,7 +337,6 @@ class Spatula:
         multi = False  # are there multiple param/cell files?
         cell = False  # was the cell file successfully scraped?
         param = False  # was the param file successfully scraped?
-        directory = False  # was the directory name successfully scraped?
         import_count = 0  # how many files have been successfully imported?
 
         if file_lists[root]['param_count'] == 1:
@@ -387,15 +385,8 @@ class Spatula:
                                 print('Found matching cell and param files:', param_name)
                             break
 
-        # always try to scrape directory
-        dir_dict, success = dir2dict(root)
-        if not success:
-            self.logfile.write(dir_dict)
-        directory = success
         # combine cell and param dicts for folder
         input_dict = dict()
-        if directory:
-            input_dict = dir_dict.copy()
         if cell and param:
             input_dict.update(cell_dict)
             input_dict.update(param_dict)

@@ -28,6 +28,13 @@
    K              0.612207000000000       0.500000000000000       0.403589000000000
 %ENDBLOCK positions_frac
 
+%BLOCK HUBBARD_U
+eV
+K s: 2
+P p: 3.0
+U d: 10.101
+%ENDBLOCK HUBBARD_U
+
 %BLOCK species_pot
    P       3|1.8|4|4|5|30:31:32
    K       2|1.5|9|10|11|30U:40:31(qc=6)

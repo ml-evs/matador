@@ -75,6 +75,9 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(test_dict['phonon_fine_kpoint_path_spacing'], 0.01, msg='Failed to read kpoint {}'.format(test_dict['phonon_fine_kpoint_path_spacing']))
             self.assertEqual(test_dict['species_pot']['K'], '2|1.5|9|10|11|30U:40:31(qc=6)', msg='Failed to read pspots.')
             self.assertEqual(test_dict['species_pot']['P'], '3|1.8|4|4|5|30:31:32', msg='Failed to read pspots.')
+            self.assertEqual(test_dict['hubbard_u']['K']['s'], 2, msg='Failed to read Hubbard U block.')
+            self.assertEqual(test_dict['hubbard_u']['P']['p'], 3, msg='Failed to read Hubbard U block.')
+            self.assertEqual(test_dict['hubbard_u']['U']['d'], 10.101, msg='Failed to read Hubbard U block.')
             self.assertTrue(test_dict['snap_to_symmetry'])
             self.assertTrue(test_dict['symmetry_generate'])
 
@@ -317,6 +320,80 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(test_dict['write_checkpoint'], 'none', msg='Wrong db=False checkpointing!')
             self.assertEqual(test_dict['write_cell_structure'], True, msg='Wrong db=False cell_structure!')
 
+    def testPhononScraper(self):
+        from matador.scrapers import phonon2dict
+        phonon_fname = REAL_PATH + 'data/K8SnP4.phonon'
+        failed_open = False
+        try:
+            f = open(phonon_fname, 'r')
+        except Exception:
+            failed_open = True
+            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(phonon_fname))
+        if not failed_open:
+            f.close()
+            ph_dict, s = phonon2dict(phonon_fname)
+            print(ph_dict['softest_mode_freq'])
+            self.assertTrue(s, msg='Failed to read phonon file')
+            self.assertEqual(ph_dict['num_atoms'], 26)
+            self.assertEqual(ph_dict['num_branches'], 78)
+            self.assertEqual(ph_dict['num_qpoints'], 110)
+            self.assertEqual(ph_dict['freq_unit'], 'cm-1')
+            self.assertEqual(ph_dict['lattice_cart'][0], [7.621987, 7.621987, 0.00000])
+            self.assertEqual(ph_dict['lattice_cart'][1], [-7.621987, 7.621987, 0.00000])
+            self.assertEqual(ph_dict['lattice_cart'][2], [-7.621987, 0.000000, 7.621987])
+            self.assertEqual(ph_dict['positions_frac'][0], [0.725087, 0.725075, 0.549843])
+            self.assertEqual(ph_dict['atom_types'][0], 'P')
+            self.assertEqual(ph_dict['atom_types'][14], 'K')
+            self.assertEqual(ph_dict['atom_types'][-1], 'Sn')
+            self.assertEqual(ph_dict['atom_masses'][0], 30.97376)
+            self.assertEqual(ph_dict['atom_masses'][14], 39.0983)
+            self.assertEqual(ph_dict['atom_masses'][-1], 118.710)
+            self.assertEqual(ph_dict['softest_mode_freq'], -0.021599)
+            self.assertAlmostEqual(ph_dict['qpoint_path_spacing'], 0.021, places=2)
+            self.assertEqual(ph_dict['qpoint_branches'][0][0], 0)
+            self.assertEqual(ph_dict['qpoint_branches'][0][-1], 28)
+            self.assertEqual(ph_dict['qpoint_branches'][1][0], 29)
+            self.assertEqual(ph_dict['qpoint_branches'][1][-1], 76)
+            self.assertEqual(ph_dict['qpoint_branches'][-1][0], 77)
+            self.assertEqual(ph_dict['qpoint_branches'][-1][-1], 109)
+
+    def testOptadosDOSScraper(self):
+        from matador.scrapers import optados2dict
+        odo_fname = REAL_PATH + 'data/K3P.adaptive.dat'
+        failed_open = False
+        try:
+            f = open(odo_fname, 'r')
+        except Exception:
+            failed_open = True
+            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(odo_fname))
+        if not failed_open:
+            f.close()
+            od_dict, s = optados2dict(odo_fname)
+            self.assertTrue(s)
+            self.assertEqual(len(od_dict['dos']), 529)
+            self.assertEqual(len(od_dict['energies']), 529)
+
+    def testOptadosPDOSScraper(self):
+        from matador.scrapers import optados2dict
+        odo_fname = REAL_PATH + 'data/KP.pdos.adaptive.dat'
+        failed_open = False
+        try:
+            f = open(odo_fname, 'r')
+        except Exception:
+            failed_open = True
+            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(odo_fname))
+        if not failed_open:
+            f.close()
+            od_dict, s = optados2dict(odo_fname)
+            self.assertTrue(s)
+            self.assertEqual(len(od_dict['dos']), 53684)
+            self.assertEqual(len(od_dict['energies']), 53684)
+            self.assertEqual(od_dict['num_projectors'], 4)
+            self.assertEqual(len(od_dict['pdos'][('K', 's')]), 53684)
+            self.assertEqual(len(od_dict['pdos'][('K', 'p')]), 53684)
+            self.assertEqual(len(od_dict['pdos'][('P', 's')]), 53684)
+            self.assertEqual(len(od_dict['pdos'][('P', 'p')]), 53684)
+
     def testBands(self):
         from matador.scrapers.castep_scrapers import bands2dict
         bands_fname = REAL_PATH + 'data/KPSn.bands'
@@ -328,7 +405,7 @@ class ScrapeTest(unittest.TestCase):
             self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(bands_fname))
         if not failed_open:
             f.close()
-            bs_dict, s = bands2dict(bands_fname)
+            bs_dict, s = bands2dict(bands_fname, gap=True)
             self.assertTrue(s)
             self.assertEqual(len(bs_dict['kpoint_path']), 518)
             self.assertEqual(np.shape(bs_dict['eigenvalues_k_s']), (1, 71, 518))
@@ -337,6 +414,10 @@ class ScrapeTest(unittest.TestCase):
             self.assertAlmostEqual(bs_dict['fermi_energy'], 4.0781, places=4)
             self.assertLessEqual(bs_dict['kpoint_path_spacing'], 0.01)
             self.assertGreaterEqual(bs_dict['kpoint_path_spacing'], 0.009)
+            self.assertAlmostEqual(bs_dict['direct_gap'], 0.7807715152197994, places=4)
+            self.assertEqual(bs_dict['direct_gap_path_inds'], [0, 0])
+            self.assertAlmostEqual(bs_dict['band_gap'], 0.760001, places=4)
+            self.assertEqual(bs_dict['band_gap_path_inds'], [246, 235])
 
         bands_fname = REAL_PATH + 'data/KPSn_2.bands'
         failed_open = False
@@ -347,7 +428,7 @@ class ScrapeTest(unittest.TestCase):
             self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(bands_fname))
         if not failed_open:
             f.close()
-            bs_dict, s = bands2dict(bands_fname)
+            bs_dict, s = bands2dict(bands_fname, gap=True)
             self.assertEqual(len(bs_dict['kpoint_path']), 28)
             self.assertEqual(np.shape(bs_dict['eigenvalues_k_s']), (1, 71, 28))
             self.assertEqual(bs_dict['num_kpoints'], 28)
@@ -356,6 +437,10 @@ class ScrapeTest(unittest.TestCase):
             self.assertLessEqual(bs_dict['kpoint_path_spacing'], 0.3)
             self.assertGreaterEqual(bs_dict['kpoint_path_spacing'], 0.29)
             self.assertEqual(len(bs_dict['kpoint_branches']), 1)
+            self.assertAlmostEqual(bs_dict['direct_gap'], 0.7807715152197994, places=4)
+            self.assertAlmostEqual(bs_dict['direct_gap'], bs_dict['band_gap'], places=4)
+            self.assertEqual(bs_dict['direct_gap_path_inds'], [0, 0])
+            self.assertEqual(bs_dict['band_gap_path_inds'], bs_dict['direct_gap_path_inds'])
 
     def testMagres(self):
         from matador.scrapers.magres_scrapers import magres2dict
