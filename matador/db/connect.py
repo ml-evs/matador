@@ -40,7 +40,7 @@ def make_connection_to_collection(coll_names, check_collection=False, allow_chan
         port=settings['mongo']['port'],
         connect=False,
         maxIdleTimeMS=600000,  # disconnect after 10 minutes idle
-        socketTimeoutMS=10000,  # give up on database after 20 seconds without results
+        socketTimeoutMS=3600000,  # give up on database after 1 hr without results
         serverSelectionTimeoutMS=10000,  # give up on server after 2 seconds without results
         connectTimeoutMS=10000)  # give up trying to connect to new database after 2 seconds
 
