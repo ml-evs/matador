@@ -443,6 +443,8 @@ def main(override=False):
                              help='show as much detail about calculation as possible')
     query_flags.add_argument('-pa', '--per_atom', action='store_true', help='show quantities per atom not per fu.')
     query_flags.add_argument('-dt', '--time', type=int, help='query only structures added before this time in days')
+    query_flags.add_argument('--since', action='store_true',
+                             help='query only structures added after time specified by --time in days')
     query_flags.add_argument('--source', action='store_true',
                              help='print filenames from which structures were wrangled')
     query_flags.add_argument('-v', '--view', action='store_true',

@@ -280,7 +280,7 @@ class DBQuery:
             self.query_dict['$and'].append(self._query_quality())
 
         if self.args.get('time') is not None:
-            self.query_dict['$and'].append(self._query_time())
+            self.query_dict['$and'].append(self._query_time(self.args.get('since', False)))
             self._empty_query = False
 
     def perform_query(self):
@@ -988,9 +988,13 @@ class DBQuery:
 
         return query_dict
 
-    def _query_time(self, preceding=True):
-        """ Only include structures added before
-        the date given in args['time'].
+    def _query_time(self, since=False):
+        """ Only include structures added before or after (depending on
+        since) the date given in args['time'].
+
+        Keyword arguments:
+            since (bool): query before or after this time.
+
         """
         from datetime import datetime, timedelta
         from time import mktime
@@ -1000,7 +1004,9 @@ class DBQuery:
         elapsed = str(hex(int(mktime(time))))[2:]
         cutoff_id = ObjectId(elapsed + '0000000000000000')
         query_dict['_id'] = dict()
-        if preceding:
+        if since:
+            query_dict['_id']['$gte'] = cutoff_id
+        else:
             query_dict['_id']['$lte'] = cutoff_id
 
         return query_dict
