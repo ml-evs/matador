@@ -298,7 +298,8 @@ class DBQuery:
                     if self.top == -1 or self.top is None:
                         self.top = self.cursor.count()
                     self.cursor = list(self.cursor)
-                    display_results(self.cursor[:self.top], args=self.args)
+                    if self.cursor:
+                        display_results(self.cursor[:self.top], args=self.args)
 
         # if no special query has been made already, begin executing the query
         if not self._empty_query:
