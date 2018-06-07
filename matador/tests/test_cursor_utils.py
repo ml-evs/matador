@@ -46,6 +46,23 @@ class CursorUtilTest(unittest.TestCase):
         for source, answer in zip(sources, answers):
             self.assertEqual(get_guess_doc_provenance(source), answer, msg='failed {}'.format(source))
 
+    def testFilterCursor(self):
+        from matador.utils.cursor_utils import filter_cursor
+        cursor = [{'field': int} for int in range(100)]
+
+        filtered = filter_cursor(cursor, 'field', 98)
+        self.assertEqual(len(filtered), 2)
+
+        filtered = filter_cursor(cursor, 'field', [-2, 100])
+        self.assertEqual(len(filtered), len(cursor))
+
+        cursor.append({'no_field': 1})
+        filtered = filter_cursor(cursor, 'field', [-2, 100])
+        self.assertEqual(len(filtered), len(cursor)-1)
+
+        cursor.append({'field': [0]})
+        filtered = filter_cursor(cursor, 'field', [-2, 100])
+        self.assertEqual(len(filtered), len(cursor)-2)
 
 if __name__ == '__main__':
     unittest.main()

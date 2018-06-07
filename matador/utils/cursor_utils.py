@@ -223,13 +223,12 @@ def display_results(cursor,
         struct_string[-1] += postfix
 
         if latex:
-            latex_struct_string.append("{:^30} {:^10} & ".format(formula_substring, '$\\star$' if doc['hull_distance'] == 0 else ''))
-            latex_struct_string[-1] += "{:^20.0f} & ".format(doc.get('hull_distance') * 1000
-                                                             ) if doc.get('hull_distance'
-                                                                          ) > 0 else '{:^20} &'.format('-')
-            latex_struct_string[-1] += "{:^20.0f} & ".format(doc['gravimetric_capacity']
-                                                             ) if doc.get('hull_distance'
-                                                                          ) == 0 else '{:^20} &'.format('-')
+            latex_struct_string.append("{:^30} {:^10} & ".format(formula_substring, '$\\star$'
+                                                                 if doc['hull_distance'] == 0 else ''))
+            latex_struct_string[-1] += ("{:^20.0f} & ".format(doc.get('hull_distance') * 1000)
+                                        if doc.get('hull_distance') > 0 else '{:^20} &'.format('-'))
+            latex_struct_string[-1] += ("{:^20.0f} & ".format(doc['gravimetric_capacity'])
+                                        if doc.get('hull_distance') == 0 else '{:^20} &'.format('-'))
             latex_struct_string[-1] += "{:^20} & ".format(get_spacegroup_spg(doc))
             prov = get_guess_doc_provenance(doc['source'], doc.get('icsd'))
             if doc.get('icsd'):
@@ -411,7 +410,7 @@ def get_guess_doc_provenance(sources, icsd=None):
         fname_with_folder = fname
         fname = fname.split('/')[-1].lower()
         if (fname.endswith('.castep') or fname.endswith('.res') or fname.endswith('.history') or
-            ('oqmd' in fname and fname.count('.') == 0)):
+                ('oqmd' in fname and fname.count('.') == 0)):
             if any(substr in fname for substr in ['collcode', 'colcode', 'collo']):
                 if fname.count('-') == 2 + fname.count('oqmd') or 'swap' in fname:
                     prov = 'SWAPS'
@@ -432,87 +431,48 @@ def get_guess_doc_provenance(sources, icsd=None):
     return prov
 
 
-def get_spg_uniq(cursor, symprec=1e-2, latvecprec=1e-3, posprec=1e-3):
-    """ Use spglib to find duplicate structures in a cursor.
-    Returns uniq_list and same_list.
+def filter_cursor(cursor, key, vals, verbosity=0):
+    """ Returns a cursor obeying the filter on the given key. Any
+    documents that are missing the key will not be returned. Any
+    documents with values that cannot be compared to floats will also
+    not be returned.
 
-    * cursor     : list of matador structure docs.
-    * symprec    : spglib symmetry precision for cell standardisation.
-    * latvecprec : tolerance on lattice vectors.
-    * posprec    : tolerance on fractional atomic positions.
-    * uniq_list  : list of indices of the unique structures in cursor.
-    * same_list  : list of pairs indices of duplicate structures.
+    Parameters:
+        cursor (list): list of dictionaries to filter.
+        key (str): key to filter.
+        vals (list): either 1 value to 2 values to use as a range.
+            The values are interpreted as floats for comparison.
+
+    Returns:
+        list: list of dictionaries that pass the filter.
+
     """
-    import spglib as spg
-    from .cell_utils import doc2spg
-
-    spg_cursor = list()
-    for doc in cursor:
-        spg_cursor.append(doc2spg(doc))
-
-    refined_list = []
-    for crystal in spg_cursor:
-        refined_list.append(spg.standardize_cell(crystal, to_primitive=False, no_idealize=False, symprec=symprec))
-    for i in range(len(refined_list)):
-        for j in range(len(refined_list[i][1])):
-            for k in range(len(refined_list[i][1][j])):
-                if refined_list[i][1][j][k] > 1 - 1e-10:
-                    refined_list[i][1][j][k] = 0.0
-    for i in range(len(refined_list)):
-        refined_list[i] = (
-            refined_list[i][0], refined_list[i][1][np.argsort(refined_list[i][1][:, 0])],
-            refined_list[i][2][np.argsort(refined_list[i][1][:, 0])]
-        )
-    uniq_list = np.arange(0, len(spg_cursor))
-    same_list = []
-    shift_list = []
-    for i in range(len(spg_cursor)):
-        for j in range(i + 1, len(spg_cursor)):
-            if sorted(cursor[i]['stoichiometry']) == sorted(cursor[j]['stoichiometry']):
-                if np.allclose(refined_list[i][0], refined_list[j][0], atol=latvecprec, rtol=0):
-                    if np.allclose(refined_list[i][1], refined_list[j][1], atol=posprec, rtol=0):
-                        same_list.append((i, j))
-                    else:
-                        for dim in range(3):
-                            if not rigid_shift(refined_list[i], refined_list[j], dim, posprec):
-                                break
-                            elif dim == 3:
-                                same_list.append((i, j))
-                                shift_list.append((i, j, dim))
-                            break
-    dupes = list(set([pair[1] for pair in same_list]))
-    uniq_list = np.delete(uniq_list, dupes)
-    print(len(dupes), 'duplicates found and removed.')
-    print(len(shift_list), 'of which were shifted cells.')
-    return uniq_list
-
-
-def rigid_shift(structA, structB, dim, posprec):
-    raise DeprecationWarning
-
-
-def filter_cursor(cursor, key, vals):
-    """ Returns a cursor obeying the filter on the given key. """
     filtered_cursor = list()
     orig_cursor_len = len(cursor)
+    if not isinstance(vals, list):
+        vals = [vals]
     if len(vals) == 2:
         min_val = float(vals[0])
         max_val = float(vals[1])
-        print('Filtering', key, min_val, max_val)
+        if verbosity > 0:
+            print('Filtering {} <= {} < {}'.format(min_val, key, max_val))
         for doc in cursor:
             try:
                 if doc[key] < max_val and doc[key] >= min_val:
                     filtered_cursor.append(doc)
-            except:
-                print_exc()
+            except (TypeError, ValueError, KeyError):
+                pass
     else:
         min_val = float(vals[0])
-        print('Filtering', key, min_val)
+        if verbosity > 0:
+            print('Filtering {} >= {}'.format(key, min_val))
         for doc in cursor:
             try:
                 if doc[key] >= min_val:
                     filtered_cursor.append(doc)
-            except:
-                print_exc()
-    print(orig_cursor_len, 'filtered to', len(filtered_cursor), 'documents.')
+            except (TypeError, ValueError, KeyError):
+                pass
+
+    if verbosity > 0:
+        print(orig_cursor_len, 'filtered to', len(filtered_cursor), 'documents.')
     return filtered_cursor
