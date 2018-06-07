@@ -250,21 +250,20 @@ class Spatula:
                 struct['species_pot'] = {}
 
             root_src = get_root_source(struct)
+            exts = ['.castep', '.res', '.history', '.history.gz']
+            for ext in exts:
+                for src in struct['source']:
+                    if src.endswith(ext):
+                        expanded_root_src = src
 
             if struct['quality'] == 5:
                 struct_id = self.repo.insert_one(struct).inserted_id
                 self.struct_list.append((struct_id, root_src))
-                self.manifest.write('+ {}\n'.format(root_src))
+                self.manifest.write('+ {}\n'.format(expanded_root_src))
                 if self.debug:
                     print('Inserted', struct_id)
             else:
-                exts = ['.castep', '.res', '.history', '.history.gz']
-                for ext in exts:
-                    for src in struct['source']:
-                        if src.endswith(ext):
-                            expanded_root_src = src
-                            print(expanded_root_src)
-                self.logfile.write('? {} failed quality checks: {}'.format(expanded_root_src, failed_checks))
+                self.logfile.write('? {} failed quality checks: {}\n'.format(expanded_root_src, failed_checks))
                 if self.debug:
                     print('Error with', root_src)
                 return 0
@@ -293,7 +292,8 @@ class Spatula:
 
         """
         print('\n{:^52}'.format('###### RUNNING IMPORTER ######') + '\n')
-        for _, root in enumerate(file_lists):
+        total = len(file_lists)
+        for ind, root in enumerate(file_lists):
             root_str = root
             if root_str == '.':
                 root_str = os.getcwd().split('/')[-1]
@@ -367,21 +367,26 @@ class Spatula:
             for param_name in file_lists[root]['param']:
                 for cell_name in file_lists[root]['cell']:
                     if param_name.split('.')[0] in cell_name:
-                        param_dict, success = param2dict(param_name,
-                                                         debug=self.debug,
-                                                         verbosity=self.verbosity)
-                        param = success
-                        if not success:
-                            self.logfile.write(param_dict)
                         cell_dict, success = cell2dict(cell_name,
                                                        debug=self.debug,
                                                        verbosity=self.verbosity)
                         cell = success
                         if not success:
                             self.logfile.write(cell_dict)
-                        if self.verbosity > 0:
-                            print('Found matching cell and param files:', param_name)
-                        break
+                            continue
+
+                        param_dict, success = param2dict(param_name,
+                                                         debug=self.debug,
+                                                         verbosity=self.verbosity)
+                        param = success
+                        if not success:
+                            self.logfile.write(param_dict)
+
+                        if success:
+                            if self.verbosity > 0:
+                                print('Found matching cell and param files:', param_name)
+                            break
+
         # always try to scrape directory
         dir_dict, success = dir2dict(root)
         if not success:
@@ -391,12 +396,12 @@ class Spatula:
         input_dict = dict()
         if directory:
             input_dict = dir_dict.copy()
-        if cell:
+        if cell and param:
             input_dict.update(cell_dict)
-            input_dict['source'].extend(cell_dict['source'])
-        if param:
             input_dict.update(param_dict)
-            input_dict['source'].extend(param_dict['source'])
+            input_dict['source'] = cell_dict['source'] + param_dict['source']
+        else:
+            self.logfile.write('! {} failed to scrape any cell and param\n'.format(root))
 
         # create res dicts and combine them with input_dict
         for _, file in enumerate(file_lists[root]['res']):
@@ -416,19 +421,27 @@ class Spatula:
                 struct_dict, success = res2dict(file, verbosity=self.verbosity)
 
             if not success:
-                self.logfile.write('! {} failed to scrape: {}'.format(file, struct_dict))
+                self.logfile.write('! {}'.format(struct_dict))
             else:
                 final_struct = input_dict.copy()
                 final_struct.update(struct_dict)
                 # calculate kpoint spacing if not found
-                if ('kpoints_mp_spacing' not in final_struct and
-                        'kpoints_mp_grid' in final_struct):
-                    final_struct['kpoints_mp_spacing'] = calc_mp_spacing(
-                        final_struct['lattice_cart'], final_struct['mp_grid'])
+                if 'lattice_cart' not in final_struct and 'lattice_abc' not in final_struct:
+                    self.logfile.write('! {} missing lattice'.format(file))
+
                 try:
-                    final_struct['source'] = struct_dict['source'] + input_dict['source']
-                except Exception:
-                    pass
+                    if ('kpoints_mp_spacing' not in final_struct and
+                            'kpoints_mp_grid' in final_struct):
+                        final_struct['kpoints_mp_spacing'] = calc_mp_spacing(final_struct['lattice_cart'],
+                                                                             final_struct['mp_grid'])
+                except Exception as exc:
+                    print(final_struct)
+                    raise exc
+
+                final_struct['source'] = struct_dict['source']
+                if 'source' in input_dict:
+                    final_struct['source'] += input_dict['source']
+
                 if not self.dryrun:
                     final_struct.update(self.tag_dict)
                     import_count += self._struct2db(final_struct)
@@ -451,7 +464,7 @@ class Spatula:
         for _, file in enumerate(file_lists[root]['castep']):
             castep_dict, success = castep2dict(file, debug=False, verbosity=self.verbosity)
             if not success:
-                self.logfile.write('! {} failed to scrape: {}'.format(file, castep_dict))
+                self.logfile.write('! {}'.format(castep_dict))
             else:
                 final_struct = castep_dict
                 if not self.dryrun:
@@ -476,7 +489,7 @@ class Spatula:
         for _, file in enumerate(file_lists[root]['res']):
             res_dict, success = res2dict(file, db=False, verbosity=self.verbosity)
             if not success:
-                self.logfile.write('! {} failed to scrape: {}'.format(file, res_dict))
+                self.logfile.write('! {}'.format(res_dict))
             else:
                 final_struct = res_dict
                 if not self.dryrun:
