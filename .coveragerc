@@ -16,3 +16,8 @@ omit =
     *matador/plugins*
     *matador/cli/dispersion.py
     *matador/cli/run3.py
+exclude_lines = 
+    pragma: no cover
+    if *verbosity*:
+    if *debug*
+    def plot_*
