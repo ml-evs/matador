@@ -328,7 +328,7 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, verb
                     for directory in seed.split('/')[:-1]:
                         pspot_seed += directory + '/'
                     # glob for all .usp files with format species_*OTF.usp
-                    pspot_seed += species + '_*OTF.usp'
+                    pspot_seed += species + '_*OTF*.usp'
                     for globbed in glob.glob(pspot_seed):
                         if isfile(globbed):
                             cell['species_pot'].update(usp2dict(globbed))
@@ -412,7 +412,7 @@ def param2dict(seed, db=True, verbosity=0, **kwargs):
                             param[keyword] = False
 
                         if 'cut_off_energy' in line and 'mix_cut_off_energy' not in line:
-                            temp_cut_off = (param['cut_off_energy'].replace('ev', ''))
+                            temp_cut_off = (param['cut_off_energy'].lower().replace('ev', ''))
                             temp_cut_off = temp_cut_off.strip()
                             param['cut_off_energy'] = float(temp_cut_off)
                         elif 'xc_functional' in line:
@@ -422,7 +422,9 @@ def param2dict(seed, db=True, verbosity=0, **kwargs):
                         elif 'geom_force_tol' in line:
                             param['geom_force_tol'] = float(param['geom_force_tol'])
                         elif 'elec_energy_tol' in line:
-                            param['elec_energy_tol'] = float(param['elec_energy_tol'])
+                            temp = (param['elec_energy_tol'].lower().replace('ev', ''))
+                            temp = temp.strip()
+                            param['elec_energy_tol'] = float(temp)
                         break
         if len(unrecognised) > 0:
             raise RuntimeError('Found several unrecognised parameters: {}'.format(unrecognised))
@@ -1080,7 +1082,7 @@ def _castep_scrape_thermo_data(flines, castep):
 
 def _castep_scrape_atoms(flines, castep):
     """ Iterate forwards through flines to scrape atomic types and
-    initial positions.
+    initial positions, and get a preliminary lattice.
 
     Parameters:
         flines (list): list of lines in file
@@ -1091,6 +1093,16 @@ def _castep_scrape_atoms(flines, castep):
 
     """
     for line_no, line in enumerate(flines):
+        if 'Real Lattice' in line:
+            castep['lattice_cart'] = []
+            i = 1
+            while True:
+                if not flines[line_no + i].strip():
+                    break
+                else:
+                    temp_line = flines[line_no + i].split()[0:3]
+                    castep['lattice_cart'].append(list(map(float, temp_line)))
+                i += 1
         if 'atom types' not in castep and 'Cell Contents' in line:
             castep['atom_types'] = []
             castep['positions_frac'] = []
