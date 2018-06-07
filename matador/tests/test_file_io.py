@@ -81,6 +81,17 @@ class ScrapeTest(unittest.TestCase):
             self.assertTrue(test_dict['snap_to_symmetry'])
             self.assertTrue(test_dict['symmetry_generate'])
 
+        cell_fname = REAL_PATH + 'data/K5P4-phonon_bodged.cell'
+        failed_open = False
+        try:
+            f = open(cell_fname, 'r')
+        except Exception:
+            failed_open = True
+        if not failed_open:
+            f.close()
+            test_dict, s = cell2dict(cell_fname, db=True, lattice=True, verbosity=VERBOSITY)
+            self.assertFalse(s)
+
     def testCastep16(self):
         from matador.scrapers.castep_scrapers import castep2dict
         castep_fname = REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep'
@@ -244,13 +255,6 @@ class ScrapeTest(unittest.TestCase):
             self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(castep_fname))
         if not failed_open:
             f.close()
-            fallover = False
-            try:
-                test_dict, s = castep2dict(castep_fname, db=True, intermediates=True, verbosity=VERBOSITY)
-            except Exception:
-                fallover = True
-            self.assertTrue(fallover, msg='Didn\'t fallover when using db and intermediates')
-
             test_dict, s = castep2dict(castep_fname, db=False, intermediates=True, verbosity=VERBOSITY)
             self.assertTrue(s, msg='Should have succeeded with db=False, but didn\'t!')
             final_dict, s = castep2dict(castep_fname, db=True, intermediates=False, verbosity=VERBOSITY)
@@ -289,6 +293,18 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(test_dict['cell_volume'], 105.918342, msg='Wrong cell volume!')
             self.assertEqual(test_dict['space_group'], 'Pmc2_1', msg='Wrong space group!')
             self.assertEqual(test_dict['lattice_abc'], [[5.057429, 4.93404, 4.244619], [90.0, 90.0, 90.0]], msg='Wrong lattice constants!')
+
+        res_fname = REAL_PATH + 'data/LiPZn-r57des_bodged.res'
+        failed_open = False
+        try:
+            f = open(res_fname, 'r')
+        except Exception:
+            failed_open = True
+            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(res_fname))
+        if not failed_open:
+            f.close()
+            test_dict, s = res2dict(res_fname)
+            self.assertFalse(s, 'This wasn\'t meant to succeed!')
 
     def testParam(self):
         from matador.scrapers.castep_scrapers import param2dict
@@ -332,7 +348,6 @@ class ScrapeTest(unittest.TestCase):
         if not failed_open:
             f.close()
             ph_dict, s = phonon2dict(phonon_fname)
-            print(ph_dict['softest_mode_freq'])
             self.assertTrue(s, msg='Failed to read phonon file')
             self.assertEqual(ph_dict['num_atoms'], 26)
             self.assertEqual(ph_dict['num_branches'], 78)
@@ -483,6 +498,7 @@ class ScrapeTest(unittest.TestCase):
             self.assertTrue(pwout_dict['lattice_cart'][0] == [5.887513122, 0.011925355, 0.011971927])
             self.assertTrue(pwout_dict['lattice_cart'][1] == [0.605472370, 5.817169640, -0.011329548])
             self.assertTrue(pwout_dict['lattice_cart'][2] == [-4.543028478, 0.450282751, 10.044268095])
+            self.assertTrue(pwout_dict['source'][0].endswith('NaP.out'))
 
             self.assertEqual(pwout_dict['pressure'], 0)
             from matador.utils.chem_utils import RY_TO_EV
@@ -645,6 +661,8 @@ class ExportTest(unittest.TestCase):
         if not failed_open:
             f.close()
             test_dict, s = castep2dict(castep_fname, db=False, verbosity=VERBOSITY)
+            print(test_dict)
+            print(s)
             self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
             self.assertEqual(test_dict['task'].lower(), 'thermodynamicscalculation', msg='This is not a Thermodynamics calculation...')
             self.assertEqual(test_dict['temp_final'], 1000.0, msg='Wrong final temp!')

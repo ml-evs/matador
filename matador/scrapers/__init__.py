@@ -22,7 +22,6 @@ __all__ = ['res2dict', 'cell2dict', 'param2dict', 'castep2dict', 'bands2dict',
 __author__ = 'Matthew Evans'
 __maintainer__ = 'Matthew Evans'
 
-
 from matador.scrapers.castep_scrapers import res2dict, cell2dict, param2dict
 from matador.scrapers.castep_scrapers import castep2dict, bands2dict
 from matador.scrapers.castep_scrapers import phonon2dict, optados2dict, usp2dict

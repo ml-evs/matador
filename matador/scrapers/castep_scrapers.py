@@ -1,22 +1,25 @@
 # coding: utf-8
+# Distributed under the terms of the MIT License.
+
 """ This file implements the scraper functions for CASTEP-related
 inputs and outputs.
+
 """
 
+
 from collections import defaultdict
-from os import getcwd, stat
+from os import stat
 from os.path import isfile
 from time import strptime
 from pwd import getpwuid
-from traceback import print_exc
 import glob
 import gzip
-
-import bson.json_util as json
 from matador.utils.cell_utils import abc2cart, calc_mp_spacing, cart2volume, wrap_frac_coords
 from matador.utils.chem_utils import get_stoich
+from matador.scrapers.utils import DFTError, CalculationError, scraper_function
 
 
+@scraper_function
 def res2dict(seed, db=True, verbosity=0):
     """ Extract available information from .res file; preferably
     used in conjunction with cell or param file.
@@ -33,101 +36,93 @@ def res2dict(seed, db=True, verbosity=0):
 
     """
     res = dict()
-    try:
-        # read .res file into array
-        if seed.endswith('.res'):
-            seed = seed.replace('.res', '')
-        with open(seed + '.res', 'r') as f:
-            flines = f.readlines()
-        # add .res to source
-        res['source'] = []
-        res['source'].append(seed + '.res')
-        # grab file owner username
-        res['user'] = getpwuid(stat(seed + '.res').st_uid).pw_name
-        # try to grab ICSD CollCode
-        if 'CollCode' in seed:
-            res['icsd'] = seed.split('CollCode')[-1]
-        if '-mp-' in seed:
-            res['mp-id'] = int(seed.split('-mp-')[-1].split('-')[0].split('.')[0])
-        # alias special lines in res file
-        titl = ''
-        cell = ''
-        remark = ''
-        for line in flines:
-            if 'TITL' in line and db:
-                # if not db, then don't read title
-                titl = line.split()
-                if len(titl) != 12:
-                    raise RuntimeError('missing some TITL info')
-            elif 'CELL' in line:
-                cell = line.split()
-            elif 'REM' in line:
-                remark = line.split()
-        if cell == '':
-            raise RuntimeError('missing CELL info')
-        elif titl == '' and db:
-            raise RuntimeError('missing TITL')
-        if db:
-            res['pressure'] = float(titl[2])
-            res['cell_volume'] = float(titl[3])
-            res['enthalpy'] = float(titl[4])
-            res['num_atoms'] = int(titl[7])
-            res['space_group'] = titl[8].strip('()')
-            res['enthalpy_per_atom'] = res['enthalpy'] / res['num_atoms']
-        res['lattice_abc'] = [list(map(float, cell[2:5])), list(map(float, cell[5:8]))]
-        # calculate lattice_cart from abc
-        res['lattice_cart'] = abc2cart(res['lattice_abc'])
-        if 'cell_volume' not in res:
-            res['cell_volume'] = cart2volume(res['lattice_cart'])
-        res['atom_types'] = []
-        res['positions_frac'] = []
-        for line_no, line in enumerate(flines):
-            if 'SFAC' in line:
-                i = 1
-                while 'END' not in flines[line_no + i] and line_no + i < len(flines):
-                    cursor = flines[line_no + i].split()
-                    res['atom_types'].append(cursor[0])
-                    res['positions_frac'].append(list(map(float, cursor[2:5])))
-                    assert len(res['positions_frac'][-1]) == 3
-                    i += 1
-        res['positions_frac'] = wrap_frac_coords(res['positions_frac'])
-        if 'num_atoms' in res:
-            assert len(res['atom_types']) == res['num_atoms']
-        else:
-            res['num_atoms'] = len(res['atom_types'])
-        # deal with implicit encapsulation
-        if remark:
-            if 'NTPROPS' in remark:
-                res['cnt_chiral'] = [0, 0]
-                res['encapsulated'] = True
-                for ind, entry in enumerate(remark):
-                    if 'chiralN' in entry:
-                        res['cnt_chiral'][0] = int(remark[ind + 1].replace(',', ''))
-                    if 'chiralM' in entry:
-                        res['cnt_chiral'][1] = int(remark[ind + 1].replace(',', ''))
-                    if entry == '\'r\':':
-                        res['cnt_radius'] = float(remark[ind + 1].replace(',', ''))
-                    if entry == '\'z\':':
-                        temp_length = remark[ind + 1].replace(',', '')
-                        temp_length = temp_length.replace('\n', '')
-                        temp_length = temp_length.replace('}', '')
-                        res['cnt_length'] = float(temp_length)
+    # read .res file into array
+    if seed.endswith('.res'):
+        seed = seed.replace('.res', '')
+    with open(seed + '.res', 'r') as f:
+        flines = f.readlines()
+    # add .res to source
+    res['source'] = []
+    res['source'].append(seed + '.res')
+    # grab file owner username
+    res['user'] = getpwuid(stat(seed + '.res').st_uid).pw_name
+    # try to grab ICSD CollCode
+    if 'CollCode' in seed:
+        res['icsd'] = seed.split('CollCode')[-1]
+    if '-mp-' in seed:
+        res['mp-id'] = int(seed.split('-mp-')[-1].split('-')[0].split('.')[0])
+    # alias special lines in res file
+    titl = ''
+    cell = ''
+    remark = ''
+    for line in flines:
+        if 'TITL' in line and db:
+            # if not db, then don't read title
+            titl = line.split()
+            if len(titl) != 12:
+                raise RuntimeError('missing some TITL info')
+        elif 'CELL' in line:
+            cell = line.split()
+        elif 'REM' in line:
+            remark = line.split()
+    if cell == '':
+        raise RuntimeError('missing CELL info')
+    elif titl == '' and db:
+        raise RuntimeError('missing TITL')
+    if db:
+        res['pressure'] = float(titl[2])
+        res['cell_volume'] = float(titl[3])
+        res['enthalpy'] = float(titl[4])
+        res['num_atoms'] = int(titl[7])
+        res['space_group'] = titl[8].strip('()')
+        res['enthalpy_per_atom'] = res['enthalpy'] / res['num_atoms']
+    res['lattice_abc'] = [list(map(float, cell[2:5])), list(map(float, cell[5:8]))]
+    # calculate lattice_cart from abc
+    res['lattice_cart'] = abc2cart(res['lattice_abc'])
+    if 'cell_volume' not in res:
+        res['cell_volume'] = cart2volume(res['lattice_cart'])
+    res['atom_types'] = []
+    res['positions_frac'] = []
+    for line_no, line in enumerate(flines):
+        if 'SFAC' in line:
+            i = 1
+            while 'END' not in flines[line_no + i] and line_no + i < len(flines):
+                cursor = flines[line_no + i].split()
+                res['atom_types'].append(cursor[0])
+                res['positions_frac'].append(list(map(float, cursor[2:5])))
+                assert len(res['positions_frac'][-1]) == 3
+                i += 1
+    res['positions_frac'] = wrap_frac_coords(res['positions_frac'])
+    if 'num_atoms' in res:
+        assert len(res['atom_types']) == res['num_atoms']
+    else:
+        res['num_atoms'] = len(res['atom_types'])
+    # deal with implicit encapsulation
+    if remark:
+        if 'NTPROPS' in remark:
+            res['cnt_chiral'] = [0, 0]
+            res['encapsulated'] = True
+            for ind, entry in enumerate(remark):
+                if 'chiralN' in entry:
+                    res['cnt_chiral'][0] = int(remark[ind + 1].replace(',', ''))
+                if 'chiralM' in entry:
+                    res['cnt_chiral'][1] = int(remark[ind + 1].replace(',', ''))
+                if entry == '\'r\':':
+                    res['cnt_radius'] = float(remark[ind + 1].replace(',', ''))
+                if entry == '\'z\':':
+                    temp_length = remark[ind + 1].replace(',', '')
+                    temp_length = temp_length.replace('\n', '')
+                    temp_length = temp_length.replace('}', '')
+                    res['cnt_length'] = float(temp_length)
 
-        res['stoichiometry'] = get_stoich(res['atom_types'])
-        res['num_fu'] = len(res['atom_types']) / sum([elem[1] for elem in res['stoichiometry']])
-    except Exception as oops:
-        if verbosity > 0:
-            print_exc()
-            print('Error in .res file', seed + '.res, skipping...')
-        if isinstance(oops, IOError):
-            print_exc()
-        return seed + '.res\t\t' + str(type(oops)) + ' ' + str(oops) + '\n', False
-    if verbosity > 4:
-        print(json.dumps(res, indent=2))
+    res['stoichiometry'] = get_stoich(res['atom_types'])
+    res['num_fu'] = len(res['atom_types']) / sum([elem[1] for elem in res['stoichiometry']])
+
     return res, True
 
 
-def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, verbosity=0, **kwargs):
+@scraper_function
+def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, verbosity=0):
     """ Extract available information from .cell file; probably
     to be merged with another dict from a .param or .res file.
 
@@ -147,204 +142,191 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, verb
     cell = dict()
     if outcell:
         lattice = True
-    try:
-        if seed.endswith('.cell'):
-            seed = seed.replace('.cell', '')
-        with open(seed + '.cell', 'r') as f:
-            flines = f.readlines()
-        # add cell file to source
-        cell['source'] = []
-        cell['source'].append(seed + '.cell')
-        for line_no, line in enumerate(flines):
-            if line.startswith(('#', '!')):
-                continue
-            if '#' or '!' in line:
-                line = line.split('#')[0].split('!')[0]
-            if '%block lattice_cart' in line.lower() and lattice:
-                cell['lattice_cart'] = []
-                i = 1
-                while 'endblock' not in flines[line_no + i].lower():
-                    if not flines[line_no + i].strip()[0].isalpha():
-                        cell['lattice_cart'].append(list(map(float, flines[line_no + i].split())))
-                    i += 1
-                if verbosity > 1:
-                    print(cell['lattice_cart'])
-                assert len(cell['lattice_cart']) == 3
-                cell['cell_volume'] = cart2volume(cell['lattice_cart'])
-            elif '%block species_pot' in line.lower():
-                cell['species_pot'] = dict()
-                i = 1
-                while 'endblock' not in flines[line_no + i].lower():
-                    if db:
-                        cell['species_pot'][flines[line_no+i].split()[0]] = \
-                            flines[line_no+i].split()[1].split('/')[-1]
-                        cell['species_pot'][flines[line_no+i].split()[0]] = \
-                            cell['species_pot'][flines[line_no+i].split()[0]].replace('()', '')
-                        cell['species_pot'][flines[line_no+i].split()[0]] = \
-                            cell['species_pot'][flines[line_no+i].split()[0]].replace('[]', '')
+    if seed.endswith('.cell'):
+        seed = seed.replace('.cell', '')
+    with open(seed + '.cell', 'r') as f:
+        flines = f.readlines()
+    # add cell file to source
+    cell['source'] = []
+    cell['source'].append(seed + '.cell')
+    for line_no, line in enumerate(flines):
+        if line.startswith(('#', '!')):
+            continue
+        if '#' or '!' in line:
+            line = line.split('#')[0].split('!')[0]
+        if '%block lattice_cart' in line.lower() and lattice:
+            cell['lattice_cart'] = []
+            i = 1
+            while 'endblock' not in flines[line_no + i].lower():
+                if not flines[line_no + i].strip()[0].isalpha():
+                    cell['lattice_cart'].append(list(map(float, flines[line_no + i].split())))
+                    assert len(cell['lattice_cart'][-1]) == 3, 'Lattice vector does not have enough elements!'
+                i += 1
+            assert len(cell['lattice_cart']) == 3, 'Wrong number of lattice vectors!'
+            cell['cell_volume'] = cart2volume(cell['lattice_cart'])
+        elif '%block species_pot' in line.lower():
+            cell['species_pot'] = dict()
+            i = 1
+            while 'endblock' not in flines[line_no + i].lower():
+                if db:
+                    cell['species_pot'][flines[line_no+i].split()[0]] = \
+                        flines[line_no+i].split()[1].split('/')[-1]
+                    cell['species_pot'][flines[line_no+i].split()[0]] = \
+                        cell['species_pot'][flines[line_no+i].split()[0]].replace('()', '')
+                    cell['species_pot'][flines[line_no+i].split()[0]] = \
+                        cell['species_pot'][flines[line_no+i].split()[0]].replace('[]', '')
+                else:
+                    pspot_libs = ['C7', 'C8', 'C9', 'C17', 'C18', 'MS', 'HARD',
+                                  'QC5', 'NCP', 'NCP18', 'NCP17', 'NCP9']
+                    if flines[line_no + i].upper().split()[0] in pspot_libs:
+                        cell['species_pot']['library'] = flines[line_no + i].upper().split()[0]
                     else:
-                        pspot_libs = ['C7', 'C8', 'C9', 'C17', 'C18', 'MS', 'HARD',
-                                      'QC5', 'NCP', 'NCP18', 'NCP17', 'NCP9']
-                        if flines[line_no + i].upper().split()[0] in pspot_libs:
-                            cell['species_pot']['library'] = flines[line_no + i].upper().split()[0]
-                        else:
-                            cell['species_pot'][flines[line_no + i].split()[0]] = flines[line_no + i].split()[1]
+                        cell['species_pot'][flines[line_no + i].split()[0]] = flines[line_no + i].split()[1]
+                i += 1
+        elif '%block cell_constraints' in line.lower():
+            cell['cell_constraints'] = []
+            for j in range(2):
+                cell['cell_constraints'].append(list(map(int, flines[line_no + j + 1].split())))
+        elif '%block hubbard_u' in line.lower():
+            cell['hubbard_u'] = defaultdict(list)
+            i = 0
+            while 'endblock' not in flines[line_no + i].lower():
+                line = flines[line_no + i]
+                if line == 'eV' or len(line.split()) < 3:
                     i += 1
-            elif '%block cell_constraints' in line.lower():
-                cell['cell_constraints'] = []
-                for j in range(2):
-                    cell['cell_constraints'].append(list(map(int, flines[line_no + j + 1].split())))
-            elif '%block hubbard_u' in line.lower():
-                cell['hubbard_u'] = defaultdict(list)
-                i = 0
-                while 'endblock' not in flines[line_no + i].lower():
-                    line = flines[line_no + i]
-                    if line == 'eV' or len(line.split()) < 3:
-                        i += 1
-                        continue
-                    else:
-                        atom = line.split()[0]
-                        orbital = line.split()[1].replace(':', '')
-                        shift = float(line.split()[-1])
-                        atom = line.split()[0]
-                        cell['hubbard_u'][atom] = dict()
-                        cell['hubbard_u'][atom][orbital] = shift
-                        i += 1
-            elif '%block external_pressure' in line.lower():
-                cell['external_pressure'] = []
-                i = 1
-                while 'endblock' not in flines[line_no + i].lower():
-                    if not flines[line_no + i].strip()[0].isalpha():
-                        flines[line_no+i] = flines[line_no+i].replace(',', '')
-                        cell['external_pressure'].append(list(map(float, flines[line_no+i].split())))
-                    i += 1
-            # parse kpoints
-            elif 'kpoints_mp_spacing' in line.lower() or 'kpoint_mp_spacing' in line.lower():
-                if 'spectral_kpoints_mp_spacing' in line.lower() or 'spectral_kpoint_mp_spacing' in line.lower():
-                    cell['spectral_kpoints_mp_spacing'] = float(line.split()[-1])
-                elif 'phonon_kpoints_mp_spacing' in line.lower() or 'phonon_kpoint_mp_spacing' in line.lower():
-                    cell['phonon_kpoint_mp_spacing'] = float(line.split()[-1])
-                elif 'phonon_fine_kpoints_mp_spacing' in line.lower() or 'phonon_fine_kpoint_mp_spacing' in line.lower():
-                    cell['phonon_fine_kpoint_mp_spacing'] = float(line.split()[-1])
+                    continue
                 else:
-                    cell['kpoints_mp_spacing'] = float(line.split()[-1])
-            elif 'kpoints_mp_grid' in line.lower() or 'kpoint_mp_grid' in line.lower():
-                if 'spectral_kpoints_mp_grid' in line.lower() or 'spectral_kpoint_mp_grid' in line.lower():
-                    cell['spectral_kpoints_mp_grid'] = list(map(int, line.split()[-3:]))
-                elif 'phonon_kpoints_mp_grid' in line.lower() or 'phonon_kpoint_mp_grid' in line.lower():
-                    cell['phonon_kpoint_mp_grid'] = list(map(int, line.split()[-3:]))
-                elif 'phonon_fine_kpoints_mp_grid' in line.lower() or 'phonon_fine_kpoint_mp_grid' in line.lower():
-                    cell['phonon_fine_kpoint_mp_grid'] = list(map(int, line.split()[-3:]))
-                else:
-                    cell['kpoints_mp_grid'] = list(map(int, line.split()[-3:]))
-            elif 'kpoints_mp_offset' in line.lower() or 'kpoint_mp_offset' in line.lower():
-                if 'spectral_kpoints_mp_offset' in line.lower() or 'spectral_kpoint_mp_offset' in line.lower():
-                    cell['spectral_kpoints_mp_offset'] = list(map(float, line.split()[-3:]))
-                elif 'phonon_kpoints_mp_offset' in line.lower() or 'phonon_kpoint_mp_offset' in line.lower():
-                    # this is a special case where phonon_kpointS_mp_offset doesn't exist
-                    cell['phonon_kpoint_mp_offset'] = list(map(float, line.split()[-3:]))
-                elif 'phonon_fine_kpoints_mp_offset' in line.lower() or 'phonon_fine_kpoint_mp_offset' in line.lower():
-                    cell['phonon_fine_kpoint_mp_offset'] = list(map(float, line.split()[-3:]))
-                else:
-                    cell['kpoints_mp_offset'] = list(map(float, line.split()[-3:]))
-            elif '%block spectral_kpoints_path' in line.lower() or '%block spectral_kpoint_path' in line.lower():
-                i = 1
-                cell['spectral_kpoints_path'] = []
-                while '%endblock' not in flines[line_no + i].lower():
-                    cell['spectral_kpoints_path'].append(list(map(float, flines[line_no + i].split()[:3])))
+                    atom = line.split()[0]
+                    orbital = line.split()[1].replace(':', '')
+                    shift = float(line.split()[-1])
+                    atom = line.split()[0]
+                    cell['hubbard_u'][atom] = dict()
+                    cell['hubbard_u'][atom][orbital] = shift
                     i += 1
-            elif '%block spectral_kpoints_list' in line.lower() or '%block spectral_kpoint_list' in line.lower():
+        elif '%block external_pressure' in line.lower():
+            cell['external_pressure'] = []
+            i = 1
+            while 'endblock' not in flines[line_no + i].lower():
+                if not flines[line_no + i].strip()[0].isalpha():
+                    flines[line_no+i] = flines[line_no+i].replace(',', '')
+                    cell['external_pressure'].append(list(map(float, flines[line_no+i].split())))
+                i += 1
+        # parse kpoints
+        elif 'kpoints_mp_spacing' in line.lower() or 'kpoint_mp_spacing' in line.lower():
+            if 'spectral_kpoints_mp_spacing' in line.lower() or 'spectral_kpoint_mp_spacing' in line.lower():
+                cell['spectral_kpoints_mp_spacing'] = float(line.split()[-1])
+            elif 'phonon_kpoints_mp_spacing' in line.lower() or 'phonon_kpoint_mp_spacing' in line.lower():
+                cell['phonon_kpoint_mp_spacing'] = float(line.split()[-1])
+            elif 'phonon_fine_kpoints_mp_spacing' in line.lower() or 'phonon_fine_kpoint_mp_spacing' in line.lower():
+                cell['phonon_fine_kpoint_mp_spacing'] = float(line.split()[-1])
+            else:
+                cell['kpoints_mp_spacing'] = float(line.split()[-1])
+        elif 'kpoints_mp_grid' in line.lower() or 'kpoint_mp_grid' in line.lower():
+            if 'spectral_kpoints_mp_grid' in line.lower() or 'spectral_kpoint_mp_grid' in line.lower():
+                cell['spectral_kpoints_mp_grid'] = list(map(int, line.split()[-3:]))
+            elif 'phonon_kpoints_mp_grid' in line.lower() or 'phonon_kpoint_mp_grid' in line.lower():
+                cell['phonon_kpoint_mp_grid'] = list(map(int, line.split()[-3:]))
+            elif 'phonon_fine_kpoints_mp_grid' in line.lower() or 'phonon_fine_kpoint_mp_grid' in line.lower():
+                cell['phonon_fine_kpoint_mp_grid'] = list(map(int, line.split()[-3:]))
+            else:
+                cell['kpoints_mp_grid'] = list(map(int, line.split()[-3:]))
+        elif 'kpoints_mp_offset' in line.lower() or 'kpoint_mp_offset' in line.lower():
+            if 'spectral_kpoints_mp_offset' in line.lower() or 'spectral_kpoint_mp_offset' in line.lower():
+                cell['spectral_kpoints_mp_offset'] = list(map(float, line.split()[-3:]))
+            elif 'phonon_kpoints_mp_offset' in line.lower() or 'phonon_kpoint_mp_offset' in line.lower():
+                # this is a special case where phonon_kpointS_mp_offset doesn't exist
+                cell['phonon_kpoint_mp_offset'] = list(map(float, line.split()[-3:]))
+            elif 'phonon_fine_kpoints_mp_offset' in line.lower() or 'phonon_fine_kpoint_mp_offset' in line.lower():
+                cell['phonon_fine_kpoint_mp_offset'] = list(map(float, line.split()[-3:]))
+            else:
+                cell['kpoints_mp_offset'] = list(map(float, line.split()[-3:]))
+        elif '%block spectral_kpoints_path' in line.lower() or '%block spectral_kpoint_path' in line.lower():
+            i = 1
+            cell['spectral_kpoints_path'] = []
+            while '%endblock' not in flines[line_no + i].lower():
+                cell['spectral_kpoints_path'].append(list(map(float, flines[line_no + i].split()[:3])))
+                i += 1
+        elif '%block spectral_kpoints_list' in line.lower() or '%block spectral_kpoint_list' in line.lower():
+            i = 1
+            cell['spectral_kpoints_list'] = []
+            while '%endblock' not in flines[line_no + i].lower():
+                cell['spectral_kpoints_list'].append(list(map(float, flines[line_no + i].split()[:4])))
+                i += 1
+        elif '%block phonon_fine_kpoints_list' in line.lower() or '%block phonon_fine_kpoint_list' in line.lower():
+            i = 1
+            # this is a special case where phonon_fine_kpointS_list doesn't exist
+            cell['phonon_fine_kpoint_list'] = []
+            while '%endblock' not in flines[line_no + i].lower():
+                cell['phonon_fine_kpoint_list'].append(list(map(float, flines[line_no + i].split()[:4])))
+                i += 1
+        elif not db:
+            if '%block positions_frac' in line.lower():
+                atomic_init_spins = defaultdict(list)
                 i = 1
-                cell['spectral_kpoints_list'] = []
-                while '%endblock' not in flines[line_no + i].lower():
-                    cell['spectral_kpoints_list'].append(list(map(float, flines[line_no + i].split()[:4])))
-                    i += 1
-            elif '%block phonon_fine_kpoints_list' in line.lower() or '%block phonon_fine_kpoint_list' in line.lower():
-                i = 1
-                # this is a special case where phonon_fine_kpointS_list doesn't exist
-                cell['phonon_fine_kpoint_list'] = []
-                while '%endblock' not in flines[line_no + i].lower():
-                    cell['phonon_fine_kpoint_list'].append(list(map(float, flines[line_no + i].split()[:4])))
-                    i += 1
-            elif not db:
-                if '%block positions_frac' in line.lower():
-                    atomic_init_spins = defaultdict(list)
-                    i = 1
+                if positions:
+                    cell['atom_types'] = []
+                    cell['positions_frac'] = []
+                while '%endblock positions_frac' not in flines[line_no + i].lower():
+                    line = flines[line_no + i].split()
                     if positions:
-                        cell['atom_types'] = []
-                        cell['positions_frac'] = []
-                    while '%endblock positions_frac' not in flines[line_no + i].lower():
-                        line = flines[line_no + i].split()
-                        if positions:
-                            cell['atom_types'].append(line[0])
-                            cell['positions_frac'].append(list(map(float, line[1:4])))
-                        if 'spin=' in flines[line_no + i].lower():
-                            split_line = flines[line_no + i].split()
-                            atomic_init_spins[split_line[0]] = \
-                                split_line[-1].lower().replace('spin=', '')
-                        i += 1
-                    if atomic_init_spins:
-                        cell['atomic_init_spins'] = atomic_init_spins
-                    if positions:
-                        cell['num_atoms'] = len(cell['atom_types'])
-                        for ind, pos in enumerate(cell['positions_frac']):
-                            for k in range(3):
-                                if pos[k] > 1 or pos[k] < 0:
-                                    cell['positions_frac'][ind][k] %= 1
-                elif 'fix_com' in line.lower():
-                    cell['fix_com'] = line.split()[-1]
-                elif 'symmetry_generate' in line.lower():
-                    cell['symmetry_generate'] = True
-                elif 'symmetry_tol' in line.lower():
-                    cell['symmetry_tol'] = float(line.split()[-1])
-                elif 'snap_to_symmetry' in line.lower():
-                    cell['snap_to_symmetry'] = True
-                elif 'quantisation_axis' in line.lower():
-                    cell['quantisation_axis'] = list(map(int, line.split()[1:]))
-                elif 'positions_noise' in line.lower():
-                    cell['positions_noise'] = float(line.split()[-1])
-                elif 'cell_noise' in line.lower():
-                    cell['cell_noise'] = float(line.split()[-1])
-                elif 'kpoints_path' in line.lower() or 'kpoint_path' in line.lower():
-                    if 'spectral_kpoints_path_spacing' in line.lower() or 'spectral_kpoint_path_spacing' in line.lower():
-                        cell['spectral_kpoints_path_spacing'] = float(line.split()[-1])
-                    elif 'phonon_fine_kpoints_path_spacing' in line.lower() or 'phonon_fine_kpoint_path_spacing' in line.lower():
-                        cell['phonon_fine_kpoint_path_spacing'] = float(line.split()[-1])
-                    elif 'kpoints_path_spacing' in line.lower() or 'kpoint_path_spacing' in line.lower():
-                        cell['kpoints_path_spacing'] = float(line.split()[-1])
+                        cell['atom_types'].append(line[0])
+                        cell['positions_frac'].append(list(map(float, line[1:4])))
+                    if 'spin=' in flines[line_no + i].lower():
+                        split_line = flines[line_no + i].split()
+                        atomic_init_spins[split_line[0]] = \
+                            split_line[-1].lower().replace('spin=', '')
+                    i += 1
+                if atomic_init_spins:
+                    cell['atomic_init_spins'] = atomic_init_spins
+                if positions:
+                    cell['num_atoms'] = len(cell['atom_types'])
+                    for ind, pos in enumerate(cell['positions_frac']):
+                        for k in range(3):
+                            if pos[k] > 1 or pos[k] < 0:
+                                cell['positions_frac'][ind][k] %= 1
+            elif 'fix_com' in line.lower():
+                cell['fix_com'] = line.split()[-1]
+            elif 'symmetry_generate' in line.lower():
+                cell['symmetry_generate'] = True
+            elif 'symmetry_tol' in line.lower():
+                cell['symmetry_tol'] = float(line.split()[-1])
+            elif 'snap_to_symmetry' in line.lower():
+                cell['snap_to_symmetry'] = True
+            elif 'quantisation_axis' in line.lower():
+                cell['quantisation_axis'] = list(map(int, line.split()[1:]))
+            elif 'positions_noise' in line.lower():
+                cell['positions_noise'] = float(line.split()[-1])
+            elif 'cell_noise' in line.lower():
+                cell['cell_noise'] = float(line.split()[-1])
+            elif 'kpoints_path' in line.lower() or 'kpoint_path' in line.lower():
+                if 'spectral_kpoints_path_spacing' in line.lower() or 'spectral_kpoint_path_spacing' in line.lower():
+                    cell['spectral_kpoints_path_spacing'] = float(line.split()[-1])
+                elif 'phonon_fine_kpoints_path_spacing' in line.lower() or 'phonon_fine_kpoint_path_spacing' in line.lower():
+                    cell['phonon_fine_kpoint_path_spacing'] = float(line.split()[-1])
+                elif 'kpoints_path_spacing' in line.lower() or 'kpoint_path_spacing' in line.lower():
+                    cell['kpoints_path_spacing'] = float(line.split()[-1])
 
-        if 'external_pressure' not in cell or not cell['external_pressure']:
-            cell['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0], [0.0]]
-    except Exception as oops:
-        if verbosity > 0:
-            print_exc()
-            print('Error in', seed + '.cell, skipping...')
-        return seed + '\t\t' + str(type(oops)) + ' ' + str(oops), False
-    try:
-        if db:
-            for species in cell['species_pot']:
-                if 'OTF' in cell['species_pot'][species].upper():
-                    pspot_seed = ''
-                    for directory in seed.split('/')[:-1]:
-                        pspot_seed += directory + '/'
-                    # glob for all .usp files with format species_*OTF.usp
-                    pspot_seed += species + '_*OTF*.usp'
-                    for globbed in glob.glob(pspot_seed):
-                        if isfile(globbed):
-                            cell['species_pot'].update(usp2dict(globbed))
-    except Exception as oops:
-        if verbosity > 0:
-            print_exc()
-            print('Error in', seed + '.cell, skipping...')
-        if isinstance(oops, IOError):
-            print_exc()
-        return seed + '.cell\t\t' + str(type(oops)) + ' ' + str(oops), False
-    if kwargs.get('debug'):
-        print(json.dumps(cell, indent=2))
+    if 'external_pressure' not in cell or not cell['external_pressure']:
+        cell['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0], [0.0]]
+
+    if db:
+        for species in cell['species_pot']:
+            if 'OTF' in cell['species_pot'][species].upper():
+                pspot_seed = ''
+                for directory in seed.split('/')[:-1]:
+                    pspot_seed += directory + '/'
+                # glob for all .usp files with format species_*OTF.usp
+                pspot_seed += species + '_*OTF.usp'
+                for globbed in glob.glob(pspot_seed):
+                    if isfile(globbed):
+                        cell['species_pot'].update(usp2dict(globbed))
+                        break
+
     return cell, True
 
 
-def param2dict(seed, db=True, verbosity=0, **kwargs):
+@scraper_function
+def param2dict(seed, db=True, verbosity=0):
     """ Extract available information from .param file; probably
     to be merged with other dicts from other files.
 
@@ -359,88 +341,81 @@ def param2dict(seed, db=True, verbosity=0, **kwargs):
             if not, then an error string and False.
 
     """
-    try:
-        from matador.utils.castep_params import CASTEP_PARAMS
-        param = dict()
-        if seed.endswith('.param'):
-            seed = seed.replace('.param', '')
-        with open(seed + '.param', 'r') as f:
-            flines = f.readlines()
-        param['source'] = []
-        param['source'].append(seed + '.param')
-        # exclude some useless info if importing to db
-        scrub_list = ['checkpoint', 'write_bib', 'mix_history_length',
-                      'fix_occupancy', 'page_wvfns', 'num_dump_cycles',
-                      'backup_interval', 'geom_max_iter', 'fixed_npw',
-                      'write_cell_structure', 'bs_write_eigenvalues',
-                      'calculate_stress', 'opt_strategy', 'max_scf_cycles']
-        false_str = ['False', 'false', '0']
-        splitters = [':', '=', '\t', ' ']
-        unrecognised = []
-        for _, line in enumerate(flines):
-            if '#' or '!' in line:
-                line = line.split('#')[0].split('!')[0]
-            line = line.lower()
-            # skip blank lines and comments
-            if line.startswith(('#', '!')) or not line.strip():
-                continue
-            else:
-                # if scraping to db, ignore "rubbish"
-                if db:
-                    if [rubbish for rubbish in scrub_list if rubbish in line]:
-                        continue
-                # read all other parameters in
-                for splitter in splitters:
-                    if splitter in line:
-                        keyword = line.split(splitter)[0].strip()
-                        value = line.split(splitter)[-1].strip()
-                        if keyword.lower() not in CASTEP_PARAMS:
-                            unrecognised.append(keyword.lower())
-                        param[keyword] = value
-                        # deal with edge cases
-                        if 'spin_polarised' in line:
-                            param['spin_polarized'] = param['spin_polarised']
-                        if 'spin_polarized' in line or 'spin_polarised' in line:
-                            if [false for false in false_str if false in param['spin_polarized']]:
-                                param['spin_polarized'] = False
-                            else:
-                                param['spin_polarized'] = True
+    from matador.utils.castep_params import CASTEP_PARAMS
+    param = dict()
+    if seed.endswith('.param'):
+        seed = seed.replace('.param', '')
+    with open(seed + '.param', 'r') as f:
+        flines = f.readlines()
+    param['source'] = []
+    param['source'].append(seed + '.param')
+    # exclude some useless info if importing to db
+    scrub_list = ['checkpoint', 'write_bib', 'mix_history_length',
+                  'fix_occupancy', 'page_wvfns', 'num_dump_cycles',
+                  'backup_interval', 'geom_max_iter', 'fixed_npw',
+                  'write_cell_structure', 'bs_write_eigenvalues',
+                  'calculate_stress', 'opt_strategy', 'max_scf_cycles']
+    false_str = ['False', 'false', '0']
+    splitters = [':', '=', '\t', ' ']
+    unrecognised = []
+    for _, line in enumerate(flines):
+        if '#' or '!' in line:
+            line = line.split('#')[0].split('!')[0]
+        line = line.lower()
+        # skip blank lines and comments
+        if line.startswith(('#', '!')) or not line.strip():
+            continue
+        else:
+            # if scraping to db, ignore "rubbish"
+            if db:
+                if [rubbish for rubbish in scrub_list if rubbish in line]:
+                    continue
+            # read all other parameters in
+            for splitter in splitters:
+                if splitter in line:
+                    keyword = line.split(splitter)[0].strip()
+                    value = line.split(splitter)[-1].strip()
+                    if keyword.lower() not in CASTEP_PARAMS:
+                        unrecognised.append(keyword.lower())
+                    param[keyword] = value
+                    # deal with edge cases
+                    if 'spin_polarised' in line:
+                        param['spin_polarized'] = param['spin_polarised']
+                    if 'spin_polarized' in line or 'spin_polarised' in line:
+                        if [false for false in false_str if false in param['spin_polarized']]:
+                            param['spin_polarized'] = False
+                        else:
+                            param['spin_polarized'] = True
 
-                        if 'true' in value.lower():
-                            param[keyword] = True
-                        elif 'false' in value.lower():
-                            param[keyword] = False
+                    if 'true' in value.lower():
+                        param[keyword] = True
+                    elif 'false' in value.lower():
+                        param[keyword] = False
 
-                        if 'cut_off_energy' in line and 'mix_cut_off_energy' not in line:
-                            temp_cut_off = (param['cut_off_energy'].lower().replace('ev', ''))
-                            temp_cut_off = temp_cut_off.strip()
-                            param['cut_off_energy'] = float(temp_cut_off)
-                        elif 'xc_functional' in line:
-                            param['xc_functional'] = param['xc_functional'].upper()
-                        elif 'perc_extra_bands' in line:
-                            param['perc_extra_bands'] = float(param['perc_extra_bands'])
-                        elif 'geom_force_tol' in line:
-                            param['geom_force_tol'] = float(param['geom_force_tol'])
-                        elif 'elec_energy_tol' in line:
-                            temp = (param['elec_energy_tol'].lower().replace('ev', ''))
-                            temp = temp.strip()
-                            param['elec_energy_tol'] = float(temp)
-                        break
-        if len(unrecognised) > 0:
-            raise RuntimeError('Found several unrecognised parameters: {}'.format(unrecognised))
-    except Exception as oops:
-        if verbosity > 0:
-            print_exc()
-            print('Error in', seed + '.param, skipping...')
-        if isinstance(oops, IOError):
-            print_exc()
-        return seed + '.param\t\t' + str(type(oops)) + ' ' + str(oops), False
-    if kwargs.get('debug'):
-        print(json.dumps(param, indent=2))
+                    if 'cut_off_energy' in line and 'mix_cut_off_energy' not in line:
+                        temp_cut_off = (param['cut_off_energy'].lower().replace('ev', ''))
+                        temp_cut_off = temp_cut_off.strip()
+                        param['cut_off_energy'] = float(temp_cut_off)
+                    elif 'xc_functional' in line:
+                        param['xc_functional'] = param['xc_functional'].upper()
+                    elif 'perc_extra_bands' in line:
+                        param['perc_extra_bands'] = float(param['perc_extra_bands'])
+                    elif 'geom_force_tol' in line:
+                        param['geom_force_tol'] = float(param['geom_force_tol'])
+                    elif 'elec_energy_tol' in line:
+                        temp = (param['elec_energy_tol'].lower().replace('ev', ''))
+                        temp = temp.strip()
+                        param['elec_energy_tol'] = float(temp)
+                    break
+
+    if unrecognised:
+        raise RuntimeError('Found several unrecognised parameters: {}'.format(unrecognised))
+
     return param, True
 
 
-def castep2dict(seed, db=True, verbosity=0, intermediates=False, **kwargs):
+@scraper_function
+def castep2dict(seed, db=True, verbosity=0, intermediates=False):
     """ From seed filename, create dict of the most relevant
     information about a calculation.
 
@@ -458,106 +433,88 @@ def castep2dict(seed, db=True, verbosity=0, intermediates=False, **kwargs):
 
     """
     castep = dict()
-    if db and intermediates:
-        raise RuntimeError('db and intermediates cannot both be True')
-    try:
-        # read .castep, .history or .history.gz file
-        if '.gz' in seed:
-            with gzip.open(seed, 'r') as f:
-                flines = f.readlines()
-        else:
-            with open(seed, 'r') as f:
-                flines = f.readlines()
-        # set source tag to castep file
-        castep['source'] = []
-        castep['source'].append(seed)
-        # grab file owner
-        castep['user'] = getpwuid(stat(seed).st_uid).pw_name
-        if 'CollCode' in seed:
-            temp_icsd = seed.split('CollCode')[-1].replace('.castep', '').replace('.history', '')
-            castep['icsd'] = temp_icsd
-        if '-mp-' in seed:
-            castep['mp-id'] = int(seed.split('-mp-')[-1].split('-')[0].split('.')[0])
-        # wrangle castep file for parameters in 3 passes:
-        # once forwards to get number and types of atoms
-        castep.update(_castep_scrape_atoms(flines, castep))
-        # once backwards to get the final parameter set for the calculation
-        castep.update(_castep_scrape_final_parameters(flines, castep))
-        # once more forwards, from the final step, to get the final structure
+    # read .castep, .history or .history.gz file
+    if '.gz' in seed:
+        with gzip.open(seed, 'r') as f:
+            flines = f.readlines()
+    else:
+        with open(seed, 'r') as f:
+            flines = f.readlines()
+    # set source tag to castep file
+    castep['source'] = []
+    castep['source'].append(seed)
+    # grab file owner
+    castep['user'] = getpwuid(stat(seed).st_uid).pw_name
+    if 'CollCode' in seed:
+        temp_icsd = seed.split('CollCode')[-1].replace('.castep', '').replace('.history', '')
+        castep['icsd'] = temp_icsd
+    if '-mp-' in seed:
+        castep['mp-id'] = int(seed.split('-mp-')[-1].split('-')[0].split('.')[0])
+    # wrangle castep file for parameters in 3 passes:
+    # once forwards to get number and types of atoms
+    castep.update(_castep_scrape_atoms(flines, castep))
+    # once backwards to get the final parameter set for the calculation
+    castep.update(_castep_scrape_final_parameters(flines, castep))
+    # once more forwards, from the final step, to get the final structure
 
-        # task specific options
-        if db and 'geometry' not in castep['task']:
-            raise RuntimeError('CASTEP file does not contain GO calculation')
+    # task specific options
+    if db and 'geometry' not in castep['task']:
+        raise RuntimeError('CASTEP file does not contain GO calculation')
 
-        if not db and 'thermo' in castep['task'].lower():
-            castep.update(_castep_scrape_thermo_data(flines, castep))
+    if not db and 'thermo' in castep['task'].lower():
+        castep.update(_castep_scrape_thermo_data(flines, castep))
 
-        if intermediates:
-            castep['intermediates'] = _castep_scrape_all_snapshots(flines)
+    if intermediates:
+        castep['intermediates'] = _castep_scrape_all_snapshots(flines)
 
-        castep.update(_castep_scrape_final_structure(flines, castep, db=db))
-        castep.update(_castep_scrape_metadata(flines, castep))
+    castep.update(_castep_scrape_final_structure(flines, castep, db=db))
+    castep.update(_castep_scrape_metadata(flines, castep))
 
-        # check that any optimized results were saved and raise errors if not
-        if not castep.get('optimised'):
-            castep['optimised'] = False
-            raise DFTError('CASTEP GO failed to converge.')
-        if 'positions_frac' not in castep or not castep['positions_frac']:
-            raise CalculationError('Could not find positions')
+    if 'positions_frac' not in castep or not castep['positions_frac']:
+        raise CalculationError('Could not find positions')
 
-        # unfortunately CASTEP does not write forces when there is only one atom
-        if 'forces' not in castep and castep['num_atoms'] == 1 and 'geometry' in castep['task']:
-            castep['forces'] = [[0, 0, 0]]
+    # unfortunately CASTEP does not write forces when there is only one atom
+    if 'forces' not in castep and castep['num_atoms'] == 1 and 'geometry' in castep['task']:
+        castep['forces'] = [[0, 0, 0]]
 
-        # fill in any missing fields with filler
-        if 'total_energy' not in castep:
-            castep['total_energy'] = 'xxx'
-            castep['total_energy_per_atom'] = 'xxx'
-        if 'enthalpy' not in castep:
-            castep['enthalpy'] = 'xxx'
-            castep['enthalpy_per_atom'] = 'xxx'
-        if 'pressure' not in castep:
-            castep['pressure'] = 'xxx'
-        if 'cell_volume' not in castep:
-            castep['cell_volume'] = 'xxx'
-        if 'space_group' not in castep:
-            castep['space_group'] = 'xxx'
+    # fill in any missing fields with filler
+    if 'total_energy' not in castep:
+        castep['total_energy'] = 'xxx'
+        castep['total_energy_per_atom'] = 'xxx'
+    if 'enthalpy' not in castep:
+        castep['enthalpy'] = 'xxx'
+        castep['enthalpy_per_atom'] = 'xxx'
+    if 'pressure' not in castep:
+        castep['pressure'] = 'xxx'
+    if 'cell_volume' not in castep:
+        castep['cell_volume'] = 'xxx'
+    if 'space_group' not in castep:
+        castep['space_group'] = 'xxx'
 
-        # finally check for pseudopotential files if OTF is present in species_pot
-        if db:
-            for species in castep['species_pot']:
-                if 'OTF' in castep['species_pot'][species].upper():
-                    pspot_seed = ''
-                    for directory in seed.split('/')[:-1]:
-                        pspot_seed += directory + '/'
-                    # glob for all .usp files with format species_*OTF.usp
-                    pspot_seed += species + '_*OTF.usp'
-                    for globbed in glob.glob(pspot_seed):
-                        if isfile(globbed):
-                            castep['species_pot'].update(usp2dict(globbed))
+    # finally check for pseudopotential files if OTF is present in species_pot
+    if db:
+        for species in castep['species_pot']:
+            if 'OTF' in castep['species_pot'][species].upper():
+                pspot_seed = ''
+                for directory in seed.split('/')[:-1]:
+                    pspot_seed += directory + '/'
+                # glob for all .usp files with format species_*OTF.usp
+                pspot_seed += species + '_*OTF.usp'
+                for globbed in glob.glob(pspot_seed):
+                    if isfile(globbed):
+                        castep['species_pot'].update(usp2dict(globbed))
 
-    except DFTError as oops:
+    # check that any optimized results were saved and raise errors if not
+    if not castep.get('optimised'):
+        castep['optimised'] = False
         if db:
             # if importing to db, skip unconverged structure
-            # and report in log file
-            return seed + '\t\t' + str(type(oops)) + ' ' + str(oops) + '\n', False
-        else:
-            # if not importing to db, return unconverged structure
-            if verbosity > 1:
-                print(oops)
-            return castep, True
+            raise DFTError('CASTEP GO failed to converge.')
 
-    except Exception as oops:
-        if kwargs.get('dryrun') or verbosity > 0:
-            print_exc()
-            print('Error in .castep file', seed, 'skipping...')
-        return seed + '\t\t' + str(type(oops)) + ' ' + str(oops) + '\n', False
-
-    if kwargs.get('debug'):
-        print(json.dumps(castep, indent=2, ensure_ascii=False))
     return castep, True
 
 
+@scraper_function
 def bands2dict(seed, summary=False, gap=False, external_efermi=None, verbosity=0):
     """ Parse a CASTEP bands file into a dictionary.
 
@@ -748,7 +705,8 @@ def bands2dict(seed, summary=False, gap=False, external_efermi=None, verbosity=0
     return bs, True
 
 
-def optados2dict(seed):
+@scraper_function
+def optados2dict(seed, verbosity=0):
     """ Scrape optados output file (*.adaptive.dat) or (*.pdos.adaptive.dat)
     for DOS, projectors and projected DOS.
 
@@ -821,6 +779,7 @@ def optados2dict(seed):
     return dos, True
 
 
+@scraper_function
 def phonon2dict(seed, verbosity=0):
     """ Parse a CASTEP phonon file into a dictionary.
 
@@ -922,7 +881,8 @@ def phonon2dict(seed, verbosity=0):
     return ph, True
 
 
-def usp2dict(seed):
+@scraper_function
+def usp2dict(seed, verbosity=0):
     """ Extract pseudopotential string from a CASTEP
     OTF .USP file.
 
@@ -1513,21 +1473,3 @@ def _castep_scrape_all_snapshots(flines):
                 i += 1
 
     return intermediates
-
-
-class DFTError(Exception):
-    """ Quick DFT exception class for unconverged or
-    non-useful calculations.
-
-    """
-    pass
-
-
-class CalculationError(Exception):
-    """ Raised when the calculation fails to do the DFT.
-    Distinct from DFTError as this is an issue of numerics
-    or chemistry, where this is raised for technical issues,
-    e.g. CASTEP crashes.
-
-    """
-    pass

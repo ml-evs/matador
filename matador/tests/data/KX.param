@@ -1,6 +1,7 @@
 task                 : geometryoptimization 
 xc_functional        : PBE 
 spin_polarized       : false 
+elec_energy_tol      : 1 EV
 fix_occupancy        : false 
 metals_method        : dm 
 max_scf_cycles       : 100
