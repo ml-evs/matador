@@ -8,7 +8,7 @@ theory compute engines.
 """
 
 
-__all__ = ['__version__']
+__all__ = ['__version__', 'DBQuery', 'QueryConvexHull', 'Crystal']
 __author__ = 'Matthew Evans'
 __maintainer__ = 'Matthew Evans'
 
@@ -18,3 +18,7 @@ try:
     __version__ = require('matador')[0].version
 except DistributionNotFound:
     __version__ = 'xxx'
+
+from matador.query import DBQuery
+from matador.hull import QueryConvexHull
+from matador.crystal import Crystal
