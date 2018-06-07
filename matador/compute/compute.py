@@ -559,13 +559,13 @@ class FullRelaxer:
 
                 if phon_dispersion and phon_dos:
                     if self.verbosity >= 1:
-                        print('Settings params to continue with phonon DOS after dispersion completes')
+                        print('Setting params to continue with phonon dispersion after DOS completes')
                     calc_doc['write_checkpoint'] = 'ALL'
-                    calc_doc['phonon_calculate_dos'] = False
+                    calc_doc['phonon_calculate_dos'] = True
                     cached = {}
-                    cached['phonon_fine_kpoint_mp_spacing'] = calc_doc['phonon_fine_kpoint_mp_spacing']
+                    cached['phonon_fine_kpoint_path'] = calc_doc['phonon_fine_kpoint_path']
                     try:
-                        del calc_doc['phonon_fine_kpoint_mp_spacing']
+                        del calc_doc['phonon_fine_kpoint_path']
                         del calc_doc['phonon_fine_kpoint_path_spacing']
                     except KeyError:
                         pass
@@ -624,13 +624,14 @@ class FullRelaxer:
                 if phon_dispersion and phon_dos and recursion_depth < 2:
                     calc_doc['write_checkpoint'] = 'None'
                     calc_doc['continuation'] = 'default'
-                    calc_doc['phonon_calculate_dos'] = True
+                    calc_doc['phonon_calculate_dos'] = False
+                    # remove previous fine keys
                     fine_keys = [key for key in calc_doc if key.startswith('phonon_fine')]
                     for key in fine_keys:
                         del calc_doc[key]
-                    calc_doc['phonon_fine_kpoint_mp_spacing'] = cached['phonon_fine_kpoint_mp_spacing']
+                    calc_doc['phonon_fine_kpoint_path'] = cached['phonon_fine_kpoint_path']
                     if self.verbosity >= 1:
-                        print('Now performing phonon DOS...')
+                        print('Now performing phonon dispersion...')
 
                     success = self.scf(calc_doc, seed, keep=keep, recursion_depth=recursion_depth)
 
