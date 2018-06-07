@@ -14,7 +14,8 @@ pipelines:
           - pip install .[db]
           - pip install .[network]
           - py.test --cov-config .coveragerc --cov=matador
-          - coveralls
+          #- coveralls
+          - codecov --token=$CODECOV_TOKEN
         services:
           - mongo
 
