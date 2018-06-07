@@ -51,7 +51,7 @@ def res2dict(seed, db=True, **kwargs):
     if 'CollCode' in seed:
         res['icsd'] = seed.split('CollCode')[-1]
     if '-mp-' in seed:
-        res['mp-id'] = int(seed.split('-mp-')[-1].split('-')[0].split('.')[0])
+        res['mp-id'] = int(seed.split('-mp-')[-1].split('-')[0].split('_')[0].split('.')[0])
     # alias special lines in res file
     titl = ''
     cell = ''
@@ -452,7 +452,7 @@ def castep2dict(seed, db=True, intermediates=False, **kwargs):
         temp_icsd = seed.split('CollCode')[-1].replace('.castep', '').replace('.history', '')
         castep['icsd'] = temp_icsd
     if '-mp-' in seed:
-        castep['mp-id'] = int(seed.split('-mp-')[-1].split('-')[0].split('.')[0])
+        castep['mp-id'] = int(seed.split('-mp-')[-1].split('-')[0].split('.')[0].split('_')[0])
     # wrangle castep file for parameters in 3 passes:
     # once forwards to get number and types of atoms
     castep.update(_castep_scrape_atoms(flines, castep))

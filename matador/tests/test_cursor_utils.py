@@ -43,6 +43,9 @@ class CursorUtilTest(unittest.TestCase):
         sources.append(['/u/fs1/swaps+known/LiP-CollCode10101-swap-KSnP-GA-abcdef-5x101.res'])
         answers.append('SWAPS')
 
+        sources.append(['Ag2Bi2I8-mp-35909_300eV.castep'])
+        answers.append('MP')
+
         for source, answer in zip(sources, answers):
             self.assertEqual(get_guess_doc_provenance(source), answer, msg='failed {}'.format(source))
 
