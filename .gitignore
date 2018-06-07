@@ -11,7 +11,6 @@ f90wrap*
 *pdf_calculator_funcs*
 htmlcov
 _build
-.coverage*
 docs/src/matador.*rst
 *.ipynb_checkpoints
 .pytest_cache

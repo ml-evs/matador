@@ -18,6 +18,8 @@ omit =
     *matador/cli/run3.py
 exclude_lines = 
     pragma: no cover
-    if *verbosity*:
-    if *debug*
-    def plot_*
+    if verbosity
+    if self.verbosity
+    if debug
+    if self.debug
+    def plot_
