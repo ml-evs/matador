@@ -2,4 +2,3 @@ pytest
 pytest-cov
 coverage
 codecov
-python-coveralls

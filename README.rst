@@ -82,7 +82,7 @@ matador is available under the `MIT License <https://bitbucket.org/ml-evs/matado
 
 .. |Bitbucket Pipelines| image:: https://img.shields.io/bitbucket/pipelines/ml-evs/matador/master.svg
    :target: https://bitbucket.org/ml-evs/matador/addon/pipelines/home
-.. |Coverage Status| image:: https://coveralls.io/repos/bitbucket/ml-evs/matador/badge.svg?branch=master
-   :target: https://coveralls.io/bitbucket/ml-evs/matador?branch=master
+.. |Coverage Status| image:: https://img.shields.io/codecov/c/bitbucket/ml-evs/matador.svg
+   :target: https://codecov.io/bb/ml-evs/matador
 .. |Documentation Status| image:: https://readthedocs.org/projects/matador-db/badge/?version=latest
    :target: https://matador-db.readthedocs.io/en/latest/?badge=latest
