@@ -23,3 +23,5 @@ exclude_lines =
     if debug
     if self.debug
     def plot_
+    if kwargs.get('verbosity')
+    if kwargs.get('debug')
