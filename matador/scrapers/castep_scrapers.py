@@ -49,7 +49,7 @@ def res2dict(seed, db=True, **kwargs):
     res['user'] = getpwuid(stat(seed + '.res').st_uid).pw_name
     # try to grab ICSD CollCode
     if 'CollCode' in seed:
-        res['icsd'] = seed.split('CollCode')[-1]
+        res['icsd'] = int(seed.split('CollCode')[-1])
     if '-mp-' in seed:
         res['mp-id'] = int(seed.split('-mp-')[-1].split('-')[0].split('_')[0].split('.')[0])
     # alias special lines in res file
@@ -450,7 +450,7 @@ def castep2dict(seed, db=True, intermediates=False, **kwargs):
     castep['user'] = getpwuid(stat(seed).st_uid).pw_name
     if 'CollCode' in seed:
         temp_icsd = seed.split('CollCode')[-1].replace('.castep', '').replace('.history', '')
-        castep['icsd'] = temp_icsd
+        castep['icsd'] = int(temp_icsd)
     if '-mp-' in seed:
         castep['mp-id'] = int(seed.split('-mp-')[-1].split('-')[0].split('.')[0].split('_')[0])
     # wrangle castep file for parameters in 3 passes:
@@ -1316,17 +1316,22 @@ def _castep_scrape_metadata(flines, castep):
     for line in flines:
         if 'Release CASTEP version' in line:
             castep['castep_version'] = line.replace('|', '').split()[-1]
-        elif 'Run started:' in line:
-            year = line.split()[5]
-            month = str(strptime(line.split()[4], '%b').tm_mon)
-            day = line.split()[3]
-            castep['date'] = day + '-' + month + '-' + year
-        elif 'Total time' in line:
-            castep['total_time_hrs'] = float(line.split()[-2]) / 3600
-        elif 'Peak Memory Use' in line:
-            castep['peak_mem_MB'] = int(float(line.split()[-2]) / 1024)
-        elif 'total storage required per process' in line:
-            castep['estimated_mem_MB'] = float(line.split()[-5])
+        try:
+            if 'Run started:' in line:
+                year = line.split()[5]
+                month = str(strptime(line.split()[4], '%b').tm_mon)
+                day = line.split()[3]
+                castep['date'] = day + '-' + month + '-' + year
+            elif 'Total time' in line and 'matrix elements' not in line:
+                castep['total_time_hrs'] = float(line.split()[-2]) / 3600
+            elif 'Peak Memory Use' in line:
+                castep['peak_mem_MB'] = int(float(line.split()[-2]) / 1024)
+            elif 'total storage required per process' in line:
+                castep['estimated_mem_MB'] = float(line.split()[-5])
+
+        # if any of these error, don't worry too much (at all)
+        except Exception:
+            pass
 
     return castep
 

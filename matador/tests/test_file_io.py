@@ -156,7 +156,7 @@ class ScrapeTest(unittest.TestCase):
 
     def testCastepSingleAtomEdgeCase(self):
         from matador.scrapers.castep_scrapers import castep2dict
-        castep_fname = REAL_PATH + 'data/Na-edgecase.castep'
+        castep_fname = REAL_PATH + 'data/castep_files/Na-edgecase-CollCode10101.castep'
         failed_open = False
         try:
             f = open(castep_fname, 'r')
@@ -189,6 +189,7 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(test_dict['geom_force_tol'], 0.05, msg='Wrong geom force tol')
             self.assertEqual(test_dict['castep_version'], '16.1')
             self.assertEqual(test_dict['species_pot']['Na'], 'Na_00PBE.usp')
+            self.assertEqual(test_dict['icsd'], 10101)
 
             int_dict, s = castep2dict(castep_fname, db=False, intermediates=True, verbosity=VERBOSITY)
             for key in test_dict:
@@ -210,7 +211,7 @@ class ScrapeTest(unittest.TestCase):
 
     def testCastepUnoptimised(self):
         from matador.scrapers.castep_scrapers import castep2dict
-        castep_fname = REAL_PATH + 'data/TiO2_unconverged.castep'
+        castep_fname = REAL_PATH + 'data/castep_files/TiO2_unconverged-mp-10101.castep'
         failed_open = False
         try:
             f = open(castep_fname, 'r')
@@ -243,6 +244,7 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(test_dict['castep_version'], '18.1')
             self.assertEqual(test_dict['species_pot']['Ti'], '3|1.9|8|9|10|30U:40:31:32(qc=5)')
             self.assertEqual(test_dict['species_pot']['O'], '2|1.5|12|13|15|20:21(qc=5)')
+            self.assertEqual(test_dict['mp-id'], 10101)
 
     def testFileNotFound(self):
         """ Ensure that FileNotFound errors fail gracefully. """
@@ -273,11 +275,11 @@ class ScrapeTest(unittest.TestCase):
         """
         from matador.scrapers.castep_scrapers import castep2dict, res2dict
         castep_fname = []
-        castep_fname += [REAL_PATH + 'data/NaP_intermediates.castep']
-        castep_fname += [REAL_PATH + 'data/Na-edgecase.castep']
-        castep_fname += [REAL_PATH + 'data/KP-castep17.castep']
-        castep_fname += [REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep']
-        castep_fname += [REAL_PATH + 'data/TiO2_unconverged.castep']
+        castep_fname += [REAL_PATH + 'data/castep_files/NaP_intermediates.castep']
+        castep_fname += [REAL_PATH + 'data/castep_files/Na-edgecase-CollCode10101.castep']
+        castep_fname += [REAL_PATH + 'data/castep_files/KP-castep17.castep']
+        castep_fname += [REAL_PATH + 'data/castep_files/Na3Zn4-OQMD_759599.castep']
+        castep_fname += [REAL_PATH + 'data/castep_files/TiO2_unconverged-mp-10101.castep']
 
         cursor, failures = castep2dict(castep_fname, db=True)
         self.assertEqual(len(cursor), 4)
@@ -735,4 +737,4 @@ class ExportTest(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main()
+    unittest.main(buffer=True, verbosity=2)
