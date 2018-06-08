@@ -276,7 +276,7 @@ def display_results(cursor,
                 except KeyError:
                     pass
             if 'icsd' in doc:
-                detail_substring[-1] += 'ICSD-CollCode' + doc['icsd'] + ', '
+                detail_substring[-1] += 'ICSD-CollCode {}, '.format(doc['icsd'])
             if 'tags' in doc:
                 try:
                     if isinstance(doc['tags'], list):
