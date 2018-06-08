@@ -49,7 +49,7 @@ def res2dict(seed, db=True, **kwargs):
     res['user'] = getpwuid(stat(seed + '.res').st_uid).pw_name
     # try to grab ICSD CollCode
     if 'CollCode' in seed:
-        res['icsd'] = int(seed.split('CollCode')[-1])
+        res['icsd'] = int(seed.split('CollCode')[-1].split('-')[0].split('_')[0].split('.')[0])
     if '-mp-' in seed:
         res['mp-id'] = int(seed.split('-mp-')[-1].split('-')[0].split('_')[0].split('.')[0])
     # alias special lines in res file
@@ -449,8 +449,7 @@ def castep2dict(seed, db=True, intermediates=False, **kwargs):
     # grab file owner
     castep['user'] = getpwuid(stat(seed).st_uid).pw_name
     if 'CollCode' in seed:
-        temp_icsd = seed.split('CollCode')[-1].replace('.castep', '').replace('.history', '')
-        castep['icsd'] = int(temp_icsd)
+        castep['icsd'] = int(seed.split('CollCode')[-1].split('-')[0].split('.')[0].split('_')[0])
     if '-mp-' in seed:
         castep['mp-id'] = int(seed.split('-mp-')[-1].split('-')[0].split('.')[0].split('_')[0])
     # wrangle castep file for parameters in 3 passes:

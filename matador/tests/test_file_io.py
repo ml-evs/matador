@@ -342,6 +342,20 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(test_dict['space_group'], 'Pmc2_1', msg='Wrong space group!')
             self.assertEqual(test_dict['lattice_abc'], [[5.057429, 4.93404, 4.244619], [90.0, 90.0, 90.0]], msg='Wrong lattice constants!')
 
+        res_fname = REAL_PATH + 'data/hull-NaFeP-afh41_new_Na+Fe+P/FeP2-OQMD_2958-CollCode15027-nospin.res'
+        failed_open = False
+        try:
+            f = open(res_fname, 'r')
+        except Exception:
+            failed_open = True
+            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(res_fname))
+        if not failed_open:
+            f.close()
+            test_dict, s = res2dict(res_fname)
+            self.assertTrue(s)
+            self.assertEqual(test_dict['icsd'], 15027)
+
+
         res_fname = REAL_PATH + 'data/LiPZn-r57des_bodged.res'
         failed_open = False
         try:
