@@ -133,7 +133,7 @@ def test_swaps():
     elem_successes = []
     if output_folder_exists:
         os.chdir(expected_dir)
-        expected_files = ['LiSi-swap-NaP_intermediates', 'LiSn-swap-Na3Zn4-OQMD_759599', 'Li-swap-Na-edgecase']
+        expected_files = ['LiSi-swap-NaP_intermediates', 'LiSn-swap-Na3Zn4-OQMD_759599', 'Li-swap-Na-edgecase-CollCode10101']
         target_elems = ['Li', 'Si', 'Sn']
 
         for files in expected_files:
