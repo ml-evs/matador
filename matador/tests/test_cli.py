@@ -81,7 +81,7 @@ def test_import_castep():
 
     matador.cli.cli.main(override=True)
 
-    query = DBQuery(db=DB_NAME, config=CONFIG_FNAME)
+    query = DBQuery(db=DB_NAME, config=CONFIG_FNAME, details=True, source=True)
 
     with open('spatula.err', 'r') as err_file:
         err_flines = err_file.readlines()
@@ -108,8 +108,8 @@ def test_import_res():
 
     matador.cli.cli.main(override=True)
 
-    query_1 = DBQuery(db=DB_NAME, config=CONFIG_FNAME)
-    query_2 = DBQuery(db=DB_NAME, composition='KSnP', config=CONFIG_FNAME)
+    query_1 = DBQuery(db=DB_NAME, config=CONFIG_FNAME, details=True, source=True)
+    query_2 = DBQuery(db=DB_NAME, composition='KSnP', config=CONFIG_FNAME, details=True, source=True)
 
     files_to_delete = glob.glob('*spatula*')
     for f in files_to_delete:
