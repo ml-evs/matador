@@ -14,6 +14,7 @@ Written by `Matthew Evans <https://www.ml-evs.github.io>`_ (2016-).
 .. figure:: ../img/lipzn.png
    :alt: lipzn.png
    :height: 400px
+   :scale: 50%
    :align: center
 
 
