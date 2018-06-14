@@ -133,7 +133,7 @@ class FullRelaxer:
             self.max_walltime = self.timings[0]
             self.start_time = self.timings[1]
 
-        if self.verbosity > 5:
+        if self.verbosity > 2:
             print('Timing data: ', self.timings)
 
         self._redirect_filename = None
@@ -232,7 +232,7 @@ class FullRelaxer:
 
         # run convergence tests
         if any([self.conv_cutoff_bool, self.conv_kpt_bool]):
-            if self.verbosity >= 1:
+            if self.verbosity > 0:
                 print('Running convergence tests...')
             success = self.run_convergence_tests(calc_doc)
             return success
@@ -270,6 +270,9 @@ class FullRelaxer:
                     self.remove_compute_dir_if_finished(self.compute_dir, debug=self.debug)
 
                 return success
+
+        elif calc_doc['task'].upper() in ['PHONON', 'THERMODYNAMICS']:
+            success = self.castep_full_phonon(calc_doc, self.seed)
 
         # run in SCF mode, i.e. just call CASTEP on the seeds
         else:
@@ -332,10 +335,11 @@ class FullRelaxer:
             for ind, num_iter in enumerate(self.geom_max_iter_list):
 
                 # print some blurb about what we're doing
-                if self.verbosity > 1:
+                if self.verbosity > 0:
                     if ind == 0:
-                        if self.custom_params is not False:
-                            print_notify('custom params: {}'.format(self.custom_params))
+                        if self.verbosity > 2:
+                            if self.custom_params is not False:
+                                print_notify('custom params: {}'.format(self.custom_params))
                         print_notify('Beginning geometry optimisation...')
                     elif ind == self.num_rough_iter:
                         print_notify('Beginning fine geometry optimisation...')
@@ -345,7 +349,7 @@ class FullRelaxer:
                     # if we're now reoptimising after a success in last step
                     # use the fine iter value
                     num_iter = self.fine_iter
-                    if self.verbosity > 1:
+                    if self.verbosity > 0:
                         print_notify('Last step was successful, performing one last relaxation...')
 
                 # update the geom_max_iter to use with either the number in iter_list, or the overriden value
@@ -411,20 +415,20 @@ class FullRelaxer:
 
                 # or did the relaxation complete successfuly, including rerun?
                 elif (not self.reopt or rerun) and opti_dict['optimised']:
-                    if self.verbosity > 1:
+                    if self.verbosity > 0:
                         print_success('Successfully relaxed ' + seed)
                     self._update_output_files(opti_dict)
                     return self._finalise_result()
 
                 # reached maximum number of steps
                 elif ind == len(self.geom_max_iter_list) - 1:
-                    if self.verbosity > 1:
+                    if self.verbosity > 0:
                         print_warning('Failed to optimise ' + seed)
                     return self._finalise_result()
 
                 errors_present, errors = self._catch_castep_errors()
                 if errors_present:
-                    if self.verbosity > 1:
+                    if self.verbosity > 0:
                         print_warning('Failed to optimise {} as CASTEP crashed with error:'.format(seed))
                         print(errors)
 
@@ -446,7 +450,7 @@ class FullRelaxer:
                 if self.debug:
                     print_notify('Restarting calculation with current state:')
                     print(self.calc_doc)
-                if self.verbosity >= 2:
+                if self.verbosity > 1:
                     print(('num_iter: {:3d} | max F: {:5f} eV/A | stress: {: 5f} GPa | ' +
                            'cell volume: {:5f} A^3 | enthalpy per atom {:5f} eV')
                           .format(sum(self.geom_max_iter_list[:ind+1]),
@@ -469,129 +473,185 @@ class FullRelaxer:
             self._finalise_result()
             raise err
 
-    def scf(self, calc_doc, seed, keep=True, prerelaxing=False, recursion_depth=0):
-        """ Perform a single-shot (e.g. scf) calculation with CASTEP.
-        Files from completed runs are moved to "completed" and failed
-        runs to `bad_castep`. If both phonon DOS and dispersion are
-        detected in the cell file, this function will call itself to
-        perform the phonon DOS interpolation after completing the
-        dispersion.
+    def castep_full_phonon(self, calc_doc, seed):
+        """ Perform a "full" phonon calculation on a system, i.e.
+        first perform a relaxation in a standardised unit cell,
+        then compute the dynamical matrix, then finally interpolate
+        that dynamical matrix into dispersion curves and DOS.
+
+        Parameters:
+            calc_doc (dict): dictionary of structure and calculation
+                parameters.
+            seed (str): root seed for the calculation.
+
+        Raises:
+            RuntimeError: if any part of the calculation fails.
+
+        """
+        from matador.utils.cell_utils import cart2abc
+        todo = {'relax': True, 'dynmat': True, 'dispersion': False, 'dos': False, 'thermodynamics': False}
+        if calc_doc.get('task').lower() in ['phonon', 'thermodynamics']:
+            if (('phonon_fine_kpoint_path' not in calc_doc and 'phonon_fine_kpoint_list' not in calc_doc) and
+                    'phonon_fine_kpoint_path_spacing' in calc_doc):
+                todo['dispersion'] = True
+            if 'phonon_kpoint_mp_spacing' in calc_doc:
+                todo['dos'] = True
+            if calc_doc['task'].lower() == 'thermodynamics':
+                todo['thermodynamics'] = True
+
+        # always standardise the cell so that any phonon calculation can have
+        # post-processing performed after the fact
+        prim_doc, kpt_path = self._get_seekpath_compliant_input(
+            calc_doc, calc_doc.get('phonon_fine_kpoint_path_spacing', 0.02))
+        calc_doc.update(prim_doc)
+        calc_doc['lattice_abc'] = cart2abc(calc_doc['lattice_cart'])
+
+        if todo['dispersion']:
+            calc_doc['phonon_fine_kpoint_list'] = kpt_path
+
+        # always shift phonon grid
+        if 'phonon_kpoint_mp_spacing' in calc_doc:
+            from matador.utils.cell_utils import calc_mp_grid, shift_to_include_gamma
+            grid = calc_mp_grid(calc_doc['lattice_cart'], calc_doc['phonon_kpoint_mp_spacing'])
+            offset = shift_to_include_gamma(grid)
+            if offset != [0, 0, 0]:
+                calc_doc['phonon_kpoint_mp_offset'] = offset
+                if self.verbosity > 2:
+                    print('Set phonon MP grid offset to {}'.format(offset))
+
+        # prepare to do pre-relax if there's no check file
+        if os.path.isfile(seed + '.check'):
+            todo['relax'] = False
+            if self.verbosity > 0:
+                print_notify('Restarting from {}.check, so not performing re-relaxation'.format(seed))
+
+        if self.debug:
+            print(todo)
+
+        if todo['relax']:
+            if self.verbosity > 0:
+                print('Pre-relaxing structure...')
+            success = self._castep_phonon_prerelax_only(calc_doc, seed,
+                                                        intermediate=bool(sum([bool(todo[key]) for key in todo])))
+            if success:
+                todo['relax'] = False
+                if self.verbosity > 0:
+                    print_notify('Pre-relaxation complete.')
+            else:
+                raise RuntimeError('Pre-requisite geometry optimisation failed.')
+
+        if todo['dynmat']:
+            if self.verbosity > 0:
+                print('Now computing phonon dynmat...')
+            success = self._castep_phonon_dynmat_only(calc_doc, seed,
+                                                      intermediate=bool(sum([bool(todo[key]) for key in todo])))
+            if success:
+                todo['dynmat'] = False
+                if self.verbosity > 0:
+                    print_notify('Dynmat complete.')
+            else:
+                raise RuntimeError('Phonon dynamical matrix calculation failed.')
+
+        if todo['thermodynamics']:
+            if self.verbosity > 0:
+                print('Now performing phonon thermodynamics...')
+            success = self._castep_phonon_thermodynamics_only(calc_doc, seed,
+                                                              intermediate=bool(sum([bool(todo[key]) for key in todo])))
+            if success:
+                todo['thermodynamics'] = False
+                if self.verbosity > 0:
+                    print_notify('Thermodynamics complete.')
+            else:
+                raise RuntimeError('Phonon thermodynamics calculation failed.')
+
+        if todo['dos']:
+            if self.verbosity > 0:
+                print('Now performing phonon DOS...')
+            success = self._castep_phonon_dos_only(calc_doc, seed,
+                                                   intermediate=bool(sum([bool(todo[key]) for key in todo])))
+            if success:
+                todo['dos'] = False
+                if self.verbosity > 0:
+                    print_notify('DOS complete.')
+            else:
+                raise RuntimeError('Phonon DOS calculation failed.')
+
+        if todo['dispersion']:
+            if self.verbosity > 0:
+                print('Now performing phonon dispersion...')
+            success = self._castep_phonon_dispersion_only(calc_doc, seed,
+                                                          intermediate=bool(sum([bool(todo[key]) for key in todo])))
+            if success:
+                todo['dispersion'] = False
+                if self.verbosity > 0:
+                    print_notify('Dispersion complete.')
+            else:
+                raise RuntimeError('Phonon dispersion calculation failed.')
+
+    def _get_seekpath_compliant_input(self, calc_doc, spacing):
+        """ Return seekpath cell/kpoint path for the given cell and spacing.
+
+        Parameters:
+            calc_doc (dict): structural and calculation parameters.
+            spacing (float): desired kpoint path spacing.
+
+        Returns:
+            (dict, list): dictionary containing the standardised unit cell
+                and list containing the kpoints.
+
+        """
+        from matador.utils.cell_utils import get_seekpath_kpoint_path
+        if self.verbosity >= 2:
+            from matador.crystal import Crystal
+            print('Old lattice:')
+            print(Crystal(calc_doc))
+        prim_doc, kpt_path, _ = get_seekpath_kpoint_path(calc_doc,
+                                                         spacing=spacing,
+                                                         debug=self.debug)
+
+        if self.verbosity >= 2:
+            print('New lattice:')
+            print(Crystal(calc_doc))
+
+        return prim_doc, kpt_path
+
+    def scf(self, calc_doc, seed, keep=True, intermediate=False):
+        """ Perform a single-shot (e.g. scf, bandstructure, NMR)
+        calculation with CASTEP.
+
+        Files from completed runs are moved to `completed`, if not
+        in intermediate mode, and failed runs to `bad_castep`.
 
         Parameters:
             calc_doc (dict): dictionary containing parameters and structure
             seed (str): structure filename
 
         Keyword arguments:
+            intermediate (bool): whether we want to run more calculations
+                on the output of this, i.e. whether to move to completed
+                or not.
             keep (bool): whether to keep intermediate files e.g. .bands
-            recursion_depth (int): internal kwarg to count the recursion
-                depth; function will quit if this exceeds 2.
-            prerelaxing (bool): internal flag; whether or not we are
-                currently performing a singleshot relaxation
 
         Returns:
             bool: True iff SCF completed successfully, False otherwise.
 
         """
-
+        from matador.utils.cell_utils import cart2abc
         try:
-            recursion_depth += 1
             self.cp_to_input(self.seed)
 
             # try to add a k/q-point path to cell, for spectral/phonon tasks
             elec_dispersion = False
-            phon_dispersion = False
-            phon_dos = False
             if 'spectral_task' in calc_doc and calc_doc['spectral_task'] == 'bandstructure':
                 if 'spectral_kpoints_path' not in calc_doc and 'spectral_kpoints_list' not in calc_doc:
                     elec_dispersion = True
 
-            if calc_doc.get('task').lower() in ['phonon', 'thermodynamics']:
-                if (('phonon_fine_kpoint_path' not in calc_doc and 'phonon_fine_kpoint_list' not in calc_doc) and
-                        'phonon_fine_kpoint_path_spacing' in calc_doc):
-                    phon_dispersion = True
-                if 'phonon_kpoint_mp_spacing' in calc_doc:
-                    phon_dos = True
-
-            if phon_dos or phon_dispersion or elec_dispersion:
-                from matador.utils.cell_utils import get_seekpath_kpoint_path, cart2abc
-                if self.verbosity >= 2:
-                    from matador.crystal import Crystal
-                    print('Old lattice:')
-                    print(Crystal(calc_doc))
-
-                if elec_dispersion:
-                    if calc_doc.get('spectral_kpoints_path_spacing') is None:
-                        calc_doc['spectral_kpoints_path_spacing'] = 0.02
-                    spacing = calc_doc['spectral_kpoints_path_spacing']
-
-                elif phon_dispersion:
-                    if calc_doc.get('phonon_fine_kpoint_path_spacing') is None:
-                        calc_doc['phonon_fine_kpoint_path_spacing'] = 0.02
-                    spacing = calc_doc['phonon_fine_kpoint_path_spacing']
-
-                if phon_dispersion or elec_dispersion:
-                    prim_doc, kpt_path, _ = get_seekpath_kpoint_path(calc_doc,
-                                                                     spacing=spacing,
-                                                                     debug=self.debug)
-
-                    if self.verbosity >= 2:
-                        print('New lattice:')
-                        print(Crystal(calc_doc))
-                    calc_doc.update(prim_doc)
-                    calc_doc['lattice_abc'] = cart2abc(calc_doc['lattice_cart'])
-
-                if elec_dispersion:
-                    calc_doc['spectral_kpoints_list'] = kpt_path
-
-                elif phon_dispersion:
-                    calc_doc['phonon_fine_kpoint_list'] = kpt_path
-
-                # always shift phonon grid if we're doing a phonon calc
-                if phon_dos or phon_dispersion:
-                    if 'phonon_kpoint_mp_spacing' in calc_doc:
-                        from matador.utils.cell_utils import calc_mp_grid, shift_to_include_gamma
-                        grid = calc_mp_grid(calc_doc['lattice_cart'], calc_doc['phonon_kpoint_mp_spacing'])
-                        offset = shift_to_include_gamma(grid)
-                        if offset != [0, 0, 0]:
-                            calc_doc['phonon_kpoint_mp_offset'] = offset
-                            if self.verbosity >= 2:
-                                print('Set phonon MP grid offset to {}'.format(offset))
-
-                if phon_dispersion and phon_dos:
-                    if self.verbosity >= 1:
-                        print('Setting params to continue with phonon dispersion after DOS completes')
-                    calc_doc['write_checkpoint'] = 'ALL'
-                    calc_doc['phonon_calculate_dos'] = True
-                    cached = {}
-                    cached['phonon_fine_kpoint_path'] = calc_doc['phonon_fine_kpoint_path']
-                    try:
-                        del calc_doc['phonon_fine_kpoint_path']
-                        del calc_doc['phonon_fine_kpoint_path_spacing']
-                    except KeyError:
-                        pass
-
-            if self.verbosity >= 1:
-                if elec_dispersion:
-                    print_notify('Calculating bandstructure ' + seed)
-                elif phon_dispersion and phon_dos:
-                    print_notify('Calculating phonon dispersion & DOS ' + seed)
-                elif phon_dispersion:
-                    print_notify('Calculating phonon dispersion ' + seed)
-                elif phon_dos:
-                    print_notify('Calculating phonon DOS ' + seed)
-                elif prerelaxing:
-                    print_notify('Performing pre-relaxation ' + seed)
-                else:
-                    print_notify('Calculating SCF ' + seed)
-
-            attempt_prerelax = True
-            if prerelaxing or os.path.isfile(seed + '.check'):
-                attempt_prerelax = False
-
-            if phon_dispersion or phon_dos and attempt_prerelax:
-                self._phonon_prerelax(calc_doc, seed)
-
-                print_notify('Relxation complete, now performing phonon calculation.')
+            if elec_dispersion:
+                prim_doc, kpt_path = self._get_seekpath_compliant_input(
+                    calc_doc, spacing=calc_doc.get('spectral_kpoints_path_spacing', 0.02))
+                calc_doc.update(prim_doc)
+                calc_doc['lattice_abc'] = cart2abc(calc_doc['lattice_cart'])
+                calc_doc['spectral_kpoints_list'] = kpt_path
 
             if not self.custom_params:
                 doc2param(calc_doc, seed, hash_dupe=False, overwrite=True)
@@ -616,24 +676,10 @@ class FullRelaxer:
 
             success = True
 
-            if not prerelaxing:
+            if not intermediate:
                 self.mv_to_completed(seed, keep=keep, completed_dir=self.paths['completed_dir'])
                 if not keep:
                     self.tidy_up(seed)
-
-                if phon_dispersion and phon_dos and recursion_depth < 2:
-                    calc_doc['write_checkpoint'] = 'None'
-                    calc_doc['continuation'] = 'default'
-                    calc_doc['phonon_calculate_dos'] = False
-                    # remove previous fine keys
-                    fine_keys = [key for key in calc_doc if key.startswith('phonon_fine')]
-                    for key in fine_keys:
-                        del calc_doc[key]
-                    calc_doc['phonon_fine_kpoint_path'] = cached['phonon_fine_kpoint_path']
-                    if self.verbosity >= 1:
-                        print('Now performing phonon dispersion...')
-
-                    success = self.scf(calc_doc, seed, keep=keep, recursion_depth=recursion_depth)
 
             return success
 
@@ -645,7 +691,28 @@ class FullRelaxer:
                 self.tidy_up(seed)
             raise err
 
-    def _phonon_prerelax(self, calc_doc, seed, recursion_depth=1):
+    @staticmethod
+    def _validate_calc_doc(calc_doc, required, forbidden):
+        """ Remove keys inside forbidden from calc_doc, and error
+        if a required key is missing.
+
+        Parameters:
+            calc_doc (dict): dictionary of structure and parameters.
+            required (list): list of required key strings.
+            forbidden (list): list of forbidden keys.
+
+        Raises:
+            AssertionError: if required key is missing.
+
+        """
+        for keyword in forbidden:
+            if keyword in calc_doc:
+                del calc_doc[keyword]
+
+        for keyword in required:
+            assert keyword in calc_doc
+
+    def _castep_phonon_prerelax_only(self, calc_doc, seed, intermediate=False):
         """ Run a singleshot geometry optimisation before an SCF-style calculation.
         This is typically used to ensure phonon calculations start successfully.
         The phonon calculation will then be restarted from the .check file produced here.
@@ -654,12 +721,126 @@ class FullRelaxer:
             calc_doc (dict): the structure to converge.
             seed (str): root filename of structure.
 
+        Keyword arguments:
+            final (bool): whether this is the final step in a calculation.
+
         """
         relax_doc = deepcopy(calc_doc)
         relax_doc['write_checkpoint'] = 'ALL'
-        relax_doc['geom_max_iter'] = 20
+        if 'geom_max_iter' not in relax_doc:
+            relax_doc['geom_max_iter'] = 20
         relax_doc['task'] = 'geometryoptimisation'
-        self.scf(relax_doc, seed, prerelaxing=True, recursion_depth=1)
+
+        required = []
+        forbidden = ['phonon_fine_kpoint_list',
+                     'phonon_fine_kpoint_path',
+                     'phonon_fine_kpoint_mp_spacing',
+                     'phonon_fine_kpoint_path_spacing']
+
+        self._validate_calc_doc(relax_doc, required, forbidden)
+
+        return self.scf(relax_doc, seed, keep=True, intermediate=intermediate)
+
+    def _castep_phonon_dynmat_only(self, calc_doc, seed, intermediate=False):
+        """ Runs a singleshot phonon dynmat calculation, with no "fine_method" interpolation.
+
+        Parameters:
+            calc_doc (dict): the structure to converge.
+            seed (str): root filename of structure.
+
+        Keyword arguments:
+            final (bool): whether this is the final step in a calculation.
+
+        """
+        relax_doc = deepcopy(calc_doc)
+        relax_doc['write_checkpoint'] = 'ALL'
+        relax_doc['continuation'] = 'default'
+        relax_doc['task'] = 'phonon'
+
+        required = []
+        forbidden = ['phonon_fine_kpoint_list',
+                     'phonon_fine_kpoint_path',
+                     'phonon_fine_kpoint_mp_spacing',
+                     'phonon_fine_kpoint_path_spacing']
+
+        self._validate_calc_doc(relax_doc, required, forbidden)
+        return self.scf(relax_doc, seed, keep=True, intermediate=intermediate)
+
+    def _castep_phonon_dos_only(self, calc_doc, seed, intermediate=False):
+        """ Runs a DOS interpolation on top of a completed
+        phonon calculation.
+
+        Parameters:
+            calc_doc (dict): the structure to converge.
+            seed (str): root filename of structure.
+
+        Keyword arguments:
+            final (bool): whether this is the final step in a calculation.
+
+        """
+        dos_doc = deepcopy(calc_doc)
+        dos_doc['task'] = 'phonon'
+        dos_doc['phonon_calculate_dos'] = True
+
+        required = ['phonon_fine_kpoint_mp_spacing']
+        forbidden = ['phonon_fine_kpoint_list',
+                     'phonon_fine_kpoint_path',
+                     'phonon_fine_kpoint_path_spacing']
+
+        self._validate_calc_doc(dos_doc, required, forbidden)
+
+        return self.scf(dos_doc, seed, keep=True, intermediate=intermediate)
+
+    def _castep_phonon_dispersion_only(self, calc_doc, seed, intermediate=False):
+        """ Runs a dispersion interpolation on top of a completed
+        phonon calculation.
+
+        Parameters:
+            calc_doc (dict): the structure to converge.
+            seed (str): root filename of structure.
+
+        Keyword arguments:
+            final (bool): whether this is the final step in a calculation.
+
+        """
+        disp_doc = deepcopy(calc_doc)
+        disp_doc['task'] = 'phonon'
+        disp_doc['phonon_calculate_dos'] = False
+
+        required = ['phonon_fine_kpoint_list']
+        forbidden = ['phonon_fine_kpoint_mp_spacing',
+                     'phonon_fine_kpoint_path',
+                     'phonon_fine_kpoint_path_spacing']
+
+        self._validate_calc_doc(disp_doc, required, forbidden)
+
+        return self.scf(disp_doc, seed, keep=True, intermediate=intermediate)
+
+    def _castep_phonon_thermodynamics_only(self, calc_doc, seed, intermediate=False):
+        """ Runs a "thermodynamics" interpolation on top of a completed
+        phonon calculation, using the phonon_fine_kpoint_mp_grid.
+
+        Parameters:
+            calc_doc (dict): the structure to converge.
+            seed (str): root filename of structure.
+
+        Keyword arguments:
+            final (bool): whether this is the final step in a calculation.
+
+        """
+        thermo_doc = deepcopy(calc_doc)
+        thermo_doc['continuation'] = 'default'
+        thermo_doc['task'] = 'thermodynamics'
+        thermo_doc['phonon_calculate_dos'] = False
+
+        required = ['phonon_fine_kpoint_mp_spacing']
+        forbidden = ['phonon_fine_kpoint_list',
+                     'phonon_fine_kpoint_path',
+                     'phonon_fine_kpoint_path_spacing']
+
+        self._validate_calc_doc(thermo_doc, required, forbidden)
+
+        return self.scf(thermo_doc, seed, keep=True, intermediate=intermediate)
 
     def run_convergence_tests(self, calc_doc):
         """ Run kpoint and cutoff_energy convergence tests based on
@@ -807,23 +988,22 @@ class FullRelaxer:
             print_exc()
             raise exc
         if 'Intel' in mpi_version_string:
-            if verbosity > 1:
-                print('Detected Intel MPI library.')
-            return 'intel'
+            mpi_version = 'intel'
         elif 'aprun' in mpi_version_string:
-            if verbosity > 2:
-                print('Detected ARCHER MPI library.')
-            return 'archer'
+            mpi_version = 'archer'
         elif 'Open MPI' in mpi_version_string:
-            if verbosity > 2:
-                print('Detected Open MPI library.')
-            return 'default'
+            mpi_version = 'default'
         else:
-            if verbosity > 1:
+            if verbosity > 3:
                 print('Could not detect MPI library, version string was:')
                 print(mpi_version_string)
                 print('Using default (OpenMPI-style) mpi calls.')
-            return 'default'
+            mpi_version = 'default'
+
+        if verbosity > 2:
+            print('Using {} MPI library.'.format(mpi_version))
+
+        return mpi_version
 
     def do_memcheck(self, calc_doc, seed):
         """ Perform a CASTEP dryrun to estimate memory usage.
@@ -839,7 +1019,7 @@ class FullRelaxer:
         """
         doc2param(calc_doc, seed, hash_dupe=False)
         doc2cell(calc_doc, seed, hash_dupe=False, copy_pspots=False)
-        if self.verbosity > 1:
+        if self.verbosity > 2:
             print('Performing memcheck...')
         free_memory = float(virtual_memory().available) / 1024**2
         if self.maxmem is None:
@@ -853,7 +1033,7 @@ class FullRelaxer:
                 print('Cell is pathological...')
             return False
 
-        if self.verbosity > 1:
+        if self.verbosity > 2:
             print('{:10}: {:8.0f} MB'.format('Available', maxmem))
         process = sp.Popen(['nice', '-n', '15', self.executable, '-d', seed])
         process.communicate()
@@ -875,18 +1055,14 @@ class FullRelaxer:
             else:
                 os.remove(_file)
 
-        if self.verbosity > 1:
+        if self.verbosity > 2:
             if 'estimated_mem_MB' in results:
                 print('{:10}: {:8.0f} MB'.format('Estimate', results['estimated_mem_MB']))
 
         if skip or results['estimated_mem_MB'] > maxmem:
-            if self.verbosity > 1:
-                print('Not enough!')
             return False
-        else:
-            if self.verbosity > 1:
-                print('Enough memory, proceeding...')
-            return True
+
+        return True
 
     def run_command(self, seed, exec_test=False):
         """ Calls executable on seed with desired number of cores.
@@ -1000,7 +1176,7 @@ class FullRelaxer:
             bad_dir = self.root_folder + '/bad_castep'
             if not os.path.exists(bad_dir):
                 os.makedirs(bad_dir, exist_ok=True)
-            if self.verbosity > 1:
+            if self.verbosity > 0:
                 print('Something went wrong, moving files to bad_castep')
             seed_files = glob.glob(seed + '.*')
             for _file in seed_files:
@@ -1037,8 +1213,6 @@ class FullRelaxer:
             os.makedirs(completed_dir, exist_ok=True)
         if keep:
             seed_files = glob.glob(seed + '.*') + glob.glob(seed + '-out.cell')
-            if self.verbosity > 3:
-                print(seed_files)
             for _file in seed_files:
                 shutil.copy(_file, completed_dir)
                 os.remove(_file)
@@ -1093,7 +1267,7 @@ class FullRelaxer:
 
     def _setup_relaxation_dirs(self):
         """ Set up directories and files for relaxation. """
-        if self.verbosity > 1:
+        if self.verbosity > 0:
             print_notify('Relaxing ' + self.seed)
 
         if self.compute_dir is not None:
@@ -1126,7 +1300,7 @@ class FullRelaxer:
         if os.path.isfile(self.seed + '.cell'):
             os.remove(self.seed + '.cell')
         if self.kpts_1D:
-            if self.verbosity > 1:
+            if self.verbosity > 0:
                 print('Calculating 1D kpt grid...')
             n_kz = ceil(1 / (calc_doc['lattice_abc'][0][2] * self._target_spacing))
             if n_kz % 2 == 1:
@@ -1138,7 +1312,7 @@ class FullRelaxer:
 
         # update param
         if self.custom_params:
-            if self.verbosity > 1:
+            if self.verbosity > 0:
                 print('Using custom param files...')
         if not self.custom_params:
             if os.path.isfile(self.seed + '.param'):
@@ -1202,10 +1376,10 @@ class FullRelaxer:
             subprocess.Popen: running process to be killed.
 
         """
-        if self.verbosity > 5:
+        if self.verbosity > 2:
             print_notify('Ending process early for seed {}'.format(self.seed))
         process.terminate()
-        if self.verbosity > 5:
+        if self.verbosity > 2:
             print_notify('Ended process early for seed {}'.format(self.seed))
         if self.compute_dir is not None:
             for f in glob.glob('{}.*'.format(self.seed)):
