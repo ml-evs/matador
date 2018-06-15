@@ -21,4 +21,3 @@ except DistributionNotFound:
 
 from matador.query import DBQuery
 from matador.hull import QueryConvexHull
-from matador.crystal import Crystal
