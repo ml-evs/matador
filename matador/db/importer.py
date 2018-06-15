@@ -554,6 +554,19 @@ class Spatula:
                 elif file.endswith('.expt'):
                     file_lists[root]['expt'].append(file)
                     file_lists[root]['expt_count'] += 1
+
+        # finally, filter the castep list so that history/castep/history.gz duplicates
+        # are not included
+        for root in file_lists:
+            cached_list = [entry.split('/')[-1].split('.')[0] for entry in file_lists[root]['castep']]
+            duplicates = []
+            for ind, file in enumerate(file_lists[root]['castep']):
+                if not file.endswith('.castep') and cached_list.count(file.split('/')[-1].split('.')[0]) > 1:
+                    duplicates.append(ind)
+                    file_lists[root]['castep_count'] -= 1
+            file_lists[root]['castep'] = [entry for ind, entry in
+                                          enumerate(file_lists[root]['castep']) if ind not in duplicates]
+
         return file_lists
 
     def _scan_dupes(self, file_lists):
@@ -582,14 +595,13 @@ class Spatula:
                     # find number of entries with same root filename in database
                     structure_exts = ['.castep', '.res', '.history', '.history.gz']
                     structure_count = 0
-                    for ext in structure_exts:
-                        if _file.endswith(ext):
-                            structure_count += self.repo.find(
-                                {'source': {'$in': [_file.replace(ext, '.res')]}}
-                            ).count()
-                            structure_count += self.repo.find(
-                                {'source': {'$in': [_file.replace(ext, '.castep')]}}
-                            ).count()
+                    ext = [_ext for _ext in structure_exts if _file.endswith(_ext)]
+                    assert len(ext) == 1
+                    ext = ext[0]
+                    for other_ext in structure_exts:
+                        structure_count += self.repo.find(
+                            {'source': {'$in': [_file.replace(ext, other_ext)]}}
+                        ).count()
                     if structure_count > 1 and self.debug:
                         print('Duplicates', structure_count, _file)
 

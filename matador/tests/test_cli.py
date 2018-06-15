@@ -27,6 +27,7 @@ DB_NAME = 'ci_test'
 ROOT_DIR = os.getcwd()
 SETTINGS = load_custom_settings(config_fname=CONFIG_FNAME)
 
+DEBUG = False
 MONGO_PRESENT = True
 try:
     MONGO_CLIENT = pm.MongoClient(SETTINGS['mongo']['host'], serverSelectionTimeoutMS=1000)
@@ -48,10 +49,15 @@ class IntegrationTest(unittest.TestCase):
         """ Test import and query. """
         query, files_to_delete, err_flines, manifest_flines = test_import_castep()
         self.assertEqual(len(files_to_delete), 2, msg='Failed to write spatula files')
-        print(err_flines)
-        print(manifest_flines)
         self.assertEqual(len(err_flines), 3, msg='Failed to report errors correctly')
         self.assertEqual(len(manifest_flines), 3, msg='Failed to report successes correctly')
+        self.assertEqual(len(query.cursor), 3, msg='Failed to import structures correctly')
+
+        # run again and hopefully nothing will change, i.e. no duplication
+        query, files_to_delete, err_flines, manifest_flines = test_import_castep()
+        self.assertEqual(len(files_to_delete), 2, msg='Failed to write spatula files')
+        self.assertEqual(len(err_flines), 3, msg='Failed to report errors correctly')
+        self.assertEqual(len(manifest_flines), 0, msg='Failed to report successes correctly')
         self.assertEqual(len(query.cursor), 3, msg='Failed to import structures correctly')
 
         query_1, query_2, files_to_delete = test_import_res()
@@ -79,6 +85,9 @@ def test_import_castep():
     if CONFIG_FNAME is not None:
         sys.argv += ['--config', CONFIG_FNAME]
 
+    if DEBUG:
+        sys.argv += ['--debug']
+
     matador.cli.cli.main(override=True)
 
     query = DBQuery(db=DB_NAME, config=CONFIG_FNAME, details=True, source=True)
@@ -105,6 +114,9 @@ def test_import_res():
 
     if CONFIG_FNAME is not None:
         sys.argv += ['--config', CONFIG_FNAME]
+
+    if DEBUG:
+        sys.argv += ['--debug']
 
     matador.cli.cli.main(override=True)
 
