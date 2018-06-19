@@ -241,7 +241,7 @@ class MatadorCommandLine(object):
                 cursor = self.collections[collname].find()
                 for doc in cursor:
                     temp = ''
-                    for ind, elem in enumerate(doc['stoichiometry']):
+                    for ind, elem in enumerate(sorted(doc['stoichiometry'])):
                         temp += str(elem[0])
                         if ind != len(doc['stoichiometry']) - 1:
                             temp += '+'
@@ -267,17 +267,19 @@ class MatadorCommandLine(object):
                 from ascii_graph import Pyasciigraph
                 from ascii_graph.colors import Gre, Blu, Red
                 from ascii_graph.colordata import hcolor
-            except ImportError:
-                exit('Pyascii graph missing; not printing detailed stats.')
 
-            graph = Pyasciigraph(line_length=80, multivalue=False)
-            thresholds = {int(stats_dict['count'] / 40): Gre,
-                          int(stats_dict['count'] / 10): Blu,
-                          int(stats_dict['count'] / 4): Red}
-            data = hcolor(comp_list, thresholds)
-            for line in graph.graph(label=None, data=data):
-                print(line)
-            print('\n')
+                graph = Pyasciigraph(line_length=80, multivalue=False)
+                thresholds = {int(stats_dict['count'] / 40): Gre,
+                              int(stats_dict['count'] / 10): Blu,
+                              int(stats_dict['count'] / 4): Red}
+                data = hcolor(comp_list, thresholds)
+                for line in graph.graph(label=None, data=data):
+                    print(line)
+                print('\n')
+
+            except ImportError:
+                for comp in comp_list:
+                    print(comp)
 
 
 def main(override=False):
