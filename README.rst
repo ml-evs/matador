@@ -3,9 +3,8 @@ matador
 
 |Bitbucket Pipelines| |Coverage Status| |Documentation Status| |MIT License|
 
-matador is an aggregator and manipulator of the results first-principles
-calculations, primarily geometry optimisations.
-
+matador is an aggregator, manipulator and runner of first-principles
+calculations, written with a bent towards battery electrode materials. 
 The source can be found on `Bitbucket <https://bitbucket.org/ml-evs/matador>`_.
 
 Written by `Matthew Evans <https://www.ml-evs.github.io>`_ (2016-). 
@@ -21,28 +20,32 @@ Written by `Matthew Evans <https://www.ml-evs.github.io>`_ (2016-).
 Core functionality
 -------------------
 
+The core functionality can be summarised by the various sub-commands of the
+command-line interface. The API has many more features that can be explored
+in the examples and API documentation.
+
+
 1. The scraping of CASTEP/Quantum Espresso output files into flexible
-   Python dictionaries with a sensible pragma via ``matador import``.
-2. The transferal of said objects into a MongoDB database.
+   Python dictionaries with a sensible schema via ``matador import``.
+2. The transferal of the scraped dictionaries into a MongoDB database.
 3. Powerful CLI querying of the database, with a focus on energy storage
    applications using ``matador query``.
 4. Calculation and presentation of binary and ternary phase diagrams
    with ``matador hull``.
-5. 0K voltage curves for binary and intercalation electrodes using
+5. 0K voltage curves for binary and ternary systems, as well as arbitrary intercalation electrodes, using
    ``matador voltage``.
-6. Atomic species swapping and polishing from previous calculations from
+6. Atomic species swapping and polishing from previous calculations using 
    ``matador swaps``.
-7. Automated high-throughput geometry optimisations, convergence tests
-   and densities of states with CASTEP, with the bundled tool ``run3``.
-   Tested on supercomputing systems Darwin (Cambridge) and ARCHER
-   (UK-wide).
-8. Refinement of structural data, powered by spglib via
+7. Automated high-throughput geometry optimisations, electronic and vibrational properties, 
+   plus convergence tests, using CASTEP or Quantum Espresso, with the ``run3`` entrypoint.
+   Tested on several supercomputers.
+8. Refinement of structural and chemical data, and symmetries powered by ``spglib``, via
    ``matador refine``.
 
 Usage
 ------
 
-For basic command-line usage, please explore the help system for each sub-command, and check `Tutorials <https://matador-db.readthedocs.io/en/latest/tutorials.html>`_ tutorials for common workflows.
+For basic command-line usage, please explore the help system for each sub-command, and check the `examples <https://matador-db.readthedocs.io/en/latest/examples.html>`_ for common workflows.
 
 The full Python API documentation is `available online <http://matador-db.readthedocs.io/en/latest/modules.html>`_.
 

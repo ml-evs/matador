@@ -2,12 +2,13 @@ Installation
 ============
 
 
-Installing with conda/pip (OUT OF DATE)
----------------------------------------
+Installing with conda
+---------------------
 
 The tl;dr way to install matador, on e.g. a computing cluster, is as follows:
 
--  create a new conda environment (``conda create matador python=3.6 numpy scipy``)
+- install anaconda, if you have not already (https://conda.io/miniconda.html).
+-  create a new conda environment (``conda create -n matador python=3.6 numpy scipy``)
 -  manually install some of the heavier libraries (e.g. numpy and Scipy)
    through conda with ``conda install --yes --file requirements.txt``.
 -  run ``pip install .`` from inside the top-level matador directory.
@@ -15,8 +16,8 @@ The tl;dr way to install matador, on e.g. a computing cluster, is as follows:
    e.g. bandstructure/plotting/jupyter notebook visualisation
    functionality, use ``pip install .[plotting,bandstructure,viz]``.
 
-Esoteric installation on ARCHER (30th October 2017)
----------------------------------------------------
+More esoteric installation on ARCHER (30th October 2017)
+--------------------------------------------------------
 
 These steps assume you have your ``work`` directory symlinked inside
 ``$HOME``.
