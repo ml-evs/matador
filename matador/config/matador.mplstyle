@@ -1,0 +1,92 @@
+# colors
+# default prop_cycle is Dark2
+axes.prop_cycle               : cycler('color', ['1b9e77', 'd95f02', '7570b3', 'e7298a', '66a61e', 'e6ab02', 'a6761d', '666666', 'bc80bd'])
+image.cmap                    : magma
+
+# global font options
+font.family                   : sans-serif
+font.size                     : 14.399999999999999
+font.serif                    : DejaVu Serif, Bitstream Vera Serif, Computer Modern Roman, New Century Schoolbook, Century Schoolbook L, Utopia, ITC Bookman, Bookman, Nimbus Roman No9 L, Times New Roman, Times, Palatino, Charter, serif
+font.sans-serif               : Arial, DejaVu Sans, Liberation Sans, Bitstream Vera Sans, sans-serif
+font.cursive                  : Apple Chancery, Textile, Zapf Chancery, Sand, Script MT, Felipa, cursive
+font.fantasy                  : Comic Sans MS, Chicago, Charcoal, ImpactWestern, Humor Sans, xkcd, fantasy
+font.monospace                : DejaVu Sans Mono, Bitstream Vera Sans Mono, Computer Modern Typewriter, Andale Mono, Nimbus Mono L, Courier New, Courier, Fixed, Terminal, monospace
+# local font/text options
+figure.titlesize              : large
+legend.fontsize               : medium
+text.color                    : .15
+text.usetex                   : False 
+text.latex.unicode            : False
+text.latex.preamble           : \usepackage{sfmath}\usepackage{helvet}\usepackage{amsmath}
+text.latex.preview            : False
+text.hinting                  : auto
+text.hinting_factor           : 8
+text.antialiased              : True
+mathtext.cal                  : cursive
+mathtext.rm                   : sans
+mathtext.tt                   : monospace
+mathtext.it                   : sans:italic
+mathtext.bf                   : sans:bold
+mathtext.sf                   : sans
+mathtext.fontset              : stixsans 
+mathtext.default              : regular
+mathtext.fallback_to_cm       : True
+
+patch.edgecolor        : k
+
+grid.color                    : .8
+grid.linestyle                : -
+grid.linewidth                : 1.0
+grid.alpha                    : 1.0
+figure.figsize                : 8.0, 6.0
+figure.dpi                    : 100.0
+figure.facecolor              : white
+figure.edgecolor              : w
+figure.frameon                : True
+figure.autolayout             : False
+savefig.facecolor             : w
+savefig.edgecolor             : w
+savefig.frameon               : True
+savefig.bbox                  : tight
+savefig.pad_inches            : 0.1
+savefig.transparent           : True
+
+lines.linewidth               : 1.75
+lines.linestyle               : -
+
+axes.labelcolor               : .15
+axes.labelsize                : medium 
+axes.titlesize                : medium 
+axes.facecolor                : white
+axes.edgecolor                : .8
+axes.linewidth                : 1.25
+axes.spines.left              : True
+axes.spines.right             : True 
+axes.spines.bottom            : True
+axes.spines.top               : True 
+axes.grid                     : False 
+axes.grid.which               : major
+axes.grid.axis                : both
+
+legend.fancybox               : False
+legend.loc                    : best
+legend.numpoints              : 1
+legend.scatterpoints          : 1
+legend.markerscale            : 1.0
+legend.shadow                 : False
+legend.frameon                : True
+legend.framealpha             : 0.8
+legend.borderpad              : 0.4
+legend.facecolor              : inherit
+legend.edgecolor              : 0.8
+
+xtick.labelsize               : small
+ytick.labelsize               : small
+xtick.major.size              : 3.0
+ytick.major.size              : 3.0
+xtick.major.width             : 1.0
+ytick.major.width             : 1.0
+xtick.color                   : .15
+ytick.color                   : .15
+xtick.minor.visible           : False
+ytick.minor.visible           : False

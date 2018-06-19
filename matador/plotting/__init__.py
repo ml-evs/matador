@@ -5,13 +5,10 @@
 plots for bandstructures, phase diagrams, densities of states, voltages
 and volume curves.
 
-Plot style can be configured partially via settings in matplotlibrc.
-Recommended settings:
-
-    font.family      : sans-serif
-    font.sans-serif  :  helvetica
-    mathtext.rm      : sans
-    mathtext.fontset : custom
+Plot style settings can be configured by specifying a matplotlib style
+(either built-in or a custom file). The default "matador" style can be
+found in the matador.config submodule. User default styles can be set
+with the plotting.default_style option in user's matadorrc.
 
 """
 
