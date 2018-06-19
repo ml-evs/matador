@@ -5,7 +5,6 @@
 documents or Crystal objects.
 """
 
-import string
 import os
 import sys
 from traceback import print_exc
@@ -18,8 +17,23 @@ from matador.utils.cursor_utils import display_results
 
 
 def query2files(cursor, *args, **kwargs):
-    """ Write either .res or .cell + .param files
-    for all documents in a cursor.
+    """ Many-to-many convenience function for many structures being written to
+    many file types. File types are passed via **kwargs, e.g.
+
+        {
+            'xsf': True,
+            'cell': True,
+            'pdb': True,
+            'res': True,
+            'param': True
+        }
+
+    Parameters:
+        cursor (:obj:`list` of :obj:`dict`): list of matador dictionaries to write out.
+
+    Keyword arguments:
+        **kwargs (dict): command-line arguments containing file types to write out.
+
     """
     args = args[0]
     cell = args.get('cell')
@@ -53,15 +67,9 @@ def query2files(cursor, *args, **kwargs):
     if multiple_files:
         print('Intending to write', num, 'structures to file...')
         if len(cursor) > 10000:
-            try:
-                write = input('This operation will write ' + str(len(cursor)) + ' structures' +
-                              ' are you sure you want to do this? [y/n] ')
-            except:
-                print_exc()
-                print('Stop using Python2!')
-                print('Going to assume your answer was yes...')
-                write = 'y'
-            if write.lower() is 'y':
+            write = input('This operation will write ' + str(len(cursor)) + ' structures' +
+                          ' are you sure you want to do this? [y/n] ')
+            if write.lower() == 'y':
                 print('Writing them all.')
                 write = True
             else:
@@ -70,19 +78,19 @@ def query2files(cursor, *args, **kwargs):
         else:
             write = True
     dirname = generate_relevant_path(args)
-    dir = False
+    _dir = False
     dir_counter = 0
-    while not dir:
+    while not _dir:
         if dir_counter != 0:
             directory = dirname + str(dir_counter)
         else:
             directory = dirname
         if not os.path.exists(directory):
             os.makedirs(directory)
-            dir = True
+            _dir = True
         else:
             dir_counter += 1
-    for ind, doc in enumerate(cursor):
+    for _, doc in enumerate(cursor):
         name = prefix
         path = directory + '/'
         # write either cell, res or both
@@ -151,19 +159,17 @@ def query2files(cursor, *args, **kwargs):
     print('Done!')
 
 
-def doc2param(doc, path, hash_dupe=True, overwrite=False, spin=False, *args):
+def doc2param(doc, path, hash_dupe=True, overwrite=False, spin=False):
     """ Write basic .param file from single doc.
 
-    Input:
+    Parameters:
+        doc (dict): the document to write out to file
+        path (str): the desired path to file
 
-        | doc       : the document to write out to file
-        | path      : the desired path to file
-
-    Args:
-
-        | hash_dupe : hash duplicate file names, or skip?
-        | overwrite : bool, overwrite if file exists.
-        | spin      : bool, enforce spin symmetry broken to magic number of 5
+    Keyword arguments:
+        hash_dupe (bool): hash duplicate file names, or skip?
+        overwrite (bool): overwrite if filename exists.
+        spin (bool): enforce breaking of spin symmetry to magic number of 5.
 
     """
     try:
@@ -218,25 +224,23 @@ def doc2param(doc, path, hash_dupe=True, overwrite=False, spin=False, *args):
                 for line in flines:
                     f.write(line)
 
-    except Exception as oops:
+    except Exception:
         print_exc()
         print('Writing param file failed!')
 
 
-def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, overwrite=False, spin=False, *args):
+def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, overwrite=False, spin=False):
     """ Write .cell file for single doc.
 
-    Input:
+    Parameters:
+        doc (dict): the document to write to file
+        path (str): the desired path to the file
 
-        | doc         : dict, the document to write to file
-        | path        : str, the desired path to the file
-
-    Args:
-
-        | hash_dupe   : bool, hash duplicate file names or skip?
-        | copy_pspots : bool, try to copy pspots from ~/pspots?
-        | overwrite   : bool, overwrite if file exists
-        | spin        : bool, break spin symmetry with magic number 5 on first atom
+    Keyword Arguments:
+        hash_dupe (bool): hash duplicate file names or skip?
+        copy_pspots (bool): try to copy pspots from ~/pspots?
+        overwrite (bool): overwrite if filename already exists
+        spin (bool): break spin symmetry with magic number 5 on first atom
 
     """
     if path.endswith('.cell'):
@@ -265,7 +269,7 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, overwri
                     for ind, atom in enumerate(zip(doc['atom_types'], doc['positions_frac'])):
                         if atom[0] in doc['atomic_init_spins']:
                             f.write("{0:8s} {1[0]: 15f} {1[1]: 15f} {1[2]: 15f} SPIN={2:}\n".format(
-                                    atom[0], atom[1], doc['atomic_init_spins'][atom[0]]))
+                                atom[0], atom[1], doc['atomic_init_spins'][atom[0]]))
                         else:
                             f.write("{0:8s} {1[0]: 15f} {1[1]: 15f} {1[2]: 15f}\n".format(
                                 atom[0], atom[1]))
@@ -403,8 +407,18 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, overwri
         print('Continuing...')
 
 
-def doc2pdb(doc, path, info=True, hash_dupe=True, *args):
-    """ Write a simple .pdb for single doc. """
+def doc2pdb(doc, path, info=True, hash_dupe=True):
+    """ Write a simple .pdb for single doc.
+
+    Parameters:
+        doc (dict): matador document containing structure.
+        path (str): desired path of xsf file.
+
+    Keyword arguments:
+        info (bool): write info string to HEADER.
+        hash_dupe (bool): hash duplicate file names or skip?
+
+    """
     if path.endswith('.pdb'):
         path = path.replace('.pdb', '')
     try:
@@ -416,82 +430,79 @@ def doc2pdb(doc, path, info=True, hash_dupe=True, *args):
                 raise RuntimeError('Skipping duplicate structure...')
         with open(path+'.pdb', 'w') as f:
             try:
-                HEADER = 'HEADER    {} {}'.format(doc['text_id'][0], doc['text_id'][1])
-            except:
-                HEADER = 'HEADER    Generated with matador.'
+                header = 'HEADER    {} {}'.format(doc['text_id'][0], doc['text_id'][1])
+            except Exception:
+                header = 'HEADER    Generated with matador.'
             try:
                 # write res file header if info
-                TITLE = 'TITLE     '
-                TITLE += path.split('/')[-1] + ' '
-                if type(doc['pressure']) == str:
-                    TITLE += '0.00 '
+                title = 'TITLE     '
+                title += path.split('/')[-1] + ' '
+                if isinstance(doc['pressure'], str):
+                    title += '0.00 '
                 else:
-                    TITLE += str(doc['pressure']) + ' '
-                TITLE += str(doc['cell_volume']) + ' '
-                TITLE += str(doc['enthalpy']) + ' '
-                TITLE += '0 0 '             # spin
-                TITLE += str(doc['num_atoms']) + ' '
+                    title += str(doc['pressure']) + ' '
+                title += str(doc['cell_volume']) + ' '
+                title += str(doc['enthalpy']) + ' '
+                title += '0 0 '             # spin
+                title += str(doc['num_atoms']) + ' '
                 try:
                     if 'x' in doc['space_group']:
-                        TITLE += '(P1) '
+                        title += '(P1) '
                     else:
-                        TITLE += '(' + str(doc['space_group']) + ')' + ' '
-                except:
-                    TITLE += '(P1) '
-                TITLE += 'n - 1'
-            except:
+                        title += '(' + str(doc['space_group']) + ')' + ' '
+                except Exception:
+                    title += '(P1) '
+                title += 'n - 1'
+            except Exception:
                 if not info:
-                    TITLE = 'TITLE\t' + path.split('/')[-1]
+                    title = 'TITLE\t' + path.split('/')[-1]
                 raise RuntimeError('Failed to get info for res file, turn info off.')
-            AUTHOR = 'AUTHOR    Generated with matador (Matthew Evans, 2016)'
-            f.write(HEADER + '\n')
-            f.write(TITLE + '\n')
-            f.write(AUTHOR + '\n')
+            author = 'AUTHOR    Generated with matador (Matthew Evans, 2016)'
+            f.write(header + '\n')
+            f.write(author + '\n')
+            f.write(title + '\n')
             # use dummy SG for CRYST1, shouldn't matter
-            CRYST1 = 'CRYST1 {v[0][0]:9.3f} {v[0][1]:9.3f} {v[0][2]:9.3f} {v[1][0]:7.2f} {v[1][1]:7.2f} {v[1][2]:7.2f} P 1'.format(v=doc['lattice_abc'])
-            f.write(CRYST1 + '\n')
-            SCALEn = cart2abcstar(doc['lattice_cart'])
-            f.write('SCALE1    {v[0][0]:10.6f} {v[0][1]:10.6f} {v[0][2]:10.6f}      {:10.5f}\n'.format(0.0, v=SCALEn))
-            f.write('SCALE2    {v[1][0]:10.6f} {v[1][1]:10.6f} {v[1][2]:10.6f}      {:10.5f}\n'.format(0.0, v=SCALEn))
-            f.write('SCALE3    {v[2][0]:10.6f} {v[2][1]:10.6f} {v[2][2]:10.6f}      {:10.5f}\n'.format(0.0, v=SCALEn))
+            cryst = 'CRYST1 {v[0][0]:9.3f} {v[0][1]:9.3f} {v[0][2]:9.3f} {v[1][0]:7.2f} {v[1][1]:7.2f} {v[1][2]:7.2f} P 1'.format(v=doc['lattice_abc'])
+            f.write(cryst + '\n')
+            scale_n = cart2abcstar(doc['lattice_cart'])
+            f.write('SCALE1    {v[0][0]:10.6f} {v[0][1]:10.6f} {v[0][2]:10.6f}      {:10.5f}\n'.format(0.0, v=scale_n))
+            f.write('SCALE2    {v[1][0]:10.6f} {v[1][1]:10.6f} {v[1][2]:10.6f}      {:10.5f}\n'.format(0.0, v=scale_n))
+            f.write('SCALE3    {v[2][0]:10.6f} {v[2][1]:10.6f} {v[2][2]:10.6f}      {:10.5f}\n'.format(0.0, v=scale_n))
             if 'positions_abs' not in doc:
                 doc['positions_abs'] = frac2cart(doc['lattice_cart'], doc['positions_frac'])
             for ind, atom in enumerate(doc['atom_types']):
                 try:
-                    HETATM = 'HETATM '
+                    hetatm = 'HETATM '
                     # append 00 to atom type, a la cell2pdb...
-                    HETATM += '{:4d} {:.4} NON A   1     '.format(ind+1, atom+'00')
-                    HETATM += '{v[0]:7.3f} {v[1]:7.3f} {v[2]:7.3f} {:5.2f} {:5.2f}          {:.2}'.format(1.0, 0.0, atom, v=doc['positions_abs'][ind])
-                    f.write(HETATM + '\n')
-                except:
+                    hetatm += '{:4d} {:.4} NON A   1     '.format(ind+1, atom+'00')
+                    hetatm += '{v[0]:7.3f} {v[1]:7.3f} {v[2]:7.3f} {:5.2f} {:5.2f}          {:.2}'.format(1.0, 0.0, atom, v=doc['positions_abs'][ind])
+                    f.write(hetatm + '\n')
+                except Exception:
                     print_exc()
-            TER = 'TER       {}       NON A   1'.format(len(doc['atom_types']))
-            f.write(TER + '\n')
+            ter = 'TER       {}       NON A   1'.format(len(doc['atom_types']))
+            f.write(ter + '\n')
             f.write('END')
-    except:
+    except Exception:
         if hash_dupe:
             print_exc()
             print('Writing pdb file failed for ', doc['text_id'])
         else:
             print_exc()
-            pass
 
 
-def doc2pwscf(doc, path, template=None, spacing=None, *args):
+def doc2pwscf(doc, path, template=None, spacing=None):
     """ Write the structural part of QE input file based
     on the provided matador doc. Will calculate the correct
     kpoint_mp_grid if spacing is provided.
 
-    Input:
+    Parameters:
+        doc (dict): matador document containing structure
+        path (str): desired filename for res file
 
-        | doc  : dict, matador document,
-        | path : str, filename to write out to.
-
-    Args:
-
-        | template : str, filename of template to prepend before structure
-                    (with prefix keyword to be replaced),
-        | spacing  : float, kpoint_mp_spacing to use when calculating grid.
+    Keyword Arguments:
+        template (str): filename of template to prepend before structure
+            (with prefix keyword to be replaced),
+        spacing (float): kpoint_mp_spacing to use when calculating grid.
 
     """
     if path.endswith('.in'):
@@ -539,21 +550,19 @@ def doc2pwscf(doc, path, template=None, spacing=None, *args):
         f.write(file_string)
 
 
-def doc2res(doc, path, info=True, hash_dupe=True, spoof_titl=False, overwrite=False, sort_atoms=True, *args):
+def doc2res(doc, path, info=True, hash_dupe=True, spoof_titl=False, overwrite=False, sort_atoms=True):
     """ Write .res file for single doc.
 
-    Input:
+    Parameters:
+        doc (dict): matador document containing structure
+        path (str): desired filename for res file
 
-        | doc  : dict, matador document containing structure
-        | path : str, desired filename for res file
-
-    Args:
-
-        | info       : bool, print info in res file header
-        | hash_dupe  : bool, add random hash to colliding filenames
-        | spoof_titl : bool, make up fake info for file header (for use with e.g. cryan)
-        | overwrite  : bool, overwrite files with conflicting filenames
-        | sorted     : bool, if False, atoms are not sorted (this will not be a valid res file)
+    Keyword Arguments:
+        info (bool): print info in res file header
+        hash_dupe (bool): add random hash to colliding filenames
+        spoof_titl (bool): make up fake info for file header (for use with e.g. cryan)
+        overwrite (bool): overwrite files with conflicting filenames
+        sorted (bool): if False, atoms are not sorted (this will not be a valid res file)
 
     """
     if path.endswith('.res'):
@@ -627,8 +636,8 @@ def doc2res(doc, path, info=True, hash_dupe=True, spoof_titl=False, overwrite=Fa
         # enforce correct order by elements, sorting only the atom_types, not the positions inside them
         if sort_atoms:
             positions_frac, atom_types = zip(*[(pos, types) for (types, pos) in
-                                             sorted(zip(doc['atom_types'], doc['positions_frac']),
-                                                    key=lambda k: k[0])])
+                                               sorted(zip(doc['atom_types'], doc['positions_frac']),
+                                                      key=lambda k: k[0])])
         else:
             positions_frac = doc['positions_frac']
             atom_types = doc['atom_types']
@@ -665,7 +674,6 @@ def doc2res(doc, path, info=True, hash_dupe=True, spoof_titl=False, overwrite=Fa
             print('Writing res file failed for ', path)
         else:
             print('Writing res file failed for ', path, 'this is not necessarily a problem...')
-            pass
 
 
 def doc2xsf(doc, path, write_energy=False, write_forces=False, overwrite=False):
@@ -732,9 +740,10 @@ def generate_hash(hash_len=6):
         hash_len (int): desired length of hash.
 
     """
+    import string
     hash_chars = [str(x) for x in range(0, 10)]+[x for x in string.ascii_lowercase]
     _hash = ''
-    for i in range(hash_len):
+    for _ in range(hash_len):
         _hash += np.random.choice(hash_chars)
     return _hash
 
