@@ -84,7 +84,7 @@ class Spatula:
             self.logfile = open(logfile_name, 'w')
             self.manifest = open(manifest_name, 'w')
 
-        self.settings = load_custom_settings(config_fname=self.config_fname, debug=self.debug)
+        self.settings = load_custom_settings(config_fname=self.config_fname, debug=self.debug, override=self.args.get('override'))
         result = make_connection_to_collection(self.args.get('db'),
                                                check_collection=False,
                                                import_mode=True,

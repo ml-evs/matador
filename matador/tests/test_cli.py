@@ -25,7 +25,7 @@ else:
     CONFIG_FNAME = REAL_PATH + 'data/matador_pipelines_conf.yml'
 DB_NAME = 'ci_test'
 ROOT_DIR = os.getcwd()
-SETTINGS = load_custom_settings(config_fname=CONFIG_FNAME)
+SETTINGS = load_custom_settings(config_fname=CONFIG_FNAME, override=True)
 
 DEBUG = False
 MONGO_PRESENT = True

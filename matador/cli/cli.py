@@ -32,7 +32,8 @@ class MatadorCommandLine(object):
 
         if self.args['subcmd'] != 'import':
             self.settings = load_custom_settings(config_fname=self.args.get('config'),
-                                                 debug=self.args.get('debug'))
+                                                 debug=self.args.get('debug'),
+                                                 override=self.args.get('override'))
             result = make_connection_to_collection(self.args.get('db'),
                                                    check_collection=True,
                                                    mongo_settings=self.settings)

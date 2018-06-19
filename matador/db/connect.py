@@ -29,7 +29,7 @@ def make_connection_to_collection(coll_names, check_collection=False, allow_chan
     """
 
     if mongo_settings is None:
-        settings = load_custom_settings()
+        settings = load_custom_settings(override=override)
     else:
         settings = mongo_settings
 

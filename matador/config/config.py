@@ -25,9 +25,12 @@ DEFAULT_SETTINGS = {
     }
 }
 
+
 def quickstart_settings():
     """ Call this if no user-specified configuration file is found. A series
-    of questions will be asked to create a basic matadorrc."""
+    of questions will be asked to create a basic matadorrc.
+
+    """
     print('No user-specified input found at either ~/.matadorrc or '
           '~/.config/matadorrc')
     response = input('Would you like to use quickstart to create one now? [y/n] ')
@@ -87,13 +90,8 @@ def quickstart_settings():
                     print_warning('Failed to connect to {}:{}, are you sure it is running?'
                                   .format(host_response, port_response))
                     response = input('Would you like me to try again? [y/n] ')
-                    if response.lower().startswith('y'):
-                        keep_trying = True
-                    else:
-                        keep_trying = False
-                except:
-                    from traceback import print_exc
-                    print_exc()
+                    keep_trying = response.lower().startswith('y')
+                except Exception:
                     keep_trying = False
 
         print(hline)
@@ -130,7 +128,7 @@ def quickstart_settings():
     return fname
 
 
-def load_custom_settings(config_fname=None, quiet=True, debug=False):
+def load_custom_settings(config_fname=None, quiet=True, debug=False, override=False):
     """ Load mongodb settings dict from file given by fname, or from
     defaults. Hierarchy of filenames to check:
 
@@ -140,6 +138,7 @@ def load_custom_settings(config_fname=None, quiet=True, debug=False):
     Keyword Arguments:
         fname (str): filename of custom settings file.
         quiet (bool): print nothing on loading.
+        override (bool): for testing purposes, override any questions.
         debug (bool): print settings on loading.
 
     """
@@ -162,7 +161,8 @@ def load_custom_settings(config_fname=None, quiet=True, debug=False):
                 break
         else:
             # otherwise offer to create one, or use default
-            config_fname = quickstart_settings()
+            if not override:
+                config_fname = quickstart_settings()
             if config_fname is None:
                 # otherwise load default
                 print('Loading perhaps unsuitable defaults instead.')
