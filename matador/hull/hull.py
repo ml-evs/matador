@@ -38,13 +38,16 @@ class QueryConvexHull(object):
         cursor (list): list of all structures used to create phase diagram.
         hull_cursor (list): list of all documents within hull_cutoff.
         chempot_cursor (list): list of chemical potential documents.
+        structures (numpy.ndarray): all structures used to create hull.
         structure_slice (numpy.ndarray): array of concentrations and
-            formation energies for each structure.
+            formation energies for each structure with E_F <= 0. The indices
+            in hull correspond to entries of this array.
         hull_dist (np.ndarray): array of distances from hull for each structure.
+        hull (scipy.spatial.ConvexHull): ConvexHull object.
         elements (list): list of chemical potential symbols.
         voltage_data (dict): if voltage_curve() has been called, then
             this is a dictionary containing Q, x, V and reaction pathways.
-        voltage_data (dict): if volume_curve() has been called, then
+        volume_data (dict): if volume_curve() has been called, then
             this is a dictionary containing x and volumes per B (in AxBy).
 
     """
@@ -183,10 +186,10 @@ class QueryConvexHull(object):
         """ Hull plot helper function. """
         from matador import plotting
         if self._ternary:
-            plotting.plot_ternary_hull(self, **kwargs)
+            ax = plotting.plot_ternary_hull(self, **kwargs)
         else:
-            plotting.plot_2d_hull(self, **kwargs)
-        return
+            ax = plotting.plot_2d_hull(self, **kwargs)
+        return ax
 
     def set_plot_param(self):
         """ Set some plotting options global to voltage and hull plots. """
@@ -495,7 +498,7 @@ class QueryConvexHull(object):
             print('Contructing hull with non-elemental chemical potentials...')
         elif self._ternary:
             print('Constructing ternary hull...')
-            if self._query is not None and not self.args.get('intersection'):
+            if self._query is not None and not self._query.args.get('intersection'):
                 print_warning('Please query with -int/--intersection when creating ternary hulls.')
                 raise SystemExit('Exiting...')
         else:
@@ -529,6 +532,7 @@ class QueryConvexHull(object):
         structures = np.hstack((
             get_array_from_cursor(self.cursor, 'concentration'),
             get_array_from_cursor(self.cursor, formation_key).reshape(len(self.cursor), 1)))
+
         if not self._ternary and not self._non_binary:
             Q = get_binary_grav_capacities(get_num_intercalated(self.cursor), get_molar_mass(self.elements[1]))
             set_cursor_from_array(self.cursor, Q, 'gravimetric_capacity')
@@ -541,8 +545,7 @@ class QueryConvexHull(object):
             set_cursor_from_array(self.cursor, Q, 'gravimetric_capacity')
         # create hull with SciPy routine, including only points with formation energy < 0
         if self._ternary:
-            self.structure_slice = structures
-            self.structure_slice = np.vstack((self.structure_slice, np.array([0, 0, 1e5])))
+            self.structure_slice = np.vstack((structures, np.array([0, 0, 1e5])))
         elif self._non_binary:
             # if non-binary hull, remove middle concentration
             structures = structures[:, [0, -1]]
@@ -625,10 +628,11 @@ class QueryConvexHull(object):
                 data_str += '# ' + get_formula_from_stoich(self.voltage_data['endstoichs'][ind]) + '\n'
             else:
                 data_str += '# ' + ''.join(self.elements) + '\n'
-            data_str += '# {:>10},\t{:>10}\n'.format('Q (mAh/g)', 'Voltage (V)')
+            data_str += '# {:^10},\t{:^10},\t{:^10}\n'.format('x', 'Q (mAh/g)', 'Voltage (V)')
             for idx, _ in enumerate(path):
-                data_str += '{:>10.2f},\t{:>10.4f}'.format(self.voltage_data['Q'][ind][idx],
-                                                           self.voltage_data['voltages'][ind][idx])
+                data_str += '{:>10.2f},\t{:>10.2f},\t{:>10.4f}'.format(self.voltage_data['x'][ind][idx],
+                                                                       self.voltage_data['Q'][ind][idx],
+                                                                       self.voltage_data['voltages'][ind][idx])
                 if idx != len(path) - 1:
                     data_str += '\n'
         if self.args.get('csv'):
@@ -743,7 +747,6 @@ class QueryConvexHull(object):
         _reactions = []
         _voltages = []
         _Q = []
-        _x = []
         for reaction_ind, endpoint in enumerate(endpoints):
             ratio = endpoint[1] / (1 - endpoint[0] - endpoint[1])
             if not quiet:
@@ -828,7 +831,6 @@ class QueryConvexHull(object):
             voltages = []
             crossover = sorted(crossover)
             Q = sorted([get_generic_grav_capacity(point, self.elements) for point in crossover])
-            x = []
             reactions = []
             reaction = [get_formula_from_stoich(endstoichs[reaction_ind])]
             reactions.append(reaction)
@@ -862,13 +864,12 @@ class QueryConvexHull(object):
 
             _reactions.append(reactions)
             _Q.append(Q)
-            _x.append(x)
             _voltages.append(voltages)
             if not quiet:
                 print('\n')
         assert len(_Q) == len(_voltages)
 
-        self.voltage_data['x'] = _x
+        self.voltage_data['x'] = _Q
         self.voltage_data['Q'] = _Q
         self.voltage_data['voltages'] = _voltages
         self.voltage_data['reactions'] = _reactions

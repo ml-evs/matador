@@ -433,9 +433,7 @@ class DBQuery:
                     # by default, find highest cutoff hull as first proxy for quality
                     choice = np.argmax(np.asarray(cutoff))
                 self.cursor = test_cursors[choice]
-                print_success(
-                    'Composing hull from set containing ' + self.cursor[0]['text_id'][0] + ' ' +
-                    self.cursor[0]['text_id'][1])
+                print_success('Composing hull from set containing {}'.format(' '.join(self.cursor[0]['text_id'])))
                 self.calc_dict = calc_dicts[choice]
 
     def _query_stoichiometry(self, custom_stoich=None, partial_formula=None):
