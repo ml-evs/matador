@@ -1,8 +1,8 @@
 # coding: utf-8
 # Distributed under the terms of the MIT License.
 
-""" This file implements functions that can create a file from a matador
-document or Crystal object.
+""" This file implements functions that write files from matador
+documents or Crystal objects.
 """
 
 import string
@@ -586,8 +586,8 @@ def doc2res(doc, path, info=True, hash_dupe=True, spoof_titl=False, overwrite=Fa
                 titl += str(doc['cell_volume']) + ' '
                 if 'enthalpy' in doc and not isinstance(doc['enthalpy'], str):
                     titl += str(doc['enthalpy']) + ' '
-                elif 'total_energy' in doc:
-                    titl += str(doc['total_energy']) + ' '
+                elif '0K_energy' in doc:
+                    titl += str(doc['0K_energy']) + ' '
                 else:
                     raise KeyError('No energy field found.')
                 titl += '0 0 '             # spin
