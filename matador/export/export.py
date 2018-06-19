@@ -579,12 +579,17 @@ def doc2res(doc, path, info=True, hash_dupe=True, spoof_titl=False, overwrite=Fa
             try:
                 titl = 'TITL '
                 titl += (path.split('/')[-1] + ' ')
-                if 'pressure' not in doc or type(doc['pressure']) == str:
+                if 'pressure' not in doc or isinstance(doc['pressure'], str):
                     titl += '0.00 '
                 else:
                     titl += str(doc['pressure']) + ' '
                 titl += str(doc['cell_volume']) + ' '
-                titl += str(doc['enthalpy']) + ' '
+                if 'enthalpy' in doc and not isinstance(doc['enthalpy'], str):
+                    titl += str(doc['enthalpy']) + ' '
+                elif 'total_energy' in doc:
+                    titl += str(doc['total_energy']) + ' '
+                else:
+                    raise KeyError('No energy field found.')
                 titl += '0 0 '             # spin
                 titl += str(doc['num_atoms']) + ' '
                 if 'space_group' not in doc:

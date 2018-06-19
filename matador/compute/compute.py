@@ -216,7 +216,7 @@ class FullRelaxer:
         if 'library' not in calc_doc['species_pot']:
             for elem in self.res_dict['stoichiometry']:
                 if ('|' not in calc_doc['species_pot'][elem[0]] and
-                        not os.path.isfile(calc_doc['species_pot'][elem[0]])):
+                        not os.path.isfile(os.path.expanduser(calc_doc['species_pot'][elem[0]]))):
                     raise SystemExit('You forgot your pseudos, you silly goose!')
 
         # this is now a dict containing the exact calculation we are going to run
@@ -662,7 +662,7 @@ class FullRelaxer:
             self.process.communicate()
 
             # scrape dict but ignore the results
-            _, success = castep2dict(seed + '.castep', db=False)
+            results_dict, success = castep2dict(seed + '.castep', db=False)
             # check for errors
             errors_present, errors = self._catch_castep_errors()
             if errors_present:
@@ -677,6 +677,7 @@ class FullRelaxer:
             success = True
 
             if not intermediate:
+                doc2res(results_dict, seed, hash_dupe=False, overwrite=True)
                 self.mv_to_completed(seed, keep=keep, completed_dir=self.paths['completed_dir'])
                 if not keep:
                     self.tidy_up(seed)
