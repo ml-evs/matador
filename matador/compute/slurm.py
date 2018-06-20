@@ -48,7 +48,13 @@ def get_slurm_walltime(slurm_dict):
     output_dict = {line.split('=')[0].lower(): line.split('=')[-1] for line in output.split()}
 
     walltime = output_dict.get('timelimit')
-    hrs = int(walltime.split(':')[0])
+    hrs = 0
+    if '-' in walltime:
+        days = int(walltime.split('-')[0])
+        walltime = walltime.split('-')[1]
+        hrs += days * 24
+
+    hrs += int(walltime.split(':')[0])
     mins = int(walltime.split(':')[1])
     secs = int(walltime.split(':')[2])
     walltime_in_seconds = (60 * hrs + mins) * 60 + secs
