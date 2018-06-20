@@ -3,6 +3,7 @@
 this should read data from a run3 convergence test and plot it.
 """
 from matador.scrapers.castep_scrapers import castep2dict
+from matador.plotting.plotting import plotting_function
 from matador.utils.chem_utils import get_formula_from_stoich
 from os import walk, chdir
 from os.path import isdir
@@ -138,16 +139,12 @@ def get_data(structure_files, conv_field='cut_off_energy'):
     return data
 
 
+@plotting_function
 def plot_both(plot_cutoff=False, plot_kpt=False, cutoff_data={}, kpt_data={}, log=True, show_chempots=False):
     """ Plot convergence of either cutoff/kpts or both. """
     import matplotlib.pyplot as plt
-    import seaborn as sns
-    sns.set_style('darkgrid')
-    sns.set({'font.sans-serif': ['Linux Biolinum O', 'Helvetica', 'Arial'], 'font.family': 'sans-serif', 'text.usetex': True})
     num_structures = max(len(cutoff_data['stoich_list'] if 'stoich_list' in cutoff_data else [1]), len(kpt_data['stoich_list'] if 'stoich_list' in kpt_data else [1]))
     print('Number of structures: {}'.format(num_structures))
-    sns.set_palette(sns.husl_palette(num_structures, l=0.5))
-    colours = sns.color_palette(sns.husl_palette(num_structures, l=0.5))
     if plot_cutoff and plot_kpt:
         fig, ax_list = plt.subplots(1, 2)
         ax_cutoff = ax_list[0]
@@ -166,11 +163,10 @@ def plot_both(plot_cutoff=False, plot_kpt=False, cutoff_data={}, kpt_data={}, lo
             cutoff_chempots = cutoff_data['chempots']
         if log:
             for ind, key in enumerate(cutoff_form):
-                colour = colours[ind]
                 line, = ax_cutoff.plot(-1/cutoff_form[key][:, 0], np.log10(np.abs(cutoff_form[key][:, 1]-cutoff_form[key][-1, 1])*1000),
-                                       'o', markersize=5, alpha=1, label=key, lw=0, zorder=1000, c=colour)
+                                       'o', markersize=5, alpha=1, label=key, lw=0, zorder=1000)
                 point, = ax_cutoff.plot(-1/cutoff_form[key][:, 0], np.log10(np.abs(cutoff_form[key][:, 1]-cutoff_form[key][-1, 1])*1000),
-                                        '-', alpha=0.2, label=key, lw=1, zorder=1000, c=colour)
+                                        '-', alpha=0.2, label=key, lw=1, zorder=1000)
                 lines.append(line)
                 labels.append(key)
             if show_chempots and 'chempots' in cutoff_data:
@@ -179,11 +175,10 @@ def plot_both(plot_cutoff=False, plot_kpt=False, cutoff_data={}, kpt_data={}, lo
                                    'o-', markersize=5, alpha=1, label=key, lw=1, c='grey')
         else:
             for ind, key in enumerate(cutoff_form):
-                colour = colours[ind]
                 line, = ax_cutoff.plot(-1/cutoff_form[key][:, 0], (np.abs(cutoff_form[key][:, 1]-cutoff_form[key][-1, 1])*1000),
-                                       'o', markersize=5, alpha=1, lw=0, label=key, zorder=1000, c=colour)
+                                       'o', markersize=5, alpha=1, lw=0, label=key, zorder=1000)
                 point, = ax_cutoff.plot(-1/cutoff_form[key][:, 0], (np.abs(cutoff_form[key][:, 1]-cutoff_form[key][-1, 1])*1000),
-                                        '-', alpha=0.2, label=key, lw=1, zorder=1000, c=colour)
+                                        '-', alpha=0.2, label=key, lw=1, zorder=1000)
                 lines.append(line)
                 labels.append(key)
             if show_chempots and 'chempots' in cutoff_data:
@@ -226,9 +221,8 @@ def plot_both(plot_cutoff=False, plot_kpt=False, cutoff_data={}, kpt_data={}, lo
             kpt_chempots = kpt_data['chempots']
         if log:
             for ind, key in enumerate(kpt_form):
-                colour = colours[ind]
-                line, = ax_kpt.plot(kpt_form[key][:, 0], np.log10(np.abs(kpt_form[key][:, 1]-kpt_form[key][0, 1])*1000), 'o', markersize=5, alpha=1, label=key, lw=0, zorder=1000, c=colour)
-                point, = ax_kpt.plot(kpt_form[key][:, 0], np.log10(np.abs(kpt_form[key][:, 1]-kpt_form[key][0, 1])*1000), '-', alpha=0.2, label=key, lw=1, zorder=1000, c=colour)
+                line, = ax_kpt.plot(kpt_form[key][:, 0], np.log10(np.abs(kpt_form[key][:, 1]-kpt_form[key][0, 1])*1000), 'o', markersize=5, alpha=1, label=key, lw=0, zorder=1000)
+                point, = ax_kpt.plot(kpt_form[key][:, 0], np.log10(np.abs(kpt_form[key][:, 1]-kpt_form[key][0, 1])*1000), '-', alpha=0.2, label=key, lw=1, zorder=1000)
                 lines.append(line)
                 labels.append(kpt_stoich_list[key])
             if show_chempots and 'chempots' in kpt_data:
@@ -236,9 +230,8 @@ def plot_both(plot_cutoff=False, plot_kpt=False, cutoff_data={}, kpt_data={}, lo
                     ax_kpt.plot(kpt_chempots[key][:, 0], np.log10(np.abs(kpt_chempots[key][:, 1]-kpt_chempots[key][0, 1])*1000), 'o-', markersize=5, alpha=1, label=key, lw=1)
         else:
             for ind, key in enumerate(kpt_form):
-                colour = colours[ind]
-                line, = ax_kpt.plot(kpt_form[key][:, 0], np.abs(kpt_form[key][:, 1]-kpt_form[key][0, 1])*1000, 'o', markersize=5, alpha=1, label=key, lw=0, zorder=1000, c=colour)
-                point, = ax_kpt.plot(kpt_form[key][:, 0], np.abs(kpt_form[key][:, 1]-kpt_form[key][0, 1])*1000, '-', alpha=0.2, label=key, lw=1, zorder=1000, c=colour)
+                line, = ax_kpt.plot(kpt_form[key][:, 0], np.abs(kpt_form[key][:, 1]-kpt_form[key][0, 1])*1000, 'o', markersize=5, alpha=1, label=key, lw=0, zorder=1000)
+                point, = ax_kpt.plot(kpt_form[key][:, 0], np.abs(kpt_form[key][:, 1]-kpt_form[key][0, 1])*1000, '-', alpha=0.2, label=key, lw=1, zorder=1000)
                 lines.append(line)
                 labels.append(key)
             if show_chempots and 'chempots' in kpt_data:
