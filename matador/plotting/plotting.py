@@ -195,6 +195,8 @@ def plot_spectral(seeds, **kwargs):
                                            gap=kwargs.get('gap'),
                                            external_efermi=kwargs.get('external_efermi'),
                                            verbosity=kwargs.get('verbosity'))
+                if not s:
+                    raise RuntimeError(dispersion)
                 branch_key = 'kpoint_branches'
                 num_key = 'num_kpoints'
                 path_key = 'kpoint_path'
@@ -230,8 +232,10 @@ def plot_spectral(seeds, **kwargs):
                             if dispersion[spin_key] == 2:
                                 if ns == 0:
                                     colour = 'red'
+                                    alpha = 0.3
                                 else:
                                     colour = 'blue'
+                                    alpha = 0.3
                             else:
                                 if kwargs.get('band_colour') == 'occ':
                                     band_min = np.min(dispersion[eig_key][ns][nb][branch])
@@ -261,6 +265,7 @@ def plot_spectral(seeds, **kwargs):
                         ax_dispersion.plot(path[(np.asarray(branch)-branch_ind).tolist()],
                                            dispersion[eig_key][ns][nb][branch], c=colour,
                                            lw=1, ls=ls[seed_ind], alpha=alpha, label=label)
+
             if len(seeds) > 1:
                 ax_dispersion.legend()
             ax_dispersion.axhline(0, ls='--', lw=1, c='grey')
@@ -520,11 +525,15 @@ def plot_spectral(seeds, **kwargs):
             elif 'spin_dos' in dos_data:
                 print('Plotting spin dos')
                 if kwargs['plot_bandstructure']:
-                    ax_dos.plot(dos_data['spin_dos']['up'], energies, lw=1, ls=ls[seed_ind], color='r', zorder=1e10, label='spin-up channel')
-                    ax_dos.plot(dos_data['spin_dos']['down'], energies, lw=1, ls=ls[seed_ind], color='b', zorder=1e10, label='spin-down channel')
+                    ax_dos.plot(dos_data['spin_dos']['up'], energies, lw=1, ls=ls[seed_ind], color='r', zorder=1e10, label='spin-up channel', alpha=alpha)
+                    ax_dos.plot(dos_data['spin_dos']['down'], energies, lw=1, ls=ls[seed_ind], color='b', zorder=1e10, label='spin-down channel', alpha=alpha)
+                    ax_dos.fill_betweenx(energies, 0, dos_data['spin_dos']['up'], alpha=0.2, color='r')
+                    ax_dos.fill_betweenx(energies, 0, dos_data['spin_dos']['down'], alpha=0.2, color='b')
                 else:
                     ax_dos.plot(energies, dos_data['spin_dos']['up'], lw=1, ls=ls[seed_ind], color='r', zorder=1e10, label='spin-up channel')
                     ax_dos.plot(energies, dos_data['spin_dos']['down'], lw=1, ls=ls[seed_ind], color='b', zorder=1e10, label='spin-down channel')
+                    ax_dos.fill_between(energies, 0, dos_data['spin_dos']['up'], alpha=0.2, color='r')
+                    ax_dos.fill_between(energies, 0, dos_data['spin_dos']['down'], alpha=0.2, color='b')
 
             dos_legend = ax_dos.legend(bbox_to_anchor=(1, 1), facecolor='w', frameon=True, fancybox=False, shadow=False)
 

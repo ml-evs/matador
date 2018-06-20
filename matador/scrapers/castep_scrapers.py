@@ -572,12 +572,11 @@ def bands2dict(seed, summary=False, gap=False, external_efermi=None, **kwargs):
         bs['kpoint_path'][int(data[kpt_ind].split()[1]) - 1] = (
             np.asarray([float(elem) for elem in data[kpt_ind].split()[-4:-1]])
         )
-        # bs['kpoint_path'][nk] = np.asarray([float(elem) for elem in data[kpt_ind].split()[-4:-1]])
-        for ns in range(bs['num_spins']):
-            for nb in range(bs['num_bands']):
+        for nb in range(bs['num_bands']):
+            for ns in range(bs['num_spins']):
+                line_number = kpt_ind + 2 + ns + (ns * bs['num_bands']) + nb
                 bs['eigenvalues_k_s'][ns][nb][int(data[kpt_ind].split()[1]) - 1] = (
-                    float(data[kpt_ind + 2 + nb].strip())
-                )
+                    float(data[line_number].strip()))
     bs['eigenvalues_k_s'] *= HARTREE_TO_EV
     bs['eigenvalues_k_s'] -= bs['fermi_energy']
 

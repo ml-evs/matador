@@ -473,7 +473,8 @@ class ScrapeTest(unittest.TestCase):
 
     def testBands(self):
         from matador.scrapers.castep_scrapers import bands2dict
-        bands_fname = REAL_PATH + 'data/KPSn.bands'
+        from matador.utils.chem_utils import HARTREE_TO_EV
+        bands_fname = REAL_PATH + 'data/bands_files/KPSn.bands'
         failed_open = False
         try:
             f = open(bands_fname, 'r')
@@ -496,7 +497,7 @@ class ScrapeTest(unittest.TestCase):
             self.assertAlmostEqual(bs_dict['band_gap'], 0.760001, places=4)
             self.assertEqual(bs_dict['band_gap_path_inds'], [246, 235])
 
-        bands_fname = REAL_PATH + 'data/KPSn_2.bands'
+        bands_fname = REAL_PATH + 'data/bands_files/KPSn_2.bands'
         failed_open = False
         try:
             f = open(bands_fname, 'r')
@@ -506,6 +507,7 @@ class ScrapeTest(unittest.TestCase):
         if not failed_open:
             f.close()
             bs_dict, s = bands2dict(bands_fname, gap=True)
+            self.assertTrue(s)
             self.assertEqual(len(bs_dict['kpoint_path']), 28)
             self.assertEqual(np.shape(bs_dict['eigenvalues_k_s']), (1, 71, 28))
             self.assertEqual(bs_dict['num_kpoints'], 28)
@@ -518,6 +520,34 @@ class ScrapeTest(unittest.TestCase):
             self.assertAlmostEqual(bs_dict['direct_gap'], bs_dict['band_gap'], places=4)
             self.assertEqual(bs_dict['direct_gap_path_inds'], [0, 0])
             self.assertEqual(bs_dict['band_gap_path_inds'], bs_dict['direct_gap_path_inds'])
+            print((bs_dict['eigenvalues_k_s'][0][0][0]+bs_dict['fermi_energy']) / HARTREE_TO_EV)
+            print((bs_dict['eigenvalues_k_s'][0][0][0]-bs_dict['fermi_energy']) / HARTREE_TO_EV)
+            self.assertAlmostEqual(bs_dict['eigenvalues_k_s'][0][0][0], -0.99624287*HARTREE_TO_EV-bs_dict['fermi_energy'], places=4)
+            self.assertAlmostEqual(bs_dict['eigenvalues_k_s'][-1][-1][-1], 0.74794320*HARTREE_TO_EV-bs_dict['fermi_energy'], places=4)
+
+        bands_fname = REAL_PATH + 'data/bands_files/spin_polarised.bands'
+        failed_open = False
+        try:
+            f = open(bands_fname, 'r')
+        except Exception:
+            failed_open = True
+            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(bands_fname))
+        if not failed_open:
+            f.close()
+            bs_dict, s = bands2dict(bands_fname, gap=True)
+            self.assertTrue(s)
+            self.assertEqual(len(bs_dict['kpoint_path']), 51)
+            self.assertEqual(np.shape(bs_dict['eigenvalues_k_s']), (2, 462, 51))
+            self.assertEqual(bs_dict['num_kpoints'], 51)
+            self.assertEqual(bs_dict['num_bands'], 462)
+            self.assertAlmostEqual(bs_dict['fermi_energy'], 6.7507, places=4)
+            self.assertLessEqual(bs_dict['kpoint_path_spacing'], 0.03)
+            self.assertGreaterEqual(bs_dict['kpoint_path_spacing'], 0.01)
+            self.assertEqual(len(bs_dict['kpoint_branches']), 1)
+            self.assertAlmostEqual(bs_dict['eigenvalues_k_s'][0][0][0], -1.84888124*HARTREE_TO_EV-bs_dict['fermi_energy'], places=4)
+            self.assertAlmostEqual(bs_dict['eigenvalues_k_s'][1][0][0], -1.84666287*HARTREE_TO_EV-bs_dict['fermi_energy'], places=4)
+            self.assertAlmostEqual(bs_dict['eigenvalues_k_s'][-1][-1][-1], 0.64283955*HARTREE_TO_EV-bs_dict['fermi_energy'], places=4)
+            self.assertAlmostEqual(bs_dict['eigenvalues_k_s'][0][-1][-1], 0.63571135*HARTREE_TO_EV-bs_dict['fermi_energy'], places=4)
 
     def testMagres(self):
         from matador.scrapers.magres_scrapers import magres2dict
