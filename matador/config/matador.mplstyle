@@ -51,7 +51,7 @@ savefig.bbox                  : tight
 savefig.pad_inches            : 0.1
 savefig.transparent           : True
 
-lines.linewidth               : 1.75
+lines.linewidth               : 1.25
 lines.linestyle               : -
 
 axes.labelcolor               : .15
