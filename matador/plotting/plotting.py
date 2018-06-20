@@ -614,7 +614,8 @@ def get_hull_labels(hull, label_cutoff=0.0, num_species=2):
     eps = 1e-9
     if isinstance(label_cutoff, list) and len(label_cutoff) == 2:
         label_cutoff = sorted(label_cutoff)
-        label_cursor = [doc for doc in hull.hull_cursor if label_cutoff[0] <= doc['hull_distance'] <= label_cutoff[1]]
+        # first, only apply upper limit as we need to filter by stoich aftewards
+        label_cursor = [doc for doc in hull.hull_cursor if doc['hull_distance'] <= label_cutoff[1]]
     else:
         if isinstance(label_cutoff, list):
             assert len(label_cutoff) == 1, 'Incorrect number of label_cutoff values passed, should be 1 or 2.'
@@ -629,7 +630,10 @@ def get_hull_labels(hull, label_cutoff=0.0, num_species=2):
                 tmp_cursor.append(doc)
             else:
                 label_cursor = tmp_cursor
-    # remove chemical potentials
+    if isinstance(label_cutoff, list) and len(label_cutoff) == 2:
+        # now apply lower limit
+        label_cursor = [doc for doc in label_cursor if label_cutoff[0] <= doc['hull_distance'] <= label_cutoff[1]]
+    # remove chemical potentials and unwanted e.g. binaries
     label_cursor = [doc for doc in label_cursor if len(doc['stoichiometry']) == num_species]
 
     return label_cursor
