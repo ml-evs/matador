@@ -119,16 +119,20 @@ def plot_similarity_energy_correlation_matrix(cursor, sim_mat, sim_vmin=0.05, si
     TO-DO:
     * guidelines for different stoichiometries
 
-    Inputs:
+    Parameters:
+        cursor (list): a matador cursor
+        sim_mat (np.array): matrix where S_{ij} = similarity distance(i, j)
 
-        | cursor   : a matador cursor
-        | sim_mat  : matrix where S_{ij} = similarity distance(i, j)
-        | sim_vmin : sim distance at which to show minimum colour
-        | sim_vmax : "---------------------------" maximum "----"
+    Keyword arguments:
+        sim_vmin (float): sim distance at which to show minimum colour
+        sim_vmax (float): "---------------------------" maximum "----"
 
     """
     import matplotlib.pyplot as plt
-    import seaborn as sns
+    try:
+        import seaborn as sns
+    except ImportError as exc:
+        raise exc('This is the one function that needs seaborn throughout matador... please install it.')
     assert(len(cursor) == len(sim_mat))
     energy_list = get_array_from_cursor(cursor, 'enthalpy_per_atom')
     energy_mat = np.zeros_like(sim_mat)
@@ -143,7 +147,7 @@ def plot_similarity_energy_correlation_matrix(cursor, sim_mat, sim_vmin=0.05, si
     energy_mask = np.zeros_like(sim_mat, dtype=np.bool)
     energy_mask[np.tril_indices(len(sim_mask), k=1)] = True
 
-    f, axarr = plt.subplots(ncols=2, nrows=2, figsize=(10, 10),
+    _, axarr = plt.subplots(ncols=2, nrows=2, figsize=(10, 10),
                             gridspec_kw={'height_ratios': [20, 1],
                                          'width_ratios': [20, 1]})
     cmap_energy = sns.cubehelix_palette(as_cmap=True, rot=-.4, light=1, start=1.5)

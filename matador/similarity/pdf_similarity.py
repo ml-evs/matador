@@ -15,6 +15,7 @@ from matador.utils.cell_utils import frac2cart, cart2abc, cart2volume
 from matador.utils.cell_utils import standardize_doc_cell
 from matador.utils.print_utils import print_notify
 from matador.similarity.fingerprint import Fingerprint
+from matador.plotting.plotting import plotting_function
 
 
 class PDF(Fingerprint):
@@ -329,21 +330,19 @@ class PDF(Fingerprint):
         except AttributeError:
             return (None, None)
 
-    def plot_projected_pdf(self, keys=None, other_pdfs=None, cmap='Dark2'):
+    @plotting_function
+    def plot_projected_pdf(self, keys=None, other_pdfs=None):
         """ Plot projected PDFs.
 
         Keyword arguments:
             keys (list): plot only a subset of projections, e.g. [('K', )].
             other_pdfs (list of PDF): other PDFs to plot.
-            cmap (str): name of matplotlib colourmap.
 
         """
         import matplotlib.pyplot as plt
-        import seaborn as sns
-        sns.set(style='whitegrid', font_scale=1.2)
         fig = plt.figure(figsize=(8, 5))
         ax1 = fig.add_subplot(111)
-        ax1.plot(self.r_space, self.gr, lw=1, zorder=100000, ls='-', label='total {}'.format(self.label), c='k')
+        ax1.plot(self.r_space, self.gr, zorder=100000, ls='-', label='total {}'.format(self.label), c='k')
         if keys is None:
             keys = [key for key in self.elem_gr]
         for key in keys:
@@ -353,13 +352,13 @@ class PDF(Fingerprint):
                 other_pdfs = [other_pdfs]
             for pdf in other_pdfs:
                 if isinstance(pdf, PDF):
-                    ax1.plot(pdf.r_space, pdf.gr, lw=1, zorder=99999, ls='--',
+                    ax1.plot(pdf.r_space, pdf.gr, zorder=99999, ls='--',
                              label='total {}'.format(pdf.label), c='k')
                     for key in keys:
                         ax1.plot(self.r_space, pdf.elem_gr[key], ls='--',
                                  label='-'.join(key) + ' {}'.format(pdf.label))
                 elif isinstance(pdf, tuple):
-                    ax1.plot(pdf[0], pdf[1], lw=2, alpha=1, ls='--')
+                    ax1.plot(pdf[0], pdf[1], alpha=1, ls='--')
                 else:
                     raise RuntimeError
         ax1.legend(loc=1)
@@ -367,21 +366,18 @@ class PDF(Fingerprint):
         ax1.set_xlabel('$r$ (Angstrom)')
         plt.show()
 
-    def plot_pdf(self, other_pdfs=None, cmap='Dark2'):
+    @plotting_function
+    def plot_pdf(self, other_pdfs=None):
         """ Plot PDFs.
 
         Keyword arguments:
             other_pdfs (list of PDF): other PDFs to add to the plot.
-            cmap (str): name of matplotlib colourmap.
-
 
         """
         import matplotlib.pyplot as plt
-        import seaborn as sns
-        sns.set(style='whitegrid', font_scale=1.2)
         fig = plt.figure(figsize=(8, 5))
         ax1 = fig.add_subplot(111)
-        ax1.plot(self.r_space, self.gr, lw=2, label=self.label, c='k')
+        ax1.plot(self.r_space, self.gr, label=self.label, c='k')
         ax1.set_ylabel('Pair distribution function, $g(r)$')
         ax1.set_xlim(0, self.rmax)
         if other_pdfs is not None:
@@ -389,9 +385,9 @@ class PDF(Fingerprint):
                 other_pdfs = [other_pdfs]
             for pdf in other_pdfs:
                 if isinstance(pdf, PDF):
-                    ax1.plot(pdf.r_space, pdf.gr, lw=2, label=pdf.label, alpha=1, ls='--')
+                    ax1.plot(pdf.r_space, pdf.gr, label=pdf.label, alpha=1, ls='--')
                 elif isinstance(pdf, tuple):
-                    ax1.plot(pdf[0], pdf[1], lw=2, alpha=1, ls='--')
+                    ax1.plot(pdf[0], pdf[1], alpha=1, ls='--')
                 else:
                     raise RuntimeError
         ax1.set_xlabel('$r$ (Angstrom)')
@@ -629,12 +625,11 @@ class PDFOverlap:
 
         self.similarity_distance = self.overlap_int / len(elems)
 
-    def plot_diff(self, cmap='Dark2'):
+    @plotting_function
+    def plot_diff(self):
         """ Simple plot for comparing two PDF's. """
         import matplotlib.pyplot as plt
         import matplotlib.gridspec as gridspec
-        import seaborn as sns
-        sns.set(style='whitegrid', font_scale=1.2)
 
         plt.figure(figsize=(8, 6))
         gs = gridspec.GridSpec(2, 1, height_ratios=[2, 1])
@@ -649,24 +644,23 @@ class PDFOverlap:
         ax2.axhline(0, ls='--', c='k', lw=0.5)
         ax1.set_xlim(0, np.max(self.fine_space))
 
-        ax1.plot(self.fine_space, self.fine_gr_a, label=self.pdf_a.label, c=colours[0])
-        ax1.plot(self.fine_space, self.fine_gr_b, label=self.pdf_b.label, c=colours[1])
+        ax1.plot(self.fine_space, self.fine_gr_a, label=self.pdf_a.label)
+        ax1.plot(self.fine_space, self.fine_gr_b, label=self.pdf_b.label)
 
         plt.setp(ax1.get_xticklabels(), visible=False)
         ax2.set_ylim(-0.5 * ax1.get_ylim()[1], 0.5 * ax1.get_ylim()[1])
 
         ax1.legend(loc=0)
-        ax2.plot(self.fine_space, self.overlap_fn, ls='-', c=colours[2])
+        ax2.plot(self.fine_space, self.overlap_fn, ls='-')
         ax2.set_ylim(-0.5 * ax1.get_ylim()[1], 0.5 * ax1.get_ylim()[1])
         plt.tight_layout()
         plt.show()
 
-    def plot_projected_diff(self, cmap='Dark2'):
+    @plotting_function
+    def plot_projected_diff(self):
         """ Simple plot for comparing two PDF's. """
         import matplotlib.pyplot as plt
         import matplotlib.gridspec as gridspec
-        import seaborn as sns
-        sns.set(style='whitegrid', font_scale=1.2)
 
         plt.figure(figsize=(8, 6))
         gs = gridspec.GridSpec(2, 1, height_ratios=[2, 1])
@@ -679,16 +673,14 @@ class PDFOverlap:
         ax2.set_ylabel('$g_a(r) - g_b(r)$')
         ax2.axhline(0, ls='--', c='k', lw=0.5)
         ax1.set_xlim(0, np.max(self.fine_space))
-        for ind, key in enumerate(self.fine_elem_gr_a):
+        for _, key in enumerate(self.fine_elem_gr_a):
             ax1.plot(self.fine_space, self.fine_elem_gr_a[key],
-                     label='-'.join(key) + ' {}'.format(self.pdf_a.label),
-                     c=colours[ind])
+                     label='-'.join(key) + ' {}'.format(self.pdf_a.label))
             ax1.plot(self.fine_space, self.fine_elem_gr_b[key],
                      label='-'.join(key) + ' {}'.format(self.pdf_b.label),
-                     ls='--', c=colours[ind])
+                     ls='--')
             ax2.plot(self.fine_space, self.fine_elem_gr_a[key] - self.fine_elem_gr_b[key],
-                     label='-'.join(key) + ' diff',
-                     c=colours[ind], ls='-')
+                     label='-'.join(key) + ' diff')
         plt.setp(ax1.get_xticklabels(), visible=False)
         ax2.set_ylim(-0.5 * ax1.get_ylim()[1], 0.5 * ax1.get_ylim()[1])
         ax1.legend(loc=0)
