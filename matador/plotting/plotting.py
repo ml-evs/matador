@@ -96,6 +96,7 @@ def plot_spectral(seeds, **kwargs):
             linearising the kpoint path. If False, bandstructures of different lattice parameters
             with the same Bravais lattice can be more easily compared. If True, bandstructures may
             appear rarefied or compressed in particular regions.
+        band_reorder (bool): try to reorder bands based on local gradients (DEFAULT: True for phonons, otherwise False).
         pdos_hide_tot (bool): whether or not to plot the total DOS on a PDOS plot; this is to hide
             regions where the PDOS is negative (leading to total DOS lower than stacked PDOS) (DEFAULT: False).
 
@@ -112,7 +113,7 @@ def plot_spectral(seeds, **kwargs):
                      'labels': None, 'cmap': 'Dark2', 'band_colour': 'occ',
                      'n_colours': 4,
                      'no_stacked_pdos': False, 'preserve_kspace_distance': False,
-                     'no_band_reorder': False,
+                     'band_reorder': None,
                      'verbosity': 0, 'highlight_bands': None, 'pdos_hide_tot': False}
     prop_defaults.update(kwargs)
     dos_legend = None
@@ -213,7 +214,8 @@ def plot_spectral(seeds, **kwargs):
             path = np.asarray(path)
             path /= np.max(path)
             assert len(path) == int(dispersion[num_key]) - len(dispersion[branch_key]) + 1
-            if not kwargs['no_band_reorder']:
+            if kwargs['band_reorder'] or (kwargs['band_reorder'] is None and kwargs['phonons']):
+                print('Reordering bands based on local gradients...')
                 dispersion[eig_key] = match_bands(dispersion[eig_key], dispersion[branch_key])
 
             # seem to have to reset this here for some reason
@@ -347,12 +349,20 @@ def plot_spectral(seeds, **kwargs):
         if kwargs['plot_dos']:
             if not kwargs['phonons']:
                 if kwargs.get('dos') is None:
-                    dos_data, s = optados2dict(seed + '.adaptive.dat')
+                    # look for dat files, and just use the first
+                    import glob
+                    dos_seed = glob.glob('{}*.dat'.format(seed))
+                    dos_data, s = optados2dict(dos_seed[0])
                 else:
                     dos_data, s = optados2dict(kwargs.get('dos'))
                 energies = dos_data['energies']
                 dos = dos_data['dos']
-                max_density = np.max(dos[np.where(energies > plot_window[0])])
+                if 'spin_dos' in dos_data:
+                    max_density = max(np.max(np.abs(dos_data['spin_dos']['down'][np.where(energies > plot_window[0])])),
+                                      np.max(np.abs(dos_data['spin_dos']['up'][np.where(energies > plot_window[0])])))
+                else:
+                    max_density = np.max(dos[np.where(energies > plot_window[0])])
+
                 if 'pdos' in dos_data:
                     pdos = dos_data['pdos']
             else:
@@ -434,22 +444,28 @@ def plot_spectral(seeds, **kwargs):
                 ax_dos.set_xticks([0.6 * max_density])
                 ax_dos.set_xticklabels([ylabel])
                 ax_dos.axhline(0, c='grey', ls='-', lw=0.5)
-                ax_dos.set_xlim(0, max_density * 1.2)
+                if 'spin_dos' in dos_data:
+                    ax_dos.set_xlim(-max_density*1.2, max_density * 1.2)
+                else:
+                    ax_dos.set_xlim(0, max_density * 1.2)
                 ax_dos.set_ylim(plot_window)
                 ax_dos.axvline(0, c='k')
 
-                if not kwargs['pdos_hide_tot']:
+                if not kwargs['pdos_hide_tot'] and 'spin_dos' not in dos_data:
                     ax_dos.plot(dos, energies, lw=1, ls=ls[seed_ind], color=colour, zorder=1e10, label='Total DOS')
 
             else:
                 ax_dos.set_xlabel(xlabel)
                 ax_dos.set_ylabel(ylabel)
                 ax_dos.axvline(0, c='grey', lw=0.5)
-                ax_dos.set_ylim(0, max_density * 1.2)
+                if 'spin_dos' in dos_data:
+                    ax_dos.set_ylim(-max_density*1.2, max_density * 1.2)
+                else:
+                    ax_dos.set_ylim(0, max_density * 1.2)
                 ax_dos.set_xlim(plot_window)
                 ax_dos.axhline(0, c='grey', lw=0.5)
 
-                if not kwargs['pdos_hide_tot']:
+                if not kwargs['pdos_hide_tot'] and 'spin_dos' not in dos_data:
                     ax_dos.plot(energies, dos, lw=1, ls=ls[seed_ind], color=colour, zorder=1e10, label='Total DOS')
 
             if 'pdos' in dos_data and len(seeds) == 1:
@@ -500,6 +516,15 @@ def plot_spectral(seeds, **kwargs):
 
                     if not kwargs['no_stacked_pdos']:
                         stack += pdos[projector]
+
+            elif 'spin_dos' in dos_data:
+                print('Plotting spin dos')
+                if kwargs['plot_bandstructure']:
+                    ax_dos.plot(dos_data['spin_dos']['up'], energies, lw=1, ls=ls[seed_ind], color='r', zorder=1e10, label='spin-up channel')
+                    ax_dos.plot(dos_data['spin_dos']['down'], energies, lw=1, ls=ls[seed_ind], color='b', zorder=1e10, label='spin-down channel')
+                else:
+                    ax_dos.plot(energies, dos_data['spin_dos']['up'], lw=1, ls=ls[seed_ind], color='r', zorder=1e10, label='spin-up channel')
+                    ax_dos.plot(energies, dos_data['spin_dos']['down'], lw=1, ls=ls[seed_ind], color='b', zorder=1e10, label='spin-down channel')
 
             dos_legend = ax_dos.legend(bbox_to_anchor=(1, 1), facecolor='w', frameon=True, fancybox=False, shadow=False)
 

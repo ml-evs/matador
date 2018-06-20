@@ -9,6 +9,7 @@ then a combined BS/DOS plot will be created.
 
 from os.path import isfile
 import argparse
+import glob
 
 
 def main():
@@ -36,7 +37,9 @@ def main():
     parser.add_argument('--no_stacked_pdos', action='store_true',
                         help='plot PDOS as overlap rather than stack')
     parser.add_argument('--no_band_reorder', action='store_true',
-                        help='don\'t resorder bands based on local gradients')
+                        help='don\'t reorder bands based on local gradients')
+    parser.add_argument('--band_reorder', action='store_true',
+                        help='try to reorder bands based on local gradients')
     parser.add_argument('--pdos_hide_tot', action='store_true',
                         help='plot PDOS without total DOS, i.e. if PDOS is negative in parts')
     parser.add_argument('--band_colour', type=str,
@@ -72,21 +75,29 @@ def main():
     band_colour = kwargs.get('band_colour')
     if band_colour is None:
         band_colour = 'occ'
+    if kwargs['no_band_reorder']:
+        band_reorder = False
+    elif kwargs['band_reorder']:
+        band_reorder = True
+    else:
+        band_reorder = None
+
+    from matador.plotting import plot_spectral
 
     del kwargs['seed']
     del kwargs['verbosity']
     del kwargs['labels']
     del kwargs['cmap']
     del kwargs['band_colour']
+    del kwargs['band_reorder']
+    del kwargs['no_band_reorder']
 
-    from matador.plotting import plot_spectral
     from matador.utils.print_utils import print_failure
 
     if not phonons:
         bs_seed = test_seed.replace('.bands', '') + '.bands'
         bandstructure = isfile(bs_seed)
-        dos_seeds = [test_seed.replace('.bands', '') + '.adaptive.dat',
-                     test_seed.replace('.bands', '') + '.pdos.adaptive.dat']
+        dos_seeds = glob.glob(test_seed.replace('.bands', '') + '*.dat')
         dos = any([isfile(dos_seed) for dos_seed in dos_seeds])
         cell_seed = test_seed.replace('.bands', '') + '.cell'
         cell = isfile(cell_seed)
@@ -117,6 +128,7 @@ def main():
                   verbosity=verbosity,
                   labels=labels,
                   cmap=cmap,
+                  band_reorder=band_reorder,
                   band_colour=band_colour,
                   **kwargs)
 

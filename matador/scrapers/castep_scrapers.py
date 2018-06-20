@@ -711,7 +711,7 @@ def bands2dict(seed, summary=False, gap=False, external_efermi=None, **kwargs):
 
 @scraper_function
 def optados2dict(seed, **kwargs):
-    """ Scrape optados output file (*.adaptive.dat) or (*.pdos.adaptive.dat)
+    """ Scrape optados output file (*.*.dat) or (*.pdos.*.dat)
     for DOS, projectors and projected DOS.
 
     Parameters:
@@ -726,6 +726,7 @@ def optados2dict(seed, **kwargs):
     import numpy as np
     dos = dict()
     is_pdos = False
+    is_spin_dos = False
     with open(seed, 'r') as f:
         flines = f.readlines()
 
@@ -735,6 +736,8 @@ def optados2dict(seed, **kwargs):
             break
         if 'Partial' in line:
             is_pdos = True
+        elif 'spin' in line:
+            is_spin_dos = True
         else:
             header.append(line)
 
@@ -776,6 +779,12 @@ def optados2dict(seed, **kwargs):
             dos['pdos'][projector] = data[:, i + 1]
             dos['dos'] += data[:, i + 1]
         dos['num_projectors'] = len(projectors)
+
+    elif is_spin_dos:
+        dos['spin_dos'] = dict()
+        dos['spin_dos']['up'] = data[:, 1]
+        dos['spin_dos']['down'] = data[:, 2]
+        dos['dos'] = np.abs(dos['spin_dos']['up']) + np.abs(dos['spin_dos']['down'])
 
     else:
         dos['dos'] = data[:, 1]
