@@ -572,7 +572,7 @@ def match_bands(dispersion, branches):
     return dispersion
 
 
-def get_hull_labels(hull, num_species=2):
+def get_hull_labels(hull, label_cutoff=0.0, num_species=2):
     """ Return list of structures to labels on phase diagram.
 
     Parameters:
@@ -587,7 +587,15 @@ def get_hull_labels(hull, num_species=2):
 
     """
     eps = 1e-9
-    label_cursor = [doc for doc in hull.hull_cursor if doc['hull_distance'] <= hull.args.get('label_cutoff', 0.0) + eps]
+    if isinstance(label_cutoff, list) and len(label_cutoff) == 2:
+        label_cutoff = sorted(label_cutoff)
+        label_cursor = [doc for doc in hull.hull_cursor if label_cutoff[0] <= doc['hull_distance'] <= label_cutoff[1]]
+    else:
+        if isinstance(label_cutoff, list):
+            assert len(label_cutoff) == 1, 'Incorrect number of label_cutoff values passed, should be 1 or 2.'
+            label_cutoff = label_cutoff[0]
+        label_cursor = [doc for doc in hull.hull_cursor if doc['hull_distance'] <= label_cutoff + eps]
+
     num_labels = len(set([get_formula_from_stoich(doc['stoichiometry']) for doc in label_cursor]))
     if num_labels < len(label_cursor):
         tmp_cursor = []
@@ -913,8 +921,8 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
         plot_hull_points (bool): whether or not to display on-hull structures,
         labels (bool): whether to label formulae of hull structures, also read from
             hull.args.
-        label_cutoff (float): draw labels less than this distance from the hull, also
-            read from hull.args.
+        label_cutoff (float/:obj:`tuple` of :obj:`float`): draw labels less than or
+            between these distances form the hull, also read from hull.args.
         colour_by_source (bool): plot and label points by their sources
         alpha (float): alpha value of points when colour_by_source is True
         sources (list): list of possible provenances to colour when colour_by_source
@@ -937,9 +945,9 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
     hull.default_cmap = get_linear_cmap(hull.colours[1:4], list_only=False)
 
     if labels is None:
-        labels = hull.args.get('labels')
+        labels = hull.args.get('labels', False)
     if label_cutoff is None:
-        label_cutoff = hull.args.get('label_cutoff')
+        label_cutoff = hull.args.get('label_cutoff', 0)
 
     scale = 1
     scatter = []
@@ -973,7 +981,7 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
                 position = (min(1.1 * tie_line[ind + 2, 0] + 0.15, 0.95), 1.15 * (tie_line[ind + 2, 1]) - 0.05)
             ax.annotate(get_formula_from_stoich(doc['stoichiometry'],
                                                 elements=hull.elements,
-                                                latex_sub_style='\mathregular',
+                                                latex_sub_style=r'\mathregular',
                                                 tex=True),
                         xy=(tie_line[ind+2, 0], tie_line[ind+2, 1]),
                         xytext=position,
@@ -1071,10 +1079,6 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
         legend = ax.legend(loc=9, facecolor='w', frameon=True, fancybox=False, shadow=False)
         legend.set_zorder(1e20)
 
-    print(hull.structures[0])
-    print(hull.structures[1])
-    print(hull.structures[-1])
-
     eform_limits = (np.min(hull.structures[:, 1]), np.max(hull.structures[:, 1]))
     lims = (-0.1 if eform_limits[0] >= 0 else eform_limits[0] - 0.15,
             eform_limits[1] if eform_limits[0] >= 0 else 0.1)
@@ -1113,7 +1117,7 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
 
 
 @plotting_function
-def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, expecting_cbar=True, labels=False):
+def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=None, label_cutoff=None, expecting_cbar=True, labels=None):
     """ Plot calculated ternary hull as a 2D projection.
 
     Parameters:
@@ -1123,6 +1127,8 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, expecting_cb
         axis (matplotlib.axes.Axes): matplotlib axis object on which to plot.
         show (bool): whether or not to show plot in X window.
         plot_points (bool): whether or not to plot each structure as a point.
+        label_cutoff (float/:obj:`tuple` of :obj:`float`): draw labels less than or
+            between these distances form the hull, also read from hull.args.
         expecting_cbar (bool): whether or not to space out the plot to preserve
             aspect ratio if a colourbar is present.
         labels (bool): whether or not to label on-hull structures
@@ -1141,6 +1147,18 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, expecting_cb
     plt.rcParams['ytick.major.size'] = 0
     plt.rcParams['xtick.minor.size'] = 0
     plt.rcParams['ytick.minor.size'] = 0
+
+    if labels is None:
+        labels = hull.args.get('labels')
+    if label_cutoff is None:
+        label_cutoff = hull.args.get('label_cutoff')
+        if label_cutoff is None:
+            label_cutoff = 0
+
+    if hull_cutoff is None or hull.args.get('hull_cutoff') is None:
+        hull_cutoff = 0
+    else:
+        hull_cutoff = hull.args.get('hull_cutoff')
 
     print('Plotting ternary hull...')
     if hull.args.get('capmap') or hull.args.get('efmap'):
@@ -1201,7 +1219,7 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, expecting_cb
     hull_dist = np.asarray(filtered_hull_dists)
 
     min_cut = 0.0
-    max_cut = hull.args.get('hull_cutoff', 0.1)
+    max_cut = max(0.1, hull_cutoff)
     hull.colours = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])
     hull.default_cmap_list = get_linear_cmap(hull.colours[1:4], list_only=True)
     hull.default_cmap = get_linear_cmap(hull.colours[1:4], list_only=False)
@@ -1286,8 +1304,8 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, expecting_cb
         ax.heatmap(sampling, style="hexagonal", cbarlabel='Number of structures', cmap='afmhot')
 
     # add labels
-    if hull.args.get('labels') or labels or hull.args.get('label_cutoff') is not None:
-        label_cursor = get_hull_labels(hull, num_species=3)
+    if labels or label_cutoff is not None:
+        label_cursor = get_hull_labels(hull, label_cutoff=label_cutoff, num_species=3)
         if len(label_cursor) == 1:
             label_coords = [[0.25, 0.5]]
         else:
