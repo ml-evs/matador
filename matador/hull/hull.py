@@ -191,34 +191,6 @@ class QueryConvexHull(object):
             ax = plotting.plot_2d_hull(self, **kwargs)
         return ax
 
-    def set_plot_param(self):
-        """ Set some plotting options global to voltage and hull plots. """
-        from matador import plotting
-        import matplotlib.pyplot as plt
-
-        if self.savefig:
-            plt.style.use('article')
-        import seaborn as sns
-        sns.set(font_scale=1.2)
-        sns.set_style('ticks')
-        sns.set_style({
-            'axes.facecolor': 'white', 'figure.facecolor': 'white',
-            'axes.linewidth': 0.5,
-            'axes.grid': False,
-            'legend.frameon': False,
-            'axes.axisbelow': True})
-        dark2_8 = plt.cm.get_cmap('Dark2').colors
-        self.default_cmap_list = plotting.get_linear_cmap(dark2_8[1:4], list_only=True)
-        self.default_cmap = plotting.get_linear_cmap(dark2_8[1:4], list_only=False)
-        # first colour reserved for hull
-        # penultimate colour reserved for off hull above cutoff
-        # last colour reserved for OQMD
-        dark2_8_hex = ['#1b9e77', '#d95f02', '#7570b3', '#e7298a', '#66a61e', '#e6ab02', '#a6761d', '#666666']
-        self.colours = dark2_8_hex
-        self.colours.append('#bc80bd')
-        self.plot_params = True
-        return
-
     def get_chempots(self):
         """ Search for chemical potentials that match the structures in
         the query cursor and add them to the cursor.

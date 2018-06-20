@@ -255,28 +255,7 @@ class VoronoiSimilarityTest(unittest.TestCase):
 
 
 def plot_doc_strucs(doc):
-    import matplotlib.pyplot as plt
-    import seaborn as sns
-    sns.set_style('whitegrid')
-    colours = sns.color_palette("Dark2", 8)
-    fig, ax_list = plt.subplots(len(doc['similar_sites']), len(doc['similar_sites']), figsize=(10, 5))
-    for jind, elem in enumerate(doc['similar_sites']):
-        print(elem)
-        for ind, site in enumerate(doc['similar_sites'][elem]):
-            # for cind, _elem in enumerate(doc['unique_site_array'][elem][ind]):
-                # if len(doc['unique_site_array'][elem][ind][_elem]) > 0:
-                    # ax.errorbar(range(len(doc['unique_site_array'][elem][ind][_elem])), doc['unique_site_array'][elem][ind][_elem],
-                                # yerr=doc['unique_site_stddev'][elem][ind][_elem], ls='--', zorder=10000, lw=0, label=_elem, c=colours[cind])
-            for cind, _elem in enumerate(doc['unique_site_array'][elem][ind]):
-                ax = ax_list[cind, jind]
-                ax.set_ylim(0, 1)
-                ax.set_title('-'.join([elem, _elem]))
-                if len(doc['site_array'][elem][ind][_elem]) > 1:
-                    sns.tsplot(ax=ax, ci='sd', data=np.asarray([doc['site_array'][elem][index][_elem] for index in site]), color=colours[ind])
-                # for index in site:
-                    # if len(doc['unique_site_array'][elem][ind][_elem]) > 0:
-                        # ax.plot(range(len(doc['site_array'][elem][index][_elem])), doc['site_array'][elem][index][_elem], c=colours[ind], lw=0.5, alpha=0.1)
-    plt.show()
+    raise NotImplementedError
 
 
 if __name__ == '__main__':
