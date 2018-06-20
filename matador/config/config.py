@@ -128,7 +128,7 @@ def quickstart_settings():
     return fname
 
 
-def load_custom_settings(config_fname=None, quiet=True, debug=False, override=False):
+def load_custom_settings(config_fname=None, quiet=True, debug=False, override=True):
     """ Load mongodb settings dict from file given by fname, or from
     defaults. Hierarchy of filenames to check:
 
