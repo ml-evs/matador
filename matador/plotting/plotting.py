@@ -1179,11 +1179,13 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
         label_cutoff = hull.args.get('label_cutoff')
         if label_cutoff is None:
             label_cutoff = 0
+    else:
+        labels = True
 
-    if hull_cutoff is None or hull.args.get('hull_cutoff') is None:
+    if hull_cutoff is None and hull.hull_cutoff is None:
         hull_cutoff = 0
     else:
-        hull_cutoff = hull.args.get('hull_cutoff')
+        hull_cutoff = hull.hull_cutoff
 
     print('Plotting ternary hull...')
     if hull.args.get('capmap') or hull.args.get('efmap'):
@@ -1244,7 +1246,8 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
     hull_dist = np.asarray(filtered_hull_dists)
 
     min_cut = 0.0
-    max_cut = max(0.1, hull_cutoff)
+    max_cut = 0.2
+
     hull.colours = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])
     hull.default_cmap_list = get_linear_cmap(hull.colours[1:4], list_only=True)
     hull.default_cmap = get_linear_cmap(hull.colours[1:4], list_only=False)
@@ -1329,7 +1332,7 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
         ax.heatmap(sampling, style="hexagonal", cbarlabel='Number of structures', cmap='afmhot')
 
     # add labels
-    if labels or label_cutoff is not None:
+    if labels:
         label_cursor = get_hull_labels(hull, label_cutoff=label_cutoff, num_species=3)
         if len(label_cursor) == 1:
             label_coords = [[0.25, 0.5]]
