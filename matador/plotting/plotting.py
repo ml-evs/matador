@@ -458,6 +458,8 @@ def plot_spectral(seeds, **kwargs):
 
                 if not kwargs['pdos_hide_tot'] and 'spin_dos' not in dos_data:
                     ax_dos.plot(dos, energies, lw=1, ls=ls[seed_ind], color=colour, zorder=1e10, label='Total DOS')
+                    if 'pdos' not in dos_data and 'spin_dos' not in dos_data:
+                        ax_dos.fill_betweenx(energies, 0, dos, alpha=0.2, color=colour)
 
             else:
                 ax_dos.set_xlabel(xlabel)
@@ -471,7 +473,9 @@ def plot_spectral(seeds, **kwargs):
                 ax_dos.axhline(0, c='grey', lw=0.5)
 
                 if not kwargs['pdos_hide_tot'] and 'spin_dos' not in dos_data:
-                    ax_dos.plot(energies, dos, lw=1, ls=ls[seed_ind], color=colour, zorder=1e10, label='Total DOS')
+                    ax_dos.plot(energies, dos, lw=1, ls=ls[seed_ind], alpha=1, color=colour, zorder=1e10, label='Total DOS')
+                    if 'pdos' not in dos_data and 'spin_dos' not in dos_data:
+                        ax_dos.fill_between(energies, 0, dos, alpha=0.2, color=colour)
 
             if 'pdos' in dos_data and len(seeds) == 1:
                 dos_colours = []
