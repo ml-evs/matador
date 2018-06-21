@@ -119,12 +119,14 @@ def frac2cart(lattice_cart, positions_frac):
 
     """
     _positions_frac = np.asarray(positions_frac)
+    reshaped = False
     if len(np.shape(_positions_frac)) == 1:
+        reshaped = True
         _positions_frac = _positions_frac.reshape((1, 3))
     _lattice_cart = np.asarray(lattice_cart)
     positions_abs = switch_coords(_lattice_cart, _positions_frac)
-    if len(positions_abs) == 1:
-        positions_abs = positions_abs.reshape((3))
+    if reshaped:
+        positions_abs = positions_abs.reshape(-1)
     return positions_abs.tolist()
 
 
@@ -193,17 +195,20 @@ def cart2frac(lattice_cart, positions_abs):
         positions_abs (list): list of absolute position vectors.
 
     Returns:
-        list: list of fractional position vectors.
+        list: list of fractional position vectors with the same shape
+            as the input list.
 
     """
     _positions_abs = np.asarray(positions_abs, dtype=np.float64)
+    reshaped = False
     if len(np.shape(_positions_abs)) == 1:
+        reshaped = True
         _positions_abs = _positions_abs.reshape((1, 3))
     recip_lat = np.asarray(real2recip(lattice_cart))
     recip_lat = recip_lat.T
     positions_frac = switch_coords(recip_lat, _positions_abs, norm=2*np.pi)
-    if len(positions_frac) == 1:
-        positions_frac = positions_frac.reshape((3))
+    if reshaped:
+        positions_frac = positions_frac.reshape(-1)
     return positions_frac.tolist()
 
 

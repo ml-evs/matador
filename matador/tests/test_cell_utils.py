@@ -8,6 +8,9 @@ from matador.utils.cell_utils import doc2spg, cart2abcstar, real2recip
 from matador.scrapers.castep_scrapers import castep2dict, res2dict, cell2dict, bands2dict
 from matador.similarity.pdf_similarity import PDF, PDFOverlap
 from matador.export import doc2cell
+
+VERBOSITY = 0
+
 try:
     from matador.utils.cell_utils import get_seekpath_kpoint_path
     from seekpath import get_path
@@ -32,7 +35,7 @@ class CellUtilTest(unittest.TestCase):
             print('Failed to open test case', castep_fname, '- please check installation.')
         if not failed_open:
             f.close()
-            test_doc, s = castep2dict(castep_fname, db=True, verbosity=5)
+            test_doc, s = castep2dict(castep_fname, db=True, verbosity=VERBOSITY)
             try:
                 self.assertTrue(np.allclose(test_doc['lattice_abc'], cart2abc(test_doc['lattice_cart'])),
                                 msg='Conversion cart2abc failed.')
@@ -62,7 +65,7 @@ class CellUtilTest(unittest.TestCase):
         self.assertFalse(failed_open,
                          msg='Failed to open test case {} - please check installation'
                          .format(castep_fname))
-        test_doc, success = castep2dict(castep_fname, db=True, verbosity=5)
+        test_doc, success = castep2dict(castep_fname, db=True, verbosity=VERBOSITY)
         self.assertTrue(success)
         self.assertTrue(np.allclose(real2recip(test_doc['lattice_cart']), 2*np.pi*np.asarray(cart2abcstar(test_doc['lattice_cart']))),
                         msg='Conversion cart2abc failed.')
@@ -70,84 +73,37 @@ class CellUtilTest(unittest.TestCase):
     def testFrac2Cart(self):
         lattice_cart = [[2, 0, 0], [0, 2, 0], [0, 0, 2]]
         positions_frac = [0.5, 0.5, 0.5]
-        np.testing.assert_array_almost_equal(frac2cart(lattice_cart, positions_frac), [1, 1, 1])
+        self.assertEqual(frac2cart(lattice_cart, positions_frac), [1, 1, 1])
+
+        lattice_cart = [[2, 0, 0], [0, 2, 0], [0, 0, 2]]
+        positions_frac = [[0.5, 0.5, 0.5]]
+        self.assertEqual(frac2cart(lattice_cart, positions_frac), [[1, 1, 1]])
+
+        lattice_cart = [[2, 0, 0], [0, 2, 0], [0, 0, 2]]
+        positions_frac = [[1, 1, 1], [0.5, 0.5, 0.5]]
+        self.assertEqual(frac2cart(lattice_cart, positions_frac), [[2, 2, 2], [1, 1, 1]])
 
     def testCart2Frac(self):
         lattice_cart = [[2, 0, 0], [0, 2, 0], [0, 0, 2]]
         positions_abs = [1, 1, 1]
-        np.testing.assert_array_almost_equal(cart2frac(lattice_cart, positions_abs), [0.5, 0.5, 0.5])
+        self.assertEqual(cart2frac(lattice_cart, positions_abs), [0.5, 0.5, 0.5])
 
-    def testSupercellCreator(self):
+        lattice_cart = [[2, 0, 0], [0, 2, 0], [0, 0, 2]]
+        positions_abs = [[1, 1, 1]]
+        self.assertEqual(cart2frac(lattice_cart, positions_abs), [[0.5, 0.5, 0.5]])
+
+        lattice_cart = [[2, 0, 0], [0, 2, 0], [0, 0, 2]]
+        positions_abs = [[2, 2, 2], [1, 1, 1]]
+        self.assertEqual(cart2frac(lattice_cart, positions_abs), [[1, 1, 1], [0.5, 0.5, 0.5]])
+
+    def testConversionTransitivity(self):
+        """ Test that cart2frac(frac2cart(A)) == A. """
         castep_fname = REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep'
-        failed_open = False
-        num_tests = 3
-        try:
-            f = open(castep_fname, 'r')
-        except:
-            failed_open = True
-            print('Failed to open test case', castep_fname, '- please check installation.')
-        if not failed_open:
-            f.close()
-            test_doc, s = castep2dict(castep_fname, db=True, verbosity=5)
-            _iter = 0
-            while _iter < num_tests:
-                extension = np.random.randint(low=1, high=5, size=(3)).tolist()
-                if extension == [1, 1, 1]:
-                    extension[np.random.randint(low=0, high=2)] += 1
-                num_images = np.prod(extension)
+        test_doc, s = castep2dict(castep_fname, db=True, verbosity=VERBOSITY)
+        lattice_cart = test_doc['lattice_cart']
+        positions_frac = test_doc['positions_frac']
+        np.testing.assert_almost_equal(cart2frac(lattice_cart, frac2cart(lattice_cart, positions_frac)), positions_frac, decimal=10)
 
-                standardize = bool(_iter % 2)
-                symmetric = bool(_iter % 2)
-
-                supercell = create_simple_supercell(test_doc, tuple(extension),
-                                                    standardize=standardize,
-                                                    symmetric=symmetric)
-                self.assertEqual(supercell['num_atoms'], num_images * test_doc['num_atoms'])
-                self.assertAlmostEqual(supercell['cell_volume'], num_images * test_doc['cell_volume'], places=3)
-                self.assertEqual(len(supercell['positions_frac']), num_images * len(test_doc['positions_frac']))
-                for i in range(3):
-                    if not standardize:
-                        np.testing.assert_array_equal(np.asarray(supercell['lattice_cart'][i]), extension[i]*np.asarray(test_doc['lattice_cart'][i]))
-                self.assertLess(pdf_sim_dist(test_doc, supercell), 1e-3)
-                _iter += 1
-
-            # test error for 1x1x1
-            try:
-                supercell = create_simple_supercell(test_doc, (1, 1, 1))
-                error = False
-            except:
-                error = True
-            self.assertTrue(error)
-
-        res_fname = REAL_PATH + 'data/parent2.res'
-        failed_open = False
-        try:
-            f = open(res_fname, 'r')
-        except:
-            failed_open = True
-        if not failed_open:
-            f.close()
-            test_doc, s = res2dict(res_fname, db=False, verbosity=0)
-            while _iter < num_tests:
-                extension = np.random.randint(low=1, high=5, size=(3, 1)).tolist()
-                num_images = np.prod(extension)
-
-                supercell = create_simple_supercell(test_doc, tuple(extension))
-                self.assertEqual(supercell['num_atoms'], num_images * test_doc['num_atoms'])
-                self.assertAlmostEqual(supercell['cell_volume'], num_images * test_doc['cell_volume'], places=3)
-                self.assertEqual(len(supercell['positions_frac']), num_images * len(test_doc['positions_frac']))
-                for i in range(3):
-                    np.testing.assert_array_equal(np.asarray(supercell['lattice_cart'][i]), extension[i]*np.asarray(test_doc['lattice_cart'][i]))
-                self.assertLess(pdf_sim_dist(test_doc, supercell), 1e-3)
-                _iter += 1
-
-            # test error for 1x1x1
-            try:
-                supercell = create_simple_supercell(test_doc, (1, 1, 1))
-                error = False
-            except:
-                error = True
-            self.assertTrue(error)
 
     def testRecipToReal(self):
         real_lattice = [[5.5902240, 0, 0], [3.7563195, 4.1401290, 0], [-2.9800295, -1.3200288, 8.5321695]]
@@ -192,6 +148,82 @@ class CellUtilTest(unittest.TestCase):
         mp_grid = calc_mp_grid(lattice_cart, spacing)
         self.assertEqual(mp_grid, [4, 2, 2])
         self.assertEqual(shift_to_include_gamma(mp_grid), [0.125, 0.25, 0.25])
+
+
+class SymmetriesAndSupercellsTest(unittest.TestCase):
+    """ Tests cell util functions. """
+
+    def testSupercellCreator(self):
+        castep_fname = REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep'
+        failed_open = False
+        num_tests = 3
+        try:
+            f = open(castep_fname, 'r')
+        except:
+            failed_open = True
+            print('Failed to open test case', castep_fname, '- please check installation.')
+        if not failed_open:
+            f.close()
+            test_doc, s = castep2dict(castep_fname, db=True, verbosity=VERBOSITY)
+            _iter = 0
+            while _iter < num_tests:
+                extension = np.random.randint(low=1, high=5, size=(3)).tolist()
+                if extension == [1, 1, 1]:
+                    extension[np.random.randint(low=0, high=2)] += 1
+                num_images = np.prod(extension)
+
+                standardize = bool(_iter % 2)
+                symmetric = bool(_iter % 2)
+
+                supercell = create_simple_supercell(test_doc, tuple(extension),
+                                                    standardize=standardize,
+                                                    symmetric=symmetric)
+                self.assertEqual(supercell['num_atoms'], num_images * test_doc['num_atoms'])
+                self.assertAlmostEqual(supercell['cell_volume'], num_images * test_doc['cell_volume'], places=3)
+                self.assertEqual(len(supercell['positions_frac']), num_images * len(test_doc['positions_frac']))
+                for i in range(3):
+                    if not standardize:
+                        np.testing.assert_array_equal(np.asarray(supercell['lattice_cart'][i]), extension[i]*np.asarray(test_doc['lattice_cart'][i]))
+                self.assertLess(pdf_sim_dist(test_doc, supercell), 1e-3)
+                _iter += 1
+
+            # test error for 1x1x1
+            try:
+                supercell = create_simple_supercell(test_doc, (1, 1, 1))
+                error = False
+            except:
+                error = True
+            self.assertTrue(error)
+
+        res_fname = REAL_PATH + 'data/parent2.res'
+        failed_open = False
+        try:
+            f = open(res_fname, 'r')
+        except:
+            failed_open = True
+        if not failed_open:
+            f.close()
+            test_doc, s = res2dict(res_fname, db=False, verbosity=VERBOSITY)
+            while _iter < num_tests:
+                extension = np.random.randint(low=1, high=5, size=(3, 1)).tolist()
+                num_images = np.prod(extension)
+
+                supercell = create_simple_supercell(test_doc, tuple(extension))
+                self.assertEqual(supercell['num_atoms'], num_images * test_doc['num_atoms'])
+                self.assertAlmostEqual(supercell['cell_volume'], num_images * test_doc['cell_volume'], places=3)
+                self.assertEqual(len(supercell['positions_frac']), num_images * len(test_doc['positions_frac']))
+                for i in range(3):
+                    np.testing.assert_array_equal(np.asarray(supercell['lattice_cart'][i]), extension[i]*np.asarray(test_doc['lattice_cart'][i]))
+                self.assertLess(pdf_sim_dist(test_doc, supercell), 1e-3)
+                _iter += 1
+
+            # test error for 1x1x1
+            try:
+                supercell = create_simple_supercell(test_doc, (1, 1, 1))
+                error = False
+            except:
+                error = True
+            self.assertTrue(error)
 
     @unittest.skipIf(not IMPORTED_SEEKPATH, 'Seekpath package not found in this distribution')
     def testKPointPath(self):
@@ -263,6 +295,7 @@ class CellUtilTest(unittest.TestCase):
             std_doc = standardize_doc_cell(doc)
             dist = pdf_sim_dist(doc, std_doc)
             self.assertLess(dist, 0.01)
+
 
 
 def pdf_sim_dist(doc_test, doc_supercell):
