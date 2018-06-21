@@ -60,10 +60,10 @@ def display_results(cursor,
         raise RuntimeError('No structures found in cursor.')
 
     if markdown:
-        markdown_string = ('GenDate: ' + strftime("%H:%M %d/%m/%Y") + '\n')
+        markdown_string = 'Date: {}  \n'.format(strftime("%H:%M %d/%m/%Y"))
         if argstr is not None:
-            markdown_string += ('Command: matador ' + ' '.join(argstr) + '\n')
-        markdown_string += ('Version: ' + __version__ + '\n\n')
+            markdown_string += 'Command: matador {}  \n'.format(' '.join(argstr))
+        markdown_string += 'Version: {}  \n\n'.format(__version__)
 
     if latex:
         latex_string = (
@@ -87,6 +87,7 @@ def display_results(cursor,
         header_string += "{:^5}".format('!?!')
         units_string += "{:^5}".format('')
     else:
+        header_string += '```\n'
         header_string += "{:^40}".format('Root')
         units_string += "{:^40}".format('')
     header_string += "{:^10}".format('Pressure')
@@ -224,10 +225,10 @@ def display_results(cursor,
 
         if latex:
             latex_struct_string.append("{:^30} {:^10} & ".format(formula_substring, '$\\star$'
-                                                                 if doc['hull_distance'] == 0 else ''))
+                                                                 if doc.get('hull_distance') == 0 else ''))
             latex_struct_string[-1] += ("{:^20.0f} & ".format(doc.get('hull_distance') * 1000)
-                                        if doc.get('hull_distance') > 0 else '{:^20} &'.format('-'))
-            latex_struct_string[-1] += ("{:^20.0f} & ".format(doc['gravimetric_capacity'])
+                                        if doc.get('hull_distance', 0) > 0 else '{:^20} &'.format('-'))
+            latex_struct_string[-1] += ("{:^20.0f} & ".format(doc.get('gravimetric_capacity', '-'))
                                         if doc.get('hull_distance') == 0 else '{:^20} &'.format('-'))
             latex_struct_string[-1] += "{:^20} & ".format(get_spacegroup_spg(doc))
             prov = get_guess_doc_provenance(doc['source'], doc.get('icsd'))
@@ -314,7 +315,7 @@ def display_results(cursor,
                 if num != len(doc['source']) - 1:
                     source_string[-1] += '\n'
 
-    if not markdown or latex:
+    if not markdown and not latex:
         print(len(header_string) * '─')
         print(header_string)
         print(units_string)
@@ -362,6 +363,7 @@ def display_results(cursor,
                 if details or args.get('source'):
                     print(len(header_string) * '─')
     if markdown:
+        markdown_string += '```'
         return markdown_string
     elif latex:
         latex_string += '\\end{tabular}'
