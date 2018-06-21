@@ -45,6 +45,18 @@ def display_results(cursor,
 
     details = args.get('details')
 
+    #add this in to handle different energy,enthalpy,free energy etc.
+    if args.get('energy_key') is not None:
+        if args.get('energy_key').endswith('per_atom'):
+            energy = args.get('energy_key').split('_per_atom')[0]
+            energy_pa = args.get('energy_key')
+        else:
+            energy = args.get('energy_key')
+            energy_pa = args.get('energy_key') + '_per_atom'
+    else:
+        energy = 'enthalpy'
+        energy_pa = 'enthalpy_per_atom'
+
     if markdown and latex:
         raise RuntimeError('Cannot specify both latex and markdown output at once.')
 
@@ -112,7 +124,11 @@ def display_results(cursor,
     header_string += "{:^8}".format('Prov.')
 
     # ensure cursor is sorted by enthalpy
-    cursor = sorted(cursor, key=lambda doc: doc['enthalpy_per_atom'], reverse=False)
+    if args.get('temperature') is None:
+        cursor = sorted(cursor, key=lambda doc: doc[energy_pa], reverse=False)
+    else:
+        cursor = sorted(cursor, key=lambda doc: doc[energy_pa][args.get('temperature')], reverse=False)
+
 
     if latex:
         latex_sub_style = r'\text'
@@ -197,9 +213,9 @@ def display_results(cursor,
                     0 if doc.get('hull_distance') <= 1e-12 else 1000 * doc.get('hull_distance')
                 )
             elif args.get('per_atom'):
-                struct_string[-1] += "{:>18.5f}".format(doc['enthalpy_per_atom'] - gs_enthalpy)
+                struct_string[-1] += "{:>18.5f}".format(doc[energy_pa] - gs_enthalpy)
             else:
-                struct_string[-1] += "{:>18.5f}".format(doc['enthalpy'] / doc['num_fu'] - gs_enthalpy)
+                struct_string[-1] += "{:>18.5f}".format(doc[energy] / doc['num_fu'] - gs_enthalpy)
         except KeyError:
             struct_string[-1] += "{:^18}".format('xxx')
 
@@ -238,10 +254,16 @@ def display_results(cursor,
             latex_struct_string[-1] += "{:^30} \\\\".format('')
 
         if last_formula != formula_substring:
-            if args.get('per_atom'):
-                gs_enthalpy = doc['enthalpy'] / doc['num_atoms']
+            if args.get('temperature') is None:
+                if args.get('per_atom'):
+                    gs_enthalpy = doc[energy] / doc['num_atoms']
+                else:
+                    gs_enthalpy = doc[energy] / doc['num_fu']
             else:
-                gs_enthalpy = doc['enthalpy'] / doc['num_fu']
+                if args.get('per-atom'):
+                    gs_enthalpy = doc[energy][args.get('temperature')] / doc['num_atoms']
+                else:
+                    gs_enthalpy = doc[energy][args.get('temperature')] / doc['num_fu']
 
         last_formula = formula_substring
 

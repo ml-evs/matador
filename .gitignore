@@ -14,3 +14,4 @@ _build
 docs/src/matador.*rst
 *.ipynb_checkpoints
 .pytest_cache
+*.swp

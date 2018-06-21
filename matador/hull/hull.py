@@ -114,12 +114,23 @@ class QueryConvexHull(object):
             sys.stdout = f
 
         if self.args.get('energy_key') is not None:
-            self._energy_key = self.args.get('energy_key')
+            # consider if temperature present and looking for thermo_* keys
+            if self.args.get('temperature') is not None:
+                if self.args.get('energy_key').startswith('thermo_'):
+                    prefix = ''
+                else:
+                    prefix = 'thermo_'
+            else:
+                prefix = ''
+
+            if self.args.get('energy_key').endswith('_per_atom'):
+                self._energy_key = prefix + self.args.get('energy_key')
+            else:
+                self._energy_key = prefix + self.args.get('energy_key') + '_per_atom'
         else:
             self._energy_key = 'enthalpy_per_atom'
 
         self.temperature = self.args.get('temperature')
-
         if self.args.get('hull_temp') is not None:
             self.hull_cutoff = float(self.args['hull_temp'] * KELVIN_TO_EV)
         elif self.args.get('hull_cutoff') is not None:
@@ -140,7 +151,6 @@ class QueryConvexHull(object):
                 print_notify(
                     str(len(self.hull_cursor)) + ' structures within ' + str(self.hull_cutoff) +
                     ' eV of the hull with chosen chemical potentials.')
-
         display_results(self.hull_cursor, self.args, hull=True, use_source=use_source)
 
         if not self.args.get('no_plot'):
@@ -198,6 +208,7 @@ class QueryConvexHull(object):
         """
         query = self._query
         query_dict = dict()
+        self.chempot_cursor = []
         if not self._non_binary:
             elements = self.elements
         else:
@@ -207,7 +218,12 @@ class QueryConvexHull(object):
         elif self.from_cursor:
             chempot_cursor = sorted([doc for doc in self.cursor if len(doc['stoichiometry']) == 1],
                                     key=lambda k: k[self._energy_key])
-            self.chempot_cursor = []
+            if self.temperature is None:
+                chempot_cursor = sorted([doc for doc in self.cursor if len(doc['stoichiometry']) == 1],
+                                        key=lambda k: k[self._energy_key])
+            else:
+                chempot_cursor = sorted([doc for doc in self.cursor if len(doc['stoichiometry']) == 1],
+                                        key=lambda k: k[self._energy_key][self.temperature])
             for elem in elements:
                 for doc in chempot_cursor:
                     if doc['stoichiometry'][0][0] == elem:
@@ -254,7 +270,7 @@ class QueryConvexHull(object):
                 self.chempot_cursor[ind] = mu_cursor[0]
                 if self.chempot_cursor[ind] is not None:
                     print('Using', ''.join([self.chempot_cursor[ind]['text_id'][0], ' ',
-                          self.chempot_cursor[ind]['text_id'][1]]), 'as chem pot for', elem)
+                                            self.chempot_cursor[ind]['text_id'][1]]), 'as chem pot for', elem)
                     print(60 * '─')
                 else:
                     print_failure('No possible chem pots found for ' + elem + '.')
@@ -496,9 +512,20 @@ class QueryConvexHull(object):
                     self.cursor[ind]['enthalpy_per_b'] = 12345e5
                     self.cursor[ind]['cell_volume_per_b'] = 12345e5
                 else:
-                    self.cursor[ind]['enthalpy_per_b'] = doc['enthalpy'] / (num_b * num_fu)
+                    if self._energy_key == 'enthalpy_per_atom':
+                        self.cursor[ind]['enthalpy_per_b'] = doc['enthalpy'] / (num_b * num_fu)
+                    else:
+
+                        if self.temperature is not None:
+                            key = self._energy_key.split("_per_atom")[0]
+                            self.cursor[ind]['enthalpy_per_b'] = doc[key][self.temperature] / (num_b * num_fu)
+                        else:
+                            self.cursor[ind]['enthalpy_per_b'] = doc[self._energy_key.split("_per_atom")[0]] / (num_b * num_fu)
+
                     self.cursor[ind]['cell_volume_per_b'] = doc['cell_volume'] / (num_b * num_fu)
-            self.cursor[ind][formation_key] = get_formation_energy(self.chempot_cursor, doc, energy_key=self._energy_key, temperature=self.temperature)
+            self.cursor[ind][formation_key] = get_formation_energy(self.chempot_cursor, doc,
+                                                                   energy_key=self._energy_key,
+                                                                   temperature=self.temperature)
             self.cursor[ind]['concentration'] = get_concentration(doc, self.elements)
         # create stacked array of hull data
         structures = np.hstack((
@@ -557,7 +584,11 @@ class QueryConvexHull(object):
 
         # ensure hull cursor is sorted by enthalpy_per_atom, then by concentration, as it will be by default if from database
         hull_cursor = [self.cursor[idx] for idx in np.where(self.hull_dist <= self.hull_cutoff + 1e-12)[0]]
-        hull_cursor = sorted(hull_cursor, key=lambda doc: doc[self._energy_key])
+        if self.temperature is not None:
+            hull_cursor = sorted(hull_cursor, key=lambda doc: doc[self._energy_key][self.temperature])
+        else:
+            hull_cursor = sorted(hull_cursor, key=lambda doc: doc[self._energy_key])
+
         hull_cursor = sorted(hull_cursor, key=lambda k: k['concentration'])
 
         # if summary requested and we're in hulldiff mode, filter hull_cursor for lowest per stoich
@@ -658,7 +689,17 @@ class QueryConvexHull(object):
 
         if not quiet:
             print('Generating voltage curve...')
-        mu_enthalpy = get_array_from_cursor(self.chempot_cursor, 'enthalpy_per_atom')
+        if self.temperature is not None and self._energy_key is not None:
+            mu_enthalpy = []
+            for doc in self.chempot_cursor:
+                mu_enthalpy.append(doc[self._energy_key][self.temperature])
+            mu_enthalpy = np.asarray(mu_enthalpy)
+            if len(mu_enthalpy) != len(self.chempot_cursor):
+                raise RuntimeError('Some keys were missing.')
+        elif self._energy_key is not None:
+            mu_enthalpy = get_array_from_cursor(self.chempot_cursor, self._energy_key)
+        else:
+            mu_enthalpy = get_array_from_cursor(self.chempot_cursor, 'enthalpy_per_atom')
         x = get_num_intercalated(hull_cursor)
         # sort for voltage calculation
         Q = get_array_from_cursor(hull_cursor, 'gravimetric_capacity')
@@ -669,7 +710,7 @@ class QueryConvexHull(object):
         stable_enthalpy_per_b = stable_enthalpy_per_b[uniq_idxs]
         Q = Q[uniq_idxs]
         V = []
-        for i in range(len(x)):
+        for i, _ in enumerate(x):
             V.append(
                 -(stable_enthalpy_per_b[i] - stable_enthalpy_per_b[i-1]) / (x[i] - x[i-1]) + (mu_enthalpy[0]))
         V[0] = V[1]

@@ -944,6 +944,7 @@ def _castep_scrape_thermo_data(flines, castep):
 
     Returns:
         dict: dictionary updated with scraped thermodynamics data
+              in format doc['energy_type'] = {300:-0.01,200:-0.05}
 
     """
     for line_no, line in enumerate(flines):
@@ -959,10 +960,10 @@ def _castep_scrape_thermo_data(flines, castep):
             castep['zero_point_E'] = float(line.split("=")[1].strip().split(' ')[0])
         elif 'T(K)' and 'E(eV)' in line:
             castep['thermo_temps'] = []  # temperatures calculation was done at
-            castep['thermo_enthalpy_E'] = []  # enthalpy E(eV)
-            castep['thermo_free_energy_F'] = []  # free energy F(eV)
-            castep['thermo_entropy_S'] = []  # entropy S(J/mol/K)
-            castep['thermo_heat_cap_Cv'] = []  # heat capacity Cv(J/mol/K)
+            castep['thermo_enthalpy'] = {}  # enthalpy E(eV)
+            castep['thermo_free_energy'] = {}  # free energy F(eV)
+            castep['thermo_entropy'] = {}  # entropy S(J/mol/K)
+            castep['thermo_heat_cap'] = {}  # heat capacity Cv(J/mol/K)
             i = 2
             while True:
                 if not flines[line_no + i + 1].strip():
@@ -970,10 +971,10 @@ def _castep_scrape_thermo_data(flines, castep):
                 else:
                     temp_line = flines[line_no + i].split()
                     castep['thermo_temps'].append(float(temp_line[0]))
-                    castep['thermo_enthalpy_E'].append(float(temp_line[1]))
-                    castep['thermo_free_energy_F'].append(float(temp_line[2]))
-                    castep['thermo_entropy_S'].append(float(temp_line[3]))
-                    castep['thermo_heat_cap_Cv'].append(float(temp_line[4]))
+                    castep['thermo_enthalpy'][float(temp_line[0])] = float(temp_line[1])
+                    castep['thermo_free_energy'][float(temp_line[0])] = float(temp_line[2])
+                    castep['thermo_entropy'][float(temp_line[0])] = float(temp_line[3])
+                    castep['thermo_heat_cap'][float(temp_line[0])] = float(temp_line[4])
                 i += 1
 
     return castep

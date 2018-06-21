@@ -95,6 +95,8 @@ class VoltageTest(unittest.TestCase):
             bare_hull.elements = list(elements)
             bare_hull.hull_cursor = list(hull_cursor)
             bare_hull.chempot_cursor = list(chempot_cursor)
+            bare_hull.temperature = None
+            bare_hull._energy_key = None
             bare_hull.voltage_curve(bare_hull.hull_cursor)
         sys.stdout = sys.__stdout__
         self.assertTrue(len(bare_hull.voltage_data['voltages']) == 1)
