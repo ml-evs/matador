@@ -41,6 +41,7 @@ def query2files(cursor, *args, **kwargs):
     param = args.get('param')
     res = args.get('res')
     pdb = args.get('pdb')
+    json = args.get('json')
     xsf = args.get('xsf')
     md = args.get('markdown')
     tex = args.get('latex')
@@ -136,6 +137,8 @@ def query2files(cursor, *args, **kwargs):
             doc2cell(doc, path, pressure, hash_dupe=hash_dupe)
         if res:
             doc2res(doc, path, info=info, hash_dupe=hash_dupe)
+        if json:
+            doc2json(doc, path, hash_dupe=hash_dupe)
         if pdb:
             doc2pdb(doc, path, hash_dupe=hash_dupe)
         if xsf:
@@ -488,6 +491,42 @@ def doc2pdb(doc, path, info=True, hash_dupe=True):
             print('Writing pdb file failed for ', doc['text_id'])
         else:
             print_exc()
+
+
+def doc2json(doc, path, overwrite=False, hash_dupe=True):
+    """ Return raw JSON document as stored in database.
+
+    Parameters:
+        doc (dict): matador document containing structure
+        path (str): desired filename for res file
+
+    Keyword arguments:
+        hash_dupe (bool): hash duplicate file names, or skip?
+        overwrite (bool): overwrite if filename exists.
+
+    """
+    try:
+        import json
+        if path.endswith('.json'):
+            path = path.replace('.json', '')
+
+        if os.path.isfile(path+'.json'):
+            if overwrite:
+                os.remove(path + '.json')
+            elif hash_dupe:
+                print('File name already exists, generating hash...')
+                path += '-' + generate_hash()
+            else:
+                print('File name already exists! Skipping!')
+
+        if '_id' in doc:
+            doc['_id'] = str(doc['_id'])
+
+        with open(path + '.json', 'w') as f:
+            f.write(json.dumps(doc, skipkeys=True, indent=2))
+    except Exception:
+        print_exc()
+        print('Writing {}.json failed!'.format(path))
 
 
 def doc2pwscf(doc, path, template=None, spacing=None):
