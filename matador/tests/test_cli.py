@@ -75,6 +75,35 @@ class IntegrationTest(unittest.TestCase):
         self.assertEqual(len(query_2.cursor), 0, msg='matador changes did not remove files')
         self.assertEqual(changes_count, 1, msg='matador changes did not changelog')
 
+        test_export()
+        expected_dir = 'query-ci_test'
+        expected_files = [
+            'query-ci_test/query-ci_test.md',
+            'query-ci_test/query-ci_test.tex',
+            'query-ci_test/Na3Zn4-OQMD_759599.pdb',
+            'query-ci_test/Na3Zn4-OQMD_759599.xsf',
+            'query-ci_test/Na3Zn4-OQMD_759599.json',
+            'query-ci_test/Na-edgecase-CollCode10101.pdb',
+            'query-ci_test/Na-edgecase-CollCode10101.xsf',
+            'query-ci_test/Na-edgecase-CollCode10101.json',
+            'query-ci_test/NaP_intermediates.pdb',
+            'query-ci_test/NaP_intermediates.xsf',
+            'query-ci_test/NaP_intermediates.json'
+        ]
+        dir_exists = os.path.isdir(expected_dir)
+        files_exist = all([os.path.isfile(_file) for _file in expected_files])
+
+        for _file in expected_files:
+            if os.path.isfile(_file):
+                os.remove(_file)
+
+        if os.path.isdir(expected_dir):
+            os.removedirs(expected_dir)
+
+        self.assertTrue(dir_exists, msg='Failed to create output directory')
+        self.assertTrue(files_exist, msg='Some files missing from export')
+
+
 
 def test_import_castep():
     """ Import from castep files, returning data to be checked. """
@@ -174,7 +203,9 @@ def test_swaps():
 
 
 def test_changes():
-    """ Test matador changes functionality by undoing the second change (i.e. the res import). """
+    """ Test matador changes functionality by undoing the second
+    change (i.e. the res import).
+    """
     sys.argv = ['matador', 'changes', '--db', DB_NAME, '-c', '2', '--undo']
 
     if CONFIG_FNAME is not None:
@@ -187,6 +218,18 @@ def test_changes():
     changes_count = MONGO_CLIENT.crystals['__changelog_' + DB_NAME].count()
 
     return query_1, query_2, changes_count
+
+
+def test_export():
+    """ Test exporting to some random file types. Don't worry too much about
+    the contents of the files yet, just that they exist with non-zero size.
+    """
+    sys.argv = ['matador', 'query', '--db', DB_NAME, '--xsf', '--pdb', '--markdown', '--latex', '--json']
+
+    if CONFIG_FNAME is not None:
+        sys.argv += ['--config', CONFIG_FNAME]
+
+    matador.cli.cli.main(override=True)
 
 
 if __name__ == '__main__':
