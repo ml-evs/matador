@@ -13,8 +13,9 @@ The tl;dr way to install matador, on e.g. a computing cluster, is as follows:
    through conda with ``conda install --yes --file requirements.txt``.
 -  run ``pip install .`` from inside the top-level matador directory.
 -  this will provide a basic matador installation, if you wish to use
-   e.g. bandstructure/plotting/jupyter notebook visualisation
-   functionality, use ``pip install .[plotting,bandstructure,viz]``.
+   e.g. plotting, your own database or jupyter notebook visualisation
+   functionality, use ``pip install .[plotting,db,viz]``. (More options in
+   setup.py).
 
 More esoteric installation on ARCHER (30th October 2017)
 --------------------------------------------------------
