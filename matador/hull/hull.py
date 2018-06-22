@@ -215,9 +215,8 @@ class QueryConvexHull(object):
             elements = self.chempot_search
         if self.args.get('chempots') is not None:
             self.fake_chempots(custom_elem=elements)
+
         elif self.from_cursor:
-            chempot_cursor = sorted([doc for doc in self.cursor if len(doc['stoichiometry']) == 1],
-                                    key=lambda k: k[self._energy_key])
             if self.temperature is None:
                 chempot_cursor = sorted([doc for doc in self.cursor if len(doc['stoichiometry']) == 1],
                                         key=lambda k: k[self._energy_key])
