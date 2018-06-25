@@ -175,7 +175,7 @@ def load_custom_settings(config_fname=None, quiet=True, debug=False, override=Tr
     if os.path.isfile(config_fname):
         try:
             with open(config_fname, 'r') as f:
-                custom_settings = yaml.load(f)
+                custom_settings = yaml.safe_load(f)
         except Exception:
             print_exc()
             raise SystemExit(
