@@ -1126,7 +1126,7 @@ def _castep_scrape_final_parameters(flines, castep):
 
                 elif 'core correction' in flines[line_no + i]:
                     i += 2
-                    if not pspot_report_dict[elem]:
+                    if not pspot_report_dict.get(elem):
                         castep['species_pot'][elem] = flines[line_no + i].split('"')[1].replace('[]', '')
                         pspot_report_dict[elem] = True
                 i += 1
