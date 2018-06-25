@@ -45,6 +45,9 @@ class DatabaseChanges:
         if changeset_ind == 0:
             self.print_change_summary(curs)
 
+        elif changeset_ind > len(curs):
+            exit('No changeset {} found for collection called "{}".'.format(changeset_ind, collection_name))
+
         # otherwise, try to act on particular changeset
         elif changeset_ind <= len(curs):
             self.change = curs[changeset_ind-1]
@@ -69,10 +72,12 @@ class DatabaseChanges:
                     else:
                         exit('As I thought...')
                 else:
-                    return
+                    exit()
 
                 # proceed with deletion
-                _, _, collections = make_connection_to_collection(collection_name, allow_changelog=False, override=override)
+                _, _, collections = make_connection_to_collection(collection_name,
+                                                                  allow_changelog=False,
+                                                                  override=override)
                 collection_to_delete_from = [collections[key] for key in collections][0]
                 result = collection_to_delete_from.remove({'_id': {'$in': self.change['id_list']}})
                 print('Deleted {}/{} successfully.'.format(result['n'], self.change['count']))

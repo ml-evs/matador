@@ -9,7 +9,7 @@ from matador.config import load_custom_settings
 
 
 def make_connection_to_collection(coll_names, check_collection=False, allow_changelog=False,
-                                  mongo_settings=None, override=False, import_mode=False, debug=False):
+                                  mongo_settings=None, override=False, import_mode=False, quiet=True, debug=False):
     """ Connect to database of choice.
 
     Parameters:
@@ -20,6 +20,7 @@ def make_connection_to_collection(coll_names, check_collection=False, allow_chan
         allow_changelog (bool): allow queries to collections with names prefixed by __
         mongo_settings (dict): dict containing mongo and related config
         override (bool): don't ask for user input from stdin and assume all is well
+        quiet (bool): don't print very much.
 
     Returns:
         client (MongoClient): the connection to the database
@@ -33,7 +34,8 @@ def make_connection_to_collection(coll_names, check_collection=False, allow_chan
     else:
         settings = mongo_settings
 
-    print('Trying to connect to {host}:{port}/{db}'.format(**settings['mongo']))
+    if not quiet:
+        print('Trying to connect to {host}:{port}/{db}'.format(**settings['mongo']))
 
     client = pm.MongoClient(
         host=settings['mongo']['host'],
@@ -46,7 +48,8 @@ def make_connection_to_collection(coll_names, check_collection=False, allow_chan
 
     try:
         database_names = client.database_names()
-        print('Success!')
+        if not quiet:
+            print('Success!')
     except pm.errors.ServerSelectionTimeoutError as exc:
         print('{}: {}'.format(type(exc).__name__, exc))
         raise SystemExit('Unable to connect to {host}:{port}/{db}, exiting...'.format(**settings['mongo']))
