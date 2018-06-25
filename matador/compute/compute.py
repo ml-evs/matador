@@ -672,7 +672,7 @@ class FullRelaxer:
                 raise RuntimeError('SCF failed.')
 
             if not success:
-                raise RuntimeError('Failed to scrape CASTEP file.')
+                raise RuntimeError('Error scraping CASTEP file.')
 
             success = True
 
@@ -1215,8 +1215,7 @@ class FullRelaxer:
         if keep:
             seed_files = glob.glob(seed + '.*') + glob.glob(seed + '-out.cell')
             for _file in seed_files:
-                shutil.copy(_file, completed_dir)
-                os.remove(_file)
+                shutil.move(_file, completed_dir)
         else:
             # move castep/param/res/out_cell files to completed
             file_exts = ['.castep']
@@ -1230,8 +1229,7 @@ class FullRelaxer:
                 file_exts.append('.den_fmt')
             for ext in file_exts:
                 try:
-                    shutil.copy('{}{}'.format(seed, ext), completed_dir)
-                    os.remove('{}{}'.format(seed, ext))
+                    shutil.move('{}{}'.format(seed, ext), completed_dir)
                 except Exception:
                     if self.verbosity > 1:
                         print_exc()
@@ -1264,7 +1262,8 @@ class FullRelaxer:
                     shutil.copy('{}'.format(f), input_dir)
         else:
             if os.path.isfile('{}.{}'.format(seed, ext)):
-                shutil.copy('{}.{}'.format(seed, ext), input_dir)
+                if not os.path.isfile('{}/{}.{}'.format(input_dir, seed, ext)):
+                    shutil.copy('{}.{}'.format(seed, ext), input_dir)
 
     def _setup_relaxation_dirs(self):
         """ Set up directories and files for relaxation. """
