@@ -9,6 +9,7 @@ diagrams, as well as voltage and volume expansion plots.
 
 from traceback import print_exc
 import numpy as np
+import os
 from matador.utils.chem_utils import get_formula_from_stoich
 from matador.utils.viz_utils import ELEMENT_COLOURS
 
@@ -80,7 +81,6 @@ def plot_spectral(seeds, **kwargs):
         dos (str): separate seed name for pDOS/DOS data
         phonons (bool): whether to plot phonon or electronic data
         labels (list): list of strings for legend labels for multiple bandstructures
-        cell (bool): whether to work out correct labels from structure in cell file
         gap (bool): whether to draw on the band gap
         colour_by_seed (bool): plot with a separate colour per bandstructure
         external_efermi (float): replace scraped Fermi energy with this value (eV)
@@ -102,23 +102,32 @@ def plot_spectral(seeds, **kwargs):
 
     """
     import matplotlib.pyplot as plt
+    from cycler import cycler
+    from os.path import isfile
     from matador.scrapers.castep_scrapers import bands2dict, cell2dict, phonon2dict, optados2dict
     from matador.utils.cell_utils import doc2spg
     from seekpath import get_path
-    from os.path import isfile
     # set defaults and update class with desired values
-    prop_defaults = {'plot_bandstructure': True, 'plot_dos': False,
-                     'phonons': False, 'cell': False, 'gap': False,
+    prop_defaults = {'plot_bandstructure': True, 'plot_dos': True,
+                     'phonons': False, 'gap': False,
                      'colour_by_seed': False, 'external_efermi': None,
-                     'labels': None, 'cmap': 'Dark2', 'band_colour': 'occ',
+                     'labels': None, 'cmap': None, 'band_colour': 'occ',
                      'n_colours': 4,
                      'no_stacked_pdos': False, 'preserve_kspace_distance': False,
                      'band_reorder': None,
                      'verbosity': 0, 'highlight_bands': None, 'pdos_hide_tot': False}
     prop_defaults.update(kwargs)
+    kwargs = prop_defaults
+
+    if kwargs.get('cmap') is None:
+        colours = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])
+    else:
+        print('Adjusting colour palette... to {}'.format(kwargs.get('cmap')))
+        colours = plt.cm.get_cmap(kwargs.get('cmap')).colors
+        plt.rcParams['axes.prop_cycle'] = cycler('color', colours)
+
     dos_legend = None
 
-    kwargs = prop_defaults
     if (kwargs.get('phonons') and kwargs['band_colour'] == 'occ') or kwargs['band_colour'] == 'random':
         kwargs['band_colour'] = None
 
@@ -148,16 +157,9 @@ def plot_spectral(seeds, **kwargs):
     elif not kwargs['plot_bandstructure'] and kwargs['plot_dos']:
         _, ax_dos = plt.subplots(1, figsize=(8, 4))
 
-    colours = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])
-
-    if kwargs.get('cmap') == 'Dark2':
-        valence = colours[0]
-        conduction = colours[1]
-        crossing = colours[2]
-    else:
-        valence = colours[0]
-        conduction = colours[-1]
-        crossing = colours[int(len(colours) / 2)]
+    valence = colours[0]
+    conduction = colours[-1]
+    crossing = colours[int(len(colours) / 2)]
 
     if len(seeds) > 1 or kwargs.get('colour_by_seed'):
         seed_colours = colours
@@ -222,7 +224,7 @@ def plot_spectral(seeds, **kwargs):
 
             # seem to have to reset this here for some reason
             for branch_ind, branch in enumerate(dispersion[branch_key]):
-                plt.gca().set_prop_cycle(None)
+                plt.rcParams['axes.prop_cycle'] = cycler('color', colours)
                 for ns in range(dispersion[spin_key]):
                     for nb in range(dispersion[band_key]):
                         colour = None
@@ -282,43 +284,53 @@ def plot_spectral(seeds, **kwargs):
             shear_planes = []
             labelled = []
 
-            if kwargs['cell']:
+            # get dispersion path labels
+            spg_structure = None
+            if kwargs['phonons']:
+                spg_structure = doc2spg(dispersion)
+            else:
+                if not os.path.isfile(seed + '.cell'):
+                    print('Failed to find {}.cell, will not be able to generate labels.'.format(seed))
+
                 doc, success = cell2dict(seed + '.cell',
                                          db=False, verbosity=kwargs['verbosity'],
                                          outcell=True, positions=True)
                 if success:
                     spg_structure = doc2spg(doc)
-                    if spg_structure is not False:
-                        seekpath_results = get_path(spg_structure)
-                    path_labels = seekpath_results['point_coords']
                 else:
-                    raise RuntimeError(doc)
+                    print('Failed to scrape {}.cell, will not be able to generate labels.'.format(seed))
 
-                for branch_ind, branch in enumerate(dispersion[branch_key]):
-                    for sub_ind, ind in enumerate(branch):
-                        kpt = dispersion[path_key][ind]
-                        for label, point in path_labels.items():
-                            if np.allclose(point, kpt):
-                                if ind - branch_ind not in labelled:
-                                    label = label.replace('GAMMA', r'\Gamma')
-                                    label = label.replace('SIGMA', r'\Sigma')
-                                    if sub_ind == len(branch) - 1:
-                                        if branch_ind < len(dispersion[branch_key]) - 1:
-                                            _tmp = dispersion[path_key]
-                                            next_point = _tmp[dispersion[branch_key][branch_ind + 1][0]]
-                                            for new_label, new_point in path_labels.items():
-                                                new_label = new_label.replace('GAMMA', r'\Gamma')
-                                                new_label = new_label.replace('SIGMA', r'\Sigma')
-                                                if np.allclose(new_point, next_point):
-                                                    label = '{}|{}'.format(label, new_label)
-                                                    ax_dispersion.axvline(path[ind - branch_ind], ls='-', c='grey', zorder=1, lw=0.5)
-                                                    labelled.append(ind - branch_ind)
-                                                    shear_planes.append(ind)
-                                    label = '${}$'.format(label)
-                                    ax_dispersion.axvline(path[ind - branch_ind], ls='--', c='grey', zorder=0, lw=0.5)
-                                    xticklabels.append(label)
-                                    xticks.append(path[ind - branch_ind])
-                                    break
+            if spg_structure is not False and spg_structure is not None:
+                seekpath_results = get_path(spg_structure)
+                path_labels = seekpath_results['point_coords']
+
+            for branch_ind, branch in enumerate(dispersion[branch_key]):
+                for sub_ind, ind in enumerate(branch):
+                    kpt = dispersion[path_key][ind]
+                    for label, point in path_labels.items():
+                        if np.allclose(point, kpt):
+                            if ind - branch_ind not in labelled:
+                                label = label.replace('GAMMA', r'\Gamma')
+                                label = label.replace('SIGMA', r'\Sigma')
+                                if sub_ind == len(branch) - 1:
+                                    if branch_ind < len(dispersion[branch_key]) - 1:
+                                        _tmp = dispersion[path_key]
+                                        next_point = _tmp[dispersion[branch_key][branch_ind + 1][0]]
+                                        for new_label, new_point in path_labels.items():
+                                            new_label = new_label.replace('GAMMA', r'\Gamma')
+                                            new_label = new_label.replace('SIGMA', r'\Sigma')
+                                            if np.allclose(new_point, next_point):
+                                                label = '{}|{}'.format(label, new_label)
+                                                ax_dispersion.axvline(path[ind - branch_ind], ls='-', c='grey', zorder=1, lw=0.5)
+                                                labelled.append(ind - branch_ind)
+                                                shear_planes.append(ind)
+                                label = '${}$'.format(label)
+                                ax_dispersion.axvline(path[ind - branch_ind], ls='--', c='grey', zorder=0, lw=0.5)
+                                xticklabels.append(label)
+                                xticks.append(path[ind - branch_ind])
+                                break
+
+            # plot band gaps
             if not kwargs['phonons'] and kwargs['gap'] and dispersion['band_gap'] > 0:
                 vbm_pos = dispersion['band_gap_path_inds'][1]
                 vbm = dispersion['valence_band_min']
