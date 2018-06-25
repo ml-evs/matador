@@ -1358,15 +1358,17 @@ def _castep_find_final_structure(flines):
     finish_line = 0
     success_string = 'Geometry optimization completed successfully'
     failure_string = 'Geometry optimization failed to converge after'
-    for line_no, line in enumerate(flines):
+    for line_no, line in enumerate(reversed(flines)):
         if any(finished in line for finished in [success_string, failure_string]):
             for line_next in range(line_no, len(flines)):
                 if any(finished in flines[line_next] for finished in [success_string, failure_string]):
                     finish_line = line_next
                     if success_string in flines[line_next]:
                         optimised = True
+                        break
                     elif failure_string in flines[line_next]:
                         optimised = False
+                        break
 
     # now wind back to get final total energies and non-symmetrised forces
     for count, line in enumerate(reversed(flines[:finish_line])):
