@@ -120,11 +120,6 @@ class MatadorCommandLine(object):
                     exit('Please specify which hulls to query with --compare.')
                 diff_hulls(self.client, self.collections, **self.args)
 
-            # perform any extra filtration
-            if self.args.get('filter'):
-                from matador.utils.cursor_utils import filter_cursor
-                self.cursor = filter_cursor(self.cursor, self.args.get('filter'), self.args.get('values'))
-
             if self.export and self.cursor:
                 from matador.export import query2files
                 if self.args.get('write_n') is not None:
@@ -377,10 +372,10 @@ def main(override=False):
     structure_flags.add_argument('--loose', action='store_true',
                                  help='loosely matches with calc_match, i.e. only matches pspot and xc_functional')
     structure_flags.add_argument('--ignore_warnings', action='store_true', help='includes possibly bad structures')
-    structure_flags.add_argument('--filter', type=str,
-                                 help='specify a simple float field to filter. Requires --values')
-    structure_flags.add_argument('--values', nargs='+', type=float,
-                                 help='specify the minimum floats, or [min, max] values of field')
+    structure_flags.add_argument('--field', type=str, action='append',
+                                 help='name of arbitrary field to query')
+    structure_flags.add_argument('--filter', nargs='+', action='append',
+                                 help='specify either float [min, max] or a string/float value.')
 
     material_flags = argparse.ArgumentParser(add_help=False)
     material_flags.add_argument('-hc', '--hull_cutoff', type=float,
@@ -447,6 +442,7 @@ def main(override=False):
                              help='show as much detail about calculation as possible')
     query_flags.add_argument('-pa', '--per_atom', action='store_true', help='show quantities per atom not per fu.')
     query_flags.add_argument('-dt', '--time', type=int, help='query only structures added before this time in days')
+    query_flags.add_argument('-avail', '--available_values', type=str, help='list all values of field in query results')
     query_flags.add_argument('--since', action='store_true',
                              help='query only structures added after time specified by --time in days')
     query_flags.add_argument('--source', action='store_true',
@@ -560,31 +556,28 @@ def main(override=False):
                                    refine_flags, material_flags])
 
     parsed_args = parser.parse_args()
+    vars_args = vars(parsed_args)
 
     # check for inconsistent argument combinations
-    if vars(parsed_args).get('intersection') and vars(parsed_args).get('composition') is None:
+    if vars_args.get('intersection') and vars_args.get('composition') is None:
         raise SystemExit('--intersection requires --composition.')
-    if vars(parsed_args).get('subcmd') == 'stats' and vars(parsed_args).get('list') and vars(parsed_args).get(
+    if vars_args.get('subcmd') == 'stats' and vars_args.get('list') and vars_args.get(
             'delete'):
         raise SystemExit('Cannot use -l/--list and --delete')
-    # if vars(parsed_args).get('formula') and vars(parsed_args).get('composition'):
-    # raise SystemExit('Cannot use -f/--formula and -c/--composition together.')
-    if vars(parsed_args).get('filter') and vars(parsed_args).get('values') is None:
-        raise SystemExit('--filter requires --values.')
-    if vars(parsed_args).get('values') and vars(parsed_args).get('filter') is None:
-        print('Ignoring redundant supplied values...')
-    if vars(parsed_args).get('subcmd') == 'hull' and vars(parsed_args).get('composition') is None:
+    if vars_args.get('field') and vars_args.get('filter') is None:
+        raise SystemExit('--field requires --filter.')
+    if vars_args.get('subcmd') == 'hull' and vars_args.get('composition') is None:
         raise SystemExit('hull requires --composition')
-    if vars(parsed_args).get('subcmd') == 'pdffit':
-        if vars(parsed_args).get('file') is None:
+    if vars_args.get('subcmd') == 'pdffit':
+        if vars_args.get('file') is None:
             raise SystemExit('pdffit requires specified --file, exiting...')
-        if not os.path.isfile(vars(parsed_args).get('file')):
+        if not os.path.isfile(vars_args.get('file')):
             raise SystemExit('specified --file does not exist, exiting...')
-    if vars(parsed_args).get('hull_cutoff') and vars(parsed_args).get('hull_temp'):
+    if vars_args.get('hull_cutoff') and vars_args.get('hull_temp'):
         raise SystemExit('hull_cutoff and hull_temp both specified, exiting...')
-    if vars(parsed_args).get('calc_match') and vars(parsed_args).get('id') is None:
+    if vars_args.get('calc_match') and vars_args.get('id') is None:
         raise SystemExit('calc_match requires specification of a text_id with -i, exiting...')
-    if vars(parsed_args).get('profile'):
+    if vars_args.get('profile'):
         import cProfile
         import pstats
         from sys import version_info
@@ -593,7 +586,7 @@ def main(override=False):
 
     MatadorCommandLine(parsed_args, argstr=argv[1:], override=override)
 
-    if vars(parsed_args).get('profile'):
+    if vars_args.get('profile'):
         profiler.disable()
         fname = 'matador-{}-{}.{}.{}'.format(__version__, version_info.major, version_info.minor, version_info.micro)
         profiler.dump_stats(fname + '.prof')

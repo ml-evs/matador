@@ -127,6 +127,10 @@ class DBQuery:
                     self.cursor = [self.cursor[ind] for ind in unique_set]
 
                 display_results(self.cursor, hull=None, args=self.args)
+
+            if self.args.get('available_values') is not None:
+                self._query_available_values(self.args.get('available_values'), self.cursor)
+
             if not client and not self.args.get('testing'):
                 self._client.close()
 
@@ -224,12 +228,31 @@ class DBQuery:
             self.query_dict['$and'].append(self._query_icsd())
             self._empty_query = False
 
+        if self.args.get('field') is not None:
+            for ind, field in enumerate(self.args.get('field')):
+                _filter = self.args.get('filter')[ind]
+                try:
+                    for i, value in enumerate(_filter):
+                        _filter[i] = float(value)
+                    filter_type = 'float'
+                except ValueError:
+                    filter_type = 'string'
+
+                if filter_type == 'float':
+                    self.query_dict['$and'].append(self._query_float_range(
+                        field, _filter))
+                else:
+                    self.query_dict['$and'].append(self._query_string(
+                        field, _filter))
+
         if self.args.get('cutoff') is not None:
-            self.query_dict['$and'].append(self._query_cutoff())
+            self.query_dict['$and'].append(self._query_float_range(
+                'cut_off_energy', self.args.get('cutoff')))
             self._empty_query = False
 
         if self.args.get('geom_force_tol') is not None:
-            self.query_dict['$and'].append(self._query_geom_force_tol())
+            self.query_dict['$and'].append(self._query_float_range(
+                'geom_force_tol', self.args.get('geom_force_tol')))
             self._empty_query = False
 
         if self.args.get('src_str') is not None:
@@ -243,6 +266,7 @@ class DBQuery:
         if self.args.get('pressure') is not None:
             self.query_dict['$and'].append(self._query_pressure())
             self._empty_query = False
+
         elif self.args['subcmd'] in ['hull', 'hulldiff', 'voltage']:
             self.query_dict['$and'].append(self._query_pressure(custom_pressure=0))
 
@@ -251,7 +275,8 @@ class DBQuery:
             self._empty_query = False
 
         if self.args.get('cnt_radius') is not None:
-            self.query_dict['$and'].append(self._query_cnt_radius())
+            self.query_dict['$and'].append(self._query_float_range(
+                'cnt_radius', self.args.get('cnt_radius'), tolerance=0.01))
             self._empty_query = False
 
         if self.args.get('cnt_vector') is not None:
@@ -267,7 +292,8 @@ class DBQuery:
             self._empty_query = False
 
         if self.args.get('mp_spacing') is not None:
-            self.query_dict['$and'].append(self._query_kpoints())
+            self.query_dict['$and'].append(self._query_float_range(
+                'kpoints_mp_spacing', self.args.get('mp_spacing'), tolerance=self.args.get('kpoint_tolerance', 0.01)))
             self._empty_query = False
 
         if self.args.get('spin') is not None:
@@ -435,6 +461,68 @@ class DBQuery:
                 self.cursor = test_cursors[choice]
                 print_success('Composing hull from set containing {}'.format(' '.join(self.cursor[0]['text_id'])))
                 self.calc_dict = calc_dicts[choice]
+
+    @staticmethod
+    def _query_float_range(field, values, tolerance=None):
+        """ Query all entries with field between float value range,
+        or with float value.
+
+        Parameters:
+            field (str): the field to query.
+            values (float/list of float): either single value, or list
+                of 2 floats.
+
+        Keyword arguments:
+            tolerance (float): tolerance to add and subtract if single value is provided.
+
+        Returns:
+            dict: the constructed query.
+
+        """
+        query_dict = dict()
+        query_dict[field] = dict()
+        if not isinstance(values, list):
+            values = [values]
+        if len(values) == 2:
+            if values[0] > values[1]:
+                tmp = values[0]
+                values[0] = values[1]
+                values[1] = tmp
+
+            query_dict[field]['$gte'] = values[0]
+            query_dict[field]['$lte'] = values[1]
+        else:
+            if tolerance is None:
+                query_dict[field]['$eq'] = values[0]
+            else:
+                query_dict[field]['$gte'] = values[0] - tolerance
+                query_dict[field]['$lte'] = values[0] + tolerance
+
+        return query_dict
+
+    @staticmethod
+    def _query_string(field, values):
+        """ Query all entries for an exact string match on field.
+
+        Parameters:
+            field (str): the field to query.
+            values (list or str): strings to query with $or joins.
+
+        Returns:
+            dict: the constructed query.
+
+        """
+        query_dict = dict()
+        if not isinstance(values, list):
+            values = [values]
+        if len(values) > 1:
+            query_dict['$or'] = []
+            for value in values:
+                query_dict['$or'].append({field: value})
+        else:
+            query_dict[field] = values[0]
+
+        return query_dict
 
     def _query_stoichiometry(self, custom_stoich=None, partial_formula=None):
         """ Query DB for particular stoichiometry. """
@@ -725,6 +813,42 @@ class DBQuery:
         return query_dict
 
     @staticmethod
+    def _query_available_values(field, cursor):
+        """ Query the values stored under a particular field and
+        print the information.
+
+        Parameters:
+            field (str): the field to query.
+            cursor (list): the cursor to query.
+
+        """
+        number_containing_field = sum([1 for doc in cursor if field in doc])
+        print('{}/{} contain field {}'.format(number_containing_field, len(cursor), field))
+        if field in ['doi', 'tags', 'cnt_vector', 'castep_version']:
+            value_degeneracy = dict()
+            for doc in cursor:
+                if doc.get(field) is not None:
+                    values = doc.get(field)
+                    if isinstance(values, list):
+                        for value in values:
+                            if value in value_degeneracy:
+                                value_degeneracy[value] += 1
+                            else:
+                                value_degeneracy[value] = 1
+
+                    else:
+                        if values in value_degeneracy:
+                            value_degeneracy[values] += 1
+                        else:
+                            value_degeneracy[values] = 1
+
+            print('Set of values under key {}:'.format(field))
+            for value in sorted(value_degeneracy, key=value_degeneracy.get):
+                print('{:<10}: {:>10} entries'.format(value, value_degeneracy[value]))
+        else:
+            print('No querying available values for field {}'.format(field))
+
+    @staticmethod
     def _query_quality():
         """ Find all structures with non-zero or non-existent (e.g.
         OQMD) quality.
@@ -773,24 +897,11 @@ class DBQuery:
 
         return query_dict
 
-    def _query_cnt_radius(self):
-        """ Query structures within a nanotube of given radius
-        to within a tolerance of 0.01 A.
-        """
-        query_dict = dict()
-        if not isinstance(self.args.get('cnt_radius'), list):
-            cnt_rad = [self.args.get('cnt_radius')]
-        query_dict['cnt_radius'] = dict()
-        query_dict['cnt_radius']['$gt'] = cnt_rad[0] - 0.01
-        query_dict['cnt_radius']['$lt'] = cnt_rad[0] + 0.01
-
-        return query_dict
-
     def _query_cnt_vector(self):
         """ Query structures within a nanotube of given chiral vector. """
         query_dict = dict()
         if not isinstance(self.args.get('cnt_vector'), list) or len(self.args.get('cnt_vector')) != 2:
-            sys.exit('CNT vector query needs to be of form [n, m]')
+            raise SystemExit('CNT vector query needs to be of form [n, m]')
         else:
             chiral_vec = self.args.get('cnt_vector')
         query_dict['cnt_chiral'] = dict()
@@ -798,44 +909,11 @@ class DBQuery:
 
         return query_dict
 
-    def _query_cutoff(self):
-        """ Query all calculations above given plane-wave cutoff. """
-        query_dict = dict()
-        query_dict['cut_off_energy'] = dict()
-        if not isinstance(self.args.get('cutoff'), list):
-            cutoffs = [self.args.get('cutoff')]
-        else:
-            cutoffs = self.args.get('cutoff')
-        if len(cutoffs) == 2:
-            if cutoffs[0] > cutoffs[1]:
-                sys.exit('Cutoff query needs to be of form [min, max]')
-            query_dict['cut_off_energy']['$gte'] = cutoffs[0]
-            query_dict['cut_off_energy']['$lte'] = cutoffs[1]
-        else:
-            query_dict['cut_off_energy']['$eq'] = cutoffs[0]
-        return query_dict
-
-    def _query_geom_force_tol(self):
-        """ Query all calculations with the correct relaxed force tolerance. """
-        query_dict = dict()
-        query_dict['geom_force_tol'] = dict()
-        if not isinstance(self.args.get('geom_force_tol'), list):
-            tols = [self.args.get('geom_force_tol')]
-        else:
-            tols = self.args.get('geom_force_tol')
-        if len(tols) == 2:
-            if tols[0] > tols[1]:
-                sys.exit('Force tol needs to be of form [min, max]')
-            query_dict['geom_force_tol']['$gte'] = tols[0]
-            query_dict['geom_force_tol']['$lte'] = tols[1]
-        else:
-            query_dict['geom_force_tol']['$eq'] = tols[0]
-        return query_dict
-
     def _query_sedc(self):
         """ Query all calculations using given SEDC scheme.
 
         Use --sedc null to query for no dispersion correction.
+
         """
         query_dict = dict()
         if self.args.get('sedc') != 'null':
@@ -865,26 +943,6 @@ class DBQuery:
             query_dict['xc_functional'] = xc_functional.upper()
         return query_dict
 
-    def _query_kpoints(self):
-        """ Query all calculations with finer than the given
-        kpoint sampling.
-
-        """
-        query_dict = dict()
-        if not isinstance(self.args.get('mp_spacing'), list):
-            mp_spacing = [self.args.get('mp_spacing')]
-        else:
-            mp_spacing = self.args.get('mp_spacing')
-        tol = 0.01
-        if self.args.get('kpoint_tolerance') is not None:
-            try:
-                tol = float(self.args.get('kpoint_tolerance'))
-            except Exception:
-                print_warning('Failed to read custom kpoint tolerance.')
-        query_dict['kpoints_mp_spacing'] = dict()
-        query_dict['kpoints_mp_spacing']['$lte'] = mp_spacing[0] + tol
-        query_dict['kpoints_mp_spacing']['$gte'] = mp_spacing[0] - tol
-        return query_dict
 
     def _query_spin(self):
         """ Query all calculations with spin polarisation,

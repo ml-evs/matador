@@ -93,6 +93,37 @@ class QueryTest(unittest.TestCase):
         })
         self.assertDictEqual(test_dict, query.query_dict)
 
+        kwargs = {'field': ['xc_functional', 'cut_off_energy'], 'filter': [['PBE'], ['301.2312', 400.0]], 'testing': True}
+        query = DBQuery(**kwargs)
+        test_dict = ({
+            '$and': [
+                {'xc_functional': 'PBE'},
+                {'cut_off_energy': {'$gte': 301.2312, '$lte': 400.0}},
+                {'$or': [
+                    {'quality': {'$gt': 0}},
+                    {'quality': {'$exists': False}}
+                ]},
+            ]
+        })
+        self.assertDictEqual(test_dict, query.query_dict)
+
+        kwargs = {'field': ['cut_off_energy', 'xc_functional'], 'filter': [['301.2312', 400.0], ['PBE', 'LDA']], 'testing': True}
+        query = DBQuery(**kwargs)
+        test_dict = ({
+            '$and': [
+                {'cut_off_energy': {'$gte': 301.2312, '$lte': 400.0}},
+                {'$or': [
+                    {'xc_functional': 'PBE'},
+                    {'xc_functional': 'LDA'}
+                ]},
+                {'$or': [
+                    {'quality': {'$gt': 0}},
+                    {'quality': {'$exists': False}}
+                ]},
+            ]
+        })
+        self.assertDictEqual(test_dict, query.query_dict)
+
     def testComplexQueries(self):
         """ Test long queries with multiple mismatching of lists
         (emulating argparse) and values.
@@ -146,7 +177,7 @@ class QueryTest(unittest.TestCase):
                 {'source': {'$in': [re.compile('/Foo/bar/foo/Bar.res')]}},
                 {'pressure': {'$lt': 5.5, '$gt': 4.5}},
                 {'encapsulated': {'$exists': True}},
-                {'cnt_radius': {'$gt': 5.20, '$lt': 5.22}},
+                {'cnt_radius': {'$gte': 5.20, '$lte': 5.22}},
                 {'sedc_scheme': {'$exists': False}},
                 {'kpoints_mp_spacing': {'$gte': 0.04, '$lte': 0.060000000000000005}},
                 {'spin_polarized': {'$ne': True}},
@@ -173,7 +204,7 @@ class QueryTest(unittest.TestCase):
                 {'source': {'$in': [re.compile('/Foo/bar/foo/Bar.res')]}},
                 {'pressure': {'$lt': 5.5, '$gt': 4.5}},
                 {'encapsulated': {'$exists': True}},
-                {'cnt_radius': {'$gt': 5.20, '$lt': 5.22}},
+                {'cnt_radius': {'$gte': 5.20, '$lte': 5.22}},
                 {'sedc_scheme': {'$exists': False}},
                 {'kpoints_mp_spacing': {'$gte': 0.04, '$lte': 0.060000000000000005}},
             ]
