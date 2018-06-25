@@ -640,17 +640,19 @@ def bands2dict(seed, summary=False, gap=False, external_efermi=None, **kwargs):
                     if band_branch_max > 0 and band_branch_min < 0:
                         vbm = 0
                         cbm = 0
+                        vbm_pos = [0]
+                        cbm_pos = [0]
                         break
-            if vbm != 0 and cbm != 0:
-                smallest_diff = 1e10
-                for _cbm_pos in cbm_pos:
-                    for _vbm_pos in vbm_pos:
-                        if abs(_vbm_pos - _cbm_pos) < smallest_diff:
-                            tmp_cbm_pos = _cbm_pos
-                            tmp_vbm_pos = _vbm_pos
-                            smallest_diff = abs(_vbm_pos - _cbm_pos)
-                cbm_pos = tmp_cbm_pos
-                vbm_pos = tmp_vbm_pos
+
+            smallest_diff = 1e10
+            for _cbm_pos in cbm_pos:
+                for _vbm_pos in vbm_pos:
+                    if abs(_vbm_pos - _cbm_pos) < smallest_diff:
+                        tmp_cbm_pos = _cbm_pos
+                        tmp_vbm_pos = _vbm_pos
+                        smallest_diff = abs(_vbm_pos - _cbm_pos)
+            cbm_pos = tmp_cbm_pos
+            vbm_pos = tmp_vbm_pos
             bs['valence_band_min'] = vbm
             bs['conduction_band_max'] = cbm
             bs['band_gap'] = cbm - vbm
