@@ -394,6 +394,17 @@ def display_results(cursor,
     return None
 
 
+def loading_bar(iterable):
+    """ Checks if tqdm exists and makes a loading bar, otherwise
+    just returns initial iterable.
+    """
+    try:
+        import tqdm
+        return tqdm.tqdm(iterable)
+    except ImportError:
+        return iterable
+
+
 def set_cursor_from_array(cursor, array, key):
     """ Updates the key-value pair for documents in
     internal cursor from a numpy array.

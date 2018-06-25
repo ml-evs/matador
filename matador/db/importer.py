@@ -293,6 +293,7 @@ class Spatula:
         """
         print('\n{:^52}'.format('###### RUNNING IMPORTER ######') + '\n')
         for _, root in enumerate(file_lists):
+            print(root)
             root_str = root
             if root_str == '.':
                 root_str = os.getcwd().split('/')[-1]
@@ -303,7 +304,6 @@ class Spatula:
                 self.import_count += self._scrape_prototypes(file_lists, root)
 
             else:
-
                 # default to only scraping castep files
                 style = 'castep'
                 # if there are multiple res files, per cell, assume we are working in "airss" mode
@@ -317,7 +317,7 @@ class Spatula:
                 elif style == 'castep':
                     self.import_count += self._scrape_single_file_structures(file_lists, root)
 
-        if self.struct_list:
+        if self.struct_list and not self.dryrun:
             self._update_changelog(self.repo.name, self.struct_list)
 
     def _scrape_multi_file_results(self, file_lists, root):
@@ -395,7 +395,8 @@ class Spatula:
             self.logfile.write('! {} failed to scrape any cell and param\n'.format(root))
 
         # create res dicts and combine them with input_dict
-        for _, file in enumerate(file_lists[root]['res']):
+        from matador.utils.cursor_utils import loading_bar
+        for _, file in enumerate(loading_bar(file_lists[root]['res'])):
             exts_with_precedence = ['.castep', '.history', 'history.gz']
             # check if a castep-like file exists instead of scraping res
             if any([file.replace('.res', ext) in file_lists[root]['castep']
@@ -452,7 +453,8 @@ class Spatula:
 
         """
         import_count = 0
-        for _, file in enumerate(file_lists[root]['castep']):
+        from matador.utils.cursor_utils import loading_bar
+        for _, file in enumerate(loading_bar(file_lists[root]['castep'])):
             castep_dict, success = castep2dict(file, debug=False, verbosity=self.verbosity)
             if not success:
                 self.logfile.write('! {}'.format(castep_dict))
@@ -594,10 +596,10 @@ class Spatula:
                 for _, _file in enumerate(new_file_lists[root][structure_type]):
                     # find number of entries with same root filename in database
                     structure_exts = ['.castep', '.res', '.history', '.history.gz']
-                    structure_count = 0
                     ext = [_ext for _ext in structure_exts if _file.endswith(_ext)]
                     assert len(ext) == 1
                     ext = ext[0]
+                    structure_count = 0
                     for other_ext in structure_exts:
                         structure_count += self.repo.find(
                             {'source': {'$in': [_file.replace(ext, other_ext)]}}
@@ -607,11 +609,17 @@ class Spatula:
 
                     # if duplicate found, don't reimport
                     if structure_count >= 1:
-                        for _type in types:
-                            fname_trial = _file.replace('.{}'.format(_file.split('.')[-1]), '.{}'.format(_type))
-                            if fname_trial in new_file_lists[root][_type] and fname_trial not in delete_list[_type]:
-                                delete_list[_type].add(fname_trial)
-                                new_file_lists[root][_type + '_count'] -= 1
+                        for _type in structure_exts:
+                            if _type.startswith('.'):
+                                _type = _type[1:]
+                            fname_trial = _file.replace(_file.split('.')[-1], _type)
+                            if _type == 'history' or _type == '.history.gz':
+                                list_type = 'castep'
+                            else:
+                                list_type = _type.replace('.', '')
+                            if fname_trial in new_file_lists[root][list_type] and fname_trial not in delete_list[list_type]:
+                                delete_list[list_type].add(fname_trial)
+                                new_file_lists[root][list_type + '_count'] -= 1
 
                     if structure_count > 1:
                         print('Found double in database, this needs to be dealt with manually')
