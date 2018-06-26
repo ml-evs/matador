@@ -27,4 +27,4 @@ from matador.scrapers.castep_scrapers import castep2dict, bands2dict
 from matador.scrapers.castep_scrapers import phonon2dict, optados2dict, usp2dict
 from matador.scrapers.qe_scrapers import pwout2dict
 from matador.scrapers.magres_scrapers import magres2dict
-from matador.scrapers.cif_ase_scraper import cif2dict
+from matador.scrapers.cif_scraper import cif2dict

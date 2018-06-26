@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
-from matador.scrapers.cif_ase_scraper import cif2dict
+from matador.scrapers.cif_scraper import cif2dict
 from matador.export import doc2res
 from matador.utils.print_utils import print_notify, print_success, print_failure
 from sys import argv

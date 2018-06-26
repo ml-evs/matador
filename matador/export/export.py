@@ -16,6 +16,20 @@ from matador.utils.cell_utils import abc2cart, calc_mp_grid
 from matador.utils.cursor_utils import display_results
 
 
+def file_writer_function(function):
+    """ Wrapper for file writers to safely overwrite/hash duplicate files. """
+
+    from functools import wraps
+
+    @wraps(function)
+    def wrapped_writer(*args, **kwargs):
+        """ Wrap and return the writer function. """
+        result = function(*args, **kwargs)
+        return result
+
+    return wrapped_writer
+
+
 def query2files(cursor, *args, **kwargs):
     """ Many-to-many convenience function for many structures being written to
     many file types. File types are passed via **kwargs, e.g.
@@ -674,12 +688,22 @@ def doc2res(doc, path, info=True, hash_dupe=True, spoof_titl=False, overwrite=Fa
 
         # enforce correct order by elements, sorting only the atom_types, not the positions inside them
         if sort_atoms:
-            positions_frac, atom_types = zip(*[(pos, types) for (types, pos) in
-                                               sorted(zip(doc['atom_types'], doc['positions_frac']),
-                                                      key=lambda k: k[0])])
+            if 'site_occupancy' in doc:
+                positions_frac, atom_types, occupancies = zip(*[(pos, types, occ) for (types, pos, occ) in
+                                                                sorted(zip(doc['atom_types'], doc['positions_frac'], doc['site_occupancy']),
+                                                                       key=lambda k: k[0])])
+            else:
+                positions_frac, atom_types = zip(*[(pos, types) for (types, pos) in
+                                                   sorted(zip(doc['atom_types'], doc['positions_frac']),
+                                                          key=lambda k: k[0])])
+                occupancies = [1.0] * len(positions_frac)
         else:
             positions_frac = doc['positions_frac']
             atom_types = doc['atom_types']
+            if 'site_occupancy' in doc:
+                occupancies = doc['site_occupancy']
+            else:
+                occupancies = [1.0] * len(positions_frac)
 
         written_atoms = []
         for elem in atom_types:
@@ -695,9 +719,10 @@ def doc2res(doc, path, info=True, hash_dupe=True, spoof_titl=False, overwrite=Fa
             atom_labels.extend(num*[j])
             i += num
             j += 1
-        for atom in zip(atom_types, atom_labels, positions_frac):
-            flines.append("{0:8s}{1:3d}{2[0]: 15f} {2[1]: 15f} {2[2]: 15f}   1.0\n".format(
-                atom[0], atom[1], atom[2]))
+
+        for atom in zip(atom_types, atom_labels, positions_frac, occupancies):
+            flines.append("{0:8s}{1:3d}{2[0]: 15f} {2[1]: 15f} {2[2]: 15f}  {3: 15f}\n".format(
+                atom[0], atom[1], atom[2], atom[3]))
         flines.append('END')
         # very important newline for compatibliy with cryan
         flines.append('\n')

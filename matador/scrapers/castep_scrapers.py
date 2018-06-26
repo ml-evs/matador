@@ -84,6 +84,7 @@ def res2dict(seed, db=True, **kwargs):
         res['cell_volume'] = cart2volume(res['lattice_cart'])
     res['atom_types'] = []
     res['positions_frac'] = []
+    res['site_occupancy'] = []
     for line_no, line in enumerate(flines):
         if 'SFAC' in line:
             i = 1
@@ -91,6 +92,7 @@ def res2dict(seed, db=True, **kwargs):
                 cursor = flines[line_no + i].split()
                 res['atom_types'].append(cursor[0])
                 res['positions_frac'].append(list(map(float, cursor[2:5])))
+                res['site_occupancy'].append(float(cursor[5]))
                 assert len(res['positions_frac'][-1]) == 3
                 i += 1
     res['positions_frac'] = wrap_frac_coords(res['positions_frac'])
