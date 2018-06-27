@@ -7,9 +7,8 @@ diagrams, as well as voltage and volume expansion plots.
 """
 
 
-from traceback import print_exc
-import numpy as np
 import os
+import numpy as np
 from matador.utils.chem_utils import get_formula_from_stoich
 from matador.utils.viz_utils import ELEMENT_COLOURS
 
@@ -54,8 +53,8 @@ def plotting_function(function):
                 style = '/'.join(__file__.split('/')[:-1]) + '/../config/matador.mplstyle'
             if kwargs.get('debug'):
                 print('Using style {}'.format(style))
-            with plt.style.context(style):
-                result = function(*args, **kwargs)
+            plt.style.use(style)
+            result = function(*args, **kwargs)
         except TclError as exc:
             print_failure('Caught exception: {}'.format(type(exc).__name__))
             print_warning('Error message was: {}'.format(exc))

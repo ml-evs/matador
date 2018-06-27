@@ -16,7 +16,21 @@ from matador.utils.cell_utils import abc2cart, calc_mp_grid
 from matador.utils.cursor_utils import display_results
 
 
-def query2files(cursor, *args, **kwargs):
+def file_writer_function(function):
+    """ Wrapper for file writers to safely overwrite/hash duplicate files. """
+
+    from functools import wraps
+
+    @wraps(function)
+    def wrapped_writer(*args, **kwargs):
+        """ Wrap and return the writer function. """
+        result = function(*args, **kwargs)
+        return result
+
+    return wrapped_writer
+
+
+def query2files(cursor, **kwargs):
     """ Many-to-many convenience function for many structures being written to
     many file types. File types are passed via **kwargs, e.g.
 
@@ -35,21 +49,20 @@ def query2files(cursor, *args, **kwargs):
         **kwargs (dict): command-line arguments containing file types to write out.
 
     """
-    args = args[0]
-    cell = args.get('cell')
-    top = args.get('top')
-    param = args.get('param')
-    res = args.get('res')
-    pdb = args.get('pdb')
-    json = args.get('json')
-    xsf = args.get('xsf')
-    md = args.get('markdown')
-    tex = args.get('latex')
+    cell = kwargs.get('cell')
+    top = kwargs.get('top')
+    param = kwargs.get('param')
+    res = kwargs.get('res')
+    pdb = kwargs.get('pdb')
+    json = kwargs.get('json')
+    xsf = kwargs.get('xsf')
+    md = kwargs.get('markdown')
+    tex = kwargs.get('latex')
     argstr = kwargs.get('argstr')
     multiple_files = cell or param or res or pdb or xsf
-    prefix = (args.get('prefix') + '-') if args.get('prefix') is not None else ''
-    pressure = args.get('write_pressure')
-    if args['subcmd'] == 'polish' or args['subcmd'] == 'swaps':
+    prefix = (kwargs.get('prefix') + '-') if kwargs.get('prefix') is not None else ''
+    pressure = kwargs.get('write_pressure')
+    if kwargs.get('subcmd') in ['polish', 'swaps']:
         info = False
         hash_dupe = False
     else:
@@ -78,7 +91,7 @@ def query2files(cursor, *args, **kwargs):
                 return
         else:
             write = True
-    dirname = generate_relevant_path(args)
+    dirname = generate_relevant_path(kwargs)
     _dir = False
     dir_counter = 0
     while not _dir:
@@ -86,7 +99,7 @@ def query2files(cursor, *args, **kwargs):
             directory = dirname + str(dir_counter)
         else:
             directory = dirname
-        if not os.path.exists(directory):
+        if not os.path.isdir(directory):
             os.makedirs(directory)
             _dir = True
         else:
@@ -98,7 +111,7 @@ def query2files(cursor, *args, **kwargs):
         for source in doc['source']:
             source = str(source)
             if '.res' in source or '.castep' in source or '.history' in source:
-                if args['subcmd'] == 'swaps':
+                if kwargs.get('subcmd') == 'swaps':
                     comp_string = ''
                     comp_list = []
                     for atom in doc['atom_types']:
@@ -119,7 +132,7 @@ def query2files(cursor, *args, **kwargs):
                         stoich_string += str(atom[1]) if atom[1] != 1 else ''
                 name = stoich_string + '-OQMD_' + source.split(' ')[-1]
                 # if swaps, prepend new composition
-                if args['subcmd'] == 'swaps':
+                if kwargs.get('subcmd') == 'swaps':
                     comp_string = ''
                     comp_list = []
                     for atom in doc['atom_types']:
@@ -147,15 +160,15 @@ def query2files(cursor, *args, **kwargs):
     if md:
         md_path = path.split('/')[0] + '/' + path.split('/')[0] + '.md'
         print('Writing markdown file', md_path + '...')
-        hull = True if args['subcmd'] in ['hull', 'voltage'] else False
-        md_string = display_results(cursor, args, argstr=argstr, markdown=True, hull=hull)
+        hull = True if kwargs.get('subcmd') in ['hull', 'voltage'] else False
+        md_string = display_results(cursor, kwargs, argstr=argstr, markdown=True, hull=hull)
         with open(md_path, 'w') as f:
             f.write(md_string)
     if tex:
         tex_path = path.split('/')[0] + '/' + path.split('/')[0] + '.tex'
         print('Writing LaTeX file', tex_path + '...')
-        hull = True if args['subcmd'] in ['hull', 'voltage'] else False
-        tex_string = display_results(cursor, args, argstr=argstr, latex=True, hull=hull)
+        hull = True if kwargs.get('subcmd') in ['hull', 'voltage'] else False
+        tex_string = display_results(cursor, kwargs, argstr=argstr, latex=True, hull=hull)
         with open(tex_path, 'w') as f:
             f.write(tex_string)
 
@@ -674,12 +687,22 @@ def doc2res(doc, path, info=True, hash_dupe=True, spoof_titl=False, overwrite=Fa
 
         # enforce correct order by elements, sorting only the atom_types, not the positions inside them
         if sort_atoms:
-            positions_frac, atom_types = zip(*[(pos, types) for (types, pos) in
-                                               sorted(zip(doc['atom_types'], doc['positions_frac']),
-                                                      key=lambda k: k[0])])
+            if 'site_occupancy' in doc:
+                positions_frac, atom_types, occupancies = zip(*[(pos, types, occ) for (types, pos, occ) in
+                                                                sorted(zip(doc['atom_types'], doc['positions_frac'], doc['site_occupancy']),
+                                                                       key=lambda k: k[0])])
+            else:
+                positions_frac, atom_types = zip(*[(pos, types) for (types, pos) in
+                                                   sorted(zip(doc['atom_types'], doc['positions_frac']),
+                                                          key=lambda k: k[0])])
+                occupancies = [1.0] * len(positions_frac)
         else:
             positions_frac = doc['positions_frac']
             atom_types = doc['atom_types']
+            if 'site_occupancy' in doc:
+                occupancies = doc['site_occupancy']
+            else:
+                occupancies = [1.0] * len(positions_frac)
 
         written_atoms = []
         for elem in atom_types:
@@ -695,9 +718,10 @@ def doc2res(doc, path, info=True, hash_dupe=True, spoof_titl=False, overwrite=Fa
             atom_labels.extend(num*[j])
             i += num
             j += 1
-        for atom in zip(atom_types, atom_labels, positions_frac):
-            flines.append("{0:8s}{1:3d}{2[0]: 15f} {2[1]: 15f} {2[2]: 15f}   1.0\n".format(
-                atom[0], atom[1], atom[2]))
+
+        for atom in zip(atom_types, atom_labels, positions_frac, occupancies):
+            flines.append("{0:8s}{1:3d}{2[0]: 15f} {2[1]: 15f} {2[2]: 15f}  {3: 15f}\n".format(
+                atom[0], atom[1], atom[2], atom[3]))
         flines.append('END')
         # very important newline for compatibliy with cryan
         flines.append('\n')
@@ -789,14 +813,18 @@ def generate_hash(hash_len=6):
 
 def generate_relevant_path(args):
     """ Generates a suitable path name based on query. """
-    dirname = args['subcmd'] + '-'
-    if args['composition'] is not None:
+    dirname = ''
+    if args.get('subcmd') is not None:
+        dirname += args.get('subcmd') + '-'
+    else:
+        dirname = 'query'
+    if args.get('composition') is not None:
         for comp in args['composition']:
             dirname += comp
-    elif args['formula'] is not None:
-        dirname += args['formula'][0]
-    if args['db'] is not None:
-        dirname += '-' + args['db'][0]
+    elif args.get('formula') is not None:
+        dirname += args.get('formula')[0]
+    if args.get('db') is not None:
+        dirname += '-' + args.get('db')[0]
     if args.get('swap') is not None:
         for swap in args['swap']:
             dirname += '-' + swap
