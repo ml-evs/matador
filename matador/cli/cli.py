@@ -126,7 +126,7 @@ class MatadorCommandLine(object):
                     self.cursor = [doc for doc in self.cursor if len(doc['stoichiometry']) == self.args.get('write_n')]
                 if len(self.cursor) < 1:
                     print_failure('No structures left to export.')
-                query2files(self.cursor, self.args, argstr=self.argstr)
+                query2files(self.cursor, **self.args, argstr=self.argstr)
 
             if self.args.get('view'):
                 from matador.utils.viz_utils import viz
