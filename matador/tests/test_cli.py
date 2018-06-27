@@ -49,14 +49,14 @@ class IntegrationTest(unittest.TestCase):
         """ Test import and query. """
         query, files_to_delete, err_flines, manifest_flines = test_import_castep()
         self.assertEqual(len(files_to_delete), 2, msg='Failed to write spatula files')
-        self.assertEqual(len(err_flines), 3, msg='Failed to report errors correctly')
+        self.assertEqual(len(err_flines), 4, msg='Failed to report errors correctly')
         self.assertEqual(len(manifest_flines), 3, msg='Failed to report successes correctly')
         self.assertEqual(len(query.cursor), 3, msg='Failed to import structures correctly')
 
         # run again and hopefully nothing will change, i.e. no duplication
         query, files_to_delete, err_flines, manifest_flines = test_import_castep()
         self.assertEqual(len(files_to_delete), 2, msg='Failed to write spatula files')
-        self.assertEqual(len(err_flines), 3, msg='Failed to report errors correctly')
+        self.assertEqual(len(err_flines), 4, msg='Failed to report errors correctly')
         self.assertEqual(len(manifest_flines), 0, msg='Failed to report successes correctly')
         self.assertEqual(len(query.cursor), 3, msg='Failed to import structures correctly')
 
