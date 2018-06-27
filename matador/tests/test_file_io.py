@@ -8,7 +8,7 @@ from os import system, remove
 import numpy as np
 # grab abs path for accessing test data
 REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
-VERBOSITY = 0
+VERBOSITY = 10
 
 
 class ScrapeTest(unittest.TestCase):
@@ -150,6 +150,7 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(test_dict['lattice_abc'][1][2], 90.000000, msg='Wrong lattice constants!')
             self.assertEqual(test_dict['geom_force_tol'], 0.01, msg='Wrong geom force tol')
             self.assertEqual(test_dict['castep_version'], '17.21')
+            self.assertEqual(test_dict['optimised'], True)
             self.assertEqual(test_dict['estimated_mem_MB'], 300.1)
             self.assertEqual(test_dict['species_pot']['K'], '2|1.5|9|10|11|30U:40:31(qc=6)', msg='Failed to scrape K_OTF.usp file')
             self.assertEqual(test_dict['species_pot']['P'], '3|1.8|4|4|5|30:31:32', msg='Failed to scrape P_OTF.usp file')
@@ -319,6 +320,24 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(test_dict['free_energy'], -8546.922614706)
             self.assertEqual(final_dict['free_energy'], -8546.922614706)
 
+    def testCastepParameterChange(self):
+        from matador.scrapers.castep_scrapers import castep2dict
+        castep_fname = REAL_PATH + 'data/castep_files/input-mzs7x1.castep'
+        failed_open = False
+        try:
+            f = open(castep_fname, 'r')
+        except Exception:
+            failed_open = True
+            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(castep_fname))
+        if not failed_open:
+            f.close()
+            test_dict, s = castep2dict(castep_fname, db=True, verbosity=VERBOSITY)
+            self.assertTrue(s)
+            self.assertTrue(test_dict['optimised'])
+            self.assertEqual(test_dict['enthalpy'], -6.16805339E+003)
+            self.assertEqual(test_dict['total_energy'], -6168.053386094)
+
+
     def testRes(self):
         from matador.scrapers.castep_scrapers import res2dict
         failed_open = False
@@ -367,6 +386,46 @@ class ScrapeTest(unittest.TestCase):
             f.close()
             test_dict, s = res2dict(res_fname)
             self.assertFalse(s, 'This wasn\'t meant to succeed!')
+
+    def testCIF(self):
+        from matador.scrapers import cif2dict
+        cif_fname = REAL_PATH + 'data/cif_files/AgBiI.cif'
+        failed_open = False
+        try:
+            f = open(cif_fname, 'r')
+        except Exception:
+            failed_open = True
+            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(cif_fname))
+        if not failed_open:
+            f.close()
+            test_dict, s = cif2dict(cif_fname)
+            self.assertTrue(s, 'Failed entirely, oh dear!')
+            self.assertAlmostEqual(test_dict['num_atoms'], 46.623999999999995, msg='Failed to read num_atoms!', places=5)
+            self.assertTrue(['Bi', 1.0] in test_dict['stoichiometry'], msg='Wrong stoichiometry!')
+            self.assertTrue(['I', 4.0] in test_dict['stoichiometry'], msg='Wrong stoichiometry!')
+            self.assertTrue(sorted(test_dict['stoichiometry']) == test_dict['stoichiometry'], msg='Wrong stoichiometry!')
+            self.assertAlmostEqual(test_dict['cell_volume'], 1826.0028753, msg='Wrong cell volume!', places=3)
+            self.assertEqual(test_dict['space_group'], 'Fd-3m', msg='Wrong space group!')
+            self.assertEqual(len(test_dict['atom_types']), 64)
+            self.assertEqual(len(test_dict['positions_frac']), 64)
+            self.assertEqual(len(test_dict['site_occupancy']), 64)
+
+        cif_fname = REAL_PATH + 'data/cif_files/malicious.cif'
+        failed_open = False
+        try:
+            import os
+            f = open(cif_fname, 'r')
+        except FileNotFoundError:
+            failed_open = True
+            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(cif_fname))
+        if not failed_open:
+            f.close()
+            errored = False
+            test_dict, s = cif2dict(cif_fname)
+            errored = isinstance(test_dict, str) and 'RuntimeError' in test_dict
+            self.assertTrue(errored, 'WARNING: malicious attack is possible through symops')
+            self.assertFalse(s, 'This should have failed entirely, oh dear!')
+
 
     def testParam(self):
         from matador.scrapers.castep_scrapers import param2dict
@@ -725,7 +784,7 @@ class ExportTest(unittest.TestCase):
 
     def compareResDocwithResDoc(self, doc, doc_exported):
         for key in doc_exported:
-            if key not in ['source', 'atom_types', 'positions_frac', 'stoichiometry', 'user', 'lattice_abc', 'lattice_cart']:
+            if key not in ['source', 'atom_types', 'positions_frac', 'stoichiometry', 'user', 'lattice_abc', 'lattice_cart', 'site_occupancy']:
                 self.assertEqual(doc_exported[key], doc[key],
                                  msg='Input and output of {} do not match after scraping.'.format(key))
             elif key == 'positions_frac':

@@ -84,6 +84,7 @@ def res2dict(seed, db=True, **kwargs):
         res['cell_volume'] = cart2volume(res['lattice_cart'])
     res['atom_types'] = []
     res['positions_frac'] = []
+    res['site_occupancy'] = []
     for line_no, line in enumerate(flines):
         if 'SFAC' in line:
             i = 1
@@ -91,6 +92,7 @@ def res2dict(seed, db=True, **kwargs):
                 cursor = flines[line_no + i].split()
                 res['atom_types'].append(cursor[0])
                 res['positions_frac'].append(list(map(float, cursor[2:5])))
+                res['site_occupancy'].append(float(cursor[5]))
                 assert len(res['positions_frac'][-1]) == 3
                 i += 1
     res['positions_frac'] = wrap_frac_coords(res['positions_frac'])
@@ -1360,17 +1362,16 @@ def _castep_find_final_structure(flines):
     finish_line = 0
     success_string = 'Geometry optimization completed successfully'
     failure_string = 'Geometry optimization failed to converge after'
+    # look for final "success/failure" string in file for geometry optimisation
     for line_no, line in enumerate(reversed(flines)):
-        if any(finished in line for finished in [success_string, failure_string]):
-            for line_next in range(line_no, len(flines)):
-                if any(finished in flines[line_next] for finished in [success_string, failure_string]):
-                    finish_line = line_next
-                    if success_string in flines[line_next]:
-                        optimised = True
-                        break
-                    elif failure_string in flines[line_next]:
-                        optimised = False
-                        break
+        if success_string in line:
+            finish_line = len(flines) - line_no
+            optimised = True
+            break
+        elif failure_string in line:
+            finish_line = len(flines) - line_no
+            optimised = False
+            break
 
     # now wind back to get final total energies and non-symmetrised forces
     for count, line in enumerate(reversed(flines[:finish_line])):
