@@ -231,6 +231,5 @@ def test_export():
 
     matador.cli.cli.main(override=True)
 
-
 if __name__ == '__main__':
     unittest.main()

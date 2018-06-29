@@ -61,6 +61,8 @@ def scraper_function(function):
             if kwargs.get('verbosity', 0) > 0:
                 print_exc()
                 print('Error in file', seed, 'skipping...')
+            if kwargs.get('debug'):
+                raise oops
             return '{} {}: {}\n'.format(seed, type(oops), str(oops)), False
 
         if kwargs.get('verbosity', 0) > 4:

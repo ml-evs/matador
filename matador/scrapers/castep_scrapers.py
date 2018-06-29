@@ -814,7 +814,7 @@ def phonon2dict(seed, **kwargs):
         # read whole file into RAM, typically <~ 1 MB
         flines = f.readlines()
 
-    verbosity = kwargs.get('verbosity')
+    verbosity = kwargs.get('verbosity', 0)
 
     ph = dict()
     seed = seed.replace('.phonon', '')
