@@ -32,14 +32,14 @@ def main():
                         help='cell and param seed to use as template for CASTEP calculations OR list of files\
                               to apply run executable on')
     parser.add_argument('-nc', '--ncores', type=int,
-                        help='number of cores per job [DEFAULT=cpu_count/nprocesses]')
+                        help='number of cores per node per job [DEFAULT=cpu_count/nprocesses]')
     parser.add_argument('-np', '--nprocesses', type=int, default=1,
                         help='number of concurrent calculations, i.e. number \
                               of concurrent mpiruns [DEFAULT=1]')
     parser.add_argument('-nn', '--nnodes', type=int, default=1,
                         help='number of nodes per job, i.e. number of nodes \
-                              using -nc cores [DEFAULT=1]. REQUIRES Intel MPI as \
-                              found on e.g. Darwin HPC.')
+                              using -nc cores [DEFAULT=1].')
+
     parser.add_argument('-t', '--max_walltime', type=int,
                         help='maximum walltime in seconds (job will quit early to clean up if specified)')
     parser.add_argument('-exec', '--executable', type=str, default='castep',

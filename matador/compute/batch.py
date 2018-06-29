@@ -14,7 +14,7 @@ import os
 import glob
 import time
 from matador.utils.print_utils import print_notify
-from matador.compute.slurm import get_slurm_env, get_slurm_walltime
+from matador.compute.queue import get_queue_env, get_queue_walltime, get_queue_manager
 from matador.scrapers.castep_scrapers import cell2dict, param2dict
 from matador.compute.compute import FullRelaxer
 
@@ -90,22 +90,28 @@ class BatchRun:
         self.limit = self.args.get('limit')
         del self.args['limit']
 
-        # assign number of cores
-        self.all_cores = mp.cpu_count()
-        self.slurm_avail_tasks = os.environ.get('SLURM_NTASKS')
-        self.slurm_env = None
-        self.slurm_walltime = None
-        if self.slurm_avail_tasks is not None:
-            self.slurm_avail_tasks = int(self.slurm_avail_tasks)
-            self.slurm_env = get_slurm_env()
+        # detect and scrape queue settings
+        self._queue_env = None
+        self._queue_walltime = None
+        self._queue_available_tasks = None
+        queue_mgr = get_queue_manager()
+        if queue_mgr is not None:
+            self._queue_env = get_queue_env(token=queue_mgr)
+            if queue_mgr == 'slurm':
+                self._queue_available_tasks = int(self._queue_env.get('SLURM_NTASKS', 0))
+            elif queue_mgr == 'pbs':
+                # PBS docs are unclear whether this is actually available
+                self._queue_available_tasks = int(self._queue_env.get('PBS_TASKNUM', 0))
+                self._queue_available_tasks = None
 
-        if self.slurm_env is not None:
-            self.slurm_walltime = get_slurm_walltime(self.slurm_env)
+            if self._queue_env is not None:
+                self._queue_walltime = get_queue_walltime(self._queue_env, queue_mgr)
 
+        # handle user-specified walltime and queue walltimes
         if self.args.get('max_walltime') is not None:
             self.max_walltime = self.args.get('max_walltime')
-        elif self.slurm_walltime is not None:
-            self.max_walltime = self.slurm_walltime
+        elif self._queue_walltime is not None:
+            self.max_walltime = self._queue_walltime
         else:
             self.max_walltime = None
 
@@ -113,11 +119,14 @@ class BatchRun:
         if self.max_walltime is not None:
             self.start_time = time.time()
 
+        # assign number of cores
+        self.all_cores = mp.cpu_count()
         if self.args.get('ncores') is None:
-            if self.slurm_avail_tasks is None:
+            if self._queue_available_tasks is None:
                 self.args['ncores'] = int(self.all_cores / self.nprocesses)
             else:
-                self.args['ncores'] = int(self.slurm_avail_tasks / self.nprocesses)
+                self.args['ncores'] = int(self._queue_available_tasks / self.nprocesses)
+
         if self.args['nnodes'] < 1 or self.args['ncores'] < 1 or self.nprocesses < 1:
             raise SystemExit('Invalid number of cores, nodes or processes.')
 

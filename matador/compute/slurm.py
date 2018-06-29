@@ -7,23 +7,18 @@ cancelling jobs.
 
 """
 
+from matador.compute.queue import get_queue_env
 
-def get_slurm_env(fail_loudly=True):
+
+def get_slurm_env():
     """ Scrape SLURM environment variables from current env.
     This function can be used when called inside an active slurm job.
-
-    Keyword arguments:
-        fail_loudly (bool): option to raise SystemExit if SLURM not detected.
 
     Returns:
         dict: dictionary containing all the currently set SLURM environment variables.
 
     """
-    from os import environ
-    slurm_dict = {key: environ[key] for key in environ if 'slurm' in key.lower()}
-    if not slurm_dict and fail_loudly:
-        exit('Requested SLURM array mode, yet no SLURM settings were found. Was this process submitted as a job?')
-    return slurm_dict
+    return get_queue_env(token='slurm')
 
 
 def get_slurm_walltime(slurm_dict):
