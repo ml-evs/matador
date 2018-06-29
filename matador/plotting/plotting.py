@@ -96,6 +96,7 @@ def plot_spectral(seeds, **kwargs):
             with the same Bravais lattice can be more easily compared. If True, bandstructures may
             appear rarefied or compressed in particular regions.
         band_reorder (bool): try to reorder bands based on local gradients (DEFAULT: True for phonons, otherwise False).
+        title (str): optional plot title
         pdos_hide_tot (bool): whether or not to plot the total DOS on a PDOS plot; this is to hide
             regions where the PDOS is negative (leading to total DOS lower than stacked PDOS) (DEFAULT: False).
 
@@ -113,7 +114,7 @@ def plot_spectral(seeds, **kwargs):
                      'labels': None, 'cmap': None, 'band_colour': 'occ',
                      'n_colours': 4,
                      'no_stacked_pdos': False, 'preserve_kspace_distance': False,
-                     'band_reorder': None,
+                     'band_reorder': None, 'title': None,
                      'verbosity': 0, 'highlight_bands': None, 'pdos_hide_tot': False}
     prop_defaults.update(kwargs)
     kwargs = prop_defaults
@@ -144,9 +145,9 @@ def plot_spectral(seeds, **kwargs):
         plot_window = (-5, 5)
 
     if kwargs['plot_bandstructure'] and not kwargs['plot_dos']:
-        _, ax_dispersion = plt.subplots(figsize=(7, 6))
+        fig, ax_dispersion = plt.subplots(figsize=(7, 6))
     elif kwargs['plot_bandstructure'] and kwargs['plot_dos']:
-        _, ax_grid = plt.subplots(1, 3, figsize=(8, 6), sharey=True,
+        fig, ax_grid = plt.subplots(1, 3, figsize=(8, 6), sharey=True,
                                   gridspec_kw={'width_ratios': [4, 1, 1],
                                                'wspace': 0.05,
                                                'left': 0.15})
@@ -154,7 +155,7 @@ def plot_spectral(seeds, **kwargs):
         ax_dos = ax_grid[1]
         ax_grid[2].axis('off')
     elif not kwargs['plot_bandstructure'] and kwargs['plot_dos']:
-        _, ax_dos = plt.subplots(1, figsize=(8, 4))
+        fig, ax_dos = plt.subplots(1, figsize=(8, 4))
 
     valence = colours[0]
     conduction = colours[-1]
@@ -551,6 +552,9 @@ def plot_spectral(seeds, **kwargs):
                     ax_dos.fill_between(energies, 0, dos_data['spin_dos']['down'], alpha=0.2, color='b')
 
             dos_legend = ax_dos.legend(bbox_to_anchor=(1, 1), facecolor='w', frameon=True, fancybox=False, shadow=False)
+
+    if kwargs.get('title') is not None:
+        fig.suptitle(kwargs.get('title'))
 
     if any([kwargs.get('pdf'), kwargs.get('svg'), kwargs.get('png')]):
         if dos_legend is not None:
