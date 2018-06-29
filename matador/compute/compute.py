@@ -44,7 +44,7 @@ class FullRelaxer:
             res (str/dict): filename or input structure dict
             param_dict (dict): dictionary of CASTEP parameters
             cell_dict (dict): dictionary of CASTEP cell options
-            ncores (int): number of cores for mpirun call
+            ncores (int): number of cores *per node* for mpirun call
             nnodes (int): number of nodes for mpirun call (if None, use 1)
             node (str): node name to run on (if None, run on localhost)
 
@@ -854,6 +854,7 @@ class FullRelaxer:
             bool: True unless every single calculation failed.
 
         """
+        from matador.utils.cell_utils import get_best_mp_offset_for_cell
         successes = []
         cached_cutoff = calc_doc['cut_off_energy']
         if self.conv_cutoff_bool:
@@ -871,12 +872,15 @@ class FullRelaxer:
         if self.conv_kpt_bool:
             # run series of singlepoints for various cutoffs
             if self.verbosity > 1:
-                print('Running cutoff convergence tests...')
+                print('Running kpt convergence tests...')
             calc_doc['cut_off_energy'] = cached_cutoff
             for kpt in self.conv_kpt:
                 if self.verbosity > 1:
                     print('{} 1/A... '.format(kpt), end='')
                 calc_doc.update({'kpoints_mp_spacing': kpt})
+                calc_doc['kpoints_mp_offset'] = get_best_mp_offset_for_cell(calc_doc)
+                if self.verbosity > 1:
+                    print('Using offset {}'.format(calc_doc['kpoints_mp_offset']))
                 self.paths['completed_dir'] = 'completed_kpts'
                 seed = self.seed + '_' + str(kpt) + 'A'
                 success = self.scf(calc_doc, seed, keep=False)
@@ -1160,7 +1164,7 @@ class FullRelaxer:
         for globbed in glob.glob(err_file):
             if os.path.isfile(globbed):
                 with open(globbed, 'r') as f:
-                    error_str += ''.join(f.readlines())
+                    error_str += ' '.join(f.readlines())
                 error_str += '\n'
                 errors_present = True
 

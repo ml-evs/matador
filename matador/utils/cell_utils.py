@@ -272,6 +272,60 @@ def shift_to_include_gamma(mp_grid):
     return shift
 
 
+def shift_to_exclude_gamma(mp_grid):
+    """ Calculate the shift required to exclude $\\Gamma$.
+    in the Monkhorst-Pack grid. Returns the "minimal shift", i.e. only
+    one direction will be shifted.
+
+    Parameters:
+        mp_grid (:obj:`list` of :obj:`int`): number of grid points
+            in each reciprocal space direction.
+
+    Returns:
+        :obj:`list` of :obj:`float`: shift required to exclude $\\Gamma$.
+
+    """
+    shift = [0, 0, 0]
+    if all([val % 2 == 1 for val in mp_grid]):
+        for ind, val in enumerate(mp_grid):
+            if val % 2 == 1:
+                shift[ind] = 1.0/(val*2)
+                break
+
+    return shift
+
+
+def get_best_mp_offset_for_cell(doc):
+    """ Calculates the "best" kpoint_mp_offset to use for the passed
+    cell. If the crystal has a hexagonal space group, then the offset
+    returned will shift the grid to include $\\Gamma$ point, and vice
+    versa for non-hexagonal cells.
+
+    Parameters:
+        doc (dict): matador document to consider, containing structural
+            information and a "kpoints_mp_spacing" key.
+
+    Returns:
+        :obj:`list` of :obj:`float`: the desired kpoint_mp_offset.
+
+    """
+
+    gamma = False
+    if '6' in get_spacegroup_spg(doc, symprec=1e-5):
+        gamma = True
+
+    print(doc)
+
+    if 'lattice_cart' not in doc or 'kpoints_mp_spacing' not in doc:
+        raise RuntimeError('Unable to calculate offset without lattice or spacing')
+
+    mp_grid = calc_mp_grid(doc['lattice_cart'], doc['kpoints_mp_spacing'])
+    if gamma:
+        return shift_to_include_gamma(mp_grid)
+
+    return shift_to_exclude_gamma(mp_grid)
+
+
 def calc_mp_spacing(real_lat, mp_grid, prec=3):
     """ Convert real lattice in Cartesian basis and the
     kpoint_mp_grid into a grid spacing.
