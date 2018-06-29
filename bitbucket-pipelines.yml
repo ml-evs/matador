@@ -12,7 +12,7 @@ pipelines:
         script:
           - pip install .[test]
           - pip install .[db]
-          - pip install .[network]
+          - pip install .[crystal]
           - py.test --cov-config .coveragerc --cov=matador
           - codecov --token=$CODECOV_TOKEN
         services:
