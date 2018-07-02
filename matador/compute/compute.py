@@ -991,7 +991,7 @@ class FullRelaxer:
                 mpi_version_string = str(sp.check_output('aprun --version', shell=True))
         except Exception as exc:
             print_exc()
-            raise exc
+            raise SystemExit('Failed to detect MPI library.')
         if 'Intel' in mpi_version_string:
             mpi_version = 'intel'
         elif 'aprun' in mpi_version_string:
