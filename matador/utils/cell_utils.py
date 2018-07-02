@@ -444,6 +444,7 @@ def standardize_doc_cell(doc, primitive=True, symprec=1e-5):
     std_doc['lattice_abc'] = cart2abc(std_doc['lattice_cart'])
     std_doc['positions_frac'] = [list(atom) for atom in spg_standardized[1]]
     std_doc['atom_types'] = [get_atomic_symbol(atom) for atom in spg_standardized[2]]
+    std_doc['site_occupancy'] = len(std_doc['positions_frac']) * [1]
     std_doc['cell_volume'] = cart2volume(std_doc['lattice_cart'])
 
     return std_doc

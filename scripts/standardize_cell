@@ -2,7 +2,7 @@
 """ Standardize crystal structure with spglib. """
 from matador.utils.cell_utils import standardize_doc_cell
 from matador.scrapers.castep_scrapers import res2dict
-from matador.export import doc2res
+from matador.export import doc2res, doc2cell
 import argparse
 
 
@@ -23,18 +23,21 @@ def standardize_cell(symtol=0.01, **kwargs):
                 if primitive:
                     print('and reducing to primitive.')
             spg_doc = standardize_doc_cell(doc, primitive=primitive, symprec=symtol)
-            doc.update(spg_doc)
-            doc2res(spg_doc, seed + '_std.res', info=False)
+            if not kwargs.get('cell'):
+                doc2res(spg_doc, seed + '_std.res', info=False)
+            else:
+                doc2cell(spg_doc, seed + '_std.cell', copy_pspots=False)
         else:
             print('Standardization failed for {}'.format(seed))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog='standardize_cell', description='standardize res file with spglig')
-    parser.add_argument('-sym', '--symtol', type=float, nargs='?', const=0.01, help='spglib symtol (default: 0.0)')
+    parser.add_argument('-sym', '--symtol', type=float, nargs='?', const=0.01, help='spglib symtol (default: 0.01)')
     parser.add_argument('-prim', '--primitive', action='store_true', help='reduce cell to primitive')
     parser.add_argument('seeds', nargs='+', type=str, help='res files to manipulate')
     parser.add_argument('--debug', action='store_true', help='print debug output')
+    parser.add_argument('--cell', action='store_true', help='write cell file instead of res')
     kwargs = vars(parser.parse_args())
 
     standardize_cell(**kwargs)

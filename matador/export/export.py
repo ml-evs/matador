@@ -686,23 +686,29 @@ def doc2res(doc, path, info=True, hash_dupe=True, spoof_titl=False, overwrite=Fa
         flines.append('SFAC \t')
 
         # enforce correct order by elements, sorting only the atom_types, not the positions inside them
+        assert len(doc['positions_frac']) == len(doc['atom_types'])
+        if 'site_occupancy' in doc:
+            assert len(doc['site_occupancy']) == len(doc['positions_frac'])
+
+        if 'site_occupancy' not in doc:
+            occupancies = [1.0] * len(doc['positions_frac'])
+
         if sort_atoms:
+            positions_frac, atom_types = zip(*[(pos, types) for (types, pos) in
+                                               sorted(zip(doc['atom_types'], doc['positions_frac']),
+                                                      key=lambda k: k[0])])
             if 'site_occupancy' in doc:
-                positions_frac, atom_types, occupancies = zip(*[(pos, types, occ) for (types, pos, occ) in
-                                                                sorted(zip(doc['atom_types'], doc['positions_frac'], doc['site_occupancy']),
-                                                                       key=lambda k: k[0])])
-            else:
-                positions_frac, atom_types = zip(*[(pos, types) for (types, pos) in
-                                                   sorted(zip(doc['atom_types'], doc['positions_frac']),
-                                                          key=lambda k: k[0])])
-                occupancies = [1.0] * len(positions_frac)
+                occupancies, _atom_types = zip(*[(occ, types) for (types, occ) in
+                                                 sorted(zip(doc['atom_types'], doc['site_occupancy']),
+                                                        key=lambda k: k[0])])
+
         else:
             positions_frac = doc['positions_frac']
             atom_types = doc['atom_types']
-            if 'site_occupancy' in doc:
-                occupancies = doc['site_occupancy']
-            else:
-                occupancies = [1.0] * len(positions_frac)
+
+        assert len(positions_frac) == len(doc['positions_frac'])
+        assert len(atom_types) == len(doc['atom_types'])
+        assert len(_atom_types) == len(doc['atom_types'])
 
         written_atoms = []
         for elem in atom_types:
