@@ -142,15 +142,15 @@ def plot_spectral(seeds, **kwargs):
         else:
             plot_window = (-kwargs.get('plot_window'), kwargs.get('plot_window'))
     else:
-        plot_window = (-5, 5)
+        plot_window = None
 
     if kwargs['plot_bandstructure'] and not kwargs['plot_dos']:
         fig, ax_dispersion = plt.subplots(figsize=(7, 6))
     elif kwargs['plot_bandstructure'] and kwargs['plot_dos']:
         fig, ax_grid = plt.subplots(1, 3, figsize=(8, 6), sharey=True,
-                                  gridspec_kw={'width_ratios': [4, 1, 1],
-                                               'wspace': 0.05,
-                                               'left': 0.15})
+                                    gridspec_kw={'width_ratios': [4, 1, 1],
+                                                 'wspace': 0.05,
+                                                 'left': 0.15})
         ax_dispersion = ax_grid[0]
         ax_dos = ax_grid[1]
         ax_grid[2].axis('off')
@@ -190,7 +190,8 @@ def plot_spectral(seeds, **kwargs):
                 band_key = 'num_branches'
                 dispersion['num_spins'] = 1
                 spin_key = 'num_spins'
-                plot_window = [np.min(dispersion[eig_key])-10, np.max(dispersion[eig_key])]
+                if plot_window is None:
+                    plot_window = [min(-10, np.min(dispersion[eig_key])-10), np.max(dispersion[eig_key])]
             else:
                 dispersion, s = bands2dict(seed + '.bands',
                                            summary=True,
@@ -278,7 +279,6 @@ def plot_spectral(seeds, **kwargs):
                 ylabel = r'Energy (eV)'
             ax_dispersion.set_ylabel(ylabel)
             ax_dispersion.set_xlim(0, 1)
-            # ax_dispersion.set_xlim(-0.05, 1.05)
             xticks = []
             xticklabels = []
             shear_planes = []
@@ -312,6 +312,8 @@ def plot_spectral(seeds, **kwargs):
                             if ind - branch_ind not in labelled:
                                 label = label.replace('GAMMA', r'\Gamma')
                                 label = label.replace('SIGMA', r'\Sigma')
+                                label = label.replace('DELTA', r'\Delta')
+                                label = label.replace('LAMBDA', r'\Lambda')
                                 if sub_ind == len(branch) - 1:
                                     if branch_ind < len(dispersion[branch_key]) - 1:
                                         _tmp = dispersion[path_key]
@@ -319,6 +321,8 @@ def plot_spectral(seeds, **kwargs):
                                         for new_label, new_point in path_labels.items():
                                             new_label = new_label.replace('GAMMA', r'\Gamma')
                                             new_label = new_label.replace('SIGMA', r'\Sigma')
+                                            new_label = new_label.replace('DELTA', r'\Delta')
+                                            new_label = new_label.replace('LAMBDA', r'\Lambda')
                                             if np.allclose(new_point, next_point):
                                                 label = '{}|{}'.format(label, new_label)
                                                 ax_dispersion.axvline(path[ind - branch_ind], ls='-', c='grey', zorder=1, lw=0.5)
@@ -388,7 +392,8 @@ def plot_spectral(seeds, **kwargs):
                     if not s:
                         raise RuntimeError(phonon_data)
                     else:
-                        plot_window = [np.min(phonon_data['eigenvalues_q']) - 10, np.max(phonon_data['eigenvalues_q'])]
+                        if plot_window is None:
+                            plot_window = [min(-10, np.min(phonon_data['eigenvalues_q']) - 10), np.max(phonon_data['eigenvalues_q'])]
                         space_size = 1000
                         gaussian_width = 10
                         raw_weights = []
@@ -432,7 +437,8 @@ def plot_spectral(seeds, **kwargs):
                     dos_data['dos'] = dos
                     max_density = np.max(dos)
                     dos_data['energies'] = energies
-                    plot_window = [np.min(energies[np.where(dos > 1e-3)]) - 10, np.max(energies[np.where(dos > 1e-3)])]
+                    if plot_window is None:
+                        plot_window = [np.min(energies[np.where(dos > 1e-3)]) - 10, np.max(energies[np.where(dos > 1e-3)])]
                     dos_data['pdos'] = dict()
                     for i, label in enumerate(projector_labels):
                         dos_data['pdos'][label] = raw_data[:, i + 2]
