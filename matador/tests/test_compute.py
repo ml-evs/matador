@@ -79,7 +79,7 @@ class ComputeTest(unittest.TestCase):
 
         match_dict = dict()
         for key in queue_result:
-            if key == 'source':
+            if key in ['source', 'site_occupancy']:
                 continue
             match_dict[key] = queue_result[key] == result[key]
 
@@ -368,6 +368,10 @@ class ComputeTest(unittest.TestCase):
         dirs_exist = [os.path.isdir(_dir) for _dir in ['completed_kpts', 'completed_cutoff']]
         bad_castep_exist = os.path.isdir('bad_castep')
 
+        files_that_should_not_exist = ['_LiAs_testcase_300eV.res', '_LiAs_testcase_400eV.res',
+                                       '_LiAs_testcase_0.08A.res', '_LiAs_testcase_0.07A.res']
+        do_bad_files_exist = [os.path.isfile(_file) for _file in files_that_should_not_exist]
+
         results = ['completed_cutoff/_LiAs_testcase_{}eV.castep'.format(cutoff) for cutoff in [300, 400]]
         results += ['completed_kpts/_LiAs_testcase_{}A.castep'.format(kpts) for kpts in [0.08, 0.07]]
         files_exist = [os.path.isfile(_file) for _file in results]
@@ -389,6 +393,7 @@ class ComputeTest(unittest.TestCase):
         self.assertTrue(all(dirs_exist))
         self.assertFalse(bad_castep_exist)
         self.assertTrue(all(files_exist))
+        self.assertFalse(any(do_bad_files_exist))
 
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
     def testBatchFailedSCF(self):
