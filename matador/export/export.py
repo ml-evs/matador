@@ -701,6 +701,7 @@ def doc2res(doc, path, info=True, hash_dupe=True, spoof_titl=False, overwrite=Fa
                 occupancies, _atom_types = zip(*[(occ, types) for (types, occ) in
                                                  sorted(zip(doc['atom_types'], doc['site_occupancy']),
                                                         key=lambda k: k[0])])
+                assert len(_atom_types) == len(doc['atom_types'])
 
         else:
             positions_frac = doc['positions_frac']
@@ -708,7 +709,6 @@ def doc2res(doc, path, info=True, hash_dupe=True, spoof_titl=False, overwrite=Fa
 
         assert len(positions_frac) == len(doc['positions_frac'])
         assert len(atom_types) == len(doc['atom_types'])
-        assert len(_atom_types) == len(doc['atom_types'])
 
         written_atoms = []
         for elem in atom_types:
