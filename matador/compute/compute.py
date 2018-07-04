@@ -375,7 +375,7 @@ class FullRelaxer:
                             print('Elapsed time: {:>10.1f} s'.format(elapsed))
 
                         # leave 1 minute to clean up
-                        if elapsed > abs(self.max_walltime):  # - 60):
+                        if elapsed > abs(self.max_walltime - 3*self.polltime):
                             raise WalltimeError('Ran out of time on seed {}'.format(self.seed))
                         time.sleep(self.polltime)
 
@@ -1242,6 +1242,11 @@ class FullRelaxer:
             for ext in file_exts + ['.res.lock']:
                 if os.path.isfile('{}{}'.format(fname, ext)):
                     os.remove('{}{}'.format(fname, ext))
+            if self.conv_kpt_bool or self.conv_cutoff_bool:
+                for _file in glob.glob(fname + '*.res'):
+                    if os.path.isfile(_file):
+                        print(_file)
+                        os.remove(_file)
 
     def cp_to_input(self, seed, ext='res', glob_files=False):
         """ Copy initial cell and res to input folder.
