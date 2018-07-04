@@ -9,18 +9,18 @@ errors.
 
 
 import os
+import sys
 import shutil
 import subprocess as sp
 import glob
 import time
+import logging
 from copy import deepcopy
-from traceback import print_exc
 from math import ceil
 from psutil import virtual_memory
 
 from matador.scrapers.castep_scrapers import cell2dict
 from matador.scrapers.castep_scrapers import res2dict, castep2dict
-from matador.utils.print_utils import print_success, print_warning, print_notify, print_failure
 from matador.export import doc2cell, doc2param, doc2res
 
 
@@ -88,6 +88,8 @@ class FullRelaxer:
                 operation, and kill executable if present (DEFAULT: True)
             compute_dir (str): folder to run computations in; default is
                 None (i.e. cwd), if not None, prepend paths with this folder
+            verbosity (int): either 0, 1, 2 or >3, corresponding to ERROR, WARNING
+                INFO and DEBUG logging levels.
             timings (`obj`:tuple: of `obj`:int:): tuple containing max and elapsed time in seconds
 
         Raises:
@@ -98,12 +100,11 @@ class FullRelaxer:
         """
         # set defaults and update class with desired values
         prop_defaults = {'paths': None, 'param_dict': None, 'cell_dict': None, 'mode': 'castep', 'executable': 'castep',
-                         'memcheck': False, 'rough': 4, 'rough_iter': 2, 'fine_iter': 20, 'spin': False, 'output_queue': None,
-                         'redirect': None, 'reopt': False, 'compute_dir': None, 'custom_params': False, 'archer': False,
-                         'maxmem': None, 'killcheck': True, 'kpts_1D': False, 'conv_cutoff': False, 'conv_kpt': False,
-                         'debug': False, 'profile': False, 'slurm': False, 'intel': False, 'exec_test': True, 'timings': (None, None),
-                         'start': True, 'verbosity': 0, 'polltime': 30}
-
+                         'memcheck': False, 'rough': 4, 'rough_iter': 2, 'fine_iter': 20, 'spin': False,
+                         'output_queue': None, 'redirect': None, 'reopt': False, 'compute_dir': None,
+                         'custom_params': False, 'archer': False, 'maxmem': None, 'killcheck': True, 'kpts_1D': False,
+                         'conv_cutoff': False, 'conv_kpt': False, 'profile': False, 'slurm': False, 'intel': False,
+                         'exec_test': True, 'timings': (None, None), 'start': True, 'verbosity': 1, 'polltime': 30}
         self.paths = None
         self.process = None
         self.output_queue = None
@@ -118,8 +119,41 @@ class FullRelaxer:
             profile = cProfile.Profile()
             profile.enable()
 
-        self.ncores = ncores
+        # scrape and save seed name
         self.res = res
+        if isinstance(self.res, str):
+            self.seed = self.res.replace('.res', '')
+        else:
+            assert isinstance(self.res['source'], list)
+            assert len(self.res['source']) == 1
+            self.seed = self.res['source'][0].replace('.res', '')
+
+        # set up logging; by default, write DEBUG level into a file called logs/$seed.log
+        # and write desired verbosity to stdout (default WARN).
+        if self.verbosity == 0:
+            loglevel = logging.ERROR
+        elif self.verbosity == 1:
+            loglevel = logging.WARN
+        elif self.verbosity == 2:
+            loglevel = logging.INFO
+        else:
+            loglevel = logging.DEBUG
+
+        if not os.path.isdir('logs'):
+            os.mkdir('logs')
+
+        logging.basicConfig(filename='logs/{}.log'.format(self.seed),
+                            level=logging.DEBUG, filemode='a',
+                            format='%(asctime)s - %(levelname)s: %(message)s',)
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setLevel(loglevel)
+        handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s: %(message)s'))
+        logging.getLogger().addHandler(handler)
+
+        logging.info('Initialising FullRelaxer object for {seed}'.format(seed=self.seed))
+
+        # set up compute parameters
+        self.ncores = ncores
         self.nnodes = nnodes
         self.node = node
         self.conv_cutoff_bool = isinstance(self.conv_cutoff, list)
@@ -133,8 +167,8 @@ class FullRelaxer:
             self.max_walltime = self.timings[0]
             self.start_time = self.timings[1]
 
-        if self.verbosity > 2:
-            print('Timing data: ', self.timings)
+        logging.debug('Starting at {start}, max walltime allowed is {walltime}'.format(
+            start=self.start_time, walltime=self.max_walltime))
 
         self._redirect_filename = None
 
@@ -153,7 +187,8 @@ class FullRelaxer:
             else:
                 self.success = self.run_generic(res)
 
-        except RuntimeError:
+        except RuntimeError as exc:
+            logging.error('Process raised RuntimeError with message {error}.'.format(error=exc))
             self.success = False
 
         if self.profile:
@@ -164,6 +199,8 @@ class FullRelaxer:
             with open(fname + '.pstats', 'w') as fp:
                 stats = pstats.Stats(profile, stream=fp).sort_stats('cumulative')
                 stats.print_stats()
+
+        logging.info('FullRelaxer finished successfully for {seed}'.format(seed=self.seed))
 
     def run_castep(self, res):
         """ Set up and run CASTEP calculation.
@@ -185,10 +222,13 @@ class FullRelaxer:
                 unless every calculation fails.
 
         """
+        logging.info('Calling CASTEP on {seed}'.format(seed=self.seed))
+
         if self.exec_test:
             self.test_exec()
 
         if self.kpts_1D:
+            logging.debug('1D kpoint grid requested.')
             if 'kpoints_mp_spacing' not in self.cell_dict:
                 raise SystemExit('kpoints_mp_spacing not found, but kpts_1D requested...')
             self._target_spacing = deepcopy(self.cell_dict['kpoints_mp_spacing'])
@@ -197,16 +237,13 @@ class FullRelaxer:
         if isinstance(res, str):
             self.res_dict, success = res2dict(res, db=False)
             if not success:
-                raise RuntimeError('Failed to parse initial res file {}'.format(res))
-
+                msg = 'Unable to parse initial res file, error: {res_dict}'.format(res_dict=self.res_dict)
+                logging.error(msg)
+                raise RuntimeError(msg)
         elif isinstance(res, dict):
             self.res_dict = res
 
         calc_doc = deepcopy(self.res_dict)
-
-        # set seed name
-        assert isinstance(calc_doc['source'], list)
-        self.seed = calc_doc['source'][0].replace('.res', '')
 
         # update global doc with cell and param dicts for folder
         calc_doc.update(self.cell_dict)
@@ -217,7 +254,9 @@ class FullRelaxer:
             for elem in self.res_dict['stoichiometry']:
                 if ('|' not in calc_doc['species_pot'][elem[0]] and
                         not os.path.isfile(os.path.expanduser(calc_doc['species_pot'][elem[0]]))):
-                    raise SystemExit('You forgot your pseudos, you silly goose!')
+                    msg = 'Unable to find pseudopotential file/string: {}'.format(calc_doc['species_pot'][elem[0]])
+                    logging.critical(msg)
+                    raise SystemExit(msg)
 
         # this is now a dict containing the exact calculation we are going to run
         self.calc_doc = calc_doc
@@ -227,15 +266,13 @@ class FullRelaxer:
             self.enough_memory = self.do_memcheck(calc_doc, self.seed)
         else:
             self.enough_memory = True
+
         if not self.enough_memory:
-            return self.enough_memory
+            return False
 
         # run convergence tests
         if any([self.conv_cutoff_bool, self.conv_kpt_bool]):
-            if self.verbosity > 0:
-                print('Running convergence tests...')
             success = self.run_convergence_tests(calc_doc)
-            return success
 
         # perform relaxation
         elif calc_doc['task'].upper() in ['GEOMETRYOPTIMISATION', 'GEOMETRYOPTIMIZATION']:
@@ -251,25 +288,27 @@ class FullRelaxer:
             self.geom_max_iter_list = (self.num_rough_iter * [rough_iter])
             self.geom_max_iter_list.extend(num_fine_iter * [fine_iter])
             if not self.geom_max_iter_list:
-                raise SystemExit('Could not divide up relaxation; consider increasing geom_max_iter')
+                msg = 'Could not divide up relaxation; consider increasing geom_max_iter'
+                logging.critical(msg)
+                raise SystemExit(msg)
 
             # begin relaxation
             if self.start:
                 try:
                     success = self.relax()
                 except Exception as err:
+                    logging.debug('Cleaning up after catching error from relax.')
                     if self.compute_dir is not None:
                         # always cd back to root folder
                         os.chdir(self.root_folder)
-                        self.remove_compute_dir_if_finished(self.compute_dir, debug=self.debug)
+                        self.remove_compute_dir_if_finished(self.compute_dir)
                     raise err
 
                 if self.compute_dir is not None:
+                    logging.debug('Cleaning up after relaxation.')
                     # always cd back to root folder
                     os.chdir(self.root_folder)
-                    self.remove_compute_dir_if_finished(self.compute_dir, debug=self.debug)
-
-                return success
+                    self.remove_compute_dir_if_finished(self.compute_dir)
 
         elif calc_doc['task'].upper() in ['PHONON', 'THERMODYNAMICS']:
             success = self.castep_full_phonon(calc_doc, self.seed)
@@ -277,7 +316,8 @@ class FullRelaxer:
         # run in SCF mode, i.e. just call CASTEP on the seeds
         else:
             success = self.scf(calc_doc, self.seed, keep=True)
-            return success
+
+        return success
 
     def run_generic(self, seed):
         """ Run a generic mpi program on the given seed. Files from
@@ -290,6 +330,7 @@ class FullRelaxer:
             bool: True if calculations progressed without error.
 
         """
+        logging.info('Calling "generic" MPI program on {seed}'.format(seed=self.seed))
         try:
             self.seed = seed
             if '.' in self.seed:
@@ -309,7 +350,7 @@ class FullRelaxer:
             return True
 
         except Exception as err:
-            print_exc()
+            logging.critical('Caught error inside run_generic: {error}.'.format(error=err))
             self.mv_to_bad(seed)
             raise err
 
@@ -327,6 +368,7 @@ class FullRelaxer:
             WalltimeError: if walltime was reached, and jobs need to stop.
 
         """
+        logging.info('Attempting to relax {}'.format(self.seed))
         self._setup_relaxation_dirs()
         seed = self.seed
         rerun = False
@@ -334,23 +376,12 @@ class FullRelaxer:
             # iterate over geom iter blocks
             for ind, num_iter in enumerate(self.geom_max_iter_list):
 
-                # print some blurb about what we're doing
-                if self.verbosity > 0:
-                    if ind == 0:
-                        if self.verbosity > 2:
-                            if self.custom_params is not False:
-                                print_notify('custom params: {}'.format(self.custom_params))
-                        print_notify('Beginning geometry optimisation...')
-                    elif ind == self.num_rough_iter:
-                        print_notify('Beginning fine geometry optimisation...')
-
                 # preprocess last step that did not finish geom opt
                 if self.reopt and rerun:
                     # if we're now reoptimising after a success in last step
                     # use the fine iter value
                     num_iter = self.fine_iter
-                    if self.verbosity > 0:
-                        print_notify('Last step was successful, performing one last relaxation...')
+                    logging.info('Last step was successful, performing one last relaxation...')
 
                 # update the geom_max_iter to use with either the number in iter_list, or the overriden value
                 self.calc_doc['geom_max_iter'] = num_iter
@@ -364,35 +395,41 @@ class FullRelaxer:
                 # if specified max_walltime (or found through SLURM), then monitor job
                 if self.max_walltime is not None:
                     if self.start_time is None:
-                        raise SystemExit('Somehow initial start time was not found')
+                        msg = 'Somehow initial start time was not found'
+                        logging.critical(msg)
+                        raise SystemExit(msg)
 
-                    if self.debug:
-                        print('Polling process every {} s'.format(self.polltime))
+                    logging.info('Polling process every {} s'.format(self.polltime))
 
                     while self.process.poll() is None:
                         elapsed = time.time() - self.start_time
-                        if self.debug:
-                            print('Elapsed time: {:>10.1f} s'.format(elapsed))
+                        logging.debug('Elapsed time: {:>10.1f} s / {:>10.1f}'
+                                      .format(elapsed, self.max_walltime - 3*self.polltime))
 
                         # leave 1 minute to clean up
                         if elapsed > abs(self.max_walltime - 3*self.polltime):
-                            raise WalltimeError('Ran out of time on seed {}'.format(self.seed))
+                            msg = 'Ran out of time on seed {}'.format(self.seed)
+                            logging.info(msg)
+                            raise WalltimeError(msg)
+
                         time.sleep(self.polltime)
 
                 self.process.communicate()
 
                 # scrape new structure from castep file
                 if not os.path.isfile(seed + '.castep'):
-                    raise SystemExit('CASTEP file was not created, '
-                                     'please check your executable: {}.'.format(self.executable))
+                    msg = ('CASTEP file was not created, please check your executable: {}.'
+                           .format(self.executable))
+                    logging.critical(msg)
+                    raise SystemExit(msg)
 
                 opti_dict, success = castep2dict(seed + '.castep', db=False, verbosity=self.verbosity)
                 if not success and isinstance(opti_dict, str):
-                    raise RuntimeError('Failed to parse CASTEP file...')
+                    msg = 'Failed to parse CASTEP file...'
+                    logging.warning(msg)
+                    raise RuntimeError(msg)
 
-                if self.debug:
-                    print_notify('Intermediate calculation finished')
-                    print(opti_dict)
+                logging.debug('Intermediate calculation completed successfully: num_iter = {} '.format(num_iter))
 
                 # scrub keys that need to be rescraped
                 keys_to_remove = ['kpoints_mp_spacing', 'kpoints_mp_grid', 'species_pot', 'sedc_apply', 'sedc_scheme']
@@ -401,7 +438,6 @@ class FullRelaxer:
                         del opti_dict[key]
 
                 # now post-process the last step
-
                 # did we try to rerun, and are now no longer optimised?
                 # then reset, and go again...
                 if self.reopt and rerun and not opti_dict['optimised']:
@@ -415,25 +451,24 @@ class FullRelaxer:
 
                 # or did the relaxation complete successfuly, including rerun?
                 elif (not self.reopt or rerun) and opti_dict['optimised']:
-                    if self.verbosity > 0:
-                        print_success('Successfully relaxed ' + seed)
+                    logging.info('Successfully relaxed {}'.format(seed))
                     self._update_output_files(opti_dict)
-                    return self._finalise_result()
+                    break
 
                 # reached maximum number of steps
                 elif ind == len(self.geom_max_iter_list) - 1:
-                    if self.verbosity > 0:
-                        print_warning('Failed to optimise ' + seed)
-                    return self._finalise_result()
+                    logging.info('Failed to optimise {}'.format(seed))
+                    break
 
                 errors_present, errors = self._catch_castep_errors()
                 if errors_present:
-                    if self.verbosity > 0:
-                        print_warning('Failed to optimise {} as CASTEP crashed with error:'.format(seed))
-                        print(errors)
-
+                    msg = 'Failed to optimise {} as CASTEP crashed with error:'.format(seed)
+                    msg += errors
+                    logging.warning(msg)
                     self._update_output_files(opti_dict)
-                    return self._finalise_result()
+                    break
+
+                # if we weren't successful, then preprocess the next step
 
                 # set atomic_init_spins with value from CASTEP file, if it exists
                 if 'mulliken_spins' in opti_dict:
@@ -447,28 +482,24 @@ class FullRelaxer:
                     if success:
                         opti_dict['lattice_cart'] = list(cell_dict['lattice_cart'])
 
-                if self.debug:
-                    print_notify('Restarting calculation with current state:')
-                    print(self.calc_doc)
-                if self.verbosity > 1:
-                    print(('num_iter: {:3d} | max F: {:5f} eV/A | stress: {: 5f} GPa | ' +
-                           'cell volume: {:5f} A^3 | enthalpy per atom {:5f} eV')
-                          .format(sum(self.geom_max_iter_list[:ind+1]),
-                                  opti_dict['max_force_on_atom'],
-                                  opti_dict['pressure'],
-                                  opti_dict['cell_volume'],
-                                  opti_dict['enthalpy_per_atom']))
+                logging.debug('N = {iters:03d} | |F| = {d[max_force_on_atom]:5.5f} eV/A | '
+                              'S = {d[pressure]:5.5f} GPa | H = {d[enthalpy_per_atom]:5.5f} eV/atom'
+                              .format(d=opti_dict, iters=sum(self.geom_max_iter_list[:ind+1])))
 
                 self.calc_doc.update(opti_dict)
 
+            return self._finalise_result()
+
         # catch WalltimeErrors and reset the job folder ready for continuation
         except WalltimeError as err:
+            logging.error('WalltimeError thrown; calling times_up')
             self.times_up(self.process)
             raise err
 
         # All other errors mean something bad has happened, so we should clean up this job
         # more jobs will run unless this exception is either SystemExit or KeyboardInterrupt
         except Exception as err:
+            logging.error('Error caught: terminating job for {}. Error = {}'.format(self.seed, err))
             self.process.terminate()
             self._finalise_result()
             raise err
@@ -488,6 +519,7 @@ class FullRelaxer:
             RuntimeError: if any part of the calculation fails.
 
         """
+        logging.info('Performing CASTEP phonon job on {}'.format(seed))
         from matador.utils.cell_utils import cart2abc
         todo = {'relax': True, 'dynmat': True, 'dispersion': False, 'dos': False, 'thermodynamics': False}
         if calc_doc.get('task').lower() in ['phonon', 'thermodynamics']:
@@ -516,77 +548,69 @@ class FullRelaxer:
             offset = shift_to_include_gamma(grid)
             if offset != [0, 0, 0]:
                 calc_doc['phonon_kpoint_mp_offset'] = offset
-                if self.verbosity > 2:
-                    print('Set phonon MP grid offset to {}'.format(offset))
+                logging.debug('Set phonon MP grid offset to {}'.format(offset))
 
         # prepare to do pre-relax if there's no check file
         if os.path.isfile(seed + '.check'):
             todo['relax'] = False
-            if self.verbosity > 0:
-                print_notify('Restarting from {}.check, so not performing re-relaxation'.format(seed))
+            logging.info('Restarting from {}.check, so not performing re-relaxation'.format(seed))
 
-        if self.debug:
-            print(todo)
+        logging.info('run3 phonon options {}'.format(todo))
 
         if todo['relax']:
-            if self.verbosity > 0:
-                print('Pre-relaxing structure...')
             success = self._castep_phonon_prerelax_only(calc_doc, seed,
                                                         intermediate=bool(sum([bool(todo[key]) for key in todo])))
             if success:
                 todo['relax'] = False
-                if self.verbosity > 0:
-                    print_notify('Pre-relaxation complete.')
+                logging.info('Pre-relaxation completed successfully.')
             else:
-                raise RuntimeError('Pre-requisite geometry optimisation failed.')
+                msg = 'Pre-requisite geometry optimisation failed.'
+                logging.error(msg)
+                raise RuntimeError(msg)
 
         if todo['dynmat']:
-            if self.verbosity > 0:
-                print('Now computing phonon dynmat...')
             success = self._castep_phonon_dynmat_only(calc_doc, seed,
                                                       intermediate=bool(sum([bool(todo[key]) for key in todo])))
             if success:
                 todo['dynmat'] = False
-                if self.verbosity > 0:
-                    print_notify('Dynmat complete.')
+                logging.info('Dynmat calculation completed successfully.')
             else:
-                raise RuntimeError('Phonon dynamical matrix calculation failed.')
+                msg = 'Phonon dynamical matrix calculation failed.'
+                logging.error(msg)
+                raise RuntimeError(msg)
 
         if todo['thermodynamics']:
-            if self.verbosity > 0:
-                print('Now performing phonon thermodynamics...')
             success = self._castep_phonon_thermodynamics_only(calc_doc, seed,
                                                               intermediate=bool(sum([bool(todo[key]) for key in todo])))
             if success:
                 todo['thermodynamics'] = False
-                if self.verbosity > 0:
-                    print_notify('Thermodynamics complete.')
+                logging.info('Thermodynamics calculation completed successfully.')
             else:
-                raise RuntimeError('Phonon thermodynamics calculation failed.')
+                msg = 'Phonon thermodynamics calculation failed.'
+                logging.error(msg)
+                raise RuntimeError(msg)
 
         if todo['dos']:
-            if self.verbosity > 0:
-                print('Now performing phonon DOS...')
             success = self._castep_phonon_dos_only(calc_doc, seed,
                                                    intermediate=bool(sum([bool(todo[key]) for key in todo])))
             if success:
                 todo['dos'] = False
-                if self.verbosity > 0:
-                    print_notify('DOS complete.')
+                logging.info('Phonon DOS calculation completed successfully.')
             else:
-                raise RuntimeError('Phonon DOS calculation failed.')
+                msg = 'Phonon DOS calculation failed.'
+                logging.error(msg)
+                raise RuntimeError(msg)
 
         if todo['dispersion']:
-            if self.verbosity > 0:
-                print('Now performing phonon dispersion...')
             success = self._castep_phonon_dispersion_only(calc_doc, seed,
                                                           intermediate=bool(sum([bool(todo[key]) for key in todo])))
             if success:
                 todo['dispersion'] = False
-                if self.verbosity > 0:
-                    print_notify('Dispersion complete.')
+                logging.info('Phonon dispersion calculation completed successfully.')
             else:
-                raise RuntimeError('Phonon dispersion calculation failed.')
+                msg = 'Phonon DOS calculation failed.'
+                logging.error(msg)
+                raise RuntimeError(msg)
 
     def _get_seekpath_compliant_input(self, calc_doc, spacing):
         """ Return seekpath cell/kpoint path for the given cell and spacing.
@@ -600,19 +624,14 @@ class FullRelaxer:
                 and list containing the kpoints.
 
         """
+        logging.info('Getting seekpath cell and kpoint path.')
         from matador.utils.cell_utils import get_seekpath_kpoint_path
-        if self.verbosity >= 2:
-            from matador.crystal import Crystal
-            print('Old lattice:')
-            print(Crystal(calc_doc))
+        from matador.crystal import Crystal
+        logging.debug('Old lattice: {}'.format(Crystal(calc_doc)))
         prim_doc, kpt_path, _ = get_seekpath_kpoint_path(calc_doc,
                                                          spacing=spacing,
                                                          debug=self.debug)
-
-        if self.verbosity >= 2:
-            print('New lattice:')
-            print(Crystal(calc_doc))
-
+        logging.debug('New lattice: {}'.format(Crystal(calc_doc)))
         return prim_doc, kpt_path
 
     def scf(self, calc_doc, seed, keep=True, intermediate=False):
@@ -636,6 +655,7 @@ class FullRelaxer:
             bool: True iff SCF completed successfully, False otherwise.
 
         """
+        logging.info('Performing single-shot CASTEP run on {}'.format(seed))
         from matador.utils.cell_utils import cart2abc
         try:
             self.cp_to_input(self.seed)
@@ -666,17 +686,19 @@ class FullRelaxer:
             # check for errors
             errors_present, errors = self._catch_castep_errors()
             if errors_present:
-                if self.verbosity > 1:
-                    print_warning('Failed to optimise {} as CASTEP crashed with error:'.format(seed))
-                    print(errors)
-                raise RuntimeError('SCF failed.')
+                msg = 'CASTEP run on {} failed with errors: {}'.format(seed, errors)
+                logging.error(msg)
+                raise RuntimeError(msg)
 
             if not success:
-                raise RuntimeError('Error scraping CASTEP file.')
+                msg = 'Error scraping CASTEP file {}: {}'.format(seed, results_dict)
+                logging.error(msg)
+                raise RuntimeError(msg)
 
             success = True
 
             if not intermediate:
+                logging.info('Writing results of singleshot CASTEP run to res file and tidyig up.')
                 doc2res(results_dict, seed, hash_dupe=False, overwrite=True)
                 self.mv_to_completed(seed, keep=keep, completed_dir=self.paths['completed_dir'])
                 if not keep:
@@ -685,8 +707,7 @@ class FullRelaxer:
             return success
 
         except Exception as err:
-            if self.verbosity > 1:
-                print_exc()
+            logging.error('Caught error: {}'.format(err))
             self.mv_to_bad(seed)
             if not keep:
                 self.tidy_up(seed)
@@ -726,6 +747,7 @@ class FullRelaxer:
             final (bool): whether this is the final step in a calculation.
 
         """
+        logging.info('Performing CASTEP phonon pre-relax...')
         relax_doc = deepcopy(calc_doc)
         relax_doc['write_checkpoint'] = 'ALL'
         if 'geom_max_iter' not in relax_doc:
@@ -753,6 +775,7 @@ class FullRelaxer:
             final (bool): whether this is the final step in a calculation.
 
         """
+        logging.info('Performing CASTEP dynmat calculation...')
         relax_doc = deepcopy(calc_doc)
         relax_doc['write_checkpoint'] = 'ALL'
         relax_doc['continuation'] = 'default'
@@ -779,6 +802,7 @@ class FullRelaxer:
             final (bool): whether this is the final step in a calculation.
 
         """
+        logging.info('Performing CASTEP phonon DOS calculation...')
         dos_doc = deepcopy(calc_doc)
         dos_doc['task'] = 'phonon'
         dos_doc['phonon_calculate_dos'] = True
@@ -804,6 +828,7 @@ class FullRelaxer:
             final (bool): whether this is the final step in a calculation.
 
         """
+        logging.info('Performing CASTEP phonon dispersion calculation...')
         disp_doc = deepcopy(calc_doc)
         disp_doc['task'] = 'phonon'
         disp_doc['phonon_calculate_dos'] = False
@@ -829,6 +854,7 @@ class FullRelaxer:
             final (bool): whether this is the final step in a calculation.
 
         """
+        logging.info('Performing CASTEP thermodynamics calculation...')
         thermo_doc = deepcopy(calc_doc)
         thermo_doc['continuation'] = 'default'
         thermo_doc['task'] = 'thermodynamics'
@@ -854,16 +880,15 @@ class FullRelaxer:
             bool: True unless every single calculation failed.
 
         """
+        logging.info('Performing convergence tests...')
         from matador.utils.cell_utils import get_best_mp_offset_for_cell
         successes = []
         cached_cutoff = calc_doc['cut_off_energy']
         if self.conv_cutoff_bool:
             # run series of singlepoints for various cutoffs
-            if self.verbosity > 1:
-                print('Running cutoff convergence tests...')
+            logging.info('Running cutoff convergence...')
             for cutoff in self.conv_cutoff:
-                if self.verbosity > 1:
-                    print('{} eV... '.format(cutoff), end='')
+                logging.info('{} eV... '.format(cutoff))
                 calc_doc.update({'cut_off_energy': cutoff})
                 self.paths['completed_dir'] = 'completed_cutoff'
                 seed = self.seed + '_' + str(cutoff) + 'eV'
@@ -871,16 +896,13 @@ class FullRelaxer:
                 successes.append(success)
         if self.conv_kpt_bool:
             # run series of singlepoints for various cutoffs
-            if self.verbosity > 1:
-                print('Running kpt convergence tests...')
+            logging.info('Running kpt convergence tests...')
             calc_doc['cut_off_energy'] = cached_cutoff
             for kpt in self.conv_kpt:
-                if self.verbosity > 1:
-                    print('{} 1/A... '.format(kpt), end='')
+                logging.info('{} 1/A... '.format(kpt))
                 calc_doc.update({'kpoints_mp_spacing': kpt})
                 calc_doc['kpoints_mp_offset'] = get_best_mp_offset_for_cell(calc_doc)
-                if self.verbosity > 1:
-                    print('Using offset {}'.format(calc_doc['kpoints_mp_offset']))
+                logging.debug('Using offset {}'.format(calc_doc['kpoints_mp_offset']))
                 self.paths['completed_dir'] = 'completed_kpts'
                 seed = self.seed + '_' + str(kpt) + 'A'
                 success = self.scf(calc_doc, seed, keep=False)
@@ -890,21 +912,13 @@ class FullRelaxer:
     def parse_executable(self, seed):
         """ Turn executable string into list with arguments to be executed.
 
-        e.g.1:
+        Example:
+            With `self.executable='castep17'` and `seed='test'`, `['castep17', 'test']`
+            will be returned.
 
-            | self.executable = 'castep17'
-            | seed = 'test'
-
-            | returns
-            | ['castep17', 'test']
-
-        e.g.2:
-
-            | self.executable = 'pw6.x -i $seed.in > $seed.out'
-            | seed = 'test'
-
-            | returns
-            | ['pw6.x', '-i', 'test.in', '>' 'test.out']
+        Example:
+            With `self.executable='pw6.x -i $seed.in > $seed.out'` and `seed='test'`,
+            `['pw6.x', '-i', 'test.in', '>' 'test.out']` will be returned.
 
         Parameters:
             seed (str): filename to replace $seed with in command.
@@ -930,6 +944,8 @@ class FullRelaxer:
         else:
             self._redirect_filename = None
 
+        logging.info('Executable string parsed as {}'.format(command))
+
         return command
 
     def test_exec(self):
@@ -939,18 +955,22 @@ class FullRelaxer:
             SystemExit: if executable not found.
 
         """
+        logging.info('Testing executable {executable}.'.format(executable=self.executable))
         try:
             proc = self.run_command('--version', exec_test=True)
         except FileNotFoundError:
-            print('Unable to call mpirun/aprun/srun, currently selected: {}'.format(self.mpi_library))
-            raise SystemExit('Please check initialistion of FullRelaxer object/CLI args.')
+            logging.critical('Unable to call mpirun/aprun/srun, currently selected: {}'.format(self.mpi_library))
+            message = 'Please check initialistion of FullRelaxer object/CLI args.'
+            logging.debug('Raising SystemExit with message: {message}'.format(message=message))
+            raise SystemExit(message)
 
         out, errs = proc.communicate()
         if 'version' not in out.decode('utf-8') and errs is not None:
-            err_string = 'Executable {} failed testing. Is it on your PATH?\n'.format(self.executable)
-            print_failure(err_string)
-            print('stdout: {}'.format(out.decode('utf-8')))
-            print('stderr: {}'.format(errs.decode('utf-8')))
+            err_string = 'Executable {exc} failed testing. Is it on your PATH?'.format(exc=self.executable)
+            logging.critical(err_string)
+            logging.critical('stdout: {stdout}'.format(stdout=out.decode('utf-8')))
+            logging.critical('sterr: {stderr}'.format(stderr=errs.decode('utf-8')))
+            logging.debug('Raising SystemExit.')
             raise SystemExit(err_string)
 
     @property
@@ -958,6 +978,7 @@ class FullRelaxer:
         """ Property to store/compute desired MPI library. """
         if self._mpi_library is None:
             self._mpi_library = self.set_mpi_library()
+            logging.info('Detected {mpi} MPI.'.format(mpi=self._mpi_library))
         return self._mpi_library
 
     def set_mpi_library(self):
@@ -965,7 +986,9 @@ class FullRelaxer:
         MPI library detection is no args are present.
         """
         if sum([self.archer, self.intel, self.slurm]) > 1:
-            raise SystemExit('Conflicting command-line arguments for MPI library have been supplied, exiting.')
+            message = 'Conflicting command-line arguments for MPI library have been supplied, exiting.'
+            logging.critical(message)
+            raise SystemExit(message)
         elif self.archer:
             return 'archer'
         elif self.intel:
@@ -973,10 +996,10 @@ class FullRelaxer:
         elif self.slurm:
             return 'slurm'
         else:
-            return self.detect_mpi(verbosity=self.verbosity)
+            return self.detect_mpi()
 
     @staticmethod
-    def detect_mpi(verbosity=0):
+    def detect_mpi():
         """ Test which mpi library is being used when `mpirun`.
 
         Returns:
@@ -986,12 +1009,15 @@ class FullRelaxer:
         # check first for existence of mpirun command, then aprun if that fails
         try:
             try:
+                logging.info('Failed to find mpirun, checking aprun...')
                 mpi_version_string = str(sp.check_output('mpirun --version', shell=True))
             except sp.CalledProcessError:
                 mpi_version_string = str(sp.check_output('aprun --version', shell=True))
         except Exception as exc:
-            print_exc()
-            raise SystemExit('Failed to detect MPI library.')
+            msg = 'Failed to find mpirun or aprun.'
+            logging.critical(msg)
+            logging.debug('Error message: {exc}'.format(exc=exc))
+            raise SystemExit(msg)
         if 'Intel' in mpi_version_string:
             mpi_version = 'intel'
         elif 'aprun' in mpi_version_string:
@@ -999,15 +1025,11 @@ class FullRelaxer:
         elif 'Open MPI' in mpi_version_string:
             mpi_version = 'default'
         else:
-            if verbosity > 3:
-                print('Could not detect MPI library, version string was:')
-                print(mpi_version_string)
-                print('Using default (OpenMPI-style) mpi calls.')
+            logging.debug('Could not detect MPI library so using default (OpenMPI), version string was: {response}'
+                          .format(response=mpi_version_string))
             mpi_version = 'default'
 
-        if verbosity > 2:
-            print('Using {} MPI library.'.format(mpi_version))
-
+        logging.info('Using {version} MPI library.'.format(version=mpi_version))
         return mpi_version
 
     def do_memcheck(self, calc_doc, seed):
@@ -1022,10 +1044,9 @@ class FullRelaxer:
                 `self.maxmem`, if set
 
         """
+        logging.info('Performing memory check for {seed}'.format(seed=seed))
         doc2param(calc_doc, seed, hash_dupe=False)
         doc2cell(calc_doc, seed, hash_dupe=False, copy_pspots=False)
-        if self.verbosity > 2:
-            print('Performing memcheck...')
         free_memory = float(virtual_memory().available) / 1024**2
         if self.maxmem is None:
             maxmem = 0.9 * free_memory
@@ -1034,25 +1055,18 @@ class FullRelaxer:
 
         # check if cell is totally pathological, as CASTEP dryrun will massively underestimate mem
         if all([angle < 30 for angle in calc_doc['lattice_abc'][1]]):
-            if self.debug:
-                print('Cell is pathological...')
+            logging.error('Cell is pathological (at least one angle < 30), failing memory check.')
             return False
 
-        if self.verbosity > 2:
-            print('{:10}: {:8.0f} MB'.format('Available', maxmem))
+        logging.debug('Running CASTEP dryrun.')
         process = sp.Popen(['nice', '-n', '15', self.executable, '-d', seed])
         process.communicate()
 
         skip = False
         results, success = castep2dict(seed + '.castep', db=False)
-        if not success:
+        if not success or 'estimated_mem_MB' not in results:
             skip = True
-
-        if 'estimated_mem_MB' not in results:
-            skip = True
-            if self.debug:
-                print('CASTEP dryrun failed, this is probably a bad sign... skipping calculation')
-                print(results)
+            logging.warning('CASTEP dryrun failed with output {results}'.format(results=results))
 
         for _file in glob.glob(seed + '*'):
             if _file.endswith('.res'):
@@ -1060,9 +1074,10 @@ class FullRelaxer:
             else:
                 os.remove(_file)
 
-        if self.verbosity > 2:
-            if 'estimated_mem_MB' in results:
-                print('{:10}: {:8.0f} MB'.format('Estimate', results['estimated_mem_MB']))
+        if 'estimated_mem_MB' in results:
+            mem_string = ('Memory estimate / Available memory (MB): {:8.0f} / {:8.0f}'
+                          .format(results['estimated_mem_MB'], maxmem))
+            logging.info(mem_string)
 
         if skip or results['estimated_mem_MB'] > maxmem:
             return False
@@ -1132,6 +1147,7 @@ class FullRelaxer:
             stderr = dev_null
 
         if self._redirect_filename is not None:
+            logging.info('Redirecting output to {redirect}'.format(redirect=self._redirect_filename))
             redirect_file = open(self._redirect_filename, 'w')
             stdout = redirect_file
 
@@ -1148,9 +1164,10 @@ class FullRelaxer:
         return process
 
     def _catch_castep_errors(self):
-        """ Look for CASTEP error files and fallover appropriately.
-
-        TO-DO: better parsing of harmless errors, e.g. LAPACK bugs.
+        """ Look for CASTEP error files and fallover appropriately. If
+        the magic string 'Work-around was succesful' is found in error,
+        no errors will be reported and the file will be deleted,
+        provided no other errors exist.
 
         Returns:
             bool, str: True if error files were found, otherwise False,
@@ -1164,9 +1181,17 @@ class FullRelaxer:
         for globbed in glob.glob(err_file):
             if os.path.isfile(globbed):
                 with open(globbed, 'r') as f:
-                    error_str += ' '.join(f.readlines())
-                error_str += '\n'
-                errors_present = True
+                    flines = f.readlines()
+
+                for line in flines:
+                    if 'Work-around was successful, continuing with calculation.' in line:
+                        logging.info('Found LAPACK issue that was circumvented, removing error file.')
+                        os.remove(globbed)
+                        break
+                else:
+                    error_str += ' '.join(flines)
+                    error_str += '\n'
+                    errors_present = True
 
         return errors_present, error_str
 
@@ -1179,26 +1204,26 @@ class FullRelaxer:
         """
         try:
             bad_dir = self.root_folder + '/bad_castep'
+            logging.info('Moving files to completed: {bad}.'.format(bad=bad_dir))
             if not os.path.exists(bad_dir):
                 os.makedirs(bad_dir, exist_ok=True)
             if self.verbosity > 0:
                 print('Something went wrong, moving files to bad_castep')
             seed_files = glob.glob(seed + '.*')
+            logging.debug('Files to move: {seed}'.format(seed=seed_files))
             for _file in seed_files:
                 try:
                     shutil.copy(_file, bad_dir)
                     os.remove(_file)
-                except Exception:
-                    if self.verbosity > 1:
-                        print_exc()
+                except Exception as exc:
+                    logging.warning('Error moving files to bad: {error}'.format(error=exc))
             # check root folder for any matching files and remove them
             fname = '{}/{}'.format(self.root_folder, seed)
             for ext in ['.res', '.res.lock', '.castep']:
                 if os.path.isfile('{}{}'.format(fname, ext)):
                     os.remove('{}{}'.format(fname, ext))
-        except Exception:
-            if self.verbosity > 1:
-                print_exc()
+        except Exception as exc:
+            logging.warning('Error moving files to bad: {error}'.format(error=exc))
 
     def mv_to_completed(self, seed, completed_dir='completed', keep=False):
         """ Move all associated files to completed, removing any
@@ -1214,10 +1239,12 @@ class FullRelaxer:
 
         """
         completed_dir = self.root_folder + '/' + completed_dir
+        logging.info('Moving files to completed: {completed}.'.format(completed=completed_dir))
         if not os.path.exists(completed_dir):
             os.makedirs(completed_dir, exist_ok=True)
         if keep:
             seed_files = glob.glob(seed + '.*') + glob.glob(seed + '-out.cell')
+            logging.debug('Files to move: {files}.'.format(files=seed_files))
             for _file in seed_files:
                 shutil.move(_file, completed_dir)
         else:
@@ -1234,9 +1261,8 @@ class FullRelaxer:
             for ext in file_exts:
                 try:
                     shutil.move('{}{}'.format(seed, ext), completed_dir)
-                except Exception:
-                    if self.verbosity > 1:
-                        print_exc()
+                except Exception as exc:
+                    logging.warning('Error moving files to completed: {error}'.format(error=exc))
             # check root folder for any matching files and remove them
             fname = '{}/{}'.format(self.root_folder, seed)
             for ext in file_exts + ['.res.lock']:
@@ -1245,7 +1271,6 @@ class FullRelaxer:
             if self.conv_kpt_bool or self.conv_cutoff_bool:
                 for _file in glob.glob(fname + '*.res'):
                     if os.path.isfile(_file):
-                        print(_file)
                         os.remove(_file)
 
     def cp_to_input(self, seed, ext='res', glob_files=False):
@@ -1260,36 +1285,41 @@ class FullRelaxer:
 
         """
         input_dir = self.root_folder + '/input'
+        logging.info('Copying file to input_dir: {input}'.format(input=input_dir))
         if not os.path.exists(input_dir):
             os.makedirs(input_dir, exist_ok=True)
         if glob_files:
             files = glob.glob('{}*'.format(seed))
+            logging.info('Files to copy: {files}'.format(files=files))
             for f in files:
                 if f.endswith('.lock'):
                     continue
                 if not os.path.isfile(f):
                     shutil.copy('{}'.format(f), input_dir)
         else:
+            logging.info('File to copy: {file}'.format(file='{}.{}'.format(seed, ext)))
             if os.path.isfile('{}.{}'.format(seed, ext)):
                 if not os.path.isfile('{}/{}.{}'.format(input_dir, seed, ext)):
                     shutil.copy('{}.{}'.format(seed, ext), input_dir)
 
     def _setup_relaxation_dirs(self):
         """ Set up directories and files for relaxation. """
-        if self.verbosity > 0:
-            print_notify('Relaxing ' + self.seed)
 
+        logging.info('Preparing to relax {seed}'.format(seed=self.seed))
         if self.compute_dir is not None:
+            logging.info('Using compute_dir: {compute}'.format(compute=self.compute_dir))
             if not os.path.isdir(self.compute_dir):
                 os.makedirs(self.compute_dir)
 
             # copy pspots and any intermediate calcs to compute_dir
+            logging.info('Copying pspots into compute_dir')
             pspots = glob.glob('*.usp')
             for pspot in pspots:
                 shutil.copy(pspot, self.compute_dir)
 
             # update res file with intermediate calculation if castep file is newer than res
             if os.path.isfile(self.seed + '.castep') and os.path.isfile(self.seed + '.res'):
+                logging.info('Updating res file with result from intermediate CASTEP file in root_dir')
                 shutil.copy(self.seed + '.castep', self.compute_dir)
                 if os.path.getmtime(self.seed + '.res') < os.path.getmtime(self.seed + '.castep'):
                     castep_dict, success = castep2dict(self.seed + '.castep', db=False)
@@ -1299,6 +1329,7 @@ class FullRelaxer:
             os.chdir(self.compute_dir)
 
         # copy initial res file to seed
+        logging.info('Writing fresh res file to start calculation from.')
         doc2res(self.res_dict, self.seed, info=False, hash_dupe=False, overwrite=True)
         self.cp_to_input(self.seed)
 
@@ -1336,7 +1367,9 @@ class FullRelaxer:
             seed (str): filename for structure.
 
         """
-        for f in glob.glob(seed + '.*'):
+        files = glob.glob(seed + '.*')
+        logging.info('Tidying up remaining files: {files}'.format(files=files))
+        for f in files:
             if not (f.endswith('.res') or f.endswith('.castep')):
                 os.remove(f)
 
@@ -1348,6 +1381,7 @@ class FullRelaxer:
             opti_dict (dict): intermediate calculation results.
 
         """
+        logging.info('Updating .res and .castep files in root_dir with new results')
         if os.path.isfile(self.seed + '.res'):
             os.remove(self.seed + '.res')
         doc2res(opti_dict, self.seed, hash_dupe=False)
@@ -1364,8 +1398,11 @@ class FullRelaxer:
             bool: True is relaxation was successful, False otherwise.
 
         """
+        logging.info('Finalising calculation...')
         success = self.res_dict.get('optimised', False)
+        logging.info('Was calculation successful? {success}'.format(success=success))
         if self.output_queue is not None:
+            logging.info('Pushing results to output queue')
             self.output_queue.put(self.res_dict)
         if success:
             self.mv_to_completed(self.seed, completed_dir=self.paths['completed_dir'])
@@ -1385,21 +1422,21 @@ class FullRelaxer:
             subprocess.Popen: running process to be killed.
 
         """
-        if self.verbosity > 2:
-            print_notify('Ending process early for seed {}'.format(self.seed))
+        logging.info('Ending process early for seed: {seed}'.format(seed=self.seed))
         process.terminate()
-        if self.verbosity > 2:
-            print_notify('Ended process early for seed {}'.format(self.seed))
+        logging.info('Ended process early for seed: {seed}'.format(seed=self.seed))
         if self.compute_dir is not None:
+            logging.info('Cleaning up compute_dir: {dir}'.format(dir=self.compute_dir))
             for f in glob.glob('{}.*'.format(self.seed)):
                 shutil.copy(f, self.root_folder)
                 os.remove(f)
 
+        logging.info('Removing lock file so calculation can be continued.')
         if os.path.isfile('{}/{}{}'.format(self.root_folder, self.seed, '.res.lock')):
             os.remove('{}/{}{}'.format(self.root_folder, self.seed, '.res.lock'))
 
     @staticmethod
-    def remove_compute_dir_if_finished(compute_dir, debug=True):
+    def remove_compute_dir_if_finished(compute_dir):
         """ Delete the compute directory, provided it contains no
         calculation data.
 
@@ -1410,36 +1447,30 @@ class FullRelaxer:
             bool: True if folder was deleted as no res/castep files
                 were found, otherwise False.
         """
-
+        logging.info('Checking if compute_dir still contains calculations...')
         if not os.path.isdir(compute_dir):
             return False
 
         files = glob.glob(compute_dir + '/*')
-
-        if debug:
-            print('Checking {}'.format(compute_dir))
-            print('Found {} files:'.format(len(files)))
-            print(files)
+        logging.debug('Found {files} in {dir}'.format(files=files, dir=compute_dir))
 
         for fname in files:
             if fname.endswith('.res') or fname.endswith('.castep'):
+                logging.debug('Not removing {dir} as it still contains calculation {fname}'.format(
+                    dir=compute_dir, fname=fname))
                 return False
 
         # remove files in directory, then delete directory
+        logging.debug('Deleting files {files} from {dir}'.format(files=files, dir=compute_dir))
         for fname in files:
             if os.path.isfile(fname):
                 try:
                     os.remove(fname)
-                    if debug:
-                        print('Removing {}'.format(fname))
                 except FileNotFoundError:
-                    if debug:
-                        print('Failed to remove {}'.format(fname))
+                    pass
 
-        if os.path.isdir(compute_dir):
-            os.rmdir(compute_dir)
-        if debug:
-            print('Removed {}'.format(compute_dir))
+        logging.debug('Deleting directory {dir}'.format(dir=compute_dir))
+        os.rmdir(compute_dir)
         return True
 
 
