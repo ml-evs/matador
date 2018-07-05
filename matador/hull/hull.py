@@ -71,6 +71,8 @@ class QueryConvexHull(object):
             self.args['subcmd'] = subcmd
         if plot_kwargs is None:
             plot_kwargs = {}
+        if plot_kwargs.get('show') is None:
+            plot_kwargs['show'] = True
         self._query = query
         self.from_cursor = False
         self.plot_params = False

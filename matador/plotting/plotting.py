@@ -674,7 +674,7 @@ def get_hull_labels(hull, label_cutoff=0.0, num_species=2):
 
 
 @plotting_function
-def plot_voltage_curve(hull, ax=None, show=True):
+def plot_voltage_curve(hull, ax=None, show=False):
     """ Plot voltage curve calculated for phase diagram.
 
     Parameters:
@@ -768,7 +768,7 @@ def plot_voltage_curve(hull, ax=None, show=True):
 
 
 @plotting_function
-def plot_thermo_curves(seed, show=True, **kwargs):
+def plot_thermo_curves(seed, show=False, **kwargs):
     """ Plot free energies and heat capacity as a function of temperature, as
     calculated from a CASTEP thermodynamics run in <seed>.castep.
 
@@ -883,7 +883,7 @@ def get_linear_cmap(colours, num_colours=100, list_only=False):
 
 
 @plotting_function
-def plot_volume_curve(hull, show=True):
+def plot_volume_curve(hull, show=False):
     """ Plot volume curve calculated for phase diagram.
 
     Parameters:
@@ -968,7 +968,7 @@ def plot_volume_curve(hull, show=True):
 
 
 @plotting_function
-def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
+def plot_2d_hull(hull, ax=None, show=False, plot_points=True,
                  plot_hull_points=True, labels=None, label_cutoff=None, colour_by_source=False,
                  sources=None, source_labels=None, title=True,
                  **kwargs):
@@ -1010,7 +1010,7 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
     if labels is None:
         labels = hull.args.get('labels', False)
     if label_cutoff is None:
-        label_cutoff = hull.args.get('label_cutoff', 0)
+        label_cutoff = hull.args.get('label_cutoff')
 
     scale = 1
     scatter = []
@@ -1143,7 +1143,7 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
         legend.set_zorder(1e20)
 
     eform_limits = (np.min(hull.structures[:, 1]), np.max(hull.structures[:, 1]))
-    lims = (-0.1 if eform_limits[0] >= 0 else eform_limits[0] - 0.15,
+    lims = (-0.1 if eform_limits[0] >= 0 else 1.4*eform_limits[0],
             eform_limits[1] if eform_limits[0] >= 0 else 0.1)
     ax.set_ylim(lims)
 
@@ -1180,7 +1180,7 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
 
 
 @plotting_function
-def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=None, label_cutoff=None, expecting_cbar=True, labels=None):
+def plot_ternary_hull(hull, axis=None, show=False, plot_points=True, hull_cutoff=None, label_cutoff=None, expecting_cbar=True, labels=None):
     """ Plot calculated ternary hull as a 2D projection.
 
     Parameters:
