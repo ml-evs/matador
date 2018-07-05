@@ -457,7 +457,7 @@ class ComputeTest(unittest.TestCase):
         walltime_error = False
         runner = BatchRun(seed=['LiAs'], debug=False, no_reopt=True,
                           verbosity=VERBOSITY, ncores=2, nprocesses=2, executable=EXECUTABLE,
-                          max_walltime=5, polltime=1)
+                          max_walltime=15, polltime=1)
         try:
             runner.spawn()
         except WalltimeError as err:

@@ -224,6 +224,8 @@ class FullRelaxer:
         """
         logging.info('Calling CASTEP on {seed}'.format(seed=self.seed))
 
+        success = False
+
         if self.exec_test:
             self.test_exec()
 
@@ -403,12 +405,12 @@ class FullRelaxer:
 
                     while self.process.poll() is None:
                         elapsed = time.time() - self.start_time
-                        logging.debug('Elapsed time: {:>10.1f} s / {:>10.1f}'
-                                      .format(elapsed, self.max_walltime - 3*self.polltime))
+                        logging.debug('Elapsed time: {:.0f} s / {:.0f} s'
+                                      .format(elapsed, self.max_walltime))
 
                         # leave 1 minute to clean up
                         if elapsed > abs(self.max_walltime - 3*self.polltime):
-                            msg = 'Ran out of time on seed {}'.format(self.seed)
+                            msg = 'About to run out of time on seed {}, killing early...'.format(self.seed)
                             logging.info(msg)
                             raise WalltimeError(msg)
 
@@ -1469,8 +1471,9 @@ class FullRelaxer:
                 except FileNotFoundError:
                     pass
 
-        logging.debug('Deleting directory {dir}'.format(dir=compute_dir))
-        os.rmdir(compute_dir)
+        if os.path.isdir(compute_dir):
+            logging.debug('Deleting directory {dir}'.format(dir=compute_dir))
+            os.rmdir(compute_dir)
         return True
 
 
