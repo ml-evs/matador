@@ -190,6 +190,7 @@ class FullRelaxer:
         except RuntimeError as exc:
             logging.error('Process raised RuntimeError with message {error}.'.format(error=exc))
             self.success = False
+            self._finalise_result()
 
         if self.profile:
             profile.disable()
@@ -1401,7 +1402,11 @@ class FullRelaxer:
 
         """
         logging.info('Finalising calculation...')
-        success = self.res_dict.get('optimised', False)
+        try:
+            success = self.res_dict.get('optimised', False)
+        except AttributeError:
+            success = False
+
         logging.info('Was calculation successful? {success}'.format(success=success))
         if self.output_queue is not None:
             logging.info('Pushing results to output queue')
