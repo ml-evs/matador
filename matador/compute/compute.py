@@ -142,13 +142,19 @@ class FullRelaxer:
         if not os.path.isdir('logs'):
             os.mkdir('logs')
 
-        logging.basicConfig(filename='logs/{}.log'.format(self.seed),
-                            level=logging.DEBUG, filemode='a',
-                            format='%(asctime)s - %(levelname)s: %(message)s',)
-        handler = logging.StreamHandler(sys.stdout)
-        handler.setLevel(loglevel)
-        handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s: %(message)s'))
-        logging.getLogger().addHandler(handler)
+        logging.basicConfig(level=logging.DEBUG)
+        logging.getLogger().handlers = []
+
+        stdout_handler = logging.StreamHandler(sys.stdout)
+        stdout_handler.setLevel(loglevel)
+        stdout_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)8s: %(message)s'))
+        logging.getLogger().addHandler(stdout_handler)
+
+        logname = os.path.abspath('logs/{}.log'.format(self.seed))
+        file_handler = logging.FileHandler(logname, mode='a')
+        file_handler.setLevel(logging.INFO)
+        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)8s: %(message)s'))
+        logging.getLogger().addHandler(file_handler)
 
         logging.info('Initialising FullRelaxer object for {seed}'.format(seed=self.seed))
 
@@ -345,6 +351,7 @@ class FullRelaxer:
             self.cp_to_input(seed, ext=self.input_ext, glob_files=True)
             self.process = self.run_command(seed)
             self.process.communicate()
+            logging.debug('Process returned {}'.format(self.process.returncode))
             if self.process.returncode != 0:
                 self.mv_to_bad(seed)
                 return False
@@ -418,6 +425,11 @@ class FullRelaxer:
                         time.sleep(self.polltime)
 
                 self.process.communicate()
+                logging.debug('Process returned {}'.format(self.process.returncode))
+                if self.process.returncode != 0:
+                    msg = 'CASTEP returned non-zero error code.'
+                    logging.warning(msg)
+                    raise RuntimeError(msg)
 
                 # scrape new structure from castep file
                 if not os.path.isfile(seed + '.castep'):
@@ -1164,6 +1176,7 @@ class FullRelaxer:
         except Exception:
             pass
 
+        logging.info('Running {}'.format(command))
         return process
 
     def _catch_castep_errors(self):
@@ -1453,6 +1466,7 @@ class FullRelaxer:
         Returns:
             bool: True if folder was deleted as no res/castep files
                 were found, otherwise False.
+
         """
         logging.info('Checking if compute_dir still contains calculations...')
         if not os.path.isdir(compute_dir):
