@@ -219,6 +219,8 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, **kw
         elif 'kpoints_mp_spacing' in line.lower() or 'kpoint_mp_spacing' in line.lower():
             if 'spectral_kpoints_mp_spacing' in line.lower() or 'spectral_kpoint_mp_spacing' in line.lower():
                 cell['spectral_kpoints_mp_spacing'] = float(line.split()[-1])
+            elif 'supercell_kpoints_mp_spacing' in line.lower() or 'supercell_kpoint_mp_spacing' in line.lower():
+                cell['supercell_kpoints_mp_spacing'] = float(line.split()[-1])
             elif 'phonon_kpoints_mp_spacing' in line.lower() or 'phonon_kpoint_mp_spacing' in line.lower():
                 cell['phonon_kpoint_mp_spacing'] = float(line.split()[-1])
             elif 'phonon_fine_kpoints_mp_spacing' in line.lower() or 'phonon_fine_kpoint_mp_spacing' in line.lower():

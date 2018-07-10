@@ -318,6 +318,8 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, overwri
                         str(doc['kpoints_mp_grid'][0]) + ' ' +
                         str(doc['kpoints_mp_grid'][1]) + ' ' +
                         str(doc['kpoints_mp_grid'][2]) + '\n')
+            if 'supercell_kpoints_mp_spacing' in doc:
+                f.write('supercell_kpoints_mp_spacing : ' + str(doc['supercell_kpoints_mp_spacing']) + '\n')
             if 'kpoints_mp_offset' in doc:
                 f.write('kpoints_mp_offset : ' +
                         str(doc['kpoints_mp_offset'][0]) + ' ' +
