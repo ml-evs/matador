@@ -541,7 +541,7 @@ class FullRelaxer:
             if (('phonon_fine_kpoint_path' not in calc_doc and 'phonon_fine_kpoint_list' not in calc_doc) and
                     'phonon_fine_kpoint_path_spacing' in calc_doc):
                 todo['dispersion'] = True
-            if 'phonon_kpoint_mp_spacing' in calc_doc:
+            if 'phonon_fine_kpoint_mp_spacing' in calc_doc:
                 todo['dos'] = True
             if calc_doc['task'].lower() == 'thermodynamics':
                 todo['thermodynamics'] = True
@@ -556,7 +556,7 @@ class FullRelaxer:
         if todo['dispersion']:
             calc_doc['phonon_fine_kpoint_list'] = kpt_path
 
-        # always shift phonon grid
+        # always shift phonon grid to include Gamma
         if 'phonon_kpoint_mp_spacing' in calc_doc:
             from matador.utils.cell_utils import calc_mp_grid, shift_to_include_gamma
             grid = calc_mp_grid(calc_doc['lattice_cart'], calc_doc['phonon_kpoint_mp_spacing'])
