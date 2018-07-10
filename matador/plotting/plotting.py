@@ -122,11 +122,17 @@ def plot_spectral(seeds, **kwargs):
     if kwargs.get('cmap') is None:
         colours = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])
     else:
-        print('Adjusting colour palette... to {}'.format(kwargs.get('cmap')))
-        colours = plt.cm.get_cmap(kwargs.get('cmap')).colors
-        plt.rcParams['axes.prop_cycle'] = cycler('color', colours)
+        if isinstance(kwargs['cmap'], str):
+            print('Adjusting colour palette... to {}'.format(kwargs.get('cmap')))
+            colours = plt.cm.get_cmap(kwargs.get('cmap')).colors
+            plt.rcParams['axes.prop_cycle'] = cycler('color', colours)
+        elif isinstance(kwargs['cmap'], list):
+            print('Reading list of colours...'.format(kwargs.get('cmap')))
+            colours = kwargs['cmap']
+            plt.rcParams['axes.prop_cycle'] = cycler('color', colours)
 
     dos_legend = None
+    disp_legend = None
 
     if (kwargs.get('phonons') and kwargs['band_colour'] == 'occ') or kwargs['band_colour'] == 'random':
         kwargs['band_colour'] = None
@@ -270,7 +276,9 @@ def plot_spectral(seeds, **kwargs):
                                            lw=1, ls=ls[seed_ind], alpha=alpha, label=label)
 
             if len(seeds) > 1:
-                ax_dispersion.legend()
+                disp_legend = ax_dispersion.legend(loc='upper center', facecolor='w',
+                                                   frameon=True, fancybox=False, shadow=False, framealpha=1)
+
             ax_dispersion.axhline(0, ls='--', lw=1, c='grey')
             ax_dispersion.set_ylim(plot_window)
             if kwargs['phonons']:
@@ -557,15 +565,19 @@ def plot_spectral(seeds, **kwargs):
                     ax_dos.fill_between(energies, 0, dos_data['spin_dos']['up'], alpha=0.2, color='r')
                     ax_dos.fill_between(energies, 0, dos_data['spin_dos']['down'], alpha=0.2, color='b')
 
-            dos_legend = ax_dos.legend(bbox_to_anchor=(1, 1), facecolor='w', frameon=True, fancybox=False, shadow=False)
+            if len(seeds) == 1:
+                dos_legend = ax_dos.legend(bbox_to_anchor=(1, 1), facecolor='w', frameon=True, fancybox=False, shadow=False)
 
     if kwargs.get('title') is not None:
         fig.suptitle(kwargs.get('title'))
 
     if any([kwargs.get('pdf'), kwargs.get('svg'), kwargs.get('png')]):
+        bbox_extra_artists = []
         if dos_legend is not None:
-            bbox_extra_artists = (dos_legend, )
-        else:
+            bbox_extra_artists.append(dos_legend)
+        if disp_legend is not None:
+            bbox_extra_artists.append(disp_legend)
+        if not bbox_extra_artists:
             bbox_extra_artists = None
         if kwargs.get('pdf'):
             plt.savefig(seeds[0].replace('.bands', '').replace('.phonon', '') + '_spectral.pdf',

@@ -13,7 +13,7 @@ font.fantasy                  : Comic Sans MS, Chicago, Charcoal, ImpactWestern,
 font.monospace                : DejaVu Sans Mono, Bitstream Vera Sans Mono, Computer Modern Typewriter, Andale Mono, Nimbus Mono L, Courier New, Courier, Fixed, Terminal, monospace
 # local font/text options
 figure.titlesize              : large
-legend.fontsize               : medium
+legend.fontsize               : small
 text.color                    : .15
 text.usetex                   : False 
 text.latex.unicode            : False
