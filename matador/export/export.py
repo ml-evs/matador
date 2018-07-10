@@ -375,7 +375,7 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, overwri
             if 'phonon_supercell_matrix' in doc:
                 f.write('\n%BLOCK PHONON_SUPERCELL_MATRIX\n')
                 for i in range(3):
-                    f.write('{d[0]:3d} {d[1]:3d} {d[2]:3d}'.format(d=doc['phonon_supercell_matrix'][i]))
+                    f.write('{d[0]:3d} {d[1]:3d} {d[2]:3d}\n'.format(d=doc['phonon_supercell_matrix'][i]))
                 f.write('%ENDBLOCK PHONON_SUPERCELL_MATRIX\n')
             if 'cell_constraints' in doc:
                 f.write('\n%BLOCK CELL_CONSTRAINTS\n')

@@ -267,9 +267,8 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, **kw
             cell['phonon_supercell_matrix'] = []
             i = 1
             while 'endblock' not in flines[line_no + i].lower():
-                if not flines[line_no + i].strip()[0].isalpha():
-                    cell['phonon_supercell_matrix'].append(list(map(int, flines[line_no + i].split())))
-                    assert len(cell['phonon_supercell_matrix'][-1]) == 3, 'Supercell matrix row does not have enough elements!'
+                cell['phonon_supercell_matrix'].append(list(map(int, flines[line_no + i].split())))
+                assert len(cell['phonon_supercell_matrix'][-1]) == 3, 'Supercell matrix row does not have enough elements!'
                 i += 1
             assert len(cell['phonon_supercell_matrix']) == 3, 'Wrong supercell matrix shape!'
         elif not db:

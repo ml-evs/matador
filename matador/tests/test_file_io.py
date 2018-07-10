@@ -80,9 +80,9 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(test_dict['hubbard_u']['U']['d'], 10.101, msg='Failed to read Hubbard U block.')
             self.assertTrue(test_dict['snap_to_symmetry'])
             self.assertTrue(test_dict['symmetry_generate'])
-            self.assertEqual(test_dict['phonon_supercell_matrix'][0] == [3, 0, 1])
-            self.assertEqual(test_dict['phonon_supercell_matrix'][0] == [0, 3, 0])
-            self.assertEqual(test_dict['phonon_supercell_matrix'][0] == [0, 0, 9])
+            self.assertEqual(test_dict['phonon_supercell_matrix'][0], [3, 0, 1])
+            self.assertEqual(test_dict['phonon_supercell_matrix'][1], [0, 3, 0])
+            self.assertEqual(test_dict['phonon_supercell_matrix'][2], [0, 0, 9])
 
         cell_fname = REAL_PATH + 'data/K5P4-phonon_bodged.cell'
         failed_open = False
@@ -755,6 +755,9 @@ class ExportTest(unittest.TestCase):
             self.assertEqual(test_dict['species_pot']['P'], '3|1.8|4|4|5|30:31:32', msg='Failed to read pspots.')
             self.assertTrue(test_dict['snap_to_symmetry'])
             self.assertTrue(test_dict['symmetry_generate'])
+            self.assertEqual(test_dict['phonon_supercell_matrix'][0], [3, 0, 1])
+            self.assertEqual(test_dict['phonon_supercell_matrix'][1], [0, 3, 0])
+            self.assertEqual(test_dict['phonon_supercell_matrix'][2], [0, 0, 9])
 
     def testDoc2ResFromJson(self):
         json_fname = REAL_PATH + 'data/doc2res.json'
