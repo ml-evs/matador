@@ -263,6 +263,15 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, **kw
             while '%endblock' not in flines[line_no + i].lower():
                 cell['phonon_fine_kpoint_list'].append(list(map(float, flines[line_no + i].split()[:4])))
                 i += 1
+        elif '%block phonon_supercell_matrix' in line.lower():
+            cell['phonon_supercell_matrix'] = []
+            i = 1
+            while 'endblock' not in flines[line_no + i].lower():
+                if not flines[line_no + i].strip()[0].isalpha():
+                    cell['phonon_supercell_matrix'].append(list(map(int, flines[line_no + i].split())))
+                    assert len(cell['phonon_supercell_matrix'][-1]) == 3, 'Supercell matrix row does not have enough elements!'
+                i += 1
+            assert len(cell['phonon_supercell_matrix']) == 3, 'Wrong supercell matrix shape!'
         elif not db:
             if '%block positions_frac' in line.lower():
                 atomic_init_spins = defaultdict(list)

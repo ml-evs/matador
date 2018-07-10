@@ -364,9 +364,19 @@ def doc2cell(doc, path, pressure=None, hash_dupe=True, copy_pspots=True, overwri
                 for point in doc['phonon_fine_kpoint_list']:
                     f.write('{p[0]} {p[1]} {p[2]}\n'.format(p=point))
                 f.write('%ENDBLOCK PHONON_FINE_KPOINT_LIST\n')
-            if 'phonon_fine_kpoint_mp_spacing' in doc:
+            elif 'phonon_fine_kpoint_mp_spacing' in doc:
                 f.write('PHONON_FINE_KPOINT_MP_SPACING {}\n'
                         .format(doc['phonon_fine_kpoint_mp_spacing']))
+            elif 'phonon_fine_kpoint_mp_grid' in doc:
+                f.write('PHONON_FINE_KPOINT_MP_GRID ' +
+                        str(doc['phonon_fine_kpoint_mp_grid'][0]) + ' ' +
+                        str(doc['phonon_fine_kpoint_mp_grid'][1]) + ' ' +
+                        str(doc['phonon_fine_kpoint_mp_grid'][2]) + '\n')
+            if 'phonon_supercell_matrix' in doc:
+                f.write('\n%BLOCK PHONON_SUPERCELL_MATRIX\n')
+                for i in range(3):
+                    f.write('{d[0]:3d} {d[1]:3d} {d[2]:3d}'.format(d=doc['phonon_supercell_matrix'][i]))
+                f.write('%ENDBLOCK PHONON_SUPERCELL_MATRIX\n')
             if 'cell_constraints' in doc:
                 f.write('\n%BLOCK CELL_CONSTRAINTS\n')
                 f.write((''.join(str(doc['cell_constraints'][0]).strip('[]'))+'\n').replace(',', ''))
