@@ -10,9 +10,11 @@ import numpy as np
 from matador.scrapers.utils import scraper_function
 from matador.utils.cell_utils import get_spacegroup_spg
 
+EPS = 1e-13
+
 
 @scraper_function
-def cif2dict(seed):
+def cif2dict(seed, **kwargs):
     """ Extract available information from  .cif file and store as a
     dictionary. Raw cif data is stored under the `'_cif'` key. Symmetric
     sites are expanded by the symmetry operations and their occupancies
@@ -71,7 +73,10 @@ def cif2dict(seed):
 
     _cif_set_unreduced_sites(doc)
 
-    doc['space_group'] = get_spacegroup_spg(doc)
+    try:
+        doc['space_group'] = get_spacegroup_spg(doc)
+    except RuntimeError:
+        pass
 
     return doc, True
 
@@ -228,7 +233,10 @@ def _cif_set_unreduced_sites(doc):
     doc['positions_frac'] = unreduced_sites
     doc['site_occupancy'] = unreduced_occupancies
     doc['atom_types'] = unreduced_species
-    doc['num_atoms'] = sum(doc['site_occupancy'])
+    tmp = sum(doc['site_occupancy'])
+    if abs(tmp - round(tmp, 0)) < EPS:
+        tmp = round(tmp, 0)
+    doc['num_atoms'] = tmp
     assert len(doc['site_occupancy']) == len(doc['positions_frac']) == len(doc['atom_types'])
 
 

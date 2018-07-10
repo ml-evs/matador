@@ -465,7 +465,11 @@ def get_spacegroup_spg(doc, symprec=0.01):
     """
     import spglib as spg
     spg_cell = doc2spg(doc)
-    return spg.get_spacegroup(spg_cell, symprec=symprec).split(' ')[0]
+    space_group = spg.get_spacegroup(spg_cell, symprec=symprec)
+    if space_group is None:
+        raise RuntimeError('Spglib was unable to calculate space group.')
+
+    return space_group.split(' ')[0]
 
 
 def create_simple_supercell(doc, extension, standardize=False, symmetric=False):
