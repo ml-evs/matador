@@ -159,7 +159,7 @@ class QueryTest(unittest.TestCase):
         self.assertDictEqual(test_dict, query.query_dict)
 
         kwargs = {'composition': 'LiFeBe', 'icsd': 0, 'ignore_warnings': True,
-                  'src_str': '/Foo/bar/foo/Bar.res', 'pressure': 5,
+                  'src_str': '/Foo/bar/foo/Bar.res', 'pressure': 5, 'pressure_tolerance': 1,
                   'cutoff': [300, 400], 'encapsulated': True, 'cnt_radius': 5.21,
                   'sedc': 'null', 'mp_spacing': [0.05], 'spin': 0,
                   'testing': True}
@@ -175,7 +175,7 @@ class QueryTest(unittest.TestCase):
                 {'icsd': {'$exists': True}},
                 {'cut_off_energy': {'$gte': 300, '$lte': 400}},
                 {'source': {'$in': [re.compile('/Foo/bar/foo/Bar.res')]}},
-                {'pressure': {'$lt': 5.5, '$gt': 4.5}},
+                {'pressure': {'$lte': 6.0, '$gte': 4.0}},
                 {'encapsulated': {'$exists': True}},
                 {'cnt_radius': {'$gte': 5.20, '$lte': 5.22}},
                 {'sedc_scheme': {'$exists': False}},
@@ -202,7 +202,7 @@ class QueryTest(unittest.TestCase):
                 {'icsd': {'$exists': True}},
                 {'cut_off_energy': {'$gte': 300, '$lte': 400}},
                 {'source': {'$in': [re.compile('/Foo/bar/foo/Bar.res')]}},
-                {'pressure': {'$lt': 5.5, '$gt': 4.5}},
+                {'pressure': {'$lte': 5.5, '$gte': 4.5}},
                 {'encapsulated': {'$exists': True}},
                 {'cnt_radius': {'$gte': 5.20, '$lte': 5.22}},
                 {'sedc_scheme': {'$exists': False}},

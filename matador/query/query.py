@@ -264,11 +264,13 @@ class DBQuery:
             self._empty_query = False
 
         if self.args.get('pressure') is not None:
-            self.query_dict['$and'].append(self._query_pressure())
+            self.query_dict['$and'].append(self._query_float_range(
+                'pressure', self.args.get('pressure', 0.0), tolerance=self.args.get('pressure_tolerance', 0.5)))
             self._empty_query = False
 
         elif self.args['subcmd'] in ['hull', 'hulldiff', 'voltage']:
-            self.query_dict['$and'].append(self._query_pressure(custom_pressure=0))
+            self.query_dict['$and'].append(self._query_float_range(
+                'pressure', 0.0, tolerance=self.args.get('pressure_tolerance', 0.5)))
 
         if self.args.get('encapsulated') is True:
             self.query_dict['$and'].append(self._query_encap())
@@ -865,29 +867,6 @@ class DBQuery:
 
         return query_dict
 
-    def _query_pressure(self, custom_pressure=None):
-        """ Query pressure, by an approximate match on the stress
-        of the cell, with tolerance the default CASTEP geom_stress_tol,
-        +/-0.5 GPa, with convenience rounding to nearest GPa.
-
-        Keyword arguments:
-            custom_pressure (float): override cmdline value with this in GPa.
-
-        """
-        if custom_pressure is None:
-            input_pressure = self.args.get('pressure')
-        else:
-            input_pressure = custom_pressure
-
-        approx_pressure = [round(input_pressure, 0) - 0.5, round(input_pressure, 0) + 0.5]
-
-        query_dict = dict()
-        query_dict['pressure'] = dict()
-        query_dict['pressure']['$lt'] = approx_pressure[1]
-        query_dict['pressure']['$gt'] = approx_pressure[0]
-
-        return query_dict
-
     @staticmethod
     def _query_encap():
         """ Query only CNT encapsulated structures. """
@@ -943,7 +922,6 @@ class DBQuery:
             query_dict['xc_functional'] = xc_functional.upper()
         return query_dict
 
-
     def _query_spin(self):
         """ Query all calculations with spin polarisation,
         i.e. --spin n!=0, or non-spin-polarization, i.e. --spin 0.
@@ -972,7 +950,9 @@ class DBQuery:
         query_dict = {}
         query_dict['$and'] = []
         query_dict['$and'].append(self._query_xc_functional(xc_functional=doc.get('xc_functional')))
-        query_dict['$and'].append(self._query_pressure(custom_pressure=doc.get('pressure')))
+        query_dict['$and'].append(self._query_float_range(
+            'pressure', doc.get('pressure', 0.0), tolerance=self.args.get('pressure_tolerance', 0.5)))
+
         if self.args.get('time') is not None:
             query_dict['$and'].append(self._query_time())
         if 'spin_polarized' in doc and doc['spin_polarized']:
@@ -1017,15 +997,8 @@ class DBQuery:
             # query_dict.append(dict())
             # query_dict[-1]['cut_off_energy'] = doc['cut_off_energy']
         else:
-            temp_dict = dict()
-            temp_dict['kpoints_mp_spacing'] = dict()
-            if self.args.get('kpoint_tolerance') is not None:
-                tol = float(self.args.get('kpoint_tolerance'))
-            else:
-                tol = 0.01
-            temp_dict['kpoints_mp_spacing']['$gte'] = doc['kpoints_mp_spacing'] - tol
-            temp_dict['kpoints_mp_spacing']['$lte'] = doc['kpoints_mp_spacing'] + tol
-            query_dict['$and'].append(temp_dict)
+            query_dict['$and'].append(self._query_float_range(
+                'kpoints_mp_spacing', self.args.get('mp_spacing'), tolerance=self.args.get('kpoint_tolerance', 0.01)))
             query_dict['$and'].append(dict())
             query_dict['$and'][-1]['cut_off_energy'] = doc['cut_off_energy']
         if 'species_pot' in doc:
