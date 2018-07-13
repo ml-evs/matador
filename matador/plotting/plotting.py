@@ -1045,20 +1045,29 @@ def plot_2d_hull(hull, ax=None, show=False, plot_points=True,
 
     # annotate hull structures
     if labels or label_cutoff is not None:
-        label_cursor = get_hull_labels(hull, num_species=2)
+        label_cursor = get_hull_labels(hull, num_species=2, label_cutoff=label_cutoff)
         for ind, doc in enumerate(label_cursor):
             arrowprops = dict(arrowstyle="-|>", lw=2, alpha=1, zorder=1, shrinkA=2, shrinkB=4)
-            if (ind + 2) < np.argmin(tie_line[:, 1]):
-                position = (0.8 * tie_line[ind + 2, 0], 1.15 * (tie_line[ind + 2, 1]) - 0.05)
-            elif (ind + 2) == np.argmin(tie_line[:, 1]):
-                position = (tie_line[ind + 2, 0], 1.15 * (tie_line[ind + 2, 1]) - 0.05)
+            min_comp = tie_line[np.argmin(tie_line[:, 1]), 0]
+            e_f = label_cursor[ind]['formation_' + str(hull._energy_key)]
+            conc = label_cursor[ind]['concentration'][0]
+            if conc < min_comp:
+                position = (0.8 * conc, 1.15 * (e_f - 0.05))
+            elif label_cursor[ind]['concentration'][0] == min_comp:
+                position = (conc, 1.15 * (e_f - 0.05))
             else:
-                position = (min(1.1 * tie_line[ind + 2, 0] + 0.15, 0.95), 1.15 * (tie_line[ind + 2, 1]) - 0.05)
+                position = (min(1.1 * conc + 0.15, 0.95),1.15 * (e_f - 0.05))
+            # if (ind + 2) < np.argmin(tie_line[:, 1]):
+                # position = (0.8 * tie_line[ind + 2, 0], 1.15 * (tie_line[ind + 2, 1]) - 0.05)
+            # elif (ind + 2) == np.argmin(tie_line[:, 1]):
+                # position = (tie_line[ind + 2, 0], 1.15 * (tie_line[ind + 2, 1]) - 0.05)
+            # else:
+                # position = (min(1.1 * tie_line[ind + 2, 0] + 0.15, 0.95), 1.15 * (tie_line[ind + 2, 1]) - 0.05)
             ax.annotate(get_formula_from_stoich(doc['stoichiometry'],
                                                 elements=hull.elements,
                                                 latex_sub_style=r'\mathregular',
                                                 tex=True),
-                        xy=(tie_line[ind+2, 0], tie_line[ind+2, 1]),
+                        xy=(conc, e_f),
                         xytext=position,
                         textcoords='data',
                         ha='right',
