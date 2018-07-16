@@ -179,14 +179,14 @@ class QueryTest(unittest.TestCase):
                 {'encapsulated': {'$exists': True}},
                 {'cnt_radius': {'$gte': 5.20, '$lte': 5.22}},
                 {'sedc_scheme': {'$exists': False}},
-                {'kpoints_mp_spacing': {'$gte': 0.04, '$lte': 0.060000000000000005}},
+                {'kpoints_mp_spacing': {'$gte': 0.04, '$lte': 0.06}},
                 {'spin_polarized': {'$ne': True}},
             ]
         })
         self.assertDictEqual(test_dict, query.query_dict)
 
         kwargs = {'composition': 'LiFeBe', 'icsd': 0, 'ignore_warnings': True,
-                  'src_str': '/Foo/bar/foo/Bar.res', 'pressure': 5,
+                  'src_str': '/Foo/bar/foo/Bar.res', 'pressure': 5, 'pressure_tolerance': None, 'kpoint_tolerance': None,
                   'cutoff': [300, 400], 'encapsulated': True, 'cnt_radius': 5.21,
                   'sedc': 'null', 'mp_spacing': [0.05], 'spin': 'any',
                   'testing': True}
@@ -206,7 +206,33 @@ class QueryTest(unittest.TestCase):
                 {'encapsulated': {'$exists': True}},
                 {'cnt_radius': {'$gte': 5.20, '$lte': 5.22}},
                 {'sedc_scheme': {'$exists': False}},
-                {'kpoints_mp_spacing': {'$gte': 0.04, '$lte': 0.060000000000000005}},
+                {'kpoints_mp_spacing': {'$lte': 0.06, '$gte': 0.04}},
+            ]
+        })
+        self.assertDictEqual(test_dict, query.query_dict)
+
+        kwargs = {'composition': 'LiFeBe', 'icsd': 0, 'ignore_warnings': True,
+                  'src_str': '/Foo/bar/foo/Bar.res', 'pressure': 5, 'pressure_tolerance': 10, 'kpoint_tolerance': 0.02,
+                  'cutoff': [300, 400], 'encapsulated': True, 'cnt_radius': 5.21,
+                  'sedc': 'null', 'mp_spacing': [0.04, 0.05], 'spin': 'any',
+                  'testing': True}
+        query = DBQuery(**kwargs)
+        test_dict = ({
+            '$and': [
+                {'$and': [
+                    {'elems': {'$in': ['Li']}},
+                    {'elems': {'$in': ['Fe']}},
+                    {'elems': {'$in': ['Be']}},
+                    {'stoichiometry': {'$size': 3}}
+                ]},
+                {'icsd': {'$exists': True}},
+                {'cut_off_energy': {'$gte': 300, '$lte': 400}},
+                {'source': {'$in': [re.compile('/Foo/bar/foo/Bar.res')]}},
+                {'pressure': {'$lte': 15, '$gte': -5}},
+                {'encapsulated': {'$exists': True}},
+                {'cnt_radius': {'$gte': 5.20, '$lte': 5.22}},
+                {'sedc_scheme': {'$exists': False}},
+                {'kpoints_mp_spacing': {'$lte': 0.05, '$gte': 0.04}},
             ]
         })
         self.assertDictEqual(test_dict, query.query_dict)

@@ -265,12 +265,12 @@ class DBQuery:
 
         if self.args.get('pressure') is not None:
             self.query_dict['$and'].append(self._query_float_range(
-                'pressure', self.args.get('pressure', 0.0), tolerance=self.args.get('pressure_tolerance', 0.5)))
+                'pressure', self.args.get('pressure') or 0.0, tolerance=self.args.get('pressure_tolerance') or 0.5))
             self._empty_query = False
 
         elif self.args['subcmd'] in ['hull', 'hulldiff', 'voltage']:
             self.query_dict['$and'].append(self._query_float_range(
-                'pressure', 0.0, tolerance=self.args.get('pressure_tolerance', 0.5)))
+                'pressure', 0.0, tolerance=self.args.get('pressure_tolerance') or 0.5))
 
         if self.args.get('encapsulated') is True:
             self.query_dict['$and'].append(self._query_encap())
@@ -295,7 +295,7 @@ class DBQuery:
 
         if self.args.get('mp_spacing') is not None:
             self.query_dict['$and'].append(self._query_float_range(
-                'kpoints_mp_spacing', self.args.get('mp_spacing'), tolerance=self.args.get('kpoint_tolerance', 0.01)))
+                'kpoints_mp_spacing', self.args.get('mp_spacing'), tolerance=self.args.get('kpoint_tolerance') or 0.01))
             self._empty_query = False
 
         if self.args.get('spin') is not None:
@@ -308,7 +308,7 @@ class DBQuery:
             self.query_dict['$and'].append(self._query_quality())
 
         if self.args.get('time') is not None:
-            self.query_dict['$and'].append(self._query_time(self.args.get('since', False)))
+            self.query_dict['$and'].append(self._query_time(self.args.get('since') or False))
             self._empty_query = False
 
     def perform_query(self):
@@ -385,7 +385,7 @@ class DBQuery:
                     self.repo = self._collections[list(self._collections.keys())[0]]
                 else:
                     sys.exit('Hulls and voltage curves require just one source or --include_oqmd, exiting...')
-                print('Creating hull from AJM db structures.')
+                print('Creating hull from structures in query results.')
                 if self.args.get('biggest'):
                     print('\nFinding biggest calculation set for hull...\n')
                 else:
@@ -497,9 +497,8 @@ class DBQuery:
             if tolerance is None:
                 query_dict[field]['$eq'] = values[0]
             else:
-                query_dict[field]['$gte'] = values[0] - tolerance
-                query_dict[field]['$lte'] = values[0] + tolerance
-
+                query_dict[field]['$gte'] = round(values[0] - tolerance, 8)
+                query_dict[field]['$lte'] = round(values[0] + tolerance, 8)
         return query_dict
 
     @staticmethod
@@ -951,7 +950,7 @@ class DBQuery:
         query_dict['$and'] = []
         query_dict['$and'].append(self._query_xc_functional(xc_functional=doc.get('xc_functional')))
         query_dict['$and'].append(self._query_float_range(
-            'pressure', doc.get('pressure', 0.0), tolerance=self.args.get('pressure_tolerance', 0.5)))
+            'pressure', doc.get('pressure', 0.0), tolerance=self.args.get('pressure_tolerance') or 0.5))
 
         if self.args.get('time') is not None:
             query_dict['$and'].append(self._query_time())
@@ -998,7 +997,7 @@ class DBQuery:
             # query_dict[-1]['cut_off_energy'] = doc['cut_off_energy']
         else:
             query_dict['$and'].append(self._query_float_range(
-                'kpoints_mp_spacing', self.args.get('mp_spacing'), tolerance=self.args.get('kpoint_tolerance', 0.01)))
+                'kpoints_mp_spacing', doc.get('kpoints_mp_spacing'), tolerance=self.args.get('kpoint_tolerance') or 0.01))
             query_dict['$and'].append(dict())
             query_dict['$and'][-1]['cut_off_energy'] = doc['cut_off_energy']
         if 'species_pot' in doc:
