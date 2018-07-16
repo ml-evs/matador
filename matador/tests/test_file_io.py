@@ -8,7 +8,7 @@ from os import system, remove
 import numpy as np
 # grab abs path for accessing test data
 REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
-VERBOSITY = 10
+VERBOSITY = 0
 
 
 class ScrapeTest(unittest.TestCase):
@@ -212,6 +212,7 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(int_dict['intermediates'][-1]['free_energy_per_atom'], -1304.233706274)
             self.assertEqual(int_dict['intermediates'][-7]['total_energy_per_atom'], -1304.222982442)
             self.assertEqual(int_dict['intermediates'][-7]['free_energy_per_atom'], -1304.233677344)
+            self.assertEqual(int_dict['geom_iter'], 44)
 
     def testCastepUnoptimised(self):
         from matador.scrapers.castep_scrapers import castep2dict
@@ -261,7 +262,7 @@ class ScrapeTest(unittest.TestCase):
         self.assertTrue(error)
 
         castep_fname = []
-        castep_fname += [REAL_PATH + 'data/NaP_intermediates.castep']
+        castep_fname += [REAL_PATH + 'data/castep_files/NaP_intermediates.castep']
         castep_fname += [REAL_PATH + 'data/___not_a_file']
         castep_fname += [REAL_PATH + 'data/KP-castep17.castep']
         castep_fname += [REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep']
@@ -298,7 +299,7 @@ class ScrapeTest(unittest.TestCase):
 
     def testCastepIntermediates(self):
         from matador.scrapers.castep_scrapers import castep2dict
-        castep_fname = REAL_PATH + 'data/NaP_intermediates.castep'
+        castep_fname = REAL_PATH + 'data/castep_files/NaP_intermediates.castep'
         failed_open = False
         try:
             f = open(castep_fname, 'r')
@@ -319,6 +320,7 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(test_dict['intermediates'][0]['free_energy'], -8537.247551883)
             self.assertEqual(test_dict['intermediates'][1]['free_energy'], -8538.215032441)
             self.assertEqual(test_dict['intermediates'][-1]['free_energy'], -8546.922614706)
+            self.assertEqual(test_dict['geom_iter'], 70)
             self.assertEqual(len(test_dict['intermediates']), 141)
             self.assertEqual(test_dict['free_energy'], -8546.922614706)
             self.assertEqual(final_dict['free_energy'], -8546.922614706)
@@ -339,7 +341,6 @@ class ScrapeTest(unittest.TestCase):
             self.assertTrue(test_dict['optimised'])
             self.assertEqual(test_dict['enthalpy'], -6.16805339E+003)
             self.assertEqual(test_dict['total_energy'], -6168.053386094)
-
 
     def testRes(self):
         from matador.scrapers.castep_scrapers import res2dict
@@ -376,7 +377,6 @@ class ScrapeTest(unittest.TestCase):
             test_dict, s = res2dict(res_fname)
             self.assertTrue(s)
             self.assertEqual(test_dict['icsd'], 15027)
-
 
         res_fname = REAL_PATH + 'data/LiPZn-r57des_bodged.res'
         failed_open = False
@@ -455,7 +455,7 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(test_dict['xc_functional'], 'PBE', msg='Failed to read db=False xc!')
             self.assertEqual(test_dict['fix_occupancy'], False, msg='Failed to read db=False occupancy!')
             self.assertEqual(test_dict['perc_extra_bands'], 40.0, msg='Failed to read db=False extra bands!')
-            self.assertEqual(test_dict['geom_max_iter'], '200', msg='Wrong db=False geom_max_iter!')
+            self.assertEqual(test_dict['geom_max_iter'], 200, msg='Wrong db=False geom_max_iter!')
             self.assertEqual(test_dict['fixed_npw'], False, msg='Wrong db=False fixed_npw!')
             self.assertEqual(test_dict['write_checkpoint'], 'none', msg='Wrong db=False checkpointing!')
             self.assertEqual(test_dict['write_cell_structure'], True, msg='Wrong db=False cell_structure!')

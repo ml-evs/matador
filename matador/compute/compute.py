@@ -93,9 +93,12 @@ class FullRelaxer:
             timings (`obj`:tuple: of `obj`:int:): tuple containing max and elapsed time in seconds
 
         Raises:
-            WalltimeError: if desired walltime is exceeded.
-            SystemExit: if a fatal error occurs.
-            RuntimeError: if a structure-level error occurs.
+            WalltimeError: if desired/alotted walltime is exceeded, current run will be
+                tidied up, ready to be restarted from intermediate state.
+            SystemExit: if a fatal error occurs, failed run will be moved to bad_castep and
+                no further calculations will be attempted.
+            RuntimeError: if a structure-level error occurs, causing the seed files to be moved
+                to bad_castep.
 
         """
         # set defaults and update class with desired values
@@ -108,6 +111,10 @@ class FullRelaxer:
         self.paths = None
         self.process = None
         self.output_queue = None
+
+        self.geom_max_iter_list = None
+        self.max_iter = None
+        self.num_rough_iter = None
         self.__dict__.update(prop_defaults)
         self.__dict__.update(kwargs)
 
@@ -122,11 +129,15 @@ class FullRelaxer:
         # scrape and save seed name
         self.res = res
         if isinstance(self.res, str):
-            self.seed = self.res.replace('.res', '')
+            self.seed = self.res
+            if '/' in self.seed:
+                shutil.copy(self.seed, self.seed.split('/')[-1])
         else:
             assert isinstance(self.res['source'], list)
             assert len(self.res['source']) == 1
-            self.seed = self.res['source'][0].replace('.res', '')
+            self.seed = self.res['source'][0]
+
+        self.seed = self.seed.split('/')[-1].replace('.res', '')
 
         # set up logging; by default, write DEBUG level into a file called logs/$seed.log
         # and write desired verbosity to stdout (default WARN).
@@ -285,21 +296,6 @@ class FullRelaxer:
 
         # perform relaxation
         elif calc_doc['task'].upper() in ['GEOMETRYOPTIMISATION', 'GEOMETRYOPTIMIZATION']:
-            # set up geom opt parameters
-            self.max_iter = calc_doc['geom_max_iter']
-            self.num_rough_iter = self.rough
-            fine_iter = self.fine_iter
-            rough_iter = self.rough_iter
-            if 'geom_method' in calc_doc:
-                if calc_doc['geom_method'].lower() == 'tpsd' and rough_iter < 3:
-                    rough_iter = 3
-            num_fine_iter = int(int(self.max_iter) / fine_iter)
-            self.geom_max_iter_list = (self.num_rough_iter * [rough_iter])
-            self.geom_max_iter_list.extend(num_fine_iter * [fine_iter])
-            if not self.geom_max_iter_list:
-                msg = 'Could not divide up relaxation; consider increasing geom_max_iter'
-                logging.critical(msg)
-                raise SystemExit(msg)
 
             # begin relaxation
             if self.start:
@@ -379,7 +375,8 @@ class FullRelaxer:
 
         """
         logging.info('Attempting to relax {}'.format(self.seed))
-        self._setup_relaxation_dirs()
+
+        self._setup_relaxation()
         seed = self.seed
         rerun = False
         try:
@@ -1060,8 +1057,9 @@ class FullRelaxer:
 
         """
         logging.info('Performing memory check for {seed}'.format(seed=seed))
-        doc2param(calc_doc, seed, hash_dupe=False)
-        doc2cell(calc_doc, seed, hash_dupe=False, copy_pspots=False)
+        memcheck_seed = seed + '_memcheck'
+        doc2param(calc_doc, memcheck_seed, hash_dupe=False)
+        doc2cell(calc_doc, memcheck_seed, hash_dupe=False, copy_pspots=False)
         free_memory = float(virtual_memory().available) / 1024**2
         if self.maxmem is None:
             maxmem = 0.9 * free_memory
@@ -1074,16 +1072,16 @@ class FullRelaxer:
             return False
 
         logging.debug('Running CASTEP dryrun.')
-        process = sp.Popen(['nice', '-n', '15', self.executable, '-d', seed])
+        process = sp.Popen(['nice', '-n', '15', self.executable, '-d', memcheck_seed])
         process.communicate()
 
         skip = False
-        results, success = castep2dict(seed + '.castep', db=False)
+        results, success = castep2dict(memcheck_seed + '.castep', db=False)
         if not success or 'estimated_mem_MB' not in results:
             skip = True
             logging.warning('CASTEP dryrun failed with output {results}'.format(results=results))
 
-        for _file in glob.glob(seed + '*'):
+        for _file in glob.glob(memcheck_seed + '*'):
             if _file.endswith('.res'):
                 continue
             else:
@@ -1212,7 +1210,8 @@ class FullRelaxer:
         return errors_present, error_str
 
     def mv_to_bad(self, seed):
-        """ Move all files associated with "seed" to bad_castep.
+        """ Move all files associated with "seed" to bad_castep, from both
+        the compute directory (if it exists) and the root dir..
 
         Parameters:
             seed (str): filename of structure.
@@ -1259,7 +1258,7 @@ class FullRelaxer:
         if not os.path.exists(completed_dir):
             os.makedirs(completed_dir, exist_ok=True)
         if keep:
-            seed_files = glob.glob(seed + '.*') + glob.glob(seed + '-out.cell')
+            seed_files = glob.glob(seed + '.*') + [seed + '-out.cell']
             logging.debug('Files to move: {files}.'.format(files=seed_files))
             for _file in seed_files:
                 shutil.move(_file, completed_dir)
@@ -1284,10 +1283,10 @@ class FullRelaxer:
             for ext in file_exts + ['.res.lock']:
                 if os.path.isfile('{}{}'.format(fname, ext)):
                     os.remove('{}{}'.format(fname, ext))
-            if self.conv_kpt_bool or self.conv_cutoff_bool:
-                for _file in glob.glob(fname + '*.res'):
-                    if os.path.isfile(_file):
-                        os.remove(_file)
+
+            wildcard_fnames = glob.glob('{}/{}.*'.format(self.root_folder, seed))
+            for fname in wildcard_fnames:
+                os.remove(fname)
 
     def cp_to_input(self, seed, ext='res', glob_files=False):
         """ Copy initial cell and res to input folder.
@@ -1318,7 +1317,7 @@ class FullRelaxer:
                 if not os.path.isfile('{}/{}.{}'.format(input_dir, seed, ext)):
                     shutil.copy('{}.{}'.format(seed, ext), input_dir)
 
-    def _setup_relaxation_dirs(self):
+    def _setup_relaxation(self):
         """ Set up directories and files for relaxation. """
 
         logging.info('Preparing to relax {seed}'.format(seed=self.seed))
@@ -1333,21 +1332,61 @@ class FullRelaxer:
             for pspot in pspots:
                 shutil.copy(pspot, self.compute_dir)
 
-            # update res file with intermediate calculation if castep file is newer than res
-            if os.path.isfile(self.seed + '.castep') and os.path.isfile(self.seed + '.res'):
-                logging.info('Updating res file with result from intermediate CASTEP file in root_dir')
+        # update res file with intermediate calculation if castep file is newer than res
+        if os.path.isfile(self.seed + '.castep') and os.path.isfile(self.seed + '.res'):
+            logging.info('Trying to update res file with result from intermediate CASTEP file found in root_dir')
+            if self.compute_dir is not None:
                 shutil.copy(self.seed + '.castep', self.compute_dir)
-                if os.path.getmtime(self.seed + '.res') < os.path.getmtime(self.seed + '.castep'):
-                    castep_dict, success = castep2dict(self.seed + '.castep', db=False)
-                    if success:
-                        self.res_dict.update(castep_dict)
+            castep_dict, success = castep2dict(self.seed + '.castep', db=False)
+            if success:
+                self.res_dict['geom_iter'] = castep_dict.get('geom_iter')
 
+            if os.path.getmtime(self.seed + '.res') < os.path.getmtime(self.seed + '.castep'):
+                logging.info('CASTEP file was updated more recently than res file, using intermediate structure...')
+                self.res_dict.update(castep_dict)
+
+        if self.compute_dir is not None:
             os.chdir(self.compute_dir)
 
         # copy initial res file to seed
         logging.info('Writing fresh res file to start calculation from.')
         doc2res(self.res_dict, self.seed, info=False, hash_dupe=False, overwrite=True)
         self.cp_to_input(self.seed)
+
+        # set up geom opt iteration options based on input/scraped parameters
+        self.max_iter = self.calc_doc['geom_max_iter']
+        if 'geom_iter' in self.res_dict:
+            self.max_iter -= self.res_dict['geom_iter']
+
+        if self.max_iter < 0:
+            msg = '{} iterations already performed on structure, exiting...'
+            logging.critical(msg)
+            raise RuntimeError(msg)
+
+        # number of steps in fine and rough calcs respectively
+        fine_iter = self.fine_iter
+        rough_iter = self.rough_iter
+        # number of calculations to run with rough_iter steps
+        num_rough_iter = self.rough
+        if 'geom_method' in self.calc_doc:
+            if self.calc_doc['geom_method'].lower() == 'tpsd' and rough_iter < 3:
+                rough_iter = 3
+        self.geom_max_iter_list = (num_rough_iter * [rough_iter])
+        self.max_iter -= num_rough_iter * rough_iter
+
+        num_fine_iter = ceil(int(self.max_iter) / fine_iter)
+        if self.max_iter > 0:
+            if self.max_iter < fine_iter:
+                fine_iter = self.max_iter
+                num_fine_iter = 1
+            self.geom_max_iter_list.extend(num_fine_iter * [fine_iter])
+
+        logging.info('Geometry optimisation iteration scheme set to {}'.format(self.geom_max_iter_list))
+
+        if not self.geom_max_iter_list:
+            msg = 'Could not divide up relaxation; consider increasing geom_max_iter'
+            logging.critical(msg)
+            raise SystemExit(msg)
 
     def _update_input_files(self):
         """ Update the cell and param files for the next relaxation. """

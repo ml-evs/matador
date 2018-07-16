@@ -407,6 +407,9 @@ def param2dict(seed, db=True, **kwargs):
                     elif 'false' in value.lower():
                         param[keyword] = False
 
+                    if 'geom_max_iter' == keyword:
+                        param['geom_max_iter'] = int(param['geom_max_iter'])
+
                     if 'cut_off_energy' in line and 'mix_cut_off_energy' not in line:
                         temp_cut_off = (param['cut_off_energy'].lower().replace('ev', ''))
                         temp_cut_off = temp_cut_off.strip()
@@ -478,8 +481,12 @@ def castep2dict(seed, db=True, intermediates=False, **kwargs):
     if not db and 'thermo' in castep['task'].lower():
         castep.update(_castep_scrape_thermo_data(flines, castep))
 
-    if intermediates:
-        castep['intermediates'] = _castep_scrape_all_snapshots(flines)
+    # only scrape snapshots/number of intermediates if requested,
+    # or if not in db mode
+    if intermediates or not db:
+        snapshots, castep['geom_iter'] = _castep_scrape_all_snapshots(flines)
+        if intermediates:
+            castep['intermediates'] = snapshots
 
     castep.update(_castep_scrape_final_structure(flines, castep, db=db))
     castep.update(_castep_scrape_metadata(flines, castep))
@@ -1401,9 +1408,11 @@ def _castep_scrape_all_snapshots(flines):
     Returns:
         :obj:`list` of :obj:`dict`: list of dictionaries containing
             intermediate snapshots.
+        int: number of completed geometry optimisation steps.
 
     """
     intermediates = []
+    num_opt_steps = 0
     snapshot = dict()
     for line_no, line in enumerate(flines):
         # use the "Real Lattice" line as the start of a new snapshot / end of old one
@@ -1437,6 +1446,21 @@ def _castep_scrape_all_snapshots(flines):
                     temp_line = flines[line_no + i].split()[0:3]
                     snapshot['lattice_cart'].append(list(map(float, temp_line)))
                 i += 1
+
+        elif 'Lattice parameters' in line:
+            snapshot['lattice_abc'] = []
+            i = 1
+            snapshot['lattice_abc'].append(
+                list(map(float,
+                         [flines[line_no+i].split('=')[1].strip().split(' ')[0],
+                          flines[line_no+i+1].split('=')[1].strip().split(' ')[0],
+                          flines[line_no+i+2].split('=')[1].strip().split(' ')[0]])))
+            snapshot['lattice_abc'].append(
+                list(map(float,
+                         [flines[line_no+i].split('=')[-1].strip(),
+                          flines[line_no+i+1].split('=')[-1].strip(),
+                          flines[line_no+i+2].split('=')[-1].strip()])))
+
         elif 'Current cell volume' in line:
             snapshot['cell_volume'] = float(line.split('=')[1].split()[0].strip())
         elif 'Cell Contents' in line:
@@ -1507,4 +1531,10 @@ def _castep_scrape_all_snapshots(flines):
                     break
                 i += 1
 
-    return intermediates
+        # use only finished iterations for counting number of complete GO steps
+        elif ': finished iteration' in line and 'with enthalpy' in line:
+            # don't include the "zeroth" step before anything has been moved
+            if '0' not in line.split():
+                num_opt_steps += 1
+
+    return intermediates, num_opt_steps

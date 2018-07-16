@@ -79,9 +79,11 @@ class ComputeTest(unittest.TestCase):
 
         match_dict = dict()
         for key in queue_result:
-            if key in ['source', 'site_occupancy']:
+            if key in ['source', 'site_occupancy', 'geom_iter']:
                 continue
-            match_dict[key] = queue_result[key] == result[key]
+            match_dict[key] = (queue_result[key] == result[key])
+            if not match_dict[key]:
+                print(key, queue_result[key], result[key])
 
         print('Process completed!')
 
@@ -119,7 +121,7 @@ class ComputeTest(unittest.TestCase):
 
         node = None
         nnodes = None
-        seed = 'data/_LiAs_testcase.res'
+        seed = 'data/structures/LiAs_testcase.res'
 
         fall_over = False
 
@@ -245,6 +247,58 @@ class ComputeTest(unittest.TestCase):
         os.chdir(ROOT_DIR)
         self.assertTrue(bad_exists, "couldn't find output file!")
         self.assertEqual(num, 0)
+
+
+    @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
+    def testDontRestartCompletedCalc(self):
+        """ Set a relaxation up to fail. """
+        from matador.compute import FullRelaxer, reset_job_folder
+        from matador.scrapers.castep_scrapers import cell2dict, param2dict
+
+        os.chdir(REAL_PATH + 'data/no_steps_left_todo')
+
+        shutil.copy('cache/NaP_intermediates_stopped_early.res', '.')
+        shutil.copy('cache/NaP_intermediates_stopped_early.castep', '.')
+
+        cell_dict, s = cell2dict('NaP.cell', verbosity=VERBOSITY, db=False)
+        assert s
+        param_dict, s = param2dict('NaP.param', verbosity=VERBOSITY, db=False)
+        assert s
+        ncores = 4
+        executable = 'castep'
+        node = None
+        seed = 'NaP_intermediates_stopped_early'
+
+        FullRelaxer(ncores=ncores, nnodes=None, node=node,
+                    res=seed, param_dict=param_dict, cell_dict=cell_dict,
+                    debug=False, verbosity=VERBOSITY, killcheck=True, memcheck=False,
+                    reopt=True, executable=executable,
+                    start=True)
+
+        print('Process completed!')
+
+        bad_exists = []
+        bad_exists.append(os.path.isfile('bad_castep/NaP_intermediates_stopped_early.res'))
+        bad_exists.append(os.path.isfile('bad_castep/NaP_intermediates_stopped_early.castep'))
+
+        good_exists = []
+
+        paths = ['input', 'bad_castep', 'logs']
+        for path in paths:
+            if os.path.isdir(path):
+                good_exists.append(True)
+                files = glob.glob(path + '/*')
+                for file in files:
+                    os.remove(file)
+                os.removedirs(path)
+            else:
+                good_exists.append(False)
+
+        for _file in glob.glob('*.usp'):
+            os.remove(_file)
+
+        self.assertTrue(all(bad_exists))
+        self.assertTrue(all(good_exists))
 
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
     def testBatchRelax(self):
