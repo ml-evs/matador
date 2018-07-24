@@ -218,7 +218,10 @@ class FullRelaxer:
                 stats = pstats.Stats(profile, stream=fp).sort_stats('cumulative')
                 stats.print_stats()
 
-        logging.info('FullRelaxer finished successfully for {seed}'.format(seed=self.seed))
+        if self.success:
+            logging.info('FullRelaxer finished successfully for {seed}'.format(seed=self.seed))
+        else:
+            logging.info('FullRelaxer failed cleanly for {seed}'.format(seed=self.seed))
 
     def run_castep(self, res):
         """ Set up and run CASTEP calculation.
@@ -316,7 +319,12 @@ class FullRelaxer:
                     self.remove_compute_dir_if_finished(self.compute_dir)
 
         elif calc_doc['task'].upper() in ['PHONON', 'THERMODYNAMICS']:
-            success = self.castep_full_phonon(calc_doc, self.seed)
+            from matador.workflows.castep import castep_full_phonon
+            success = castep_full_phonon(self, calc_doc, self.seed)
+
+        elif calc_doc['task'].upper() in ['SPECTRAL']:
+            from matador.workflows.castep import castep_full_spectral
+            success = castep_full_spectral(self, calc_doc, self.seed)
 
         # run in SCF mode, i.e. just call CASTEP on the seeds
         else:
@@ -324,12 +332,18 @@ class FullRelaxer:
 
         return success
 
-    def run_generic(self, seed):
+    def run_generic(self, seed, intermediate=False):
         """ Run a generic mpi program on the given seed. Files from
-        completed runs are moved to "completed" and failed runs to "bad_castep".
+        completed runs are moved to "completed" (unless intermediate
+        is True) and failed runs to "bad_castep".
 
         Parameters:
             seed (str): filename of structure
+
+        Keyword arguments:
+            intermediate (bool): whether we want to run more calculations
+                on the output of this, i.e. whether to move to completed
+                or not.
 
         Returns:
             bool: True if calculations progressed without error.
@@ -347,16 +361,17 @@ class FullRelaxer:
             self.cp_to_input(seed, ext=self.input_ext, glob_files=True)
             self.process = self.run_command(seed)
             self.process.communicate()
-            logging.debug('Process returned {}'.format(self.process.returncode))
             if self.process.returncode != 0:
-                self.mv_to_bad(seed)
-                return False
+                raise RuntimeError('Process returned code {}'.format(self.process.returncode))
 
-            self.mv_to_completed(seed, keep=True, completed_dir=self.paths['completed_dir'])
+            if not intermediate:
+                logging.info('Writing results of generic call to res file and tidying up.')
+                self.mv_to_completed(seed, keep=True, completed_dir=self.paths['completed_dir'])
+
             return True
 
         except Exception as err:
-            logging.critical('Caught error inside run_generic: {error}.'.format(error=err))
+            logging.error('Caught error inside run_generic: {error}.'.format(error=err))
             self.mv_to_bad(seed)
             raise err
 
@@ -516,139 +531,8 @@ class FullRelaxer:
             self._finalise_result()
             raise err
 
-    def castep_full_phonon(self, calc_doc, seed):
-        """ Perform a "full" phonon calculation on a system, i.e.
-        first perform a relaxation in a standardised unit cell,
-        then compute the dynamical matrix, then finally interpolate
-        that dynamical matrix into dispersion curves and DOS.
-
-        Parameters:
-            calc_doc (dict): dictionary of structure and calculation
-                parameters.
-            seed (str): root seed for the calculation.
-
-        Raises:
-            RuntimeError: if any part of the calculation fails.
-
-        """
-        logging.info('Performing CASTEP phonon job on {}'.format(seed))
-        from matador.utils.cell_utils import cart2abc
-        todo = {'relax': True, 'dynmat': True, 'dispersion': False, 'dos': False, 'thermodynamics': False}
-        if calc_doc.get('task').lower() in ['phonon', 'thermodynamics']:
-            if (('phonon_fine_kpoint_path' not in calc_doc and 'phonon_fine_kpoint_list' not in calc_doc) and
-                    'phonon_fine_kpoint_path_spacing' in calc_doc):
-                todo['dispersion'] = True
-            if 'phonon_fine_kpoint_mp_spacing' in calc_doc:
-                todo['dos'] = True
-            if calc_doc['task'].lower() == 'thermodynamics':
-                todo['thermodynamics'] = True
-
-        # always standardise the cell so that any phonon calculation can have
-        # post-processing performed after the fact
-        prim_doc, kpt_path = self._get_seekpath_compliant_input(
-            calc_doc, calc_doc.get('phonon_fine_kpoint_path_spacing', 0.02))
-        calc_doc.update(prim_doc)
-        calc_doc['lattice_abc'] = cart2abc(calc_doc['lattice_cart'])
-
-        if todo['dispersion']:
-            calc_doc['phonon_fine_kpoint_list'] = kpt_path
-
-        # always shift phonon grid to include Gamma
-        if 'phonon_kpoint_mp_spacing' in calc_doc:
-            from matador.utils.cell_utils import calc_mp_grid, shift_to_include_gamma
-            grid = calc_mp_grid(calc_doc['lattice_cart'], calc_doc['phonon_kpoint_mp_spacing'])
-            offset = shift_to_include_gamma(grid)
-            if offset != [0, 0, 0]:
-                calc_doc['phonon_kpoint_mp_offset'] = offset
-                logging.debug('Set phonon MP grid offset to {}'.format(offset))
-
-        # prepare to do pre-relax if there's no check file
-        if os.path.isfile(seed + '.check'):
-            todo['relax'] = False
-            logging.info('Restarting from {}.check, so not performing re-relaxation'.format(seed))
-
-        logging.info('run3 phonon options {}'.format(todo))
-
-        if todo['relax']:
-            success = self._castep_phonon_prerelax_only(calc_doc, seed,
-                                                        intermediate=bool(sum([bool(todo[key]) for key in todo])))
-            if success:
-                todo['relax'] = False
-                logging.info('Pre-relaxation completed successfully.')
-            else:
-                msg = 'Pre-requisite geometry optimisation failed.'
-                logging.error(msg)
-                raise RuntimeError(msg)
-
-        if todo['dynmat']:
-            success = self._castep_phonon_dynmat_only(calc_doc, seed,
-                                                      intermediate=bool(sum([bool(todo[key]) for key in todo])))
-            if success:
-                todo['dynmat'] = False
-                logging.info('Dynmat calculation completed successfully.')
-            else:
-                msg = 'Phonon dynamical matrix calculation failed.'
-                logging.error(msg)
-                raise RuntimeError(msg)
-
-        if todo['thermodynamics']:
-            success = self._castep_phonon_thermodynamics_only(calc_doc, seed,
-                                                              intermediate=bool(sum([bool(todo[key]) for key in todo])))
-            if success:
-                todo['thermodynamics'] = False
-                logging.info('Thermodynamics calculation completed successfully.')
-            else:
-                msg = 'Phonon thermodynamics calculation failed.'
-                logging.error(msg)
-                raise RuntimeError(msg)
-
-        if todo['dos']:
-            success = self._castep_phonon_dos_only(calc_doc, seed,
-                                                   intermediate=bool(sum([bool(todo[key]) for key in todo])))
-            if success:
-                todo['dos'] = False
-                logging.info('Phonon DOS calculation completed successfully.')
-            else:
-                msg = 'Phonon DOS calculation failed.'
-                logging.error(msg)
-                raise RuntimeError(msg)
-
-        if todo['dispersion']:
-            success = self._castep_phonon_dispersion_only(calc_doc, seed,
-                                                          intermediate=bool(sum([bool(todo[key]) for key in todo])))
-            if success:
-                todo['dispersion'] = False
-                logging.info('Phonon dispersion calculation completed successfully.')
-            else:
-                msg = 'Phonon DOS calculation failed.'
-                logging.error(msg)
-                raise RuntimeError(msg)
-
-    def _get_seekpath_compliant_input(self, calc_doc, spacing):
-        """ Return seekpath cell/kpoint path for the given cell and spacing.
-
-        Parameters:
-            calc_doc (dict): structural and calculation parameters.
-            spacing (float): desired kpoint path spacing.
-
-        Returns:
-            (dict, list): dictionary containing the standardised unit cell
-                and list containing the kpoints.
-
-        """
-        logging.info('Getting seekpath cell and kpoint path.')
-        from matador.utils.cell_utils import get_seekpath_kpoint_path
-        from matador.crystal import Crystal
-        logging.debug('Old lattice: {}'.format(Crystal(calc_doc)))
-        prim_doc, kpt_path, _ = get_seekpath_kpoint_path(calc_doc,
-                                                         spacing=spacing,
-                                                         debug=self.debug)
-        logging.debug('New lattice: {}'.format(Crystal(calc_doc)))
-        return prim_doc, kpt_path
-
     def scf(self, calc_doc, seed, keep=True, intermediate=False):
-        """ Perform a single-shot (e.g. scf, bandstructure, NMR)
-        calculation with CASTEP.
+        """ Perform a single-shot calculation with CASTEP.
 
         Files from completed runs are moved to `completed`, if not
         in intermediate mode, and failed runs to `bad_castep`.
@@ -668,22 +552,8 @@ class FullRelaxer:
 
         """
         logging.info('Performing single-shot CASTEP run on {}'.format(seed))
-        from matador.utils.cell_utils import cart2abc
         try:
             self.cp_to_input(self.seed)
-
-            # try to add a k/q-point path to cell, for spectral/phonon tasks
-            elec_dispersion = False
-            if 'spectral_task' in calc_doc and calc_doc['spectral_task'] == 'bandstructure':
-                if 'spectral_kpoints_path' not in calc_doc and 'spectral_kpoints_list' not in calc_doc:
-                    elec_dispersion = True
-
-            if elec_dispersion:
-                prim_doc, kpt_path = self._get_seekpath_compliant_input(
-                    calc_doc, spacing=calc_doc.get('spectral_kpoints_path_spacing', 0.02))
-                calc_doc.update(prim_doc)
-                calc_doc['lattice_abc'] = cart2abc(calc_doc['lattice_cart'])
-                calc_doc['spectral_kpoints_list'] = kpt_path
 
             if not self.custom_params:
                 doc2param(calc_doc, seed, hash_dupe=False, overwrite=True)
@@ -710,7 +580,7 @@ class FullRelaxer:
             success = True
 
             if not intermediate:
-                logging.info('Writing results of singleshot CASTEP run to res file and tidyig up.')
+                logging.info('Writing results of singleshot CASTEP run to res file and tidying up.')
                 doc2res(results_dict, seed, hash_dupe=False, overwrite=True)
                 self.mv_to_completed(seed, keep=keep, completed_dir=self.paths['completed_dir'])
                 if not keep:
@@ -726,7 +596,7 @@ class FullRelaxer:
             raise err
 
     @staticmethod
-    def _validate_calc_doc(calc_doc, required, forbidden):
+    def validate_calc_doc(calc_doc, required, forbidden):
         """ Remove keys inside forbidden from calc_doc, and error
         if a required key is missing.
 
@@ -746,140 +616,28 @@ class FullRelaxer:
         for keyword in required:
             assert keyword in calc_doc
 
-    def _castep_phonon_prerelax_only(self, calc_doc, seed, intermediate=False):
-        """ Run a singleshot geometry optimisation before an SCF-style calculation.
-        This is typically used to ensure phonon calculations start successfully.
-        The phonon calculation will then be restarted from the .check file produced here.
+    @staticmethod
+    def get_seekpath_compliant_input(calc_doc, spacing, debug=False):
+        """ Return seekpath cell/kpoint path for the given cell and spacing.
 
         Parameters:
-            calc_doc (dict): the structure to converge.
-            seed (str): root filename of structure.
+            calc_doc (dict): structural and calculation parameters.
+            spacing (float): desired kpoint path spacing.
 
-        Keyword arguments:
-            final (bool): whether this is the final step in a calculation.
-
-        """
-        logging.info('Performing CASTEP phonon pre-relax...')
-        relax_doc = deepcopy(calc_doc)
-        relax_doc['write_checkpoint'] = 'ALL'
-        if 'geom_max_iter' not in relax_doc:
-            relax_doc['geom_max_iter'] = 20
-        relax_doc['task'] = 'geometryoptimisation'
-
-        required = []
-        forbidden = ['phonon_fine_kpoint_list',
-                     'phonon_fine_kpoint_path',
-                     'phonon_fine_kpoint_mp_spacing',
-                     'phonon_fine_kpoint_path_spacing']
-
-        self._validate_calc_doc(relax_doc, required, forbidden)
-
-        return self.scf(relax_doc, seed, keep=True, intermediate=intermediate)
-
-    def _castep_phonon_dynmat_only(self, calc_doc, seed, intermediate=False):
-        """ Runs a singleshot phonon dynmat calculation, with no "fine_method" interpolation.
-
-        Parameters:
-            calc_doc (dict): the structure to converge.
-            seed (str): root filename of structure.
-
-        Keyword arguments:
-            final (bool): whether this is the final step in a calculation.
+        Returns:
+            (dict, list): dictionary containing the standardised unit cell
+                and list containing the kpoints.
 
         """
-        logging.info('Performing CASTEP dynmat calculation...')
-        relax_doc = deepcopy(calc_doc)
-        relax_doc['write_checkpoint'] = 'ALL'
-        relax_doc['continuation'] = 'default'
-        relax_doc['task'] = 'phonon'
-
-        required = []
-        forbidden = ['phonon_fine_kpoint_list',
-                     'phonon_fine_kpoint_path',
-                     'phonon_fine_kpoint_mp_spacing',
-                     'phonon_fine_kpoint_path_spacing']
-
-        self._validate_calc_doc(relax_doc, required, forbidden)
-        return self.scf(relax_doc, seed, keep=True, intermediate=intermediate)
-
-    def _castep_phonon_dos_only(self, calc_doc, seed, intermediate=False):
-        """ Runs a DOS interpolation on top of a completed
-        phonon calculation.
-
-        Parameters:
-            calc_doc (dict): the structure to converge.
-            seed (str): root filename of structure.
-
-        Keyword arguments:
-            final (bool): whether this is the final step in a calculation.
-
-        """
-        logging.info('Performing CASTEP phonon DOS calculation...')
-        dos_doc = deepcopy(calc_doc)
-        dos_doc['task'] = 'phonon'
-        dos_doc['phonon_calculate_dos'] = True
-
-        required = ['phonon_fine_kpoint_mp_spacing']
-        forbidden = ['phonon_fine_kpoint_list',
-                     'phonon_fine_kpoint_path',
-                     'phonon_fine_kpoint_path_spacing']
-
-        self._validate_calc_doc(dos_doc, required, forbidden)
-
-        return self.scf(dos_doc, seed, keep=True, intermediate=intermediate)
-
-    def _castep_phonon_dispersion_only(self, calc_doc, seed, intermediate=False):
-        """ Runs a dispersion interpolation on top of a completed
-        phonon calculation.
-
-        Parameters:
-            calc_doc (dict): the structure to converge.
-            seed (str): root filename of structure.
-
-        Keyword arguments:
-            final (bool): whether this is the final step in a calculation.
-
-        """
-        logging.info('Performing CASTEP phonon dispersion calculation...')
-        disp_doc = deepcopy(calc_doc)
-        disp_doc['task'] = 'phonon'
-        disp_doc['phonon_calculate_dos'] = False
-
-        required = ['phonon_fine_kpoint_list']
-        forbidden = ['phonon_fine_kpoint_mp_spacing',
-                     'phonon_fine_kpoint_path',
-                     'phonon_fine_kpoint_path_spacing']
-
-        self._validate_calc_doc(disp_doc, required, forbidden)
-
-        return self.scf(disp_doc, seed, keep=True, intermediate=intermediate)
-
-    def _castep_phonon_thermodynamics_only(self, calc_doc, seed, intermediate=False):
-        """ Runs a "thermodynamics" interpolation on top of a completed
-        phonon calculation, using the phonon_fine_kpoint_mp_grid.
-
-        Parameters:
-            calc_doc (dict): the structure to converge.
-            seed (str): root filename of structure.
-
-        Keyword arguments:
-            final (bool): whether this is the final step in a calculation.
-
-        """
-        logging.info('Performing CASTEP thermodynamics calculation...')
-        thermo_doc = deepcopy(calc_doc)
-        thermo_doc['continuation'] = 'default'
-        thermo_doc['task'] = 'thermodynamics'
-        thermo_doc['phonon_calculate_dos'] = False
-
-        required = ['phonon_fine_kpoint_mp_spacing']
-        forbidden = ['phonon_fine_kpoint_list',
-                     'phonon_fine_kpoint_path',
-                     'phonon_fine_kpoint_path_spacing']
-
-        self._validate_calc_doc(thermo_doc, required, forbidden)
-
-        return self.scf(thermo_doc, seed, keep=True, intermediate=intermediate)
+        logging.info('Getting seekpath cell and kpoint path.')
+        from matador.utils.cell_utils import get_seekpath_kpoint_path
+        from matador.crystal import Crystal
+        logging.debug('Old lattice: {}'.format(Crystal(calc_doc)))
+        prim_doc, kpt_path, _ = get_seekpath_kpoint_path(calc_doc,
+                                                         spacing=spacing,
+                                                         debug=debug)
+        logging.debug('New lattice: {}'.format(Crystal(calc_doc)))
+        return prim_doc, kpt_path
 
     def run_convergence_tests(self, calc_doc):
         """ Run kpoint and cutoff_energy convergence tests based on
@@ -956,7 +714,7 @@ class FullRelaxer:
         else:
             self._redirect_filename = None
 
-        logging.info('Executable string parsed as {}'.format(command))
+        logging.debug('Executable string parsed as {}'.format(command))
 
         return command
 
@@ -1174,7 +932,8 @@ class FullRelaxer:
         except Exception:
             pass
 
-        logging.info('Running {}'.format(command))
+        if not exec_test:
+            logging.debug('Running {}'.format(command))
         return process
 
     def _catch_castep_errors(self):
@@ -1219,19 +978,18 @@ class FullRelaxer:
         """
         try:
             bad_dir = self.root_folder + '/bad_castep'
-            logging.info('Moving files to completed: {bad}.'.format(bad=bad_dir))
+            logging.info('Moving files to bad_castep: {bad}.'.format(bad=bad_dir))
             if not os.path.exists(bad_dir):
                 os.makedirs(bad_dir, exist_ok=True)
-            if self.verbosity > 0:
-                print('Something went wrong, moving files to bad_castep')
             seed_files = glob.glob(seed + '.*')
-            logging.debug('Files to move: {seed}'.format(seed=seed_files))
-            for _file in seed_files:
-                try:
-                    shutil.copy(_file, bad_dir)
-                    os.remove(_file)
-                except Exception as exc:
-                    logging.warning('Error moving files to bad: {error}'.format(error=exc))
+            if seed_files:
+                logging.debug('Files to move: {seed}'.format(seed=seed_files))
+                for _file in seed_files:
+                    try:
+                        shutil.copy(_file, bad_dir)
+                        os.remove(_file)
+                    except Exception as exc:
+                        logging.warning('Error moving files to bad: {error}'.format(error=exc))
             # check root folder for any matching files and remove them
             fname = '{}/{}'.format(self.root_folder, seed)
             for ext in ['.res', '.res.lock', '.castep']:
@@ -1259,9 +1017,10 @@ class FullRelaxer:
             os.makedirs(completed_dir, exist_ok=True)
         if keep:
             seed_files = glob.glob(seed + '.*') + [seed + '-out.cell']
-            logging.debug('Files to move: {files}.'.format(files=seed_files))
-            for _file in seed_files:
-                shutil.move(_file, completed_dir)
+            if seed_files:
+                logging.debug('Files to move: {files}.'.format(files=seed_files))
+                for _file in seed_files:
+                    shutil.move(_file, completed_dir)
         else:
             # move castep/param/res/out_cell files to completed
             file_exts = ['.castep']
@@ -1300,19 +1059,19 @@ class FullRelaxer:
 
         """
         input_dir = self.root_folder + '/input'
-        logging.info('Copying file to input_dir: {input}'.format(input=input_dir))
+        logging.debug('Copying file to input_dir: {input}'.format(input=input_dir))
         if not os.path.exists(input_dir):
             os.makedirs(input_dir, exist_ok=True)
         if glob_files:
             files = glob.glob('{}*'.format(seed))
-            logging.info('Files to copy: {files}'.format(files=files))
+            logging.debug('Files to copy: {files}'.format(files=files))
             for f in files:
                 if f.endswith('.lock'):
                     continue
                 if not os.path.isfile(f):
                     shutil.copy('{}'.format(f), input_dir)
         else:
-            logging.info('File to copy: {file}'.format(file='{}.{}'.format(seed, ext)))
+            logging.debug('File to copy: {file}'.format(file='{}.{}'.format(seed, ext)))
             if os.path.isfile('{}.{}'.format(seed, ext)):
                 if not os.path.isfile('{}/{}.{}'.format(input_dir, seed, ext)):
                     shutil.copy('{}.{}'.format(seed, ext), input_dir)
@@ -1395,8 +1154,6 @@ class FullRelaxer:
         if os.path.isfile(self.seed + '.cell'):
             os.remove(self.seed + '.cell')
         if self.kpts_1D:
-            if self.verbosity > 0:
-                print('Calculating 1D kpt grid...')
             n_kz = ceil(1 / (calc_doc['lattice_abc'][0][2] * self._target_spacing))
             if n_kz % 2 == 1:
                 n_kz += 1
@@ -1406,9 +1163,6 @@ class FullRelaxer:
         doc2cell(calc_doc, self.seed, hash_dupe=False, copy_pspots=False, spin=self.spin)
 
         # update param
-        if self.custom_params:
-            if self.verbosity > 0:
-                print('Using custom param files...')
         if not self.custom_params:
             if os.path.isfile(self.seed + '.param'):
                 os.remove(self.seed + '.param')
@@ -1423,10 +1177,11 @@ class FullRelaxer:
 
         """
         files = glob.glob(seed + '.*')
-        logging.info('Tidying up remaining files: {files}'.format(files=files))
-        for f in files:
-            if not (f.endswith('.res') or f.endswith('.castep')):
-                os.remove(f)
+        if files:
+            logging.info('Tidying up remaining files: {files}'.format(files=files))
+            for f in files:
+                if not (f.endswith('.res') or f.endswith('.castep')):
+                    os.remove(f)
 
     def _update_output_files(self, opti_dict):
         """ Copy new data to output files and update

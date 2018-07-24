@@ -8,7 +8,7 @@ The compute submodule contains the FullRelaxer class for performing
 continually restarted geometry optimisation and SCF calculations in
 CASTEP, as well as the execution of arbitrary programs with mpirun.
 
-The bathc submodule contains the BatchRun class for running several
+The batch submodule contains the BatchRun class for running several
 independent FullRelaxer instances on a folder of structures, without
 clashes.
 
