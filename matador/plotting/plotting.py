@@ -51,9 +51,10 @@ def plotting_function(function):
             style = settings.get('plotting', {}).get('default_style')
             if style is None or style == 'matador':
                 style = '/'.join(__file__.split('/')[:-1]) + '/../config/matador.mplstyle'
+            plt.style.use(style)
             if kwargs.get('debug'):
                 print('Using style {}'.format(style))
-            plt.style.use(style)
+                print(plt.rcParams)
             result = function(*args, **kwargs)
         except TclError as exc:
             print_failure('Caught exception: {}'.format(type(exc).__name__))
@@ -212,6 +213,8 @@ def plot_spectral(seeds, **kwargs):
                 eig_key = 'eigenvalues_k_s'
                 band_key = 'num_bands'
                 spin_key = 'num_spins'
+                if plot_window is None:
+                    plot_window = [-10, 10]
 
             path = [0]
             for branch in dispersion[branch_key]:
@@ -482,7 +485,7 @@ def plot_spectral(seeds, **kwargs):
                 ax_dos.set_ylim(plot_window)
                 ax_dos.axvline(0, c='k')
 
-                if not kwargs['pdos_hide_tot'] and 'spin_dos' not in dos_data:
+                if 'pdos' not in dos_data and 'spin_dos' not in dos_data:
                     ax_dos.plot(dos, energies, lw=1, ls=ls[seed_ind], color=colour, zorder=1e10, label='Total DOS')
                     if 'pdos' not in dos_data and 'spin_dos' not in dos_data:
                         ax_dos.fill_betweenx(energies, 0, dos, alpha=0.2, color=colour)
@@ -498,7 +501,7 @@ def plot_spectral(seeds, **kwargs):
                 ax_dos.set_xlim(plot_window)
                 ax_dos.axhline(0, c='grey', lw=0.5)
 
-                if not kwargs['pdos_hide_tot'] and 'spin_dos' not in dos_data:
+                if 'pdos' not in dos_data and 'spin_dos' not in dos_data:
                     ax_dos.plot(energies, dos, lw=1, ls=ls[seed_ind], alpha=1, color=colour, zorder=1e10, label='Total DOS')
                     if 'pdos' not in dos_data and 'spin_dos' not in dos_data:
                         ax_dos.fill_between(energies, 0, dos, alpha=0.2, color=colour)
@@ -510,16 +513,16 @@ def plot_spectral(seeds, **kwargs):
                         stack = np.zeros_like(pdos[projector])
 
                     if projector[0] is None:
-                        projector_label = projector[1]
+                        projector_label = '${}$-character'.format(projector[1])
                     elif projector[1] is None:
                         projector_label = projector[0]
                     else:
-                        projector_label = '{p[0]} ({p[1]})'.format(p=projector)
+                        projector_label = '{p[0]} (${p[1]}$)'.format(p=projector)
 
                     # if species-projected only, then use VESTA colours
                     if projector[0] is not None and projector[1] is None:
                         dos_colours.append(ELEMENT_COLOURS.get(projector[0]))
-                    # if species_ang-projected only, then use VESTA colours but lightened
+                    # if species_ang-projected, then use VESTA colours but lightened
                     elif projector[0] is not None and projector[1] is not None:
                         from copy import deepcopy
                         dos_colour = deepcopy(ELEMENT_COLOURS.get(projector[0]))
@@ -527,8 +530,9 @@ def plot_spectral(seeds, **kwargs):
                         for jind, _ in enumerate(dos_colour):
                             dos_colour[jind] = max(min(dos_colour[jind]+multi*0.2, 1), 0)
                         dos_colours.append(dos_colour)
+                    # otherwise if just ang-projected, use colour_cycle
                     else:
-                        dos_colours.append(None)
+                        dos_colours.append(list(plt.rcParams['axes.prop_cycle'].by_key()['color'])[ind])
 
                     if not kwargs['no_stacked_pdos']:
                         alpha = 0.8
@@ -540,17 +544,25 @@ def plot_spectral(seeds, **kwargs):
                     np.ma.set_fill_value(pdos[projector], 0)
                     pdos[projector] = np.ma.filled(pdos[projector])
 
-                    if kwargs['plot_bandstructure']:
-                        ax_dos.plot(stack+pdos[projector], energies, lw=1, zorder=1000, color=dos_colours[-1])
-                        ax_dos.fill_betweenx(energies, stack, stack+pdos[projector], alpha=alpha, label=projector_label,
-                                             color=dos_colours[-1])
-                    else:
-                        ax_dos.plot(energies, stack+pdos[projector], lw=1, zorder=1000, color=dos_colours[-1])
-                        ax_dos.fill_between(energies, stack, stack+pdos[projector], alpha=alpha, label=projector_label,
-                                            color=dos_colours[-1])
+                    if not np.max(pdos[projector]) < 1e-8:
 
-                    if not kwargs['no_stacked_pdos']:
-                        stack += pdos[projector]
+                        if kwargs['plot_bandstructure']:
+                            ax_dos.plot(stack+pdos[projector], energies, lw=1, zorder=1000, color=dos_colours[-1])
+                            ax_dos.fill_betweenx(energies, stack, stack+pdos[projector], alpha=alpha, label=projector_label,
+                                                 color=dos_colours[-1])
+                        else:
+                            ax_dos.plot(energies, stack+pdos[projector], lw=1, zorder=1000, color=dos_colours[-1])
+                            ax_dos.fill_between(energies, stack, stack+pdos[projector], alpha=alpha, label=projector_label,
+                                                color=dos_colours[-1])
+
+                        if not kwargs['no_stacked_pdos']:
+                            stack += pdos[projector]
+
+                if not kwargs['pdos_hide_tot'] and not kwargs['no_stacked_pdos']:
+                    if kwargs['plot_bandstructure']:
+                        ax_dos.plot(stack, energies, lw=1, ls=ls[seed_ind], alpha=1, color=colour, zorder=1e10, label='Total DOS')
+                    else:
+                        ax_dos.plot(energies, stack, lw=1, ls=ls[seed_ind], alpha=1, color=colour, zorder=1e10, label='Total DOS')
 
             elif 'spin_dos' in dos_data:
                 print('Plotting spin dos')
@@ -643,7 +655,7 @@ def match_bands(dispersion, branches):
     return dispersion
 
 
-def get_hull_labels(hull, label_cutoff=0.0, num_species=2):
+def get_hull_labels(hull, label_cutoff=None, num_species=2):
     """ Return list of structures to labels on phase diagram.
 
     Parameters:
@@ -658,6 +670,8 @@ def get_hull_labels(hull, label_cutoff=0.0, num_species=2):
 
     """
     eps = 1e-9
+    if label_cutoff is None:
+        label_cutoff = 0.0
     if isinstance(label_cutoff, list) and len(label_cutoff) == 2:
         label_cutoff = sorted(label_cutoff)
         # first, only apply upper limit as we need to filter by stoich aftewards
@@ -1201,7 +1215,7 @@ def plot_2d_hull(hull, ax=None, show=False, plot_points=True,
 
 
 @plotting_function
-def plot_ternary_hull(hull, axis=None, show=False, plot_points=True, hull_cutoff=None, label_cutoff=None, expecting_cbar=True, labels=None):
+def plot_ternary_hull(hull, axis=None, show=False, plot_points=True, hull_cutoff=None, label_cutoff=None, expecting_cbar=True, labels=None, **kwargs):
     """ Plot calculated ternary hull as a 2D projection.
 
     Parameters:

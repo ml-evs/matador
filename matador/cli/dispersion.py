@@ -70,8 +70,6 @@ def main():
     phonons = kwargs.get('phonons')
     labels = kwargs.get('labels')
     cmap = kwargs.get('cmap')
-    if cmap is None:
-        cmap = 'Dark2'
     band_colour = kwargs.get('band_colour')
     if band_colour is None:
         band_colour = 'occ'
