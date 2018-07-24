@@ -162,7 +162,7 @@ class QueryConvexHull(object):
             self.voltage_curve([doc for doc in self.hull_cursor if doc['hull_distance'] <= 1e-9])
             if not self.args.get('no_plot'):
                 plotting.plot_voltage_curve(self)
-                self.plot_hull(**plot_kwargs)
+                self.plot_hull(**plot_kwargs, debug=self.args.get('debug'))
 
         if self.args.get('volume'):
             self.volume_curve()
@@ -170,7 +170,7 @@ class QueryConvexHull(object):
                 plotting.plot_volume_curve(self)
 
         if self.args['subcmd'] == 'hull' and not self.args.get('no_plot'):
-            self.plot_hull(**plot_kwargs)
+            self.plot_hull(**plot_kwargs, debug=self.args.get('debug'))
 
         if self.args.get('uniq'):
             from matador.similarity.similarity import get_uniq_cursor

@@ -197,7 +197,8 @@ class TDHull(object):
         if not self.args.get('no_temp_plot'):
             plt.show()
 
-    def plot_hull_line(self, hull, ax, label='', color='k'):
+    @staticmethod
+    def plot_hull_line(hull, ax, label='', color=None, plot_points=True):
         """ Add one convex hull tie-line to a given set of axes.
 
         Parameters:
@@ -207,25 +208,22 @@ class TDHull(object):
         Keyword arguments:
             label (str): the label to attach to the hull.
             color (str): the color to use for the hull.
+            plot_points (bool): whether to plot all points on the hull,
+                or just those on the tie-line.
 
         """
 
         tie_line = hull.structure_slice[hull.hull.vertices]
-        ax.scatter(tie_line[:, 0], tie_line[:, 1],
-                   c=color,
-                   marker='o',
-                   label=label,
-                   zorder=99999,
-                   edgecolor='k',
-                   lw=1,
-                   alpha=1)
-        ax.scatter(hull.structures[np.argsort(hull.hull_dist), 0][::-1],
-                   hull.structures[np.argsort(hull.hull_dist), -1][::-1],
-                   lw=1, alpha=1, edgecolor='k', zorder=10000,
-                   c=color)
+        if plot_points:
+            ax.scatter(hull.structures[np.argsort(hull.hull_dist), 0][::-1],
+                       hull.structures[np.argsort(hull.hull_dist), -1][::-1],
+                       lw=1, alpha=1, edgecolor='k', zorder=10000,
+                       c=color)
         ax.plot(np.sort(tie_line[:, 0]), tie_line[np.argsort(tie_line[:, 0]), 1],
-                c=color, lw=2, alpha=1, zorder=1000)
-        return
+                c=color, lw=2, alpha=1, marker='o', markeredgecolor='k', label=label,
+                zorder=99999)
+
+        return ax
 
     def set_zp_td_energy(self):
         """ Set the zero-point energy and temperature-dependent

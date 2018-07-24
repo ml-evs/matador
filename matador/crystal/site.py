@@ -1,6 +1,10 @@
-#!/usr/bin/env python
 # coding: utf-8
-""" This file implements the Site class. """
+# Distributed under the terms of the MIT License.
+
+""" This submodule implements the Site class for handling
+atomic sites.
+
+"""
 
 from matador.utils.cell_utils import cart2frac, frac2cart
 
@@ -42,7 +46,6 @@ class Site:
         species, position, lattice = (deepcopy(x) for x in (self.species, self._coords['fractional'], self.lattice))
         site_data = deepcopy(self.site_data)
         return Site(species, position, lattice, position_unit='fractional', **site_data)
-
 
     def set_position(self, position, units):
         if '_coords' not in self.__dict__:
