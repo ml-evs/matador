@@ -42,6 +42,7 @@ def scraper_function(function):
                     success = False
                     if kwargs.get('verbosity', 0) > 0:
                         print_exc()
+                        print(oops)
                         print('Error in file', _seed, 'skipping...')
 
                 if not success:
