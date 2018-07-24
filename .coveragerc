@@ -13,6 +13,7 @@ omit =
     */__init__.py
     *matador/plotting*
     *matador/compute*
+    *matador/workflows*
     *matador/plugins*
     *matador/cli/dispersion.py
     *matador/cli/run3.py
