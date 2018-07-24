@@ -1,11 +1,15 @@
 # coding: utf-8
-""" This file implements the Crystal class, a wrapper
+# Distributed under the terms of the MIT License.
+
+""" This submodule implements the Crystal class, a wrapper
 to the raw dictionary stored in MongoDB that allows for validation,
 manipulation and analysis of the lattice.
+
 """
+
 from copy import deepcopy
-from matador.similarity.pdf_similarity import PDF
 import matador.utils.cell_utils as cell_utils
+from matador.similarity.pdf_similarity import PDF
 from matador.crystal.site import Site
 
 
@@ -19,11 +23,9 @@ class Crystal:
         and any additional abstractions, e.g. voronoi or CrystalGraph.
 
         Parameters:
-
             doc (dict): matador document containing structural information
 
         Keyword Arguments:
-
            voronoi (bool): whether to compute Voronoi substructure for each site
            network_kwargs (dict): keywords to pass to the CrystalGraph initialiser
 
@@ -115,6 +117,9 @@ class Crystal:
         for ind, species in enumerate(self.atom_types):
             position = self._doc['positions_frac'][ind]
             site_data = {}
+            if 'site_occupancy' in self._doc:
+                if len(self._doc['site_occupancy']) == len(self._doc['atom_types']):
+                    site_data['site_occupancy'] = self._doc['site_occupancy'][ind]
             if 'chemical_shifts' in self._doc:
                 if len(self._doc['chemical_shifts']) == len(self._doc['atom_types']):
                     site_data['magres_shift'] = self._doc['chemical_shifts'][ind]
