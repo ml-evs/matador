@@ -332,6 +332,10 @@ class FullRelaxer:
             from matador.workflows.castep import castep_full_spectral
             success = castep_full_spectral(self, calc_doc, self.seed)
 
+        elif calc_doc['task'].upper() in ['BULK_MODULUS']:
+            from matador.workflows.castep import castep_elastic
+            success = castep_elastic(self, calc_doc, self.seed)
+
         # run in SCF mode, i.e. just call CASTEP on the seeds
         else:
             success = self.scf(calc_doc, self.seed, keep=True)

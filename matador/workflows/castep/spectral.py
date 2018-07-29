@@ -4,13 +4,13 @@
 """ This module implements the CastepSpectralWorkflow, which performs
 spectral calculations with CASTEP in multiple steps:
 
-    1. Performs a singlepoint calculation (if check file is not found).
-    2. If `spectral_fine_kpoints_mp_spacing` keyword is found, interpolate
-       wavefunction to DOS grid.
-           - If an OptaDOS input file (.odi) with the root seedname
-             is found, run OptaDOS on the resulting density of states.
-    3. If `spectral_fine_kpoints_path_spacing` keyword is present, create
-       a bandstructure on the seekpath-generated path.
+1. Performs a singlepoint calculation (if check file is not found).
+2. If `spectral_fine_kpoints_mp_spacing` keyword is found, interpolate
+   wavefunction to DOS grid.
+   - If an OptaDOS input file (.odi) with the root seedname
+     is found, run OptaDOS on the resulting density of states.
+3. If `spectral_fine_kpoints_path_spacing` keyword is present, create
+   a bandstructure on the seekpath-generated path.
 
 """
 
@@ -30,7 +30,7 @@ def castep_full_spectral(relaxer, calc_doc, seed):
     of DOS.
 
     Parameters:
-        relaxer (FullRelaxer): the object that will be calling CASTEP.
+        relaxer (:obj:`FullRelaxer`): the object that will be calling CASTEP.
         calc_doc (dict): dictionary of structure and calculation
             parameters.
         seed (str): root seed for the calculation.
@@ -53,7 +53,7 @@ class CastepSpectralWorkflow(Workflow):
     of DOS.
 
     Attributes:
-        relaxer (FullRelaxer): the object that calls CASTEP.
+        relaxer (:obj:`FullRelaxer`): the object that calls CASTEP.
         calc_doc (dict): the interim dictionary of structural and
             calculation parameters.
         seed (str): the root seed for the calculation.
@@ -106,7 +106,7 @@ def castep_spectral_scf(relaxer, calc_doc, seed):
     """ Run a singleshot SCF calculation.
 
     Parameters:
-        relaxer (FullRelaxer): the object that will be calling CASTEP.
+        relaxer (:obj:`FullRelaxer`): the object that will be calling CASTEP.
         calc_doc (dict): the structure to run on.
         seed (str): root filename of structure.
 
@@ -132,7 +132,7 @@ def castep_spectral_dos(relaxer, calc_doc, seed):
     .odi file is found, run OptaDOS on the resulting DOS.
 
     Parameters:
-        relaxer (FullRelaxer): the object that will be calling CASTEP.
+        relaxer (:obj:`FullRelaxer`): the object that will be calling CASTEP.
         calc_doc (dict): the structure to run on.
         seed (str): root filename of structure.
 
@@ -181,7 +181,7 @@ def castep_spectral_dispersion(relaxer, calc_doc, seed):
     """ Runs a dispersion interpolation on top of a completed SCF calculation.
 
     Parameters:
-        relaxer (FullRelaxer): the object that will be calling CASTEP.
+        relaxer (:obj:`FullRelaxer`): the object that will be calling CASTEP.
         calc_doc (dict): the structure to run on.
         seed (str): root filename of structure.
 

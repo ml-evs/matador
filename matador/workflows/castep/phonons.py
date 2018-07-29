@@ -33,7 +33,7 @@ def castep_full_phonon(relaxer, calc_doc, seed):
     is a wrapper for the CastepPhononWorkflow class.
 
     Parameters:
-        relaxer (FullRelaxer): the object that will be calling CASTEP.
+        relaxer (:obj:`FullRelaxer`): the object that will be calling CASTEP.
         calc_doc (dict): dictionary of structure and calculation
             parameters.
         seed (str): root seed for the calculation.
@@ -56,7 +56,7 @@ class CastepPhononWorkflow(Workflow):
     that dynamical matrix into dispersion curves and DOS.
 
     Attributes:
-        relaxer (FullRelaxer): the object that calls CASTEP.
+        relaxer (:obj:`FullRelaxer`): the object that calls CASTEP.
         calc_doc (dict): the interim dictionary of structural and
             calculation parameters.
         seed (str): the root seed for the calculation.
@@ -125,7 +125,7 @@ def castep_phonon_prerelax(relaxer, calc_doc, seed):
     The phonon calculation will then be restarted from the .check file produced here.
 
     Parameters:
-        relaxer (FullRelaxer): the object that will be calling CASTEP.
+        relaxer (:obj:`FullRelaxer`): the object that will be calling CASTEP.
         calc_doc (dict): the structure to run on.
         seed (str): root filename of structure.
 
@@ -152,7 +152,7 @@ def castep_phonon_dynmat(relaxer, calc_doc, seed):
     """ Runs a singleshot phonon dynmat calculation, with no "fine_method" interpolation.
 
     Parameters:
-        relaxer (FullRelaxer): the object that will be calling CASTEP.
+        relaxer (:obj:`FullRelaxer`): the object that will be calling CASTEP.
         calc_doc (dict): the structure to run on.
         seed (str): root filename of structure.
 
@@ -178,7 +178,7 @@ def castep_phonon_dos(relaxer, calc_doc, seed):
     phonon calculation.
 
     Parameters:
-        relaxer (FullRelaxer): the object that will be calling CASTEP.
+        relaxer (:obj:`FullRelaxer`): the object that will be calling CASTEP.
         calc_doc (dict): the structure to run on.
         seed (str): root filename of structure.
 
@@ -203,7 +203,7 @@ def castep_phonon_dispersion(relaxer, calc_doc, seed):
     phonon calculation.
 
     Parameters:
-        relaxer (FullRelaxer): the object that will be calling CASTEP.
+        relaxer (:obj:`FullRelaxer`): the object that will be calling CASTEP.
         calc_doc (dict): the structure to run on.
         seed (str): root filename of structure.
 
@@ -228,7 +228,7 @@ def castep_phonon_thermodynamics(relaxer, calc_doc, seed):
     phonon calculation, using the phonon_fine_kpoint_mp_grid.
 
     Parameters:
-        relaxer (FullRelaxer): the object that will be calling CASTEP.
+        relaxer (:obj:`FullRelaxer`): the object that will be calling CASTEP.
         calc_doc (dict): the structure to run on.
         seed (str): root filename of structure.
 
