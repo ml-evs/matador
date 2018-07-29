@@ -472,6 +472,35 @@ def get_spacegroup_spg(doc, symprec=0.01):
     return space_group.split(' ')[0]
 
 
+def add_noise(doc, amplitude=0.1):
+    """ Add random noise to the positions of structure contained in doc.
+    Useful for force convergence tests.
+
+    Parameters:
+        doc (dict): dictionary containing matador structure.
+
+    Keyword arguments:
+        amplitude (float): maximum amplitude of noise vector.
+
+    Raises:
+        KeyError if (`lattice_cart` and `positions_frac`) or `positions_abs`
+            are missing.
+
+    Returns:
+        dict: the randomised structure.
+    """
+    poscart = np.asarray(doc.get('positions_abs') or frac2cart(doc['lattice_cart'], doc['positions_frac']))
+    for atom in poscart:
+        noise_vector = np.random.rand(3)
+        noise_vector /= np.sqrt(np.sum(noise_vector**2))
+        noise_vector *= amplitude*(np.random.rand())
+        atom += noise_vector
+    doc['positions_abs'] = poscart.tolist()
+    doc['positions_frac'] = cart2frac(doc['lattice_cart'], doc['positions_abs'])
+
+    return doc
+
+
 def create_simple_supercell(doc, extension, standardize=False, symmetric=False):
     """ Return a document with new supercell, given extension vector.
 

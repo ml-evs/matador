@@ -48,6 +48,8 @@ def main():
                         help='do not run geometry optimisation again after first success')
     parser.add_argument('--redirect', type=str,
                         help='filename to redirect output to, can use $seed macro')
+    parser.add_argument('--noise', action='store_true',
+                        help='add 0.1 A of random noise to positions on every cell, useful for converging forces (DEFAULT: off)')
     parser.add_argument('--ignore_jobs_file', action='store_true',
                         help='whether to use the jobs.txt file to avoid clashes')
     parser.add_argument('-d', '--debug', action='store_true', default=False,

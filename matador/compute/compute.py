@@ -104,7 +104,7 @@ class FullRelaxer:
         # set defaults and update class with desired values
         prop_defaults = {'paths': None, 'param_dict': None, 'cell_dict': None, 'mode': 'castep', 'executable': 'castep',
                          'memcheck': False, 'rough': 4, 'rough_iter': 2, 'fine_iter': 20, 'spin': False,
-                         'output_queue': None, 'redirect': None, 'reopt': False, 'compute_dir': None,
+                         'output_queue': None, 'redirect': None, 'reopt': False, 'compute_dir': None, 'noise': False,
                          'custom_params': False, 'archer': False, 'maxmem': None, 'killcheck': True, 'kpts_1D': False,
                          'conv_cutoff': False, 'conv_kpt': False, 'profile': False, 'slurm': False, 'intel': False,
                          'exec_test': True, 'timings': (None, None), 'start': True, 'verbosity': 1, 'polltime': 30}
@@ -250,6 +250,7 @@ class FullRelaxer:
         if self.exec_test:
             self.test_exec()
 
+        # pre-processing
         if self.kpts_1D:
             logging.debug('1D kpoint grid requested.')
             if 'kpoints_mp_spacing' not in self.cell_dict:
@@ -265,6 +266,11 @@ class FullRelaxer:
                 raise RuntimeError(msg)
         elif isinstance(res, dict):
             self.res_dict = res
+
+        if self.noise:
+            from matador.utils.cell_utils import add_noise
+            logging.info('Adding noise to the positions in the cell')
+            self.res_dict = add_noise(self.res_dict, amplitude=0.1)
 
         calc_doc = deepcopy(self.res_dict)
 

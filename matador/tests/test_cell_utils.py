@@ -104,6 +104,23 @@ class CellUtilTest(unittest.TestCase):
         positions_frac = test_doc['positions_frac']
         np.testing.assert_almost_equal(cart2frac(lattice_cart, frac2cart(lattice_cart, positions_frac)), positions_frac, decimal=10)
 
+    def testRandomNoise(self):
+        """ Test that zero amplitude random noise doesn't do anything, but any other
+        amplitude does.
+        """
+        from matador.utils.cell_utils import add_noise
+        castep_fname = REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep'
+        test_doc, s = castep2dict(castep_fname, db=True, verbosity=VERBOSITY)
+
+        init_positions_frac = test_doc['positions_frac']
+        test_doc = add_noise(test_doc, amplitude=0)
+        np.testing.assert_almost_equal(init_positions_frac, test_doc['positions_frac'], decimal=10)
+
+        test_doc = add_noise(test_doc, amplitude=0.1)
+        np.testing.assert_almost_equal(init_positions_frac, test_doc['positions_frac'], decimal=1)
+        diff = np.sqrt(np.sum((np.asarray(init_positions_frac) - np.asarray(test_doc['positions_frac']))**2, axis=-1))
+        self.assertTrue(np.max(diff) <= 0.1)
+        self.assertTrue(np.max(diff) >= 0)
 
     def testRecipToReal(self):
         real_lattice = [[5.5902240, 0, 0], [3.7563195, 4.1401290, 0], [-2.9800295, -1.3200288, 8.5321695]]
