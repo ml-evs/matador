@@ -9,7 +9,8 @@ import glob
 HOSTNAME = os.uname()[1]
 REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
 ROOT_DIR = os.getcwd()
-VERBOSITY = 0
+VERBOSITY = 1
+NCORES = 4
 EXECUTABLE = 'castep'
 
 try:
@@ -299,6 +300,56 @@ class ComputeTest(unittest.TestCase):
 
         self.assertTrue(all(bad_exists))
         self.assertTrue(all(good_exists))
+
+    @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
+    def testMemcheck(self):
+        """ Test the memory checker will not proceed with huge jobs. """
+        from matador.scrapers.castep_scrapers import cell2dict, param2dict
+        from matador.compute import FullRelaxer
+        shutil.copy(REAL_PATH + 'data/structures/LiAs_testcase.res', REAL_PATH + '_LiAs_testcase.res')
+        shutil.copy(REAL_PATH + 'data/LiAs.cell', REAL_PATH + 'LiAs.cell')
+        shutil.copy(REAL_PATH + 'data/LiAs.param', REAL_PATH + 'LiAs.param')
+        shutil.copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', REAL_PATH + 'Li_00PBE.usp')
+        shutil.copy(REAL_PATH + 'data/pspots/As_00PBE.usp', REAL_PATH + 'As_00PBE.usp')
+
+        cell_dict, s = cell2dict(REAL_PATH + 'LiAs.cell', verbosity=VERBOSITY, db=False)
+        assert s
+        param_dict, s = param2dict(REAL_PATH + 'LiAs.param', verbosity=VERBOSITY, db=False)
+        assert s
+
+        try:
+            raised_error = False
+            FullRelaxer(ncores=NCORES, nnodes=None, node=None,
+                        res='_LiAs_testcase', param_dict=param_dict, cell_dict=cell_dict,
+                        debug=False, verbosity=VERBOSITY, killcheck=True, memcheck=True, maxmem=1,
+                        start=True)
+        except RuntimeError:
+            raised_error = True
+
+        files_to_del = ['_LiAs_testcase.res', 'LiAs.cell', 'LiAs.param', 'Li_00PBE.usp', 'As_00PBE.usp']
+        files_that_should_not_exist = ['_LiAs_testcase.res.lock', 'jobs.txt']
+        folders_that_should_exist = ['logs']
+        folders_that_should_not_exist = ['bad_castep', 'input', 'completed']
+
+        correct_files = all([not os.path.isfile(_file) for _file in files_that_should_not_exist])
+        correct_folders = all([os.path.isdir(folder) for folder in folders_that_should_exist])
+        correct_folders *= all([not os.path.isdir(folder) for folder in folders_that_should_not_exist])
+
+        for _f in files_to_del + files_that_should_not_exist:
+            if os.path.isfile(_f):
+                os.remove(_f)
+
+        for _folder in folders_that_should_exist + folders_that_should_not_exist:
+            if os.path.isdir(_folder):
+                for _file in glob.glob(_folder + '/*'):
+                    os.remove(_file)
+                os.removedirs(_folder)
+
+        self.assertFalse(raised_error)
+        self.assertTrue(correct_folders)
+        self.assertTrue(correct_files)
+
+
 
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
     def testBatchRelax(self):

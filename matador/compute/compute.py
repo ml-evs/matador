@@ -23,6 +23,8 @@ from matador.scrapers.castep_scrapers import cell2dict
 from matador.scrapers.castep_scrapers import res2dict, castep2dict
 from matador.export import doc2cell, doc2param, doc2res
 
+MATADOR_CUSTOM_TASKS = ['bulk_modulus']
+
 
 class FullRelaxer:
     """ The main use of this class is to call an executable on a given
@@ -297,6 +299,8 @@ class FullRelaxer:
             self.enough_memory = True
 
         if not self.enough_memory:
+            msg = 'Structure {} failed memcheck, skipping...'.format(self.seed)
+            logging.error(msg)
             return False
 
         # run convergence tests
@@ -789,9 +793,9 @@ class FullRelaxer:
         # check first for existence of mpirun command, then aprun if that fails
         try:
             try:
-                logging.info('Failed to find mpirun, checking aprun...')
                 mpi_version_string = str(sp.check_output('mpirun --version', shell=True))
             except sp.CalledProcessError:
+                logging.info('Failed to find mpirun, checking aprun...')
                 mpi_version_string = str(sp.check_output('aprun --version', shell=True))
         except Exception as exc:
             msg = 'Failed to find mpirun or aprun.'
@@ -826,8 +830,14 @@ class FullRelaxer:
         """
         logging.info('Performing memory check for {seed}'.format(seed=seed))
         memcheck_seed = seed + '_memcheck'
-        doc2param(calc_doc, memcheck_seed, hash_dupe=False)
-        doc2cell(calc_doc, memcheck_seed, hash_dupe=False, copy_pspots=False)
+
+        memcheck_doc = deepcopy(calc_doc)
+
+        if memcheck_doc['task'] in MATADOR_CUSTOM_TASKS:
+            memcheck_doc['task'] = 'singlepoint'
+
+        doc2param(memcheck_doc, memcheck_seed, hash_dupe=False)
+        doc2cell(memcheck_doc, memcheck_seed, hash_dupe=False, copy_pspots=False)
         free_memory = float(virtual_memory().available) / 1024**2
         if self.maxmem is None:
             maxmem = 0.9 * free_memory
@@ -835,7 +845,7 @@ class FullRelaxer:
             maxmem = self.maxmem
 
         # check if cell is totally pathological, as CASTEP dryrun will massively underestimate mem
-        if all([angle < 30 for angle in calc_doc['lattice_abc'][1]]):
+        if all([angle < 30 for angle in memcheck_doc['lattice_abc'][1]]):
             logging.error('Cell is pathological (at least one angle < 30), failing memory check.')
             return False
 
