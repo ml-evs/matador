@@ -19,6 +19,8 @@ __author__ = 'Matthew Evans'
 __maintainer__ = 'Matthew Evans'
 
 
-from matador.plotting.plotting import get_linear_cmap, match_bands
-from matador.plotting.plotting import plot_spectral, plot_voltage_curve, plot_volume_curve
-from matador.plotting.plotting import plot_thermo_curves, plot_2d_hull, plot_ternary_hull
+from matador.plotting.plotting import get_linear_cmap
+from matador.plotting.spectral_plotting import plot_spectral, match_bands
+from matador.plotting.battery_plotting import plot_voltage_curve, plot_volume_curve
+from matador.plotting.hull_plotting import plot_2d_hull, plot_ternary_hull
+from matador.plotting.temperature_plotting import plot_thermo_curves
