@@ -60,7 +60,9 @@ class CastepElasticWorkflow(Workflow):
         and set the appropriate CASTEP parameters.
 
         """
-        self.volume_rescale = np.linspace(0.8, 1.2, num=5, endpoint=True).tolist()
+        num_volumes = 9
+        self.volume_rescale = np.cbrt(np.geomspace(0.7, 1.2, num=num_volumes, endpoint=True)).tolist()
+        self.volume_rescale.append(1.0)
         self._completed_volumes = []
         logging.info('Preprocessing completed: run3 bulk modulus calculation options {}'
                      .format(self.volume_rescale))
@@ -82,7 +84,7 @@ def castep_rescaled_volume_scf(relaxer, calc_doc, seed, rescale=1):
 
     """
     assert rescale > 0
-    logging.info('Performing CASTEP SCF on volume rescaled by {}.'.format(rescale))
+    logging.info('Performing CASTEP SCF on volume rescaled by {}.'.format(rescale**3))
     scf_doc = copy.deepcopy(calc_doc)
     for i in range(3):
         for k in range(3):

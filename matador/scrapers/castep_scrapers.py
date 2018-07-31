@@ -1248,7 +1248,7 @@ def _castep_scrape_final_structure(flines, castep, db=True):
             elif '0K energy' in line:
                 castep['0K_energy'] = float(line.split('=')[1].split()[0])
                 castep['0K_energy_per_atom'] = castep['0K_energy'] / castep['num_atoms']
-            elif '* Forces *' in line:
+            elif ' Forces **' in line:
                 castep['forces'] = []
                 i = 1
                 max_force = 0
@@ -1327,7 +1327,7 @@ def _castep_scrape_final_structure(flines, castep, db=True):
 
         except Exception as oops:
             msg = 'Error on line {}, contents: {}, error: {}'.format(line_no, line, oops)
-            raise RuntimeError(oops)
+            raise RuntimeError(msg)
 
     # calculate kpoint spacing if not found
     if 'kpoints_mp_grid' in castep and 'kpoints_mp_spacing' not in castep and 'lattice_cart' in castep:
@@ -1405,7 +1405,8 @@ def _castep_find_final_structure(flines):
 
 
 def _castep_scrape_all_snapshots(flines):
-    """ Scrape all intermediate structures from a CASTEP file.
+    """ Scrape all intermediate structures from a CASTEP file, both
+    geometry optimisation snapshots, and repeated SCF calculations.
 
     Parameters:
         flines (list): list of lines of file.
@@ -1501,7 +1502,7 @@ def _castep_scrape_all_snapshots(flines):
                 snapshot['free_energy'] = float(line.split('=')[1].split()[0])
             elif '0K energy' in line:
                 snapshot['0K_energy'] = float(line.split('=')[1].split()[0])
-            elif '* Forces *' in line:
+            elif ' Forces **' in line:
                 snapshot['forces'] = []
                 i = 1
                 max_force = 0
