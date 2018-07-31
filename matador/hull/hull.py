@@ -340,7 +340,7 @@ class QueryConvexHull(object):
         print(notify)
         print(len(notify) * '─')
 
-    def get_hull_distances(self, structures, precompute=True):
+    def get_hull_distances(self, structures, precompute=False):
         """ Returns array of distances to pre-computed binary or ternary
         hull, from array containing concentrations and energies.
 
@@ -580,7 +580,7 @@ class QueryConvexHull(object):
                 self.hull.vertices = list(filtered_vertices)
                 self.hull.simplices = list(filtered_simplices)
 
-        self.hull_dist = self.get_hull_distances(structures)
+        self.hull_dist = self.get_hull_distances(structures, precompute=True)
         set_cursor_from_array(self.cursor, self.hull_dist, 'hull_distance')
 
         # ensure hull cursor is sorted by enthalpy_per_atom, then by concentration, as it will be by default if from database
