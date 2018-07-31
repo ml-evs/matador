@@ -10,7 +10,7 @@ manipulation and analysis of the lattice.
 from copy import deepcopy
 import matador.utils.cell_utils as cell_utils
 from matador.similarity.pdf_similarity import PDF
-from matador.crystal.site import Site
+from matador.crystal.crystal_site import Site
 
 
 class Crystal:
