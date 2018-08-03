@@ -2,7 +2,7 @@
 # coding: utf-8
 from matador.scrapers import castep_scrapers
 from ase.io import write
-from matador.viz import doc2ase
+from matador.utils.viz_utils import doc2ase
 from matador.utils.print_utils import print_notify, print_success, print_failure
 from sys import argv
 
