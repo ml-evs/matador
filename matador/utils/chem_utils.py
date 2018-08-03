@@ -67,15 +67,20 @@ def get_concentration(doc, elements):
     or x,y for A_x B_y C_z, (x+y+z=1).
 
     Parameters:
-        doc (dict): structure to evaluate.
+        doc (list/dict): structure to evaluate OR matador-style stoichiometry.
         elements (list): list of element symbols to enforce ordering.
 
     Returns:
         list of float: concentrations of elements in given order.
 
     """
+    if isinstance(doc, dict):
+        stoich = doc['stoichiometry']
+    else:
+        stoich = doc
+
     concs = [0.0] * (len(elements) - 1)
-    for _, elem in enumerate(doc['stoichiometry']):
+    for _, elem in enumerate(stoich):
         if elem[0] in elements[:-1]:
             concs[elements.index(elem[0])] = elem[1] / float(get_atoms_per_fu(doc))
     return concs
