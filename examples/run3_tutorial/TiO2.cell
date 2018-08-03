@@ -1,0 +1,9 @@
+kpoint_mp_spacing: 0.07
+
+%block species_pot
+QC5
+%endblock species_pot
+
+symmetry_generate
+symmetry_tol: 0.01
+snap_to_symmetry
