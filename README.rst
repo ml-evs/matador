@@ -45,9 +45,9 @@ in the examples and API documentation.
 Usage
 ------
 
-For basic command-line usage, please explore the help system for each sub-command, and check the `examples <https://matador-db.readthedocs.io/en/latest/examples.html>`_ for common workflows.
+For basic command-line usage, please explore the help system for each sub-command. Common workflows can be found under :ref:`examples` and :ref:`tutorials`.
 
-The full Python API documentation is `available online <http://matador-db.readthedocs.io/en/latest/modules.html>`_.
+The full Python API documentation can be found under :ref:`modules`.
 
 .. code-block:: text
 

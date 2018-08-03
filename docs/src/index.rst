@@ -8,4 +8,5 @@
     getting_started
     changelog
     examples
+    tutorials
     Python API <modules>
