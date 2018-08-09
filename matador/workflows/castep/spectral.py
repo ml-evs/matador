@@ -46,6 +46,29 @@ def castep_full_spectral(relaxer, calc_doc, seed):
     return workflow.success
 
 
+def castep_projected_bandstructure(relaxer, calc_doc, seed):
+    """ Perform a "full" spectral calculation on a system, i.e. first
+    perform an SCF then interpolate to different kpoint paths/grids to
+    form DOS and dispersions. Optionally use OptaDOS for post-processing
+    of DOS.
+
+    Parameters:
+        relaxer (:obj:`FullRelaxer`): the object that will be calling CASTEP.
+        calc_doc (dict): dictionary of structure and calculation
+            parameters.
+        seed (str): root seed for the calculation.
+
+    Raises:
+        RuntimeError: if any part of the calculation fails.
+
+    Returns:
+        bool: True if Workflow completed successfully, or False otherwise.
+
+    """
+    workflow = CastepProjectedBandstructureWorkflow(relaxer, calc_doc, seed)
+    return workflow.success
+
+
 class CastepSpectralWorkflow(Workflow):
     """ Perform a "full" spectral calculation on a system, i.e. first
     perform an SCF then interpolate to different kpoint paths/grids to
@@ -88,6 +111,57 @@ class CastepSpectralWorkflow(Workflow):
             if todo[key]:
                 self.add_step(steps[key], key)
 
+        # always reduce cell to primitive and standardise the cell so that any
+        # post-processing performed after the fact will be consistent
+        from matador.utils.cell_utils import cart2abc
+        prim_doc, kpt_path = self.relaxer.get_seekpath_compliant_input(
+            self.calc_doc, self.calc_doc.get('spectral_kpoints_path_spacing', 0.02))
+        self.calc_doc.update(prim_doc)
+        self.calc_doc['lattice_abc'] = cart2abc(self.calc_doc['lattice_cart'])
+
+        if todo['dispersion']:
+            self.calc_doc['spectral_kpoints_list'] = kpt_path
+
+        logging.info('Preprocessing completed: run3 spectral options {}'.format(todo))
+
+
+class CastepProjectedBandstructureWorkflow(Workflow):
+    """ Perform a projected bandstructure on a system. This is achieved
+    in multiple steps. First perform an SCF, then interpolate to different
+    kpoints along a paths one by one, running OptaDOS on the results of each,
+    accumulating the results.
+
+    Attributes:
+        relaxer (:obj:`FullRelaxer`): the object that calls CASTEP.
+        calc_doc (dict): the interim dictionary of structural and
+            calculation parameters.
+        seed (str): the root seed for the calculation.
+        success (bool): the status of the Workflow: only set to True after
+            post-processing method completes.
+
+    """
+    def preprocess(self):
+        """ Decide which parts of the Workflow need to be performed,
+        and set the appropriate CASTEP parameters.
+
+        """
+        # default todo
+        todo = {'scf': True, 'dispersion': False}
+        # definition of steps and names
+        steps = {'scf': castep_spectral_scf,
+                 'dispersion': castep_spectral_projected_dispersion}
+
+        if (('spectral_kpoints_path' not in self.calc_doc and 'spectral_kpoints_list' not in self.calc_doc) and
+                'spectral_kpoints_path_spacing' in self.calc_doc):
+            todo['dispersion'] = True
+        if 'spectral_kpoints_mp_spacing' in self.calc_doc:
+            todo['dos'] = True
+
+        # prepare to do scf if there's no check file
+        if os.path.isfile(self.seed + '.check'):
+            todo['scf'] = False
+            logging.info('Restarting from {}.check, so not performing initial SCF'.format(self.seed))
+
         # always reduce cell to primitivve and standardise the cell so that any
         # post-processing performed after the fact will be consistent
         from matador.utils.cell_utils import cart2abc
@@ -98,6 +172,12 @@ class CastepSpectralWorkflow(Workflow):
 
         if todo['dispersion']:
             self.calc_doc['spectral_kpoints_list'] = kpt_path
+
+        if todo['scf']:
+            self.add_step(steps['scf'], 'scf')
+
+        if todo['dispersion']:
+            self.add_step(steps['dispersion'], 'projected_dispersion')
 
         logging.info('Preprocessing completed: run3 spectral options {}'.format(todo))
 
@@ -117,7 +197,8 @@ def castep_spectral_scf(relaxer, calc_doc, seed):
     scf_doc['task'] = 'singlepoint'
 
     required = []
-    forbidden = ['spectral_kpoints_list',
+    forbidden = ['spectral_task',
+                 'spectral_kpoints_list',
                  'spectral_kpoints_path',
                  'spectral_kpoints_mp_spacing',
                  'spectral_kpoints_path_spacing']
@@ -174,6 +255,7 @@ def castep_spectral_dos(relaxer, calc_doc, seed):
         relaxer.executable = _cache_executable
         raise exc
     relaxer.executable = _cache_executable
+
     return success
 
 
@@ -186,10 +268,10 @@ def castep_spectral_dispersion(relaxer, calc_doc, seed):
         seed (str): root filename of structure.
 
     """
-    logging.info('Performing CASTEP phonon dispersion calculation...')
+    logging.info('Performing CASTEP spectral dispersion calculation...')
     disp_doc = copy.deepcopy(calc_doc)
     disp_doc['task'] = 'spectral'
-    disp_doc['phonon_calculate_dos'] = False
+    disp_doc['spectral_task'] = 'bandstructure'
 
     required = ['spectral_kpoints_list']
     forbidden = ['spectral_kpoints_mp_spacing',
@@ -199,3 +281,56 @@ def castep_spectral_dispersion(relaxer, calc_doc, seed):
     relaxer.validate_calc_doc(disp_doc, required, forbidden)
 
     return relaxer.scf(disp_doc, seed, keep=True, intermediate=True)
+
+
+def castep_spectral_projected_dispersion(relaxer, calc_doc, seed, kpoint=None):
+    """ Runs a non-scf interpolation calculation on a single kpoint, as if it
+    were a DOS, then calls OptaDOS on the result to project it onto the desired
+    orbitals/elements.
+
+    Parameters:
+        relaxer (:obj:`FullRelaxer`): the object that will be calling CASTEP.
+        calc_doc (dict): the structure to run on.
+        seed (str): root filename of structure.
+
+    Keyword arguments:
+        kpoint (:obj:`list` of :obj:`float`): the kpoint to run the projection for.
+
+    """
+    logging.info('Performing CASTEP projected dispersion calculation on kpoint = {}.'.format(kpoint))
+    disp_doc = copy.deepcopy(calc_doc)
+    disp_doc['task'] = 'spectral'
+    disp_doc['spectral_task'] = 'bandstructure'
+    disp_doc['pdos_calculate_weights'] = True
+    disp_doc['continuation'] = 'default'
+    # disp_doc['spectral_kpoints_list'] = [kpoint]
+
+    required = ['spectral_kpoints_list']
+    forbidden = ['spectral_kpoints_mp_spacing',
+                 'spectral_kpoints_path',
+                 'spectral_kpoints_path_spacing']
+
+    relaxer.validate_calc_doc(disp_doc, required, forbidden)
+
+    success = relaxer.scf(disp_doc, seed, keep=True, intermediate=True)
+
+    if not os.path.isfile(seed + '.odi'):
+        odi_fname = glob.glob('*.odi')[0]
+        shutil.copy(odi_fname, seed + '.odi')
+        logging.info('Performing OptaDOS PDOS calculation with parameters from {}'.format(odi_fname))
+
+    _cache_executable = copy.deepcopy(relaxer.executable)
+    _cache_core = copy.deepcopy(relaxer.ncores)
+
+    relaxer.ncores = 1
+    relaxer.executable = 'optados'
+    try:
+        success = relaxer.run_generic(seed, intermediate=True)
+    except Exception as exc:
+        relaxer.executable = _cache_executable
+        raise exc
+
+    relaxer.ncores = _cache_core
+    relaxer.executable = _cache_executable
+
+    return success

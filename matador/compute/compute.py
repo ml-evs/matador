@@ -23,7 +23,7 @@ from matador.scrapers.castep_scrapers import cell2dict
 from matador.scrapers.castep_scrapers import res2dict, castep2dict
 from matador.export import doc2cell, doc2param, doc2res
 
-MATADOR_CUSTOM_TASKS = ['bulk_modulus']
+MATADOR_CUSTOM_TASKS = ['bulk_modulus', 'projected_bandstructure']
 
 
 class FullRelaxer:
@@ -333,8 +333,12 @@ class FullRelaxer:
             success = castep_full_phonon(self, calc_doc, self.seed)
 
         elif calc_doc['task'].upper() in ['SPECTRAL']:
-            from matador.workflows.castep import castep_full_spectral
-            success = castep_full_spectral(self, calc_doc, self.seed)
+            if calc_doc.get('spectral_task').upper() in ['PROJECTED_BANDSTRUCTURE']:
+                from matador.workflows.castep.spectral import castep_projected_bandstructure
+                success = castep_projected_bandstructure(self, calc_doc, self.seed)
+            else:
+                from matador.workflows.castep import castep_full_spectral
+                success = castep_full_spectral(self, calc_doc, self.seed)
 
         elif calc_doc['task'].upper() in ['BULK_MODULUS']:
             from matador.workflows.castep import castep_elastic
