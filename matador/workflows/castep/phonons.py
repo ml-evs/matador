@@ -70,7 +70,7 @@ class CastepPhononWorkflow(Workflow):
 
         """
         # default todo
-        todo = {'relax': True, 'dynmat': True, 'dispersion': False, 'dos': False, 'thermodynamics': False}
+        todo = {'relax': True, 'dynmat': True, 'dos': False, 'dispersion': False, 'thermodynamics': False}
         # definition of steps and names
         steps = {'relax': castep_phonon_prerelax,
                  'dynmat': castep_phonon_dynmat,
