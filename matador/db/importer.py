@@ -52,6 +52,7 @@ class Spatula:
         self.tag_dict['tags'] = self.tags
         self.import_count = 0
         self.struct_list = []
+        self.path_list = []
         # I/O files
         if not self.dryrun:
             logfile_name = 'spatula.err'
@@ -293,7 +294,6 @@ class Spatula:
         """
         print('\n{:^52}'.format('###### RUNNING IMPORTER ######') + '\n')
         for _, root in enumerate(file_lists):
-            print(root)
             root_str = root
             if root_str == '.':
                 root_str = os.getcwd().split('/')[-1]
@@ -312,13 +312,18 @@ class Spatula:
                             file_lists[root]['cell_count'] <= file_lists[root]['res_count']):
                         style = 'airss'
                 if style == 'airss':
-                    self.import_count += self._scrape_multi_file_results(file_lists, root)
+                    imported = self._scrape_multi_file_results(file_lists, root)
                 # otherwise, we are just in a folder of CASTEP files
                 elif style == 'castep':
-                    self.import_count += self._scrape_single_file_structures(file_lists, root)
+                    imported = self._scrape_single_file_structures(file_lists, root)
+
+            self.import_count += imported
+            if imported > 0:
+                print('Imported {} structures from {}'.format(imported, root))
+                self.path_list.append(root)
 
         if self.struct_list and not self.dryrun:
-            self._update_changelog(self.repo.name, self.struct_list)
+            self._update_changelog()
 
     def _scrape_multi_file_results(self, file_lists, root):
         """ Add structures to database by parsing .res or .castep files., with DFT data
@@ -491,20 +496,17 @@ class Spatula:
 
         return import_count
 
-    def _update_changelog(self, collection_name: str, struct_list: list):
+    def _update_changelog(self):
         """ Add a list of ObjectIds to a collection called __changelog_{collection_name},
         storing "commits" that can be undone or reverted to.
 
-        Input:
-            collection_name (str): the name of the base collection being imported to
-            struct_list (list of (ObjectId, str)): list of Ids and sources of imported structures
-
         """
         changes = {'date': datetime.datetime.today(),
-                   'count': len(struct_list),
-                   'id_list': [struct[0] for struct in struct_list],
-                   'src_list': [struct[1] for struct in struct_list]}
-        self.db['__changelog_{}'.format(collection_name)].insert_one(changes)
+                   'count': len(self.struct_list),
+                   'id_list': [struct[0] for struct in self.struct_list],
+                   'src_list': [struct[1] for struct in self.struct_list],
+                   'path_list': self.path_list}
+        self.db['__changelog_{}'.format(self.repo.name)].insert_one(changes)
 
     def _scan_dir(self):
         """ Scans folder topdir recursively, returning list of
