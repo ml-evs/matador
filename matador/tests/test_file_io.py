@@ -429,7 +429,6 @@ class ScrapeTest(unittest.TestCase):
             self.assertTrue(errored, 'WARNING: malicious attack is possible through symops')
             self.assertFalse(s, 'This should have failed entirely, oh dear!')
 
-
     def testParam(self):
         from matador.scrapers.castep_scrapers import param2dict
         param_fname = REAL_PATH + 'data/KX.param'
@@ -642,9 +641,9 @@ class ScrapeTest(unittest.TestCase):
             self.assertAlmostEqual(bs_dict['eigenvalues_k_s'][-1][-1][-1], 0.64283955*HARTREE_TO_EV-bs_dict['fermi_energy'], places=4)
             self.assertAlmostEqual(bs_dict['eigenvalues_k_s'][0][-1][-1], 0.63571135*HARTREE_TO_EV-bs_dict['fermi_energy'], places=4)
 
-    def testMagres(self):
+    def testQEMagres(self):
         from matador.scrapers.magres_scrapers import magres2dict
-        magres_fname = REAL_PATH + 'data/NaP.magres'
+        magres_fname = REAL_PATH + 'data/NaP_QE6.magres'
         failed_open = False
         try:
             f = open(magres_fname, 'r')
@@ -664,6 +663,37 @@ class ScrapeTest(unittest.TestCase):
             np.testing.assert_almost_equal(magres_dict['chemical_shifts'], [518.15, 467.61, 467.61, 275.34], decimal=2)
 
             self.assertEqual(magres_dict['calculator'], 'QE-GIPAW')
+
+    def testCASTEPMagres(self):
+        from matador.scrapers.magres_scrapers import magres2dict
+        magres_fname = REAL_PATH + 'data/LiP_CASTEP18.magres'
+        failed_open = False
+        try:
+            f = open(magres_fname, 'r')
+        except Exception:
+            failed_open = True
+            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(magres_fname))
+        if not failed_open:
+            f.close()
+            magres_dict, s = magres2dict(magres_fname)
+            self.assertTrue(s)
+            self.assertEqual(len(magres_dict['atom_types']), 20)
+            self.assertTrue(magres_dict['lattice_cart'][0] == [4.1332870000000002, 0.0000000000000000, 0.0000000000000000])
+            self.assertTrue(magres_dict['lattice_cart'][1] == [-8.9905292805212659e-4, 6.0637949333506347, 0.0000000000000000])
+            self.assertTrue(magres_dict['lattice_cart'][2] == [2.0677013018922552, 3.3924745014331725e-1, 12.368724395669441])
+
+            np.testing.assert_almost_equal(magres_dict['chemical_shifts'],
+                                           [83.7, 84.3, 83.4, 86.6, 83.3, 85.1, 84.4, 83.8, 82.8, 83.6, 84.9, 84.9, 83.6, 82.7, 85.1, 350.0, 500.3, 353.3, 530.9, 531.2],
+                                           decimal=1)
+            np.testing.assert_almost_equal(magres_dict['chemical_shift_anisos'],
+                                           [9.4, 4.4, 8.1, 2.9, 8.1, 3.4, 4.7, 9.1, 10.1, -9.5, 8.7, 8.8, -9.6, 10.4, 3.4, -393.0, 162.7, -391.2, 223.9, 224.0],
+                                           decimal=1)
+            np.testing.assert_almost_equal(magres_dict['chemical_shift_asymmetries'],
+                                           [0.33, 0.76, 0.19, 0.46, 0.21, 0.84, 0.65, 0.32, 0.11, 0.92, 0.85, 0.86, 0.91, 0.11, 0.92, 0.48, 0.95, 0.47, 0.59, 0.61],
+                                           decimal=2)
+
+            self.assertEqual(magres_dict['calculator'], 'CASTEP')
+            self.assertEqual(magres_dict['calculator_version'], '18.1')
 
     def testPWSCF(self):
         from matador.scrapers.qe_scrapers import pwout2dict
@@ -863,7 +893,7 @@ class ExportTest(unittest.TestCase):
                                  'thermo_entropy': [16.573, 60.998, 92.749, 115.772, 133.586, 148.051, 160.206, 170.678, 179.872, 188.064, 195.45],
                                  'thermo_heat_cap': [24.686, 57.799, 67.215, 70.549, 72.047, 72.836, 73.301, 73.596, 73.795, 73.936, 74.039]}
 
-            for num,i in enumerate(test_dict['thermo_temps']):
+            for num, i in enumerate(test_dict['thermo_temps']):
                 self.assertEqual(i, thermo_db_compare['thermo_temps'][num],
                                  msg='Wrong temperature %f' % test_dict['thermo_temps'][num])
                 self.assertEqual(test_dict['thermo_enthalpy'][i], thermo_db_compare['thermo_enthalpy'][num],
