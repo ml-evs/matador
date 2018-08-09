@@ -1,0 +1,507 @@
+#$magres-abinitio-v1.0
+# See http://www.ccpnc.ac.uk/pmwiki.php/CCPNC/Fileformat for format definition and code samples and libraries
+[calculation]
+calc_code CASTEP
+calc_code_version  18.1
+calc_code_hgversion baee3ec33e17+  Mon, 11 Dec 2017 11:05:17 +0000                  
+calc_code_platform linux_x86_64_ifort17-TCM                                        
+calc_name LiP-GA-o0ol95-2x5
+calc_comment                                                                                 
+calc_xcfunctional PBE 
+calc_cutoffenergy    650.00000000 eV
+calc_pspot Li 1|1.2|10|15|20|10U:20(qc=6)
+calc_pspot P 3|1.8|2|4|6|30:31:32
+calc_kpoint_mp_grid 9 6 3
+calc_kpoint_mp_offset       0.00000000      0.00000000      0.00000000
+[/calculation]
+[atoms]
+units lattice Angstrom
+lattice           4.1332870000000002E+00          0.0000000000000000E+00          0.0000000000000000E+00         -8.9905292805212659E-04          6.0637949333506347E+00          0.0000000000000000E+00          2.0677013018922552E+00          3.3924745014331725E-01          1.2368724395669441E+01
+units atom Angstrom
+symmetry x,y,z
+atom Li      Li   1          2.3268265882371804E+00          2.4931589640892020E+00          1.1656731144557124E+01
+atom Li      Li   2          2.3066442787917798E+00          5.0050596194084687E+00          8.8993219401329533E+00
+atom Li      Li   3          2.3149691490349826E+00          6.2409738785208795E+00          6.9125955840785496E+00
+atom Li      Li   4          2.2781835031203719E+00          4.6068822171199617E+00          5.0454871616546644E+00
+atom Li      Li   5          2.3279494548614337E+00          2.9942670283538568E+00          3.1741238980386699E+00
+atom Li      Li   6          2.3161735114844975E+00          2.0838420104692898E-01          2.9442140489719666E+00
+atom Li      Li   7          2.3335410857881040E+00          4.2145738248879292E+00          1.1719490052140753E+00
+atom Li      Li   8          4.3895508215023522E+00          9.7673169132992388E-01          1.0797846922521838E+01
+atom Li      Li   9          4.3785027426942804E+00          3.0554730910172019E+00          9.1191636475415816E+00
+atom Li      Li  10          4.3807268420111134E+00          7.9165497413703334E-01          8.1451760762801957E+00
+atom Li      Li  11          4.3691171800028039E+00          2.9128409739899817E+00          5.1587228334970190E+00
+atom Li      Li  12          4.3699223743419422E+00          2.6214988799748395E-01          4.9153063373902439E+00
+atom Li      Li  13          4.3955083387398517E+00          2.3715162432724117E+00          1.9343324395143482E+00
+atom Li      Li  14          2.6524763129960849E-01          1.1219088641263336E-01          9.9459386610457101E-01
+atom Li      Li  15          2.3193238129209877E+00          2.9535338625032428E+00          7.1495184998775976E+00
+atom P       P   1          2.3166215139445909E+00          1.5396342101288412E+00          9.3637056975683635E+00
+atom P       P   2          2.3043485475117480E+00          1.5856781441357817E+00          5.0431618414682795E+00
+atom P       P   3          2.3279281369337315E+00          1.6146143310801506E+00          7.2211086766797328E-01
+atom P       P   4          4.3806802410514321E+00          4.6335673345696637E+00          7.2011950304027055E+00
+atom P       P   5          4.3905239195498300E+00          4.5905062701851218E+00          2.8882579398059582E+00
+[/atoms]
+[magres]
+units ms ppm
+ms Li  1          8.1600986401113687E+01          6.1130293933470570E-03         -4.2958365057751573E-02          1.2721775192694783E-02          7.9850071216494683E+01          1.3577395723819454E+00         -5.0650377173033174E-02          2.1342340351827458E+00          8.9649729535201928E+01
+ms Li  2          8.3992129315797385E+01          9.1261682150506424E-02          4.6570783615107150E-02          1.3024582758021527E-01          8.6974549865549420E+01          9.9350591700953539E-01          9.8727418429848321E-02          1.5672032169703269E+00          8.2051923067980937E+01
+ms Li  3          8.1163966035099818E+01         -1.5142558983336591E-02         -4.4243393014587504E-02          1.1853671400620512E-02          8.4428048185855232E+01         -4.3852516568549591E+00          2.6045000782516192E-03         -4.2627338300254829E+00          8.4527114714498666E+01
+ms Li  4          8.5209777516364881E+01          4.2332416926027898E-02         -2.4141218980466977E-02          4.8895207484242635E-02          8.8238801800800118E+01          1.0103915981287233E+00         -2.4343383787252737E-03          7.3368646737774013E-01          8.6465478236851439E+01
+ms Li  5          8.1201685985954015E+01          1.2702653875555336E-01         -1.6759224272584511E-01          1.2823278151281656E-01          8.4389637118878753E+01         -4.3936909747693305E+00         -9.0840170776571583E-02         -4.2653734659682803E+00          8.4439094072660538E+01
+ms Li  6          8.2951532879228736E+01          8.8956122919388161E-02         -4.8667329032433690E-02          1.2212040938237492E-01          8.6310509236269908E+01          1.2019914383920018E+00          4.2410559262882414E-04          1.2422015588744644E+00          8.5890703926398615E+01
+ms Li  7          8.3871160820564768E+01          4.6846009569068515E-02          7.0910963574851882E-02          1.3152068120859101E-01          8.7260184564300971E+01          1.0225600258878833E+00          8.5097997300484077E-02          1.5983862851926194E+00          8.2130258201522210E+01
+ms Li  8          8.1706166778226887E+01          1.1088957345699842E-02         -1.0604969275745527E-01          4.8124440203031497E-03          8.0032660438343754E+01          1.3427937718338008E+00         -1.3390927554462867E-01          2.1054708982929373E+00          8.9544647041724545E+01
+ms Li  9          7.9841915216448200E+01          1.3520862419496377E-01         -7.8928591990147220E-02          1.1643452713268743E-01          8.6695336632796170E+01         -5.3617651563736191E+00         -8.8819837384533154E-02         -3.9240050524857586E+00          8.1920334065682724E+01
+ms Li 10          8.3875011861033954E+01         -2.1546081057911174E-02         -2.3356799027669156E-02         -1.2583469588441270E-02          8.5715891868140943E+01          5.7156813363758419E+00         -5.9709324813211839E-02          5.9033750971446048E+00          8.1288175010350713E+01
+ms Li 11          9.0714191655674483E+01          1.7042185965214843E-01         -6.9013636374944828E-02          1.6461578948146088E-01          8.4393425740594921E+01          1.0031521293963341E+00          8.5558116014514424E-03          4.9445992155897761E-01          7.9681703043993011E+01
+ms Li 12          9.0759795656385606E+01         -8.0728774701606873E-02         -9.2263013280563438E-02         -5.2541771242148073E-02          8.4354866472184369E+01          1.1012628947052776E+00         -2.6874992117895846E-02          5.8097906567711000E-01          7.9613926239474822E+01
+ms Li 13          8.3885686125074074E+01         -8.9105920196629121E-03         -3.5521967712282276E-02         -2.4170663805252856E-03          8.5707788121876987E+01          5.7152893166901393E+00         -8.3861284327045052E-02          5.9520624693454680E+00          8.1216531737587033E+01
+ms Li 14          7.9621061390319241E+01          1.3800834477759555E-01         -8.1022357309438228E-02          1.1312757901474774E-01          8.6624032444857932E+01         -5.5129473563379303E+00         -1.0169012828787645E-01         -4.1022656568986662E+00          8.1790320731436381E+01
+ms Li 15          8.2918753386928429E+01          1.0764025961306692E-01          3.2704162057393348E-03          1.3354465466204690E-01          8.6374720566325109E+01          1.1218555436552098E+00         -5.7462152405975573E-03          1.1681955533456385E+00          8.5914308276876696E+01
+ms P  1          8.8030677188767129E+01          5.6155608731505269E-01         -3.1021211662530940E-01         -8.1634727826074238E-01          5.3864602770580200E+02          9.5165935591392437E+00         -9.0334376362450042E-01         -6.0242499404813842E+01          4.2340005422822026E+02
+ms P  2          4.9742143209899882E+02          1.0843113770517249E+01          1.2110131521292869E+01          6.5554619695819039E-01          4.1821171887291086E+02         -6.6522055426708363E+01          3.6815543508758930E+00         -6.6275851158570973E+01          5.8532586717751462E+02
+ms P  3          9.2488364674017348E+01          5.4537474400382102E-01          1.5352437042350546E+00         -1.7399043680072307E-01          5.3996839857441228E+02          1.1154517435831460E+01         -9.6095850732987131E-01         -5.7799228260280309E+01          4.2749794195057063E+02
+ms P  4          4.1272595858612038E+02          8.1274923913024502E+00          4.9535001855699834E+00          6.3166053413685552E-01          5.0479902086608195E+02         -9.7722360685431475E+00          1.0610340994283158E+00         -4.8897654312294520E+01          6.7528099793290698E+02
+ms P  5          4.1130664007891232E+02          8.6465099251103901E+00          7.5307252509254381E+00          7.1504542749235467E-01          5.0585197657512526E+02         -7.5736791790057838E+00          1.7507622043459767E+00         -4.5027594856125951E+01          6.7654602806193827E+02
+[/magres]
+[magres_old]
+============
+Atom: Li       1
+============
+Li       1 Coordinates      2.327    2.493   11.657   A
+ 
+TOTAL Shielding Tensor
+
+              81.6010      0.0061     -0.0430
+               0.0127     79.8501      1.3577
+              -0.0507      2.1342     89.6497
+
+Li       1 Eigenvalue  sigma_xx      79.5481 (ppm)
+Li       1 Eigenvector sigma_xx      -0.0084      0.9853     -0.1703
+Li       1 Eigenvalue  sigma_yy      81.6009 (ppm)
+Li       1 Eigenvector sigma_yy       1.0000      0.0092      0.0038
+Li       1 Eigenvalue  sigma_zz      89.9518 (ppm)
+Li       1 Eigenvector sigma_zz      -0.0053      0.1703      0.9854
+ 
+Li       1 Isotropic:       83.7003 (ppm)
+Li       1 Anisotropy:       9.3772 (ppm)
+Li       1 Asymmetry:        0.3284
+ 
+============
+Atom: Li       2
+============
+Li       2 Coordinates      2.307    5.005    8.899   A
+ 
+TOTAL Shielding Tensor
+
+              83.9921      0.0913      0.0466
+               0.1302     86.9745      0.9935
+               0.0987      1.5672     82.0519
+
+Li       2 Eigenvalue  sigma_xx      81.7380 (ppm)
+Li       2 Eigenvector sigma_xx      -0.0197     -0.2371      0.9713
+Li       2 Eigenvalue  sigma_yy      83.9883 (ppm)
+Li       2 Eigenvector sigma_yy      -0.9991      0.0414     -0.0101
+Li       2 Eigenvalue  sigma_zz      87.2924 (ppm)
+Li       2 Eigenvector sigma_zz      -0.0378     -0.9706     -0.2377
+ 
+Li       2 Isotropic:       84.3395 (ppm)
+Li       2 Anisotropy:       4.4293 (ppm)
+Li       2 Asymmetry:        0.7621
+ 
+============
+Atom: Li       3
+============
+Li       3 Coordinates      2.315    6.241    6.913   A
+ 
+TOTAL Shielding Tensor
+
+              81.1640     -0.0151     -0.0442
+               0.0119     84.4280     -4.3853
+               0.0026     -4.2627     84.5271
+
+Li       3 Eigenvalue  sigma_xx      80.1531 (ppm)
+Li       3 Eigenvector sigma_xx       0.0156      0.7110      0.7030
+Li       3 Eigenvalue  sigma_yy      81.1642 (ppm)
+Li       3 Eigenvector sigma_yy       0.9999     -0.0124     -0.0097
+Li       3 Eigenvalue  sigma_zz      88.8019 (ppm)
+Li       3 Eigenvector sigma_zz      -0.0018     -0.7030      0.7111
+ 
+Li       3 Isotropic:       83.3730 (ppm)
+Li       3 Anisotropy:       8.1433 (ppm)
+Li       3 Asymmetry:        0.1863
+ 
+============
+Atom: Li       4
+============
+Li       4 Coordinates      2.278    4.607    5.045   A
+ 
+TOTAL Shielding Tensor
+
+              85.2098      0.0423     -0.0241
+               0.0489     88.2388      1.0104
+              -0.0024      0.7337     86.4655
+
+Li       4 Eigenvalue  sigma_xx      85.2084 (ppm)
+Li       4 Eigenvector sigma_xx       0.9994     -0.0226      0.0262
+Li       4 Eigenvalue  sigma_yy      86.1095 (ppm)
+Li       4 Eigenvector sigma_yy       0.0328      0.3782     -0.9251
+Li       4 Eigenvalue  sigma_zz      88.5962 (ppm)
+Li       4 Eigenvector sigma_zz       0.0110      0.9255      0.3787
+ 
+Li       4 Isotropic:       86.6380 (ppm)
+Li       4 Anisotropy:       2.9372 (ppm)
+Li       4 Asymmetry:        0.4602
+ 
+============
+Atom: Li       5
+============
+Li       5 Coordinates      2.328    2.994    3.174   A
+ 
+TOTAL Shielding Tensor
+
+              81.2017      0.1270     -0.1676
+               0.1282     84.3896     -4.3937
+              -0.0908     -4.2654     84.4391
+
+Li       5 Eigenvalue  sigma_xx      80.0848 (ppm)
+Li       5 Eigenvector sigma_xx       0.0005      0.7091      0.7051
+Li       5 Eigenvalue  sigma_yy      81.1973 (ppm)
+Li       5 Eigenvector sigma_yy       0.9997     -0.0173      0.0167
+Li       5 Eigenvalue  sigma_zz      88.7483 (ppm)
+Li       5 Eigenvector sigma_zz      -0.0241     -0.7049      0.7089
+ 
+Li       5 Isotropic:       83.3435 (ppm)
+Li       5 Anisotropy:       8.1073 (ppm)
+Li       5 Asymmetry:        0.2058
+ 
+============
+Atom: Li       6
+============
+Li       6 Coordinates      2.316    0.208    2.944   A
+ 
+TOTAL Shielding Tensor
+
+              82.9515      0.0890     -0.0487
+               0.1221     86.3105      1.2020
+               0.0004      1.2422     85.8907
+
+Li       6 Eigenvalue  sigma_xx      82.9467 (ppm)
+Li       6 Eigenvector sigma_xx       0.9989     -0.0404      0.0250
+Li       6 Eigenvalue  sigma_yy      84.8645 (ppm)
+Li       6 Eigenvector sigma_yy       0.0451      0.6429     -0.7646
+Li       6 Eigenvalue  sigma_zz      87.3416 (ppm)
+Li       6 Eigenvector sigma_zz       0.0148      0.7649      0.6440
+ 
+Li       6 Isotropic:       85.0509 (ppm)
+Li       6 Anisotropy:       3.4360 (ppm)
+Li       6 Asymmetry:        0.8373
+ 
+============
+Atom: Li       7
+============
+Li       7 Coordinates      2.334    4.215    1.172   A
+ 
+TOTAL Shielding Tensor
+
+              83.8712      0.0468      0.0709
+               0.1315     87.2602      1.0226
+               0.0851      1.5984     82.1303
+
+Li       7 Eigenvalue  sigma_xx      81.8134 (ppm)
+Li       7 Eigenvector sigma_xx      -0.0267     -0.2334      0.9720
+Li       7 Eigenvalue  sigma_yy      83.8697 (ppm)
+Li       7 Eigenvector sigma_yy      -0.9992      0.0338     -0.0194
+Li       7 Eigenvalue  sigma_zz      87.5785 (ppm)
+Li       7 Eigenvector sigma_zz      -0.0283     -0.9718     -0.2341
+ 
+Li       7 Isotropic:       84.4205 (ppm)
+Li       7 Anisotropy:       4.7370 (ppm)
+Li       7 Asymmetry:        0.6511
+ 
+============
+Atom: Li       8
+============
+Li       8 Coordinates      4.390    0.977   10.798   A
+ 
+TOTAL Shielding Tensor
+
+              81.7062      0.0111     -0.1060
+               0.0048     80.0327      1.3428
+              -0.1339      2.1055     89.5446
+
+Li       8 Eigenvalue  sigma_xx      79.7294 (ppm)
+Li       8 Eigenvector sigma_xx      -0.0145      0.9848     -0.1732
+Li       8 Eigenvalue  sigma_yy      81.7049 (ppm)
+Li       8 Eigenvector sigma_yy       0.9998      0.0167      0.0116
+Li       8 Eigenvalue  sigma_zz      89.8492 (ppm)
+Li       8 Eigenvector sigma_zz      -0.0143      0.1730      0.9848
+ 
+Li       8 Isotropic:       83.7612 (ppm)
+Li       8 Anisotropy:       9.1321 (ppm)
+Li       8 Asymmetry:        0.3245
+ 
+============
+Atom: Li       9
+============
+Li       9 Coordinates      4.379    3.055    9.119   A
+ 
+TOTAL Shielding Tensor
+
+              79.8419      0.1352     -0.0789
+               0.1164     86.6953     -5.3618
+              -0.0888     -3.9240     81.9203
+
+Li       9 Eigenvalue  sigma_xx      79.0870 (ppm)
+Li       9 Eigenvector sigma_xx       0.0080      0.5208      0.8536
+Li       9 Eigenvalue  sigma_yy      79.8396 (ppm)
+Li       9 Eigenvector sigma_yy       0.9998     -0.0175      0.0013
+Li       9 Eigenvalue  sigma_zz      89.5310 (ppm)
+Li       9 Eigenvector sigma_zz      -0.0156     -0.8535      0.5209
+ 
+Li       9 Isotropic:       82.8192 (ppm)
+Li       9 Anisotropy:      10.0677 (ppm)
+Li       9 Asymmetry:        0.1121
+ 
+============
+Atom: Li      10
+============
+Li      10 Coordinates      4.381    0.792    8.145   A
+ 
+TOTAL Shielding Tensor
+
+              83.8750     -0.0215     -0.0234
+              -0.0126     85.7159      5.7157
+              -0.0597      5.9034     81.2882
+
+Li      10 Eigenvalue  sigma_xx      89.7193 (ppm)
+Li      10 Eigenvector sigma_xx       0.0064     -0.8234     -0.5674
+Li      10 Eigenvalue  sigma_yy      83.8749 (ppm)
+Li      10 Eigenvector sigma_yy      -1.0000     -0.0074     -0.0006
+Li      10 Eigenvalue  sigma_zz      77.2849 (ppm)
+Li      10 Eigenvector sigma_zz       0.0037     -0.5674      0.8234
+ 
+Li      10 Isotropic:       83.6264 (ppm)
+Li      10 Anisotropy:      -9.5122 (ppm)
+Li      10 Asymmetry:        0.9216
+ 
+============
+Atom: Li      11
+============
+Li      11 Coordinates      4.369    2.913    5.159   A
+ 
+TOTAL Shielding Tensor
+
+              90.7142      0.1704     -0.0690
+               0.1646     84.3934      1.0032
+               0.0086      0.4945     79.6817
+
+Li      11 Eigenvalue  sigma_xx      79.5653 (ppm)
+Li      11 Eigenvector sigma_xx       0.0050     -0.1534      0.9881
+Li      11 Eigenvalue  sigma_yy      84.5054 (ppm)
+Li      11 Eigenvector sigma_yy      -0.0259      0.9878      0.1535
+Li      11 Eigenvalue  sigma_zz      90.7186 (ppm)
+Li      11 Eigenvector sigma_zz      -0.9997     -0.0264      0.0009
+ 
+Li      11 Isotropic:       84.9298 (ppm)
+Li      11 Anisotropy:       8.6833 (ppm)
+Li      11 Asymmetry:        0.8534
+ 
+============
+Atom: Li      12
+============
+Li      12 Coordinates      4.370    0.262    4.915   A
+ 
+TOTAL Shielding Tensor
+
+              90.7598     -0.0807     -0.0923
+              -0.0525     84.3549      1.1013
+              -0.0269      0.5810     79.6139
+
+Li      12 Eigenvalue  sigma_xx      79.4689 (ppm)
+Li      12 Eigenvector sigma_xx       0.0042     -0.1696      0.9855
+Li      12 Eigenvalue  sigma_yy      84.4988 (ppm)
+Li      12 Eigenvector sigma_yy       0.0121      0.9854      0.1695
+Li      12 Eigenvalue  sigma_zz      90.7609 (ppm)
+Li      12 Eigenvector sigma_zz      -0.9999      0.0112      0.0062
+ 
+Li      12 Isotropic:       84.9095 (ppm)
+Li      12 Anisotropy:       8.7771 (ppm)
+Li      12 Asymmetry:        0.8596
+ 
+============
+Atom: Li      13
+============
+Li      13 Coordinates      4.396    2.372    1.934   A
+ 
+TOTAL Shielding Tensor
+
+              83.8857     -0.0089     -0.0355
+              -0.0024     85.7078      5.7153
+              -0.0839      5.9521     81.2165
+
+Li      13 Eigenvalue  sigma_xx      89.7134 (ppm)
+Li      13 Eigenvector sigma_xx       0.0066     -0.8244     -0.5660
+Li      13 Eigenvalue  sigma_yy      83.8857 (ppm)
+Li      13 Eigenvector sigma_yy      -1.0000     -0.0093      0.0019
+Li      13 Eigenvalue  sigma_zz      77.2109 (ppm)
+Li      13 Eigenvector sigma_zz       0.0069     -0.5660      0.8244
+ 
+Li      13 Isotropic:       83.6033 (ppm)
+Li      13 Anisotropy:      -9.5887 (ppm)
+Li      13 Asymmetry:        0.9116
+ 
+============
+Atom: Li      14
+============
+Li      14 Coordinates      0.265    0.112    0.995   A
+ 
+TOTAL Shielding Tensor
+
+              79.6211      0.1380     -0.0810
+               0.1131     86.6240     -5.5129
+              -0.1017     -4.1023     81.7903
+
+Li      14 Eigenvalue  sigma_xx      78.8261 (ppm)
+Li      14 Eigenvector sigma_xx       0.0150      0.5246      0.8512
+Li      14 Eigenvalue  sigma_yy      79.6188 (ppm)
+Li      14 Eigenvector sigma_yy       0.9998     -0.0211     -0.0046
+Li      14 Eigenvalue  sigma_zz      89.5905 (ppm)
+Li      14 Eigenvector sigma_zz      -0.0155     -0.8511      0.5248
+ 
+Li      14 Isotropic:       82.6785 (ppm)
+Li      14 Anisotropy:      10.3680 (ppm)
+Li      14 Asymmetry:        0.1147
+ 
+============
+Atom: Li      15
+============
+Li      15 Coordinates      2.319    2.954    7.150   A
+ 
+TOTAL Shielding Tensor
+
+              82.9188      0.1076      0.0033
+               0.1335     86.3747      1.1219
+              -0.0057      1.1682     85.9143
+
+Li      15 Eigenvalue  sigma_xx      82.9139 (ppm)
+Li      15 Eigenvector sigma_xx       0.9991     -0.0400      0.0157
+Li      15 Eigenvalue  sigma_yy      84.9795 (ppm)
+Li      15 Eigenvector sigma_yy       0.0374      0.6320     -0.7741
+Li      15 Eigenvalue  sigma_zz      87.3144 (ppm)
+Li      15 Eigenvector sigma_zz       0.0211      0.7739      0.6329
+ 
+Li      15 Isotropic:       85.0693 (ppm)
+Li      15 Anisotropy:       3.3677 (ppm)
+Li      15 Asymmetry:        0.9200
+ 
+============
+Atom: P        1
+============
+P        1 Coordinates      2.317    1.540    9.364   A
+ 
+TOTAL Shielding Tensor
+
+              88.0307      0.5616     -0.3102
+              -0.8163    538.6460      9.5166
+              -0.9033    -60.2425    423.4001
+
+P        1 Eigenvalue  sigma_xx     543.9809 (ppm)
+P        1 Eigenvector sigma_xx       0.0000      0.9786     -0.2058
+P        1 Eigenvalue  sigma_yy     418.0664 (ppm)
+P        1 Eigenvector sigma_yy       0.0019     -0.2058     -0.9786
+P        1 Eigenvalue  sigma_zz      88.0295 (ppm)
+P        1 Eigenvector sigma_zz       1.0000      0.0004      0.0018
+ 
+P        1 Isotropic:      350.0256 (ppm)
+P        1 Anisotropy:    -392.9941 (ppm)
+P        1 Asymmetry:        0.4806
+ 
+============
+Atom: P        2
+============
+P        2 Coordinates      2.304    1.586    5.043   A
+ 
+TOTAL Shielding Tensor
+
+             497.4214     10.8431     12.1101
+               0.6555    418.2117    -66.5221
+               3.6816    -66.2759    585.3259
+
+P        2 Eigenvalue  sigma_xx     394.4152 (ppm)
+P        2 Eigenvector sigma_xx      -0.0778      0.9406      0.3304
+P        2 Eigenvalue  sigma_yy     497.7698 (ppm)
+P        2 Eigenvector sigma_yy       0.9957      0.0900     -0.0216
+P        2 Eigenvalue  sigma_zz     608.7740 (ppm)
+P        2 Eigenvector sigma_zz       0.0500     -0.3273      0.9436
+ 
+P        2 Isotropic:      500.3197 (ppm)
+P        2 Anisotropy:     162.6815 (ppm)
+P        2 Asymmetry:        0.9530
+ 
+============
+Atom: P        3
+============
+P        3 Coordinates      2.328    1.615    0.722   A
+ 
+TOTAL Shielding Tensor
+
+              92.4884      0.5454      1.5352
+              -0.1740    539.9684     11.1545
+              -0.9610    -57.7992    427.4979
+
+P        3 Eigenvalue  sigma_xx     544.6129 (ppm)
+P        3 Eigenvector sigma_xx       0.0003      0.9807     -0.1953
+P        3 Eigenvalue  sigma_yy     422.8538 (ppm)
+P        3 Eigenvector sigma_yy      -0.0010     -0.1953     -0.9807
+P        3 Eigenvalue  sigma_zz      92.4880 (ppm)
+P        3 Eigenvector sigma_zz       1.0000     -0.0005     -0.0009
+ 
+P        3 Isotropic:      353.3182 (ppm)
+P        3 Anisotropy:    -391.2453 (ppm)
+P        3 Asymmetry:        0.4668
+ 
+============
+Atom: P        4
+============
+P        4 Coordinates      4.381    4.634    7.201   A
+ 
+TOTAL Shielding Tensor
+
+             412.7260      8.1275      4.9535
+               0.6317    504.7990     -9.7722
+               1.0610    -48.8977    675.2810
+
+P        4 Eigenvalue  sigma_xx     412.4420 (ppm)
+P        4 Eigenvector sigma_xx       0.9985     -0.0528     -0.0173
+P        4 Eigenvalue  sigma_yy     500.1577 (ppm)
+P        4 Eigenvector sigma_yy       0.0550      0.9849      0.1640
+P        4 Eigenvalue  sigma_zz     680.2063 (ppm)
+P        4 Eigenvector sigma_zz       0.0084     -0.1647      0.9863
+ 
+P        4 Isotropic:      530.9353 (ppm)
+P        4 Anisotropy:     223.9065 (ppm)
+P        4 Asymmetry:        0.5876
+ 
+============
+Atom: P        5
+============
+P        5 Coordinates      4.391    4.591    2.888   A
+ 
+TOTAL Shielding Tensor
+
+             411.3066      8.6465      7.5307
+               0.7150    505.8520     -7.5737
+               1.7508    -45.0276    676.5460
+
+P        5 Eigenvalue  sigma_xx     410.9393 (ppm)
+P        5 Eigenvector sigma_xx       0.9982     -0.0556     -0.0229
+P        5 Eigenvalue  sigma_yy     502.2025 (ppm)
+P        5 Eigenvector sigma_yy       0.0584      0.9874      0.1474
+P        5 Eigenvalue  sigma_zz     680.5628 (ppm)
+P        5 Eigenvector sigma_zz       0.0145     -0.1485      0.9888
+ 
+P        5 Isotropic:      531.2349 (ppm)
+P        5 Anisotropy:     223.9919 (ppm)
+P        5 Asymmetry:        0.6112
+ 
+[/magres_old]
