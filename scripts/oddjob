@@ -25,7 +25,7 @@ class Hive:
             self.prefix = 'node'
         if len(set(self.nodes)) < len(list(self.nodes)):
             print_warning('Skipping duplicate nodes...')
-        self.nodes = set(self.node)
+        self.nodes = set(self.nodes)
 
     def spawn(self):
         """ Spawn processes to perform calculations (borrowed from run3). """
