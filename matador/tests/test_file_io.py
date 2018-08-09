@@ -533,6 +533,37 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(len(od_dict['pdos'][('P', 's')]), 53684)
             self.assertEqual(len(od_dict['pdos'][('P', 'p')]), 53684)
 
+    def testOptadosPDISScraper(self):
+        from matador.scrapers import optados2dict
+        odo_fname = REAL_PATH + 'data/Si2.pdis.dat'
+        failed_open = False
+        try:
+            f = open(odo_fname, 'r')
+        except Exception:
+            failed_open = True
+            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(odo_fname))
+        if not failed_open:
+            f.close()
+            od_dict, s = optados2dict(odo_fname)
+            self.assertTrue(s)
+            self.assertEqual(len(od_dict['kpoints']), 166)
+            self.assertEqual(od_dict['num_kpoints'], 166)
+            self.assertEqual(od_dict['num_bands'], 23)
+            self.assertEqual(od_dict['num_projectors'], 4)
+            self.assertEqual(np.shape(od_dict['pdis']), (166, 23, 4))
+            self.assertEqual(np.shape(od_dict['eigenvalues']), (166, 23))
+            self.assertEqual(od_dict['projectors'][0], ('Si', 's'))
+            self.assertEqual(od_dict['projectors'][1], ('Si', 'p'))
+            self.assertEqual(od_dict['projectors'][2], ('Si', 'd'))
+            self.assertEqual(od_dict['projectors'][3], ('Si', 'f'))
+            self.assertEqual(od_dict['pdis'][0][0][0], 0.99654675)
+            self.assertEqual(od_dict['eigenvalues'][0][0], -12.110537)
+            self.assertEqual(od_dict['eigenvalues'][0][-1], 24.862777)
+            self.assertEqual(od_dict['eigenvalues'][-1][-1], 24.771165)
+            self.assertEqual(od_dict['pdis'][0][0][-1], 0)
+            self.assertEqual(od_dict['pdis'][0][-1][1], 0.028667372)
+            self.assertEqual(od_dict['pdis'][-1][2][1], 0.99444594)
+
     def testBands(self):
         from matador.scrapers.castep_scrapers import bands2dict
         from matador.utils.chem_utils import HARTREE_TO_EV
