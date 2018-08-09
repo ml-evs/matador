@@ -732,7 +732,7 @@ def bands2dict(seed, summary=False, gap=False, external_efermi=None, **kwargs):
 @scraper_function
 def optados2dict(seed, **kwargs):
     """ Scrape optados output file (*.*.dat) or (*.pdos.*.dat)
-    for DOS, projectors and projected DOS.
+    for DOS, projectors and projected DOS/dispersion.
 
     Parameters:
         seed (str/list): optados filename or list of filenames.
@@ -742,111 +742,108 @@ def optados2dict(seed, **kwargs):
             if not, then an error string and False.
 
     """
-    try:
-        import numpy as np
-        optados = dict()
-        is_pdos = False
-        is_spin_dos = False
-        with open(seed, 'r') as f:
-            flines = f.readlines()
+    import numpy as np
+    optados = dict()
+    is_pdos = False
+    is_pdis = False
+    is_spin_dos = False
+    with open(seed, 'r') as f:
+        flines = f.readlines()
 
-        header = []
-        for ind, line in enumerate(flines):
-            if not line.strip().startswith('#') or 'K-point' in line:
-                break
-            if 'Partial' in line:
-                is_pdos = True
-            elif 'spin' in line:
-                is_spin_dos = True
-            elif 'Projected Dispersion' in line:
-                is_pdis = True
-            else:
-                header.append(line)
-
-        flines = flines[ind:]
-
-        if not is_pdis:
-            data = np.loadtxt(seed, comments='#')
-            optados['energies'] = data[:, 0]
-
-        if is_pdos or is_pdis:
-            projectors = []
-            # get pdos labels
-            for ind, line in enumerate(header):
-                if 'Projector:' in line:
-                    # skip current line and column headings
-                    j = 2
-                    elements = []
-                    ang_mom_channels = []
-                    while ind + j + 1 < len(header) and 'Projector:' not in header[ind + j + 1]:
-                        elements.append(header[ind + j].split()[1])
-                        ang_mom_channels.append(header[ind + j].split()[3])
-                        j += 1
-                    projector_label = []
-                    if len(set(elements)) == 1:
-                        projector_label.append(elements[0])
-                    else:
-                        projector_label.append(None)
-
-                    if len(set(ang_mom_channels)) == 1:
-                        projector_label.append(ang_mom_channels[0])
-                    else:
-                        projector_label.append(None)
-
-                    projector_label = tuple(projector_label)
-                    projectors.append(projector_label)
-
-            optados['num_projectors'] = len(projectors)
-            print('Found projectors:', projectors)
-            optados['projectors'] = projectors
-
-        if is_pdos:
-            # get pdos values
-            optados['pdos'] = dict()
-            optados['dos'] = np.zeros_like(data[:, 0])
-            for i, projector in enumerate(projectors):
-                optados['pdos'][projector] = data[:, i + 1]
-                optados['dos'] += data[:, i + 1]
-
-        elif is_spin_dos:
-            optados['spin_dos'] = dict()
-            optados['spin_dos']['up'] = data[:, 1]
-            optados['spin_dos']['down'] = data[:, 2]
-            optados['dos'] = np.abs(optados['spin_dos']['up']) + np.abs(optados['spin_dos']['down'])
-
-        elif is_pdis:
-            optados['pdis'] = []
-            optados['kpoints'] = []
-            optados['eigenvalues'] = []
-            # get kpoints and count number of bands
-            kpt_ind = -1
-            for i, line in enumerate(flines):
-                if 'K-point' in line:
-                    optados['kpoints'].append([float(val) for val in line.split()[-3:]])
-                    if kpt_ind == -1:
-                        kpt_ind = i
-                    else:
-                        if not optados.get('num_bands'):
-                            optados['num_bands'] = i - kpt_ind - 1
-
-            optados['num_kpoints'] = len(optados['kpoints'])
-
-            for nk in range(optados['num_kpoints']):
-                eigs = []
-                pdis = []
-                for nb in range(0, optados['num_bands']):
-                    eigs.append(float(flines[nk*(optados['num_bands']+1) + nb + 1].split()[0]))
-                    pdis.append([float(val) for val in flines[nk*(optados['num_bands']+1) + 1 + nb].split()[1:]])
-                optados['eigenvalues'].append(eigs)
-                optados['pdis'].append(pdis)
-
+    header = []
+    for ind, line in enumerate(flines):
+        if not line.strip().startswith('#') or 'K-point' in line:
+            break
+        if 'Partial' in line:
+            is_pdos = True
+        elif 'spin' in line:
+            is_spin_dos = True
+        elif 'Projected Dispersion' in line:
+            is_pdis = True
         else:
-            optados['dos'] = data[:, 1]
+            header.append(line)
 
-        return optados, True
+    flines = flines[ind:]
 
-    except Exception as err:
-        raise err
+    if not is_pdis:
+        data = np.loadtxt(seed, comments='#')
+        optados['energies'] = data[:, 0]
+
+    if is_pdos or is_pdis:
+        projectors = []
+        # get pdos labels
+        for ind, line in enumerate(header):
+            if 'Projector:' in line:
+                # skip current line and column headings
+                j = 2
+                elements = []
+                ang_mom_channels = []
+                while ind + j + 1 < len(header) and 'Projector:' not in header[ind + j + 1]:
+                    elements.append(header[ind + j].split()[1])
+                    ang_mom_channels.append(header[ind + j].split()[3])
+                    j += 1
+                projector_label = []
+                if len(set(elements)) == 1:
+                    projector_label.append(elements[0])
+                else:
+                    projector_label.append(None)
+
+                if len(set(ang_mom_channels)) == 1:
+                    projector_label.append(ang_mom_channels[0])
+                else:
+                    projector_label.append(None)
+
+                projector_label = tuple(projector_label)
+                projectors.append(projector_label)
+
+        optados['num_projectors'] = len(projectors)
+        print('Found projectors:', projectors)
+        optados['projectors'] = projectors
+
+    if is_pdos:
+        # get pdos values
+        optados['pdos'] = dict()
+        optados['dos'] = np.zeros_like(data[:, 0])
+        for i, projector in enumerate(projectors):
+            optados['pdos'][projector] = data[:, i + 1]
+            optados['dos'] += data[:, i + 1]
+
+    elif is_spin_dos:
+        optados['spin_dos'] = dict()
+        optados['spin_dos']['up'] = data[:, 1]
+        optados['spin_dos']['down'] = data[:, 2]
+        optados['dos'] = np.abs(optados['spin_dos']['up']) + np.abs(optados['spin_dos']['down'])
+
+    elif is_pdis:
+        optados['pdis'] = []
+        optados['kpoints'] = []
+        optados['eigenvalues'] = []
+        # get kpoints and count number of bands
+        kpt_ind = -1
+        for i, line in enumerate(flines):
+            if 'K-point' in line:
+                optados['kpoints'].append([float(val) for val in line.split()[-3:]])
+                if kpt_ind == -1:
+                    kpt_ind = i
+                else:
+                    if not optados.get('num_bands'):
+                        optados['num_bands'] = i - kpt_ind - 1
+
+        optados['num_kpoints'] = len(optados['kpoints'])
+
+        for nk in range(optados['num_kpoints']):
+            eigs = []
+            pdis = []
+            for nb in range(0, optados['num_bands']):
+                eigs.append(float(flines[nk*(optados['num_bands']+1) + nb + 1].split()[0]))
+                pdis.append([float(val) for val in flines[nk*(optados['num_bands']+1) + 1 + nb].split()[1:]])
+            optados['eigenvalues'].append(eigs)
+            optados['pdis'].append(pdis)
+
+    else:
+        optados['dos'] = data[:, 1]
+
+    return optados, True
 
 
 @scraper_function
