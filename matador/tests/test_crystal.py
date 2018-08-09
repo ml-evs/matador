@@ -31,14 +31,14 @@ class CrystalTest(unittest.TestCase):
         print(crystal.get_space_group(symprec=0.001))
 
     def testFromMagres(self):
-        doc, s = magres2dict(REAL_PATH + 'data/NaP.magres')
+        doc, s = magres2dict(REAL_PATH + 'data/NaP_QE6.magres')
         crystal = Crystal(doc)
         for atom in crystal:
             print(atom, atom.magres_shift)
 
     @unittest.skipIf(not imported_vornet, 'Voronoi code not found in this distribution')
     def testCoordination(self):
-        doc, s = magres2dict(REAL_PATH + 'data/NaP.magres')
+        doc, s = magres2dict(REAL_PATH + 'data/NaP_QE6.magres')
         crystal = Crystal(doc, voronoi=True)
         for atom in crystal:
             print(atom, atom.coordination)
@@ -47,15 +47,20 @@ class CrystalTest(unittest.TestCase):
 
     @unittest.skipIf(not imported_vornet, 'Voronoi code not found in this distribution')
     def testVoronoi(self):
-        doc, s = magres2dict(REAL_PATH + 'data/NaP.magres')
+        doc, s = magres2dict(REAL_PATH + 'data/NaP_QE6.magres')
         crystal = Crystal(doc)
         print(crystal.unique_sites)
 
     def testBondLengths(self):
-        doc, s = magres2dict(REAL_PATH + 'data/NaP.magres')
+        doc, s = magres2dict(REAL_PATH + 'data/NaP_QE6.magres')
         crystal = Crystal(doc)
         print(crystal.bond_lengths)
 
+
+# class ElasticCrystalTest(unittest.TestCase):
+    # """ Test the elastic functionality of the Crystal module. """
+    # def testKBulkModulus(self):
+        # raise NotImplementedError
 
 if __name__ == '__main__':
     unittest.main(buffer=False, verbosity=2)
