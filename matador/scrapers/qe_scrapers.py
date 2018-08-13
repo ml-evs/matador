@@ -46,7 +46,7 @@ def pwout2dict(seed):
         pwout['icsd'] = seed.split('CollCode')[-1]
     for ind, line in enumerate(reversed(flines)):
         ind = len(flines) - 1 - ind
-        if 'cell_parameters (angstrom)' in line.lower() and 'lattice_cart' not in pwout:
+        if 'cell_parameters' in line.lower() and 'angstrom' in line.lower() and 'lattice_cart' not in pwout:
             pwout['lattice_cart'] = []
             for j in range(3):
                 line = flines[ind+j+1].strip().split()

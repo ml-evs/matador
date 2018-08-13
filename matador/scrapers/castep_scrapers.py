@@ -907,7 +907,6 @@ def phonon2dict(seed, **kwargs):
     line_offset = ph['num_branches'] * (ph['num_atoms'] + 1) + 3
     for qind in range(ph['num_qpoints']):
         ph['phonon_kpoint_list'].append([float(elem) for elem in data[qind * line_offset].split()[2:]])
-        assert len(ph['phonon_kpoint_list'][-1]) == 4
         for i in range(1, ph['num_branches'] + 1):
             if i == 1:
                 assert data[qind * line_offset + i].split()[0] == '1'
