@@ -17,7 +17,7 @@ for fname in fnames:
     pw_dict['num_atoms'] = len(pw_dict['atom_types'])
     ext = '.' + fname.split('.')[-1]
     if success:
-        doc2res(pw_dict, fname.replace(ext, ''), hash_dupe=True, info=True)
+        doc2res(pw_dict, fname.replace(ext, ''), hash_dupe=True, info=False)
         print_success('Wrote .res file to ' + fname.replace(ext, '') + '.res')
     else:
         print_failure('Unable to find final structure in ' + fname + '.')
