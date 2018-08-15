@@ -75,6 +75,9 @@ def get_concentration(doc, elements):
 
     """
     if isinstance(doc, dict):
+        if doc.get('stoichiometry') is None:
+            raise RuntimeError('No stoichiometry found.')
+
         stoich = doc['stoichiometry']
     else:
         stoich = doc
