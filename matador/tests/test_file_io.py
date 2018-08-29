@@ -563,6 +563,37 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(od_dict['pdis'][0][-1][1], 0.028667372)
             self.assertEqual(od_dict['pdis'][-1][2][1], 0.99444594)
 
+        odo_fname = REAL_PATH + 'data/graphite.pdis.dat'
+        failed_open = False
+        try:
+            f = open(odo_fname, 'r')
+        except Exception:
+            failed_open = True
+            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(odo_fname))
+        if not failed_open:
+            f.close()
+            od_dict, s = optados2dict(odo_fname)
+            self.assertTrue(s)
+            self.assertEqual(len(od_dict['kpoints']), 942)
+            self.assertEqual(od_dict['num_kpoints'], 942)
+            self.assertEqual(od_dict['num_bands'], 30)
+            self.assertEqual(od_dict['num_projectors'], 4)
+            self.assertEqual(np.shape(od_dict['pdis']), (942, 30, 4))
+            self.assertEqual(np.shape(od_dict['eigenvalues']), (942, 30))
+            self.assertEqual(od_dict['projectors'][0], ('C', 's'))
+            self.assertEqual(od_dict['projectors'][1], ('C', 'p'))
+            self.assertEqual(od_dict['projectors'][2], ('C', 'd'))
+            self.assertEqual(od_dict['projectors'][3], ('C', 'f'))
+            self.assertEqual(od_dict['pdis'][29][3][1], 0.85401752)
+            self.assertEqual(od_dict['pdis'][30][3][1], 0.84705066)
+            self.assertEqual(od_dict['pdis'][31][3][1], 0.84004878)
+            self.assertEqual(od_dict['pdis'][32][3][1], 0.83310338)
+            self.assertEqual(od_dict['pdis'][33][3][1], 0.82617687)
+            self.assertEqual(od_dict['pdis'][34][3][1], 0.81927189)
+            self.assertEqual(od_dict['pdis'][35][3][1], 0.81239121)
+            self.assertEqual(od_dict['pdis'][36][3][1], 0.80304369)
+            self.assertEqual(od_dict['pdis'][37][3][1], 0.79613539)
+
     def testBands(self):
         from matador.scrapers.castep_scrapers import bands2dict
         from matador.utils.chem_utils import HARTREE_TO_EV
