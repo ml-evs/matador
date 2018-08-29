@@ -218,7 +218,7 @@ def plot_2d_hull(hull, ax=None, show=False, plot_points=True,
                 colours.append(colour_choices[source])
             zorders.append(sources.index(source))
             concs.append(doc['concentration'])
-            energies.append(doc['formation_enthalpy_per_atom'])
+            energies.append(doc[f'formation_{hull._energy_key}'])
 
         alpha = kwargs.get('alpha')
         if alpha is None:
@@ -440,7 +440,7 @@ def plot_ternary_hull(hull, axis=None, show=False, plot_points=True, hull_cutoff
             capacities[(i, j, k)] = get_generic_grav_capacity([
                 float(i) / scale, float(j) / scale, float(scale - i - j) / scale
             ], hull.elements)
-        ax.heatmap(capacities, style="hexagonal", cbarlabel='Gravimetric capacity (maH/g)',
+        ax.heatmap(capacities, style="hexagonal", cbarlabel='Gravimetric capacity (mAh/g)',
                    vmin=0, vmax=3000, cmap=pastel_cmap)
     elif hull.args.get('efmap'):
         energies = dict()
