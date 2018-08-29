@@ -918,7 +918,7 @@ class DBQuery:
             else:
                 xc_functional = self.args.get('xc_functional')
         if xc_functional is not None:
-            query_dict['xc_functional'] = xc_functional.upper()
+            query_dict['xc_functional'] = xc_functional
         return query_dict
 
     def _query_spin(self):
