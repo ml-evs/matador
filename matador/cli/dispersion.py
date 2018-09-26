@@ -34,6 +34,8 @@ def main():
                         help='matplotlib colourmap name to use')
     parser.add_argument('--n_colours', type=int,
                         help='number of colours to use from colourmap (DEFAULT: 6)')
+    parser.add_argument('--spin_only', type=str,
+                        help='either "up" or "down" to only plot one channel')
     parser.add_argument('--no_stacked_pdos', action='store_true',
                         help='plot PDOS as overlap rather than stack')
     parser.add_argument('--no_band_reorder', action='store_true',
