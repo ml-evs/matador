@@ -1,0 +1,21 @@
+#!/usr/bin/env python
+# coding: utf-8
+from ase.io import read
+from matador.export import doc2res
+from matador.utils.print_utils import print_notify, print_success, print_failure
+from matador.utils.ase_utils import ase2dict
+from sys import argv
+
+fnames = argv[1:]
+for fname in fnames:
+    print_notify('Reading ' + fname)
+    atoms = read(fname)
+    doc, success = ase2dict(atoms)
+    if success:
+        doc2res(doc, fname.replace('.cif', '.res'), spoof_titl=True)
+        print_success('Wrote .res file to ' + fname.replace('.cif', '') + '.res')
+    else:
+        print(doc)
+        print_failure('Unable to read structure in ' + fname + '.')
+
+print_success('Completed!')
