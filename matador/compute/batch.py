@@ -298,7 +298,8 @@ class BatchRun:
         if not cell_success:
             print(self.cell_dict)
             raise SystemExit('Failed to parse cell file')
-        self.param_dict, param_success = param2dict(self.seed + '.param', db=False)
+        if not self.args.get('custom_params'):
+            self.param_dict, param_success = param2dict(self.seed + '.param', db=False)
         if not param_success:
             print(self.param_dict)
             raise SystemExit('Failed to parse param file')
