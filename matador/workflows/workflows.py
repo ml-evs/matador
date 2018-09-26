@@ -54,7 +54,13 @@ class Workflow:
         logging.info('Performing Workflow of type {} on {}'.format(self.label, self.seed))
 
         self.preprocess()
-        self.run_steps()
+        try:
+            self.run_steps()
+        except RuntimeError as exc:
+            logging.critical('Workflow failed: calling postprocess()')
+            self.postprocess()
+            raise exc
+
         self.postprocess()
 
     @abc.abstractmethod

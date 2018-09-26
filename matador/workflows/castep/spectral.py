@@ -46,29 +46,6 @@ def castep_full_spectral(relaxer, calc_doc, seed):
     return workflow.success
 
 
-def castep_projected_bandstructure(relaxer, calc_doc, seed):
-    """ Perform a "full" spectral calculation on a system, i.e. first
-    perform an SCF then interpolate to different kpoint paths/grids to
-    form DOS and dispersions. Optionally use OptaDOS for post-processing
-    of DOS.
-
-    Parameters:
-        relaxer (:obj:`FullRelaxer`): the object that will be calling CASTEP.
-        calc_doc (dict): dictionary of structure and calculation
-            parameters.
-        seed (str): root seed for the calculation.
-
-    Raises:
-        RuntimeError: if any part of the calculation fails.
-
-    Returns:
-        bool: True if Workflow completed successfully, or False otherwise.
-
-    """
-    workflow = CastepProjectedBandstructureWorkflow(relaxer, calc_doc, seed)
-    return workflow.success
-
-
 class CastepSpectralWorkflow(Workflow):
     """ Perform a "full" spectral calculation on a system, i.e. first
     perform an SCF then interpolate to different kpoint paths/grids to
@@ -102,11 +79,6 @@ class CastepSpectralWorkflow(Workflow):
         if 'spectral_kpoints_mp_spacing' in self.calc_doc:
             todo['dos'] = True
 
-        # prepare to do scf if there's no check file
-        if os.path.isfile(self.seed + '.check'):
-            todo['scf'] = False
-            logging.info('Restarting from {}.check, so not performing initial SCF'.format(self.seed))
-
         for key in todo:
             if todo[key]:
                 self.add_step(steps[key], key)
@@ -118,66 +90,10 @@ class CastepSpectralWorkflow(Workflow):
             self.calc_doc, self.calc_doc.get('spectral_kpoints_path_spacing', 0.02))
         self.calc_doc.update(prim_doc)
         self.calc_doc['lattice_abc'] = cart2abc(self.calc_doc['lattice_cart'])
+        self.calc_doc['continuation'] = 'default'
 
         if todo['dispersion']:
             self.calc_doc['spectral_kpoints_list'] = kpt_path
-
-        logging.info('Preprocessing completed: run3 spectral options {}'.format(todo))
-
-
-class CastepProjectedBandstructureWorkflow(Workflow):
-    """ Perform a projected bandstructure on a system. This is achieved
-    in multiple steps. First perform an SCF, then interpolate to different
-    kpoints along a paths one by one, running OptaDOS on the results of each,
-    accumulating the results.
-
-    Attributes:
-        relaxer (:obj:`FullRelaxer`): the object that calls CASTEP.
-        calc_doc (dict): the interim dictionary of structural and
-            calculation parameters.
-        seed (str): the root seed for the calculation.
-        success (bool): the status of the Workflow: only set to True after
-            post-processing method completes.
-
-    """
-    def preprocess(self):
-        """ Decide which parts of the Workflow need to be performed,
-        and set the appropriate CASTEP parameters.
-
-        """
-        # default todo
-        todo = {'scf': True, 'dispersion': False}
-        # definition of steps and names
-        steps = {'scf': castep_spectral_scf,
-                 'dispersion': castep_spectral_projected_dispersion}
-
-        if (('spectral_kpoints_path' not in self.calc_doc and 'spectral_kpoints_list' not in self.calc_doc) and
-                'spectral_kpoints_path_spacing' in self.calc_doc):
-            todo['dispersion'] = True
-        if 'spectral_kpoints_mp_spacing' in self.calc_doc:
-            todo['dos'] = True
-
-        # prepare to do scf if there's no check file
-        if os.path.isfile(self.seed + '.check'):
-            todo['scf'] = False
-            logging.info('Restarting from {}.check, so not performing initial SCF'.format(self.seed))
-
-        # always reduce cell to primitivve and standardise the cell so that any
-        # post-processing performed after the fact will be consistent
-        from matador.utils.cell_utils import cart2abc
-        prim_doc, kpt_path = self.relaxer.get_seekpath_compliant_input(
-            self.calc_doc, self.calc_doc.get('spectral_kpoints_path_spacing', 0.02))
-        self.calc_doc.update(prim_doc)
-        self.calc_doc['lattice_abc'] = cart2abc(self.calc_doc['lattice_cart'])
-
-        if todo['dispersion']:
-            self.calc_doc['spectral_kpoints_list'] = kpt_path
-
-        if todo['scf']:
-            self.add_step(steps['scf'], 'scf')
-
-        if todo['dispersion']:
-            self.add_step(steps['dispersion'], 'projected_dispersion')
 
         logging.info('Preprocessing completed: run3 spectral options {}'.format(todo))
 
@@ -195,6 +111,8 @@ def castep_spectral_scf(relaxer, calc_doc, seed):
     scf_doc = copy.deepcopy(calc_doc)
     scf_doc['write_checkpoint'] = 'ALL'
     scf_doc['task'] = 'singlepoint'
+    if 'spectral_task' in scf_doc:
+        del scf_doc['spectral_task']
 
     required = []
     forbidden = ['spectral_task',
@@ -220,19 +138,12 @@ def castep_spectral_dos(relaxer, calc_doc, seed):
     """
     logging.info('Performing CASTEP spectral DOS calculation...')
 
-    if len(glob.glob('*.odi')) == 1:
-        odi_fname = glob.glob('*.odi')[0]
-        optados = True
-        logging.info('Detected single .odi file for OptaDOS post-processing.')
-    else:
-        optados = False
-        logging.info('Detected {} .odi files; not performing OptaDOS post-processing.'.format(len(glob.glob('*.odi'))))
-
     dos_doc = copy.deepcopy(calc_doc)
     dos_doc['task'] = 'spectral'
     dos_doc['spectral_task'] = 'dos'
-    if optados:
-        dos_doc['pdos_calculate_weights'] = True
+    # disable checkpointing for BS/DOS by default, leaving just SCF
+    dos_doc['write_checkpoint'] = 'none'
+    dos_doc['pdos_calculate_weights'] = True
 
     required = ['spectral_kpoints_mp_spacing']
     forbidden = ['spectral_kpoints_list',
@@ -243,24 +154,67 @@ def castep_spectral_dos(relaxer, calc_doc, seed):
 
     success = relaxer.scf(dos_doc, seed, keep=True, intermediate=True)
 
-    if optados:
-        shutil.copy(odi_fname, seed + '.odi')
-    logging.info('Performing OptaDOS smearing calculation with parameters from {}'.format(odi_fname))
-    _cache_executable = copy.deepcopy(relaxer.executable)
-    relaxer.executable = 'optados'
-    relaxer.parse_executable(seed)
-    try:
-        success = relaxer.run_generic(seed, intermediate=True)
-    except Exception as exc:
+    from matador.scrapers import arbitrary2dict
+    from matador.export import doc2arbitrary
+
+    odi_fname = None
+    if os.path.isfile(seed + '.odi'):
+        os.remove(seed + '.odi')
+
+    if glob.glob('*.odi'):
+        # dodginess: choose the odi file with the shortest name...
+        shortest_fname = None
+        for fname in glob.glob('*.odi'):
+            if shortest_fname is None or len(fname) < len(shortest_fname):
+                shortest_fname = fname
+        odi_fname = shortest_fname
+
+    if odi_fname is not None:
+        odi_dict, _ = arbitrary2dict(odi_fname)
+        _cache_executable = copy.deepcopy(relaxer.executable)
+        _cache_core = copy.deepcopy(relaxer.ncores)
+        relaxer.ncores = 1
+        relaxer.executable = 'optados'
+        relaxer.parse_executable(seed)
+
+        odi_dict['task'] = 'pdos'
+        if 'pdispersion' in odi_dict:
+            del odi_dict['pdispersion']
+
+        logging.info('Performing OptaDOS pDOS calculation with parameters from {}'.format(odi_fname))
+        doc2arbitrary(odi_dict, seed + '.odi', overwrite=True)
+
+        try:
+            success = relaxer.run_generic(seed, intermediate=True)
+        except Exception as exc:
+            relaxer.executable = _cache_executable
+            raise exc
+
+        odi_dict['task'] = 'dos'
+        if 'pdos' in odi_dict:
+            del odi_dict['pdos']
+        if 'pdispersion' in odi_dict:
+            del odi_dict['pdispersion']
+
+        logging.info('Performing OptaDOS DOS calculation with parameters from {}'.format(odi_fname))
+        doc2arbitrary(odi_dict, seed + '.odi', overwrite=True)
+
+        try:
+            success = relaxer.run_generic(seed, intermediate=True)
+        except Exception as exc:
+            relaxer.executable = _cache_executable
+            relaxer.ncores = _cache_core
+            raise exc
+
         relaxer.executable = _cache_executable
-        raise exc
-    relaxer.executable = _cache_executable
+        relaxer.ncores = _cache_core
 
     return success
 
 
 def castep_spectral_dispersion(relaxer, calc_doc, seed):
-    """ Runs a dispersion interpolation on top of a completed SCF calculation.
+    """ Runs a dispersion interpolation on top of a completed SCF calculation,
+    optionally running orbitals2bands and OptaDOS projected dispersion.
 
     Parameters:
         relaxer (:obj:`FullRelaxer`): the object that will be calling CASTEP.
@@ -273,37 +227,10 @@ def castep_spectral_dispersion(relaxer, calc_doc, seed):
     disp_doc['task'] = 'spectral'
     disp_doc['spectral_task'] = 'bandstructure'
 
-    required = ['spectral_kpoints_list']
-    forbidden = ['spectral_kpoints_mp_spacing',
-                 'spectral_kpoints_path',
-                 'spectral_kpoints_path_spacing']
-
-    relaxer.validate_calc_doc(disp_doc, required, forbidden)
-
-    return relaxer.scf(disp_doc, seed, keep=True, intermediate=True)
-
-
-def castep_spectral_projected_dispersion(relaxer, calc_doc, seed, kpoint=None):
-    """ Runs a non-scf interpolation calculation on a single kpoint, as if it
-    were a DOS, then calls OptaDOS on the result to project it onto the desired
-    orbitals/elements.
-
-    Parameters:
-        relaxer (:obj:`FullRelaxer`): the object that will be calling CASTEP.
-        calc_doc (dict): the structure to run on.
-        seed (str): root filename of structure.
-
-    Keyword arguments:
-        kpoint (:obj:`list` of :obj:`float`): the kpoint to run the projection for.
-
-    """
-    logging.info('Performing CASTEP projected dispersion calculation on kpoint = {}.'.format(kpoint))
-    disp_doc = copy.deepcopy(calc_doc)
-    disp_doc['task'] = 'spectral'
-    disp_doc['spectral_task'] = 'bandstructure'
+    # disable checkpointing for BS/DOS by default, leaving just SCF
+    disp_doc['write_checkpoint'] = 'none'
     disp_doc['pdos_calculate_weights'] = True
     disp_doc['continuation'] = 'default'
-    # disp_doc['spectral_kpoints_list'] = [kpoint]
 
     required = ['spectral_kpoints_list']
     forbidden = ['spectral_kpoints_mp_spacing',
@@ -311,26 +238,64 @@ def castep_spectral_projected_dispersion(relaxer, calc_doc, seed, kpoint=None):
                  'spectral_kpoints_path_spacing']
 
     relaxer.validate_calc_doc(disp_doc, required, forbidden)
-
     success = relaxer.scf(disp_doc, seed, keep=True, intermediate=True)
 
-    if not os.path.isfile(seed + '.odi'):
-        odi_fname = glob.glob('*.odi')[0]
-        shutil.copy(odi_fname, seed + '.odi')
-        logging.info('Performing OptaDOS PDOS calculation with parameters from {}'.format(odi_fname))
+    if disp_doc.get('write_orbitals'):
+        logging.info('Planning to call orbitals2bands...')
+        if os.path.isfile(f'{seed}.bands'):
+            shutil.copy2(f'{seed}.bands', f'{seed}.bands_orig')
 
-    _cache_executable = copy.deepcopy(relaxer.executable)
-    _cache_core = copy.deepcopy(relaxer.ncores)
+        _cache_executable = copy.deepcopy(relaxer.executable)
+        _cache_core = copy.deepcopy(relaxer.ncores)
+        relaxer.ncores = 1
+        relaxer.executable = 'orbitals2bands'
+        try:
+            success = relaxer.run_generic(seed, intermediate=True)
+        except Exception as exc:
+            relaxer.executable = _cache_executable
+            relaxer.ncores = _cache_core
+            raise exc
 
-    relaxer.ncores = 1
-    relaxer.executable = 'optados'
-    try:
-        success = relaxer.run_generic(seed, intermediate=True)
-    except Exception as exc:
+        relaxer.ncores = _cache_core
         relaxer.executable = _cache_executable
-        raise exc
 
-    relaxer.ncores = _cache_core
-    relaxer.executable = _cache_executable
+    from matador.scrapers import arbitrary2dict
+    from matador.export import doc2arbitrary
+
+    odi_fname = None
+    if os.path.isfile(seed + '.odi'):
+        os.remove(seed + '.odi')
+
+    if glob.glob('*.odi'):
+        # dodginess: choose the odi file with the shortest name...
+        shortest_fname = None
+        for fname in glob.glob('*.odi'):
+            if shortest_fname is None or len(fname) < len(shortest_fname):
+                shortest_fname = fname
+        odi_fname = shortest_fname
+
+    if odi_fname is not None:
+        odi_dict, _ = arbitrary2dict(odi_fname)
+        odi_dict['task'] = 'pdispersion'
+        if 'pdos' in odi_dict:
+            del odi_dict['pdos']
+        logging.info('Performing OptaDOS PDIS calculation with parameters from {}'.format(odi_fname))
+
+        doc2arbitrary(odi_dict, seed + '.odi', overwrite=True)
+
+        _cache_executable = copy.deepcopy(relaxer.executable)
+        _cache_core = copy.deepcopy(relaxer.ncores)
+
+        relaxer.ncores = 1
+        relaxer.executable = 'optados'
+        try:
+            success = relaxer.run_generic(seed, intermediate=True)
+        except Exception as exc:
+            relaxer.executable = _cache_executable
+            relaxer.ncores = _cache_core
+            raise exc
+
+        relaxer.ncores = _cache_core
+        relaxer.executable = _cache_executable
 
     return success
