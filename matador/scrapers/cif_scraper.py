@@ -258,14 +258,9 @@ def _ase_cif2dict(fname):
 
     """
     import ase.io
-    from matador.utils.cell_utils import cart2abc
+    from matador.utils.ase_utils import ase2dict
     fname = fname.replace('.cif', '')
     atoms = ase.io.read(fname + '.cif')
-    doc = dict()
-    doc['atom_types'] = atoms.get_chemical_symbols()
-    doc['lattice_cart'] = atoms.get_cell()
-    doc['lattice_abc'] = cart2abc(doc['lattice_cart'])
-    doc['positions_frac'] = atoms.get_scaled_positions()
-    doc['num_atoms'] = len(doc['atom_types'])
+    doc = ase2dict(atoms)
 
     return doc, True
