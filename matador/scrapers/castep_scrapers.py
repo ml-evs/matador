@@ -599,32 +599,11 @@ def bands2dict(seed, summary=False, gap=False, external_efermi=None, **kwargs):
     bs['eigenvalues_k_s'] *= HARTREE_TO_EV
     bs['eigenvalues_k_s'] -= bs['fermi_energy']
 
-    cart_kpts = np.asarray(frac2cart(real2recip(bs['lattice_cart']), bs['kpoint_path']))
-    bs['cart_kpoints'] = cart_kpts
-    kpts_diff = np.zeros((len(cart_kpts) - 1))
-    kpts_diff_set = set()
-    for i in range(len(cart_kpts) - 1):
-        kpts_diff[i] = np.sqrt(np.sum((cart_kpts[i] - cart_kpts[i + 1])**2))
-        kpts_diff_set.add(kpts_diff[i])
-    bs['kpoint_path_spacing'] = np.median(kpts_diff)
-
     # create list containing kpoint indices of discontinuous branches through k-space
-    bs['kpoint_branches'] = []
-    current_branch = []
-    for ind, point in enumerate(cart_kpts):
-        if ind == 0:
-            current_branch.append(ind)
-        elif ind == len(cart_kpts) - 1:
-            bs['kpoint_branches'].append(current_branch)
-            continue
+    bs['kpoints_cartesian'] = np.asarray(frac2cart(real2recip(bs['lattice_cart']), bs['kpoint_path']))
+    bs['kpoint_branches'], bs['kpoint_path_spacing'] = get_kpt_branches(bs['kpoints_cartesian'])
 
-        if np.sqrt(np.sum((point - cart_kpts[ind + 1])**2)) < 10 * bs['kpoint_path_spacing']:
-            current_branch.append(ind + 1)
-        else:
-            bs['kpoint_branches'].append(current_branch)
-            current_branch = [ind + 1]
     assert sum([len(branch) for branch in bs['kpoint_branches']]) == bs['num_kpoints']
-
     if verbosity > 2:
         print('Found branch structure', [(branch[0], branch[-1]) for branch in bs['kpoint_branches']])
 
@@ -730,6 +709,34 @@ def bands2dict(seed, summary=False, gap=False, external_efermi=None, **kwargs):
 
 
 @scraper_function
+def arbitrary2dict(seed, **kwargs):
+    """ Read arbitrary CASTEP-style input files into
+    a dictionary.
+
+    Parameters:
+        seed (str/list): filename or list of filenames.
+
+    Returns:
+        (dict/str, bool): if successful, a dictionary containing scraped data and True,
+            if not, then an error string and False.
+
+    """
+    with open(seed, 'r') as f:
+        flines = f.readlines()
+    splitters = [':', '=', '\t', ' ']
+    result = {}
+    for line in flines:
+        for splitter in splitters:
+            if splitter in line:
+                keyword = line.split(splitter)[0].strip()
+                value = line.split(splitter)[-1].strip()
+                result[keyword.lower()] = value
+                break
+
+    return result, True
+
+
+@scraper_function
 def optados2dict(seed, **kwargs):
     """ Scrape optados output file (*.*.dat) or (*.pdos.*.dat)
     for DOS, projectors and projected DOS/dispersion.
@@ -803,10 +810,10 @@ def optados2dict(seed, **kwargs):
     if is_pdos:
         # get pdos values
         optados['pdos'] = dict()
-        optados['dos'] = np.zeros_like(data[:, 0])
+        optados['sum_dos'] = np.zeros_like(data[:, 0])
         for i, projector in enumerate(projectors):
             optados['pdos'][projector] = data[:, i + 1]
-            optados['dos'] += data[:, i + 1]
+            optados['sum_dos'] += data[:, i + 1]
 
     elif is_spin_dos:
         optados['spin_dos'] = dict()
@@ -1583,3 +1590,39 @@ def _castep_scrape_all_snapshots(flines):
             raise RuntimeError(msg)
 
     return intermediates, num_opt_steps
+
+
+def get_kpt_branches(cart_kpts):
+    """ Separate a kpoint path into discontinuous branches, returning
+    the indices of the branches and the estimated kpoint spacing.
+
+    Parameters:
+        cart_kpts (list or np.ndarray): list of kpoints in Cartesian coordinates.
+
+    Returns:
+        list: list of lists containing branches of continous kpoint indices.
+        float: estimated kpoint spacing.
+
+    """
+    import numpy as np
+    kpt_branches = []
+    kpts_diff = np.zeros((len(cart_kpts) - 1))
+    kpts_diff_set = set()
+    for i in range(len(cart_kpts) - 1):
+        kpts_diff[i] = np.sqrt(np.sum((cart_kpts[i] - cart_kpts[i + 1])**2))
+        kpts_diff_set.add(kpts_diff[i])
+    kpt_spacing = np.median(kpts_diff)
+    current_branch = []
+    for ind, point in enumerate(cart_kpts):
+        if ind == 0:
+            current_branch.append(ind)
+        elif ind == len(cart_kpts) - 1:
+            kpt_branches.append(current_branch)
+            continue
+
+        if np.sqrt(np.sum((point - cart_kpts[ind + 1])**2)) < 10 * kpt_spacing:
+            current_branch.append(ind + 1)
+        else:
+            kpt_branches.append(current_branch)
+            current_branch = [ind + 1]
+    return kpt_branches, kpt_spacing
