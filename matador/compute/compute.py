@@ -23,7 +23,7 @@ from matador.scrapers.castep_scrapers import cell2dict
 from matador.scrapers.castep_scrapers import res2dict, castep2dict
 from matador.export import doc2cell, doc2param, doc2res
 
-MATADOR_CUSTOM_TASKS = ['bulk_modulus', 'projected_bandstructure']
+MATADOR_CUSTOM_TASKS = ['bulk_modulus', 'projected_bandstructure', 'pdispersion', 'all']
 
 
 class FullRelaxer:
@@ -333,12 +333,8 @@ class FullRelaxer:
             success = castep_full_phonon(self, calc_doc, self.seed)
 
         elif calc_doc['task'].upper() in ['SPECTRAL']:
-            if calc_doc.get('spectral_task').upper() in ['PROJECTED_BANDSTRUCTURE']:
-                from matador.workflows.castep.spectral import castep_projected_bandstructure
-                success = castep_projected_bandstructure(self, calc_doc, self.seed)
-            else:
-                from matador.workflows.castep import castep_full_spectral
-                success = castep_full_spectral(self, calc_doc, self.seed)
+            from matador.workflows.castep import castep_full_spectral
+            success = castep_full_spectral(self, calc_doc, self.seed)
 
         elif calc_doc['task'].upper() in ['BULK_MODULUS']:
             from matador.workflows.castep import castep_elastic
@@ -1005,7 +1001,7 @@ class FullRelaxer:
             logging.info('Moving files to bad_castep: {bad}.'.format(bad=bad_dir))
             if not os.path.exists(bad_dir):
                 os.makedirs(bad_dir, exist_ok=True)
-            seed_files = glob.glob(seed + '.*')
+            seed_files = glob.glob(seed + '.*') + glob.glob(seed + '-out.cell')
             if seed_files:
                 logging.debug('Files to move: {seed}'.format(seed=seed_files))
                 for _file in seed_files:
@@ -1016,7 +1012,7 @@ class FullRelaxer:
                         logging.warning('Error moving files to bad: {error}'.format(error=exc))
             # check root folder for any matching files and remove them
             fname = '{}/{}'.format(self.root_folder, seed)
-            for ext in ['.res', '.res.lock', '.castep']:
+            for ext in ['.res', '.res.lock', '.castep', '-out.cell']:
                 if os.path.isfile('{}{}'.format(fname, ext)):
                     os.remove('{}{}'.format(fname, ext))
         except Exception as exc:
@@ -1033,14 +1029,13 @@ class FullRelaxer:
             completed_dir (str): folder for completed jobs.
             keep (bool): whether to also move intermediate files.
 
-
         """
         completed_dir = self.root_folder + '/' + completed_dir
         logging.info('Moving files to completed: {completed}.'.format(completed=completed_dir))
         if not os.path.exists(completed_dir):
             os.makedirs(completed_dir, exist_ok=True)
         if keep:
-            seed_files = glob.glob(seed + '.*') + [seed + '-out.cell']
+            seed_files = glob.glob(seed + '.*') + glob.glob(seed + '-out.cell')
             if seed_files:
                 logging.debug('Files to move: {files}.'.format(files=seed_files))
                 for _file in seed_files:
@@ -1052,7 +1047,7 @@ class FullRelaxer:
                 file_exts.append('.param')
             if not self.conv_kpt_bool and not self.conv_cutoff_bool:
                 file_exts.append('.res')
-            if self.calc_doc.get('write_cell_structure'):
+            if os.isfile(seed + '-out.cell'):
                 file_exts.append('-out.cell')
             if self.calc_doc.get('write_formatted_density'):
                 file_exts.append('.den_fmt')
