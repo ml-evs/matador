@@ -607,7 +607,7 @@ class ScrapeTest(unittest.TestCase):
         if not failed_open:
             f.close()
             bs_dict, s = bands2dict(bands_fname, gap=True)
-            self.assertTrue(s)
+            self.assertTrue(s, msg=bs_dict)
             self.assertEqual(len(bs_dict['kpoint_path']), 518)
             self.assertEqual(np.shape(bs_dict['eigenvalues_k_s']), (1, 71, 518))
             self.assertEqual(bs_dict['num_kpoints'], 518)

@@ -656,7 +656,7 @@ def bands2dict(seed, summary=False, gap=False, external_efermi=None, **kwargs):
             bs['band_gap'] = cbm - vbm
             bs['band_gap_path'] = [bs['kpoint_path'][cbm_pos], bs['kpoint_path'][vbm_pos]]
             bs['band_gap_path_inds'] = [cbm_pos, vbm_pos]
-            bs['gap_momentum'] = np.sqrt(np.sum((bs['cart_kpoints'][cbm_pos] - bs['cart_kpoints'][vbm_pos])**2))
+            bs['gap_momentum'] = np.sqrt(np.sum((bs['kpoints_cartesian'][cbm_pos] - bs['kpoints_cartesian'][vbm_pos])**2))
 
             # calculate direct gap
             direct_gaps = np.zeros((len(bs['kpoint_path'])))
@@ -688,7 +688,7 @@ def bands2dict(seed, summary=False, gap=False, external_efermi=None, **kwargs):
             cbm_pos = bs['direct_gap_path_inds'][0]
             vbm_pos = bs['direct_gap_path_inds'][1]
             bs['band_gap_path'] = bs['direct_gap_path']
-            bs['gap_momentum'] = np.sqrt(np.sum((bs['cart_kpoints'][cbm_pos] - bs['cart_kpoints'][vbm_pos])**2))
+            bs['gap_momentum'] = np.sqrt(np.sum((bs['kpoints_cartesian'][cbm_pos] - bs['kpoints_cartesian'][vbm_pos])**2))
             assert bs['gap_momentum'] == 0
 
         if summary:
