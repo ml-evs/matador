@@ -810,10 +810,10 @@ def optados2dict(seed, **kwargs):
     if is_pdos:
         # get pdos values
         optados['pdos'] = dict()
-        optados['sum_dos'] = np.zeros_like(data[:, 0])
+        optados['sum_pdos'] = np.zeros_like(data[:, 0])
         for i, projector in enumerate(projectors):
             optados['pdos'][projector] = data[:, i + 1]
-            optados['sum_dos'] += data[:, i + 1]
+            optados['sum_pdos'] += data[:, i + 1]
 
     elif is_spin_dos:
         optados['spin_dos'] = dict()

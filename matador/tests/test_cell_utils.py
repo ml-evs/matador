@@ -279,9 +279,9 @@ class SymmetriesAndSupercellsTest(unittest.TestCase):
                 bs, s = bands2dict(fname.replace('.res', '.bands'))
                 np.testing.assert_array_almost_equal(bs['kpoint_path'], rel_path)
                 np.testing.assert_array_almost_equal(bs['lattice_cart'], std_doc['lattice_cart'])
-                np.testing.assert_array_almost_equal(bs['cart_kpoints'], abs_path)
-                for ind, kpt in enumerate(bs['cart_kpoints'][:-1]):
-                    diffs[ind] = np.sqrt(np.sum((kpt - bs['cart_kpoints'][ind + 1])**2))
+                np.testing.assert_array_almost_equal(bs['kpoints_cartesian'], abs_path)
+                for ind, kpt in enumerate(bs['kpoints_cartesian'][:-1]):
+                    diffs[ind] = np.sqrt(np.sum((kpt - bs['kpoints_cartesian'][ind + 1])**2))
             self.assertLess(len(np.where(diffs > 1.1 * spacing)[0]), len(seekpath_results['explicit_segments']))
 
             cell_path = fname.replace('.res', '.cell')
@@ -312,7 +312,6 @@ class SymmetriesAndSupercellsTest(unittest.TestCase):
             std_doc = standardize_doc_cell(doc)
             dist = pdf_sim_dist(doc, std_doc)
             self.assertLess(dist, 0.01)
-
 
 
 def pdf_sim_dist(doc_test, doc_supercell):

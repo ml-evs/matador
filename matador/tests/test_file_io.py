@@ -524,7 +524,7 @@ class ScrapeTest(unittest.TestCase):
             f.close()
             od_dict, s = optados2dict(odo_fname)
             self.assertTrue(s)
-            self.assertEqual(len(od_dict['dos']), 53684)
+            self.assertEqual(len(od_dict['sum_pdos']), 53684)
             self.assertEqual(len(od_dict['energies']), 53684)
             self.assertEqual(od_dict['num_projectors'], 4)
             self.assertEqual(len(od_dict['pdos'][('K', 's')]), 53684)
