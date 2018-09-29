@@ -281,11 +281,14 @@ class FullRelaxer:
         calc_doc.update(self.param_dict)
 
         # check for pseudos
+        pspot_libs = ['C7', 'C8', 'C9', 'C17', 'C18', 'MS', 'HARD',
+                      'QC5', 'NCP', 'NCP18', 'NCP17', 'NCP9']
         if 'library' not in calc_doc['species_pot']:
             for elem in self.res_dict['stoichiometry']:
                 if ('|' not in calc_doc['species_pot'][elem[0]] and
-                        not os.path.isfile(os.path.expanduser(calc_doc['species_pot'][elem[0]]))):
-                    msg = 'Unable to find pseudopotential file/string: {}'.format(calc_doc['species_pot'][elem[0]])
+                        not os.path.isfile(os.path.expanduser(calc_doc['species_pot'][elem[0]])) and
+                        calc_doc['species_pot'][elem[0]] not in pspot_libs):
+                    msg = 'Unable to find pseudopotential file/string/library: {}'.format(calc_doc['species_pot'][elem[0]])
                     logging.critical(msg)
                     raise SystemExit(msg)
 
