@@ -6,7 +6,6 @@ documents or Crystal objects.
 """
 
 import os
-import sys
 from traceback import print_exc
 
 import numpy as np
@@ -245,7 +244,7 @@ def doc2param(doc, *args, spin=False, **kwargs):
         try:
             from implicit_cnts import implicit_cnt_params
         except ImportError:
-            sys.exit('Failed to import implicit_cnt_params, please ensure pyairss is on your PYTHONPATH!')
+            raise ImportError('Failed to import implicit_cnt_params, please ensure pyairss is on your PYTHONPATH!')
         cnt_params = implicit_cnt_params(doc['cnt_radius'])
         flines.append('%BLOCK DEVEL_CODE')
         flines.append('ADD_EXT_LOCPOT: \"gaussian_cylinder\"')

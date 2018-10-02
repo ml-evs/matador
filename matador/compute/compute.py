@@ -574,6 +574,7 @@ class FullRelaxer:
 
             if not self.custom_params:
                 doc2param(calc_doc, seed, hash_dupe=False, overwrite=True)
+
             doc2cell(calc_doc, seed, hash_dupe=False, copy_pspots=False, overwrite=True)
 
             # run CASTEP
@@ -1113,6 +1114,9 @@ class FullRelaxer:
             for pspot in pspots:
                 shutil.copy(pspot, self.compute_dir)
 
+            if self.custom_params:
+                shutil.copy(self.seed + '.param', self.compute_dir)
+
         # update res file with intermediate calculation if castep file is newer than res
         if os.path.isfile(self.seed + '.castep') and os.path.isfile(self.seed + '.res'):
             logging.info('Trying to update res file with result from intermediate CASTEP file found in root_dir')
@@ -1188,7 +1192,7 @@ class FullRelaxer:
         if not self.custom_params:
             if os.path.isfile(self.seed + '.param'):
                 os.remove(self.seed + '.param')
-        doc2param(calc_doc, self.seed, hash_dupe=False, spin=self.spin)
+            doc2param(calc_doc, self.seed, hash_dupe=False, spin=self.spin)
 
     @staticmethod
     def tidy_up(seed):
