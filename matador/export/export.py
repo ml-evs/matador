@@ -32,9 +32,9 @@ def file_writer_function(function):
                 print('File name already exists, generating hash...')
                 req_ext = ''
                 for ext in known_types:
-                    if path.endswith(f'.{ext}'):
+                    if path.endswith('.{}'.format(ext)):
                         req_ext = ext
-                        path.replace(f'.{ext}', '')
+                        path.replace('.{}'.format(ext), '')
                 path += '-' + generate_hash() + req_ext
             else:
                 print('File name already exists! Skipping!')
@@ -43,14 +43,14 @@ def file_writer_function(function):
         try:
             flines, ext = function(*args, **kwargs)
             if ext is not None and not path.endswith(ext):
-                path += f'.{ext}'
+                path += '.{}'.format(ext)
             with open(path, 'w') as f:
                 for line in flines:
                     f.write(line + '\n')
             return flines
         except Exception as exc:
             print_exc()
-            raise RuntimeError(f'Failed to write {path}: {exc}')
+            raise RuntimeError('Failed to write {}: {}'.format(path, exc))
 
     return wrapped_writer
 
@@ -851,11 +851,11 @@ def doc2arbitrary(doc, path, **kwargs):
     # sanitise dict to include only unique-by-case keys
     for key in doc:
         if key.lower() in output_doc:
-            raise Warning(f'Key {key} defined multiple times.')
+            raise Warning('Key {} defined multiple times.'.format(key))
         output_doc[key.lower()] = doc[key]
 
     for key in output_doc:
-        flines.append(f"{key}: {output_doc[key]}")
+        flines.append("{}: {}".format(key, output_doc[key]))
     return flines, ext
 
 

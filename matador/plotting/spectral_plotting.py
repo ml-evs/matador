@@ -109,7 +109,7 @@ def plot_spectral(seeds, **kwargs):
     if kwargs['plot_dos']:
         # check an optados file exists
         exts = ['pdos.dat', 'adaptive.dat', 'fixed.dat', 'linear.dat', 'jdos.dat', 'phonon_dos']
-        kwargs['plot_dos'] = any([any([os.path.isfile(f'{seed}.{ext}') for ext in exts]) for seed in seeds])
+        kwargs['plot_dos'] = any([any([os.path.isfile('{}.{}'.format(seed, ext)) for ext in exts]) for seed in seeds])
 
     if kwargs['plot_bandstructure'] and not kwargs['plot_dos']:
         fig, ax_dispersion = plt.subplots(figsize=(7, 6))
@@ -194,7 +194,7 @@ def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
     plotted_pdis = False
     for seed_ind, seed in enumerate(seeds):
         seed = seed.replace('.bands', '').replace('.phonon', '')
-        if os.path.isfile(f'{seed}.phonon'):
+        if os.path.isfile('{}.phonon'.format(seed)):
             dispersion, s = phonon2dict(seed + '.phonon', verbosity=kwargs.get('verbosity'))
             if not s:
                 raise RuntimeError(dispersion)
@@ -210,7 +210,7 @@ def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
 
             path = _linearise_path(dispersion, path_key, branch_key, num_key, kwargs)
 
-        elif os.path.isfile(f'{seed}.bands'):
+        elif os.path.isfile('{seed}.bands'.format(seed)):
             dispersion, s = bands2dict(seed + '.bands',
                                        summary=True,
                                        gap=kwargs.get('gap'),
@@ -229,13 +229,13 @@ def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
 
             path = _linearise_path(dispersion, path_key, branch_key, num_key, kwargs)
 
-            if os.path.isfile(f'{seed}.pdis.dat') and len(seeds) == 1 and kwargs['plot_pdis']:
+            if os.path.isfile('{}.pdis.dat'.format(seed)) and len(seeds) == 1 and kwargs['plot_pdis']:
                 ax_dispersion = projected_bandstructure_plot(seed, ax_dispersion, path, dispersion, bbox_extra_artists)
                 kwargs['band_colour'] = 'grey'
                 plotted_pdis = True
 
         else:
-            raise RuntimeError(f'{seed}.bands/.phonon not found.')
+            raise RuntimeError('{}.bands/.phonon not found.'.format(seed))
 
         if kwargs['band_reorder'] or (kwargs['band_reorder'] is None and kwargs['phonons']):
             print('Reordering bands based on local gradients...')
@@ -299,8 +299,8 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                     # look for dat files, and just use the first
                     exts = ['adaptive', 'fixed', 'linear']
                     for ext in exts:
-                        if os.path.isfile(f'{seed}.{ext}.dat'):
-                            dos_seed = f'{seed}.{ext}.dat'
+                        if os.path.isfile('{}.{}.dat'.format(seed, ext)):
+                            dos_seed = '{}.{}.dat'.format(seed, ext)
                             break
                     else:
                         raise SystemExit('No total DOS files found.')
@@ -322,7 +322,7 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                 else:
                     max_density = np.max(dos[np.where(np.logical_and(energies < kwargs['plot_window'][1], energies > kwargs['plot_window'][0]))])
 
-                pdos_seed = f'{seed}.pdos.dat'
+                pdos_seed = '{}.pdos.dat'.format(seed)
                 pdos_data = {}
                 if os.path.isfile(pdos_seed):
                     pdos_data, s = optados2dict(pdos_seed, verbosity=0)
