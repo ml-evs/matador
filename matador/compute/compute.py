@@ -1051,7 +1051,7 @@ class FullRelaxer:
                 file_exts.append('.param')
             if not self.conv_kpt_bool and not self.conv_cutoff_bool:
                 file_exts.append('.res')
-            if os.isfile(seed + '-out.cell'):
+            if os.path.isfile(seed + '-out.cell'):
                 file_exts.append('-out.cell')
             if self.calc_doc.get('write_formatted_density'):
                 file_exts.append('.den_fmt')
