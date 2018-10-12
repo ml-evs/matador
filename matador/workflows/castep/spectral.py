@@ -242,8 +242,8 @@ def castep_spectral_dispersion(relaxer, calc_doc, seed):
 
     if disp_doc.get('write_orbitals'):
         logging.info('Planning to call orbitals2bands...')
-        if os.path.isfile(f'{seed}.bands'):
-            shutil.copy2(f'{seed}.bands', f'{seed}.bands_orig')
+        if os.path.isfile('{}.bands'.format(seed)):
+            shutil.copy2('{}.bands', '{}.bands_orig'.format(seed, seed))
 
         _cache_executable = copy.deepcopy(relaxer.executable)
         _cache_core = copy.deepcopy(relaxer.ncores)
