@@ -1,1 +1,2 @@
 tqdm
+ascii_graph>=1.2

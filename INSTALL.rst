@@ -9,14 +9,15 @@ The tl;dr way to install matador, on e.g. a computing cluster, is as follows:
 
 Optional conda steps:
 
-1. install anaconda, if you have not already (https://conda.io/miniconda.html).
-2. create a new conda environment (``conda create -n matador python=3.6 numpy scipy``)
-3. manually install some of the heavier libraries (e.g. numpy and Scipy) through conda with ``conda install --yes --file requirements/requirements.txt``.
+1. install conda, if you have not already (https://conda.io/miniconda.html) (choose the version suitable for you, the installers Python version does not matter that much, but it may as well be 3+!).
+2. Create a new conda environment to install matador into(``conda create -n matador python=3.6``)
+3. Install some of the heavier requirements (e.g. NumPy and SciPy) through conda with ``conda install --yes --file requirements/requirements.txt``. You may also want to install some of the optional dependencies in this manner, e.g. ``conda install --yes --file requirements/plotting_requirements.txt``.
 
 Required steps:
 
-4. run ``pip install .`` from inside the top-level matador directory, or ``pip install -e .`` for an editable developer install.
-5. you now have a basic matador installation, if you wish to use all matador features, install extra dependencies from the other requirements files inside ``requirements/``. e.g. for plotting, running your own database and Jupyter notebook visualisation functionality, use ``pip install .[plotting,db,viz]``.
+4. Run ``pip install .`` from inside the top-level matador directory, or ``pip install -e .`` for an editable developer install.
+5. You now have a basic matador API installation, if you wish to use all matador features, install extra dependencies from the other requirements files inside ``requirements/`` using either conda (preferably) or pip. e.g. for plotting, running your own database and Jupyter notebook visualisation functionality, use ``pip install .[plotting,db,viz]``. If you wish to just install everything use ``pip install .[all]``.
+6. To use matador, you will need to work inside the conda environment from step 2, by running ``source activate matador``.
 
 
 More esoteric installation on ARCHER (30th October 2017)

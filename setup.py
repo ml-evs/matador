@@ -16,10 +16,12 @@ except sp.CalledProcessError:
 with open('requirements/requirements.txt', 'r') as f:
     requirements = [line.strip() for line in f.readlines()]
 
-extra_requirements = dict()
-for subreq in ['docs', 'test', 'plotting', 'viz', 'db', 'crystal']:
+extra_requirements = dict(all=[])
+for subreq in ['docs', 'test', 'plotting', 'viz', 'crystal', 'optional']:
     with open('requirements/{}_requirements.txt'.format(subreq), 'r') as f:
         extra_requirements[subreq] = [line.strip() for line in f.readlines()]
+        extra_requirements['all'] += extra_requirements[subreq]
+
 
 setup(name='matador',
       version=__version__,
@@ -30,7 +32,7 @@ setup(name='matador',
       author_email='me388@cam.ac.uk',
       license='MIT',
       packages=find_packages(),
-      python_requires='>=3.5',
+      python_requires='>=3.6',
       install_requires=requirements,
       scripts=glob('bin/*') + glob('scripts/*'),
       test_suite='matador.tests',

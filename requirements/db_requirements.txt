@@ -1,2 +1,0 @@
-pymongo>=3.4
-ascii_graph>=1.2
