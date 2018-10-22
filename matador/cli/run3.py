@@ -28,7 +28,7 @@ def main():
                 by Chris Pickard and Andrew Morris and PyAIRSS CastepRunner by Jamie Wynn.')
     parser.add_argument('--version', action='version', version='run3 operating from matador version ' +
                         __version__ + '.')
-    parser.add_argument('seed', type=str, nargs='*',
+    parser.add_argument('seed', type=str, nargs='+',
                         help='cell and param seed to use as template for CASTEP calculations OR list of files\
                               to apply run executable on')
     parser.add_argument('-nc', '--ncores', type=int,
