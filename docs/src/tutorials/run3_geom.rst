@@ -125,6 +125,8 @@ These calculations are performed in exactly the same was as above, except a ``<s
 
     $ run3 --custom_params TiO2
 
+.. tip:: If you have a .res file that contains a PyAIRSS "REM NT_PROPS" line, this will be ignored.
+
 
 Example 1.2: High-throughput geometry optimisations with CASTEP on a supercomputer
 ----------------------------------------------------------------------------------
