@@ -7,3 +7,6 @@ python:
     - viz
     - db
     - crystal
+
+build:
+    image: latest
