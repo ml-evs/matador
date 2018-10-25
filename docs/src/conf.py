@@ -183,11 +183,11 @@ man_pages = [
      [author], 1)
 ]
 
-intersphinx_mapping = intersphinx_mapping = {'python': ('https://docs.python.org/3.6', None),
-                                             'numpy': ('http://docs.scipy.org/doc/numpy/', None),
-                                             'pymongo': ('https://api.mongodb.com/python/current/', None),
-                                             'np': ('http://docs.scipy.org/doc/numpy/', None),
-                                             'matplotlib': ('http://matplotlib.org', None)}
+intersphinx_mapping = {'python': ('https://docs.python.org/3.6', None),
+                       'numpy': ('http://docs.scipy.org/doc/numpy/', None),
+                       'pymongo': ('https://api.mongodb.com/python/current/', None),
+                       'np': ('http://docs.scipy.org/doc/numpy/', None),
+                       'matplotlib': ('http://matplotlib.org', None)}
 
 # -- Options for Texinfo output -------------------------------------------
 
