@@ -1,8 +1,5 @@
 numpy>=1.10
 scipy>=1.0
-seekpath>=1.8
-periodictable
-spglib
 psutil
 pyyaml
 pymongo>=3.4

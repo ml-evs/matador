@@ -16,6 +16,9 @@ except sp.CalledProcessError:
 with open('requirements/requirements.txt', 'r') as f:
     requirements = [line.strip() for line in f.readlines()]
 
+with open('requirements/pip_requirements.txt', 'r') as f:
+    requirements += [line.strip() for line in f.readlines()]
+
 extra_requirements = dict(all=[])
 for subreq in ['docs', 'test', 'plotting', 'viz', 'crystal', 'optional']:
     with open('requirements/{}_requirements.txt'.format(subreq), 'r') as f:
