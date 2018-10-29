@@ -1,6 +1,6 @@
 .. _modules:
 
-matador
+Modules
 =======
 
 .. toctree::
