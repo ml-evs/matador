@@ -1,8 +1,9 @@
+.. index:: tutorials
+
 .. _tutorials:
 
 Tutorials
 =========
-
 
 .. toctree::
     :maxdepth: 0
