@@ -210,7 +210,7 @@ def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
 
             path = _linearise_path(dispersion, path_key, branch_key, num_key, kwargs)
 
-        elif os.path.isfile('{seed}.bands'.format(seed)):
+        elif os.path.isfile('{}.bands'.format(seed)):
             dispersion, s = bands2dict(seed + '.bands',
                                        summary=True,
                                        gap=kwargs.get('gap'),
