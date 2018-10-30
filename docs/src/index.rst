@@ -7,6 +7,5 @@
     install
     getting_started
     changelog
-    examples
-    tutorials
+    tutorials_index
     Python API <modules>

@@ -2,7 +2,7 @@
 
 .. highlight:: bash
 
-.. _run3_geom:
+.. _run3_elastic:
 
 
 Example 4: Bulk moduli with CASTEP and run3

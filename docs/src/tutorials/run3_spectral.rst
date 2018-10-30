@@ -2,7 +2,7 @@
 
 .. highlight:: bash
 
-.. _run3_geom:
+.. _run3_spectral:
 
 
 Example 2: Spectral calculations with CASTEP and run3

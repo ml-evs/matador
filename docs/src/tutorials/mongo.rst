@@ -10,7 +10,7 @@ Tutorial: Setting up your own database
 ``matador`` uses MongoDB to store and operate on results from first principles calculations. In this tutorial, we will set up a MongoDB database containing some dummy test data.
 
 Installing and configuring MongoDB
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+----------------------------------
 
 Instructions on how to install MongoDB community edition can be found at the `MongoDB website <https://docs.mongodb.com/manual/administration/install-community/>`_. If you are using Linux, you may find that your OS provides a MongoDB package that you can install.
 
@@ -25,7 +25,7 @@ Once installed, you can run your MongoDB server with the ``mongod`` command. An 
    You should ensure the path found under the ``storage.dbPath`` option in your configuration file exists before running ``mongod``, and that you have access to it!
 
 Importing structures
-^^^^^^^^^^^^^^^^^^^^
+--------------------
 
 With a MongoDB server running, you can now import some structures. Navigate to ``examples/mongo/castep_files`` and run ``matador import``. If this is your first time using ``matador``, you should be prompted to make a configuration file. Follow the instructions and enter the values you used to set up your database. You will be given the option to test the connection to your database at the end.
 
@@ -35,7 +35,7 @@ Caring for your database
 ========================
 
 Collections
-^^^^^^^^^^^
+-----------
 
 MongoDB databases are made out of "collections" of data. To create a new collection, simply specify ``--db <collection_name>`` when performing an import. You may wish to create multiple collections of data, or one monolithic database.
    
@@ -50,6 +50,6 @@ A summary of the contents of existing collections can be generated using ``matad
    Each collection also saves its own "changelog". You can view this changelog and undo changes with the ``matador changes`` interface.
 
 Backing up
-^^^^^^^^^^
+----------
 
-You should always back up the data used to create a database, but if you wish, you can also directly backup the database itself using the MongoDB tool ``mongodump`` (`documentation <https://docs.mongodb.com/manual/reference/program/mongodump/>`_). Similarly, restoration can be performed using ``mongorestore`` (`documentation <https://docs.mongodb.com/manual/reference/program/mongorestore/>_`). You may also wish to read the general back up and restore tutorial on the `MongoDB website <https://docs.mongodb.com/manual/tutorial/backup-and-restore-tools/>`_.
+You should always back up the data used to create a database, but if you wish, you can also directly backup the database itself using the MongoDB tool ``mongodump`` (`documentation <https://docs.mongodb.com/manual/reference/program/mongodump/>`_). Similarly, restoration can be performed using ``mongorestore`` (`documentation <https://docs.mongodb.com/manual/reference/program/mongorestore/>`_). You may also wish to read the general back up and restore tutorial on the `MongoDB website <https://docs.mongodb.com/manual/tutorial/backup-and-restore-tools/>`_.

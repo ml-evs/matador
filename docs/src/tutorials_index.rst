@@ -1,11 +1,10 @@
-.. index:: tutorials
+.. index:: tutorials_index
 
-.. _tutorials:
+.. _tutorials_index:
 
 Tutorials
 =========
 
 .. toctree::
-    :maxdepth: 0
     tutorials/run3
     tutorials/mongo

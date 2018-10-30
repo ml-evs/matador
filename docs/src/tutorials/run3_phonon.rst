@@ -2,7 +2,7 @@
 
 .. highlight:: bash
 
-.. _run3_geom:
+.. _run3_phonon:
 
 
 Example 3: Phonon calculations with CASTEP and run3
