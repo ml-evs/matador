@@ -5,11 +5,11 @@
 spectral calculations with CASTEP in multiple steps:
 
 1. Performs a singlepoint calculation (if check file is not found).
-2. If `spectral_fine_kpoints_mp_spacing` keyword is found, interpolate
+2. If `spectral_kpoints_mp_spacing` keyword is found, interpolate
    wavefunction to DOS grid.
    - If an OptaDOS input file (.odi) with the root seedname
      is found, run OptaDOS on the resulting density of states.
-3. If `spectral_fine_kpoints_path_spacing` keyword is present, create
+3. If `spectral_kpoints_path_spacing` keyword is present, create
    a bandstructure on the seekpath-generated path.
 
 """
