@@ -203,8 +203,10 @@ def are_graphs_the_same(g1, g2, edge_match=None):
 
 def draw_network(structure, layout=None, edge_labels=False, node_index=False, curved_edges=True, node_colour='elem', partition=None, ax=None):
     import networkx as nx
-    from matador.utils.viz_utils import ELEMENT_COLOURS
+    from matador.utils.viz_utils import get_element_colours
     import matplotlib.pyplot as plt
+
+    element_colours = get_element_colours()
     try:
         network = structure.network
     except:
@@ -228,7 +230,7 @@ def draw_network(structure, layout=None, edge_labels=False, node_index=False, cu
         colours = [cmap[partition[node]] for node in network.nodes()]
 
     else:
-        elem_map = ELEMENT_COLOURS
+        elem_map = element_colours
         colours = [elem_map.get(data['species']) for node, data in network.nodes.data()]
 
     if node_index:

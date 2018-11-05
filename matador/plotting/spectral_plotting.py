@@ -9,7 +9,7 @@ bandstructures for electronic and vibrational calculations.
 
 import os
 import numpy as np
-from matador.utils.viz_utils import ELEMENT_COLOURS
+from matador.utils.viz_utils import get_element_colours
 from matador.plotting.plotting import plotting_function
 
 
@@ -190,7 +190,6 @@ def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
     from matador.scrapers.castep_scrapers import bands2dict, phonon2dict
     from cycler import cycler
     import matplotlib.pyplot as plt
-    import os
     plotted_pdis = False
     for seed_ind, seed in enumerate(seeds):
         seed = seed.replace('.bands', '').replace('.phonon', '')
@@ -632,7 +631,7 @@ def _ordered_scatter(k, e, projections, alpha=1, ax=None, zorder=None, colours=N
     ek_interp = ek_fn(k_interp)
     projections = projections.T
     interp_projections = []
-    for i in range(len(projections)):
+    for _, i in enumerate(projections):
         interp_projections.append(interp1d(k, projections[i])(k_interp))
     interp_projections = np.asarray(interp_projections)
     pts = np.array([k_interp, ek_interp]).T.reshape(-1, 1, 2)
@@ -720,8 +719,6 @@ def _linearise_path(dispersion, path_key, branch_key, num_key, kwargs):
         np.ndarray: 3xN array containing k-points mapped onto [0, 1].
 
     """
-    import numpy as np
-
     path = [0]
     for branch in dispersion[branch_key]:
         for ind, kpt in enumerate(dispersion[path_key][branch]):
@@ -759,7 +756,7 @@ def _get_lineprops(dispersion, eig_key, spin_key, nb, ns, branch, branch_ind, se
                     colour = kwargs.get('valence')
                 elif band_min > 0:
                     colour = kwargs.get('conduction')
-                elif band_min < 0 and band_max > 0:
+                elif band_min < 0 < band_max:
                     colour = kwargs.get('crossing')
 
     if kwargs['colour_by_seed']:
@@ -888,6 +885,7 @@ def _get_projector_info(projectors):
     """
 
     import matplotlib.pyplot as plt
+    element_colours = get_element_colours()
     projector_labels = []
     dos_colours = []
     for ind, projector in enumerate(projectors):
@@ -901,11 +899,11 @@ def _get_projector_info(projectors):
 
         # if species-projected only, then use VESTA colours
         if projector[0] is not None and projector[1] is None:
-            dos_colours.append(ELEMENT_COLOURS.get(projector[0]))
+            dos_colours.append(element_colours.get(projector[0]))
         # if species_ang-projected, then use VESTA colours but lightened
         elif projector[0] is not None and projector[1] is not None:
             from copy import deepcopy
-            dos_colour = deepcopy(ELEMENT_COLOURS.get(projector[0]))
+            dos_colour = deepcopy(element_colours.get(projector[0]))
             multi = ['s', 'p', 'd', 'f'].index(projector[1]) - 1
             for jind, _ in enumerate(dos_colour):
                 dos_colour[jind] = max(min(dos_colour[jind]+multi*0.2, 1), 0)

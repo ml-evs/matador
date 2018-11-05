@@ -23,13 +23,14 @@ def get_element_colours():
     """
     import os
     from matador.config import load_custom_settings
+    raise RuntimeError
     # check if element_colours has been given as an absolute path
     colours_fname = load_custom_settings().get('plotting').get('element_colours')
-    # if element_colours is not specified or doesn't exist, try relative path
-    if not os.path.isfile(colours_fname):
-        colours_fname = '/'.join(os.path.realpath(__file__).split('/')[:-1]) + '/../config/{}'.format(colours_fname)
-    # otherwise fallback to ../config/vesta_elements.ini
-    if not os.path.isfile(colours_fname):
+    if colours_fname is None:
+        colours_fname = '/'.join(os.path.realpath(__file__).split('/')[:-1]) + '/../config/vesta_elements.ini'
+    elif not os.path.isfile(colours_fname):
+        print('Could not find {}, please specify an absolute path. Falling back to default...'.format(colours_fname))
+        # otherwise fallback to ../config/vesta_elements.ini
         colours_fname = '/'.join(os.path.realpath(__file__).split('/')[:-1]) + '/../config/vesta_elements.ini'
 
     with open(colours_fname, 'r') as f:
@@ -84,6 +85,3 @@ def doc2ase(doc):
                  scaled_positions=doc['positions_frac'],
                  cell=doc['lattice_cart'],
                  pbc=True)
-
-
-ELEMENT_COLOURS = get_element_colours()
