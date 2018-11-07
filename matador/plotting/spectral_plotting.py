@@ -165,14 +165,15 @@ def plot_spectral(seeds, **kwargs):
     if any([kwargs.get('pdf'), kwargs.get('svg'), kwargs.get('png')]):
         if not bbox_extra_artists:
             bbox_extra_artists = None
+        filename = seeds[0].split('/')[-1].replace('.bands', '').replace('.phonon', '') + '_spectral'
         if kwargs.get('pdf'):
-            plt.savefig(seeds[0].replace('.bands', '').replace('.phonon', '') + '_spectral.pdf',
+            plt.savefig('{}.pdf'.format(filename),
                         bbox_inches='tight', transparent=True, bbox_extra_artists=bbox_extra_artists)
         if kwargs.get('svg'):
-            plt.savefig(seeds[0].replace('.bands', '').replace('.phonon', '') + '_spectral.svg',
+            plt.savefig('{}.svg'.format(filename),
                         bbox_inches='tight', transparent=True, bbox_extra_artists=bbox_extra_artists)
         if kwargs.get('png'):
-            plt.savefig(seeds[0].replace('.bands', '').replace('.phonon', '') + '_spectral.png',
+            plt.savefig('{}.png'.format(filename),
                         bbox_inches='tight', transparent=True, bbox_extra_artists=bbox_extra_artists)
 
     else:
@@ -365,6 +366,7 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                     pdos_data, s = optados2dict(pdos_seed, verbosity=0)
                     if not s:
                         raise RuntimeError(pdos_data)
+                    dos_data['pdos'] = pdos_data
             else:
                 if not os.path.isfile(seed + '.phonon_dos'):
                     phonon_data, s = phonon2dict(seed + '.phonon')
@@ -458,7 +460,7 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                 if 'spin_dos' not in dos_data:
                     ax_dos.plot(dos, energies, ls=kwargs['ls'][seed_ind],
                                 color='grey', zorder=1e10, label='Total DOS')
-                    if 'spin_dos' not in dos_data:
+                    if 'pdos' not in dos_data:
                         ax_dos.fill_betweenx(energies[np.where(energies > 0)], 0, dos[np.where(energies > 0)], alpha=0.2, color=kwargs['conduction'])
                         ax_dos.fill_betweenx(energies[np.where(energies <= 0)], 0, dos[np.where(energies <= 0)], alpha=0.2, color=kwargs['valence'])
 
@@ -476,7 +478,7 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                 if 'spin_dos' not in dos_data:
                     ax_dos.plot(energies, dos, ls=kwargs['ls'][seed_ind], alpha=1,
                                 c='grey', zorder=1e10, label='Total DOS')
-                    if 'spin_dos' not in dos_data:
+                    if 'pdos' not in dos_data:
                         ax_dos.fill_between(energies[np.where(energies > 0)], 0, dos[np.where(energies > 0)], alpha=0.2, color=kwargs['conduction'])
                         ax_dos.fill_between(energies[np.where(energies <= 0)], 0, dos[np.where(energies <= 0)], alpha=0.2, color=kwargs['valence'])
 
@@ -519,10 +521,10 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                 if not kwargs['pdos_hide_tot'] and not kwargs['no_stacked_pdos']:
                     if kwargs['plot_bandstructure']:
                         ax_dos.plot(stack, energies,
-                                    ls='--', alpha=1, color=colour, zorder=1e10, label='Sum pDOS')
+                                    ls='--', alpha=1, color='black', zorder=1e10, label='Sum pDOS')
                     else:
                         ax_dos.plot(energies, stack,
-                                    ls='--', alpha=1, color=colour, zorder=1e10, label='Sum pDOS')
+                                    ls='--', alpha=1, color='black', zorder=1e10, label='Sum pDOS')
 
             elif 'spin_dos' in dos_data:
                 print('Plotting spin dos')
@@ -542,8 +544,11 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                         ax_dos.fill_between(energies, 0, dos_data['spin_dos']['up'], alpha=0.2, color='r')
 
             if len(seeds) == 1:
-                dos_legend = ax_dos.legend(bbox_to_anchor=(1, 1),
-                                           frameon=True, fancybox=False, shadow=False)
+                if kwargs['plot_bandstructure']:
+                    dos_legend = ax_dos.legend(bbox_to_anchor=(1, 1),
+                                               frameon=True, fancybox=False, shadow=False)
+                else:
+                    dos_legend = ax_dos.legend(frameon=True, fancybox=False, shadow=False)
                 bbox_extra_artists.append(dos_legend)
 
     return ax_dos
@@ -582,10 +587,11 @@ def projected_bandstructure_plot(seed, ax, path, dispersion, bbox_extra_artists,
         if np.max(pdis[:, :, ind]) > 1e-8:
             keep_inds.append(ind)
 
-    if len(keep_inds) <= 2:
+    if len(keep_inds) <= 3:
         mode = 'rgb'
     else:
         mode = 'scatter'
+    mode = 'scatter'
 
     lattice_cart = dispersion['lattice_cart']
     eigs = np.asarray(dos_data['eigenvalues'])
@@ -596,16 +602,22 @@ def projected_bandstructure_plot(seed, ax, path, dispersion, bbox_extra_artists,
     for ind, projector in enumerate(projectors):
         if ind in keep_inds:
             if mode == 'scatter':
-                ax.scatter(1e20, 0, c=dos_colours[ind], label=projector_labels[ind], lw=0)
+                ax.scatter(1e20, 0, facecolor=(1,1,1,0), edgecolor=dos_colours[ind], label=projector_labels[ind], lw=1)
             else:
                 colours = ['red', 'blue', 'green']
                 ax.plot([1e20, 1e20], [0, 0], c=colours[counter], label=projector_labels[ind], lw=3, alpha=0.8)
                 counter += 1
 
-    import tqdm
+    try:
+        from tqdm import tqdm
+    except ImportError:
+        def tqdm(x):
+            return x
+        pass
+
     dos_data['kpoints_cartesian'] = np.asarray(frac2cart(real2recip(lattice_cart), dos_data['kpoints']))
     dos_data['kpoint_branches'], dos_data['kpoint_path_spacing'] = get_kpt_branches(dos_data['kpoints_cartesian'])
-    for nb in tqdm.tqdm(range(dos_data['num_bands'])):
+    for nb in tqdm(range(dos_data['num_bands'])):
         if mode == 'scatter':
             for branch_ind, branch in enumerate(dos_data['kpoint_branches']):
                 _ordered_scatter(path[(np.asarray(branch) - branch_ind).tolist()],
@@ -663,7 +675,7 @@ def _rgbline(k, e, red, green, blue, alpha=1, ax=None, zorder=None, interpolatio
         ax.add_collection(lc)
 
 
-def _ordered_scatter(k, e, projections, alpha=1, ax=None, zorder=None, colours=None, interpolation_factor=2):
+def _ordered_scatter(k, e, projections, alpha=1, ax=None, zorder=None, colours=None, interpolation_factor=10):
     """ WIP: Try to plot a scatter of PDIS points. """
     from scipy.interpolate import interp1d
     ek_fn = interp1d(k, e)
@@ -672,7 +684,7 @@ def _ordered_scatter(k, e, projections, alpha=1, ax=None, zorder=None, colours=N
     ek_interp = ek_fn(k_interp)
     projections = projections.T
     interp_projections = []
-    for _, i in enumerate(projections):
+    for i, proj in enumerate(projections):
         interp_projections.append(interp1d(k, projections[i])(k_interp))
     interp_projections = np.asarray(interp_projections)
     pts = np.array([k_interp, ek_interp]).T.reshape(-1, 1, 2)
@@ -694,7 +706,7 @@ def _ordered_scatter(k, e, projections, alpha=1, ax=None, zorder=None, colours=N
     cat_pts = cat_pts[::-1]
     flat_projections = flat_projections[::-1]
     colours = list(reversed(colours))
-    ax.scatter(cat_pts[:, 0, 0], cat_pts[:, 0, 1], s=10*flat_projections**2, facecolor=colours, alpha=0.8)
+    ax.scatter(cat_pts[:, 0, 0], cat_pts[:, 0, 1], s=50*flat_projections**2, edgecolor=colours, lw=1, facecolor=None, alpha=0.8)
     ax.plot(pts[:, 0, 0], pts[:, 0, 1], lw=0.5, alpha=0.5)
 
 
