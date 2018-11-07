@@ -581,6 +581,7 @@ def bands2dict(seed, summary=False, gap=False, external_efermi=None, **kwargs):
     for i in range(3):
         bs['lattice_cart'].append([BOHR_TO_ANGSTROM * float(elem) for elem in header[6 + i].split()])
     bs['kpoint_path'] = np.zeros((bs['num_kpoints'], 3))
+    bs['kpoint_weights'] = np.zeros((bs['num_kpoints']))
     bs['eigenvalues_k_s'] = np.empty((bs['num_spins'], bs['num_bands'], bs['num_kpoints']))
 
     if verbosity > 2:
@@ -591,6 +592,7 @@ def bands2dict(seed, summary=False, gap=False, external_efermi=None, **kwargs):
         bs['kpoint_path'][int(data[kpt_ind].split()[1]) - 1] = (
             np.asarray([float(elem) for elem in data[kpt_ind].split()[-4:-1]])
         )
+        bs['kpoint_weights'][int(data[kpt_ind].split()[1]) - 1] = float(data[kpt_ind].split()[-1])
         for nb in range(bs['num_bands']):
             for ns in range(bs['num_spins']):
                 line_number = kpt_ind + 2 + ns + (ns * bs['num_bands']) + nb
@@ -1620,7 +1622,7 @@ def get_kpt_branches(cart_kpts):
             kpt_branches.append(current_branch)
             continue
 
-        if np.sqrt(np.sum((point - cart_kpts[ind + 1])**2)) < 10 * kpt_spacing:
+        if np.sqrt(np.sum((point - cart_kpts[ind + 1])**2)) < 3 * kpt_spacing:
             current_branch.append(ind + 1)
         else:
             kpt_branches.append(current_branch)
