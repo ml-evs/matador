@@ -23,7 +23,6 @@ def get_element_colours():
     """
     import os
     from matador.config import load_custom_settings
-    raise RuntimeError
     # check if element_colours has been given as an absolute path
     colours_fname = load_custom_settings().get('plotting').get('element_colours')
     if colours_fname is None:
