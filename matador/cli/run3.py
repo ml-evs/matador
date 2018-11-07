@@ -70,6 +70,10 @@ def main():
                         help='run all res files at kpoint spacings defined in kpt.conv file')
     parser.add_argument('--memcheck', action='store_true', default=False,
                         help='enable memcheck via castep dryrun')
+    parser.add_argument('--scratch_prefix', type=str,
+                        help='specify absolute path prefix for compute dir e.g. '
+                             '--scratch_prefix /scratch/user/ will set the compute directory to /scratch/user/$hostname. '
+                             'default value is taken from .matadorrc.')
     parser.add_argument('--maxmem', type=int,
                         help='override max memory for memcheck')
     parser.add_argument('--killcheck', action='store_true', default=True,
@@ -94,8 +98,15 @@ def main():
     args = parser.parse_args()
 
     seed = vars(args)['seed']
+
     kwargs = vars(args)
     del kwargs['seed']
+
+    from matador.config import load_custom_settings
+    if kwargs['scratch_prefix'] is None:
+        settings = load_custom_settings(debug=kwargs.get('debug')).get('run3')
+        if 'run3' in settings:
+            kwargs['scratch_prefix'] = settings['run3'].get('scratch_prefix')
 
     if sum([vars(args)['slurm'], vars(args)['archer'], vars(args)['intel']]) > 1:
         exit('Incompatible MPI arguments specified, please use at most one of --archer/--intel/--slurm.')

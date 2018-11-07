@@ -13,10 +13,10 @@ import multiprocessing as mp
 import os
 import glob
 import time
-from matador.utils.print_utils import print_notify
+from matador.utils.print_utils import print_notify, print_failure, print_warning
 from matador.compute.queue import get_queue_env, get_queue_walltime, get_queue_manager
 from matador.scrapers.castep_scrapers import cell2dict, param2dict
-from matador.compute.compute import FullRelaxer
+from matador.compute.compute import FullRelaxer, CriticalError
 
 
 class BatchRun:
@@ -57,7 +57,7 @@ class BatchRun:
                          'redirect': None, 'debug': False, 'custom_params': False,
                          'verbosity': 0, 'archer': False, 'slurm': False,
                          'intel': False, 'conv_cutoff': False, 'conv_kpt': False,
-                         'memcheck': False, 'maxmem': None, 'killcheck': True,
+                         'memcheck': False, 'maxmem': None, 'killcheck': True, 'scratch_prefix': None,
                          'kpts_1D': False, 'spin': False, 'ignore_jobs_file': False,
                          'rough': 4, 'rough_iter': 2, 'fine_iter': 20, 'max_walltime': None,
                          'limit': None, 'profile': False, 'polltime': 30}
@@ -73,6 +73,10 @@ class BatchRun:
                 self.seed = glob.glob(self.seed[0])
             elif not os.path.isfile(self.seed[0]):
                 self.seed = self.seed[0]
+
+        self.compute_dir = os.uname()[1]
+        if self.args.get('scratch_prefix') is not None:
+            self.compute_dir = '{}/{}'.format(self.args['scratch_prefix'], self.compute_dir).replace('//', '/')
 
         if isinstance(self.seed, str):
             self.mode = 'castep'
@@ -128,7 +132,7 @@ class BatchRun:
                 self.args['ncores'] = int(self._queue_available_tasks / self.nprocesses)
 
         if self.args['nnodes'] < 1 or self.args['ncores'] < 1 or self.nprocesses < 1:
-            raise SystemExit('Invalid number of cores, nodes or processes.')
+            raise CriticalError('Invalid number of cores, nodes or processes.')
 
         if self.mode == 'castep':
             self.castep_setup()
@@ -188,7 +192,6 @@ class BatchRun:
         for _, proc in enumerate(procs):
             result = error_queue.get()
             if isinstance(result[1], Exception):
-                print_notify('Process {} raised error: {}\n'.format(result[0], result[1]))
                 errors.append(result)
 
         try:
@@ -200,11 +203,12 @@ class BatchRun:
                     raise type(errors[0][1])(error_message)
                 raise BundledErrors(error_message)
 
-        # the only errors that reach here are fatal, e.g. WalltimeError, SystemExit or KeyboardInterrupt,
+        # the only errors that reach here are fatal, e.g. WalltimeError, CriticalError or KeyboardInterrupt,
         except Exception as err:
             result = [proc.join(timeout=10) for proc in procs]
             result = [proc.terminate() for proc in procs if proc.is_alive()]
-            raise err
+            print_failure('Bundled errors:')
+            print_warning(err)
 
     def perform_new_calculations(self, res_list, error_queue, proc_id):
         """ Perform all calculations that have not already
@@ -247,11 +251,10 @@ class BatchRun:
 
                     # create full relaxer object for creation and running of job
                     job_count += 1
-                    hostname = os.uname()[1]
                     relaxer = FullRelaxer(node=None, res=res,
                                           param_dict=self.param_dict,
                                           cell_dict=self.cell_dict,
-                                          mode=self.mode, paths=self.paths, compute_dir=hostname,
+                                          mode=self.mode, paths=self.paths, compute_dir=self.compute_dir,
                                           timings=(self.max_walltime, self.start_time),
                                           **self.args)
                     # if memory check failed, let other nodes have a go
@@ -293,15 +296,15 @@ class BatchRun:
         exts = ['cell', 'param']
         for ext in exts:
             if not os.path.isfile('{}.{}'.format(self.seed, ext)):
-                raise SystemExit('Failed to find {} file, {}.{}'.format(ext, self.seed, ext))
+                raise CriticalError('Failed to find {} file, {}.{}'.format(ext, self.seed, ext))
         self.cell_dict, cell_success = cell2dict(self.seed + '.cell', db=False)
         if not cell_success:
             print(self.cell_dict)
-            raise SystemExit('Failed to parse cell file')
+            raise CriticalError('Failed to parse cell file')
         self.param_dict, param_success = param2dict(self.seed + '.param', db=False)
         if not param_success:
             print(self.param_dict)
-            raise SystemExit('Failed to parse param file')
+            raise CriticalError('Failed to parse param file')
 
         # scan directory for files to run
         self.file_lists = defaultdict(list)
@@ -311,14 +314,14 @@ class BatchRun:
                 'run3 in CASTEP mode requires at least 1 res file in folder, found {}'
                 .format(len(self.file_lists['res']))
             )
-            raise SystemExit(error)
+            raise CriticalError(error)
 
         # do some prelim checks of parameters
         if self.param_dict['task'].upper() in ['GEOMETRYOPTIMISATION', 'GEOMETRYOPTIMIZATION']:
             if 'geom_max_iter' not in self.param_dict:
-                raise SystemExit('geom_max_iter is unset, please fix this.')
+                raise CriticalError('geom_max_iter is unset, please fix this.')
             elif int(self.param_dict['geom_max_iter']) <= 0:
-                raise SystemExit('geom_max_iter is only {}!'.format(self.param_dict['geom_max_iter']))
+                raise CriticalError('geom_max_iter is only {}!'.format(self.param_dict['geom_max_iter']))
 
         # parse convergence args and set them up
         self.convergence_run_setup()
@@ -339,7 +342,7 @@ class BatchRun:
                         if not line.startswith('#'):
                             self.args['conv_cutoff'].append(int(line))
             else:
-                raise SystemExit('Missing cutoff.conv file')
+                raise CriticalError('Missing cutoff.conv file')
         else:
             self.args['conv_cutoff'] = None
 
@@ -352,7 +355,7 @@ class BatchRun:
                         if not line.startswith('#'):
                             self.args['conv_kpt'].append(float(line))
             else:
-                raise SystemExit('Missing with conv.kpt file')
+                raise CriticalError('Missing with conv.kpt file')
         else:
             self.args['conv_kpt'] = None
 

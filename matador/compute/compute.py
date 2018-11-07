@@ -97,7 +97,7 @@ class FullRelaxer:
         Raises:
             WalltimeError: if desired/alotted walltime is exceeded, current run will be
                 tidied up, ready to be restarted from intermediate state.
-            SystemExit: if a fatal error occurs, failed run will be moved to bad_castep and
+            CriticalError: if a fatal error occurs, failed run will be moved to bad_castep and
                 no further calculations will be attempted.
             RuntimeError: if a structure-level error occurs, causing the seed files to be moved
                 to bad_castep.
@@ -234,7 +234,7 @@ class FullRelaxer:
 
         Raises:
             WalltimeError: if max_walltime is exceeded.
-            SystemExit: if no further calculations should be performed
+            CriticalError: if no further calculations should be performed
                 on this thread.
             RuntimeError: if this structure errored in some way, but
                 others will hopefully be okay.
@@ -256,7 +256,7 @@ class FullRelaxer:
         if self.kpts_1D:
             logging.debug('1D kpoint grid requested.')
             if 'kpoints_mp_spacing' not in self.cell_dict:
-                raise SystemExit('kpoints_mp_spacing not found, but kpts_1D requested...')
+                raise CriticalError('kpoints_mp_spacing not found, but kpts_1D requested...')
             self._target_spacing = deepcopy(self.cell_dict['kpoints_mp_spacing'])
 
         # read in initial structure and skip if failed
@@ -283,6 +283,8 @@ class FullRelaxer:
         # check for pseudos
         pspot_libs = ['C7', 'C8', 'C9', 'C17', 'C18', 'MS', 'HARD',
                       'QC5', 'NCP', 'NCP18', 'NCP17', 'NCP9']
+        if 'species_pot' not in calc_doc:
+            calc_doc['species_pot'] = {'library': 'C18'}
         if 'library' not in calc_doc['species_pot']:
             for elem in self.res_dict['stoichiometry']:
                 if ('|' not in calc_doc['species_pot'][elem[0]] and
@@ -290,7 +292,7 @@ class FullRelaxer:
                         calc_doc['species_pot'][elem[0]] not in pspot_libs):
                     msg = 'Unable to find pseudopotential file/string/library: {}'.format(calc_doc['species_pot'][elem[0]])
                     logging.critical(msg)
-                    raise SystemExit(msg)
+                    raise CriticalError(msg)
 
         # this is now a dict containing the exact calculation we are going to run
         self.calc_doc = calc_doc
@@ -366,7 +368,7 @@ class FullRelaxer:
             bool: True if calculations progressed without error.
 
         """
-        logging.info('Calling "generic" MPI program on {seed}'.format(seed=self.seed))
+        logging.info('Calling executable {exe} MPI program on {seed}'.format(exe=self.executable, seed=self.seed))
         try:
             self.seed = seed
             if '.' in self.seed:
@@ -402,7 +404,7 @@ class FullRelaxer:
 
         Raises:
             RuntimeError: if structure-level error occured.
-            SystemExit: if fatal global error occured.
+            CriticalError: if fatal global error occured.
             WalltimeError: if walltime was reached, and jobs need to stop.
 
         """
@@ -436,7 +438,7 @@ class FullRelaxer:
                     if self.start_time is None:
                         msg = 'Somehow initial start time was not found'
                         logging.critical(msg)
-                        raise SystemExit(msg)
+                        raise CriticalError(msg)
 
                     logging.info('Polling process every {} s'.format(self.polltime))
 
@@ -465,7 +467,7 @@ class FullRelaxer:
                     msg = ('CASTEP file was not created, please check your executable: {}.'
                            .format(self.executable))
                     logging.critical(msg)
-                    raise SystemExit(msg)
+                    raise CriticalError(msg)
 
                 opti_dict, success = castep2dict(seed + '.castep', db=False, verbosity=self.verbosity)
                 if not success and isinstance(opti_dict, str):
@@ -541,7 +543,7 @@ class FullRelaxer:
             raise err
 
         # All other errors mean something bad has happened, so we should clean up this job
-        # more jobs will run unless this exception is either SystemExit or KeyboardInterrupt
+        # more jobs will run unless this exception is either CriticalError or KeyboardInterrupt
         except Exception as err:
             logging.error('Error caught: terminating job for {}. Error = {}'.format(self.seed, err))
             self.process.terminate()
@@ -631,8 +633,12 @@ class FullRelaxer:
             if keyword in calc_doc:
                 del calc_doc[keyword]
 
+        failures = []
         for keyword in required:
-            assert keyword in calc_doc
+            if keyword not in calc_doc:
+                failures.append(keyword)
+        if len(failures) != 0:
+            raise InputError('The following keywords are required for workflow: {}'.format(', '.join(failures)))
 
     @staticmethod
     def get_seekpath_compliant_input(calc_doc, spacing, debug=False):
@@ -740,7 +746,7 @@ class FullRelaxer:
         """ Test if <executable> --version returns a valid string.
 
         Raises:
-            SystemExit: if executable not found.
+            CriticalError: if executable not found.
 
         """
         logging.info('Testing executable {executable}.'.format(executable=self.executable))
@@ -749,17 +755,32 @@ class FullRelaxer:
         except FileNotFoundError:
             logging.critical('Unable to call mpirun/aprun/srun, currently selected: {}'.format(self.mpi_library))
             message = 'Please check initialistion of FullRelaxer object/CLI args.'
-            logging.debug('Raising SystemExit with message: {message}'.format(message=message))
-            raise SystemExit(message)
+            logging.debug('Raising CriticalError with message: {message}'.format(message=message))
+            raise CriticalError(message)
 
         out, errs = proc.communicate()
-        if 'version' not in out.decode('utf-8') and errs is not None:
-            err_string = 'Executable {exc} failed testing. Is it on your PATH?'.format(exc=self.executable)
-            logging.critical(err_string)
-            logging.critical('stdout: {stdout}'.format(stdout=out.decode('utf-8')))
-            logging.critical('sterr: {stderr}'.format(stderr=errs.decode('utf-8')))
-            logging.debug('Raising SystemExit.')
-            raise SystemExit(err_string)
+        if 'CASTEP version' not in out.decode('utf-8') or len(errs) > 0:
+            # this is an OpenMPI error that occurs when hyperthreading is enabled
+            # best way to handle is to half the number of procs available
+            if 'not enough slots' in errs.decode('utf-8'):
+                err_string = ('MPI library tried to use too many cores and failed, '
+                              'rescaling core count and re-running with {} cores...'.format(int(self.ncores/2)))
+                logging.warning(err_string)
+                logging.warning('stdout: {stdout}'.format(stdout=out.decode('utf-8')))
+                logging.warning('sterr: {stderr}'.format(stderr=errs.decode('utf-8')))
+                if self.ncores >= 2:
+                    self.ncores = int(self.ncores/2)
+                else:
+                    raise CriticalError(err_string)
+                self.test_exec()
+
+            else:
+                err_string = 'Executable {exc} failed testing. Is it on your PATH?'.format(exc=self.executable)
+                logging.critical(err_string)
+                logging.critical('stdout: {stdout}'.format(stdout=out.decode('utf-8')))
+                logging.critical('sterr: {stderr}'.format(stderr=errs.decode('utf-8')))
+                logging.debug('Raising CriticalError.')
+                raise CriticalError(err_string)
 
     @property
     def mpi_library(self):
@@ -776,7 +797,7 @@ class FullRelaxer:
         if sum([self.archer, self.intel, self.slurm]) > 1:
             message = 'Conflicting command-line arguments for MPI library have been supplied, exiting.'
             logging.critical(message)
-            raise SystemExit(message)
+            raise CriticalError(message)
         elif self.archer:
             return 'archer'
         elif self.intel:
@@ -805,7 +826,7 @@ class FullRelaxer:
             msg = 'Failed to find mpirun or aprun.'
             logging.critical(msg)
             logging.debug('Error message: {exc}'.format(exc=exc))
-            raise SystemExit(msg)
+            raise CriticalError(msg)
         if 'Intel' in mpi_version_string:
             mpi_version = 'intel'
         elif 'aprun' in mpi_version_string:
@@ -976,6 +997,8 @@ class FullRelaxer:
         errors_present = False
 
         for globbed in glob.glob(err_file):
+            if globbed.endswith('opt_err'):
+                continue
             if os.path.isfile(globbed):
                 with open(globbed, 'r') as f:
                     flines = f.readlines()
@@ -1107,6 +1130,13 @@ class FullRelaxer:
             logging.info('Using compute_dir: {compute}'.format(compute=self.compute_dir))
             if not os.path.isdir(self.compute_dir):
                 os.makedirs(self.compute_dir)
+            # if compute_dir isn't simply inside this folder, make a symlink that is
+            if '/' in self.compute_dir:
+                link_name = self.compute_dir.split('/')[-1]
+                if not os.path.isfile(link_name) and not os.path.isdir(link_name):
+                    if os.path.islink(link_name):
+                        os.remove(link_name)
+                    os.symlink(self.compute_dir, link_name)
 
             # copy pspots and any intermediate calcs to compute_dir
             logging.info('Copying pspots into compute_dir')
@@ -1171,7 +1201,7 @@ class FullRelaxer:
         if not self.geom_max_iter_list:
             msg = 'Could not divide up relaxation; consider increasing geom_max_iter'
             logging.critical(msg)
-            raise SystemExit(msg)
+            raise CriticalError(msg)
 
     def _update_input_files(self):
         """ Update the cell and param files for the next relaxation. """
@@ -1313,7 +1343,25 @@ class FullRelaxer:
         if os.path.isdir(compute_dir):
             logging.debug('Deleting directory {dir}'.format(dir=compute_dir))
             os.rmdir(compute_dir)
+
+        if os.path.islink(compute_dir.split('/')[-1]):
+            os.remove(compute_dir.split('/')[-1])
+
         return True
+
+
+class CriticalError(Exception):
+    """ Raise this when you don't want any more jobs to run because something
+    uncorrectable has happened! Plays more nicely with multiprocessing than
+    SystemExit.
+
+    """
+    pass
+
+
+class InputError(Exception):
+    """ Raise this when there is an issue with the input files. """
+    pass
 
 
 class WalltimeError(Exception):
