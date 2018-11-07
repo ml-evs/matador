@@ -142,11 +142,11 @@ class WorkflowStep:
 
         """
         try:
-            logging.info('{} starting...'.format(self.name))
+            logging.info('WorkflowStep {} starting...'.format(self.name))
             self.function(relaxer, calc_doc, seed, **self.func_kwargs)
-            logging.info('{} completed successfully.'.format(self.name))
+            logging.info('WorkflowStep {} completed successfully.'.format(self.name))
 
         except RuntimeError as exc:
-            msg = '{} step failed with error {}.'.format(self.name, exc)
+            msg = 'WorkflowStep {} failed with error {}.'.format(self.name, exc)
             logging.error(msg)
             raise RuntimeError(msg)

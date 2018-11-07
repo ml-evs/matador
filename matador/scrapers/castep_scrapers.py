@@ -806,7 +806,6 @@ def optados2dict(seed, **kwargs):
                 projectors.append(projector_label)
 
         optados['num_projectors'] = len(projectors)
-        print('Found projectors:', projectors)
         optados['projectors'] = projectors
 
     if is_pdos:
