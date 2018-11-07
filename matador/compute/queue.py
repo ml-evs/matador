@@ -15,7 +15,8 @@ def get_queue_env(token=None):
 
     Keyword arguments:
         token (str): choose one of either SLURM or PBS explicitly.
-Returns:
+
+    Returns:
         (dict, str): dictionary of keys from the detected/specified queue, and
             a string containing either "slurm" or "pbs".
 
@@ -44,11 +45,10 @@ def get_queue_walltime(queue_env, queue_mgr):
     if queue_mgr == 'slurm':
         from matador.compute.slurm import get_slurm_walltime
         return get_slurm_walltime(queue_env)
-    elif queue_mgr == 'pbs':
+    if queue_mgr == 'pbs':
         from matador.compute.pbs import get_pbs_walltime
         return get_pbs_walltime(queue_env)
-    else:
-        raise SystemExit('Unable to detect queue.')
+    raise SystemExit('Unable to detect queue.')
 
 
 def get_queue_manager():
@@ -71,7 +71,7 @@ def get_queue_manager():
 
     if len(queue_mgr) > 1:
         raise SystemExit('Both SLURM and PBS were found... aah!')
-    elif not queue_mgr:
+    if not queue_mgr:
         return None
-    else:
-        return queue_mgr[0]
+
+    return queue_mgr[0]
