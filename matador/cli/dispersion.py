@@ -51,10 +51,14 @@ def main():
                         help='plot position and size of band gap')
     parser.add_argument('-ph', '--phonons', action='store_true', default=False,
                         help='plot phonon calculation, rather than electronic')
+    parser.add_argument('-gw', '--gaussian_width', type=float,
+                        help='smearing width for DOS from .bands_dos (default: 0.1 eV) or .phonon_dos files (default: 10 1/cm)')
     parser.add_argument('--highlight_bands', nargs='+', type=int,
                         help='specify band numbres to highlight in plot')
     parser.add_argument('-v', '--verbosity', type=int, default=0,
                         help='control verbosity of output')
+    parser.add_argument('-figsize', '--figsize', nargs='+', type=int,
+                        help='figure size in inches to pass to matplotlib')
     parser.add_argument('-pw', '--plot_window', type=float,
                         help='energy window to plot either side of E_F (eV)\
                              (DEFAULT: 5 eV)')
@@ -98,6 +102,7 @@ def main():
         bs_seed = test_seed.replace('.bands', '') + '.bands'
         bandstructure = isfile(bs_seed)
         dos_seeds = glob.glob(test_seed.replace('.bands', '') + '*.dat')
+        dos_seeds += [test_seed + '.bands_dos']
         dos = any([isfile(dos_seed) for dos_seed in dos_seeds])
         cell_seed = test_seed.replace('.bands', '') + '.cell'
         cell = isfile(cell_seed)
