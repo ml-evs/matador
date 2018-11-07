@@ -70,7 +70,7 @@ def plot_spectral(seeds, **kwargs):
                      'phonons': False, 'gap': False,
                      'colour_by_seed': False, 'external_efermi': None,
                      'labels': None, 'cmap': None, 'band_colour': 'occ',
-                     'n_colours': 4, 'spin_only': None,
+                     'n_colours': 4, 'spin_only': None, 'figsize': None,
                      'no_stacked_pdos': False, 'preserve_kspace_distance': False,
                      'band_reorder': None, 'title': None,
                      'verbosity': 0, 'highlight_bands': None, 'pdos_hide_tot': True}
@@ -108,13 +108,18 @@ def plot_spectral(seeds, **kwargs):
 
     if kwargs['plot_dos']:
         # check an optados file exists
-        exts = ['pdos.dat', 'adaptive.dat', 'fixed.dat', 'linear.dat', 'jdos.dat', 'phonon_dos']
+        exts = ['pdos.dat', 'adaptive.dat', 'fixed.dat', 'linear.dat', 'jdos.dat', 'phonon_dos', 'bands_dos']
         kwargs['plot_dos'] = any([any([os.path.isfile('{}.{}'.format(seed, ext)) for ext in exts]) for seed in seeds])
 
+    figsize = kwargs['figsize']
     if kwargs['plot_bandstructure'] and not kwargs['plot_dos']:
-        fig, ax_dispersion = plt.subplots(figsize=(7, 6))
+        if figsize is None:
+            figsize = (7, 6)
+        fig, ax_dispersion = plt.subplots(figsize=figsize)
     elif kwargs['plot_bandstructure'] and kwargs['plot_dos']:
-        fig, ax_grid = plt.subplots(1, 3, figsize=(8, 6), sharey=True,
+        if figsize is None:
+            figsize = (8, 6)
+        fig, ax_grid = plt.subplots(1, 3, figsize=figsize, sharey=True,
                                     gridspec_kw={'width_ratios': [4, 1, 1],
                                                  'wspace': 0.05,
                                                  'left': 0.15})
@@ -122,7 +127,9 @@ def plot_spectral(seeds, **kwargs):
         ax_dos = ax_grid[1]
         ax_grid[2].axis('off')
     elif not kwargs['plot_bandstructure'] and kwargs['plot_dos']:
-        fig, ax_dos = plt.subplots(1, figsize=(8, 4))
+        if figsize is None:
+            figsize = (6, 3)
+        fig, ax_dos = plt.subplots(1, figsize=figsize)
 
     kwargs['valence'] = kwargs['colours'][0]
     kwargs['conduction'] = kwargs['colours'][-1]
@@ -169,6 +176,7 @@ def plot_spectral(seeds, **kwargs):
                         bbox_inches='tight', transparent=True, bbox_extra_artists=bbox_extra_artists)
 
     else:
+        plt.tight_layout()
         print('Displaying plot...')
         plt.show()
 
@@ -223,6 +231,7 @@ def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
             eig_key = 'eigenvalues_k_s'
             band_key = 'num_bands'
             spin_key = 'num_spins'
+
             if kwargs['plot_window'] is None:
                 kwargs['plot_window'] = [-10, 10]
 
@@ -258,7 +267,7 @@ def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
                                            ls=kwargs['ls'][seed_ind], alpha=alpha, label=label)
 
     if len(seeds) > 1:
-        disp_legend = ax_dispersion.legend(loc='upper center', facecolor='w',
+        disp_legend = ax_dispersion.legend(loc='upper center',
                                            frameon=True, fancybox=False, shadow=False, framealpha=1)
         bbox_extra_artists.append(disp_legend)
 
@@ -289,23 +298,52 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
         matplotlib.Axes: the axis that was plotted on.
 
     """
-    from matador.scrapers import optados2dict, phonon2dict
+    from matador.scrapers import optados2dict, phonon2dict, bands2dict
     for seed_ind, seed in enumerate(seeds):
         seed = seed.replace('.bands', '').replace('.phonon', '')
         if kwargs['plot_dos']:
             if not kwargs['phonons']:
                 if kwargs.get('dos') is None:
                     # look for dat files, and just use the first
-                    exts = ['adaptive', 'fixed', 'linear']
+                    exts = ['adaptive.dat', 'fixed.dat', 'linear.dat', 'bands_dos']
                     for ext in exts:
-                        if os.path.isfile('{}.{}.dat'.format(seed, ext)):
-                            dos_seed = '{}.{}.dat'.format(seed, ext)
+                        if os.path.isfile('{}.{}'.format(seed, ext)):
+                            dos_seed = '{}.{}'.format(seed, ext)
                             break
                     else:
                         raise SystemExit('No total DOS files found.')
                 else:
                     dos_seed = kwargs.get('dos')
-                dos_data, s = optados2dict(dos_seed, verbosity=0)
+
+                if dos_seed.endswith('.bands_dos'):
+                    # if bands_dos exists, do some manual broadening
+                    dos_data, s = bands2dict(dos_seed)
+                    raw_weights = []
+                    space_size = 1000
+                    gaussian_width = kwargs.get('gaussian_width')
+                    if gaussian_width is None:
+                        gaussian_width = 0.1
+
+                    raw_eigenvalues = []
+                    for kind, qpt in enumerate(dos_data['eigenvalues_k_s']):
+                            weight = dos_data['kpoint_weights'][kind]
+                            for eig in qpt:
+                                raw_weights.append(weight)
+                                raw_eigenvalues.append(eig)
+                    raw_eigenvalues = np.asarray(raw_eigenvalues)
+                    hist, energies = np.histogram(raw_eigenvalues, bins=space_size)
+                    # shift bin edges to bin centres
+                    energies -= energies[1] - energies[0]
+                    energies = energies[:-1]
+                    new_energies = np.reshape(energies, (1, len(energies)))
+                    new_energies = new_energies - np.reshape(energies, (1, len(energies))).T
+                    dos = np.sum(hist * np.exp(-(new_energies)**2 / gaussian_width), axis=1)
+                    dos = np.divide(dos, np.sqrt(2 * np.pi * gaussian_width**2))
+                    dos_data['dos'] = dos
+                    dos_data['energies'] = energies
+                else:
+                    dos_data, s = optados2dict(dos_seed, verbosity=0)
+
                 if not s:
                     raise RuntimeError(dos_data)
 
@@ -313,7 +351,7 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                 dos = dos_data['dos']
 
                 if kwargs['plot_window'] is None:
-                    kwargs['plot_window'] = [np.min(energies[np.where(dos > 1e-3)]) - 10, np.max(energies[np.where(dos > 1e-3)])]
+                    kwargs['plot_window'] = [-10, 10]
 
                 if 'spin_dos' in dos_data:
                     max_density = max(np.max(np.abs(dos_data['spin_dos']['down'][np.where(energies > kwargs['plot_window'][0])])),
@@ -336,7 +374,7 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                         if kwargs['plot_window'] is None:
                             kwargs['plot_window'] = [min(-10, np.min(phonon_data['eigenvalues_q']) - 10), np.max(phonon_data['eigenvalues_q'])]
                         space_size = 1000
-                        gaussian_width = 10
+                        gaussian_width = kwargs.get('gaussian_width', 100)
                         raw_weights = []
                         raw_eigenvalues = []
                         for qind, qpt in enumerate(phonon_data['eigenvalues_q']):
@@ -401,43 +439,46 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
             if len(seeds) > 1:
                 colour = kwargs['seed_colours'][seed_ind]
             else:
-                colour = 'k'
+                colour = None
 
             ax_dos.grid(False)
 
             if kwargs['plot_bandstructure']:
                 ax_dos.set_xticks([0.6 * max_density])
                 ax_dos.set_xticklabels([ylabel])
-                ax_dos.axhline(0, c='grey', ls='-', lw=0.5)
+                ax_dos.axhline(0, c='grey', ls='--', lw=1)
                 if 'spin_dos' in dos_data:
                     ax_dos.set_xlim(-max_density*1.2, max_density * 1.2)
                 else:
                     ax_dos.set_xlim(0, max_density * 1.2)
                 ax_dos.set_ylim(kwargs['plot_window'])
-                ax_dos.axvline(0, c='k')
+                ax_dos.axvline(0, c='grey', lw=1)
+                ax_dos.xaxis.set_ticks_position('none')
 
                 if 'spin_dos' not in dos_data:
                     ax_dos.plot(dos, energies, ls=kwargs['ls'][seed_ind],
-                                color=colour, zorder=1e10, label='Total DOS')
+                                color='grey', zorder=1e10, label='Total DOS')
                     if 'spin_dos' not in dos_data:
-                        ax_dos.fill_betweenx(energies, 0, dos, alpha=0.2, color=colour)
+                        ax_dos.fill_betweenx(energies[np.where(energies > 0)], 0, dos[np.where(energies > 0)], alpha=0.2, color=kwargs['conduction'])
+                        ax_dos.fill_betweenx(energies[np.where(energies <= 0)], 0, dos[np.where(energies <= 0)], alpha=0.2, color=kwargs['valence'])
 
             else:
                 ax_dos.set_xlabel(xlabel)
                 ax_dos.set_ylabel(ylabel)
-                ax_dos.axvline(0, c='grey', lw=0.5)
+                ax_dos.axvline(0, c='grey', lw=1, ls='--')
                 if 'spin_dos' in dos_data:
                     ax_dos.set_ylim(-max_density*1.2, max_density * 1.2)
                 else:
                     ax_dos.set_ylim(0, max_density * 1.2)
                 ax_dos.set_xlim(kwargs['plot_window'])
-                ax_dos.axhline(0, c='grey', lw=0.5)
+                ax_dos.axhline(0, c='grey', lw=1)
 
                 if 'spin_dos' not in dos_data:
                     ax_dos.plot(energies, dos, ls=kwargs['ls'][seed_ind], alpha=1,
-                                color=colour, zorder=1e10, label='Total DOS')
+                                c='grey', zorder=1e10, label='Total DOS')
                     if 'spin_dos' not in dos_data:
-                        ax_dos.fill_between(energies, 0, dos, alpha=0.1, color=colour)
+                        ax_dos.fill_between(energies[np.where(energies > 0)], 0, dos[np.where(energies > 0)], alpha=0.2, color=kwargs['conduction'])
+                        ax_dos.fill_between(energies[np.where(energies <= 0)], 0, dos[np.where(energies <= 0)], alpha=0.2, color=kwargs['valence'])
 
             if 'pdos' in pdos_data and len(seeds) == 1:
                 pdos = pdos_data['pdos']
@@ -501,7 +542,7 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                         ax_dos.fill_between(energies, 0, dos_data['spin_dos']['up'], alpha=0.2, color='r')
 
             if len(seeds) == 1:
-                dos_legend = ax_dos.legend(bbox_to_anchor=(1, 1), facecolor='w',
+                dos_legend = ax_dos.legend(bbox_to_anchor=(1, 1),
                                            frameon=True, fancybox=False, shadow=False)
                 bbox_extra_artists.append(dos_legend)
 
@@ -654,7 +695,7 @@ def _ordered_scatter(k, e, projections, alpha=1, ax=None, zorder=None, colours=N
     flat_projections = flat_projections[::-1]
     colours = list(reversed(colours))
     ax.scatter(cat_pts[:, 0, 0], cat_pts[:, 0, 1], s=10*flat_projections**2, facecolor=colours, alpha=0.8)
-    ax.plot(pts[:, 0, 0], pts[:, 0, 1], lw=0.5, c='k', alpha=0.5)
+    ax.plot(pts[:, 0, 0], pts[:, 0, 1], lw=0.5, alpha=0.5)
 
 
 def match_bands(dispersion, branches):
@@ -779,7 +820,7 @@ def _get_lineprops(dispersion, eig_key, spin_key, nb, ns, branch, branch_ind, se
 
 def _get_path_labels(seed, dispersion, ax_dispersion, path, path_key, branch_key, seed_ind, kwargs):
     """ Scrape k-point path labels from cell file and seekpath. """
-    from matador.scrapers import cell2dict
+    from matador.scrapers import cell2dict, res2dict
     from matador.utils.cell_utils import doc2spg
     from seekpath import get_path
     xticks = []
@@ -792,16 +833,27 @@ def _get_path_labels(seed, dispersion, ax_dispersion, path, path_key, branch_key
     if kwargs['phonons']:
         spg_structure = doc2spg(dispersion)
     else:
-        if not os.path.isfile(seed + '.cell'):
-            print('Failed to find {}.cell, will not be able to generate labels.'.format(seed))
+        res = False
+        cell = False
+        if os.path.isfile(seed + '.res'):
+            res = True
+        elif os.path.isfile(seed + '.cell'):
+            cell = True
+        else:
+            print('Failed to find {}.cell or {}.res, will not be able to generate labels.'.format(seed, seed))
 
-        doc, success = cell2dict(seed + '.cell',
-                                 db=False, verbosity=kwargs.get('verbosity', 0),
-                                 outcell=True, positions=True)
+        success = False
+        if cell:
+            doc, success = cell2dict(seed + '.cell',
+                                     db=False, verbosity=kwargs.get('verbosity', 0),
+                                     outcell=True, positions=True)
+        if res and not success:
+            doc, success = res2dict(seed + '.res',
+                                    db=False, verbosity=kwargs.get('verbosity', 0))
         if success:
             spg_structure = doc2spg(doc)
         else:
-            print('Failed to scrape {}.cell, will not be able to generate labels.'.format(seed))
+            print('Failed to scrape {}.cell/.res, will not be able to generate labels.'.format(seed))
 
     if spg_structure is not False and spg_structure is not None:
         seekpath_results = get_path(spg_structure)
