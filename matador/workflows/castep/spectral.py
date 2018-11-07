@@ -173,12 +173,6 @@ def castep_spectral_dos(relaxer, calc_doc, seed):
 
     success = relaxer.scf(dos_doc, seed, keep=True, intermediate=True)
 
-    shutil.move('{}.bands'.format(seed), '{}.bands_dos'.format(seed))
-    if os.path.isfile('{}.bands_bak'.format(seed)):
-        shutil.move('{}.bands_bak'.format(seed), '{}.bands'.format(seed))
-    shutil.copy2('{}.cell'.format(seed), '{}.cell_dos'.format(seed))
-    shutil.copy2('{}.param'.format(seed), '{}.param_dos'.format(seed))
-
     from matador.scrapers import arbitrary2dict
     from matador.export import doc2arbitrary
 
@@ -215,7 +209,7 @@ def castep_spectral_dos(relaxer, calc_doc, seed):
                 shutil.copy2('{}.pdos_bin'.format(seed), '{}.pdos_bin_pdos_bak'.format(seed))
 
             try:
-                success = relaxer.run_generic(seed, intermediate=True)
+                success = relaxer.run_generic(seed, intermediate=True, mv_bad_on_failure=False)
             except Exception as exc:
                 relaxer.executable = _cache_executable
                 logging.warning('Failed to call optados, with error: {}'.format(exc))
@@ -233,7 +227,7 @@ def castep_spectral_dos(relaxer, calc_doc, seed):
             shutil.copy2('{}.odi'.format(seed), '{}.odi_dos'.format(seed))
 
             try:
-                success = relaxer.run_generic(seed, intermediate=True)
+                success = relaxer.run_generic(seed, intermediate=True, mv_bad_on_failure=False)
             except Exception as exc:
                 relaxer.executable = _cache_executable
                 relaxer.ncores = _cache_core
@@ -241,6 +235,13 @@ def castep_spectral_dos(relaxer, calc_doc, seed):
 
             relaxer.executable = _cache_executable
             relaxer.ncores = _cache_core
+
+    # backup input files and save output files that might be overwritten
+    shutil.copy2('{}.bands'.format(seed), '{}.bands_dos'.format(seed))
+    if os.path.isfile('{}.bands_bak'.format(seed)):
+        shutil.move('{}.bands_bak'.format(seed), '{}.bands'.format(seed))
+    shutil.copy2('{}.cell'.format(seed), '{}.cell_dos'.format(seed))
+    shutil.copy2('{}.param'.format(seed), '{}.param_dos'.format(seed))
 
     return success
 
@@ -285,7 +286,7 @@ def castep_spectral_dispersion(relaxer, calc_doc, seed):
         relaxer.ncores = 1
         relaxer.executable = 'orbitals2bands'
         try:
-            success = relaxer.run_generic(seed, intermediate=True)
+            success = relaxer.run_generic(seed, intermediate=True, mv_bad_on_failure=False)
         except Exception as exc:
             relaxer.executable = _cache_executable
             relaxer.ncores = _cache_core
@@ -330,7 +331,7 @@ def castep_spectral_dispersion(relaxer, calc_doc, seed):
             relaxer.executable = 'optados'
             shutil.copy2('{}.odi'.format(seed), '{}.odi_bs'.format(seed))
             try:
-                success = relaxer.run_generic(seed, intermediate=True)
+                success = relaxer.run_generic(seed, intermediate=True, mv_bad_on_failure=False)
             except Exception as exc:
                 relaxer.executable = _cache_executable
                 relaxer.ncores = _cache_core

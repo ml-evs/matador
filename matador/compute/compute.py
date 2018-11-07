@@ -351,7 +351,7 @@ class FullRelaxer:
 
         return success
 
-    def run_generic(self, seed, intermediate=False):
+    def run_generic(self, seed, intermediate=False, mv_bad_on_failure=True):
         """ Run a generic mpi program on the given seed. Files from
         completed runs are moved to "completed" (unless intermediate
         is True) and failed runs to "bad_castep".
@@ -363,6 +363,8 @@ class FullRelaxer:
             intermediate (bool): whether we want to run more calculations
                 on the output of this, i.e. whether to move to completed
                 or not.
+            mv_bad_on_failure (bool): whether to move files to bad_castep on
+                failure, or leave them in place.
 
         Returns:
             bool: True if calculations progressed without error.
@@ -387,11 +389,13 @@ class FullRelaxer:
                 logging.info('Writing results of generic call to res file and tidying up.')
                 self.mv_to_completed(seed, keep=True, completed_dir=self.paths['completed_dir'])
 
+            logging.info('Executable {exe} finished cleanly.'.format(exe=self.executable))
             return True
 
         except Exception as err:
             logging.error('Caught error inside run_generic: {error}.'.format(error=err))
-            self.mv_to_bad(seed)
+            if mv_bad_on_failure:
+                self.mv_to_bad(seed)
             raise err
 
     def relax(self):
