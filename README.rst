@@ -1,3 +1,4 @@
+=======
 matador
 =======
 
@@ -10,12 +11,9 @@ The source can be found on `Bitbucket <https://bitbucket.org/ml-evs/matador>`_.
 Written by `Matthew Evans <https://www.ml-evs.github.io>`_ (2016-). 
 
 
-.. figure:: ../img/lipzn.png
-   :alt: lipzn.png
-   :height: 400px
-   :width: 636px
+.. image:: img/lipzn.png
+   :name: LiPZn
    :align: center
-
 
 Core functionality
 -------------------

@@ -13,7 +13,7 @@ The tl;dr way to install matador, on e.g. a computing cluster, is as follows:
 
 Optional (but recommended) steps:
 
-2. Install conda, if you have not already (https://conda.io/miniconda.html) (choose the version suitable for you, the installers Python version does not matter that much, but it may as well be 3+!).
+2. `Install conda <https://conda.io/miniconda.html>`_, if you have not already (choose the version suitable for you, the installers Python version does not matter that much, but it may as well be 3+!).
 3. Create a new conda environment to install matador into (``conda create -n matador python=3.6``)
 4. Install some of the heavier requirements (e.g. NumPy and SciPy) through conda with ``conda install --yes --file requirements/requirements.txt``. You may also want to install some of the optional dependencies in this manner, e.g. ``conda install --yes --file requirements/plotting_requirements.txt``.
 

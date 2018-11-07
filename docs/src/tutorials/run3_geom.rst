@@ -2,11 +2,15 @@
 
 .. _run3_geom:
 
-
 Example 1: High-throughput geometry optimisations with CASTEP
 -------------------------------------------------------------
 
 .. _ex1:
+
+
+Example 1.1: Using run3 locally
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 
 In this example, we will suppose that you want to perform a geometry optimisation on several different polymorphs of TiO<sub>2</sub> from the ICSD. The files for this example can be found in ``examples/run3_tutorial``, `here <https://bitbucket.org/ml-evs/matador/src/examples/run3_tutorial>`_.
 
@@ -116,8 +120,8 @@ Several folders will also be created:
 Eventually, all jobs will hopefully be moved to ``completed/``, then you are done!
 
 
-Example 1.1: High-throughput geometry optimisations with CASTEP with per-structure parameters
----------------------------------------------------------------------------------------------
+Example 1.1.1: High-throughput geometry optimisations with CASTEP with per-structure parameters
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 There are a few occasions where you might need a custom ``.param`` file for each structure, for example, if using the implicit nanotube ``%devel_code`` in CASTEP.
 
@@ -129,7 +133,7 @@ These calculations are performed in exactly the same was as above, except a ``<s
 
 
 Example 1.2: High-throughput geometry optimisations with CASTEP on a supercomputer
-----------------------------------------------------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Each HPC facility has its own quirks, so in this example we will try to be as explicit as possible. The set up of the job is exactly the same as in `example 1 <ex1_>`__, but we now must add run3 to our job submission script. The following examples are for the SLURM system on the BlueBear machine at the University of Birmingham and PBS on ARCHER (Tier-1), but run3 has also been tested on CSD3 (Tier-2), HPC Midlands-Plus (Tier-2), Thomas (Tier-2) and several local group-scale clusters.
 
@@ -159,8 +163,7 @@ In this job, we will submit a run3 job that performs CASTEP calculations across 
     
     ###### RUN3 COMMANDS (assuming installation guide followed at https://matador-db.readthedocs.io/en/latest/install.html) ######
 
-    source activate matador 
-    run3 -nc 48 --intel -v 4 --executable castep.mpi --ignore_jobs_file TiO2
+    source activate matador run3 -nc 48 --intel -v 4 --executable castep.mpi --ignore_jobs_file TiO2
 
 Let's unpick a few of the flags used to call run3 here:
 
@@ -221,4 +224,3 @@ Instructions are almost identical to the above, but the array job script looks a
 Notice here we have specified ``--archer`` instead of ``--intel``: again, run3 should be able to detect that ``mpirun`` is missing and thus try ``aprun``, but it can be worth specifying just in case. With PBS, the whole array can be submitted with just::
 
     $ qsub run3.job
-
