@@ -57,6 +57,8 @@ def plot_spectral(seeds, **kwargs):
             linearising the kpoint path. If False, bandstructures of different lattice parameters
             with the same Bravais lattice can be more easily compared. If True, bandstructures may
             appear rarefied or compressed in particular regions.
+        pdis_interpolation_factor (float): multiple by which to interpolate pDIS bands
+        pdis_point_scale (float): size of points in pDIS (DEFAULT: 50).
         band_reorder (bool): try to reorder bands based on local gradients (DEFAULT: True for phonons, otherwise False).
         title (str): optional plot title
         pdos_hide_tot (bool): whether or not to plot the total DOS on a PDOS plot; this is to hide
@@ -71,6 +73,7 @@ def plot_spectral(seeds, **kwargs):
                      'colour_by_seed': False, 'external_efermi': None,
                      'labels': None, 'cmap': None, 'band_colour': 'occ',
                      'n_colours': 4, 'spin_only': None, 'figsize': None,
+                     'pdis_interpolation_factor': 2, 'pdis_point_scale': None,
                      'no_stacked_pdos': False, 'preserve_kspace_distance': False,
                      'band_reorder': None, 'title': None,
                      'verbosity': 0, 'highlight_bands': None, 'pdos_hide_tot': True}
@@ -239,7 +242,10 @@ def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
             path = _linearise_path(dispersion, path_key, branch_key, num_key, kwargs)
 
             if os.path.isfile('{}.pdis.dat'.format(seed)) and len(seeds) == 1 and kwargs['plot_pdis']:
-                ax_dispersion = projected_bandstructure_plot(seed, ax_dispersion, path, dispersion, bbox_extra_artists)
+                ax_dispersion = projected_bandstructure_plot(seed, ax_dispersion, path, dispersion,
+                                                             bbox_extra_artists,
+                                                             point_scale=kwargs.get('pdis_point_scale', 25),
+                                                             interpolation_factor=kwargs.get('pdis_interpolation_factor', 2))
                 kwargs['band_colour'] = 'grey'
                 plotted_pdis = True
 
@@ -554,7 +560,7 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
     return ax_dos
 
 
-def projected_bandstructure_plot(seed, ax, path, dispersion, bbox_extra_artists, mode='scatter', **kwargs):
+def projected_bandstructure_plot(seed, ax, path, dispersion, bbox_extra_artists, interpolation_factor=2, point_scale=25, **kwargs):
     """ Plot projected bandstructure with weightings from OptaDOS pdis.dat file.
 
     Parameters:
@@ -564,7 +570,8 @@ def projected_bandstructure_plot(seed, ax, path, dispersion, bbox_extra_artists,
         bbox_extra_artists (list): list to append any legends too.
 
     Keyword arguments:
-        mode (str): either 'scatter' or 'rgb' for two plotting options.
+        interpolation_factor (float): amount by which to interpolate bands.
+        point_scale (float): rescale points by this amount
 
     Returns:
         matplotlib.pyplot.Axes: the axis that was plotted on.
@@ -587,127 +594,92 @@ def projected_bandstructure_plot(seed, ax, path, dispersion, bbox_extra_artists,
         if np.max(pdis[:, :, ind]) > 1e-8:
             keep_inds.append(ind)
 
-    if len(keep_inds) <= 3:
-        mode = 'rgb'
-    else:
-        mode = 'scatter'
-    mode = 'scatter'
-
     lattice_cart = dispersion['lattice_cart']
     eigs = np.asarray(dos_data['eigenvalues'])
 
     projector_labels, dos_colours = _get_projector_info(projectors)
 
-    counter = 0
     for ind, projector in enumerate(projectors):
         if ind in keep_inds:
-            if mode == 'scatter':
-                ax.scatter(1e20, 0, facecolor=(1,1,1,0), edgecolor=dos_colours[ind], label=projector_labels[ind], lw=1)
-            else:
-                colours = ['red', 'blue', 'green']
-                ax.plot([1e20, 1e20], [0, 0], c=colours[counter], label=projector_labels[ind], lw=3, alpha=0.8)
-                counter += 1
-
-    try:
-        from tqdm import tqdm
-    except ImportError:
-        def tqdm(x):
-            return x
-        pass
+            ax.scatter(1e20, 0, facecolor=dos_colours[ind],
+                       label=projector_labels[ind], lw=0)
 
     dos_data['kpoints_cartesian'] = np.asarray(frac2cart(real2recip(lattice_cart), dos_data['kpoints']))
     dos_data['kpoint_branches'], dos_data['kpoint_path_spacing'] = get_kpt_branches(dos_data['kpoints_cartesian'])
-    for nb in tqdm(range(dos_data['num_bands'])):
-        if mode == 'scatter':
-            for branch_ind, branch in enumerate(dos_data['kpoint_branches']):
-                _ordered_scatter(path[(np.asarray(branch) - branch_ind).tolist()],
-                                 eigs[branch, nb], pdis[branch, nb], ax=ax, colours=[dos_colours[ind] for ind in keep_inds], zorder=0)
-        elif mode == 'rgb':
-            for branch_ind, branch in enumerate(dos_data['kpoint_branches']):
-                red = pdis[branch, nb, 0]
-                if np.shape(pdis)[-1] > 1:
-                    blue = pdis[branch, nb, 1]
-                else:
-                    blue = np.zeros_like(red)
-                if np.shape(pdis)[-1] > 2:
-                    green = pdis[branch, nb, 2]
-                else:
-                    green = np.zeros_like(red)
-                _rgbline(path[(np.asarray(branch) - branch_ind).tolist()],
-                         eigs[branch, nb], red, green, blue, ax=ax, zorder=0)
+    _ordered_scatter(path, eigs, pdis, dos_data['kpoint_branches'],
+                     interpolation_factor=interpolation_factor, point_scale=point_scale,
+                     ax=ax, colours=[dos_colours[ind] for ind in keep_inds])
 
-    l = ax.legend(loc=1)
-    l.set_zorder(1e20)
-    bbox_extra_artists.append(l)
+    legend = ax.legend(loc=1, frameon=True, fancybox=False, shadow=False)
+    legend.set_zorder(1e20)
+    bbox_extra_artists.append(legend)
     return ax
 
 
-def _rgbline(k, e, red, green, blue, alpha=1, ax=None, zorder=None, interpolation_factor=10):
-    """ Draw a line coloured by three components. Based on:
-    http://nbviewer.ipython.org/urls/raw.github.com/dpsanders/matplotlib-examples/master/colorline.ipynb
+def _ordered_scatter(path, eigs, pdis, branches, ax=None, colours=None, interpolation_factor=2, point_scale=25):
+    """ Plots an ordered scatter plot of a projected bandstructure.
+
+    Parameters:
+        path (np.ndarray): linearised [0, 1] kpoint path array.
+        eigs (np.ndarray): (num_kpoints x num_bands) array containing eigenvalues
+        pdis (np.ndarray): (num_kpoints x num_bands x num_projecttors) array containing
+            projector weights.
+        branches (list): list of branch indices, e.g. for two branches [[0,1,2], [3, 4]].
+
+    Keyword arguments:
+        ax (matplotlib.Axes): axis to plot on
+        colours (list): colours assigned for each projector.
+        interpolation_factor (float): multiplier for fineness of band interpolation.
+
     """
-    from matplotlib.collections import LineCollection
     from scipy.interpolate import interp1d
-    ek_fn = interp1d(k, e)
-    k_interp = np.linspace(np.min(k), np.max(k), num=int(interpolation_factor*len(k)))
-    k_interp2 = np.linspace(np.min(k)+0.0001, np.max(k), num=int(interpolation_factor*len(k)))
-    ek_interp = ek_fn(k_interp)
-    ek_interp2 = ek_fn(k_interp2)
-    red = interp1d(k, red)(k_interp)
-    blue = interp1d(k, blue)(k_interp)
-    green = interp1d(k, green)(k_interp)
-    left = np.array([k_interp, ek_interp]).T.reshape(-1, 1, 2)
-    right = np.array([k_interp2, ek_interp2]).T.reshape(-1, 1, 2)
-    seg = np.concatenate([left[:-1], right[1:]], axis=1)
-    nseg = len(k_interp)-1
-    r = [0.5*(red[i]+red[i+1]) for i in range(nseg)]
-    g = [0.5*(green[i]+green[i+1]) for i in range(nseg)]
-    b = [0.5*(blue[i]+blue[i+1]) for i in range(nseg)]
-    widths = np.asarray(r+g+b) * 10 + 1
-    a = 2 * np.asarray(r+g+b) + 0.5
-    a[a >= 1] = 1
-    try:
-        lc = LineCollection(seg, colors=list(zip(r, g, b, a)), linewidths=widths, zorder=zorder)
-    except Exception as exc:
-        print(r, g, b)
-        raise exc
-    if ax is not None:
-        ax.add_collection(lc)
+    flat_pts_k = []
+    flat_pts_e = []
+    flat_sizes = []
+    flat_colours = []
+    flat_zorders = []
 
+    for nb in range(len(eigs[0])):
+        for branch_ind, branch in enumerate(branches):
+            k = path[(np.asarray(branch) - branch_ind).tolist()]
+            e = eigs[branch, nb]
+            projections = pdis[branch, nb]
 
-def _ordered_scatter(k, e, projections, alpha=1, ax=None, zorder=None, colours=None, interpolation_factor=10):
-    """ WIP: Try to plot a scatter of PDIS points. """
-    from scipy.interpolate import interp1d
-    ek_fn = interp1d(k, e)
+            ek_fn = interp1d(k, e)
+            k_interp = np.linspace(np.min(k), np.max(k), num=int(interpolation_factor*len(k)))
+            ek_interp = ek_fn(k_interp)
+            projections = projections.T
+            interp_projections = []
+            for i, proj in enumerate(projections):
+                interp_projections.append(interp1d(k, projections[i])(k_interp))
+            projections = np.asarray(interp_projections).T
+            pts = np.array([k_interp, ek_interp]).T.reshape(-1, 1, 2)
 
-    k_interp = np.linspace(np.min(k), np.max(k), num=int(interpolation_factor*len(k)))
-    ek_interp = ek_fn(k_interp)
-    projections = projections.T
-    interp_projections = []
-    for i, proj in enumerate(projections):
-        interp_projections.append(interp1d(k, projections[i])(k_interp))
-    interp_projections = np.asarray(interp_projections)
-    pts = np.array([k_interp, ek_interp]).T.reshape(-1, 1, 2)
+            plot_colours = [colours[i] for i in range(len(projections[0]))]
+            for i in range(len(projections)):
+                # zeros mess up zorder, so add small shift then subtract
+                # before calculating real sizes
+                projections[projections <= 1e-9] = 1e-9
+                sizes = np.cumsum(projections[i])
+                zorders = 1000*(-nb + 1-sizes)
+                projections[projections <= 1e-9] = 0
+                sizes = np.cumsum(projections[i])
+                for j in range(len(projections[i])):
+                    flat_pts_k.append(pts[i, 0, 0])
+                    flat_pts_e.append(pts[i, 0, 1])
+                    size = sizes[j]
+                    flat_sizes.append(point_scale*(size)**2)
+                    flat_colours.append(plot_colours[j])
+                    flat_zorders.append(zorders[j])
+            ax.plot(pts[:, 0, 0], pts[:, 0, 1], lw=0.5, alpha=0.5, c='grey',zorder=0)
 
-    from copy import deepcopy
-    cat_pts = deepcopy(pts)
-    flat_colours = np.zeros_like(interp_projections[0], dtype=int)
-    flat_projections = deepcopy(interp_projections[0])
-    for i in range(len(projections)-1):
-        # pts[:, 0, 1] += 0.1
-        cat_pts = np.concatenate((cat_pts, pts), axis=0)
-        flat_colours = np.concatenate((flat_colours, np.ones_like(projections[i])*(i+1)))
-        flat_projections = np.concatenate((flat_projections, projections[i+1]))
+    flat_zorders = np.asarray(flat_zorders)
+    flat_pts_k = np.asarray(flat_pts_k)[np.argsort(flat_zorders)]
+    flat_pts_e = np.asarray(flat_pts_e)[np.argsort(flat_zorders)]
+    flat_sizes = np.asarray(flat_sizes)[np.argsort(flat_zorders)]
+    flat_colours = np.asarray(flat_colours)[np.argsort(flat_zorders)]
 
-    cat_pts = cat_pts[np.argsort(flat_projections)]
-    flat_colours = flat_colours[np.argsort(flat_projections)].tolist()
-    flat_projections.sort()
-    colours = [colours[int(i)] for i in flat_colours]
-    cat_pts = cat_pts[::-1]
-    flat_projections = flat_projections[::-1]
-    colours = list(reversed(colours))
-    ax.scatter(cat_pts[:, 0, 0], cat_pts[:, 0, 1], s=50*flat_projections**2, edgecolor=colours, lw=1, facecolor=None, alpha=0.8)
-    ax.plot(pts[:, 0, 0], pts[:, 0, 1], lw=0.5, alpha=0.5)
+    ax.scatter(flat_pts_k, flat_pts_e, edgecolor=flat_colours, s=flat_sizes, lw=0, marker='o', facecolor=flat_colours)
 
 
 def match_bands(dispersion, branches):
