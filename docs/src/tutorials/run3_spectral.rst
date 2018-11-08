@@ -112,7 +112,7 @@ run3 will try to perform three types of calculation: a simple DOS smearing, a pr
    broadening: adaptive
    dos_spacing: 0.01
 
-With all these files in place, simply running ``run3 LiCoO2`` and ``dispersion LiCoO2-CollCode29225`` should yield the following plot:
+With all these files in place, simply running ``run3 LiCoO2`` and ``dispersion (-interp 3 -scale 25) LiCoO2-CollCode29225`` (optional flags in brackets) should yield the following plot:
 
 .. image:: LiCoO2-CollCode29225_spectral_pdis.png
    :name: full_spectral
