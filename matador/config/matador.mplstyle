@@ -39,7 +39,7 @@ grid.linestyle                : -
 grid.linewidth                : 1.0
 grid.alpha                    : 1.0
 figure.figsize                : 8.0, 6.0
-figure.dpi                    : 100.0
+figure.dpi                    : 100
 figure.facecolor              : white
 figure.edgecolor              : w
 figure.frameon                : True
@@ -47,6 +47,7 @@ figure.autolayout             : False
 savefig.facecolor             : w
 savefig.edgecolor             : w
 savefig.frameon               : True
+savefig.dpi                   : 400
 savefig.bbox                  : tight
 savefig.pad_inches            : 0.1
 savefig.transparent           : True
