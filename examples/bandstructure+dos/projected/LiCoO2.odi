@@ -1,0 +1,7 @@
+pdos: species_ang
+pdispersion: species
+adaptive_smearing: 1
+set_efermi_zero: True
+dos_per_volume: True
+broadening: adaptive
+dos_spacing: 0.01
