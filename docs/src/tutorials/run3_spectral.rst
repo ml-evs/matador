@@ -101,15 +101,21 @@ The final piece of the puzzle is `OptaDOS <http://www.tcm.phy.cam.ac.uk/~ajm255/
 .. note::
    The projected dispersion curve feature is quite new to OptaDOS and thus is temperamental. Depending on when you are reading this, it may require you to have compiled OptaDOS from the development branch on `BitBucket <http://bitbucket.org/ajm255/optados>`_.
 
-run3 will try to perform three types of calculation: a simple DOS smearing, a projected density of states (with projectors specified by the ``pdos`` keyword), and a projected bandstructure (with projectors specified by the ``pdispersion`` keyword). If ``pdos``/``pdispersion`` is not found in the .odi, this corresponding task will be skipped. Likewise, if ``broadening`` is not found in the .odi, the standard DOS broadening will not be performed.
+run3 will try to perform three types of calculation: a simple DOS smearing, a projected density of states (with projectors specified by the ``pdos`` keyword), and a projected bandstructure (with projectors specified by the ``pdispersion`` keyword). If ``pdos``/``pdispersion`` is not found in the .odi, this corresponding task will be skipped. Likewise, if ``broadening`` is not found in the .odi, the standard DOS broadening will not be performed.::
 
-::
    $ cat LiCoO2.odi
    pdos: species_ang
    pdispersion: species
-   adaptive_smearing: 0.4
+   adaptive_smearing: 1
    set_efermi_zero: True
    dos_per_volume: True
    broadening: adaptive
+   dos_spacing: 0.01
 
 With all these files in place, simply running ``run3 LiCoO2`` and ``dispersion LiCoO2-CollCode29225`` should yield the following plot:
+
+.. image:: LiCoO2-CollCode29225_spectral_pdis.png
+   :name: full_spectral
+   :align: center
+
+.. tip:: Note that the colours of each projectors in these plots is set by your VESTA colour scheme, which is bundled by default inside ``matador/config``.
