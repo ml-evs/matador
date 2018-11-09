@@ -11,7 +11,7 @@ The source can be found on `Bitbucket <https://bitbucket.org/ml-evs/matador>`_.
 Written by `Matthew Evans <https://www.ml-evs.github.io>`_ (2016-). 
 
 
-.. image:: img/lipzn.png
+.. image:: docs/src/img/lipzn.png
    :name: LiPZn
    :align: center
 

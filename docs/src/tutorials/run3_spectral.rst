@@ -93,7 +93,7 @@ After calling run3 again, the ``completed/`` folder in this case should contain 
 Example 2.4: Using OptaDOS for post-processing: projected DOS and bandstructures
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The final piece of the puzzle is `OptaDOS <http://www.tcm.phy.cam.ac.uk/~ajm255/optados/>`, a package for broadening and projecting densities of states (amongst other things) that comes with CASTEP. By default, run3 will turn on the required CASTEP settings (namely ``pdos_calculate_weights``) required by OptaDOS. In order for OptaDOS to be run automatically by run3, an extra .odi file must be added into our input deck, containing the details of the desired OptaDOS calculation.
+The final piece of the puzzle is `OptaDOS <http://www.tcm.phy.cam.ac.uk/~ajm255/optados/>`_, a package for broadening and projecting densities of states (amongst other things) that comes with CASTEP. By default, run3 will turn on the required CASTEP settings (namely ``pdos_calculate_weights``) required by OptaDOS. In order for OptaDOS to be run automatically by run3, an extra .odi file must be added into our input deck, containing the details of the desired OptaDOS calculation.
 
 .. note::
    This example assumes that the OptaDOS binary is called ``optados`` and resides in your PATH, likewise ``orbitals2bands``.
