@@ -16,7 +16,7 @@ import time
 from matador.utils.print_utils import print_notify, print_failure, print_warning
 from matador.compute.queue import get_queue_env, get_queue_walltime, get_queue_manager
 from matador.scrapers.castep_scrapers import cell2dict, param2dict
-from matador.compute.compute import FullRelaxer, CriticalError
+from matador.compute.compute import FullRelaxer, InputError
 
 
 class BatchRun:
@@ -132,7 +132,7 @@ class BatchRun:
                 self.args['ncores'] = int(self._queue_available_tasks / self.nprocesses)
 
         if self.args['nnodes'] < 1 or self.args['ncores'] < 1 or self.nprocesses < 1:
-            raise CriticalError('Invalid number of cores, nodes or processes.')
+            raise InputError('Invalid number of cores, nodes or processes.')
 
         if self.mode == 'castep':
             self.castep_setup()
@@ -297,32 +297,37 @@ class BatchRun:
         exts = ['cell', 'param']
         for ext in exts:
             if not os.path.isfile('{}.{}'.format(self.seed, ext)):
-                raise CriticalError('Failed to find {} file, {}.{}'.format(ext, self.seed, ext))
+                raise InputError('Failed to find {} file, {}.{}'.format(ext, self.seed, ext))
         self.cell_dict, cell_success = cell2dict(self.seed + '.cell', db=False)
         if not cell_success:
             print(self.cell_dict)
-            raise CriticalError('Failed to parse cell file')
+            raise InputError('Failed to parse cell file')
         self.param_dict, param_success = param2dict(self.seed + '.param', db=False)
         if not param_success:
             print(self.param_dict)
-            raise CriticalError('Failed to parse param file')
+            raise InputError('Failed to parse param file')
 
         # scan directory for files to run
         self.file_lists = defaultdict(list)
         self.file_lists['res'] = [file.name for file in os.scandir() if file.name.endswith('.res')]
+        if self.seed in (file.replace('.res', '') for file in self.file_lists['res']):
+            error = ("Found .res file with same name as seed: {}.res. This will wreak havoc on your calculations!".format(self.seed) +
+                     "Please rename either your seed.cell/seed.param files, or rename the offending .res")
+            raise InputError(error)
+
         if len(self.file_lists['res']) < 1:
             error = (
                 'run3 in CASTEP mode requires at least 1 res file in folder, found {}'
                 .format(len(self.file_lists['res']))
             )
-            raise CriticalError(error)
+            raise InputError(error)
 
         # do some prelim checks of parameters
         if self.param_dict['task'].upper() in ['GEOMETRYOPTIMISATION', 'GEOMETRYOPTIMIZATION']:
             if 'geom_max_iter' not in self.param_dict:
-                raise CriticalError('geom_max_iter is unset, please fix this.')
+                raise InputError('geom_max_iter is unset, please fix this.')
             elif int(self.param_dict['geom_max_iter']) <= 0:
-                raise CriticalError('geom_max_iter is only {}!'.format(self.param_dict['geom_max_iter']))
+                raise InputError('geom_max_iter is only {}!'.format(self.param_dict['geom_max_iter']))
 
         # parse convergence args and set them up
         self.convergence_run_setup()
@@ -343,7 +348,7 @@ class BatchRun:
                         if not line.startswith('#'):
                             self.args['conv_cutoff'].append(int(line))
             else:
-                raise CriticalError('Missing cutoff.conv file')
+                raise InputError('Missing cutoff.conv file')
         else:
             self.args['conv_cutoff'] = None
 
@@ -356,7 +361,7 @@ class BatchRun:
                         if not line.startswith('#'):
                             self.args['conv_kpt'].append(float(line))
             else:
-                raise CriticalError('Missing with conv.kpt file')
+                raise InputError('Missing with conv.kpt file')
         else:
             self.args['conv_kpt'] = None
 
