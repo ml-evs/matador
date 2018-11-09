@@ -209,6 +209,7 @@ class BatchRun:
             result = [proc.terminate() for proc in procs if proc.is_alive()]
             print_failure('Bundled errors:')
             print_warning(err)
+            raise err
 
     def perform_new_calculations(self, res_list, error_queue, proc_id):
         """ Perform all calculations that have not already
