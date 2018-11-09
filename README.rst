@@ -43,7 +43,7 @@ in the examples and API documentation.
 Usage
 ------
 
-For basic command-line usage, please explore the help system for each sub-command. Common workflows can be found under :ref:`examples` and :ref:`tutorials`.
+For basic command-line usage, please explore the help system for each sub-command. Common workflows can be found under ``examples/`` and :ref:`tutorials_index`.
 
 The full Python API documentation can be found under :ref:`modules`.
 
