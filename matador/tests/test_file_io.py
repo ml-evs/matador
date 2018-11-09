@@ -638,7 +638,7 @@ class ScrapeTest(unittest.TestCase):
             self.assertAlmostEqual(bs_dict['fermi_energy'], 4.0781, places=4)
             self.assertLessEqual(bs_dict['kpoint_path_spacing'], 0.3)
             self.assertGreaterEqual(bs_dict['kpoint_path_spacing'], 0.29)
-            self.assertEqual(len(bs_dict['kpoint_branches']), 1)
+            self.assertEqual(len(bs_dict['kpoint_branches']), 2)
             self.assertAlmostEqual(bs_dict['direct_gap'], 0.7807715152197994, places=4)
             self.assertAlmostEqual(bs_dict['direct_gap'], bs_dict['band_gap'], places=4)
             self.assertEqual(bs_dict['direct_gap_path_inds'], [0, 0])

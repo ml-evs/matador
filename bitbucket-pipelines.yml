@@ -10,6 +10,7 @@ pipelines:
   default:
     - step:
         script:
+          - cp matador/tests/data/matador_pipelines_conf.yml $HOME
           - pip install .[test]
           - pip install .[extras]
           - py.test --cov-config .coveragerc --cov=matador

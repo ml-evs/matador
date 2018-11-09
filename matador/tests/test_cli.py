@@ -19,10 +19,7 @@ from matador.query import DBQuery
 from matador.scrapers.castep_scrapers import cell2dict, res2dict
 
 REAL_PATH = '/'.join(os.path.realpath(__file__).split('/')[:-1]) + '/'
-if os.uname()[1] == 'cluster2':
-    CONFIG_FNAME = None
-else:
-    CONFIG_FNAME = REAL_PATH + 'data/matador_pipelines_conf.yml'
+CONFIG_FNAME = None
 DB_NAME = 'ci_test'
 ROOT_DIR = os.getcwd()
 SETTINGS = load_custom_settings(config_fname=CONFIG_FNAME, override=True)

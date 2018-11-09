@@ -7,6 +7,7 @@ import shutil
 import glob
 
 HOSTNAME = os.uname()[1]
+PATHS_TO_DEL = ['completed', 'bad_castep', 'input', 'logs', HOSTNAME]
 REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
 ROOT_DIR = os.getcwd()
 VERBOSITY = 1
@@ -91,8 +92,7 @@ class ComputeTest(unittest.TestCase):
         completed_exists = os.path.isfile('completed/_LiAs_testcase.res')
         input_exists = os.path.isfile('input/_LiAs_testcase.res')
 
-        paths = ['completed', 'input', 'bad_castep']
-        for path in paths:
+        for path in PATHS_TO_DEL:
             if os.path.isdir(path):
                 files = glob.glob(path + '/*')
                 for file in files:
@@ -115,6 +115,7 @@ class ComputeTest(unittest.TestCase):
         """ Ensure failure if exec misses. """
         from matador.compute import FullRelaxer
         from matador.scrapers.castep_scrapers import cell2dict, param2dict
+        from matador.compute.compute import CriticalError
         cell_dict, s = cell2dict(REAL_PATH + '/data/LiAs.cell', verbosity=VERBOSITY, db=False)
         assert s
         param_dict, s = param2dict(REAL_PATH + '/data/LiAs.param', verbosity=VERBOSITY, db=False)
@@ -132,11 +133,10 @@ class ComputeTest(unittest.TestCase):
                         debug=False, verbosity=VERBOSITY, killcheck=True,
                         reopt=False, executable='THIS WAS MEANT TO FAIL, DON\'T WORRY',
                         start=True)
-        except SystemExit:
+        except CriticalError:
             fall_over = True
 
-        paths = ['completed', 'input', 'bad_castep']
-        for path in paths:
+        for path in PATHS_TO_DEL:
             if os.path.isdir(path):
                 files = glob.glob(path + '/*')
                 for file in files:
@@ -182,8 +182,7 @@ class ComputeTest(unittest.TestCase):
 
         completed_exists = os.path.isfile('completed/_LiAs_testcase.res')
 
-        paths = ['completed', 'input', 'bad_castep']
-        for path in paths:
+        for path in PATHS_TO_DEL:
             if os.path.isdir(path):
                 files = glob.glob(path + '/*')
                 for file in files:
@@ -232,8 +231,7 @@ class ComputeTest(unittest.TestCase):
 
         num = reset_job_folder()
 
-        paths = ['completed', 'input', 'bad_castep']
-        for path in paths:
+        for path in PATHS_TO_DEL:
             if os.path.isdir(path):
                 files = glob.glob(path + '/*')
                 for file in files:
@@ -371,8 +369,7 @@ class ComputeTest(unittest.TestCase):
         cruft = glob.glob('_LiAs_testcase*')
         cruft_doesnt_exist = bool(len(cruft))
 
-        paths = ['completed', 'input', 'bad_castep']
-        for path in paths:
+        for path in PATHS_TO_DEL:
             if os.path.isdir(path):
                 files = glob.glob(path + '/*')
                 for file in files:
@@ -429,8 +426,7 @@ class ComputeTest(unittest.TestCase):
                             os.path.isfile('completed/_LiAs_testcase.castep'),
                             os.path.isfile('completed/_LiAs_testcase-out.cell')]
 
-        paths = ['completed', 'input', 'bad_castep']
-        for path in paths:
+        for path in PATHS_TO_DEL:
             if os.path.isdir(path):
                 files = glob.glob(path + '/*')
                 for file in files:
@@ -522,8 +518,7 @@ class ComputeTest(unittest.TestCase):
         cruft = glob.glob('LiAs_testcase*')
         cruft_doesnt_exist = bool(len(cruft))
 
-        paths = ['completed', 'input', 'bad_castep']
-        for path in paths:
+        for path in PATHS_TO_DEL:
             if os.path.isdir(path):
                 files = glob.glob(path + '/*')
                 for file in files:
@@ -572,10 +567,9 @@ class ComputeTest(unittest.TestCase):
         bad_castep_exists = os.path.isfile('LiAs_testcase_bad.castep')
         res_exists = os.path.isfile('LiAs_testcase.res') and os.path.isfile('LiAs_testcase_bad.res')
         lock_exists = os.path.isfile('LiAs_testcase.res.lock') and os.path.isfile('LiAs_testcase_bad.res.lock')
-        compute_dir_doesnt_exist = os.path.isdir(HOSTNAME)
+        compute_dir_exist = os.path.isdir(HOSTNAME)
 
-        paths = ['completed', 'input', 'bad_castep', HOSTNAME]
-        for path in paths:
+        for path in PATHS_TO_DEL:
             if os.path.isdir(path):
                 files = glob.glob(path + '/*')
                 for file in files:
@@ -598,6 +592,7 @@ class ComputeTest(unittest.TestCase):
         self.assertTrue(castep_exists, 'Could not find castep file!')
         self.assertTrue(bad_castep_exists, 'Could not find bad castep file!')
         self.assertTrue(res_exists, 'Could not find res file!')
+        self.assertFalse(compute_dir_exist, 'Compute dir not cleaned up!')
         self.assertFalse(lock_exists, 'Lock file was not deleted!')
 
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
