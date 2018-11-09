@@ -73,7 +73,7 @@ def plot_spectral(seeds, **kwargs):
                      'colour_by_seed': False, 'external_efermi': None,
                      'labels': None, 'cmap': None, 'band_colour': 'occ',
                      'n_colours': 4, 'spin_only': None, 'figsize': None,
-                     'pdis_interpolation_factor': 2, 'pdis_point_scale': None,
+                     'pdis_interpolation_factor': 2,
                      'no_stacked_pdos': False, 'preserve_kspace_distance': False,
                      'band_reorder': None, 'title': None,
                      'verbosity': 0, 'highlight_bands': None, 'pdos_hide_tot': True}
@@ -865,8 +865,9 @@ def _get_path_labels(seed, dispersion, ax_dispersion, path, path_key, branch_key
                                         new_label = new_label.replace('SIGMA', r'\Sigma')
                                         new_label = new_label.replace('DELTA', r'\Delta')
                                         new_label = new_label.replace('LAMBDA', r'\Lambda')
+                                        import matplotlib
                                         if np.allclose(new_point, next_point):
-                                            label = '{}|{}'.format(label, new_label)
+                                            label = '\\dfrac{{{}}}{{{}}}'.format(label, new_label)
                                             ax_dispersion.axvline(path[ind - branch_ind], ls='-', c='grey', zorder=1, lw=0.5)
                                             labelled.append(ind - branch_ind)
                                             shear_planes.append(ind)
