@@ -105,7 +105,7 @@ def main():
     from matador.config import load_custom_settings
     if kwargs['scratch_prefix'] is None:
         settings = load_custom_settings(debug=kwargs.get('debug')).get('run3')
-        if 'run3' in settings:
+        if settings is not None:
             kwargs['scratch_prefix'] = settings['run3'].get('scratch_prefix')
 
     if sum([vars(args)['slurm'], vars(args)['archer'], vars(args)['intel']]) > 1:
