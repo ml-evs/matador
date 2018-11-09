@@ -11,6 +11,7 @@ pipelines:
     - step:
         script:
           - cp matador/tests/data/matador_pipelines_conf.yml $HOME/.matadorrc
+          - alias mpirun='echo "mpirun (Open MPI) 3.1.2\n"'
           - pip install .[test]
           - pip install .[extras]
           - py.test --cov-config .coveragerc --cov=matador

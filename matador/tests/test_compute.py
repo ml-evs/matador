@@ -12,7 +12,7 @@ REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
 ROOT_DIR = os.getcwd()
 VERBOSITY = 1
 NCORES = 4
-EXECUTABLE = 'castep'
+EXECUTABLE = 'castepasdfasdf'
 
 try:
     with open('/dev/null', 'w') as f:
@@ -110,7 +110,7 @@ class ComputeTest(unittest.TestCase):
         self.assertTrue(success, "couldn't parse output file!")
         self.assertTrue(all([match_dict[key] for key in match_dict]))
 
-    @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
+    # @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
     def testMissingExec(self):
         """ Ensure failure if exec misses. """
         from matador.compute import FullRelaxer
@@ -123,7 +123,7 @@ class ComputeTest(unittest.TestCase):
 
         node = None
         nnodes = None
-        seed = 'data/structures/LiAs_testcase.res'
+        seed = REAL_PATH + '/data/structures/LiAs_testcase.res'
 
         fall_over = False
 
@@ -247,8 +247,7 @@ class ComputeTest(unittest.TestCase):
         self.assertTrue(bad_exists, "couldn't find output file!")
         self.assertEqual(num, 0)
 
-
-    @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
+    # @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
     def testDontRestartCompletedCalc(self):
         """ Set a relaxation up to fail. """
         from matador.compute import FullRelaxer, reset_job_folder
@@ -346,8 +345,6 @@ class ComputeTest(unittest.TestCase):
         self.assertFalse(raised_error)
         self.assertTrue(correct_folders)
         self.assertTrue(correct_files)
-
-
 
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
     def testBatchRelax(self):
@@ -595,7 +592,7 @@ class ComputeTest(unittest.TestCase):
         self.assertFalse(compute_dir_exist, 'Compute dir not cleaned up!')
         self.assertFalse(lock_exists, 'Lock file was not deleted!')
 
-    @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
+    # @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
     def testBatchNothingToDo(self):
         """ Check that nothing is done when there's nothing to do... """
         from matador.compute import BatchRun
@@ -608,6 +605,29 @@ class ComputeTest(unittest.TestCase):
         runner.spawn()
         elapsed = time.time() - start
         self.assertTrue(elapsed < 10, 'Sluggish to quit!')
+
+    def testResNameCollision(self):
+        """ Check that run3 safely falls over if there is a file called <seed>.res. """
+        from matador.compute import BatchRun
+        from matador.compute.compute import InputError
+        os.chdir(REAL_PATH + 'data/file_collision')
+        try:
+            runner = BatchRun(seed=['LiAs'], debug=False, no_reopt=True,
+                              verbosity=VERBOSITY, ncores=2, nprocesses=2, executable=EXECUTABLE)
+            runner.spawn()
+        except InputError:
+            failed_safely = True
+
+        for path in PATHS_TO_DEL:
+            if os.path.isdir(path):
+                files = glob.glob(path + '/*')
+                for file in files:
+                    os.remove(file)
+                os.removedirs(path)
+
+        os.chdir(ROOT_DIR)
+
+        self.assertTrue(failed_safely)
 
 
 if __name__ == '__main__':
