@@ -247,7 +247,7 @@ class ComputeTest(unittest.TestCase):
         self.assertTrue(bad_exists, "couldn't find output file!")
         self.assertEqual(num, 0)
 
-    # @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
+    @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
     def testDontRestartCompletedCalc(self):
         """ Set a relaxation up to fail. """
         from matador.compute import FullRelaxer, reset_job_folder
