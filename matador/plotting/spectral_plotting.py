@@ -452,7 +452,10 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
             ax_dos.grid(False)
 
             if kwargs['plot_bandstructure']:
-                ax_dos.set_xticks([0.6 * max_density])
+                if 'spin_dos' in dos_data:
+                    ax_dos.set_xticks([0])
+                else:
+                    ax_dos.set_xticks([0.6 * max_density])
                 ax_dos.set_xticklabels([ylabel])
                 ax_dos.axhline(0, c='grey', ls='--', lw=1)
                 if 'spin_dos' in dos_data:
