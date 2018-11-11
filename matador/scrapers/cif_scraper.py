@@ -72,7 +72,8 @@ def cif2dict(seed, **kwargs):
     doc['stoichiometry'] = _cif_disordered_stoichiometry(doc)
     doc['num_atoms'] = len(doc['positions_frac'])
 
-    # _cif_set_unreduced_sites(doc)
+    if '_symmetry_equiv_pos_as_xyz' in doc['_cif']:
+        _cif_set_unreduced_sites(doc)
 
     try:
         doc['space_group'] = get_spacegroup_spg(doc)
@@ -204,7 +205,6 @@ def _cif_set_unreduced_sites(doc):
     from matador.utils.cell_utils import wrap_frac_coords
     species_sites = dict()
     species_occ = dict()
-    print(doc['site_occupancy'], len(doc['site_occupancy']))
     for ind, site in enumerate(doc['positions_frac']):
         species = doc['atom_types'][ind]
         occupancy = doc['site_occupancy'][ind]
@@ -246,7 +246,6 @@ def _cif_set_unreduced_sites(doc):
     if abs(tmp - round(tmp, 0)) < EPS:
         tmp = round(tmp, 0)
     doc['num_atoms'] = tmp
-    print(doc['site_occupancy'], len(doc['site_occupancy']))
     assert len(doc['site_occupancy']) == len(doc['positions_frac']), 'Size mismatch between positions and occs, {} vs {}'.format(len(doc['site_occupancy']), len(doc['positions_frac']))
     assert len(doc['positions_frac']) == len(doc['atom_types']), 'Size mismatch between positions and types'
 
