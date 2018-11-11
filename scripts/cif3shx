@@ -15,5 +15,3 @@ for fname in fnames:
     else:
         print(doc)
         print_failure('Unable to read structure in ' + fname + '.')
-
-print_success('Completed!')

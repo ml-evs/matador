@@ -70,8 +70,9 @@ def cif2dict(seed, **kwargs):
     doc['lattice_cart'] = abc2cart(doc['lattice_abc'])
     doc['cell_volume'] = cart2volume(doc['lattice_cart'])
     doc['stoichiometry'] = _cif_disordered_stoichiometry(doc)
+    doc['num_atoms'] = len(doc['positions_frac'])
 
-    _cif_set_unreduced_sites(doc)
+    # _cif_set_unreduced_sites(doc)
 
     try:
         doc['space_group'] = get_spacegroup_spg(doc)
@@ -88,7 +89,7 @@ def _cif_parse_float_with_errors(x):
 
 def _cif_disordered_stoichiometry(doc):
     """ Create a matador stoichiometry normalised to the smallest integer
-    number of atoms.
+    number of atoms, unless all occupancies are 1/0.
 
     Parameters:
         doc: dictionary containing `atom_types`, `site_occupancy` and
@@ -101,18 +102,23 @@ def _cif_disordered_stoichiometry(doc):
     from collections import defaultdict
     stoich = defaultdict(float)
     eps = 1e-8
+    disordered = False
     for ind, site in enumerate(doc['atom_types']):
         stoich[site] += doc['site_occupancy'][ind] * doc['site_multiplicity'][ind]
-    min_int = 1e10
-    for atom in stoich:
-        if abs(int(stoich[atom]) - stoich[atom]) < eps:
-            if int(stoich[atom]) < min_int:
-                min_int = int(stoich[atom])
+        if doc['site_multiplicity'][ind] % 1 > 1e-5:
+            disordered = True
 
-    if min_int == 1e10:
-        min_int = 1
-    for atom in stoich:
-        stoich[atom] /= min_int
+    if disordered:
+        min_int = 1e10
+        for atom in stoich:
+            if abs(int(stoich[atom]) - stoich[atom]) < eps:
+                if int(stoich[atom]) < min_int:
+                    min_int = int(stoich[atom])
+
+        if min_int == 1e10:
+            min_int = 1
+        for atom in stoich:
+            stoich[atom] /= min_int
 
     return sorted([[atom, stoich[atom]] for atom in stoich])
 
@@ -130,9 +136,11 @@ def _cif_parse_raw(flines):
     ind = 0
     cif_dict = dict()
     cif_dict['loops'] = list()
+    for line in flines:
+        line = line.strip()
     while ind < len(flines):
         jnd = 1
-        line = flines[ind]
+        line = flines[ind].strip()
         # parse single (multi-line) tag
         if line.startswith('_'):
             line = line.split()
@@ -140,15 +148,15 @@ def _cif_parse_raw(flines):
             data = ''
             if len(line) > 1:
                 data += ' '.join(line[1:])
-            while ind + jnd < len(flines) and _cif_line_contains_data(flines[ind+jnd]):
-                data += flines[ind+jnd].replace(';', '')
+            while ind + jnd < len(flines) and _cif_line_contains_data(flines[ind+jnd].strip()):
+                data += flines[ind+jnd].strip().replace(';', '')
                 jnd += 1
             cif_dict[key] = data.strip()
         # parse loop block
         elif line.startswith('loop_'):
             # get loop keys
             keys = []
-            while flines[ind+jnd].startswith('_'):
+            while flines[ind+jnd].strip().startswith('_'):
                 keys.append(flines[ind+jnd].strip())
                 jnd += 1
             for key in keys:
@@ -196,6 +204,7 @@ def _cif_set_unreduced_sites(doc):
     from matador.utils.cell_utils import wrap_frac_coords
     species_sites = dict()
     species_occ = dict()
+    print(doc['site_occupancy'], len(doc['site_occupancy']))
     for ind, site in enumerate(doc['positions_frac']):
         species = doc['atom_types'][ind]
         occupancy = doc['site_occupancy'][ind]
@@ -224,7 +233,7 @@ def _cif_set_unreduced_sites(doc):
     unreduced_species = []
     for species in species_sites:
         unreduced_sites_spec, indices = np.unique(species_sites[species],
-                                                  return_index=True, axis=0)
+                                                  return_index=True, axis=1)
         unreduced_occupancies_spec = np.asarray(species_occ[species])[indices].tolist()
         unreduced_occupancies.extend(unreduced_occupancies_spec)
         unreduced_sites.extend(unreduced_sites_spec.tolist())
@@ -237,7 +246,9 @@ def _cif_set_unreduced_sites(doc):
     if abs(tmp - round(tmp, 0)) < EPS:
         tmp = round(tmp, 0)
     doc['num_atoms'] = tmp
-    assert len(doc['site_occupancy']) == len(doc['positions_frac']) == len(doc['atom_types'])
+    print(doc['site_occupancy'], len(doc['site_occupancy']))
+    assert len(doc['site_occupancy']) == len(doc['positions_frac']), 'Size mismatch between positions and occs, {} vs {}'.format(len(doc['site_occupancy']), len(doc['positions_frac']))
+    assert len(doc['positions_frac']) == len(doc['atom_types']), 'Size mismatch between positions and types'
 
 
 def _cif_line_contains_data(line):
