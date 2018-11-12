@@ -73,12 +73,18 @@ def plot_spectral(seeds, **kwargs):
                      'colour_by_seed': False, 'external_efermi': None,
                      'labels': None, 'cmap': None, 'band_colour': 'occ',
                      'n_colours': 4, 'spin_only': None, 'figsize': None,
-                     'pdis_interpolation_factor': 2,
+                     'pdis_interpolation_factor': 2, 'pdis_point_scale': 25,
                      'no_stacked_pdos': False, 'preserve_kspace_distance': False,
                      'band_reorder': None, 'title': None,
                      'verbosity': 0, 'highlight_bands': None, 'pdos_hide_tot': True}
-    prop_defaults.update(kwargs)
+    for key in kwargs:
+        if kwargs[key] is not None:
+            prop_defaults[key] = kwargs[key]
     kwargs = prop_defaults
+
+    # unset spin_only if its None
+    if kwargs.get('spin_only') is None:
+        del kwargs['spin_only']
 
     if kwargs.get('cmap') is None:
         kwargs['colours'] = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])
@@ -538,17 +544,21 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
             elif 'spin_dos' in dos_data:
                 print('Plotting spin dos')
                 if kwargs['plot_bandstructure']:
-                    if not kwargs.get('spin_only') == 'up':
+                    if kwargs.get('spin_only') == 'up':
+                        print('Plotting only spin down channel...')
                         ax_dos.fill_betweenx(energies, 0, dos_data['spin_dos']['down'], alpha=0.2, color='b')
                         ax_dos.plot(dos_data['spin_dos']['down'], energies, ls=kwargs['ls'][seed_ind], color='b', zorder=1e10, label='spin-down channel')
                     elif not kwargs.get('spin_only') == 'down':
+                        print('Plotting only spin up channel...')
                         ax_dos.fill_betweenx(energies, 0, dos_data['spin_dos']['up'], alpha=0.2, color='r')
                         ax_dos.plot(dos_data['spin_dos']['up'], energies, ls=kwargs['ls'][seed_ind], color='r', zorder=1e10, label='spin-up channel')
                 else:
                     if not kwargs.get('spin_only') == 'up':
+                        print('Plotting only spin down channel...')
                         ax_dos.plot(energies, dos_data['spin_dos']['down'], ls=kwargs['ls'][seed_ind], color='b', zorder=1e10, label='spin-down channel')
                         ax_dos.fill_between(energies, 0, dos_data['spin_dos']['down'], alpha=0.2, color='b')
                     elif not kwargs.get('spin_only') == 'down':
+                        print('Plotting only spin up channel...')
                         ax_dos.plot(energies, dos_data['spin_dos']['up'], ls=kwargs['ls'][seed_ind], color='r', zorder=1e10, label='spin-up channel')
                         ax_dos.fill_between(energies, 0, dos_data['spin_dos']['up'], alpha=0.2, color='r')
 

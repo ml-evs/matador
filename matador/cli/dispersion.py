@@ -36,7 +36,7 @@ def main():
                         help='number of colours to use from colourmap (DEFAULT: 6)')
     parser.add_argument('--spin_only', type=str,
                         help='either "up" or "down" to only plot one channel')
-    parser.add_argument('-interp', '--pdis_interpolation_factor', type=float, default=2,
+    parser.add_argument('-interp', '--pdis_interpolation_factor', type=float,
                         help='multiple by which to interpolate pDIS bands (DEFAULT: 2)')
     parser.add_argument('-scale', '--pdis_point_scale', type=float,
                         help='point scale in pDIS plots (DEFAULT: 25)')
