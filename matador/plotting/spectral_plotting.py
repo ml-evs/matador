@@ -540,10 +540,10 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                 if kwargs['plot_bandstructure']:
                     if not kwargs.get('spin_only') == 'up':
                         ax_dos.fill_betweenx(energies, 0, dos_data['spin_dos']['down'], alpha=0.2, color='b')
-                        ax_dos.plot(dos_data['spin_dos']['down'], energies, ls=kwargs['ls'][seed_ind], color='b', zorder=1e10, label='spin-down channel', alpha=alpha)
+                        ax_dos.plot(dos_data['spin_dos']['down'], energies, ls=kwargs['ls'][seed_ind], color='b', zorder=1e10, label='spin-down channel')
                     elif not kwargs.get('spin_only') == 'down':
                         ax_dos.fill_betweenx(energies, 0, dos_data['spin_dos']['up'], alpha=0.2, color='r')
-                        ax_dos.plot(dos_data['spin_dos']['up'], energies, ls=kwargs['ls'][seed_ind], color='r', zorder=1e10, label='spin-up channel', alpha=alpha)
+                        ax_dos.plot(dos_data['spin_dos']['up'], energies, ls=kwargs['ls'][seed_ind], color='r', zorder=1e10, label='spin-up channel')
                 else:
                     if not kwargs.get('spin_only') == 'up':
                         ax_dos.plot(energies, dos_data['spin_dos']['down'], ls=kwargs['ls'][seed_ind], color='b', zorder=1e10, label='spin-down channel')
@@ -674,7 +674,7 @@ def _ordered_scatter(path, eigs, pdis, branches, ax=None, colours=None, interpol
                     flat_sizes.append(point_scale*(size)**2)
                     flat_colours.append(plot_colours[j])
                     flat_zorders.append(zorders[j])
-            ax.plot(pts[:, 0, 0], pts[:, 0, 1], lw=0.5, alpha=0.5, c='grey',zorder=0)
+            ax.plot(pts[:, 0, 0], pts[:, 0, 1], lw=0.5, alpha=0.5, c='grey', zorder=0)
 
     flat_zorders = np.asarray(flat_zorders)
     flat_pts_k = np.asarray(flat_pts_k)[np.argsort(flat_zorders)]
