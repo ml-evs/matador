@@ -3,7 +3,8 @@ recursive-include docs *
 recursive-include matador/tests/data *
 include matador/scrapers/words
 include matador/scrapers/nouns
-include README
-include CHANGELOG
+include README.rst
+include CHANGELOG.rst
+include INSTALL.rst
 include LICENSE
 include contributors.txt

@@ -22,6 +22,7 @@ Required steps:
 4. Run ``pip install .`` from inside the top-level matador directory, or ``pip install -e .`` for an editable developer install.
 5. You now have a basic matador API installation, if you wish to use all matador features, install extra dependencies from the other requirements files inside ``requirements/`` using either conda (preferably) or pip. e.g. for plotting, running your own database and Jupyter notebook visualisation functionality, use ``pip install .[plotting,db,viz]``. If you wish to just install everything use ``pip install .[all]``.
 6. To use matador, you will need to work inside the conda environment from step 2, by running ``source activate matador``.
+7. You can test your installation using ``python -m unittest discover`` or simply ``py.test`` (if you have it installed).
 
 
 More esoteric installation on ARCHER (30th October 2017)
