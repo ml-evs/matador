@@ -101,7 +101,6 @@ class IntegrationTest(unittest.TestCase):
         self.assertTrue(files_exist, msg='Some files missing from export')
 
 
-
 def test_import_castep():
     """ Import from castep files, returning data to be checked. """
     # import from CASTEP files only
@@ -227,6 +226,7 @@ def test_export():
         sys.argv += ['--config', CONFIG_FNAME]
 
     matador.cli.cli.main(override=True)
+
 
 if __name__ == '__main__':
     unittest.main()
