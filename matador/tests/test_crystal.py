@@ -57,10 +57,20 @@ class CrystalTest(unittest.TestCase):
         print(crystal.bond_lengths)
 
 
-# class ElasticCrystalTest(unittest.TestCase):
-    # """ Test the elastic functionality of the Crystal module. """
-    # def testKBulkModulus(self):
-        # raise NotImplementedError
+class ElasticCrystalTest(unittest.TestCase):
+    """ Test the elastic functionality of the Crystal module. """
+    def testKBulkModulus(self):
+        from matador.crystal.elastic import get_equation_of_state
+        results = get_equation_of_state(REAL_PATH + '/data/castep_files/K-bulk_modulus', plot=False)
+        self.assertTrue('eos' in results)
+        self.assertEqual(len(results['eos']), 3)
+        self.assertAlmostEqual(results['eos'][0].bulk_modulus, 3.696117355)
+        self.assertAlmostEqual(results['eos'][1].bulk_modulus, 3.699072676)
+        self.assertAlmostEqual(results['eos'][2].bulk_modulus, 3.691406442)
+        self.assertAlmostEqual(results['eos'][0].bulk_modulus_err, 3e-6, places=1)
+        self.assertAlmostEqual(results['eos'][1].bulk_modulus_err, 2e-6, places=1)
+        self.assertAlmostEqual(results['eos'][2].bulk_modulus_err, 2e-6, places=1)
+
 
 if __name__ == '__main__':
     unittest.main(buffer=False, verbosity=2)

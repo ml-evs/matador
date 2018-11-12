@@ -11,7 +11,7 @@ import numpy as np
 from matador.utils.chem_utils import eV_PER_ANGSTROM_CUBED_TO_GPa
 
 
-def get_equation_of_state(seed):
+def get_equation_of_state(seed, plot=False):
     """ Extract E(V) data from CASTEP files and perform
     fits for the equation of state and bulk moduli.
 
@@ -31,6 +31,9 @@ def get_equation_of_state(seed):
     volumes = np.asarray(volumes)
     energies = np.asarray(energies)
 
+    if len(volumes) < 3:
+        raise RuntimeError('Seed {} does not contain enough energies vs volumes to fit a bulk modulus')
+
     energies = energies[np.argsort(volumes)]
     volumes = np.sort(volumes)
 
@@ -39,9 +42,12 @@ def get_equation_of_state(seed):
 
     types_of_fit = EquationOfState.__subclasses__()
 
-    import matplotlib.pyplot as plt
-    _, ax = plt.subplots(1)
-    ax.plot(volumes, energies, marker='o')
+    if plot:
+        import matplotlib.pyplot as plt
+        _, ax = plt.subplots(1)
+        ax.plot(volumes, energies, marker='o')
+
+    results['eos'] = []
 
     for eos_type in types_of_fit:
         eos = eos_type(E_0, V_0)
@@ -49,14 +55,18 @@ def get_equation_of_state(seed):
         print(eos_type.__name__)
         print('fitting parameters = {d[0]:.6f}, {d[1]:.6f}'.format(d=eos.fit_parameters))
         print('rrrmsd = {:10.10f} %'.format(eos.rrmsd))
-        print('bulk modulus = {d[0]:.6f}±{d[1]:.6f} GPa'.format(d=eos.bulk_modulus))
+        print('bulk modulus = {d[0]:.6f} +/- {d[1]:.6f} GPa'.format(d=(eos.bulk_modulus, eos.bulk_modulus_err)))
         probes = np.linspace(min(volumes), max(volumes), num=100)
         fitted_curve = eos.evaluate(probes, *eos.popt)
-        ax.plot(probes, fitted_curve, label=eos_type.__name__)
+        results['eos'].append(eos)
+        if plot:
+            ax.plot(probes, fitted_curve, label=eos_type.__name__)
 
-    ax.legend(loc=0)
-    plt.show()
+    if plot:
+        ax.legend(loc=0)
+        plt.show()
 
+    return results
 
 
 class EquationOfState:
@@ -124,11 +134,14 @@ class EquationOfState:
 
     @property
     def bulk_modulus(self):
-        """ Returns the bulk modulus predicted by the fit, and its
-        estimated error.
-        """
+        """ Returns the bulk modulus predicted by the fit. """
         bulk_modulus = self.get_bulk_modulus()
-        return bulk_modulus, bulk_modulus * self.rrmsd
+        return bulk_modulus
+
+    @property
+    def bulk_modulus_err(self):
+        """ Returns the estimated error on the bulk modulus. """
+        return self.bulk_modulus * self.rrmsd
 
     @property
     def fit_parameters(self):
