@@ -450,9 +450,21 @@ def castep2dict(seed, db=True, intermediates=False, **kwargs):
             containing scraped data and True, if not, then an error string and False.
 
     """
+    if seed.endswith('.history'):
+        seed = seed.replace('.history', '')
+        ftype = 'history'
+    elif seed.endswith('.history.gz'):
+        seed = seed.replace('.history.gz', '')
+        ftype = 'history.gz'
+    else:
+        seed = seed.replace('.castep', '')
+        ftype = 'castep'
+
+    seed = '{}.{}'.format(seed, ftype)
+
     castep = dict()
     # read .castep, .history or .history.gz file
-    if '.gz' in seed:
+    if ftype == 'history.gz':
         with gzip.open(seed, 'r') as f:
             flines = f.readlines()
     else:
