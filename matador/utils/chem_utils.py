@@ -421,7 +421,7 @@ def get_formula_from_stoich(stoich, elements=None, tex=False, latex_sub_style=''
         elements (list): list of element symbols to enforce order.
         tex (bool): whether to print a LaTeX-compatibile string.
         latex_sub_style (str): a string to wrap subscripts in, e.g.
-            r"\mathrm" or r"\text" (default is blank).
+            r"\\mathrm" or r"\\text" (default is blank).
 
     Returns:
         str: the string representation of the chemical formula.
