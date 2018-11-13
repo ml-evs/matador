@@ -731,14 +731,22 @@ def arbitrary2dict(seed, **kwargs):
     with open(seed, 'r') as f:
         flines = f.readlines()
     splitters = [':', '=', '\t', ' ']
+    comment_delims = ['!', '%', '#', '/*', '*/']
     result = {}
+    result['source'] = [seed]
     for line in flines:
-        for splitter in splitters:
-            if splitter in line:
-                keyword = line.split(splitter)[0].strip()
-                value = line.split(splitter)[-1].strip()
-                result[keyword.lower()] = value
+        comment = False
+        for delim in comment_delims:
+            if line.strip().startswith(delim):
+                comment = True
                 break
+        if not comment:
+            for splitter in splitters:
+                if splitter in line:
+                    keyword = line.split(splitter)[0].strip()
+                    value = line.split(splitter)[-1].strip()
+                    result[keyword.lower()] = value
+                    break
 
     return result, True
 

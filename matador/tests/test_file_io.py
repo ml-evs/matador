@@ -417,7 +417,6 @@ class ScrapeTest(unittest.TestCase):
         cif_fname = REAL_PATH + 'data/cif_files/malicious.cif'
         failed_open = False
         try:
-            import os
             f = open(cif_fname, 'r')
         except FileNotFoundError:
             failed_open = True
@@ -498,7 +497,7 @@ class ScrapeTest(unittest.TestCase):
 
     def testOptadosDOSScraper(self):
         from matador.scrapers import optados2dict
-        odo_fname = REAL_PATH + 'data/K3P.adaptive.dat'
+        odo_fname = REAL_PATH + 'data/optados_files/K3P.adaptive.dat'
         failed_open = False
         try:
             f = open(odo_fname, 'r')
@@ -514,7 +513,7 @@ class ScrapeTest(unittest.TestCase):
 
     def testOptadosPDOSScraper(self):
         from matador.scrapers import optados2dict
-        odo_fname = REAL_PATH + 'data/KP.pdos.adaptive.dat'
+        odo_fname = REAL_PATH + 'data/optados_files/KP.pdos.adaptive.dat'
         failed_open = False
         try:
             f = open(odo_fname, 'r')
@@ -535,7 +534,7 @@ class ScrapeTest(unittest.TestCase):
 
     def testOptadosPDISScraper(self):
         from matador.scrapers import optados2dict
-        odo_fname = REAL_PATH + 'data/Si2.pdis.dat'
+        odo_fname = REAL_PATH + 'data/optados_files/Si2.pdis.dat'
         failed_open = False
         try:
             f = open(odo_fname, 'r')
@@ -564,7 +563,7 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(od_dict['pdis'][0][-1][1], 0.028667372)
             self.assertEqual(od_dict['pdis'][-1][2][1], 0.99444594)
 
-        odo_fname = REAL_PATH + 'data/graphite.pdis.dat'
+        odo_fname = REAL_PATH + 'data/optados_files/graphite.pdis.dat'
         failed_open = False
         try:
             f = open(odo_fname, 'r')
@@ -594,6 +593,29 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(od_dict['pdis'][35][3][1], 0.81239121)
             self.assertEqual(od_dict['pdis'][36][3][1], 0.80304369)
             self.assertEqual(od_dict['pdis'][37][3][1], 0.79613539)
+
+    def testArbitraryScraper(self):
+        from matador.scrapers.castep_scrapers import arbitrary2dict
+        odi_fname = REAL_PATH + 'data/optados_files/testcase.odi'
+        failed_open = False
+        try:
+            f = open(odi_fname, 'r')
+        except Exception:
+            failed_open = True
+            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(odi_fname))
+        if not failed_open:
+            f.close()
+            od_dict, s = arbitrary2dict(odi_fname)
+            self.assertEqual(od_dict['pdispersion'], 'species')
+            self.assertEqual(od_dict['adaptive_smearing'], '1')
+            self.assertEqual(od_dict['set_efermi_zero'], 'True')
+            self.assertEqual(od_dict['dos_per_volume'], 'True')
+            self.assertEqual(od_dict['broadening'], 'adaptive')
+            self.assertEqual(od_dict['dos_spacing'], '0.01')
+            self.assertEqual(od_dict['task'], 'pdispersion')
+            self.assertTrue(od_dict['source'][0].endswith('testcase.odi'))
+            self.assertEqual(len(od_dict['source']), 1)
+            self.assertEqual(len(od_dict), 8)
 
     def testBands(self):
         from matador.scrapers.castep_scrapers import bands2dict

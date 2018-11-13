@@ -1,0 +1,10 @@
+pdispersion: species
+adaptive_smearing: 1
+%%% whyyyyy
+set_EfermI_zero: True
+dos_per_volume: True
+/* qq123123
+Broadening: adaptive
+dos_spacing: 0.01
+task: pdispersion
+! broadening: blah
