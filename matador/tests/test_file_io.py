@@ -216,7 +216,7 @@ class ScrapeTest(unittest.TestCase):
 
     def testCastepUnoptimised(self):
         from matador.scrapers.castep_scrapers import castep2dict
-        castep_fname = REAL_PATH + 'data/castep_files/TiO2_unconverged-mp-10101.castep'
+        castep_fname = REAL_PATH + 'data/castep_files/TiO2_unconverged-MP-10101.castep'
         failed_open = False
         try:
             f = open(castep_fname, 'r')
@@ -284,7 +284,7 @@ class ScrapeTest(unittest.TestCase):
         castep_fname += [REAL_PATH + 'data/castep_files/Na-edgecase-CollCode10101.castep']
         castep_fname += [REAL_PATH + 'data/castep_files/KP-castep17.castep']
         castep_fname += [REAL_PATH + 'data/castep_files/Na3Zn4-OQMD_759599.castep']
-        castep_fname += [REAL_PATH + 'data/castep_files/TiO2_unconverged-mp-10101.castep']
+        castep_fname += [REAL_PATH + 'data/castep_files/TiO2_unconverged-MP-10101.castep']
 
         cursor, failures = castep2dict(castep_fname, db=True)
         self.assertEqual(len(cursor), 4)
@@ -757,6 +757,29 @@ class ScrapeTest(unittest.TestCase):
         self.assertEqual(usp2dict(REAL_PATH + 'data/K_OTF.usp')['K'], '2|1.5|9|10|11|30U:40:31(qc=6)', msg='Failed to scrape K_OTF.usp file')
         self.assertEqual(usp2dict(REAL_PATH + 'data/P_OTF.usp')['P'], '3|1.8|4|4|5|30:31:32', msg='Failed to scrape P_OTF.usp file')
         self.assertEqual(usp2dict(REAL_PATH + 'data/Sn_OTF.usp')['Sn'], '2|2|2|1.6|9.6|10.8|11.7|50U=-0.395U=+0.25:51U=-0.14U=+0.25', msg='Failed to scrape Sn_OTF.usp file')
+
+    def testSeedMetadataScrape(self):
+        from matador.scrapers.castep_scrapers import get_seed_metadata
+        doc = {}
+        seed = 'blah/blah/blah4/AgBiI4-spinel-Config5-DOI-10.17638__datacat.liverpool.ac.uk__240'
+        get_seed_metadata(doc, seed)
+        self.assertEqual(doc['doi'], '10.17638/datacat.liverpool.ac.uk/240')
+        doc = {}
+        seed = 'blah/blah/blah4/AgBiI4-spinel-Config5-CollCode123456-from_polish_swaps_garbage'
+        get_seed_metadata(doc, seed)
+        self.assertEqual(doc['icsd'], 123456)
+        doc = {}
+        seed = 'blah/blah/blah4/AgBiI4-spinel-Config5-CollCode-123456-from_polish_swaps_garbage'
+        get_seed_metadata(doc, seed)
+        self.assertEqual(doc['icsd'], 123456)
+        doc = {}
+        seed = 'blah/blah/blah4/AgBiI4-spinel-Config5-ICSD-123456-from_polish_swaps_garbage'
+        get_seed_metadata(doc, seed)
+        self.assertEqual(doc['icsd'], 123456)
+        doc = {}
+        seed = 'blah/blah/blah4/AgBiI4-spinel-Config5-MP-123456-blah-SnPQ'
+        get_seed_metadata(doc, seed)
+        self.assertEqual(doc['mp-id'], 123456)
 
 
 class ExportTest(unittest.TestCase):

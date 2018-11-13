@@ -47,11 +47,7 @@ def res2dict(seed, db=True, **kwargs):
     res['source'].append(seed + '.res')
     # grab file owner username
     res['user'] = getpwuid(stat(seed + '.res').st_uid).pw_name
-    # try to grab ICSD CollCode
-    if 'CollCode' in seed:
-        res['icsd'] = int(seed.split('CollCode')[-1].split('-')[0].split('_')[0].split('.')[0])
-    if '-mp-' in seed:
-        res['mp-id'] = int(seed.split('-mp-')[-1].split('-')[0].split('_')[0].split('.')[0])
+    get_seed_metadata(res, seed)
     # alias special lines in res file
     titl = ''
     cell = ''
@@ -475,10 +471,7 @@ def castep2dict(seed, db=True, intermediates=False, **kwargs):
     castep['source'].append(seed)
     # grab file owner
     castep['user'] = getpwuid(stat(seed).st_uid).pw_name
-    if 'CollCode' in seed:
-        castep['icsd'] = int(seed.split('CollCode')[-1].split('-')[0].split('.')[0].split('_')[0])
-    if '-mp-' in seed:
-        castep['mp-id'] = int(seed.split('-mp-')[-1].split('-')[0].split('.')[0].split('_')[0])
+    get_seed_metadata(castep, seed.replace('.' + ftype, ''))
     # wrangle castep file for parameters in 3 passes:
     # once forwards to get number and types of atoms
     castep.update(_castep_scrape_atoms(flines, castep))
@@ -1639,3 +1632,35 @@ def get_kpt_branches(cart_kpts):
             kpt_branches.append(current_branch)
             current_branch = [ind + 1]
     return kpt_branches, kpt_spacing
+
+
+def get_seed_metadata(doc, seed):
+    """ For a given document and seedname, look for
+    ICSD CollCode, MaterialsProject IDs and DOIs to add
+    to the document.
+
+    Input:
+        doc (dict): the input document.
+        seed (str): the filename that is being scraped (sans file extension).
+
+    """
+    if '-CollCode-' in seed:
+        print('ICSD', seed)
+        doc['icsd'] = int(seed.split('CollCode-')[-1].split('-')[0].split('_')[0].split('.')[0])
+        print(doc['icsd'])
+    elif 'CollCode' in seed:
+        print('ICSD', seed)
+        doc['icsd'] = int(seed.split('CollCode')[-1].split('-')[0].split('_')[0].split('.')[0])
+        print(doc['icsd'])
+    elif '-ICSD-' in seed:
+        print('ICSD', seed)
+        doc['icsd'] = int(seed.split('-ICSD-')[-1].split('-')[0].split('_')[0].split('.')[0])
+        print(doc['icsd'])
+    if '-MP-' in seed:
+        print('mp', seed)
+        doc['mp-id'] = int(seed.split('-MP-')[-1].split('-')[0].split('_')[0].split('.')[0])
+        print(doc['mp-id'])
+    if '-DOI-' in seed:
+        print('doi', seed)
+        doc['doi'] = seed.split('-DOI-')[-1].split('-')[0].replace('__', '/')
+        print(doc['doi'])

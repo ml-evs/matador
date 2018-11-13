@@ -45,7 +45,7 @@ def display_results(cursor,
 
     details = args.get('details')
 
-    #add this in to handle different energy,enthalpy,free energy etc.
+    # add this in to handle different energy, enthalpy, free energy etc.
     if args.get('energy_key') is not None:
         if args.get('energy_key').endswith('per_atom'):
             energy = args.get('energy_key').split('_per_atom')[0]
@@ -128,7 +128,6 @@ def display_results(cursor,
         cursor = sorted(cursor, key=lambda doc: doc[energy_pa], reverse=False)
     else:
         cursor = sorted(cursor, key=lambda doc: doc[energy_pa][args.get('temperature')], reverse=False)
-
 
     if latex:
         latex_sub_style = r'\text'
@@ -463,6 +462,9 @@ def get_guess_doc_provenance(sources, icsd=None):
                 prov = 'ICSD'
             elif '-mp-' in fname:
                 prov = 'MP'
+            elif '-doi-' in fname:
+                prov = 'DOI'
+
     return prov
 
 
