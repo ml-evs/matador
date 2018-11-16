@@ -112,21 +112,34 @@ class DBQuery:
             if self.args.get('uniq') and self.args.get('subcmd') not in ['hull', 'hulldiff', 'voltage', 'swaps']:
                 from matador.similarity.similarity import get_uniq_cursor
                 print_notify('Filtering for unique structures...')
-                if self.top is not None:
-                    # filter for uniqueness
-                    unique_set, _, _, _ = get_uniq_cursor(self.cursor[:self.args.get('top')],
-                                                          debug=self.args.get('debug'),
-                                                          sim_tol=self.args.get('uniq'))
-                    print('Filtered {} down to {}'.format(len(self.cursor[:self.args.get('top')]), len(unique_set)))
-                    self.cursor = [self.cursor[:self.args.get('top')][ind] for ind in unique_set]
+                if self.args.get('top') is not None:
+                    top = self.top
                 else:
-                    unique_set, _, _, _ = get_uniq_cursor(self.cursor,
-                                                          debug=self.args.get('debug'),
-                                                          sim_tol=self.args.get('uniq'))
-                    print('Filtered {} down to {}'.format(len(self.cursor), len(unique_set)))
-                    self.cursor = [self.cursor[ind] for ind in unique_set]
+                    top = len(self.cursor)
+                # filter for uniqueness
+                unique_set, dupe_dict, _, _ = get_uniq_cursor(self.cursor[:top],
+                                                              debug=self.args.get('debug'),
+                                                              sim_tol=self.args.get('uniq'))
+                print('Filtered {} down to {}'.format(len(self.cursor[:top]), len(unique_set)))
 
-                display_results(self.cursor, hull=None, args=self.args)
+                display_cursor = []
+                additions = []
+                deletions = []
+                for key in dupe_dict:
+                    additions.append(len(display_cursor))
+                    display_cursor.append(self.cursor[key])
+                    if dupe_dict[key]:
+                        for _, jnd in enumerate(dupe_dict[key]):
+                            deletions.append(len(display_cursor))
+                            display_cursor.append(self.cursor[jnd])
+
+                self.cursor = [self.cursor[:top][ind] for ind in unique_set]
+
+                display_results(display_cursor,
+                                additions=additions,
+                                deletions=deletions,
+                                no_sort=True,
+                                hull=None, args=self.args)
 
             if self.args.get('available_values') is not None:
                 self._query_available_values(self.args.get('available_values'), self.cursor)
@@ -169,7 +182,7 @@ class DBQuery:
                 for doc in temp_cursor:
                     self.cursor.append(doc)
 
-            if len(self.cursor) < 1:
+            if self.cursor:
                 sys.exit('Could not find a match with {} try widening your search.'.format(self.args.get('id')))
 
             elif len(self.cursor) >= 1:
@@ -350,7 +363,7 @@ class DBQuery:
                         self._num_to_display = cursor_count
                         if self.args.get('delta_E') is not None:
                             self.cursor = list(self.cursor)
-                            if len(set([get_formula_from_stoich(doc['stoichiometry']) for doc in self.cursor])) != 1:
+                            if len({get_formula_from_stoich(doc['stoichiometry']) for doc in self.cursor}) != 1:
                                 print('Multiple stoichiometries in cursor, unable to filter by energy.')
                             else:
                                 gs_enthalpy = self.cursor[0]['enthalpy_per_atom']
@@ -992,14 +1005,12 @@ class DBQuery:
 
         if self.args.get('loose') or (db is not None and 'oqmd' in db):
             return query_dict
-            # temp_dict = dict()
-            # query_dict.append(dict())
-            # query_dict[-1]['cut_off_energy'] = doc['cut_off_energy']
-        else:
-            query_dict['$and'].append(self._query_float_range(
-                'kpoints_mp_spacing', doc.get('kpoints_mp_spacing'), tolerance=self.args.get('kpoint_tolerance') or 0.01))
-            query_dict['$and'].append(dict())
-            query_dict['$and'][-1]['cut_off_energy'] = doc['cut_off_energy']
+
+        query_dict['$and'].append(self._query_float_range(
+            'kpoints_mp_spacing', doc.get('kpoints_mp_spacing'), tolerance=self.args.get('kpoint_tolerance') or 0.01))
+        query_dict['$and'].append(dict())
+        query_dict['$and'][-1]['cut_off_energy'] = doc['cut_off_energy']
+
         if 'species_pot' in doc:
             for species in doc['species_pot']:
                 temp_dict = dict()
