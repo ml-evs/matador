@@ -366,15 +366,15 @@ def param2dict(seed, db=True, **kwargs):
                   'backup_interval', 'geom_max_iter', 'fixed_npw',
                   'write_cell_structure', 'bs_write_eigenvalues',
                   'calculate_stress', 'opt_strategy', 'max_scf_cycles']
-    false_str = ['False', 'false', '0']
     splitters = [':', '=', '\t', ' ']
     unrecognised = []
-    for _, line in enumerate(flines):
+    devel_lines = []
+    for line_no, line in enumerate(flines):
         if '#' or '!' in line:
             line = line.split('#')[0].split('!')[0]
         line = line.lower()
         # skip blank lines and comments
-        if line.startswith(('#', '!')) or not line.strip():
+        if line.startswith(('#', '!')) or not line.strip() or line_no in devel_lines:
             continue
         else:
             # if scraping to db, ignore "rubbish"
@@ -384,32 +384,51 @@ def param2dict(seed, db=True, **kwargs):
             # read all other parameters in
             for splitter in splitters:
                 if splitter in line:
-                    keyword = line.split(splitter)[0].strip()
-                    value = line.split(splitter)[-1].strip()
-                    if keyword.lower() not in CASTEP_PARAMS:
-                        unrecognised.append(keyword.lower())
-                    param[keyword] = value
+                    if not line.startswith('%'):
+                        keyword = line.split(splitter)[0].strip()
+                        value = line.split(splitter)[-1].strip()
+                        if keyword.lower() not in CASTEP_PARAMS:
+                            unrecognised.append(keyword.lower())
+                        param[keyword] = value
                     # deal with edge cases
-                    if 'spin_polarised' in line:
-                        param['spin_polarized'] = param['spin_polarised']
-                    if 'spin_polarized' in line or 'spin_polarised' in line:
-                        if [false for false in false_str if false in param['spin_polarized']]:
-                            param['spin_polarized'] = False
-                        else:
-                            param['spin_polarized'] = True
+                    if '%block devel_code' in line:
+                        i = 1
+                        while '%endblock devel_code' not in flines[line_no+i].lower():
+                            if i+line_no >= len(flines):
+                                raise RuntimeError('Found unclosed %block devel_code.')
+                            line = flines[line_no+i].lower()
+                            devel_lines.append(line_no+i)
+                            if 'devel_code' not in param:
+                                param['devel_code'] = ''
+                            param['devel_code'] += line
+                            i += 1
+                        break
 
                     if 'true' in value.lower():
                         param[keyword] = True
                     elif 'false' in value.lower():
                         param[keyword] = False
 
-                    if 'geom_max_iter' == keyword:
+                    if 'spin_polarised' in line:
+                        param['spin_polarized'] = param['spin_polarised']
+                        if 'spin_polarised' in param:
+                            del param['spin_polarised']
+
+                    if keyword == 'geom_max_iter':
                         param['geom_max_iter'] = int(param['geom_max_iter'])
 
                     if 'cut_off_energy' in line and 'mix_cut_off_energy' not in line:
-                        temp_cut_off = (param['cut_off_energy'].lower().replace('ev', ''))
-                        temp_cut_off = temp_cut_off.strip()
-                        param['cut_off_energy'] = float(temp_cut_off)
+                        temp_cut_off = param['cut_off_energy'].split()
+                        if len(temp_cut_off) > 1:
+                            if temp_cut_off[1] == 'ev':
+                                param['cut_off_energy'] = float(temp_cut_off[0])
+                            elif db:
+                                raise RuntimeError('cut_off_energy units must be eV or blank in db mode, not {}'.format(temp_cut_off[1]))
+                            else:
+                                param['cut_off_energy'] = '{} {}'.format(temp_cut_off[0], temp_cut_off[1])
+                        else:
+                            param['cut_off_energy'] = float(temp_cut_off[0])
+
                     elif 'xc_functional' in line:
                         param['xc_functional'] = param['xc_functional'].upper()
                     elif 'perc_extra_bands' in line:

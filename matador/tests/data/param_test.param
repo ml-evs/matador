@@ -11,6 +11,10 @@ bs_write_eigenvalues          : false
 num_dump_cycles               : 0
 xc_functional                 : PBE
 write_checkpoint              : none
+%block devel_code
+hello hello
+blah blah
+%endblock devel_code
 write_orbitals : true
 spectral_task                 : bandstructure
 spin_polarized                : False

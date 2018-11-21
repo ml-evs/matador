@@ -446,6 +446,7 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(test_dict['task'], 'geometryoptimization', msg='Failed to read task!')
             self.assertEqual(test_dict['xc_functional'], 'PBE', msg='Failed to read xc!')
             self.assertEqual(test_dict['perc_extra_bands'], 40.0, msg='Failed to read extra bands!')
+            self.assertEqual(test_dict['cut_off_energy'], 500, msg='Failed to read cut_off_energy')
 
             test_dict, s = param2dict(param_fname, db=False)
             self.assertTrue(s, 'Failed db=False test entirely, oh dear!')
@@ -458,6 +459,30 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(test_dict['fixed_npw'], False, msg='Wrong db=False fixed_npw!')
             self.assertEqual(test_dict['write_checkpoint'], 'none', msg='Wrong db=False checkpointing!')
             self.assertEqual(test_dict['write_cell_structure'], True, msg='Wrong db=False cell_structure!')
+
+    def testTrickyParam(self):
+        from matador.scrapers.castep_scrapers import param2dict
+        param_fname = REAL_PATH + 'data/tricky_param.param'
+        failed_open = False
+        try:
+            f = open(param_fname, 'r')
+        except Exception:
+            failed_open = True
+            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(param_fname))
+        if not failed_open:
+            f.close()
+            test_dict, s = param2dict(param_fname, db=False, debug=True, verbosity=4)
+            self.assertTrue(s, 'Failed entirely, oh dear!')
+            self.assertEqual(test_dict['source'][0].split('/')[-1], 'tricky_param.param', msg='Wrong source!')
+            self.assertEqual(test_dict['task'], 'spectral', msg='Failed to read non colon delimited field task!')
+            self.assertEqual(test_dict['perc_extra_bands'], 40.0, msg='Failed to read extra bands!')
+            self.assertEqual(test_dict['fix_occupancy'], True, msg='Failed to read lowercase bool fix_occupancy')
+            self.assertEqual(test_dict['spin_polarized'], True, msg='Failed to read Anglicised spelling of polarised')
+            self.assertFalse('spin_polarised' in test_dict)
+            self.assertEqual(test_dict['write_cell_structure'], True, msg='Failed to read = delimited field write_cell_structure')
+            self.assertEqual(test_dict['cut_off_energy'], '50.0 ry', msg='Failed to non-eV cut_off_energy.')
+            self.assertEqual(test_dict['devel_code'], 'xc_bee: true\nxc_bee_rand_seed: 2\n# including comment\nxc_bee_num_trials: 100\n', msg='Failed to read devel code')
+            self.assertEqual(len(test_dict), 14)
 
     def testPhononScraper(self):
         from matador.scrapers import phonon2dict
@@ -839,12 +864,14 @@ class ExportTest(unittest.TestCase):
             print('Failed to open test case', param_fname, '- please check installation.')
         if not failed_open:
             f.close()
-            doc, s = param2dict(param_fname, db=False)
+            doc, s = param2dict(param_fname, db=False, debug=True, verbosity=5)
+            self.assertTrue(s)
             doc2param(doc, test_fname, hash_dupe=False, overwrite=True)
             doc_exported, s = param2dict(test_fname, db=False)
             remove(test_fname)
             self.assertTrue(s, msg='Failed entirely, oh dear!')
             self.assertEqual(len(doc_exported), len(doc))
+            self.assertEqual(doc['devel_code'], doc_exported['devel_code'])
 
         param_fname = REAL_PATH + 'data/nmr.param'
         test_fname = REAL_PATH + 'data/dummy.param'
