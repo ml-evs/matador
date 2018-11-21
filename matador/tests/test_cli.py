@@ -41,7 +41,7 @@ for _file in glob.glob('*spatula*'):
 
 @unittest.skipIf(not MONGO_PRESENT, 'MongoDB instance not found, skipping tests...')
 class IntegrationTest(unittest.TestCase):
-    """ Test  functionality acting on local database. """
+    """ Test functionality acting on local database. """
     def testIntegration(self):
         """ Test import and query. """
         query, files_to_delete, err_flines, manifest_flines = test_import_castep()
@@ -155,6 +155,15 @@ def test_import_res():
     os.chdir(REAL_PATH)
 
     return query_1, query_2, files_to_delete
+
+
+def test_stats():
+    """ Run the stats command just to check it works at all. """
+    sys.argv = ['matador', 'stats', '--db', DB_NAME]
+    if CONFIG_FNAME is not None:
+        sys.argv += ['--config', CONFIG_FNAME]
+    matador.cli.cli.main()
+    return
 
 
 def test_swaps():
