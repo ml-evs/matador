@@ -47,10 +47,10 @@ class AtomicSwapper:
         if self.args.get('uniq'):
             from matador.similarity.similarity import get_uniq_cursor
             print('Filtering for unique structures...')
-            unique_set, _, _, _ = get_uniq_cursor(self.cursor,
-                                                  debug=self.args.get('debug'),
-                                                  sim_tol=self.args.get('uniq'))
-            print('Filtered {} down to {}'.format(len(self.cursor[:self.args.get('top')]), len(unique_set)))
+            unique_set, dupe_dict, _, _ = get_uniq_cursor(self.cursor,
+                                                          debug=self.args.get('debug'),
+                                                          sim_tol=self.args.get('uniq'))
+            print('Filtered {} down to {}'.format(len(self.cursor), len(unique_set)))
             self.cursor = [self.cursor[ind] for ind in unique_set]
 
     def parse_swaps(self, swap_args=None):

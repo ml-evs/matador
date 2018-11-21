@@ -1,10 +1,13 @@
 #!/usr/bin/env python
+
+""" Some tests for high-throughput calculations. """
+
 import unittest
-from os.path import realpath
 import subprocess as sp
-import os
 import shutil
 import glob
+import os
+from os.path import realpath
 
 HOSTNAME = os.uname()[1]
 PATHS_TO_DEL = ['completed', 'bad_castep', 'input', 'logs', HOSTNAME]
@@ -12,12 +15,11 @@ REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
 ROOT_DIR = os.getcwd()
 VERBOSITY = 1
 NCORES = 4
-EXECUTABLE = 'castepasdfasdf'
+EXECUTABLE = 'castep'
 
 try:
-    with open('/dev/null', 'w') as f:
-        proc = sp.Popen([EXECUTABLE, '--version'], stdout=f, stderr=f)
-        proc.communicate()
+    with open('/dev/null', 'w') as devnull:
+        sp.Popen([EXECUTABLE, '--version'], stdout=devnull, stderr=devnull).communicate()
     if VERBOSITY > 0:
         print('Successfully detected CASTEP')
     CASTEP_PRESENT = True
@@ -27,9 +29,8 @@ except FileNotFoundError:
     CASTEP_PRESENT = False
 
 try:
-    with open('/dev/null', 'w') as f:
-        proc = sp.Popen(['mpirun', '--version'], stdout=f, stderr=f)
-        proc.communicate()
+    with open('/dev/null', 'w') as devnull:
+        sp.Popen(['mpirun', '--version'], stdout=devnull, stderr=devnull).communicate()
     if VERBOSITY > 0:
         print('Successfully detected mpirun')
     MPI_PRESENT = True
@@ -40,8 +41,12 @@ except FileNotFoundError:
 
 
 class ComputeTest(unittest.TestCase):
+    """ Run tests equivalent to using the run3 script for
+    various artificial setups.
+
+    """
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
-    def testRelaxToQueue(self):
+    def test_relax_to_queue(self):
         """ Mimic GA and test Queue relaxations. """
         from matador.compute import FullRelaxer
         from matador.scrapers.castep_scrapers import res2dict, cell2dict, param2dict, castep2dict
@@ -111,7 +116,7 @@ class ComputeTest(unittest.TestCase):
         self.assertTrue(all([match_dict[key] for key in match_dict]))
 
     # @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
-    def testMissingExec(self):
+    def test_missing_exec(self):
         """ Ensure failure if exec misses. """
         from matador.compute import FullRelaxer
         from matador.scrapers.castep_scrapers import cell2dict, param2dict
@@ -151,7 +156,7 @@ class ComputeTest(unittest.TestCase):
         self.assertTrue(fall_over)
 
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
-    def testRelaxToFile(self):
+    def test_relax_to_file(self):
         """ Relax structure from file to file. """
         from matador.compute import FullRelaxer
         from matador.scrapers.castep_scrapers import cell2dict, param2dict
@@ -198,7 +203,7 @@ class ComputeTest(unittest.TestCase):
         self.assertTrue(completed_exists, "couldn't find output file!")
 
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
-    def testFailedRelaxation(self):
+    def test_failed_relaxation(self):
         """ Set a relaxation up to fail. """
         from matador.compute import FullRelaxer, reset_job_folder
         from matador.scrapers.castep_scrapers import cell2dict, param2dict
@@ -248,9 +253,9 @@ class ComputeTest(unittest.TestCase):
         self.assertEqual(num, 0)
 
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
-    def testDontRestartCompletedCalc(self):
+    def test_dont_restart_completed_calc(self):
         """ Set a relaxation up to fail. """
-        from matador.compute import FullRelaxer, reset_job_folder
+        from matador.compute import FullRelaxer
         from matador.scrapers.castep_scrapers import cell2dict, param2dict
 
         os.chdir(REAL_PATH + 'data/no_steps_left_todo')
@@ -299,7 +304,7 @@ class ComputeTest(unittest.TestCase):
         self.assertTrue(all(good_exists))
 
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
-    def testMemcheck(self):
+    def test_memcheck(self):
         """ Test the memory checker will not proceed with huge jobs. """
         from matador.scrapers.castep_scrapers import cell2dict, param2dict
         from matador.compute import FullRelaxer
@@ -347,7 +352,7 @@ class ComputeTest(unittest.TestCase):
         self.assertTrue(correct_files)
 
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
-    def testBatchRelax(self):
+    def test_batch_relax(self):
         """ Batch relax structures from file to file. """
         from matador.compute import BatchRun, reset_job_folder
 
@@ -390,7 +395,7 @@ class ComputeTest(unittest.TestCase):
         self.assertFalse(cruft_doesnt_exist, "found some cruft {}".format(cruft))
 
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
-    def testSCF(self):
+    def test_scf(self):
         """ Perform SCF on structure from file. """
         from matador.compute import FullRelaxer
         from matador.scrapers.castep_scrapers import cell2dict, param2dict
@@ -439,7 +444,7 @@ class ComputeTest(unittest.TestCase):
         self.assertTrue(all(completed_exists), "couldn't find output files!")
 
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
-    def testConvergenceRunner(self):
+    def test_convergence_runner(self):
         """ Check that convergence tests run to completion. """
         from matador.compute import BatchRun
         os.chdir(REAL_PATH)
@@ -448,7 +453,6 @@ class ComputeTest(unittest.TestCase):
         shutil.copy(REAL_PATH + 'data/LiAs_scf.param', REAL_PATH + 'LiAs_scf.param')
         shutil.copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', REAL_PATH + 'Li_00PBE.usp')
         shutil.copy(REAL_PATH + 'data/pspots/As_00PBE.usp', REAL_PATH + 'As_00PBE.usp')
-
 
         with open(REAL_PATH + 'kpt.conv', 'w') as f:
             f.write('0.08\n')
@@ -494,7 +498,7 @@ class ComputeTest(unittest.TestCase):
         self.assertFalse(any(do_bad_files_exist))
 
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
-    def testBatchFailedSCF(self):
+    def test_batch_failed_scf(self):
         """ Check that SCF failures don't kill everything... """
         from matador.compute import BatchRun, reset_job_folder
 
@@ -541,7 +545,7 @@ class ComputeTest(unittest.TestCase):
         self.assertFalse(cruft_doesnt_exist, "found some cruft {}".format(cruft))
 
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
-    def testBatchMaxWallTimeThreaded(self):
+    def test_batch_max_walltime_threaded(self):
         """ Check that WallTimeErrors do kill everything... """
         from matador.compute import BatchRun
         from matador.compute.compute import WalltimeError
@@ -557,7 +561,7 @@ class ComputeTest(unittest.TestCase):
                           max_walltime=15, polltime=1)
         try:
             runner.spawn()
-        except WalltimeError as err:
+        except WalltimeError:
             walltime_error = True
 
         castep_exists = os.path.isfile('LiAs_testcase.castep')
@@ -593,7 +597,7 @@ class ComputeTest(unittest.TestCase):
         self.assertFalse(lock_exists, 'Lock file was not deleted!')
 
     # @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
-    def testBatchNothingToDo(self):
+    def test_batch_nothing_todo(self):
         """ Check that nothing is done when there's nothing to do... """
         from matador.compute import BatchRun
         import time
@@ -606,7 +610,7 @@ class ComputeTest(unittest.TestCase):
         elapsed = time.time() - start
         self.assertTrue(elapsed < 10, 'Sluggish to quit!')
 
-    def testResNameCollision(self):
+    def test_res_name_collision(self):
         """ Check that run3 safely falls over if there is a file called <seed>.res. """
         from matador.compute import BatchRun
         from matador.compute.compute import InputError

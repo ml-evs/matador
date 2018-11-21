@@ -445,6 +445,7 @@ def main(override=False):
     query_flags.add_argument('-pa', '--per_atom', action='store_true', help='show quantities per atom not per fu.')
     query_flags.add_argument('-dt', '--time', type=int, help='query only structures added before this time in days')
     query_flags.add_argument('-avail', '--available_values', type=str, help='list all values of field in query results')
+    query_flags.add_argument('--use_source', action='store_true', help='show the source rather than database ID')
     query_flags.add_argument('--since', action='store_true',
                              help='query only structures added after time specified by --time in days')
     query_flags.add_argument('--source', action='store_true',

@@ -17,8 +17,8 @@ from matador import __version__
 
 
 def display_results(cursor,
-                    args=None, argstr=None, additions=None, deletions=None,
-                    hull=False, markdown=False, latex=False, use_source=False, colour=True):
+                    args=None, argstr=None, additions=None, deletions=None, no_sort=False,
+                    hull=False, markdown=False, latex=False, use_source=None, colour=True):
     """ Print query results in a cryan-like fashion, optionally
     in a markdown format.
 
@@ -29,7 +29,9 @@ def display_results(cursor,
         args (dict): extra keyword arguments
         argstr (str): string to store matador initialisation command
         additions (list): list of string text_ids to be coloured green with a (+)
+            or, list of indices referring to those structures in the cursor.
         deletions (list): list of string text_ids to be coloured red with a (-)
+            or, list of indices referring to those structures in the cursor.
         hull (bool): whether or not to print hull-style (True) or query-style
         markdown (bool): whether or not to write a markdown file containing results
         latex (bool): whether or not to create a LaTeX table
@@ -45,6 +47,20 @@ def display_results(cursor,
 
     details = args.get('details')
 
+    add_index_mode = False
+    del_index_mode = False
+    if additions is not None and len(additions) > 0:
+        if isinstance(additions[0], int):
+            add_index_mode = True
+    if deletions is not None and len(deletions) > 0:
+        if isinstance(deletions[0], int):
+            del_index_mode = True
+
+    if add_index_mode:
+        assert max(additions) <= len(cursor) and min(additions) >= 0
+    if del_index_mode:
+        assert max(deletions) <= len(cursor) and min(deletions) >= 0
+
     # add this in to handle different energy, enthalpy, free energy etc.
     if args.get('energy_key') is not None:
         if args.get('energy_key').endswith('per_atom'):
@@ -56,6 +72,11 @@ def display_results(cursor,
     else:
         energy = 'enthalpy'
         energy_pa = 'enthalpy_per_atom'
+
+    if use_source is None and args.get('use_source') in [False, None]:
+        use_source = False
+    elif args.get('use_source') is not None:
+        use_source = args.get('use_source')
 
     if markdown and latex:
         raise RuntimeError('Cannot specify both latex and markdown output at once.')
@@ -124,10 +145,11 @@ def display_results(cursor,
     header_string += "{:^8}".format('Prov.')
 
     # ensure cursor is sorted by enthalpy
-    if args.get('temperature') is None:
-        cursor = sorted(cursor, key=lambda doc: doc[energy_pa], reverse=False)
-    else:
-        cursor = sorted(cursor, key=lambda doc: doc[energy_pa][args.get('temperature')], reverse=False)
+    if not no_sort:
+        if args.get('temperature') is None:
+            cursor = sorted(cursor, key=lambda doc: doc[energy_pa], reverse=False)
+        else:
+            cursor = sorted(cursor, key=lambda doc: doc[energy_pa][args.get('temperature')], reverse=False)
 
     if latex:
         latex_sub_style = r'\text'
@@ -178,12 +200,14 @@ def display_results(cursor,
                     struct_string.append("  {:<38}".format(src))
                 else:
                     struct_string.append("  {:^26}".format(doc['text_id'][0] + ' ' + doc['text_id'][1]))
-            if additions is not None and doc['text_id'] in additions:
-                struct_string[-1] = '\033[92m\033[1m' + ' + ' + struct_string[-1]
-                postfix = '\033[0m'
-            elif deletions is not None and doc['text_id'] in deletions:
-                struct_string[-1] = '\033[91m\033[1m' + ' - ' + struct_string[-1]
-                postfix = '\033[0m'
+            if additions is not None:
+                if (add_index_mode and ind in additions) or doc['text_id'] in additions:
+                    struct_string[-1] = '\033[92m\033[1m' + ' + ' + struct_string[-1]
+                    postfix = '\033[0m'
+            if deletions is not None:
+                if (del_index_mode and ind in deletions) or doc['text_id'] in deletions:
+                    struct_string[-1] = '\033[91m\033[1m' + ' - ' + struct_string[-1]
+                    postfix = '\033[0m'
             try:
                 if doc.get('prototype'):
                     struct_string[-1] += "{:^5}".format('*p*')
