@@ -62,6 +62,9 @@ class DBQuery:
         if self.args.get('testing') is None:
             self.args['testing'] = False
 
+        if subcmd in ['hull', 'hulldiff', 'voltage'] and self.args.get('composition') is None:
+            raise RuntimeError('{} requires composition query'.format(subcmd))
+
         # public attributes
         self.cursor = EmptyCursor()
         self.query_dict = None
