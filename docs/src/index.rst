@@ -2,7 +2,7 @@
 
 .. toctree::
     :hidden:
-    :maxdepth: 2
+    :maxdepth: 4
     
     install
     getting_started
