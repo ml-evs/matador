@@ -57,21 +57,14 @@ def file_writer_function(function):
 
 def query2files(cursor, **kwargs):
     """ Many-to-many convenience function for many structures being written to
-    many file types. File types are passed via **kwargs, e.g.
-
-        {
-            'xsf': True,
-            'cell': True,
-            'pdb': True,
-            'res': True,
-            'param': True
-        }
+    many file types.
 
     Parameters:
         cursor (:obj:`list` of :obj:`dict`): list of matador dictionaries to write out.
 
     Keyword arguments:
-        **kwargs (dict): command-line arguments containing file types to write out.
+        **kwargs (dict): dictionary of {filetype: bool(whether to write)}. Accepted file types
+            are cell, param, res, pdb, json, xsf, markdown and latex.
 
     """
     cell = kwargs.get('cell')
@@ -814,7 +807,7 @@ def doc2xsf(doc, path, write_energy=False, write_forces=False, overwrite=False):
 
 
 @file_writer_function
-def doc2arbitrary(doc, **kwargs):
+def doc2arbitrary(doc, *args, **kwargs):
     """ Write a Python dictionary into a standard CASTEP-style
     keyword: value file.
 
