@@ -641,7 +641,7 @@ class FullRelaxer:
         for keyword in required:
             if keyword not in calc_doc:
                 failures.append(keyword)
-        if len(failures) != 0:
+        if failures:
             raise InputError('The following keywords are required for workflow: {}'.format(', '.join(failures)))
 
     @staticmethod
@@ -763,7 +763,7 @@ class FullRelaxer:
             raise CriticalError(message)
 
         out, errs = proc.communicate()
-        if 'CASTEP version' not in out.decode('utf-8') or len(errs) > 0:
+        if 'CASTEP version' not in out.decode('utf-8'):
             # this is an OpenMPI error that occurs when hyperthreading is enabled
             # best way to handle is to half the number of procs available
             if 'not enough slots' in errs.decode('utf-8'):
@@ -785,6 +785,10 @@ class FullRelaxer:
                 logging.critical('sterr: {stderr}'.format(stderr=errs.decode('utf-8')))
                 logging.debug('Raising CriticalError.')
                 raise CriticalError(err_string)
+
+        if errs:
+            logging.info('Executable {} passed test, but stderr contains the following:')
+            logging.info(errs.decode('utf-8'))
 
     @property
     def mpi_library(self):
