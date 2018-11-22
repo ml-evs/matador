@@ -25,15 +25,15 @@ def res2dict(seed, db=True, **kwargs):
     used in conjunction with cell or param file.
 
     Parameters:
-        seed (str/list): filename or list of filenames of res file(s)
+        seed (str or list): filename or list of filenames of res file(s)
             (with or without extension).
 
     Keyword arguments:
         db (bool): whether to fail if unable to scrape energies.
 
     Returns:
-        (dict/str, bool): if successful, a dictionary containing scraped data and True,
-            if not, then an error string and False.
+        (tuple): containing either dict/str containing data or error, and a bool stating
+            if the scrape was successful.
 
     """
     res = dict()
@@ -135,8 +135,8 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, **kw
         positions (bool): scrape positions
 
     Returns:
-        (dict/str, bool): if successful, a dictionary containing scraped
-            data and True, if not, then an error string and False.
+        (tuple): containing either dict/str containing data or error, and a bool stating
+            if the scrape was successful.
 
     """
     cell = dict()
@@ -348,8 +348,8 @@ def param2dict(seed, db=True, **kwargs):
         db (bool): if True, only scrape relevant info, otherwise scrape all
 
     Returns:
-        (dict/str, bool): if successful, a dictionary containing scraped data and True,
-            if not, then an error string and False.
+        (tuple): containing either dict/str containing data or error, and a bool stating
+            if the scrape was successful.
 
     """
     from matador.utils.castep_params import CASTEP_PARAMS
@@ -461,8 +461,8 @@ def castep2dict(seed, db=True, intermediates=False, **kwargs):
             return a list of snapshots found in .castep file
 
     Returns:
-        (dict/str/list, bool): if successful, a dictionary or list of dictionaries
-            containing scraped data and True, if not, then an error string and False.
+        (tuple): containing either dict/str containing data or error, and a bool stating
+            if the scrape was successful.
 
     """
     if seed.endswith('.history'):
@@ -572,8 +572,8 @@ def bands2dict(seed, summary=False, gap=False, external_efermi=None, **kwargs):
         external_efermi (float): override the Fermi energy with this value (eV)
 
     Returns:
-        (dict/str, bool): if successful, a dictionary containing scraped data and True,
-            if not, then an error string and False.
+        (tuple): containing either dict/str containing data or error, and a bool stating
+            if the scrape was successful.
 
     """
     from matador.utils.chem_utils import HARTREE_TO_EV, BOHR_TO_ANGSTROM
@@ -743,8 +743,8 @@ def arbitrary2dict(seed, **kwargs):
         seed (str/list): filename or list of filenames.
 
     Returns:
-        (dict/str, bool): if successful, a dictionary containing scraped data and True,
-            if not, then an error string and False.
+        (tuple): containing either dict/str containing data or error, and a bool stating
+            if the scrape was successful.
 
     """
     with open(seed, 'r') as f:
@@ -779,8 +779,8 @@ def optados2dict(seed, **kwargs):
         seed (str/list): optados filename or list of filenames.
 
     Returns:
-        (dict/str, bool): if successful, a dictionary containing scraped data and True,
-            if not, then an error string and False.
+        (tuple): containing either dict/str containing data or error, and a bool stating
+            if the scrape was successful.
 
     """
     import numpy as np
@@ -894,8 +894,8 @@ def phonon2dict(seed, **kwargs):
         seed (str/list): phonon filename or list of filenames.
 
     Returns:
-        (dict/str, bool): if successful, a dictionary containing scraped data and True,
-            if not, then an error string and False.
+        (tuple): containing either dict/str containing data or error, and a bool stating
+            if the scrape was successful.
 
     """
     import numpy as np
@@ -1672,22 +1672,12 @@ def get_seed_metadata(doc, seed):
 
     """
     if '-CollCode-' in seed:
-        print('ICSD', seed)
         doc['icsd'] = int(seed.split('CollCode-')[-1].split('-')[0].split('_')[0].split('.')[0])
-        print(doc['icsd'])
     elif 'CollCode' in seed:
-        print('ICSD', seed)
         doc['icsd'] = int(seed.split('CollCode')[-1].split('-')[0].split('_')[0].split('.')[0])
-        print(doc['icsd'])
     elif '-ICSD-' in seed:
-        print('ICSD', seed)
         doc['icsd'] = int(seed.split('-ICSD-')[-1].split('-')[0].split('_')[0].split('.')[0])
-        print(doc['icsd'])
     if '-MP-' in seed:
-        print('mp', seed)
         doc['mp-id'] = int(seed.split('-MP-')[-1].split('-')[0].split('_')[0].split('.')[0])
-        print(doc['mp-id'])
     if '-DOI-' in seed:
-        print('doi', seed)
         doc['doi'] = seed.split('-DOI-')[-1].split('-')[0].replace('__', '/')
-        print(doc['doi'])

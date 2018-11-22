@@ -7,8 +7,7 @@ many common DFT/crystallography file formats.
 Currently supported filetypes:
 
     - CASTEP filetypes: .cell, .param, .castep, .bands, .phonon, .usp
-    - Custom .res type based on SHELX files, first used by AIRSS package
-        https://www.mtg.msm.cam.ac.uk/Codes/AIRSS
+    - Custom .res type based on SHELX files, first used by AIRSS package https://www.mtg.msm.cam.ac.uk/Codes/AIRSS
     - OptaDOS output: .odo, .adaptive.dat
     - Quantum Espresso output files: .out
     - Magres files: .magres
