@@ -43,7 +43,7 @@ def quickstart_settings():
     valid = False
     while not valid:
         response = input('[1] ~/.matadorrc, [2] ~/.config/matadorrc? ')
-        if response != '1' and response != '2':
+        if response not in ['1', '2']:
             print('I didn\'t understand, sorry... please enter 1 or 2')
         else:
             valid = True
@@ -176,6 +176,8 @@ def load_custom_settings(config_fname=None, quiet=True, debug=False, override=Tr
         try:
             with open(config_fname, 'r') as f:
                 custom_settings = yaml.safe_load(f)
+                if custom_settings is None:
+                    custom_settings = {}
         except Exception:
             print_exc()
             raise SystemExit(
