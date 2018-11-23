@@ -80,9 +80,7 @@ def main():
                         help='check for $seed.kill file and quit job if present')
     parser.add_argument('--kpts_1D', action='store_true', default=False,
                         help='recalculate a 1D kpoint mesh of spacing specified in template cell')
-    parser.add_argument('--spin', action='store_true', default=False,
-                        help='if not specified in .cell file, break spin symmetry on first atom with a spin of 5')
-    parser.add_argument('--mag_spin', type=int, default=5,
+    parser.add_argument('--spin', type=int, nargs='?', const=5, default=None,
                         help='if not specified in .cell file, break spin symmetry on first atom using the spin specified by the user [DEFAULT: 5]')
     parser.add_argument('--rough', type=int, default=4,
                         help='choose how many <rough_iter> geometry optimizations \
