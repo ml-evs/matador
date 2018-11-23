@@ -81,7 +81,9 @@ def main():
     parser.add_argument('--kpts_1D', action='store_true', default=False,
                         help='recalculate a 1D kpoint mesh of spacing specified in template cell')
     parser.add_argument('--spin', action='store_true', default=False,
-                        help='if not specified in .cell file, break spin symmetry on first atom')
+                        help='if not specified in .cell file, break spin symmetry on first atom with a spin of 5')
+    parser.add_argument('--mag_spin', type=int, default=5,
+                        help='if not specified in .cell file, break spin symmetry on first atom using the spin specified by the user [DEFAULT: 5]')
     parser.add_argument('--rough', type=int, default=4,
                         help='choose how many <rough_iter> geometry optimizations \
                               to perform, decrease if lattice is nearly correct. [DEFAULT: 4].')

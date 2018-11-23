@@ -58,7 +58,7 @@ class BatchRun:
                          'verbosity': 0, 'archer': False, 'slurm': False,
                          'intel': False, 'conv_cutoff': False, 'conv_kpt': False,
                          'memcheck': False, 'maxmem': None, 'killcheck': True, 'scratch_prefix': None,
-                         'kpts_1D': False, 'spin': False, 'ignore_jobs_file': False,
+                         'kpts_1D': False, 'spin': False, 'mag_spin': 5, 'ignore_jobs_file': False,
                          'rough': 4, 'rough_iter': 2, 'fine_iter': 20, 'max_walltime': None,
                          'limit': None, 'profile': False, 'polltime': 30}
         self.args = {}
