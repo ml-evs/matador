@@ -77,6 +77,27 @@ def scraper_function(function):
     return wrapped_scraper_function
 
 
+def f90_float_parse(val):
+    """ Wrapper to float that handles Fortran's horrible behaviour for
+    float exponents <= 100, e.g. 1e-100 -> 1.0000000-100 rather than
+    1.000000E-100.
+
+    Parameters:
+        val (str): the string to cast to a float.
+
+    """
+    try:
+        return float(val)
+    except ValueError as exc:
+        # if the E is being displayed, then something else has gone wrong
+        if 'E' in val:
+            raise exc
+        # if there's a minus sign after the first char, but no E...
+        if len(val) > 1 and '-' in val[1:]:
+            val = val[0] + val[1:].replace('-', 'E-')
+        return float(val)
+
+
 class DFTError(Exception):
     """ Quick DFT exception class for unconverged or
     non-useful calculations.

@@ -16,7 +16,7 @@ import glob
 import gzip
 from matador.utils.cell_utils import abc2cart, calc_mp_spacing, cart2volume, wrap_frac_coords
 from matador.utils.chem_utils import get_stoich
-from matador.scrapers.utils import DFTError, CalculationError, scraper_function
+from matador.scrapers.utils import DFTError, CalculationError, scraper_function, f90_float_parse
 
 
 @scraper_function
@@ -67,13 +67,13 @@ def res2dict(seed, db=True, **kwargs):
     elif titl == '' and db:
         raise RuntimeError('missing TITL')
     if db:
-        res['pressure'] = float(titl[2])
-        res['cell_volume'] = float(titl[3])
-        res['enthalpy'] = float(titl[4])
+        res['pressure'] = f90_float_parse(titl[2])
+        res['cell_volume'] = f90_float_parse(titl[3])
+        res['enthalpy'] = f90_float_parse(titl[4])
         res['num_atoms'] = int(titl[7])
         res['space_group'] = titl[8].strip('()')
         res['enthalpy_per_atom'] = res['enthalpy'] / res['num_atoms']
-    res['lattice_abc'] = [list(map(float, cell[2:5])), list(map(float, cell[5:8]))]
+    res['lattice_abc'] = [list(map(f90_float_parse, cell[2:5])), list(map(f90_float_parse, cell[5:8]))]
     # calculate lattice_cart from abc
     res['lattice_cart'] = abc2cart(res['lattice_abc'])
     if 'cell_volume' not in res:
@@ -87,8 +87,8 @@ def res2dict(seed, db=True, **kwargs):
             while 'END' not in flines[line_no + i] and line_no + i < len(flines):
                 cursor = flines[line_no + i].split()
                 res['atom_types'].append(cursor[0])
-                res['positions_frac'].append(list(map(float, cursor[2:5])))
-                res['site_occupancy'].append(float(cursor[5]))
+                res['positions_frac'].append(list(map(f90_float_parse, cursor[2:5])))
+                res['site_occupancy'].append(f90_float_parse(cursor[5]))
                 assert len(res['positions_frac'][-1]) == 3
                 i += 1
     res['positions_frac'] = wrap_frac_coords(res['positions_frac'])
@@ -107,12 +107,12 @@ def res2dict(seed, db=True, **kwargs):
                 if 'chiralM' in entry:
                     res['cnt_chiral'][1] = int(remark[ind + 1].replace(',', ''))
                 if entry == '\'r\':':
-                    res['cnt_radius'] = float(remark[ind + 1].replace(',', ''))
+                    res['cnt_radius'] = f90_float_parse(remark[ind + 1].replace(',', ''))
                 if entry == '\'z\':':
                     temp_length = remark[ind + 1].replace(',', '')
                     temp_length = temp_length.replace('\n', '')
                     temp_length = temp_length.replace('}', '')
-                    res['cnt_length'] = float(temp_length)
+                    res['cnt_length'] = f90_float_parse(temp_length)
 
     res['stoichiometry'] = get_stoich(res['atom_types'])
     res['num_fu'] = len(res['atom_types']) / sum([elem[1] for elem in res['stoichiometry']])
@@ -159,7 +159,7 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, **kw
             i = 1
             while 'endblock' not in flines[line_no + i].lower():
                 if not flines[line_no + i].strip()[0].isalpha():
-                    cell['lattice_cart'].append(list(map(float, flines[line_no + i].split())))
+                    cell['lattice_cart'].append(list(map(f90_float_parse, flines[line_no + i].split())))
                     assert len(cell['lattice_cart'][-1]) == 3, 'Lattice vector does not have enough elements!'
                 i += 1
             assert len(cell['lattice_cart']) == 3, 'Wrong number of lattice vectors!'
@@ -198,7 +198,7 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, **kw
                 else:
                     atom = line.split()[0]
                     orbital = line.split()[1].replace(':', '')
-                    shift = float(line.split()[-1])
+                    shift = f90_float_parse(line.split()[-1])
                     atom = line.split()[0]
                     cell['hubbard_u'][atom] = dict()
                     cell['hubbard_u'][atom][orbital] = shift
@@ -209,20 +209,20 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, **kw
             while 'endblock' not in flines[line_no + i].lower():
                 if not flines[line_no + i].strip()[0].isalpha():
                     flines[line_no+i] = flines[line_no+i].replace(',', '')
-                    cell['external_pressure'].append(list(map(float, flines[line_no+i].split())))
+                    cell['external_pressure'].append(list(map(f90_float_parse, flines[line_no+i].split())))
                 i += 1
         # parse kpoints
         elif 'kpoints_mp_spacing' in line.lower() or 'kpoint_mp_spacing' in line.lower():
             if 'spectral_kpoints_mp_spacing' in line.lower() or 'spectral_kpoint_mp_spacing' in line.lower():
-                cell['spectral_kpoints_mp_spacing'] = float(line.split()[-1])
+                cell['spectral_kpoints_mp_spacing'] = f90_float_parse(line.split()[-1])
             elif 'supercell_kpoints_mp_spacing' in line.lower() or 'supercell_kpoint_mp_spacing' in line.lower():
-                cell['supercell_kpoints_mp_spacing'] = float(line.split()[-1])
+                cell['supercell_kpoints_mp_spacing'] = f90_float_parse(line.split()[-1])
             elif 'phonon_kpoints_mp_spacing' in line.lower() or 'phonon_kpoint_mp_spacing' in line.lower():
-                cell['phonon_kpoint_mp_spacing'] = float(line.split()[-1])
+                cell['phonon_kpoint_mp_spacing'] = f90_float_parse(line.split()[-1])
             elif 'phonon_fine_kpoints_mp_spacing' in line.lower() or 'phonon_fine_kpoint_mp_spacing' in line.lower():
-                cell['phonon_fine_kpoint_mp_spacing'] = float(line.split()[-1])
+                cell['phonon_fine_kpoint_mp_spacing'] = f90_float_parse(line.split()[-1])
             else:
-                cell['kpoints_mp_spacing'] = float(line.split()[-1])
+                cell['kpoints_mp_spacing'] = f90_float_parse(line.split()[-1])
         elif 'kpoints_mp_grid' in line.lower() or 'kpoint_mp_grid' in line.lower():
             if 'spectral_kpoints_mp_grid' in line.lower() or 'spectral_kpoint_mp_grid' in line.lower():
                 cell['spectral_kpoints_mp_grid'] = list(map(int, line.split()[-3:]))
@@ -234,32 +234,32 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, **kw
                 cell['kpoints_mp_grid'] = list(map(int, line.split()[-3:]))
         elif 'kpoints_mp_offset' in line.lower() or 'kpoint_mp_offset' in line.lower():
             if 'spectral_kpoints_mp_offset' in line.lower() or 'spectral_kpoint_mp_offset' in line.lower():
-                cell['spectral_kpoints_mp_offset'] = list(map(float, line.split()[-3:]))
+                cell['spectral_kpoints_mp_offset'] = list(map(f90_float_parse, line.split()[-3:]))
             elif 'phonon_kpoints_mp_offset' in line.lower() or 'phonon_kpoint_mp_offset' in line.lower():
                 # this is a special case where phonon_kpointS_mp_offset doesn't exist
-                cell['phonon_kpoint_mp_offset'] = list(map(float, line.split()[-3:]))
+                cell['phonon_kpoint_mp_offset'] = list(map(f90_float_parse, line.split()[-3:]))
             elif 'phonon_fine_kpoints_mp_offset' in line.lower() or 'phonon_fine_kpoint_mp_offset' in line.lower():
-                cell['phonon_fine_kpoint_mp_offset'] = list(map(float, line.split()[-3:]))
+                cell['phonon_fine_kpoint_mp_offset'] = list(map(f90_float_parse, line.split()[-3:]))
             else:
-                cell['kpoints_mp_offset'] = list(map(float, line.split()[-3:]))
+                cell['kpoints_mp_offset'] = list(map(f90_float_parse, line.split()[-3:]))
         elif '%block spectral_kpoints_path' in line.lower() or '%block spectral_kpoint_path' in line.lower():
             i = 1
             cell['spectral_kpoints_path'] = []
             while '%endblock' not in flines[line_no + i].lower():
-                cell['spectral_kpoints_path'].append(list(map(float, flines[line_no + i].split()[:3])))
+                cell['spectral_kpoints_path'].append(list(map(f90_float_parse, flines[line_no + i].split()[:3])))
                 i += 1
         elif '%block spectral_kpoints_list' in line.lower() or '%block spectral_kpoint_list' in line.lower():
             i = 1
             cell['spectral_kpoints_list'] = []
             while '%endblock' not in flines[line_no + i].lower():
-                cell['spectral_kpoints_list'].append(list(map(float, flines[line_no + i].split()[:4])))
+                cell['spectral_kpoints_list'].append(list(map(f90_float_parse, flines[line_no + i].split()[:4])))
                 i += 1
         elif '%block phonon_fine_kpoints_list' in line.lower() or '%block phonon_fine_kpoint_list' in line.lower():
             i = 1
             # this is a special case where phonon_fine_kpointS_list doesn't exist
             cell['phonon_fine_kpoint_list'] = []
             while '%endblock' not in flines[line_no + i].lower():
-                cell['phonon_fine_kpoint_list'].append(list(map(float, flines[line_no + i].split()[:4])))
+                cell['phonon_fine_kpoint_list'].append(list(map(f90_float_parse, flines[line_no + i].split()[:4])))
                 i += 1
         elif '%block phonon_supercell_matrix' in line.lower():
             cell['phonon_supercell_matrix'] = []
@@ -280,7 +280,7 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, **kw
                     line = flines[line_no + i].split()
                     if positions:
                         cell['atom_types'].append(line[0])
-                        cell['positions_frac'].append(list(map(float, line[1:4])))
+                        cell['positions_frac'].append(list(map(f90_float_parse, line[1:4])))
                     if 'spin=' in flines[line_no + i].lower():
                         split_line = flines[line_no + i].split()
                         atomic_init_spins[split_line[0]] = \
@@ -299,22 +299,22 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, **kw
             elif 'symmetry_generate' in line.lower():
                 cell['symmetry_generate'] = True
             elif 'symmetry_tol' in line.lower():
-                cell['symmetry_tol'] = float(line.split()[-1])
+                cell['symmetry_tol'] = f90_float_parse(line.split()[-1])
             elif 'snap_to_symmetry' in line.lower():
                 cell['snap_to_symmetry'] = True
             elif 'quantisation_axis' in line.lower():
                 cell['quantisation_axis'] = list(map(int, line.split()[1:]))
             elif 'positions_noise' in line.lower():
-                cell['positions_noise'] = float(line.split()[-1])
+                cell['positions_noise'] = f90_float_parse(line.split()[-1])
             elif 'cell_noise' in line.lower():
-                cell['cell_noise'] = float(line.split()[-1])
+                cell['cell_noise'] = f90_float_parse(line.split()[-1])
             elif 'kpoints_path' in line.lower() or 'kpoint_path' in line.lower():
                 if 'spectral_kpoints_path_spacing' in line.lower() or 'spectral_kpoint_path_spacing' in line.lower():
-                    cell['spectral_kpoints_path_spacing'] = float(line.split()[-1])
+                    cell['spectral_kpoints_path_spacing'] = f90_float_parse(line.split()[-1])
                 elif 'phonon_fine_kpoints_path_spacing' in line.lower() or 'phonon_fine_kpoint_path_spacing' in line.lower():
-                    cell['phonon_fine_kpoint_path_spacing'] = float(line.split()[-1])
+                    cell['phonon_fine_kpoint_path_spacing'] = f90_float_parse(line.split()[-1])
                 elif 'kpoints_path_spacing' in line.lower() or 'kpoint_path_spacing' in line.lower():
-                    cell['kpoints_path_spacing'] = float(line.split()[-1])
+                    cell['kpoints_path_spacing'] = f90_float_parse(line.split()[-1])
 
     if 'external_pressure' not in cell or not cell['external_pressure']:
         cell['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0], [0.0]]
@@ -421,24 +421,24 @@ def param2dict(seed, db=True, **kwargs):
                         temp_cut_off = param['cut_off_energy'].split()
                         if len(temp_cut_off) > 1:
                             if temp_cut_off[1] == 'ev':
-                                param['cut_off_energy'] = float(temp_cut_off[0])
+                                param['cut_off_energy'] = f90_float_parse(temp_cut_off[0])
                             elif db:
                                 raise RuntimeError('cut_off_energy units must be eV or blank in db mode, not {}'.format(temp_cut_off[1]))
                             else:
                                 param['cut_off_energy'] = '{} {}'.format(temp_cut_off[0], temp_cut_off[1])
                         else:
-                            param['cut_off_energy'] = float(temp_cut_off[0])
+                            param['cut_off_energy'] = f90_float_parse(temp_cut_off[0])
 
                     elif 'xc_functional' in line:
                         param['xc_functional'] = param['xc_functional'].upper()
                     elif 'perc_extra_bands' in line:
-                        param['perc_extra_bands'] = float(param['perc_extra_bands'])
+                        param['perc_extra_bands'] = f90_float_parse(param['perc_extra_bands'])
                     elif 'geom_force_tol' in line:
-                        param['geom_force_tol'] = float(param['geom_force_tol'])
+                        param['geom_force_tol'] = f90_float_parse(param['geom_force_tol'])
                     elif 'elec_energy_tol' in line:
                         temp = (param['elec_energy_tol'].lower().replace('ev', ''))
                         temp = temp.strip()
-                        param['elec_energy_tol'] = float(temp)
+                        param['elec_energy_tol'] = f90_float_parse(temp)
                     break
 
     if unrecognised:
@@ -569,7 +569,7 @@ def bands2dict(seed, summary=False, gap=False, external_efermi=None, **kwargs):
     Keyword arguments:
         summary (bool): print info about bandgap.
         gap (bool): re-compute bandgap info.
-        external_efermi (float): override the Fermi energy with this value (eV)
+        external_efermi (f90_float_parse): override the Fermi energy with this value (eV)
 
     Returns:
         (tuple): containing either dict/str containing data or error, and a bool stating
@@ -594,16 +594,16 @@ def bands2dict(seed, summary=False, gap=False, external_efermi=None, **kwargs):
 
     bs['num_kpoints'] = int(header[0].split()[-1])
     bs['num_spins'] = int(header[1].split()[-1])
-    bs['num_electrons'] = float(header[2].split()[-1])
+    bs['num_electrons'] = f90_float_parse(header[2].split()[-1])
     bs['num_bands'] = int(header[3].split()[-1])
     if external_efermi is None:
-        bs['fermi_energy_Ha'] = float(header[4].split()[-1])
+        bs['fermi_energy_Ha'] = f90_float_parse(header[4].split()[-1])
         bs['fermi_energy'] = bs['fermi_energy_Ha'] * HARTREE_TO_EV
     else:
         bs['fermi_energy'] = external_efermi
     bs['lattice_cart'] = []
     for i in range(3):
-        bs['lattice_cart'].append([BOHR_TO_ANGSTROM * float(elem) for elem in header[6 + i].split()])
+        bs['lattice_cart'].append([BOHR_TO_ANGSTROM * f90_float_parse(elem) for elem in header[6 + i].split()])
     bs['kpoint_path'] = np.zeros((bs['num_kpoints'], 3))
     bs['kpoint_weights'] = np.zeros((bs['num_kpoints']))
     bs['eigenvalues_k_s'] = np.empty((bs['num_spins'], bs['num_bands'], bs['num_kpoints']))
@@ -614,14 +614,14 @@ def bands2dict(seed, summary=False, gap=False, external_efermi=None, **kwargs):
     for nk in range(bs['num_kpoints']):
         kpt_ind = nk * (bs['num_spins'] * bs['num_bands'] + bs['num_spins'] + 1)
         bs['kpoint_path'][int(data[kpt_ind].split()[1]) - 1] = (
-            np.asarray([float(elem) for elem in data[kpt_ind].split()[-4:-1]])
+            np.asarray([f90_float_parse(elem) for elem in data[kpt_ind].split()[-4:-1]])
         )
-        bs['kpoint_weights'][int(data[kpt_ind].split()[1]) - 1] = float(data[kpt_ind].split()[-1])
+        bs['kpoint_weights'][int(data[kpt_ind].split()[1]) - 1] = f90_float_parse(data[kpt_ind].split()[-1])
         for nb in range(bs['num_bands']):
             for ns in range(bs['num_spins']):
                 line_number = kpt_ind + 2 + ns + (ns * bs['num_bands']) + nb
                 bs['eigenvalues_k_s'][ns][nb][int(data[kpt_ind].split()[1]) - 1] = (
-                    float(data[line_number].strip()))
+                    f90_float_parse(data[line_number].strip()))
     bs['eigenvalues_k_s'] *= HARTREE_TO_EV
     bs['eigenvalues_k_s'] -= bs['fermi_energy']
 
@@ -649,19 +649,19 @@ def bands2dict(seed, summary=False, gap=False, external_efermi=None, **kwargs):
                     band_branch_max = np.max(band)
                     band_branch_argmin = np.where(band <= band_branch_min + eps)[0]
                     band_branch_argmax = np.where(band >= band_branch_max - eps)[0]
-                    if band_branch_max < 0 and band_branch_max > vbm + eps:
+                    if vbm + eps < band_branch_max < 0:
                         vbm = band_branch_max
                         vbm_pos = [branch[max_ind] for max_ind in band_branch_argmax]
-                    elif band_branch_max < 0 and band_branch_max >= vbm - eps:
+                    elif vbm - eps <= band_branch_max < 0:
                         vbm = band_branch_max
                         vbm_pos.extend([branch[val] for val in band_branch_argmax])
-                    if band_branch_min > 0 and band_branch_min < cbm - eps:
+                    if cbm - eps > band_branch_min > 0:
                         cbm = band_branch_min
                         cbm_pos = [branch[min_ind] for min_ind in band_branch_argmin]
-                    elif band_branch_min > 0 and band_branch_min <= cbm + eps:
+                    elif cbm + eps >= band_branch_min > 0:
                         cbm = band_branch_min
                         cbm_pos.extend([branch[val] for val in band_branch_argmin])
-                    if band_branch_max > 0 and band_branch_min < 0:
+                    if band_branch_min < 0 < band_branch_max:
                         vbm = 0
                         cbm = 0
                         vbm_pos = [0]
@@ -693,9 +693,9 @@ def bands2dict(seed, summary=False, gap=False, external_efermi=None, **kwargs):
                 direct_vbm = -1e10
                 for nb in range(bs['num_bands']):
                     band_eig = bs['eigenvalues_k_s'][0][nb][ind]
-                    if band_eig < 0 and band_eig >= direct_vbm:
+                    if direct_vbm <= band_eig < 0:
                         direct_vbm = band_eig
-                    if band_eig > 0 and band_eig <= direct_cbm:
+                    if direct_cbm >= band_eig > 0:
                         direct_cbm = band_eig
                 direct_gaps[ind] = direct_cbm - direct_vbm
                 direct_cbms[ind] = direct_cbm
@@ -792,7 +792,9 @@ def optados2dict(seed, **kwargs):
         flines = f.readlines()
 
     header = []
+    header_ind = 0
     for ind, line in enumerate(flines):
+        header_ind = ind
         if not line.strip().startswith('#') or 'K-point' in line:
             break
         if 'Partial' in line:
@@ -804,7 +806,7 @@ def optados2dict(seed, **kwargs):
         else:
             header.append(line)
 
-    flines = flines[ind:]
+    flines = flines[header_ind:]
 
     if not is_pdis:
         data = np.loadtxt(seed, comments='#')
@@ -862,7 +864,7 @@ def optados2dict(seed, **kwargs):
         kpt_ind = -1
         for i, line in enumerate(flines):
             if 'K-point' in line:
-                optados['kpoints'].append([float(val) for val in line.split()[-3:]])
+                optados['kpoints'].append([f90_float_parse(val) for val in line.split()[-3:]])
                 if kpt_ind == -1:
                     kpt_ind = i
                 else:
@@ -875,8 +877,8 @@ def optados2dict(seed, **kwargs):
             eigs = []
             pdis = []
             for nb in range(0, optados['num_bands']):
-                eigs.append(float(flines[nk*(optados['num_bands']+1) + nb + 1].split()[0]))
-                pdis.append([float(val) for val in flines[nk*(optados['num_bands']+1) + 1 + nb].split()[1:]])
+                eigs.append(f90_float_parse(flines[nk*(optados['num_bands']+1) + nb + 1].split()[0]))
+                pdis.append([f90_float_parse(val) for val in flines[nk*(optados['num_bands']+1) + 1 + nb].split()[1:]])
             optados['eigenvalues'].append(eigs)
             optados['pdis'].append(pdis)
 
@@ -924,7 +926,7 @@ def phonon2dict(seed, **kwargs):
         elif 'unit cell vectors' in line:
             ph['lattice_cart'] = []
             for i in range(3):
-                ph['lattice_cart'].append([float(elem) for elem in flines[line_no + i + 1].split()])
+                ph['lattice_cart'].append([f90_float_parse(elem) for elem in flines[line_no + i + 1].split()])
                 assert len(ph['lattice_cart'][-1]) == 3
         elif 'fractional co-ordinates' in line:
             ph['positions_frac'] = []
@@ -932,9 +934,9 @@ def phonon2dict(seed, **kwargs):
             ph['atom_masses'] = []
             i = 1
             while 'END header' not in flines[line_no + i]:
-                ph['positions_frac'].append([float(elem) for elem in flines[line_no + i].split()[1:4]])
+                ph['positions_frac'].append([f90_float_parse(elem) for elem in flines[line_no + i].split()[1:4]])
                 ph['atom_types'].append(flines[line_no + i].split()[-2])
-                ph['atom_masses'].append(float(flines[line_no + i].split()[-1]))
+                ph['atom_masses'].append(f90_float_parse(flines[line_no + i].split()[-1]))
                 assert len(ph['positions_frac'][-1]) == 3
                 i += 1
             assert len(ph['positions_frac']) == ph['num_atoms']
@@ -946,11 +948,11 @@ def phonon2dict(seed, **kwargs):
     ph['eigenvalues_q'] = np.zeros((1, ph['num_branches'], ph['num_qpoints']))
     line_offset = ph['num_branches'] * (ph['num_atoms'] + 1) + 3
     for qind in range(ph['num_qpoints']):
-        ph['phonon_kpoint_list'].append([float(elem) for elem in data[qind * line_offset].split()[2:]])
+        ph['phonon_kpoint_list'].append([f90_float_parse(elem) for elem in data[qind * line_offset].split()[2:]])
         for i in range(1, ph['num_branches'] + 1):
             if i == 1:
                 assert data[qind * line_offset + i].split()[0] == '1'
-            ph['eigenvalues_q'][0][i - 1][qind] = float(data[qind * line_offset + i].split()[-1])
+            ph['eigenvalues_q'][0][i - 1][qind] = f90_float_parse(data[qind * line_offset + i].split()[-1])
 
     ph['qpoint_path'] = np.asarray([qpt[0:3] for qpt in ph['phonon_kpoint_list']])
     ph['qpoint_weights'] = [qpt[3] for qpt in ph['phonon_kpoint_list']]
@@ -1046,13 +1048,13 @@ def _castep_scrape_thermo_data(flines, castep):
         if 'Number of temperature values' in line:
             castep['num_temp_vals'] = int(line.split(':')[-1].strip())
         elif 'Initial temperature' in line:
-            castep['temp_init'] = float(line.split(':')[1].strip().split(' ')[0])
+            castep['temp_init'] = f90_float_parse(line.split(':')[1].strip().split(' ')[0])
         elif 'Final temperature' in line:
-            castep['temp_final'] = float(line.split(':')[1].strip().split(' ')[0])
+            castep['temp_final'] = f90_float_parse(line.split(':')[1].strip().split(' ')[0])
         elif 'Spacing between temperature values' in line:
-            castep['temp_spacing'] = float(line.split(':')[1].strip().split(' ')[0])
+            castep['temp_spacing'] = f90_float_parse(line.split(':')[1].strip().split(' ')[0])
         elif 'Zero-point energy' in line:
-            castep['zero_point_E'] = float(line.split("=")[1].strip().split(' ')[0])
+            castep['zero_point_E'] = f90_float_parse(line.split("=")[1].strip().split(' ')[0])
         elif 'T(K)' and 'E(eV)' in line:
             castep['thermo_temps'] = []  # temperatures calculation was done at
             castep['thermo_enthalpy'] = {}  # enthalpy E(eV)
@@ -1065,11 +1067,11 @@ def _castep_scrape_thermo_data(flines, castep):
                     break
                 else:
                     temp_line = flines[line_no + i].split()
-                    castep['thermo_temps'].append(float(temp_line[0]))
-                    castep['thermo_enthalpy'][float(temp_line[0])] = float(temp_line[1])
-                    castep['thermo_free_energy'][float(temp_line[0])] = float(temp_line[2])
-                    castep['thermo_entropy'][float(temp_line[0])] = float(temp_line[3])
-                    castep['thermo_heat_cap'][float(temp_line[0])] = float(temp_line[4])
+                    castep['thermo_temps'].append(f90_float_parse(temp_line[0]))
+                    castep['thermo_enthalpy'][f90_float_parse(temp_line[0])] = f90_float_parse(temp_line[1])
+                    castep['thermo_free_energy'][f90_float_parse(temp_line[0])] = f90_float_parse(temp_line[2])
+                    castep['thermo_entropy'][f90_float_parse(temp_line[0])] = f90_float_parse(temp_line[3])
+                    castep['thermo_heat_cap'][f90_float_parse(temp_line[0])] = f90_float_parse(temp_line[4])
                 i += 1
 
     return castep
@@ -1096,7 +1098,7 @@ def _castep_scrape_atoms(flines, castep):
                     break
                 else:
                     temp_line = flines[line_no + i].split()[0:3]
-                    castep['lattice_cart'].append(list(map(float, temp_line)))
+                    castep['lattice_cart'].append(list(map(f90_float_parse, temp_line)))
                 i += 1
         if 'atom types' not in castep and 'Cell Contents' in line:
             castep['atom_types'] = []
@@ -1110,7 +1112,7 @@ def _castep_scrape_atoms(flines, castep):
                         break
                     else:
                         castep['atom_types'].append(flines[line_no + i].split()[1])
-                        castep['positions_frac'].append(list(map(float, (flines[line_no + i].split()[3:6]))))
+                        castep['positions_frac'].append(list(map(f90_float_parse, (flines[line_no + i].split()[3:6]))))
                 if 'x------' in flines[line_no + i]:
                     atoms = True
                 i += 1
@@ -1162,7 +1164,7 @@ def _castep_scrape_final_parameters(flines, castep):
             elif 'hybrid HSE06' in xc_string:
                 castep['xc_functional'] = 'HSE06'
         elif 'cut_off_energy' not in castep and 'plane wave basis set' in line:
-            castep['cut_off_energy'] = float(line.split(':')[-1].split()[0])
+            castep['cut_off_energy'] = f90_float_parse(line.split(':')[-1].split()[0])
         elif 'finite_basis_corr' not in castep and 'finite basis set correction  ' in line:
             castep['finite_basis_corr'] = line.split(':')[-1].strip()
         elif 'kpoints_mp_grid' not in castep and 'MP grid size for SCF' in line:
@@ -1170,9 +1172,9 @@ def _castep_scrape_final_parameters(flines, castep):
         elif 'num_kpoints' not in castep and 'Number of kpoints used' in line:
             castep['num_kpoints'] = int(line.split()[-1])
         elif 'geom_force_tol' not in castep and 'max ionic |force| tolerance' in line:
-            castep['geom_force_tol'] = float(line.split()[-2])
+            castep['geom_force_tol'] = f90_float_parse(line.split()[-2])
         elif 'elec_energy_tol' not in castep and 'total energy / atom convergence tol' in line:
-            castep['elec_energy_tol'] = float(line.split()[-2])
+            castep['elec_energy_tol'] = f90_float_parse(line.split()[-2])
         elif 'sedc_apply' not in castep and \
                 'DFT+D: Semi-empirical dispersion correction    : on' in line:
             castep['sedc_apply'] = True
@@ -1182,9 +1184,9 @@ def _castep_scrape_final_parameters(flines, castep):
         elif 'external_pressure' not in castep and 'External pressure/stress' in line:
             try:
                 castep['external_pressure'] = []
-                castep['external_pressure'].append(list(map(float, flines[line_no + 1].split())))
-                castep['external_pressure'].append(list(map(float, flines[line_no + 2].split())))
-                castep['external_pressure'].append(list(map(float, flines[line_no + 3].split())))
+                castep['external_pressure'].append(list(map(f90_float_parse, flines[line_no + 1].split())))
+                castep['external_pressure'].append(list(map(f90_float_parse, flines[line_no + 2].split())))
+                castep['external_pressure'].append(list(map(f90_float_parse, flines[line_no + 3].split())))
             except ValueError:
                 castep['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
         elif 'spin_polarized' not in castep and 'treating system as spin-polarized' in line:
@@ -1195,7 +1197,7 @@ def _castep_scrape_final_parameters(flines, castep):
             while i < castep['num_atoms']:
                 line = flines[line_no + i].strip()
                 atom = line.split()[0].replace('|', '')
-                shifts = list(map(float, line.split()[-5:-1]))
+                shifts = list(map(f90_float_parse, line.split()[-5:-1]))
                 for ind, shift in enumerate(shifts):
                     if shift != 0:
                         if atom not in castep['hubbard_u']:
@@ -1280,23 +1282,23 @@ def _castep_scrape_final_structure(flines, castep, db=True):
                         break
                     else:
                         temp_line = final_flines[line_no + i].split()[0:3]
-                        castep['lattice_cart'].append(list(map(float, temp_line)))
+                        castep['lattice_cart'].append(list(map(f90_float_parse, temp_line)))
                     i += 1
             elif 'Lattice parameters' in line:
                 castep['lattice_abc'] = []
                 i = 1
                 castep['lattice_abc'].append(
-                    list(map(float,
+                    list(map(f90_float_parse,
                              [final_flines[line_no+i].split('=')[1].strip().split(' ')[0],
                               final_flines[line_no+i+1].split('=')[1].strip().split(' ')[0],
                               final_flines[line_no+i+2].split('=')[1].strip().split(' ')[0]])))
                 castep['lattice_abc'].append(
-                    list(map(float,
+                    list(map(f90_float_parse,
                              [final_flines[line_no+i].split('=')[-1].strip(),
                               final_flines[line_no+i+1].split('=')[-1].strip(),
                               final_flines[line_no+i+2].split('=')[-1].strip()])))
             elif 'Current cell volume' in line:
-                castep['cell_volume'] = float(line.split('=')[1].split()[0].strip())
+                castep['cell_volume'] = f90_float_parse(line.split('=')[1].split()[0].strip())
             elif 'Cell Contents' in line:
                 castep['positions_frac'] = []
                 i = 1
@@ -1308,19 +1310,19 @@ def _castep_scrape_final_structure(flines, castep, db=True):
                             break
                         else:
                             temp_frac = final_flines[line_no + i].split()[3:6]
-                            castep['positions_frac'].append(list(map(float, temp_frac)))
+                            castep['positions_frac'].append(list(map(f90_float_parse, temp_frac)))
                     if 'x------' in final_flines[line_no + i]:
                         atoms = True
                     i += 1
             # don't check if final_energy exists, as this will update for each GO step
             elif 'Final energy, E' in line:
-                castep['total_energy'] = float(line.split('=')[1].split()[0])
+                castep['total_energy'] = f90_float_parse(line.split('=')[1].split()[0])
                 castep['total_energy_per_atom'] = castep['total_energy'] / castep['num_atoms']
             elif 'Final free energy' in line:
-                castep['free_energy'] = float(line.split('=')[1].split()[0])
+                castep['free_energy'] = f90_float_parse(line.split('=')[1].split()[0])
                 castep['free_energy_per_atom'] = castep['free_energy'] / castep['num_atoms']
             elif '0K energy' in line:
-                castep['0K_energy'] = float(line.split('=')[1].split()[0])
+                castep['0K_energy'] = f90_float_parse(line.split('=')[1].split()[0])
                 castep['0K_energy_per_atom'] = castep['0K_energy'] / castep['num_atoms']
             elif ' Forces **' in line:
                 castep['forces'] = []
@@ -1337,8 +1339,8 @@ def _castep_scrape_final_structure(flines, castep, db=True):
                             castep['forces'].append([])
                             for j in range(3):
                                 temp = final_flines[line_no + i].replace('(cons\'d)', '')
-                                force_on_atom += float(temp.split()[3 + j])**2
-                                castep['forces'][-1].append(float(temp.split()[3 + j]))
+                                force_on_atom += f90_float_parse(temp.split()[3 + j])**2
+                                castep['forces'][-1].append(f90_float_parse(temp.split()[3 + j]))
                             if force_on_atom > max_force:
                                 max_force = force_on_atom
                     elif 'x' in final_flines[line_no + i]:
@@ -1352,10 +1354,10 @@ def _castep_scrape_final_structure(flines, castep, db=True):
                     if 'Cartesian components' in final_flines[line_no + i]:
                         castep['stress'] = []
                         for j in range(3):
-                            castep['stress'].append(list(map(float, (final_flines[line_no + i + j + 4].split()[2:5]))))
+                            castep['stress'].append(list(map(f90_float_parse, (final_flines[line_no + i + j + 4].split()[2:5]))))
                     elif 'Pressure' in final_flines[line_no + i]:
                         try:
-                            castep['pressure'] = float(final_flines[line_no + i].split()[-2])
+                            castep['pressure'] = f90_float_parse(final_flines[line_no + i].split()[-2])
                         except ValueError:
                             pass
                         break
@@ -1370,19 +1372,19 @@ def _castep_scrape_final_structure(flines, castep, db=True):
                 i = 0
                 while i < len(castep['atom_types']):
                     if castep['spin_polarized']:
-                        castep['mulliken_charges'].append(float(final_flines[line_no + i + 4].split()[-2]))
-                        castep['mulliken_spins'].append(float(final_flines[line_no + i + 4].split()[-1]))
+                        castep['mulliken_charges'].append(f90_float_parse(final_flines[line_no + i + 4].split()[-2]))
+                        castep['mulliken_spins'].append(f90_float_parse(final_flines[line_no + i + 4].split()[-1]))
                         castep['mulliken_net_spin'] += castep['mulliken_spins'][-1]
                         castep['mulliken_abs_spin'] += abs(castep['mulliken_spins'][-1])
                     else:
-                        castep['mulliken_charges'].append(float(final_flines[line_no + i + 4].split()[-1]))
+                        castep['mulliken_charges'].append(f90_float_parse(final_flines[line_no + i + 4].split()[-1]))
                     i += 1
             elif 'Final Enthalpy' in line:
-                castep['enthalpy'] = float(line.split('=')[-1].split()[0])
-                castep['enthalpy_per_atom'] = (float(line.split('=')[-1].split()[0]) / castep['num_atoms'])
+                castep['enthalpy'] = f90_float_parse(line.split('=')[-1].split()[0])
+                castep['enthalpy_per_atom'] = (f90_float_parse(line.split('=')[-1].split()[0]) / castep['num_atoms'])
             elif 'Final bulk modulus' in line:
                 try:
-                    castep['bulk_modulus'] = float(line.split('=')[-1].split()[0])
+                    castep['bulk_modulus'] = f90_float_parse(line.split('=')[-1].split()[0])
                 except ValueError:
                     # the above will fail if bulk modulus was not printed (i.e. if it was unchanged)
                     pass
@@ -1431,11 +1433,11 @@ def _castep_scrape_metadata(flines, castep):
                 day = line.split()[3]
                 castep['date'] = day + '-' + month + '-' + year
             elif 'Total time' in line and 'matrix elements' not in line:
-                castep['total_time_hrs'] = float(line.split()[-2]) / 3600
+                castep['total_time_hrs'] = f90_float_parse(line.split()[-2]) / 3600
             elif 'Peak Memory Use' in line:
-                castep['peak_mem_MB'] = int(float(line.split()[-2]) / 1024)
+                castep['peak_mem_MB'] = int(f90_float_parse(line.split()[-2]) / 1024)
             elif 'total storage required per process' in line:
-                castep['estimated_mem_MB'] = float(line.split()[-5])
+                castep['estimated_mem_MB'] = f90_float_parse(line.split()[-5])
 
         # if any of these error, don't worry too much (at all)
         except Exception:
@@ -1525,25 +1527,25 @@ def _castep_scrape_all_snapshots(flines):
                         break
                     else:
                         temp_line = flines[line_no + i].split()[0:3]
-                        snapshot['lattice_cart'].append(list(map(float, temp_line)))
+                        snapshot['lattice_cart'].append(list(map(f90_float_parse, temp_line)))
                     i += 1
 
             elif 'Lattice parameters' in line:
                 snapshot['lattice_abc'] = []
                 i = 1
                 snapshot['lattice_abc'].append(
-                    list(map(float,
+                    list(map(f90_float_parse,
                              [flines[line_no+i].split('=')[1].strip().split(' ')[0],
                               flines[line_no+i+1].split('=')[1].strip().split(' ')[0],
                               flines[line_no+i+2].split('=')[1].strip().split(' ')[0]])))
                 snapshot['lattice_abc'].append(
-                    list(map(float,
+                    list(map(f90_float_parse,
                              [flines[line_no+i].split('=')[-1].strip(),
                               flines[line_no+i+1].split('=')[-1].strip(),
                               flines[line_no+i+2].split('=')[-1].strip()])))
 
             elif 'Current cell volume' in line:
-                snapshot['cell_volume'] = float(line.split('=')[1].split()[0].strip())
+                snapshot['cell_volume'] = f90_float_parse(line.split('=')[1].split()[0].strip())
             elif 'Cell Contents' in line:
                 snapshot['positions_frac'] = []
                 snapshot['atom_types'] = []
@@ -1556,7 +1558,7 @@ def _castep_scrape_all_snapshots(flines):
                             break
                         else:
                             temp_frac = flines[line_no + i].split()[3:6]
-                            snapshot['positions_frac'].append(list(map(float, temp_frac)))
+                            snapshot['positions_frac'].append(list(map(f90_float_parse, temp_frac)))
                             snapshot['atom_types'].append(flines[line_no + i].split()[1])
                     if 'x------' in flines[line_no + i]:
                         atoms = True
@@ -1571,11 +1573,11 @@ def _castep_scrape_all_snapshots(flines):
 
             # don't check if final_energy exists, as this will update for each GO step
             elif 'Final energy, E' in line:
-                snapshot['total_energy'] = float(line.split('=')[1].split()[0])
+                snapshot['total_energy'] = f90_float_parse(line.split('=')[1].split()[0])
             elif 'Final free energy' in line:
-                snapshot['free_energy'] = float(line.split('=')[1].split()[0])
+                snapshot['free_energy'] = f90_float_parse(line.split('=')[1].split()[0])
             elif '0K energy' in line:
-                snapshot['0K_energy'] = float(line.split('=')[1].split()[0])
+                snapshot['0K_energy'] = f90_float_parse(line.split('=')[1].split()[0])
             elif ' Forces **' in line:
                 snapshot['forces'] = []
                 i = 1
@@ -1591,8 +1593,8 @@ def _castep_scrape_all_snapshots(flines):
                             snapshot['forces'].append([])
                             for j in range(3):
                                 temp = flines[line_no + i].replace('(cons\'d)', '')
-                                force_on_atom += float(temp.split()[3 + j])**2
-                                snapshot['forces'][-1].append(float(temp.split()[3 + j]))
+                                force_on_atom += f90_float_parse(temp.split()[3 + j])**2
+                                snapshot['forces'][-1].append(f90_float_parse(temp.split()[3 + j]))
                             if force_on_atom > max_force:
                                 max_force = force_on_atom
                     elif 'x' in flines[line_no + i]:
@@ -1606,9 +1608,9 @@ def _castep_scrape_all_snapshots(flines):
                     if 'Cartesian components' in flines[line_no + i]:
                         snapshot['stress'] = []
                         for j in range(3):
-                            snapshot['stress'].append(list(map(float, (flines[line_no + i + j + 4].split()[2:5]))))
+                            snapshot['stress'].append(list(map(f90_float_parse, (flines[line_no + i + j + 4].split()[2:5]))))
                     elif 'Pressure' in flines[line_no + i]:
-                        snapshot['pressure'] = float(flines[line_no + i].split()[-2])
+                        snapshot['pressure'] = f90_float_parse(flines[line_no + i].split()[-2])
                         break
                     i += 1
 
@@ -1633,8 +1635,9 @@ def get_kpt_branches(cart_kpts):
         cart_kpts (list or np.ndarray): list of kpoints in Cartesian coordinates.
 
     Returns:
-        list: list of lists containing branches of continous kpoint indices.
-        float: estimated kpoint spacing.
+        (tuple):
+            - list: list of lists containing branches of continous kpoint indices,
+            - float: estimated kpoint spacing.
 
     """
     import numpy as np
@@ -1666,7 +1669,7 @@ def get_seed_metadata(doc, seed):
     ICSD CollCode, MaterialsProject IDs and DOIs to add
     to the document.
 
-    Input:
+    Parameters:
         doc (dict): the input document.
         seed (str): the filename that is being scraped (sans file extension).
 
