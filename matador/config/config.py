@@ -22,6 +22,11 @@ DEFAULT_SETTINGS = {
     "plotting": {
         "default_style": "matador",
         "element_colours": "vesta_elements.ini",
+    },
+    "run3": {
+        "scratch_prefix": ".",
+        "castep_executable": "castep",
+        "optados_executable": "optados"
     }
 }
 

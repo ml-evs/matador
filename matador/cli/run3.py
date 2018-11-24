@@ -42,8 +42,8 @@ def main():
 
     parser.add_argument('-t', '--max_walltime', type=int,
                         help='maximum walltime in seconds (job will quit early to clean up if specified)')
-    parser.add_argument('-exec', '--executable', type=str, default='castep',
-                        help='specify path to or name of executable')
+    parser.add_argument('-exec', '--executable', type=str,
+                        help='specify path to or name of executable (DEFAULT: castep)')
     parser.add_argument('--no_reopt', action='store_true', default=False,
                         help='do not run geometry optimisation again after first success')
     parser.add_argument('--redirect', type=str,
@@ -103,10 +103,17 @@ def main():
     del kwargs['seed']
 
     from matador.config import load_custom_settings
-    if kwargs['scratch_prefix'] is None:
-        settings = load_custom_settings(debug=kwargs.get('debug')).get('run3')
-        if settings is not None:
+    settings = load_custom_settings(debug=kwargs.get('debug')).get('run3')
+    if settings is not None:
+        if kwargs['scratch_prefix'] is None:
             kwargs['scratch_prefix'] = settings.get('scratch_prefix')
+            if kwargs['scratch_prefix'] == '.':
+                kwargs['scratch_prefix'] = None
+
+        if kwargs['executable'] is None:
+            kwargs['executable'] = settings.get('castep_executable', 'castep')
+
+        kwargs['run3_settings'] = settings
 
     if sum([vars(args)['slurm'], vars(args)['archer'], vars(args)['intel']]) > 1:
         exit('Incompatible MPI arguments specified, please use at most one of --archer/--intel/--slurm.')

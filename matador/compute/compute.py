@@ -109,10 +109,13 @@ class FullRelaxer:
                          'output_queue': None, 'redirect': None, 'reopt': False, 'compute_dir': None, 'noise': False,
                          'custom_params': False, 'archer': False, 'maxmem': None, 'killcheck': True, 'kpts_1D': False,
                          'conv_cutoff': False, 'conv_kpt': False, 'profile': False, 'slurm': False, 'intel': False,
-                         'exec_test': True, 'timings': (None, None), 'start': True, 'verbosity': 1, 'polltime': 30}
+                         'exec_test': True, 'timings': (None, None), 'start': True, 'verbosity': 1, 'polltime': 30,
+                         'optados_executable': 'optados', 'run3_settings': None}
+
         self.paths = None
         self.process = None
         self.output_queue = None
+        self._first_run = True
 
         self.geom_max_iter_list = None
         self.max_iter = None
@@ -133,7 +136,7 @@ class FullRelaxer:
         if isinstance(self.res, str):
             self.seed = self.res
             if '/' in self.seed:
-                shutil.copy(self.seed, self.seed.split('/')[-1])
+                shutil.copy2(self.seed, self.seed.split('/')[-1])
         else:
             assert isinstance(self.res['source'], list)
             assert len(self.res['source']) == 1
@@ -349,6 +352,8 @@ class FullRelaxer:
         else:
             success = self.scf(calc_doc, self.seed, keep=True)
 
+        self._first_run = False
+
         return success
 
     def run_generic(self, seed, intermediate=False, mv_bad_on_failure=True):
@@ -381,18 +386,23 @@ class FullRelaxer:
             assert isinstance(self.seed, str)
             self.cp_to_input(seed, ext=self.input_ext, glob_files=True)
             self.process = self.run_command(seed)
-            self.process.communicate()
-            if self.process.returncode != 0:
-                raise RuntimeError('Process returned code {}'.format(self.process.returncode))
+            out, errs = self.process.communicate()
+            if self.process.returncode != 0 or errs:
+                message = 'Process returned error code {}'.format(self.process.returncode)
+                message += '\nstdout: {}'.format(out.decode('utf-8'))
+                message += '\nstderr: {}'.format(errs.decode('utf-8'))
+                raise RuntimeError(message)
 
             if not intermediate:
                 logging.info('Writing results of generic call to res file and tidying up.')
                 self.mv_to_completed(seed, keep=True, completed_dir=self.paths['completed_dir'])
 
             logging.info('Executable {exe} finished cleanly.'.format(exe=self.executable))
+            self._first_run = False
             return True
 
         except Exception as err:
+            self._first_run = False
             logging.error('Caught error inside run_generic: {error}.'.format(error=err))
             if mv_bad_on_failure:
                 self.mv_to_bad(seed)
@@ -955,20 +965,12 @@ class FullRelaxer:
             else:
                 command = ['mpirun', '-n', str(self.ncores * self.nnodes), '-npernode', str(self.ncores)] + command
 
-        # ensure default stdout is None for generic mpi calls
-        stdout = None
-        stderr = None
+        stdout = sp.PIPE
+        stderr = sp.PIPE
 
-        if exec_test:
-            stdout = sp.PIPE
-            stderr = sp.PIPE
-        elif self.debug:
+        if self.debug:
             stdout = None
             stderr = None
-        else:
-            dev_null = open(os.devnull, 'w')
-            stdout = dev_null
-            stderr = dev_null
 
         if self._redirect_filename is not None:
             logging.info('Redirecting output to {redirect}'.format(redirect=self._redirect_filename))
@@ -978,10 +980,6 @@ class FullRelaxer:
         process = sp.Popen(command, shell=False, stdout=stdout, stderr=stderr)
         try:
             redirect_file.close()
-        except Exception:
-            pass
-        try:
-            dev_null.close()
         except Exception:
             pass
 
@@ -1036,12 +1034,12 @@ class FullRelaxer:
             logging.info('Moving files to bad_castep: {bad}.'.format(bad=bad_dir))
             if not os.path.exists(bad_dir):
                 os.makedirs(bad_dir, exist_ok=True)
-            seed_files = glob.glob(seed + '.*') + glob.glob(seed + '-out.cell')
+            seed_files = glob.glob(seed + '.*') + glob.glob(seed + '-out.cell*')
             if seed_files:
                 logging.debug('Files to move: {seed}'.format(seed=seed_files))
                 for _file in seed_files:
                     try:
-                        shutil.copy(_file, bad_dir)
+                        shutil.copy2(_file, bad_dir)
                         os.remove(_file)
                     except Exception as exc:
                         logging.warning('Error moving files to bad: {error}'.format(error=exc))
@@ -1069,8 +1067,10 @@ class FullRelaxer:
         logging.info('Moving files to completed: {completed}.'.format(completed=completed_dir))
         if not os.path.exists(completed_dir):
             os.makedirs(completed_dir, exist_ok=True)
+        for _file in glob.glob(seed + '*_bak') + glob.glob(seed + '*.lock'):
+            os.remove(_file)
         if keep:
-            seed_files = glob.glob(seed + '.*') + glob.glob(seed + '-out.cell')
+            seed_files = glob.glob(seed + '.*') + glob.glob(seed + '-out.cell*')
             if seed_files:
                 logging.debug('Files to move: {files}.'.format(files=seed_files))
                 for _file in seed_files:
@@ -1091,15 +1091,12 @@ class FullRelaxer:
                     shutil.move('{}{}'.format(seed, ext), completed_dir)
                 except Exception as exc:
                     logging.warning('Error moving files to completed: {error}'.format(error=exc))
-            # check root folder for any matching files and remove them
-            fname = '{}/{}'.format(self.root_folder, seed)
-            for ext in file_exts + ['.res.lock']:
-                if os.path.isfile('{}{}'.format(fname, ext)):
-                    os.remove('{}{}'.format(fname, ext))
 
-            wildcard_fnames = glob.glob('{}/{}.*'.format(self.root_folder, seed))
-            for fname in wildcard_fnames:
-                os.remove(fname)
+        # delete whatever is left
+        wildcard_fnames = glob.glob('{}/{}.*'.format(self.root_folder, seed))
+        wildcard_fnames += glob.glob('{}/{}-out.*'.format(self.root_folder, seed))
+        for fname in wildcard_fnames:
+            os.remove(fname)
 
     def cp_to_input(self, seed, ext='res', glob_files=False):
         """ Copy initial cell and res to input folder.
@@ -1112,6 +1109,8 @@ class FullRelaxer:
             glob_files (bool): whether to glob all related seed files.
 
         """
+        if self._first_run:
+            return
         input_dir = self.root_folder + '/input'
         logging.debug('Copying file to input_dir: {input}'.format(input=input_dir))
         if not os.path.exists(input_dir):
@@ -1123,12 +1122,12 @@ class FullRelaxer:
                 if f.endswith('.lock'):
                     continue
                 if not os.path.isfile(f):
-                    shutil.copy('{}'.format(f), input_dir)
+                    shutil.copy2('{}'.format(f), input_dir)
         else:
             logging.debug('File to copy: {file}'.format(file='{}.{}'.format(seed, ext)))
             if os.path.isfile('{}.{}'.format(seed, ext)):
                 if not os.path.isfile('{}/{}.{}'.format(input_dir, seed, ext)):
-                    shutil.copy('{}.{}'.format(seed, ext), input_dir)
+                    shutil.copy2('{}.{}'.format(seed, ext), input_dir)
 
     def _setup_relaxation(self):
         """ Set up directories and files for relaxation. """
@@ -1150,16 +1149,16 @@ class FullRelaxer:
             logging.info('Copying pspots into compute_dir')
             pspots = glob.glob('*.usp')
             for pspot in pspots:
-                shutil.copy(pspot, self.compute_dir)
+                shutil.copy2(pspot, self.compute_dir)
 
             if self.custom_params:
-                shutil.copy(self.seed + '.param', self.compute_dir)
+                shutil.copy2(self.seed + '.param', self.compute_dir)
 
         # update res file with intermediate calculation if castep file is newer than res
         if os.path.isfile(self.seed + '.castep') and os.path.isfile(self.seed + '.res'):
             logging.info('Trying to update res file with result from intermediate CASTEP file found in root_dir')
             if self.compute_dir is not None:
-                shutil.copy(self.seed + '.castep', self.compute_dir)
+                shutil.copy2(self.seed + '.castep', self.compute_dir)
             castep_dict, success = castep2dict(self.seed + '.castep', db=False)
             if success:
                 self.res_dict['geom_iter'] = castep_dict.get('geom_iter')
@@ -1260,9 +1259,9 @@ class FullRelaxer:
             os.remove(self.seed + '.res')
         doc2res(opti_dict, self.seed, hash_dupe=False)
         if self.compute_dir is not None:
-            shutil.copy(self.seed + '.res', self.root_folder)
+            shutil.copy2(self.seed + '.res', self.root_folder)
             if os.path.isfile(self.seed + '.castep'):
-                shutil.copy(self.seed + '.castep', self.root_folder)
+                shutil.copy2(self.seed + '.castep', self.root_folder)
         self.res_dict.update(opti_dict)
 
     def _finalise_result(self):
@@ -1306,7 +1305,7 @@ class FullRelaxer:
         if self.compute_dir is not None:
             logging.info('Cleaning up compute_dir: {dir}'.format(dir=self.compute_dir))
             for f in glob.glob('{}.*'.format(self.seed)):
-                shutil.copy(f, self.root_folder)
+                shutil.copy2(f, self.root_folder)
                 os.remove(f)
 
         logging.info('Removing lock file so calculation can be continued.')

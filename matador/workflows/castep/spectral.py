@@ -120,6 +120,16 @@ class CastepSpectralWorkflow(Workflow):
                               input_exts=exts[key].get('input'),
                               output_exts=exts[key].get('output'))
 
+        if self.relaxer.run3_settings.get('run3_settings') is not None:
+            settings = self.relaxer.kwargs.get('run3_settings')
+            # check that relaxer.exec was not overriden at cmd-line, then check settings file
+            if settings.get('castep_executable') is not None and self.relaxer.executable == 'castep':
+                self.castep_executable = settings.get('castep_executable', 'castep')
+                self.relaxer.executable = self.castep_executable
+            if settings.get('optados_executable') is not None:
+                self.optados_executable = settings.get('optados_executable', 'optados')
+                self.relaxer.optados_executable = self.optados_executable
+
         # always reduce cell to primitive and standardise the cell so that any
         # post-processing performed after the fact will be consistent
         from matador.utils.cell_utils import cart2abc
@@ -352,7 +362,7 @@ def _run_optados(relaxer, odi_dict, seed, suffix=None):
     _cache_executable = copy.deepcopy(relaxer.executable)
     _cache_core = copy.deepcopy(relaxer.ncores)
     relaxer.ncores = 1
-    relaxer.executable = 'optados'
+    relaxer.executable = relaxer.optados_executable
     success = False
 
     try:

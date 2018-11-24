@@ -13,7 +13,7 @@ import multiprocessing as mp
 import os
 import glob
 import time
-from matador.utils.print_utils import print_notify, print_failure, print_warning
+from matador.utils.print_utils import print_failure, print_warning
 from matador.compute.queue import get_queue_env, get_queue_walltime, get_queue_manager
 from matador.scrapers.castep_scrapers import cell2dict, param2dict
 from matador.compute.compute import FullRelaxer, InputError
@@ -75,7 +75,7 @@ class BatchRun:
                 self.seed = self.seed[0]
 
         self.compute_dir = os.uname()[1]
-        if self.args.get('scratch_prefix') is not None:
+        if self.args.get('scratch_prefix') not in [None, '.']:
             self.compute_dir = '{}/{}'.format(self.args['scratch_prefix'], self.compute_dir).replace('//', '/')
 
         if isinstance(self.seed, str):
@@ -199,7 +199,7 @@ class BatchRun:
                 error_message = ''
                 for error in errors:
                     error_message += 'Process {} raised error {}. '.format(error[0], error[1])
-                if len(set([type(error[1]) for error in errors])) == 1:
+                if len({type(error[1]) for error in errors}) == 1:
                     raise type(errors[0][1])(error_message)
                 raise BundledErrors(error_message)
 
@@ -315,7 +315,7 @@ class BatchRun:
                      "Please rename either your seed.cell/seed.param files, or rename the offending .res")
             raise InputError(error)
 
-        if len(self.file_lists['res']) < 1:
+        if not self.file_lists['res']:
             error = (
                 'run3 in CASTEP mode requires at least 1 res file in folder, found {}'
                 .format(len(self.file_lists['res']))
