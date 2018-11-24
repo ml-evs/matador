@@ -828,6 +828,10 @@ def doc2arbitrary(doc, *args, **kwargs):
     output_doc = {}
     # sanitise dict to include only unique-by-case keys
     for key in doc:
+        if key.startswith('_'):
+            continue
+        if key.lower() == 'source':
+            continue
         if key.lower() in output_doc:
             raise Warning('Key {} defined multiple times.'.format(key))
         output_doc[key.lower()] = doc[key]
