@@ -13,13 +13,13 @@ import abc
 class Workflow:
     """ Workflow objects are bundles of calculations defined as
     :obj:`WorkflowStep` objects. Each :obj:`WorkflowStep` takes three arguments:
-    the :obj:`FullRelaxer` object used to run the calculations, the calculation
+    the :obj:`matador.compute.FullRelaxer` object used to run the calculations, the calculation
     parameters (which can be modified by each step), the seed name.
     Any subclass of Workflow must implement `preprocess` and `postprocess`
     methods (even if they just return True).
 
     Attributes:
-        relaxer (:obj:`FullRelaxer`): the object that calls CASTEP.
+        relaxer (:obj:`matador.compute.FullRelaxer`): the object that will be running the computation.
         calc_doc (dict): the interim dictionary of structural and
             calculation parameters.
         seed (str): the root seed for the calculation.
@@ -31,11 +31,11 @@ class Workflow:
 
     """
     def __init__(self, relaxer, calc_doc, seed, **workflow_kwargs):
-        """ Initialise the Workflow object from a :obj:`FullRelaxer`, calculation
+        """ Initialise the Workflow object from a :obj:`matador.compute.FullRelaxer`, calculation
         parameters and the seed name.
 
         Parameters:
-            relaxer (:obj:`FullRelaxer`): the object that will be calling CASTEP.
+            relaxer (:obj:`matador.compute.FullRelaxer`): the object that will be running the computation.
             calc_doc (dict): dictionary of structure and calculation
                 parameters.
             seed (str): root seed for the calculation.
@@ -84,7 +84,7 @@ class Workflow:
             logging.info('Writing results of failed Workflow {} run to res file and tidying up.'.format(self.label))
             self.relaxer.mv_to_bad(self.seed)
 
-    def add_step(self, function, name, **func_kwargs):
+    def add_step(self, function, name, input_exts=None, output_exts=None, **func_kwargs):
         """ Add a step to the workflow.
 
         Parameters:
@@ -94,7 +94,9 @@ class Workflow:
             func_kwargs (dict): any arguments to pass to function when called.
 
         """
-        self.steps.append(WorkflowStep(function, name, **func_kwargs))
+        self.steps.append(WorkflowStep(function, name,
+                                       input_exts, output_exts,
+                                       **func_kwargs))
 
     def run_steps(self):
         """ Loop over steps and run them. """
@@ -106,6 +108,7 @@ class Workflow:
 
             for step in self.steps:
                 step.run_step(self.relaxer, self.calc_doc, self.seed)
+
             self.success = True
 
         except RuntimeError:
@@ -120,19 +123,94 @@ class WorkflowStep:
     and a name. The function will be called with arguments
     (relaxer, calc_doc, seed) with the run_step method.
 
+    Attributes:
+        function (function): the function to call.
+        name (str): the human-readable name of the step.
+        func_kwargs (dict): any extra kwargs to pass to the function.
+        input_exts (list): list of input file extensions to cache after running.
+        output_exts (list): list of output file extensions to cache after running.
+
     """
-    def __init__(self, function, name, **func_kwargs):
+    def __init__(self, function, name, input_exts=None, output_exts=None, **func_kwargs):
         """ Construct a WorkflowStep from a function. """
         logging.debug('Constructing WorkflowStep: {}'.format(name))
         self.function = function
         self.name = name
         self.func_kwargs = func_kwargs
+        self.input_exts = input_exts
+        self.output_exts = output_exts
+
+    def _cache_files(self, seed, exts, mode):
+        """ Copy any files <seed>.<ext> for ext in exts to
+        <seed>.<ext>_<label>.
+
+        Parameters:
+            seed (str): seed for the workflow step.
+            exts (:obj:`list` of :obj:`str`): list of file extensions, including '.'.
+            mode (str): either 'in' (warning printed if file missing) or 'out' (no warning).
+
+        """
+        import shutil
+        import os
+        import glob
+        for ext in exts:
+            if '*' in ext:
+                srcs = glob.glob('{}{}'.format(seed, ext))
+            else:
+                srcs = ['{}{}'.format(seed, ext)]
+            print(ext, srcs)
+            for src in srcs:
+                dst = src + '_{}'.format(self.name)
+                if os.path.isfile(src):
+                    shutil.copy2(src, dst, follow_symlinks=True)
+                    logging.info('Backed up {} file {} to {}.'.format(mode, src, dst))
+                else:
+                    if mode == 'in':
+                        error = 'Failed to cache input file {} for step {}.'.format(src, self.name)
+                        logging.warning(error)
+
+    def _cache_inputs(self, seed):
+        """ Save any input files for the WorkflowStep with appropriate suffix
+        as determined by the WorkflowStep label. All files with <seed>.<ext>
+        will be moved to <seed>.<ext>_<name>, for any <ext> inside the
+        `input_exts` attribute. This is called after the WorkflowStep has
+        finished, even if it does not succeed...
+
+        Parameters:
+            seed (str): seed for the workflow step.
+
+        """
+        if self.input_exts is not None:
+            self._cache_files(seed, self.input_exts, 'in')
+
+    def _cache_outputs(self, seed):
+        """ Save any output files for the WorkflowStep with appropriate suffix
+        as determined by the WorkflowStep label. All files with <seed>.<ext>
+        will be moved to <seed>.<ext>_<name>, for any <ext> inside the
+        `output_exts` attribute.
+
+        Parameters:
+            seed (str): seed for the workflow step.
+
+        """
+        if self.output_exts is not None:
+            self._cache_files(seed, self.output_exts, 'out')
+
+    def cache_files(self, seed):
+        """ Wrapper for calling both _cache_inputs and _cache_outputs, without
+        throwing any errors.
+        """
+        # try:
+        self._cache_inputs(seed)
+        self._cache_outputs(seed)
+        # except Exception:
+            # pass
 
     def run_step(self, relaxer, calc_doc, seed):
         """ Run the workflow step.
 
         Parameters:
-            relaxer (:obj:`FullRelaxer`): the object that will be calling CASTEP.
+            relaxer (:obj:`matador.compute.FullRelaxer`): the object that will be running the computation.
             calc_doc (dict): dictionary of structure and calculation
                 parameters.
             seed (str): root seed for the calculation.
@@ -143,10 +221,23 @@ class WorkflowStep:
         """
         try:
             logging.info('WorkflowStep {} starting...'.format(self.name))
-            self.function(relaxer, calc_doc, seed, **self.func_kwargs)
-            logging.info('WorkflowStep {} completed successfully.'.format(self.name))
-
+            success = self.function(relaxer, calc_doc, seed, **self.func_kwargs)
         except RuntimeError as exc:
             msg = 'WorkflowStep {} failed with error {}.'.format(self.name, exc)
             logging.error(msg)
-            raise RuntimeError(msg)
+            success = False
+            self.cache_files(seed)
+            raise exc
+
+        if success is None:
+            logging.info('WorkflowStep {} skipped, did you provide all the input files?'.format(self.name))
+            return success
+
+        if success:
+            logging.info('WorkflowStep {} completed successfully.'.format(self.name))
+        else:
+            logging.warning('WorkflowStep {} was unsuccessful.'.format(self.name))
+
+        self.cache_files(seed)
+
+        return success
