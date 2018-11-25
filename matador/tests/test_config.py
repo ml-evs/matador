@@ -5,7 +5,11 @@ import shutil
 from matador.config import load_custom_settings
 from matador.config.config import DEFAULT_SETTINGS
 
-DUMMY_SETTINGS = {'mongo': {'host': 'blah', 'port': 666}, 'plotting': {'style': 'matador'}, 'this_is_a_test': {True: 'it is'}}
+DUMMY_SETTINGS = {'mongo': {'host': 'blah', 'port': 666},
+                  'plotting': {'style': 'matador'},
+                  'this_is_a_test': {True: 'it is'},
+                  'run3': {'castep_executable': 'castep', 'optados_executable': 'optados', 'scratch_prefix': '.'}}
+
 REAL_PATH = '/'.join(__file__.split('/')[:-1]) + '/'
 
 
