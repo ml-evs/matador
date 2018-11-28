@@ -289,12 +289,17 @@ class ScrapeTest(unittest.TestCase):
         self.assertEqual(len(cursor), 4)
         self.assertEqual(len(failures), 1)
 
+        cursor, failures = castep2dict(REAL_PATH + 'data/castep_files/*.castep', db=True)
+        self.assertEqual(len(cursor), 5)
+        self.assertEqual(len(failures), 2)
+
         res_fname = []
         res_fname += [REAL_PATH + 'data/LiPZn-r57des.res']
         res_fname += [REAL_PATH + 'data/LiPZn-r57des_bodged.res']
         cursor, failures = res2dict(res_fname, db=True)
         self.assertEqual(len(cursor), 1)
         self.assertEqual(len(failures), 1)
+
 
     def test_castep_intermediates(self):
         from matador.scrapers.castep_scrapers import castep2dict

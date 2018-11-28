@@ -991,7 +991,6 @@ def phonon2dict(seed, **kwargs):
     return ph, True
 
 
-@scraper_function
 def usp2dict(seed, **kwargs):
     """ Extract pseudopotential string from a CASTEP
     OTF .USP file.
