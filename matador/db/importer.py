@@ -231,7 +231,7 @@ class Spatula:
                 else:
                     for elem in struct['stoichiometry']:
                         # remove all points for a missing pseudo
-                        if 'species_pot' not in struct or elem[0] not in struct['species_pot']:
+                        if elem[0] not in struct['species_pot']:
                             struct['quality'] = 0
                             failed_checks.append('missing pspot for {}'.format(elem[0]))
                         else:
@@ -239,6 +239,8 @@ class Spatula:
                             if 'OTF' in struct['species_pot'][elem[0]].upper():
                                 struct['quality'] -= 1
                                 failed_checks.append('pspot not fully specified for {}'.format(elem[0]))
+                    struct['species_pot'] = {species: struct['species_pot'][species] for species in set(struct['atom_types'])}
+
                 if 'xc_functional' not in struct:
                     struct['quality'] = 0
                     failed_checks.append('missing xc functional')

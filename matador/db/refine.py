@@ -3,6 +3,8 @@
 
 """ This module contains functionality to update and overwrite database
 entries with specific tasks, e.g. symmetry and substructure analysis.
+This can be especially useful for "patching" the data in databases
+created with older matador versions.
 
 """
 
@@ -32,7 +34,7 @@ class Refiner:
             mode (str): one of 'display', 'overwrite', 'set'.
 
         """
-        possible_tasks = ['sym', 'spg', 'substruc', 'sub', 'elem_set', 'ratios', 'tag', 'doi', 'source']
+        possible_tasks = ['sym', 'spg', 'substruc', 'sub', 'elem_set', 'ratios', 'tag', 'doi', 'source', 'pspot']
         possible_modes = ['display', 'overwrite', 'set']
 
         if mode not in possible_modes:
@@ -55,13 +57,13 @@ class Refiner:
         self.failed_count = 0
         self.args = kwargs
 
-        if task == 'spg' or task == 'sym':
+        if task in ['spg', 'sym']:
             if kwargs.get('symprec'):
                 self.symmetry(symprec=kwargs.get('symprec'))
             else:
                 self.symmetry()
             self.field = 'space_group'
-        elif task == 'substruc' or task == 'sub':
+        elif task in ['substruc', 'sub']:
             self.substruc()
             self.field = 'substruc'
         elif task == 'ratios':
@@ -87,6 +89,9 @@ class Refiner:
         elif task == 'source':
             self.field = 'root_source'
             self.add_root_source()
+        elif task == 'pspot':
+            self.field = 'species_pot'
+            self.tidy_pspots()
 
         print(self.changed_count, '/', len(self.cursor), 'to be changed.')
         print(self.failed_count, '/', len(self.cursor), 'failed.')
@@ -245,6 +250,26 @@ class Refiner:
                     continue
                 else:
                     doc['root_source'] = get_root_source(doc['source'])
+                    self.diff_cursor.append(doc)
+                    self.changed_count += 1
+            except Exception as error:
+                print(repr(error))
+                self.failed_count += 1
+
+    def tidy_pspots(self):
+        """ Loop over all documents and make sure they only have pspots
+        for the elements that exist in the structure.
+
+        """
+        for _, doc in enumerate(self.cursor):
+            try:
+                marked_for_del = []
+                atoms = set(doc['atom_types'])
+                for elem in doc['species_pot']:
+                    if elem not in atoms:
+                        marked_for_del.append(elem)
+                for elem in marked_for_del:
+                    del doc['species_pot'][elem]
                     self.diff_cursor.append(doc)
                     self.changed_count += 1
             except Exception as error:

@@ -61,6 +61,9 @@ class IntegrationTest(unittest.TestCase):
         self.assertEqual(len(query_1.cursor), 7, msg='Failed to import res files')
         self.assertEqual(len(query_2.cursor), 4, msg='Failed to import res files')
         self.assertEqual(len(files_to_delete), 2, msg='Failed to write spatula files')
+        self.assertEqual(query_2.cursor[0]['species_pot']['K'], "2|1.5|9|10|11|30U:40:31(qc=6)", msg='Failed to scrape OTF with weird name')
+        self.assertEqual(query_2.cursor[0]['species_pot']['Sn'], "2|2|2|1.6|9.6|10.8|11.7|50U=-0.395U=+0.25:51U=-0.14U=+0.25", msg='Failed to scrape OTF with linebreak')
+        self.assertFalse(any(['Sb' in doc['species_pot'] for doc in query_2.cursor]), msg='pspots over-scraped!')
 
         output_folder_exists, successes, elem_successes = test_swaps()
         self.assertTrue(output_folder_exists, msg='No folder created')

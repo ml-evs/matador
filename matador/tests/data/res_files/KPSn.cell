@@ -24,5 +24,6 @@ kpoints_mp_spacing : 0.03
 %BLOCK SPECIES_POT
 P P_OTF.usp
 Sn Sn_OTF.usp
-K K_OTF.usp
+K K_OTF_qc.usp
+Sb Sb_OTF_blah.usp
 %ENDBLOCK SPECIES_POT
