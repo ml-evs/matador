@@ -1109,7 +1109,7 @@ class FullRelaxer:
             glob_files (bool): whether to glob all related seed files.
 
         """
-        if self._first_run:
+        if not self._first_run:
             return
         input_dir = self.root_folder + '/input'
         logging.debug('Copying file to input_dir: {input}'.format(input=input_dir))
