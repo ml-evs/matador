@@ -13,8 +13,8 @@ __author__ = 'Matthew Evans'
 __maintainer__ = 'Matthew Evans'
 
 
-from pkg_resources import require, DistributionNotFound
+from pkg_resources import require
 try:
     __version__ = require('matador')[0].version
-except DistributionNotFound:
+except Exception:
     __version__ = 'xxx'
