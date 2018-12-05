@@ -169,12 +169,9 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, **kw
             i = 1
             while 'endblock' not in flines[line_no + i].lower():
                 if db:
-                    cell['species_pot'][flines[line_no+i].split()[0]] = \
-                        flines[line_no+i].split()[1].split('/')[-1]
-                    cell['species_pot'][flines[line_no+i].split()[0]] = \
-                        cell['species_pot'][flines[line_no+i].split()[0]].replace('()', '')
-                    cell['species_pot'][flines[line_no+i].split()[0]] = \
-                        cell['species_pot'][flines[line_no+i].split()[0]].replace('[]', '')
+                    species = flines[line_no+i].split()[0]
+                    pspot_string = flines[line_no+i].split()[1].split('/')[-1]
+                    cell['species_pot'][species] = pspot_string.replace('()', '').replace('[]', '')
                 else:
                     pspot_libs = ['C7', 'C8', 'C9', 'C17', 'C18', 'MS', 'HARD',
                                   'QC5', 'NCP', 'NCP18', 'NCP17', 'NCP9']
@@ -322,15 +319,9 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, **kw
     if db:
         for species in cell['species_pot']:
             if 'OTF' in cell['species_pot'][species].upper():
-                pspot_seed = ''
-                for directory in seed.split('/')[:-1]:
-                    pspot_seed += directory + '/'
-                # glob for all .usp files with format species_*OTF.usp
-                pspot_seed += species + '_*OTF.usp'
-                for globbed in glob.glob(pspot_seed):
-                    if isfile(globbed):
-                        cell['species_pot'].update(usp2dict(globbed))
-                        break
+                pspot_seed = '/'.join(seed.split('/')[:-1]) + '/' + cell['species_pot'][species]
+                if isfile(pspot_seed):
+                    cell['species_pot'].update(usp2dict(pspot_seed))
 
     return cell, True
 
@@ -493,17 +484,16 @@ def castep2dict(seed, db=True, intermediates=False, **kwargs):
     get_seed_metadata(castep, seed.replace('.' + ftype, ''))
     # wrangle castep file for parameters in 3 passes:
     # once forwards to get number and types of atoms
-    castep.update(_castep_scrape_atoms(flines, castep))
+    _castep_scrape_atoms(flines, castep)
     # once backwards to get the final parameter set for the calculation
-    castep.update(_castep_scrape_final_parameters(flines, castep))
-    # once more forwards, from the final step, to get the final structure
+    _castep_scrape_final_parameters(flines, castep)
 
     # task specific options
     if db and 'geometry' not in castep['task']:
         raise RuntimeError('CASTEP file does not contain GO calculation')
 
     if not db and 'thermo' in castep['task'].lower():
-        castep.update(_castep_scrape_thermo_data(flines, castep))
+        _castep_scrape_thermo_data(flines, castep)
 
     # only scrape snapshots/number of intermediates if requested,
     # or if not in db mode
@@ -512,8 +502,12 @@ def castep2dict(seed, db=True, intermediates=False, **kwargs):
         if intermediates:
             castep['intermediates'] = snapshots
 
-    castep.update(_castep_scrape_final_structure(flines, castep, db=db))
-    castep.update(_castep_scrape_metadata(flines, castep))
+    # once more forwards, from the final step, to get the final structure
+    _castep_scrape_final_structure(flines, castep, db=db)
+    _castep_scrape_metadata(flines, castep)
+
+    # scrape any BEEF post-processing
+    _castep_scrape_beef(flines, castep)
 
     if 'positions_frac' not in castep or not castep['positions_frac']:
         raise CalculationError('Could not find positions')
@@ -544,7 +538,7 @@ def castep2dict(seed, db=True, intermediates=False, **kwargs):
                 for directory in seed.split('/')[:-1]:
                     pspot_seed += directory + '/'
                 # glob for all .usp files with format species_*OTF.usp
-                pspot_seed += species + '_*OTF.usp'
+                pspot_seed += castep['species_pot'][species]
                 for globbed in glob.glob(pspot_seed):
                     if isfile(globbed):
                         castep['species_pot'].update(usp2dict(globbed))
@@ -1073,8 +1067,6 @@ def _castep_scrape_thermo_data(flines, castep):
                     castep['thermo_heat_cap'][f90_float_parse(temp_line[0])] = f90_float_parse(temp_line[4])
                 i += 1
 
-    return castep
-
 
 def _castep_scrape_atoms(flines, castep):
     """ Iterate forwards through flines to scrape atomic types and
@@ -1125,8 +1117,6 @@ def _castep_scrape_atoms(flines, castep):
             break
     else:
         raise CalculationError('Unable to find atoms in CASTEP file.')
-
-    return castep
 
 
 def _castep_scrape_final_parameters(flines, castep):
@@ -1247,7 +1237,6 @@ def _castep_scrape_final_parameters(flines, castep):
         castep['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0], [0.0]]
     if 'spin_polarized' not in castep:
         castep['spin_polarized'] = False
-    return castep
 
 
 def _castep_scrape_final_structure(flines, castep, db=True):
@@ -1442,8 +1431,6 @@ def _castep_scrape_metadata(flines, castep):
         except Exception:
             pass
 
-    return castep
-
 
 def _castep_find_final_structure(flines):
     """ Search for info on final structure in .castep file.
@@ -1624,6 +1611,50 @@ def _castep_scrape_all_snapshots(flines):
             raise RuntimeError(msg)
 
     return intermediates, num_opt_steps
+
+
+def _castep_scrape_beef(flines, castep):
+    """ Scrape the Bayesian error estimate output from CASTEP, storing
+    it under the `_beef` key.
+
+    Parameters:
+        flines (list): CASTEP output flines to scrape.
+        castep (dict): dictionary to update with BEEF output.
+
+    """
+    from matador.utils.chem_utils import HARTREE_TO_EV
+    for line_no, line in enumerate(flines):
+        if 'Bayesian Error Estimate (BEE)' in line.strip():
+            beef_start = line_no
+            break
+    else:
+        return
+
+    castep['_beef'] = {'thetas': [], 'xc_energy': [], 'total_energy': [], 'total_energy_per_atom': [], 'xc_energy_per_atom': []}
+
+    for line_no, line in enumerate(flines[beef_start:]):
+        if 'Self-consistent xc-energy' in line:
+            castep['_beef']['total_energy_sans_xc'] = castep['total_energy'] + HARTREE_TO_EV*f90_float_parse(line.strip().split()[-1])
+
+    for line_no, line in enumerate(flines[beef_start:]):
+        if '<-- BEEF' in line:
+            castep['_beef']['thetas'].append([f90_float_parse(val) for val in line.strip().split()[1:4]])
+            castep['_beef']['xc_energy'].append(HARTREE_TO_EV*f90_float_parse(line.strip().split()[4]))
+            castep['_beef']['total_energy'].append(HARTREE_TO_EV*f90_float_parse(line.strip().split()[6]))
+            castep['_beef']['xc_energy_per_atom'].append(castep['_beef']['xc_energy'][-1] / castep['num_atoms'])
+            castep['_beef']['total_energy_per_atom'].append(castep['_beef']['total_energy'][-1] / castep['num_atoms'])
+        if 'BEEF completed' in line:
+            beef_end = line_no
+            break
+    else:
+        print('Warning, end of BEEF estimate not found.')
+        return
+
+    for ind, line in enumerate(flines[beef_end:]):
+        if 'Mean total energy' in line:
+            castep['_beef']['mean_total_energy'] = HARTREE_TO_EV*f90_float_parse(line.strip().split()[-2])
+        if 'Standard deviation' in line:
+            castep['_beef']['std_dev'] = HARTREE_TO_EV*f90_float_parse(line.strip().split()[-2])
 
 
 def get_kpt_branches(cart_kpts):
