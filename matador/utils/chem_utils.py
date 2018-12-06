@@ -322,7 +322,8 @@ def get_stoich_from_formula(formula: str):
 
 
 def parse_element_string(elements_str, stoich=False):
-    """ Parse element query string with macros.
+    """ Parse element query string with macros. Has to parse braces
+    too, and throw an error if brackets are unmatched.
 
     e.g.
         Parameters: '[VII][Fe,Ru,Os][I]'
@@ -338,8 +339,11 @@ def parse_element_string(elements_str, stoich=False):
     Keyword arguments:
         stoich: bool, parse as a stoichiometry, i.e. check for numbers
 
+    Raises:
+        RuntimeError: if the composition contains unmatched brackets.
+
     Returns:
-        elements: list, split list of elements contained in input
+        list: split list of elements contained in input
 
     """
     import re
@@ -361,7 +365,7 @@ def parse_element_string(elements_str, stoich=False):
             if not any(char.isdigit() for char in strng):
                 tmp_stoich[ind] = [strng]
             else:
-                tmp_stoich[ind] = [elem for elem in re.split(r'([0-9]*)', strng) if elem]
+                tmp_stoich[ind] = [elem for elem in re.split(r'([0-9]+)', strng) if elem]
         elements = [item for sublist in tmp_stoich for item in sublist]
     # split macros
     while '[' in elements or '{' in elements or '][' in elements or '}{' in elements or ']{' in elements or '}[' in elements:
@@ -415,6 +419,10 @@ def parse_element_string(elements_str, stoich=False):
             tmp_stoich.remove('')
 
         elements = tmp_stoich
+
+    for elem in elements:
+        if '}[' in elem or ']{' in elem:
+            raise RuntimeError('Unmatched brackets in query string')
 
     return elements
 
