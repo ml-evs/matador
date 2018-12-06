@@ -300,6 +300,49 @@ class ScrapeTest(unittest.TestCase):
         self.assertEqual(len(cursor), 1)
         self.assertEqual(len(failures), 1)
 
+    def test_history(self):
+        from matador.scrapers import castep2dict
+        castep_fname = REAL_PATH + 'data/castep_files/Na3Zn4-OQMD_759600.history'
+        test_dict, s = castep2dict(castep_fname, db=True)
+        self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
+        self.assertEqual(test_dict['pressure'], 0.0763, msg='Failed to read pressure!')
+        self.assertEqual(test_dict['enthalpy'], -2.15036930e4, msg='Failed to read enthalpy!')
+        self.assertEqual(test_dict['num_atoms'], 14, msg='Wrong number of atoms!')
+        self.assertTrue(['Na', 3] in test_dict['stoichiometry'], msg='Wrong stoichiometry!')
+        self.assertTrue(['Zn', 4] in test_dict['stoichiometry'], msg='Wrong stoichiometry!')
+        self.assertEqual(test_dict['cell_volume'], 288.041941, msg='Wrong cell volume!')
+        self.assertEqual(test_dict['space_group'], 'Pm', msg='Wrong space group!')
+        self.assertEqual(test_dict['lattice_abc'][0][0], 9.039776, msg='Wrong lattice constants!')
+        self.assertEqual(test_dict['lattice_abc'][0][1], 9.045651, msg='Wrong lattice constants!')
+        self.assertEqual(test_dict['lattice_abc'][0][2], 4.068682, msg='Wrong lattice constants!')
+        self.assertEqual(test_dict['lattice_abc'][1][0], 90, msg='Wrong lattice constants!')
+        self.assertEqual(test_dict['lattice_abc'][1][1], 90, msg='Wrong lattice constants!')
+        self.assertEqual(test_dict['lattice_abc'][1][2], 59.971185, msg='Wrong lattice constants!')
+        self.assertEqual(test_dict['geom_force_tol'], 0.05, msg='Wrong geom force tol')
+        self.assertEqual(test_dict['castep_version'], '16.11')
+        self.assertEqual(test_dict['estimated_mem_MB'], 345.1)
+
+    def test_history_gz(self):
+        from matador.scrapers import castep2dict
+        castep_fname = REAL_PATH + 'data/castep_files/Na3Zn4-OQMD_759601.history.gz'
+        test_dict, s = castep2dict(castep_fname, db=True)
+        print(test_dict)
+        self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
+        self.assertEqual(test_dict['pressure'], 0.0763, msg='Failed to read pressure!')
+        self.assertEqual(test_dict['enthalpy'], -2.15036930e4, msg='Failed to read enthalpy!')
+        self.assertEqual(test_dict['num_atoms'], 14, msg='Wrong number of atoms!')
+        self.assertTrue(['Na', 3] in test_dict['stoichiometry'], msg='Wrong stoichiometry!')
+        self.assertTrue(['Zn', 4] in test_dict['stoichiometry'], msg='Wrong stoichiometry!')
+        self.assertEqual(test_dict['cell_volume'], 288.041941, msg='Wrong cell volume!')
+        self.assertEqual(test_dict['space_group'], 'Pm', msg='Wrong space group!')
+        self.assertEqual(test_dict['lattice_abc'][0][0], 9.039776, msg='Wrong lattice constants!')
+        self.assertEqual(test_dict['lattice_abc'][0][1], 9.045651, msg='Wrong lattice constants!')
+        self.assertEqual(test_dict['lattice_abc'][0][2], 4.068682, msg='Wrong lattice constants!')
+        self.assertEqual(test_dict['lattice_abc'][1][0], 90, msg='Wrong lattice constants!')
+        self.assertEqual(test_dict['lattice_abc'][1][1], 90, msg='Wrong lattice constants!')
+        self.assertEqual(test_dict['lattice_abc'][1][2], 59.971185, msg='Wrong lattice constants!')
+        self.assertEqual(test_dict['geom_force_tol'], 0.05, msg='Wrong geom force tol')
+        self.assertEqual(test_dict['castep_version'], '16.11')
 
     def test_castep_intermediates(self):
         from matador.scrapers.castep_scrapers import castep2dict

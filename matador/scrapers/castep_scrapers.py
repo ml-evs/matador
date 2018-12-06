@@ -422,7 +422,7 @@ def param2dict(seed, db=True, **kwargs):
 
                     elif 'xc_functional' in line:
                         param['xc_functional'] = param['xc_functional'].upper()
-                    elif 'spin' in line:
+                    elif 'spin' in line and not 'polar' in line and 'spin' in param:
                         param['spin'] = int(param['spin'])
                     elif 'perc_extra_bands' in line:
                         param['perc_extra_bands'] = f90_float_parse(param['perc_extra_bands'])
@@ -474,7 +474,7 @@ def castep2dict(seed, db=True, intermediates=False, **kwargs):
     # read .castep, .history or .history.gz file
     if ftype == 'history.gz':
         with gzip.open(seed, 'r') as f:
-            flines = f.readlines()
+            flines = [line.decode('utf-8') for line in f.readlines()]
     else:
         with open(seed, 'r') as f:
             flines = f.readlines()
