@@ -281,7 +281,7 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, **kw
                     if 'spin=' in flines[line_no + i].lower():
                         split_line = flines[line_no + i].split()
                         atomic_init_spins[split_line[0]] = \
-                            split_line[-1].lower().replace('spin=', '')
+                            int(split_line[-1].lower().replace('spin=', ''))
                     i += 1
                 if atomic_init_spins:
                     cell['atomic_init_spins'] = atomic_init_spins
@@ -422,6 +422,8 @@ def param2dict(seed, db=True, **kwargs):
 
                     elif 'xc_functional' in line:
                         param['xc_functional'] = param['xc_functional'].upper()
+                    elif 'spin' in line:
+                        param['spin'] = int(param['spin'])
                     elif 'perc_extra_bands' in line:
                         param['perc_extra_bands'] = f90_float_parse(param['perc_extra_bands'])
                     elif 'geom_force_tol' in line:

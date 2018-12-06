@@ -905,6 +905,28 @@ class ExportTest(unittest.TestCase):
         for _f in dummy_files:
             os.remove(_f)
 
+    def test_doc2cell_and_param_with_spin(self):
+        import glob
+        from matador.export import doc2cell, doc2param
+        from matador.scrapers.castep_scrapers import cell2dict, param2dict
+
+        cell_fname = REAL_PATH + 'data/K5P4-phonon.cell'
+        test_fname = REAL_PATH + 'data/dummy'
+        test_param = {'xc_functional': 'PBE', 'task': 'geometryoptimisation', 'spin_polarized': False}
+
+        doc, s = cell2dict(cell_fname, db=False, outcell=True, verbosity=VERBOSITY, positions=True)
+        doc2cell(doc, test_fname + '.cell', debug=True, spin=10)
+
+        doc2param(test_param, test_fname + '.param', spin=10)
+
+        param_doc, s = param2dict(test_fname + '.param')
+        cell_doc, s = cell2dict(test_fname + '.cell', db=False, outcell=True, positions=True)
+
+        self.assertTrue(param_doc['spin_polarized'])
+        self.assertEqual(param_doc['spin'], 10)
+
+        self.assertEqual(cell_doc['atomic_init_spins']['P'], 10)
+
     def test_doc2res_from_json(self):
         json_fname = REAL_PATH + 'data/doc2res.json'
         test_fname = REAL_PATH + 'data/doc2res.res'
