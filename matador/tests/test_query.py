@@ -237,7 +237,7 @@ class QueryTest(unittest.TestCase):
         })
         self.assertDictEqual(test_dict, query.query_dict)
 
-    def testParseElementStr(self):
+    def test_parse_element_strings(self):
         arg = '[VII][Fe,Ru,Os][I]'
         elements = parse_element_string(arg)
         self.assertEqual(elements, ['[VII]', '[Fe,Ru,Os]', '[I]'])
@@ -246,11 +246,27 @@ class QueryTest(unittest.TestCase):
         elements = parse_element_string(arg)
         self.assertEqual(elements, ['[VII]', '[Fe,Ru,Os]', '[I]', '[V]', '[VIII]', '[ASDASD]'])
 
+        arg = '{VII}[Fe,Ru,Os][I]{V}[VIII][ASDASD]'
+        elements = parse_element_string(arg)
+        self.assertEqual(elements, ['{VII}', '[Fe,Ru,Os]', '[I]', '{V}', '[VIII]', '[ASDASD]'])
+
+        arg = '{VII}[Fe,Ru,Os][I][V][VIII][ASDASD]'
+        elements = parse_element_string(arg)
+        self.assertEqual(elements, ['{VII}', '[Fe,Ru,Os]', '[I]', '[V]', '[VIII]', '[ASDASD]'])
+
         arg = '[VII]5[Fe,Ru,Os]2[I][V]6[VIII]2[ASDASD]'
         elements = parse_element_string(arg, stoich=True)
         self.assertEqual(elements, ['[VII]', '5', '[Fe,Ru,Os]', '2', '[I]', '[V]', '6', '[VIII]', '2', '[ASDASD]'])
 
-    def testHarderCompositions(self):
+        raised = False
+        arg = '{VII}[Fe,Ru,Os}[I][V][VIII][ASDASD]'
+        try:
+            elements = parse_element_string(arg)
+        except RuntimeError:
+            raised = True
+        self.assertTrue(raised, msg='Failed to raise error for unmatched brackets')
+
+    def test_macro_composition(self):
         kwargs = {'composition': ['[I]FeBe'], 'ignore_warnings': True, 'testing': True}
         query = DBQuery(**kwargs)
         test_dict = ({
@@ -270,8 +286,12 @@ class QueryTest(unittest.TestCase):
                 ]},
             ]
         })
+        import json
+        print(json.dumps(test_dict, indent=2))
+        print(json.dumps(query.query_dict,indent=2))
         self.assertDictEqual(test_dict, query.query_dict)
 
+    def test_intersection(self):
         kwargs = {'composition': ['LiFeBe'], 'ignore_warnings': True, 'intersection': True, 'testing': True}
         query = DBQuery(**kwargs)
         test_dict = ({
@@ -314,6 +334,7 @@ class QueryTest(unittest.TestCase):
             ]})
         self.assertDictEqual(test_dict, query.query_dict)
 
+    def test_middle_macro_composition(self):
         kwargs = {'composition': ['Fe[I]Be'], 'ignore_warnings': True, 'testing': True}
         query = DBQuery(**kwargs)
         test_dict = ({
@@ -335,6 +356,7 @@ class QueryTest(unittest.TestCase):
         })
         self.assertDictEqual(test_dict, query.query_dict)
 
+    def test_double_macro_composition(self):
         kwargs = {'composition': ['[Fe,Ru,Os][I]Be'], 'ignore_warnings': True, 'testing': True}
         query = DBQuery(**kwargs)
         test_dict = ({
@@ -360,6 +382,7 @@ class QueryTest(unittest.TestCase):
         })
         self.assertDictEqual(test_dict, query.query_dict)
 
+    def test_double_end_macro_composition(self):
         kwargs = {'composition': ['Be[Fe,Ru,Os][I]'], 'ignore_warnings': True, 'testing': True}
         query = DBQuery(**kwargs)
         test_dict = ({
@@ -385,6 +408,7 @@ class QueryTest(unittest.TestCase):
         })
         self.assertDictEqual(test_dict, query.query_dict)
 
+    def test_triple_macro_composition(self):
         kwargs = {'composition': ['[VII][Fe,Ru,Os][I]'], 'ignore_warnings': True, 'testing': True}
         query = DBQuery(**kwargs)
         test_dict = ({
@@ -414,8 +438,12 @@ class QueryTest(unittest.TestCase):
                 ]},
             ]
         })
+        import json
+        # print(json.dumps(test_dict, indent=2))
+        # print(json.dumps(query.query_dict, indent=2))
         self.assertDictEqual(test_dict, query.query_dict)
 
+    def test_double_list_composition(self):
         kwargs = {'composition': ['[Si,Ge,Sn][Fe,Ru,Os]'], 'ignore_warnings': True, 'testing': True}
         query = DBQuery(**kwargs)
         test_dict = ({
@@ -438,7 +466,180 @@ class QueryTest(unittest.TestCase):
 
         self.assertDictEqual(test_dict, query.query_dict)
 
-    def testTrickyStoichs(self):
+    def test_triple_list_composition(self):
+        kwargs = {'composition': ['[Li,Na,K][Fe,Ru,Os][F,P,S]'], 'ignore_warnings': True, 'testing': True}
+        query = DBQuery(**kwargs)
+        test_dict = ({
+            '$and': [{
+                '$and': [
+                    {'$or': [
+                        {'elems': {'$in': ['Li']}},
+                        {'elems': {'$in': ['Na']}},
+                        {'elems': {'$in': ['K']}}
+                    ]},
+                    {'$or': [
+                        {'elems': {'$in': ['Fe']}},
+                        {'elems': {'$in': ['Ru']}},
+                        {'elems': {'$in': ['Os']}}
+                    ]},
+                    {'$or': [
+                        {'elems': {'$in': ['F']}},
+                        {'elems': {'$in': ['P']}},
+                        {'elems': {'$in': ['S']}}
+                    ]},
+                    {'stoichiometry': {'$size': 3}}
+                ]},
+           ],
+        })
+        print(query.query_dict)
+        self.assertDictEqual(test_dict, query.query_dict)
+
+    def test_single_set_composition(self):
+        kwargs = {'composition': ['{Li,Na}'], 'ignore_warnings': True, 'testing': True}
+        query = DBQuery(**kwargs)
+        test_dict = ({
+            '$and': [{
+                '$and': [
+                    {'$or': [
+                        {'$and': [
+                            {'elems': {'$in': ['Li']}}
+                        ]},
+                        {'$and': [
+                            {'elems': {'$in': ['Na']}}
+                        ]},
+                    ]},
+                    {'stoichiometry': {'$size': 1}}
+                ]
+            }]
+        })
+        self.assertDictEqual(test_dict, query.query_dict)
+
+
+    def test_double_set_composition(self):
+        kwargs = {'composition': ['{Li,Na}{Be,Fe}'], 'ignore_warnings': True, 'testing': True}
+        query = DBQuery(**kwargs)
+        test_dict = ({
+            '$and': [{
+                '$and': [
+                    {'$or': [
+                        {'$and': [
+                            {'elems': {'$in': ['Li']}},
+                            {'elems': {'$in': ['Be']}}
+                        ]},
+                        {'$and': [
+                            {'elems': {'$in': ['Li']}},
+                            {'elems': {'$in': ['Fe']}}
+                        ]},
+                        {'$and': [
+                            {'elems': {'$in': ['Na']}},
+                            {'elems': {'$in': ['Be']}}
+                        ]},
+                        {'$and': [
+                            {'elems': {'$in': ['Na']}},
+                            {'elems': {'$in': ['Fe']}}
+                        ]},
+                    ]},
+                    {'stoichiometry': {'$size': 2}}
+                ]
+            }]
+        })
+        self.assertDictEqual(test_dict, query.query_dict)
+
+    def test_ternary_set_composition(self):
+        kwargs = {'composition': ['LiRu{Ru,S}'], 'ignore_warnings': True, 'testing': True}
+        query = DBQuery(**kwargs)
+        test_dict = ({
+            '$and': [{
+                '$and': [
+                    {'$or': [
+                        {'$and': [
+                            {'elems': {'$in': ['Li']}},
+                            {'elems': {'$in': ['Ru']}},
+                            {'elems': {'$in': ['S']}}
+                        ]},
+                    ]},
+                    {'stoichiometry': {'$size': 3}},
+                ]
+            }]
+        })
+        self.assertDictEqual(test_dict, query.query_dict)
+
+    def test_solo_set_composition(self):
+        kwargs = {'composition': ['{Li}Ru{Ru,S}'], 'ignore_warnings': True, 'testing': True}
+        query = DBQuery(**kwargs)
+        test_dict = ({
+            '$and': [{
+                '$and': [
+                    {'$or': [
+                        {'$and': [
+                            {'elems': {'$in': ['Li']}},
+                            {'elems': {'$in': ['Ru']}},
+                            {'elems': {'$in': ['S']}}
+                        ]},
+                    ]},
+                    {'stoichiometry': {'$size': 3}},
+                ]
+            }]
+        })
+        self.assertDictEqual(test_dict, query.query_dict)
+
+
+    def test_triple_set_composition(self):
+        kwargs = {'composition': ['{Li,Na}{Ru,Os}{Ru,S}'], 'ignore_warnings': True, 'testing': True}
+        query = DBQuery(**kwargs)
+        test_dict = ({
+            '$and': [{
+                '$and': [
+                    {'$or': [
+                        {'$and': [
+                            {'elems': {'$in': ['Li']}},
+                            {'elems': {'$in': ['Ru']}},
+                            {'elems': {'$in': ['S']}}
+                        ]},
+                        {'$and': [
+                            {'elems': {'$in': ['Li']}},
+                            {'elems': {'$in': ['Os']}},
+                            {'elems': {'$in': ['Ru']}}
+                        ]},
+                        {'$and': [
+                            {'elems': {'$in': ['Li']}},
+                            {'elems': {'$in': ['Os']}},
+                            {'elems': {'$in': ['S']}}
+                        ]},
+                        {'$and': [
+                            {'elems': {'$in': ['Na']}},
+                            {'elems': {'$in': ['Ru']}},
+                            {'elems': {'$in': ['S']}}
+                        ]},
+                        {'$and': [
+                            {'elems': {'$in': ['Na']}},
+                            {'elems': {'$in': ['Os']}},
+                            {'elems': {'$in': ['Ru']}}
+                        ]},
+                        {'$and': [
+                            {'elems': {'$in': ['Na']}},
+                            {'elems': {'$in': ['Os']}},
+                            {'elems': {'$in': ['S']}}
+                        ]},
+                    ]},
+                    {'stoichiometry': {'$size': 3}},
+                ]},
+            ]
+        })
+        self.assertDictEqual(test_dict, query.query_dict)
+
+    def test_illegal_character(self):
+        kwargs = {'composition': ['{Li,Na,K}.{Fe,Ru,Os>}{F,P,S}'], 'ignore_warnings': True, 'testing': True}
+        failed_safely = False
+        try:
+            query = DBQuery(**kwargs)
+        except RuntimeError:
+            failed_safely = True
+
+        self.assertTrue(failed_safely)
+
+
+    def test_triple_macro_stoich(self):
         kwargs = {'formula': ['[VII]2[Fe,Ru,Os]3[I]'], 'ignore_warnings': True, 'testing': True}
         query = DBQuery(**kwargs)
         test_dict = ({
@@ -499,7 +700,7 @@ class QueryTest(unittest.TestCase):
         })
         self.assertDictEqual(test_dict, query.query_dict)
 
-    def testRatioQuery(self):
+    def test_ratio_query(self):
         kwargs = {'composition': ['Li:TiP4'], 'ignore_warnings': True, 'testing': True}
         query = DBQuery(**kwargs)
         test_dict = ({
@@ -521,6 +722,7 @@ class QueryTest(unittest.TestCase):
         })
         self.assertDictEqual(test_dict, query.query_dict)
 
+    def test_harder_ratio(self):
         kwargs = {'composition': ['LiMn:Mo2S3'], 'ignore_warnings': True, 'testing': True}
         query = DBQuery(**kwargs)
         test_dict = ({
@@ -572,7 +774,7 @@ class QueryTest(unittest.TestCase):
         })
         self.assertDictEqual(test_dict, query.query_dict)
 
-    def testTimePeriod(self):
+    def test_query_time(self):
         from bson.objectid import ObjectId
         from datetime import datetime, timedelta
         from time import mktime
@@ -595,6 +797,8 @@ class QueryTest(unittest.TestCase):
                 ]},
                 {'_id': {'$lte': ObjectId(time_str)}}
             ]})
+        print(test_dict['$and'][0])
+        print(query.query_dict['$and'][0])
         self.assertDictEqual(test_dict, query.query_dict)
 
         num_days = 3001

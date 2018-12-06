@@ -611,10 +611,12 @@ class DBQuery:
         feature, replaced by query_num_species.
 
         Keyword arguments:
+            custom_elem (str): use to query custom string, rather than CLI args
+            partial_formula (bool): remove stoich size from query if True
+            elem_field (str): which field to query for elems, either `atom_types` or `elems`
 
-            custom_elem     : str, use to query custom string, rather than CLI args
-            partial_formula : bool, remove stoich size from query if True
-            elem_field      : str, which field to query for elems, either `atom_types` or `elems`
+        Returns:
+            dict: dictionary containing database query.
 
         """
         if custom_elem is None:
@@ -638,7 +640,15 @@ class DBQuery:
 
         elements = parse_element_string(elements[0])
 
+        or_preference = False
+        for ind, elem in enumerate(elements):
+            if '{' in elem or '}' in elem:
+                or_preference = True
+
         if self.args.get('intersection'):
+            if or_preference:
+                raise RuntimeError('Intersection not implemented for overlapping sets, e.g. {}')
+
             query_dict = dict()
             query_dict['$or'] = []
             size = len(elements)
@@ -689,27 +699,58 @@ class DBQuery:
             query_dict = dict()
             query_dict['$and'] = []
             size = len(elements)
-            for ind, elem in enumerate(elements):
-                # prototype for chemically motivated searches, e.g. transition metals
-                if '[' in elem or ']' in elem:
-                    types_dict = dict()
-                    types_dict['$or'] = list()
-                    elem = elem.strip('[').strip(']')
-                    if elem in self._periodic_table:
-                        for group_elem in self._periodic_table[elem]:
-                            types_dict['$or'].append(dict())
-                            types_dict['$or'][-1][elem_field] = dict()
-                            types_dict['$or'][-1][elem_field]['$in'] = [group_elem]
-                    elif ',' in elem:
-                        for group_elem in elem.split(','):
-                            types_dict['$or'].append(dict())
-                            types_dict['$or'][-1][elem_field] = dict()
-                            types_dict['$or'][-1][elem_field]['$in'] = [group_elem]
-                else:
-                    types_dict = dict()
-                    types_dict[elem_field] = dict()
-                    types_dict[elem_field]['$in'] = [elem]
+
+            if or_preference:
+                element_slots = []
+                for ind, elem in enumerate(elements):
+                    if '[' in elem or '{' in elem:
+                        elem = elem.strip('{').strip('}').strip('[').strip(']')
+                        if elem in self._periodic_table:
+                            element_slots.append(self._periodic_table[elem])
+                        elif ',' in elem:
+                            element_slots.append(elem.split(','))
+                        else:
+                            element_slots.append([elem])
+                    else:
+                        element_slots.append([elem])
+
+                from itertools import product
+                slots = [list(config) for config in product(*element_slots)]
+                types_dict = dict()
+                types_dict['$or'] = list()
+                for slot in slots:
+                    if len({elem for elem in slot}) == len(slot):
+                        types_dict['$or'].append(dict())
+                        types_dict['$or'][-1]['$and'] = []
+                        for elem in slot:
+                            types_dict['$or'][-1]['$and'].append(dict())
+                            types_dict['$or'][-1]['$and'][-1][elem_field] = dict()
+                            types_dict['$or'][-1]['$and'][-1][elem_field]['$in'] = [elem]
                 query_dict['$and'].append(types_dict)
+
+            else:
+                for ind, elem in enumerate(elements):
+                    if '[' in elem or ']' in elem:
+                        types_dict = dict()
+                        types_dict['$or'] = list()
+                        elem = elem.strip('[').strip(']')
+                        if elem in self._periodic_table:
+                            for group_elem in self._periodic_table[elem]:
+                                types_dict['$or'].append(dict())
+                                types_dict['$or'][-1][elem_field] = dict()
+                                types_dict['$or'][-1][elem_field]['$in'] = [group_elem]
+                        elif ',' in elem:
+                            for group_elem in elem.split(','):
+                                types_dict['$or'].append(dict())
+                                types_dict['$or'][-1][elem_field] = dict()
+                                types_dict['$or'][-1][elem_field]['$in'] = [group_elem]
+                    else:
+                        types_dict = dict()
+                        types_dict[elem_field] = dict()
+                        types_dict[elem_field]['$in'] = [elem]
+
+                    query_dict['$and'].append(types_dict)
+
         if not partial_formula and not self.args.get('intersection'):
             size_dict = dict()
             size_dict['stoichiometry'] = dict()
