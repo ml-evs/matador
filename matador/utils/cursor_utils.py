@@ -49,10 +49,10 @@ def display_results(cursor,
 
     add_index_mode = False
     del_index_mode = False
-    if additions is not None and len(additions) > 0:
+    if additions:
         if isinstance(additions[0], int):
             add_index_mode = True
-    if deletions is not None and len(deletions) > 0:
+    if deletions:
         if isinstance(deletions[0], int):
             del_index_mode = True
 
@@ -131,8 +131,8 @@ def display_results(cursor,
         header_string += "{:^11}".format('Volume/fu')
     units_string += "{:^11}".format('(Ang^3)')
     if hull:
-        header_string += "{:^13}".format('Hull dist.')
-        units_string += "{:^13}".format('(meV/atom)')
+        header_string += "{:^18}".format('Hull dist.')
+        units_string += "{:^18}".format('(meV/atom)')
     elif args.get('per_atom'):
         header_string += "{:^18}".format('Enthalpy')
         units_string += "{:^18}".format('(eV/atom)')
@@ -410,7 +410,7 @@ def display_results(cursor,
     if markdown:
         markdown_string += '```'
         return markdown_string
-    elif latex:
+    if latex:
         latex_string += '\\end{tabular}'
         return latex_string
 
@@ -435,7 +435,6 @@ def set_cursor_from_array(cursor, array, key):
     assert len(array) == len(cursor) or len(array) - 1 == len(cursor)
     for ind, _ in enumerate(cursor):
         cursor[ind][key] = array[ind]
-    return
 
 
 def get_array_from_cursor(cursor, key):
