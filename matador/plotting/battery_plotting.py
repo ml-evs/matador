@@ -13,7 +13,7 @@ from matador.plotting.hull_plotting import get_hull_labels
 
 
 @plotting_function
-def plot_voltage_curve(hull, ax=None, show=False):
+def plot_voltage_curve(hull, ax=None, show=False, alpha=1, line_colour=None):
     """ Plot voltage curve calculated for phase diagram.
 
     Parameters:
@@ -44,32 +44,38 @@ def plot_voltage_curve(hull, ax=None, show=False):
         else:
             axQ.plot(expt_data[:, 0], expt_data[:, 1], c='k', lw=2, ls='-', label='Experiment')
     for ind, voltage in enumerate(hull.voltage_data['voltages']):
+        if line_colour is None:
+            line_colour = hull.colours[ind]
         for i in range(1, len(voltage) - 1):
             if i == 1 and hull.args.get('expt'):
                 axQ.plot([hull.voltage_data['Q'][ind][i - 1], hull.voltage_data['Q'][ind][i]], [voltage[i], voltage[i]],
                          marker='*',
                          lw=2,
-                         c=hull.colours[ind],
+                         alpha=alpha,
+                         c=line_colour,
                          label='DFT (this work)')
             elif i == 1 and len(hull.voltage_data['voltages']) != 1:
                 axQ.plot([hull.voltage_data['Q'][ind][i - 1], hull.voltage_data['Q'][ind][i]], [voltage[i], voltage[i]],
                          # marker='o',
                          markersize=5,
                          lw=2,
-                         c=hull.colours[ind],
+                         alpha=alpha,
+                         c=line_colour,
                          label=get_formula_from_stoich(hull.endstoichs[ind], tex=True))
             else:
                 axQ.plot([hull.voltage_data['Q'][ind][i - 1], hull.voltage_data['Q'][ind][i]], [voltage[i], voltage[i]],
                          # marker='o',
                          markersize=5,
                          lw=2,
-                         c=hull.colours[ind])
+                         alpha=alpha,
+                         c=line_colour)
             if i != len(voltage) - 2:
                 axQ.plot([hull.voltage_data['Q'][ind][i], hull.voltage_data['Q'][ind][i]], [voltage[i], voltage[i + 1]],
                          # marker='o',
                          markersize=5,
+                         alpha=alpha,
                          lw=2,
-                         c=hull.colours[ind])
+                         c=line_colour)
     if hull.args.get('labels') or hull.args.get('label_cutoff') is not None:
         label_cursor = get_hull_labels(hull, num_species=2)
         for i in range(len(label_cursor)):
