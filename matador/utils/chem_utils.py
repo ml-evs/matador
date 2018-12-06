@@ -180,8 +180,16 @@ def get_binary_volumetric_capacity(initial_doc, final_doc):
 
 
 def get_atoms_per_fu(doc):
-    """ Calculate and return the number of atoms per formula unit. """
-    return sum([elem[1] for elem in doc['stoichiometry']])
+    """ Calculate and return the number of atoms per formula unit.
+
+    Parameters:
+        doc (list/dict): structure to evaluate OR matador-style stoichiometry.
+
+    """
+    if isinstance(doc, dict):
+        return sum([elem[1] for elem in doc['stoichiometry']])
+    else:
+        return sum([elem[1] for elem in doc])
 
 
 def get_formation_energy(chempots, doc, energy_key='enthalpy_per_atom', temperature=None):
@@ -337,10 +345,15 @@ def parse_element_string(elements_str, stoich=False):
     import re
     valid = False
     for char in elements_str:
+        if char not in ['[', ']', '{', '}', ',', ':'] and not char.isalnum():
+            raise RuntimeError('Illegal character {} detected in query.'.format(char))
+    valid = False
+    for char in elements_str:
         if char.isupper():
             valid = True
+            break
     if not valid:
-        exit('Composition must contain at least one upper case character.')
+        raise RuntimeError('Composition must contain at least one upper case character.')
     elements = [elem for elem in re.split(r'([A-Z][a-z]*)', elements_str) if elem]
     if stoich:
         tmp_stoich = elements
@@ -351,7 +364,7 @@ def parse_element_string(elements_str, stoich=False):
                 tmp_stoich[ind] = [elem for elem in re.split(r'([0-9]*)', strng) if elem]
         elements = [item for sublist in tmp_stoich for item in sublist]
     # split macros
-    while '[' in elements or '][' in elements:
+    while '[' in elements or '{' in elements or '][' in elements or '}{' in elements or ']{' in elements or '}[' in elements:
         tmp_stoich = list(elements)
         cleaned = True
         while cleaned:
@@ -360,6 +373,21 @@ def parse_element_string(elements_str, stoich=False):
                     del tmp_stoich[ind]
                     tmp_stoich.insert(ind, '[')
                     tmp_stoich.insert(ind, ']')
+                    cleaned = True
+                elif tmp == '}{':
+                    del tmp_stoich[ind]
+                    tmp_stoich.insert(ind, '{')
+                    tmp_stoich.insert(ind, '}')
+                    cleaned = True
+                elif tmp == ']{':
+                    del tmp_stoich[ind]
+                    tmp_stoich.insert(ind, '{')
+                    tmp_stoich.insert(ind, ']')
+                    cleaned = True
+                elif tmp == '}[':
+                    del tmp_stoich[ind]
+                    tmp_stoich.insert(ind, '[')
+                    tmp_stoich.insert(ind, '}')
                     cleaned = True
                 elif ind == len(tmp_stoich) - 1:
                     cleaned = False
@@ -371,10 +399,21 @@ def parse_element_string(elements_str, stoich=False):
                         end_bracket = True
                     tmp_stoich[ind] += tmp_stoich[ind + 1]
                     del tmp_stoich[ind + 1]
+        for ind, tmp in enumerate(tmp_stoich):
+            if tmp == '{':
+                end_bracket = False
+                while not end_bracket:
+                    if tmp_stoich[ind + 1] == '}':
+                        end_bracket = True
+                    tmp_stoich[ind] += tmp_stoich[ind + 1]
+                    del tmp_stoich[ind + 1]
         if ']' in tmp_stoich:
             tmp_stoich.remove(']')
+        if '}' in tmp_stoich:
+            tmp_stoich.remove('}')
         if '' in tmp_stoich:
             tmp_stoich.remove('')
+
         elements = tmp_stoich
 
     return elements
