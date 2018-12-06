@@ -63,8 +63,8 @@ class FullRelaxer:
                 (DEFAULT: 2)
             fine_iter (int): number of iterations per fine calculation
                 (DEFAULT: 20)
-            spin (bool): break spin symmetry in first calculation
-                (DEFAULT: False)
+            spin (bool): break spin symmetry in first calculation by amount specified
+                (DEFAULT: None if not present, 5 if no argument)
             conv_cutoffs (:obj:`list` of :obj:`float`): list of cutoffs
                 to use for SCF convergence test
             conv_kpts (:obj:`list` of :obj:`float`): list of kpt spacings
@@ -105,7 +105,7 @@ class FullRelaxer:
         """
         # set defaults and update class with desired values
         prop_defaults = {'paths': None, 'param_dict': None, 'cell_dict': None, 'mode': 'castep', 'executable': 'castep',
-                         'memcheck': False, 'rough': 4, 'rough_iter': 2, 'fine_iter': 20, 'spin': False,
+                         'memcheck': False, 'rough': 4, 'rough_iter': 2, 'fine_iter': 20, 'spin': None,
                          'output_queue': None, 'redirect': None, 'reopt': False, 'compute_dir': None, 'noise': False,
                          'custom_params': False, 'archer': False, 'maxmem': None, 'killcheck': True, 'kpts_1D': False,
                          'conv_cutoff': False, 'conv_kpt': False, 'profile': False, 'slurm': False, 'intel': False,
