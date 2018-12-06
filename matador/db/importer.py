@@ -168,6 +168,7 @@ class Spatula:
                 self.repo.create_index([('species_pot', pm.ASCENDING)])
                 self.repo.create_index([('kpoints_mp_spacing', pm.ASCENDING)])
                 self.repo.create_index([('xc_functional', pm.ASCENDING)])
+                self.repo.create_index([('elems', pm.ASCENDING)])
                 # index by source for rebuilds
                 self.repo.create_index([('source', pm.ASCENDING)])
                 print('Done!')
