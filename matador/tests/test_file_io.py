@@ -302,7 +302,7 @@ class ScrapeTest(unittest.TestCase):
 
     def test_history(self):
         from matador.scrapers import castep2dict
-        castep_fname = REAL_PATH + 'data/castep_files/Na3Zn4-OQMD_759600.history'
+        castep_fname = REAL_PATH + 'data/castep_files/Na3Zn4-OQMD_759599.history'
         test_dict, s = castep2dict(castep_fname, db=True)
         self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
         self.assertEqual(test_dict['pressure'], 0.0763, msg='Failed to read pressure!')
@@ -324,7 +324,7 @@ class ScrapeTest(unittest.TestCase):
 
     def test_history_gz(self):
         from matador.scrapers import castep2dict
-        castep_fname = REAL_PATH + 'data/castep_files/Na3Zn4-OQMD_759601.history.gz'
+        castep_fname = REAL_PATH + 'data/castep_files/Na3Zn4-OQMD_759599.history.gz'
         test_dict, s = castep2dict(castep_fname, db=True)
         print(test_dict)
         self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
