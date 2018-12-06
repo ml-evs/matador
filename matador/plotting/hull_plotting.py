@@ -39,7 +39,7 @@ def get_hull_labels(hull, label_cutoff=None, num_species=2):
             label_cutoff = label_cutoff[0]
         label_cursor = [doc for doc in hull.hull_cursor if doc['hull_distance'] <= label_cutoff + eps]
 
-    num_labels = len(set([get_formula_from_stoich(doc['stoichiometry']) for doc in label_cursor]))
+    num_labels = {get_formula_from_stoich(doc['stoichiometry']) for doc in label_cursor}
     if num_labels < len(label_cursor):
         tmp_cursor = []
         for doc in label_cursor:
@@ -133,7 +133,7 @@ def plot_2d_hull(hull, ax=None, show=False, plot_points=True,
             elif label_cursor[ind]['concentration'][0] == min_comp:
                 position = (conc, 1.15 * (e_f - 0.05))
             else:
-                position = (min(1.1 * conc + 0.15, 0.95),1.15 * (e_f - 0.05))
+                position = (min(1.1 * conc + 0.15, 0.95), 1.15 * (e_f - 0.05))
             # if (ind + 2) < np.argmin(tie_line[:, 1]):
                 # position = (0.8 * tie_line[ind + 2, 0], 1.15 * (tie_line[ind + 2, 1]) - 0.05)
             # elif (ind + 2) == np.argmin(tie_line[:, 1]):
@@ -275,6 +275,99 @@ def plot_2d_hull(hull, ax=None, show=False, plot_points=True,
         plt.show()
 
     return ax
+
+
+@plotting_function
+def plot_beef_hull(hull, ax=None, plot_points=True, plot_hulls=True, plot_hist=True, subcmd='hull', **kwargs):
+    """ Plot and generate an ensemble of hulls with associated
+    Bayesian Error Estimate functionals (BEEF). If axis not requested,
+    a histogram of frequency of a particular concentration appearing on
+    the convex hull is also generated as a second axis.
+
+    Parameters:
+        hull (QueryConvexHull): hull object created with a cursor that
+            contains the ``_beef`` key for all entries in hull.cursor.
+
+    Keyword arguments:
+        ax (matplotlib.axes.Axes): matplotlib axis object on which to plot.
+        plot_points (bool): whether to plot the hull points for each hull in the ensemble.
+        plot_hulls (bool): whether to plot the hull tie-lines for each hull in the ensemble.
+        plot_hist (bool): whether to plot a histogram of hull frequency.
+
+    """
+    import matplotlib.pyplot as plt
+    from copy import deepcopy
+    from collections import defaultdict
+    from matador.hull import QueryConvexHull
+    from matador.plotting import plot_voltage_curve
+
+    if ax is None:
+        fig = plt.figure(figsize=(7, 10))
+        ax = fig.add_subplot(111)
+
+    fig2 = plt.figure()
+    ax_volt = fig2.add_subplot(111)
+
+    min_ef = 0
+
+    if plot_hist:
+        ax_hist = ax.twinx()
+        for doc in hull.cursor:
+            doc['_formula'] = get_formula_from_stoich(doc['stoichiometry'],
+                                                      elements=hull.elements, tex=False)
+        hull_concs = defaultdict(int)
+
+    plot_2d_hull(hull, ax=ax, plot_points=False, plot_hull_points=True)
+    if plot_hist:
+        orig_hull_concs = []
+        for doc in hull.hull_cursor[1:-1]:
+            orig_hull_concs.append(doc['concentration'][0])
+
+    beef_cursor = deepcopy(hull.cursor)
+    n_beef = len(beef_cursor[0]['_beef']['thetas'])
+    for beef_ind in range(n_beef):
+        for ind, doc in enumerate(beef_cursor):
+            beef_cursor[ind]['total_energy_per_atom'] = hull.cursor[ind]['_beef']['total_energy_per_atom'][beef_ind]
+
+        beef_hull = QueryConvexHull(subcmd=subcmd, cursor=beef_cursor, elements=hull.elements, no_plot=True, quiet=True, energy_key='total_energy')
+        min_ef = np.min([doc['formation_total_energy_per_atom'] for doc in beef_hull.hull_cursor] + [min_ef])
+        if plot_hulls:
+            ax.plot([doc['concentration'][0] for doc in beef_hull.hull_cursor],
+                    [doc['formation_total_energy_per_atom'] for doc in beef_hull.hull_cursor],
+                    alpha=0.01, c='k', lw=0.5, zorder=0)
+        if plot_points:
+            ax.scatter([doc['concentration'][0] for doc in beef_hull.hull_cursor],
+                       [doc['formation_total_energy_per_atom'] for doc in beef_hull.hull_cursor],
+                       alpha=0.2, c=hull.colours[1], s=10, zorder=10, lw=0)
+
+        if plot_hist:
+            for doc in beef_hull.hull_cursor[1:-1]:
+                hull_concs[doc['_formula']] += 1
+        if subcmd == 'voltage':
+            ax_volt = plot_voltage_curve(beef_hull, ax=ax_volt, alpha=0.2, line_colour='k')
+
+    ax.set_ylim(min_ef)
+
+    if plot_hist:
+        from matador.utils.chem_utils import get_concentration
+        from matador.utils.chem_utils import get_stoich_from_formula
+        concs = []
+        freqs = []
+        for key in hull_concs:
+            concs.append(get_concentration(get_stoich_from_formula(key), elements=hull.elements)[0])
+            freqs.append(hull_concs[key])
+
+        max_freq = 0
+        for ind, conc in enumerate(concs):
+            if conc in orig_hull_concs:
+                ax_hist.plot([conc, conc], [0, freqs[ind]], lw=3, alpha=0.5, c=hull.colours[1])
+            else:
+                ax_hist.plot([conc, conc], [0, freqs[ind]], lw=3, alpha=0.5, c=hull.colours[0])
+
+        max_freq = max(freqs)
+        ax_hist.set_ylim(0, 10*max_freq)
+        ax_hist.set_ylabel('Frequency')
+        ax_hist.set_xlabel('Concentration')
 
 
 @plotting_function
