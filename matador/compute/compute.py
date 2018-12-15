@@ -172,6 +172,24 @@ class FullRelaxer:
         file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)8s: %(message)s'))
         logging.getLogger().addHandler(file_handler)
 
+        splash_screen = """ Run started.
+
+
+                                   .d8888b.
+                                  d88P  Y88b
+                                       .d88P
+        888d888 888  888 88888b.      8888"
+        888P"   888  888 888 "88b      "Y8b.
+        888     888  888 888  888 888    888
+        888     Y88b 888 888  888 Y88b  d88P
+        888      "Y88888 888  888  "Y8888P"
+
+        """
+
+        if self.verbosity == 1:
+            print(splash_screen)
+
+        logging.info(splash_screen)
         logging.info('Initialising FullRelaxer object for {seed}'.format(seed=self.seed))
 
         # set up compute parameters

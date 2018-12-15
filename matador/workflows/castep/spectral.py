@@ -361,7 +361,9 @@ def _run_optados(relaxer, odi_dict, seed, suffix=None):
 
     _cache_executable = copy.deepcopy(relaxer.executable)
     _cache_core = copy.deepcopy(relaxer.ncores)
+    _cache_nodes = copy.deepcopy(relaxer.nnodes)
     relaxer.ncores = 1
+    relaxer.nnodes = 1
     relaxer.executable = relaxer.optados_executable
     success = False
 
@@ -371,6 +373,7 @@ def _run_optados(relaxer, odi_dict, seed, suffix=None):
         logging.warning('Failed to call optados with error: {}'.format(exc))
 
     relaxer.ncores = _cache_core
+    relaxer.nnodes = _cache_nodes
     relaxer.executable = _cache_executable
     if suffix is not None:
         _get_correct_files_for_optados(seed, suffix='bak')

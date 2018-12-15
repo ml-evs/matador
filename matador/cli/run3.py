@@ -56,7 +56,7 @@ def main():
                         help='debug output')
     parser.add_argument('-cust', '--custom_params', action='store_true', default=False,
                         help='use custom param file per structure')
-    parser.add_argument('-v', '--verbosity', type=int, default=0,
+    parser.add_argument('-v', '--verbosity', type=int, default=2,
                         help='integer to set level of verbosity')
     parser.add_argument('--archer', action='store_true', default=False,
                         help='use aprun over mpirun')

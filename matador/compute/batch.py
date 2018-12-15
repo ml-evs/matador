@@ -133,6 +133,8 @@ class BatchRun:
 
         if self.args['nnodes'] < 1 or self.args['ncores'] < 1 or self.nprocesses < 1:
             raise InputError('Invalid number of cores, nodes or processes.')
+        if self.all_cores < self.nprocesses:
+            raise InputError('Requesting more processes than available cores.')
 
         if self.mode == 'castep':
             self.castep_setup()
@@ -314,6 +316,9 @@ class BatchRun:
             error = ("Found .res file with same name as seed: {}.res. This will wreak havoc on your calculations!".format(self.seed) +
                      "Please rename either your seed.cell/seed.param files, or rename the offending .res")
             raise InputError(error)
+
+        if len(self.file_lists['res']) < self.nprocesses:
+            raise InputError('Requested more processes than there are jobs to run!')
 
         if not self.file_lists['res']:
             error = (
