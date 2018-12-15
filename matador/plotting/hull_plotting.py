@@ -108,7 +108,7 @@ def plot_2d_hull(hull, ax=None, show=False, plot_points=True,
     tie_line = hull.structure_slice[hull.hull.vertices]
 
     # plot hull structures
-    if plot_hull_points:
+    if plot_hull_points and '_beef' not in hull.cursor[0]:
         ax.scatter(tie_line[:, 0], tie_line[:, 1],
                    c=hull.colours[1],
                    marker='o', zorder=99999, edgecolor='k',
@@ -155,7 +155,19 @@ def plot_2d_hull(hull, ax=None, show=False, plot_points=True,
     # points for off hull structures; we either colour by source or by energy
     if plot_points and not colour_by_source:
 
-        if hull.hull_cutoff == 0:
+        if '_beef' in hull.cursor[0]:
+            cmap = hull.default_cmap
+            if plot_points:
+                scatter = ax.scatter(hull.structures[np.argsort(hull.hull_dist), 0][::-1],
+                                     hull.structures[np.argsort(hull.hull_dist), -1][::-1],
+                                     s=scale*40,
+                                     c=np.asarray([doc['_beef']['std_dev'] for doc in hull.cursor])[np.argsort(hull.hull_dist)],
+                                     cmap=cmap,
+                                     zorder=10000)
+                cbar = plt.colorbar(scatter, aspect=30, pad=0.02)
+                cbar.set_label('Standard deviation (BEEF) (eV/atom)')
+
+        elif hull.hull_cutoff == 0:
             # if no specified hull cutoff, ignore labels and colour by hull distance
             cmap = hull.default_cmap
             if plot_points:
@@ -278,7 +290,7 @@ def plot_2d_hull(hull, ax=None, show=False, plot_points=True,
 
 
 @plotting_function
-def plot_beef_hull(hull, ax=None, plot_points=True, plot_hulls=True, plot_hist=True, subcmd='hull', **kwargs):
+def plot_binary_beef_hull(hull, ax=None, plot_points=True, plot_hulls=True, voltages=False, **kwargs):
     """ Plot and generate an ensemble of hulls with associated
     Bayesian Error Estimate functionals (BEEF). If axis not requested,
     a histogram of frequency of a particular concentration appearing on
@@ -292,14 +304,14 @@ def plot_beef_hull(hull, ax=None, plot_points=True, plot_hulls=True, plot_hist=T
         ax (matplotlib.axes.Axes): matplotlib axis object on which to plot.
         plot_points (bool): whether to plot the hull points for each hull in the ensemble.
         plot_hulls (bool): whether to plot the hull tie-lines for each hull in the ensemble.
-        plot_hist (bool): whether to plot a histogram of hull frequency.
+        voltages (bool): compute average voltage and heatmaps.
 
     """
     import matplotlib.pyplot as plt
     from copy import deepcopy
     from collections import defaultdict
     from matador.hull import QueryConvexHull
-    from matador.plotting import plot_voltage_curve
+    from matador.plotting.battery_plotting import add_voltage_curve
 
     if ax is None:
         fig = plt.figure(figsize=(7, 10))
@@ -308,66 +320,124 @@ def plot_beef_hull(hull, ax=None, plot_points=True, plot_hulls=True, plot_hist=T
     fig2 = plt.figure()
     ax_volt = fig2.add_subplot(111)
 
-    min_ef = 0
+    subcmd = 'voltage' if voltages else 'hull'
 
-    if plot_hist:
-        ax_hist = ax.twinx()
-        for doc in hull.cursor:
-            doc['_formula'] = get_formula_from_stoich(doc['stoichiometry'],
-                                                      elements=hull.elements, tex=False)
-        hull_concs = defaultdict(int)
+    ax_hist = ax.twinx()
+    for doc in hull.cursor:
+        doc['_formula'] = get_formula_from_stoich(doc['stoichiometry'],
+                                                  elements=hull.elements, tex=False)
+    hull_concs = defaultdict(int)
 
     plot_2d_hull(hull, ax=ax, plot_points=False, plot_hull_points=True)
-    if plot_hist:
-        orig_hull_concs = []
-        for doc in hull.hull_cursor[1:-1]:
-            orig_hull_concs.append(doc['concentration'][0])
+    orig_hull_concs = []
+    for doc in hull.hull_cursor[1:-1]:
+        orig_hull_concs.append(doc['concentration'][0])
 
     beef_cursor = deepcopy(hull.cursor)
     n_beef = len(beef_cursor[0]['_beef']['thetas'])
+    if kwargs.get('n_beef') is not None:
+        n_beef = min([n_beef, kwargs.get('n_beef')])
+
+    # parameters for voltage heat map
+    max_voltage = 1.5*max(hull.voltage_data['voltages'][0])
+    min_voltage = 0
+    max_q = 1.5*max(hull.voltage_data['Q'][0])
+    min_q = 0
+    grid_scale = kwargs.get('grid_scale', 1000)
+    voltage_heatmap = np.zeros((grid_scale, grid_scale), dtype=np.int)
+    q_grid, v_grid = np.meshgrid(np.linspace(min_q, max_q, num=grid_scale), np.linspace(min_voltage, max_voltage, num=grid_scale))
+
+    print('Calculating voltage heat map from {} to {} V'.format(min_voltage, max_voltage))
+
+    # collect minimum formation energy for ylimits
+    min_ef = 0
+
     for beef_ind in range(n_beef):
         for ind, doc in enumerate(beef_cursor):
             beef_cursor[ind]['total_energy_per_atom'] = hull.cursor[ind]['_beef']['total_energy_per_atom'][beef_ind]
+            beef_cursor[ind]['total_energy'] = hull.cursor[ind]['_beef']['total_energy_per_atom'][beef_ind] * doc['num_atoms']
 
         beef_hull = QueryConvexHull(subcmd=subcmd, cursor=beef_cursor, elements=hull.elements, no_plot=True, quiet=True, energy_key='total_energy')
         min_ef = np.min([doc['formation_total_energy_per_atom'] for doc in beef_hull.hull_cursor] + [min_ef])
         if plot_hulls:
             ax.plot([doc['concentration'][0] for doc in beef_hull.hull_cursor],
                     [doc['formation_total_energy_per_atom'] for doc in beef_hull.hull_cursor],
-                    alpha=0.01, c='k', lw=0.5, zorder=0)
+                    alpha=min([1, max([1/(0.25*n_beef), 0.01])]), c='k', lw=0.5, zorder=0)
         if plot_points:
             ax.scatter([doc['concentration'][0] for doc in beef_hull.hull_cursor],
                        [doc['formation_total_energy_per_atom'] for doc in beef_hull.hull_cursor],
-                       alpha=0.2, c=hull.colours[1], s=10, zorder=10, lw=0)
+                       alpha=min([1, max([1/(0.25*n_beef), 0.01])]), c=hull.colours[1], s=10, zorder=10, lw=0)
 
-        if plot_hist:
-            for doc in beef_hull.hull_cursor[1:-1]:
-                hull_concs[doc['_formula']] += 1
-        if subcmd == 'voltage':
-            ax_volt = plot_voltage_curve(beef_hull, ax=ax_volt, alpha=0.2, line_colour='k')
+        previous_qindex = 0
+        V = beef_hull.voltage_data['voltages'][0]
+        Q = beef_hull.voltage_data['Q'][0]
+        for step, (qs, vs) in enumerate(zip(Q, V)):
+            if step == len(V) - 1 or np.isnan(qs) or np.isnan(vs):
+                continue
+            v_index = max([0, min([int((vs-min_voltage)/(max_voltage-min_voltage) * grid_scale), grid_scale-1])])
+            q_index = max([0, min([int((qs-min_q)/(max_q-min_q)*grid_scale), grid_scale-1])])
+            voltage_heatmap[v_index, previous_qindex:q_index+1] += 1
+            if kwargs.get('hist_vertical'):
+                if not np.isnan(V[step+1]):
+                    next_vindex = max([0, min([int(V[step+1]/(max_voltage-min_voltage) * grid_scale), grid_scale-1])])
+                    voltage_heatmap[next_vindex+1:v_index, q_index] += 1
+            previous_qindex = q_index
+
+        for doc in beef_hull.hull_cursor[1:-1]:
+            hull_concs[doc['_formula']] += 1
 
     ax.set_ylim(min_ef)
 
-    if plot_hist:
-        from matador.utils.chem_utils import get_concentration
-        from matador.utils.chem_utils import get_stoich_from_formula
-        concs = []
-        freqs = []
-        for key in hull_concs:
-            concs.append(get_concentration(get_stoich_from_formula(key), elements=hull.elements)[0])
-            freqs.append(hull_concs[key])
+    import matplotlib as mpl
+    ax_volt.pcolor(q_grid, v_grid, voltage_heatmap, cmap='viridis')#, norm=mpl.colors.LogNorm(vmin=1, vmax=np.max(voltage_heatmap)))
 
-        max_freq = 0
-        for ind, conc in enumerate(concs):
-            if conc in orig_hull_concs:
-                ax_hist.plot([conc, conc], [0, freqs[ind]], lw=3, alpha=0.5, c=hull.colours[1])
-            else:
-                ax_hist.plot([conc, conc], [0, freqs[ind]], lw=3, alpha=0.5, c=hull.colours[0])
+    voltage_curve = calculate_average_voltage_from_heatmap(voltage_heatmap, v_grid, q_grid)
+    ax_volt.plot(q_grid[0, :], voltage_curve, c='white', zorder=1e20, lw=3, ls='--')
+    c = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])[1]
+    add_voltage_curve(hull.voltage_data['Q'][0], hull.voltage_data['voltages'][0], ax_volt, lw=5, ls='--', c=c)
 
-        max_freq = max(freqs)
-        ax_hist.set_ylim(0, 10*max_freq)
-        ax_hist.set_ylabel('Frequency')
-        ax_hist.set_xlabel('Concentration')
+    from matador.utils.chem_utils import get_concentration
+    from matador.utils.chem_utils import get_stoich_from_formula
+    concs = []
+    freqs = []
+    for key in hull_concs:
+        concs.append(get_concentration(get_stoich_from_formula(key), elements=hull.elements)[0])
+        freqs.append(hull_concs[key])
+
+    max_freq = 0
+    for ind, conc in enumerate(concs):
+        if conc in orig_hull_concs:
+            ax_hist.plot([conc, conc], [0, freqs[ind]], lw=3, alpha=0.5, c=hull.colours[1])
+        else:
+            ax_hist.plot([conc, conc], [0, freqs[ind]], lw=3, alpha=0.5, c=hull.colours[0])
+
+    max_freq = max(freqs)
+    ax_hist.set_ylim(0, 10*max_freq)
+    ax_hist.set_ylabel('Frequency')
+    ax_hist.set_xlabel('Concentration')
+    return voltage_heatmap
+
+
+def calculate_average_voltage_from_heatmap(voltage_heatmap, v_grid, q_grid):
+    """ For a histogram of voltages computed on grids v_grid and q_grid,
+    compute the average voltage curve.
+
+    Parameters:
+        voltage_heatmap (numpy.ndarray): NxN square array containing
+            frequencies of Q vs V.
+        v_grid (numpy.ndarray): NxN array containing the voltage value
+            at each point of the heatmap
+        q_grid (numpy.ndarray): NxN array containing the capacity value
+            at each point of the heatmap.
+
+    """
+    voltage_curve = np.zeros((len(voltage_heatmap)))
+    for q in range(len(voltage_heatmap)):
+        v_indices = np.where(voltage_heatmap[:, q] > 0)
+        voltages = [v_grid[index] for index in v_indices]
+        voltage_curve[q] = np.mean(voltages)
+
+    return voltage_curve
 
 
 @plotting_function

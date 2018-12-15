@@ -853,7 +853,6 @@ def _get_path_labels(seed, dispersion, ax_dispersion, path, path_key, branch_key
         seekpath_results = get_path(spg_structure)
         path_labels = seekpath_results['point_coords']
 
-    if cell or res:
         for branch_ind, branch in enumerate(dispersion[branch_key]):
             for sub_ind, ind in enumerate(branch):
                 kpt = dispersion[path_key][ind]

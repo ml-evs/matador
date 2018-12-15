@@ -422,7 +422,7 @@ def param2dict(seed, db=True, **kwargs):
 
                     elif 'xc_functional' in line:
                         param['xc_functional'] = param['xc_functional'].upper()
-                    elif 'spin' in line and not 'polar' in line and 'spin' in param:
+                    elif 'spin' in line and 'polar' not in line and 'spin' in param:
                         param['spin'] = int(param['spin'])
                     elif 'perc_extra_bands' in line:
                         param['perc_extra_bands'] = f90_float_parse(param['perc_extra_bands'])
@@ -1636,7 +1636,10 @@ def _castep_scrape_beef(flines, castep):
 
     for line_no, line in enumerate(flines[beef_start:]):
         if 'Self-consistent xc-energy' in line:
-            castep['_beef']['total_energy_sans_xc'] = castep['total_energy'] + HARTREE_TO_EV*f90_float_parse(line.strip().split()[-1])
+            try:
+                castep['_beef']['total_energy_sans_xc'] = castep['total_energy'] + HARTREE_TO_EV*f90_float_parse(line.strip().split()[-2])
+            except:
+                castep['_beef']['total_energy_sans_xc'] = castep['total_energy'] + HARTREE_TO_EV*f90_float_parse(line.strip().split()[-1])
 
     for line_no, line in enumerate(flines[beef_start:]):
         if '<-- BEEF' in line:
@@ -1656,7 +1659,7 @@ def _castep_scrape_beef(flines, castep):
         if 'Mean total energy' in line:
             castep['_beef']['mean_total_energy'] = HARTREE_TO_EV*f90_float_parse(line.strip().split()[-2])
         if 'Standard deviation' in line:
-            castep['_beef']['std_dev'] = HARTREE_TO_EV*f90_float_parse(line.strip().split()[-2])
+            castep['_beef']['std_dev'] = HARTREE_TO_EV*f90_float_parse(line.strip().split()[-2]) / castep['num_atoms']
 
 
 def get_kpt_branches(cart_kpts):
