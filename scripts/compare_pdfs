@@ -3,6 +3,7 @@
 import argparse
 from matador.scrapers.castep_scrapers import res2dict
 from matador.similarity.pdf_similarity import PDF, PDFOverlap
+import matplotlib.pyplot as plt
 
 
 def compare_pdfs(**kwargs):
@@ -48,12 +49,14 @@ def compare_pdfs(**kwargs):
     if kwargs.get('diff'):
         if kwargs.get('total'):
             for overlap in overlaps:
-                overlap.plot_diff(cmap=kwargs.get('cmap'))
+                overlap.plot_diff()
         else:
             for overlap in overlaps:
-                overlap.plot_projected_diff(cmap=kwargs.get('cmap'))
+                overlap.plot_projected_diff()
     else:
         strucs[0]['pdf'].plot_projected_pdf(other_pdfs=[doc['pdf'] for doc in strucs[1:]])
+
+    plt.show()
 
 
 if __name__ == '__main__':

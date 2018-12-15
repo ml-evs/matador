@@ -34,17 +34,17 @@ def plot_pdf(pdf, other_pdfs=None):
             other_pdfs = [other_pdfs]
         for _pdf in other_pdfs:
             if isinstance(_pdf, PDF):
-                ax1.plot(_pdf.r_space, _pdf.gr, label=_pdf.label, alpha=1)
+                ax1.plot(_pdf.r_space, _pdf.gr, label=_pdf.label, ls='--', alpha=1)
             elif isinstance(_pdf, tuple):
-                ax1.plot(_pdf[0], _pdf[1], alpha=1)
+                ax1.plot(_pdf[0], _pdf[1], alpha=1, ls='--')
             else:
-                raise RuntimeError
+                raise RuntimeError('Wrong PDF format specified, please either pass a PDF object or (r, g(r)) tuple.')
     ax1.set_xlabel('$r$ (Angstrom)')
     ax1.legend()
 
 
 @plotting_function
-def plot_projected_pdf(pdf, keys=None, other_pdfs=None):
+def plot_projected_pdf(pdf, keys=None, other_pdfs=None, vlines=None):
     """ Plot projected PDFs.
 
     Parameters:
@@ -53,23 +53,23 @@ def plot_projected_pdf(pdf, keys=None, other_pdfs=None):
     Keyword arguments:
         keys (list): plot only a subset of projections, e.g. [('K', )].
         other_pdfs (list of PDF): other PDFs to plot.
+        vlines (list of float): plot vertical lines at these points.
 
     """
     import matplotlib.pyplot as plt
     fig = plt.figure(figsize=(10, 6))
     ax1 = fig.add_subplot(111)
-    ax1.plot(pdf.r_space, pdf.gr, zorder=100000, ls='-', label='total {}'.format(pdf.label), c='k')
     if keys is None:
         keys = [key for key in pdf.elem_gr]
     for key in keys:
+        if key not in pdf.elem_gr:
+            key = (key[1], key[0])
         ax1.plot(pdf.r_space, pdf.elem_gr[key], label='-'.join(key) + ' {}'.format(pdf.label))
     if other_pdfs is not None:
         if isinstance(other_pdfs, PDF):
             other_pdfs = [other_pdfs]
         for _pdf in other_pdfs:
             if isinstance(_pdf, PDF):
-                ax1.plot(_pdf.r_space, _pdf.gr, zorder=99999, ls='--',
-                         label='total {}'.format(_pdf.label), c='k')
                 for key in keys:
                     ax1.plot(_pdf.r_space, _pdf.elem_gr[key], ls='--',
                              label='-'.join(key) + ' {}'.format(_pdf.label))
@@ -77,6 +77,10 @@ def plot_projected_pdf(pdf, keys=None, other_pdfs=None):
                 ax1.plot(_pdf[0], _pdf[1], alpha=1, ls='--')
             else:
                 raise RuntimeError
+
+    if vlines is not None:
+        for line in vlines:
+            ax1.axvline(line, ls='--', alpha=0.8, c='grey')
     ax1.legend(loc=1)
     ax1.set_ylabel('$g(r)$')
     ax1.set_xlabel('$r$ (Angstrom)')

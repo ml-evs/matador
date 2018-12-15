@@ -7,15 +7,17 @@ the similarity between two structures.
 """
 
 
-from itertools import product, combinations_with_replacement
+from itertools import combinations_with_replacement
+import itertools
+import copy
 from math import ceil
-from copy import deepcopy
 import time
 
 import numpy as np
+import numba
 from scipy.spatial.distance import cdist
 
-from matador.utils.cell_utils import frac2cart, cart2abc, cart2volume
+from matador.utils.cell_utils import frac2cart, cart2volume
 from matador.utils.cell_utils import standardize_doc_cell
 from matador.utils.print_utils import print_notify
 from matador.similarity.fingerprint import Fingerprint
@@ -58,7 +60,7 @@ class PDF(Fingerprint):
 
         """
 
-        prop_defaults = {'dr': 0.01, 'gaussian_width': 0.01, 'rmax': 15, 'num_images': 'auto',
+        prop_defaults = {'dr': 0.01, 'gaussian_width': 0.1, 'rmax': 15, 'num_images': 'auto',
                          'style': 'smear', 'debug': False, 'timing': False, 'low_mem': False, 'projected': True,
                          'max_num_images': 50, 'standardize': False}
 
@@ -69,7 +71,7 @@ class PDF(Fingerprint):
         self.kwargs.update(kwargs)
 
         # standardize cell
-        structure = deepcopy(doc)
+        structure = copy.deepcopy(doc)
         if self.kwargs.get('standardize'):
             structure = standardize_doc_cell(structure)
 
@@ -106,10 +108,27 @@ class PDF(Fingerprint):
     def calc_pdf(self):
         """ Wrapper to calculate PDF with current settings. """
         if self._image_vec is None:
+
+            if self.kwargs.get('debug'):
+                start = time.time()
+
             self._set_image_trans_vectors()
+
+            if self.kwargs.get('debug'):
+                end = time.time()
+                print('Image vectors length = {}'.format(len(self._image_vec)))
+                print('Set image trans vectors in {} s'.format(end - start))
+
         if self.kwargs.get('projected'):
+            if self.kwargs.get('debug'):
+                start = time.time()
+
             if self.elem_gr is None:
                 self._calc_projected_pdf()
+
+            if self.kwargs.get('debug'):
+                end = time.time()
+                print('Calculated projected PDF {} s'.format(end - start))
         if self.gr is None:
             self._calc_unprojected_pdf()
 
@@ -132,7 +151,7 @@ class PDF(Fingerprint):
             start = time.time()
         distances = np.array([])
         if poscart_b is None:
-            poscart_b = deepcopy(poscart)
+            poscart_b = poscart
         for prod in self._image_vec:
             trans = np.zeros((3))
             for ind, multi in enumerate(prod):
@@ -164,75 +183,9 @@ class PDF(Fingerprint):
         else:
             distances = self._calc_distances(self._poscart)
             self.r_space = np.arange(0, self.rmax + self.dr, self.dr)
-            self.gr = self._set_broadened_normalised_pdf(distances,
+            self.gr = self._get_broadened_normalised_pdf(distances,
                                                          style=self.kwargs.get('style'),
                                                          gaussian_width=self.kwargs.get('gaussian_width'))
-
-    def _calc_unprojected_pdf_from_projected(self):
-        """" Reconstruct full PDF from projected. """
-        self.gr = np.zeros_like(self.r_space)
-        for key in self.elem_gr:
-            self.gr += self.elem_gr[key]
-
-    def _set_broadened_normalised_pdf(self, distances, style='smear', gaussian_width=0.01):
-        """ Broaden the values provided as distances and return
-        G(r) and r_space of the normalised PDF.
-
-        Parameters:
-            distances (numpy.ndarray): distances used to calculate PDF
-
-        Keyword arguments:
-            style (str): either 'smear' or 'histogram'
-            gaussian_width (float): smearing width in Angstrom^1/2
-
-        Returns:
-            gr (np.ndarray): G(r), the PDF of supplied distances
-
-        """
-
-        if self.kwargs.get('debug'):
-            start = time.time()
-
-        hist = np.zeros_like(self.r_space, dtype=int)
-        gr = np.zeros_like(self.r_space)
-        for d_ij in distances:
-            hist[ceil(d_ij / self.dr)] += 1
-        if style == 'histogram' or gaussian_width == 0:
-            # if hist, normalise G(r) by ideal gas then be done
-            norm = 4 * np.pi * (self.r_space + self.dr)**2 * self.dr * self._num_atoms * self.number_density
-            gr = np.divide(hist, norm)
-        # otherwise do normal smearing
-        else:
-            if self.kwargs.get('low_mem'):
-                if self.kwargs.get('debug'):
-                    print('Using low memory mode...')
-                new_space = np.reshape(self.r_space,
-                                       (1, len(self.r_space))) - np.reshape(distances, (1, len(distances))).T
-                gr = np.sum(np.exp(-(new_space)**2 / gaussian_width), axis=0)
-            else:
-                try:
-                    new_space = np.reshape(self.r_space,
-                                           (1, len(self.r_space))) - np.reshape(self.r_space, (1, len(self.r_space))).T
-                    gr = np.sum(hist * np.exp(-(new_space)**2 / gaussian_width), axis=1)
-                except MemoryError:
-                    # if run out of memory, use low memory mode
-                    if self.kwargs.get('debug'):
-                        print('Ran out of memory, using low memory mode...')
-                    self.kwargs['low_mem'] = True
-                    new_space = np.reshape(self.r_space,
-                                           (1, len(self.r_space))) - np.reshape(distances, (1, len(distances))).T
-                    gr = np.sum(np.exp(-(new_space)**2 / gaussian_width), axis=0)
-
-            # normalise G(r) by Gaussian integral and then ideal gas
-            gr = np.divide(gr,
-                           np.sqrt(np.pi * gaussian_width) *
-                           4*np.pi * (self.r_space + self.dr)**2 * self._num_atoms * self.number_density)
-
-        if self.kwargs.get('debug'):
-            end = time.time()
-            print('Calculated broadening and normalised in {} s'.format(end - start))
-
-        return gr
 
     def _calc_projected_pdf(self):
         """ Calculate broadened and normalised element-projected PDF of a matador document.
@@ -247,6 +200,8 @@ class PDF(Fingerprint):
 
         """
         # initalise dict of element pairs with correct keys
+        style = self.kwargs.get('style')
+        gw = self.kwargs.get('gaussian_width')
         self.r_space = np.arange(0, self.rmax + self.dr, self.dr)
         elem_gr = dict()
         for comb in combinations_with_replacement(set(self._types), 2):
@@ -257,13 +212,196 @@ class PDF(Fingerprint):
             poscart_b = ([self._poscart[i] for i in range(len(self._poscart)) if self._types[i] == elem_type[1]]
                          if len(elem_type) == 2 else None)
             distances = self._calc_distances(poscart, poscart_b=poscart_b)
-            style = self.kwargs.get('style')
-            gw = self.kwargs.get('gaussian_width')
-            elem_gr[elem_type] = (
-                len(elem_type) * self._set_broadened_normalised_pdf(distances, style=style, gaussian_width=gw)
-            )
+            elem_gr[elem_type] = (len(elem_type) *
+                                  self._get_broadened_normalised_pdf(distances,
+                                                                     style=style,
+                                                                     gaussian_width=gw))
 
         self.elem_gr = elem_gr
+
+    def _calc_unprojected_pdf_from_projected(self):
+        """" Reconstruct full PDF from projected. """
+        self.gr = np.zeros_like(self.r_space)
+        for key in self.elem_gr:
+            self.gr += self.elem_gr[key]
+
+    @staticmethod
+    @numba.njit
+    def _broadening_space_dominated(distances, r_space, gaussian_width):
+        """ Add Gaussian broadening to the PDF by convolving distances with
+        the radial space and summing. More memory-efficient if len(r_space)
+        is less than len(distances).
+
+        Parameters:
+            distances (numpy.ndarray): array of pair-wise distances.
+            r_space (numpy.ndarray): radial grid
+            gaussian_width (float): amount of gaussian broadening.
+
+        Returns:
+            gr (numpy.ndarray): the unnormalised PDF.
+
+        """
+        new_space = (np.reshape(r_space, (1, len(r_space))) -
+                     np.reshape(distances, (1, len(distances))).T)
+        gr = np.sum(np.exp(-(new_space / gaussian_width)**2), axis=0)
+        return gr
+
+    @staticmethod
+    @numba.njit
+    def _broadening_distance_dominated(hist, r_space, gaussian_width):
+        """ Add Gaussian broadening to the PDF by convolving the distance histogram with
+        the radial space and summing. Potentially more memory-efficient than the alternative
+        implementation if len(distances) > len(r_space).
+
+        Parameters:
+            hist (numpy.ndarray): histogram of pairwise frequencies.
+            r_space (numpy.ndarray): radial grid
+            gaussian_width (float): amount of gaussian broadening.
+
+        Returns:
+            gr (numpy.ndarray): the unnormalised PDF.
+
+        """
+        new_space = (np.reshape(r_space, (1, len(r_space))) -
+                     np.reshape(r_space, (1, len(r_space))).T)
+        gr = np.sum(hist * np.exp(-(new_space / gaussian_width)**2), axis=1)
+        return gr
+
+    @staticmethod
+    @numba.njit
+    def _broadening_unrolled(hist, r_space, gaussian_width):
+        """ Add Gaussian broadening to the PDF by convolving the distance histogram with
+        the radial space and summing. Unrolled loop to save memory.
+
+
+        Parameters:
+            hist (numpy.ndarray): histogram of pairwise frequencies.
+            r_space (numpy.ndarray): radial grid
+            gaussian_width (float): amount of gaussian broadening.
+
+        Returns:
+            gr (numpy.ndarray): the unnormalised PDF.
+
+        """
+        gr = np.zeros_like(r_space)
+        for ind, _ in enumerate(hist):
+            if hist[ind] != 0:
+                gr += hist[ind] * np.exp(-((r_space-r_space[ind]) / gaussian_width)**2)
+        return gr
+
+    @staticmethod
+    @numba.njit
+    def _normalize_gr(gr, r_space, dr, num_atoms, number_density):
+        """ Normalise a broadened PDF, ignoring the Gaussian magnitude. """
+        norm = 4 * np.pi * (r_space + dr)**2 * dr * num_atoms * number_density
+        return np.divide(gr, norm)
+
+    @staticmethod
+    @numba.njit
+    def _dist_hist(distances, r_space, dr):
+        """ Bin the pair-wise distances according to the radial grid.
+
+        Parameters:
+            distances (numpy.ndarray): array of pair-wise distances.
+            r_space (numpy.ndarray): radial grid
+            dr (float): bin width.
+
+        """
+        hist = np.zeros_like(r_space)
+        for dij in distances:
+            hist[ceil(dij / dr)] += 1
+        return hist
+
+    def _get_broadened_normalised_pdf(self, distances, style='smear', gaussian_width=0.1):
+        """ Broaden the values provided as distances and return
+        G(r) and r_space of the normalised PDF.
+
+        Parameters:
+            distances (numpy.ndarray): distances used to calculate PDF
+
+        Keyword arguments:
+            style (str): either 'smear' or 'histogram'
+            gaussian_width (float): smearing width in Angstrom^1/2
+
+        Returns:
+            gr (np.ndarray): G(r), the PDF of supplied distances
+
+        """
+        if style == 'histogram' or gaussian_width == 0:
+            gr = self._dist_hist(distances, self.r_space, self.dr)
+        else:
+            # otherwise do normal smearing
+            hist = self._dist_hist(distances, self.r_space, self.dr)
+            if self.kwargs.get('low_mem'):
+                if self.kwargs.get('debug'):
+                    print('Using low memory mode...')
+                gr = self._broadening_unrolled(hist, self.r_space, gaussian_width)
+            else:
+                try:
+                    gr = self._broadening_distance_dominated(hist, self.r_space, gaussian_width)
+                except MemoryError:
+                    # if run out of memory, use low memory mode
+                    if self.kwargs.get('debug'):
+                        print('Ran out of memory, using low memory mode...')
+                    self.kwargs['low_mem'] = True
+                    gr = self._broadening_unrolled(hist, self.r_space, gaussian_width)
+
+        gr = self._normalize_gr(gr, self.r_space, self.dr, self._num_atoms, self.number_density)
+
+        return gr
+
+    @staticmethod
+    @numba.jit
+    def _get_image_trans_vectors_auto(lattice, rmax, dr, max_num_images=50):
+        """ Finds all "images" (integer 3-tuples, supercells) that have
+        atoms within rmax + dr + longest LV of the parent lattice.
+
+        Parameters:
+            lattice (list): list of lattice vectors.
+            rmax (float): maximum radial distance.
+            dr (float): PDF bin width.
+
+        Keyword arguments:
+            max_num_images (int): the greatest integer multiple of LVs to search out to.
+
+        Returns:
+            list: list of int 3-tuples of cells, up to rmax or if max_num_images is exceeded,
+                just up to 1 cell away.
+
+        """
+        image_vec = set()
+        any_in_sphere = True
+        # find longest combination of single LV's
+        max_trans = 0
+        trans = np.zeros((3))
+        products = list(itertools.product(range(-1, 2), repeat=3))
+        for prod in products:
+            trans = 0
+            for ind, multi in enumerate(prod):
+                trans += lattice[ind] * multi
+            if np.sqrt(np.sum(trans**2)) > max_trans:
+                max_trans = np.sqrt(np.sum(trans**2))
+        test_num_images = 3
+        while any_in_sphere and test_num_images <= max_num_images:
+            products = list(itertools.product(range(-test_num_images, test_num_images+1), repeat=3))
+            any_in_sphere = False
+            for prod in products:
+                if prod in image_vec:
+                    continue
+                trans = 0
+                for ind, multi in enumerate(prod):
+                    trans += lattice[ind] * multi
+                if np.sqrt(np.sum(trans**2)) <= rmax + dr + max_trans:
+                    image_vec.add(prod)
+                    any_in_sphere = True
+            test_num_images += 1
+            if test_num_images > max_num_images:
+                print('Something has probably gone wrong; required images reached {}.'
+                      .format(max_num_images))
+                print('Continuing with num_images = 1')
+                return list(itertools.product(range(-1, 2), repeat=3))
+
+        return image_vec
 
     def _set_image_trans_vectors(self):
         """ Sets self._image_vec to a list/generator of image translation vectors,
@@ -277,50 +415,10 @@ class PDF(Fingerprint):
         e.g. self._image_vec = [[1, 0, 1], [0, 1, 1], [1, 1, 1]].
 
         """
-        if self.kwargs.get('debug'):
-            start = time.time()
-
         if self._num_images == 'auto':
-            self._image_vec = set()
-            any_in_sphere = True
-            # find longest combination of single LV's
-            max_trans = 0
-            trans = np.zeros((3))
-            for prod in product(range(-1, 2), repeat=3):
-                trans = 0
-                for ind, multi in enumerate(prod):
-                    trans += self._lattice[ind] * multi
-                if np.sqrt(np.sum(trans**2)) > max_trans:
-                    max_trans = np.sqrt(np.sum(trans**2))
-            first_attempt = 3
-            test_num_images = deepcopy(first_attempt)
-            while any_in_sphere:
-                any_in_sphere = False
-                for prod in product(range(-test_num_images, test_num_images + 1), repeat=3):
-                    if prod in self._image_vec:
-                        continue
-                    trans = 0
-                    for ind, multi in enumerate(prod):
-                        trans += self._lattice[ind] * multi
-                    if np.sqrt(np.sum(trans**2)) <= self.rmax + self.dr + max_trans:
-                        self._image_vec.add(prod)
-                        any_in_sphere = True
-                test_num_images += 1
-                if test_num_images > self.kwargs.get('max_num_images'):
-                    print('Something has probably gone wrong; required images reached {}.'
-                          .format(self.kwargs.get('max_num_images')))
-                    print('lattice_abc:')
-                    print('Continuing with num_images = 1')
-                    self._num_images = 1
-                    self._image_vec = list(product(range(-self._num_images, self._num_images + 1), repeat=3))
-                    print(cart2abc(self._lattice))
-                    break
+            self._image_vec = self._get_image_trans_vectors_auto(self._lattice, self.rmax, self.dr, max_num_images=self.kwargs.get('max_num_images'))
         else:
-            self._image_vec = list(product(range(-self._num_images, self._num_images + 1), repeat=3))
-        if self.kwargs.get('debug'):
-            end = time.time()
-            print('Image vectors length = {}'.format(len(self._image_vec)))
-            print('Set image trans vectors in {} s'.format(end - start))
+            self._image_vec = list(itertools.product(range(-self._num_images, self._num_images + 1), repeat=3))
 
     def get_sim_distance(self, pdf_b, projected=False):
         """ Return the similarity between two PDFs. """
@@ -333,7 +431,7 @@ class PDF(Fingerprint):
         except AttributeError:
             return (None, None)
 
-    def plot_projected_pdf(self, keys=None, other_pdfs=None):
+    def plot_projected_pdf(self, **kwargs):
         """ Plot projected PDFs.
 
         Keyword arguments:
@@ -342,9 +440,9 @@ class PDF(Fingerprint):
 
         """
         from matador.plotting.pdf_plotting import plot_projected_pdf
-        plot_projected_pdf(self, keys=keys, other_pdfs=other_pdfs)
+        plot_projected_pdf(self, **kwargs)
 
-    def plot_pdf(self, other_pdfs=None):
+    def plot_pdf(self, **kwargs):
         """ Plot PDFs.
 
         Keyword arguments:
@@ -352,7 +450,7 @@ class PDF(Fingerprint):
 
         """
         from matador.plotting.pdf_plotting import plot_pdf
-        plot_pdf(self, other_pdfs=other_pdfs)
+        plot_pdf(self, **kwargs)
 
 
 class PDFFactory:
@@ -404,45 +502,22 @@ class PDFFactory:
             print('Initialising worker {}...'.format(concurrency))
 
         start = time.time()
-        if concurrency == 'queue':
-            queue = mp.Queue()
-            # split cursor into subcursors
-            pdfs_per_proc = int(round((len(cursor) / self.nprocs)))
-            subcursors = []
-            for i in range(self.nprocs):
-                if i == self.nprocs - 1:
-                    subcursors.append(deepcopy(cursor[i * pdfs_per_proc:]))
-                else:
-                    subcursors.append(deepcopy(cursor[i * pdfs_per_proc:(i + 1) * pdfs_per_proc]))
-
-            processes = [mp.Process(target=calc_pdf_queue_wrapper,
-                                    args=(subcursors[i], i, queue))
-                         for i in range(self.nprocs)]
-            for proc in processes:
-                proc.start()
-
-            results_cursor = dict()
-            for i in range(self.nprocs):
-                results_cursor.update(queue.get())
-
-            assert len(results_cursor) == self.nprocs
-            pdf_cursor = []
-            for i in range(self.nprocs):
-                pdf_cursor.append(results_cursor[i])
-            pdf_cursor = [doc for subcursor in pdf_cursor for doc in subcursor]
-
-        elif concurrency == 'pool':
+        if self.nprocs == 1:
+            import tqdm
+            for ind, doc in tqdm.tqdm(enumerate(cursor)):
+                cursor[ind]['pdf'].calc_pdf()
+        else:
             pool = mp.Pool(processes=self.nprocs)
             pdf_cursor = []
             pool.map_async(calc_pdf_pool_wrapper, cursor, callback=pdf_cursor.extend, error_callback=print)
             pool.close()
             pool.join()
 
-        if len(pdf_cursor) != len(cursor):
-            raise RuntimeError('There was an error calculating the desired PDFs')
+            if len(pdf_cursor) != len(cursor):
+                raise RuntimeError('There was an error calculating the desired PDFs')
 
-        for ind, doc in enumerate(cursor):
-            cursor[ind]['pdf'] = pdf_cursor[ind]['pdf']
+            for ind, doc in enumerate(cursor):
+                cursor[ind]['pdf'] = pdf_cursor[ind]['pdf']
 
         elapsed = time.time() - start
         if debug:
