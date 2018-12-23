@@ -19,7 +19,6 @@ class PDFCalculatorTest(unittest.TestCase):
         doc['text_id'] = ['pdf', 'test']
         doc['pdf_num_images'] = PDF(doc, low_mem=True, num_images=5, rmax=15, dr=0.1, **{'debug': True, 'projected': False})
         doc['pdf_auto_images'] = PDF(doc, low_mem=True, num_images='auto', rmax=15, dr=0.1, **{'debug': True, 'projected': False})
-        doc['pdf_auto_images'].plot_pdf(other_pdfs=doc['pdf_num_images'])
         np.testing.assert_array_almost_equal(doc['pdf_num_images'].gr, doc['pdf_auto_images'].gr)
 
     def test_pdf_from_projected(self):
@@ -93,7 +92,6 @@ class PDFCalculatorTest(unittest.TestCase):
             doc['text_id'] = 'hist'
             doc['pdf'] = PDF(doc, num_images=num_images, dr=dr, rmax=rmax, lazy=True, style='histogram', debug=True)
             doc['pdf'].calc_pdf()
-            # doc['pdf_smear'].plot_pdf(other_pdfs=[doc['pdf'], doc['pdf_low']])
             self.assertAlmostEqual(np.mean(doc['pdf'].gr[50:]), 1.0, places=1)
 
     def test_single_atom_pdf(self):
@@ -116,7 +114,6 @@ class PDFCalculatorTest(unittest.TestCase):
         doc['text_id'] = ['low']
         doc['pdf_low'] = PDF(doc, low_mem=True, num_images=num_images, gaussian_width=0.01, dr=0.1, rmax=rmax, lazy=True, style='smear', debug=True)
         doc['pdf_low'].calc_pdf()
-        doc['pdf_smear'].plot_pdf(other_pdfs=[doc['pdf'], doc['pdf_low']])
         peaks = [20, np.sqrt(2)*20, np.sqrt(3)*20, 40]
         indices = [ceil(peak/dr) for peak in peaks]
         self.assertListEqual(np.where(doc['pdf_low'].gr > 1e-8)[0].tolist(), indices)
