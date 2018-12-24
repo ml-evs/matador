@@ -186,6 +186,7 @@ class FullRelaxer:
 
         """
 
+        # at every other verbosity level, logging also writes to stdout
         if self.verbosity == 1:
             print(splash_screen)
 
@@ -353,24 +354,27 @@ class FullRelaxer:
                     # always cd back to root folder
                     os.chdir(self.root_folder)
                     self.remove_compute_dir_if_finished(self.compute_dir)
+                self._first_run = False
 
         elif calc_doc['task'].upper() in ['PHONON', 'THERMODYNAMICS']:
             from matador.workflows.castep import castep_full_phonon
             success = castep_full_phonon(self, calc_doc, self.seed)
+            self._first_run = False
 
         elif calc_doc['task'].upper() in ['SPECTRAL']:
             from matador.workflows.castep import castep_full_spectral
             success = castep_full_spectral(self, calc_doc, self.seed)
+            self._first_run = False
 
         elif calc_doc['task'].upper() in ['BULK_MODULUS']:
             from matador.workflows.castep import castep_elastic
             success = castep_elastic(self, calc_doc, self.seed)
+            self._first_run = False
 
         # run in SCF mode, i.e. just call CASTEP on the seeds
         else:
             success = self.scf(calc_doc, self.seed, keep=True)
-
-        self._first_run = False
+            self._first_run = False
 
         return success
 
@@ -985,10 +989,6 @@ class FullRelaxer:
 
         stdout = sp.PIPE
         stderr = sp.PIPE
-
-        if self.debug:
-            stdout = None
-            stderr = None
 
         if self._redirect_filename is not None:
             logging.info('Redirecting output to {redirect}'.format(redirect=self._redirect_filename))

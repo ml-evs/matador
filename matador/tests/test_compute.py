@@ -63,7 +63,7 @@ class ComputeTest(unittest.TestCase):
         ncores = 4
         node = None
         executable = 'castep'
-        newborn['source'] = [REAL_PATH + '/data/_LiAs_testcase.res']
+        newborn['source'] = [REAL_PATH + '/data/GA_TESTCASE.res']
 
         os.chdir(REAL_PATH)
         shutil.copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
@@ -81,7 +81,7 @@ class ComputeTest(unittest.TestCase):
         while proc[2].is_alive():
             sleep(1)
 
-        result, success = castep2dict('completed/_LiAs_testcase.castep')
+        result, success = castep2dict('completed/GA_TESTCASE.castep')
         queue_result = queue.get()
 
         match_dict = dict()
@@ -94,8 +94,8 @@ class ComputeTest(unittest.TestCase):
 
         print('Process completed!')
 
-        completed_exists = os.path.isfile('completed/_LiAs_testcase.res')
-        input_exists = os.path.isfile('input/_LiAs_testcase.res')
+        completed_exists = os.path.isfile('completed/GA_TESTCASE.res')
+        input_exists = os.path.isfile('input/GA_TESTCASE.res')
 
         for path in PATHS_TO_DEL:
             if os.path.isdir(path):
@@ -115,7 +115,6 @@ class ComputeTest(unittest.TestCase):
         self.assertTrue(success, "couldn't parse output file!")
         self.assertTrue(all([match_dict[key] for key in match_dict]))
 
-    # @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
     def test_missing_exec(self):
         """ Ensure failure if exec misses. """
         from matador.compute import FullRelaxer
@@ -148,7 +147,7 @@ class ComputeTest(unittest.TestCase):
                     os.remove(file)
                 os.removedirs(path)
 
-        paths = ['Li_00PBE.usp', 'As_00PBE.usp']
+        paths = ['Li_00PBE.usp', 'As_00PBE.usp', 'LiAs_testcase.res']
         for path in paths:
             if os.path.isfile(path):
                 os.remove(path)
@@ -300,6 +299,7 @@ class ComputeTest(unittest.TestCase):
         for _file in glob.glob('*.usp'):
             os.remove(_file)
 
+        os.chdir(ROOT_DIR)
         self.assertTrue(all(bad_exists))
         self.assertTrue(all(good_exists))
 
@@ -308,11 +308,12 @@ class ComputeTest(unittest.TestCase):
         """ Test the memory checker will not proceed with huge jobs. """
         from matador.scrapers.castep_scrapers import cell2dict, param2dict
         from matador.compute import FullRelaxer
-        shutil.copy(REAL_PATH + 'data/structures/LiAs_testcase.res', REAL_PATH + '_LiAs_testcase.res')
-        shutil.copy(REAL_PATH + 'data/LiAs.cell', REAL_PATH + 'LiAs.cell')
-        shutil.copy(REAL_PATH + 'data/LiAs.param', REAL_PATH + 'LiAs.param')
-        shutil.copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', REAL_PATH + 'Li_00PBE.usp')
-        shutil.copy(REAL_PATH + 'data/pspots/As_00PBE.usp', REAL_PATH + 'As_00PBE.usp')
+        os.chdir(REAL_PATH)
+        shutil.copy(REAL_PATH + 'data/structures/LiAs_testcase.res', REAL_PATH + '/_LiAs_testcase.res')
+        shutil.copy(REAL_PATH + 'data/LiAs.cell', REAL_PATH + '/LiAs.cell')
+        shutil.copy(REAL_PATH + 'data/LiAs.param', REAL_PATH + '/LiAs.param')
+        shutil.copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', REAL_PATH + '/Li_00PBE.usp')
+        shutil.copy(REAL_PATH + 'data/pspots/As_00PBE.usp', REAL_PATH + '/As_00PBE.usp')
 
         cell_dict, s = cell2dict(REAL_PATH + 'LiAs.cell', verbosity=VERBOSITY, db=False)
         assert s
@@ -346,6 +347,8 @@ class ComputeTest(unittest.TestCase):
                 for _file in glob.glob(_folder + '/*'):
                     os.remove(_file)
                 os.removedirs(_folder)
+
+        os.chdir(ROOT_DIR)
 
         self.assertFalse(raised_error)
         self.assertTrue(correct_folders)
@@ -608,6 +611,7 @@ class ComputeTest(unittest.TestCase):
         start = time.time()
         runner.spawn()
         elapsed = time.time() - start
+        os.chdir(ROOT_DIR)
         self.assertTrue(elapsed < 10, 'Sluggish to quit!')
 
     def test_res_name_collision(self):

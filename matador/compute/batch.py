@@ -317,7 +317,8 @@ class BatchRun:
                      "Please rename either your seed.cell/seed.param files, or rename the offending .res")
             raise InputError(error)
 
-        if len(self.file_lists['res']) < self.nprocesses:
+        if (len(self.file_lists['res']) < self.nprocesses and
+                (not self.args.get('conv_cutoff') and not self.args.get('conv_kpt'))):
             raise InputError('Requested more processes than there are jobs to run!')
 
         if not self.file_lists['res']:
