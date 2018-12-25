@@ -514,7 +514,6 @@ class QueryTest(unittest.TestCase):
         })
         self.assertDictEqual(test_dict, query.query_dict)
 
-
     def test_double_set_composition(self):
         kwargs = {'composition': ['{Li,Na}{Be,Fe}'], 'ignore_warnings': True, 'testing': True}
         query = DBQuery(**kwargs)
@@ -583,7 +582,6 @@ class QueryTest(unittest.TestCase):
         })
         self.assertDictEqual(test_dict, query.query_dict)
 
-
     def test_triple_set_composition(self):
         kwargs = {'composition': ['{Li,Na}{Ru,Os}{Ru,S}'], 'ignore_warnings': True, 'testing': True}
         query = DBQuery(**kwargs)
@@ -637,7 +635,6 @@ class QueryTest(unittest.TestCase):
             failed_safely = True
 
         self.assertTrue(failed_safely)
-
 
     def test_triple_macro_stoich(self):
         kwargs = {'formula': ['[VII]2[Fe,Ru,Os]3[I]'], 'ignore_warnings': True, 'testing': True}
@@ -841,6 +838,24 @@ class QueryTest(unittest.TestCase):
                 ]},
                 {'_id': {'$lte': ObjectId(time_str)}}
             ]})
+        self.assertDictEqual(test_dict, query.query_dict)
+
+    def test_id_query(self):
+        kwargs = {'id': 'testing testing', 'ignore_warnings': False, 'testing': True}
+        query = DBQuery(**kwargs)
+
+        test_dict = ({
+            '$and': [
+                {'text_id': ['testing', 'testing']},
+                {'$or': [
+                    {'quality': {'$gt': 0}},
+                    {'quality': {'$exists': False}}
+                ]}
+            ]
+        })
+
+        print(test_dict)
+        print(query.query_dict)
         self.assertDictEqual(test_dict, query.query_dict)
 
 

@@ -11,7 +11,7 @@ from matador.db import make_connection_to_collection
 from matador.config import load_custom_settings
 
 
-class MatadorCommandLine(object):
+class MatadorCommandLine:
     """ Class that implements the command-line interface to a MongoDB
     structure repository.
 
@@ -124,7 +124,7 @@ class MatadorCommandLine(object):
                 from matador.export import query2files
                 if self.args.get('write_n') is not None:
                     self.cursor = [doc for doc in self.cursor if len(doc['stoichiometry']) == self.args.get('write_n')]
-                if len(self.cursor) < 1:
+                if not self.cursor:
                     print_failure('No structures left to export.')
                 query2files(self.cursor, **self.args, argstr=self.argstr)
 

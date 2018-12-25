@@ -156,9 +156,9 @@ class DBQuery:
 
     def _construct_query(self):
         """ Set up query dict and perform query depending on
-        command-line / API arguments.
-        """
+        command-line / API arguments. Sets self.query_dict.
 
+        """
         self.cursor = EmptyCursor()
         # initalize query_dict to '$and' all queries
         self.query_dict = dict()
@@ -170,31 +170,33 @@ class DBQuery:
 
         # operate on one structure and related others
         if self.args.get('id') is not None:
-            if isinstance(self.args.get('id'), str):
-                self.args['id'] = self.args['id'].strip().split(' ')
-
-            for collection in self._collections:
-                query_dict = dict()
-                query_dict['$and'] = []
-                query_dict['$and'].append(self._query_id())
-                if not self.args.get('ignore_warnings'):
-                    query_dict['$and'].append(self._query_quality())
-                self.repo = self._collections[collection]
-                temp_cursor = self.repo.find(query_dict)
-                self.cursor = []
-                for doc in temp_cursor:
-                    self.cursor.append(doc)
-
-            if self.cursor:
-                sys.exit('Could not find a match with {} try widening your search.'.format(self.args.get('id')))
-
-            elif len(self.cursor) >= 1:
-                display_results(list(self.cursor)[:self.top], args=self.args)
-                if len(self.cursor) > 1:
-                    print_warning('Matched multiple structures with same text_id. The first one will be used.')
+            self.query_dict['$and'].append(self._query_id())
+            self._empty_query = False
 
             if self.args.get('calc_match') or \
                     self.args['subcmd'] in ['hull', 'hulldiff', 'voltage']:
+
+                self.cursor = []
+                for collection in self._collections:
+                    query_dict = dict()
+                    query_dict['$and'] = []
+                    query_dict['$and'].append(self._query_id())
+                    if not self.args.get('ignore_warnings'):
+                        query_dict['$and'].append(self._query_quality())
+                    self.repo = self._collections[collection]
+                    temp_cursor = self.repo.find(query_dict)
+                    for doc in temp_cursor:
+                        self.cursor.append(doc)
+
+                if not self.cursor:
+                    raise RuntimeError('Could not find a match with {} try widening your search.'.format(self.args.get('id')))
+
+                elif len(self.cursor) >= 1:
+                    display_results(list(self.cursor)[:self.top], args=self.args)
+
+                if len(self.cursor) > 1:
+                    print_warning('Matched multiple structures with same text_id. The first one will be used.')
+
                 # save special copy of calc_dict for hulls
                 self.calc_dict = dict()
                 self.calc_dict['$and'] = []
@@ -202,13 +204,6 @@ class DBQuery:
                 # don't append, just set
                 self.query_dict = self._query_calc(self.cursor[0])
                 self.calc_dict['$and'] = list(self.query_dict['$and'])
-                if self.args['subcmd'] in ['hull', 'hulldiff'] and \
-                        self.args.get('composition') is None:
-                    self.args['composition'] = ''
-                    for elem in self.cursor[0]['stoichiometry']:
-                        self.args['composition'] += elem[0]
-                    self.args['composition'] = [self.args['composition']]
-                self._empty_query = False
 
         # create alias for formula for backwards-compatibility
         self.args['stoichiometry'] = self.args.get('formula')
@@ -829,6 +824,8 @@ class DBQuery:
 
     def _query_id(self):
         """ Find all structures matching given tags. """
+        if isinstance(self.args.get('id'), str):
+            self.args['id'] = self.args['id'].strip().split(' ')
         query_dict = dict()
         query_dict['text_id'] = self.args.get('id')
         return query_dict
