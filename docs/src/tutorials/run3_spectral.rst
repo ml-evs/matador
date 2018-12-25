@@ -61,6 +61,17 @@ Note that the path labels are generated from the .cell/.res file in the ``comple
 .. tip::
    Plots can be customised using a custom matplotlib stylesheet. By default, matador plots will use the stylesheet found in ``matador/config/matador.mplstyle``, which can be copied elsewhere and specified by path in your ``.matadorrc`` under the ``plotting.default_style`` option. The default matplotlib styles can also be used directly by name, e.g. "dark_background".
 
+.. tip::
+   You can also specify a ``spectral_kpoint_path`` in your .cell file, that will be used for all structures in that
+   folder. This can be useful when comparing the electronic structure of e.g. defected cells. The ``dispersion`` 
+   script will try to scrape the labels to use for plotting from the comments at the specification of the kpoint path,
+   e.g. ::
+
+    %block spectral_kpoint_path
+    0.0 0.0 0.0 ! \Gamma
+    0.5 0.0 0.0 ! X
+    %endblock spectral_kpoint_path
+
 Example 2.2: A simple density of states (DOS) calculation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
