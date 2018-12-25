@@ -288,7 +288,7 @@ def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
         ylabel = r'Energy (eV)'
     ax_dispersion.set_ylabel(ylabel)
     ax_dispersion.set_xlim(0, 1)
-    _get_path_labels(seed, dispersion, ax_dispersion, path, path_key, branch_key, seed_ind, kwargs)
+    _add_path_labels(seed, dispersion, ax_dispersion, path, path_key, branch_key, seed_ind, kwargs)
 
     return ax_dispersion
 
@@ -810,8 +810,8 @@ def _get_lineprops(dispersion, eig_key, spin_key, nb, ns, branch, branch_ind, se
     return colour, alpha, label
 
 
-def _get_path_labels(seed, dispersion, ax_dispersion, path, path_key, branch_key, seed_ind, kwargs):
-    """ Scrape k-point path labels from cell file and seekpath. """
+def _add_path_labels(seed, dispersion, ax_dispersion, path, path_key, branch_key, seed_ind, kwargs):
+    """ Scrape k-point path labels from cell file and seekpath, then add them to the plot. """
     from matador.scrapers import cell2dict, res2dict
     from matador.utils.cell_utils import doc2spg
     from seekpath import get_path
@@ -819,70 +819,85 @@ def _get_path_labels(seed, dispersion, ax_dispersion, path, path_key, branch_key
     xticklabels = []
     shear_planes = []
     labelled = []
+    path_labels = dict()
 
-    # get dispersion path labels
-    spg_structure = None
-    if kwargs['phonons']:
-        spg_structure = doc2spg(dispersion)
-    else:
-        res = False
-        cell = False
-        if os.path.isfile(seed + '.res'):
-            res = True
-        elif os.path.isfile(seed + '.cell'):
-            cell = True
+    # first, try to grab them from the cell file
+    if os.path.isfile(seed + '.cell'):
+        doc, success = cell2dict(seed + '.cell',
+                                 db=False, verbosity=kwargs.get('verbosity', 0),
+                                 outcell=True, positions=True)
+        if kwargs['phonons']:
+            key = 'phonon_fine_kpoint_path'
         else:
-            print('Failed to find {}.cell or {}.res, will not be able to generate labels.'.format(seed, seed))
+            key = 'spectral_kpoints_path'
+        if key in doc and key + '_labels' in doc:
+            for label, point in zip(doc[key + '_labels'], doc[key]):
+                path_labels[label] = point
+            print('Detected path labels from cell file')
 
-        success = False
-        if cell:
-            doc, success = cell2dict(seed + '.cell',
-                                     db=False, verbosity=kwargs.get('verbosity', 0),
-                                     outcell=True, positions=True)
-        if res and not success:
-            doc, success = res2dict(seed + '.res',
-                                    db=False, verbosity=kwargs.get('verbosity', 0))
-
-        if cell or res:
-            if success:
-                spg_structure = doc2spg(doc)
+    if not path_labels:
+        # try to get dispersion path labels from spglib/seekpath
+        spg_structure = None
+        if kwargs['phonons']:
+            spg_structure = doc2spg(dispersion)
+        else:
+            res = False
+            cell = False
+            if os.path.isfile(seed + '.res'):
+                res = True
+            elif os.path.isfile(seed + '.cell'):
+                cell = True
             else:
-                print('Failed to scrape {}.cell/.res, will not be able to generate labels.'.format(seed))
+                print('Failed to find {}.cell or {}.res, will not be able to generate labels.'.format(seed, seed))
 
-    if spg_structure is not False and spg_structure is not None:
+            success = False
+            if cell:
+                doc, success = cell2dict(seed + '.cell',
+                                         db=False, verbosity=kwargs.get('verbosity', 0),
+                                         outcell=True, positions=True)
+            if res and not success:
+                doc, success = res2dict(seed + '.res',
+                                        db=False, verbosity=kwargs.get('verbosity', 0))
+
+            if cell or res:
+                if success:
+                    spg_structure = doc2spg(doc)
+                else:
+                    print('Failed to scrape {}.cell/.res, will not be able to generate labels.'.format(seed))
+
         seekpath_results = get_path(spg_structure)
         path_labels = seekpath_results['point_coords']
 
-        for branch_ind, branch in enumerate(dispersion[branch_key]):
-            for sub_ind, ind in enumerate(branch):
-                kpt = dispersion[path_key][ind]
-                for label, point in path_labels.items():
-                    if np.allclose(point, kpt):
-                        if ind - branch_ind not in labelled:
-                            label = label.replace('GAMMA', r'\Gamma')
-                            label = label.replace('SIGMA', r'\Sigma')
-                            label = label.replace('DELTA', r'\Delta')
-                            label = label.replace('LAMBDA', r'\Lambda')
-                            if sub_ind == len(branch) - 1:
-                                if branch_ind < len(dispersion[branch_key]) - 1:
-                                    _tmp = dispersion[path_key]
-                                    next_point = _tmp[dispersion[branch_key][branch_ind + 1][0]]
-                                    for new_label, new_point in path_labels.items():
-                                        new_label = new_label.replace('GAMMA', r'\Gamma')
-                                        new_label = new_label.replace('SIGMA', r'\Sigma')
-                                        new_label = new_label.replace('DELTA', r'\Delta')
-                                        new_label = new_label.replace('LAMBDA', r'\Lambda')
-                                        import matplotlib
-                                        if np.allclose(new_point, next_point):
-                                            label = '\\dfrac{{{}}}{{{}}}'.format(label, new_label)
-                                            ax_dispersion.axvline(path[ind - branch_ind], ls='-', c='grey', zorder=1, lw=0.5)
-                                            labelled.append(ind - branch_ind)
-                                            shear_planes.append(ind)
-                            label = '${}$'.format(label)
-                            ax_dispersion.axvline(path[ind - branch_ind], ls='--', c='grey', zorder=0, lw=0.5)
-                            xticklabels.append(label)
-                            xticks.append(path[ind - branch_ind])
-                            break
+    for branch_ind, branch in enumerate(dispersion[branch_key]):
+        for sub_ind, ind in enumerate(branch):
+            kpt = dispersion[path_key][ind]
+            for label, point in path_labels.items():
+                if np.allclose(point, kpt):
+                    if ind - branch_ind not in labelled:
+                        label = label.replace('GAMMA', r'\Gamma')
+                        label = label.replace('SIGMA', r'\Sigma')
+                        label = label.replace('DELTA', r'\Delta')
+                        label = label.replace('LAMBDA', r'\Lambda')
+                        if sub_ind == len(branch) - 1:
+                            if branch_ind < len(dispersion[branch_key]) - 1:
+                                _tmp = dispersion[path_key]
+                                next_point = _tmp[dispersion[branch_key][branch_ind + 1][0]]
+                                for new_label, new_point in path_labels.items():
+                                    new_label = new_label.replace('GAMMA', r'\Gamma')
+                                    new_label = new_label.replace('SIGMA', r'\Sigma')
+                                    new_label = new_label.replace('DELTA', r'\Delta')
+                                    new_label = new_label.replace('LAMBDA', r'\Lambda')
+                                    # import matplotlib
+                                    if np.allclose(new_point, next_point):
+                                        label = '\\dfrac{{{}}}{{{}}}'.format(label, new_label)
+                                        ax_dispersion.axvline(path[ind - branch_ind], ls='-', c='grey', zorder=1, lw=0.5)
+                                        labelled.append(ind - branch_ind)
+                                        shear_planes.append(ind)
+                        label = '${}$'.format(label.replace('$', ''))
+                        ax_dispersion.axvline(path[ind - branch_ind], ls='--', c='grey', zorder=0, lw=0.5)
+                        xticklabels.append(label)
+                        xticks.append(path[ind - branch_ind])
+                        break
 
     if not kwargs['phonons'] and kwargs['gap'] and dispersion['band_gap'] > 0:
         vbm_pos = dispersion['band_gap_path_inds'][1]

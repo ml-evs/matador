@@ -94,12 +94,10 @@ class CastepSpectralWorkflow(Workflow):
 
         if (
                 (
-                    'spectral_kpoints_path' not in self.calc_doc and
-                    'spectral_kpoints_list' not in self.calc_doc
-                ) and
-                (
+                    'spectral_kpoints_path' in self.calc_doc or
+                    'spectral_kpoints_list' in self.calc_doc or
                     'spectral_kpoints_path_spacing' in self.calc_doc or
-                    self.calc_doc.get('spectral_task').lower() == 'bandstructure'
+                    self.calc_doc.get('spectral_task', '').lower() == 'bandstructure'
                 )
         ):
             todo['dispersion'] = not os.path.isfile(self.seed + '.bands_dispersion')
@@ -107,7 +105,7 @@ class CastepSpectralWorkflow(Workflow):
                 todo['pdis'] = True
         if (
                 'spectral_kpoints_mp_spacing' in self.calc_doc or
-                self.calc_doc.get('spectral_task').lower() == 'dos'
+                self.calc_doc.get('spectral_task', '').lower() == 'dos'
         ):
             todo['dos'] = not os.path.isfile(self.seed + '.bands_dos')
             if glob.glob('*.odi'):
@@ -130,19 +128,26 @@ class CastepSpectralWorkflow(Workflow):
                 self.optados_executable = settings.get('optados_executable', 'optados')
                 self.relaxer.optados_executable = self.optados_executable
 
-        # always reduce cell to primitive and standardise the cell so that any
-        # post-processing performed after the fact will be consistent
-        from matador.utils.cell_utils import cart2abc
         self.calc_doc['spectral_kpoints_mp_spacing'] = self.calc_doc.get('spectral_kpoints_mp_spacing', 0.05)
         self.calc_doc['spectral_kpoints_path_spacing'] = self.calc_doc.get('spectral_kpoints_path_spacing', 0.05)
-        prim_doc, kpt_path = self.relaxer.get_seekpath_compliant_input(
-            self.calc_doc, self.calc_doc['spectral_kpoints_path_spacing'])
-        self.calc_doc.update(prim_doc)
-        self.calc_doc['lattice_abc'] = cart2abc(self.calc_doc['lattice_cart'])
-        self.calc_doc['continuation'] = 'default'
 
-        if todo['dispersion']:
-            self.calc_doc['spectral_kpoints_list'] = kpt_path
+        # if not using a user-requested path, use seekpath and spglib
+        # to reduce to primitive and use consistent path
+        if 'spectral_kpoints_list' not in self.calc_doc and 'spectral_kpoints_path' not in self.calc_doc:
+            from matador.utils.cell_utils import cart2abc
+            prim_doc, kpt_path = self.relaxer.get_seekpath_compliant_input(
+                self.calc_doc, self.calc_doc['spectral_kpoints_path_spacing'])
+            self.calc_doc.update(prim_doc)
+            self.calc_doc['lattice_abc'] = cart2abc(self.calc_doc['lattice_cart'])
+            if todo['dispersion']:
+                self.calc_doc['spectral_kpoints_list'] = kpt_path
+
+        elif todo['dispersion']:
+            self._user_defined_kpt_path = True
+            logging.warning('Using user-defined k-point path for all structures.')
+
+        # always use continuation
+        self.calc_doc['continuation'] = 'default'
 
         logging.info('Preprocessing completed: run3 spectral options {}'.format(todo))
 
@@ -228,10 +233,8 @@ def castep_spectral_dispersion(relaxer, calc_doc, seed):
     disp_doc['write_cell_structure'] = True
     disp_doc['continuation'] = 'default'
 
-    required = ['spectral_kpoints_list']
-    forbidden = ['spectral_kpoints_mp_spacing',
-                 'spectral_kpoints_path',
-                 'spectral_kpoints_path_spacing']
+    required = []
+    forbidden = ['spectral_kpoints_mp_spacing']
 
     relaxer.validate_calc_doc(disp_doc, required, forbidden)
     success = relaxer.scf(disp_doc, seed, keep=True, intermediate=True)

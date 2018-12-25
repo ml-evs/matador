@@ -239,12 +239,31 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, **kw
                 cell['phonon_fine_kpoint_mp_offset'] = list(map(f90_float_parse, line.split()[-3:]))
             else:
                 cell['kpoints_mp_offset'] = list(map(f90_float_parse, line.split()[-3:]))
-        elif '%block spectral_kpoints_path' in line.lower() or '%block spectral_kpoint_path' in line.lower():
+        elif '%block' in line.lower() and ('_kpoints_path' in line.lower() or '_kpoint_path' in line.lower()):
+            if 'spectral' in line.lower():
+                key = 'spectral_kpoints_path'
+            elif 'phonon_fine' in line.lower():
+                key = 'phonon_fine_kpoint_path'
+            else:
+                raise RuntimeError('Found unknown kpoint path block.')
             i = 1
-            cell['spectral_kpoints_path'] = []
+            labels = []
+            found_labels = False
+            comment_delims = ['!', '%', '#']
+            cell[key] = []
             while '%endblock' not in flines[line_no + i].lower():
-                cell['spectral_kpoints_path'].append(list(map(f90_float_parse, flines[line_no + i].split()[:3])))
+                for delim in comment_delims:
+                    if delim in flines[line_no+i]:
+                        labels.append(flines[line_no+i].split(delim)[-1].strip())
+                        found_labels = True
+                        break
+                else:
+                    labels.append(None)
+
+                cell[key].append(list(map(f90_float_parse, flines[line_no + i].split()[:3])))
                 i += 1
+            if found_labels:
+                cell[key + '_labels'] = labels
         elif '%block spectral_kpoints_list' in line.lower() or '%block spectral_kpoint_list' in line.lower():
             i = 1
             cell['spectral_kpoints_list'] = []
@@ -305,7 +324,7 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, **kw
                 cell['positions_noise'] = f90_float_parse(line.split()[-1])
             elif 'cell_noise' in line.lower():
                 cell['cell_noise'] = f90_float_parse(line.split()[-1])
-            elif 'kpoints_path' in line.lower() or 'kpoint_path' in line.lower():
+            elif 'kpoints_path' in line.lower() or 'kpoint_path' in line.lower() and '%block' not in line.lower():
                 if 'spectral_kpoints_path_spacing' in line.lower() or 'spectral_kpoint_path_spacing' in line.lower():
                     cell['spectral_kpoints_path_spacing'] = f90_float_parse(line.split()[-1])
                 elif 'phonon_fine_kpoints_path_spacing' in line.lower() or 'phonon_fine_kpoint_path_spacing' in line.lower():

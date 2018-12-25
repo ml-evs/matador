@@ -437,6 +437,19 @@ class ScrapeTest(unittest.TestCase):
             test_dict, s = res2dict(res_fname)
             self.assertFalse(s, 'This wasn\'t meant to succeed!')
 
+    def test_cell_kpoint_path(self):
+        from matador.scrapers import cell2dict
+        cell_name = REAL_PATH + 'data/cell_files/kpoint_path.cell'
+        cell, s = cell2dict(cell_name, db=False)
+
+        self.assertTrue(s)
+        self.assertEqual(cell['spectral_kpoints_path'], [[0.0, 0.0, 0.0], [0.0, 0.0, 0.5], [0.0, 0.5, 0.0], [0.5, 0.0, 0.0]])
+        self.assertEqual(cell['spectral_kpoints_path_labels'], ['$\Gamma$', 'Z', '$Y$', 'X'])
+        self.assertEqual(cell['spectral_kpoints_path_spacing'], 0.02)
+        self.assertEqual(cell['phonon_fine_kpoint_path'], [[0.0, 0.0, 0.0], [0.0, 0.0, 0.5], [0.0, 0.5, 0.0], [0.5, 0.0, 0.0]])
+        self.assertEqual(cell['phonon_fine_kpoint_path_labels'], ['$\Gamma$', 'Z', '$Y$', 'X'])
+        self.assertEqual(cell['phonon_fine_kpoint_path_spacing'], 0.01)
+
     @unittest.skipIf(True, 'CIF tests temporarily disabled...')
     def test_cif(self):
         from matador.scrapers import cif2dict
@@ -947,6 +960,23 @@ class ExportTest(unittest.TestCase):
         self.assertEqual(len(dummy_files), 2)
         for _f in dummy_files:
             os.remove(_f)
+
+    def test_doc2cell_kpoint_path(self):
+        from matador.scrapers import cell2dict
+        from matador.export import doc2cell
+        cell_name = REAL_PATH + 'data/cell_files/kpoint_path.cell'
+        dummy_name = REAL_PATH + 'dummy.cell'
+        cell, s = cell2dict(cell_name, db=False)
+
+        doc2cell(cell, dummy_name)
+        cell, s = cell2dict(dummy_name, db=False)
+
+        os.remove(dummy_name)
+
+        self.assertTrue(s)
+        self.assertEqual(cell['spectral_kpoints_path'], [[0.0, 0.0, 0.0], [0.0, 0.0, 0.5], [0.0, 0.5, 0.0], [0.5, 0.0, 0.0]])
+        self.assertEqual(cell['spectral_kpoints_path_labels'], ['$\Gamma$', 'Z', '$Y$', 'X'])
+        self.assertEqual(cell['spectral_kpoints_path_spacing'], 0.02)
 
     def test_doc2cell_and_param_with_spin(self):
         import glob
