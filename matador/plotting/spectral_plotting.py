@@ -335,10 +335,10 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
 
                     raw_eigenvalues = []
                     for kind, qpt in enumerate(dos_data['eigenvalues_k_s']):
-                            weight = dos_data['kpoint_weights'][kind]
-                            for eig in qpt:
-                                raw_weights.append(weight)
-                                raw_eigenvalues.append(eig)
+                        weight = dos_data['kpoint_weights'][kind]
+                        for eig in qpt:
+                            raw_weights.append(weight)
+                            raw_eigenvalues.append(eig)
                     raw_eigenvalues = np.asarray(raw_eigenvalues)
                     hist, energies = np.histogram(raw_eigenvalues, bins=space_size)
                     # shift bin edges to bin centres
@@ -445,13 +445,6 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                 else:
                     ylabel = 'DOS (eV$^{{-1}}$Å$^{{-3}}$)'
                 xlabel = 'Energy (eV)'
-
-            if len(seeds) > 1:
-                colour = kwargs['seed_colours'][seed_ind]
-            else:
-                colour = None
-
-            ax_dos.grid(False)
 
             if kwargs['plot_bandstructure']:
                 if 'spin_dos' in dos_data:
@@ -598,7 +591,7 @@ def projected_bandstructure_plot(seed, ax, path, dispersion, bbox_extra_artists,
 
     projectors = dos_data['projectors']
     keep_inds = []
-    for ind, projector in enumerate(projectors):
+    for ind, _ in enumerate(projectors):
         if np.max(pdis[:, :, ind]) > 1e-8:
             keep_inds.append(ind)
 
@@ -616,7 +609,7 @@ def projected_bandstructure_plot(seed, ax, path, dispersion, bbox_extra_artists,
     dos_data['kpoint_branches'], dos_data['kpoint_path_spacing'] = get_kpt_branches(dos_data['kpoints_cartesian'])
     _ordered_scatter(path, eigs, pdis, dos_data['kpoint_branches'],
                      interpolation_factor=interpolation_factor, point_scale=point_scale,
-                     ax=ax, colours=[dos_colours[ind] for ind in keep_inds])
+                     ax=ax, colours=dos_colours)
 
     legend = ax.legend(loc=1, frameon=True, fancybox=False, shadow=False)
     legend.set_zorder(1e20)
@@ -658,13 +651,16 @@ def _ordered_scatter(path, eigs, pdis, branches, ax=None, colours=None, interpol
             ek_interp = ek_fn(k_interp)
             projections = projections.T
             interp_projections = []
-            for i, proj in enumerate(projections):
+            for i, _ in enumerate(projections):
                 interp_projections.append(interp1d(k, projections[i])(k_interp))
             projections = np.asarray(interp_projections).T
             pts = np.array([k_interp, ek_interp]).T.reshape(-1, 1, 2)
 
-            plot_colours = [colours[i] for i in range(len(projections[0]))]
-            for i in range(len(projections)):
+            if colours is not None:
+                plot_colours = [colours[i] for i in range(len(projections[0]))]
+            else:
+                plot_colours = [None for i in range(len(projections[0]))]
+            for i, _ in enumerate(projections):
                 # zeros mess up zorder, so add small shift then subtract
                 # before calculating real sizes
                 projections[projections <= 1e-9] = 1e-9
@@ -950,6 +946,7 @@ def _get_projector_info(projectors):
     element_colours = get_element_colours()
     projector_labels = []
     dos_colours = []
+    num_species = len({projector[0] for projector in projectors})
     for ind, projector in enumerate(projectors):
         if projector[0] is None:
             projector_label = '${}$-character'.format(projector[1])
@@ -968,7 +965,10 @@ def _get_projector_info(projectors):
             dos_colour = deepcopy(element_colours.get(projector[0]))
             multi = ['s', 'p', 'd', 'f'].index(projector[1]) - 1
             for jind, _ in enumerate(dos_colour):
-                dos_colour[jind] = max(min(dos_colour[jind]+multi*0.2, 1), 0)
+                if num_species == 1:
+                    dos_colour[jind] = (dos_colour[jind] + multi*0.2) % 1.0
+                else:
+                    dos_colour[jind] = (dos_colour[jind] + multi*0.1) % 1.0
             dos_colours.append(dos_colour)
         # otherwise if just ang-projected, use colour_cycle
         else:
