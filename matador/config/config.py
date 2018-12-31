@@ -30,6 +30,14 @@ DEFAULT_SETTINGS = {
     }
 }
 
+FILE_PATHS = {
+    'mongo': ['default_collection_file_path'],
+    'plotting': ['element_colours']
+}
+
+# this global gets set by load_custom_settings, each time it is called
+SETTINGS = None
+
 
 def quickstart_settings():
     """ Call this if no user-specified configuration file is found. A series
@@ -195,8 +203,20 @@ def load_custom_settings(config_fname=None, quiet=True, debug=False, override=Tr
     settings.update(DEFAULT_SETTINGS)
     settings.update(custom_settings)
 
+    # check absolute/relative paths
+    for key in FILE_PATHS:
+        for setting in FILE_PATHS[key]:
+            if settings.get(key) is not None:
+                if settings[key].get(setting) is not None:
+                    settings[key][setting] = os.path.expanduser(settings[key][setting])
+                    if not os.path.isabs(settings[key][setting]):
+                        settings[key][setting] = '/'.join(config_fname.split('/')[:-1]) + '/' + settings[key][setting]
+
     if debug:
         import json
         print(json.dumps(settings, indent=2))
+
+    global SETTINGS
+    SETTINGS = settings
 
     return settings

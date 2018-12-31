@@ -22,9 +22,13 @@ def get_element_colours():
 
     """
     import os
-    from matador.config import load_custom_settings
+    from matador.config import load_custom_settings, SETTINGS
     # check if element_colours has been given as an absolute path
-    colours_fname = load_custom_settings().get('plotting').get('element_colours')
+    if SETTINGS:
+        colours_fname = SETTINGS.get('plotting', {}).get_element_colours('element_colours')
+    else:
+        colours_fname = load_custom_settings().get('plotting', {}).get('element_colours')
+
     if colours_fname is None:
         colours_fname = '/'.join(os.path.realpath(__file__).split('/')[:-1]) + '/../config/vesta_elements.ini'
     elif not os.path.isfile(colours_fname):

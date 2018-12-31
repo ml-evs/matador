@@ -7,7 +7,7 @@ mongo:
 
 plotting:
     default_style: matador
-    element_colours: config/vesta_colours.ini
+    element_colours: vesta_colours.ini
 
 run3:
     castep_executable: castep
