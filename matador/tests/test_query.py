@@ -9,7 +9,7 @@ from matador.utils.chem_utils import parse_element_string
 class QueryTest(unittest.TestCase):
     """ Test query functionality. """
 
-    def testBasicQueries(self):
+    def test_basic_queries(self):
         kwargs = {'composition': 'KP', 'testing': True}
         query = DBQuery(**kwargs)
         test_dict = ({
@@ -124,7 +124,7 @@ class QueryTest(unittest.TestCase):
         })
         self.assertDictEqual(test_dict, query.query_dict)
 
-    def testComplexQueries(self):
+    def test_complex_queries(self):
         """ Test long queries with multiple mismatching of lists
         (emulating argparse) and values.
         """
@@ -236,6 +236,20 @@ class QueryTest(unittest.TestCase):
             ]
         })
         self.assertDictEqual(test_dict, query.query_dict)
+
+    def test_non_elemental_query(self):
+        kwargs = {'composition': 'Li4Ge:Fe2Be',
+                  'testing': True}
+        query = DBQuery(**kwargs)
+
+        kwargs = {'composition': 'LiGeFeBe', 'intersection': True,
+                  'testing': True}
+        query2 = DBQuery(**kwargs)
+        print(query.query_dict)
+        print(query2.query_dict)
+
+        self.assertDictEqual(query.query_dict, query2.query_dict)
+        self.assertEqual(query._chempots, ['Li4Ge', 'Fe2Be'])
 
     def test_parse_element_strings(self):
         arg = '[VII][Fe,Ru,Os][I]'
@@ -666,6 +680,8 @@ class QueryTest(unittest.TestCase):
                 ]},
             ]
         })
+        print(test_dict)
+        print(query.query_dict)
         self.assertDictEqual(test_dict, query.query_dict)
 
         kwargs = {'formula': ['[Ag,Cd,In]2[Fe,Ru,Os]3[I]'], 'ignore_warnings': True, 'testing': True}
@@ -693,80 +709,6 @@ class QueryTest(unittest.TestCase):
                     ]},
                     {'stoichiometry': {'$size': 3}}
                 ]},
-            ]
-        })
-        self.assertDictEqual(test_dict, query.query_dict)
-
-    def test_ratio_query(self):
-        kwargs = {'composition': ['Li:TiP4'], 'ignore_warnings': True, 'testing': True}
-        query = DBQuery(**kwargs)
-        test_dict = ({
-            '$and': [
-                {'$and': [
-                    {'$and': [
-                        {'elems': {'$in': ['Li']}},
-                    ]},
-                    {'ratios.TiP': 0.25},
-                    {'$and': [
-                        {'elems': {'$in': ['Ti']}},
-                    ]},
-                    {'$and': [
-                        {'elems': {'$in': ['P']}},
-                    ]},
-                    {'stoichiometry': {'$size': 3}}
-                ]}
-            ]
-        })
-        self.assertDictEqual(test_dict, query.query_dict)
-
-    def test_harder_ratio(self):
-        kwargs = {'composition': ['LiMn:Mo2S3'], 'ignore_warnings': True, 'testing': True}
-        query = DBQuery(**kwargs)
-        test_dict = ({
-            '$and': [
-                {'$and': [
-                    {'$and': [
-                        {'elems': {'$in': ['Li']}},
-                    ]},
-                    {'$and': [
-                        {'elems': {'$in': ['Mn']}},
-                    ]},
-                    {'ratios.MoS': 0.667},
-                    {'$and': [
-                        {'elems': {'$in': ['Mo']}},
-                    ]},
-                    {'$and': [
-                        {'elems': {'$in': ['S']}},
-                    ]},
-                    {'stoichiometry': {'$size': 4}}
-                ]}
-            ]
-        })
-        self.assertDictEqual(test_dict, query.query_dict)
-
-        kwargs = {'composition': ['LiMn:Mo2S3B5'], 'ignore_warnings': True, 'testing': True}
-        query = DBQuery(**kwargs)
-        test_dict = ({
-            '$and': [
-                {'$and': [
-                    {'$and': [
-                        {'elems': {'$in': ['Li']}},
-                    ]},
-                    {'$and': [
-                        {'elems': {'$in': ['Mn']}},
-                    ]},
-                    {'ratios.MoS': 0.667, 'ratios.SB': 0.6, 'ratios.MoB': 0.4},
-                    {'$and': [
-                        {'elems': {'$in': ['Mo']}},
-                    ]},
-                    {'$and': [
-                        {'elems': {'$in': ['S']}},
-                    ]},
-                    {'$and': [
-                        {'elems': {'$in': ['B']}},
-                    ]},
-                    {'stoichiometry': {'$size': 5}}
-                ]}
             ]
         })
         self.assertDictEqual(test_dict, query.query_dict)

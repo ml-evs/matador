@@ -1,0 +1,4 @@
+task: geometryoptimisation
+geom_force_tol: 1e-3
+xc_functional: PBE
+cut_off_energy: 1000

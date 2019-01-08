@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 import unittest
-import sys
-import os
 import json
+import copy
 from os.path import realpath
 from glob import glob
 
@@ -17,47 +16,47 @@ REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
 
 class HullTest(unittest.TestCase):
     """ Test Convex hull functionality. """
-    def testHullFromFile(self):
+    def test_hull_from_file(self):
         """ Loading hull structures from files. """
         res_list = glob(REAL_PATH + 'data/hull-KPSn-KP/*.res')
         self.assertEqual(len(res_list), 87, 'Could not find test res files, please check installation...')
         cursor = [res2dict(res)[0] for res in res_list]
-        hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'], no_plot=True, quiet=True)
+        hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'], no_plot=True, quiet=False)
         self.assertEqual(len(hull.hull_cursor), 16)
 
-    def testHullFromCustomChempots(self):
+    def test_hull_from_custom_chempots(self):
         """ Loading hull structures from files. """
         res_list = glob(REAL_PATH + 'data/hull-KPSn-KP/*.res')
         self.assertEqual(len(res_list), 87, 'Could not find test res files, please check installation...')
         cursor = [res2dict(res)[0] for res in res_list]
         cursor = [doc for doc in cursor if len(doc['stoichiometry']) != 1]
         hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'],
-                               no_plot=True, quiet=True, chempots=[-791.456765, -928.045026/2.0, 878.326441/4.0])
+                               no_plot=True, quiet=False, chempots=[-791.456765, -928.045026/2.0, 878.326441/4.0])
         self.assertEqual(len(hull.hull_cursor), 16)
 
-    def testHullFromFileWithExtraneousElements(self):
+    def test_hull_from_file_with_extraneous_elements(self):
         """ Loading hull structures from files with too many elements. """
         res_list = glob(REAL_PATH + 'data/hull-KPSn-KP/*.res')
         cursor = [res2dict(res)[0] for res in res_list]
-        hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn'], no_plot=True, quiet=True)
+        hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn'], no_plot=True, debug=True, quiet=False)
         self.assertEqual(len(hull.hull_cursor), 5)
 
-    def testBinaryHullDistances(self):
+    def test_binary_hull_distances(self):
         """ Test computing binary hull distances. """
         res_list = glob(REAL_PATH + 'data/hull-KP-KSnP_pub/*.res')
         self.assertEqual(len(res_list), 295, 'Could not find test res files, please check installation...')
         cursor = [res2dict(res)[0] for res in res_list]
-        hull = QueryConvexHull(cursor=cursor, elements=['K', 'P'], no_plot=True, quiet=True)
+        hull = QueryConvexHull(cursor=cursor, elements=['K', 'P'], no_plot=True, quiet=False)
 
         hull_dist_test = np.loadtxt(REAL_PATH + 'data/test_KP_hull_dist.dat')
         np.testing.assert_array_almost_equal(np.sort(hull_dist_test), np.sort(hull.hull_dist), decimal=3)
 
-    def testTernaryHullDistances(self):
+    def test_ternary_hull_distances(self):
         """ Test computing ternary hull distances. """
         res_list = glob(REAL_PATH + 'data/hull-KPSn-KP/*.res')
         self.assertEqual(len(res_list), 87, 'Could not find test res files, please check installation...')
         cursor = [res2dict(res)[0] for res in res_list]
-        hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'], no_plot=True, quiet=True)
+        hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'], no_plot=True, quiet=False)
         self.assertEqual(len(hull.hull_cursor), 16)
         self.assertEqual(len(hull.cursor), 87)
         for ind, doc in enumerate(hull.cursor):
@@ -69,40 +68,131 @@ class HullTest(unittest.TestCase):
         np.testing.assert_array_almost_equal(np.sort(hull_dist_test), np.sort(hull.hull_dist), decimal=3)
         np.testing.assert_array_almost_equal(np.sort(hull.hull_dist), np.sort(precomp_hull_dist), decimal=3)
 
+    def test_hull_with_non_elemental_chempots(self):
+        cursor, s = res2dict(REAL_PATH + 'data/hull-LLZO/*.res')
+        print()
+        print(80*'-')
+        self.assertEqual(len(cursor), 12, 'Error with test res files, please check installation...')
+        hull = QueryConvexHull(cursor=cursor,
+                               elements=['La2O3', 'ZrO2', 'Li2O'],
+                               no_plot=True)
+        self.assertEqual(len(hull.cursor), 7)
+        self.assertEqual(len(hull.hull_cursor), 5)
+        hull = QueryConvexHull(cursor=cursor,
+                               elements=['La2O3', 'ZrO2', 'Li2O'],
+                               hull_cutoff=0.01,
+                               no_plot=True)
+        self.assertEqual(len(hull.cursor), 7)
+        self.assertEqual(len(hull.hull_cursor), 6)
+        for doc in hull.hull_cursor:
+            if 'cubic-LLZO' in doc['source'][0]:
+                self.assertAlmostEqual(doc['formation_enthalpy_per_atom'], -0.05758265622)
+                self.assertAlmostEqual(doc['hull_distance'], 0.008746875)
+                break
+        else:
+            raise RuntimeError('Did not find cubic-LLZO in cursor')
+
+    def test_pseudoternary_hull_with_custom_chempots(self):
+        cursor, s = res2dict(REAL_PATH + 'data/hull-LLZO/*.res')
+        print()
+        print(80*'-')
+        self.assertEqual(len(cursor), 12, 'Error with test res files, please check installation...')
+        hull = QueryConvexHull(cursor=cursor,
+                               elements=['La2O3', 'ZrO2', 'Li2O'],
+                               chempots=[-3275.040/5, -2178.987/3, -848.148/3],
+                               no_plot=True)
+        self.assertEqual(len(hull.cursor), 10)
+        self.assertEqual(len(hull.hull_cursor), 5)
+
+        hull = QueryConvexHull(cursor=cursor,
+                               elements=['La2O3', 'ZrO2', 'Li2O'],
+                               hull_cutoff=0.01,
+                               chempots=[26200.3194/40, -8715.94784/12, -3392.59361/12],
+                               no_plot=True)
+        self.assertEqual(len(hull.cursor), 10)
+        self.assertEqual(len(hull.hull_cursor), 9)
+
+        for doc in hull.hull_cursor:
+            if 'cubic-LLZO' in doc['source'][0]:
+                self.assertAlmostEqual(doc['formation_enthalpy_per_atom'], -0.05758265622)
+                self.assertAlmostEqual(doc['hull_distance'], 0.008746875)
+                break
+        else:
+            raise RuntimeError('Did not find cubic-LLZO in cursor')
+
+    def test_pseudoternary_hull_with_custom_chempots_below_hull(self):
+        cursor, s = res2dict(REAL_PATH + 'data/hull-LLZO/*.res')
+        hull = QueryConvexHull(cursor=cursor,
+                               elements=['La2O3', 'ZrO2', 'Li2O'],
+                               hull_cutoff=0.02,
+                               chempots=[26200.3194/40, -8715.94784/12, -3392.59361/12],
+                               no_plot=True)
+        self.assertEqual(len(hull.cursor), 10)
+        self.assertEqual(len(hull.hull_cursor), 9)
+        for doc in cursor:
+            if 'La2O3' in doc['source'][0]:
+                new_doc = copy.deepcopy(doc)
+                new_doc['enthalpy_per_atom'] -= 1
+                new_doc['source'][0] = 'IMAGINARY.res'
+        hull_dists = hull.get_hull_distances([[1, 0, -1]])
+        self.assertEqual(hull_dists[0], -1)
+
+    def test_hull_pseudobinary_hull(self):
+        cursor, s = res2dict(REAL_PATH + 'data/query-SrTiO-oqmd_1.1/*.res')
+        print()
+        print(80*'-')
+        self.assertEqual(len(cursor), 202, 'Error with test res files, please check installation...')
+        hull = QueryConvexHull(cursor=cursor,
+                               species=['Sr', 'TiO3'],
+                               no_plot=True)
+
+        self.assertEqual(len(hull.cursor), 37)
+        self.assertEqual(len(hull.hull_cursor), 3)
+
+        hull = QueryConvexHull(cursor=cursor,
+                               species=['Sr', 'TiO3'],
+                               hull_cutoff=0.05,
+                               no_plot=True)
+        self.assertEqual(len(hull.cursor), 37)
+        self.assertEqual(len(hull.hull_cursor), 10)
+
+    def test_filter_cursor(self):
+        cursor, s = res2dict(REAL_PATH + 'data/hull-LLZO/*.res')
+        species = ['Li2O', 'La2O3', 'ZrO2']
+        new_cursor = QueryConvexHull.filter_cursor_by_chempots(species, cursor)
+        self.assertEqual(len(cursor), 12)
+        self.assertEqual(len(new_cursor), 7)
+        cursor = [{'stoichiometry': [['Li', 7], ['O', 12], ['Zr', 2], ['La', 3]]}]
+        new_cursor = QueryConvexHull.filter_cursor_by_chempots(species, cursor)
+        self.assertEqual(len(new_cursor), 1)
+        self.assertAlmostEqual(new_cursor[0]['concentration'][0], 0.5, msg='Concentrations do not match')
+        self.assertAlmostEqual(new_cursor[0]['concentration'][1], 1.5/7.0, msg='Concentrations do not match')
+
+    def test_filter_cursor_simple(self):
+        cursor, s = res2dict(REAL_PATH + 'data/hull-KPSn-KP/*.res')
+        species = ['K', 'Sn']
+        hull = QueryConvexHull(cursor=cursor, species=species, no_plot=True)
+        # new_cursor = QueryConvexHull.filter_cursor_by_chempots(species, cursor)
+        print(len(hull.cursor))
+        # print(len(new_cursor))
+
 
 class VoltageTest(unittest.TestCase):
     """ Test voltage curve functionality. """
-    def testBinaryVoltage(self):
+    def test_binary_voltage(self):
         """ Test simple binary voltage curve. """
-        with open(os.devnull, 'w') as sys.stdout:
-            chempot_cursor, hull_cursor = [], []
-            test_x = np.loadtxt(REAL_PATH + 'data/LiAs_x.dat')
-            test_Q = np.loadtxt(REAL_PATH + 'data/LiAs_Q.dat')
-            test_V = np.loadtxt(REAL_PATH + 'data/LiAs_V.dat')
-            for i in range(5):
-                with open(REAL_PATH + 'data/hull_data' + str(i) + '.json') as f:
-                    hull_cursor.append(json.load(f))
-            for i in range(2):
-                with open(REAL_PATH + 'data/mu' + str(i) + '.json') as f:
-                    chempot_cursor.append(json.load(f))
-            with open(REAL_PATH + 'data/elements.json') as f:
-                elements = json.load(f)
-            bare_hull = QueryConvexHull.__new__(QueryConvexHull)
-            bare_hull.voltage_data = {}
-            bare_hull.args = {'debug': True, 'quiet': True}
-            bare_hull.cursor = list(hull_cursor)
-            bare_hull._ternary = False
-            bare_hull.elements = list(elements)
-            bare_hull.hull_cursor = list(hull_cursor)
-            bare_hull.chempot_cursor = list(chempot_cursor)
-            bare_hull.temperature = None
-            bare_hull._energy_key = None
-            bare_hull.voltage_curve(bare_hull.hull_cursor)
-        sys.stdout = sys.__stdout__
+        hull_cursor = []
+        test_x = np.loadtxt(REAL_PATH + 'data/voltage_data/LiAs_x.dat')
+        test_Q = np.loadtxt(REAL_PATH + 'data/voltage_data/LiAs_Q.dat')
+        test_V = np.loadtxt(REAL_PATH + 'data/voltage_data/LiAs_V.dat')
+        for i in range(5):
+            with open(REAL_PATH + 'data/voltage_data/hull_data' + str(i) + '.json') as f:
+                hull_cursor.append(json.load(f))
+        bare_hull = QueryConvexHull(cursor=hull_cursor, species=['Li', 'As'], subcmd='voltage', no_plot=True)
         self.assertTrue(len(bare_hull.voltage_data['voltages']) == 1)
-        np.testing.assert_array_equal(bare_hull.voltage_data['voltages'][0], test_V, verbose=True)
-        np.testing.assert_array_equal(bare_hull.voltage_data['x'][0], test_x)
-        np.testing.assert_array_equal(bare_hull.voltage_data['Q'][0], test_Q)
+        np.testing.assert_array_almost_equal(bare_hull.voltage_data['voltages'][0], test_V, verbose=True)
+        np.testing.assert_array_almost_equal(bare_hull.voltage_data['x'][0], test_x)
+        np.testing.assert_array_almost_equal(bare_hull.voltage_data['Q'][0], test_Q)
         for ind in range(len(bare_hull.voltage_data['voltages'])):
             assert len(bare_hull.voltage_data['Q'][ind]) == len(bare_hull.voltage_data['voltages'][ind])
             assert np.isnan(bare_hull.voltage_data['Q'][ind][-1])
@@ -113,7 +203,7 @@ class VoltageTest(unittest.TestCase):
         # test LiP voltage curve from Mayo et al, Chem. Mater. (2015) DOI: 10.1021/acs.chemmater.5b04208
         res_list = glob(REAL_PATH + 'data/hull-LiP-mdm_chem_mater/*.res')
         cursor = [res2dict(res)[0] for res in res_list]
-        hull = QueryConvexHull(cursor=cursor, elements=['Li', 'P'], no_plot=True, subcmd='voltage', quiet=True)
+        hull = QueryConvexHull(cursor=cursor, elements=['Li', 'P'], no_plot=True, subcmd='voltage', quiet=False)
         self.assertEqual(len(hull.voltage_data['voltages']), len(hull.voltage_data['Q']))
         self.assertEqual(len(hull.voltage_data['voltages']), len(hull.voltage_data['Q']))
         LiP_voltage_curve = np.loadtxt(REAL_PATH + 'data/LiP_voltage.csv', delimiter=',')
@@ -128,7 +218,7 @@ class VoltageTest(unittest.TestCase):
         res_list = glob(REAL_PATH + 'data/hull-LiSnS/*.res')
         cursor = [res2dict(res)[0] for res in res_list]
         hull = QueryConvexHull(cursor=cursor, elements=['Li', 'Sn', 'S'], no_plot=True, pathways=True, subcmd='voltage',
-                               debug=True, quiet=True)
+                               debug=True, quiet=False)
         pin = np.array([[2, 0, 0, -380.071],
                         [0, 2, 4, -1305.0911],
                         [2, 0, 1, -661.985],
@@ -175,7 +265,7 @@ class VoltageTest(unittest.TestCase):
                                             doc['stoichiometry'] != [['K', 4], ['Sn', 9]] and
                                             doc['stoichiometry'] != [['K', 5], ['P', 4]] and
                                             doc['stoichiometry'] != [['P', 2], ['Sn', 1]])]
-        hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'], no_plot=True, pathways=True, subcmd='voltage', quiet=True)
+        hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'], no_plot=True, pathways=True, subcmd='voltage', quiet=False)
         self.assertEqual(len(hull.voltage_data['voltages']), len(hull.voltage_data['Q']))
         np.testing.assert_array_almost_equal(np.asarray(hull.voltage_data['voltages']), np.asarray([[1.0229, 1.0229, 0.2676, 0.000]]), decimal=3)
         for ind in range(len(hull.voltage_data['voltages'])):
@@ -199,7 +289,7 @@ class VoltageTest(unittest.TestCase):
                                             doc['stoichiometry'] != [['K', 4], ['Sn', 9]] and
                                             doc['stoichiometry'] != [['K', 5], ['P', 4]] and
                                             doc['stoichiometry'] != [['P', 2], ['Sn', 1]])]
-        hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'], no_plot=True, pathways=True, subcmd='voltage', quiet=True)
+        hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'], no_plot=True, pathways=True, subcmd='voltage', quiet=False)
         self.assertEqual(len(hull.voltage_data['voltages']), len(hull.voltage_data['Q']))
         for ind in range(len(hull.voltage_data['voltages'])):
             self.assertTrue(len(hull.voltage_data['voltages'][ind])-1, len(hull.voltage_data['Q'][ind]) or len(hull.voltage_data['voltages'][ind]) == len(hull.voltage_data['Q'][ind]))
@@ -222,7 +312,7 @@ class VoltageTest(unittest.TestCase):
                                             doc['stoichiometry'] == [['K', 1]] or
                                             doc['stoichiometry'] == [['Sn', 1]])]
 
-        hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'], no_plot=True, pathways=True, subcmd='voltage', quiet=True)
+        hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'], no_plot=True, pathways=True, subcmd='voltage', quiet=False)
         self.assertEqual(len(hull.voltage_data['voltages']), len(hull.voltage_data['Q']))
         self.assertEqual(len(hull.voltage_data['voltages']), 1)
         for ind in range(len(hull.voltage_data['voltages'])):
@@ -234,7 +324,7 @@ class VoltageTest(unittest.TestCase):
         # load old hull then rejig it to go through a ternary phase
         res_list = glob(REAL_PATH + 'data/hull-LiSiP/*.res')
         cursor = [res2dict(res)[0] for res in res_list]
-        hull = QueryConvexHull(cursor=cursor, elements=['Li', 'Si', 'P'], pathways=True, no_plot=True, subcmd='voltage', quiet=True)
+        hull = QueryConvexHull(cursor=cursor, elements=['Li', 'Si', 'P'], pathways=True, no_plot=True, subcmd='voltage', quiet=False)
         self.assertEqual(len(hull.voltage_data['voltages']), len(hull.voltage_data['Q']))
         np.testing.assert_array_almost_equal(np.asarray(hull.voltage_data['voltages'][0]),
                                              np.asarray([1.1683, 1.1683, 1.0759, 0.7983,
@@ -254,7 +344,7 @@ class VoltageTest(unittest.TestCase):
         res_list = glob(REAL_PATH + 'data/hull-NaFeP-afh41_new_Na+Fe+P/*.res')
         self.assertEqual(len(res_list), 16, 'Could not find test res files, please check installation...')
         cursor = [res2dict(res)[0] for res in res_list]
-        hull = QueryConvexHull(cursor=cursor, elements=['Na', 'Fe', 'P'], no_plot=True, quiet=True, subcmd='voltage')
+        hull = QueryConvexHull(cursor=cursor, elements=['Na', 'Fe', 'P'], no_plot=True, quiet=False, subcmd='voltage')
         self.assertEqual(len(hull.voltage_data['voltages'][0]), 8)
         self.assertEqual(len(hull.voltage_data['voltages'][1]), 5)
         self.assertEqual(len(hull.voltage_data['voltages'][2]), 3)
@@ -262,12 +352,12 @@ class VoltageTest(unittest.TestCase):
 
 class VolumeTest(unittest.TestCase):
     """ Test simple binary volume curve. """
-    def testVolumeCurve(self):
+    def test_binary_volume_curve(self):
         """ Test simple binary volume curve. """
         res_list = glob(REAL_PATH + 'data/hull-LiP-mdm_chem_mater/*.res')
         cursor = [res2dict(res)[0] for res in res_list]
-        hull = QueryConvexHull(cursor=cursor, elements=['Li', 'P'], no_plot=True, quiet=True)
-        hull.volume_curve(quiet=True)
+        hull = QueryConvexHull(cursor=cursor, elements=['Li', 'P'], no_plot=True, quiet=False)
+        hull.volume_curve(quiet=False)
         self.assertEqual(len(hull.volume_data['x']), len(hull.hull_cursor)-1)
         self.assertEqual(len(hull.volume_data['vol_per_y']), len(hull.hull_cursor)-1)
 

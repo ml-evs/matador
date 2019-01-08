@@ -1,0 +1,8 @@
+%block species_pot
+La QC5
+Li QC5
+Zr QC5
+O QC5
+%endblock species_pot
+
+kpoint_mp_spacing: 0.05

@@ -550,7 +550,7 @@ def get_root_source(source):
     return list(src_list)[0]
 
 
-def get_formula_from_stoich(stoich, elements=None, tex=False, latex_sub_style=''):
+def get_formula_from_stoich(stoich, elements=None, tex=False, sort=True, latex_sub_style=''):
     """ Get the chemical formula of a structure from
     its matador stoichiometry.
 
@@ -570,6 +570,8 @@ def get_formula_from_stoich(stoich, elements=None, tex=False, latex_sub_style=''
     form = ''
     if not isinstance(stoich, list):
         stoich = stoich.tolist()
+    if sort:
+        stoich = sorted(stoich)
     if elements is not None:
         for targ_elem in elements:
             for elem in stoich:

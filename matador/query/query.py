@@ -18,10 +18,10 @@ from bson.son import SON
 from bson.json_util import dumps
 from bson.objectid import ObjectId
 
-from matador.utils.print_utils import print_failure, print_warning, print_success, print_notify
+from matador.utils.print_utils import print_warning, print_success, print_notify
 from matador.utils.chem_utils import get_periodic_table, get_formula_from_stoich
 from matador.utils.chem_utils import parse_element_string, get_stoich_from_formula
-from matador.utils.cursor_utils import display_results
+from matador.utils.cursor_utils import display_results, filter_cursor_by_chempots
 from matador.db import make_connection_to_collection
 from matador.config import load_custom_settings
 
@@ -65,6 +65,9 @@ class DBQuery:
         if subcmd in ['hull', 'hulldiff', 'voltage'] and self.args.get('composition') is None:
             raise RuntimeError('{} requires composition query'.format(subcmd))
 
+        self._create_hull = (self.args.get('subcmd') in ['hull', 'hulldiff', 'voltage'] or
+                             self.args.get('hull_cutoff') is not None)
+
         # public attributes
         self.cursor = EmptyCursor()
         self.query_dict = None
@@ -74,6 +77,8 @@ class DBQuery:
         # private attributes to be set later
         self._empty_query = None
         self._gs_enthalpy = None
+        self._non_elemental = None
+        self._chempots = None
 
         if debug:
             print(self.args)
@@ -111,38 +116,42 @@ class DBQuery:
             # execute the query
             self.perform_query()
 
-            # only filter for uniqueness if not eventually making a hull
-            if self.args.get('uniq') and self.args.get('subcmd') not in ['hull', 'hulldiff', 'voltage', 'swaps']:
-                from matador.similarity.similarity import get_uniq_cursor
-                print_notify('Filtering for unique structures...')
-                if self.args.get('top') is not None:
-                    top = self.top
-                else:
-                    top = len(self.cursor)
-                # filter for uniqueness
-                unique_set, dupe_dict, _, _ = get_uniq_cursor(self.cursor[:top],
-                                                              debug=self.args.get('debug'),
-                                                              sim_tol=self.args.get('uniq'))
-                print('Filtered {} down to {}'.format(len(self.cursor[:top]), len(unique_set)))
+            if self._create_hull and self.args.get('id') is None:
+                self.perform_hull_query()
 
-                display_cursor = []
-                additions = []
-                deletions = []
-                for key in dupe_dict:
-                    additions.append(len(display_cursor))
-                    display_cursor.append(self.cursor[key])
-                    if dupe_dict[key]:
-                        for _, jnd in enumerate(dupe_dict[key]):
-                            deletions.append(len(display_cursor))
-                            display_cursor.append(self.cursor[jnd])
+            if not self._create_hull:
+                # only filter for uniqueness if not eventually making a hull
+                if self.args.get('uniq'):
+                    from matador.similarity.similarity import get_uniq_cursor
+                    print_notify('Filtering for unique structures...')
+                    if self.args.get('top') is not None:
+                        top = self.top
+                    else:
+                        top = len(self.cursor)
+                    # filter for uniqueness
+                    unique_set, dupe_dict, _, _ = get_uniq_cursor(self.cursor[:top],
+                                                                  debug=self.args.get('debug'),
+                                                                  sim_tol=self.args.get('uniq'))
+                    print('Filtered {} down to {}'.format(len(self.cursor[:top]), len(unique_set)))
 
-                self.cursor = [self.cursor[:top][ind] for ind in unique_set]
+                    display_cursor = []
+                    additions = []
+                    deletions = []
+                    for key in dupe_dict:
+                        additions.append(len(display_cursor))
+                        display_cursor.append(self.cursor[key])
+                        if dupe_dict[key]:
+                            for _, jnd in enumerate(dupe_dict[key]):
+                                deletions.append(len(display_cursor))
+                                display_cursor.append(self.cursor[jnd])
 
-                display_results(display_cursor,
-                                additions=additions,
-                                deletions=deletions,
-                                no_sort=True,
-                                hull=None, args=self.args)
+                    self.cursor = [self.cursor[:top][ind] for ind in unique_set]
+
+                    display_results(display_cursor,
+                                    additions=additions,
+                                    deletions=deletions,
+                                    no_sort=True,
+                                    hull=None, args=self.args)
 
             if self.args.get('available_values') is not None:
                 self._query_available_values(self.args.get('available_values'), self.cursor)
@@ -347,8 +356,11 @@ class DBQuery:
                 if self.debug:
                     print('Query dict:')
                     print(dumps(self.query_dict, indent=1))
+
                 # execute query
                 self.cursor = list(self.repo.find(SON(self.query_dict)).sort('enthalpy_per_atom', pm.ASCENDING))
+                if self._non_elemental:
+                    self.cursor = filter_cursor_by_chempots(self._chempots, self.cursor)
 
                 # self.cursors.append(self.cursor)
                 cursor_count = len(self.cursor)
@@ -356,7 +368,8 @@ class DBQuery:
                 # if called as script, always print results
                 if self.args.get('id') is None:
                     print(cursor_count, 'results found for query in', collection + '.')
-                if self.args.get('subcmd') not in ['hull', 'hulldiff', 'voltage', 'swaps']:
+
+                if self.args.get('subcmd') != 'swaps' and not self._create_hull:
                     if cursor_count >= 1:
                         self._num_to_display = cursor_count
                         if self.args.get('delta_E') is not None:
@@ -365,19 +378,10 @@ class DBQuery:
                                 print('Multiple stoichiometries in cursor, unable to filter by energy.')
                             else:
                                 gs_enthalpy = self.cursor[0]['enthalpy_per_atom']
-                                if self.debug:
-                                    print('Filtering by {} eV/atom'.format(self.args.get('delta_E')))
-                                    print('gs_enthalpy = {}'.format(gs_enthalpy))
-                                num_to_display = 1
-                                for doc in self.cursor[1:]:
-                                    if doc['enthalpy_per_atom'] - gs_enthalpy > self.args.get('delta_E'):
-                                        break
-                                    else:
-                                        num_to_display += 1
-                                self._num_to_display = num_to_display
+                                self._num_to_display = \
+                                    1 + sum([1 for doc in self.cursor[1:]
+                                             if doc['enthalpy_per_atom'] - gs_enthalpy > self.args.get('delta_E')])
                                 cursor_count = self._num_to_display
-                                if self.debug:
-                                    print('Displaying top {}'.format(self._num_to_display))
                         elif self.top == -1 or self.top is None:
                             self._num_to_display = cursor_count
                             self.top = cursor_count
@@ -389,91 +393,97 @@ class DBQuery:
                 if self.args.get('delta_E') is not None:
                     self.cursor = self.cursor[:self._num_to_display]
 
-            # building hull from just comp, find best structure to calc_match
-            if self.args.get('id') is None and (self.args.get('subcmd') in ['hull', 'hulldiff', 'voltage'] or
-                                                self.args.get('hull_cutoff') is not None):
-                if len(self._collections) == 1:
-                    self.repo = self._collections[list(self._collections.keys())[0]]
-                else:
-                    sys.exit('Hulls and voltage curves require just one source or --include_oqmd, exiting...')
-                print('Creating hull from structures in query results.')
-                if self.args.get('biggest'):
-                    print('\nFinding biggest calculation set for hull...\n')
-                else:
-                    print('\nFinding the best calculation set for hull...')
+    def perform_hull_query(self):
+        """ Perform the multiple queries necessary to find possible
+        calculation sets to create a convex hull from.
 
-                test_cursors = []
-                test_cursor_count = []
-                test_query_dict = []
-                calc_dicts = []
-                cutoff = []
-                sample = 2
-                rand_sample = 5 if self.args.get('biggest') else 3
-                i = 0
-                count = len(self.cursor)
-                if count <= 0:
-                    sys.exit('No structures found for hull.')
-                while i < sample + rand_sample:
-                    # start with sample/2 lowest enthalpy structures
-                    if i < int(sample) and not self.args.get('intersection'):
-                        ind = i
-                    # then do some random samples
-                    else:
-                        ind = np.random.randint(rand_sample if rand_sample < count - 1 else 0, count - 1)
-                    id_cursor = list(self.repo.find({'text_id': self.cursor[ind]['text_id']}))
-                    if len(id_cursor) > 1:
-                        print_warning(
-                            'WARNING: matched multiple structures with text_id ' + id_cursor[0]['text_id'][0] + ' ' +
-                            id_cursor[0]['text_id'][1] + '.' + ' Skipping this set...')
+        Raises:
+            SystemExit: if no structures are found for hull.
+
+        """
+        for collection in self._collections:
+            self.repo = self._collections[collection]
+            print('Creating hull from structures in query results.')
+            if self.args.get('biggest'):
+                print('\nFinding biggest calculation set for hull...\n')
+            else:
+                print('\nFinding the best calculation set for hull...')
+
+            test_cursors = []
+            test_cursor_count = []
+            test_query_dict = []
+            calc_dicts = []
+            cutoff = []
+            sample = 2
+            rand_sample = 5 if self.args.get('biggest') else 3
+            i = 0
+            count = len(self.cursor)
+            if count <= 0:
+                raise SystemExit('No structures found for hull.')
+
+            while i < sample + rand_sample:
+                # start with sample/2 lowest enthalpy structures
+                if i < int(sample) and not self.args.get('intersection'):
+                    ind = i
+                # then do some random samples
+                else:
+                    ind = np.random.randint(rand_sample if rand_sample < count - 1 else 0, count - 1)
+                id_cursor = list(self.repo.find({'text_id': self.cursor[ind]['text_id']}))
+                if len(id_cursor) > 1:
+                    print_warning(
+                        'WARNING: matched multiple structures with text_id ' + id_cursor[0]['text_id'][0] + ' ' +
+                        id_cursor[0]['text_id'][1] + '.' + ' Skipping this set...')
+                    rand_sample += 1
+                else:
+                    self.query_dict = dict()
+                    try:
+                        self.query_dict = self._query_calc(id_cursor[0])
+                        cutoff.append(id_cursor[0]['cut_off_energy'])
+                        calc_dicts.append(dict())
+                        calc_dicts[-1]['$and'] = list(self.query_dict['$and'])
+                        self.query_dict['$and'].append(self._query_composition())
+                        if not self.args.get('ignore_warnings'):
+                            self.query_dict['$and'].append(self._query_quality())
+                        test_query_dict.append(self.query_dict)
+                        test_cursors.append(
+                            list(self.repo.find(SON(test_query_dict[-1])).sort('enthalpy_per_atom',
+                                                                               pm.ASCENDING)))
+                        if self._non_elemental:
+                            test_cursors[-1] = filter_cursor_by_chempots(self._chempots, test_cursors[-1])
+                        test_cursor_count.append(len(test_cursors[-1]))
+                        print("{:^24}".format(self.cursor[ind]['text_id'][0] + ' ' +
+                                              self.cursor[ind]['text_id'][1]) +
+                              ': matched ' + str(test_cursor_count[-1]), 'structures.', end='\t-> ')
+                        print('S-' if self.cursor[ind].get('spin_polarized') else '',
+                              self.cursor[ind]['sedc_scheme'] + '-' if self.cursor[ind].get('sedc_scheme') is not None else '',
+                              self.cursor[ind]['xc_functional'] + ', ',
+                              self.cursor[ind]['cut_off_energy'], ' eV, ',
+                              self.cursor[ind]['geom_force_tol'] if self.cursor[ind].get('geom_force_tol') is not None else 'xxx', ' eV/A, ',
+                              self.cursor[ind]['kpoints_mp_spacing'] if self.cursor[ind].get('kpoints_mp_spacing') is not None else 'xxx', ' 1/A', sep='')
+                        if test_cursor_count[-1] == count:
+                            print('Matched all structures...')
+                            break
+                        if test_cursor_count[-1] > 2 * int(count / 3):
+                            print('Matched at least 2/3 of total number, composing hull...')
+                            break
+                    except (KeyboardInterrupt, SystemExit) as oops:
+                        raise oops
+                    except Exception:
+                        print_exc()
+                        print_warning('Error with {}'.format(' '.join(id_cursor[0]['text_id'])))
                         rand_sample += 1
-                    else:
-                        self.query_dict = dict()
-                        try:
-                            self.query_dict = self._query_calc(id_cursor[0])
-                            cutoff.append(id_cursor[0]['cut_off_energy'])
-                            calc_dicts.append(dict())
-                            calc_dicts[-1]['$and'] = list(self.query_dict['$and'])
-                            self.query_dict['$and'].append(self._query_composition())
-                            if not self.args.get('ignore_warnings'):
-                                self.query_dict['$and'].append(self._query_quality())
-                            test_query_dict.append(self.query_dict)
-                            test_cursors.append(
-                                list(self.repo.find(SON(test_query_dict[-1])).sort('enthalpy_per_atom',
-                                                                                   pm.ASCENDING)))
-                            test_cursor_count.append(len(test_cursors[-1]))
-                            print("{:^24}".format(self.cursor[ind]['text_id'][0] + ' ' +
-                                                  self.cursor[ind]['text_id'][1]) +
-                                  ': matched ' + str(test_cursor_count[-1]), 'structures.', end='\t-> ')
-                            print('S-' if self.cursor[ind].get('spin_polarized') else '',
-                                  self.cursor[ind]['sedc_scheme'] + '-' if self.cursor[ind].get('sedc_scheme') is not None else '',
-                                  self.cursor[ind]['xc_functional'] + ', ',
-                                  self.cursor[ind]['cut_off_energy'], ' eV, ',
-                                  self.cursor[ind]['geom_force_tol'] if self.cursor[ind].get('geom_force_tol') is not None else 'xxx', ' eV/A, ',
-                                  self.cursor[ind]['kpoints_mp_spacing'] if self.cursor[ind].get('kpoints_mp_spacing') is not None else 'xxx', ' 1/A', sep='')
-                            if test_cursor_count[-1] == count:
-                                print('Matched all structures...')
-                                break
-                            if test_cursor_count[-1] > 2 * int(count / 3):
-                                print('Matched at least 2/3 of total number, composing hull...')
-                                break
-                        except (KeyboardInterrupt, SystemExit):
-                            print('Received exit signal, exiting...')
-                            sys.exit()
-                        except Exception:
-                            print_exc()
-                            print_warning(
-                                'Error with ' + id_cursor[0]['text_id'][0] + ' ' + id_cursor[0]['text_id'][1])
-                            rand_sample += 1
-                    i += 1
+                i += 1
 
-                if self.args.get('biggest'):
-                    choice = np.argmax(np.asarray(test_cursor_count))
-                else:
-                    # by default, find highest cutoff hull as first proxy for quality
-                    choice = np.argmax(np.asarray(cutoff))
-                self.cursor = test_cursors[choice]
-                print_success('Composing hull from set containing {}'.format(' '.join(self.cursor[0]['text_id'])))
-                self.calc_dict = calc_dicts[choice]
+            if self.args.get('biggest'):
+                choice = np.argmax(np.asarray(test_cursor_count))
+            else:
+                # by default, find highest cutoff hull as first proxy for quality
+                choice = np.argmax(np.asarray(cutoff))
+            self.cursor = test_cursors[choice]
+            if not self.cursor == 0:
+                raise RuntimeError('No structures found that match chemical potentials.')
+            print_success('Composing hull from set containing {}'.format(' '.join(self.cursor[0]['text_id'])))
+            self.calc_dict = calc_dicts[choice]
 
     @staticmethod
     def _query_float_range(field, values, tolerance=None):
@@ -550,7 +560,7 @@ class DBQuery:
         if ':' in stoich[0]:
             sys.exit('Formula cannot contain ":", you probably meant to query composition.')
 
-        stoich = get_stoich_from_formula(stoich[0])
+        stoich = get_stoich_from_formula(stoich[0], sort=False)
 
         query_dict = dict()
         query_dict['$and'] = []
@@ -623,20 +633,23 @@ class DBQuery:
             elements = custom_elem
         if partial_formula is None:
             partial_formula = self.args.get('partial_formula')
-        non_binary = False
+
+        self._non_elemental = False
         if ':' in elements[0]:
-            non_binary = True
+            self._non_elemental = True
+            self.args['intersection'] = True
+            self._chempots = elements[0].split(':')
+            elements = [parse_element_string(elem) for elem in self._chempots]
+            elements = list(dict.fromkeys([char for elem in elements for char in elem if char.isalpha()]))
         # if there's only one string, try split it by caps
-        if not non_binary:
+        if not self._non_elemental:
             for char in elements[0]:
                 if char.isdigit():
-                    print_failure('Composition cannot contain a number.')
-                    sys.exit()
-
-        elements = parse_element_string(elements[0])
+                    raise SystemExit('Composition cannot contain a number.')
+            elements = parse_element_string(elements[0])
 
         or_preference = False
-        for ind, elem in enumerate(elements):
+        for _, elem in enumerate(elements):
             if '{' in elem or '}' in elem:
                 or_preference = True
 
@@ -661,34 +674,6 @@ class DBQuery:
                         types_dict['$and'][-1][elem_field] = dict()
                         types_dict['$and'][-1][elem_field]['$in'] = [elem]
                     query_dict['$or'].append(types_dict)
-        elif non_binary:
-            query_dict = dict()
-            query_dict['$and'] = []
-            size = 0
-            for ind, elem in enumerate(elements):
-                if elem != ':' and not elem.isdigit():
-                    query_dict['$and'].append(self._query_composition(custom_elem=[elem], partial_formula=True))
-                    size += 1
-                if elem == ':':
-                    # convert e.g. MoS2 to [['MoS', 2]]
-                    # or LiMoS2 to [['LiMo', 1], ['MoS', '2], ['LiS', 2]]
-                    ratio_elements = elements[ind + 1:]
-                    for _ind, _ in enumerate(ratio_elements):
-                        if _ind < len(ratio_elements) - 1:
-                            if not ratio_elements[_ind].isdigit() and \
-                                    not ratio_elements[_ind+1].isdigit():
-                                ratio_elements.insert(_ind + 1, '1')
-                    if not ratio_elements[-1].isdigit():
-                        ratio_elements.append('1')
-                    ratios = []
-                    for _ind in range(0, len(ratio_elements), 2):
-                        for _jind in range(_ind, len(ratio_elements), 2):
-                            if ratio_elements[_ind] != ratio_elements[_jind]:
-                                ratios.append([ratio_elements[_ind] + ratio_elements[_jind],
-                                               round(float(ratio_elements[_ind+1]) /
-                                                     float(ratio_elements[_jind+1]),
-                                                     3)])
-                    query_dict['$and'].append(self._query_ratio(ratios))
         else:
             # expand group macros
             query_dict = dict()
@@ -697,7 +682,7 @@ class DBQuery:
 
             if or_preference:
                 element_slots = []
-                for ind, elem in enumerate(elements):
+                for elem in elements:
                     if '[' in elem or '{' in elem:
                         elem = elem.strip('{').strip('}').strip('[').strip(']')
                         if elem in self._periodic_table:
@@ -724,7 +709,7 @@ class DBQuery:
                 query_dict['$and'].append(types_dict)
 
             else:
-                for ind, elem in enumerate(elements):
+                for elem in elements:
                     if '[' in elem or ']' in elem:
                         types_dict = dict()
                         types_dict['$or'] = list()
@@ -878,8 +863,7 @@ class DBQuery:
 
         """
         number_containing_field = sum([1 for doc in cursor if field in doc])
-        print('{}/{} contain field {}'.format(number_containing_field, len(cursor), field))
-        if field in ['doi', 'tags', 'cnt_vector', 'castep_version']:
+        if field in ['doi', 'tags', 'cnt_vector', 'castep_version'] and number_containing_field != 0:
             value_degeneracy = dict()
             for doc in cursor:
                 if doc.get(field) is not None:
@@ -902,6 +886,7 @@ class DBQuery:
                 print('{:<10}: {:>10} entries'.format(value, value_degeneracy[value]))
         else:
             print('No querying available values for field {}'.format(field))
+            print('{}/{} contain field {}'.format(number_containing_field, len(cursor), field))
 
     @staticmethod
     def _query_quality():
