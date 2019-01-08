@@ -12,8 +12,10 @@ from time import strftime
 
 import numpy as np
 from matador.utils.cell_utils import get_spacegroup_spg
-from matador.utils.chem_utils import get_formula_from_stoich, get_root_source
+from matador.utils.chem_utils import get_formula_from_stoich, get_root_source, get_stoich_from_formula
 from matador import __version__
+
+EPS = 1e-12
 
 
 def display_results(cursor,
@@ -536,3 +538,39 @@ def filter_cursor(cursor, key, vals, verbosity=0):
     if verbosity > 0:
         print(orig_cursor_len, 'filtered to', len(filtered_cursor), 'documents.')
     return filtered_cursor
+
+
+def filter_cursor_by_chempots(species, cursor):
+    """ For the desired chemical potentials, remove any incompatible structures
+    from cursor.
+
+    Parameters:
+        species (list): list of chemical potential formulae.
+        cursor (list): list of matador documents to filter.
+
+    Returns:
+        list: the filtered cursor.
+
+    """
+    # filter out structures with any elements with missing chem pots
+    chempot_stoichiometries = []
+    for label in species:
+        chempot_stoichiometries.append(get_stoich_from_formula(label))
+
+    print(chempot_stoichiometries)
+    inds_to_remove = set()
+    for ind, doc in enumerate(cursor):
+        from matador.utils.chem_utils import get_number_of_chempots
+        try:
+            num_chempots = get_number_of_chempots(doc, chempot_stoichiometries)
+            cursor[ind]['concentration'] = (num_chempots[:-1] / np.sum(num_chempots)).tolist()
+            for idx, conc in enumerate(cursor[ind]['concentration']):
+                if conc < 0 + EPS:
+                    cursor[ind]['concentration'][idx] = 0.0
+                elif conc > 1 - EPS:
+                    cursor[ind]['concentration'][idx] = 1.0
+
+        except RuntimeError:
+            inds_to_remove.add(ind)
+
+    return [doc for ind, doc in enumerate(cursor) if ind not in inds_to_remove]
