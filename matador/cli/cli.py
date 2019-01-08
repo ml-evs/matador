@@ -153,9 +153,11 @@ class MatadorCommandLine:
             if self.args.get('subcmd') != 'import':
                 self.client.close()
 
-        except SystemExit as oops:
-            print(oops)
-            print('Trying to nicely close connection...')
+        except (RuntimeError, SystemExit, KeyboardInterrupt) as oops:
+            if type(oops) == RuntimeError:
+                print_failure(oops)
+            elif type(oops) == SystemExit:
+                print_warning(oops)
             try:
                 self.client.close()
             except AttributeError:
