@@ -135,7 +135,7 @@ class HullTest(unittest.TestCase):
                 new_doc['enthalpy_per_atom'] -= 1
                 new_doc['source'][0] = 'IMAGINARY.res'
         hull_dists = hull.get_hull_distances([[1, 0, -1]])
-        self.assertEqual(hull_dists[0], -1)
+        self.assertAlmostEqual(hull_dists[0], -1)
 
     def test_hull_pseudobinary_hull(self):
         cursor, s = res2dict(REAL_PATH + 'data/query-SrTiO-oqmd_1.1/*.res')
