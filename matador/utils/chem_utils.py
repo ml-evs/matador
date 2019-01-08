@@ -7,7 +7,7 @@ constants, with a focus on battery materials.
 """
 
 
-# external libraries
+import copy
 import numpy as np
 
 # global consts
@@ -23,6 +23,8 @@ AVOGADROS_NUMBER = 6.022141e23
 ANGSTROM_CUBED_TO_CENTIMETRE_CUBED = 1e-24
 ELECTRON_CHARGE = 1.6021766e-19
 KELVIN_TO_EV = 8.61733e-5
+
+EPS = 1e-12
 
 
 def get_periodic_table():
@@ -62,13 +64,17 @@ def get_atomic_symbol(atomic_number):
     return periodictable.elements[atomic_number].symbol
 
 
-def get_concentration(doc, elements):
+def get_concentration(doc, elements, include_end=False):
     """ Returns x for A_x B_{1-x}
     or x,y for A_x B_y C_z, (x+y+z=1).
 
     Parameters:
         doc (list/dict): structure to evaluate OR matador-style stoichiometry.
         elements (list): list of element symbols to enforce ordering.
+
+    Keyword arguments:
+        include_end (bool): whether or not to return the final value, i.e.
+            [x, y, z] rather than [x, y] in the above.
 
     Returns:
         list of float: concentrations of elements in given order.
@@ -82,9 +88,9 @@ def get_concentration(doc, elements):
     else:
         stoich = doc
 
-    concs = [0.0] * (len(elements) - 1)
+    concs = [0.0] * (len(elements) - bool(not include_end))
     for _, elem in enumerate(stoich):
-        if elem[0] in elements[:-1]:
+        if (include_end and elem[0] in elements) or (not include_end and elem[0] in elements[:-1]):
             concs[elements.index(elem[0])] = elem[1] / float(get_atoms_per_fu(doc))
     return concs
 
@@ -212,16 +218,72 @@ def get_formation_energy(chempots, doc, energy_key='enthalpy_per_atom', temperat
         formation = doc[energy_key][temperature]
     else:
         formation = doc[energy_key]
+
+    num_chempots = get_number_of_chempots(doc, chempots)
     num_atoms_per_fu = get_atoms_per_fu(doc)
-    for mu in chempots:
-        for j in range(len(doc['stoichiometry'])):
-            for i in range(len(mu['stoichiometry'])):
-                if mu['stoichiometry'][i][0] == doc['stoichiometry'][j][0]:
-                    if temperature is not None:
-                        formation -= (mu[energy_key][temperature] * doc['stoichiometry'][j][1] / num_atoms_per_fu)
-                    else:
-                        formation -= (mu[energy_key] * doc['stoichiometry'][j][1] / num_atoms_per_fu)
+    for ind, mu in enumerate(chempots):
+        num_atoms_per_mu = get_atoms_per_fu(mu)
+        if temperature is not None:
+            formation -= mu[energy_key][temperature] * num_chempots[ind] * num_atoms_per_mu / num_atoms_per_fu
+        else:
+            formation -= mu[energy_key] * num_chempots[ind] * num_atoms_per_mu / num_atoms_per_fu
     return formation
+
+
+def get_number_of_chempots(stoich, chempot_stoichs):
+    """ Return the required number of each (arbitrary) chemical potentials
+    to construct one formula unit of the input stoichiometry.
+
+    Parameters:
+        stoich (list/dict): matador-style stoichiometry,
+            e.g. [['Li', 3], ['P', 1]], or the full document.
+        chempot_stoichs (list/dict): list of stoichiometries of the input
+            chemical potentials, or the full documents.
+
+    Returns:
+        list: number of each chemical potential required to create
+            1 formula unit.
+
+    Raises:
+        RuntimeError: if the stoichiometry provided cannot be created
+            with the given chemical potentials.
+
+    """
+    import scipy.linalg
+
+    if isinstance(stoich, dict):
+        stoich = stoich['stoichiometry']
+    if isinstance(chempot_stoichs[0], dict):
+        chempot_stoichs = [mu['stoichiometry'] for mu in chempot_stoichs]
+
+    # find all elements present in the chemical potentials
+    elements = set()
+    for mu in chempot_stoichs:
+        for elem, num in mu:
+            elements.add(elem)
+    elements = sorted(list(elements))
+
+    chempot_matrix = np.asarray([get_padded_composition(mu, elements) for mu in chempot_stoichs])
+    num_extraneous_equations = max(np.shape(chempot_matrix)) - min(np.shape(chempot_matrix))
+
+    try:
+        solution = np.asarray(get_padded_composition(stoich, elements))
+    except RuntimeError:
+        raise RuntimeError('Stoichiometry {} could not be created from chemical potentials {}: missing chempot'
+                           .format(stoich, chempot_stoichs))
+
+    if num_extraneous_equations == 0:
+        num_chempots = scipy.linalg.solve(chempot_matrix.T, solution)
+    else:
+        num_chempots = scipy.linalg.solve(chempot_matrix[:, :-num_extraneous_equations].T, solution[:-num_extraneous_equations])
+        # check equations are consistent
+        for i in range(1, num_extraneous_equations+1):
+            verify = sum(num_chempots * chempot_matrix[:, -i])
+            if np.abs(verify - solution[-i]) > EPS:
+                raise RuntimeError('Stoichiometry {} could not be created from chemical potentials {}: stoichiometry inconsistent with chempots'
+                                   .format(stoich, chempot_stoichs))
+
+    return num_chempots.tolist()
 
 
 def get_stoich(atom_types):
@@ -264,6 +326,34 @@ def get_stoich(atom_types):
     return sorted(temp_stoich)
 
 
+def get_padded_composition(stoichiometry, elements):
+    """ Return a list that contains how many of each species in
+    elements exists in the given stoichiometry. e.g. for [['Li', 2], ['O', 1]]
+    with elements ['O', 'Li', 'Ba'], this function will return [1, 2, 0].
+
+    Parameters:
+        stoichiometry (list): matador-style stoichiometry, as above.
+        elements (list): order of element labels to pick out.
+
+    """
+    composition = []
+    for element in elements:
+        if not isinstance(element, str):
+            raise RuntimeError('Found invalid element symbol {}'.format(element))
+        for species in stoichiometry:
+            if not isinstance(species, list):
+                raise RuntimeError('Found invalid stoichiometry {}'.format(stoichiometry))
+            if species[0] == element:
+                composition.append(species[1])
+                break
+            elif species[0] not in elements:
+                raise RuntimeError('Extra element {} in stoichiometry'.format(species[0]))
+        else:
+            composition.append(0)
+
+    return composition
+
+
 def get_ratios_from_stoichiometry(stoichiometry):
     """ Get a dictionary of pairwise atomic ratios.
 
@@ -285,7 +375,7 @@ def get_ratios_from_stoichiometry(stoichiometry):
     return ratio_dict
 
 
-def get_stoich_from_formula(formula: str):
+def get_stoich_from_formula(formula: str, sort=True):
     """ Convert formula string, e.g. Li2TiP4 into a matador-style
     stoichiometry, e.g. [['Li', 2], ['Ti', 1], ['P', 4]].
 
@@ -293,7 +383,7 @@ def get_stoich_from_formula(formula: str):
         formula (str): chemical formula of compound
 
     Returns:
-        stoich (list): matador-style stoichiometry.
+        list: sorted matador-style stoichiometry.
 
     """
     from math import gcd
@@ -318,7 +408,10 @@ def get_stoich_from_formula(formula: str):
     fraction = np.asarray(fraction)
     fraction /= gcd_val
     stoich = [[elements[ind], fraction[ind]] for ind, _ in enumerate(elements)]
-    return stoich
+    if sort:
+        return sorted(stoich)
+    else:
+        return stoich
 
 
 def parse_element_string(elements_str, stoich=False):
@@ -492,7 +585,7 @@ def get_formula_from_stoich(stoich, elements=None, tex=False, latex_sub_style=''
                             form += elem[0] + str(int(elem[1]))
         assert form != ''
     else:
-        for elem in sorted(stoich):
+        for elem in stoich:
             if elem[1] == 1:
                 form += elem[0]
             elif int(elem[1]) != 0:
