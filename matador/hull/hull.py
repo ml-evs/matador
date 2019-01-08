@@ -9,9 +9,10 @@ queries.
 
 from traceback import print_exc
 from bisect import bisect_left
+from copy import deepcopy
 import sys
-import re
 import os
+import re
 
 from scipy.spatial import ConvexHull
 from scipy.spatial.qhull import QhullError
@@ -23,14 +24,15 @@ from matador.utils.print_utils import print_failure, print_notify, print_warning
 from matador.utils.hull_utils import barycentric2cart, vertices2plane, vertices2line, FakeHull
 from matador.utils.chem_utils import parse_element_string, get_padded_composition, get_num_intercalated
 from matador.utils.chem_utils import get_generic_grav_capacity, get_formula_from_stoich, get_stoich_from_formula
-from matador.utils.chem_utils import get_formation_energy, KELVIN_TO_EV
+from matador.utils.chem_utils import get_formation_energy, KELVIN_TO_EV, get_concentration
 from matador.utils.cursor_utils import set_cursor_from_array, get_array_from_cursor
 from matador.utils.cursor_utils import display_results
+from matador.export import generate_hash
 
 EPS = 1e-12
 
 
-class QueryConvexHull(object):
+class QueryConvexHull:
     """ Construct a binary or ternary phase diagram from a
     matador.query.DBQuery object, or a list of structures.
 
@@ -68,7 +70,11 @@ class QueryConvexHull(object):
             plot_kwargs (dict): arguments to pass to plot_hull function
 
         """
-        self.args = kwargs
+        self.args = dict()
+        if query is not None:
+            self.args.update(query.args)
+        self.args.update(kwargs)
+
         self.devel = True
         if self.args.get('subcmd') is None:
             self.args['subcmd'] = subcmd
@@ -141,7 +147,10 @@ class QueryConvexHull(object):
         self._non_elemental = False
         if species is None:
             if elements is None:
-                species = self.args.get('composition')[0]
+                if isinstance(self.args.get('composition'), list):
+                    species = self.args.get('composition')[0]
+                else:
+                    species = self.args.get('composition')
                 if ':' in species:
                     species = species.split(':')
             else:
@@ -150,6 +159,8 @@ class QueryConvexHull(object):
         if isinstance(species, str):
             if ':' in species:
                 species = species.split(':')
+            else:
+                species = [spec for spec in re.split(r'([A-Z][a-z]*)', species) if spec]
 
         self.species = species
         assert isinstance(self.species, list)
@@ -159,8 +170,7 @@ class QueryConvexHull(object):
 
         self._dimension = len(self.species)
         if self._dimension > 2 and self._query is not None and not self._query.args.get('intersection'):
-            print_warning('Please query with -int/--intersection when creating ternary+ hulls.')
-            raise SystemExit('Exiting...')
+            raise SystemExit('Please query with -int/--intersection when creating ternary+ hulls.')
 
         self.construct_phase_diagram()
 
@@ -234,7 +244,6 @@ class QueryConvexHull(object):
             custom_elem (list(str)): list of element symbols to generate chempots for.
 
         """
-        from matador.export import generate_hash
         self.chempot_cursor = []
 
         if custom_elem is None:
@@ -259,7 +268,7 @@ class QueryConvexHull(object):
         self.chempot_cursor[0]['num_a'] = float('inf')
         notify = 'Custom chempots:'
         for chempot in self.chempot_cursor:
-            notify += '{:3} = {} eV/fu, '.format(get_formula_from_stoich(chempot['stoichiometry']),
+            notify += '{:3} = {} eV/fu, '.format(get_formula_from_stoich(chempot['stoichiometry'], sort=False),
                                                  chempot['enthalpy'])
 
         if self.args.get('debug'):
@@ -315,7 +324,7 @@ class QueryConvexHull(object):
             hull_dist = np.ones((len(structures)))
             if precompute:
                 for ind, _ in enumerate(structures):
-                    formula = get_formula_from_stoich(self.cursor[ind]['stoichiometry'], tex=False)
+                    formula = get_formula_from_stoich(self.cursor[ind]['stoichiometry'], sort=True, tex=False)
                     if formula in cached_formula_dists:
                         hull_dist[ind] = (structures[ind, -1] - cached_formula_dists[formula][0] +
                                           cached_formula_dists[formula][1])
@@ -360,9 +369,9 @@ class QueryConvexHull(object):
                 for ind, plane in enumerate(self.convex_hull.planes):
                     if structures_finished[idx] or planes_R_inv[ind] is None:
                         continue
-                    if precompute and get_formula_from_stoich(self.cursor[idx]['stoichiometry'],
+                    if precompute and get_formula_from_stoich(self.cursor[idx]['stoichiometry'], sort=True,
                                                               tex=False) in cached_formula_dists:
-                        formula = get_formula_from_stoich(self.cursor[idx]['stoichiometry'], tex=False)
+                        formula = get_formula_from_stoich(self.cursor[idx]['stoichiometry'], sort=True, tex=False)
                         if formula in cached_formula_dists:
                             cache_hits += 1
                             hull_dist[idx] = (structures[idx, -1] - cached_formula_dists[formula][0] +
@@ -371,13 +380,13 @@ class QueryConvexHull(object):
                     else:
                         barycentric_structure = barycentric2cart(structure.reshape(1, 3)).T
                         barycentric_structure[-1, :] = 1
-                        plane_barycentric_structure = np.matmul(planes_R_inv[ind], barycentric_structure)
+                        plane_barycentric_structure = np.matrix(planes_R_inv[ind]) * np.matrix(barycentric_structure)
                         if (plane_barycentric_structure >= 0 - 1e-12).all():
                             structures_finished[idx] = True
                             hull_dist[idx] = planes_height_fn[ind](structure)
                             if precompute:
                                 cached_formula_dists[
-                                    get_formula_from_stoich(self.cursor[idx]['stoichiometry'],
+                                    get_formula_from_stoich(self.cursor[idx]['stoichiometry'], sort=True,
                                                             tex=False)] = (structure[-1], hull_dist[idx])
                                 cache_misses += 1
 
@@ -431,16 +440,15 @@ class QueryConvexHull(object):
 
         Expects self.chempot_cursor to be set with unique entries.
 
-        TO-DO:
-            - improve chempot_cursor to look for non-elemental
-            - improve get_formation_energy to work for weird chempots
-            - likewise get_concentration
-            - extend get_hull_distances to work for arbitrary dimension...
-
         """
+        # only filter if hull is using non-elemental chempots to save time
+        if self._non_elemental or self.from_cursor:
+            self.cursor = self.filter_cursor_by_chempots(self.species, self.cursor)
+            print('Cursor filtered down to {} structures.'.format(len(self.cursor)))
+        else:
+            for ind, doc in enumerate(self.cursor):
+                self.cursor[ind]['concentration'] = get_concentration(doc, self.species)
 
-        self.cursor = self.filter_cursor_by_chempots(self.species, self.cursor)
-        print('Cursor filtered down to {} structures.'.format(len(self.cursor)))
         self.set_chempots()
 
         formation_key = 'formation_{}'.format(self.energy_key)
@@ -459,14 +467,15 @@ class QueryConvexHull(object):
         elif self.args.get('subcmd') in ['voltage', 'volume']:
             raise NotImplementedError('Pseudo-binary/ternary voltages not yet implemented.')
 
-        # filter out those with positive formation energy, to reduce expense computing hull
-        self.structure_slice = structures[np.where(structures[:, -1] <= 0 + EPS)]
-
-        # add a point "above" the hull
-        # for simple removal of extraneous vertices (e.g. top of 2D hull)
         if self._dimension == 3:
-            dummy_point = [0.3333, 0.333, 100]
-            self.structure_slice = np.vstack((self.structure_slice, dummy_point))
+            # add a point "above" the hull
+            # for simple removal of extraneous vertices (e.g. top of 2D hull)
+            dummy_point = [0.333, 0.333, 1e5]
+            # if ternary, use all structures, not just those with negative eform for compatibility reasons
+            self.structure_slice = np.vstack((structures, dummy_point))
+        else:
+            # filter out those with positive formation energy, to reduce expense computing hull
+            self.structure_slice = structures[np.where(structures[:, -1] <= 0 + EPS)]
 
         if len(self.structure_slice) <= self._dimension:
             if len(self.structure_slice) < self._dimension:
@@ -512,7 +521,7 @@ class QueryConvexHull(object):
             self.hull_cursor = []
             compositions = set()
             for ind, member in enumerate(hull_cursor):
-                formula = get_formula_from_stoich(sorted(member['stoichiometry']))
+                formula = get_formula_from_stoich(member['stoichiometry'], sort=True)
                 if formula not in compositions:
                     compositions.add(formula)
                     self.hull_cursor.append(member)
@@ -563,7 +572,6 @@ class QueryConvexHull(object):
             for ind, elem in enumerate(self.species):
 
                 print('Scanning for suitable', elem, 'chemical potential...')
-                from copy import deepcopy
                 query_dict['$and'] = deepcopy(list(query.calc_dict['$and']))
 
                 if not self.args.get('ignore_warnings'):
@@ -618,6 +626,7 @@ class QueryConvexHull(object):
             for match in self.chempot_cursor[1:]:
                 if match['_id'] not in ids:
                     self.cursor.append(match)
+
         # add faked chempots to overall cursor
         elif self.args.get('chempots') is not None:
             self.cursor.insert(0, self.chempot_cursor[0])
@@ -650,6 +659,7 @@ class QueryConvexHull(object):
         return filter_cursor_by_chempots(species, cursor)
 
     def _setup_per_b_fields(self):
+        """ Calculate the enthalpy and volume per "B" in A_x B. """
         for ind, doc in enumerate(self.cursor):
             nums_b = len(self.species[1:]) * [0]
             for elem in doc['stoichiometry']:

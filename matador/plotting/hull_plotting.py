@@ -143,7 +143,8 @@ def plot_2d_hull(hull, ax=None, show=False, plot_points=True,
             print(doc['stoichiometry'], hull.species)
             ax.annotate(get_formula_from_stoich(doc['stoichiometry'],
                                                 latex_sub_style=r'\mathregular',
-                                                tex=True),
+                                                tex=True,
+                                                sort=False),
                         xy=(conc, e_f),
                         xytext=position,
                         textcoords='data',
@@ -506,12 +507,11 @@ def plot_ternary_hull(hull, axis=None, show=False, plot_points=True, hull_cutoff
     else:
         fig.set_size_inches(6.67, 5)
 
-    ax.boundary(linewidth=0, zorder=99)
+    ax.boundary(linewidth=2.0, zorder=99)
     ax.clear_matplotlib_ticks()
 
-    chempot_labels = [get_formula_from_stoich(get_stoich_from_formula(species, sort=False), tex=True) for species in hull.species]
+    chempot_labels = [get_formula_from_stoich(get_stoich_from_formula(species, sort=False), sort=False, tex=True) for species in hull.species]
 
-    ax.boundary(linewidth=2.0, zorder=99)
     ax.gridlines(color='black', multiple=scale * 0.1, linewidth=0.5)
     ticks = [float(val) for val in np.linspace(0, 1, 6)]
     ax.ticks(axis='lbr', linewidth=1, offset=0.02, fontsize=fontsize-2, locations=ticks,
@@ -522,7 +522,6 @@ def plot_ternary_hull(hull, axis=None, show=False, plot_points=True, hull_cutoff
     ax.bottom_axis_label(chempot_labels[0], fontsize=fontsize + 2)
 
     concs = np.zeros((len(hull.structures), 3))
-
     concs[:, :-1] = hull.structures[:, :-1]
     for i in range(len(concs)):
         # set third triangular coordinate

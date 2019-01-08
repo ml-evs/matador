@@ -9,6 +9,8 @@ construction and manipulation of convex hulls.
 
 import numpy as np
 
+EPS = 1e-12
+
 
 def vertices2plane(points):
     """ Convert points (xi, yi, zi) for i=1,..,3 into the
@@ -32,15 +34,13 @@ def vertices2plane(points):
 
 
     """
-    esp = 1e-12
     v12 = points[1] - points[0]
     v13 = points[2] - points[0]
     normal = np.cross(v12, v13)
     d = -np.sum(np.dot(normal, points[0]))
     # check other points are on the plane, to some precision
-    assert(np.abs(np.dot(normal, points[2]) + d) < 0 + esp)
-    assert(np.abs(np.dot(normal, points[1]) + d) < 0 + esp)
-    # assert(normal[2] != 0)
+    assert np.abs(np.dot(normal, points[2]) + d) < 0 + EPS
+    assert np.abs(np.dot(normal, points[1]) + d) < 0 + EPS
 
     def get_height_above_plane(structure):
         """ Find the z-coordinate on the plane matching
@@ -50,9 +50,7 @@ def vertices2plane(points):
         x = structure[0]
         y = structure[1]
         z = structure[2]
-        try:
-            assert(normal[2] != 0)
-        except:
+        if np.abs(normal[2]) < EPS:
             print('Something fishy with height above plane, returning 0...')
             print(x, y, z)
             print(normal)

@@ -8,7 +8,9 @@ from glob import glob
 import numpy as np
 
 from matador.hull import QueryConvexHull
+from matador.query import DBQuery
 from matador.scrapers.castep_scrapers import res2dict
+from matador.export import generate_hash
 
 # grab abs path for accessing test data
 REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
@@ -68,7 +70,7 @@ class HullTest(unittest.TestCase):
         np.testing.assert_array_almost_equal(np.sort(hull_dist_test), np.sort(hull.hull_dist), decimal=3)
         np.testing.assert_array_almost_equal(np.sort(hull.hull_dist), np.sort(precomp_hull_dist), decimal=3)
 
-    def test_hull_with_non_elemental_chempots(self):
+    def test_pseudoternary_hull(self):
         cursor, s = res2dict(REAL_PATH + 'data/hull-LLZO/*.res')
         print()
         print(80*'-')
@@ -84,6 +86,7 @@ class HullTest(unittest.TestCase):
                                no_plot=True)
         self.assertEqual(len(hull.cursor), 7)
         self.assertEqual(len(hull.hull_cursor), 6)
+        self.assertEqual(len(hull.convex_hull.vertices), 5)
         for doc in hull.hull_cursor:
             if 'cubic-LLZO' in doc['source'][0]:
                 self.assertAlmostEqual(doc['formation_enthalpy_per_atom'], -0.05758265622)
@@ -156,6 +159,34 @@ class HullTest(unittest.TestCase):
         self.assertEqual(len(hull.cursor), 37)
         self.assertEqual(len(hull.hull_cursor), 10)
 
+    def test_pseudoternary_from_fake_query(self):
+        cursor, s = res2dict(REAL_PATH + 'data/hull-LLZO/*.res')
+        print()
+        print(80*'-')
+        self.assertEqual(len(cursor), 12, 'Error with test res files, please check installation...')
+        hull = QueryConvexHull(cursor=cursor,
+                               elements=['La2O3', 'ZrO2', 'Li2O'],
+                               no_plot=True)
+        self.assertEqual(len(hull.cursor), 7)
+
+        fake_query = DBQuery.__new__(DBQuery)
+        fake_query.cursor = hull.cursor
+        for ind, doc in enumerate(fake_query.cursor):
+            fake_query.cursor[ind]['_id'] = generate_hash(hash_len=20)
+            fake_query.cursor[ind]['text_id'] = [doc['source'][0], '.']
+        fake_query._non_elemental = True
+        fake_query._create_hull = True
+        fake_query.args = dict()
+        fake_query.args['intersection'] = True
+        fake_query.args['subcmd'] = 'hull'
+        fake_query.args['composition'] = ['La2O3:ZrO2:Li2O']
+        hull = QueryConvexHull(query=fake_query,
+                               hull_cutoff=0.01,
+                               chempots=[26200.3194/40, -8715.94784/12, -3392.59361/12],
+                               no_plot=True)
+        self.assertEqual(len(hull.cursor), 10)
+        self.assertEqual(len(hull.hull_cursor), 9)
+
     def test_filter_cursor(self):
         cursor, s = res2dict(REAL_PATH + 'data/hull-LLZO/*.res')
         species = ['Li2O', 'La2O3', 'ZrO2']
@@ -167,15 +198,6 @@ class HullTest(unittest.TestCase):
         self.assertEqual(len(new_cursor), 1)
         self.assertAlmostEqual(new_cursor[0]['concentration'][0], 0.5, msg='Concentrations do not match')
         self.assertAlmostEqual(new_cursor[0]['concentration'][1], 1.5/7.0, msg='Concentrations do not match')
-
-    def test_filter_cursor_simple(self):
-        cursor, s = res2dict(REAL_PATH + 'data/hull-KPSn-KP/*.res')
-        species = ['K', 'Sn']
-        hull = QueryConvexHull(cursor=cursor, species=species, no_plot=True)
-        # new_cursor = QueryConvexHull.filter_cursor_by_chempots(species, cursor)
-        print(len(hull.cursor))
-        # print(len(new_cursor))
-
 
 class VoltageTest(unittest.TestCase):
     """ Test voltage curve functionality. """

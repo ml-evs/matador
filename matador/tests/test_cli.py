@@ -16,6 +16,7 @@ import pymongo as pm
 import matador.cli.cli
 from matador.config import load_custom_settings
 from matador.query import DBQuery
+from matador.hull import QueryConvexHull
 from matador.scrapers.castep_scrapers import cell2dict, res2dict
 
 REAL_PATH = '/'.join(os.path.realpath(__file__).split('/')[:-1]) + '/'
@@ -44,20 +45,20 @@ class IntegrationTest(unittest.TestCase):
     """ Test functionality acting on local database. """
     def testIntegration(self):
         """ Test import and query. """
-        query, files_to_delete, err_flines, manifest_flines = test_import_castep()
+        query, files_to_delete, err_flines, manifest_flines = import_castep()
         self.assertEqual(len(files_to_delete), 2, msg='Failed to write spatula files')
         self.assertEqual(len(err_flines), 4, msg='Failed to report errors correctly')
         self.assertEqual(len(manifest_flines), 3, msg='Failed to report successes correctly')
         self.assertEqual(len(query.cursor), 3, msg='Failed to import structures correctly')
 
         # run again and hopefully nothing will change, i.e. no duplication
-        query, files_to_delete, err_flines, manifest_flines = test_import_castep()
+        query, files_to_delete, err_flines, manifest_flines = import_castep()
         self.assertEqual(len(files_to_delete), 2, msg='Failed to write spatula files')
         self.assertEqual(len(err_flines), 4, msg='Failed to report errors correctly')
         self.assertEqual(len(manifest_flines), 0, msg='Failed to report successes correctly')
         self.assertEqual(len(query.cursor), 3, msg='Failed to import structures correctly')
 
-        query_1, query_2, files_to_delete = test_import_res()
+        query_1, query_2, files_to_delete = import_res()
         self.assertEqual(len(query_1.cursor), 7, msg='Failed to import res files')
         self.assertEqual(len(query_2.cursor), 4, msg='Failed to import res files')
         self.assertEqual(len(files_to_delete), 2, msg='Failed to write spatula files')
@@ -65,17 +66,17 @@ class IntegrationTest(unittest.TestCase):
         self.assertEqual(query_2.cursor[0]['species_pot']['Sn'], "2|2|2|1.6|9.6|10.8|11.7|50U=-0.395U=+0.25:51U=-0.14U=+0.25", msg='Failed to scrape OTF with linebreak')
         self.assertFalse(any(['Sb' in doc['species_pot'] for doc in query_2.cursor]), msg='pspots over-scraped!')
 
-        output_folder_exists, successes, elem_successes = test_swaps()
+        output_folder_exists, successes, elem_successes = swaps()
         self.assertTrue(output_folder_exists, msg='No folder created')
         self.assertTrue(all(successes), msg='Failed to even read files')
         self.assertFalse(all(elem_successes), msg='Swaps had wrong elements')
 
-        query_1, query_2, changes_count = test_changes()
+        query_1, query_2, changes_count = changes()
         self.assertEqual(len(query_1.cursor), 3, msg='matador changes did not remove files')
         self.assertEqual(len(query_2.cursor), 0, msg='matador changes did not remove files')
         self.assertEqual(changes_count, 1, msg='matador changes did not changelog')
 
-        test_export()
+        export()
         expected_dir = 'query-ci_test'
         expected_files = [
             'query-ci_test/query-ci_test.md',
@@ -103,8 +104,16 @@ class IntegrationTest(unittest.TestCase):
         self.assertTrue(dir_exists, msg='Failed to create output directory')
         self.assertTrue(files_exist, msg='Some files missing from export')
 
+        query, hull, files_to_delete = pseudoternary_hull()
+        self.assertTrue(query.args.get('intersection'))
+        self.assertTrue(query._non_elemental)
+        self.assertTrue(query._create_hull)
+        self.assertEqual(len(query.cursor), 7)
+        self.assertEqual(len(hull.cursor), 7)
+        self.assertEqual(len(hull.hull_cursor), 5)
 
-def test_import_castep():
+
+def import_castep():
     """ Import from castep files, returning data to be checked. """
     # import from CASTEP files only
     os.chdir(REAL_PATH + '/data/castep_files')
@@ -133,7 +142,7 @@ def test_import_castep():
     return query, files_to_delete, err_flines, manifest_flines
 
 
-def test_import_res():
+def import_res():
     """ Import from res files, returning data to be checked. """
     # import from combined res/cell/param files
     os.chdir(REAL_PATH + '/data/res_files')
@@ -160,7 +169,32 @@ def test_import_res():
     return query_1, query_2, files_to_delete
 
 
-def test_stats():
+def pseudoternary_hull():
+    """ Import some other res files ready to make a hull. """
+    os.chdir(REAL_PATH + '/data/hull-LLZO')
+    sys.argv = ['matador', 'import', '--db', DB_NAME]
+
+    if CONFIG_FNAME is not None:
+        sys.argv += ['--config', CONFIG_FNAME]
+
+    if DEBUG:
+        sys.argv += ['--debug']
+
+    matador.cli.cli.main(override=True)
+
+    query = DBQuery(db=DB_NAME, composition='La2O3:Li2O:ZrO2', config=CONFIG_FNAME, details=True, source=True, subcmd='hull', no_plot=True)
+    hull = QueryConvexHull(query=query)
+
+    files_to_delete = glob.glob('*spatula*')
+    for f in files_to_delete:
+        os.remove(f)
+
+    os.chdir(REAL_PATH)
+
+    return query, hull, files_to_delete
+
+
+def stats():
     """ Run the stats command just to check it works at all. """
     sys.argv = ['matador', 'stats', '--db', DB_NAME]
     if CONFIG_FNAME is not None:
@@ -169,7 +203,7 @@ def test_stats():
     return
 
 
-def test_swaps():
+def swaps():
     """ Run swaps, returning data to be checked. """
     sys.argv = ['matador', 'swaps', '--db', DB_NAME, '--res', '--cell',
                 '-c', 'NaPZn', '-int', '-sw', 'NaLi:PSi:ZnSn']
@@ -210,7 +244,7 @@ def test_swaps():
     return output_folder_exists, successes, elem_successes
 
 
-def test_changes():
+def changes():
     """ Test matador changes functionality by undoing the second
     change (i.e. the res import).
     """
@@ -228,7 +262,7 @@ def test_changes():
     return query_1, query_2, changes_count
 
 
-def test_export():
+def export():
     """ Test exporting to some random file types. Don't worry too much about
     the contents of the files yet, just that they exist with non-zero size.
     """

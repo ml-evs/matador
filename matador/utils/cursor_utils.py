@@ -557,7 +557,6 @@ def filter_cursor_by_chempots(species, cursor):
     for label in species:
         chempot_stoichiometries.append(get_stoich_from_formula(label))
 
-    print(chempot_stoichiometries)
     inds_to_remove = set()
     for ind, doc in enumerate(cursor):
         from matador.utils.chem_utils import get_number_of_chempots

@@ -182,26 +182,26 @@ class DBQuery:
             self.query_dict['$and'].append(self._query_id())
             self._empty_query = False
 
+            self.cursor = []
+            for collection in self._collections:
+                query_dict = dict()
+                query_dict['$and'] = []
+                query_dict['$and'].append(self._query_id())
+                if not self.args.get('ignore_warnings'):
+                    query_dict['$and'].append(self._query_quality())
+                self.repo = self._collections[collection]
+                temp_cursor = self.repo.find(query_dict)
+                for doc in temp_cursor:
+                    self.cursor.append(doc)
+            if not self.cursor:
+                raise RuntimeError('Could not find a match with {} try widening your search.'.format(self.args.get('id')))
+
+            elif len(self.cursor) >= 1:
+                display_results(list(self.cursor)[:self.top], args=self.args)
+
+            # if we're trying to match calculations to this ID, save the info as self.calc_dict
             if self.args.get('calc_match') or \
                     self.args['subcmd'] in ['hull', 'hulldiff', 'voltage']:
-
-                self.cursor = []
-                for collection in self._collections:
-                    query_dict = dict()
-                    query_dict['$and'] = []
-                    query_dict['$and'].append(self._query_id())
-                    if not self.args.get('ignore_warnings'):
-                        query_dict['$and'].append(self._query_quality())
-                    self.repo = self._collections[collection]
-                    temp_cursor = self.repo.find(query_dict)
-                    for doc in temp_cursor:
-                        self.cursor.append(doc)
-
-                if not self.cursor:
-                    raise RuntimeError('Could not find a match with {} try widening your search.'.format(self.args.get('id')))
-
-                elif len(self.cursor) >= 1:
-                    display_results(list(self.cursor)[:self.top], args=self.args)
 
                 if len(self.cursor) > 1:
                     print_warning('Matched multiple structures with same text_id. The first one will be used.')
@@ -480,8 +480,9 @@ class DBQuery:
                 # by default, find highest cutoff hull as first proxy for quality
                 choice = np.argmax(np.asarray(cutoff))
             self.cursor = test_cursors[choice]
-            if not self.cursor == 0:
+            if not self.cursor:
                 raise RuntimeError('No structures found that match chemical potentials.')
+
             print_success('Composing hull from set containing {}'.format(' '.join(self.cursor[0]['text_id'])))
             self.calc_dict = calc_dicts[choice]
 
