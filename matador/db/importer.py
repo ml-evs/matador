@@ -245,6 +245,12 @@ class Spatula:
                 if 'xc_functional' not in struct:
                     struct['quality'] = 0
                     failed_checks.append('missing xc functional')
+
+                if 'cut_off_energy' not in struct:
+                    struct['quality'] -= 1
+                if 'kpoints_mp_spacing' not in struct:
+                    struct['quality'] -= 1
+
             else:
                 struct['prototype'] = True
                 struct['xc_functional'] = 'xxx'
