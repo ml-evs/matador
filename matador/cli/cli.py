@@ -386,8 +386,6 @@ def main(override=False):
                                 help='return only structures within a certain distance from hull in eV/atom')
     material_flags.add_argument('-lc', '--label_cutoff', nargs='+', type=float,
                                 help='label only structures within a certain distance from hull in eV/atom')
-    material_flags.add_argument('-hT', '--hull_temp', type=float,
-                                help='return only structures within a certain distance from hull in K')
     material_flags.add_argument('--biggest', action='store_true',
                                 help='use the largest subset of structures to create a hull')
     material_flags.add_argument('--volume', action='store_true',
@@ -578,8 +576,6 @@ def main(override=False):
             raise SystemExit('pdffit requires specified --file, exiting...')
         if not os.path.isfile(vars_args.get('file')):
             raise SystemExit('specified --file does not exist, exiting...')
-    if vars_args.get('hull_cutoff') and vars_args.get('hull_temp'):
-        raise SystemExit('hull_cutoff and hull_temp both specified, exiting...')
     if vars_args.get('calc_match') and vars_args.get('id') is None:
         raise SystemExit('calc_match requires specification of a text_id with -i, exiting...')
     if vars_args.get('profile'):
