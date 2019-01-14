@@ -131,9 +131,7 @@ class QueryConvexHull:
             self.energy_key = 'enthalpy_per_atom'
 
         self.temperature = self.args.get('temperature')
-        if self.args.get('hull_temp') is not None:
-            self.hull_cutoff = float(self.args['hull_temp'] * KELVIN_TO_EV)
-        elif self.args.get('hull_cutoff') is not None:
+        if self.args.get('hull_cutoff') is not None:
             self.hull_cutoff = float(self.args['hull_cutoff'])
         else:
             self.hull_cutoff = 0.0
@@ -177,14 +175,9 @@ class QueryConvexHull:
         if not self.hull_cursor:
             print_warning('No structures on hull with chosen chemical potentials.')
         else:
-            if self.args.get('hull_temp'):
-                print_notify(
-                    str(len(self.hull_cursor)) + ' structures within ' + str(self.args.get('hull_temp')) +
-                    ' K of the hull with chosen chemical potentials.')
-            else:
-                print_notify(
-                    str(len(self.hull_cursor)) + ' structures within ' + str(self.hull_cutoff) +
-                    ' eV of the hull with chosen chemical potentials.')
+            print_notify('{} structures found within {} eV of the hull, including chemical potentials.'
+                         .format(len(self.hull_cursor), self.hull_cutoff))
+
         display_results(self.hull_cursor, self.args, hull=True, use_source=use_source)
 
         if not self.args.get('no_plot'):
@@ -477,17 +470,20 @@ class QueryConvexHull:
             # filter out those with positive formation energy, to reduce expense computing hull
             self.structure_slice = structures[np.where(structures[:, -1] <= 0 + EPS)]
 
+        # if we only have the chempots (or worse) with negative formation energy, don't even make the hull
         if len(self.structure_slice) <= self._dimension:
             if len(self.structure_slice) < self._dimension:
-                print_warning('No chemical potentials on hull... either mysterious use of custom chempots, or worry!')
+                raise RuntimeError('No chemical potentials on hull... either mysterious use of custom chempots, or worry!')
             self.convex_hull = FakeHull()
-
-        try:
-            self.convex_hull = ConvexHull(self.structure_slice)
-        except QhullError:
-            print_exc()
-            self.convex_hull = FakeHull()
-            print('Error with QHull, plotting points only...')
+        else:
+            try:
+                self.convex_hull = ConvexHull(self.structure_slice)
+            except QhullError:
+                print('Error with QHull, plotting formation energies only...')
+                print('To view errors, use --debug')
+                if self.args.get('debug'):
+                    print_exc()
+                self.convex_hull = FakeHull()
 
         # remove vertices that have positive formation energy
         filtered_vertices = [vertex for vertex in self.convex_hull.vertices if self.structure_slice[vertex, -1] <= 0 + EPS]
