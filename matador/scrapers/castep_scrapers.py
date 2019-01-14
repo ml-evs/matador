@@ -537,20 +537,6 @@ def castep2dict(seed, db=True, intermediates=False, **kwargs):
     if 'forces' not in castep and castep['num_atoms'] == 1 and 'geometry' in castep['task']:
         castep['forces'] = [[0, 0, 0]]
 
-    # fill in any missing fields with filler
-    if 'total_energy' not in castep:
-        castep['total_energy'] = 'xxx'
-        castep['total_energy_per_atom'] = 'xxx'
-    if 'enthalpy' not in castep:
-        castep['enthalpy'] = 'xxx'
-        castep['enthalpy_per_atom'] = 'xxx'
-    if 'pressure' not in castep:
-        castep['pressure'] = 'xxx'
-    if 'cell_volume' not in castep:
-        castep['cell_volume'] = 'xxx'
-    if 'space_group' not in castep:
-        castep['space_group'] = 'xxx'
-
     # finally check for pseudopotential files if OTF is present in species_pot
     if db:
         for species in castep['species_pot']:
