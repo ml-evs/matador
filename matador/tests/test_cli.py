@@ -76,8 +76,13 @@ class IntegrationTest(unittest.TestCase):
         self.assertEqual(len(query_2.cursor), 0, msg='matador changes did not remove files')
         self.assertEqual(changes_count, 1, msg='matador changes did not changelog')
 
-        export()
         expected_dir = 'query-ci_test'
+        if os.path.isdir(expected_dir):
+            for _file in glob.glob(expected_dir + '/*'):
+                os.remove(_file)
+            os.removedirs(expected_dir)
+
+        export()
         expected_files = [
             'query-ci_test/query-ci_test.md',
             'query-ci_test/query-ci_test.tex',
@@ -111,6 +116,33 @@ class IntegrationTest(unittest.TestCase):
         self.assertEqual(len(query.cursor), 7)
         self.assertEqual(len(hull.cursor), 7)
         self.assertEqual(len(hull.hull_cursor), 5)
+
+        expected_dir = 'query-LaLiZrO-ci_test'
+        if os.path.isdir(expected_dir):
+            for _file in glob.glob(expected_dir + '/*'):
+                os.remove(_file)
+            os.removedirs(expected_dir)
+
+        uniq()
+        expected_files = [
+            expected_dir + '/cubic-LLZO-CollCode999999.res'
+        ]
+
+        dir_exists = os.path.isdir(expected_dir)
+        files_exist = all([os.path.isfile(_file) for _file in expected_files])
+        correct_num = len(glob.glob(expected_dir + '/*.res'))
+
+        if os.path.isdir(expected_dir):
+            for _file in glob.glob(expected_dir + '/*'):
+                os.remove(_file)
+            os.removedirs(expected_dir)
+
+        if os.path.isdir(expected_dir):
+            os.removedirs(expected_dir)
+
+        self.assertTrue(dir_exists, msg='Failed to create output directory, uniq')
+        self.assertTrue(files_exist, msg='Some files missing from export, uniq')
+        self.assertTrue(correct_num == len(expected_files), msg='Incorrect filter')
 
 
 def import_castep():
@@ -267,6 +299,26 @@ def export():
     the contents of the files yet, just that they exist with non-zero size.
     """
     sys.argv = ['matador', 'query', '--db', DB_NAME, '--xsf', '--pdb', '--markdown', '--latex', '--json']
+
+    if CONFIG_FNAME is not None:
+        sys.argv += ['--config', CONFIG_FNAME]
+
+    matador.cli.cli.main(override=True)
+
+
+def uniq():
+    """ Test filtering of structures by PDF. """
+    sys.argv = ['matador', 'query', '--db', DB_NAME, '-u 0.1', '--res', '-c', 'LaLiZrO']
+
+    if CONFIG_FNAME is not None:
+        sys.argv += ['--config', CONFIG_FNAME]
+
+    matador.cli.cli.main(override=True)
+
+
+def id():
+    """ Test a simple ID query, and that nothing is found... """
+    sys.argv = ['matador', 'query', '--db', DB_NAME, '-i', 'testing testing']
 
     if CONFIG_FNAME is not None:
         sys.argv += ['--config', CONFIG_FNAME]

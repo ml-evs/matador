@@ -22,6 +22,7 @@ class CrystalTest(unittest.TestCase):
         doc, s = castep2dict(REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep')
         del doc['lattice_cart']
         crystal = Crystal(doc)
+        print(crystal)
         assert [atom for atom in crystal] == [atom[1] for atom in enumerate(crystal)]
 
     def testSpg(self):

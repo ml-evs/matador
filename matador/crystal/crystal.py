@@ -220,52 +220,6 @@ class Crystal:
         return self._doc['voronoi_substructure']
 
     @property
-    def concentration(self):
-        """ Returns the an array of floats storing the concentration of
-        each element in the structure.
-
-        """
-        if 'concentration' in self._doc:
-            return self._doc['concentration']
-
-        concentration = []
-        for species in self.stoichiometry:
-            concentration.append(species[1])
-        total = sum(concentration)
-        for ind, _ in enumerate(concentration):
-            concentration[ind] /= total
-
-        self._doc['concentration'] = concentration
-        return self._doc['concentration']
-
-    def get_ordered_concentration(self, elems):
-        """ Return a padded and ordered concentration list based on the
-        provided elements.
-
-        Parameters:
-            elems (list of str): list of element symbols
-
-        Returns:
-            concentration: (list of float), concentrations of each
-                element in elems.
-
-        """
-        concentration = []
-        for species in elems:
-            for ind, atom in enumerate(self.stoichiometry):
-                if atom[0] == species:
-                    concentration.append(atom[1])
-                    break
-                elif ind == len(self.stoichiometry) - 1:
-                    concentration.append(0)
-
-        total = sum(concentration)
-        for ind, _ in enumerate(concentration):
-            concentration[ind] /= total
-
-        return concentration
-
-    @property
     def space_group(self):
         """ Return the space group symbol at the last-used symprec. """
         return self.get_space_group(symprec=self._doc.get('symprec', 0.01))

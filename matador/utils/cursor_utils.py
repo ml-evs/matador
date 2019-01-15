@@ -161,15 +161,6 @@ def display_results(cursor,
     for ind, doc in enumerate(cursor):
         postfix = ''
         formula_substring = ''
-        if 'phase' in doc:
-            if 'alpha' in doc['phase']:
-                formula_substring += 'α-'
-            elif 'beta' in doc['phase']:
-                formula_substring += 'β-'
-            elif 'gamma' in doc['phase']:
-                formula_substring += 'γ-'
-            elif 'theta' in doc['phase']:
-                formula_substring += 'θ-'
 
         formula_substring = get_formula_from_stoich(doc['stoichiometry'],
                                                     tex=latex,

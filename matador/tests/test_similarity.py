@@ -46,11 +46,38 @@ class SimilarityFilterTest(unittest.TestCase):
         self.assertTrue('KP-NaP-OQMD_2817-CollCode14009' in filtered_cursor[0]['source'][0])
         self.assertTrue('KP-NaP-CollCode421420' in filtered_cursor[1]['source'][0])
 
+    def testUniqFilterWithHierarchy_ICSD_vs_AIRSS(self):
+        import glob
+        cursor, failures = res2dict(REAL_PATH + 'data/hull-LLZO/*LLZO*.res')
+        cursor = sorted(cursor, key=lambda x: x['enthalpy_per_atom'])[0:10]
+        uniq_inds, _, _, _ = get_uniq_cursor(cursor, sim_tol=0.1, energy_tol=1e10, projected=True,
+                                             **{'dr': 0.01, 'gaussian_width': 0.01})
+        filtered_cursor = [cursor[ind] for ind in uniq_inds]
+        self.assertEqual(len(uniq_inds), 1)
+        self.assertEqual(len(filtered_cursor), 1)
+        self.assertTrue('cubic-LLZO-CollCode999999' in filtered_cursor[0]['source'][0])
+
+    def testDoubleUniquenessHierarchy(self):
+        import glob
+        files = glob.glob(REAL_PATH + 'data/uniqueness_hierarchy/*.res')
+        files += glob.glob(REAL_PATH + 'data/hull-LLZO/*LLZO*.res')
+        cursor = [res2dict(f)[0] for f in files]
+        cursor = sorted(cursor, key=lambda x: x['enthalpy_per_atom'])[0:10]
+        uniq_inds, _, _, _ = get_uniq_cursor(cursor, sim_tol=0.1, energy_tol=1e20, projected=True,
+                                             **{'dr': 0.01, 'gaussian_width': 0.01})
+        filtered_cursor = [cursor[ind] for ind in uniq_inds]
+        self.assertEqual(len(uniq_inds), 3)
+        self.assertEqual(len(filtered_cursor), 3)
+        print([doc['source'] for doc in filtered_cursor])
+        self.assertTrue('cubic-LLZO-CollCode999999' in filtered_cursor[0]['source'][0])
+        self.assertTrue('KP-NaP-OQMD_2817-CollCode14009' in filtered_cursor[1]['source'][0])
+        self.assertTrue('KP-NaP-CollCode421420' in filtered_cursor[2]['source'][0])
+
     def testNoUniquenessRetainsAllStructures(self):
         import glob
         files = glob.glob(REAL_PATH + 'data/uniqueness_hierarchy/*.res')
         cursor = [res2dict(f)[0] for f in files]
-        uniq_inds, _, _, _ = get_uniq_cursor(cursor, sim_tol=0, energy_tol=1e20, projected=True,
+        uniq_inds, _, _, _ = get_uniq_cursor(cursor, sim_tol=0, energy_tol=1e20, projected=True, debug=True,
                                              **{'dr': 0.1, 'gaussian_width': 0.1})
         filtered_cursor = [cursor[ind] for ind in uniq_inds]
         self.assertEqual(len(filtered_cursor), len(cursor))
