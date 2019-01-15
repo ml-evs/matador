@@ -92,21 +92,31 @@ def get_uniq_cursor(cursor, fingerprint=PDF, sim_tol=0.1, energy_tol=1e-2,
                 del dupe_dict[j]
             dupe_set.add(j)
             dupe_dict[i].append(j)
+
     assert len(cursor) == len(set([key for key in dupe_dict] + [item for key in dupe_dict for item in dupe_dict[key]]))
+
     for i in dupe_dict:
         to_compare = [i]
         to_compare.extend(dupe_dict[i])
         hierarchy = ['ICSD', 'OQMD', 'SWAPS', 'AIRSS', 'GA']
+        swapped = []
         for provenance in hierarchy:
             found = False
             for k in to_compare:
                 if prov[k] is provenance:
                     distinct_set.remove(i)
                     distinct_set.add(k)
+                    swapped.append((i, k))
                     found = True
                     break
             if found:
                 break
+
+    for pair in swapped:
+        i, k = pair
+        dupe_dict[k] = [ind for ind in dupe_dict[i] if ind != k] + [i]
+        del dupe_dict[i]
+
     print('Done!')
     return distinct_set, dupe_dict, fingerprint_list, sim_mat
 
