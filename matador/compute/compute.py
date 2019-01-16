@@ -1197,9 +1197,11 @@ class FullRelaxer:
         self.max_iter = self.calc_doc['geom_max_iter']
         if 'geom_iter' in self.res_dict:
             self.max_iter -= self.res_dict['geom_iter']
+        else:
+            self.res_dict['geom_iter'] = 0
 
-        if self.max_iter < 0:
-            msg = '{} iterations already performed on structure, exiting...'
+        if self.res_dict['geom_iter'] > self.calc_doc['geom_max_iter']:
+            msg = '{} iterations already performed on structure, exiting...'.format(self.res_dict['geom_iter'])
             logging.critical(msg)
             raise RuntimeError(msg)
 
