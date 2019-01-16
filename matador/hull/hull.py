@@ -13,6 +13,7 @@ from copy import deepcopy
 import sys
 import os
 import re
+import random
 
 from scipy.spatial import ConvexHull
 from scipy.spatial.qhull import QhullError
@@ -28,6 +29,7 @@ from matador.utils.chem_utils import get_formation_energy, KELVIN_TO_EV, get_con
 from matador.utils.cursor_utils import set_cursor_from_array, get_array_from_cursor
 from matador.utils.cursor_utils import display_results
 from matador.export import generate_hash
+from matador.utils.cursor_utils import filter_cursor_by_chempots
 
 EPS = 1e-12
 
@@ -87,12 +89,12 @@ class QueryConvexHull:
         self.plot_params = False
 
         if self._query is not None:
-            self.cursor = list(query.cursor)
+            self.cursor = list(deepcopy(query.cursor))
             use_source = False
             if self._query.args['subcmd'] not in ['hull', 'voltage', 'hulldiff']:
                 raise RuntimeError('Query was not prepared with subcmd=hull, cannot make a hull...')
         else:
-            self.cursor = cursor
+            self.cursor = list(deepcopy(cursor))
             self.from_cursor = True
             use_source = True
 
@@ -144,6 +146,7 @@ class QueryConvexHull:
 
         self._non_elemental = False
         if species is None:
+            # handles element list passed by query: should only ever be a list of one entry
             if elements is None:
                 if isinstance(self.args.get('composition'), list):
                     species = self.args.get('composition')[0]
@@ -154,13 +157,25 @@ class QueryConvexHull:
             else:
                 species = elements
 
+        # handles when species is e.g. ['LiCo2:Sn2S']
         if isinstance(species, str):
             if ':' in species:
                 species = species.split(':')
             else:
                 species = [spec for spec in re.split(r'([A-Z][a-z]*)', species) if spec]
 
+        # edge case where user passes e.g. ['KP'], when they mean ['K', 'P'].
+        if isinstance(species, list) and len(species) == 1:
+            tmp_species = []
+            for spec in species:
+                if ':' in spec:
+                    tmp_species.append(spec.split(':'))
+                else:
+                    tmp_species.extend([item for item in re.split(r'([A-Z][a-z]*)', spec) if item])
+            species = tmp_species
+
         self.species = species
+
         assert isinstance(self.species, list)
         for _species in self.species:
             if len(parse_element_string(_species, stoich=True)) > 1:
@@ -270,6 +285,7 @@ class QueryConvexHull:
         print(len(notify) * '─')
         print(notify)
         print(len(notify) * '─')
+
 
     def get_hull_distances(self, structures, precompute=False):
         """ Returns array of distances to pre-computed binary or ternary
@@ -431,18 +447,14 @@ class QueryConvexHull:
     def construct_phase_diagram(self):
         """ Create a phase diagram with arbitrary chemical potentials.
 
-        Expects self.chempot_cursor to be set with unique entries.
+        Expects self.cursor to be populated with structures and chemical potential
+        labels to be set under self.species.
+
+        TODO: optimise cursor filtering for simple cases.
 
         """
-        # only filter if hull is using non-elemental chempots to save time
-        if self._non_elemental or self.from_cursor:
-            self.cursor = self.filter_cursor_by_chempots(self.species, self.cursor)
-            print('Cursor filtered down to {} structures.'.format(len(self.cursor)))
-        else:
-            for ind, doc in enumerate(self.cursor):
-                self.cursor[ind]['concentration'] = get_concentration(doc, self.species)
-
         self.set_chempots()
+        self.cursor = filter_cursor_by_chempots(self.species, self.cursor)
 
         formation_key = 'formation_{}'.format(self.energy_key)
         for ind, doc in enumerate(self.cursor):
@@ -450,7 +462,6 @@ class QueryConvexHull:
                                                                    energy_key=self.energy_key,
                                                                    temperature=self.temperature)
 
-        # create stacked array of hull data
         structures = np.hstack((
             get_array_from_cursor(self.cursor, 'concentration').reshape(len(self.cursor), self._dimension-1),
             get_array_from_cursor(self.cursor, formation_key).reshape(len(self.cursor), 1)))
@@ -529,7 +540,8 @@ class QueryConvexHull:
 
     def set_chempots(self):
         """ Search for chemical potentials that match the structures in
-        the query cursor and add them to the cursor.
+        the query cursor and add them to the cursor. Also set the concentration
+        of chemical potentials in cursor, if not already set.
 
         """
         query = self._query
@@ -626,8 +638,7 @@ class QueryConvexHull:
         # add faked chempots to overall cursor
         elif self.args.get('chempots') is not None:
             self.cursor.insert(0, self.chempot_cursor[0])
-            for match in self.chempot_cursor[1:]:
-                self.cursor.append(match)
+            self.cursor.extend(self.chempot_cursor[1:])
 
         # find all elements present in the chemical potentials
         elements = []

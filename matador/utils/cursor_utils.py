@@ -7,7 +7,6 @@ displaying, extracting and refining results from a Mongo cursor/list.
 """
 
 
-from traceback import print_exc
 from time import strftime
 
 import numpy as np
@@ -430,19 +429,36 @@ def set_cursor_from_array(cursor, array, key):
         cursor[ind][key] = array[ind]
 
 
-def get_array_from_cursor(cursor, key):
+def get_array_from_cursor(cursor, key, pad_missing=False):
     """ Returns a numpy array of the values of a key
     in a cursor.
+
+    Parameters:
+        cursor (list): list of matador dictionaries.
+        key (str): the key to extract.
+
+    Keyword arguments:
+        pad_missing (bool): whether to fill array with NaN's
+            where data is missing.
+    Raises:
+        KeyError: if any document is missing that key,
+            unless pad_missing is True.
+
+    Returns:
+        np.ndarray: numpy array containing results, padded
+            with np.nan if key is missing and pad_missing is True.
     """
     array = []
-    try:
-        for doc in cursor:
+    for ind, doc in enumerate(cursor):
+        try:
             array.append(doc[key])
-    except KeyError:
-        print_exc()
+        except KeyError as exc:
+            print('{} missing  in entry {}, with source {}'.format(key, ind, doc.get('source')))
+            if pad_missing:
+                array.append(np.NaN)
+            else:
+                raise exc
     array = np.asarray(array)
-    if len(array) != len(cursor):
-        raise RuntimeError('Some keys were missing.')
     return array
 
 
@@ -552,8 +568,9 @@ def filter_cursor_by_chempots(species, cursor):
     for ind, doc in enumerate(cursor):
         from matador.utils.chem_utils import get_number_of_chempots
         try:
-            num_chempots = get_number_of_chempots(doc, chempot_stoichiometries)
-            cursor[ind]['concentration'] = (num_chempots[:-1] / np.sum(num_chempots)).tolist()
+            cursor[ind]['num_chempots'] = get_number_of_chempots(doc, chempot_stoichiometries)
+            cursor[ind]['concentration'] = (cursor[ind]['num_chempots'][:-1] /
+                                            np.sum(cursor[ind]['num_chempots'])).tolist()
             for idx, conc in enumerate(cursor[ind]['concentration']):
                 if conc < 0 + EPS:
                     cursor[ind]['concentration'][idx] = 0.0

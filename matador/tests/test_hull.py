@@ -107,13 +107,14 @@ class HullTest(unittest.TestCase):
         self.assertEqual(len(hull.cursor), 10)
         self.assertEqual(len(hull.hull_cursor), 5)
 
+        # cursor, s = res2dict(REAL_PATH + 'data/hull-LLZO/*.res')
         hull = QueryConvexHull(cursor=cursor,
                                elements=['La2O3', 'ZrO2', 'Li2O'],
-                               hull_cutoff=0.01,
+                               hull_cutoff=0.20,
                                chempots=[26200.3194/40, -8715.94784/12, -3392.59361/12],
                                no_plot=True)
         self.assertEqual(len(hull.cursor), 10)
-        self.assertEqual(len(hull.hull_cursor), 9)
+        self.assertEqual(len(hull.hull_cursor), 10)
 
         for doc in hull.hull_cursor:
             if 'cubic-LLZO' in doc['source'][0]:
@@ -187,6 +188,97 @@ class HullTest(unittest.TestCase):
         self.assertEqual(len(hull.cursor), 10)
         self.assertEqual(len(hull.hull_cursor), 9)
 
+    def test_variations_of_element_parsing(self):
+        cursor, s = res2dict(REAL_PATH + 'data/hull-KP-KSnP_pub/*.res')
+        self.assertEqual(len(cursor), 295, 'Error with test res files, please check installation...')
+        msg = 'failed to parse elements=[\'KP\']'
+        hull = QueryConvexHull(cursor=cursor,
+                               elements=['KP'],
+                               no_plot=True)
+        self.assertEqual(len(hull.cursor), 295, msg=msg)
+        self.assertEqual(len(hull.hull_cursor), 7, msg=msg)
+
+        msg = 'failed to parse species=[\'KP\']'
+        hull = QueryConvexHull(cursor=cursor,
+                               species=['KP'],
+                               no_plot=True)
+        self.assertEqual(len(hull.cursor), 295, msg=msg)
+        self.assertEqual(len(hull.hull_cursor), 7, msg=msg)
+
+        msg = 'failed to parse elements=[\'K\', \'P\']'
+        hull = QueryConvexHull(cursor=cursor,
+                               elements=['K', 'P'],
+                               no_plot=True)
+        self.assertEqual(len(hull.cursor), 295, msg=msg)
+        self.assertEqual(len(hull.hull_cursor), 7, msg=msg)
+
+        msg = 'failed to parse species=[\'K\', \'P\']'
+        hull = QueryConvexHull(cursor=cursor,
+                               species=['K', 'P'],
+                               no_plot=True)
+        self.assertEqual(len(hull.cursor), 295, msg=msg)
+        self.assertEqual(len(hull.hull_cursor), 7, msg=msg)
+
+        msg = 'failed to parse species=\'KP\''
+        hull = QueryConvexHull(cursor=cursor,
+                               species='KP',
+                               no_plot=True)
+        self.assertEqual(len(hull.cursor), 295, msg=msg)
+        self.assertEqual(len(hull.hull_cursor), 7, msg=msg)
+
+        msg = 'failed to parse elements=\'KP\''
+        hull = QueryConvexHull(cursor=cursor,
+                               elements='KP',
+                               no_plot=True)
+        self.assertEqual(len(hull.cursor), 295, msg=msg)
+        self.assertEqual(len(hull.hull_cursor), 7, msg=msg)
+
+        msg = 'failed to parse elements=\'K:P\''
+        hull = QueryConvexHull(cursor=cursor,
+                               elements='K:P',
+                               no_plot=True)
+        self.assertEqual(len(hull.cursor), 295, msg=msg)
+        self.assertEqual(len(hull.hull_cursor), 7, msg=msg)
+
+        msg = 'failed to parse species=\'K:P\''
+        hull = QueryConvexHull(cursor=cursor,
+                               species='K:P',
+                               no_plot=True)
+        self.assertEqual(len(hull.cursor), 295, msg=msg)
+        self.assertEqual(len(hull.hull_cursor), 7, msg=msg)
+
+    def test_binary_from_fake_query(self):
+        cursor, s = res2dict(REAL_PATH + 'data/hull-KP-KSnP_pub/*.res')
+        print()
+        print(80*'-')
+        self.assertEqual(len(cursor), 295, 'Error with test res files, please check installation...')
+        hull = QueryConvexHull(cursor=cursor,
+                               elements=['KP'],
+                               no_plot=True)
+        self.assertEqual(len(hull.cursor), 295)
+        self.assertEqual(len(hull.hull_cursor), 7)
+
+        fake_query = DBQuery.__new__(DBQuery)
+        fake_query.cursor = hull.cursor
+        for ind, doc in enumerate(fake_query.cursor):
+            fake_query.cursor[ind]['_id'] = generate_hash(hash_len=20)
+            fake_query.cursor[ind]['text_id'] = [doc['source'][0], '.']
+            del fake_query.cursor[ind]['hull_distance']
+            del fake_query.cursor[ind]['concentration']
+
+        fake_query._non_elemental = False
+        fake_query._create_hull = True
+        fake_query.args = dict()
+        fake_query.args['intersection'] = False
+        fake_query.args['subcmd'] = 'hull'
+        fake_query.args['composition'] = ['KP']
+        hull = QueryConvexHull(query=fake_query,
+                               chempots=[-791.456765, -219.58161025],
+                               no_plot=True)
+        # now need to include custom chempots in counts
+        self.assertEqual(len(hull.cursor), 297)
+        self.assertEqual(len(hull.hull_cursor), 9)
+
     def test_filter_cursor(self):
         cursor, s = res2dict(REAL_PATH + 'data/hull-LLZO/*.res')
         species = ['Li2O', 'La2O3', 'ZrO2']
@@ -198,6 +290,7 @@ class HullTest(unittest.TestCase):
         self.assertEqual(len(new_cursor), 1)
         self.assertAlmostEqual(new_cursor[0]['concentration'][0], 0.5, msg='Concentrations do not match')
         self.assertAlmostEqual(new_cursor[0]['concentration'][1], 1.5/7.0, msg='Concentrations do not match')
+
 
 class VoltageTest(unittest.TestCase):
     """ Test voltage curve functionality. """

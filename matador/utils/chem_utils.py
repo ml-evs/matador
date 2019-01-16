@@ -219,7 +219,12 @@ def get_formation_energy(chempots, doc, energy_key='enthalpy_per_atom', temperat
     else:
         formation = doc[energy_key]
 
-    num_chempots = get_number_of_chempots(doc, chempots)
+    # see if num chempots has been set and try to reuse it
+    if 'num_chempots' in doc:
+        num_chempots = doc['num_chempots']
+    else:
+        num_chempots = get_number_of_chempots(doc, chempots)
+
     num_atoms_per_fu = get_atoms_per_fu(doc)
     for ind, mu in enumerate(chempots):
         num_atoms_per_mu = get_atoms_per_fu(mu)
