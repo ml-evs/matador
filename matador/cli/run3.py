@@ -7,6 +7,7 @@ such that there are no clashes.
 import os
 import argparse
 from matador import __version__
+from matador.utils.print_utils import print_notify
 from matador.compute import BatchRun
 
 
@@ -125,8 +126,12 @@ def main():
         hostname = os.uname()[1]
         pr = cProfile.Profile()
         pr.enable()
-    runner = BatchRun(seed, **kwargs)
-    runner.spawn()
+    try:
+        runner = BatchRun(seed, **kwargs)
+        runner.spawn()
+    except Exception:
+        print_notify('run3 failed, exiting...')
+
     if vars(args).get('profile'):
         pr.disable()
         fname = 'run3-{}-{}-{}.{}.{}'.format(__version__, hostname, version_info.major,

@@ -200,7 +200,7 @@ class BatchRun:
             if errors:
                 error_message = ''
                 for error in errors:
-                    error_message += 'Process {} raised error {}. '.format(error[0], error[1])
+                    error_message += 'Process {} raised error(s): {}. '.format(error[0], error[1])
                 if len({type(error[1]) for error in errors}) == 1:
                     raise type(errors[0][1])(error_message)
                 raise BundledErrors(error_message)
@@ -212,6 +212,8 @@ class BatchRun:
             print_failure('Bundled errors:')
             print_warning(err)
             raise err
+
+    print('Nothing left to do.')
 
     def perform_new_calculations(self, res_list, error_queue, proc_id):
         """ Perform all calculations that have not already
@@ -284,7 +286,6 @@ class BatchRun:
                 # push errors to error queue and raise
                 except Exception as err:
                     error_queue.put((proc_id, err))
-                    raise err
 
         error_queue.put((proc_id, job_count))
 

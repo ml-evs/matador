@@ -307,6 +307,8 @@ class FullRelaxer:
                       'QC5', 'NCP', 'NCP18', 'NCP17', 'NCP9']
         if 'species_pot' not in calc_doc:
             calc_doc['species_pot'] = {'library': 'C18'}
+
+        errors = []
         if 'library' not in calc_doc['species_pot']:
             for elem in self.res_dict['stoichiometry']:
                 if ('|' not in calc_doc['species_pot'][elem[0]] and
@@ -314,7 +316,22 @@ class FullRelaxer:
                         calc_doc['species_pot'][elem[0]] not in pspot_libs):
                     msg = 'Unable to find pseudopotential file/string/library: {}'.format(calc_doc['species_pot'][elem[0]])
                     logging.critical(msg)
-                    raise CriticalError(msg)
+                    errors.append(msg)
+
+        if 'cut_off_energy' not in calc_doc:
+            msg = 'Unable to find cut_off_energy field in param file'
+            logging.critical(msg)
+            errors.append(msg)
+        if 'xc_functional' not in calc_doc:
+            msg = 'Unable to find xc_functional field in param file'
+            logging.critical(msg)
+            errors.append(msg)
+        if not any([string in calc_doc for string in ['kpoints_list', 'kpoints_mp_grid', 'kpoints_mp_spacing']]):
+            msg = 'Unable to find kpoint specifications in cell'
+            logging.critical(msg)
+            errors.append(msg)
+        if errors:
+            raise CriticalError('\n' + '\n'.join(errors))
 
         # this is now a dict containing the exact calculation we are going to run
         self.calc_doc = calc_doc
@@ -610,10 +627,7 @@ class FullRelaxer:
         try:
             self.cp_to_input(self.seed)
 
-            if not self.custom_params:
-                doc2param(calc_doc, seed, hash_dupe=False, overwrite=True)
-
-            doc2cell(calc_doc, seed, hash_dupe=False, copy_pspots=False, overwrite=True)
+            self._update_input_files()
 
             # run CASTEP
             self.process = self.run_command(seed)
