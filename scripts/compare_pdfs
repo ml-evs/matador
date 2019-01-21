@@ -17,11 +17,7 @@ def compare_pdfs(**kwargs):
     if isinstance(seeds, str):
         seeds = [seeds]
     dr = kwargs.get('dr')
-    if dr is None:
-        dr = 0.01
     gaussian_width = kwargs.get('gaussian_width')
-    if gaussian_width is None:
-        gaussian_width = 0.01
     for res in seeds:
         struc, success = res2dict(res, db=False)
         if not success:

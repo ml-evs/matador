@@ -66,9 +66,9 @@ class PDF(Fingerprint):
 
         # read and store kwargs
         self.kwargs = prop_defaults
-        if 'sim_calc_args' in kwargs:
-            self.kwargs.update(kwargs['sim_calc_args'])
-        self.kwargs.update(kwargs)
+        self.kwargs.update({key: kwargs[key]
+                            for key in kwargs
+                            if kwargs[key] is not None})
 
         # standardize cell
         structure = copy.deepcopy(doc)

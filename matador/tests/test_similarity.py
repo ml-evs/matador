@@ -51,7 +51,7 @@ class SimilarityFilterTest(unittest.TestCase):
         cursor, failures = res2dict(REAL_PATH + 'data/hull-LLZO/*LLZO*.res')
         cursor = sorted(cursor, key=lambda x: x['enthalpy_per_atom'])[0:10]
         uniq_inds, _, _, _ = get_uniq_cursor(cursor, sim_tol=0.1, energy_tol=1e10, projected=True,
-                                             **{'dr': 0.01, 'gaussian_width': 0.01})
+                                             **{'dr': 0.01, 'gaussian_width': 0.1})
         filtered_cursor = [cursor[ind] for ind in uniq_inds]
         self.assertEqual(len(uniq_inds), 1)
         self.assertEqual(len(filtered_cursor), 1)
@@ -64,7 +64,7 @@ class SimilarityFilterTest(unittest.TestCase):
         cursor = [res2dict(f)[0] for f in files]
         cursor = sorted(cursor, key=lambda x: x['enthalpy_per_atom'])[0:10]
         uniq_inds, _, _, _ = get_uniq_cursor(cursor, sim_tol=0.1, energy_tol=1e20, projected=True,
-                                             **{'dr': 0.01, 'gaussian_width': 0.01})
+                                             **{'dr': 0.01, 'gaussian_width': 0.1})
         filtered_cursor = [cursor[ind] for ind in uniq_inds]
         self.assertEqual(len(uniq_inds), 3)
         self.assertEqual(len(filtered_cursor), 3)
