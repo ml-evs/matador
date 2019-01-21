@@ -3,99 +3,108 @@
 import unittest
 import json
 import os
-
+import glob
 import numpy as np
+
+from matador.scrapers import castep2dict, res2dict, cell2dict
+from matador.scrapers import cif2dict, param2dict, phonon2dict, optados2dict
+from matador.scrapers import arbitrary2dict, bands2dict, pwout2dict, magres2dict
+from matador.scrapers.castep_scrapers import usp2dict, get_seed_metadata
+from matador.export import doc2res, doc2param, doc2cell
+
+
 # grab abs path for accessing test data
 REAL_PATH = '/'.join(os.path.realpath(__file__).split('/')[:-1]) + '/'
-VERBOSITY = 0
+VERBOSITY = 10
 
 
-class ScrapeTest(unittest.TestCase):
-    """ Test scraper functions. """
-    def test_cell_scraper(self):
-        from matador.scrapers.castep_scrapers import cell2dict
+class CellScraperTests(unittest.TestCase):
+    """ Test cell scraper functions. """
+    def test_standard_cell_scraper(self):
         cell_fname = REAL_PATH + 'data/LiP2Zn-0bm995-a_9-out.cell'
-        failed_open = False
-        try:
-            f = open(cell_fname, 'r')
-        except Exception:
-            failed_open = True
-            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(cell_fname))
+        self.assertTrue(os.path.isfile(cell_fname), msg='Failed to open test case {} - please check installation.'.format(cell_fname))
+        test_dict, s = cell2dict(cell_fname, db=False, outcell=True, verbosity=VERBOSITY)
+        self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
+        self.assertEqual(test_dict['lattice_cart'][0][0], 9.83262140721165, msg='Failed to read lattice vectors.')
+        self.assertEqual(test_dict['lattice_cart'][1][1], 5.96357780025648, msg='Failed to read lattice vectors.')
+        self.assertEqual(test_dict['lattice_cart'][2][2], 4.39895761828278, msg='Failed to read lattice vectors.')
+        self.assertEqual(test_dict['lattice_cart'][1][0], -0.115688800302997, msg='Failed to read lattice vectors.')
+        self.assertEqual(test_dict['symmetry_tol'], 0.001, msg='Failed to read symmetry tolerance.')
+        self.assertEqual(test_dict['kpoints_mp_grid'], [2, 3, 4], msg='Failed to read kpoint grid {}'.format(test_dict['kpoints_mp_grid']))
+        self.assertEqual(test_dict['species_pot']['Li'], 'Li_00PBE.usp', msg='Failed to read pspots.')
+        self.assertEqual(test_dict['species_pot']['P'], 'P_00PBE.usp', msg='Failed to read pspots.')
+        self.assertEqual(test_dict['species_pot']['Zn'], 'Zn_00PBE.usp', msg='Failed to read pspots.')
+        # test that lattice_vec only read when outcell is true
+        test_dict, s = cell2dict(cell_fname, db=False, outcell=False, verbosity=VERBOSITY)
+        self.assertTrue(test_dict.get('lattice_cart') is None)
 
-        if not failed_open:
-            f.close()
-            test_dict, s = cell2dict(cell_fname, db=False, outcell=True, verbosity=VERBOSITY)
-            self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
-            self.assertEqual(test_dict['lattice_cart'][0][0], 9.83262140721165, msg='Failed to read lattice vectors.')
-            self.assertEqual(test_dict['lattice_cart'][1][1], 5.96357780025648, msg='Failed to read lattice vectors.')
-            self.assertEqual(test_dict['lattice_cart'][2][2], 4.39895761828278, msg='Failed to read lattice vectors.')
-            self.assertEqual(test_dict['lattice_cart'][1][0], -0.115688800302997, msg='Failed to read lattice vectors.')
-            self.assertEqual(test_dict['symmetry_tol'], 0.001, msg='Failed to read symmetry tolerance.')
-            self.assertEqual(test_dict['kpoints_mp_grid'], [2, 3, 4], msg='Failed to read kpoint grid {}'.format(test_dict['kpoints_mp_grid']))
-            self.assertEqual(test_dict['species_pot']['Li'], 'Li_00PBE.usp', msg='Failed to read pspots.')
-            self.assertEqual(test_dict['species_pot']['P'], 'P_00PBE.usp', msg='Failed to read pspots.')
-            self.assertEqual(test_dict['species_pot']['Zn'], 'Zn_00PBE.usp', msg='Failed to read pspots.')
-            # test that lattice_vec only read when outcell is true
-            test_dict, s = cell2dict(cell_fname, db=False, outcell=False, verbosity=VERBOSITY)
-            self.assertTrue(test_dict.get('lattice_cart') is None)
-
+    def test_cell_outcell(self):
         cell_fname = REAL_PATH + 'data/Li2C2-out.cell'
-        failed_open = False
-        try:
-            f = open(cell_fname, 'r')
-        except Exception:
-            failed_open = True
-            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(cell_fname))
+        self.assertTrue(os.path.isfile(cell_fname), msg='Failed to open test case {} - please check installation.'.format(cell_fname))
+        test_dict, s = cell2dict(cell_fname, db=False, outcell=True, verbosity=VERBOSITY)
+        self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(test_dict))
 
-        if not failed_open:
-            f.close()
-            test_dict, s = cell2dict(cell_fname, db=False, outcell=True, verbosity=VERBOSITY)
-            self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(test_dict))
-
+    def test_cell_phonon(self):
         cell_fname = REAL_PATH + 'data/K5P4-phonon.cell'
-        failed_open = False
-        try:
-            f = open(cell_fname, 'r')
-        except Exception:
-            failed_open = True
-        if not failed_open:
-            f.close()
-            test_dict, s = cell2dict(cell_fname, db=False, outcell=True, verbosity=VERBOSITY)
-            self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
-            self.assertEqual(test_dict['lattice_cart'][0][0], 11.4518745146637, msg='Failed to read lattice vectors.')
-            self.assertEqual(test_dict['lattice_cart'][1][1], 5.09448137301246, msg='Failed to read lattice vectors.')
-            self.assertEqual(test_dict['lattice_cart'][2][2], 9.18378851243459, msg='Failed to read lattice vectors.')
-            self.assertEqual(test_dict['lattice_cart'][1][0], 0.0, msg='Failed to read lattice vectors.')
-            self.assertEqual(test_dict['symmetry_tol'], 0.0001, msg='Failed to read symmetry tolerance.')
-            self.assertEqual(test_dict['kpoints_mp_spacing'], 0.03, msg='Failed to read kpoint grid {}'.format(test_dict['kpoints_mp_spacing']))
-            self.assertEqual(test_dict['phonon_kpoint_mp_grid'], [2, 2, 2], msg='Failed to read kpoint grid {}'.format(test_dict['phonon_kpoint_mp_grid']))
-            self.assertEqual(test_dict['phonon_kpoint_mp_offset'], [0.25, 0.25, 0.25], msg='Failed to read kpoint grid {}'.format(test_dict['phonon_kpoint_mp_offset']))
-            self.assertEqual(test_dict['phonon_fine_kpoint_mp_spacing'], 0.02, msg='Failed to read kpoint {}'.format(test_dict['phonon_fine_kpoint_mp_spacing']))
-            self.assertEqual(test_dict['phonon_fine_kpoint_path_spacing'], 0.01, msg='Failed to read kpoint {}'.format(test_dict['phonon_fine_kpoint_path_spacing']))
-            self.assertEqual(test_dict['species_pot']['K'], '2|1.5|9|10|11|30U:40:31(qc=6)', msg='Failed to read pspots.')
-            self.assertEqual(test_dict['species_pot']['P'], '3|1.8|4|4|5|30:31:32', msg='Failed to read pspots.')
-            self.assertEqual(test_dict['hubbard_u']['K']['s'], 2, msg='Failed to read Hubbard U block.')
-            self.assertEqual(test_dict['hubbard_u']['P']['p'], 3, msg='Failed to read Hubbard U block.')
-            self.assertEqual(test_dict['hubbard_u']['U']['d'], 10.101, msg='Failed to read Hubbard U block.')
-            self.assertTrue(test_dict['snap_to_symmetry'])
-            self.assertTrue(test_dict['symmetry_generate'])
-            self.assertEqual(test_dict['phonon_supercell_matrix'][0], [3, 0, 1])
-            self.assertEqual(test_dict['phonon_supercell_matrix'][1], [0, 3, 0])
-            self.assertEqual(test_dict['phonon_supercell_matrix'][2], [0, 0, 9])
+        self.assertTrue(os.path.isfile(cell_fname), msg='Failed to open test case {} - please check installation.'.format(cell_fname))
+        test_dict, s = cell2dict(cell_fname, db=False, outcell=True, verbosity=VERBOSITY)
+        self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
+        self.assertEqual(test_dict['lattice_cart'][0][0], 11.4518745146637, msg='Failed to read lattice vectors.')
+        self.assertEqual(test_dict['lattice_cart'][1][1], 5.09448137301246, msg='Failed to read lattice vectors.')
+        self.assertEqual(test_dict['lattice_cart'][2][2], 9.18378851243459, msg='Failed to read lattice vectors.')
+        self.assertEqual(test_dict['lattice_cart'][1][0], 0.0, msg='Failed to read lattice vectors.')
+        self.assertEqual(test_dict['symmetry_tol'], 0.0001, msg='Failed to read symmetry tolerance.')
+        self.assertEqual(test_dict['kpoints_mp_spacing'], 0.03, msg='Failed to read kpoint grid {}'.format(test_dict['kpoints_mp_spacing']))
+        self.assertEqual(test_dict['phonon_kpoint_mp_grid'], [2, 2, 2], msg='Failed to read kpoint grid {}'.format(test_dict['phonon_kpoint_mp_grid']))
+        self.assertEqual(test_dict['phonon_kpoint_mp_offset'], [0.25, 0.25, 0.25], msg='Failed to read kpoint grid {}'.format(test_dict['phonon_kpoint_mp_offset']))
+        self.assertEqual(test_dict['phonon_fine_kpoint_mp_spacing'], 0.02, msg='Failed to read kpoint {}'.format(test_dict['phonon_fine_kpoint_mp_spacing']))
+        self.assertEqual(test_dict['phonon_fine_kpoint_path_spacing'], 0.01, msg='Failed to read kpoint {}'.format(test_dict['phonon_fine_kpoint_path_spacing']))
+        self.assertEqual(test_dict['species_pot']['K'], '2|1.5|9|10|11|30U:40:31(qc=6)', msg='Failed to read pspots.')
+        self.assertEqual(test_dict['species_pot']['P'], '3|1.8|4|4|5|30:31:32', msg='Failed to read pspots.')
+        self.assertEqual(test_dict['hubbard_u']['K']['s'], 2, msg='Failed to read Hubbard U block.')
+        self.assertEqual(test_dict['hubbard_u']['P']['p'], 3, msg='Failed to read Hubbard U block.')
+        self.assertEqual(test_dict['hubbard_u']['U']['d'], 10.101, msg='Failed to read Hubbard U block.')
+        self.assertTrue(test_dict['snap_to_symmetry'])
+        self.assertTrue(test_dict['symmetry_generate'])
+        self.assertEqual(test_dict['phonon_supercell_matrix'][0], [3, 0, 1])
+        self.assertEqual(test_dict['phonon_supercell_matrix'][1], [0, 3, 0])
+        self.assertEqual(test_dict['phonon_supercell_matrix'][2], [0, 0, 9])
 
+    def test_cell_failure(self):
         cell_fname = REAL_PATH + 'data/K5P4-phonon_bodged.cell'
-        failed_open = False
-        try:
-            f = open(cell_fname, 'r')
-        except Exception:
-            failed_open = True
-        if not failed_open:
-            f.close()
-            test_dict, s = cell2dict(cell_fname, db=True, lattice=True, verbosity=VERBOSITY)
-            self.assertFalse(s)
+        self.assertTrue(os.path.isfile(cell_fname), msg='Failed to open test case {} - please check installation.'.format(cell_fname))
+        test_dict, s = cell2dict(cell_fname, db=True, lattice=True, verbosity=VERBOSITY)
+        self.assertFalse(s)
 
+    def test_cell_spin(self):
+        cell_fname = REAL_PATH + 'data/cell_files/spin_test.cell'
+        self.assertTrue(os.path.isfile(cell_fname), msg='Failed to open test case {} - please check installation.'.format(cell_fname))
+        test_dict, s = cell2dict(cell_fname, db=False, lattice=True, positions=True, verbosity=VERBOSITY)
+        self.assertEqual(test_dict['species_pot']['library'], 'QC5')
+        self.assertEqual(test_dict['atom_types'], ['H', 'C', 'H', 'C', 'H', 'H'])
+        self.assertEqual(test_dict['lattice_cart'][0], [10, 0, 0])
+        self.assertEqual(test_dict['lattice_cart'][1], [0, 10, 0])
+        self.assertEqual(test_dict['lattice_cart'][2], [0, 0, 10])
+        self.assertEqual(test_dict['lattice_abc'][0], [10, 10, 10])
+        self.assertEqual(test_dict['lattice_abc'][1], [90, 90, 90])
+        self.assertEqual(test_dict['atomic_init_spins'], [None, 0.32675521, None, -0.1234, None, 1.0])
+
+    def test_cell_kpoint_path(self):
+        cell_name = REAL_PATH + 'data/cell_files/kpoint_path.cell'
+        cell, s = cell2dict(cell_name, db=False)
+
+        self.assertTrue(s)
+        self.assertEqual(cell['spectral_kpoints_path'], [[0.0, 0.0, 0.0], [0.0, 0.0, 0.5], [0.0, 0.5, 0.0], [0.5, 0.0, 0.0]])
+        self.assertEqual(cell['spectral_kpoints_path_labels'], ['$\Gamma$', 'Z', '$Y$', 'X'])
+        self.assertEqual(cell['spectral_kpoints_path_spacing'], 0.02)
+        self.assertEqual(cell['phonon_fine_kpoint_path'], [[0.0, 0.0, 0.0], [0.0, 0.0, 0.5], [0.0, 0.5, 0.0], [0.5, 0.0, 0.0]])
+        self.assertEqual(cell['phonon_fine_kpoint_path_labels'], ['$\Gamma$', 'Z', '$Y$', 'X'])
+        self.assertEqual(cell['phonon_fine_kpoint_path_spacing'], 0.01)
+
+
+class CastepScraperTests(unittest.TestCase):
+    """ Test CASTEP scrapers. """
     def test_castep16(self):
-        from matador.scrapers.castep_scrapers import castep2dict
         castep_fname = REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep'
         failed_open = False
         try:
@@ -125,7 +134,6 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(test_dict['estimated_mem_MB'], 345.1)
 
     def test_castep17(self):
-        from matador.scrapers.castep_scrapers import castep2dict
         castep_fname = REAL_PATH + 'data/KP-castep17.castep'
         failed_open = False
         try:
@@ -158,7 +166,6 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(test_dict['species_pot']['P'], '3|1.8|4|4|5|30:31:32', msg='Failed to scrape P_OTF.usp file')
 
     def test_castep_single_atom_edgecase(self):
-        from matador.scrapers.castep_scrapers import castep2dict
         castep_fname = REAL_PATH + 'data/castep_files/Na-edgecase-CollCode10101.castep'
         failed_open = False
         try:
@@ -214,7 +221,6 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(int_dict['geom_iter'], 44)
 
     def test_castep_unoptimised(self):
-        from matador.scrapers.castep_scrapers import castep2dict
         castep_fname = REAL_PATH + 'data/castep_files/TiO2_unconverged-MP-10101.castep'
         failed_open = False
         try:
@@ -252,7 +258,6 @@ class ScrapeTest(unittest.TestCase):
 
     def test_file_not_found(self):
         """ Ensure that FileNotFound errors fail gracefully. """
-        from matador.scrapers.castep_scrapers import res2dict, castep2dict
         error = False
         try:
             res, s = res2dict('___not_a_file')
@@ -272,36 +277,7 @@ class ScrapeTest(unittest.TestCase):
         except FileNotFoundError:
             error = True
 
-    def test_batch_loading(self):
-        """ Test passing a list of files to scraper function, which
-        should be handled by decorator.
-
-        """
-        from matador.scrapers.castep_scrapers import castep2dict, res2dict
-        castep_fname = []
-        castep_fname += [REAL_PATH + 'data/castep_files/NaP_intermediates.castep']
-        castep_fname += [REAL_PATH + 'data/castep_files/Na-edgecase-CollCode10101.castep']
-        castep_fname += [REAL_PATH + 'data/castep_files/KP-castep17.castep']
-        castep_fname += [REAL_PATH + 'data/castep_files/Na3Zn4-OQMD_759599.castep']
-        castep_fname += [REAL_PATH + 'data/castep_files/TiO2_unconverged-MP-10101.castep']
-
-        cursor, failures = castep2dict(castep_fname, db=True)
-        self.assertEqual(len(cursor), 4)
-        self.assertEqual(len(failures), 1)
-
-        cursor, failures = castep2dict(REAL_PATH + 'data/castep_files/*.castep', db=True)
-        self.assertEqual(len(cursor), 5)
-        self.assertEqual(len(failures), 2)
-
-        res_fname = []
-        res_fname += [REAL_PATH + 'data/LiPZn-r57des.res']
-        res_fname += [REAL_PATH + 'data/LiPZn-r57des_bodged.res']
-        cursor, failures = res2dict(res_fname, db=True)
-        self.assertEqual(len(cursor), 1)
-        self.assertEqual(len(failures), 1)
-
     def test_history(self):
-        from matador.scrapers import castep2dict
         castep_fname = REAL_PATH + 'data/castep_files/Na3Zn4-OQMD_759599.history'
         test_dict, s = castep2dict(castep_fname, db=True)
         self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
@@ -323,10 +299,8 @@ class ScrapeTest(unittest.TestCase):
         self.assertEqual(test_dict['estimated_mem_MB'], 345.1)
 
     def test_history_gz(self):
-        from matador.scrapers import castep2dict
         castep_fname = REAL_PATH + 'data/castep_files/Na3Zn4-OQMD_759599.history.gz'
         test_dict, s = castep2dict(castep_fname, db=True)
-        print(test_dict)
         self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
         self.assertEqual(test_dict['pressure'], 0.0763, msg='Failed to read pressure!')
         self.assertEqual(test_dict['enthalpy'], -2.15036930e4, msg='Failed to read enthalpy!')
@@ -345,52 +319,51 @@ class ScrapeTest(unittest.TestCase):
         self.assertEqual(test_dict['castep_version'], '16.11')
 
     def test_castep_intermediates(self):
-        from matador.scrapers.castep_scrapers import castep2dict
         castep_fname = REAL_PATH + 'data/castep_files/NaP_intermediates.castep'
-        failed_open = False
-        try:
-            f = open(castep_fname, 'r')
-        except Exception:
-            failed_open = True
-            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(castep_fname))
-        if not failed_open:
-            f.close()
-            test_dict, s = castep2dict(castep_fname, db=False, intermediates=True, verbosity=VERBOSITY)
-            self.assertTrue(s, msg='Should have succeeded with db=False, but didn\'t!')
-            final_dict, s = castep2dict(castep_fname, db=True, intermediates=False, verbosity=VERBOSITY)
-            self.assertTrue(s)
-            for key in final_dict:
-                self.assertEqual(final_dict[key], test_dict[key], msg='{} didn\'t match'.format(key))
-            self.assertEqual(test_dict['intermediates'][0]['total_energy'], -8537.190779552)
-            self.assertEqual(test_dict['intermediates'][1]['total_energy'], -8538.161269966)
-            self.assertEqual(test_dict['intermediates'][-1]['total_energy'], -8546.922111847)
-            self.assertEqual(test_dict['intermediates'][0]['free_energy'], -8537.247551883)
-            self.assertEqual(test_dict['intermediates'][1]['free_energy'], -8538.215032441)
-            self.assertEqual(test_dict['intermediates'][-1]['free_energy'], -8546.922614706)
-            self.assertEqual(test_dict['geom_iter'], 70)
-            self.assertEqual(len(test_dict['intermediates']), 141)
-            self.assertEqual(test_dict['free_energy'], -8546.922614706)
-            self.assertEqual(final_dict['free_energy'], -8546.922614706)
+        self.assertTrue(os.path.isfile(castep_fname), msg='Failed to open test case {} - please check installation.'.format(castep_fname))
+        test_dict, s = castep2dict(castep_fname, db=False, intermediates=True, verbosity=VERBOSITY)
+        self.assertTrue(s, msg='Should have succeeded with db=False, but didn\'t!')
+        final_dict, s = castep2dict(castep_fname, db=True, intermediates=False, verbosity=VERBOSITY)
+        self.assertTrue(s)
+        for key in final_dict:
+            self.assertEqual(final_dict[key], test_dict[key], msg='{} didn\'t match'.format(key))
+        self.assertEqual(test_dict['intermediates'][0]['total_energy'], -8537.190779552)
+        self.assertEqual(test_dict['intermediates'][1]['total_energy'], -8538.161269966)
+        self.assertEqual(test_dict['intermediates'][-1]['total_energy'], -8546.922111847)
+        self.assertEqual(test_dict['intermediates'][0]['free_energy'], -8537.247551883)
+        self.assertEqual(test_dict['intermediates'][1]['free_energy'], -8538.215032441)
+        self.assertEqual(test_dict['intermediates'][-1]['free_energy'], -8546.922614706)
+        self.assertEqual(test_dict['geom_iter'], 70)
+        self.assertEqual(len(test_dict['intermediates']), 141)
+        self.assertEqual(test_dict['free_energy'], -8546.922614706)
+        self.assertEqual(final_dict['free_energy'], -8546.922614706)
 
     def test_castep_parameter_change(self):
-        from matador.scrapers.castep_scrapers import castep2dict
         castep_fname = REAL_PATH + 'data/castep_files/input-mzs7x1.castep'
-        failed_open = False
-        try:
-            f = open(castep_fname, 'r')
-        except Exception:
-            failed_open = True
-            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(castep_fname))
-        if not failed_open:
-            f.close()
-            test_dict, s = castep2dict(castep_fname, db=True, verbosity=VERBOSITY)
-            self.assertTrue(s)
-            self.assertTrue(test_dict['optimised'])
-            self.assertEqual(test_dict['enthalpy'], -6.16805339E+003)
-            self.assertEqual(test_dict['total_energy'], -6168.053386094)
+        self.assertTrue(os.path.isfile(castep_fname), msg='Failed to open test case {} - please check installation.'.format(castep_fname))
+        test_dict, s = castep2dict(castep_fname, db=True, verbosity=VERBOSITY)
+        self.assertTrue(s)
+        self.assertTrue(test_dict['optimised'])
+        self.assertEqual(test_dict['enthalpy'], -6.16805339E+003)
+        self.assertEqual(test_dict['total_energy'], -6168.053386094)
+
+    def test_castep_mulliken_scraper(self):
+        castep_fname = REAL_PATH + 'data/castep_files/Fe-spin.castep'
+        self.assertTrue(os.path.isfile(castep_fname), msg='Failed to open test case {} - please check installation.'.format(castep_fname))
+        test_dict, s = castep2dict(castep_fname, db=False, verbosity=VERBOSITY)
+        self.assertTrue(s)
+        self.assertEqual(test_dict['task'], 'singlepointenergy')
+        self.assertEqual(test_dict['atom_types'], ['Fe', 'Fe'])
+        self.assertAlmostEqual(test_dict['integrated_spin_density'], 4.27207)
+        self.assertAlmostEqual(test_dict['integrated_mod_spin_density'], 4.44521)
+        self.assertEqual(test_dict['mulliken_spins'], [2.14, 2.14])
+        self.assertEqual(test_dict['mulliken_net_spin'], 4.28)
+        self.assertEqual(test_dict['mulliken_abs_spin'], 4.28)
+
+
+class ResScraperTests(unittest.TestCase):
 
     def test_res(self):
-        from matador.scrapers.castep_scrapers import res2dict
         failed_open = False
         res_fname = REAL_PATH + 'data/LiPZn-r57des.res'
         try:
@@ -437,22 +410,8 @@ class ScrapeTest(unittest.TestCase):
             test_dict, s = res2dict(res_fname)
             self.assertFalse(s, 'This wasn\'t meant to succeed!')
 
-    def test_cell_kpoint_path(self):
-        from matador.scrapers import cell2dict
-        cell_name = REAL_PATH + 'data/cell_files/kpoint_path.cell'
-        cell, s = cell2dict(cell_name, db=False)
-
-        self.assertTrue(s)
-        self.assertEqual(cell['spectral_kpoints_path'], [[0.0, 0.0, 0.0], [0.0, 0.0, 0.5], [0.0, 0.5, 0.0], [0.5, 0.0, 0.0]])
-        self.assertEqual(cell['spectral_kpoints_path_labels'], ['$\Gamma$', 'Z', '$Y$', 'X'])
-        self.assertEqual(cell['spectral_kpoints_path_spacing'], 0.02)
-        self.assertEqual(cell['phonon_fine_kpoint_path'], [[0.0, 0.0, 0.0], [0.0, 0.0, 0.5], [0.0, 0.5, 0.0], [0.5, 0.0, 0.0]])
-        self.assertEqual(cell['phonon_fine_kpoint_path_labels'], ['$\Gamma$', 'Z', '$Y$', 'X'])
-        self.assertEqual(cell['phonon_fine_kpoint_path_spacing'], 0.01)
-
     @unittest.skipIf(True, 'CIF tests temporarily disabled...')
     def test_cif(self):
-        from matador.scrapers import cif2dict
         cif_fname = REAL_PATH + 'data/cif_files/AgBiI.cif'
         failed_open = False
         try:
@@ -489,8 +448,11 @@ class ScrapeTest(unittest.TestCase):
             self.assertTrue(errored, 'WARNING: malicious attack is possible through symops')
             self.assertFalse(s, 'This should have failed entirely, oh dear!')
 
+
+class ParamScraperTests(unittest.TestCase):
+    """ Test CASTEP param scrapers. """
+
     def test_param(self):
-        from matador.scrapers.castep_scrapers import param2dict
         param_fname = REAL_PATH + 'data/KX.param'
         failed_open = False
         try:
@@ -521,7 +483,6 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(test_dict['write_cell_structure'], True, msg='Wrong db=False cell_structure!')
 
     def test_tricky_param(self):
-        from matador.scrapers.castep_scrapers import param2dict
         param_fname = REAL_PATH + 'data/tricky_param.param'
         failed_open = False
         try:
@@ -544,8 +505,38 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(test_dict['devel_code'], 'xc_bee: true\nxc_bee_rand_seed: 2\n# including comment\nxc_bee_num_trials: 100\n', msg='Failed to read devel code')
             self.assertEqual(len(test_dict), 14)
 
+
+class ScraperMiscTest(unittest.TestCase):
+    """ Test miscellaneous other scrapers. """
+
+    def test_batch_loading(self):
+        """ Test passing a list of files to scraper function, which
+        should be handled by decorator.
+
+        """
+        castep_fname = []
+        castep_fname += [REAL_PATH + 'data/castep_files/NaP_intermediates.castep']
+        castep_fname += [REAL_PATH + 'data/castep_files/Na-edgecase-CollCode10101.castep']
+        castep_fname += [REAL_PATH + 'data/castep_files/KP-castep17.castep']
+        castep_fname += [REAL_PATH + 'data/castep_files/Na3Zn4-OQMD_759599.castep']
+        castep_fname += [REAL_PATH + 'data/castep_files/TiO2_unconverged-MP-10101.castep']
+
+        cursor, failures = castep2dict(castep_fname, db=True)
+        self.assertEqual(len(cursor), 4)
+        self.assertEqual(len(failures), 1)
+
+        cursor, failures = castep2dict(REAL_PATH + 'data/castep_files/*.castep', db=True)
+        self.assertEqual(len(cursor), 5)
+        self.assertEqual(len(failures), 3)
+
+        res_fname = []
+        res_fname += [REAL_PATH + 'data/LiPZn-r57des.res']
+        res_fname += [REAL_PATH + 'data/LiPZn-r57des_bodged.res']
+        cursor, failures = res2dict(res_fname, db=True)
+        self.assertEqual(len(cursor), 1)
+        self.assertEqual(len(failures), 1)
+
     def test_phonon_scraper(self):
-        from matador.scrapers import phonon2dict
         phonon_fname = REAL_PATH + 'data/K8SnP4.phonon'
         failed_open = False
         try:
@@ -581,7 +572,6 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(ph_dict['qpoint_branches'][-1][-1], 109)
 
     def test_optados_dos_scraper(self):
-        from matador.scrapers import optados2dict
         odo_fname = REAL_PATH + 'data/optados_files/K3P.adaptive.dat'
         failed_open = False
         try:
@@ -597,7 +587,6 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(len(od_dict['energies']), 529)
 
     def test_optados_pdos_scraper(self):
-        from matador.scrapers import optados2dict
         odo_fname = REAL_PATH + 'data/optados_files/KP.pdos.adaptive.dat'
         failed_open = False
         try:
@@ -618,7 +607,6 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(len(od_dict['pdos'][('P', 'p')]), 53684)
 
     def test_optados_pdis_scraper(self):
-        from matador.scrapers import optados2dict
         odo_fname = REAL_PATH + 'data/optados_files/Si2.pdis.dat'
         failed_open = False
         try:
@@ -680,7 +668,6 @@ class ScrapeTest(unittest.TestCase):
             self.assertEqual(od_dict['pdis'][37][3][1], 0.79613539)
 
     def test_arbitrary_scraper(self):
-        from matador.scrapers.castep_scrapers import arbitrary2dict
         odi_fname = REAL_PATH + 'data/optados_files/testcase.odi'
         od_dict, s = arbitrary2dict(odi_fname)
         self.assertEqual(od_dict['pdispersion'], 'species')
@@ -695,7 +682,6 @@ class ScrapeTest(unittest.TestCase):
         self.assertEqual(len(od_dict), 8)
 
     def test_bands(self):
-        from matador.scrapers.castep_scrapers import bands2dict
         from matador.utils.chem_utils import HARTREE_TO_EV
         bands_fname = REAL_PATH + 'data/bands_files/KPSn.bands'
         bs_dict, s = bands2dict(bands_fname, gap=True)
@@ -749,7 +735,6 @@ class ScrapeTest(unittest.TestCase):
         self.assertAlmostEqual(bs_dict['eigenvalues_k_s'][0][-1][-1], 0.63571135*HARTREE_TO_EV-bs_dict['fermi_energy'], places=4)
 
     def test_qe_magres(self):
-        from matador.scrapers.magres_scrapers import magres2dict
         magres_fname = REAL_PATH + 'data/NaP_QE6.magres'
         magres_dict, s = magres2dict(magres_fname)
         self.assertTrue(s)
@@ -764,7 +749,6 @@ class ScrapeTest(unittest.TestCase):
         self.assertEqual(magres_dict['calculator'], 'QE-GIPAW')
 
     def test_castep_magres(self):
-        from matador.scrapers.magres_scrapers import magres2dict
         magres_fname = REAL_PATH + 'data/LiP_CASTEP18.magres'
         magres_dict, s = magres2dict(magres_fname)
         self.assertTrue(s)
@@ -787,7 +771,6 @@ class ScrapeTest(unittest.TestCase):
         self.assertEqual(magres_dict['calculator_version'], '18.1')
 
     def test_pwscfout(self):
-        from matador.scrapers.qe_scrapers import pwout2dict
         pwout_fname = REAL_PATH + 'data/NaP.out'
         pwout_dict, s = pwout2dict(pwout_fname)
         self.assertTrue(s)
@@ -804,13 +787,11 @@ class ScrapeTest(unittest.TestCase):
         np.testing.assert_array_almost_equal(pwout_dict['positions_frac'][5], [0.779038368, 0.580790316, 0.631222097])
 
     def test_usp(self):
-        from matador.scrapers.castep_scrapers import usp2dict
         self.assertEqual(usp2dict(REAL_PATH + 'data/K_OTF.usp')['K'], '2|1.5|9|10|11|30U:40:31(qc=6)', msg='Failed to scrape K_OTF.usp file')
         self.assertEqual(usp2dict(REAL_PATH + 'data/P_OTF.usp')['P'], '3|1.8|4|4|5|30:31:32', msg='Failed to scrape P_OTF.usp file')
         self.assertEqual(usp2dict(REAL_PATH + 'data/Sn_OTF.usp')['Sn'], '2|2|2|1.6|9.6|10.8|11.7|50U=-0.395U=+0.25:51U=-0.14U=+0.25', msg='Failed to scrape Sn_OTF.usp file')
 
     def test_seed_metadata_scrape(self):
-        from matador.scrapers.castep_scrapers import get_seed_metadata
         doc = {}
         seed = 'blah/blah/blah4/AgBiI4-spinel-Config5-DOI-10.17638__datacat.liverpool.ac.uk__240'
         get_seed_metadata(doc, seed)
@@ -833,7 +814,6 @@ class ScrapeTest(unittest.TestCase):
         self.assertEqual(doc['mp-id'], 123456)
 
     def test_thermo_castep(self):
-        from matador.scrapers.castep_scrapers import castep2dict
         castep_fname = REAL_PATH + 'data/CuP-thermo-test.castep'
         test_dict, s = castep2dict(castep_fname, db=False, verbosity=VERBOSITY)
         self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
@@ -867,8 +847,6 @@ class ScrapeTest(unittest.TestCase):
         by Fortran when e.g. exponent < -99.
 
         """
-        from matador.scrapers.castep_scrapers import cell2dict, optados2dict
-
         optados_fname = REAL_PATH + 'data/fortran_e100_bug/fortran_e100_bug.pdis.dat'
         pdis, s = optados2dict(optados_fname, verbosity=VERBOSITY)
         self.assertTrue(s)
@@ -881,8 +859,6 @@ class ScrapeTest(unittest.TestCase):
 class ExportTest(unittest.TestCase):
     """ Test file export functions. """
     def test_doc2res(self):
-        from matador.scrapers.castep_scrapers import res2dict
-        from matador.export import doc2res
         res_fname = REAL_PATH + 'data/LiPZn-r57des.res'
         test_fname = REAL_PATH + 'data/doc2res.res'
         doc, s = res2dict(res_fname)
@@ -893,8 +869,6 @@ class ExportTest(unittest.TestCase):
         os.remove(test_fname)
 
     def test_doc2param(self):
-        from matador.scrapers.castep_scrapers import param2dict
-        from matador.export import doc2param
         param_fname = REAL_PATH + 'data/param_test.param'
         test_fname = REAL_PATH + 'data/dummy.param'
         doc, s = param2dict(param_fname, db=False, debug=True, verbosity=5)
@@ -916,11 +890,8 @@ class ExportTest(unittest.TestCase):
         self.assertEqual(len(doc_exported), len(doc))
 
     def test_doc2cell(self):
-        from matador.scrapers.castep_scrapers import cell2dict
-        from matador.export import doc2cell
-        import glob
         cell_fname = REAL_PATH + 'data/K5P4-phonon.cell'
-        test_fname = REAL_PATH + 'data/dummy.cell'
+        test_fname = REAL_PATH + 'data/dummy1.cell'
         for _f in glob.glob(REAL_PATH + 'data/dummy*.cell'):
             os.remove(_f)
 
@@ -962,10 +933,8 @@ class ExportTest(unittest.TestCase):
             os.remove(_f)
 
     def test_doc2cell_kpoint_path(self):
-        from matador.scrapers import cell2dict
-        from matador.export import doc2cell
         cell_name = REAL_PATH + 'data/cell_files/kpoint_path.cell'
-        dummy_name = REAL_PATH + 'dummy.cell'
+        dummy_name = REAL_PATH + 'dummy2.cell'
         cell, s = cell2dict(cell_name, db=False)
 
         doc2cell(cell, dummy_name)
@@ -979,12 +948,9 @@ class ExportTest(unittest.TestCase):
         self.assertEqual(cell['spectral_kpoints_path_spacing'], 0.02)
 
     def test_doc2cell_and_param_with_spin(self):
-        import glob
-        from matador.export import doc2cell, doc2param
-        from matador.scrapers.castep_scrapers import cell2dict, param2dict
 
         cell_fname = REAL_PATH + 'data/K5P4-phonon.cell'
-        test_fname = REAL_PATH + 'data/dummy'
+        test_fname = REAL_PATH + 'data/dummy3'
         test_param = {'xc_functional': 'PBE', 'task': 'geometryoptimisation', 'spin_polarized': False}
 
         doc, s = cell2dict(cell_fname, db=False, outcell=True, verbosity=VERBOSITY, positions=True)
@@ -995,10 +961,13 @@ class ExportTest(unittest.TestCase):
         param_doc, s = param2dict(test_fname + '.param')
         cell_doc, s = cell2dict(test_fname + '.cell', db=False, outcell=True, positions=True)
 
+        os.remove(test_fname + '.param')
+        os.remove(test_fname + '.cell')
+
         self.assertTrue(param_doc['spin_polarized'])
         self.assertEqual(param_doc['spin'], 10)
 
-        self.assertEqual(cell_doc['atomic_init_spins']['P'], 10)
+        self.assertEqual(cell_doc['atomic_init_spins'][0], 10)
 
     def test_doc2res_from_json(self):
         json_fname = REAL_PATH + 'data/doc2res.json'
@@ -1011,8 +980,6 @@ class ExportTest(unittest.TestCase):
         self.compare_json_with_res(json_fname, test_fname)
 
     def compare_json_with_res(self, json_fname, test_fname):
-        from matador.scrapers.castep_scrapers import res2dict
-        from matador.export import doc2res
         with open(json_fname, 'r') as f:
             doc = json.load(f)
             doc2res(doc, test_fname, hash_dupe=False, overwrite=True)

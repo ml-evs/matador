@@ -14,7 +14,7 @@ from time import strptime
 from pwd import getpwuid
 import glob
 import gzip
-from matador.utils.cell_utils import abc2cart, calc_mp_spacing, cart2volume, wrap_frac_coords
+from matador.utils.cell_utils import abc2cart, calc_mp_spacing, cart2volume, wrap_frac_coords, cart2abc
 from matador.utils.chem_utils import get_stoich
 from matador.scrapers.utils import DFTError, CalculationError, scraper_function, f90_float_parse
 
@@ -163,7 +163,15 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, **kw
                     assert len(cell['lattice_cart'][-1]) == 3, 'Lattice vector does not have enough elements!'
                 i += 1
             assert len(cell['lattice_cart']) == 3, 'Wrong number of lattice vectors!'
-            cell['cell_volume'] = cart2volume(cell['lattice_cart'])
+        elif '%block lattice_abc' in line.lower() and lattice:
+            cell['lattice_abc'] = []
+            i = 1
+            while 'endblock' not in flines[line_no + i].lower():
+                if not flines[line_no + i].strip()[0].isalpha():
+                    cell['lattice_abc'].append(list(map(f90_float_parse, flines[line_no + i].split())))
+                    assert len(cell['lattice_abc'][-1]) == 3, 'Lattice vector does not have enough elements!'
+                i += 1
+            assert len(cell['lattice_abc']) == 2, 'Wrong specification of lattice_abc'
         elif '%block species_pot' in line.lower():
             cell['species_pot'] = dict()
             i = 1
@@ -287,7 +295,7 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, **kw
             assert len(cell['phonon_supercell_matrix']) == 3, 'Wrong supercell matrix shape!'
         elif not db:
             if '%block positions_frac' in line.lower():
-                atomic_init_spins = defaultdict(list)
+                atomic_init_spins = []
                 i = 1
                 if positions:
                     cell['atom_types'] = []
@@ -299,10 +307,11 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, **kw
                         cell['positions_frac'].append(list(map(f90_float_parse, line[1:4])))
                     if 'spin=' in flines[line_no + i].lower():
                         split_line = flines[line_no + i].split()
-                        atomic_init_spins[split_line[0]] = \
-                            int(split_line[-1].lower().replace('spin=', ''))
+                        atomic_init_spins.append(float(split_line[-1].lower().replace('spin=', '')))
+                    else:
+                        atomic_init_spins.append(None)
                     i += 1
-                if atomic_init_spins:
+                if any(atomic_init_spins):
                     cell['atomic_init_spins'] = atomic_init_spins
                 if positions:
                     cell['num_atoms'] = len(cell['atom_types'])
@@ -334,6 +343,13 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, **kw
 
     if 'external_pressure' not in cell or not cell['external_pressure']:
         cell['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0], [0.0]]
+
+    if lattice:
+        if 'lattice_cart' not in cell and 'lattice_abc' in cell:
+            cell['lattice_cart'] = abc2cart(cell['lattice_abc'])
+        elif 'lattice_cart' in cell and 'lattice_abc' not in cell:
+            cell['lattice_abc'] = cart2abc(cell['lattice_cart'])
+        cell['cell_volume'] = cart2volume(cell['lattice_cart'])
 
     if db:
         for species in cell['species_pot']:
@@ -1357,6 +1373,10 @@ def _castep_scrape_final_structure(flines, castep, db=True):
                             pass
                         break
                     i += 1
+            elif 'Integrated Spin Density' in line:
+                castep['integrated_spin_density'] = f90_float_parse(line.split()[-2])
+            elif 'Integrated |Spin Density|' in line:
+                castep['integrated_mod_spin_density'] = f90_float_parse(line.split()[-2])
             elif 'Atomic Populations (Mulliken)' in line:
                 if castep['spin_polarized']:
                     castep['mulliken_spins'] = []
@@ -1365,15 +1385,18 @@ def _castep_scrape_final_structure(flines, castep, db=True):
                 castep['mulliken_charges'] = []
                 castep['mulliken_spins'] = []
                 i = 0
-                while i < len(castep['atom_types']):
+                ind = 0
+                while ind < len(castep['atom_types']):
                     if castep['spin_polarized']:
                         castep['mulliken_charges'].append(f90_float_parse(final_flines[line_no + i + 4].split()[-2]))
                         castep['mulliken_spins'].append(f90_float_parse(final_flines[line_no + i + 4].split()[-1]))
                         castep['mulliken_net_spin'] += castep['mulliken_spins'][-1]
                         castep['mulliken_abs_spin'] += abs(castep['mulliken_spins'][-1])
+                        i += 2
                     else:
                         castep['mulliken_charges'].append(f90_float_parse(final_flines[line_no + i + 4].split()[-1]))
-                    i += 1
+                        i += 1
+                    ind += 1
             elif 'Final Enthalpy' in line:
                 castep['enthalpy'] = f90_float_parse(line.split('=')[-1].split()[0])
                 castep['enthalpy_per_atom'] = (f90_float_parse(line.split('=')[-1].split()[0]) / castep['num_atoms'])
