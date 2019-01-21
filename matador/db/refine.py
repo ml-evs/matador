@@ -17,7 +17,7 @@ from matador.utils.print_utils import print_notify, print_warning, print_failure
 class Refiner:
     """ Refiner implements methods to alter certain parts of the
     database in place, either in overwrite, set or compare/display mode.
-    Current modifiables are space groups, substructures, atomic ratios,
+    Current modifiables are space groups, substructures,
     the set of elements, tags and DOIs.
 
     """
@@ -29,12 +29,11 @@ class Refiner:
 
         Keyword arguments:
             collection (Collection): mongodb collection to query/edit.
-            task (str): one of 'sym', 'spg', 'substruc', 'sub', 'elem_set', 'ratios',
-                'tag', 'doi' or 'source'.
+            task (str): one of 'sym', 'spg', 'elem_set', 'tag', 'doi' or 'source'.
             mode (str): one of 'display', 'overwrite', 'set'.
 
         """
-        possible_tasks = ['sym', 'spg', 'substruc', 'sub', 'elem_set', 'ratios', 'tag', 'doi', 'source', 'pspot']
+        possible_tasks = ['sym', 'spg', 'elem_set', 'tag', 'doi', 'source', 'pspot']
         possible_modes = ['display', 'overwrite', 'set']
 
         if mode not in possible_modes:
@@ -63,12 +62,6 @@ class Refiner:
             else:
                 self.symmetry()
             self.field = 'space_group'
-        elif task in ['substruc', 'sub']:
-            self.substruc()
-            self.field = 'substruc'
-        elif task == 'ratios':
-            self.ratios()
-            self.field = 'ratios'
         elif task == 'elem_set':
             self.elem_set()
             self.field = 'elems'
@@ -118,24 +111,6 @@ class Refiner:
         result = self.collection.bulk_write(requests)
         print_notify(str(result.modified_count) + ' docs modified.')
 
-    def substruc(self):
-        """ Compute substructure with Can's Voronoi code. """
-        from matador.plugins.voronoi_interface.voronoi_interface import get_voronoi_substructure
-        print('Performing substructure analysis...')
-        for _, doc in enumerate(self.cursor):
-            try:
-                self.changed_count += 1
-                doc['substruc'] = get_voronoi_substructure(doc)
-                self.diff_cursor.append(doc)
-            except Exception:
-                print_exc()
-                self.failed_count += 1
-                if self.args.get('debug'):
-                    print_failure('Failed for' + ' '.join(doc['text_id']))
-        if self.mode == 'display':
-            for doc in self.diff_cursor:
-                print(doc['substruc'])
-
     def symmetry(self, symprec=1e-3):
         """ Compute space group with spglib. """
         from matador.utils.cell_utils import doc2spg
@@ -164,30 +139,6 @@ class Refiner:
                 if self.args.get('debug'):
                     print_exc()
                     print_failure('Failed for' + ' '.join(doc['text_id']))
-
-    def ratios(self):
-        """ Precompute stoichiometric ratios for use in
-        non-binary voltage curves and hulls.
-
-        Adds 'ratios' field to the docs, containing, e.g.
-
-        Li2AsP:
-
-           {'LiAs': 2.0, 'AsLi': 0.5, 'PAs': 1.0,
-            'AsP' : 1.0, 'LiP' : 2.0, 'PLi': 0.5}
-
-        """
-        from matador.utils.chem_utils import get_ratios_from_stoichiometry
-        for _, doc in enumerate(self.cursor):
-            try:
-                ratio_dict = get_ratios_from_stoichiometry(doc['stoichiometry'])
-                if self.args.get('debug'):
-                    print(ratio_dict)
-                doc['ratios'] = ratio_dict
-                self.diff_cursor.append(doc)
-                self.changed_count += 1
-            except Exception:
-                self.failed_count += 1
 
     def elem_set(self):
         """ Imbue documents with the set of elements,
