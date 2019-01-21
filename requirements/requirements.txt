@@ -3,3 +3,4 @@ scipy>=1.0
 psutil
 pyyaml
 pymongo>=3.4
+numba
