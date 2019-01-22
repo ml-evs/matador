@@ -1,0 +1,5 @@
+ERROR in cell constraints: attempt to fix alpha=beta, but alpha /= beta
+Current trace stack:
+ cell_check_cell_constraints
+ cell_read_wrapped
+ castep

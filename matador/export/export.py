@@ -651,7 +651,7 @@ def doc2res(doc, path, info=True, hash_dupe=True, spoof_titl=False, overwrite=Fa
         path (str): desired filename for res file
 
     Keyword Arguments:
-        info (bool): print info in res file header
+        info (bool): require info in res file header
         hash_dupe (bool): add random hash to colliding filenames
         spoof_titl (bool): make up fake info for file header (for use with e.g. cryan)
         overwrite (bool): overwrite files with conflicting filenames

@@ -1403,6 +1403,8 @@ def _castep_scrape_final_structure(flines, castep, db=True):
                             pass
                         break
                     i += 1
+            elif 'failed to SCF' in line:
+                raise DFTError('CASTEP SCF failed to reach convergence.')
             elif 'Integrated Spin Density' in line:
                 castep['integrated_spin_density'] = f90_float_parse(line.split()[-2])
             elif 'Integrated |Spin Density|' in line:
@@ -1449,6 +1451,8 @@ def _castep_scrape_final_structure(flines, castep, db=True):
                 if len(castep['chemical_shifts']) != len(castep['atom_types']):
                     raise RuntimeError('Found fewer chemical shifts than atoms (or vice versa)!')
 
+        except DFTError as exc:
+            raise exc
         except Exception as oops:
             msg = 'Error on line {}, contents: {}, error: {}'.format(line_no, line, oops)
             raise RuntimeError(msg)

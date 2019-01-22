@@ -13,7 +13,7 @@ HOSTNAME = os.uname()[1]
 PATHS_TO_DEL = ['completed', 'bad_castep', 'input', 'logs', HOSTNAME]
 REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
 ROOT_DIR = os.getcwd()
-VERBOSITY = 1
+VERBOSITY = 4
 NCORES = 4
 EXECUTABLE = 'castep'
 
@@ -153,6 +153,50 @@ class ComputeTest(unittest.TestCase):
                 os.remove(path)
 
         self.assertTrue(fall_over)
+
+    def test_faked_error_recovery(self):
+        """ Run a calculation that *should* throw a symmetry error, and try to
+        recover from the error. If CASTEP is not present, monkey patch such that
+        FullRelaxer copies the output files it would have expected.
+
+        """
+        from matador.compute import FullRelaxer
+        from matador.scrapers.castep_scrapers import cell2dict, param2dict
+        os.chdir(REAL_PATH)
+        if not os.path.isdir(REAL_PATH + '/fake_symmetry_test'):
+            os.makedirs(REAL_PATH + '/fake_symmetry_test')
+        os.chdir(REAL_PATH + '/fake_symmetry_test')
+
+        seed = REAL_PATH + 'data/symmetry_failure/Sb.res'
+        cell_dict, s = cell2dict(REAL_PATH + '/data/symmetry_failure/KSb.cell', verbosity=VERBOSITY, db=False)
+        assert s
+        param_dict, s = param2dict(REAL_PATH + '/data/symmetry_failure/KSb.param', verbosity=VERBOSITY, db=False)
+        assert s
+        CASTEP_PRESENT = False
+        if CASTEP_PRESENT:
+            ncores = 4
+            executable = 'castep'
+        else:
+            ncores = 1
+            executable = REAL_PATH + 'data/symmetry_failure/monkey_patch_move.sh'
+        node = None
+
+        relaxer = FullRelaxer(ncores=ncores, nnodes=None, node=node,
+                              res=seed, param_dict=param_dict, cell_dict=cell_dict,
+                              debug=True, verbosity=10, executable=executable,
+                              exec_test=False, compute_dir=None,
+                              start=True)
+
+        os.chdir(REAL_PATH)
+        from shutil import rmtree
+        rmtree('fake_symmetry_test')
+
+        os.chdir(ROOT_DIR)
+        self.assertTrue(relaxer.final_result is None)
+        self.assertEqual(relaxer._num_retries, 3)
+        self.assertTrue('symmetry_generate' not in relaxer.calc_doc)
+        self.assertTrue('snap_to_symmetry' not in relaxer.calc_doc)
+        self.assertTrue('symmetry_tol' not in relaxer.calc_doc)
 
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
     def test_relax_to_file(self):
