@@ -101,6 +101,10 @@ def plot_spectral(seeds, **kwargs):
     if not isinstance(seeds, list):
         seeds = [seeds]
 
+    if len(seeds) > 1:
+        raise DeprecationWarning('Multiple seeds is a pain to make look good, '
+                                 'if you want this feature, let me know.')
+
     if kwargs.get('plot_window') is not None:
         if isinstance(kwargs.get('plot_window'), list):
             if len(kwargs.get('plot_window')) != 2:
@@ -123,10 +127,10 @@ def plot_spectral(seeds, **kwargs):
         fig, ax_dispersion = plt.subplots(figsize=figsize)
     elif kwargs['plot_bandstructure'] and kwargs['plot_dos']:
         if figsize is None:
-            figsize = (8, 6)
+            figsize = (10, 6)
         fig, ax_grid = plt.subplots(1, 3, figsize=figsize, sharey=True,
-                                    gridspec_kw={'width_ratios': [4, 1, 1],
-                                                 'wspace': 0.05,
+                                    gridspec_kw={'width_ratios': [4, 2, 1],
+                                                 'wspace': 0.1,
                                                  'left': 0.15})
         ax_dispersion = ax_grid[0]
         ax_dos = ax_grid[1]
@@ -440,18 +444,17 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                 ylabel = 'Phonon DOS'
                 xlabel = 'Wavenumber (cm$^{{-1}}$)'
             else:
-                if kwargs['plot_bandstructure']:
-                    ylabel = 'DOS'
+                if 'dos_unit_label' in dos_data:
+                    ylabel = dos_data['dos_unit_label'].replace('A^3', 'Å$^{3}$')
                 else:
-                    ylabel = 'DOS (eV$^{{-1}}$Å$^{{-3}}$)'
+                    if kwargs['plot_bandstructure']:
+                        ylabel = 'DOS'
+                    else:
+                        ylabel = 'DOS (eV$^{{-1}}$Å$^{{-3}}$)'
                 xlabel = 'Energy (eV)'
 
             if kwargs['plot_bandstructure']:
-                if 'spin_dos' in dos_data:
-                    ax_dos.set_xticks([0])
-                else:
-                    ax_dos.set_xticks([0.6 * max_density])
-                ax_dos.set_xticklabels([ylabel])
+                ax_dos.set_xlabel(ylabel)
                 ax_dos.axhline(0, c='grey', ls='--', lw=1)
                 if 'spin_dos' in dos_data:
                     ax_dos.set_xlim(-max_density*1.2, max_density * 1.2)

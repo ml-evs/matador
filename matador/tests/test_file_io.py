@@ -585,6 +585,7 @@ class ScraperMiscTest(unittest.TestCase):
             self.assertTrue(s)
             self.assertEqual(len(od_dict['dos']), 529)
             self.assertEqual(len(od_dict['energies']), 529)
+            self.assertEqual(od_dict['dos_unit_label'], 'DOS (electrons per eV/A^3)')
 
     def test_optados_pdos_scraper(self):
         odo_fname = REAL_PATH + 'data/optados_files/KP.pdos.adaptive.dat'
