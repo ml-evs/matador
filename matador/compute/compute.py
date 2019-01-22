@@ -2,8 +2,7 @@
 # Distributed under the terms of the MIT license.
 
 """ This file implements the FullRelaxer class for handling
-calculations on a single structure, and some useful associated
-errors.
+calculations on a single structure.
 
 """
 
@@ -22,11 +21,12 @@ from psutil import virtual_memory
 from matador.scrapers.castep_scrapers import cell2dict
 from matador.scrapers.castep_scrapers import res2dict, castep2dict
 from matador.export import doc2cell, doc2param, doc2res
+from matador.compute.errors import CriticalError, WalltimeError, InputError, CalculationError
 
 MATADOR_CUSTOM_TASKS = ['bulk_modulus', 'projected_bandstructure', 'pdispersion', 'all']
 
 
-class FullRelaxer:
+class ComputeTask:
     """ The main use of this class is to call an executable on a given
     structure. The various parameters are passed to this class by the
     common entrypoints, run3 and ilustrado. It is unlikely that you
@@ -104,7 +104,7 @@ class FullRelaxer:
                 tidied up, ready to be restarted from intermediate state.
             CriticalError: if a fatal error occurs, failed run will be moved to bad_castep and
                 no further calculations will be attempted.
-            RuntimeError: if a structure-level error occurs, causing the seed files to be moved
+            CalculationError: if a structure-level error occurs, causing the seed files to be moved
                 to bad_castep.
 
         """
@@ -180,7 +180,7 @@ class FullRelaxer:
         file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)8s: %(message)s'))
         logging.getLogger().addHandler(file_handler)
 
-        splash_screen = """ Run started.
+        splash_screen = """ Run started for seed {}.
 
 
                                    .d8888b.
@@ -192,7 +192,7 @@ class FullRelaxer:
         888     Y88b 888 888  888 Y88b  d88P
         888      "Y88888 888  888  "Y8888P"
 
-        """
+        """.format(self.seed)
 
         # at every other verbosity level, logging also writes to stdout
         if self.verbosity == 1:
@@ -227,7 +227,7 @@ class FullRelaxer:
         else:
             assert 'completed_dir' in self.paths
 
-        # actually run the calculations, catching only RuntimeErrors
+        # actually run the calculations, catching only CalculationErrors
         try:
             # run through CASTEP specific features
             if self.mode == 'castep':
@@ -236,10 +236,18 @@ class FullRelaxer:
             else:
                 self.success = self.run_generic(res)
 
-        except RuntimeError as exc:
-            logging.error('Process raised RuntimeError with message {error}.'.format(error=exc))
+        # errors that matter only for the current structure
+        except CalculationError as exc:
+            logging.error('Process raised {} with message {}.'.format(type(exc), exc))
             self.success = False
             self._finalise_result()
+            raise exc
+        # errors that need to be passed upwards to kill future jobs
+        except RuntimeError as exc:
+            raise exc
+        except Exception as exc:
+            logging.error('Caught unexpected error {}: {}'.format(type(exc), exc))
+            raise exc
 
         if self.profile:
             profile.disable()
@@ -266,7 +274,7 @@ class FullRelaxer:
             WalltimeError: if max_walltime is exceeded.
             CriticalError: if no further calculations should be performed
                 on this thread.
-            RuntimeError: if this structure errored in some way, but
+            CalculationError: if this structure errored in some way, but
                 others will hopefully be okay.
 
         Returns:
@@ -295,7 +303,7 @@ class FullRelaxer:
             if not success:
                 msg = 'Unable to parse initial res file, error: {res_dict}'.format(res_dict=self.res_dict)
                 logging.error(msg)
-                raise RuntimeError(msg)
+                raise CalculationError(msg)
         elif isinstance(res, dict):
             self.res_dict = res
 
@@ -323,23 +331,19 @@ class FullRelaxer:
                         not os.path.isfile(os.path.expanduser(calc_doc['species_pot'][elem[0]])) and
                         calc_doc['species_pot'][elem[0]] not in pspot_libs):
                     msg = 'Unable to find pseudopotential file/string/library: {}'.format(calc_doc['species_pot'][elem[0]])
-                    logging.critical(msg)
                     errors.append(msg)
 
         if 'cut_off_energy' not in calc_doc:
             msg = 'Unable to find cut_off_energy field in param file'
-            logging.critical(msg)
             errors.append(msg)
         if 'xc_functional' not in calc_doc:
             msg = 'Unable to find xc_functional field in param file'
-            logging.critical(msg)
             errors.append(msg)
         if not any([string in calc_doc for string in ['kpoints_list', 'kpoints_mp_grid', 'kpoints_mp_spacing']]):
             msg = 'Unable to find kpoint specifications in cell'
-            logging.critical(msg)
             errors.append(msg)
         if errors:
-            raise CriticalError('\n' + '\n'.join(errors))
+            raise InputError('\n' + '\n'.join(errors))
 
         # this is now a dict containing the exact calculation we are going to run
         self.calc_doc = calc_doc
@@ -438,7 +442,7 @@ class FullRelaxer:
                 message = 'Process returned error code {}'.format(self._process.returncode)
                 message += '\nstdout: {}'.format(out.decode('utf-8'))
                 message += '\nstderr: {}'.format(errs.decode('utf-8'))
-                raise RuntimeError(message)
+                raise CalculationError(message)
 
             if not intermediate:
                 logging.info('Writing results of generic call to res file and tidying up.')
@@ -464,7 +468,7 @@ class FullRelaxer:
             bool: True iff structure was optimised, False otherwise.
 
         Raises:
-            RuntimeError: if structure-level error occured.
+            CalculationError: if structure-level error occured.
             CriticalError: if fatal global error occured.
             WalltimeError: if walltime was reached, and jobs need to stop.
 
@@ -541,12 +545,12 @@ class FullRelaxer:
                     if remedy is not None and self._num_retries <= self._max_num_retries:
                         logging.warning('Attempting to recover using {}'.format(remedy))
                     else:
-                        raise RuntimeError(msg)
+                        raise CalculationError(msg)
 
                 if not success and remedy is None and isinstance(opti_dict, str):
                     msg = 'Failed to parse CASTEP file... {}'.format(opti_dict)
                     logging.warning(msg)
-                    raise RuntimeError(msg)
+                    raise CalculationError(msg)
                 elif isinstance(opti_dict, str) and remedy is not None:
                     opti_dict = {'optimised': False}
 
@@ -663,12 +667,12 @@ class FullRelaxer:
             if errors_present:
                 msg = 'CASTEP run on {} failed with errors: {}'.format(seed, errors)
                 logging.error(msg)
-                raise RuntimeError(msg)
+                raise CalculationError(msg)
 
             if not success:
                 msg = 'Error scraping CASTEP file {}: {}'.format(seed, results_dict)
                 logging.error(msg)
-                raise RuntimeError(msg)
+                raise CalculationError(msg)
 
             if not intermediate:
                 logging.info('Writing results of singleshot CASTEP run to res file and tidying up.')
@@ -1264,7 +1268,7 @@ class FullRelaxer:
         if self.res_dict['geom_iter'] > self.calc_doc['geom_max_iter']:
             msg = '{} iterations already performed on structure, exiting...'.format(self.res_dict['geom_iter'])
             logging.critical(msg)
-            raise RuntimeError(msg)
+            raise CalculationError(msg)
 
         # number of steps in fine and rough calcs respectively
         fine_iter = self.fine_iter
@@ -1340,7 +1344,7 @@ class FullRelaxer:
             os.rename('{}.res'.format(self.seed), '{}.res_bak'.format(self.seed))
         try:
             doc2res(opti_dict, self.seed, hash_dupe=False)
-        except RuntimeError:
+        except CalculationError:
             doc2res(opti_dict, self.seed, hash_dupe=False, info=False)
         if os.path.isfile(self.seed + '.res_bak'):
             os.remove(self.seed + '.res_bak')
@@ -1396,7 +1400,6 @@ class FullRelaxer:
             for f in glob.glob('{}.*'.format(self.seed)):
                 shutil.copy2(f, self.root_folder)
                 os.remove(f)
-
         logging.info('Removing lock file so calculation can be continued.')
         if os.path.isfile('{}/{}{}'.format(self.root_folder, self.seed, '.res.lock')):
             os.remove('{}/{}{}'.format(self.root_folder, self.seed, '.res.lock'))
@@ -1446,23 +1449,9 @@ class FullRelaxer:
         return True
 
 
-class CriticalError(Exception):
-    """ Raise this when you don't want any more jobs to run because something
-    uncorrectable has happened! Plays more nicely with multiprocessing than
-    SystemExit.
-
-    """
-    pass
-
-
-class InputError(Exception):
-    """ Raise this when there is an issue with the input files. """
-    pass
-
-
-class WalltimeError(Exception):
-    """ Raise this when you don't want any more jobs to run
-    because they're about to exceed the max walltime.
-
-    """
-    pass
+class FullRelaxer(ComputeTask):
+    """ Alias of ComputeTask class for backwards compatiblity. """
+    def __init__(self, *args, **kwargs):
+        import warnings
+        warnings.warn('FullRelaxer name is deprecated, please use ComputeTask to avoid future issues.', DeprecationWarning)
+        super().__init__(*args, **kwargs)

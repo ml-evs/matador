@@ -16,7 +16,8 @@ import time
 from matador.utils.print_utils import print_failure, print_warning
 from matador.compute.queue import get_queue_env, get_queue_walltime, get_queue_manager
 from matador.scrapers.castep_scrapers import cell2dict, param2dict
-from matador.compute.compute import FullRelaxer, InputError
+from matador.compute.compute import FullRelaxer
+from matador.compute.errors import InputError, CalculationError
 
 
 class BatchRun:
@@ -190,30 +191,37 @@ class BatchRun:
                 proc.join()
 
         errors = []
-        # wait for each proc to write to error queue
-        for _, proc in enumerate(procs):
-            result = error_queue.get()
-            if isinstance(result[1], Exception):
-                errors.append(result)
+        failed_seeds = []
 
+        # wait for each proc to write to error queue
         try:
+            print('here')
+            for _, proc in enumerate(procs):
+                result = error_queue.get()
+                if isinstance(result[1], Exception):
+                    errors.append(result)
+                    failed_seeds.append(result[2])
+
             if errors:
                 error_message = ''
                 for error in errors:
                     error_message += 'Process {} raised error(s): {}. '.format(error[0], error[1])
-                if len({type(error[1]) for error in errors}) == 1:
+                    if len({type(error[1]) for error in errors}) == 1:
+                        raise errors[0][1]
                     raise type(errors[0][1])(error_message)
                 raise BundledErrors(error_message)
-
-        # the only errors that reach here are fatal, e.g. WalltimeError, CriticalError or KeyboardInterrupt,
-        except Exception as err:
-            result = [proc.join(timeout=10) for proc in procs]
+        # the only errors that reach here are fatal, e.g. WalltimeError, CriticalError, InputError, KeyboardInterrupt
+        except RuntimeError as err:
+            result = [proc.join(timeout=2) for proc in procs]
             result = [proc.terminate() for proc in procs if proc.is_alive()]
-            print_failure('Bundled errors:')
+            if isinstance(err, InputError):
+                for failed_seed in failed_seeds:
+                    reset_single_seed(failed_seed)
+            print_failure('Fatal error(s) reported:')
             print_warning(err)
             raise err
 
-    print('Nothing left to do.')
+        print('Nothing left to do.')
 
     def perform_new_calculations(self, res_list, error_queue, proc_id):
         """ Perform all calculations that have not already
@@ -238,8 +246,8 @@ class BatchRun:
             if not running:
                 try:
                     # check we haven't reached job limit
-                    if job_count == self.limit:
-                        error_queue.put((proc_id, job_count))
+                    if self.limit is not None and job_count >= self.limit:
+                        error_queue.put((proc_id, job_count, res))
                         return
 
                     # write lock file
@@ -283,11 +291,15 @@ class BatchRun:
                         with open(self.paths['failures_fname'], 'a') as job_file:
                             job_file.write(res + '\n')
 
-                # push errors to error queue and raise
-                except Exception as err:
-                    error_queue.put((proc_id, err))
+                # push globally-fatal errors to queue, and return to prevent further calcs
+                except RuntimeError as err:
+                    error_queue.put((proc_id, err, res))
+                    return
+                # push errors on individual calculations to queue, but do not raise
+                except CalculationError as err:
+                    error_queue.put((proc_id, err, res))
 
-        error_queue.put((proc_id, job_count))
+        error_queue.put((proc_id, job_count, ''))
 
     def generic_setup(self):
         """ Undo things that are set ready for CASTEP jobs... """
@@ -441,3 +453,27 @@ def reset_job_folder(debug=False):
                 print('{} jobs remain in jobs.txt'.format(len(flines)))
 
     return len(res_list)
+
+
+def reset_single_seed(seed):
+    """ Remove the file lock and jobs.txt entry
+    for a single seed.
+
+    Parameters:
+        seed (str): the seedname to remove.
+
+    """
+    if os.path.isfile('jobs.txt'):
+        with open('jobs.txt', 'r+') as f:
+            flines = f.readlines()
+            f.seek(0)
+            for line in flines:
+                line = line.strip()
+                if seed in line:
+                    continue
+                else:
+                    f.write(line)
+            f.truncate()
+            flines = f.readlines()
+    if os.path.isfile(seed + '.lock'):
+        os.remove(seed + '.lock')
