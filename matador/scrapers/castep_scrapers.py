@@ -14,7 +14,7 @@ from time import strptime
 from pwd import getpwuid
 import glob
 import gzip
-from matador.utils.cell_utils import abc2cart, calc_mp_spacing, cart2volume, wrap_frac_coords, cart2abc
+from matador.utils.cell_utils import abc2cart, calc_mp_spacing, cart2volume, wrap_frac_coords, cart2abc, frac2cart
 from matador.utils.chem_utils import get_stoich
 from matador.scrapers.utils import DFTError, CalculationError, scraper_function, f90_float_parse
 
@@ -319,6 +319,33 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, **kw
                         for k in range(3):
                             if pos[k] > 1 or pos[k] < 0:
                                 cell['positions_frac'][ind][k] %= 1
+            elif '%block positions_abs' in line.lower():
+                atomic_init_spins = []
+                i = 1
+                if positions:
+                    cell['atom_types'] = []
+                    cell['positions_abs'] = []
+                while '%endblock positions_abs' not in flines[line_no + i].lower():
+                    print(flines[line_no+i])
+                    line = flines[line_no + i].split()
+                    if positions:
+                        cell['atom_types'].append(line[0])
+                        cell['positions_abs'].append(list(map(f90_float_parse, line[1:4])))
+                    if 'spin=' in flines[line_no + i].lower():
+                        split_line = flines[line_no + i].split()
+                        atomic_init_spins.append(float(split_line[-1].lower().replace('spin=', '')))
+                    else:
+                        atomic_init_spins.append(None)
+                    i += 1
+                if any(atomic_init_spins):
+                    cell['atomic_init_spins'] = atomic_init_spins
+                if positions:
+                    cell['num_atoms'] = len(cell['atom_types'])
+                    for ind, pos in enumerate(cell['positions_abs']):
+                        for k in range(3):
+                            if pos[k] > 1 or pos[k] < 0:
+                                cell['positions_abs'][ind][k] %= 1
+
             elif 'fix_com' in line.lower():
                 cell['fix_com'] = line.split()[-1]
             elif 'symmetry_generate' in line.lower():
@@ -350,6 +377,9 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, **kw
         elif 'lattice_cart' in cell and 'lattice_abc' not in cell:
             cell['lattice_abc'] = cart2abc(cell['lattice_cart'])
         cell['cell_volume'] = cart2volume(cell['lattice_cart'])
+    if positions:
+        if 'positions_frac' not in cell:
+            cell['positions_frac'] = frac2cart(cell['lattice_cart'], cell['positions_abs'])
 
     if db:
         for species in cell['species_pot']:
