@@ -8,7 +8,7 @@ manipulation and analysis of the lattice.
 """
 
 from copy import deepcopy
-import matador.utils.cell_utils as cell_utils
+from matador.utils import cell_utils
 from matador.similarity.pdf_similarity import PDF
 from matador.crystal.crystal_site import Site
 
@@ -49,6 +49,7 @@ class Crystal:
         self._coordination_stats = None
         self._network = None
         self._bond_lengths = None
+        self._bonding_stats = None
 
         # assume default value for symprec
         if 'space_group' in self._doc:
@@ -320,7 +321,42 @@ class Crystal:
             coordination[data['species']].append(num_edges)
         return coordination
 
+    @property
+    def bonding_stats(self):
+        """ Return network-calculated bonding stats.
+
+        Returns:
+            dict: sorted dictionary with root atom as keys and bond
+                information as values.
+
+        """
+        if self._bonding_stats is None:
+            from collections import defaultdict
+            bonding_dict = defaultdict(dict)
+            for node in self.network.nodes:
+                bonding_dict[node] = {'species': self.sites[node].species, 'position': self.sites[node].coords, 'bonds': []}
+            bonds = set()
+            for data in self.network.edges.data():
+                atom_1 = data[0]
+                atom_2 = data[1]
+                pair = tuple(sorted([atom_1, atom_2]))
+                if pair in bonds:
+                    continue
+                else:
+                    bonds.add(pair)
+
+                site_1 = self.sites[atom_1]
+                site_2 = self.sites[atom_2]
+
+                bond_length = data[2]['dist']
+                is_image = data[2]['image']
+                bonding_dict[atom_1]['bonds'].append({'species': site_2.species, 'index': atom_2, 'length': bond_length, 'is_image': is_image, 'position': site_2.coords})
+            bonding_dict[atom_2]['bonds'].append({'species': site_1.species, 'index': atom_1, 'length': bond_length, 'is_image': is_image, 'position': site_1.coords})
+            self._bonding_stats = {key: bonding_dict[key] for key in sorted(bonding_dict)}
+
+        return self._bonding_stats
+
     def draw_network(self, layout=None):
         """ Draw the CrystalGraph network. """
-        from matador.network import draw_network
+        from matador.crystal.network import draw_network
         draw_network(self, layout=layout)
