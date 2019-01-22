@@ -83,10 +83,9 @@ License
 matador is available under the `MIT License <https://bitbucket.org/ml-evs/matador/src/master/LICENSE>`_.
 
 .. |Bitbucket Pipelines| image:: https://img.shields.io/bitbucket/pipelines/ml-evs/matador/master.svg?label=master
-   :target:
-   https://bitbucket.org/ml-evs/matador/addon/pipelines/home#!/results/branch/master/page/1
+   :target: https://bitbucket.org/ml-evs/matador/addon/pipelines/home#!/results/branch/master/page/1
 .. |Develop Pipelines| image:: https://img.shields.io/bitbucket/pipelines/ml-evs/matador/develop.svg?label=develop
-   https://bitbucket.org/ml-evs/matador/addon/pipelines/home#!/results/branch/develop/page/1
+   :target: https://bitbucket.org/ml-evs/matador/addon/pipelines/home#!/results/branch/develop/page/1
 .. |MIT License| image:: https://img.shields.io/badge/license-MIT-blue.svg
    :target: https://bitbucket.org/ml-evs/matador/src/master/LICENSE
 .. |Coverage Status| image:: https://codecov.io/bb/ml-evs/matador/branch/master/graph/badge.svg
