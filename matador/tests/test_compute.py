@@ -8,6 +8,7 @@ import shutil
 import glob
 import os
 from os.path import realpath
+from matador.compute.errors import CalculationError
 
 HOSTNAME = os.uname()[1]
 PATHS_TO_DEL = ['completed', 'bad_castep', 'input', 'logs', HOSTNAME]
@@ -180,18 +181,24 @@ class ComputeTest(unittest.TestCase):
             ncores = 1
             executable = REAL_PATH + 'data/symmetry_failure/monkey_patch_move.sh'
         node = None
+        errored = False
 
         relaxer = FullRelaxer(ncores=ncores, nnodes=None, node=node,
                               res=seed, param_dict=param_dict, cell_dict=cell_dict,
                               debug=True, verbosity=10, executable=executable,
                               exec_test=False, compute_dir=None,
-                              start=True)
+                              start=False)
+        try:
+            relaxer.relax()
+        except CalculationError as err:
+            errored = True
 
         os.chdir(REAL_PATH)
         from shutil import rmtree
         rmtree('fake_symmetry_test')
 
         os.chdir(ROOT_DIR)
+        self.assertTrue(errored)
         self.assertTrue(relaxer.final_result is None)
         self.assertEqual(relaxer._num_retries, 3)
         self.assertTrue('symmetry_generate' not in relaxer.calc_doc)
