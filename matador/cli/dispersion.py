@@ -66,16 +66,19 @@ def main():
     parser.add_argument('-pw', '--plot_window', type=float,
                         help='energy window to plot either side of E_F (eV)\
                              (DEFAULT: 5 eV)')
-    parser.add_argument('seed', type=str, nargs='*',
-                        help='seedname or bands file path')
+    parser.add_argument('seed', type=str,
+                        help='seedname or related filename (e.g. bands or dos file)')
     kwargs = vars(parser.parse_args())
     if 'gap' in kwargs:
         gap = kwargs['gap']
         del kwargs['gap']
-    assert len(kwargs.get('seed')) >= 1, 'Seed name needed!'
 
     seed = kwargs.get('seed')
-    test_seed = kwargs.get('seed')[0]
+    exts_to_strip = ['bands', 'linear.dat', 'adaptive.dat', 'pdis.dat',
+                     'bands_dos', 'pdos.dat', 'phonon', 'phonon_dos']
+    for ext in exts_to_strip:
+        seed = seed.replace('.' + ext, '')
+
     verbosity = kwargs.get('verbosity')
     phonons = kwargs.get('phonons')
     labels = kwargs.get('labels')
@@ -103,24 +106,24 @@ def main():
     from matador.utils.print_utils import print_failure
 
     if not phonons:
-        bs_seed = test_seed.replace('.bands', '') + '.bands'
+        bs_seed = seed + '.bands'
         bandstructure = isfile(bs_seed)
-        dos_seeds = glob.glob(test_seed.replace('.bands', '') + '*.dat')
-        dos_seeds += [test_seed + '.bands_dos']
+        dos_seeds = glob.glob(seed + '*.dat')
+        if isfile(seed + '.bands_dos'):
+            dos_seeds.append(seed + '.bands_dos')
         dos = any([isfile(dos_seed) for dos_seed in dos_seeds])
-        cell_seed = test_seed.replace('.bands', '') + '.cell'
-        cell = isfile(cell_seed)
 
     elif phonons:
-        phonon_seed = test_seed.replace('.phonon', '') + '.phonon'
+        phonon_seed = seed + '.phonon'
         bandstructure = isfile(phonon_seed)
-        dos_seed = test_seed.replace('.phonon', '') + '.phonon_dos'
+        dos_seed = seed + '.phonon_dos'
         dos = isfile(dos_seed)
-        cell_seed = test_seed.replace('.phonon', '') + '.cell'
-        cell = isfile(cell_seed)
+
+    cell_seed = seed + '.cell'
+    cell = isfile(cell_seed)
 
     if not dos and not bandstructure:
-        print_failure('Could not find files for specified seed {}.'.format(test_seed))
+        print_failure('Could not find files for specified seed {}.'.format(seed))
         exit()
 
     if kwargs.get('dos_only') and dos:
