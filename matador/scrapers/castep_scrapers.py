@@ -805,6 +805,7 @@ def optados2dict(seed, **kwargs):
     is_pdos = False
     is_pdis = False
     is_spin_dos = False
+    dos_unit_label = None
     with open(seed, 'r') as f:
         flines = f.readlines()
 
@@ -820,6 +821,8 @@ def optados2dict(seed, **kwargs):
             is_spin_dos = True
         elif 'Projected Dispersion' in line:
             is_pdis = True
+        elif 'DOS (' in line and 'Integrated' not in line:
+            dos_unit_label = ' '.join(line.split()[2:])
         else:
             header.append(line)
 
@@ -858,6 +861,9 @@ def optados2dict(seed, **kwargs):
 
         optados['num_projectors'] = len(projectors)
         optados['projectors'] = projectors
+
+    if dos_unit_label is not None:
+        optados['dos_unit_label'] = dos_unit_label
 
     if is_pdos:
         # get pdos values
