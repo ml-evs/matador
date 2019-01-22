@@ -20,6 +20,7 @@ from psutil import virtual_memory
 
 from matador.scrapers.castep_scrapers import cell2dict
 from matador.scrapers.castep_scrapers import res2dict, castep2dict
+from matador.calculators import CastepCalculator
 from matador.export import doc2cell, doc2param, doc2res
 from matador.compute.errors import CriticalError, WalltimeError, InputError, CalculationError
 
@@ -128,6 +129,7 @@ class ComputeTask:
         self._num_rough_iter = None
         self._num_retries = 0
         self._max_num_retries = 2
+        self.maxmem = None
 
         # save all keyword arguments as attributes
         self.__dict__.update(prop_defaults)
@@ -140,6 +142,9 @@ class ComputeTask:
             from matador import __version__
             profile = cProfile.Profile()
             profile.enable()
+
+        if self.maxmem is None and self.memcheck:
+            self.maxmem = float(virtual_memory().available) / 1024**2
 
         # scrape and save seed name
         self.res = res
@@ -231,6 +236,8 @@ class ComputeTask:
         try:
             # run through CASTEP specific features
             if self.mode == 'castep':
+                calculation_parameters = {**self.cell_dict, **self.param_dict}
+                self.calculator = CastepCalculator(calculation_parameters)
                 self.success = self.run_castep(res)
             # otherwise run generic script
             else:
@@ -244,6 +251,7 @@ class ComputeTask:
             raise exc
         # errors that need to be passed upwards to kill future jobs
         except RuntimeError as exc:
+            logging.error('Process raised {} with message {}.'.format(type(exc), exc))
             raise exc
         except Exception as exc:
             logging.error('Caught unexpected error {}: {}'.format(type(exc), exc))
@@ -314,96 +322,65 @@ class ComputeTask:
 
         calc_doc = deepcopy(self.res_dict)
 
-        # update global doc with cell and param dicts for folder
+        # update global doc with cell and param dicts for folder, and verify
         calc_doc.update(self.cell_dict)
         calc_doc.update(self.param_dict)
-
-        # check for pseudos
-        pspot_libs = ['C7', 'C8', 'C9', 'C17', 'C18', 'MS', 'HARD',
-                      'QC5', 'NCP', 'NCP18', 'NCP17', 'NCP9']
-        if 'species_pot' not in calc_doc:
-            calc_doc['species_pot'] = {'library': 'C18'}
-
-        errors = []
-        if 'library' not in calc_doc['species_pot']:
-            for elem in self.res_dict['stoichiometry']:
-                if ('|' not in calc_doc['species_pot'][elem[0]] and
-                        not os.path.isfile(os.path.expanduser(calc_doc['species_pot'][elem[0]])) and
-                        calc_doc['species_pot'][elem[0]] not in pspot_libs):
-                    msg = 'Unable to find pseudopotential file/string/library: {}'.format(calc_doc['species_pot'][elem[0]])
-                    errors.append(msg)
-
-        if 'cut_off_energy' not in calc_doc:
-            msg = 'Unable to find cut_off_energy field in param file'
-            errors.append(msg)
-        if 'xc_functional' not in calc_doc:
-            msg = 'Unable to find xc_functional field in param file'
-            errors.append(msg)
-        if not any([string in calc_doc for string in ['kpoints_list', 'kpoints_mp_grid', 'kpoints_mp_spacing']]):
-            msg = 'Unable to find kpoint specifications in cell'
-            errors.append(msg)
-        if errors:
-            raise InputError('\n' + '\n'.join(errors))
+        self.calculator.verify_calculation_parameters(calc_doc, self.res_dict)
 
         # this is now a dict containing the exact calculation we are going to run
         self.calc_doc = calc_doc
 
+        # now verify the structure itself
+        self.calculator.verify_simulation_cell(self.res_dict)
+
         # do memcheck, if desired, and only continue if enough memory is free
         if self.memcheck:
-            self.enough_memory = self.do_memcheck(calc_doc, self.seed)
-        else:
-            self.enough_memory = True
+            memory_usage_estimate = self.calculator.do_memcheck()
+            memory_usage_estimate = self.do_memcheck(calc_doc, self.seed)
+            mem_string = ('Memory estimate / Available memory (MB): {:8.0f} / {:8.0f}'
+                          .format(memory_usage_estimate, self.maxmem))
+            logging.info(mem_string)
 
-        if not self.enough_memory:
-            msg = 'Structure {} failed memcheck, skipping...'.format(self.seed)
-            logging.error(msg)
-            return False
+            if memory_usage_estimate > 0.9 * self.maxmem:
+                msg = 'Structure {} failed memcheck, skipping... '.format(self.seed) + mem_string
+                raise CalculationError(msg)
 
-        # run convergence tests
-        if any([self.conv_cutoff_bool, self.conv_kpt_bool]):
-            success = self.run_convergence_tests(calc_doc)
-
-        # perform relaxation
-        elif calc_doc['task'].upper() in ['GEOMETRYOPTIMISATION', 'GEOMETRYOPTIMIZATION']:
-
-            # begin relaxation
+        try:
             if self.start:
-                try:
-                    success = self.relax()
-                except Exception as err:
-                    logging.debug('Cleaning up after catching error from relax.')
-                    if self.compute_dir is not None:
-                        # always cd back to root folder
-                        os.chdir(self.root_folder)
-                        self.remove_compute_dir_if_finished(self.compute_dir)
-                    raise err
+                # TODO: refactor this into calculator
+                # run convergence tests
+                if any([self.conv_cutoff_bool, self.conv_kpt_bool]):
+                    success = self.run_convergence_tests(calc_doc)
 
-                if self.compute_dir is not None:
-                    logging.debug('Cleaning up after relaxation.')
-                    # always cd back to root folder
-                    os.chdir(self.root_folder)
-                    self.remove_compute_dir_if_finished(self.compute_dir)
+                # perform relaxation
+                elif calc_doc['task'].upper() in ['GEOMETRYOPTIMISATION', 'GEOMETRYOPTIMIZATION']:
+                    success = self.relax()
+
+                elif calc_doc['task'].upper() in ['PHONON', 'THERMODYNAMICS']:
+                    from matador.workflows.castep import castep_full_phonon
+                    success = castep_full_phonon(self, calc_doc, self.seed)
+
+                elif calc_doc['task'].upper() in ['SPECTRAL']:
+                    from matador.workflows.castep import castep_full_spectral
+                    success = castep_full_spectral(self, calc_doc, self.seed)
+
+                elif calc_doc['task'].upper() in ['BULK_MODULUS']:
+                    from matador.workflows.castep import castep_elastic
+                    success = castep_elastic(self, calc_doc, self.seed)
+
+                # run in SCF mode, i.e. just call CASTEP on the seeds
+                else:
+                    success = self.scf(calc_doc, self.seed, keep=True)
+
                 self._first_run = False
 
-        elif calc_doc['task'].upper() in ['PHONON', 'THERMODYNAMICS']:
-            from matador.workflows.castep import castep_full_phonon
-            success = castep_full_phonon(self, calc_doc, self.seed)
-            self._first_run = False
-
-        elif calc_doc['task'].upper() in ['SPECTRAL']:
-            from matador.workflows.castep import castep_full_spectral
-            success = castep_full_spectral(self, calc_doc, self.seed)
-            self._first_run = False
-
-        elif calc_doc['task'].upper() in ['BULK_MODULUS']:
-            from matador.workflows.castep import castep_elastic
-            success = castep_elastic(self, calc_doc, self.seed)
-            self._first_run = False
-
-        # run in SCF mode, i.e. just call CASTEP on the seeds
-        else:
-            success = self.scf(calc_doc, self.seed, keep=True)
-            self._first_run = False
+        except Exception as err:
+            logging.debug('Cleaning up after catching error {}.'.format(err))
+            if self.compute_dir is not None:
+                # always cd back to root folder
+                os.chdir(self.root_folder)
+                self.remove_compute_dir_if_finished(self.compute_dir)
+            raise err
 
         return success
 
@@ -942,42 +919,24 @@ class ComputeTask:
 
         doc2param(memcheck_doc, memcheck_seed, hash_dupe=False)
         doc2cell(memcheck_doc, memcheck_seed, hash_dupe=False, copy_pspots=False)
-        free_memory = float(virtual_memory().available) / 1024**2
-        if self.maxmem is None:
-            maxmem = 0.9 * free_memory
-        else:
-            maxmem = self.maxmem
-
-        # check if cell is totally pathological, as CASTEP dryrun will massively underestimate mem
-        if all([angle < 30 for angle in memcheck_doc['lattice_abc'][1]]):
-            logging.error('Cell is pathological (at least one angle < 30), failing memory check.')
-            return False
 
         logging.debug('Running CASTEP dryrun.')
         process = sp.Popen(['nice', '-n', '15', self.executable, '-d', memcheck_seed])
         process.communicate()
 
-        skip = False
         results, success = castep2dict(memcheck_seed + '.castep', db=False)
-        if not success or 'estimated_mem_MB' not in results:
-            skip = True
-            logging.warning('CASTEP dryrun failed with output {results}'.format(results=results))
-
         for _file in glob.glob(memcheck_seed + '*'):
+
             if _file.endswith('.res'):
                 continue
             else:
                 os.remove(_file)
 
-        if 'estimated_mem_MB' in results:
-            mem_string = ('Memory estimate / Available memory (MB): {:8.0f} / {:8.0f}'
-                          .format(results['estimated_mem_MB'], maxmem))
-            logging.info(mem_string)
+        if not success or 'estimated_mem_MB' not in results:
+            msg = 'CASTEP dryrun failed with output {results}'.format(results=results)
+            raise CalculationError(msg)
 
-        if skip or results['estimated_mem_MB'] > maxmem:
-            return False
-
-        return True
+        return results['estimated_mem_MB']
 
     def run_command(self, seed, exec_test=False):
         """ Calls executable on seed with desired number of cores.

@@ -484,7 +484,12 @@ def param2dict(seed, db=True, **kwargs):
                                 param['cut_off_energy'] = '{} {}'.format(temp_cut_off[0], temp_cut_off[1])
                         else:
                             param['cut_off_energy'] = f90_float_parse(temp_cut_off[0])
-
+                    # standardize tasks that have alternative spellings
+                    elif 'task' in line:
+                        if 'singlepoint' in param['task']:
+                            param['task'] = 'singlepoint'
+                        elif 'geometry' in param['task']:
+                            param['task'] = 'geometryoptimization'
                     elif 'xc_functional' in line:
                         param['xc_functional'] = param['xc_functional'].upper()
                     elif 'spin' in line and 'polar' not in line and 'spin' in param:
