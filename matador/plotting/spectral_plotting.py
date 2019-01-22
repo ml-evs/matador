@@ -507,13 +507,11 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                     if not np.max(pdos[projector]) < 1e-8:
 
                         if kwargs['plot_bandstructure']:
-                            # ax_dos.plot(stack+pdos[projector], energies, lw=1, zorder=1000, color=dos_colours[ind])
                             if not kwargs['no_stacked_pdos']:
                                 ax_dos.fill_betweenx(energies, stack, stack+pdos[projector],
                                                      alpha=alpha, label=projector_labels[ind],
                                                      color=dos_colours[ind])
                         else:
-                            # ax_dos.plot(energies, stack+pdos[projector], lw=1, zorder=1000, color=dos_colours[ind])
                             if not kwargs['no_stacked_pdos']:
                                 ax_dos.fill_between(energies, stack, stack+pdos[projector],
                                                     alpha=alpha, label=projector_labels[ind],
@@ -946,7 +944,6 @@ def _get_projector_info(projectors):
     element_colours = get_element_colours()
     projector_labels = []
     dos_colours = []
-    num_species = len({projector[0] for projector in projectors})
     for ind, projector in enumerate(projectors):
         if projector[0] is None:
             projector_label = '${}$-character'.format(projector[1])
@@ -965,10 +962,7 @@ def _get_projector_info(projectors):
             dos_colour = deepcopy(element_colours.get(projector[0]))
             multi = ['s', 'p', 'd', 'f'].index(projector[1]) - 1
             for jind, _ in enumerate(dos_colour):
-                if num_species == 1:
-                    dos_colour[jind] = (dos_colour[jind] + multi*0.2) % 1.0
-                else:
-                    dos_colour[jind] = (dos_colour[jind] + multi*0.1) % 1.0
+                dos_colour[jind] = max(min(dos_colour[jind]+multi*0.2, 1), 0)
             dos_colours.append(dos_colour)
         # otherwise if just ang-projected, use colour_cycle
         else:
