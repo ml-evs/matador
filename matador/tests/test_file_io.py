@@ -74,7 +74,7 @@ class CellScraperTests(unittest.TestCase):
         cell_fname = REAL_PATH + 'data/K5P4-phonon_bodged.cell'
         self.assertTrue(os.path.isfile(cell_fname), msg='Failed to open test case {} - please check installation.'.format(cell_fname))
         test_dict, s = cell2dict(cell_fname, db=True, lattice=True, verbosity=VERBOSITY)
-        self.assertFalse(s)
+        self.assertFalse(s, msg=test_dict)
 
     def test_cell_spin(self):
         cell_fname = REAL_PATH + 'data/cell_files/spin_test.cell'
@@ -118,8 +118,6 @@ class CellScraperTests(unittest.TestCase):
         np.testing.assert_array_almost_equal(cell['positions_frac'][0], [0, 0, 0])
         np.testing.assert_array_almost_equal(cell['positions_frac'][95], [0.8125, 0.9166666, 0.8987889])
         np.testing.assert_array_almost_equal(cell['positions_frac'][-1], [0.625, 0.8333333, 0.26989619])
-
-
 
 
 class CastepScraperTests(unittest.TestCase):
@@ -435,7 +433,7 @@ class ResScraperTests(unittest.TestCase):
             self.assertFalse(s, 'This wasn\'t meant to succeed!')
 
     def test_c2x_shelx_res(self):
-        res_fname = REAL_PATH + 'data/res_files/npm.res'
+        res_fname = REAL_PATH + 'data/structures/npm.res'
         res, s = res2dict(res_fname, db=False)
         self.assertTrue(s, msg='Failed entirely: {}'.format(res))
 

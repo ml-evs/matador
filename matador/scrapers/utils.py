@@ -49,7 +49,7 @@ def scraper_function(function):
                     raise oops
                 except Exception as oops:
                     success = False
-                    msg = '{}: {}'.format(_seed, oops)
+                    msg = '{}: {} {}'.format(_seed, type(oops), oops)
                     print(msg)
                     result = type(oops)('{}: {}'.format(_seed, oops))
 
@@ -57,9 +57,6 @@ def scraper_function(function):
                     failures += [_seed]
                 else:
                     cursor.append(result)
-
-            if len(cursor) != len(seed):
-                print('Scraped {}/{} structures.'.format(len(cursor), len(seed)))
 
             if len(seed) == 1:
                 return result, success

@@ -378,10 +378,11 @@ def cell2dict(seed, db=False, lattice=True, positions=True, **kwargs):
             cell['lattice_cart'] = abc2cart(cell['lattice_abc'])
         elif 'lattice_cart' in cell and 'lattice_abc' not in cell:
             cell['lattice_abc'] = cart2abc(cell['lattice_cart'])
-        cell['cell_volume'] = cart2volume(cell['lattice_cart'])
+        if 'lattice_cart' in cell:
+            cell['cell_volume'] = cart2volume(cell['lattice_cart'])
 
     if positions:
-        if 'positions_frac' not in cell:
+        if 'positions_frac' not in cell and 'positions_abs' in cell:
             cell['positions_frac'] = cart2frac(cell['lattice_cart'], cell['positions_abs'])
             cell['positions_frac'] = wrap_frac_coords(cell['positions_frac'])
 
