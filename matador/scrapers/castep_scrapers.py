@@ -8,13 +8,12 @@ inputs and outputs.
 
 
 from collections import defaultdict
-from os import stat
-from os.path import isfile
-from time import strptime
-from pwd import getpwuid
+import os
 import glob
 import gzip
-from matador.utils.cell_utils import abc2cart, calc_mp_spacing, cart2volume, wrap_frac_coords, cart2abc, frac2cart
+import pwd
+import numpy as np
+from matador.utils.cell_utils import abc2cart, calc_mp_spacing, cart2volume, wrap_frac_coords, cart2abc, frac2cart, cart2frac, real2recip
 from matador.utils.chem_utils import get_stoich
 from matador.scrapers.utils import DFTError, CalculationError, scraper_function, f90_float_parse
 
@@ -46,7 +45,7 @@ def res2dict(seed, db=True, **kwargs):
     res['source'] = []
     res['source'].append(seed + '.res')
     # grab file owner username
-    res['user'] = getpwuid(stat(seed + '.res').st_uid).pw_name
+    res['user'] = pwd.getpwuid(os.stat(seed + '.res').st_uid).pw_name
     get_seed_metadata(res, seed)
     # alias special lines in res file
     titl = ''
@@ -85,6 +84,11 @@ def res2dict(seed, db=True, **kwargs):
         if 'SFAC' in line:
             i = 1
             while 'END' not in flines[line_no + i] and line_no + i < len(flines):
+                # check if we don't have some other SHELX keyword in the way, e.g. "UNIT"
+                if(len(flines[line_no + i]) >= 4 and
+                   all([char.isupper() for char in flines[line_no+i][0:4]])):
+                    i += 1
+                    continue
                 cursor = flines[line_no + i].split()
                 res['atom_types'].append(cursor[0])
                 res['positions_frac'].append(list(map(f90_float_parse, cursor[2:5])))
@@ -120,7 +124,7 @@ def res2dict(seed, db=True, **kwargs):
 
 
 @scraper_function
-def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, **kwargs):
+def cell2dict(seed, db=False, lattice=True, positions=True, **kwargs):
     """ Extract available information from .cell file; probably
     to be merged with another dict from a .param or .res file.
 
@@ -139,8 +143,6 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, **kw
 
     """
     cell = dict()
-    if outcell:
-        lattice = True
     if seed.endswith('.cell'):
         seed = seed.replace('.cell', '')
     with open(seed + '.cell', 'r') as f:
@@ -321,19 +323,18 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, **kw
                 if any(atomic_init_spins):
                     cell['atomic_init_spins'] = atomic_init_spins
                 if positions:
+                    cell['positions_frac'] = wrap_frac_coords(cell['positions_frac'])
                     cell['num_atoms'] = len(cell['atom_types'])
-                    for ind, pos in enumerate(cell['positions_frac']):
-                        for k in range(3):
-                            if pos[k] > 1 or pos[k] < 0:
-                                cell['positions_frac'][ind][k] %= 1
             elif '%block positions_abs' in line.lower():
                 atomic_init_spins = []
                 i = 1
+                # avoid units
+                if len(flines[line_no+i].split()) < 3:
+                    i += 1
                 if positions:
                     cell['atom_types'] = []
                     cell['positions_abs'] = []
                 while '%endblock positions_abs' not in flines[line_no + i].lower():
-                    print(flines[line_no+i])
                     line = flines[line_no + i].split()
                     if positions:
                         cell['atom_types'].append(line[0])
@@ -346,12 +347,6 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, **kw
                     i += 1
                 if any(atomic_init_spins):
                     cell['atomic_init_spins'] = atomic_init_spins
-                if positions:
-                    cell['num_atoms'] = len(cell['atom_types'])
-                    for ind, pos in enumerate(cell['positions_abs']):
-                        for k in range(3):
-                            if pos[k] > 1 or pos[k] < 0:
-                                cell['positions_abs'][ind][k] %= 1
 
             elif 'fix_com' in line.lower():
                 cell['fix_com'] = line.split()[-1]
@@ -384,15 +379,17 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, **kw
         elif 'lattice_cart' in cell and 'lattice_abc' not in cell:
             cell['lattice_abc'] = cart2abc(cell['lattice_cart'])
         cell['cell_volume'] = cart2volume(cell['lattice_cart'])
+
     if positions:
         if 'positions_frac' not in cell:
-            cell['positions_frac'] = frac2cart(cell['lattice_cart'], cell['positions_abs'])
+            cell['positions_frac'] = cart2frac(cell['lattice_cart'], cell['positions_abs'])
+            cell['positions_frac'] = wrap_frac_coords(cell['positions_frac'])
 
     if db:
         for species in cell['species_pot']:
             if 'OTF' in cell['species_pot'][species].upper():
                 pspot_seed = '/'.join(seed.split('/')[:-1]) + '/' + cell['species_pot'][species]
-                if isfile(pspot_seed):
+                if os.path.isfile(pspot_seed):
                     cell['species_pot'].update(usp2dict(pspot_seed))
 
     return cell, True
@@ -559,7 +556,7 @@ def castep2dict(seed, db=True, intermediates=False, **kwargs):
     castep['source'] = []
     castep['source'].append(seed)
     # grab file owner
-    castep['user'] = getpwuid(stat(seed).st_uid).pw_name
+    castep['user'] = pwd.getpwuid(os.stat(seed).st_uid).pw_name
     get_seed_metadata(castep, seed.replace('.' + ftype, ''))
     # wrangle castep file for parameters in 3 passes:
     # once forwards to get number and types of atoms
@@ -605,7 +602,7 @@ def castep2dict(seed, db=True, intermediates=False, **kwargs):
                 # glob for all .usp files with format species_*OTF.usp
                 pspot_seed += castep['species_pot'][species]
                 for globbed in glob.glob(pspot_seed):
-                    if isfile(globbed):
+                    if os.path.isfile(globbed):
                         castep['species_pot'].update(usp2dict(globbed))
 
     # check that any optimized results were saved and raise errors if not
@@ -636,8 +633,6 @@ def bands2dict(seed, summary=False, gap=False, external_efermi=None, **kwargs):
 
     """
     from matador.utils.chem_utils import HARTREE_TO_EV, BOHR_TO_ANGSTROM
-    from matador.utils.cell_utils import real2recip
-    import numpy as np
 
     verbosity = kwargs.get('verbosity', 0)
 
@@ -839,7 +834,6 @@ def optados2dict(seed, **kwargs):
             if the scrape was successful.
 
     """
-    import numpy as np
     optados = dict()
     is_pdos = False
     is_pdis = False
@@ -962,8 +956,6 @@ def phonon2dict(seed, **kwargs):
             if the scrape was successful.
 
     """
-    import numpy as np
-    from matador.utils.cell_utils import frac2cart, real2recip
 
     with open(seed, 'r') as f:
         # read whole file into RAM, typically <~ 1 MB
@@ -1482,6 +1474,7 @@ def _castep_scrape_metadata(flines, castep):
         dict: dictionary updated with scraped data
 
     """
+    from time import strptime
     # computing metadata, i.e. parallelism, time, memory, version
     for ind, line in enumerate(flines):
         if 'Release CASTEP version' in line:
@@ -1746,7 +1739,6 @@ def get_kpt_branches(cart_kpts):
             - float: estimated kpoint spacing.
 
     """
-    import numpy as np
     kpt_branches = []
     kpts_diff = np.zeros((len(cart_kpts) - 1))
     kpts_diff_set = set()
