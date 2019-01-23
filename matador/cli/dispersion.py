@@ -63,8 +63,8 @@ def main():
                         help='control verbosity of output')
     parser.add_argument('-figsize', '--figsize', nargs='+', type=int,
                         help='figure size in inches to pass to matplotlib')
-    parser.add_argument('-pw', '--plot_window', type=float,
-                        help='energy window to plot either side of E_F (eV)\
+    parser.add_argument('-pw', '--plot_window', nargs='+', type=float,
+                        help='energy window [x, y] or [-x, x] to plot either side of E_F (eV)\
                              (DEFAULT: 5 eV)')
     parser.add_argument('seed', type=str,
                         help='seedname or related filename (e.g. bands or dos file)')
