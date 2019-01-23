@@ -298,7 +298,7 @@ def main(override=False):
 
     parser = argparse.ArgumentParser(
         prog='matador',
-        description='MATerial and Atomic Database Of Refined structures.',
+        description='MATerial and Atomistic Database Of Refined structures.',
         epilog='Written and maintained by Matthew Evans (me388@cam.ac.uk) 2016-2017, version {}.'
         .format(__version__.strip()))
     parser.add_argument('--version', action='version', version='matador version ' + __version__ + '.')
