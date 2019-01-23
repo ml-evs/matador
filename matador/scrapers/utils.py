@@ -7,8 +7,6 @@ like custom errors and a scraper function wrapper.
 """
 
 
-from traceback import print_exc
-import json
 import glob
 
 
@@ -40,32 +38,33 @@ def scraper_function(function):
         cursor = []
 
         if not seed:
-            print('Nothing to scrape.')
-            return
+            raise RuntimeError('Found nothing to scrape.')
+        else:
+            for _seed in seed:
+                # we can get away with this as each
+                # scraper function only has one arg
+                try:
+                    result, success = function(_seed, **kwargs)
+                except FileNotFoundError as oops:
+                    raise oops
+                except Exception as oops:
+                    success = False
+                    msg = '{}: {}'.format(_seed, oops)
+                    print(msg)
+                    result = type(oops)('{}: {}'.format(_seed, oops))
 
-        for _seed in seed:
-            # we can get away with this as each
-            # scraper function only has one arg
-            try:
-                result, success = function(_seed, **kwargs)
-            except FileNotFoundError as oops:
-                raise oops
-            except Exception as oops:
-                success = False
-                result = '{} {}: {}\n'.format(_seed, type(oops), str(oops))
+                if not success:
+                    failures += [_seed]
+                else:
+                    cursor.append(result)
 
-            if not success:
-                failures += [_seed]
-            else:
-                cursor.append(result)
+            if len(cursor) != len(seed):
+                print('Scraped {}/{} structures.'.format(len(cursor), len(seed)))
 
-        if len(cursor) != len(seed):
-            print('Scraped {}/{} structures.'.format(len(cursor), len(seed)))
+            if len(seed) == 1:
+                return result, success
 
-        if len(seed) == 1:
-            return result, success
-
-        return cursor, failures
+            return cursor, failures
 
     return wrapped_scraper_function
 
