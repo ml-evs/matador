@@ -367,6 +367,7 @@ class Spatula:
         if file_lists[root]['cell_count'] == 1:
             cell_dict, success = cell2dict(file_lists[root]['cell'][0],
                                            debug=self.debug,
+                                           db=True,
                                            verbosity=self.verbosity)
             cell = success
             if not success:
@@ -381,6 +382,7 @@ class Spatula:
                     if param_name.split('.')[0] in cell_name:
                         cell_dict, success = cell2dict(cell_name,
                                                        debug=self.debug,
+                                                       db=True,
                                                        verbosity=self.verbosity)
                         cell = success
                         if not success:
@@ -471,7 +473,7 @@ class Spatula:
         for _, file in enumerate(loading_bar(file_lists[root]['castep'])):
             castep_dict, success = castep2dict(file, debug=False, verbosity=self.verbosity)
             if not success:
-                self.logfile.write('! {}'.format(castep_dict))
+                self.logfile.write('! {}\n'.format(castep_dict))
             else:
                 final_struct = castep_dict
                 if not self.dryrun:

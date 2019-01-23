@@ -90,7 +90,7 @@ class MatadorCommandLine:
                     except (KeyboardInterrupt, RuntimeError, SystemExit) as oops:
                         raise oops('Exiting top-level...')
                 else:
-                    exit('No structure match query.')
+                    raise SystemExit('No structure match query.')
 
             if self.args['subcmd'] == 'hull' or self.args['subcmd'] == 'voltage':
                 self.query = DBQuery(self.client, self.collections, **self.args)
@@ -100,7 +100,7 @@ class MatadorCommandLine:
             if self.args['subcmd'] == 'changes':
                 from matador.db import DatabaseChanges
                 if len(self.collections) != 1:
-                    exit('Cannot view changes of more than one collection at once.')
+                    raise SystemExit('Cannot view changes of more than one collection at once.')
                 if self.args.get('undo'):
                     action = 'undo'
                 else:
@@ -117,7 +117,7 @@ class MatadorCommandLine:
             if self.args['subcmd'] == 'hulldiff':
                 from matador.hull.hull_diff import diff_hulls
                 if self.args.get('compare') is None:
-                    exit('Please specify which hulls to query with --compare.')
+                    raise SystemExit('Please specify which hulls to query with --compare.')
                 diff_hulls(self.client, self.collections, **self.args)
 
             if self.export and self.cursor:
@@ -154,14 +154,15 @@ class MatadorCommandLine:
                 self.client.close()
 
         except (RuntimeError, SystemExit, KeyboardInterrupt) as oops:
-            if type(oops) == RuntimeError:
+            if isinstance(oops, RuntimeError):
                 print_failure(oops)
-            elif type(oops) == SystemExit:
+            elif isinstance(oops, SystemExit):
                 print_warning(oops)
             try:
                 self.client.close()
             except AttributeError:
                 pass
+            raise oops
 
     def print_report(self):
         """ Print spatula report on current database. """
@@ -190,30 +191,33 @@ class MatadorCommandLine:
             if isinstance(target, list) and len(target) == 1:
                 target = target[0]
             else:
-                exit('I will only delete one collection at a time...')
+                raise SystemExit('I will only delete one collection at a time...')
             if target is None:
-                exit('Please specify a collection to delete.')
+                raise SystemExit('Please specify a collection to delete.')
             elif target not in self.db.collection_names():
-                exit('No collection named {} was found'.format(target))
+                raise SystemExit('No collection named {} was found'.format(target))
             else:
                 from getpass import getuser
                 user = getuser()
                 if user not in target:
-                    exit('I cannot delete a collection that\'s name does not start with '
-                         'your username, {}'.format(user))
+                    raise SystemExit('I cannot delete a collection that\'s name does not start with '
+                                     'your username, {}'.format(user))
                 stats = self.db.command('collstats', target)
-                answer = input('Are you sure you want to delete collection {} containing {} '
-                               'structures? [y/n]\n'.format(target, stats['count']))
+                if self.args.get('override'):
+                    answer = 'y'
+                else:
+                    answer = input('Are you sure you want to delete collection {} containing {} '
+                                   'structures? [y/n]\n'.format(target, stats['count']))
                 if answer.lower() == 'y':
                     if target == 'repo':
-                        exit('I\'m sorry Dave, I\'m afraid I can\'t do that...')
+                        raise SystemExit('I\'m sorry Dave, I\'m afraid I can\'t do that...')
                     else:
                         print('Deleting collection {}...'.format(target))
                         self.db[target].drop()
                         print('and its changelog...')
                         self.db['__changelog_{}'.format(target)].drop()
                 else:
-                    exit('Nevermind then!')
+                    raise SystemExit('Nevermind then!')
         else:
             comp_list = dict()
             stats_dict = dict()

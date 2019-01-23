@@ -12,6 +12,7 @@ import os
 import sys
 import glob
 import pymongo as pm
+import getpass
 
 import matador.cli.cli
 from matador.config import load_custom_settings
@@ -34,6 +35,8 @@ except pm.errors.ServerSelectionTimeoutError:
     MONGO_PRESENT = False
 
 MONGO_CLIENT.crystals[DB_NAME].drop()
+MONGO_CLIENT.crystals[getpass.getuser() + '_' + DB_NAME].drop()
+
 MONGO_CLIENT.crystals['__changelog_' + DB_NAME].drop()
 
 for _file in glob.glob('*spatula*'):
@@ -143,6 +146,22 @@ class IntegrationTest(unittest.TestCase):
         self.assertTrue(dir_exists, msg='Failed to create output directory, uniq')
         self.assertTrue(files_exist, msg='Some files missing from export, uniq')
         self.assertTrue(correct_num == len(expected_files), msg='Incorrect filter')
+
+        stats()
+
+        errored = False
+        try:
+            drop(DB_NAME)
+        except SystemExit:
+            errored = True
+        self.assertTrue(DB_NAME in MONGO_CLIENT.crystals.list_collection_names())
+        self.assertTrue(errored)
+
+        coll_name = '{}_{}'.format(getpass.getuser(), DB_NAME)
+        MONGO_CLIENT.crystals[DB_NAME].rename(coll_name)
+        drop(coll_name)
+        self.assertTrue(DB_NAME not in MONGO_CLIENT.crystals.list_collection_names())
+        self.assertTrue(coll_name not in MONGO_CLIENT.crystals.list_collection_names())
 
 
 def import_castep():
@@ -324,6 +343,17 @@ def id():
         sys.argv += ['--config', CONFIG_FNAME]
 
     matador.cli.cli.main(override=True)
+
+
+def drop(collname):
+    """ Drop collection. """
+    sys.argv = ['matador', 'stats', '--delete', '--db', collname]
+
+    if CONFIG_FNAME is not None:
+        sys.argv += ['--config', CONFIG_FNAME]
+
+    matador.cli.cli.main(override=True)
+    print('Dropped ci_test!')
 
 
 if __name__ == '__main__':
