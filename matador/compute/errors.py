@@ -9,6 +9,11 @@ class CalculationError(Exception):
     pass
 
 
+class MaxMemoryEstimateExceeded(Exception):
+    """ Raised when a structure is estimated to exceed the max memory. """
+    pass
+
+
 class CriticalError(RuntimeError):
     """ Raise this when you don't want any more jobs to run because something
     uncorrectable has happened! Plays more nicely with multiprocessing than

@@ -22,7 +22,7 @@ from matador.scrapers.castep_scrapers import cell2dict
 from matador.scrapers.castep_scrapers import res2dict, castep2dict
 from matador.calculators import CastepCalculator
 from matador.export import doc2cell, doc2param, doc2res
-from matador.compute.errors import CriticalError, WalltimeError, InputError, CalculationError
+from matador.compute.errors import CriticalError, WalltimeError, InputError, CalculationError, MaxMemoryEstimateExceeded
 
 MATADOR_CUSTOM_TASKS = ['bulk_modulus', 'projected_bandstructure', 'pdispersion', 'all']
 
@@ -253,6 +253,9 @@ class ComputeTask:
         except RuntimeError as exc:
             logging.error('Process raised {} with message {}.'.format(type(exc), exc))
             raise exc
+        except MaxMemoryEstimateExceeded as exc:
+            logging.error(exc)
+            raise exc
         except Exception as exc:
             logging.error('Caught unexpected error {}: {}'.format(type(exc), exc))
             raise exc
@@ -343,7 +346,7 @@ class ComputeTask:
 
             if memory_usage_estimate > 0.9 * self.maxmem:
                 msg = 'Structure {} failed memcheck, skipping... '.format(self.seed) + mem_string
-                raise CalculationError(msg)
+                raise MaxMemoryEstimateExceeded(msg)
 
         try:
             if self.start:
@@ -372,6 +375,11 @@ class ComputeTask:
                 else:
                     success = self.scf(calc_doc, self.seed, keep=True)
 
+                if self.compute_dir is not None:
+                    logging.debug('Cleaning up after relaxation.')
+                    # always cd back to root folder
+                    os.chdir(self.root_folder)
+                    self.remove_compute_dir_if_finished(self.compute_dir)
                 self._first_run = False
 
         except Exception as err:
@@ -452,10 +460,10 @@ class ComputeTask:
         """
         logging.info('Attempting to relax {}'.format(self.seed))
 
-        self._setup_relaxation()
-        seed = self.seed
-        rerun = False
         try:
+            self._setup_relaxation()
+            seed = self.seed
+            rerun = False
             # iterate over geom iter blocks
             for ind, num_iter in enumerate(self._geom_max_iter_list):
 
@@ -470,7 +478,7 @@ class ComputeTask:
                 self.calc_doc['geom_max_iter'] = num_iter
 
                 # delete any existing files and write new ones
-                self._update_input_files()
+                self._update_input_files(self.seed, self.calc_doc)
 
                 # run CASTEP
                 self._process = self.run_command(seed)
@@ -560,8 +568,9 @@ class ComputeTask:
 
                     # reached maximum number of steps
                     elif ind == len(self._geom_max_iter_list) - 1:
-                        logging.info('Failed to optimise {}'.format(seed))
-                        break
+                        msg = 'Failed to optimise {} after {} steps'.format(seed, sum(self._geom_max_iter_list))
+                        logging.info(msg)
+                        raise CalculationError(msg)
 
                     # if we weren't successful, then preprocess the next step
 
@@ -602,7 +611,10 @@ class ComputeTask:
         # more jobs will run unless this exception is either CriticalError or KeyboardInterrupt
         except Exception as err:
             logging.error('Error caught: terminating job for {}. Error = {}'.format(self.seed, err))
-            self._process.terminate()
+            try:
+                self._process.terminate()
+            except AttributeError:
+                pass
             self._finalise_result()
             raise err
 
@@ -628,9 +640,9 @@ class ComputeTask:
         """
         logging.info('Performing single-shot CASTEP run on {}'.format(seed))
         try:
-            self.cp_to_input(self.seed)
+            self.cp_to_input(seed)
 
-            self._update_input_files()
+            self._update_input_files(seed, calc_doc)
 
             # run CASTEP
             self._process = self.run_command(seed)
@@ -934,7 +946,7 @@ class ComputeTask:
 
         if not success or 'estimated_mem_MB' not in results:
             msg = 'CASTEP dryrun failed with output {results}'.format(results=results)
-            raise CalculationError(msg)
+            raise MaxMemoryEstimateExceeded(msg)
 
         return results['estimated_mem_MB']
 
@@ -1172,7 +1184,15 @@ class ComputeTask:
                     shutil.copy2('{}.{}'.format(seed, ext), input_dir)
 
     def _setup_relaxation(self):
-        """ Set up directories and files for relaxation. """
+        """ Set up directories and files for relaxation.
+
+        Raises:
+            CalculationError: if structure has already exceeded
+                geom_max_iter.
+            CriticalError: if unable to split up calculation, normally
+                indicating geom_max_iter is too small.
+
+        """
 
         logging.info('Preparing to relax {seed}'.format(seed=self.seed))
         if self.compute_dir is not None:
@@ -1254,12 +1274,18 @@ class ComputeTask:
             logging.critical(msg)
             raise CriticalError(msg)
 
-    def _update_input_files(self):
-        """ Update the cell and param files for the next relaxation. """
-        calc_doc = self.calc_doc
+    def _update_input_files(self, seed, calc_doc):
+        """ Update the cell and param files for the next relaxation.
+
+        Parameters:
+            seed (str): the seedname to update.
+            calc_doc (dict): the calculation dictionary to write to file.
+
+        """
+
         # update cell
-        if os.path.isfile(self.seed + '.cell'):
-            os.remove(self.seed + '.cell')
+        if os.path.isfile(seed + '.cell'):
+            os.remove(seed + '.cell')
         if self.kpts_1D:
             n_kz = ceil(1 / (calc_doc['lattice_abc'][0][2] * self._target_spacing))
             if n_kz % 2 == 1:
@@ -1267,13 +1293,13 @@ class ComputeTask:
             calc_doc['kpoints_mp_grid'] = [1, 1, n_kz]
             if 'kpoints_mp_spacing' in calc_doc:
                 del calc_doc['kpoints_mp_spacing']
-        doc2cell(calc_doc, self.seed, hash_dupe=False, copy_pspots=False, spin=self.spin)
+        doc2cell(calc_doc, seed, hash_dupe=False, copy_pspots=False, spin=self.spin)
 
         # update param
         if not self.custom_params:
-            if os.path.isfile(self.seed + '.param'):
-                os.remove(self.seed + '.param')
-            doc2param(calc_doc, self.seed, hash_dupe=False, spin=self.spin)
+            if os.path.isfile(seed + '.param'):
+                os.remove(seed + '.param')
+            doc2param(calc_doc, seed, hash_dupe=False, spin=self.spin)
 
     @staticmethod
     def tidy_up(seed):

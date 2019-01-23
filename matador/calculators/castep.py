@@ -8,7 +8,7 @@ with the compute module.
 
 import os
 from matador.calculators import Calculator
-from matador.compute.errors import InputError
+from matador.compute.errors import InputError, CalculationError
 
 VALID_PSPOT_LIBS = ['C7', 'C8', 'C9', 'C17', 'C18', 'MS', 'HARD',
                     'QC5', 'NCP', 'NCP18', 'NCP17', 'NCP9']
@@ -44,9 +44,15 @@ class CastepCalculator(Calculator):
 
     @staticmethod
     def verify_simulation_cell(res_dict):
-        super().verify_simulation_cell()
+        errors = []
+        try:
+            Calculator.verify_simulation_cell(res_dict)
+        except CalculationError as exc:
+            errors.append(str(exc))
         # any extra checks here
-        return
+
+        if errors:
+            raise CalculationError('. '.join(errors))
 
     def do_memcheck(self):
         return 0

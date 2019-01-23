@@ -1414,8 +1414,6 @@ def _castep_scrape_final_structure(flines, castep, db=True):
                             pass
                         break
                     i += 1
-            elif 'failed to SCF' in line:
-                raise DFTError('CASTEP SCF failed to reach convergence.')
             elif 'Integrated Spin Density' in line:
                 castep['integrated_spin_density'] = f90_float_parse(line.split()[-2])
             elif 'Integrated |Spin Density|' in line:

@@ -17,7 +17,7 @@ from matador.utils.print_utils import print_failure, print_warning
 from matador.compute.queue import get_queue_env, get_queue_walltime, get_queue_manager
 from matador.scrapers.castep_scrapers import cell2dict, param2dict
 from matador.compute.compute import FullRelaxer
-from matador.compute.errors import InputError, CalculationError
+from matador.compute.errors import InputError, CalculationError, MaxMemoryEstimateExceeded
 
 
 class BatchRun:
@@ -195,7 +195,6 @@ class BatchRun:
 
         # wait for each proc to write to error queue
         try:
-            print('here')
             for _, proc in enumerate(procs):
                 result = error_queue.get()
                 if isinstance(result[1], Exception):
@@ -214,9 +213,6 @@ class BatchRun:
         except RuntimeError as err:
             result = [proc.join(timeout=2) for proc in procs]
             result = [proc.terminate() for proc in procs if proc.is_alive()]
-            if isinstance(err, InputError):
-                for failed_seed in failed_seeds:
-                    reset_single_seed(failed_seed)
             print_failure('Fatal error(s) reported:')
             print_warning(err)
             raise err
@@ -237,14 +233,14 @@ class BatchRun:
         if isinstance(res_list, str):
             res_list = [res_list]
         for res in res_list:
-            locked = os.path.isfile('{}.lock'.format(res))
-            if not self.args.get('ignore_jobs_file'):
-                listed = self._check_jobs_file(res)
-            else:
-                listed = []
-            running = any([listed, locked])
-            if not running:
-                try:
+            try:
+                locked = os.path.isfile('{}.lock'.format(res))
+                if not self.args.get('ignore_jobs_file'):
+                    listed = self._check_jobs_file(res)
+                else:
+                    listed = []
+                running = any([listed, locked])
+                if not running:
                     # check we haven't reached job limit
                     if self.limit is not None and job_count >= self.limit:
                         error_queue.put((proc_id, job_count, res))
@@ -291,13 +287,27 @@ class BatchRun:
                         with open(self.paths['failures_fname'], 'a') as job_file:
                             job_file.write(res + '\n')
 
-                # push globally-fatal errors to queue, and return to prevent further calcs
-                except RuntimeError as err:
-                    error_queue.put((proc_id, err, res))
-                    return
-                # push errors on individual calculations to queue, but do not raise
-                except CalculationError as err:
-                    error_queue.put((proc_id, err, res))
+            # push errors on individual calculations to queue, but do not raise
+            except CalculationError as err:
+                # error_queue.put((proc_id, err, res))
+                continue
+
+            except MaxMemoryEstimateExceeded as err:
+                reset_single_seed(res)
+                continue
+                # error_queue.put((proc_id, err, res))
+            except InputError as err:
+                reset_single_seed(res)
+                error_queue.put((proc_id, err, res))
+                return
+            # push globally-fatal errors to queue, and return to prevent further calcs
+            except RuntimeError as err:
+                error_queue.put((proc_id, err, res))
+                return
+            # finally catch any other generic error, normally caused by me
+            except Exception as err:
+                error_queue.put((proc_id, err, res))
+                return
 
         error_queue.put((proc_id, job_count, ''))
 
