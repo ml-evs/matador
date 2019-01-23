@@ -832,7 +832,7 @@ def _add_path_labels(seed, dispersion, ax_dispersion, path, path_key, branch_key
                 path_labels[label] = point
             print('Detected path labels from cell file')
 
-    if not path_labels:
+    if len(path_labels) == 0:
         # try to get dispersion path labels from spglib/seekpath
         spg_structure = None
         if kwargs['phonons']:
@@ -862,8 +862,9 @@ def _add_path_labels(seed, dispersion, ax_dispersion, path, path_key, branch_key
                 else:
                     print('Failed to scrape {}.cell/.res, will not be able to generate labels.'.format(seed))
 
-        seekpath_results = get_path(spg_structure)
-        path_labels = seekpath_results['point_coords']
+        if spg_structure:
+            seekpath_results = get_path(spg_structure)
+            path_labels = seekpath_results['point_coords']
 
     for branch_ind, branch in enumerate(dispersion[branch_key]):
         for sub_ind, ind in enumerate(branch):
