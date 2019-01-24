@@ -121,8 +121,8 @@ class Spatula:
                 elif len(self.args.get('db')) > 1:
                     exit('Can only import to one collection.')
 
-        num_prototypes_in_db = self.repo.find({'prototype': True}, projection=[]).count()
-        num_objects_in_db = self.repo.count()
+        num_prototypes_in_db = self.repo.count_documents({'prototype':True})
+        num_objects_in_db = self.repo.count_documents({})
         if self.args.get('prototype'):
             if num_prototypes_in_db != num_objects_in_db:
                 raise SystemExit('I will not import prototypes to a non-prototype database!')
@@ -614,9 +614,8 @@ class Spatula:
                     ext = ext[0]
                     structure_count = 0
                     for other_ext in structure_exts:
-                        structure_count += self.repo.find(
-                            {'source': {'$in': [_file.replace(ext, other_ext)]}}
-                        ).count()
+                        structure_count += self.repo.count_documents(
+                            {'source': {'$in': [_file.replace(ext, other_ext)]}})
                     if structure_count > 1 and self.debug:
                         print('Duplicates', structure_count, _file)
 

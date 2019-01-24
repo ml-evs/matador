@@ -308,7 +308,7 @@ def changes():
 
     query_1 = DBQuery(db=DB_NAME, config=CONFIG_FNAME)
     query_2 = DBQuery(db=DB_NAME, composition='KSnP', config=CONFIG_FNAME)
-    changes_count = MONGO_CLIENT.crystals['__changelog_' + DB_NAME].count()
+    changes_count = MONGO_CLIENT.crystals['__changelog_' + DB_NAME].count_documents({})
 
     return query_1, query_2, changes_count
 

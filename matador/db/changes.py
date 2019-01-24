@@ -83,7 +83,7 @@ class DatabaseChanges:
                 print('Deleted {}/{} successfully.'.format(result['n'], self.change['count']))
                 print('Tidying up changelog database...')
                 self.repo.remove({'_id': self.change['_id']})
-                if self.repo.count() == 0:
+                if not self.repo.find_one():
                     print('No structures left remaining, deleting database...')
                     collection_to_delete_from.drop()
                     self.repo.drop()
