@@ -323,7 +323,8 @@ class BatchRun:
         for ext in exts:
             if not os.path.isfile('{}.{}'.format(self.seed, ext)):
                 raise InputError('Failed to find {} file, {}.{}'.format(ext, self.seed, ext))
-        self.cell_dict, cell_success = cell2dict(self.seed + '.cell', db=False)
+        self.cell_dict, cell_success = cell2dict(self.seed + '.cell',
+                                                 db=False, lattice=False, positions=False)
         if not cell_success:
             print(self.cell_dict)
             raise InputError('Failed to parse cell file')

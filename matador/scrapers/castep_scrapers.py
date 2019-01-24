@@ -322,6 +322,8 @@ def cell2dict(seed, db=False, lattice=True, positions=True, **kwargs):
                     i += 1
                 if any(atomic_init_spins):
                     cell['atomic_init_spins'] = atomic_init_spins
+                    if len(cell['atomic_init_spins']) != len(cell['positions_frac']):
+                        raise RuntimeError('Atomic init spins do not match positions')
                 if positions:
                     cell['positions_frac'] = wrap_frac_coords(cell['positions_frac'])
                     cell['num_atoms'] = len(cell['atom_types'])
@@ -347,6 +349,8 @@ def cell2dict(seed, db=False, lattice=True, positions=True, **kwargs):
                     i += 1
                 if any(atomic_init_spins):
                     cell['atomic_init_spins'] = atomic_init_spins
+                    if len(cell['atomic_init_spins']) != len(cell['positions_frac']):
+                        raise RuntimeError('Atomic init spins do not match positions')
 
             elif 'fix_com' in line.lower():
                 cell['fix_com'] = line.split()[-1]

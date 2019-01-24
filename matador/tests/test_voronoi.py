@@ -181,7 +181,7 @@ class VoronoiSimilarityTest(unittest.TestCase):
         from matador.scrapers.castep_scrapers import cell2dict
         rtol = 5e-2
         atol = 1e-2
-        doc, s = cell2dict(REAL_PATH + 'data/Al5Y3O12.cell', db=False, outcell=True, positions=True)
+        doc, s = cell2dict(REAL_PATH + 'data/Al5Y3O12.cell', db=False, lattice=True, positions=True)
         set_site_array(doc)
         get_unique_sites(doc, atol=atol, rtol=rtol)
         # print(doc['similar_sites'])

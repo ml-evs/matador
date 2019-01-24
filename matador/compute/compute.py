@@ -130,6 +130,8 @@ class ComputeTask:
         self._num_retries = 0
         self._max_num_retries = 2
         self.maxmem = None
+        self.cell_dict = None
+        self.param_dict = None
 
         # save all keyword arguments as attributes
         self.__dict__.update(prop_defaults)
@@ -326,6 +328,8 @@ class ComputeTask:
         calc_doc = deepcopy(self.res_dict)
 
         # update global doc with cell and param dicts for folder, and verify
+        bad_keys = ['atom_types', 'positions_frac', 'positions_abs', 'lattice_cart', 'lattice_abc']
+        self.cell_dict = {key: self.cell_dict[key] for key in self.cell_dict if key not in bad_keys}
         calc_doc.update(self.cell_dict)
         calc_doc.update(self.param_dict)
         self.calculator.verify_calculation_parameters(calc_doc, self.res_dict)
@@ -532,11 +536,11 @@ class ComputeTask:
                     else:
                         raise CalculationError(msg)
 
-                if not success and remedy is None and isinstance(opti_dict, str):
+                if not success and remedy is None and isinstance(opti_dict, Exception):
                     msg = 'Failed to parse CASTEP file... {}'.format(opti_dict)
                     logging.warning(msg)
                     raise CalculationError(msg)
-                elif isinstance(opti_dict, str) and remedy is not None:
+                elif isinstance(opti_dict, Exception) and remedy is not None:
                     opti_dict = {'optimised': False}
 
                 logging.debug('Intermediate calculation completed successfully: num_iter = {} '.format(num_iter))
@@ -582,7 +586,7 @@ class ComputeTask:
                     if self.calc_doc.get('write_cell_structure') and os.path.isfile('{}-out.cell'.format(seed)):
                         cell_dict, success = cell2dict('{}-out.cell'.format(seed),
                                                        verbosity=self.verbosity,
-                                                       db=False, outcell=True)
+                                                       db=False, positions=True, lattice=True)
                         if success:
                             opti_dict['lattice_cart'] = list(cell_dict['lattice_cart'])
 

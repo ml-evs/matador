@@ -822,7 +822,7 @@ def _add_path_labels(seed, dispersion, ax_dispersion, path, path_key, branch_key
     if os.path.isfile(seed + '.cell'):
         doc, success = cell2dict(seed + '.cell',
                                  db=False, verbosity=kwargs.get('verbosity', 0),
-                                 outcell=True, positions=True)
+                                 lattice=True, positions=True)
         if kwargs['phonons']:
             key = 'phonon_fine_kpoint_path'
         else:
@@ -851,7 +851,7 @@ def _add_path_labels(seed, dispersion, ax_dispersion, path, path_key, branch_key
             if cell:
                 doc, success = cell2dict(seed + '.cell',
                                          db=False, verbosity=kwargs.get('verbosity', 0),
-                                         outcell=True, positions=True)
+                                         lattice=True, positions=True)
             if res and not success:
                 doc, success = res2dict(seed + '.res',
                                         db=False, verbosity=kwargs.get('verbosity', 0))
