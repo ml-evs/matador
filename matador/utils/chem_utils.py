@@ -7,7 +7,6 @@ constants, with a focus on battery materials.
 """
 
 
-import copy
 import numpy as np
 
 # global consts
@@ -127,8 +126,7 @@ def get_binary_grav_capacities(x, m_B):
     x = np.array(x)
     if m_B != 0:
         return x * FARADAY_CONSTANT_Cpermol * Cperg_to_mAhperg / m_B
-    else:
-        return float('NaN')
+    return float('NaN')
 
 
 def get_generic_grav_capacity(concs, elements):
@@ -548,9 +546,9 @@ def get_root_source(source):
             src_list.add('command line')
 
     if len(src_list) > 1:
-        raise RuntimeError('Ambiguous root source')
+        raise RuntimeError('Ambiguous root source {}'.format(source))
     if len(src_list) < 1:
-        raise RuntimeError('Unable to find root source')
+        raise RuntimeError('Unable to find root source from {}'.format(source))
 
     return list(src_list)[0]
 

@@ -31,7 +31,7 @@ def scraper_function(function):
         result = None
         seed = args[0]
         if isinstance(seed, str):
-            if '*' in seed:
+            if '*' in seed and not kwargs.get('noglob'):
                 seed = glob.glob(seed)
             else:
                 seed = [seed]
@@ -57,16 +57,18 @@ def scraper_function(function):
                     print_exc()
                     print('Error in file', _seed, 'skipping...')
 
+            if len(seed) == 1:
+                if success and not isinstance(result, dict):
+                    raise AssertionError('Scraping failed, but str returned for {}'.format(seed))
+                elif not success and not isinstance(result, str):
+                    raise AssertionError('Scraping succeeded, but dict not returned for {}'.format(seed))
+
+                return result, success
+
             if not success:
                 failures += [_seed]
             else:
                 cursor.append(result)
-
-        if len(cursor) != len(seed):
-            print('Scraped {}/{} structures.'.format(len(cursor), len(seed)))
-
-        if len(seed) == 1:
-            return result, success
 
         return cursor, failures
 

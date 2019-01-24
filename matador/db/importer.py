@@ -278,8 +278,9 @@ class Spatula:
                     print('Error with', root_src)
                 return 0
 
-        except Exception:
+        except Exception as exc:
             # this shouldn't fail, but if it does, fail loudly but cleanly
+            self.logfile.write('! Importer produced an unexpected error {}. Final state of struct: {}\n'.format(exc, struct))
             tb.print_exc()
             return 0
 
@@ -355,7 +356,7 @@ class Spatula:
 
         if file_lists[root]['param_count'] == 1:
             param_dict, success = param2dict(file_lists[root]['param'][0],
-                                             debug=self.debug,
+                                             debug=self.debug, noglob=True,
                                              verbosity=self.verbosity)
             param = success
             if not success:
@@ -366,7 +367,7 @@ class Spatula:
             multi = True
         if file_lists[root]['cell_count'] == 1:
             cell_dict, success = cell2dict(file_lists[root]['cell'][0],
-                                           debug=self.debug,
+                                           debug=self.debug, noglob=True,
                                            verbosity=self.verbosity)
             cell = success
             if not success:
@@ -418,39 +419,41 @@ class Spatula:
                 for ext in exts_with_precedence:
                     if file.replace('.res', ext) in file_lists[root]['castep']:
                         struct_dict, success = castep2dict(file.replace('.res', ext),
-                                                           debug=False,
+                                                           debug=False, noglob=True,
                                                            dryrun=self.args.get('dryrun'),
                                                            verbosity=self.verbosity)
                         break
             # otherwise, scrape res file
             else:
-                struct_dict, success = res2dict(file, verbosity=self.verbosity)
+                struct_dict, success = res2dict(file, verbosity=self.verbosity, noglob=True)
 
             if not success:
                 self.logfile.write('! {}'.format(struct_dict))
             else:
-                final_struct = input_dict.copy()
-                final_struct.update(struct_dict)
-                # calculate kpoint spacing if not found
-                if 'lattice_cart' not in final_struct and 'lattice_abc' not in final_struct:
-                    self.logfile.write('! {} missing lattice'.format(file))
-
                 try:
+                    final_struct = copy.deepcopy(input_dict)
+                    final_struct.update(struct_dict)
+                    # calculate kpoint spacing if not found
+                    if 'lattice_cart' not in final_struct and 'lattice_abc' not in final_struct:
+                        msg = '! {} missing lattice'.format(file)
+                        self.logfile.write(msg)
+                        raise RuntimeError(msg)
+
                     if ('kpoints_mp_spacing' not in final_struct and
                             'kpoints_mp_grid' in final_struct):
                         final_struct['kpoints_mp_spacing'] = calc_mp_spacing(final_struct['lattice_cart'],
                                                                              final_struct['mp_grid'])
+                    final_struct['source'] = struct_dict['source']
+                    if 'source' in input_dict:
+                        final_struct['source'] += input_dict['source']
+
+                    if not self.dryrun:
+                        final_struct.update(self.tag_dict)
+                        import_count += self._struct2db(final_struct)
+
                 except Exception as exc:
-                    print(final_struct)
+                    print('Unexpected error for {}, {}'.format(file, final_struct))
                     raise exc
-
-                final_struct['source'] = struct_dict['source']
-                if 'source' in input_dict:
-                    final_struct['source'] += input_dict['source']
-
-                if not self.dryrun:
-                    final_struct.update(self.tag_dict)
-                    import_count += self._struct2db(final_struct)
 
         return import_count
 
@@ -494,7 +497,7 @@ class Spatula:
         """
         import_count = 0
         for _, file in enumerate(file_lists[root]['res']):
-            res_dict, success = res2dict(file, db=False, verbosity=self.verbosity)
+            res_dict, success = res2dict(file, db=False, verbosity=self.verbosity, noglob=True)
             if not success:
                 self.logfile.write('! {}'.format(res_dict))
             else:
@@ -624,7 +627,7 @@ class Spatula:
                             if _type.startswith('.'):
                                 _type = _type[1:]
                             fname_trial = _file.replace(_file.split('.')[-1], _type)
-                            if _type == 'history' or _type == '.history.gz':
+                            if _type in ['history', 'history.gz']:
                                 list_type = 'castep'
                             else:
                                 list_type = _type.replace('.', '')
