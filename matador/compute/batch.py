@@ -341,16 +341,16 @@ class BatchRun:
                      "Please rename either your seed.cell/seed.param files, or rename the offending .res")
             raise InputError(error)
 
-        if (len(self.file_lists['res']) < self.nprocesses and
-                (not self.args.get('conv_cutoff') and not self.args.get('conv_kpt'))):
-            raise InputError('Requested more processes than there are jobs to run!')
-
         if not self.file_lists['res']:
             error = (
                 'run3 in CASTEP mode requires at least 1 res file in folder, found {}'
                 .format(len(self.file_lists['res']))
             )
             raise InputError(error)
+
+        if (len(self.file_lists['res']) < self.nprocesses and
+                (not self.args.get('conv_cutoff') and not self.args.get('conv_kpt'))):
+            raise InputError('Requested more processes than there are jobs to run!')
 
         # do some prelim checks of parameters
         if self.param_dict['task'].upper() in ['GEOMETRYOPTIMISATION', 'GEOMETRYOPTIMIZATION']:
