@@ -92,7 +92,7 @@ class QueryConvexHull:
             self.cursor = list(deepcopy(query.cursor))
             use_source = False
             if self._query.args['subcmd'] not in ['hull', 'voltage', 'hulldiff']:
-                raise RuntimeError('Query was not prepared with subcmd=hull, cannot make a hull...')
+                print_warning('Query was not prepared with subcmd=hull, so cannot guarantee consistent formation energies.')
         else:
             self.cursor = list(deepcopy(cursor))
             self.from_cursor = True
@@ -212,7 +212,7 @@ class QueryConvexHull:
         if self.args['subcmd'] == 'hull' and not self.args.get('no_plot'):
             self.plot_hull(**plot_kwargs, debug=self.args.get('debug'))
 
-        if self.args.get('uniq'):
+        if self.args.get('uniq') and self.args['subcmd'] != 'swaps':
             from matador.similarity.similarity import get_uniq_cursor
             if self.args.get('uniq') is True:
                 sim_tol = 0.1
