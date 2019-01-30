@@ -63,7 +63,7 @@ def get_uniq_cursor(cursor, fingerprint=PDF, sim_tol=0.1, energy_tol=1e-2,
             # are we checking stoichiometries, if so, ensure they're the same
             if (enforce_same_stoich is False or
                 (sorted(cursor[j]['stoichiometry']) == sorted(cursor[i]['stoichiometry']) and
-                 np.abs(cursor[j]['enthalpy_per_atom'] - cursor[i]['enthalpy_per_atom']) < energy_tol)):
+                 np.abs(cursor[j].get('enthalpy_per_atom', 0) - cursor[i].get('enthalpy_per_atom', 0)) < energy_tol)):
                 sim = fingerprint_list[i].get_sim_distance(fingerprint_list[j], projected=projected)
                 sim_mat[i, j] = sim
                 sim_mat[j, i] = sim
@@ -71,10 +71,6 @@ def get_uniq_cursor(cursor, fingerprint=PDF, sim_tol=0.1, energy_tol=1e-2,
                 sim = 1e10
                 sim_mat[i, j] = sim
                 sim_mat[i, j] = sim
-            if debug and sim < sim_tol:
-                print('{} similar to {} with distance {}'.format(' '.join(cursor[i]['text_id']),
-                                                                 ' '.join(cursor[j]['text_id']),
-                                                                 sim))
     rows, cols = np.where(sim_mat <= sim_tol)
     distinct_set = set()
     dupe_set = set()

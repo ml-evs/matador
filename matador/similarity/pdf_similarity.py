@@ -10,6 +10,7 @@ the similarity between two structures.
 from itertools import combinations_with_replacement
 import itertools
 import copy
+import sys
 from math import ceil
 import time
 
@@ -509,9 +510,20 @@ class PDFFactory:
         else:
             pool = mp.Pool(processes=self.nprocs)
             pdf_cursor = []
-            pool.map_async(calc_pdf_pool_wrapper, cursor, callback=pdf_cursor.extend, error_callback=print)
+            results = pool.map_async(calc_pdf_pool_wrapper,
+                                     cursor,
+                                     callback=pdf_cursor.extend,
+                                     error_callback=print,
+                                     chunksize=1)  # set chunksize to 1 as PDFs will vary in cost to compute
             pool.close()
-            pool.join()
+            width = len(str(len(cursor)))
+            total = len(cursor)
+            while not results.ready():
+                sys.stdout.write('{done:{width}d} / {total:{width}d}  {percentage:3d}%\r'
+                                 .format(width=width, done=total-results._number_left,
+                                         total=total, percentage=int(100*(total-results._number_left)/total)))
+                sys.stdout.flush()
+                time.sleep(1)
 
             if len(pdf_cursor) != len(cursor):
                 raise RuntimeError('There was an error calculating the desired PDFs')
@@ -670,3 +682,31 @@ class PDFOverlap:
         """ Simple plot for comparing two projected PDFs. """
         from matador.plotting.pdf_plotting import plot_projected_diff_overlap
         plot_projected_diff_overlap(self)
+
+
+class CombinedProjectedPDF:
+    """ Take some computed PDFs and add them together. """
+    def __init__(self, pdf_cursor):
+        """ Create CombinedPDF object from list of PDFs.
+
+        Parameters:
+            pdf_cursor (:obj:`list` of :obj:`PDF`): list of
+                PDF objects to combine.
+
+        """
+        self.dr = min([pdf.dr for pdf in pdf_cursor])
+        self.rmax = min([pdf.rmax for pdf in pdf_cursor])
+        self.r_space = np.arange(0, self.rmax + self.dr, self.dr)
+        self.label = 'Combined PDF'
+        if any([not pdf.elem_gr for pdf in pdf_cursor]):
+            raise RuntimeError('Projected PDFs not found.')
+
+        keys = {key for pdf in pdf_cursor for key in pdf.elem_gr}
+        self.elem_gr = {key: np.zeros_like(self.r_space) for key in keys}
+        for pdf in pdf_cursor:
+            for key in pdf.elem_gr:
+                self.elem_gr[key] += np.interp(self.r_space, pdf.r_space, pdf.elem_gr[key])
+
+    def plot_projected_pdf(self):
+        from matador.plotting.pdf_plotting import plot_projected_pdf
+        plot_projected_pdf(self)
