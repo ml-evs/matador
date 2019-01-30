@@ -9,22 +9,26 @@ constants, with a focus on battery materials.
 
 import copy
 import numpy as np
+from scipy.constants import physical_constants
 
-# global consts
-FARADAY_CONSTANT_Cpermol = 96.485332e3
+FARADAY_CONSTANT_Cpermol = physical_constants['Faraday constant'][0]
+HARTREE_TO_EV = physical_constants['Hartree energy in eV'][0]
 Cperg_to_mAhperg = 2.778e-1
 C_TO_mAh = Cperg_to_mAhperg
-HARTREE_TO_EV = 27.21139
-BOHR_TO_ANGSTROM = 0.529177211
-RY_TO_EV = 13.605693009
+BOHR_TO_ANGSTROM = physical_constants['Bohr radius'][0] * 1e10
+RY_TO_EV = physical_constants['Rydberg constant times hc in eV'][0]
 KBAR_TO_GPA = 0.1
 eV_PER_ANGSTROM_CUBED_TO_GPa = 160.21776
-AVOGADROS_NUMBER = 6.022141e23
+AVOGADROS_NUMBER = physical_constants['Avogadro constant'][0]
 ANGSTROM_CUBED_TO_CENTIMETRE_CUBED = 1e-24
-ELECTRON_CHARGE = 1.6021766e-19
-KELVIN_TO_EV = 8.61733e-5
+ELECTRON_CHARGE = physical_constants['elementary charge'][0]
+KELVIN_TO_EV = physical_constants['kelvin-electron volt relationship'][0]
 
 EPS = 1e-12
+
+
+def get_iupac_ordering():
+    raise NotImplementedError
 
 
 def get_periodic_table():
