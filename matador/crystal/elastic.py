@@ -15,11 +15,20 @@ def get_equation_of_state(seed, plot=False):
     """ Extract E(V) data from CASTEP files and perform
     fits for the equation of state and bulk moduli.
 
+    Parameters:
+        seed (str/dict): filename or scraped dictionary to fit.
+
+    Keyword arguments:
+        plot (bool): plot the fitted EoS.
+
     """
-    from matador.scrapers import castep2dict
-    results, success = castep2dict(seed, intermediates=True, db=False)
-    if not success:
-        raise RuntimeError(results)
+    if isinstance(seed, dict):
+        results = seed
+    else:
+        from matador.scrapers import castep2dict
+        results, success = castep2dict(seed, intermediates=True, db=False)
+        if not success:
+            raise RuntimeError(results)
 
     volumes = []
     energies = []
