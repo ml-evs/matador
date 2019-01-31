@@ -6,6 +6,7 @@ atomic sites.
 
 """
 
+import numpy as np
 from matador.utils.cell_utils import cart2frac, frac2cart
 
 
@@ -89,9 +90,7 @@ class Site:
         return coordination
 
     def displacement_between_sites(self, other_site):
-        import numpy as np
         return np.asarray(self.get_coords(units='cartesian')) - np.asarray(other_site.get_coords(units='cartesian'))
 
     def distance_between_sites(self, other_site):
-        import numpy as np
         return np.linalg.norm(self.displacement_between_sites(other_site))

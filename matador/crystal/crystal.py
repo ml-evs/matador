@@ -333,10 +333,11 @@ class Crystal:
         if self._bonding_stats is None:
             from collections import defaultdict
             bonding_dict = defaultdict(dict)
-            for node in self.network.nodes:
+            network = self.network
+            for node in network.nodes:
                 bonding_dict[node] = {'species': self.sites[node].species, 'position': self.sites[node].coords, 'bonds': []}
             bonds = set()
-            for data in self.network.edges.data():
+            for data in network.edges.data():
                 atom_1 = data[0]
                 atom_2 = data[1]
                 pair = tuple(sorted([atom_1, atom_2]))
@@ -349,9 +350,10 @@ class Crystal:
                 site_2 = self.sites[atom_2]
 
                 bond_length = data[2]['dist']
-                is_image = data[2]['image']
+                is_image = bool(data[2]['image'])
                 bonding_dict[atom_1]['bonds'].append({'species': site_2.species, 'index': atom_2, 'length': bond_length, 'is_image': is_image, 'position': site_2.coords})
-            bonding_dict[atom_2]['bonds'].append({'species': site_1.species, 'index': atom_1, 'length': bond_length, 'is_image': is_image, 'position': site_1.coords})
+                bonding_dict[atom_2]['bonds'].append({'species': site_1.species, 'index': atom_1, 'length': bond_length, 'is_image': is_image, 'position': site_1.coords})
+
             self._bonding_stats = {key: bonding_dict[key] for key in sorted(bonding_dict)}
 
         return self._bonding_stats

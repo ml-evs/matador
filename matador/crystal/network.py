@@ -4,6 +4,8 @@ into CrystalGraph objects.
 import networkx as nx
 import numpy as np
 
+EPS = 1e-12
+
 
 class CrystalGraph(nx.MultiDiGraph):
     def __init__(self, structure=None, graph=None, coordination_cutoff=1.1, bond_tolerance=1e20, num_images=1,
@@ -46,10 +48,10 @@ class CrystalGraph(nx.MultiDiGraph):
                 self.add_node(i, species=atoms[i].species)
                 # loop over all other atoms j
                 for j in range(len(atoms)):
-                    if i == j:
-                        continue
                     # loop over all possible images of atoms j
                     for displacement in image_trans:
+                        if i == j and np.linalg.norm(displacement) <= EPS:
+                            continue
                         image_atom = deepcopy(atoms[j])
                         for k in range(3):
                             image_atom._coords['cartesian'][k] += displacement[k]
@@ -78,14 +80,14 @@ class CrystalGraph(nx.MultiDiGraph):
                         pair_key = tuple(sorted([atoms[i].species, atoms[j].species]))
                         if dist <= min_dist*coordination_cutoff and dist <= element_bonds[pair_key]*bond_tolerance:
                             if debug:
-                                print(i, j, j+image_number, dist, displacement)
+                                print(i, j, j+image_number, dist, displacement, atoms[i]._coords['cartesian'], image_atom._coords['cartesian'])
                             if separate_images and all([val <= 0+1e-8 for val in displacement]):
                                 image_number += 1
                                 self.add_node(j+image_number, species=atoms[j].species)
                                 self.add_edge(i, j+image_number, dist=dist)
                                 self.add_edge(j+image_number, i, dist=dist)
                             else:
-                                image = any([abs(val) > 0 + 1e-8 for val in displacement])
+                                image = np.linalg.norm(displacement) > EPS
                                 self.add_edge(i, j, dist=dist, image=image)
 
         elif graph is not None:
