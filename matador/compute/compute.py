@@ -484,36 +484,33 @@ class ComputeTask:
                 # run CASTEP
                 self._process = self.run_command(seed)
 
-                # if specified max_walltime (or found through SLURM), then monitor job
-                if self.max_walltime is not None:
-                    if self.start_time is None:
-                        msg = 'Somehow initial start time was not found'
-                        logging.critical(msg)
-                        raise CriticalError(msg)
+                if self.max_walltime is not None and self.start_time is None:
+                    msg = 'Somehow initial start time was not found'
+                    logging.critical(msg)
+                    raise CriticalError(msg)
 
-                    logging.info('Polling process every {} s'.format(self.polltime))
+                logging.info('Polling process every {} s'.format(self.polltime))
 
-                    while self._process.poll() is None:
-                        elapsed = time.time() - self.start_time
-                        logging.debug('Elapsed time: {:.0f} s / {:.0f} s'
-                                      .format(elapsed, self.max_walltime))
+                while self._process.poll() is None:
+                    elapsed = time.time() - self.start_time
+                    if elapsed > 2*self.poll_time:
+                        # if no CASTEP file made within 2*polltime (e.g. 60 seconds), then raise error
+                        if not os.path.isfile(seed + '.castep'):
+                            msg = ('CASTEP file was not created, please check your executable: {}.'
+                                   .format(self.executable))
+                            logging.critical(msg)
+                            raise CalculationError(msg)
 
+                    if self.max_walltime is not None:
                         # leave 1 minute to clean up
                         if elapsed > abs(self.max_walltime - 3*self.polltime):
                             msg = 'About to run out of time on seed {}, killing early...'.format(self.seed)
                             logging.info(msg)
                             raise WalltimeError(msg)
 
-                        time.sleep(self.polltime)
+                    time.sleep(self.polltime)
 
                 self._process.communicate()
-
-                # scrape new structure from castep file
-                if not os.path.isfile(seed + '.castep'):
-                    msg = ('CASTEP file was not created, please check your executable: {}.'
-                           .format(self.executable))
-                    logging.critical(msg)
-                    raise CriticalError(msg)
 
                 opti_dict, success = castep2dict(seed + '.castep', db=False, verbosity=self.verbosity)
                 logging.debug('Process returned {}'.format(self._process.returncode))
@@ -840,7 +837,7 @@ class ComputeTask:
                 self.test_exec()
 
             else:
-                err_string = 'Executable {exc} failed testing. Is it on your PATH?'.format(exc=self.executable)
+                err_string = 'Executable {} failed testing. Is it on your PATH?'.format(self.executable)
                 logging.critical(err_string)
                 logging.critical('stdout: {stdout}'.format(stdout=out.decode('utf-8')))
                 logging.critical('sterr: {stderr}'.format(stderr=errs.decode('utf-8')))
@@ -848,7 +845,7 @@ class ComputeTask:
                 raise CriticalError(err_string)
 
         if errs:
-            logging.info('Executable {} passed test, but stderr contains the following:')
+            logging.info('Executable {} passed test, but stderr contains the following:'.format(self.executable))
             logging.info(errs.decode('utf-8'))
 
     @property
