@@ -3,22 +3,26 @@ into CrystalGraph objects.
 """
 import networkx as nx
 import numpy as np
+import itertools
+import copy
 
 EPS = 1e-12
 
 
 class CrystalGraph(nx.MultiDiGraph):
     def __init__(self, structure=None, graph=None, coordination_cutoff=1.1, bond_tolerance=1e20, num_images=1,
-                 debug=False, separate_images=False, delete_one_way_bonds=False):
+                 debug=False, separate_images=False, delete_one_way_bonds=False, max_bond_length=5):
         """ Create networkx.MultiDiGraph object with extra functionality for atomic networks.
 
         Keyword Arguments:
-
             structure (matador.Crystal):  crystal structure to network-ify
             graph (nx.MultiDiGraph): initialise from graph
-            coordination_cutoff (float) : max multiplier of first coordination sphere for edge drawing
-            num_images (int): number of periodic images to include in each direction
-            separate_images (bool): whether or not to include image atoms as new nodes
+            coordination_cutoff (float) : max multiplier of first
+                coordination sphere for edge drawing
+            num_images (int): number of periodic images to include in
+                each direction
+            separate_images (bool): whether or not to include image
+                atoms as new nodes
 
         """
 
@@ -28,67 +32,67 @@ class CrystalGraph(nx.MultiDiGraph):
             raise RuntimeError('No structure or graph to initialise network from.')
 
         if structure is not None:
-            # iterate over all pairs of atoms in check minimum distance
             atoms = structure.sites
+            num_atoms = len(atoms)
             element_bonds = {}
-            from itertools import product
-            from copy import deepcopy
-            images = product(range(-num_images, num_images+1), repeat=3)
-            image_trans = []
-            for image in images:
-                image_trans.append(np.zeros((3)))
-                for k in range(3):
-                    image_trans[-1] += image[k] * np.asarray(structure.lattice_cart[k])
+            images = list(itertools.product(range(-num_images, num_images+1), repeat=3))
             image_number = 0
 
-            # first loop all pairs to find the minimum distance between all species pairs
+            # now loop over pairs of atoms and decide whether to draw an edge
+            from matador.utils.cell_utils import calc_pairwise_distances_pbc
+            distances = calc_pairwise_distances_pbc(structure.positions_abs,
+                                                    images,
+                                                    structure.lattice_cart,
+                                                    max_bond_length,
+                                                    compress=False,
+                                                    debug=True)
+
+            # first over loop all pairs to find the minimum distance between all species pairs
             # and the minimum distance for each atom
+            for i, atom in enumerate(atoms):
+                self.add_node(i, species=atom.species)
+
             min_dists = [1e20 for atom in atoms]
-            for i in range(len(atoms)):
-                self.add_node(i, species=atoms[i].species)
-                # loop over all other atoms j
-                for j in range(len(atoms)):
-                    # loop over all possible images of atoms j
-                    for displacement in image_trans:
-                        if i == j and np.linalg.norm(displacement) <= EPS:
-                            continue
-                        image_atom = deepcopy(atoms[j])
-                        for k in range(3):
-                            image_atom._coords['cartesian'][k] += displacement[k]
-                        dist = atoms[i].distance_between_sites(image_atom)
-                        pair_key = tuple(sorted([atoms[i].species, atoms[j].species]))
-                        if pair_key not in element_bonds or element_bonds[pair_key] > dist:
-                            element_bonds[pair_key] = dist
-                        # find the closest image of an atom to i
-                        if dist < min_dists[i]:
-                            min_dists[i] = dist
+            for index in np.where(~distances.mask)[0]:
+                image_index = int(index / num_atoms**2)
+                i = int((index - image_index * num_atoms**2) / num_atoms)
+                j = int((index - image_index * num_atoms**2) % num_atoms)
+                atom = atoms[i]
+                other_atom = atoms[j]
+                if (i == j and np.linalg.norm(images[image_index]) <= EPS):
+                    continue
+                dist = distances[index]
+                pair_key = tuple(sorted([atom.species, other_atom.species]))
+                if pair_key not in element_bonds or element_bonds[pair_key] > dist:
+                    element_bonds[pair_key] = dist
+                # find the closest image of an atom to i
+                if dist < min_dists[i]:
+                    min_dists[i] = dist
+
             if debug:
                 print(min_dists)
                 print(element_bonds)
 
-            # now loop over pairs of atoms and decide whether to draw an edge
-            for i in range(len(atoms)):
+            for index in np.where(~distances.mask)[0]:
+                image_index = int(index / num_atoms**2)
+                i = int((index - image_index * num_atoms**2) / num_atoms)
+                j = int((index - image_index * num_atoms**2) % num_atoms)
+                atom = atoms[i]
+                other_atom = atoms[j]
                 min_dist = min_dists[i]
-                for j in range(len(atoms)):
-                    if i == j:
-                        continue
-                    for displacement in image_trans:
-                        image_atom = deepcopy(atoms[j])
-                        for k in range(3):
-                            image_atom._coords['cartesian'][k] += displacement[k]
-                        dist = atoms[i].distance_between_sites(image_atom)
-                        pair_key = tuple(sorted([atoms[i].species, atoms[j].species]))
-                        if dist <= min_dist*coordination_cutoff and dist <= element_bonds[pair_key]*bond_tolerance:
-                            if debug:
-                                print(i, j, j+image_number, dist, displacement, atoms[i]._coords['cartesian'], image_atom._coords['cartesian'])
-                            if separate_images and all([val <= 0+1e-8 for val in displacement]):
-                                image_number += 1
-                                self.add_node(j+image_number, species=atoms[j].species)
-                                self.add_edge(i, j+image_number, dist=dist)
-                                self.add_edge(j+image_number, i, dist=dist)
-                            else:
-                                image = np.linalg.norm(displacement) > EPS
-                                self.add_edge(i, j, dist=dist, image=image)
+                if (i == j and np.linalg.norm(images[image_index]) <= EPS):
+                    continue
+                dist = distances[index]
+                pair_key = tuple(sorted([atom.species, other_atom.species]))
+                if dist <= min_dist*coordination_cutoff and dist <= element_bonds[pair_key]*bond_tolerance:
+                    if separate_images and all([val <= 0+1e-8 for val in images[image_index]]):
+                        image_number += 1
+                        self.add_node(j+image_number, species=atoms[j].species)
+                        self.add_edge(i, j+image_number, dist=dist)
+                        self.add_edge(j+image_number, i, dist=dist)
+                    else:
+                        is_image = np.linalg.norm(images[image_index]) > EPS
+                        self.add_edge(i, j, dist=dist, image=is_image)
 
         elif graph is not None:
             for node, data in graph.nodes.data():

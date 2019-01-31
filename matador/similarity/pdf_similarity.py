@@ -16,7 +16,6 @@ import time
 
 import numpy as np
 import numba
-from scipy.spatial.distance import cdist
 
 from matador.utils.cell_utils import frac2cart, cart2volume
 from matador.utils.cell_utils import standardize_doc_cell
@@ -137,41 +136,24 @@ class PDF(Fingerprint):
         """ Calculate PBC distances with cdist.
 
         Parameters:
-            poscart (ndarray): array of absolute atomic coordinates.
+            poscart (numpy.ndarray): array of absolute atomic coordinates.
 
         Keyword Arguments:
-            poscart_b (ndarray): absolute positions of a second type of atoms,
-                                  where only A-B distances will be calculated.
+            poscart_b (numpy.ndarray): absolute positions of a second type of atoms,
+                where only A-B distances will be calculated.
 
         Returns:
-            distances (ndarray): pair d_ij matrix with values > rmax < 1e-12 removed.
-
+            numpy.ndarray: pair d_ij matrix with values > rmax < 1e-12 removed.
 
         """
-        if self.kwargs.get('debug'):
-            start = time.time()
-        distances = np.array([])
-        if poscart_b is None:
-            poscart_b = poscart
-        for prod in self._image_vec:
-            trans = np.zeros((3))
-            for ind, multi in enumerate(prod):
-                trans += self._lattice[ind] * multi
-            distances = np.append(distances, cdist(poscart + trans, poscart_b))
-        # mask by rmax/0 and remove masked values
-        distances = np.ma.masked_where(distances > self.rmax, distances)
-        distances = np.ma.masked_where(distances < 1e-12, distances)
-        if self.kwargs.get('debug'):
-            print('Calculated: {}, Used: {}, Ignored: {}'.format(len(distances),
-                                                                 np.ma.count(distances),
-                                                                 np.ma.count_masked(distances)))
-        distances = distances.compressed()
-
-        if self.kwargs.get('debug'):
-            end = time.time()
-            print('Calculated distances in {} s'.format(end - start))
-
-        return distances
+        from matador.utils.cell_utils import calc_pairwise_distances_pbc
+        return calc_pairwise_distances_pbc(poscart,
+                                           self._image_vec,
+                                           self._lattice,
+                                           self.rmax,
+                                           compress=True,
+                                           poscart_b=poscart_b,
+                                           debug=self.kwargs.get('debug'))
 
     def _calc_unprojected_pdf(self):
         """ Wrapper function to calculate distances and output
@@ -708,5 +690,6 @@ class CombinedProjectedPDF:
                 self.elem_gr[key] += np.interp(self.r_space, pdf.r_space, pdf.elem_gr[key])
 
     def plot_projected_pdf(self):
+        """ Plot the combined PDF. """
         from matador.plotting.pdf_plotting import plot_projected_pdf
         plot_projected_pdf(self)
