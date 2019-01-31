@@ -27,7 +27,8 @@ try:
 except FileNotFoundError:
     if VERBOSITY > 0:
         print('Failed to detect CASTEP')
-    CASTEP_PRESENT = False
+
+CASTEP_PRESENT = False
 
 try:
     with open('/dev/null', 'w') as devnull:
@@ -51,6 +52,175 @@ class ComputeTest(unittest.TestCase):
     various artificial setups.
 
     """
+
+    def test_missing_exec(self):
+        """ Ensure failure if exec misses. """
+        from matador.compute import FullRelaxer
+        from matador.scrapers.castep_scrapers import cell2dict, param2dict
+        from matador.compute.compute import CriticalError
+        cell_dict, s = cell2dict(REAL_PATH + '/data/LiAs_tests/LiAs.cell', verbosity=VERBOSITY, db=False)
+        assert s
+        param_dict, s = param2dict(REAL_PATH + '/data/LiAs_tests/LiAs.param', verbosity=VERBOSITY, db=False)
+        assert s
+
+        node = None
+        nnodes = None
+        seed = REAL_PATH + '/data/structures/LiAs_testcase.res'
+
+        fall_over = False
+
+        try:
+            FullRelaxer(ncores=NCORES, nnodes=nnodes, node=node,
+                        res=seed, param_dict=param_dict, cell_dict=cell_dict,
+                        debug=False, verbosity=VERBOSITY, killcheck=True,
+                        reopt=False, executable='THIS WAS MEANT TO FAIL, DON\'T WORRY',
+                        start=True)
+        except CriticalError:
+            fall_over = True
+
+        for path in PATHS_TO_DEL:
+            if os.path.isdir(path):
+                files = glob.glob(path + '/*')
+                for file in files:
+                    os.remove(file)
+                os.removedirs(path)
+
+        paths = ['Li_00PBE.usp', 'As_00PBE.usp', 'LiAs_testcase.res']
+        for path in paths:
+            if os.path.isfile(path):
+                os.remove(path)
+
+        self.assertTrue(fall_over)
+
+    def test_file_not_written(self):
+        """ Run a calculation with an executable that only does "sleep" and
+        check that run3 will stop the calculation early as no file is written.
+
+        """
+        from matador.compute import FullRelaxer
+        from matador.scrapers.castep_scrapers import cell2dict, param2dict
+        os.chdir(REAL_PATH)
+        if not os.path.isdir(REAL_PATH + '/missing_file_test'):
+            os.makedirs(REAL_PATH + '/missing_file_test')
+        os.chdir(REAL_PATH + '/missing_file_test')
+
+        seed = REAL_PATH + 'data/symmetry_failure/Sb.res'
+        cell_dict, s = cell2dict(REAL_PATH + '/data/symmetry_failure/KSb.cell', verbosity=VERBOSITY, db=False)
+        assert s
+        param_dict, s = param2dict(REAL_PATH + '/data/symmetry_failure/KSb.param', verbosity=VERBOSITY, db=False)
+        assert s
+        executable = REAL_PATH + 'data/missing_file_test/monkey_patch_sleep.sh'
+        node = None
+
+        relaxer = FullRelaxer(ncores=NCORES, nnodes=None, node=node,
+                              res=seed, param_dict=param_dict, cell_dict=cell_dict,
+                              debug=True, verbosity=VERBOSITY, executable=executable,
+                              exec_test=False, compute_dir=None, polltime=1,
+                              start=False)
+        errored = False
+
+        try:
+            relaxer.relax()
+        except CalculationError:
+            errored = True
+
+        os.chdir(REAL_PATH)
+        from shutil import rmtree
+        rmtree('missing_file_test')
+
+        os.chdir(ROOT_DIR)
+        self.assertTrue(relaxer.final_result is None)
+        self.assertTrue(errored)
+
+    def test_old_file(self):
+        """ Run a calculation with an executable that only does "sleep", in the
+        presence of a file that was written previouisly, and check that run3
+        will stop the calculation early as no file is written.
+
+        """
+        from matador.compute import FullRelaxer
+        from matador.scrapers.castep_scrapers import cell2dict, param2dict
+        os.chdir(REAL_PATH)
+        if not os.path.isdir(REAL_PATH + '/missing_file_test'):
+            os.makedirs(REAL_PATH + '/missing_file_test')
+        os.chdir(REAL_PATH + '/missing_file_test')
+
+        seed = REAL_PATH + 'data/symmetry_failure/Sb.res'
+        with open('Sb.castep', 'w') as f:
+            f.write('I am a CASTEP file, for sure.')
+
+        cell_dict, s = cell2dict(REAL_PATH + '/data/symmetry_failure/KSb.cell', verbosity=VERBOSITY, db=False)
+        assert s
+        param_dict, s = param2dict(REAL_PATH + '/data/symmetry_failure/KSb.param', verbosity=VERBOSITY, db=False)
+        assert s
+        executable = REAL_PATH + 'data/missing_file_test/monkey_patch_sleep.sh'
+        node = None
+
+        relaxer = FullRelaxer(ncores=NCORES, nnodes=None, node=node,
+                              res=seed, param_dict=param_dict, cell_dict=cell_dict,
+                              debug=True, verbosity=VERBOSITY, executable=executable,
+                              exec_test=False, compute_dir=None, polltime=1,
+                              start=False)
+        errored = False
+
+        try:
+            relaxer.relax()
+        except CalculationError:
+            errored = True
+
+        os.chdir(REAL_PATH)
+        from shutil import rmtree
+        rmtree('missing_file_test')
+
+        os.chdir(ROOT_DIR)
+        self.assertTrue(relaxer.final_result is None)
+        self.assertTrue(errored)
+
+    def test_faked_error_recovery(self):
+        """ Run a calculation that *should* throw a symmetry error, and try to
+        recover from the error. If CASTEP is not present, monkey patch such that
+        FullRelaxer copies the output files it would have expected.
+
+        """
+        from matador.compute import FullRelaxer
+        from matador.scrapers.castep_scrapers import cell2dict, param2dict
+        os.chdir(REAL_PATH)
+        if not os.path.isdir(REAL_PATH + '/fake_symmetry_test'):
+            os.makedirs(REAL_PATH + '/fake_symmetry_test')
+        os.chdir(REAL_PATH + '/fake_symmetry_test')
+
+        seed = REAL_PATH + 'data/symmetry_failure/Sb.res'
+        cell_dict, s = cell2dict(REAL_PATH + '/data/symmetry_failure/KSb.cell', verbosity=VERBOSITY, db=False)
+        assert s
+        param_dict, s = param2dict(REAL_PATH + '/data/symmetry_failure/KSb.param', verbosity=VERBOSITY, db=False)
+        assert s
+        executable = REAL_PATH + 'data/symmetry_failure/monkey_patch_move.sh'
+        node = None
+
+        relaxer = FullRelaxer(ncores=NCORES, nnodes=None, node=node,
+                              res=seed, param_dict=param_dict, cell_dict=cell_dict,
+                              debug=True, verbosity=VERBOSITY, executable=executable,
+                              exec_test=False, compute_dir=None,
+                              start=False)
+        errored = False
+
+        try:
+            relaxer.relax()
+        except CalculationError:
+            errored = True
+
+        os.chdir(REAL_PATH)
+        from shutil import rmtree
+        rmtree('fake_symmetry_test')
+
+        os.chdir(ROOT_DIR)
+        self.assertTrue(relaxer.final_result is None)
+        self.assertTrue(errored)
+        self.assertEqual(relaxer._num_retries, 3)
+        self.assertTrue('symmetry_generate' not in relaxer.calc_doc)
+        self.assertTrue('snap_to_symmetry' not in relaxer.calc_doc)
+        self.assertTrue('symmetry_tol' not in relaxer.calc_doc)
+
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
     def test_relax_to_queue(self):
         """ Mimic GA and test Queue relaxations. """
@@ -119,90 +289,6 @@ class ComputeTest(unittest.TestCase):
         self.assertTrue(input_exists, "couldn't find copy of input file!")
         self.assertTrue(success, "couldn't parse output file!")
         self.assertTrue(all([match_dict[key] for key in match_dict]))
-
-    def test_missing_exec(self):
-        """ Ensure failure if exec misses. """
-        from matador.compute import FullRelaxer
-        from matador.scrapers.castep_scrapers import cell2dict, param2dict
-        from matador.compute.compute import CriticalError
-        cell_dict, s = cell2dict(REAL_PATH + '/data/LiAs_tests/LiAs.cell', verbosity=VERBOSITY, db=False)
-        assert s
-        param_dict, s = param2dict(REAL_PATH + '/data/LiAs_tests/LiAs.param', verbosity=VERBOSITY, db=False)
-        assert s
-
-        node = None
-        nnodes = None
-        seed = REAL_PATH + '/data/structures/LiAs_testcase.res'
-
-        fall_over = False
-
-        try:
-            FullRelaxer(ncores=NCORES, nnodes=nnodes, node=node,
-                        res=seed, param_dict=param_dict, cell_dict=cell_dict,
-                        debug=False, verbosity=VERBOSITY, killcheck=True,
-                        reopt=False, executable='THIS WAS MEANT TO FAIL, DON\'T WORRY',
-                        start=True)
-        except CriticalError:
-            fall_over = True
-
-        for path in PATHS_TO_DEL:
-            if os.path.isdir(path):
-                files = glob.glob(path + '/*')
-                for file in files:
-                    os.remove(file)
-                os.removedirs(path)
-
-        paths = ['Li_00PBE.usp', 'As_00PBE.usp', 'LiAs_testcase.res']
-        for path in paths:
-            if os.path.isfile(path):
-                os.remove(path)
-
-        self.assertTrue(fall_over)
-
-    def test_faked_error_recovery(self):
-        """ Run a calculation that *should* throw a symmetry error, and try to
-        recover from the error. If CASTEP is not present, monkey patch such that
-        FullRelaxer copies the output files it would have expected.
-
-        """
-        from matador.compute import FullRelaxer
-        from matador.scrapers.castep_scrapers import cell2dict, param2dict
-        os.chdir(REAL_PATH)
-        if not os.path.isdir(REAL_PATH + '/fake_symmetry_test'):
-            os.makedirs(REAL_PATH + '/fake_symmetry_test')
-        os.chdir(REAL_PATH + '/fake_symmetry_test')
-
-        seed = REAL_PATH + 'data/symmetry_failure/Sb.res'
-        cell_dict, s = cell2dict(REAL_PATH + '/data/symmetry_failure/KSb.cell', verbosity=VERBOSITY, db=False)
-        assert s
-        param_dict, s = param2dict(REAL_PATH + '/data/symmetry_failure/KSb.param', verbosity=VERBOSITY, db=False)
-        assert s
-        executable = REAL_PATH + 'data/symmetry_failure/monkey_patch_move.sh'
-        node = None
-
-        relaxer = FullRelaxer(ncores=NCORES, nnodes=None, node=node,
-                              res=seed, param_dict=param_dict, cell_dict=cell_dict,
-                              debug=True, verbosity=10, executable=executable,
-                              exec_test=False, compute_dir=None,
-                              start=False)
-        errored = False
-
-        try:
-            relaxer.relax()
-        except CalculationError:
-            errored = True
-
-        os.chdir(REAL_PATH)
-        from shutil import rmtree
-        rmtree('fake_symmetry_test')
-
-        os.chdir(ROOT_DIR)
-        self.assertTrue(relaxer.final_result is None)
-        self.assertTrue(errored)
-        self.assertEqual(relaxer._num_retries, 3)
-        self.assertTrue('symmetry_generate' not in relaxer.calc_doc)
-        self.assertTrue('snap_to_symmetry' not in relaxer.calc_doc)
-        self.assertTrue('symmetry_tol' not in relaxer.calc_doc)
 
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
     def test_relax_to_file(self):
@@ -697,7 +783,7 @@ class ComputeTest(unittest.TestCase):
         os.chdir(REAL_PATH + 'data/missing_basics')
         tests = ['missing_cutoff', 'missing_kpts', 'missing_xc', 'missing_pspot']
         errors = [False for test in tests]
-        for ind, test in enumerate(tests):
+        for ind, _ in enumerate(tests):
             try:
                 runner = BatchRun(seed=['LiAs'], debug=False, no_reopt=True,
                                   verbosity=VERBOSITY, ncores=2, nprocesses=2, executable=EXECUTABLE)

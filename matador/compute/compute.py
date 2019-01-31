@@ -187,11 +187,11 @@ class ComputeTask:
         file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)8s: %(message)s'))
         logging.getLogger().addHandler(file_handler)
 
-        splash_screen = """ Run started for seed {}.
+        splash_screen = r""" Run started for seed {}.
 
                            _____
           _ __ _   _ _ __ |___ /
-         | '__| | | | '_ \  |_ \\
+         | '__| | | | '_ \  |_ \
          | |  | |_| | | | |___) |
          |_|   \__,_|_| |_|____/
 
@@ -483,6 +483,7 @@ class ComputeTask:
 
                 # run CASTEP
                 self._process = self.run_command(seed)
+                proc_clock = time.time()
 
                 if self.max_walltime is not None and self.start_time is None:
                     msg = 'Somehow initial start time was not found'
@@ -492,18 +493,25 @@ class ComputeTask:
                 logging.info('Polling process every {} s'.format(self.polltime))
 
                 while self._process.poll() is None:
-                    elapsed = time.time() - self.start_time
-                    if elapsed > 2*self.poll_time:
+                    proc_elapsed = time.time() - proc_clock
+                    if proc_elapsed > 2*self.polltime:
                         # if no CASTEP file made within 2*polltime (e.g. 60 seconds), then raise error
+                        # or if the file has not been written to in the last 60 seconds
                         if not os.path.isfile(seed + '.castep'):
                             msg = ('CASTEP file was not created, please check your executable: {}.'
                                    .format(self.executable))
                             logging.critical(msg)
                             raise CalculationError(msg)
+                        elif os.path.getmtime(seed + '.castep') - proc_clock < 0:
+                            msg = ('CASTEP file present, but too old to be made by this process. Please check your executable: {}.'
+                                   .format(self.executable))
+                            logging.critical(msg)
+                            raise CalculationError(msg)
 
                     if self.max_walltime is not None:
+                        run_elapsed = time.time() - self.start_time
                         # leave 1 minute to clean up
-                        if elapsed > abs(self.max_walltime - 3*self.polltime):
+                        if run_elapsed > abs(self.max_walltime - 3*self.polltime):
                             msg = 'About to run out of time on seed {}, killing early...'.format(self.seed)
                             logging.info(msg)
                             raise WalltimeError(msg)
