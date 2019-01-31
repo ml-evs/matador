@@ -156,6 +156,13 @@ class Crystal:
         return self._doc['positions_frac']
 
     @property
+    def positions_abs(self):
+        from matador.utils.cell_utils import frac2cart
+        if 'positions_abs' not in self._doc:
+            self._doc['positions_abs'] = frac2cart(self.lattice_cart, self.positions_frac)
+        return self._doc['positions_abs']
+
+    @property
     def stoichiometry(self):
         """ Return stoichiometry in matador format: a list of
         two-member lists containing element symbol and number
