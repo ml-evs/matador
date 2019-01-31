@@ -73,6 +73,9 @@ def compare_pdfs(**kwargs):
         combo = CombinedProjectedPDF([doc['pdf'] for doc in strucs])
         combo.plot_projected_pdf()
 
+    elif kwargs.get('plot'):
+        strucs[0]['pdf'].plot_pdf(other_pdfs=[doc['pdf'] for doc in strucs[1:]])
+
     plt.show()
 
 
@@ -81,7 +84,8 @@ if __name__ == '__main__':
     parser.add_argument('-dr', '--dr', type=float)
     parser.add_argument('-gw', '--gaussian_width', type=float)
     parser.add_argument('seeds', nargs='+', type=str, help='structures to compare')
-    parser.add_argument('--combine', help='combine pdfs into one')
+    parser.add_argument('--combine', action='store_true', help='combine pdfs into one')
+    parser.add_argument('--plot', action='store_true')
     parser.add_argument('--diff', action='store_true', help='plot diff')
     parser.add_argument('--total', action='store_true', help='plot total pdf overlap only')
     parser.add_argument('-u', '--uniq', type=float, help='filter structures for uniqueness')
