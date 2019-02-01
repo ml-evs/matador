@@ -128,9 +128,6 @@ class CastepSpectralWorkflow(Workflow):
                 self.optados_executable = settings.get('optados_executable', 'optados')
                 self.relaxer.optados_executable = self.optados_executable
 
-        self.calc_doc['spectral_kpoints_mp_spacing'] = self.calc_doc.get('spectral_kpoints_mp_spacing', 0.05)
-        self.calc_doc['spectral_kpoints_path_spacing'] = self.calc_doc.get('spectral_kpoints_path_spacing', 0.05)
-
         # if not using a user-requested path, use seekpath and spglib
         # to reduce to primitive and use consistent path
         if 'spectral_kpoints_list' not in self.calc_doc and 'spectral_kpoints_path' not in self.calc_doc:
@@ -141,10 +138,13 @@ class CastepSpectralWorkflow(Workflow):
             self.calc_doc['lattice_abc'] = cart2abc(self.calc_doc['lattice_cart'])
             if todo['dispersion']:
                 self.calc_doc['spectral_kpoints_list'] = kpt_path
-
-        elif todo['dispersion']:
+        elif todo['dispersion'] and 'spectral_kpoints_path' in self.calc_doc:
             self._user_defined_kpt_path = True
             logging.warning('Using user-defined k-point path for all structures.')
+            self.calc_doc['spectral_kpoints_path_spacing'] = self.calc_doc.get('spectral_kpoints_path_spacing', 0.05)
+
+        if todo['dos']:
+            self.calc_doc['spectral_kpoints_mp_spacing'] = self.calc_doc.get('spectral_kpoints_mp_spacing', 0.05)
 
         # always use continuation
         self.calc_doc['continuation'] = 'default'
@@ -435,4 +435,5 @@ def _get_correct_files_for_optados(seed, suffix=None):
         if os.path.isfile(old_file):
             shutil.copy2(old_file, current_file)
             if suffix == 'bak':
+                os.remove(old_file)
                 os.remove(old_file)
