@@ -334,7 +334,6 @@ class PDF(Fingerprint):
         return gr
 
     @staticmethod
-    @numba.jit
     def _get_image_trans_vectors_auto(lattice, rmax, dr, max_num_images=50):
         """ Finds all "images" (integer 3-tuples, supercells) that have
         atoms within rmax + dr + longest LV of the parent lattice.
@@ -353,36 +352,24 @@ class PDF(Fingerprint):
 
         """
         image_vec = set()
-        any_in_sphere = True
         # find longest combination of single LV's
         max_trans = 0
-        trans = np.zeros((3))
+        _lattice = np.asarray(lattice)
         products = list(itertools.product(range(-1, 2), repeat=3))
         for prod in products:
-            trans = 0
-            for ind, multi in enumerate(prod):
-                trans += lattice[ind] * multi
-            if np.sqrt(np.sum(trans**2)) > max_trans:
-                max_trans = np.sqrt(np.sum(trans**2))
-        test_num_images = 3
-        while any_in_sphere and test_num_images <= max_num_images:
-            products = list(itertools.product(range(-test_num_images, test_num_images+1), repeat=3))
-            any_in_sphere = False
-            for prod in products:
-                if prod in image_vec:
-                    continue
-                trans = 0
-                for ind, multi in enumerate(prod):
-                    trans += lattice[ind] * multi
-                if np.sqrt(np.sum(trans**2)) <= rmax + dr + max_trans:
-                    image_vec.add(prod)
-                    any_in_sphere = True
-            test_num_images += 1
-            if test_num_images > max_num_images:
-                print('Something has probably gone wrong; required images reached {}.'
-                      .format(max_num_images))
-                print('Continuing with num_images = 1')
-                return list(itertools.product(range(-1, 2), repeat=3))
+            trans = prod @ _lattice
+            length = np.sqrt(np.sum(trans**2))
+            if length > max_trans:
+                max_trans = length
+
+        unit_vector_lengths = np.sqrt(np.sum(lattice**2, axis=1))
+        limits = [int((dr + rmax + max_trans) / length) for length in unit_vector_lengths]
+        products = itertools.product(*(range(-lim, lim+1) for lim in limits))
+        for prod in products:
+            trans = prod @ _lattice
+            length = np.sqrt(np.sum(trans**2))
+            if length <= rmax + dr + max_trans:
+                image_vec.add(prod)
 
         return image_vec
 
