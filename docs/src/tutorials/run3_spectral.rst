@@ -26,6 +26,8 @@ We can compute just bandstructure by specifying ``spectral_kpoints_path_spacing`
    $ cat LiCoO2.param
    task: spectral
    spectral_task: bandstructure
+   xc_functional: LDA
+   cut_off_energy: 400 eV
 
    $ cat LiCoO2.cell
    kpoints_mp_spacing: 0.05
