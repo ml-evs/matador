@@ -542,7 +542,7 @@ def calc_pairwise_distances_pbc(poscart, images, lattice, rmax,
     num_pairs = len(_poscart) * len(_poscart_b)
 
     for image_ind, prod in enumerate(images):
-        distances[image_ind*num_pairs:(image_ind+1)*num_pairs] = cdist(_poscart, _poscart_b + _lattice @ prod).flatten()
+        distances[image_ind*num_pairs:(image_ind+1)*num_pairs] = cdist(_poscart, _poscart_b + prod @ _lattice).flatten()
 
     # mask by rmax/0 and remove masked values
     distances = np.ma.masked_where(distances > rmax, distances, copy=False)
