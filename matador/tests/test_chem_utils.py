@@ -51,8 +51,8 @@ class ChemUtilsTest(unittest.TestCase):
                 temp_conc[-1] -= conc
 
             Q.append(get_generic_grav_capacity(temp_conc, elem))
-        self.assertAlmostEqual(Q[0], 2596.09660218)
-        self.assertAlmostEqual(Q[2], 167.449398573)
+        self.assertAlmostEqual(Q[0], 2596.096626125)
+        self.assertAlmostEqual(Q[2], 167.449, places=3)
         self.assertEqual(Q[0], Q[1])
         self.assertEqual(round(8*Q[2], 3), round(Q[3], 3))
         self.assertEqual(round(Q[2], 3), round(2*Q[4], 3))
