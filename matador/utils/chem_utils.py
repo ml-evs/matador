@@ -370,11 +370,10 @@ def get_ratios_from_stoichiometry(stoichiometry):
 
     """
     ratio_dict = dict()
-    for i, elem_i in enumerate(stoichiometry):
-        for j, elem_j in enumerate(stoichiometry):
-            if elem_j != elem_i:
-                ratio_dict[stoichiometry[i][0]
-                           + stoichiometry[j][0]] = round(float(stoichiometry[i][1]) / stoichiometry[j][1], 3)
+    for _, elem_i in enumerate(stoichiometry):
+        for _, elem_j in enumerate(stoichiometry):
+            if elem_j[0] != elem_i[0]:
+                ratio_dict[elem_i[0]+elem_j[0]] = round(float(elem_i[1]) / elem_j[1], 3)
     return ratio_dict
 
 
@@ -538,7 +537,7 @@ def get_root_source(source):
         source = source['source']
     src_list = set()
     for src in source:
-        if src.endswith('.res') or src.endswith('.castep') or src.endswith('.history'):
+        if src.endswith('.res') or src.endswith('.castep') or src.endswith('.history') or src.endswith('.history.gz'):
             src_list.add('.'.join(src.split('/')[-1].split('.')[0:-1]))
         elif 'OQMD' in src.upper():
             src_list.add(src)

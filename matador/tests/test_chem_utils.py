@@ -273,6 +273,18 @@ class ChemUtilsTest(unittest.TestCase):
         src = 'KP-0.02.-1234-abcd'
         self.assertEqual(src, get_root_source(source))
 
+        source = ['KP.cell', 'KP.param', 'abcd-123.fdasf/efgf/KP-0.02.-1234-abcd.history']
+        src = 'KP-0.02.-1234-abcd'
+        self.assertEqual(src, get_root_source(source))
+
+        source = ['KP.cell', 'KP.param', 'PK-OQMD_12345.history']
+        src = 'PK-OQMD_12345'
+        self.assertEqual(src, get_root_source(source))
+
+        source = ['OQMD 12345']
+        src = 'OQMD 12345'
+        self.assertEqual(src, get_root_source(source))
+
         source = ['KP.cell', 'KP.param', 'abcd-123.fdasf/efgf/KP-0.02.-1234-abcd.castep', 'KP-1234-abcde.res']
         failed = False
         try:
