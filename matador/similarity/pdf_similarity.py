@@ -10,12 +10,12 @@ the similarity between two structures.
 from itertools import combinations_with_replacement
 import itertools
 import copy
+import sys
 from math import ceil
 import time
 
 import numpy as np
 import numba
-from scipy.spatial.distance import cdist
 
 from matador.utils.cell_utils import frac2cart, cart2volume
 from matador.utils.cell_utils import standardize_doc_cell
@@ -136,41 +136,24 @@ class PDF(Fingerprint):
         """ Calculate PBC distances with cdist.
 
         Parameters:
-            poscart (ndarray): array of absolute atomic coordinates.
+            poscart (numpy.ndarray): array of absolute atomic coordinates.
 
         Keyword Arguments:
-            poscart_b (ndarray): absolute positions of a second type of atoms,
-                                  where only A-B distances will be calculated.
+            poscart_b (numpy.ndarray): absolute positions of a second type of atoms,
+                where only A-B distances will be calculated.
 
         Returns:
-            distances (ndarray): pair d_ij matrix with values > rmax < 1e-12 removed.
-
+            numpy.ndarray: pair d_ij matrix with values > rmax < 1e-12 removed.
 
         """
-        if self.kwargs.get('debug'):
-            start = time.time()
-        distances = np.array([])
-        if poscart_b is None:
-            poscart_b = poscart
-        for prod in self._image_vec:
-            trans = np.zeros((3))
-            for ind, multi in enumerate(prod):
-                trans += self._lattice[ind] * multi
-            distances = np.append(distances, cdist(poscart + trans, poscart_b))
-        # mask by rmax/0 and remove masked values
-        distances = np.ma.masked_where(distances > self.rmax, distances)
-        distances = np.ma.masked_where(distances < 1e-12, distances)
-        if self.kwargs.get('debug'):
-            print('Calculated: {}, Used: {}, Ignored: {}'.format(len(distances),
-                                                                 np.ma.count(distances),
-                                                                 np.ma.count_masked(distances)))
-        distances = distances.compressed()
-
-        if self.kwargs.get('debug'):
-            end = time.time()
-            print('Calculated distances in {} s'.format(end - start))
-
-        return distances
+        from matador.utils.cell_utils import calc_pairwise_distances_pbc
+        return calc_pairwise_distances_pbc(poscart,
+                                           self._image_vec,
+                                           self._lattice,
+                                           self.rmax,
+                                           compress=True,
+                                           poscart_b=poscart_b,
+                                           debug=self.kwargs.get('debug'))
 
     def _calc_unprojected_pdf(self):
         """ Wrapper function to calculate distances and output
@@ -351,7 +334,6 @@ class PDF(Fingerprint):
         return gr
 
     @staticmethod
-    @numba.jit
     def _get_image_trans_vectors_auto(lattice, rmax, dr, max_num_images=50):
         """ Finds all "images" (integer 3-tuples, supercells) that have
         atoms within rmax + dr + longest LV of the parent lattice.
@@ -370,36 +352,24 @@ class PDF(Fingerprint):
 
         """
         image_vec = set()
-        any_in_sphere = True
         # find longest combination of single LV's
         max_trans = 0
-        trans = np.zeros((3))
+        _lattice = np.asarray(lattice)
         products = list(itertools.product(range(-1, 2), repeat=3))
         for prod in products:
-            trans = 0
-            for ind, multi in enumerate(prod):
-                trans += lattice[ind] * multi
-            if np.sqrt(np.sum(trans**2)) > max_trans:
-                max_trans = np.sqrt(np.sum(trans**2))
-        test_num_images = 3
-        while any_in_sphere and test_num_images <= max_num_images:
-            products = list(itertools.product(range(-test_num_images, test_num_images+1), repeat=3))
-            any_in_sphere = False
-            for prod in products:
-                if prod in image_vec:
-                    continue
-                trans = 0
-                for ind, multi in enumerate(prod):
-                    trans += lattice[ind] * multi
-                if np.sqrt(np.sum(trans**2)) <= rmax + dr + max_trans:
-                    image_vec.add(prod)
-                    any_in_sphere = True
-            test_num_images += 1
-            if test_num_images > max_num_images:
-                print('Something has probably gone wrong; required images reached {}.'
-                      .format(max_num_images))
-                print('Continuing with num_images = 1')
-                return list(itertools.product(range(-1, 2), repeat=3))
+            trans = prod @ _lattice
+            length = np.sqrt(np.sum(trans**2))
+            if length > max_trans:
+                max_trans = length
+
+        unit_vector_lengths = np.sqrt(np.sum(lattice**2, axis=1))
+        limits = [int((dr + rmax + max_trans) / length) for length in unit_vector_lengths]
+        products = itertools.product(*(range(-lim, lim+1) for lim in limits))
+        for prod in products:
+            trans = prod @ _lattice
+            length = np.sqrt(np.sum(trans**2))
+            if length <= rmax + dr + max_trans:
+                image_vec.add(prod)
 
         return image_vec
 
@@ -509,9 +479,20 @@ class PDFFactory:
         else:
             pool = mp.Pool(processes=self.nprocs)
             pdf_cursor = []
-            pool.map_async(calc_pdf_pool_wrapper, cursor, callback=pdf_cursor.extend, error_callback=print)
+            results = pool.map_async(calc_pdf_pool_wrapper,
+                                     cursor,
+                                     callback=pdf_cursor.extend,
+                                     error_callback=print,
+                                     chunksize=1)  # set chunksize to 1 as PDFs will vary in cost to compute
             pool.close()
-            pool.join()
+            width = len(str(len(cursor)))
+            total = len(cursor)
+            while not results.ready():
+                sys.stdout.write('{done:{width}d} / {total:{width}d}  {percentage:3d}%\r'
+                                 .format(width=width, done=total-results._number_left,
+                                         total=total, percentage=int(100*(total-results._number_left)/total)))
+                sys.stdout.flush()
+                time.sleep(1)
 
             if len(pdf_cursor) != len(cursor):
                 raise RuntimeError('There was an error calculating the desired PDFs')
@@ -670,3 +651,32 @@ class PDFOverlap:
         """ Simple plot for comparing two projected PDFs. """
         from matador.plotting.pdf_plotting import plot_projected_diff_overlap
         plot_projected_diff_overlap(self)
+
+
+class CombinedProjectedPDF:
+    """ Take some computed PDFs and add them together. """
+    def __init__(self, pdf_cursor):
+        """ Create CombinedPDF object from list of PDFs.
+
+        Parameters:
+            pdf_cursor (:obj:`list` of :obj:`PDF`): list of
+                PDF objects to combine.
+
+        """
+        self.dr = min([pdf.dr for pdf in pdf_cursor])
+        self.rmax = min([pdf.rmax for pdf in pdf_cursor])
+        self.r_space = np.arange(0, self.rmax + self.dr, self.dr)
+        self.label = 'Combined PDF'
+        if any([not pdf.elem_gr for pdf in pdf_cursor]):
+            raise RuntimeError('Projected PDFs not found.')
+
+        keys = {key for pdf in pdf_cursor for key in pdf.elem_gr}
+        self.elem_gr = {key: np.zeros_like(self.r_space) for key in keys}
+        for pdf in pdf_cursor:
+            for key in pdf.elem_gr:
+                self.elem_gr[key] += np.interp(self.r_space, pdf.r_space, pdf.elem_gr[key])
+
+    def plot_projected_pdf(self):
+        """ Plot the combined PDF. """
+        from matador.plotting.pdf_plotting import plot_projected_pdf
+        plot_projected_pdf(self)

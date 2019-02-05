@@ -305,9 +305,9 @@ class VoltageTest(unittest.TestCase):
                 hull_cursor.append(json.load(f))
         bare_hull = QueryConvexHull(cursor=hull_cursor, species=['Li', 'As'], subcmd='voltage', no_plot=True)
         self.assertTrue(len(bare_hull.voltage_data['voltages']) == 1)
-        np.testing.assert_array_almost_equal(bare_hull.voltage_data['voltages'][0], test_V, verbose=True)
-        np.testing.assert_array_almost_equal(bare_hull.voltage_data['x'][0], test_x)
-        np.testing.assert_array_almost_equal(bare_hull.voltage_data['Q'][0], test_Q)
+        np.testing.assert_array_almost_equal(bare_hull.voltage_data['voltages'][0], test_V, decimal=5, verbose=True)
+        np.testing.assert_array_almost_equal(bare_hull.voltage_data['x'][0], test_x, decimal=5)
+        np.testing.assert_array_almost_equal(bare_hull.voltage_data['Q'][0], test_Q, decimal=5)
         for ind in range(len(bare_hull.voltage_data['voltages'])):
             assert len(bare_hull.voltage_data['Q'][ind]) == len(bare_hull.voltage_data['voltages'][ind])
             assert np.isnan(bare_hull.voltage_data['Q'][ind][-1])
@@ -409,7 +409,7 @@ class VoltageTest(unittest.TestCase):
         for ind in range(len(hull.voltage_data['voltages'])):
             self.assertTrue(len(hull.voltage_data['voltages'][ind])-1, len(hull.voltage_data['Q'][ind]) or len(hull.voltage_data['voltages'][ind]) == len(hull.voltage_data['Q'][ind]))
         np.testing.assert_array_almost_equal(np.asarray(hull.voltage_data['voltages'][0]), np.asarray([1.1845, 1.1845, 0.8612, 0.2676, 0.000]), decimal=3)
-        self.assertAlmostEqual(hull.voltage_data['Q'][ind][-2], 425.7847612)
+        self.assertAlmostEqual(hull.voltage_data['Q'][ind][-2], 425.7847612, places=5)
         for ind in range(len(hull.voltage_data['voltages'])):
             assert len(hull.voltage_data['Q'][ind]) == len(hull.voltage_data['voltages'][ind])
             assert np.isnan(hull.voltage_data['Q'][ind][-1])

@@ -8,6 +8,7 @@ cell manipulation, symmetry checking and sampling (e.g. grids and paths.)
 
 import numpy as np
 from periodictable import elements
+EPS = 1e-12
 
 
 def abc2cart(lattice_abc):
@@ -499,6 +500,66 @@ def add_noise(doc, amplitude=0.1):
     doc['positions_frac'] = cart2frac(doc['lattice_cart'], doc['positions_abs'])
 
     return doc
+
+
+def calc_pairwise_distances_pbc(poscart, images, lattice, rmax,
+                                poscart_b=None, compress=False, debug=False):
+    """ Calculate PBC distances with SciPy's cdist, given the
+    image cell vectors.
+
+    Parameters:
+        poscart (numpy.ndarray): list or array of absolute atomic coordinates.
+        images: iterable of lattice vector multiples (e.g. [2, -1, 3])
+            required to obtain the translation to desired image cells.
+        lattice (:obj:`list` if :obj:`list`): list of lattice vectors of
+            the real cell.
+        rmax (float): maximum value after which to mask the array.
+
+    Keyword arguments:
+        poscart_b (numpy.ndarray): absolute positions of another type of
+            atom, where only A-B distances will be calculated.
+        debug (bool): print timing data and how many distances were masked.
+        compress (bool): whether or not to compressed the output array,
+            useful when e.g. creating PDFs but not when atom ID is important.
+
+    Returns:
+        distances (numpy.ndarray): pairwise 2-D d_ij masked array with values
+            or stripped 1-D array containing just the distances.
+
+    """
+    from scipy.spatial.distance import cdist
+    import time
+    if debug:
+        start = time.time()
+    _lattice = np.asarray(lattice)
+    _poscart = np.asarray(poscart)
+    if poscart_b is None:
+        _poscart_b = _poscart
+    else:
+        _poscart_b = np.asarray(poscart_b)
+
+    distances = np.empty((len(_poscart)*len(images)*len(_poscart_b)))
+    num_pairs = len(_poscart) * len(_poscart_b)
+
+    for image_ind, prod in enumerate(images):
+        distances[image_ind*num_pairs:(image_ind+1)*num_pairs] = cdist(_poscart, _poscart_b + prod @ _lattice).flatten()
+
+    # mask by rmax/0 and remove masked values
+    distances = np.ma.masked_where(distances > rmax, distances, copy=False)
+    distances = np.ma.masked_where(distances < EPS, distances, copy=False)
+
+    if debug:
+        print('Calculated: {}, Used: {}, Ignored: {}'.format(len(distances),
+                                                             np.ma.count(distances),
+                                                             np.ma.count_masked(distances)))
+    if compress:
+        distances = distances.compressed()
+
+    if debug:
+        end = time.time()
+        print('Calculated distances in {} s'.format(end - start))
+
+    return distances
 
 
 def create_simple_supercell(doc, extension, standardize=False, symmetric=False):

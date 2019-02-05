@@ -13,6 +13,7 @@ from pwd import getpwuid
 
 import numpy as np
 from matador.utils.cell_utils import cart2abc, cart2frac
+from matador.utils.chem_utils import get_stoich
 from matador.scrapers.utils import scraper_function
 
 
@@ -60,6 +61,7 @@ def magres2dict(seed, **kwargs):
 
     magres['num_atoms'] = len(magres['atom_types'])
     magres['positions_frac'] = cart2frac(magres['lattice_cart'], magres['positions_abs'])
+    magres['stoichiometry'] = get_stoich(magres['atom_types'])
 
     for line_no, line in enumerate(flines):
         line = line.lower().strip()

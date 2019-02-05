@@ -67,6 +67,7 @@ class CastepElasticWorkflow(Workflow):
         logging.info('Preprocessing completed: run3 bulk modulus calculation options {}'
                      .format(self.volume_rescale))
 
+        self.add_step(castep_elastic_prerelax, 'relax')
         for volume in self.volume_rescale:
             self.add_step(castep_rescaled_volume_scf, 'rescaled_volume_scf', rescale=volume)
 
@@ -92,3 +93,30 @@ def castep_rescaled_volume_scf(relaxer, calc_doc, seed, rescale=1):
     scf_doc['task'] = 'singlepoint'
 
     return relaxer.scf(scf_doc, seed, keep=True, intermediate=True)
+
+
+def castep_elastic_prerelax(relaxer, calc_doc, seed):
+    """ Run a geometry optimisation before re-scaling volumes SCF-style calculation.
+
+    Parameters:
+        relaxer (:obj:`FullRelaxer`): the object that will be calling CASTEP.
+        calc_doc (dict): the structure to run on.
+        seed (str): root filename of structure.
+
+    """
+    logging.info('Performing CASTEP elastic pre-relax...')
+    relax_doc = copy.deepcopy(calc_doc)
+    relax_doc['write_checkpoint'] = 'ALL'
+    if 'geom_max_iter' not in relax_doc:
+        relax_doc['geom_max_iter'] = 20
+    relax_doc['task'] = 'geometryoptimisation'
+
+    relax_seed = seed + '_relax'
+
+    required = []
+    forbidden = []
+    relaxer.validate_calc_doc(relax_doc, required, forbidden)
+    relaxer.calc_doc = relax_doc
+    relaxer.seed = relax_seed
+
+    return relaxer.relax()

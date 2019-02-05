@@ -56,9 +56,9 @@ class MatadorCommandLine:
                 self.query = DBQuery(self.client, self.collections, **self.args)
                 if self.args.get('hull_cutoff') is not None:
                     self.hull = QueryConvexHull(self.query, **self.args)
-                    self.swapper = AtomicSwapper(self.hull.hull_cursor, self.args)
+                    self.swapper = AtomicSwapper(self.hull.hull_cursor, **self.args)
                 else:
-                    self.swapper = AtomicSwapper(self.query.cursor, self.args)
+                    self.swapper = AtomicSwapper(self.query.cursor, **self.args)
                 self.cursor = self.swapper.cursor
 
             if self.args['subcmd'] == 'refine':

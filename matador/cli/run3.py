@@ -6,6 +6,7 @@ such that there are no clashes.
 """
 import os
 import argparse
+from traceback import print_exc
 from matador import __version__
 from matador.utils.print_utils import print_notify
 from matador.compute import BatchRun
@@ -126,11 +127,14 @@ def main():
         hostname = os.uname()[1]
         pr = cProfile.Profile()
         pr.enable()
+
     try:
         runner = BatchRun(seed, **kwargs)
         runner.spawn()
-    except Exception:
-        print_notify('run3 failed, exiting...')
+    except RuntimeError:
+        print_notify('Some jobs failed, exiting...')
+    except Exception as exc:
+        raise exc
 
     if vars(args).get('profile'):
         pr.disable()

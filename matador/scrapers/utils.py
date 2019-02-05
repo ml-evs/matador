@@ -53,9 +53,6 @@ def scraper_function(function):
             except Exception as oops:
                 success = False
                 result = '{} {}: {}\n'.format(_seed, type(oops), str(oops))
-                if kwargs.get('verbosity', 0) > 0:
-                    print_exc()
-                    print('Error in file', _seed, 'skipping...')
 
             if len(seed) == 1:
                 if success and not isinstance(result, dict):

@@ -7,23 +7,28 @@ constants, with a focus on battery materials.
 """
 
 
+import copy
 import numpy as np
+from scipy.constants import physical_constants
 
-# global consts
-FARADAY_CONSTANT_Cpermol = 96.485332e3
+FARADAY_CONSTANT_Cpermol = physical_constants['Faraday constant'][0]
+HARTREE_TO_EV = physical_constants['Hartree energy in eV'][0]
 Cperg_to_mAhperg = 2.778e-1
 C_TO_mAh = Cperg_to_mAhperg
-HARTREE_TO_EV = 27.21139
-BOHR_TO_ANGSTROM = 0.529177211
-RY_TO_EV = 13.605693009
+BOHR_TO_ANGSTROM = physical_constants['Bohr radius'][0] * 1e10
+RY_TO_EV = physical_constants['Rydberg constant times hc in eV'][0]
 KBAR_TO_GPA = 0.1
 eV_PER_ANGSTROM_CUBED_TO_GPa = 160.21776
-AVOGADROS_NUMBER = 6.022141e23
+AVOGADROS_NUMBER = physical_constants['Avogadro constant'][0]
 ANGSTROM_CUBED_TO_CENTIMETRE_CUBED = 1e-24
-ELECTRON_CHARGE = 1.6021766e-19
-KELVIN_TO_EV = 8.61733e-5
+ELECTRON_CHARGE = physical_constants['elementary charge'][0]
+KELVIN_TO_EV = physical_constants['kelvin-electron volt relationship'][0]
 
 EPS = 1e-12
+
+
+def get_iupac_ordering():
+    raise NotImplementedError
 
 
 def get_periodic_table():
@@ -534,20 +539,24 @@ def get_root_source(source):
 
     """
     if isinstance(source, dict):
-        source = source['source']
+        sources = copy.deepcopy(source['source'])
+    else:
+        sources = copy.deepcopy(source)
     src_list = set()
-    for src in source:
+    for src in sources:
         if src.endswith('.res') or src.endswith('.castep') or src.endswith('.history') or src.endswith('.history.gz'):
             src_list.add('.'.join(src.split('/')[-1].split('.')[0:-1]))
         elif 'OQMD' in src.upper():
+            src_list.add('_'.join(src.split()))
+        elif len(sources) == 1:
             src_list.add(src)
         elif src == 'command_line':
             src_list.add('command line')
 
     if len(src_list) > 1:
-        raise RuntimeError('Ambiguous root source {}'.format(source))
+        raise RuntimeError('Ambiguous root source {}'.format(sources))
     if len(src_list) < 1:
-        raise RuntimeError('Unable to find root source from {}'.format(source))
+        raise RuntimeError('Unable to find root source from {}'.format(sources))
 
     return list(src_list)[0]
 
