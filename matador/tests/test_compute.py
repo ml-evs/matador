@@ -173,13 +173,8 @@ class ComputeTest(unittest.TestCase):
         assert s
         param_dict, s = param2dict(REAL_PATH + '/data/symmetry_failure/KSb.param', verbosity=VERBOSITY, db=False)
         assert s
-        CASTEP_PRESENT = False
-        if CASTEP_PRESENT:
-            ncores = 4
-            executable = 'castep'
-        else:
-            ncores = 1
-            executable = REAL_PATH + 'data/symmetry_failure/monkey_patch_move.sh'
+        ncores = 1
+        executable = REAL_PATH + 'data/symmetry_failure/monkey_patch_move.sh'
         node = None
         errored = False
 
@@ -190,8 +185,11 @@ class ComputeTest(unittest.TestCase):
                               start=False)
         try:
             relaxer.relax()
-        except CalculationError as err:
+        except CalculationError:
             errored = True
+
+        bad_castep_exists = os.path.isdir('bad_castep')
+        completed_exists = os.path.isdir('completed')
 
         os.chdir(REAL_PATH)
         from shutil import rmtree
@@ -199,6 +197,8 @@ class ComputeTest(unittest.TestCase):
 
         os.chdir(ROOT_DIR)
         self.assertTrue(errored)
+        self.assertTrue(bad_castep_exists)
+        self.assertFalse(completed_exists)
         self.assertTrue(relaxer.final_result is None)
         self.assertEqual(relaxer._num_retries, 3)
         self.assertTrue('symmetry_generate' not in relaxer.calc_doc)
@@ -321,12 +321,16 @@ class ComputeTest(unittest.TestCase):
         executable = 'castep'
         node = None
         seed = 'NaP_intermediates_stopped_early'
+        errored = False
 
-        FullRelaxer(ncores=ncores, nnodes=None, node=node,
-                    res=seed, param_dict=param_dict, cell_dict=cell_dict,
-                    debug=False, verbosity=VERBOSITY, killcheck=True, memcheck=False,
-                    reopt=True, executable=executable,
-                    start=True)
+        try:
+            FullRelaxer(ncores=ncores, nnodes=None, node=node,
+                        res=seed, param_dict=param_dict, cell_dict=cell_dict,
+                        debug=False, verbosity=VERBOSITY, killcheck=True, memcheck=False,
+                        reopt=True, executable=executable,
+                        start=True)
+        except CalculationError:
+            errored = True
 
         print('Process completed!')
 
@@ -351,6 +355,7 @@ class ComputeTest(unittest.TestCase):
             os.remove(_file)
 
         os.chdir(ROOT_DIR)
+        self.assertTrue(errored)
         self.assertTrue(all(bad_exists))
         self.assertTrue(all(good_exists))
 

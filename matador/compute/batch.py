@@ -195,8 +195,8 @@ class BatchRun:
 
         # wait for each proc to write to error queue
         try:
-            print('here')
-            for _, proc in enumerate(procs):
+            for proc_ind, proc in enumerate(procs):
+                print('checking queue for {}'.format(proc_ind))
                 result = error_queue.get()
                 if isinstance(result[1], Exception):
                     errors.append(result)
@@ -291,13 +291,17 @@ class BatchRun:
                         with open(self.paths['failures_fname'], 'a') as job_file:
                             job_file.write(res + '\n')
 
+                # catch non-fatal structure-level errors
+                except CalculationError as err:
+                    continue
                 # push globally-fatal errors to queue, and return to prevent further calcs
                 except RuntimeError as err:
                     error_queue.put((proc_id, err, res))
                     return
-                # push errors on individual calculations to queue, but do not raise
-                except CalculationError as err:
+                # we're not expecting any other errors, but we will assume they are fatal
+                except Exception as err:
                     error_queue.put((proc_id, err, res))
+                    return
 
         error_queue.put((proc_id, job_count, ''))
 

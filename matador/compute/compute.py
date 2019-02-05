@@ -761,6 +761,7 @@ class ComputeTask:
                 calc_doc.update({'cut_off_energy': cutoff})
                 self.paths['completed_dir'] = 'completed_cutoff'
                 seed = self.seed + '_' + str(cutoff) + 'eV'
+                self._update_input_files(seed=seed)
                 success = self.scf(calc_doc, seed, keep=False)
                 successes.append(success)
         if self.conv_kpt_bool:
@@ -774,6 +775,7 @@ class ComputeTask:
                 logging.debug('Using offset {}'.format(calc_doc['kpoints_mp_offset']))
                 self.paths['completed_dir'] = 'completed_kpts'
                 seed = self.seed + '_' + str(kpt) + 'A'
+                self._update_input_files(seed=seed)
                 success = self.scf(calc_doc, seed, keep=False)
                 successes.append(success)
         return any(successes)
@@ -1295,12 +1297,19 @@ class ComputeTask:
             logging.critical(msg)
             raise CriticalError(msg)
 
-    def _update_input_files(self):
-        """ Update the cell and param files for the next relaxation. """
+    def _update_input_files(self, seed=None):
+        """ Update the cell and param files for the next relaxation.
+
+        Keyword argument:
+            seed (str): optionally override self.seed.
+
+        """
+        if seed is None:
+            seed = self.seed
         calc_doc = self.calc_doc
         # update cell
-        if os.path.isfile(self.seed + '.cell'):
-            os.remove(self.seed + '.cell')
+        if os.path.isfile(seed + '.cell'):
+            os.remove(seed + '.cell')
         if self.kpts_1D:
             n_kz = ceil(1 / (calc_doc['lattice_abc'][0][2] * self._target_spacing))
             if n_kz % 2 == 1:
@@ -1308,13 +1317,13 @@ class ComputeTask:
             calc_doc['kpoints_mp_grid'] = [1, 1, n_kz]
             if 'kpoints_mp_spacing' in calc_doc:
                 del calc_doc['kpoints_mp_spacing']
-        doc2cell(calc_doc, self.seed, hash_dupe=False, copy_pspots=False, spin=self.spin)
+        doc2cell(calc_doc, seed, hash_dupe=False, copy_pspots=False, spin=self.spin)
 
         # update param
         if not self.custom_params:
-            if os.path.isfile(self.seed + '.param'):
-                os.remove(self.seed + '.param')
-            doc2param(calc_doc, self.seed, hash_dupe=False, spin=self.spin)
+            if os.path.isfile(seed + '.param'):
+                os.remove(seed + '.param')
+            doc2param(calc_doc, seed, hash_dupe=False, spin=self.spin)
 
     @staticmethod
     def tidy_up(seed):
