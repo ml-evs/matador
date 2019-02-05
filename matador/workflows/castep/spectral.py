@@ -20,6 +20,8 @@ import os
 import copy
 import glob
 from matador.workflows import Workflow
+from matador.scrapers import arbitrary2dict
+
 
 
 def castep_full_spectral(relaxer, calc_doc, seed):
@@ -101,16 +103,17 @@ class CastepSpectralWorkflow(Workflow):
                 )
         ):
             todo['dispersion'] = not os.path.isfile(self.seed + '.bands_dispersion')
-            if glob.glob('*.odi'):
-                todo['pdis'] = True
-        if (
-                'spectral_kpoints_mp_spacing' in self.calc_doc or
-                self.calc_doc.get('spectral_task', '').lower() == 'dos'
-        ):
+
+        if ('spectral_kpoints_mp_spacing' in self.calc_doc or
+            self.calc_doc.get('spectral_task', '').lower() == 'dos'):
             todo['dos'] = not os.path.isfile(self.seed + '.bands_dos')
-            if glob.glob('*.odi'):
-                todo['broadening'] = True
-                todo['pdos'] = True
+
+        odi_fname = _get_optados_fname(self.seed)
+        if odi_fname is not None:
+            odi_dict, _ = arbitrary2dict(odi_fname)
+            todo['pdis'] = 'pdispersion' in odi_dict
+            todo['broadening'] = 'broadening' in odi_dict
+            todo['pdos'] = 'pdos' in odi_dict
 
         for key in todo:
             if todo[key]:
@@ -269,21 +272,18 @@ def optados_pdos(relaxer, _, seed):
 
     """
 
-    from matador.scrapers import arbitrary2dict
 
     odi_fname = _get_optados_fname(seed)
     if odi_fname is not None:
         odi_dict, _ = arbitrary2dict(odi_fname)
 
-        # if pdos keyword is present, try to run a pDOS
-        if 'pdos' in odi_dict:
-            odi_dict['task'] = 'pdos'
-            if 'pdispersion' in odi_dict:
-                del odi_dict['pdispersion']
+        odi_dict['task'] = 'pdos'
+        if 'pdispersion' in odi_dict:
+            del odi_dict['pdispersion']
 
-            logging.info('Performing OptaDOS pDOS calculation with parameters from {}'.format(odi_fname))
-            success = _run_optados(relaxer, odi_dict, seed, suffix='dos')
-            return success
+        logging.info('Performing OptaDOS pDOS calculation with parameters from {}'.format(odi_fname))
+        success = _run_optados(relaxer, odi_dict, seed, suffix='dos')
+        return success
 
     return None
 
@@ -298,21 +298,19 @@ def optados_dos_broadening(relaxer, _, seed):
 
     """
 
-    from matador.scrapers import arbitrary2dict
 
     odi_fname = _get_optados_fname(seed)
     if odi_fname is not None:
         odi_dict, _ = arbitrary2dict(odi_fname)
         # if broadening keyword is present, try to run a normal DOS
-        if 'broadening' in odi_dict:
-            odi_dict['task'] = 'dos'
-            if 'pdos' in odi_dict:
-                del odi_dict['pdos']
-            if 'pdispersion' in odi_dict:
-                del odi_dict['pdispersion']
+        odi_dict['task'] = 'dos'
+        if 'pdos' in odi_dict:
+            del odi_dict['pdos']
+        if 'pdispersion' in odi_dict:
+            del odi_dict['pdispersion']
 
-            logging.info('Performing OptaDOS DOS broadening with parameters from {}'.format(odi_fname))
-            return _run_optados(relaxer, odi_dict, seed, suffix='dos')
+        logging.info('Performing OptaDOS DOS broadening with parameters from {}'.format(odi_fname))
+        return _run_optados(relaxer, odi_dict, seed, suffix='dos')
 
     return None
 
@@ -326,18 +324,16 @@ def optados_pdispersion(relaxer, _, seed):
         seed (str): root filename of structure.
 
     """
-    from matador.scrapers import arbitrary2dict
     odi_fname = _get_optados_fname(seed)
     if odi_fname is not None:
         odi_dict, _ = arbitrary2dict(odi_fname)
         # if pdispersion keyword is present, try to run a pdis
-        if 'pdispersion' in odi_dict:
-            odi_dict['task'] = 'pdispersion'
-            if 'pdos' in odi_dict:
-                del odi_dict['pdos']
+        odi_dict['task'] = 'pdispersion'
+        if 'pdos' in odi_dict:
+            del odi_dict['pdos']
 
-            logging.info('Performing OptaDOS pDIS calculation with parameters from {}'.format(odi_fname))
-            return _run_optados(relaxer, odi_dict, seed, suffix='dispersion')
+        logging.info('Performing OptaDOS pDIS calculation with parameters from {}'.format(odi_fname))
+        return _run_optados(relaxer, odi_dict, seed, suffix='dispersion')
 
     return None
 
