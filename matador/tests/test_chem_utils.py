@@ -282,7 +282,7 @@ class ChemUtilsTest(unittest.TestCase):
         self.assertEqual(src, get_root_source(source))
 
         source = ['OQMD 12345']
-        src = 'OQMD 12345'
+        src = 'OQMD_12345'
         self.assertEqual(src, get_root_source(source))
 
         source = ['KP.cell', 'KP.param', 'abcd-123.fdasf/efgf/KP-0.02.-1234-abcd.castep', 'KP-1234-abcde.res']
