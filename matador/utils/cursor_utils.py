@@ -216,11 +216,14 @@ def display_results(cursor,
             struct_string[-1] += "{: >9.2f}".format(doc['pressure'])
         else:
             struct_string[-1] += "{:^10}".format('xxx')
-        if args.get('per_atom') and 'cell_volume' in doc and 'num_atoms' in doc:
-            struct_string[-1] += "{:>11.1f}".format(doc['cell_volume'] / doc['num_atoms'])
-        elif 'cell_volume' in doc and 'num_fu' in doc:
-            struct_string[-1] += "{:>11.1f}".format(doc['cell_volume'] / doc['num_fu'])
-        else:
+        try:
+            if args.get('per_atom') and 'cell_volume' in doc and 'num_atoms' in doc:
+                struct_string[-1] += "{:>11.1f}".format(doc['cell_volume'] / doc['num_atoms'])
+            elif 'cell_volume' in doc and 'num_fu' in doc:
+                struct_string[-1] += "{:>11.1f}".format(doc['cell_volume'] / doc['num_fu'])
+            else:
+                struct_string[-1] += "{:^11}".format('xxx')
+        except:
             struct_string[-1] += "{:^11}".format('xxx')
         try:
             if hull:
