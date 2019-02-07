@@ -36,18 +36,18 @@ class Calculator:
         return
 
     @staticmethod
-    def verify_simulation_cell(res_dict):
+    def verify_simulation_cell(structure):
         """ Run some checks on the structure.
 
         Parameters:
-            res_dict (dict): dictionary containing the structure.
+            structure (dict): dictionary containing the structure.
 
         Raises:
             CalculationError: if cell is pathological.
 
         """
         errors = []
-        if all([angle < 30 for angle in res_dict['lattice_abc'][1]]):
+        if all([angle < 30 for angle in structure['lattice_abc'][1]]):
             msg = 'Cell is pathological (at least one angle < 30).'
             errors.append(msg)
 

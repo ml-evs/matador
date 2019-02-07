@@ -17,12 +17,15 @@ VALID_PSPOT_LIBS = ['C7', 'C8', 'C9', 'C17', 'C18', 'MS', 'HARD',
 class CastepCalculator(Calculator):
     """ The CASTEP calculator. """
     @staticmethod
-    def verify_calculation_parameters(calculation_parameters, res_dict):
+    def verify_calculation_parameters(calculation_parameters, structure):
         errors = []
         if 'species_pot' not in calculation_parameters:
             calculation_parameters['species_pot'] = {'library': 'C18'}
         if 'library' not in calculation_parameters['species_pot']:
-            for elem in res_dict['stoichiometry']:
+            for elem in structure['stoichiometry']:
+                if elem[0] not in calculation_parameters['species_pot']:
+                    msg = 'Unable to find pseudopotential specification for species {}'.format(elem[0])
+                    errors.append(msg)
                 if ('|' not in calculation_parameters['species_pot'][elem[0]] and
                         not os.path.isfile(os.path.expanduser(calculation_parameters['species_pot'][elem[0]])) and
                         calculation_parameters['species_pot'][elem[0]] not in VALID_PSPOT_LIBS):
@@ -43,10 +46,10 @@ class CastepCalculator(Calculator):
             raise InputError('. '.join(errors))
 
     @staticmethod
-    def verify_simulation_cell(res_dict):
+    def verify_simulation_cell(structure):
         errors = []
         try:
-            Calculator.verify_simulation_cell(res_dict)
+            Calculator.verify_simulation_cell(structure)
         except CalculationError as exc:
             errors.append(str(exc))
         # any extra checks here
