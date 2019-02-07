@@ -196,7 +196,6 @@ class BatchRun:
         # wait for each proc to write to error queue
         try:
             for proc_ind, proc in enumerate(procs):
-                print('checking queue for {}'.format(proc_ind))
                 result = error_queue.get()
                 if isinstance(result[1], Exception):
                     errors.append(result)
