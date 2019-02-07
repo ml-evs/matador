@@ -1,2 +1,4 @@
 task: spectral
 write_orbitals: false
+xc_functional: pbe
+cut_off_energy: 500 eV
