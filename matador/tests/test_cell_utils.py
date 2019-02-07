@@ -286,7 +286,7 @@ class SymmetriesAndSupercellsTest(unittest.TestCase):
 
             cell_path = fname.replace('.res', '.cell')
             doc2cell(std_doc, cell_path)
-            new_doc, s = cell2dict(cell_path, outcell=True, positions=True, db=False)
+            new_doc, s = cell2dict(cell_path, lattice=True, positions=True, db=False)
             assert 'positions_frac' in new_doc
             remove(cell_path)
             seekpath_new_results = get_path(doc2spg(new_doc))

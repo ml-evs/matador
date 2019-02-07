@@ -18,8 +18,7 @@ writing slurm job submission files.
 """
 
 
-__all__ = ['ComputeTask', 'BatchRun', 'reset_job_folder', 'FullRelaxer',
-           'CriticalError', 'WalltimeError', 'InputError', 'CalculationError']
+__all__ = ['ComputeTask', 'BatchRun', 'reset_job_folder', 'FullRelaxer', 'CriticalError', 'WalltimeError', 'InputError', 'CalculationError']
 __author__ = 'Matthew Evans'
 __maintainer__ = 'Matthew Evans'
 

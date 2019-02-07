@@ -13,7 +13,6 @@ from copy import deepcopy
 import sys
 import os
 import re
-import random
 
 from scipy.spatial import ConvexHull
 from scipy.spatial.qhull import QhullError
@@ -21,11 +20,11 @@ from bson.son import SON
 import pymongo as pm
 import numpy as np
 
-from matador.utils.print_utils import print_failure, print_notify, print_warning
+from matador.utils.print_utils import print_notify, print_warning
 from matador.utils.hull_utils import barycentric2cart, vertices2plane, vertices2line, FakeHull
 from matador.utils.chem_utils import parse_element_string, get_padded_composition, get_num_intercalated
 from matador.utils.chem_utils import get_generic_grav_capacity, get_formula_from_stoich, get_stoich_from_formula
-from matador.utils.chem_utils import get_formation_energy, KELVIN_TO_EV, get_concentration
+from matador.utils.chem_utils import get_formation_energy
 from matador.utils.cursor_utils import set_cursor_from_array, get_array_from_cursor
 from matador.utils.cursor_utils import display_results
 from matador.export import generate_hash
@@ -285,7 +284,6 @@ class QueryConvexHull:
         print(len(notify) * '─')
         print(notify)
         print(len(notify) * '─')
-
 
     def get_hull_distances(self, structures, precompute=False):
         """ Returns array of distances to pre-computed binary or ternary
@@ -617,8 +615,7 @@ class QueryConvexHull:
                                             self.chempot_cursor[ind]['text_id'][1]]), 'as chem pot for', elem)
                     print(60 * '─')
                 else:
-                    print_failure('No possible chem pots available for {}.'.format(elem))
-                    raise RuntimeError('Exiting...')
+                    raise RuntimeError('No possible chem pots available for {}.'.format(elem))
 
             for i, mu in enumerate(self.chempot_cursor):
                 self.chempot_cursor[i]['enthalpy_per_b'] = mu[self.energy_key]
@@ -662,7 +659,6 @@ class QueryConvexHull:
             list: the filtered cursor.
         """
 
-        from matador.utils.cursor_utils import filter_cursor_by_chempots
         return filter_cursor_by_chempots(species, cursor)
 
     def _setup_per_b_fields(self):

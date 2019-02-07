@@ -9,7 +9,7 @@ import argparse
 from traceback import print_exc
 from matador import __version__
 from matador.utils.print_utils import print_notify
-from matador.compute import BatchRun
+from matador.compute import BatchRun, InputError
 
 
 def main():
@@ -131,6 +131,8 @@ def main():
     try:
         runner = BatchRun(seed, **kwargs)
         runner.spawn()
+    except InputError as exc:
+        print_notify(exc)
     except RuntimeError:
         print_notify('Some jobs failed, exiting...')
     except Exception as exc:

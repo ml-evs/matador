@@ -23,8 +23,8 @@ class CellScraperTests(unittest.TestCase):
     def test_standard_cell_scraper(self):
         cell_fname = REAL_PATH + 'data/LiP2Zn-0bm995-a_9-out.cell'
         self.assertTrue(os.path.isfile(cell_fname), msg='Failed to open test case {} - please check installation.'.format(cell_fname))
-        test_dict, s = cell2dict(cell_fname, db=False, outcell=True, verbosity=VERBOSITY)
-        self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
+        test_dict, s = cell2dict(cell_fname, db=False, lattice=True, verbosity=VERBOSITY)
+        self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(test_dict))
         self.assertEqual(test_dict['lattice_cart'][0][0], 9.83262140721165, msg='Failed to read lattice vectors.')
         self.assertEqual(test_dict['lattice_cart'][1][1], 5.96357780025648, msg='Failed to read lattice vectors.')
         self.assertEqual(test_dict['lattice_cart'][2][2], 4.39895761828278, msg='Failed to read lattice vectors.')
@@ -35,20 +35,20 @@ class CellScraperTests(unittest.TestCase):
         self.assertEqual(test_dict['species_pot']['P'], 'P_00PBE.usp', msg='Failed to read pspots.')
         self.assertEqual(test_dict['species_pot']['Zn'], 'Zn_00PBE.usp', msg='Failed to read pspots.')
         # test that lattice_vec only read when outcell is true
-        test_dict, s = cell2dict(cell_fname, db=False, outcell=False, verbosity=VERBOSITY)
+        test_dict, s = cell2dict(cell_fname, db=False, lattice=False, verbosity=VERBOSITY)
         self.assertTrue(test_dict.get('lattice_cart') is None)
 
     def test_cell_outcell(self):
         cell_fname = REAL_PATH + 'data/Li2C2-out.cell'
         self.assertTrue(os.path.isfile(cell_fname), msg='Failed to open test case {} - please check installation.'.format(cell_fname))
-        test_dict, s = cell2dict(cell_fname, db=False, outcell=True, verbosity=VERBOSITY)
+        test_dict, s = cell2dict(cell_fname, db=False, lattice=True, verbosity=VERBOSITY)
         self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(test_dict))
 
     def test_cell_phonon(self):
         cell_fname = REAL_PATH + 'data/K5P4-phonon.cell'
         self.assertTrue(os.path.isfile(cell_fname), msg='Failed to open test case {} - please check installation.'.format(cell_fname))
-        test_dict, s = cell2dict(cell_fname, db=False, outcell=True, verbosity=VERBOSITY)
-        self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
+        test_dict, s = cell2dict(cell_fname, db=False, lattice=True, verbosity=VERBOSITY)
+        self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(test_dict))
         self.assertEqual(test_dict['lattice_cart'][0][0], 11.4518745146637, msg='Failed to read lattice vectors.')
         self.assertEqual(test_dict['lattice_cart'][1][1], 5.09448137301246, msg='Failed to read lattice vectors.')
         self.assertEqual(test_dict['lattice_cart'][2][2], 9.18378851243459, msg='Failed to read lattice vectors.')
@@ -74,7 +74,7 @@ class CellScraperTests(unittest.TestCase):
         cell_fname = REAL_PATH + 'data/K5P4-phonon_bodged.cell'
         self.assertTrue(os.path.isfile(cell_fname), msg='Failed to open test case {} - please check installation.'.format(cell_fname))
         test_dict, s = cell2dict(cell_fname, db=True, lattice=True, verbosity=VERBOSITY)
-        self.assertFalse(s)
+        self.assertFalse(s, msg=test_dict)
 
     def test_cell_spin(self):
         cell_fname = REAL_PATH + 'data/cell_files/spin_test.cell'
@@ -95,11 +95,29 @@ class CellScraperTests(unittest.TestCase):
 
         self.assertTrue(s)
         self.assertEqual(cell['spectral_kpoints_path'], [[0.0, 0.0, 0.0], [0.0, 0.0, 0.5], [0.0, 0.5, 0.0], [0.5, 0.0, 0.0]])
-        self.assertEqual(cell['spectral_kpoints_path_labels'], ['$\Gamma$', 'Z', '$Y$', 'X'])
+        self.assertEqual(cell['spectral_kpoints_path_labels'], ['$\\Gamma$', 'Z', '$Y$', 'X'])
         self.assertEqual(cell['spectral_kpoints_path_spacing'], 0.02)
         self.assertEqual(cell['phonon_fine_kpoint_path'], [[0.0, 0.0, 0.0], [0.0, 0.0, 0.5], [0.0, 0.5, 0.0], [0.5, 0.0, 0.0]])
-        self.assertEqual(cell['phonon_fine_kpoint_path_labels'], ['$\Gamma$', 'Z', '$Y$', 'X'])
+        self.assertEqual(cell['phonon_fine_kpoint_path_labels'], ['$\\Gamma$', 'Z', '$Y$', 'X'])
         self.assertEqual(cell['phonon_fine_kpoint_path_spacing'], 0.01)
+
+    def test_cell_positions_abs(self):
+        cell_name = REAL_PATH + 'data/cell_files/npm.cell'
+        cell, s = cell2dict(cell_name, db=False)
+
+        self.assertTrue(s, msg='Failed entirely: {}'.format(cell))
+        self.assertEqual(cell['lattice_cart'][0], [21.84, 0, 0])
+        self.assertEqual(cell['lattice_cart'][1], [0, 16.38, 0])
+        self.assertEqual(cell['lattice_cart'][2], [0, 0, 40.46])
+        print(cell['positions_abs'][95])
+
+        self.assertEqual(cell['positions_abs'][0], [0, 0, 0])
+        self.assertEqual(cell['positions_abs'][95], [17.745, 15.015, -4.095])
+        self.assertEqual(cell['positions_abs'][-1], [13.65, 13.65, 10.92])
+
+        np.testing.assert_array_almost_equal(cell['positions_frac'][0], [0, 0, 0])
+        np.testing.assert_array_almost_equal(cell['positions_frac'][95], [0.8125, 0.9166666, 0.8987889])
+        np.testing.assert_array_almost_equal(cell['positions_frac'][-1], [0.625, 0.8333333, 0.26989619])
 
 
 class CastepScraperTests(unittest.TestCase):
@@ -115,7 +133,7 @@ class CastepScraperTests(unittest.TestCase):
         if not failed_open:
             f.close()
             test_dict, s = castep2dict(castep_fname, db=True, verbosity=VERBOSITY)
-            self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
+            self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(test_dict))
             self.assertEqual(test_dict['pressure'], 0.0763, msg='Failed to read pressure!')
             self.assertEqual(test_dict['enthalpy'], -2.15036930e4, msg='Failed to read enthalpy!')
             self.assertEqual(test_dict['num_atoms'], 14, msg='Wrong number of atoms!')
@@ -144,7 +162,7 @@ class CastepScraperTests(unittest.TestCase):
         if not failed_open:
             f.close()
             test_dict, s = castep2dict(castep_fname, db=True, verbosity=VERBOSITY)
-            self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
+            self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(test_dict))
             self.assertEqual(test_dict['pressure'], 0.0180, msg='Failed to read pressure!')
             self.assertEqual(test_dict['enthalpy'], -5.98055077e3, msg='Failed to read enthalpy!')
             self.assertEqual(test_dict['num_atoms'], 9, msg='Wrong number of atoms!')
@@ -160,6 +178,8 @@ class CastepScraperTests(unittest.TestCase):
             self.assertEqual(test_dict['lattice_abc'][1][2], 90.000000, msg='Wrong lattice constants!')
             self.assertEqual(test_dict['geom_force_tol'], 0.01, msg='Wrong geom force tol')
             self.assertEqual(test_dict['castep_version'], '17.21')
+            self.assertEqual(test_dict['_compiler_architecture'], 'linux_x86_64_ifort17')
+            self.assertEqual(test_dict['_castep_commit'], '056e886bd5a1+')
             self.assertEqual(test_dict['optimised'], True)
             self.assertEqual(test_dict['estimated_mem_MB'], 300.1)
             self.assertEqual(test_dict['species_pot']['K'], '2|1.5|9|10|11|30U:40:31(qc=6)', msg='Failed to scrape K_OTF.usp file')
@@ -176,7 +196,7 @@ class CastepScraperTests(unittest.TestCase):
         if not failed_open:
             f.close()
             test_dict, s = castep2dict(castep_fname, db=True, verbosity=VERBOSITY)
-            self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
+            self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(test_dict))
             self.assertEqual(test_dict['pressure'], -0.0966, msg='Failed to read pressure!')
             self.assertEqual(test_dict['enthalpy'], -1.30423371e3, msg='Failed to read enthalpy!')
             self.assertEqual(test_dict['positions_frac'], [[0, 0, 0]])
@@ -200,6 +220,8 @@ class CastepScraperTests(unittest.TestCase):
             self.assertEqual(test_dict['castep_version'], '16.1')
             self.assertEqual(test_dict['species_pot']['Na'], 'Na_00PBE.usp')
             self.assertEqual(test_dict['icsd'], 10101)
+            self.assertEqual(test_dict['_compiler_architecture'], 'linux_x86_64_ifort14')
+            self.assertEqual(test_dict['_castep_commit'], '2756eb6097bf+')
 
             int_dict, s = castep2dict(castep_fname, db=False, intermediates=True, verbosity=VERBOSITY)
             for key in test_dict:
@@ -232,7 +254,7 @@ class CastepScraperTests(unittest.TestCase):
             f.close()
             test_dict, s = castep2dict(castep_fname, db=True, verbosity=VERBOSITY)
             self.assertFalse(s, msg='Should have failed with db=True, but didn\'t!')
-            self.assertTrue(isinstance(test_dict, str), msg='Should have returned error message!')
+            self.assertTrue(isinstance(test_dict, Exception), msg='Should have returned error message!')
             test_dict, s = castep2dict(castep_fname, db=False, verbosity=VERBOSITY)
             self.assertTrue(s, msg='Should have succeeded with db=False, but didn\'t!')
             self.assertTrue(isinstance(test_dict, dict), msg='Should have returned dict!')
@@ -280,7 +302,7 @@ class CastepScraperTests(unittest.TestCase):
     def test_history(self):
         castep_fname = REAL_PATH + 'data/castep_files/Na3Zn4-OQMD_759599.history'
         test_dict, s = castep2dict(castep_fname, db=True)
-        self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
+        self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(test_dict))
         self.assertEqual(test_dict['pressure'], 0.0763, msg='Failed to read pressure!')
         self.assertEqual(test_dict['enthalpy'], -2.15036930e4, msg='Failed to read enthalpy!')
         self.assertEqual(test_dict['num_atoms'], 14, msg='Wrong number of atoms!')
@@ -301,7 +323,7 @@ class CastepScraperTests(unittest.TestCase):
     def test_history_gz(self):
         castep_fname = REAL_PATH + 'data/castep_files/Na3Zn4-OQMD_759599.history.gz'
         test_dict, s = castep2dict(castep_fname, db=True)
-        self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
+        self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(test_dict))
         self.assertEqual(test_dict['pressure'], 0.0763, msg='Failed to read pressure!')
         self.assertEqual(test_dict['enthalpy'], -2.15036930e4, msg='Failed to read enthalpy!')
         self.assertEqual(test_dict['num_atoms'], 14, msg='Wrong number of atoms!')
@@ -410,43 +432,10 @@ class ResScraperTests(unittest.TestCase):
             test_dict, s = res2dict(res_fname)
             self.assertFalse(s, 'This wasn\'t meant to succeed!')
 
-    @unittest.skipIf(True, 'CIF tests temporarily disabled...')
-    def test_cif(self):
-        cif_fname = REAL_PATH + 'data/cif_files/AgBiI.cif'
-        failed_open = False
-        try:
-            f = open(cif_fname, 'r')
-        except Exception:
-            failed_open = True
-            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(cif_fname))
-        if not failed_open:
-            f.close()
-            test_dict, s = cif2dict(cif_fname)
-            self.assertTrue(s, 'Failed entirely, oh dear! {}'.format(test_dict))
-            self.assertAlmostEqual(test_dict['num_atoms'], 46.623999999999995, msg='Failed to read num_atoms!', places=5)
-            self.assertTrue(['Bi', 1.0] in test_dict['stoichiometry'], msg='Wrong stoichiometry!')
-            self.assertTrue(['I', 4.0] in test_dict['stoichiometry'], msg='Wrong stoichiometry!')
-            self.assertTrue(sorted(test_dict['stoichiometry']) == test_dict['stoichiometry'], msg='Wrong stoichiometry!')
-            self.assertAlmostEqual(test_dict['cell_volume'], 1826.0028753, msg='Wrong cell volume!', places=3)
-            self.assertEqual(test_dict['space_group'], 'Fd-3m', msg='Wrong space group!')
-            self.assertEqual(len(test_dict['atom_types']), 64)
-            self.assertEqual(len(test_dict['positions_frac']), 64)
-            self.assertEqual(len(test_dict['site_occupancy']), 64)
-
-        cif_fname = REAL_PATH + 'data/cif_files/malicious.cif'
-        failed_open = False
-        try:
-            f = open(cif_fname, 'r')
-        except FileNotFoundError:
-            failed_open = True
-            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(cif_fname))
-        if not failed_open:
-            f.close()
-            errored = False
-            test_dict, s = cif2dict(cif_fname)
-            errored = isinstance(test_dict, str) and 'RuntimeError' in test_dict
-            self.assertTrue(errored, 'WARNING: malicious attack is possible through symops')
-            self.assertFalse(s, 'This should have failed entirely, oh dear!')
+    def test_c2x_shelx_res(self):
+        res_fname = REAL_PATH + 'data/structures/npm.res'
+        res, s = res2dict(res_fname, db=False)
+        self.assertTrue(s, msg='Failed entirely: {}'.format(res))
 
 
 class ParamScraperTests(unittest.TestCase):
@@ -817,7 +806,7 @@ class ScraperMiscTest(unittest.TestCase):
     def test_thermo_castep(self):
         castep_fname = REAL_PATH + 'data/CuP-thermo-test.castep'
         test_dict, s = castep2dict(castep_fname, db=False, verbosity=VERBOSITY)
-        self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
+        self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(test_dict))
         self.assertEqual(test_dict['task'].lower(), 'thermodynamicscalculation', msg='This is not a Thermodynamics calculation...')
         self.assertEqual(test_dict['temp_final'], 1000.0, msg='Wrong final temp!')
         self.assertEqual(test_dict['temp_init'], 50.0, msg='Wrong initial temp!')
@@ -856,6 +845,44 @@ class ScraperMiscTest(unittest.TestCase):
         pdis, s = cell2dict(cell_fname, db=False, lattice=True, verbosity=VERBOSITY)
         self.assertTrue(s)
 
+    @unittest.skipIf(True, 'CIF tests temporarily disabled...')
+    def test_cif(self):
+        cif_fname = REAL_PATH + 'data/cif_files/AgBiI.cif'
+        failed_open = False
+        try:
+            f = open(cif_fname, 'r')
+        except Exception:
+            failed_open = True
+            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(cif_fname))
+        if not failed_open:
+            f.close()
+            test_dict, s = cif2dict(cif_fname)
+            self.assertTrue(s, 'Failed entirely, oh dear! {}'.format(test_dict))
+            self.assertAlmostEqual(test_dict['num_atoms'], 46.623999999999995, msg='Failed to read num_atoms!', places=5)
+            self.assertTrue(['Bi', 1.0] in test_dict['stoichiometry'], msg='Wrong stoichiometry!')
+            self.assertTrue(['I', 4.0] in test_dict['stoichiometry'], msg='Wrong stoichiometry!')
+            self.assertTrue(sorted(test_dict['stoichiometry']) == test_dict['stoichiometry'], msg='Wrong stoichiometry!')
+            self.assertAlmostEqual(test_dict['cell_volume'], 1826.0028753, msg='Wrong cell volume!', places=3)
+            self.assertEqual(test_dict['space_group'], 'Fd-3m', msg='Wrong space group!')
+            self.assertEqual(len(test_dict['atom_types']), 64)
+            self.assertEqual(len(test_dict['positions_frac']), 64)
+            self.assertEqual(len(test_dict['site_occupancy']), 64)
+
+        cif_fname = REAL_PATH + 'data/cif_files/malicious.cif'
+        failed_open = False
+        try:
+            f = open(cif_fname, 'r')
+        except FileNotFoundError:
+            failed_open = True
+            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(cif_fname))
+        if not failed_open:
+            f.close()
+            errored = False
+            test_dict, s = cif2dict(cif_fname)
+            errored = isinstance(test_dict, RuntimeError) and 'RuntimeError' in test_dict
+            self.assertTrue(errored, 'WARNING: malicious attack is possible through symops')
+            self.assertFalse(s, 'This should have failed entirely, oh dear!')
+
 
 class ExportTest(unittest.TestCase):
     """ Test file export functions. """
@@ -872,12 +899,12 @@ class ExportTest(unittest.TestCase):
     def test_doc2param(self):
         param_fname = REAL_PATH + 'data/param_test.param'
         test_fname = REAL_PATH + 'data/dummy.param'
-        doc, s = param2dict(param_fname, db=False, debug=True, verbosity=5)
-        self.assertTrue(s)
+        doc, s = param2dict(param_fname, db=False, debug=True, verbosity=VERBOSITY)
+        self.assertTrue(s, msg='Failed entirely: {}'.format(doc))
         doc2param(doc, test_fname, hash_dupe=False, overwrite=True)
         doc_exported, s = param2dict(test_fname, db=False)
         os.remove(test_fname)
-        self.assertTrue(s, msg='Failed entirely, oh dear!')
+        self.assertTrue(s, msg='Failed entirely: {}'.format(doc_exported))
         self.assertEqual(len(doc_exported), len(doc))
         self.assertEqual(doc['devel_code'], doc_exported['devel_code'])
 
@@ -896,9 +923,9 @@ class ExportTest(unittest.TestCase):
         for _f in glob.glob(REAL_PATH + 'data/dummy*.cell'):
             os.remove(_f)
 
-        doc, s = cell2dict(cell_fname, db=False, outcell=True, verbosity=VERBOSITY, positions=False)
+        doc, s = cell2dict(cell_fname, db=False, lattice=True, verbosity=VERBOSITY, positions=False)
         doc2cell(doc, test_fname, debug=True)
-        test_dict, s = cell2dict(test_fname, db=False, outcell=True, positions=False)
+        test_dict, s = cell2dict(test_fname, db=False, lattice=True, positions=False)
         self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(test_dict))
         self.assertEqual(test_dict['lattice_cart'][0][0], 11.4518745146637, msg='Failed to read lattice vectors.')
         self.assertEqual(test_dict['lattice_cart'][1][1], 5.09448137301246, msg='Failed to read lattice vectors.')
@@ -919,13 +946,13 @@ class ExportTest(unittest.TestCase):
         # test that overwrite overwrites
         doc['phonon_supercell_matrix'][2] = [0, 0, 140]
         doc2cell(doc, test_fname, overwrite=True)
-        test_dict, s = cell2dict(test_fname, db=False, outcell=True, positions=False)
+        test_dict, s = cell2dict(test_fname, db=False, lattice=True, positions=False)
         self.assertEqual(test_dict['phonon_supercell_matrix'][2], [0, 0, 140])
 
         # test that hash dupe doesn't
         doc['phonon_supercell_matrix'][2] = [0, 0, 333]
         doc2cell(doc, test_fname, overwrite=False, hash_dupe=True)
-        test_dict, s = cell2dict(test_fname, db=False, outcell=True, positions=False)
+        test_dict, s = cell2dict(test_fname, db=False, lattice=True, positions=False)
         self.assertEqual(test_dict['phonon_supercell_matrix'][2], [0, 0, 140])
 
         dummy_files = glob.glob(REAL_PATH + 'data/dummy*.cell')
@@ -945,7 +972,7 @@ class ExportTest(unittest.TestCase):
 
         self.assertTrue(s)
         self.assertEqual(cell['spectral_kpoints_path'], [[0.0, 0.0, 0.0], [0.0, 0.0, 0.5], [0.0, 0.5, 0.0], [0.5, 0.0, 0.0]])
-        self.assertEqual(cell['spectral_kpoints_path_labels'], ['$\Gamma$', 'Z', '$Y$', 'X'])
+        self.assertEqual(cell['spectral_kpoints_path_labels'], ['$\\Gamma$', 'Z', '$Y$', 'X'])
         self.assertEqual(cell['spectral_kpoints_path_spacing'], 0.02)
 
     def test_doc2cell_and_param_with_spin(self):
@@ -954,13 +981,13 @@ class ExportTest(unittest.TestCase):
         test_fname = REAL_PATH + 'data/dummy3'
         test_param = {'xc_functional': 'PBE', 'task': 'geometryoptimisation', 'spin_polarized': False}
 
-        doc, s = cell2dict(cell_fname, db=False, outcell=True, verbosity=VERBOSITY, positions=True)
+        doc, s = cell2dict(cell_fname, db=False, lattice=True, verbosity=VERBOSITY, positions=True)
         doc2cell(doc, test_fname + '.cell', debug=True, spin=10)
 
         doc2param(test_param, test_fname + '.param', spin=10)
 
         param_doc, s = param2dict(test_fname + '.param')
-        cell_doc, s = cell2dict(test_fname + '.cell', db=False, outcell=True, positions=True)
+        cell_doc, s = cell2dict(test_fname + '.cell', db=False, lattice=True, positions=True)
 
         os.remove(test_fname + '.param')
         os.remove(test_fname + '.cell')
@@ -985,7 +1012,7 @@ class ExportTest(unittest.TestCase):
             doc = json.load(f)
             doc2res(doc, test_fname, hash_dupe=False, overwrite=True)
             doc_exported, s = res2dict(test_fname)
-            self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(s))
+            self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(doc_exported))
             self.compare_res_with_res(doc, doc_exported)
         os.remove(test_fname)
 
