@@ -8,13 +8,12 @@ inputs and outputs.
 
 
 from collections import defaultdict
-from os import stat
-from os.path import isfile
-from time import strptime
-from pwd import getpwuid
+import os
 import glob
 import gzip
-from matador.utils.cell_utils import abc2cart, calc_mp_spacing, cart2volume, wrap_frac_coords, cart2abc, frac2cart
+import pwd
+import numpy as np
+from matador.utils.cell_utils import abc2cart, calc_mp_spacing, cart2volume, wrap_frac_coords, cart2abc, frac2cart, cart2frac, real2recip
 from matador.utils.chem_utils import get_stoich
 from matador.scrapers.utils import DFTError, CalculationError, scraper_function, f90_float_parse
 
@@ -46,7 +45,7 @@ def res2dict(seed, db=True, **kwargs):
     res['source'] = []
     res['source'].append(seed + '.res')
     # grab file owner username
-    res['user'] = getpwuid(stat(seed + '.res').st_uid).pw_name
+    res['user'] = pwd.getpwuid(os.stat(seed + '.res').st_uid).pw_name
     get_seed_metadata(res, seed)
     # alias special lines in res file
     titl = ''
@@ -85,17 +84,21 @@ def res2dict(seed, db=True, **kwargs):
         if 'SFAC' in line:
             i = 1
             while 'END' not in flines[line_no + i] and line_no + i < len(flines):
+                # check if we don't have some other SHELX keyword in the way, e.g. "UNIT"
+                if(len(flines[line_no + i]) >= 4 and
+                   all([char.isupper() for char in flines[line_no+i][0:4]])):
+                    i += 1
+                    continue
                 cursor = flines[line_no + i].split()
                 res['atom_types'].append(cursor[0])
                 res['positions_frac'].append(list(map(f90_float_parse, cursor[2:5])))
-                res['site_occupancy'].append(f90_float_parse(cursor[5]))
-                assert len(res['positions_frac'][-1]) == 3
+                try:
+                    res['site_occupancy'].append(f90_float_parse(cursor[5]))
+                except IndexError:
+                    res['site_occupancy'].append(1.0)
                 i += 1
     res['positions_frac'] = wrap_frac_coords(res['positions_frac'])
-    if 'num_atoms' in res:
-        assert len(res['atom_types']) == res['num_atoms']
-    else:
-        res['num_atoms'] = len(res['atom_types'])
+    res['num_atoms'] = len(res['atom_types'])
     # deal with implicit encapsulation
     if remark:
         if 'NTPROPS' in remark:
@@ -121,7 +124,7 @@ def res2dict(seed, db=True, **kwargs):
 
 
 @scraper_function
-def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, **kwargs):
+def cell2dict(seed, db=False, lattice=True, positions=True, **kwargs):
     """ Extract available information from .cell file; probably
     to be merged with another dict from a .param or .res file.
 
@@ -140,8 +143,6 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, **kw
 
     """
     cell = dict()
-    if outcell:
-        lattice = True
     if seed.endswith('.cell'):
         seed = seed.replace('.cell', '')
     with open(seed + '.cell', 'r') as f:
@@ -160,18 +161,23 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, **kw
             while 'endblock' not in flines[line_no + i].lower():
                 if not flines[line_no + i].strip()[0].isalpha():
                     cell['lattice_cart'].append(list(map(f90_float_parse, flines[line_no + i].split())))
-                    assert len(cell['lattice_cart'][-1]) == 3, 'Lattice vector does not have enough elements!'
+                    if not len(cell['lattice_cart'][-1]) == 3:
+                        raise RuntimeError('Lattice vector does not have enough elements!')
                 i += 1
-            assert len(cell['lattice_cart']) == 3, 'Wrong number of lattice vectors!'
+            if not len(cell['lattice_cart']) == 3:
+                raise RuntimeError('Wrong number of lattice vectors!')
         elif '%block lattice_abc' in line.lower() and lattice:
             cell['lattice_abc'] = []
             i = 1
             while 'endblock' not in flines[line_no + i].lower():
                 if not flines[line_no + i].strip()[0].isalpha():
                     cell['lattice_abc'].append(list(map(f90_float_parse, flines[line_no + i].split())))
-                    assert len(cell['lattice_abc'][-1]) == 3, 'Lattice vector does not have enough elements!'
+                    if not len(cell['lattice_abc'][-1]) == 3:
+                        raise RuntimeError('Lattice vector does not have enough elements!')
                 i += 1
-            assert len(cell['lattice_abc']) == 2, 'Wrong specification of lattice_abc'
+            if not len(cell['lattice_abc']) == 2:
+                raise RuntimeError('Wrong specification of lattice_abc')
+
         elif '%block species_pot' in line.lower():
             cell['species_pot'] = dict()
             i = 1
@@ -290,9 +296,12 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, **kw
             i = 1
             while 'endblock' not in flines[line_no + i].lower():
                 cell['phonon_supercell_matrix'].append(list(map(int, flines[line_no + i].split())))
-                assert len(cell['phonon_supercell_matrix'][-1]) == 3, 'Supercell matrix row does not have enough elements!'
+                if not len(cell['phonon_supercell_matrix'][-1]) == 3:
+                    raise RuntimeError('Supercell matrix row does not have enough elements!')
                 i += 1
-            assert len(cell['phonon_supercell_matrix']) == 3, 'Wrong supercell matrix shape!'
+            if not len(cell['phonon_supercell_matrix']) == 3:
+                raise RuntimeError('Wrong supercell matrix shape!')
+
         elif not db:
             if '%block positions_frac' in line.lower():
                 atomic_init_spins = []
@@ -313,20 +322,21 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, **kw
                     i += 1
                 if any(atomic_init_spins):
                     cell['atomic_init_spins'] = atomic_init_spins
+                    if len(cell['atomic_init_spins']) != len(cell['positions_frac']):
+                        raise RuntimeError('Atomic init spins do not match positions')
                 if positions:
+                    cell['positions_frac'] = wrap_frac_coords(cell['positions_frac'])
                     cell['num_atoms'] = len(cell['atom_types'])
-                    for ind, pos in enumerate(cell['positions_frac']):
-                        for k in range(3):
-                            if pos[k] > 1 or pos[k] < 0:
-                                cell['positions_frac'][ind][k] %= 1
             elif '%block positions_abs' in line.lower():
                 atomic_init_spins = []
                 i = 1
+                # avoid units
+                if len(flines[line_no+i].split()) < 3:
+                    i += 1
                 if positions:
                     cell['atom_types'] = []
                     cell['positions_abs'] = []
                 while '%endblock positions_abs' not in flines[line_no + i].lower():
-                    print(flines[line_no+i])
                     line = flines[line_no + i].split()
                     if positions:
                         cell['atom_types'].append(line[0])
@@ -339,12 +349,8 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, **kw
                     i += 1
                 if any(atomic_init_spins):
                     cell['atomic_init_spins'] = atomic_init_spins
-                if positions:
-                    cell['num_atoms'] = len(cell['atom_types'])
-                    for ind, pos in enumerate(cell['positions_abs']):
-                        for k in range(3):
-                            if pos[k] > 1 or pos[k] < 0:
-                                cell['positions_abs'][ind][k] %= 1
+                    if len(cell['atomic_init_spins']) != len(cell['positions_frac']):
+                        raise RuntimeError('Atomic init spins do not match positions')
 
             elif 'fix_com' in line.lower():
                 cell['fix_com'] = line.split()[-1]
@@ -376,16 +382,19 @@ def cell2dict(seed, db=True, lattice=False, outcell=False, positions=False, **kw
             cell['lattice_cart'] = abc2cart(cell['lattice_abc'])
         elif 'lattice_cart' in cell and 'lattice_abc' not in cell:
             cell['lattice_abc'] = cart2abc(cell['lattice_cart'])
-        cell['cell_volume'] = cart2volume(cell['lattice_cart'])
+        if 'lattice_cart' in cell:
+            cell['cell_volume'] = cart2volume(cell['lattice_cart'])
+
     if positions:
-        if 'positions_frac' not in cell:
-            cell['positions_frac'] = frac2cart(cell['lattice_cart'], cell['positions_abs'])
+        if 'positions_frac' not in cell and 'positions_abs' in cell:
+            cell['positions_frac'] = cart2frac(cell['lattice_cart'], cell['positions_abs'])
+            cell['positions_frac'] = wrap_frac_coords(cell['positions_frac'])
 
     if db:
         for species in cell['species_pot']:
             if 'OTF' in cell['species_pot'][species].upper():
                 pspot_seed = '/'.join(seed.split('/')[:-1]) + '/' + cell['species_pot'][species]
-                if isfile(pspot_seed):
+                if os.path.isfile(pspot_seed):
                     cell['species_pot'].update(usp2dict(pspot_seed))
 
     return cell, True
@@ -484,7 +493,12 @@ def param2dict(seed, db=True, **kwargs):
                                 param['cut_off_energy'] = '{} {}'.format(temp_cut_off[0], temp_cut_off[1])
                         else:
                             param['cut_off_energy'] = f90_float_parse(temp_cut_off[0])
-
+                    # standardize tasks that have alternative spellings
+                    elif 'task' in line and 'spectral_task' not in line and 'magres_task' not in line:
+                        if 'singlepoint' in param['task']:
+                            param['task'] = 'singlepoint'
+                        elif 'geometry' in param['task']:
+                            param['task'] = 'geometryoptimization'
                     elif 'xc_functional' in line:
                         param['xc_functional'] = param['xc_functional'].upper()
                     elif 'spin' in line and 'polar' not in line and 'spin' in param:
@@ -547,7 +561,7 @@ def castep2dict(seed, db=True, intermediates=False, **kwargs):
     castep['source'] = []
     castep['source'].append(seed)
     # grab file owner
-    castep['user'] = getpwuid(stat(seed).st_uid).pw_name
+    castep['user'] = pwd.getpwuid(os.stat(seed).st_uid).pw_name
     get_seed_metadata(castep, seed.replace('.' + ftype, ''))
     # wrangle castep file for parameters in 3 passes:
     # once forwards to get number and types of atoms
@@ -593,7 +607,7 @@ def castep2dict(seed, db=True, intermediates=False, **kwargs):
                 # glob for all .usp files with format species_*OTF.usp
                 pspot_seed += castep['species_pot'][species]
                 for globbed in glob.glob(pspot_seed):
-                    if isfile(globbed):
+                    if os.path.isfile(globbed):
                         castep['species_pot'].update(usp2dict(globbed))
 
     # check that any optimized results were saved and raise errors if not
@@ -624,8 +638,6 @@ def bands2dict(seed, summary=False, gap=False, external_efermi=None, **kwargs):
 
     """
     from matador.utils.chem_utils import HARTREE_TO_EV, BOHR_TO_ANGSTROM
-    from matador.utils.cell_utils import frac2cart, real2recip
-    import numpy as np
 
     verbosity = kwargs.get('verbosity', 0)
 
@@ -676,12 +688,10 @@ def bands2dict(seed, summary=False, gap=False, external_efermi=None, **kwargs):
     bs['kpoints_cartesian'] = np.asarray(frac2cart(real2recip(bs['lattice_cart']), bs['kpoint_path']))
     bs['kpoint_branches'], bs['kpoint_path_spacing'] = get_kpt_branches(bs['kpoints_cartesian'])
 
-    assert sum([len(branch) for branch in bs['kpoint_branches']]) == bs['num_kpoints']
-    if verbosity > 2:
-        print('Found branch structure', [(branch[0], branch[-1]) for branch in bs['kpoint_branches']])
+    if not sum([len(branch) for branch in bs['kpoint_branches']]) == bs['num_kpoints']:
+        raise RuntimeError('Error parsing kpoints: number of kpoints does not match number in branches')
 
     if gap and bs['num_spins'] == 1:
-
         vbm = -1e10
         cbm = 1e10
         cbm_pos = []
@@ -762,7 +772,6 @@ def bands2dict(seed, summary=False, gap=False, external_efermi=None, **kwargs):
             vbm_pos = bs['direct_gap_path_inds'][1]
             bs['band_gap_path'] = bs['direct_gap_path']
             bs['gap_momentum'] = np.sqrt(np.sum((bs['kpoints_cartesian'][cbm_pos] - bs['kpoints_cartesian'][vbm_pos])**2))
-            assert bs['gap_momentum'] == 0
 
         if summary:
             print('Read bs for {}.'.format(seed))
@@ -830,7 +839,6 @@ def optados2dict(seed, **kwargs):
             if the scrape was successful.
 
     """
-    import numpy as np
     optados = dict()
     is_pdos = False
     is_pdis = False
@@ -953,8 +961,6 @@ def phonon2dict(seed, **kwargs):
             if the scrape was successful.
 
     """
-    import numpy as np
-    from matador.utils.cell_utils import frac2cart, real2recip
 
     with open(seed, 'r') as f:
         # read whole file into RAM, typically <~ 1 MB
@@ -980,7 +986,6 @@ def phonon2dict(seed, **kwargs):
             ph['lattice_cart'] = []
             for i in range(3):
                 ph['lattice_cart'].append([f90_float_parse(elem) for elem in flines[line_no + i + 1].split()])
-                assert len(ph['lattice_cart'][-1]) == 3
         elif 'fractional co-ordinates' in line:
             ph['positions_frac'] = []
             ph['atom_types'] = []
@@ -990,10 +995,7 @@ def phonon2dict(seed, **kwargs):
                 ph['positions_frac'].append([f90_float_parse(elem) for elem in flines[line_no + i].split()[1:4]])
                 ph['atom_types'].append(flines[line_no + i].split()[-2])
                 ph['atom_masses'].append(f90_float_parse(flines[line_no + i].split()[-1]))
-                assert len(ph['positions_frac'][-1]) == 3
                 i += 1
-            assert len(ph['positions_frac']) == ph['num_atoms']
-            assert len(ph['atom_types']) == ph['num_atoms']
         elif 'end header' in line:
             data = flines[line_no + 1:]
 
@@ -1003,8 +1005,6 @@ def phonon2dict(seed, **kwargs):
     for qind in range(ph['num_qpoints']):
         ph['phonon_kpoint_list'].append([f90_float_parse(elem) for elem in data[qind * line_offset].split()[2:]])
         for i in range(1, ph['num_branches'] + 1):
-            if i == 1:
-                assert data[qind * line_offset + i].split()[0] == '1'
             ph['eigenvalues_q'][0][i - 1][qind] = f90_float_parse(data[qind * line_offset + i].split()[-1])
 
     ph['qpoint_path'] = np.asarray([qpt[0:3] for qpt in ph['phonon_kpoint_list']])
@@ -1036,7 +1036,8 @@ def phonon2dict(seed, **kwargs):
             ph['qpoint_branches'].append(current_branch)
             current_branch = [ind + 1]
 
-    assert sum([len(branch) for branch in ph['qpoint_branches']]) == ph['num_qpoints']
+    if not sum([len(branch) for branch in ph['qpoint_branches']]) == ph['num_qpoints']:
+        raise RuntimeError('Error parsing qpoints: number of qpoints does not match number in branches')
 
     if verbosity > 0:
         print('{} sucessfully scraped with {} q-points.'.format(seed, ph['num_qpoints']))
@@ -1409,8 +1410,6 @@ def _castep_scrape_final_structure(flines, castep, db=True):
                             pass
                         break
                     i += 1
-            elif 'failed to SCF' in line:
-                raise DFTError('CASTEP SCF failed to reach convergence.')
             elif 'Integrated Spin Density' in line:
                 castep['integrated_spin_density'] = f90_float_parse(line.split()[-2])
             elif 'Integrated |Spin Density|' in line:
@@ -1480,8 +1479,9 @@ def _castep_scrape_metadata(flines, castep):
         dict: dictionary updated with scraped data
 
     """
+    from time import strptime
     # computing metadata, i.e. parallelism, time, memory, version
-    for line in flines:
+    for ind, line in enumerate(flines):
         if 'Release CASTEP version' in line:
             castep['castep_version'] = line.replace('|', '').split()[-1]
         try:
@@ -1490,6 +1490,10 @@ def _castep_scrape_metadata(flines, castep):
                 month = str(strptime(line.split()[4], '%b').tm_mon)
                 day = line.split()[3]
                 castep['date'] = day + '-' + month + '-' + year
+            elif 'compiled for' in line.lower():
+                castep['_compiler_architecture'] = line.split()[2]
+            elif 'from code version' in line.lower():
+                castep['_castep_commit'] = ' '.join(flines[ind:ind+2]).split()[3]
             elif 'Total time' in line and 'matrix elements' not in line:
                 castep['total_time_hrs'] = f90_float_parse(line.split()[-2]) / 3600
             elif 'Peak Memory Use' in line:
@@ -1498,7 +1502,7 @@ def _castep_scrape_metadata(flines, castep):
                 castep['estimated_mem_MB'] = f90_float_parse(line.split()[-5])
 
         # if any of these error, don't worry too much (at all)
-        except Exception:
+        except (IndexError, ValueError):
             pass
 
 
@@ -1704,10 +1708,7 @@ def _castep_scrape_beef(flines, castep):
 
     for line_no, line in enumerate(flines[beef_start:]):
         if 'Self-consistent xc-energy' in line:
-            try:
-                castep['_beef']['total_energy_sans_xc'] = castep['total_energy'] + HARTREE_TO_EV*f90_float_parse(line.strip().split()[-2])
-            except:
-                castep['_beef']['total_energy_sans_xc'] = castep['total_energy'] + HARTREE_TO_EV*f90_float_parse(line.strip().split()[-1])
+            castep['_beef']['total_energy_sans_xc'] = castep['total_energy'] + HARTREE_TO_EV*f90_float_parse(line.strip().split()[-2])
 
     for line_no, line in enumerate(flines[beef_start:]):
         if '<-- BEEF' in line:
@@ -1723,7 +1724,7 @@ def _castep_scrape_beef(flines, castep):
         print('Warning, end of BEEF estimate not found.')
         return
 
-    for ind, line in enumerate(flines[beef_end:]):
+    for _, line in enumerate(flines[beef_end:]):
         if 'Mean total energy' in line:
             castep['_beef']['mean_total_energy'] = HARTREE_TO_EV*f90_float_parse(line.strip().split()[-2])
         if 'Standard deviation' in line:
@@ -1743,7 +1744,6 @@ def get_kpt_branches(cart_kpts):
             - float: estimated kpoint spacing.
 
     """
-    import numpy as np
     kpt_branches = []
     kpts_diff = np.zeros((len(cart_kpts) - 1))
     kpts_diff_set = set()

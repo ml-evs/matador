@@ -2,5 +2,5 @@ numpy>=1.14
 scipy>=1.0
 psutil
 pyyaml
-pymongo>=3.4
+pymongo>=3.7
 numba

@@ -17,7 +17,7 @@ from matador.utils.print_utils import print_failure, print_warning
 from matador.compute.queue import get_queue_env, get_queue_walltime, get_queue_manager
 from matador.scrapers.castep_scrapers import cell2dict, param2dict
 from matador.compute.compute import FullRelaxer
-from matador.compute.errors import InputError, CalculationError
+from matador.compute.errors import InputError, CalculationError, MaxMemoryEstimateExceeded
 
 
 class BatchRun:
@@ -195,7 +195,7 @@ class BatchRun:
 
         # wait for each proc to write to error queue
         try:
-            for proc_ind, proc in enumerate(procs):
+            for _, proc in enumerate(procs):
                 result = error_queue.get()
                 if isinstance(result[1], Exception):
                     errors.append(result)
@@ -213,9 +213,6 @@ class BatchRun:
         except RuntimeError as err:
             result = [proc.join(timeout=2) for proc in procs]
             result = [proc.terminate() for proc in procs if proc.is_alive()]
-            if isinstance(err, InputError):
-                for failed_seed in failed_seeds:
-                    reset_single_seed(failed_seed)
             print_failure('Fatal error(s) reported:')
             print_warning(err)
             raise err
@@ -236,14 +233,14 @@ class BatchRun:
         if isinstance(res_list, str):
             res_list = [res_list]
         for res in res_list:
-            locked = os.path.isfile('{}.lock'.format(res))
-            if not self.args.get('ignore_jobs_file'):
-                listed = self._check_jobs_file(res)
-            else:
-                listed = []
-            running = any([listed, locked])
-            if not running:
-                try:
+            try:
+                locked = os.path.isfile('{}.lock'.format(res))
+                if not self.args.get('ignore_jobs_file'):
+                    listed = self._check_jobs_file(res)
+                else:
+                    listed = []
+                running = any([listed, locked])
+                if not running:
                     # check we haven't reached job limit
                     if self.limit is not None and job_count >= self.limit:
                         error_queue.put((proc_id, job_count, res))
@@ -290,17 +287,27 @@ class BatchRun:
                         with open(self.paths['failures_fname'], 'a') as job_file:
                             job_file.write(res + '\n')
 
-                # catch non-fatal structure-level errors
-                except CalculationError as err:
-                    continue
-                # push globally-fatal errors to queue, and return to prevent further calcs
-                except RuntimeError as err:
-                    error_queue.put((proc_id, err, res))
-                    return
-                # we're not expecting any other errors, but we will assume they are fatal
-                except Exception as err:
-                    error_queue.put((proc_id, err, res))
-                    return
+            # ignore individual calculation errors
+            except CalculationError as err:
+                continue
+
+            # catch memory errors and reset so another node can try
+            except MaxMemoryEstimateExceeded as err:
+                reset_single_seed(res)
+                continue
+            # reset txt/lock for an input error, but throw it to prevent other calcs
+            except InputError as err:
+                reset_single_seed(res)
+                error_queue.put((proc_id, err, res))
+                return
+            # push globally-fatal errors to queue, and return to prevent further calcs
+            except RuntimeError as err:
+                error_queue.put((proc_id, err, res))
+                return
+            # finally catch any other generic error, normally caused by me
+            except Exception as err:
+                error_queue.put((proc_id, err, res))
+                return
 
         error_queue.put((proc_id, job_count, ''))
 
@@ -316,7 +323,8 @@ class BatchRun:
         for ext in exts:
             if not os.path.isfile('{}.{}'.format(self.seed, ext)):
                 raise InputError('Failed to find {} file, {}.{}'.format(ext, self.seed, ext))
-        self.cell_dict, cell_success = cell2dict(self.seed + '.cell', db=False)
+        self.cell_dict, cell_success = cell2dict(self.seed + '.cell',
+                                                 db=False, lattice=False, positions=False)
         if not cell_success:
             print(self.cell_dict)
             raise InputError('Failed to parse cell file')
@@ -333,16 +341,16 @@ class BatchRun:
                      "Please rename either your seed.cell/seed.param files, or rename the offending .res")
             raise InputError(error)
 
-        if (len(self.file_lists['res']) < self.nprocesses and
-                (not self.args.get('conv_cutoff') and not self.args.get('conv_kpt'))):
-            raise InputError('Requested more processes than there are jobs to run!')
-
         if not self.file_lists['res']:
             error = (
                 'run3 in CASTEP mode requires at least 1 res file in folder, found {}'
                 .format(len(self.file_lists['res']))
             )
             raise InputError(error)
+
+        if (len(self.file_lists['res']) < self.nprocesses and
+                (not self.args.get('conv_cutoff') and not self.args.get('conv_kpt'))):
+            raise InputError('Requested more processes than there are jobs to run!')
 
         # do some prelim checks of parameters
         if self.param_dict['task'].upper() in ['GEOMETRYOPTIMISATION', 'GEOMETRYOPTIMIZATION']:

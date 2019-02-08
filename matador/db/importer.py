@@ -121,8 +121,8 @@ class Spatula:
                 elif len(self.args.get('db')) > 1:
                     exit('Can only import to one collection.')
 
-        num_prototypes_in_db = self.repo.find({'prototype': True}, projection=[]).count()
-        num_objects_in_db = self.repo.count()
+        num_prototypes_in_db = self.repo.count_documents({'prototype':True})
+        num_objects_in_db = self.repo.count_documents({})
         if self.args.get('prototype'):
             if num_prototypes_in_db != num_objects_in_db:
                 raise SystemExit('I will not import prototypes to a non-prototype database!')
@@ -367,7 +367,9 @@ class Spatula:
             multi = True
         if file_lists[root]['cell_count'] == 1:
             cell_dict, success = cell2dict(file_lists[root]['cell'][0],
-                                           debug=self.debug, noglob=True,
+                                           db=True,
+                                           debug=self.debug,
+                                           noglob=True,
                                            verbosity=self.verbosity)
             cell = success
             if not success:
@@ -382,6 +384,7 @@ class Spatula:
                     if param_name.split('.')[0] in cell_name:
                         cell_dict, success = cell2dict(cell_name,
                                                        debug=self.debug,
+                                                       db=True,
                                                        verbosity=self.verbosity)
                         cell = success
                         if not success:
@@ -407,7 +410,7 @@ class Spatula:
             input_dict.update(param_dict)
             input_dict['source'] = cell_dict['source'] + param_dict['source']
         else:
-            self.logfile.write('! {} failed to scrape any cell and param\n'.format(root))
+            self.logfile.write('! {} failed to scrape any cell and param \n'.format(root))
 
         # create res dicts and combine them with input_dict
         from matador.utils.cursor_utils import loading_bar
@@ -615,9 +618,8 @@ class Spatula:
                     ext = ext[0]
                     structure_count = 0
                     for other_ext in structure_exts:
-                        structure_count += self.repo.find(
-                            {'source': {'$in': [_file.replace(ext, other_ext)]}}
-                        ).count()
+                        structure_count += self.repo.count_documents(
+                            {'source': {'$in': [_file.replace(ext, other_ext)]}})
                     if structure_count > 1 and self.debug:
                         print('Duplicates', structure_count, _file)
 

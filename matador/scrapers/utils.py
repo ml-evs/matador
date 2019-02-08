@@ -7,8 +7,6 @@ like custom errors and a scraper function wrapper.
 """
 
 
-from traceback import print_exc
-import json
 import glob
 
 
@@ -52,13 +50,15 @@ def scraper_function(function):
                 raise oops
             except Exception as oops:
                 success = False
-                result = '{} {}: {}\n'.format(_seed, type(oops), str(oops))
+                msg = '{}: {} {}'.format(_seed, type(oops), oops)
+                print(msg)
+                result = type(oops)('{}: {}\n'.format(_seed, oops))
 
             if len(seed) == 1:
                 if success and not isinstance(result, dict):
-                    raise AssertionError('Scraping failed, but str returned for {}'.format(seed))
-                elif not success and not isinstance(result, str):
                     raise AssertionError('Scraping succeeded, but dict not returned for {}'.format(seed))
+                elif not success and isinstance(result, dict):
+                    raise AssertionError('Scraping failed, but dict returned for {}'.format(seed))
 
                 return result, success
 
