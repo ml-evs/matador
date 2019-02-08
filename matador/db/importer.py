@@ -230,17 +230,19 @@ class Spatula:
                     struct['quality'] = 0
                     failed_checks.append('missing all pspots')
                 else:
+                    specified = []
                     for elem in struct['stoichiometry']:
                         # remove all points for a missing pseudo
                         if elem[0] not in struct['species_pot']:
                             struct['quality'] = 0
                             failed_checks.append('missing pspot for {}'.format(elem[0]))
                         else:
+                            specified.append(elem[0])
                             # remove a point for a generic OTF pspot
                             if 'OTF' in struct['species_pot'][elem[0]].upper():
                                 struct['quality'] -= 1
                                 failed_checks.append('pspot not fully specified for {}'.format(elem[0]))
-                    struct['species_pot'] = {species: struct['species_pot'][species] for species in set(struct['atom_types'])}
+                    struct['species_pot'] = {species: struct['species_pot'][species] for species in specified}
 
                 if 'xc_functional' not in struct:
                     struct['quality'] = 0

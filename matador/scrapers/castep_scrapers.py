@@ -583,9 +583,10 @@ def castep2dict(seed, db=True, intermediates=False, **kwargs):
         if intermediates:
             castep['intermediates'] = snapshots
 
+    _castep_scrape_metadata(flines, castep)
+
     # once more forwards, from the final step, to get the final structure
     _castep_scrape_final_structure(flines, castep, db=db)
-    _castep_scrape_metadata(flines, castep)
 
     # scrape any BEEF post-processing
     _castep_scrape_beef(flines, castep)
@@ -1415,25 +1416,29 @@ def _castep_scrape_final_structure(flines, castep, db=True):
             elif 'Integrated |Spin Density|' in line:
                 castep['integrated_mod_spin_density'] = f90_float_parse(line.split()[-2])
             elif 'Atomic Populations (Mulliken)' in line:
-                if castep['spin_polarized']:
-                    castep['mulliken_spins'] = []
-                    castep['mulliken_net_spin'] = 0.0
-                    castep['mulliken_abs_spin'] = 0.0
-                castep['mulliken_charges'] = []
-                castep['mulliken_spins'] = []
-                i = 0
-                ind = 0
-                while ind < len(castep['atom_types']):
+                # population format seems to change every CASTEP version...
+                if float(castep.get('castep_version', 0.0)) >= 16:
                     if castep['spin_polarized']:
-                        castep['mulliken_charges'].append(f90_float_parse(final_flines[line_no + i + 4].split()[-2]))
-                        castep['mulliken_spins'].append(f90_float_parse(final_flines[line_no + i + 4].split()[-1]))
-                        castep['mulliken_net_spin'] += castep['mulliken_spins'][-1]
-                        castep['mulliken_abs_spin'] += abs(castep['mulliken_spins'][-1])
-                        i += 2
-                    else:
-                        castep['mulliken_charges'].append(f90_float_parse(final_flines[line_no + i + 4].split()[-1]))
-                        i += 1
-                    ind += 1
+                        castep['mulliken_spins'] = []
+                        castep['mulliken_net_spin'] = 0.0
+                        castep['mulliken_abs_spin'] = 0.0
+                    castep['mulliken_charges'] = []
+                    castep['mulliken_spins'] = []
+                    i = 0
+                    ind = 0
+                    while ind < len(castep['atom_types']):
+                        print(ind)
+                        print(final_flines[line_no+i+4])
+                        if castep['spin_polarized']:
+                            castep['mulliken_charges'].append(f90_float_parse(final_flines[line_no + i + 4].split()[-2]))
+                            castep['mulliken_spins'].append(f90_float_parse(final_flines[line_no + i + 4].split()[-1]))
+                            castep['mulliken_net_spin'] += castep['mulliken_spins'][-1]
+                            castep['mulliken_abs_spin'] += abs(castep['mulliken_spins'][-1])
+                            i += 2
+                        else:
+                            castep['mulliken_charges'].append(f90_float_parse(final_flines[line_no + i + 4].split()[-1]))
+                            i += 1
+                        ind += 1
             elif 'Final Enthalpy' in line:
                 castep['enthalpy'] = f90_float_parse(line.split('=')[-1].split()[0])
                 castep['enthalpy_per_atom'] = (f90_float_parse(line.split('=')[-1].split()[0]) / castep['num_atoms'])
