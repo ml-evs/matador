@@ -23,7 +23,6 @@ from matador.workflows import Workflow
 from matador.scrapers import arbitrary2dict
 
 
-
 def castep_full_spectral(relaxer, calc_doc, seed):
     """ Perform a "full" spectral calculation on a system, i.e. first
     perform an SCF then interpolate to different kpoint paths/grids to
@@ -105,7 +104,7 @@ class CastepSpectralWorkflow(Workflow):
             todo['dispersion'] = not os.path.isfile(self.seed + '.bands_dispersion')
 
         if ('spectral_kpoints_mp_spacing' in self.calc_doc or
-            self.calc_doc.get('spectral_task', '').lower() == 'dos'):
+                self.calc_doc.get('spectral_task', '').lower() == 'dos'):
             todo['dos'] = not os.path.isfile(self.seed + '.bands_dos')
 
         odi_fname = _get_optados_fname(self.seed)
@@ -272,7 +271,6 @@ def optados_pdos(relaxer, _, seed):
 
     """
 
-
     odi_fname = _get_optados_fname(seed)
     if odi_fname is not None:
         odi_dict, _ = arbitrary2dict(odi_fname)
@@ -297,7 +295,6 @@ def optados_dos_broadening(relaxer, _, seed):
         seed (str): root filename of structure.
 
     """
-
 
     odi_fname = _get_optados_fname(seed)
     if odi_fname is not None:
@@ -431,5 +428,4 @@ def _get_correct_files_for_optados(seed, suffix=None):
         if os.path.isfile(old_file):
             shutil.copy2(old_file, current_file)
             if suffix == 'bak':
-                os.remove(old_file)
                 os.remove(old_file)

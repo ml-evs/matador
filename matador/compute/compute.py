@@ -559,6 +559,7 @@ class ComputeTask:
                     # then reset, and go again...
                     if self.reopt and rerun and not opti_dict['optimised']:
                         rerun = False
+                        self._update_output_files(opti_dict)
 
                     # are we optimised, but haven't yet rerun?
                     # then set prepare to do one more full relaxation
@@ -1293,7 +1294,6 @@ class ComputeTask:
 
         if seed is None:
             seed = self.seed
-        calc_doc = self.calc_doc
         # update cell
         if os.path.isfile(seed + '.cell'):
             os.remove(seed + '.cell')
