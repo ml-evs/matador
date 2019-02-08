@@ -7,7 +7,7 @@
 import re
 from copy import deepcopy
 from matador.utils.print_utils import print_success, print_warning, print_failure
-from matador.utils.chem_utils import get_periodic_table, get_stoich, get_formula_from_stoich, get_root_source
+from matador.utils.chem_utils import get_periodic_table
 
 
 class AtomicSwapper:
@@ -159,10 +159,5 @@ class AtomicSwapper:
                     swapped = True
             if swapped:
                 swapped_doc = deepcopy(new_doc)
-                swapped_doc['stoichiometry'] = get_stoich(swapped_doc['atom_types'])
-                # if 'source' in swapped_doc:
-                    # del swapped_doc['source']
-                # if 'source' in doc:
-                    # swapped_doc['source'] = [get_formula_from_stoich(swapped_doc['stoichiometry']) + '-swap-' + get_root_source(doc)]
                 swapped_docs.append(swapped_doc)
         return swapped_docs, len(swapped_docs)

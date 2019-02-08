@@ -13,6 +13,7 @@ import numpy as np
 from matador.utils.cell_utils import cart2abcstar, frac2cart, cart2abc
 from matador.utils.cell_utils import abc2cart, calc_mp_grid
 from matador.utils.cursor_utils import display_results
+from matador.utils.chem_utils import get_formula_from_stoich
 
 
 def file_writer_function(function):
@@ -140,15 +141,8 @@ def query2files(cursor, **kwargs):
                 root_fname = source.split('/')[-1].split('.')[0].replace('-swap-', '')
                 name += root_fname
             elif 'OQMD' in source:
-                stoich_string = ''
-                # prepend old stoich
-                if len(doc['stoichiometry']) == 1:
-                    stoich_string += doc['stoichiometry'][0][0]
-                else:
-                    for atom in doc['stoichiometry']:
-                        stoich_string += atom[0]
-                        stoich_string += str(atom[1]) if atom[1] != 1 else ''
-                name = stoich_string + '-OQMD_' + source.split(' ')[-1]
+                formula = get_formula_from_stoich(doc['stoichiometry'])
+                name = formula + '-OQMD_' + source.split(' ')[-1]
                 # if swaps, prepend new composition
                 if kwargs.get('subcmd') == 'swaps':
                     comp_string = ''
