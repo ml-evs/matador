@@ -425,7 +425,7 @@ def _get_correct_files_for_optados(seed, suffix=None):
                 backup_file = '{}{}_{}'.format(seed, ext, 'bak')
                 shutil.copy2(current_file, backup_file)
             os.remove(current_file)
-        elif os.path.isfile(old_file):
+        if os.path.isfile(old_file):
             shutil.copy2(old_file, current_file)
             if suffix == 'bak':
                 os.remove(old_file)
