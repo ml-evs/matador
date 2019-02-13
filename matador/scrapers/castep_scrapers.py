@@ -1427,8 +1427,6 @@ def _castep_scrape_final_structure(flines, castep, db=True):
                     i = 0
                     ind = 0
                     while ind < len(castep['atom_types']):
-                        print(ind)
-                        print(final_flines[line_no+i+4])
                         if castep['spin_polarized']:
                             castep['mulliken_charges'].append(f90_float_parse(final_flines[line_no + i + 4].split()[-2]))
                             castep['mulliken_spins'].append(f90_float_parse(final_flines[line_no + i + 4].split()[-1]))
