@@ -789,10 +789,10 @@ class ComputeTest(unittest.TestCase):
         os.chdir(REAL_PATH + 'data/missing_basics')
         tests = ['missing_cutoff', 'missing_kpts', 'missing_xc', 'missing_pspot']
         errors = [False for test in tests]
-        for ind, _ in enumerate(tests):
+        for ind, test in enumerate(tests):
             try:
-                runner = BatchRun(seed=['LiAs'], debug=False, no_reopt=True,
-                                  verbosity=VERBOSITY, ncores=2, nprocesses=2, executable=EXECUTABLE)
+                runner = BatchRun(seed=['LiC_' + test], debug=False, no_reopt=True,
+                                  verbosity=VERBOSITY, executable=EXECUTABLE)
                 runner.spawn()
             except InputError:
                 errors[ind] = True

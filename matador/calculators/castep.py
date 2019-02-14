@@ -26,7 +26,7 @@ class CastepCalculator(Calculator):
                 if elem[0] not in calculation_parameters['species_pot']:
                     msg = 'Unable to find pseudopotential specification for species {}'.format(elem[0])
                     errors.append(msg)
-                if ('|' not in calculation_parameters['species_pot'][elem[0]] and
+                elif ('|' not in calculation_parameters['species_pot'][elem[0]] and
                         not os.path.isfile(os.path.expanduser(calculation_parameters['species_pot'][elem[0]])) and
                         calculation_parameters['species_pot'][elem[0]] not in VALID_PSPOT_LIBS):
                     msg = 'Unable to find pseudopotential file/string/library: {}'.format(calculation_parameters['species_pot'][elem[0]])
