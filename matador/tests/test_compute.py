@@ -792,7 +792,7 @@ class ComputeTest(unittest.TestCase):
         for ind, test in enumerate(tests):
             try:
                 runner = BatchRun(seed=['LiC_' + test], debug=False, no_reopt=True,
-                                  verbosity=VERBOSITY, executable=EXECUTABLE)
+                                  verbosity=VERBOSITY, executable=EXECUTABLE, exec_test=False)
                 runner.spawn()
             except InputError:
                 errors[ind] = True
