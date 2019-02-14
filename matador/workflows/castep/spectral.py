@@ -416,6 +416,9 @@ def _get_correct_files_for_optados(seed, suffix=None):
 
     """
     import shutil
+    logging.debug('Getting files for OptaDOS: {} {}'.format(seed, suffix))
+    if suffix is None:
+        return
     files_to_cache = ['.pdos_bin', '.dome_bin', '-out.cell', '.bands', '.cell', '.param']
     for ext in files_to_cache:
         old_file = '{}{}_{}'.format(seed, ext, suffix)
@@ -426,6 +429,7 @@ def _get_correct_files_for_optados(seed, suffix=None):
                 shutil.copy2(current_file, backup_file)
             os.remove(current_file)
         if os.path.isfile(old_file):
+            logging.debug('Copying {} to {}'.format(old_file, current_file))
             shutil.copy2(old_file, current_file)
             if suffix == 'bak':
                 os.remove(old_file)
