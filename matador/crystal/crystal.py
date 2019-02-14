@@ -11,6 +11,7 @@ from copy import deepcopy
 from matador.utils import cell_utils
 from matador.similarity.pdf_similarity import PDF
 from matador.crystal.crystal_site import Site
+from matador.utils.chem_utils import get_concentration
 
 
 class Crystal:
@@ -175,6 +176,13 @@ class Crystal:
             from matador.utils.chem_utils import get_stoich
             self._doc['stoichiometry'] = get_stoich(self.atom_types)
         return self._doc['stoichiometry']
+
+    @property
+    def concentration(self):
+        """ Return concentration of each species in stoichiometry. """
+        if 'concentration' not in self._doc:
+            self._doc['concentration'] = get_concentration(self.stoichiometry, [elem[0] for elem in self.stoichiometry])
+        return self._doc['concentration']
 
     @property
     def formula(self):
