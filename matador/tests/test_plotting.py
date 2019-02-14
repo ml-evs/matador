@@ -47,7 +47,7 @@ class SpectralPlotTests(unittest.TestCase):
         if os.path.isfile(expected_file):
             os.remove(expected_file)
         sys.argv = ['dispersion', 'K3P-OQMD_4786-CollCode25550', '--png',
-                    '-scale', '10', '-interp', '2', '-pw', '-5', '5', '--dos_only',
+                    '--dos_only',
                     '--figsize', '10', '10']
         error = False
         try:
@@ -60,6 +60,21 @@ class SpectralPlotTests(unittest.TestCase):
         os.chdir(ROOT_DIR)
         self.assertFalse(error)
         self.assertTrue(file_exists)
+
+    def test_x11_no_fail(self):
+        """ Test combined spectral plots. """
+        os.chdir(REAL_PATH + '/data/dispersion')
+        sys.argv = ['dispersion', 'K3P-OQMD_4786-CollCode25550',
+                    '--dos_only',
+                    '--figsize', '10', '10']
+        error = False
+        try:
+            matador.cli.dispersion.main()
+        except Exception as exc:
+            print(exc)
+            error = True
+        os.chdir(ROOT_DIR)
+        self.assertFalse(error)
 
     def test_phonon(self):
         """ Test phonon dispersion plot. """
