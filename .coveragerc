@@ -8,13 +8,8 @@ parallel = True
 # Regexes for lines to exclude from consideration
 ignore_errors = True
 omit = 
-    */tests/*
-    setup.py
-    */__init__.py
-    *matador/plotting*
     *matador/workflows*
     *matador/plugins*
-    *matador/cli/dispersion.py
     *matador/cli/run3.py
 exclude_lines = 
     pragma: no cover
