@@ -47,7 +47,7 @@ def make_connection_to_collection(coll_names, check_collection=False, allow_chan
         connectTimeoutMS=10000)  # give up trying to connect to new database after 2 seconds
 
     try:
-        database_names = client.database_names()
+        database_names = client.list_database_names()
         if not quiet:
             print('Success!')
     except pm.errors.ServerSelectionTimeoutError as exc:
@@ -68,7 +68,7 @@ def make_connection_to_collection(coll_names, check_collection=False, allow_chan
             print('Creating database {}'.format(settings['mongo']['db']))
 
     db = client[settings['mongo']['db']]
-    possible_collections = [name for name in db.collection_names() if not name.startswith('__')]
+    possible_collections = [name for name in db.list_collection_names() if not name.startswith('__')]
     collections = dict()
     # allow lists of collections for backwards-compat, though normally
     # we only want to connect to one at a time
