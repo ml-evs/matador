@@ -1,3 +1,10 @@
+#!/usr/bin/env python
+
+""" These tests only check whether plots are created,
+not that they look correct!
+
+"""
+
 import unittest
 import os
 import sys
@@ -13,6 +20,7 @@ ROOT_DIR = os.getcwd()
 class SpectralPlotTests(unittest.TestCase):
     """ Test Dispersion script. """
     def test_pdis_plot(self):
+        """ Test combined spectral plots. """
         os.chdir(REAL_PATH + '/data/dispersion')
         expected_file = 'K3P-OQMD_4786-CollCode25550_spectral.png'
         if os.path.isfile(expected_file):
@@ -37,24 +45,29 @@ class HullPlotTests(unittest.TestCase):
     """ Tests for plotting phase diagrams. """
     def test_binary_hull_plot(self):
         """ Test plotting binary hull. """
-        expected_file = 'KP_hull.png'
-        if os.path.isfile(expected_file):
-            os.remove(expected_file)
+        expected_files = ['KP_hull.png', 'KP_voltage.png']
+        for expected_file in expected_files:
+            if os.path.isfile(expected_file):
+                os.remove(expected_file)
         res_list = glob(REAL_PATH + 'data/hull-KP-KSnP_pub/*.res')
         self.assertEqual(len(res_list), 295, 'Could not find test res files, please check installation...')
         cursor = [res2dict(res)[0] for res in res_list]
-        QueryConvexHull(cursor=cursor, elements=['K', 'P'], no_plot=False, png=True, quiet=False)
-        self.assertTrue(os.path.isfile(expected_file))
-        os.remove(expected_file)
+        QueryConvexHull(cursor=cursor, elements=['K', 'P'], no_plot=False, png=True, quiet=False, subcmd='voltage')
+        for expected_file in expected_files:
+            self.assertTrue(os.path.isfile(expected_file))
+        for expected_file in expected_files:
+            os.remove(expected_file)
 
     def test_ternary_hull_plot(self):
         """ Test plotting ternary hull. """
-        expected_file = 'KSnP_hull.png'
-        if os.path.isfile(expected_file):
-            os.remove(expected_file)
+        expected_files = ['KSnP_hull.png', 'KSnP_voltage.png']
+        for expected_file in expected_files:
+            if os.path.isfile(expected_file):
+                os.remove(expected_file)
         res_list = glob(REAL_PATH + 'data/hull-KPSn-KP/*.res')
         self.assertEqual(len(res_list), 87, 'Could not find test res files, please check installation...')
         cursor = [res2dict(res)[0] for res in res_list]
-        QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'], no_plot=False, png=True, quiet=False)
+        QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'], no_plot=False, png=True, quiet=False, subcmd='voltage')
         self.assertTrue(os.path.isfile(expected_file))
-        os.remove(expected_file)
+        for expected_file in expected_files:
+            os.remove(expected_file)

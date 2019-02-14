@@ -50,8 +50,11 @@ def plot_voltage_curve(hull, ax=None, show=False):
 
     for ind, (capacities, voltages) in enumerate(zip(hull.voltage_data['Q'], hull.voltage_data['voltages'])):
         if dft_label is None and len(hull.voltage_data['voltages']) > 1:
-            dft_label = get_formula_from_stoich(hull.voltage_data['endstoichs'][ind], tex=True)
-        add_voltage_curve(capacities, voltages, ax_volt, c=hull.colours[ind], label=dft_label)
+            stoich_label = get_formula_from_stoich(hull.voltage_data['endstoichs'][ind], tex=True)
+        else:
+            stoich_label = None
+        label = stoich_label if dft_label is None else dft_label
+        add_voltage_curve(capacities, voltages, ax_volt, c=hull.colours[ind], label=label)
 
     if hull.args.get('labels') or hull.args.get('label_cutoff') is not None:
         label_cursor = get_hull_labels(hull, num_species=2)
@@ -78,12 +81,13 @@ def plot_voltage_curve(hull, ax=None, show=False):
     plt.tight_layout(pad=0.0, h_pad=1.0, w_pad=0.2)
 
     if hull.savefig:
+        fname = ''.join(hull.elements) + '_voltage'
         if hull.args.get('pdf'):
-            plt.savefig(hull.elements[0] + hull.elements[1] + '_voltage.pdf', dpi=500, transparent=True)
+            plt.savefig(fname + '.pdf', transparent=True)
         if hull.args.get('svg'):
-            plt.savefig(hull.elements[0] + hull.elements[1] + '_voltage.svg', dpi=500, transparent=True)
+            plt.savefig(fname + '.svg', transparent=True)
         if hull.args.get('png'):
-            plt.savefig(hull.elements[0] + hull.elements[1] + '_voltage.png', dpi=500, transparent=True)
+            plt.savefig(fname + '.png', transparent=True)
     elif show:
         plt.show()
 
