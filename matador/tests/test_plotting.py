@@ -34,7 +34,48 @@ class SpectralPlotTests(unittest.TestCase):
         except Exception as exc:
             print(exc)
             error = True
-        file_exists = os.path.isfile('K3P-OQMD_4786-CollCode25550_spectral.png')
+        file_exists = os.path.isfile(expected_file)
+        os.remove(expected_file)
+        os.chdir(ROOT_DIR)
+        self.assertFalse(error)
+        self.assertTrue(file_exists)
+
+    def test_dos_only(self):
+        """ Test combined spectral plots. """
+        os.chdir(REAL_PATH + '/data/dispersion')
+        expected_file = 'K3P-OQMD_4786-CollCode25550_spectral.png'
+        if os.path.isfile(expected_file):
+            os.remove(expected_file)
+        sys.argv = ['dispersion', 'K3P-OQMD_4786-CollCode25550', '--png',
+                    '-scale', '10', '-interp', '2', '-pw', '-5', '5', '--dos_only',
+                    '--figsize', '10', '10']
+        error = False
+        try:
+            matador.cli.dispersion.main()
+        except Exception as exc:
+            print(exc)
+            error = True
+        file_exists = os.path.isfile(expected_file)
+        os.remove(expected_file)
+        os.chdir(ROOT_DIR)
+        self.assertFalse(error)
+        self.assertTrue(file_exists)
+
+    def test_phonon(self):
+        """ Test phonon dispersion plot. """
+        os.chdir(REAL_PATH + '/data')
+        expected_file = 'K8SnP4_spectral.png'
+        if os.path.isfile(expected_file):
+            os.remove(expected_file)
+        sys.argv = ['dispersion', 'K8SnP4', '--png', '-ph', '--band_colour', 'k',
+                    '--figsize', '10', '10']
+        error = False
+        try:
+            matador.cli.dispersion.main()
+        except Exception as exc:
+            print(exc)
+            error = True
+        file_exists = os.path.isfile(expected_file)
         os.remove(expected_file)
         os.chdir(ROOT_DIR)
         self.assertFalse(error)
@@ -52,7 +93,8 @@ class HullPlotTests(unittest.TestCase):
         res_list = glob(REAL_PATH + 'data/hull-KP-KSnP_pub/*.res')
         self.assertEqual(len(res_list), 295, 'Could not find test res files, please check installation...')
         cursor = [res2dict(res)[0] for res in res_list]
-        QueryConvexHull(cursor=cursor, elements=['K', 'P'], no_plot=False, png=True, quiet=False, subcmd='voltage')
+        QueryConvexHull(cursor=cursor, elements=['K', 'P'], no_plot=False, png=True, quiet=False, subcmd='voltage',
+                        labels=True, label_cutoff=0.05, colour_by_source=True, hull_cutoff=0.1)
         for expected_file in expected_files:
             self.assertTrue(os.path.isfile(expected_file))
         for expected_file in expected_files:
@@ -67,7 +109,8 @@ class HullPlotTests(unittest.TestCase):
         res_list = glob(REAL_PATH + 'data/hull-KPSn-KP/*.res')
         self.assertEqual(len(res_list), 87, 'Could not find test res files, please check installation...')
         cursor = [res2dict(res)[0] for res in res_list]
-        QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'], no_plot=False, png=True, quiet=False, subcmd='voltage')
+        QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'], no_plot=False, png=True, quiet=False, subcmd='voltage',
+                        labels=True, label_cutoff=0.05, hull_cutoff=0.1, capmap=True)
         self.assertTrue(os.path.isfile(expected_file))
         for expected_file in expected_files:
             os.remove(expected_file)

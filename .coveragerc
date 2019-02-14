@@ -10,6 +10,7 @@ ignore_errors = True
 omit = 
     *matador/workflows*
     *matador/plugins*
+    *matador/tests*
     *matador/cli/run3.py
 exclude_lines = 
     pragma: no cover
@@ -17,6 +18,5 @@ exclude_lines =
     if self.verbosity
     if debug
     if self.debug
-    def plot_
     if kwargs.get('verbosity')
     if kwargs.get('debug')
