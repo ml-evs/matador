@@ -339,8 +339,7 @@ class DBQuery:
                 cursor_count = len(self.cursor)
 
                 # if called as script, always print results
-                if self.args.get('id') is None:
-                    print(cursor_count, 'results found for query in', collection + '.')
+                print(cursor_count, 'results found for query in', collection + '.')
 
                 if self.args.get('subcmd') != 'swaps' and not self._create_hull:
                     if cursor_count >= 1:

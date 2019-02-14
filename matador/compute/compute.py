@@ -1060,6 +1060,7 @@ class ComputeTask:
                         os.remove(globbed)
                         break
                     elif 'ERROR in cell constraints: attempt to fix' in line:
+                        logging.info('Trying to remedy CASTEP symmetry error...')
                         remedy = self._remedy_castep_symmetry_error
                 else:
                     error_str += ' '.join(flines)

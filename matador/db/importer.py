@@ -375,7 +375,7 @@ class Spatula:
                                            verbosity=self.verbosity)
             cell = success
             if not success:
-                self.logfile.write(cell_dict)
+                self.logfile.write(str(cell_dict))
         elif file_lists[root]['cell_count'] > 1:
             multi = True
             if self.verbosity > 5:
@@ -390,7 +390,7 @@ class Spatula:
                                                        verbosity=self.verbosity)
                         cell = success
                         if not success:
-                            self.logfile.write(cell_dict)
+                            self.logfile.write(str(cell_dict))
                             continue
 
                         param_dict, success = param2dict(param_name,

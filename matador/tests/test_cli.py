@@ -30,7 +30,7 @@ DEBUG = False
 MONGO_PRESENT = True
 try:
     MONGO_CLIENT = pm.MongoClient(SETTINGS['mongo']['host'], serverSelectionTimeoutMS=1000)
-    MONGO_DB_NAMES = MONGO_CLIENT.database_names()
+    MONGO_DB_NAMES = MONGO_CLIENT.list_database_names()
 except pm.errors.ServerSelectionTimeoutError:
     MONGO_PRESENT = False
 
