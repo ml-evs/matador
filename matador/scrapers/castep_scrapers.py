@@ -1711,7 +1711,7 @@ def _castep_scrape_beef(flines, castep):
 
     for line_no, line in enumerate(flines[beef_start:]):
         if 'Self-consistent xc-energy' in line:
-            castep['_beef']['total_energy_sans_xc'] = castep['total_energy'] + HARTREE_TO_EV*f90_float_parse(line.strip().split()[-2])
+            castep['_beef']['total_energy_sans_xc'] = castep['total_energy'] + HARTREE_TO_EV*f90_float_parse(line.strip().split()[-1])
 
     for line_no, line in enumerate(flines[beef_start:]):
         if '<-- BEEF' in line:
