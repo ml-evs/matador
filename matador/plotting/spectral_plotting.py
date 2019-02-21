@@ -11,6 +11,9 @@ import os
 import numpy as np
 from matador.utils.viz_utils import get_element_colours
 from matador.plotting.plotting import plotting_function
+from matador.scrapers import optados2dict, phonon2dict, bands2dict
+from matador.scrapers import cell2dict, res2dict
+from matador.orm.spectral import ElectronicDispersion
 
 
 @plotting_function
@@ -37,13 +40,15 @@ def plot_spectral(seeds, **kwargs):
     Keyword Arguments:
         plot_bandstructure (bool): whether to plot bandstructure, if available
         plot_dos (bool): whether to plot density of states, if available
+        plot_pdos (bool): whether or not to plot projected DOS, if available
         plot_pdis (bool): whether to plot projected dispersion, if available
         dos (str): separate seed name for pDOS/DOS data
         phonons (bool): whether to plot phonon or electronic data
         labels (list): list of strings for legend labels for multiple bandstructures
         gap (bool): whether to draw on the band gap
         colour_by_seed (bool): plot with a separate colour per bandstructure
-        external_efermi (float): replace scraped Fermi energy with this value (eV)
+        external_efermi (float or list): replace scraped Fermi energy with this value (eV) (can be
+            specified per spin channel).
         highlight_bands (list): list of integer indices, colour the bands with these indices in red
         band_colour (str): if passed "occ", bands will be coloured using cmap depending on whether
             they lie above or below the Fermi level. If passed 'random', colour bands randomly from
@@ -51,7 +56,7 @@ def plot_spectral(seeds, **kwargs):
             (e.g. hexcode or html colour name) to use for all bands (DEFAULT: 'occ').
         cmap (str): matplotlib colourmap name to use for the bands
         n_colours (int): number of colours to use from cmap (DEFAULT: 4).
-        no_stacked_pdos (bool): whether to plot projected DOS as stack or overlapping.
+        stacked_pdos (bool): whether to plot projected DOS as stack or overlapping.
         spin_only (str): either 'up' or 'down' to only plot one spin channel.
         preserve_kspace_distance (bool): whether to preserve distances in reciprocal space when
             linearising the kpoint path. If False, bandstructures of different lattice parameters
@@ -68,13 +73,13 @@ def plot_spectral(seeds, **kwargs):
     import matplotlib.pyplot as plt
     from cycler import cycler
     # set defaults and update class with desired values
-    prop_defaults = {'plot_bandstructure': True, 'plot_dos': True, 'plot_pdis': True,
+    prop_defaults = {'plot_bandstructure': True, 'plot_dos': True, 'plot_pdos': True, 'plot_pdis': True,
                      'phonons': False, 'gap': False,
                      'colour_by_seed': False, 'external_efermi': None,
                      'labels': None, 'cmap': None, 'band_colour': 'occ',
                      'n_colours': 4, 'spin_only': None, 'figsize': None,
                      'pdis_interpolation_factor': 2, 'pdis_point_scale': 25,
-                     'no_stacked_pdos': False, 'preserve_kspace_distance': False,
+                     'stacked_pdos': True, 'preserve_kspace_distance': False,
                      'band_reorder': None, 'title': None,
                      'verbosity': 0, 'highlight_bands': None, 'pdos_hide_tot': True}
     for key in kwargs:
@@ -119,6 +124,10 @@ def plot_spectral(seeds, **kwargs):
         # check an optados file exists
         exts = ['pdos.dat', 'adaptive.dat', 'fixed.dat', 'linear.dat', 'jdos.dat', 'phonon_dos', 'bands_dos']
         kwargs['plot_dos'] = any([any([os.path.isfile('{}.{}'.format(seed, ext)) for ext in exts]) for seed in seeds])
+
+    if kwargs['plot_pdos']:
+        exts = ['pdos.dat', 'phonon_dos']
+        kwargs['plot_pdos'] = any([any([os.path.isfile('{}.{}'.format(seed, ext)) for ext in exts]) for seed in seeds])
 
     figsize = kwargs['figsize']
     if kwargs['plot_bandstructure'] and not kwargs['plot_dos']:
@@ -205,7 +214,6 @@ def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
         matplotlib.Axes: the axis that was plotted on.
 
     """
-    from matador.scrapers.castep_scrapers import bands2dict, phonon2dict
     from cycler import cycler
     import matplotlib.pyplot as plt
     plotted_pdis = False
@@ -229,16 +237,23 @@ def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
 
         elif os.path.isfile('{}.bands'.format(seed)):
             dispersion, s = bands2dict(seed + '.bands',
-                                       summary=True,
-                                       gap=kwargs.get('gap'),
-                                       external_efermi=kwargs.get('external_efermi'),
                                        verbosity=kwargs.get('verbosity'))
             if not s:
                 raise RuntimeError(dispersion)
+
+            if os.path.isfile('{}.pdis.dat'.format(seed)) and kwargs['plot_pdis']:
+                pdis_data, s = optados2dict('{}.pdis.dat'.format(seed))
+                if not s:
+                    raise RuntimeError(pdis_data)
+            else:
+                pdis_data = None
+
+            dispersion = ElectronicDispersion(dispersion, pdis_data)
+
             branch_key = 'kpoint_branches'
             num_key = 'num_kpoints'
             path_key = 'kpoint_path'
-            eig_key = 'eigenvalues_k_s'
+            eig_key = 'eigs_s_k'
             band_key = 'num_bands'
             spin_key = 'num_spins'
 
@@ -248,7 +263,7 @@ def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
             path = _linearise_path(dispersion, path_key, branch_key, num_key, kwargs)
 
             if os.path.isfile('{}.pdis.dat'.format(seed)) and len(seeds) == 1 and kwargs['plot_pdis']:
-                ax_dispersion = projected_bandstructure_plot(seed, ax_dispersion, path, dispersion,
+                ax_dispersion = projected_bandstructure_plot(dispersion, ax_dispersion, path,
                                                              bbox_extra_artists,
                                                              **kwargs)
                 kwargs['band_colour'] = 'grey'
@@ -267,6 +282,17 @@ def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
                 # seem to have to reset colours here for some reason
                 plt.rcParams['axes.prop_cycle'] = cycler('color', kwargs['colours'])
                 for ns in range(dispersion[spin_key]):
+                    if kwargs['phonons']:
+                        fermi_energy = 0
+                    else:
+                        if kwargs.get('external_efermi') is None:
+                            fermi_energy = dispersion['spin_fermi_energy'][ns]
+                        else:
+                            try:
+                                fermi_energy = kwargs.get('external_efermi')[ns]
+                            except IndexError:
+                                fermi_energy = kwargs.get('external_efermi')
+
                     if ns == 1 and kwargs.get('spin_only') == 'up':
                         continue
                     elif ns == 0 and kwargs.get('spin_only') == 'down':
@@ -275,7 +301,7 @@ def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
                         colour, alpha, label = _get_lineprops(dispersion, eig_key, spin_key, nb, ns, branch, branch_ind, seed_ind, kwargs)
 
                         ax_dispersion.plot(path[(np.asarray(branch)-branch_ind).tolist()],
-                                           dispersion[eig_key][ns][nb][branch], c=colour,
+                                           dispersion[eig_key][ns][nb][branch] - fermi_energy, c=colour,
                                            ls=kwargs['ls'][seed_ind], alpha=alpha, label=label)
 
     if len(seeds) > 1:
@@ -310,7 +336,6 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
         matplotlib.Axes: the axis that was plotted on.
 
     """
-    from matador.scrapers import optados2dict, phonon2dict, bands2dict
     for seed_ind, seed in enumerate(seeds):
         seed = seed.replace('.bands', '').replace('.phonon', '')
         if kwargs['plot_dos']:
@@ -371,13 +396,14 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                 else:
                     max_density = np.max(dos[np.where(np.logical_and(energies < kwargs['plot_window'][1], energies > kwargs['plot_window'][0]))])
 
-                pdos_seed = '{}.pdos.dat'.format(seed)
-                pdos_data = {}
-                if os.path.isfile(pdos_seed):
-                    pdos_data, s = optados2dict(pdos_seed, verbosity=0)
-                    if not s:
-                        raise RuntimeError(pdos_data)
-                    dos_data['pdos'] = pdos_data
+                if kwargs['plot_pdos']:
+                    pdos_seed = '{}.pdos.dat'.format(seed)
+                    pdos_data = {}
+                    if os.path.isfile(pdos_seed):
+                        pdos_data, s = optados2dict(pdos_seed, verbosity=0)
+                        if not s:
+                            raise RuntimeError(pdos_data)
+                        dos_data['pdos'] = pdos_data
             else:
                 if not os.path.isfile(seed + '.phonon_dos'):
                     phonon_data, s = phonon2dict(seed + '.phonon')
@@ -431,11 +457,14 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                     dos_data['energies'] = energies
                     if kwargs['plot_window'] is None:
                         kwargs['plot_window'] = [np.min(energies[np.where(dos > 1e-3)]) - 10, np.max(energies[np.where(dos > 1e-3)])]
-                    dos_data['pdos'] = dict()
-                    for i, label in enumerate(projector_labels):
-                        dos_data['pdos'][label] = raw_data[:, i + 2]
-                    pdos = dos_data['pdos']
-                    pdos_data = dos_data
+
+                    if kwargs['plot_pdos']:
+                        dos_data['pdos'] = dict()
+                        for i, label in enumerate(projector_labels):
+                            dos_data['pdos'][label] = raw_data[:, i + 2]
+                        pdos = dos_data['pdos']
+                        pdos_data = dos_data
+
                     from os import remove
                     remove(seed + '.phonon_dos_tmp')
 
@@ -466,7 +495,7 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                 if 'spin_dos' not in dos_data:
                     ax_dos.plot(dos, energies, ls=kwargs['ls'][seed_ind],
                                 color='grey', zorder=1e10, label='Total DOS')
-                    if 'pdos' not in dos_data:
+                    if not kwargs['plot_dos']:
                         ax_dos.fill_betweenx(energies[np.where(energies > 0)], 0, dos[np.where(energies > 0)], alpha=0.2, color=kwargs['conduction'])
                         ax_dos.fill_betweenx(energies[np.where(energies <= 0)], 0, dos[np.where(energies <= 0)], alpha=0.2, color=kwargs['valence'])
 
@@ -484,19 +513,18 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                 if 'spin_dos' not in dos_data:
                     ax_dos.plot(energies, dos, ls=kwargs['ls'][seed_ind], alpha=1,
                                 c='grey', zorder=1e10, label='Total DOS')
-                    if 'pdos' not in dos_data:
+                    if not kwargs['plot_dos']:
                         ax_dos.fill_between(energies[np.where(energies > 0)], 0, dos[np.where(energies > 0)], alpha=0.2, color=kwargs['conduction'])
                         ax_dos.fill_between(energies[np.where(energies <= 0)], 0, dos[np.where(energies <= 0)], alpha=0.2, color=kwargs['valence'])
 
-            if 'pdos' in pdos_data and len(seeds) == 1:
+            if kwargs['plot_pdos'] and len(seeds) == 1:
                 pdos = pdos_data['pdos']
                 energies = pdos_data['energies']
+                stack = np.zeros_like(pdos[list(pdos.keys())[0]])
                 projector_labels, dos_colours = _get_projector_info([projector for projector in pdos])
                 for ind, projector in enumerate(pdos):
-                    if ind == 0:
-                        stack = np.zeros_like(pdos[projector])
 
-                    if not kwargs['no_stacked_pdos']:
+                    if kwargs['stacked_pdos']:
                         alpha = 0.8
                     else:
                         alpha = 0.7
@@ -509,26 +537,22 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                     if not np.max(pdos[projector]) < 1e-8:
 
                         if kwargs['plot_bandstructure']:
-                            if not kwargs['no_stacked_pdos']:
+                            if kwargs['stacked_pdos']:
                                 ax_dos.fill_betweenx(energies, stack, stack+pdos[projector],
                                                      alpha=alpha, label=projector_labels[ind],
                                                      color=dos_colours[ind])
+                            ax_dos.plot(stack + pdos[projector], energies,
+                                        alpha=1, color=dos_colours[ind])
                         else:
-                            if not kwargs['no_stacked_pdos']:
+                            if kwargs['stacked_pdos']:
                                 ax_dos.fill_between(energies, stack, stack+pdos[projector],
                                                     alpha=alpha, label=projector_labels[ind],
                                                     color=dos_colours[ind])
+                            ax_dos.plot(energies, stack + pdos[projector],
+                                        alpha=1, color=dos_colours[ind])
 
-                        if not kwargs['no_stacked_pdos']:
+                        if kwargs['stacked_pdos']:
                             stack += pdos[projector]
-
-                if not kwargs['pdos_hide_tot'] and not kwargs['no_stacked_pdos']:
-                    if kwargs['plot_bandstructure']:
-                        ax_dos.plot(stack, energies,
-                                    ls='--', alpha=1, color='black', zorder=1e10, label='Sum pDOS')
-                    else:
-                        ax_dos.plot(energies, stack,
-                                    ls='--', alpha=1, color='black', zorder=1e10, label='Sum pDOS')
 
             elif 'spin_dos' in dos_data:
                 if kwargs['plot_bandstructure']:
@@ -561,13 +585,14 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
     return ax_dos
 
 
-def projected_bandstructure_plot(seed, ax, path, dispersion, bbox_extra_artists, interpolation_factor=2, point_scale=25, **kwargs):
+def projected_bandstructure_plot(dispersion, ax, path, bbox_extra_artists, interpolation_factor=2, point_scale=25, **kwargs):
     """ Plot projected bandstructure with weightings from OptaDOS pdis.dat file.
 
     Parameters:
+        dispersion (matador.orm.spectral.ElectronicDispersion): scraped
+            data for bandstructure and pdis.
         seed (str): seed name for files to scrape.
         ax (matplotlib.pyplot.Axes): axis to plot on.
-        dispersion (dict): scraped bandstructure info without weights.
         bbox_extra_artists (list): list to append any legends too.
 
     Keyword arguments:
@@ -578,40 +603,32 @@ def projected_bandstructure_plot(seed, ax, path, dispersion, bbox_extra_artists,
         matplotlib.pyplot.Axes: the axis that was plotted on.
 
     """
-    from matador.scrapers.castep_scrapers import optados2dict, get_kpt_branches
-    from matador.utils.cell_utils import frac2cart, real2recip
-    seed = seed.replace('.pdis.dat', '')
-    dos_data, s = optados2dict(seed + '.pdis.dat', verbosity=0)
-    if not s:
-        raise RuntimeError(dos_data)
 
-    pdis = np.asarray(dos_data['pdis'])
+    pdis = dispersion.projector_weights
+    projectors = dispersion.projectors
+
     pdis[pdis < 0] = 0
     pdis[pdis > 1] = 1
 
-    projectors = dos_data['projectors']
     keep_inds = []
     for ind, _ in enumerate(projectors):
         if np.max(pdis[:, :, ind]) > 1e-8:
             keep_inds.append(ind)
 
-    lattice_cart = dispersion['lattice_cart']
-    eigs = np.asarray(dos_data['eigenvalues'])
-
     projector_labels, dos_colours = _get_projector_info(projectors)
 
-    for ind, projector in enumerate(projectors):
-        if ind in keep_inds:
-            ax.scatter(1e20, 0, facecolor=dos_colours[ind],
-                       label=projector_labels[ind], lw=0)
+    fermi_energy = kwargs.get('external_efermi') or dispersion.fermi_energy
 
-    dos_data['kpoints_cartesian'] = np.asarray(frac2cart(real2recip(lattice_cart), dos_data['kpoints']))
-    dos_data['kpoint_branches'], dos_data['kpoint_path_spacing'] = get_kpt_branches(dos_data['kpoints_cartesian'])
-    _ordered_scatter(path, eigs, pdis, dos_data['kpoint_branches'],
+    _ordered_scatter(path, dispersion.eigs_s_k[0].T - fermi_energy, pdis, dispersion.kpoint_branches,
                      interpolation_factor=interpolation_factor, point_scale=point_scale,
                      ax=ax, colours=dos_colours)
 
-    if not kwargs.get('plot_dos'):
+    if not kwargs['plot_pdos']:
+        for ind, projector in enumerate(projectors):
+            if ind in keep_inds:
+                ax.scatter(1e20, 0, facecolor=dos_colours[ind],
+                           label=projector_labels[ind], lw=0)
+
         legend = ax.legend(loc=1, frameon=True, fancybox=False, shadow=False)
         legend.set_zorder(1e20)
         bbox_extra_artists.append(legend)
@@ -625,7 +642,7 @@ def _ordered_scatter(path, eigs, pdis, branches, ax=None, colours=None, interpol
     Parameters:
         path (np.ndarray): linearised [0, 1] kpoint path array.
         eigs (np.ndarray): (num_kpoints x num_bands) array containing eigenvalues
-        pdis (np.ndarray): (num_kpoints x num_bands x num_projecttors) array containing
+        pdis (np.ndarray): (num_kpoints x num_bands x num_projectors) array containing
             projector weights.
         branches (list): list of branch indices, e.g. for two branches [[0,1,2], [3, 4]].
 
@@ -772,6 +789,14 @@ def _get_lineprops(dispersion, eig_key, spin_key, nb, ns, branch, branch_ind, se
     alpha = 1
     label = None
     if not kwargs['phonons']:
+        if kwargs.get('external_efermi') is None:
+            fermi_energy = dispersion['spin_fermi_energy'][ns]
+        else:
+            try:
+                fermi_energy = kwargs.get('external_efermi')[ns]
+            except IndexError:
+                fermi_energy = kwargs.get('external_efermi')
+
         if dispersion[spin_key] == 2:
             if ns == 0:
                 colour = 'red'
@@ -781,8 +806,8 @@ def _get_lineprops(dispersion, eig_key, spin_key, nb, ns, branch, branch_ind, se
                 alpha = 0.3
         else:
             if kwargs.get('band_colour') == 'occ':
-                band_min = np.min(dispersion[eig_key][ns][nb][branch])
-                band_max = np.max(dispersion[eig_key][ns][nb][branch])
+                band_min = np.min(dispersion[eig_key][ns][nb][branch]) - fermi_energy
+                band_max = np.max(dispersion[eig_key][ns][nb][branch]) - fermi_energy
                 if band_max < 0:
                     colour = kwargs.get('valence')
                 elif band_min > 0:
@@ -810,7 +835,6 @@ def _get_lineprops(dispersion, eig_key, spin_key, nb, ns, branch, branch_ind, se
 
 def _add_path_labels(seed, dispersion, ax_dispersion, path, path_key, branch_key, seed_ind, kwargs):
     """ Scrape k-point path labels from cell file and seekpath, then add them to the plot. """
-    from matador.scrapers import cell2dict, res2dict
     from matador.utils.cell_utils import doc2spg
     from seekpath import get_path
     xticks = []
@@ -900,9 +924,9 @@ def _add_path_labels(seed, dispersion, ax_dispersion, path, path_key, branch_key
 
     if not kwargs['phonons'] and kwargs['gap'] and dispersion['band_gap'] > 0:
         vbm_pos = dispersion['band_gap_path_inds'][1]
-        vbm = dispersion['valence_band_min']
+        vbm = dispersion['valence_band_min'] - dispersion.fermi_energy
         cbm_pos = dispersion['band_gap_path_inds'][0]
-        cbm = dispersion['conduction_band_max']
+        cbm = dispersion['conduction_band_max'] - dispersion.fermi_energy
         if vbm_pos != cbm_pos:
             vbm_offset = sum([vbm_pos > ind for ind in shear_planes])
             cbm_offset = sum([cbm_pos > ind for ind in shear_planes])
@@ -912,9 +936,9 @@ def _add_path_labels(seed, dispersion, ax_dispersion, path, path_key, branch_key
                                label='indirect gap {:3.3f} eV'.format(cbm - vbm))
 
         vbm_pos = dispersion['direct_gap_path_inds'][1]
-        vbm = dispersion['direct_valence_band_min']
+        vbm = dispersion['direct_valence_band_min'] - dispersion.fermi_energy
         cbm_pos = dispersion['direct_gap_path_inds'][0]
-        cbm = dispersion['direct_conduction_band_max']
+        cbm = dispersion['direct_conduction_band_max'] - dispersion.fermi_energy
         vbm_offset = sum([vbm_pos > ind for ind in shear_planes])
         cbm_offset = sum([cbm_pos > ind for ind in shear_planes])
         ax_dispersion.plot([path[vbm_pos - vbm_offset], path[cbm_pos - cbm_offset]], [vbm, cbm],

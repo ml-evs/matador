@@ -40,7 +40,7 @@ def main():
                         help='multiple by which to interpolate pDIS bands (DEFAULT: 2)')
     parser.add_argument('-scale', '--pdis_point_scale', type=float,
                         help='point scale in pDIS plots (DEFAULT: 25)')
-    parser.add_argument('--no_stacked_pdos', action='store_true',
+    parser.add_argument('--stacked_pdos', action='store_true',
                         help='plot PDOS as overlap rather than stack')
     parser.add_argument('--no_band_reorder', action='store_true',
                         help='don\'t reorder bands based on local gradients')

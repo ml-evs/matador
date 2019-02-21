@@ -11,6 +11,7 @@ from matador.scrapers import cif2dict, param2dict, phonon2dict, optados2dict
 from matador.scrapers import arbitrary2dict, bands2dict, pwout2dict, magres2dict
 from matador.scrapers.castep_scrapers import usp2dict, get_seed_metadata
 from matador.export import doc2res, doc2param, doc2cell
+from matador.orm.spectral import ElectronicDispersion
 
 
 # grab abs path for accessing test data
@@ -674,55 +675,57 @@ class ScraperMiscTest(unittest.TestCase):
     def test_bands(self):
         from matador.utils.chem_utils import HARTREE_TO_EV
         bands_fname = REAL_PATH + 'data/bands_files/KPSn.bands'
-        bs_dict, s = bands2dict(bands_fname, gap=True)
+        bs_dict, s = bands2dict(bands_fname)
         self.assertTrue(s, msg=bs_dict)
         self.assertEqual(len(bs_dict['kpoint_path']), 518)
-        self.assertEqual(np.shape(bs_dict['eigenvalues_k_s']), (1, 71, 518))
+        self.assertEqual(np.shape(bs_dict['eigs_s_k']), (1, 71, 518))
         self.assertEqual(bs_dict['num_kpoints'], 518)
         self.assertEqual(bs_dict['num_bands'], 71)
         self.assertAlmostEqual(bs_dict['fermi_energy'], 4.0781, places=4)
-        self.assertLessEqual(bs_dict['kpoint_path_spacing'], 0.01)
-        self.assertGreaterEqual(bs_dict['kpoint_path_spacing'], 0.009)
-        self.assertAlmostEqual(bs_dict['direct_gap'], 0.7807715152197994, places=4)
-        self.assertEqual(bs_dict['direct_gap_path_inds'], [0, 0])
-        self.assertAlmostEqual(bs_dict['band_gap'], 0.760001, places=4)
-        self.assertEqual(bs_dict['band_gap_path_inds'], [246, 235])
+        self.assertAlmostEqual(bs_dict['spin_fermi_energy'][0], 4.0781, places=4)
+
+        dispersion = ElectronicDispersion(bs_dict)
+        self.assertLessEqual(dispersion.kpoint_path_spacing, 0.01)
+        self.assertGreaterEqual(dispersion.kpoint_path_spacing, 0.009)
+        self.assertAlmostEqual(dispersion.band_gap, 0.760001, places=4)
+        self.assertAlmostEqual(dispersion.spin_band_gap[0], 0.760001, places=4)
+        self.assertEqual(dispersion.band_gap_path_inds, [246, 235])
 
         bands_fname = REAL_PATH + 'data/bands_files/KPSn_2.bands'
-        bs_dict, s = bands2dict(bands_fname, gap=True)
+        bs_dict, s = bands2dict(bands_fname)
         self.assertTrue(s)
         self.assertEqual(len(bs_dict['kpoint_path']), 28)
-        self.assertEqual(np.shape(bs_dict['eigenvalues_k_s']), (1, 71, 28))
+        self.assertEqual(np.shape(bs_dict['eigs_s_k']), (1, 71, 28))
         self.assertEqual(bs_dict['num_kpoints'], 28)
         self.assertEqual(bs_dict['num_bands'], 71)
-        self.assertAlmostEqual(bs_dict['fermi_energy'], 4.0781, places=4)
-        self.assertLessEqual(bs_dict['kpoint_path_spacing'], 0.3)
-        self.assertGreaterEqual(bs_dict['kpoint_path_spacing'], 0.29)
-        self.assertEqual(len(bs_dict['kpoint_branches']), 2)
-        self.assertAlmostEqual(bs_dict['direct_gap'], 0.7807715152197994, places=4)
-        self.assertAlmostEqual(bs_dict['direct_gap'], bs_dict['band_gap'], places=4)
-        self.assertEqual(bs_dict['direct_gap_path_inds'], [0, 0])
-        self.assertEqual(bs_dict['band_gap_path_inds'], bs_dict['direct_gap_path_inds'])
-        print((bs_dict['eigenvalues_k_s'][0][0][0]+bs_dict['fermi_energy']) / HARTREE_TO_EV)
-        print((bs_dict['eigenvalues_k_s'][0][0][0]-bs_dict['fermi_energy']) / HARTREE_TO_EV)
-        self.assertAlmostEqual(bs_dict['eigenvalues_k_s'][0][0][0], -0.99624287*HARTREE_TO_EV-bs_dict['fermi_energy'], places=4)
-        self.assertAlmostEqual(bs_dict['eigenvalues_k_s'][-1][-1][-1], 0.74794320*HARTREE_TO_EV-bs_dict['fermi_energy'], places=4)
+
+        dispersion = ElectronicDispersion(bs_dict)
+        self.assertAlmostEqual(dispersion.fermi_energy, 4.0781, places=4)
+        self.assertLessEqual(dispersion.kpoint_path_spacing, 0.3)
+        self.assertGreaterEqual(dispersion.kpoint_path_spacing, 0.29)
+        self.assertEqual(len(dispersion.kpoint_branches), 2)
+        self.assertEqual(dispersion['band_gap_path_inds'], dispersion['direct_gap_path_inds'])
+        self.assertAlmostEqual(bs_dict['eigs_s_k'][0][0][0], -0.99624287*HARTREE_TO_EV, places=4)
+        self.assertAlmostEqual(bs_dict['eigs_s_k'][-1][-1][-1], 0.74794320*HARTREE_TO_EV, places=4)
 
         bands_fname = REAL_PATH + 'data/bands_files/spin_polarised.bands'
-        bs_dict, s = bands2dict(bands_fname, gap=True)
+        bs_dict, s = bands2dict(bands_fname)
         self.assertTrue(s)
         self.assertEqual(len(bs_dict['kpoint_path']), 51)
-        self.assertEqual(np.shape(bs_dict['eigenvalues_k_s']), (2, 462, 51))
+        self.assertEqual(np.shape(bs_dict['eigs_s_k']), (2, 462, 51))
         self.assertEqual(bs_dict['num_kpoints'], 51)
         self.assertEqual(bs_dict['num_bands'], 462)
+        dispersion = ElectronicDispersion(bs_dict)
         self.assertAlmostEqual(bs_dict['fermi_energy'], 6.7507, places=4)
-        self.assertLessEqual(bs_dict['kpoint_path_spacing'], 0.03)
-        self.assertGreaterEqual(bs_dict['kpoint_path_spacing'], 0.01)
-        self.assertEqual(len(bs_dict['kpoint_branches']), 1)
-        self.assertAlmostEqual(bs_dict['eigenvalues_k_s'][0][0][0], -1.84888124*HARTREE_TO_EV-bs_dict['fermi_energy'], places=4)
-        self.assertAlmostEqual(bs_dict['eigenvalues_k_s'][1][0][0], -1.84666287*HARTREE_TO_EV-bs_dict['fermi_energy'], places=4)
-        self.assertAlmostEqual(bs_dict['eigenvalues_k_s'][-1][-1][-1], 0.64283955*HARTREE_TO_EV-bs_dict['fermi_energy'], places=4)
-        self.assertAlmostEqual(bs_dict['eigenvalues_k_s'][0][-1][-1], 0.63571135*HARTREE_TO_EV-bs_dict['fermi_energy'], places=4)
+        self.assertAlmostEqual(dispersion.spin_fermi_energy[0], 6.7507, places=4)
+        self.assertAlmostEqual(dispersion.spin_fermi_energy[1], 6.7507, places=4)
+        self.assertLessEqual(dispersion.kpoint_path_spacing, 0.03)
+        self.assertGreaterEqual(dispersion.kpoint_path_spacing, 0.01)
+        self.assertEqual(len(dispersion['kpoint_branches']), 1)
+        self.assertAlmostEqual(bs_dict['eigs_s_k'][0][0][0], -1.84888124*HARTREE_TO_EV, places=4)
+        self.assertAlmostEqual(bs_dict['eigs_s_k'][1][0][0], -1.84666287*HARTREE_TO_EV, places=4)
+        self.assertAlmostEqual(bs_dict['eigs_s_k'][-1][-1][-1], 0.64283955*HARTREE_TO_EV, places=4)
+        self.assertAlmostEqual(bs_dict['eigs_s_k'][0][-1][-1], 0.63571135*HARTREE_TO_EV, places=4)
 
     def test_qe_magres(self):
         magres_fname = REAL_PATH + 'data/NaP_QE6.magres'

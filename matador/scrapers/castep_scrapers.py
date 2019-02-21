@@ -622,16 +622,12 @@ def castep2dict(seed, db=True, intermediates=False, **kwargs):
 
 
 @scraper_function
-def bands2dict(seed, summary=False, gap=False, external_efermi=None, **kwargs):
-    """ Parse a CASTEP bands file into a dictionary.
+def bands2dict(seed, **kwargs):
+    """ Parse a CASTEP bands file into a dictionary, which can be used as input to
+    an :obj:`matador.orm.spectral.ElectronicDispersion` object.
 
     Parameters:
         seed (str/list): filename of list of filenames to be scraped.
-
-    Keyword arguments:
-        summary (bool): print info about bandgap.
-        gap (bool): re-compute bandgap info.
-        external_efermi (f90_float_parse): override the Fermi energy with this value (eV)
 
     Returns:
         (tuple): containing either dict/str containing data or error, and a bool stating
@@ -639,8 +635,6 @@ def bands2dict(seed, summary=False, gap=False, external_efermi=None, **kwargs):
 
     """
     from matador.utils.chem_utils import HARTREE_TO_EV, BOHR_TO_ANGSTROM
-
-    verbosity = kwargs.get('verbosity', 0)
 
     bs = dict()
     with open(seed, 'r') as f:
@@ -651,25 +645,23 @@ def bands2dict(seed, summary=False, gap=False, external_efermi=None, **kwargs):
 
     seed = seed.replace('.bands', '')
     bs['source'] = [seed + '.bands']
+    bs['raw'] = flines
 
     bs['num_kpoints'] = int(header[0].split()[-1])
     bs['num_spins'] = int(header[1].split()[-1])
     bs['num_electrons'] = f90_float_parse(header[2].split()[-1])
     bs['num_bands'] = int(header[3].split()[-1])
-    if external_efermi is None:
-        bs['fermi_energy_Ha'] = f90_float_parse(header[4].split()[-1])
-        bs['fermi_energy'] = bs['fermi_energy_Ha'] * HARTREE_TO_EV
-    else:
-        bs['fermi_energy'] = external_efermi
+
+    bs['spin_fermi_energy_Ha'] = [f90_float_parse(val) for val in header[4].split()[-bs['num_spins']:]]
+    bs['spin_fermi_energy'] = [HARTREE_TO_EV * val for val in bs['spin_fermi_energy_Ha']]
+    bs['fermi_energy'] = np.mean(bs['spin_fermi_energy'])
+
     bs['lattice_cart'] = []
     for i in range(3):
         bs['lattice_cart'].append([BOHR_TO_ANGSTROM * f90_float_parse(elem) for elem in header[6 + i].split()])
     bs['kpoint_path'] = np.zeros((bs['num_kpoints'], 3))
     bs['kpoint_weights'] = np.zeros((bs['num_kpoints']))
     bs['eigenvalues_k_s'] = np.empty((bs['num_spins'], bs['num_bands'], bs['num_kpoints']))
-
-    if verbosity > 2:
-        print('Found {}'.format(bs['num_kpoints']))
 
     for nk in range(bs['num_kpoints']):
         kpt_ind = nk * (bs['num_spins'] * bs['num_bands'] + bs['num_spins'] + 1)
@@ -682,111 +674,9 @@ def bands2dict(seed, summary=False, gap=False, external_efermi=None, **kwargs):
                 line_number = kpt_ind + 2 + ns + (ns * bs['num_bands']) + nb
                 bs['eigenvalues_k_s'][ns][nb][int(data[kpt_ind].split()[1]) - 1] = (
                     f90_float_parse(data[line_number].strip()))
+
     bs['eigenvalues_k_s'] *= HARTREE_TO_EV
-    bs['eigenvalues_k_s'] -= bs['fermi_energy']
-
-    # create list containing kpoint indices of discontinuous branches through k-space
-    bs['kpoints_cartesian'] = np.asarray(frac2cart(real2recip(bs['lattice_cart']), bs['kpoint_path']))
-    bs['kpoint_branches'], bs['kpoint_path_spacing'] = get_kpt_branches(bs['kpoints_cartesian'])
-
-    if not sum([len(branch) for branch in bs['kpoint_branches']]) == bs['num_kpoints']:
-        raise RuntimeError('Error parsing kpoints: number of kpoints does not match number in branches')
-
-    if gap and bs['num_spins'] == 1:
-        vbm = -1e10
-        cbm = 1e10
-        cbm_pos = []
-        vbm_pos = []
-        eps = 1e-6
-        if bs['num_spins'] == 1:
-            # calculate indirect gap
-            for _, branch in enumerate(bs['kpoint_branches']):
-                for nb in range(bs['num_bands']):
-                    band = bs['eigenvalues_k_s'][0][nb][branch]
-                    band_branch_min = np.min(band)
-                    band_branch_max = np.max(band)
-                    band_branch_argmin = np.where(band <= band_branch_min + eps)[0]
-                    band_branch_argmax = np.where(band >= band_branch_max - eps)[0]
-                    if vbm + eps < band_branch_max < 0:
-                        vbm = band_branch_max
-                        vbm_pos = [branch[max_ind] for max_ind in band_branch_argmax]
-                    elif vbm - eps <= band_branch_max < 0:
-                        vbm = band_branch_max
-                        vbm_pos.extend([branch[val] for val in band_branch_argmax])
-                    if cbm - eps > band_branch_min > 0:
-                        cbm = band_branch_min
-                        cbm_pos = [branch[min_ind] for min_ind in band_branch_argmin]
-                    elif cbm + eps >= band_branch_min > 0:
-                        cbm = band_branch_min
-                        cbm_pos.extend([branch[val] for val in band_branch_argmin])
-                    if band_branch_min < 0 < band_branch_max:
-                        vbm = 0
-                        cbm = 0
-                        vbm_pos = [0]
-                        cbm_pos = [0]
-                        break
-
-            smallest_diff = 1e10
-            for _cbm_pos in cbm_pos:
-                for _vbm_pos in vbm_pos:
-                    if abs(_vbm_pos - _cbm_pos) < smallest_diff:
-                        tmp_cbm_pos = _cbm_pos
-                        tmp_vbm_pos = _vbm_pos
-                        smallest_diff = abs(_vbm_pos - _cbm_pos)
-            cbm_pos = tmp_cbm_pos
-            vbm_pos = tmp_vbm_pos
-            bs['valence_band_min'] = vbm
-            bs['conduction_band_max'] = cbm
-            bs['band_gap'] = cbm - vbm
-            bs['band_gap_path'] = [bs['kpoint_path'][cbm_pos], bs['kpoint_path'][vbm_pos]]
-            bs['band_gap_path_inds'] = [cbm_pos, vbm_pos]
-            bs['gap_momentum'] = np.sqrt(np.sum((bs['kpoints_cartesian'][cbm_pos] - bs['kpoints_cartesian'][vbm_pos])**2))
-
-            # calculate direct gap
-            direct_gaps = np.zeros((len(bs['kpoint_path'])))
-            direct_cbms = np.zeros((len(bs['kpoint_path'])))
-            direct_vbms = np.zeros((len(bs['kpoint_path'])))
-            for ind, _ in enumerate(bs['kpoint_path']):
-                direct_cbm = 1e10
-                direct_vbm = -1e10
-                for nb in range(bs['num_bands']):
-                    band_eig = bs['eigenvalues_k_s'][0][nb][ind]
-                    if direct_vbm <= band_eig < 0:
-                        direct_vbm = band_eig
-                    if direct_cbm >= band_eig > 0:
-                        direct_cbm = band_eig
-                direct_gaps[ind] = direct_cbm - direct_vbm
-                direct_cbms[ind] = direct_cbm
-                direct_vbms[ind] = direct_vbm
-            bs['direct_gap'] = np.min(direct_gaps)
-            bs['direct_conduction_band_max'] = direct_cbms[np.argmin(direct_gaps)]
-            bs['direct_valence_band_min'] = direct_vbms[np.argmin(direct_gaps)]
-            bs['direct_gap'] = np.min(direct_gaps)
-            bs['direct_gap_path'] = 2 * [bs['kpoint_path'][np.argmin(direct_gaps)]]
-            bs['direct_gap_path_inds'] = 2 * [np.argmin(direct_gaps)]
-
-        if np.abs(bs['direct_gap'] - bs['band_gap']) < 1e-5:
-            bs['valence_band_min'] = direct_vbm
-            bs['conduction_band_max'] = direct_cbm
-            bs['band_gap_path_inds'] = bs['direct_gap_path_inds']
-            cbm_pos = bs['direct_gap_path_inds'][0]
-            vbm_pos = bs['direct_gap_path_inds'][1]
-            bs['band_gap_path'] = bs['direct_gap_path']
-            bs['gap_momentum'] = np.sqrt(np.sum((bs['kpoints_cartesian'][cbm_pos] - bs['kpoints_cartesian'][vbm_pos])**2))
-
-        if summary:
-            print('Read bs for {}.'.format(seed))
-            if bs['band_gap'] == 0:
-                print('The structure is metallic.')
-            elif bs['band_gap_path_inds'][0] == bs['band_gap_path_inds'][1]:
-                print('Band gap is direct with size {:5.5f} eV'.format(bs['band_gap']), end=' ')
-                print('and lies at {}'.format(bs['direct_gap_path'][0]))
-            else:
-                print('Band gap is indirect with size {:5.5f} eV'.format(bs['band_gap']), end=' ')
-                print('between {} and {}'.format(bs['kpoint_path'][cbm_pos], bs['kpoint_path'][vbm_pos]), end=' ')
-                print('corresponding to a wavenumber of {:5.5f} eV/A'.format(bs['gap_momentum']))
-                print('The smallest direct gap has size {:5.5f} eV'.format(bs['direct_gap']), end=' ')
-                print('and lies at {}'.format(bs['direct_gap_path'][0]))
+    bs['eigs_s_k'] = bs['eigenvalues_k_s']
 
     return bs, True
 
@@ -943,6 +833,8 @@ def optados2dict(seed, **kwargs):
                 pdis.append([f90_float_parse(val) for val in flines[nk*(optados['num_bands']+1) + 1 + nb].split()[1:]])
             optados['eigenvalues'].append(eigs)
             optados['pdis'].append(pdis)
+
+        optados['pdis'] = np.asarray(optados['pdis'])
 
     else:
         optados['dos'] = data[:, 1]
@@ -1732,42 +1624,6 @@ def _castep_scrape_beef(flines, castep):
             castep['_beef']['mean_total_energy'] = HARTREE_TO_EV*f90_float_parse(line.strip().split()[-2])
         if 'Standard deviation' in line:
             castep['_beef']['std_dev'] = HARTREE_TO_EV*f90_float_parse(line.strip().split()[-2]) / castep['num_atoms']
-
-
-def get_kpt_branches(cart_kpts):
-    """ Separate a kpoint path into discontinuous branches, returning
-    the indices of the branches and the estimated kpoint spacing.
-
-    Parameters:
-        cart_kpts (list or np.ndarray): list of kpoints in Cartesian coordinates.
-
-    Returns:
-        (tuple):
-            - list: list of lists containing branches of continous kpoint indices,
-            - float: estimated kpoint spacing.
-
-    """
-    kpt_branches = []
-    kpts_diff = np.zeros((len(cart_kpts) - 1))
-    kpts_diff_set = set()
-    for i in range(len(cart_kpts) - 1):
-        kpts_diff[i] = np.sqrt(np.sum((cart_kpts[i] - cart_kpts[i + 1])**2))
-        kpts_diff_set.add(kpts_diff[i])
-    kpt_spacing = np.median(kpts_diff)
-    current_branch = []
-    for ind, point in enumerate(cart_kpts):
-        if ind == 0:
-            current_branch.append(ind)
-        elif ind == len(cart_kpts) - 1:
-            kpt_branches.append(current_branch)
-            continue
-
-        if np.sqrt(np.sum((point - cart_kpts[ind + 1])**2)) < 3 * kpt_spacing:
-            current_branch.append(ind + 1)
-        else:
-            kpt_branches.append(current_branch)
-            current_branch = [ind + 1]
-    return kpt_branches, kpt_spacing
 
 
 def get_seed_metadata(doc, seed):
