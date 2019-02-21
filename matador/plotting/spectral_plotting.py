@@ -250,8 +250,7 @@ def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
             if os.path.isfile('{}.pdis.dat'.format(seed)) and len(seeds) == 1 and kwargs['plot_pdis']:
                 ax_dispersion = projected_bandstructure_plot(seed, ax_dispersion, path, dispersion,
                                                              bbox_extra_artists,
-                                                             point_scale=kwargs.get('pdis_point_scale', 25),
-                                                             interpolation_factor=kwargs.get('pdis_interpolation_factor', 2))
+                                                             **kwargs)
                 kwargs['band_colour'] = 'grey'
                 plotted_pdis = True
 
@@ -612,9 +611,11 @@ def projected_bandstructure_plot(seed, ax, path, dispersion, bbox_extra_artists,
                      interpolation_factor=interpolation_factor, point_scale=point_scale,
                      ax=ax, colours=dos_colours)
 
-    legend = ax.legend(loc=1, frameon=True, fancybox=False, shadow=False)
-    legend.set_zorder(1e20)
-    bbox_extra_artists.append(legend)
+    if not kwargs.get('plot_dos'):
+        legend = ax.legend(loc=1, frameon=True, fancybox=False, shadow=False)
+        legend.set_zorder(1e20)
+        bbox_extra_artists.append(legend)
+
     return ax
 
 
