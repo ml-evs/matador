@@ -61,11 +61,31 @@ class SpectralPlotTests(unittest.TestCase):
         self.assertFalse(error)
         self.assertTrue(file_exists)
 
+    def test_multiseed(self):
+        """ Test plotting two seed bandstructures on top of each other. """
+        os.chdir(REAL_PATH + '/data/bands_files')
+        expected_file = 'KPSn_spectral.png'
+        sys.argv = ['dispersion', 'KPSn', 'KPSn_2.bands',
+                    '--dos_only', '--cmap', 'viridis',
+                    '--labels', 'PBE, LDA',
+                    '--figsize', '10', '10']
+        error = False
+        try:
+            matador.cli.dispersion.main()
+        except Exception as exc:
+            print(exc)
+            error = True
+        file_exists = os.path.isfile(expected_file)
+        os.remove(expected_file)
+        os.chdir(ROOT_DIR)
+        self.assertFalse(error)
+        self.assertTrue(file_exists)
+
     def test_x11_no_fail(self):
         """ Test combined spectral plots. """
         os.chdir(REAL_PATH + '/data/dispersion')
         sys.argv = ['dispersion', 'K3P-OQMD_4786-CollCode25550',
-                    '--dos_only',
+                    '--dos_only', '--cmap', 'viridis',
                     '--figsize', '10', '10']
         error = False
         try:

@@ -645,7 +645,7 @@ class ComputeTask:
             bool: True iff SCF completed successfully, False otherwise.
 
         """
-        logging.info('Performing single-shot CASTEP run on {}'.format(seed))
+        logging.info('Performing single-shot CASTEP run on {}, with task: {}'.format(seed, calc_doc['task']))
         try:
             self.cp_to_input(seed)
 
