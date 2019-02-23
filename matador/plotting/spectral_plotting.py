@@ -107,8 +107,10 @@ def plot_spectral(seeds, **kwargs):
         seeds = [seeds]
 
     if len(seeds) > 1:
-        raise DeprecationWarning('Multiple seeds is a pain to make look good, '
-                                 'if you want this feature, let me know.')
+        if kwargs['plot_pdis'] or kwargs['plot_dos']:
+            kwargs['plot_pdos'] = False
+            kwargs['plot_pdis'] = False
+            print('Disabling projections as mutiple seeds requested.')
 
     if kwargs.get('plot_window') is not None:
         if isinstance(kwargs.get('plot_window'), list):
@@ -159,16 +161,15 @@ def plot_spectral(seeds, **kwargs):
         kwargs['colour_by_seed'] = True
         if kwargs.get('labels') is None:
             kwargs['labels'] = [seed.split('/')[-1].split('.')[0] for seed in seeds]
-    else:
-        kwargs['ls'] = []
-        kwargs['colour_by_seed'] = False
-        for i in range(len(seeds)):
-            if i % 3 == 0:
-                kwargs['ls'].append('-')
-            elif i % 3 == 1:
-                kwargs['ls'].append('--')
-            elif i % 3 == 2:
-                kwargs['ls'].append('-.')
+
+    kwargs['ls'] = []
+    for i in range(len(seeds)):
+        if i % 3 == 0:
+            kwargs['ls'].append('-')
+        elif i % 3 == 1:
+            kwargs['ls'].append('--')
+        elif i % 3 == 2:
+            kwargs['ls'].append('-.')
 
     bbox_extra_artists = []
     if kwargs['plot_bandstructure']:

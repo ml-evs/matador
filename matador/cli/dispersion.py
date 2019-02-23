@@ -25,7 +25,7 @@ def main():
     parser.add_argument('--svg', action='store_true',
                         help='save svg rather than showing plot in X')
     parser.add_argument('--labels', type=str, nargs='*',
-                        help='list of legend labels')
+                        help='list of legend labels, comma separated')
     parser.add_argument('--dos_only', action='store_true', help='only plot DOS')
     parser.add_argument('--bs_only', action='store_true', help='only plot dispersion')
     parser.add_argument('--preserve_kspace_distance', action='store_true',
@@ -66,22 +66,27 @@ def main():
     parser.add_argument('-pw', '--plot_window', nargs='+', type=float,
                         help='energy window [x, y] or [-x, x] to plot either side of E_F (eV)\
                              (DEFAULT: 5 eV)')
-    parser.add_argument('seed', type=str,
+    parser.add_argument('seed', type=str, nargs='+',
                         help='seedname or related filename (e.g. bands or dos file)')
     kwargs = vars(parser.parse_args())
     if 'gap' in kwargs:
         gap = kwargs['gap']
         del kwargs['gap']
 
-    seed = kwargs.get('seed')
+    seeds = kwargs.get('seed')
     exts_to_strip = ['bands', 'linear.dat', 'adaptive.dat', 'pdis.dat',
                      'bands_dos', 'pdos.dat', 'phonon', 'phonon_dos']
-    for ext in exts_to_strip:
-        seed = seed.replace('.' + ext, '')
+
+    for ind, seed in enumerate(seeds):
+        for ext in exts_to_strip:
+            seeds[ind] = seeds[ind].replace('.' + ext, '')
 
     verbosity = kwargs.get('verbosity')
     phonons = kwargs.get('phonons')
-    labels = kwargs.get('labels')
+    if kwargs.get('labels'):
+        labels = ' '.join(kwargs.get('labels')).split(',')
+    else:
+        labels = None
     cmap = kwargs.get('cmap')
     band_colour = kwargs.get('band_colour')
     if band_colour is None:
@@ -105,19 +110,20 @@ def main():
 
     from matador.utils.print_utils import print_failure
 
-    if not phonons:
-        bs_seed = seed + '.bands'
-        bandstructure = isfile(bs_seed)
-        dos_seeds = glob.glob(seed + '*.dat')
-        if isfile(seed + '.bands_dos'):
-            dos_seeds.append(seed + '.bands_dos')
-        dos = any([isfile(dos_seed) for dos_seed in dos_seeds])
+    for seed in seeds:
+        if not phonons:
+            bs_seed = seed + '.bands'
+            bandstructure = isfile(bs_seed)
+            dos_seeds = glob.glob(seed + '*.dat')
+            if isfile(seed + '.bands_dos'):
+                dos_seeds.append(seed + '.bands_dos')
+            dos = any([isfile(dos_seed) for dos_seed in dos_seeds])
 
-    elif phonons:
-        phonon_seed = seed + '.phonon'
-        bandstructure = isfile(phonon_seed)
-        dos_seed = seed + '.phonon_dos'
-        dos = isfile(dos_seed)
+        elif phonons:
+            phonon_seed = seed + '.phonon'
+            bandstructure = isfile(phonon_seed)
+            dos_seed = seed + '.phonon_dos'
+            dos = isfile(dos_seed)
 
     cell_seed = seed + '.cell'
     cell = isfile(cell_seed)
@@ -132,7 +138,7 @@ def main():
     if kwargs.get('bs_only') and bandstructure:
         dos = False
 
-    plot_spectral(seed,
+    plot_spectral(seeds,
                   plot_bandstructure=bandstructure,
                   plot_dos=dos,
                   cell=cell,
