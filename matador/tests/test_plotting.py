@@ -67,6 +67,7 @@ class SpectralPlotTests(unittest.TestCase):
         expected_file = 'KPSn_spectral.png'
         sys.argv = ['dispersion', 'KPSn', 'KPSn_2.bands',
                     '--dos_only', '--cmap', 'viridis',
+                    '--png',
                     '--labels', 'PBE, LDA',
                     '--figsize', '10', '10']
         error = False
