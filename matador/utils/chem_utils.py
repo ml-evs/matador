@@ -9,6 +9,7 @@ constants, with a focus on battery materials.
 
 import copy
 import numpy as np
+import warnings
 from scipy.constants import physical_constants
 
 FARADAY_CONSTANT_Cpermol = physical_constants['Faraday constant'][0]
@@ -201,26 +202,37 @@ def get_atoms_per_fu(doc):
         return sum([elem[1] for elem in doc])
 
 
-def get_formation_energy(chempots, doc, energy_key='enthalpy_per_atom', temperature=None):
+def get_formation_energy(chempots, doc, energy_key='enthalpy_per_atom'):
     """ From given chemical potentials, calculate the simplest
     formation energy per atom of the desired document.
+
+    Note:
+        recursive_get(doc, energy_key) MUST return an energy per atom for
+        the target doc and the chemical potentials.
 
     Parameters:
         chempots (list of dict): list of chempot structures.
         doc (dict): structure to evaluate.
 
     Keyword arguments:
-        energy_key (str): name of energy field to use to calculate formation energy.
-        temperature (float): if not None, use doc[energy_key][temperature] to calculate formation energy.
+        energy_key (str or list): name of energy field to use to calculate
+            formation energy. Can use a list of keys/subkeys/indices to
+            query nested dicts with `matador.utils.cursor_utils.recursive_get`.
 
     Returns:
         float: formation energy per atom.
 
     """
-    if temperature is not None:
-        formation = doc[energy_key][temperature]
-    else:
-        formation = doc[energy_key]
+    from matador.utils.cursor_utils import recursive_get
+
+    # warn user if per_atom energy is not found
+    warn = isinstance(energy_key, (list, tuple)) and not any(['per_atom' in key for key in energy_key])
+    warn = warn or (isinstance(energy_key, str) and 'per_atom' not in energy_key)
+    if warn:
+        warnings.warn('Requested energy key {} in get_formation_energy may'
+                      ' not be per atom, if so results will be incorrect.'.format(energy_key))
+
+    formation = recursive_get(doc, energy_key)
 
     # see if num chempots has been set and try to reuse it
     if 'num_chempots' in doc:
@@ -231,10 +243,8 @@ def get_formation_energy(chempots, doc, energy_key='enthalpy_per_atom', temperat
     num_atoms_per_fu = get_atoms_per_fu(doc)
     for ind, mu in enumerate(chempots):
         num_atoms_per_mu = get_atoms_per_fu(mu)
-        if temperature is not None:
-            formation -= mu[energy_key][temperature] * num_chempots[ind] * num_atoms_per_mu / num_atoms_per_fu
-        else:
-            formation -= mu[energy_key] * num_chempots[ind] * num_atoms_per_mu / num_atoms_per_fu
+        formation -= recursive_get(mu, energy_key) * num_chempots[ind] * num_atoms_per_mu / num_atoms_per_fu
+
     return formation
 
 

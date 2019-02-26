@@ -17,6 +17,46 @@ from matador import __version__
 EPS = 1e-12
 
 
+def recursive_get(data, keys):
+    """ Recursively slice a nested dictionary by a
+    list of keys.
+
+    Parameters:
+        data (dict): nested dictionary to get from.
+        keys (list): list of keys/indices to delve into.
+
+    """
+    if not isinstance(keys, (list, tuple)):
+        return data[keys]
+
+    if isinstance(keys, (list, tuple)) and len(keys) == 1:
+        return data[keys[0]]
+
+    return recursive_get(data[keys[0]], keys[1:])
+
+
+def recursive_set(data, keys, value):
+    """ Recursively slice a nested dictionary by a
+    list of keys and set the value.
+
+    Parameters:
+        data (dict): nested dictionary to get from.
+        keys (list): list of keys/indices to delve into.
+        value: value to store under key.
+
+    Raises:
+        KeyError: if any intermediate keys are missing.
+
+    """
+    if isinstance(keys, (list, tuple)):
+        if len(keys) == 1:
+            data[keys[0]] = value
+        else:
+            return recursive_set(data[keys[0]], keys[1:], value)
+    else:
+        data[keys] = value
+
+
 def display_results(cursor,
                     args=None, argstr=None, additions=None, deletions=None, no_sort=False,
                     hull=False, markdown=False, latex=False, use_source=None, colour=True):
@@ -434,11 +474,14 @@ def set_cursor_from_array(cursor, array, key):
 
 def get_array_from_cursor(cursor, key, pad_missing=False):
     """ Returns a numpy array of the values of a key
-    in a cursor.
+    in a cursor, where the key can be defined as list
+    of keys to use with `recursive_get`.
 
     Parameters:
         cursor (list): list of matador dictionaries.
-        key (str): the key to extract.
+        key (str or list): the key to extract, or list
+            of keys/subkeys/indices to extract with
+            recursive_get.
 
     Keyword arguments:
         pad_missing (bool): whether to fill array with NaN's
@@ -454,7 +497,10 @@ def get_array_from_cursor(cursor, key, pad_missing=False):
     array = []
     for ind, doc in enumerate(cursor):
         try:
-            array.append(doc[key])
+            if isinstance(key, (tuple, list)):
+                array.append(recursive_get(doc, key))
+            else:
+                array.append(doc[key])
         except KeyError as exc:
             print('{} missing  in entry {}, with source {}'.format(key, ind, doc.get('source')))
             if pad_missing:

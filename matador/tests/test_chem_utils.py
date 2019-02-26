@@ -139,6 +139,7 @@ class ChemUtilsTest(unittest.TestCase):
             {'stoichiometry': [['Li', 1]],
              'enthalpy': -200,
              'enthalpy_per_atom': -100,
+             'temperature': {'free_energy_per_atom': {'300': -100, '400': -120}},
              'num_fu': 2,
              'atom_types': ['Li', 'Li']})
         chempots.append(
@@ -147,6 +148,7 @@ class ChemUtilsTest(unittest.TestCase):
              'enthalpy_per_atom': -200,
              'num_fu': 3,
              'num_atoms': 3,
+             'temperature': {'free_energy_per_atom': {'300': -200, '400': -210, '450': -300}},
              'atom_types': ['P', 'P', 'P']})
         cursor = []
         cursor.append(
@@ -155,6 +157,7 @@ class ChemUtilsTest(unittest.TestCase):
              'enthalpy_per_atom': -300,
              'num_fu': 2,
              'num_atoms': 4,
+             'temperature': {'free_energy_per_atom': {'300': -300, '400': -315}},
              'atom_types': ['Li', 'Li', 'P', 'P']})
 
         cursor.append(
@@ -171,6 +174,18 @@ class ChemUtilsTest(unittest.TestCase):
 
         self.assertEqual(ef[0], -600/4)
         self.assertEqual(ef[1], -1100/4)
+
+        ef_300 = get_formation_energy(chempots, cursor[0], energy_key=['temperature', 'free_energy_per_atom', '300'])
+        self.assertEqual(ef_300, -150)
+        ef_400 = get_formation_energy(chempots, cursor[0], energy_key=['temperature', 'free_energy_per_atom', '400'])
+        self.assertEqual(ef_400, -150)
+
+        errored = False
+        try:
+            get_formation_energy(chempots, cursor[0], energy_key=['temperature', 'free_energy_per_atom', '450'])
+        except KeyError:
+            errored = True
+        self.assertTrue(errored)
 
     def test_formation_energy_nonbinary(self):
         from matador.utils.chem_utils import get_formation_energy
@@ -292,7 +307,6 @@ class ChemUtilsTest(unittest.TestCase):
         except RuntimeError:
             failed = True
         self.assertTrue(failed)
-
 
 
 if __name__ == '__main__':

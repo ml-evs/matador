@@ -8,7 +8,7 @@ REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
 
 class CursorUtilTest(unittest.TestCase):
     """ Tests cursor util functions. """
-    def testGuessProv(self):
+    def test_guess_prov(self):
         from matador.utils.cursor_utils import get_guess_doc_provenance
         sources = []
         answers = []
@@ -52,7 +52,7 @@ class CursorUtilTest(unittest.TestCase):
         for source, answer in zip(sources, answers):
             self.assertEqual(get_guess_doc_provenance(source), answer, msg='failed {}'.format(source))
 
-    def testFilterCursor(self):
+    def test_filter_cursor(self):
         from matador.utils.cursor_utils import filter_cursor
         cursor = [{'field': int} for int in range(100)]
 
@@ -69,6 +69,46 @@ class CursorUtilTest(unittest.TestCase):
         cursor.append({'field': [0]})
         filtered = filter_cursor(cursor, 'field', [-2, 100])
         self.assertEqual(len(filtered), len(cursor)-2)
+
+    def test_recursive_get_set(self):
+        from matador.utils.cursor_utils import recursive_get, recursive_set
+        nested_dict = {
+            'source': ['blah', 'foo'],
+            'lattice_cart': [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+            '_beef': {'total_energy': [1, 2, 3, 4],
+                      'thetas': [[1, 2, 3], [4, 5, 6], [7, 8, 9]],
+                      'foo': {'blah': 'bloop'}}
+        }
+        self.assertEqual(recursive_get(nested_dict, ['_beef', 'thetas', -1]), [7, 8, 9])
+        self.assertEqual(recursive_get(nested_dict, ['_beef', 'total_energy', 2]), 3)
+        self.assertEqual(recursive_get(nested_dict, ['_beef', 'foo', 'blah']), 'bloop')
+        recursive_set(nested_dict, ['_beef', 'thetas', -1], [1, 2, 3])
+        self.assertEqual(recursive_get(nested_dict, ['_beef', 'thetas', -1]), [1, 2, 3])
+        recursive_set(nested_dict, ['_beef', 'total_energy', 2], 3.5)
+        self.assertEqual(recursive_get(nested_dict, ['_beef', 'total_energy', 2]), 3.5)
+        nested_dict['_beef']['total_energy'][2] = 3
+        self.assertEqual(recursive_get(nested_dict, ['_beef', 'total_energy', 2]), 3)
+        nested_dict['_beef']['foo']['blah'] = (1, 2)
+        self.assertEqual(recursive_get(nested_dict, ['_beef', 'foo', 'blah']), (1, 2))
+        errored = False
+        try:
+            recursive_get(nested_dict, ['_beef', 'thetas', 4])
+        except IndexError:
+            errored = True
+        self.assertTrue(errored)
+        errored = False
+        try:
+            recursive_get(nested_dict, ['_beef', 'thetaz', 4])
+        except KeyError:
+            errored = True
+        self.assertTrue(errored)
+        errored = False
+        try:
+            recursive_get(nested_dict, ['_beef', 'foo', 'blahp'])
+        except KeyError:
+            errored = True
+        self.assertTrue(errored)
+
 
 if __name__ == '__main__':
     unittest.main()
