@@ -122,7 +122,7 @@ class HullPlotTests(unittest.TestCase):
     """ Tests for plotting phase diagrams. """
     def test_binary_hull_plot(self):
         """ Test plotting binary hull. """
-        expected_files = ['KP_hull.png', 'KP_voltage.png']
+        expected_files = ['KP_hull.png', 'KP_voltage.png', 'KP_volume.png']
         for expected_file in expected_files:
             if os.path.isfile(expected_file):
                 os.remove(expected_file)
@@ -130,7 +130,7 @@ class HullPlotTests(unittest.TestCase):
         self.assertEqual(len(res_list), 295, 'Could not find test res files, please check installation...')
         cursor = [res2dict(res)[0] for res in res_list]
         QueryConvexHull(cursor=cursor, elements=['K', 'P'], no_plot=False, png=True, quiet=False, subcmd='voltage',
-                        labels=True, label_cutoff=0.05, colour_by_source=True, hull_cutoff=0.1)
+                        labels=True, label_cutoff=0.05, colour_by_source=True, hull_cutoff=0.1, volume=True)
         for expected_file in expected_files:
             self.assertTrue(os.path.isfile(expected_file))
         for expected_file in expected_files:
