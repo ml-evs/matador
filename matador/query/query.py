@@ -497,25 +497,21 @@ class DBQuery:
             self.query_dict = self._query_calc(self.cursor[0])
             self.calc_dict['$and'] = list(self.query_dict['$and'])
 
-    @staticmethod
-    def query_stoichiometry(**kwargs):
+    def query_stoichiometry(self, **kwargs):
         """ Alias for private function of the same name. """
-        return DBQuery._query_stoichiometry(**kwargs)
+        return self._query_stoichiometry(**kwargs)
 
-    @staticmethod
-    def query_composition(**kwargs):
+    def query_composition(self, **kwargs):
         """ Alias for private function of the same name. """
-        return DBQuery._query_composition(**kwargs)
+        return self._query_composition(**kwargs)
 
-    @staticmethod
-    def query_tags(**kwargs):
+    def query_tags(self, **kwargs):
         """ Alias for private function of the same name. """
-        return DBQuery._query_tags(**kwargs)
+        return self._query_tags(**kwargs)
 
-    @staticmethod
-    def query_quality(**kwargs):
+    def query_quality(self, **kwargs):
         """ Alias for private function of the same name. """
-        return DBQuery._query_quality(**kwargs)
+        return self._query_quality(**kwargs)
 
     @staticmethod
     def _query_float_range(field, values, tolerance=None):
