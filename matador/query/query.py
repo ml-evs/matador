@@ -498,6 +498,26 @@ class DBQuery:
             self.calc_dict['$and'] = list(self.query_dict['$and'])
 
     @staticmethod
+    def query_stoichiometry(**kwargs):
+        """ Alias for private function of the same name. """
+        return DBQuery._query_stoichiometry(**kwargs)
+
+    @staticmethod
+    def query_composition(**kwargs):
+        """ Alias for private function of the same name. """
+        return DBQuery._query_composition(**kwargs)
+
+    @staticmethod
+    def query_tags(**kwargs):
+        """ Alias for private function of the same name. """
+        return DBQuery._query_tags(**kwargs)
+
+    @staticmethod
+    def query_quality(**kwargs):
+        """ Alias for private function of the same name. """
+        return DBQuery._query_quality(**kwargs)
+
+    @staticmethod
     def _query_float_range(field, values, tolerance=None):
         """ Query all entries with field between float value range,
         or with float value.

@@ -581,16 +581,16 @@ class QueryConvexHull:
                 query_dict['$and'] = deepcopy(list(query.calc_dict['$and']))
 
                 if not self.args.get('ignore_warnings'):
-                    query_dict['$and'].append(query._query_quality())
+                    query_dict['$and'].append(query.query_quality())
 
                 if len(species_stoich[ind]) == 1:
-                    query_dict['$and'].append(query._query_composition(custom_elem=[elem]))
+                    query_dict['$and'].append(query.query_composition(custom_elem=[elem]))
                 else:
-                    query_dict['$and'].append(query._query_stoichiometry(custom_stoich=[elem]))
+                    query_dict['$and'].append(query.query_stoichiometry(custom_stoich=[elem]))
 
                 # if oqmd, only query composition, not parameters
                 if query.args.get('tags') is not None:
-                    query_dict['$and'].append(query._query_tags())
+                    query_dict['$and'].append(query.query_tags())
 
                 mu_cursor = query.repo.find(SON(query_dict)).sort(self.energy_key, pm.ASCENDING)
                 if mu_cursor.count() == 0:
