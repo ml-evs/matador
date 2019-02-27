@@ -204,7 +204,7 @@ def display_results(cursor,
         if not markdown:
             if use_source:
                 src = get_root_source(doc['source'])
-                max_len = 20
+                max_len = 34
                 struct_string.append("  {:<38.{max_len}}".format(src if len(src) < max_len else src[:max_len-4]+'[..]', max_len=max_len))
             else:
                 struct_string.append("  {:^26.22}".format(' '.join(doc.get('text_id', ['xxx', 'yyy']))))

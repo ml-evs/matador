@@ -10,11 +10,7 @@ from matador.scrapers.magres_scrapers import magres2dict
 # grab abs path for accessing test data
 REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
 
-try:
-    from Vornetclass import VoronoiNetwork
-    imported_vornet = True
-except:
-    imported_vornet = False
+imported_vornet = False
 
 
 class CrystalTest(unittest.TestCase):

@@ -220,6 +220,7 @@ class QueryConvexHull:
             self.chempot_cursor[i][self._extensive_energy_key] = self.chempot_cursor[i][self.energy_key] * \
                 sum(elem[1] for elem in self.chempot_cursor[i]['stoichiometry'])
             self.chempot_cursor[i]['num_fu'] = 1
+            self.chempot_cursor[i]['num_atoms'] = 1
             self.chempot_cursor[i]['text_id'] = ['command', 'line']
             self.chempot_cursor[i]['_id'] = generate_hash(hash_len=10)
             self.chempot_cursor[i]['source'] = ['command_line']
@@ -272,7 +273,8 @@ class QueryConvexHull:
         # ensure hull cursor is sorted by enthalpy_per_atom,
         # then by concentration, as it will be by default if from database
         hull_cursor = [self.cursor[idx] for idx in np.where(self.hull_dist <= self.hull_cutoff + EPS)[0]]
-        hull_cursor = sorted(hull_cursor, key=lambda doc: (recursive_get(doc, self.energy_key), doc['concentration']))
+        # TODO: check why this fails when the opposite way around
+        hull_cursor = sorted(hull_cursor, key=lambda doc: (doc['concentration'], recursive_get(doc, self.energy_key)))
 
         # by default hull cursor includes all structures within hull_cutoff
         # if summary requested and we're in hulldiff mode, filter hull_cursor for lowest per stoich
