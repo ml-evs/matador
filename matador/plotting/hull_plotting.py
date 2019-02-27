@@ -114,7 +114,7 @@ def plot_2d_hull(hull, ax=None, show=False, plot_points=True,
     tie_line = hull.structure_slice[hull.convex_hull.vertices]
 
     # plot hull structures
-    if plot_hull_points and '_beef' not in hull.cursor[0]:
+    if plot_hull_points:
         ax.scatter(tie_line[:, 0], tie_line[:, 1],
                    c=hull.colours[1],
                    marker='o', zorder=99999, edgecolor='k',
@@ -140,7 +140,6 @@ def plot_2d_hull(hull, ax=None, show=False, plot_points=True,
                 position = (conc, 1.15 * (e_f - 0.05))
             else:
                 position = (min(1.1 * conc + 0.15, 0.95), 1.15 * (e_f - 0.05))
-            print(doc['stoichiometry'], hull.species)
             ax.annotate(get_formula_from_stoich(doc['stoichiometry'],
                                                 latex_sub_style=r'\mathregular',
                                                 tex=True,
@@ -156,19 +155,7 @@ def plot_2d_hull(hull, ax=None, show=False, plot_points=True,
     # points for off hull structures; we either colour by source or by energy
     if plot_points and not colour_by_source:
 
-        if '_beef' in hull.cursor[0]:
-            cmap = hull.default_cmap
-            if plot_points:
-                scatter = ax.scatter(hull.structures[np.argsort(hull.hull_dist), 0][::-1],
-                                     hull.structures[np.argsort(hull.hull_dist), -1][::-1],
-                                     s=scale*40,
-                                     c=np.asarray([doc['_beef']['std_dev'] for doc in hull.cursor])[np.argsort(hull.hull_dist)],
-                                     cmap=cmap,
-                                     zorder=10000)
-                cbar = plt.colorbar(scatter, aspect=30, pad=0.02)
-                cbar.set_label('Standard deviation (BEEF) (eV/atom)')
-
-        elif hull.hull_cutoff == 0:
+        if hull.hull_cutoff == 0:
             # if no specified hull cutoff, ignore labels and colour by hull distance
             cmap = hull.default_cmap
             if plot_points:

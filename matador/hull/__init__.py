@@ -8,10 +8,12 @@ from files.
 """
 
 
-__all__ = ['QueryConvexHull', 'HullDiff', 'diff_hulls']
+__all__ = ['PhaseDiagram', 'EnsembleHull', 'QueryConvexHull', 'HullDiff', 'diff_hulls']
 __author__ = 'Matthew Evans'
 __maintainer__ = 'Matthew Evans'
 
 
 from matador.hull.hull import QueryConvexHull
+from matador.hull.phase_diagram import PhaseDiagram
+from matador.hull.hull_ensemble import EnsembleHull
 from matador.hull.hull_diff import HullDiff, diff_hulls

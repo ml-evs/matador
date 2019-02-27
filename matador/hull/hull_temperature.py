@@ -16,7 +16,7 @@ from matador.plotting.plotting import plotting_function
 from matador.utils.chem_utils import get_formula_from_stoich
 
 
-class TDHull(object):
+class TDHull:
     """ Use QueryConvexHull to construct several hulls at different temperatures,
     based on the free_energy in those hulls rather than the enthalpy.
     This is implemented only for a list of structures, i.e. a folder
@@ -28,7 +28,7 @@ class TDHull(object):
 
     def __init__(self, elements=None, cursor=None, subcmd='hull',
                  temperature_list=None, energy_key='free_energy', **kwargs):
-        """Initialize a class from a cursor (list of matador dicts and construct
+        """ Initialize a class from a cursor (list of matador dicts and construct
         a temperature dependent phase diagram or voltage profile. Only 2D.
 
         Keyword Arguments:
