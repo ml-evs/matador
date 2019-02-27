@@ -17,7 +17,7 @@ from matador import __version__
 EPS = 1e-12
 
 
-def recursive_get(data, keys):
+def recursive_get(data, keys, top=True):
     """ Recursively slice a nested dictionary by a
     list of keys.
 
@@ -31,8 +31,13 @@ def recursive_get(data, keys):
 
     if isinstance(keys, (list, tuple)) and len(keys) == 1:
         return data[keys[0]]
-
-    return recursive_get(data[keys[0]], keys[1:])
+    try:
+        return recursive_get(data[keys[0]], keys[1:], top=False)
+    except (KeyError, IndexError) as exc:
+        if top:
+            raise type(exc)('Recursive keys {} missing'.format(keys))
+        else:
+            raise exc
 
 
 def recursive_set(data, keys, value):
@@ -58,8 +63,8 @@ def recursive_set(data, keys, value):
 
 
 def display_results(cursor,
-                    args=None, argstr=None, additions=None, deletions=None, no_sort=False,
-                    hull=False, markdown=False, latex=False, use_source=None, colour=True):
+                    energy_key='enthalpy_per_atom', args=None, argstr=None, additions=None, deletions=None, no_sort=False,
+                    hull=False, markdown=False, latex=False, colour=True, return_str=False):
     """ Print query results in a cryan-like fashion, optionally
     in a markdown format.
 
@@ -67,7 +72,6 @@ def display_results(cursor,
         cursor (list of dict): list of matador documents
 
     Keyword arguments:
-        args (dict): extra keyword arguments
         argstr (str): string to store matador initialisation command
         additions (list): list of string text_ids to be coloured green with a (+)
             or, list of indices referring to those structures in the cursor.
@@ -76,8 +80,9 @@ def display_results(cursor,
         hull (bool): whether or not to print hull-style (True) or query-style
         markdown (bool): whether or not to write a markdown file containing results
         latex (bool): whether or not to create a LaTeX table
-        use_source (bool): print source instead of text_id
+        energy_key (str or list): key (or recursive key) to print as energy (per atom)
         colour (bool): colour on-hull structures
+        return_str (bool): return string instead of printing.
 
     Returns:
         str or None: markdown or latex string, if markdown or latex is True, else None.
@@ -87,6 +92,7 @@ def display_results(cursor,
         args = dict()
 
     details = args.get('details')
+    use_source = args.get('use_source')
 
     add_index_mode = False
     del_index_mode = False
@@ -101,23 +107,6 @@ def display_results(cursor,
         assert max(additions) <= len(cursor) and min(additions) >= 0
     if del_index_mode:
         assert max(deletions) <= len(cursor) and min(deletions) >= 0
-
-    # add this in to handle different energy, enthalpy, free energy etc.
-    if args.get('energy_key') is not None:
-        if args.get('energy_key').endswith('per_atom'):
-            energy = args.get('energy_key').split('_per_atom')[0]
-            energy_pa = args.get('energy_key')
-        else:
-            energy = args.get('energy_key')
-            energy_pa = args.get('energy_key') + '_per_atom'
-    else:
-        energy = 'enthalpy'
-        energy_pa = 'enthalpy_per_atom'
-
-    if use_source is None and args.get('use_source') in [False, None]:
-        use_source = False
-    elif args.get('use_source') is not None:
-        use_source = args.get('use_source')
 
     if markdown and latex:
         raise RuntimeError('Cannot specify both latex and markdown output at once.')
@@ -153,11 +142,12 @@ def display_results(cursor,
         header_string += '   '
     if not markdown:
         if use_source:
-            header_string += "{:^40}".format('ID')
+            header_string += "{:^40}".format('Source')
             units_string += "{:^40}".format('')
         else:
             header_string += "{:^28}".format('ID')
             units_string += "{:^28}".format('')
+
         header_string += "{:^5}".format('!?!')
         units_string += "{:^5}".format('')
     else:
@@ -166,20 +156,23 @@ def display_results(cursor,
         units_string += "{:^40}".format('')
     header_string += "{:^10}".format('Pressure')
     units_string += "{:^10}".format('(GPa)')
+
     if args.get('per_atom'):
         header_string += "{:^11}".format('Volume/atom')
     else:
         header_string += "{:^11}".format('Volume/fu')
     units_string += "{:^11}".format('(Ang^3)')
+
     if hull:
         header_string += "{:^18}".format('Hull dist.')
         units_string += "{:^18}".format('(meV/atom)')
     elif args.get('per_atom'):
-        header_string += "{:^18}".format('Enthalpy')
+        header_string += "{:^18}".format(' '.join(energy_key.replace('_per_atom', '').split('_')).title())
         units_string += "{:^18}".format('(eV/atom)')
     else:
-        header_string += "{:^18}".format('Enthalpy')
+        header_string += "{:^18}".format(' '.join(energy_key.replace('_per_atom', '').split('_')).title())
         units_string += "{:^18}".format('(meV/fu)')
+
     header_string += "{:^13}".format('Space group')
     header_string += "{:^15}".format('Formula')
     header_string += "{:^8}".format('# fu')
@@ -187,10 +180,7 @@ def display_results(cursor,
 
     # ensure cursor is sorted by enthalpy
     if not no_sort:
-        if args.get('temperature') is None:
-            cursor = sorted(cursor, key=lambda doc: doc[energy_pa], reverse=False)
-        else:
-            cursor = sorted(cursor, key=lambda doc: doc[energy_pa][args.get('temperature')], reverse=False)
+        cursor = sorted(cursor, key=lambda doc: recursive_get(doc, energy_key), reverse=False)
 
     if latex:
         latex_sub_style = r'\text'
@@ -199,6 +189,7 @@ def display_results(cursor,
 
     for ind, doc in enumerate(cursor):
         postfix = ''
+        prefix = ''
         formula_substring = ''
 
         formula_substring = get_formula_from_stoich(doc['stoichiometry'],
@@ -211,35 +202,30 @@ def display_results(cursor,
             gs_enthalpy = 0.0
         formula_string.append(formula_substring)
         if not markdown:
-            if hull and np.abs(doc.get('hull_distance')) <= 0.0 + 1e-12:
-                if use_source:
-                    src = get_root_source(doc['source'])
-                    if colour:
-                        struct_string.append("\033[92m\033[1m* {:<38}".format(src))
-                        postfix = '\033[0m'
-                    else:
-                        struct_string.append("* {:<38}".format(src))
-                else:
-                    if colour:
-                        struct_string.append(
-                            "\033[92m\033[1m* {:^26}".format(doc['text_id'][0]+' '+doc['text_id'][1]))
-                        postfix = '\033[0m'
-                    else:
-                        struct_string.append("* {:^26}".format(doc['text_id'][0] + ' ' + doc['text_id'][1]))
+            if use_source:
+                src = get_root_source(doc['source'])
+                max_len = 20
+                struct_string.append("  {:<38.{max_len}}".format(src if len(src) < max_len else src[:max_len-4]+'[..]', max_len=max_len))
             else:
-                if use_source:
-                    src = get_root_source(doc['source'])
-                    struct_string.append("  {:<38}".format(src))
-                else:
-                    struct_string.append("  {:^26}".format(doc['text_id'][0] + ' ' + doc['text_id'][1]))
+                struct_string.append("  {:^26.22}".format(' '.join(doc.get('text_id', ['xxx', 'yyy']))))
+            if hull and np.abs(doc.get('hull_distance')) <= 0.0 + 1e-12:
+                if colour:
+                    prefix = '\033[92m\033[1m'
+                    postfix = '\033[0m'
+                struct_string[-1] = '*' + struct_string[-1][1:]
+
             if additions is not None:
-                if (add_index_mode and ind in additions) or doc['text_id'] in additions:
-                    struct_string[-1] = '\033[92m\033[1m' + ' + ' + struct_string[-1]
-                    postfix = '\033[0m'
+                if (add_index_mode and ind in additions) or doc.get('text_id', '_') in additions:
+                    struct_string[-1] = '+' + struct_string[-1][1:]
+                    if colour:
+                        prefix = '\033[92m\033[1m'
+                        postfix = '\033[0m'
             if deletions is not None:
-                if (del_index_mode and ind in deletions) or doc['text_id'] in deletions:
-                    struct_string[-1] = '\033[91m\033[1m' + ' - ' + struct_string[-1]
-                    postfix = '\033[0m'
+                if (del_index_mode and ind in deletions) or doc.get('text_id', '_') in deletions:
+                    struct_string[-1] = '-' + struct_string[-1][1:]
+                    if colour:
+                        prefix = '\033[91m\033[1m'
+                        postfix = '\033[0m'
             try:
                 if doc.get('prototype'):
                     struct_string[-1] += "{:^5}".format('*p*')
@@ -248,14 +234,14 @@ def display_results(cursor,
                 else:
                     struct_string[-1] += "{:^5}".format((5 - doc['quality']) * '?')
             except KeyError:
-                struct_string[-1] += "{:5}".format(' ')
+                struct_string[-1] += "{:^5}".format(' ')
         else:
             struct_string.append("{:40}".format(get_root_source(doc['source'])))
 
         if 'pressure' in doc and doc['pressure'] != 'xxx':
             struct_string[-1] += "{: >9.2f}".format(doc['pressure'])
         else:
-            struct_string[-1] += "{:^10}".format('xxx')
+            struct_string[-1] += "{:^9}".format('xxx')
         try:
             if args.get('per_atom') and 'cell_volume' in doc and 'num_atoms' in doc:
                 struct_string[-1] += "{:>11.1f}".format(doc['cell_volume'] / doc['num_atoms'])
@@ -263,7 +249,7 @@ def display_results(cursor,
                 struct_string[-1] += "{:>11.1f}".format(doc['cell_volume'] / doc['num_fu'])
             else:
                 struct_string[-1] += "{:^11}".format('xxx')
-        except:
+        except Exception:
             struct_string[-1] += "{:^11}".format('xxx')
         try:
             if hull:
@@ -271,9 +257,9 @@ def display_results(cursor,
                     0 if doc.get('hull_distance') <= 1e-12 else 1000 * doc.get('hull_distance')
                 )
             elif args.get('per_atom'):
-                struct_string[-1] += "{:>18.5f}".format(doc[energy_pa] - gs_enthalpy)
+                struct_string[-1] += "{:>18.5f}".format(recursive_get(doc, energy_key) - gs_enthalpy)
             else:
-                struct_string[-1] += "{:>18.5f}".format(doc[energy] / doc['num_fu'] - gs_enthalpy)
+                struct_string[-1] += "{:>18.5f}".format(recursive_get(doc, energy_key) * doc['num_atoms'] / doc['num_fu'] - gs_enthalpy)
         except KeyError:
             struct_string[-1] += "{:^18}".format('xxx')
 
@@ -295,15 +281,15 @@ def display_results(cursor,
         else:
             struct_string[-1] += "{:^8}".format('xxx')
 
-        struct_string[-1] += postfix
+        struct_string[-1] = prefix + struct_string[-1] + postfix
 
         if latex:
             latex_struct_string.append("{:^30} {:^10} & ".format(formula_substring, '$\\star$'
-                                                                 if doc.get('hull_distance') == 0 else ''))
+                                                                 if doc.get('hull_distance', 0.1) == 0 else ''))
             latex_struct_string[-1] += ("{:^20.0f} & ".format(doc.get('hull_distance') * 1000)
                                         if doc.get('hull_distance', 0) > 0 else '{:^20} &'.format('-'))
             latex_struct_string[-1] += ("{:^20.0f} & ".format(doc.get('gravimetric_capacity', '-'))
-                                        if doc.get('hull_distance') == 0 else '{:^20} &'.format('-'))
+                                        if doc.get('hull_distance', 0.1) == 0 else '{:^20} &'.format('-'))
             latex_struct_string[-1] += "{:^20} & ".format(get_spacegroup_spg(doc))
             prov = get_guess_doc_provenance(doc['source'], doc.get('icsd'))
             if doc.get('icsd'):
@@ -312,16 +298,10 @@ def display_results(cursor,
             latex_struct_string[-1] += "{:^30} \\\\".format('')
 
         if last_formula != formula_substring:
-            if args.get('temperature') is None:
-                if args.get('per_atom'):
-                    gs_enthalpy = doc[energy] / doc['num_atoms']
-                else:
-                    gs_enthalpy = doc[energy] / doc['num_fu']
+            if args.get('per_atom'):
+                gs_enthalpy = recursive_get(doc, energy_key)
             else:
-                if args.get('per-atom'):
-                    gs_enthalpy = doc[energy][args.get('temperature')] / doc['num_atoms']
-                else:
-                    gs_enthalpy = doc[energy][args.get('temperature')] / doc['num_fu']
+                gs_enthalpy = recursive_get(doc, energy_key) * doc['num_atoms'] / doc['num_fu']
 
         last_formula = formula_substring
 
@@ -395,11 +375,13 @@ def display_results(cursor,
                 if num != len(doc['source']) - 1:
                     source_string[-1] += '\n'
 
+    total_string = ''
+
     if not markdown and not latex:
-        print(len(header_string) * '─')
-        print(header_string)
-        print(units_string)
-        print(len(header_string) * '─')
+        total_string += len(header_string) * '─' + '\n'
+        total_string += header_string + '\n'
+        total_string += units_string + '\n'
+        total_string += len(header_string) * '─' + '\n'
 
     if markdown:
         markdown_string += len(header_string) * '-' + '\n'
@@ -419,12 +401,12 @@ def display_results(cursor,
                 elif latex:
                     latex_string += latex_struct_string[ind]
                 else:
-                    print(struct_string[ind])
+                    total_string += ('{}\n'.format(struct_string[ind]))
                 if details and not markdown:
-                    print(detail_string[ind])
-                    print(detail_substring[ind])
+                    total_string += detail_string[ind] + '\n'
+                    total_string += detail_substring[ind] + '\n'
                 if args.get('source') and not markdown:
-                    print(source_string[ind])
+                    total_string += source_string[ind] + '\n'
                 current_formula = substring
                 formula_list.append(substring)
     else:
@@ -434,22 +416,24 @@ def display_results(cursor,
             elif latex:
                 latex_string += latex_struct_string[ind] + '\n'
             else:
-                print(substring)
+                total_string += substring + '\n'
                 if details:
-                    print(detail_string[ind])
-                    print(detail_substring[ind])
+                    total_string += detail_string[ind] + '\n'
+                    total_string += detail_substring[ind] + '\n'
                 if args.get('source'):
-                    print(source_string[ind])
+                    total_string += source_string[ind] + '\n'
                 if details or args.get('source'):
-                    print(len(header_string) * '─')
+                    total_string += len(header_string) * '─' + '\n'
     if markdown:
         markdown_string += '```'
         return markdown_string
     if latex:
         latex_string += '\\end{tabular}'
         return latex_string
+    if return_str:
+        return total_string
 
-    return None
+    print(total_string)
 
 
 def loading_bar(iterable):
@@ -467,9 +451,11 @@ def set_cursor_from_array(cursor, array, key):
     """ Updates the key-value pair for documents in
     internal cursor from a numpy array.
     """
-    assert len(array) == len(cursor) or len(array) - 1 == len(cursor)
+    if len(array) != len(cursor):
+        raise RuntimeError('Trying to fit array of shape {} into cursor of length {}'
+                           .format(np.shape(array), len(cursor)))
     for ind, _ in enumerate(cursor):
-        cursor[ind][key] = array[ind]
+        recursive_set(cursor[ind], key, array[ind])
 
 
 def get_array_from_cursor(cursor, key, pad_missing=False):
