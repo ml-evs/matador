@@ -226,13 +226,16 @@ def get_formation_energy(chempots, doc, energy_key='enthalpy_per_atom'):
     from matador.utils.cursor_utils import recursive_get
 
     # warn user if per_atom energy is not found
-    warn = isinstance(energy_key, (list, tuple)) and not any(['per_atom' in key for key in energy_key])
-    warn = warn or (isinstance(energy_key, str) and 'per_atom' not in energy_key)
-    if warn:
+    if isinstance(energy_key, (list, tuple)) and not any(['per_atom' in str(key) for key in energy_key]) \
+            or (isinstance(energy_key, str) and 'per_atom' not in energy_key):
         warnings.warn('Requested energy key {} in get_formation_energy may'
                       ' not be per atom, if so results will be incorrect.'.format(energy_key))
 
-    formation = recursive_get(doc, energy_key)
+    try:
+        formation = recursive_get(doc, energy_key)
+    except KeyError as exc:
+        print('Doc {} missing key {}'.format(doc['source'], energy_key))
+        raise exc
 
     # see if num chempots has been set and try to reuse it
     if 'num_chempots' in doc:
@@ -243,7 +246,12 @@ def get_formation_energy(chempots, doc, energy_key='enthalpy_per_atom'):
     num_atoms_per_fu = get_atoms_per_fu(doc)
     for ind, mu in enumerate(chempots):
         num_atoms_per_mu = get_atoms_per_fu(mu)
-        formation -= recursive_get(mu, energy_key) * num_chempots[ind] * num_atoms_per_mu / num_atoms_per_fu
+        try:
+            mu_energy = recursive_get(mu, energy_key)
+        except KeyError as exc:
+            print('Chemical potential {} missing key {}'.format(mu['source'], energy_key))
+            raise exc
+        formation -= mu_energy * num_chempots[ind] * num_atoms_per_mu / num_atoms_per_fu
 
     return formation
 
