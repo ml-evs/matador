@@ -1602,10 +1602,6 @@ def _castep_scrape_beef(flines, castep):
     castep['_beef'] = {'thetas': [], 'xc_energy': [], 'total_energy': [], 'total_energy_per_atom': [], 'xc_energy_per_atom': []}
 
     for line_no, line in enumerate(flines[beef_start:]):
-        if 'Self-consistent xc-energy' in line:
-            castep['_beef']['total_energy_sans_xc'] = castep['total_energy'] + HARTREE_TO_EV*f90_float_parse(line.strip().split()[-1])
-
-    for line_no, line in enumerate(flines[beef_start:]):
         if '<-- BEEF' in line:
             castep['_beef']['thetas'].append([f90_float_parse(val) for val in line.strip().split()[1:4]])
             castep['_beef']['xc_energy'].append(HARTREE_TO_EV*f90_float_parse(line.strip().split()[4]))
@@ -1613,17 +1609,14 @@ def _castep_scrape_beef(flines, castep):
             castep['_beef']['xc_energy_per_atom'].append(castep['_beef']['xc_energy'][-1] / castep['num_atoms'])
             castep['_beef']['total_energy_per_atom'].append(castep['_beef']['total_energy'][-1] / castep['num_atoms'])
         if 'BEEF completed' in line:
-            beef_end = line_no
             break
     else:
-        print('Warning, end of BEEF estimate not found.')
-        return
+        raise RuntimeError('End of BEEF estimate not found.')
 
-    for _, line in enumerate(flines[beef_end:]):
-        if 'Mean total energy' in line:
-            castep['_beef']['mean_total_energy'] = HARTREE_TO_EV*f90_float_parse(line.strip().split()[-2])
-        if 'Standard deviation' in line:
-            castep['_beef']['std_dev'] = HARTREE_TO_EV*f90_float_parse(line.strip().split()[-2]) / castep['num_atoms']
+    castep['_beef']['mean_total_energy'] = np.mean(castep['_beef']['total_energy'])
+    castep['_beef']['mean_total_energy_per_atom'] = np.mean(castep['_beef']['total_energy']) / castep['num_atoms']
+    castep['_beef']['std_dev_total_energy'] = np.std(castep['_beef']['total_energy'])
+    castep['_beef']['std_dev_total_energy_per_atom'] = np.std(castep['_beef']['total_energy']) / castep['num_atoms']
 
 
 def get_seed_metadata(doc, seed):

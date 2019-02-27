@@ -383,6 +383,23 @@ class CastepScraperTests(unittest.TestCase):
         self.assertEqual(test_dict['mulliken_net_spin'], 4.28)
         self.assertEqual(test_dict['mulliken_abs_spin'], 4.28)
 
+    def test_castep_beef_scraper(self):
+        from matador.utils.chem_utils import HARTREE_TO_EV
+        castep_fname = REAL_PATH + 'data/beef_files/K3P_BEEF.castep'
+        self.assertTrue(os.path.isfile(castep_fname), msg='Failed to open tes  case {} - please check installation'.format(castep_fname))
+        test_dict, s = castep2dict(castep_fname, db=False, verbosity=VERBOSITY)
+        self.assertTrue(s)
+        self.assertEqual(test_dict['task'], 'singlepointenergy')
+        self.assertEqual(test_dict['atom_types'], ['P', 'P', 'K', 'K', 'K', 'K', 'K', 'K'])
+        self.assertEqual(len(test_dict['_beef']['thetas']), 5000)
+        self.assertEqual(len(test_dict['_beef']['total_energy_per_atom']), 5000)
+        self.assertAlmostEqual(test_dict['_beef']['total_energy'][-1], -1.9029640520E+02 * HARTREE_TO_EV)
+        self.assertAlmostEqual(test_dict['_beef']['total_energy_per_atom'][-1], -1.9029640520E+02 * HARTREE_TO_EV / 8)
+        self.assertAlmostEqual(test_dict['_beef']['mean_total_energy'], -190.6571830577 * HARTREE_TO_EV)
+        self.assertAlmostEqual(test_dict['_beef']['std_dev_total_energy'], 2.2674151843 * HARTREE_TO_EV)
+        self.assertAlmostEqual(test_dict['_beef']['mean_total_energy_per_atom'], -190.6571830577 * HARTREE_TO_EV / 8)
+        self.assertAlmostEqual(test_dict['_beef']['std_dev_total_energy_per_atom'], 2.2674151843 * HARTREE_TO_EV / 8)
+
 
 class ResScraperTests(unittest.TestCase):
 
