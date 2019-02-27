@@ -56,7 +56,7 @@ def plot_spectral(seeds, **kwargs):
             (e.g. hexcode or html colour name) to use for all bands (DEFAULT: 'occ').
         cmap (str): matplotlib colourmap name to use for the bands
         n_colours (int): number of colours to use from cmap (DEFAULT: 4).
-        stacked_pdos (bool): whether to plot projected DOS as stack or overlapping.
+        no_stacked_pdos (bool): whether to plot projected DOS as stack or overlapping.
         spin_only (str): either 'up' or 'down' to only plot one spin channel.
         preserve_kspace_distance (bool): whether to preserve distances in reciprocal space when
             linearising the kpoint path. If False, bandstructures of different lattice parameters
@@ -79,7 +79,7 @@ def plot_spectral(seeds, **kwargs):
                      'labels': None, 'cmap': None, 'band_colour': 'occ',
                      'n_colours': 4, 'spin_only': None, 'figsize': None,
                      'pdis_interpolation_factor': 2, 'pdis_point_scale': 25,
-                     'stacked_pdos': True, 'preserve_kspace_distance': False,
+                     'no_stacked_pdos': False, 'preserve_kspace_distance': False,
                      'band_reorder': None, 'title': None,
                      'verbosity': 0, 'highlight_bands': None, 'pdos_hide_tot': True}
     for key in kwargs:
@@ -525,7 +525,7 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                 projector_labels, dos_colours = _get_projector_info([projector for projector in pdos])
                 for ind, projector in enumerate(pdos):
 
-                    if kwargs['stacked_pdos']:
+                    if not kwargs['no_stacked_pdos']:
                         alpha = 0.8
                     else:
                         alpha = 0.7
@@ -538,21 +538,27 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                     if not np.max(pdos[projector]) < 1e-8:
 
                         if kwargs['plot_bandstructure']:
-                            if kwargs['stacked_pdos']:
+                            label = None
+                            if not kwargs['no_stacked_pdos']:
                                 ax_dos.fill_betweenx(energies, stack, stack+pdos[projector],
                                                      alpha=alpha, label=projector_labels[ind],
                                                      color=dos_colours[ind])
+                            else:
+                                label = projector_labels[ind]
                             ax_dos.plot(stack + pdos[projector], energies,
-                                        alpha=1, color=dos_colours[ind])
+                                        alpha=1, color=dos_colours[ind], label=label)
                         else:
-                            if kwargs['stacked_pdos']:
+                            label = None
+                            if not kwargs['no_stacked_pdos']:
                                 ax_dos.fill_between(energies, stack, stack+pdos[projector],
                                                     alpha=alpha, label=projector_labels[ind],
                                                     color=dos_colours[ind])
+                            else:
+                                label = projector_labels[ind]
                             ax_dos.plot(energies, stack + pdos[projector],
-                                        alpha=1, color=dos_colours[ind])
+                                        alpha=1, color=dos_colours[ind], label=label)
 
-                        if kwargs['stacked_pdos']:
+                        if not kwargs['no_stacked_pdos']:
                             stack += pdos[projector]
 
             elif 'spin_dos' in dos_data:
