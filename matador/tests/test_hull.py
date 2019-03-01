@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+
+""" Test hull routines. """
+
 import unittest
 import json
 import copy
@@ -67,8 +70,10 @@ class HullTest(unittest.TestCase):
         structures = np.loadtxt(REAL_PATH + 'data/test_KSnP.dat')
         hull_dist_test = np.loadtxt(REAL_PATH + 'data/test_KSnP_hull_dist.dat')
         precomp_hull_dist = hull.get_hull_distances(structures, precompute=True)
+        no_precomp_hull_dist = hull.get_hull_distances(structures, precompute=False)
         np.testing.assert_array_almost_equal(np.sort(hull_dist_test), np.sort(hull.hull_dist), decimal=3)
         np.testing.assert_array_almost_equal(np.sort(hull.hull_dist), np.sort(precomp_hull_dist), decimal=3)
+        np.testing.assert_array_almost_equal(no_precomp_hull_dist, precomp_hull_dist, decimal=5)
 
     def test_pseudoternary_hull(self):
         cursor, s = res2dict(REAL_PATH + 'data/hull-LLZO/*.res')
@@ -292,6 +297,22 @@ class HullTest(unittest.TestCase):
         self.assertAlmostEqual(new_cursor[0]['concentration'][1], 1.5/7.0, msg='Concentrations do not match')
 
 
+class EnsembleHullTest(unittest.TestCase):
+    """ Test of Ensemble Hulls for BEEF/temperature. """
+    def test_beef_hull(self):
+        from matador.hull import EnsembleHull
+        from matador.scrapers import castep2dict
+
+        cursor, s = castep2dict(REAL_PATH + 'data/beef_files/*.castep', db=False)
+
+        beef_hull = EnsembleHull(cursor, '_beef',
+                                 energy_key='total_energy_per_atom',
+                                 parameter_key='thetas')
+
+        self.assertEqual(len(beef_hull.phase_diagrams), 5000)
+        self.assertEqual(len(beef_hull.cursor[0]['_beef']['hull_distance']), 5000)
+
+
 class VoltageTest(unittest.TestCase):
     """ Test voltage curve functionality. """
     def test_binary_voltage(self):
@@ -309,13 +330,14 @@ class VoltageTest(unittest.TestCase):
         np.testing.assert_array_almost_equal(bare_hull.voltage_data['x'][0], test_x, decimal=5)
         np.testing.assert_array_almost_equal(bare_hull.voltage_data['Q'][0], test_Q, decimal=5)
         for ind in range(len(bare_hull.voltage_data['voltages'])):
-            assert len(bare_hull.voltage_data['Q'][ind]) == len(bare_hull.voltage_data['voltages'][ind])
-            assert np.isnan(bare_hull.voltage_data['Q'][ind][-1])
-            assert bare_hull.voltage_data['voltages'][ind][-1] == 0
+            self.assertTrue(np.isnan(bare_hull.voltage_data['Q'][ind][-1]))
+            self.assertTrue(bare_hull.voltage_data['voltages'][ind][-1] == 0)
 
-    def testBinaryVoltageAgain(self):
-        """ Test binary voltages from cursor. """
-        # test LiP voltage curve from Mayo et al, Chem. Mater. (2015) DOI: 10.1021/acs.chemmater.5b04208
+    def test_binary_voltage_mayo(self):
+        """ Test binary voltages from cursor for Mayo et al,
+        DOI: 10.1021/acs.chemmater.5b04208.
+
+        """
         res_list = glob(REAL_PATH + 'data/hull-LiP-mdm_chem_mater/*.res')
         cursor = [res2dict(res)[0] for res in res_list]
         hull = QueryConvexHull(cursor=cursor, elements=['Li', 'P'], no_plot=True, subcmd='voltage')
@@ -326,10 +348,9 @@ class VoltageTest(unittest.TestCase):
         np.testing.assert_allclose(hull.voltage_data['voltages'][0], LiP_voltage_curve[:, 1], verbose=True, rtol=1e-4)
         np.testing.assert_allclose(hull.voltage_data['Q'][0], LiP_voltage_curve[:, 0], verbose=True, rtol=1e-4)
 
-    def testTernaryVoltage(self):
+    def test_ternary_voltage(self):
         """ Test ternary voltages from cursor. """
         # test data from LiSnS
-        # with open(os.devnull, 'w') as sys.stdout:
         res_list = glob(REAL_PATH + 'data/hull-LiSnS/*.res')
         cursor = [res2dict(res)[0] for res in res_list]
         hull = QueryConvexHull(cursor=cursor, elements=['Li', 'Sn', 'S'], no_plot=True, pathways=True, subcmd='voltage',
@@ -359,11 +380,11 @@ class VoltageTest(unittest.TestCase):
             np.testing.assert_array_almost_equal(hull.voltage_data['voltages'][i], voltage_data[i], decimal=3)
             np.testing.assert_array_almost_equal(hull.voltage_data['Q'][i], Q_data[i], decimal=0)
         for ind in range(len(hull.voltage_data['voltages'])):
-            assert len(hull.voltage_data['Q'][ind]) == len(hull.voltage_data['voltages'][ind])
-            assert np.isnan(hull.voltage_data['Q'][ind][-1])
-            assert hull.voltage_data['voltages'][ind][-1] == 0
+            self.assertEqual(len(hull.voltage_data['Q'][ind]), len(hull.voltage_data['voltages'][ind]))
+            self.assertTrue(np.isnan(hull.voltage_data['Q'][ind][-1]))
+            self.assertTrue(hull.voltage_data['voltages'][ind][-1] == 0)
 
-    def testTernaryVoltageWithOneTwoPhaseRegion(self):
+    def test_ternary_voltage_with_one_two_phase_region(self):
         """ Test ternary voltages with awkward two-phase region. """
         # load old hull then rejig it to go through a ternary phase
         res_list = glob(REAL_PATH + 'data/hull-KPSn-KP/*.res')
@@ -384,11 +405,11 @@ class VoltageTest(unittest.TestCase):
         self.assertEqual(len(hull.voltage_data['voltages']), len(hull.voltage_data['Q']))
         np.testing.assert_array_almost_equal(np.asarray(hull.voltage_data['voltages']), np.asarray([[1.0229, 1.0229, 0.2676, 0.000]]), decimal=3)
         for ind in range(len(hull.voltage_data['voltages'])):
-            assert len(hull.voltage_data['Q'][ind]) == len(hull.voltage_data['voltages'][ind])
-            assert np.isnan(hull.voltage_data['Q'][ind][-1])
-            assert hull.voltage_data['voltages'][ind][-1] == 0
+            self.assertEqual(len(hull.voltage_data['Q'][ind]), len(hull.voltage_data['voltages'][ind]))
+            self.assertTrue(np.isnan(hull.voltage_data['Q'][ind][-1]))
+            self.assertTrue(hull.voltage_data['voltages'][ind][-1] == 0)
 
-    def testTernaryVoltageWithTwoTwoPhaseRegions(self):
+    def test_ternary_voltage_with_two_two_phase_regions(self):
         """ Test ternary voltages with two awkward two-phase regions. """
         # load old hull then rejig it to go through a ternary phase
         res_list = glob(REAL_PATH + 'data/hull-KPSn-KP/*.res')
@@ -406,16 +427,14 @@ class VoltageTest(unittest.TestCase):
                                             doc['stoichiometry'] != [['P', 2], ['Sn', 1]])]
         hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'], no_plot=True, pathways=True, subcmd='voltage')
         self.assertEqual(len(hull.voltage_data['voltages']), len(hull.voltage_data['Q']))
-        for ind in range(len(hull.voltage_data['voltages'])):
-            self.assertTrue(len(hull.voltage_data['voltages'][ind])-1, len(hull.voltage_data['Q'][ind]) or len(hull.voltage_data['voltages'][ind]) == len(hull.voltage_data['Q'][ind]))
         np.testing.assert_array_almost_equal(np.asarray(hull.voltage_data['voltages'][0]), np.asarray([1.1845, 1.1845, 0.8612, 0.2676, 0.000]), decimal=3)
-        self.assertAlmostEqual(hull.voltage_data['Q'][ind][-2], 425.7847612, places=5)
+        self.assertAlmostEqual(hull.voltage_data['Q'][0][-2], 425.7847612, places=5)
         for ind in range(len(hull.voltage_data['voltages'])):
-            assert len(hull.voltage_data['Q'][ind]) == len(hull.voltage_data['voltages'][ind])
-            assert np.isnan(hull.voltage_data['Q'][ind][-1])
-            assert hull.voltage_data['voltages'][ind][-1] == 0
+            self.assertEqual(len(hull.voltage_data['Q'][ind]), len(hull.voltage_data['voltages'][ind]))
+            self.assertTrue(np.isnan(hull.voltage_data['Q'][ind][-1]))
+            self.assertTrue(hull.voltage_data['voltages'][ind][-1] == 0)
 
-    def testTernaryVoltageOnlyTwoPhaseRegions(self):
+    def test_ternary_voltage_with_exclusively_two_phase_regions(self):
         """ Test ternary voltages exclusively awkward two-phase regions. """
         # load old hull then rejig it to go through a ternary phase
         res_list = glob(REAL_PATH + 'data/hull-KPSn-KP/*.res')
@@ -431,11 +450,11 @@ class VoltageTest(unittest.TestCase):
         self.assertEqual(len(hull.voltage_data['voltages']), len(hull.voltage_data['Q']))
         self.assertEqual(len(hull.voltage_data['voltages']), 1)
         for ind in range(len(hull.voltage_data['voltages'])):
-            assert len(hull.voltage_data['Q'][ind]) == len(hull.voltage_data['voltages'][ind])
-            assert np.isnan(hull.voltage_data['Q'][ind][-1])
+            self.assertEqual(len(hull.voltage_data['Q'][ind]), len(hull.voltage_data['voltages'][ind]))
+            self.assertTrue(np.isnan(hull.voltage_data['Q'][ind][-1]))
 
-    def testTernaryVoltageWithSinglePhaseRegion(self):
-        """ Test ternary voltages a single-phase regions. """
+    def test_ternary_voltage_with_single_phase_region(self):
+        """ Test ternary voltages with single-phase regions. """
         # load old hull then rejig it to go through a ternary phase
         res_list = glob(REAL_PATH + 'data/hull-LiSiP/*.res')
         cursor = [res2dict(res)[0] for res in res_list]
@@ -447,13 +466,11 @@ class VoltageTest(unittest.TestCase):
                                                          0.1570, 0.1113, 0.1041, 0.0000]),
                                              decimal=3)
         for ind in range(len(hull.voltage_data['voltages'])):
-            self.assertTrue(len(hull.voltage_data['voltages'][ind])-1, len(hull.voltage_data['Q'][ind]) or len(hull.voltage_data['voltages'][ind]) == len(hull.voltage_data['Q'][ind]))
-        for ind in range(len(hull.voltage_data['voltages'])):
-            assert len(hull.voltage_data['Q'][ind]) == len(hull.voltage_data['voltages'][ind])
-            assert np.isnan(hull.voltage_data['Q'][ind][-1])
-            assert hull.voltage_data['voltages'][ind][-1] == 0
+            self.assertEqual(len(hull.voltage_data['voltages'][ind]), len(hull.voltage_data['Q'][ind]))
+            self.assertTrue(np.isnan(hull.voltage_data['Q'][ind][-1]))
+            self.assertTrue(hull.voltage_data['voltages'][ind][-1] == 0)
 
-    def testAngelasAwkwardTernaryVoltage(self):
+    def test_angelas_awkward_voltage(self):
         """ Test a particular example of Angela's awkward ternary voltages. """
         # test data from NaFeP
         res_list = glob(REAL_PATH + 'data/hull-NaFeP-afh41_new_Na+Fe+P/*.res')

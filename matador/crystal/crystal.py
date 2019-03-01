@@ -32,7 +32,7 @@ class Crystal:
 
         """
 
-        self._doc = deepcopy(doc)
+        self._doc = dict(doc)
         self.elems = sorted(list(set(self._doc['atom_types'])))
         self.sites = []
         self._construct_sites(voronoi=voronoi)
@@ -67,10 +67,11 @@ class Crystal:
 
     def __getitem__(self, key):
         # if array-style access, e.g. crystal[3], return 3rd site object
-        if isinstance(key, int):
-            return self.sites[key]
+        try:
+            return getattr(self, key)
+        except AttributeError:
+            pass
 
-        # otherwise, if dict-style access, try to return key from doc/__dict__
         return self._doc[key]
 
     def __setitem__(self, key, item):
