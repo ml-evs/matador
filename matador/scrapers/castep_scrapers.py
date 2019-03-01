@@ -217,10 +217,16 @@ def cell2dict(seed, db=False, lattice=True, positions=True, **kwargs):
         elif '%block external_pressure' in line.lower():
             cell['external_pressure'] = []
             i = 1
-            while 'endblock' not in flines[line_no + i].lower():
+            while 'endblock' not in flines[line_no+i].lower():
                 if not flines[line_no + i].strip()[0].isalpha():
                     flines[line_no+i] = flines[line_no+i].replace(',', '')
                     cell['external_pressure'].append(list(map(f90_float_parse, flines[line_no+i].split())))
+                i += 1
+        elif '%block ionic_constraints' in line.lower():
+            cell['ionic_constraints'] = []
+            i = 1
+            while 'endblock' not in flines[line_no+i].lower():
+                cell['ionic_constraints'].append(flines[line_no+i].strip())
                 i += 1
         # parse kpoints
         elif 'kpoints_mp_spacing' in line.lower() or 'kpoint_mp_spacing' in line.lower():

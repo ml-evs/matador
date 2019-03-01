@@ -120,6 +120,15 @@ class CellScraperTests(unittest.TestCase):
         np.testing.assert_array_almost_equal(cell['positions_frac'][95], [0.8125, 0.9166666, 0.8987889])
         np.testing.assert_array_almost_equal(cell['positions_frac'][-1], [0.625, 0.8333333, 0.26989619])
 
+    def test_cell_ionic_constraints(self):
+        cell_name = REAL_PATH + 'data/cell_files/ionic_constraints.cell'
+        cell, s = cell2dict(cell_name, db=False)
+
+        self.assertTrue(s)
+        self.assertEqual(cell['ionic_constraints'][0], '1 C 1 0 0 1')
+        self.assertEqual(cell['ionic_constraints'][1], '2 C 1 0 1 0')
+        self.assertEqual(cell['ionic_constraints'][2], '3 C 1 1 0 0')
+
 
 class CastepScraperTests(unittest.TestCase):
     """ Test CASTEP scrapers. """

@@ -331,6 +331,12 @@ def doc2cell(doc, *args, **kwargs):
         flines.append('{d[2][0]}'.format(d=doc['external_pressure']))
         flines.append('%ENDBLOCK EXTERNAL_PRESSURE')
 
+    if 'ionic_constraints' in doc:
+        flines.append('\n%BLOCK IONIC_CONSTRAINTS')
+        for constraint in doc['ionic_constraints']:
+            flines.append('{}'.format(constraint))
+        flines.append('%ENDBLOCK IONIC_CONSTRAINTS')
+
     # specify SCF kpoints
     if 'kpoints_list' in doc:
         flines.append('\n%BLOCK KPOINTS_LIST')
