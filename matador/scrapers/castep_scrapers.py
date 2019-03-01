@@ -359,7 +359,13 @@ def cell2dict(seed, db=False, lattice=True, positions=True, **kwargs):
                         raise RuntimeError('Atomic init spins do not match positions')
 
             elif 'fix_com' in line.lower():
-                cell['fix_com'] = line.split()[-1]
+                cell['fix_com'] = True
+            elif 'fix_all_ions' in line.lower():
+                cell['fix_all_ions'] = True
+            elif 'fix_all_cell' in line.lower():
+                cell['fix_all_cell'] = True
+            elif 'fix_vol' in line.lower():
+                cell['fix_vol'] = True
             elif 'symmetry_generate' in line.lower():
                 cell['symmetry_generate'] = True
             elif 'symmetry_tol' in line.lower():
