@@ -67,6 +67,8 @@ class Crystal:
 
     def __getitem__(self, key):
         # if array-style access, e.g. crystal[3], return 3rd site object
+        if isinstance(key, int):
+            return self.sites[key]
         try:
             return getattr(self, key)
         except AttributeError:
