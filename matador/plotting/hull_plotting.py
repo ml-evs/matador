@@ -12,6 +12,8 @@ from matador.utils.chem_utils import get_concentration
 from matador.utils.chem_utils import get_stoich_from_formula, get_formula_from_stoich
 from matador.plotting.plotting import plotting_function, get_linear_cmap
 
+EPS = 1e-12
+
 
 def get_hull_labels(hull, label_cutoff=None, num_species=None, exclude_edges=True):
     """ Return list of structures to labels on phase diagram.
@@ -110,6 +112,7 @@ def plot_2d_hull(hull, ax=None, show=False, plot_points=True,
 
     scale = 1
     scatter = []
+    # TODO: think this might cause things to go out of order?
     chempot_labels = [get_formula_from_stoich(get_stoich_from_formula(species, sort=False), tex=True) for species in hull.species]
     tie_line = hull.structure_slice[hull.convex_hull.vertices]
 
@@ -247,7 +250,7 @@ def plot_2d_hull(hull, ax=None, show=False, plot_points=True,
 
     if isinstance(title, bool) and title:
         if hull._non_elemental:
-            ax.set_title(r'{d[0]}$_\mathrm{{x}}$({d[1]})$_\mathrm{{1-x}}$'.format(d=chempot_labels))
+            ax.set_title(r'({d[0]})$_\mathrm{{x}}$({d[1]})$_\mathrm{{1-x}}$'.format(d=chempot_labels))
         else:
             ax.set_title(r'{d[0]}$_\mathrm{{x}}${d[1]}$_\mathrm{{1-x}}$'.format(d=chempot_labels))
     elif title:
@@ -255,9 +258,9 @@ def plot_2d_hull(hull, ax=None, show=False, plot_points=True,
 
     plt.locator_params(nbins=3)
     if hull._non_elemental:
-        ax.set_xlabel(r'x in {d[0]}$_\mathrm{{x}}(${d[1]}$)_\mathrm{{1-x}}$'.format(d=chempot_labels))
+        ax.set_xlabel(r'x in ({d[0]})$_\mathrm{{x}}(${d[1]}$)_\mathrm{{1-x}}$'.format(d=chempot_labels))
     else:
-        ax.set_xlabel(r'x in {d[0]}$_\mathrm{{x}}${d[1]}$_\mathrm{{1-x}}$'.format(d=chempot_labels))
+        ax.set_xlabel(r'x in ({d[0]})$_\mathrm{{x}}${d[1]}$_\mathrm{{1-x}}$'.format(d=chempot_labels))
 
     ax.grid(False)
     ax.set_xlim(-0.05, 1.05)
@@ -514,7 +517,7 @@ def plot_ternary_hull(hull, axis=None, show=False, plot_points=True, hull_cutoff
         # set third triangular coordinate
         concs[i, -1] = 1 - concs[i, 0] - concs[i, 1]
 
-    stable = np.asarray([concs[ind] for ind in hull.convex_hull.vertices])
+    stable = concs[np.where(hull.hull_dist <= 0 + EPS)]
 
     # sort by hull distances so things are plotting the right order
     concs = concs[np.argsort(hull.hull_dist)].tolist()

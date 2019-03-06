@@ -67,6 +67,11 @@ class PhaseDiagram:
             # filter out those with positive formation energy, to reduce expense computing hull
             self.structure_slice = structures[np.where(structures[:, -1] <= 0 + EPS)]
 
+        # filter out "duplicates" in structure_slice
+        # this prevents breakages if no structures are on the hull and chempots are duplicated
+        # but it might be faster to hardcode this case individually
+        self.structure_slice = np.unique(self.structure_slice, axis=0)
+
         # if we only have the chempots (or worse) with negative formation energy, don't even make the hull
         if len(self.structure_slice) <= dimension:
             if len(self.structure_slice) < dimension:
@@ -75,11 +80,10 @@ class PhaseDiagram:
         else:
             try:
                 self.convex_hull = scipy.spatial.ConvexHull(self.structure_slice)
-            except scipy.spatial.QhullError:
+            except scipy.spatial.qhull.QhullError:
+                print(self.structure_slice)
                 print('Error with QHull, plotting formation energies only...')
-                print('To view errors, use --debug')
-                if self.args.get('debug'):
-                    print_exc()
+                print_exc()
                 self.convex_hull = FakeHull()
 
         # remove vertices that have positive formation energy
