@@ -264,6 +264,15 @@ class ChemUtilsTest(unittest.TestCase):
         chempots = [[['La', 2], ['O', 3]], [['Li', 2], ['O', 1]]]
         self.assertEqual(get_number_of_chempots(stoich, chempots), [1, 2])
 
+        stoich = [['Li', 1], ['P', 1], ['O', 3]]
+        chempots = [[['Li', 2], ['S', 1]], [['P', 2], ['O', 5]], [['P', 2], ['S', 5]]]
+        errored = False
+        try:
+            get_number_of_chempots(stoich, chempots)
+        except RuntimeError:
+            errored = True
+        self.assertTrue(errored)
+
     def test_ratios_from_stoich(self):
         stoich = [['Li', 12], ['N', 18], ['P', 1]]
         ratios = {'LiN': round(12./18, 3), 'LiP': 12, 'NP': 18,

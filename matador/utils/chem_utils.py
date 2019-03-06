@@ -302,6 +302,12 @@ def get_number_of_chempots(stoich, chempot_stoichs):
         num_chempots = scipy.linalg.solve(chempot_matrix.T, solution)
     else:
         num_chempots = scipy.linalg.solve(chempot_matrix[:, :-num_extraneous_equations].T, solution[:-num_extraneous_equations])
+        # clean near zero float values
+        num_chempots[np.where(np.abs(num_chempots) < EPS)] = 0.0
+        if np.min(np.sign(num_chempots)) == -1:
+            print(num_chempots)
+            raise RuntimeError('Stoichiometry {} could not be created from chemical potentials {}: stoichiometry inconsistent with chempots'
+                               .format(stoich, chempot_stoichs))
         # check equations are consistent
         for i in range(1, num_extraneous_equations+1):
             verify = sum(num_chempots * chempot_matrix[:, -i])
