@@ -290,11 +290,12 @@ def doc2cell(doc, *args, **kwargs):
 
     # if spin symmetry breaking is requested, update atomic init spins
     if 'positions_frac' in doc and len(doc['positions_frac']) > 0:
-        if not any(doc.get('atomic_init_spins', [])):
-            doc['atomic_init_spins'] = len(doc['positions_frac']) * [None]
-            doc['atomic_init_spins'][0] = spin
+        if spin or 'atomic_init_spins' in doc:
+            if not any(doc.get('atomic_init_spins', [])):
+                doc['atomic_init_spins'] = len(doc['positions_frac']) * [None]
+                doc['atomic_init_spins'][0] = spin
 
-    if 'atomic_init_spins' in doc and len(doc['atomic_init_spins']) != doc['num_atoms']:
+    if 'atomic_init_spins' in doc and len(doc['atomic_init_spins']) != len(doc['positions_frac']):
         print('Length mismatch between atoms and spins, will pad with zeros...')
 
     flines = []
