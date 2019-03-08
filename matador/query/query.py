@@ -332,7 +332,7 @@ class DBQuery:
 
                 # execute query
                 self.cursor = list(self.repo.find(SON(self.query_dict)).sort('enthalpy_per_atom', pm.ASCENDING))
-                if self._create_hull and self._non_elemental:
+                if self._non_elemental:
                     self.cursor = filter_cursor_by_chempots(self._chempots, self.cursor)
 
                 # self.cursors.append(self.cursor)
