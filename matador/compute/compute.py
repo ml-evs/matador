@@ -339,7 +339,6 @@ class ComputeTask:
 
         # do memcheck, if desired, and only continue if enough memory is free
         if self.memcheck:
-            memory_usage_estimate = self.calculator.do_memcheck()
             memory_usage_estimate = self.do_memcheck(calc_doc, self.seed)
             mem_string = ('Memory estimate / Available memory (MB): {:8.0f} / {:8.0f}'
                           .format(memory_usage_estimate, self.maxmem))
@@ -351,7 +350,6 @@ class ComputeTask:
 
         try:
             if self.start:
-                # TODO: refactor this into calculator
                 # run convergence tests
                 if any([self.conv_cutoff_bool, self.conv_kpt_bool]):
                     success = self.run_convergence_tests(calc_doc)
@@ -942,12 +940,13 @@ class ComputeTask:
         doc2cell(memcheck_doc, memcheck_seed, hash_dupe=False, copy_pspots=False)
 
         logging.debug('Running CASTEP dryrun.')
-        process = sp.Popen(['nice', '-n', '15', self.executable, '-d', memcheck_seed])
+        self.executable += ' --dryrun'
+        process = self.run_command(memcheck_seed, exec_test=False)
         process.communicate()
 
         results, success = castep2dict(memcheck_seed + '.castep', db=False)
-        for _file in glob.glob(memcheck_seed + '*'):
 
+        for _file in glob.glob(memcheck_seed + '*'):
             if _file.endswith('.res'):
                 continue
             else:
@@ -957,7 +956,13 @@ class ComputeTask:
             msg = 'CASTEP dryrun failed with output {results}'.format(results=results)
             raise MaxMemoryEstimateExceeded(msg)
 
-        return results['estimated_mem_MB']
+        estimate = results['estimated_mem_MB']
+        if self.ncores is not None:
+            estimate *= self.ncores
+        if self.nnodes is not None:
+            estimate *= self.nnodes
+
+        return estimate
 
     def run_command(self, seed, exec_test=False):
         """ Calls executable on seed with desired number of cores.
@@ -1332,7 +1337,7 @@ class ComputeTask:
         """ Copy new data to output files and update
          the results dict.
 
-        Parameter:
+        Parameters:
             opti_dict (dict): intermediate calculation results.
 
         """
