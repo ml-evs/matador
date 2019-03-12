@@ -943,6 +943,7 @@ class ComputeTask:
         self.executable += ' --dryrun'
         process = self.run_command(memcheck_seed, exec_test=False)
         process.communicate()
+        self.executable = self.executable.replace(' --dryrun', '')
 
         results, success = castep2dict(memcheck_seed + '.castep', db=False)
 
