@@ -11,7 +11,7 @@ from matador.scrapers import cif2dict, param2dict, phonon2dict, optados2dict
 from matador.scrapers import arbitrary2dict, bands2dict, pwout2dict, magres2dict
 from matador.scrapers.castep_scrapers import usp2dict, get_seed_metadata
 from matador.export import doc2res, doc2param, doc2cell
-from matador.orm.spectral import ElectronicDispersion
+from matador.orm.spectral import ElectronicDispersion, VibrationalDispersion
 
 
 # grab abs path for accessing test data
@@ -557,7 +557,8 @@ class ScraperMiscTest(unittest.TestCase):
             self.assertTrue(s, msg='Failed to read phonon file')
             self.assertEqual(ph_dict['num_atoms'], 26)
             self.assertEqual(ph_dict['num_branches'], 78)
-            self.assertEqual(ph_dict['num_qpoints'], 110)
+            self.assertEqual(ph_dict['num_modes'], 78)
+            self.assertEqual(ph_dict['num_kpoints'], 110)
             self.assertEqual(ph_dict['freq_unit'], 'cm-1')
             self.assertEqual(ph_dict['lattice_cart'][0], [7.621987, 7.621987, 0.00000])
             self.assertEqual(ph_dict['lattice_cart'][1], [-7.621987, 7.621987, 0.00000])
@@ -570,13 +571,17 @@ class ScraperMiscTest(unittest.TestCase):
             self.assertEqual(ph_dict['atom_masses'][14], 39.0983)
             self.assertEqual(ph_dict['atom_masses'][-1], 118.710)
             self.assertEqual(ph_dict['softest_mode_freq'], -0.021599)
-            self.assertAlmostEqual(ph_dict['qpoint_path_spacing'], 0.021, places=2)
-            self.assertEqual(ph_dict['qpoint_branches'][0][0], 0)
-            self.assertEqual(ph_dict['qpoint_branches'][0][-1], 28)
-            self.assertEqual(ph_dict['qpoint_branches'][1][0], 29)
-            self.assertEqual(ph_dict['qpoint_branches'][1][-1], 76)
-            self.assertEqual(ph_dict['qpoint_branches'][-1][0], 77)
-            self.assertEqual(ph_dict['qpoint_branches'][-1][-1], 109)
+
+            disp = VibrationalDispersion(ph_dict)
+            ph_dict['kpoint_branches'] = disp.kpoint_branches
+            ph_dict['kpoint_path_spacing'] = disp.kpoint_path_spacing
+            self.assertAlmostEqual(ph_dict['kpoint_path_spacing'], 0.021, places=2)
+            self.assertEqual(ph_dict['kpoint_branches'][0][0], 0)
+            self.assertEqual(ph_dict['kpoint_branches'][0][-1], 28)
+            self.assertEqual(ph_dict['kpoint_branches'][1][0], 29)
+            self.assertEqual(ph_dict['kpoint_branches'][1][-1], 76)
+            self.assertEqual(ph_dict['kpoint_branches'][-1][0], 77)
+            self.assertEqual(ph_dict['kpoint_branches'][-1][-1], 109)
 
     def test_optados_dos_scraper(self):
         odo_fname = REAL_PATH + 'data/optados_files/K3P.adaptive.dat'

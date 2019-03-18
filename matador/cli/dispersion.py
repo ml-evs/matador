@@ -42,6 +42,8 @@ def main():
                         help='point scale in pDIS plots (DEFAULT: 25)')
     parser.add_argument('--unstacked_pdos', action='store_true',
                         help='plot PDOS as overlap rather than stack')
+    parser.add_argument('--no_pdis', action='store_true',
+                        help='do not try to plot PDIS, even if its available')
     parser.add_argument('--no_band_reorder', action='store_true',
                         help='don\'t reorder bands based on local gradients')
     parser.add_argument('--band_reorder', action='store_true',
@@ -87,6 +89,13 @@ def main():
         labels = ' '.join(kwargs.get('labels')).split(',')
     else:
         labels = None
+
+    if kwargs['no_pdis']:
+        plot_pdis = False
+    else:
+        plot_pdis = True
+    del kwargs['no_pdis']
+
     cmap = kwargs.get('cmap')
     band_colour = kwargs.get('band_colour')
     if band_colour is None:
@@ -141,6 +150,7 @@ def main():
     plot_spectral(seeds,
                   plot_bandstructure=bandstructure,
                   plot_dos=dos,
+                  plot_pdis=plot_pdis,
                   cell=cell,
                   gap=gap,
                   verbosity=verbosity,

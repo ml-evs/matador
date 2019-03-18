@@ -1,10 +1,9 @@
 # coding: utf-8
 # Distributed under the terms of the MIT license.
 
-""" This file implements the Spectrum class and its
-children, used for storing collections of electronic
-and vibrational reciprocal spcae spectra, with or without
-projector_weights.
+""" This file implements the Spectrum class and it children, used for
+storing collections of electronic and vibrational reciprocal space
+spectra, with or without projector_weights.
 
 """
 
@@ -29,6 +28,12 @@ class Dispersion:
     """ Parent class for continuous spectra in reciprocal space, i.e.
     electronic and vibrational bandstructures.
 
+    Note:
+        This class speaks of "k-points" as general reciprocal space points
+        used to display the dispersion curves; these correspond to CASTEP's
+        phonon_kpoints or spectral_kpoints, and not the k-points
+        used to generate the underlying wavefunction or dynamical matrix.
+
     """
     def __init__(self, data):
         """ Initalise copy of raw data. """
@@ -46,6 +51,200 @@ class Dispersion:
             pass
 
         return self._data[key]
+
+    @property
+    def source(self):
+        """ List of source files. """
+        return self._data['source']
+
+    @property
+    def lattice_cart(self):
+        """ The Cartesian lattice vectors of the real space lattice. """
+        return self._data['lattice_cart']
+
+    @property
+    def num_kpoints(self):
+        """ Number of dispersion k-points sampled. """
+        return self._data['num_kpoints']
+
+    @property
+    def projectors(self):
+        """ Return list of projector labels in the format
+        (`element`, `l-channel`).
+
+        """
+        return self._data.get('projectors')
+
+    @property
+    def projector_weights(self):
+        """ Return the array of projector weights per eigval, with shape
+        (num_projectors, num_kpoints, num_bands).
+
+        """
+        return self._data.get('projector_weights')
+
+    @property
+    def num_projectors(self):
+        """ Return the number of projectors. """
+        if self.projectors is None:
+            return 0
+        return len(self.projectors)
+
+    @property
+    def kpoint_branches(self):
+        """ Return the k-point branches in the older format, which
+        contained a list of lists of continous indices.
+
+        """
+        if not self._data.get('kpoint_branches'):
+            self._data['kpoint_branches'] = self.find_full_kpt_branch()
+        return self._data['kpoint_branches']
+
+    def find_full_kpt_branch(self):
+        """ Find all branch indices from branch start indices. """
+        branch_inds = []
+        for ind, start_ind in enumerate(self.kpoint_branch_start[:-1]):
+            branch_inds.append(list(range(start_ind,
+                                          self.kpoint_branch_start[ind+1])))
+        branch_inds.append(list(range(self.kpoint_branch_start[-1],
+                                      self.num_kpoints)))
+
+        if not sum([len(branch) for branch in branch_inds]) == self.num_kpoints:
+            raise RuntimeError('Error parsing kpoints: number of kpoints does '
+                               'not match number in branches')
+
+        return branch_inds
+
+    @property
+    def kpoint_branch_start(self):
+        """ Return the indices of the start of branches. """
+        if not self._data.get('kpoint_branch_start'):
+            self.set_branches_and_spacing()
+        return self._data['kpoint_branch_start']
+
+    @property
+    def kpoint_path_spacing(self):
+        """ An estimated kpoint spacing. """
+        if not self._data.get('kpoint_path_spacing'):
+            self.set_branches_and_spacing()
+        return self._data['kpoint_path_spacing']
+
+    @property
+    def kpoint_path(self):
+        """ The fractional sampling path in reciprocal space. """
+        return self._data['kpoint_path']
+
+    @property
+    def kpoint_path_cartesian(self):
+        """ The reicprocal space sampling path in Cartesian coordinates. """
+        return np.asarray(frac2cart(real2recip(self.lattice_cart),
+                                    self.kpoint_path))
+
+    @property
+    def num_spins(self):
+        """ Dummy number of spins. """
+        return 1
+
+    @property
+    def spin_fermi_energy(self):
+        """ Dummy Fermi energy per spin channel. """
+        return [0]
+
+    def set_branches_and_spacing(self):
+        """ Set the relevant kpoint spacing and branch attributes. """
+        branch_start, spacing = self.find_kpoint_branches()
+        self._data['kpoint_path_spacing'] = spacing
+        self._data['kpoint_branch_start'] = branch_start
+
+    def find_kpoint_branches(self):
+        """ Separate a kpoint path into discontinuous branches,
+
+        Returns:
+            list[list[int]]: list of lists containing the indices of
+                the discontinuous kpoint branches.
+            float: estimated k-point spacing from median of their
+                separations.
+
+        """
+        kpt_diffs = np.linalg.norm(np.diff(self.kpoint_path_cartesian, axis=0), axis=1)
+        spacing = np.median(kpt_diffs)
+        # add 0 as its the start of the first path, then add all indices
+        # have to add 1 to the where to get the start rather than end of the branch
+        branch_start = [0] + (np.where(kpt_diffs > 3*spacing)[0] + 1).tolist()
+        return branch_start, spacing
+
+    def linearise_path(self, preserve_kspace_distance=False):
+        """ For a given k-point path, normalise the spacing between points, mapping
+        it onto [0, 1].
+
+        Keyword arguments:
+            preserve_kspace_distance (bool): if True, point separation
+                will be determined by their actual separation in
+                reciprocal space, otherwise they will be evenly spaced.
+
+        Returns:
+            np.ndarray: 3xN array containing k-points mapped onto [0, 1].
+
+        """
+        path = [0]
+        for branch in self.kpoint_branches:
+            for ind, kpt in enumerate(self.kpoint_path[branch]):
+                if ind != len(branch) - 1:
+                    if preserve_kspace_distance:
+                        diff = np.sqrt(np.sum((kpt - self.kpoint_path[branch[ind + 1]])**2))
+                    else:
+                        diff = 1.
+                    path.append(path[-1] + diff)
+        path = np.asarray(path)
+        path /= np.max(path)
+        if len(path) != self.num_kpoints - len(self.kpoint_branches) + 1:
+            raise RuntimeError('Linearised kpoint path has wrong number of kpoints!')
+
+        return path
+
+    def reorder_bands(self):
+        """ Recursively reorder eigenvalues such that bands join up correctly,
+        based on local gradients.
+
+        Parameters:
+            dispersion (numpy.ndarray): array containing eigenvalues as a
+                function of q/k
+            branches (:obj:`list` of :obj:`int`): list containing branches of
+                k/q-point path
+
+        Returns:
+            numpy.ndarray: reordered branches.
+
+        """
+        from copy import deepcopy
+
+        for channel_ind, channel in enumerate(self.eigs):
+            eigs = channel
+            for branch_ind, branch in enumerate(self.kpoint_branches):
+                eigs_branch = eigs[:, branch]
+                converged = False
+                counter = 0
+                i_cached = 0
+                while not converged and counter < len(branch):
+                    counter += 1
+                    for i in range(i_cached+1, len(branch) - 1):
+                        guess = (2 * eigs_branch[:, i] - eigs_branch[:, i-1])
+                        argsort_guess = np.argsort(guess)
+                        if np.any(np.argsort(guess) != np.argsort(eigs_branch[:, i+1])):
+                            tmp_copy = deepcopy(eigs)
+                            for ind, mode in enumerate(np.argsort(eigs_branch[:, i]).tolist()):
+                                eigs_branch[mode, i+1:] = tmp_copy[:, branch][argsort_guess[ind], i+1:]
+                            for other_branch in self.kpoint_branches[branch_ind:]:
+                                eigs_other_branch = eigs[:, other_branch]
+                            for ind, mode in enumerate(np.argsort(eigs_branch[:, i]).tolist()):
+                                eigs_other_branch[mode] = tmp_copy[:, other_branch][argsort_guess[ind]]
+                            eigs[:, other_branch] = eigs_other_branch
+                        eigs[:, branch] = eigs_branch
+                        i_cached = i
+                    else:
+                        converged = True
+
+            self.eigs[channel_ind] = eigs.reshape(1, self.num_bands, len(eigs[0]))
 
 
 class ElectronicDispersion(Dispersion):
@@ -99,16 +298,6 @@ class ElectronicDispersion(Dispersion):
             self._data['projector_weights'] = None
 
     @property
-    def source(self):
-        """ List of source files. """
-        return self._data['source']
-
-    @property
-    def num_kpoints(self):
-        """ Number of k-points sampled. """
-        return self._data['num_kpoints']
-
-    @property
     def num_spins(self):
         """ Number of spin channels in spectrum. """
         return self._data['num_spins']
@@ -132,20 +321,9 @@ class ElectronicDispersion(Dispersion):
         return self._data['eigs_s_k']
 
     @property
-    def kpoint_path(self):
-        """ The fractional sampling path in reciprocal space. """
-        return self._data['kpoint_path']
-
-    @property
-    def kpoint_path_cartesian(self):
-        """ The reicprocal space sampling path in Cartesian coordinates. """
-        return np.asarray(frac2cart(real2recip(self.lattice_cart),
-                                    self.kpoint_path))
-
-    @property
-    def lattice_cart(self):
-        """ The Cartesian lattice vectors of the real space lattice. """
-        return self._data['lattice_cart']
+    def eigs(self):
+        """ Alias for `self.eigs_s_k`. """
+        return self.eigs_s_k
 
     @property
     def fermi_energy(self):
@@ -156,30 +334,6 @@ class ElectronicDispersion(Dispersion):
     def spin_fermi_energy(self):
         """ Return the Fermi energy as described in the raw data. """
         return self._data.get('spin_fermi_energy')
-
-    @property
-    def kpoint_branch_start(self):
-        """ Return the indices of the start of branches. """
-        if not self._data.get('kpoint_branch_start'):
-            self.set_branches_and_spacing()
-        return self._data['kpoint_branch_start']
-
-    @property
-    def kpoint_path_spacing(self):
-        """ An estimated kpoint spacing. """
-        if not self._data.get('kpoint_path_spacing'):
-            self.set_branches_and_spacing()
-        return self._data['kpoint_path_spacing']
-
-    @property
-    def kpoint_branches(self):
-        """ Return the k-point branches in the older format, which
-        contained a list of lists of continous indices.
-
-        """
-        if not self._data.get('kpoint_branches'):
-            self._data['kpoint_branches'] = self.find_full_kpt_branch()
-        return self._data['kpoint_branches']
 
     @property
     def band_gap(self):
@@ -214,67 +368,6 @@ class ElectronicDispersion(Dispersion):
         if not self._data.get('spin_band_gap_path_inds'):
             self.set_gap_data()
         return self._data['spin_band_gap_path_inds']
-
-    @property
-    def projectors(self):
-        """ Return list of projector labels in the format
-        (`element`, `l-channel`).
-
-        """
-        return self._data['projectors']
-
-    @property
-    def projector_weights(self):
-        """ Return the array of projector weights per eigval, with shape
-        (num_projectors, num_kpoints, num_bands).
-
-        """
-        return self._data['projector_weights']
-
-    @property
-    def num_projectors(self):
-        """ Return the number of projectors. """
-        if self.projectors is None:
-            return 0
-        return len(self.projectors)
-
-    def find_full_kpt_branch(self):
-        """ Find all branch indices from branch start indices. """
-        branch_inds = []
-        for ind, start_ind in enumerate(self.kpoint_branch_start[:-1]):
-            branch_inds.append(list(range(start_ind,
-                                          self.kpoint_branch_start[ind+1])))
-        branch_inds.append(list(range(self.kpoint_branch_start[-1],
-                                      self.num_kpoints)))
-
-        if not sum([len(branch) for branch in branch_inds]) == self.num_kpoints:
-            raise RuntimeError('Error parsing kpoints: number of kpoints does '
-                               'not match number in branches')
-
-        return branch_inds
-
-    def set_branches_and_spacing(self):
-        """ Set the relevant kpoint spacing and branch attributes. """
-        branch_start, spacing = self.find_kpoint_branches()
-        self._data['kpoint_path_spacing'] = spacing
-        self._data['kpoint_branch_start'] = branch_start
-
-    def find_kpoint_branches(self):
-        """ Separate a kpoint path into discontinuous branches,
-
-        Returns:
-            list[list[int]]: list of lists containing the indices of
-                the discontinuous kpoint branches.
-            float: estimated k-point spacing from median of their
-                separations.
-
-        """
-        kpt_diffs = np.linalg.norm(np.diff(self.kpoint_path_cartesian, axis=0), axis=1)
-        spacing = np.median(kpt_diffs)
-        # add 0 as its the start of the first path, then add all indices
-        # have to add 1 to the where to get the start rather than end of the branch
-        branch_start = [0] + (np.where(kpt_diffs > 3*spacing)[0] + 1).tolist()
-        return branch_start, spacing
 
     def set_gap_data(self):
         """ Loop over bands to set the band gap, VBM, CBM, their
@@ -375,11 +468,69 @@ class ElectronicDispersion(Dispersion):
             self._data[key.replace('spin_', '')] = self._data[key][spin_gap_index]
 
 
-# TODO finish these
-# class VibrationalDispersion(Dispersion):
-    # def __init__(self):
-        # pass
+class VibrationalDispersion(Dispersion):
+    """ Class that stores vibrational dispersion data. Attributes are
+    all implemented as properties based on underlying raw data.
 
+    Attributes:
+        source (list): list of source files.
+        num_kpoints (int): number of kpoints.
+        num_atoms (int): number of atoms.
+        num_modes (int): number of phonon modes.
+        eigs_k (numpy.ndarray):  eigenvalue array of shape
+            (1, num_modes, num_kpoints), in frequency units below, with
+            first index denoting the single "spin channel" for phonons.
+        freq_unit (str): human-readable frequency unit used for eig array.
+        kpoint_path (numpy.ndarray): array of shape (num_kpoints, 3)
+            containing the k-point path in fractional coordinates.
+        kpoint_path_cartesian (numpy.ndarray): as above, in Cartesian
+            coordinates.
+
+    """
+
+    @property
+    def num_atoms(self):
+        """ Number of atoms in cell. """
+        return self._data['num_atoms']
+
+    @property
+    def num_modes(self):
+        """ Number of phonon modes. """
+        return self._data['num_modes']
+
+    @property
+    def num_bands(self):
+        """ Alias for `self.num_modes`. """
+        return self.num_modes
+
+    @property
+    def freq_unit(self):
+        """ The units for the `self.eigs_q` array. """
+        return self._data['freq_unit']
+
+    @property
+    def eigs_q(self):
+        """ Eigenvalues in frequency units `self.freq_unit`, with shape
+        (1, num_modes, num_kpoints).
+
+        """
+        return self._data['eigs_q']
+
+    @property
+    def eigs(self):
+        """ Alias for `self.eigs_q`. """
+        return self.eigs_q
+
+    @property
+    def softest_mode_freq(self):
+        """ The frequency of the softest mode in the calculation.
+        Negative modes correspond to imaginary frequencies.
+
+        """
+        return np.min(self.eigs)
+
+
+# TODO finish these
 # class DensityOfStates:
     # def __init__(self, dos_dict=None):
         # pass

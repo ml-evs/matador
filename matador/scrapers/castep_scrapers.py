@@ -870,9 +870,10 @@ def phonon2dict(seed, **kwargs):
         if 'number of ions' in line:
             ph['num_atoms'] = int(line.split()[-1])
         elif 'number of branches' in line:
-            ph['num_branches'] = int(line.split()[-1])
+            ph['num_modes'] = int(line.split()[-1])
+            ph['num_branches'] = ph['num_modes']
         elif 'number of wavevectors' in line:
-            ph['num_qpoints'] = int(line.split()[-1])
+            ph['num_kpoints'] = int(line.split()[-1])
         elif 'frequencies in' in line:
             ph['freq_unit'] = line.split()[-1]
         elif 'unit cell vectors' in line:
@@ -893,47 +894,20 @@ def phonon2dict(seed, **kwargs):
             data = flines[line_no + 1:]
 
     ph['phonon_kpoint_list'] = []
-    ph['eigenvalues_q'] = np.zeros((1, ph['num_branches'], ph['num_qpoints']))
-    line_offset = ph['num_branches'] * (ph['num_atoms'] + 1) + 3
-    for qind in range(ph['num_qpoints']):
+    ph['eigenvalues_q'] = np.zeros((1, ph['num_modes'], ph['num_kpoints']))
+    line_offset = ph['num_modes'] * (ph['num_atoms'] + 1) + 3
+    for qind in range(ph['num_kpoints']):
         ph['phonon_kpoint_list'].append([f90_float_parse(elem) for elem in data[qind * line_offset].split()[2:]])
-        for i in range(1, ph['num_branches'] + 1):
+        for i in range(1, ph['num_modes'] + 1):
             ph['eigenvalues_q'][0][i - 1][qind] = f90_float_parse(data[qind * line_offset + i].split()[-1])
 
-    ph['qpoint_path'] = np.asarray([qpt[0:3] for qpt in ph['phonon_kpoint_list']])
-    ph['qpoint_weights'] = [qpt[3] for qpt in ph['phonon_kpoint_list']]
+    ph['kpoint_path'] = np.asarray([qpt[0:3] for qpt in ph['phonon_kpoint_list']])
+    ph['kpoint_weights'] = [qpt[3] for qpt in ph['phonon_kpoint_list']]
     ph['softest_mode_freq'] = np.min(ph['eigenvalues_q'])
-
-    cart_kpts = np.asarray(frac2cart(real2recip(ph['lattice_cart']), ph['qpoint_path']))
-    ph['cart_qpoints'] = cart_kpts
-    kpts_diff = np.zeros((len(cart_kpts) - 1))
-    kpts_diff_set = set()
-    for i in range(len(cart_kpts) - 1):
-        kpts_diff[i] = np.sqrt(np.sum((cart_kpts[i] - cart_kpts[i + 1])**2))
-        kpts_diff_set.add(kpts_diff[i])
-    ph['qpoint_path_spacing'] = np.median(kpts_diff)
-
-    # create list containing qpoint indices of discontinuous branches through k-space
-    ph['qpoint_branches'] = []
-    current_branch = []
-    for ind, point in enumerate(cart_kpts):
-        if ind == 0:
-            current_branch.append(ind)
-        elif ind == len(cart_kpts) - 1:
-            ph['qpoint_branches'].append(current_branch)
-            continue
-
-        if np.sqrt(np.sum((point - cart_kpts[ind + 1])**2)) < 10 * ph['qpoint_path_spacing']:
-            current_branch.append(ind + 1)
-        else:
-            ph['qpoint_branches'].append(current_branch)
-            current_branch = [ind + 1]
-
-    if not sum([len(branch) for branch in ph['qpoint_branches']]) == ph['num_qpoints']:
-        raise RuntimeError('Error parsing qpoints: number of qpoints does not match number in branches')
+    ph['eigs_q'] = ph['eigenvalues_q']
 
     if verbosity > 0:
-        print('{} sucessfully scraped with {} q-points.'.format(seed, ph['num_qpoints']))
+        print('{} sucessfully scraped with {} q-points.'.format(seed, ph['num_kpoints']))
 
     return ph, True
 

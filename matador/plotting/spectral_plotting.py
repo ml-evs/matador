@@ -13,7 +13,7 @@ from matador.utils.viz_utils import get_element_colours
 from matador.plotting.plotting import plotting_function
 from matador.scrapers import optados2dict, phonon2dict, bands2dict
 from matador.scrapers import cell2dict, res2dict
-from matador.orm.spectral import ElectronicDispersion
+from matador.orm.spectral import ElectronicDispersion, VibrationalDispersion
 
 
 @plotting_function
@@ -224,17 +224,11 @@ def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
             dispersion, s = phonon2dict(seed + '.phonon', verbosity=kwargs.get('verbosity'))
             if not s:
                 raise RuntimeError(dispersion)
-            branch_key = 'qpoint_branches'
-            num_key = 'num_qpoints'
-            path_key = 'qpoint_path'
-            eig_key = 'eigenvalues_q'
-            band_key = 'num_branches'
-            dispersion['num_spins'] = 1
-            spin_key = 'num_spins'
-            if kwargs['plot_window'] is None:
-                kwargs['plot_window'] = [min(-10, np.min(dispersion[eig_key])-10), np.max(dispersion[eig_key])]
 
-            path = _linearise_path(dispersion, path_key, branch_key, num_key, kwargs)
+            dispersion = VibrationalDispersion(dispersion)
+
+            if kwargs['plot_window'] is None:
+                kwargs['plot_window'] = [min(-10, np.min(dispersion.eigs) - 10), np.max(dispersion.eigs)]
 
         elif os.path.isfile('{}.bands'.format(seed)):
             dispersion, s = bands2dict(seed + '.bands',
@@ -251,59 +245,53 @@ def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
 
             dispersion = ElectronicDispersion(dispersion, pdis_data)
 
-            branch_key = 'kpoint_branches'
-            num_key = 'num_kpoints'
-            path_key = 'kpoint_path'
-            eig_key = 'eigs_s_k'
-            band_key = 'num_bands'
-            spin_key = 'num_spins'
-
             if kwargs['plot_window'] is None:
                 kwargs['plot_window'] = [-10, 10]
-
-            path = _linearise_path(dispersion, path_key, branch_key, num_key, kwargs)
-
-            if os.path.isfile('{}.pdis.dat'.format(seed)) and len(seeds) == 1 and kwargs['plot_pdis']:
-                ax_dispersion = projected_bandstructure_plot(dispersion, ax_dispersion, path,
-                                                             bbox_extra_artists,
-                                                             **kwargs)
-                kwargs['band_colour'] = 'grey'
-                plotted_pdis = True
 
         else:
             raise RuntimeError('{}.bands/.phonon not found.'.format(seed))
 
+        path = dispersion.linearise_path(preserve_kspace_distance=kwargs['preserve_kspace_distance'])
+
+        # try to match bands if requested
         if kwargs['band_reorder'] or (kwargs['band_reorder'] is None and kwargs['phonons']):
             print('Reordering bands based on local gradients...')
-            dispersion[eig_key] = match_bands(dispersion[eig_key], dispersion[branch_key])
+            dispersion.reorder_bands()
+
+        if dispersion.projectors and len(seeds) == 1 and kwargs['plot_pdis']:
+            ax_dispersion = projected_bandstructure_plot(dispersion, ax_dispersion, path,
+                                                         bbox_extra_artists,
+                                                         **kwargs)
+            kwargs['band_colour'] = 'grey'
+            plotted_pdis = True
 
         # loop over branches and plot
         if not plotted_pdis:
-            for branch_ind, branch in enumerate(dispersion[branch_key]):
+            if kwargs.get('external_efermi') is None:
+                spin_fermi_energy = dispersion.spin_fermi_energy
+            else:
+                spin_fermi_energy = kwargs.get('external_efermi')
+            if len(spin_fermi_energy) == 1 and dispersion.num_spins != 1:
+                spin_fermi_energy = [spin_fermi_energy] * dispersion.num_spins
+
+            for branch_ind, branch in enumerate(dispersion.kpoint_branches):
+
                 # seem to have to reset colours here for some reason
                 plt.rcParams['axes.prop_cycle'] = cycler('color', kwargs['colours'])
-                for ns in range(dispersion[spin_key]):
-                    if kwargs['phonons']:
-                        fermi_energy = 0
-                    else:
-                        if kwargs.get('external_efermi') is None:
-                            fermi_energy = dispersion['spin_fermi_energy'][ns]
-                        else:
-                            try:
-                                fermi_energy = kwargs.get('external_efermi')[ns]
-                            except IndexError:
-                                fermi_energy = kwargs.get('external_efermi')
+
+                for ns in range(dispersion.num_spins):
 
                     if ns == 1 and kwargs.get('spin_only') == 'up':
                         continue
                     elif ns == 0 and kwargs.get('spin_only') == 'down':
                         continue
-                    for nb in range(dispersion[band_key]):
-                        colour, alpha, label = _get_lineprops(dispersion, eig_key, spin_key, nb, ns, branch, branch_ind, seed_ind, kwargs)
+
+                    for nb in range(dispersion.num_bands):
+                        colour, alpha, label = _get_lineprops(dispersion, spin_fermi_energy, nb, ns, branch, branch_ind, seed_ind, kwargs)
 
                         ax_dispersion.plot(path[(np.asarray(branch)-branch_ind).tolist()],
-                                           dispersion[eig_key][ns][nb][branch] - fermi_energy, c=colour,
-                                           ls=kwargs['ls'][seed_ind], alpha=alpha, label=label)
+                                           dispersion.eigs[ns][nb][branch] - spin_fermi_energy[ns],
+                                           c=colour, ls=kwargs['ls'][seed_ind], alpha=alpha, label=label)
 
     if len(seeds) > 1:
         disp_legend = ax_dispersion.legend(loc='upper center',
@@ -318,7 +306,7 @@ def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
         ylabel = r'Energy (eV)'
     ax_dispersion.set_ylabel(ylabel)
     ax_dispersion.set_xlim(0, 1)
-    _add_path_labels(seed, dispersion, ax_dispersion, path, path_key, branch_key, seed_ind, kwargs)
+    _add_path_labels(seed, dispersion, ax_dispersion, path, seed_ind, kwargs)
 
     return ax_dispersion
 
@@ -631,7 +619,7 @@ def projected_bandstructure_plot(dispersion, ax, path, bbox_extra_artists, inter
                      ax=ax, colours=dos_colours)
 
     if not kwargs['plot_pdos']:
-        for ind, projector in enumerate(projectors):
+        for ind, _ in enumerate(projectors):
             if ind in keep_inds:
                 ax.scatter(1e20, 0, facecolor=dos_colours[ind],
                            label=projector_labels[ind], lw=0)
@@ -712,99 +700,13 @@ def _ordered_scatter(path, eigs, pdis, branches, ax=None, colours=None, interpol
     ax.scatter(flat_pts_k, flat_pts_e, edgecolor=flat_colours, s=flat_sizes, lw=0, marker='o', facecolor=flat_colours)
 
 
-def match_bands(dispersion, branches):
-    """ Recursively reorder eigenvalues such that bands join up correctly,
-    based on local gradients.
-
-    Parameters:
-        dispersion (numpy.ndarray): array containing eigenvalues as a
-            function of q/k
-        branches (:obj:`list` of :obj:`int`): list containing branches of
-            k/q-point path
-
-    Returns:
-        numpy.ndarray: reordered branches.
-
-    """
-    from copy import deepcopy
-
-    for channel_ind, channel in enumerate(dispersion):
-        eigs = channel
-        for branch_ind, branch in enumerate(branches):
-            eigs_branch = eigs[:, branch]
-            converged = False
-            counter = 0
-            i_cached = 0
-            while not converged and counter < len(branch):
-                counter += 1
-                for i in range(i_cached+1, len(branch) - 1):
-                    guess = (2 * eigs_branch[:, i] - eigs_branch[:, i-1])
-                    argsort_guess = np.argsort(guess)
-                    if np.any(np.argsort(guess) != np.argsort(eigs_branch[:, i+1])):
-                        tmp_copy = deepcopy(eigs)
-                        for ind, mode in enumerate(np.argsort(eigs_branch[:, i]).tolist()):
-                            eigs_branch[mode, i+1:] = tmp_copy[:, branch][argsort_guess[ind], i+1:]
-                        for other_branch in branches[branch_ind:]:
-                            eigs_other_branch = eigs[:, other_branch]
-                            for ind, mode in enumerate(np.argsort(eigs_branch[:, i]).tolist()):
-                                eigs_other_branch[mode] = tmp_copy[:, other_branch][argsort_guess[ind]]
-                            eigs[:, other_branch] = eigs_other_branch
-                        eigs[:, branch] = eigs_branch
-                        i_cached = i
-                        break
-
-                    if i == len(branch) - 2:
-                        converged = True
-
-        dispersion[channel_ind] = eigs.reshape(1, len(eigs), len(eigs[0]))
-
-    return dispersion
-
-
-def _linearise_path(dispersion, path_key, branch_key, num_key, kwargs):
-    """ For a given k-point path, normalise the spacing between points, mapping
-    it onto [0, 1].
-
-    Note:
-        If kwargs['preserve_kspace-distance'], point separation will be determined
-        by their actual separation in reciprocal space, otherwise they will be
-        equally spaced.
-
-    Returns:
-        np.ndarray: 3xN array containing k-points mapped onto [0, 1].
-
-    """
-    path = [0]
-    for branch in dispersion[branch_key]:
-        for ind, kpt in enumerate(dispersion[path_key][branch]):
-            if ind != len(branch) - 1:
-                if kwargs['preserve_kspace_distance']:
-                    diff = np.sqrt(np.sum((kpt - dispersion[path_key][branch[ind + 1]])**2))
-                else:
-                    diff = 1.
-                path.append(path[-1] + diff)
-    path = np.asarray(path)
-    path /= np.max(path)
-    assert len(path) == int(dispersion[num_key]) - len(dispersion[branch_key]) + 1
-
-    return path
-
-
-def _get_lineprops(dispersion, eig_key, spin_key, nb, ns, branch, branch_ind, seed_ind, kwargs):
+def _get_lineprops(dispersion, spin_fermi_energy, nb, ns, branch, branch_ind, seed_ind, kwargs):
     """ Get the properties of the line to plot. """
     colour = None
     alpha = 1
     label = None
-    if not kwargs['phonons']:
-        if kwargs.get('external_efermi') is None:
-            fermi_energy = dispersion['spin_fermi_energy'][ns]
-        else:
-            try:
-                fermi_energy = kwargs.get('external_efermi')[ns]
-            except IndexError:
-                fermi_energy = kwargs.get('external_efermi')
-
-        if dispersion[spin_key] == 2:
+    if isinstance(dispersion, ElectronicDispersion):
+        if dispersion.num_spins == 2:
             if ns == 0:
                 colour = 'red'
                 alpha = 0.3
@@ -813,8 +715,9 @@ def _get_lineprops(dispersion, eig_key, spin_key, nb, ns, branch, branch_ind, se
                 alpha = 0.3
         else:
             if kwargs.get('band_colour') == 'occ':
-                band_min = np.min(dispersion[eig_key][ns][nb][branch]) - fermi_energy
-                band_max = np.max(dispersion[eig_key][ns][nb][branch]) - fermi_energy
+                band_min = np.min(dispersion.eigs[ns][nb][branch]) - spin_fermi_energy[ns]
+                band_max = np.max(dispersion.eigs[ns][nb][branch]) - spin_fermi_energy[ns]
+
                 if band_max < 0:
                     colour = kwargs.get('valence')
                 elif band_min > 0:
@@ -834,13 +737,14 @@ def _get_lineprops(dispersion, eig_key, spin_key, nb, ns, branch, branch_ind, se
             colour = 'red'
         else:
             alpha = 0.5
+
     if branch_ind == 0 and ns == 0 and nb == 0 and kwargs.get('labels') is not None:
         label = kwargs.get('labels')[seed_ind]
 
     return colour, alpha, label
 
 
-def _add_path_labels(seed, dispersion, ax_dispersion, path, path_key, branch_key, seed_ind, kwargs):
+def _add_path_labels(seed, dispersion, ax_dispersion, path, seed_ind, kwargs):
     """ Scrape k-point path labels from cell file and seekpath, then add them to the plot. """
     from matador.utils.cell_utils import doc2spg
     from seekpath import get_path
@@ -864,11 +768,11 @@ def _add_path_labels(seed, dispersion, ax_dispersion, path, path_key, branch_key
                 path_labels[label] = point
             print('Detected path labels from cell file')
 
-    if len(path_labels) == 0:
+    if not path_labels:
         # try to get dispersion path labels from spglib/seekpath
         spg_structure = None
-        if kwargs['phonons']:
-            spg_structure = doc2spg(dispersion)
+        if isinstance(dispersion, VibrationalDispersion):
+            spg_structure = doc2spg(dispersion._data)
         else:
             res = False
             cell = False
@@ -898,9 +802,9 @@ def _add_path_labels(seed, dispersion, ax_dispersion, path, path_key, branch_key
             seekpath_results = get_path(spg_structure)
             path_labels = seekpath_results['point_coords']
 
-    for branch_ind, branch in enumerate(dispersion[branch_key]):
+    for branch_ind, branch in enumerate(dispersion.kpoint_branches):
         for sub_ind, ind in enumerate(branch):
-            kpt = dispersion[path_key][ind]
+            kpt = dispersion.kpoint_path[ind]
             for label, point in path_labels.items():
                 if np.allclose(point, kpt):
                     if ind - branch_ind not in labelled:
@@ -909,9 +813,9 @@ def _add_path_labels(seed, dispersion, ax_dispersion, path, path_key, branch_key
                         label = label.replace('DELTA', r'\Delta')
                         label = label.replace('LAMBDA', r'\Lambda')
                         if sub_ind == len(branch) - 1:
-                            if branch_ind < len(dispersion[branch_key]) - 1:
-                                _tmp = dispersion[path_key]
-                                next_point = _tmp[dispersion[branch_key][branch_ind + 1][0]]
+                            if branch_ind < len(dispersion.kpoint_branches) - 1:
+                                _tmp = dispersion.kpoint_path
+                                next_point = _tmp[dispersion.kpoint_branches[branch_ind + 1][0]]
                                 for new_label, new_point in path_labels.items():
                                     new_label = new_label.replace('GAMMA', r'\Gamma')
                                     new_label = new_label.replace('SIGMA', r'\Sigma')
@@ -929,33 +833,36 @@ def _add_path_labels(seed, dispersion, ax_dispersion, path, path_key, branch_key
                         xticks.append(path[ind - branch_ind])
                         break
 
-    if not kwargs['phonons'] and kwargs['gap'] and dispersion['band_gap'] > 0:
-        vbm_pos = dispersion['band_gap_path_inds'][1]
-        vbm = dispersion['valence_band_min'] - dispersion.fermi_energy
-        cbm_pos = dispersion['band_gap_path_inds'][0]
-        cbm = dispersion['conduction_band_max'] - dispersion.fermi_energy
-        if vbm_pos != cbm_pos:
+    if isinstance(dispersion, ElectronicDispersion) and kwargs['gap']:
+        if dispersion.num_spins != 1:
+            raise NotImplementedError('Band gap summary not implemented for multiple spin channels.')
+        if dispersion.band_gap > 0:
+            vbm_pos = dispersion['band_gap_path_inds'][1]
+            vbm = dispersion['valence_band_min'] - dispersion.fermi_energy
+            cbm_pos = dispersion['band_gap_path_inds'][0]
+            cbm = dispersion['conduction_band_max'] - dispersion.fermi_energy
+            if vbm_pos != cbm_pos:
+                vbm_offset = sum([vbm_pos > ind for ind in shear_planes])
+                cbm_offset = sum([cbm_pos > ind for ind in shear_planes])
+                ax_dispersion.plot([path[vbm_pos - vbm_offset], path[cbm_pos - cbm_offset]], [vbm, cbm],
+                                   ls=kwargs['ls'][seed_ind],
+                                   c='blue',
+                                   label='indirect gap {:3.3f} eV'.format(cbm - vbm))
+
+            vbm_pos = dispersion['direct_gap_path_inds'][1]
+            vbm = dispersion['direct_valence_band_min'] - dispersion.fermi_energy
+            cbm_pos = dispersion['direct_gap_path_inds'][0]
+            cbm = dispersion['direct_conduction_band_max'] - dispersion.fermi_energy
             vbm_offset = sum([vbm_pos > ind for ind in shear_planes])
             cbm_offset = sum([cbm_pos > ind for ind in shear_planes])
             ax_dispersion.plot([path[vbm_pos - vbm_offset], path[cbm_pos - cbm_offset]], [vbm, cbm],
                                ls=kwargs['ls'][seed_ind],
-                               c='blue',
-                               label='indirect gap {:3.3f} eV'.format(cbm - vbm))
-
-        vbm_pos = dispersion['direct_gap_path_inds'][1]
-        vbm = dispersion['direct_valence_band_min'] - dispersion.fermi_energy
-        cbm_pos = dispersion['direct_gap_path_inds'][0]
-        cbm = dispersion['direct_conduction_band_max'] - dispersion.fermi_energy
-        vbm_offset = sum([vbm_pos > ind for ind in shear_planes])
-        cbm_offset = sum([cbm_pos > ind for ind in shear_planes])
-        ax_dispersion.plot([path[vbm_pos - vbm_offset], path[cbm_pos - cbm_offset]], [vbm, cbm],
-                           ls=kwargs['ls'][seed_ind],
-                           c='red',
-                           label='direct gap {:3.3f} eV'.format(cbm - vbm))
-        ax_dispersion.legend(loc='upper center',
-                             bbox_to_anchor=(0.5, 1.1),
-                             fancybox=True, shadow=True,
-                             ncol=2, handlelength=1)
+                               c='red',
+                               label='direct gap {:3.3f} eV'.format(cbm - vbm))
+            ax_dispersion.legend(loc='upper center',
+                                 bbox_to_anchor=(0.5, 1.1),
+                                 fancybox=True, shadow=True,
+                                 ncol=2, handlelength=1)
 
     if seed_ind == 0:
         ax_dispersion.set_xticks(xticks)
@@ -964,8 +871,7 @@ def _add_path_labels(seed, dispersion, ax_dispersion, path, path_key, branch_key
 
 
 def _get_projector_info(projectors):
-    """ Grab appropriate colours and labels from
-    a list of projectors.
+    """ Grab appropriate colours and labels from a list of projectors.
 
     Parameters:
         projectors (list): list containing (element_str, l_channel) tuples.

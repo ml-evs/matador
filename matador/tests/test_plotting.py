@@ -32,12 +32,13 @@ class SpectralPlotTests(unittest.TestCase):
         try:
             matador.cli.dispersion.main()
         except Exception as exc:
-            print(exc)
-            error = True
+            error = exc
         file_exists = os.path.isfile(expected_file)
-        os.remove(expected_file)
+        if file_exists:
+            os.remove(expected_file)
         os.chdir(ROOT_DIR)
-        self.assertFalse(error)
+        if error:
+            raise error
         self.assertTrue(file_exists)
 
     def test_dos_only(self):
@@ -53,12 +54,14 @@ class SpectralPlotTests(unittest.TestCase):
         try:
             matador.cli.dispersion.main()
         except Exception as exc:
-            print(exc)
-            error = True
+            error = exc
+            pass
         file_exists = os.path.isfile(expected_file)
-        os.remove(expected_file)
+        if file_exists:
+            os.remove(expected_file)
         os.chdir(ROOT_DIR)
-        self.assertFalse(error)
+        if error:
+            raise error
         self.assertTrue(file_exists)
 
     def test_multiseed(self):
@@ -74,12 +77,13 @@ class SpectralPlotTests(unittest.TestCase):
         try:
             matador.cli.dispersion.main()
         except Exception as exc:
-            print(exc)
-            error = True
+            error = exc
         file_exists = os.path.isfile(expected_file)
-        os.remove(expected_file)
+        if file_exists:
+            os.remove(expected_file)
         os.chdir(ROOT_DIR)
-        self.assertFalse(error)
+        if error:
+            raise error
         self.assertTrue(file_exists)
 
     def test_x11_no_fail(self):
@@ -92,10 +96,10 @@ class SpectralPlotTests(unittest.TestCase):
         try:
             matador.cli.dispersion.main()
         except Exception as exc:
-            print(exc)
-            error = True
+            error = exc
         os.chdir(ROOT_DIR)
-        self.assertFalse(error)
+        if error:
+            raise error
 
     def test_phonon(self):
         """ Test phonon dispersion plot. """
@@ -109,12 +113,13 @@ class SpectralPlotTests(unittest.TestCase):
         try:
             matador.cli.dispersion.main()
         except Exception as exc:
-            print(exc)
-            error = True
+            error = exc
         file_exists = os.path.isfile(expected_file)
-        os.remove(expected_file)
+        if file_exists:
+            os.remove(expected_file)
         os.chdir(ROOT_DIR)
-        self.assertFalse(error)
+        if error:
+            raise error
         self.assertTrue(file_exists)
 
 
