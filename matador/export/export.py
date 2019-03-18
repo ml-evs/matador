@@ -236,6 +236,8 @@ def doc2param(doc, *args, **kwargs):
 
     for param in param_dict:
         if param not in ['source', 'devel_code']:
+            if param in ['basis_precision'] and 'cut_off_energy' in param_dict:
+                continue
             flines.append("{0:30}: {1}".format(param, param_dict[param]))
 
     if 'encapsulated' in doc and doc['encapsulated']:

@@ -27,12 +27,13 @@ class CastepCalculator(Calculator):
                     msg = 'Unable to find pseudopotential specification for species {}'.format(elem[0])
                     errors.append(msg)
                 elif ('|' not in calculation_parameters['species_pot'][elem[0]] and
-                        not os.path.isfile(os.path.expanduser(calculation_parameters['species_pot'][elem[0]])) and
-                        calculation_parameters['species_pot'][elem[0]] not in VALID_PSPOT_LIBS):
-                    msg = 'Unable to find pseudopotential file/string/library: {}'.format(calculation_parameters['species_pot'][elem[0]])
+                      not os.path.isfile(os.path.expanduser(calculation_parameters['species_pot'][elem[0]])) and
+                      calculation_parameters['species_pot'][elem[0]] not in VALID_PSPOT_LIBS):
+                    msg = ('Unable to find pseudopotential file/string/library: {}'
+                           .format(calculation_parameters['species_pot'][elem[0]]))
                     errors.append(msg)
 
-        if 'cut_off_energy' not in calculation_parameters:
+        if 'cut_off_energy' not in calculation_parameters and 'basis_precision' not in calculation_parameters:
             msg = 'Unable to find cut_off_energy field in param file'
             errors.append(msg)
         if 'xc_functional' not in calculation_parameters:
