@@ -135,7 +135,7 @@ These calculations are performed in exactly the same was as above, except a ``<s
 Example 1.2: High-throughput geometry optimisations with CASTEP on a supercomputer
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Each HPC facility has its own quirks, so in this example we will try to be as explicit as possible. The set up of the job is exactly the same as in `example 1 <ex1_>`__, but we now must add run3 to our job submission script. The following examples are for the SLURM system on the BlueBear machine at the University of Birmingham and PBS on ARCHER (Tier-1), but run3 has also been tested on CSD3 (Tier-2), HPC Midlands-Plus (Tier-2), Thomas (Tier-2) and several local group-scale clusters.
+Each HPC facility has its own quirks, so in this example we will try to be as explicit as possible. The set up of the job is exactly the same as in `example 1 <ex1_>`__, but we now must add run3 to our job submission script. The following examples are for the SLURM queuing system on the BlueBear machine at the University of Birmingham and PBS on ARCHER (Tier-1), but run3 has also been tested on CSD3 (Tier-2), HPC Midlands-Plus (Tier-2), Thomas (Tier-2) and several local group-scale clusters.
 
 Example 1.2.1: SLURM on BlueBear
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -161,9 +161,12 @@ In this job, we will submit a run3 job that performs CASTEP calculations across 
     module load mpi/impi/2017.1.132-iccifort-2017.1.132
     unset I_MPI_PMI_LIBRARY
     
-    ###### RUN3 COMMANDS (assuming installation guide followed at https://matador-db.readthedocs.io/en/latest/install.html) ######
+    # RUN3 COMMANDS 
+    # (assuming installation guide followed at 
+    #  https://matador-db.readthedocs.io/en/latest/install.html) 
 
-    source activate matador run3 -nc 48 --intel -v 4 --executable castep.mpi --ignore_jobs_file TiO2
+    source activate matador 
+    run3 -nc 48 --intel -v 4 --executable castep.mpi --ignore_jobs_file TiO2
 
 Let's unpick a few of the flags used to call run3 here:
 
