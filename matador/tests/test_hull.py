@@ -320,6 +320,7 @@ class EnsembleHullTest(unittest.TestCase):
 
         self.assertEqual(len(beef_hull.phase_diagrams), 5000)
         self.assertEqual(len(beef_hull.cursor[0]['_beef']['hull_distance']), 5000)
+        self.assertEqual(len(beef_hull.cursor[1]['_beef']['hull_distance']), 5000)
 
 
 class VoltageTest(unittest.TestCase):

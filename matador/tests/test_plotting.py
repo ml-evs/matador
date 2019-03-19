@@ -127,6 +127,22 @@ class HullPlotTests(unittest.TestCase):
     """ Tests for plotting phase diagrams. """
     def test_binary_hull_plot(self):
         """ Test plotting binary hull. """
+        expected_files = ['KP_hull_simple.svg']
+        for expected_file in expected_files:
+            if os.path.isfile(expected_file):
+                os.remove(expected_file)
+        res_list = glob(REAL_PATH + 'data/hull-KP-KSnP_pub/*.res')
+        self.assertEqual(len(res_list), 295, 'Could not find test res files, please check installation...')
+        cursor = [res2dict(res)[0] for res in res_list]
+        QueryConvexHull(cursor=cursor, elements=['K', 'P'], subcmd='hull', svg=True,
+                        hull_cutoff=0.0, plot_kwargs={'plot_fname': 'KP_hull_simple', 'svg': True})
+        for expected_file in expected_files:
+            self.assertTrue(os.path.isfile(expected_file))
+        for expected_file in expected_files:
+            os.remove(expected_file)
+
+    def test_binary_battery_plots(self):
+        """ Test plotting binary hull. """
         expected_files = ['KP_hull.png', 'KP_voltage.png', 'KP_volume.png']
         for expected_file in expected_files:
             if os.path.isfile(expected_file):
@@ -135,7 +151,7 @@ class HullPlotTests(unittest.TestCase):
         self.assertEqual(len(res_list), 295, 'Could not find test res files, please check installation...')
         cursor = [res2dict(res)[0] for res in res_list]
         QueryConvexHull(cursor=cursor, elements=['K', 'P'], no_plot=False, png=True, quiet=False, subcmd='voltage',
-                        labels=True, label_cutoff=0.05, colour_by_source=True, hull_cutoff=0.1, volume=True)
+                        labels=True, label_cutoff=0.05, hull_cutoff=0.1, volume=True, plot_kwargs={'colour_by_source': True})
         for expected_file in expected_files:
             self.assertTrue(os.path.isfile(expected_file))
         for expected_file in expected_files:
@@ -152,6 +168,28 @@ class HullPlotTests(unittest.TestCase):
         cursor = [res2dict(res)[0] for res in res_list]
         QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'], no_plot=False, png=True, quiet=False, subcmd='voltage',
                         labels=True, label_cutoff=0.05, hull_cutoff=0.1, capmap=True)
+        self.assertTrue(os.path.isfile(expected_file))
+        for expected_file in expected_files:
+            os.remove(expected_file)
+
+    def test_beef_hull_plot(self):
+        """ Test plotting BEEF hull. """
+        from matador.hull import EnsembleHull
+        from matador.scrapers import castep2dict
+
+        expected_files = ['KP_beef_hull.svg']
+        for expected_file in expected_files:
+            if os.path.isfile(expected_file):
+                os.remove(expected_file)
+
+        cursor, s = castep2dict(REAL_PATH + 'data/beef_files/*.castep', db=False)
+
+        beef_hull = EnsembleHull(cursor, '_beef',
+                                 elements=['K', 'P'],
+                                 energy_key='total_energy_per_atom',
+                                 parameter_key='thetas')
+
+        beef_hull.plot_hull(svg=True)
         self.assertTrue(os.path.isfile(expected_file))
         for expected_file in expected_files:
             os.remove(expected_file)

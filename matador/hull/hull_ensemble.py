@@ -60,7 +60,7 @@ class EnsembleHull(QueryConvexHull):
             kwargs (dict): other arguments to pass to QueryConvexHull.
 
         """
-        super().__init__(cursor=cursor, energy_key=energy_key, species=species, subcmd=subcmd, lazy=True)
+        super().__init__(cursor=cursor, energy_key=energy_key, species=species, subcmd=subcmd, no_plot=True, lazy=False, **kwargs)
 
         if self.phase_diagram is None:
             del self.phase_diagram
@@ -117,3 +117,8 @@ class EnsembleHull(QueryConvexHull):
             set_cursor_from_array(self.cursor,
                                   self.phase_diagrams[-1].hull_dist,
                                   self.hulldist_key + [param_ind])
+
+    def plot_hull(self, **kwargs):
+        """ Hull plot helper function. """
+        from matador.plotting.hull_plotting import plot_ensemble_hull
+        plot_ensemble_hull(self, '_beef', **kwargs)

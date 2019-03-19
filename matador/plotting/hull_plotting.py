@@ -68,7 +68,7 @@ def get_hull_labels(hull, label_cutoff=None, num_species=None, exclude_edges=Tru
 @plotting_function
 def plot_2d_hull(hull, ax=None, show=False, plot_points=True,
                  plot_hull_points=True, labels=None, label_cutoff=None, colour_by_source=False,
-                 sources=None, source_labels=None, title=True,
+                 sources=None, source_labels=None, title=True, plot_fname=None,
                  **kwargs):
     """ Plot calculated hull, returning ax and fig objects for further editing.
 
@@ -89,6 +89,8 @@ def plot_2d_hull(hull, ax=None, show=False, plot_points=True,
         sources (list): list of possible provenances to colour when colour_by_source
             is True (others will be grey)
         title (str/bool): whether to include a plot title.
+        png/pdf/svg (bool): whether or not to write the plot to a file.
+        plot_fname (str): filename to write plot to, without file extension.
 
     Returns:
         matplotlib.axes.Axes: matplotlib axis with plot.
@@ -258,9 +260,9 @@ def plot_2d_hull(hull, ax=None, show=False, plot_points=True,
 
     plt.locator_params(nbins=3)
     if hull._non_elemental:
-        ax.set_xlabel(r'x in ({d[0]})$_\mathrm{{x}}(${d[1]}$)_\mathrm{{1-x}}$'.format(d=chempot_labels))
+        ax.set_xlabel(r'x in ({d[0]})$_\mathrm{{x}}$({d[1]})$_\mathrm{{1-x}}$'.format(d=chempot_labels))
     else:
-        ax.set_xlabel(r'x in ({d[0]})$_\mathrm{{x}}${d[1]}$_\mathrm{{1-x}}$'.format(d=chempot_labels))
+        ax.set_xlabel(r'x in {d[0]}$_\mathrm{{x}}${d[1]}$_\mathrm{{1-x}}$'.format(d=chempot_labels))
 
     ax.grid(False)
     ax.set_xlim(-0.05, 1.05)
@@ -269,7 +271,7 @@ def plot_2d_hull(hull, ax=None, show=False, plot_points=True,
     ax.set_ylabel('Formation energy (eV/atom)')
 
     if hull.savefig:
-        fname = ''.join(hull.species) + '_hull'
+        fname = plot_fname or ''.join(hull.species) + '_hull'
         exts = ['pdf', 'svg', 'png']
         for ext in exts:
             if hull.args.get(ext):
@@ -283,7 +285,7 @@ def plot_2d_hull(hull, ax=None, show=False, plot_points=True,
 
 
 @plotting_function
-def plot_binary_beef_hull(hull, ax=None, plot_points=True, plot_hulls=True, voltages=False, **kwargs):
+def plot_ensemble_hull(hull, parameter, ax=None, plot_points=True, plot_hulls=True, voltages=False, show=True, plot_fname=None, **kwargs):
     """ Plot and generate an ensemble of hulls with associated
     Bayesian Error Estimate functionals (BEEF). If axis not requested,
     a histogram of frequency of a particular concentration appearing on
@@ -301,138 +303,35 @@ def plot_binary_beef_hull(hull, ax=None, plot_points=True, plot_hulls=True, volt
 
     """
     import matplotlib.pyplot as plt
-    from copy import deepcopy
-    from collections import defaultdict
-    from matador.hull import QueryConvexHull
-    from matador.plotting.battery_plotting import add_voltage_curve
 
-    if ax is None:
-        fig = plt.figure(figsize=(7, 10))
-        ax = fig.add_subplot(111)
+    fig = plt.figure(figsize=(7, 10))
+    ax = fig.add_subplot(111)
 
-    fig2 = plt.figure()
-    ax_volt = fig2.add_subplot(111)
-
-    subcmd = 'voltage' if voltages else 'hull'
-
-    ax_hist = ax.twinx()
-    for doc in hull.cursor:
-        doc['_formula'] = get_formula_from_stoich(doc['stoichiometry'],
-                                                  elements=hull.species, tex=False)
-    hull_concs = defaultdict(int)
-
+    n_beef = len(hull.phase_diagrams)
     plot_2d_hull(hull, ax=ax, plot_points=False, plot_hull_points=True)
-    orig_hull_concs = []
-    for doc in hull.hull_cursor[1:-1]:
-        orig_hull_concs.append(doc['concentration'][0])
-
-    beef_cursor = deepcopy(hull.cursor)
-    n_beef = len(beef_cursor[0]['_beef']['thetas'])
-    if kwargs.get('n_beef') is not None:
-        n_beef = min([n_beef, kwargs.get('n_beef')])
-
-    # parameters for voltage heat map
-    max_voltage = 1.5*max(hull.voltage_data['voltages'][0])
-    min_voltage = 0
-    max_q = 1.5*max(hull.voltage_data['Q'][0])
-    min_q = 0
-    grid_scale = kwargs.get('grid_scale', 1000)
-    voltage_heatmap = np.zeros((grid_scale, grid_scale), dtype=np.int)
-    q_grid, v_grid = np.meshgrid(np.linspace(min_q, max_q, num=grid_scale), np.linspace(min_voltage, max_voltage, num=grid_scale))
-
-    print('Calculating voltage heat map from {} to {} V'.format(min_voltage, max_voltage))
-
-    # collect minimum formation energy for ylimits
     min_ef = 0
-
-    for beef_ind in range(n_beef):
-        for ind, doc in enumerate(beef_cursor):
-            beef_cursor[ind]['total_energy_per_atom'] = hull.cursor[ind]['_beef']['total_energy_per_atom'][beef_ind]
-            beef_cursor[ind]['total_energy'] = hull.cursor[ind]['_beef']['total_energy_per_atom'][beef_ind] * doc['num_atoms']
-
-        beef_hull = QueryConvexHull(subcmd=subcmd, cursor=beef_cursor, elements=hull.species, no_plot=True, quiet=True, energy_key='total_energy')
-        min_ef = np.min([doc['formation_total_energy_per_atom'] for doc in beef_hull.hull_cursor] + [min_ef])
+    for ind, phase_diagram in enumerate(hull.phase_diagrams):
+        hull_cursor = [doc for doc in hull.cursor if doc[parameter]['hull_distance'][ind] <= 0.0 + EPS]
+        min_ef = np.min([doc[parameter]['formation_total_energy_per_atom'][ind] for doc in hull_cursor] + [min_ef])
         if plot_hulls:
-            ax.plot([doc['concentration'][0] for doc in beef_hull.hull_cursor],
-                    [doc['formation_total_energy_per_atom'] for doc in beef_hull.hull_cursor],
+            ax.plot([doc['concentration'][0] for doc in hull_cursor],
+                    [doc[parameter]['formation_total_energy_per_atom'][ind] for doc in hull_cursor],
                     alpha=min([1, max([1/(0.25*n_beef), 0.01])]), c='k', lw=0.5, zorder=0)
-        if plot_points:
-            ax.scatter([doc['concentration'][0] for doc in beef_hull.hull_cursor],
-                       [doc['formation_total_energy_per_atom'] for doc in beef_hull.hull_cursor],
-                       alpha=min([1, max([1/(0.25*n_beef), 0.01])]), c=hull.colours[1], s=10, zorder=10, lw=0)
-
-        previous_qindex = 0
-        V = beef_hull.voltage_data['voltages'][0]
-        Q = beef_hull.voltage_data['Q'][0]
-        for step, (qs, vs) in enumerate(zip(Q, V)):
-            if step == len(V) - 1 or np.isnan(qs) or np.isnan(vs):
-                continue
-            v_index = max([0, min([int((vs-min_voltage)/(max_voltage-min_voltage) * grid_scale), grid_scale-1])])
-            q_index = max([0, min([int((qs-min_q)/(max_q-min_q)*grid_scale), grid_scale-1])])
-            voltage_heatmap[v_index, previous_qindex:q_index+1] += 1
-            if kwargs.get('hist_vertical'):
-                if not np.isnan(V[step+1]):
-                    next_vindex = max([0, min([int(V[step+1]/(max_voltage-min_voltage) * grid_scale), grid_scale-1])])
-                    voltage_heatmap[next_vindex+1:v_index, q_index] += 1
-            previous_qindex = q_index
-
-        for doc in beef_hull.hull_cursor[1:-1]:
-            hull_concs[doc['_formula']] += 1
 
     ax.set_ylim(min_ef)
-
-    ax_volt.pcolor(q_grid, v_grid, voltage_heatmap, cmap='viridis')#, norm=mpl.colors.LogNorm(vmin=1, vmax=np.max(voltage_heatmap)))
-
-    voltage_curve = calculate_average_voltage_from_heatmap(voltage_heatmap, v_grid, q_grid)
-    ax_volt.plot(q_grid[0, :], voltage_curve, c='white', zorder=1e20, lw=3, ls='--')
-    c = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])[1]
-    add_voltage_curve(hull.voltage_data['Q'][0], hull.voltage_data['voltages'][0], ax_volt, lw=5, ls='--', c=c)
-
-    concs = []
-    freqs = []
-    for key in hull_concs:
-        concs.append(get_concentration(get_stoich_from_formula(key), elements=hull.species)[0])
-        freqs.append(hull_concs[key])
-
-    max_freq = 0
-    for ind, conc in enumerate(concs):
-        if conc in orig_hull_concs:
-            ax_hist.plot([conc, conc], [0, freqs[ind]], lw=3, alpha=0.5, c=hull.colours[1])
-        else:
-            ax_hist.plot([conc, conc], [0, freqs[ind]], lw=3, alpha=0.5, c=hull.colours[0])
-
-    max_freq = max(freqs)
-    ax_hist.set_ylim(0, 10*max_freq)
-    ax_hist.set_ylabel('Frequency')
-    ax_hist.set_xlabel('Concentration')
-    return voltage_heatmap
-
-
-def calculate_average_voltage_from_heatmap(voltage_heatmap, v_grid, q_grid):
-    """ For a histogram of voltages computed on grids v_grid and q_grid,
-    compute the average voltage curve.
-
-    Parameters:
-        voltage_heatmap (numpy.ndarray): NxN square array containing
-            frequencies of Q vs V.
-        v_grid (numpy.ndarray): NxN array containing the voltage value
-            at each point of the heatmap
-        q_grid (numpy.ndarray): NxN array containing the capacity value
-            at each point of the heatmap.
-
-    """
-    voltage_curve = np.zeros((len(voltage_heatmap)))
-    for q in range(len(voltage_heatmap)):
-        v_indices = np.where(voltage_heatmap[:, q] > 0)
-        voltages = [v_grid[index] for index in v_indices]
-        voltage_curve[q] = np.mean(voltages)
-
-    return voltage_curve
+    exts = ['pdf', 'svg', 'png']
+    if hull.savefig or any(kwargs.get(ext) for ext in exts):
+        fname = plot_fname or ''.join(hull.species) + parameter + '_hull'
+        for ext in exts:
+            if kwargs.get(ext):
+                plt.savefig('{}.{}'.format(fname, ext),
+                            bbox_inches='tight', transparent=True)
+                print('Wrote {}.{}'.format(fname, ext))
 
 
 @plotting_function
 def plot_ternary_hull(hull, axis=None, show=False, plot_points=True, hull_cutoff=None,
-                      label_cutoff=None, expecting_cbar=True, labels=None, **kwargs):
+                      label_cutoff=None, expecting_cbar=True, labels=None, plot_fname=None, **kwargs):
     """ Plot calculated ternary hull as a 2D projection.
 
     Parameters:
@@ -447,6 +346,8 @@ def plot_ternary_hull(hull, axis=None, show=False, plot_points=True, hull_cutoff
         expecting_cbar (bool): whether or not to space out the plot to preserve
             aspect ratio if a colourbar is present.
         labels (bool): whether or not to label on-hull structures
+        png/pdf/svg (bool): whether or not to write the plot to a file.
+        plot_fname (str): filename to write plot to.
 
     Returns:
         matplotlib.axes.Axes: matplotlib axis with plot.
@@ -654,13 +555,14 @@ def plot_ternary_hull(hull, axis=None, show=False, plot_points=True, hull_cutoff
     plt.tight_layout(w_pad=0.2)
 
     if hull.savefig:
-        if hull.args.get('png'):
-            plt.savefig(''.join(hull.species) + '_hull.png', dpi=400, transparent=True, bbox_inches='tight')
-        if hull.args.get('svg'):
-            plt.savefig(''.join(hull.species) + '_hull.svg', dpi=400, transparent=True, bbox_inches='tight')
-        if hull.args.get('pdf'):
-            plt.savefig(''.join(hull.species) + '_hull.pdf', dpi=400, transparent=True, bbox_inches='tight')
+        fname = plot_fname or ''.join(hull.species) + '_hull'
+        exts = ['pdf', 'svg', 'png']
+        for ext in exts:
+            if hull.args.get(ext):
+                plt.savefig('{}.{}'.format(fname, ext),
+                            bbox_inches='tight', transparent=True)
+                print('Wrote {}.{}'.format(fname, ext))
     elif show:
-        ax.show()
+        plt.show()
 
     return ax
