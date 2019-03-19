@@ -236,11 +236,12 @@ class Dispersion:
                                 eigs_branch[mode, i+1:] = tmp_copy[:, branch][argsort_guess[ind], i+1:]
                             for other_branch in self.kpoint_branches[branch_ind:]:
                                 eigs_other_branch = eigs[:, other_branch]
-                            for ind, mode in enumerate(np.argsort(eigs_branch[:, i]).tolist()):
-                                eigs_other_branch[mode] = tmp_copy[:, other_branch][argsort_guess[ind]]
+                                for ind, mode in enumerate(np.argsort(eigs_branch[:, i]).tolist()):
+                                    eigs_other_branch[mode] = tmp_copy[:, other_branch][argsort_guess[ind]]
                             eigs[:, other_branch] = eigs_other_branch
-                        eigs[:, branch] = eigs_branch
-                        i_cached = i
+                            eigs[:, branch] = eigs_branch
+                            i_cached = i
+                            break
                     else:
                         converged = True
 
