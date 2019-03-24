@@ -10,7 +10,6 @@ the similarity between two structures.
 from itertools import combinations_with_replacement
 import itertools
 import copy
-import sys
 from math import ceil
 import time
 
@@ -19,7 +18,6 @@ import numba
 
 from matador.utils.cell_utils import frac2cart, cart2volume
 from matador.utils.cell_utils import standardize_doc_cell
-from matador.utils.print_utils import print_notify
 from matador.similarity.fingerprint import Fingerprint, FingerprintFactory
 
 
@@ -39,7 +37,7 @@ class PDF(Fingerprint):
 
     """
 
-    def __init__(self, doc, **kwargs):
+    def __init__(self, doc, lazy=False, **kwargs):
         """ Initialise parameters and run PDF (unless lazy=True).
 
         Parameters:
@@ -97,7 +95,7 @@ class PDF(Fingerprint):
         else:
             self.label = 'null'
 
-        if not kwargs.get('lazy'):
+        if not lazy:
             if self.kwargs.get('timing'):
                 start = time.time()
             self.calc_pdf()

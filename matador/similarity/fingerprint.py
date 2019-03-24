@@ -13,6 +13,8 @@ import multiprocessing as mp
 import os
 import time
 import sys
+import functools
+
 import numba
 import numpy as np
 
@@ -114,7 +116,8 @@ class FingerprintFactory:
         nprocs (int): number of concurrent processes to be used.
 
     """
-    # TODO: how do you prevent this init from being called when fingerprint is None?
+    fingerprint = None
+    default_key = None
 
     def __init__(self, cursor, debug=False, **fprint_args):
         """ Compute PDFs over n processes, where n is set by either
@@ -122,11 +125,16 @@ class FingerprintFactory:
 
         Parameters:
             cursor (list of dict): list of matador structures
+            fingerprint (Fingerprint): class to compute for each structure
 
         Keyword arguments:
             pdf_args (dict): arguments to pass to the PDF calculator
 
         """
+        if self.fingerprint is None or self.default_key is None:
+            # TODO: is this the right way of doing this?
+            raise NotImplementedError('Do not create FingerprintFactory directly, '
+                                      'use the appropriate sub-class!')
         # create list of empty (lazy) PDF objects
         if 'lazy' in fprint_args:
             del fprint_args['lazy']
@@ -155,10 +163,9 @@ class FingerprintFactory:
                 cursor[ind][self.default_key].calculate()
         else:
             pool = mp.Pool(processes=self.nprocs)
-            import functools
             fprint_cursor = []
-            results = pool.map_async(functools.partial(calc_fprint_pool_wrapper,
-                                                       self.default_key),
+            results = pool.map_async(functools.partial(_calc_fprint_pool_wrapper,
+                                                       key=self.default_key),
                                      cursor,
                                      callback=fprint_cursor.extend,
                                      error_callback=print,
@@ -184,13 +191,14 @@ class FingerprintFactory:
 
         elapsed = time.time() - start
         if debug:
+            pool.close()
             print('Compute time: {:.4f} s'.format(elapsed))
             print('Work complete!')
 
 
-def calc_fprint_pool_wrapper(doc, key):
+def _calc_fprint_pool_wrapper(doc, key=None):
     """ Evaluate Fingerprint of a structure where a lazy init of the
-    doc's PDF object has already been made.
+    doc's Fingerprint object has already been made.
 
     Parameters:
         doc (dict): matador structures with empty PDF

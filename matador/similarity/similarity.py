@@ -3,8 +3,7 @@
 structural similarity metrics.
 """
 # matador modules
-from matador.similarity.fingerprint import FingerprintFactory
-from matador.similarity.pdf_similarity import PDF
+from matador.similarity.pdf_similarity import PDF, PDFFactory
 from matador.utils.cursor_utils import get_array_from_cursor, get_guess_doc_provenance
 # external libraries
 import numpy as np
@@ -12,8 +11,8 @@ import numpy as np
 from collections import defaultdict
 
 
-def get_uniq_cursor(cursor, fingerprint=PDF, sim_tol=0.1, energy_tol=1e-2,
-                    enforce_same_stoich=True,
+def get_uniq_cursor(cursor, sim_tol=0.1, energy_tol=1e-2,
+                    enforce_same_stoich=True, fingerprint=PDF,
                     debug=False, **fingerprint_calc_args):
     """ Uses fingerprint to filter cursor into unique structures to some
     tolerance sim_tol, additionally returning a dict of duplicates and the
@@ -45,18 +44,16 @@ def get_uniq_cursor(cursor, fingerprint=PDF, sim_tol=0.1, energy_tol=1e-2,
     fingerprint_list = []
     if not enforce_same_stoich:
         energy_tol = 1e20
-    if projected:
-        fingerprint_calc_args['projected'] = True
     print('Calculating fingerprints...')
     if debug:
         import time
         start = time.time()
-    factory = FingerprintFactory(cursor, **fingerprint_calc_args)
+    factory = PDFFactory(cursor, **fingerprint_calc_args)
     if debug:
         completed = time.time() - start
         print('{} of {} structures completed in {:0.1f} s'.format(fingerprint, len(cursor), completed))
 
-    fingerprint_list = [doc[fingerprint.key] for doc in cursor]
+    fingerprint_list = [doc[factory.default_key] for doc in cursor]
     sim_mat = np.ones((len(fingerprint_list), len(fingerprint_list)))
     print('Assessing similarities...')
     for i in range(len(fingerprint_list)):
@@ -66,7 +63,7 @@ def get_uniq_cursor(cursor, fingerprint=PDF, sim_tol=0.1, energy_tol=1e-2,
             if (enforce_same_stoich is False or
                 (sorted(cursor[j]['stoichiometry']) == sorted(cursor[i]['stoichiometry']) and
                  np.abs(cursor[j].get('enthalpy_per_atom', 0) - cursor[i].get('enthalpy_per_atom', 0)) < energy_tol)):
-                sim = fingerprint_list[i].get_sim_distance(fingerprint_list[j], projected=projected)
+                sim = fingerprint_list[i].get_sim_distance(fingerprint_list[j])
                 sim_mat[i, j] = sim
                 sim_mat[j, i] = sim
             else:

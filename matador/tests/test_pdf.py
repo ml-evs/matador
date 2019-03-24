@@ -134,7 +134,7 @@ class PDFFactoryCalculatorTest(unittest.TestCase):
         serial_cursor = deepcopy(cursor)
         pdf_args = {'dr': 0.1, 'num_images': 'auto', 'gaussian_width': 0.1, 'lazy': False, 'projected': False}
         start = time.time()
-        pdf_factory = PDFFactory(cursor, concurrency='pool', **pdf_args)
+        pdf_factory = PDFFactory(cursor, **pdf_args)
         factory_elapsed = time.time() - start
         start = time.time()
         for doc in serial_cursor:
@@ -159,7 +159,7 @@ class PDFFactoryCalculatorTest(unittest.TestCase):
 
         pdf_args = {'dr': 0.1, 'num_images': 'auto', 'gaussian_width': 0.1, 'lazy': False, 'projected': False}
         start = time.time()
-        pdf_factory = PDFFactory(hull.cursor, concurrency='pool', **pdf_args)
+        pdf_factory = PDFFactory(hull.cursor, **pdf_args)
         factory_elapsed = time.time() - start
         start = time.time()
         for doc in serial_cursor:
@@ -181,7 +181,7 @@ class PDFFactoryCalculatorTest(unittest.TestCase):
         serial_cursor = deepcopy(cursor)
         pdf_args = {'dr': 0.1, 'num_images': 'auto', 'gaussian_width': 0.1, 'lazy': False, 'projected': True}
         start = time.time()
-        pdf_factory = PDFFactory(cursor, concurrency='pool', **pdf_args)
+        pdf_factory = PDFFactory(cursor, **pdf_args)
         factory_elapsed = time.time() - start
         start = time.time()
         for doc in serial_cursor:
