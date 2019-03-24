@@ -20,7 +20,7 @@ import numba
 from matador.utils.cell_utils import frac2cart, cart2volume
 from matador.utils.cell_utils import standardize_doc_cell
 from matador.utils.print_utils import print_notify
-from matador.similarity.fingerprint import Fingerprint
+from matador.similarity.fingerprint import Fingerprint, FingerprintFactory
 
 
 class PDF(Fingerprint):
@@ -132,6 +132,10 @@ class PDF(Fingerprint):
         if self.gr is None:
             self._calc_unprojected_pdf()
 
+    def calculate(self):
+        """ Alias for `self.calc_pdf`. """
+        self.calc_pdf()
+
     def _calc_distances(self, poscart, poscart_b=None):
         """ Calculate PBC distances with cdist.
 
@@ -207,70 +211,6 @@ class PDF(Fingerprint):
         self.gr = np.zeros_like(self.r_space)
         for key in self.elem_gr:
             self.gr += self.elem_gr[key]
-
-    @staticmethod
-    @numba.njit
-    def _broadening_space_dominated(distances, r_space, gaussian_width):
-        """ Add Gaussian broadening to the PDF by convolving distances with
-        the radial space and summing. More memory-efficient if len(r_space)
-        is less than len(distances).
-
-        Parameters:
-            distances (numpy.ndarray): array of pair-wise distances.
-            r_space (numpy.ndarray): radial grid
-            gaussian_width (float): amount of gaussian broadening.
-
-        Returns:
-            gr (numpy.ndarray): the unnormalised PDF.
-
-        """
-        new_space = (np.reshape(r_space, (1, len(r_space))) -
-                     np.reshape(distances, (1, len(distances))).T)
-        gr = np.sum(np.exp(-(new_space / gaussian_width)**2), axis=0)
-        return gr
-
-    @staticmethod
-    @numba.njit
-    def _broadening_distance_dominated(hist, r_space, gaussian_width):
-        """ Add Gaussian broadening to the PDF by convolving the distance histogram with
-        the radial space and summing. Potentially more memory-efficient than the alternative
-        implementation if len(distances) > len(r_space).
-
-        Parameters:
-            hist (numpy.ndarray): histogram of pairwise frequencies.
-            r_space (numpy.ndarray): radial grid
-            gaussian_width (float): amount of gaussian broadening.
-
-        Returns:
-            gr (numpy.ndarray): the unnormalised PDF.
-
-        """
-        new_space = (np.reshape(r_space, (1, len(r_space))) -
-                     np.reshape(r_space, (1, len(r_space))).T)
-        gr = np.sum(hist * np.exp(-(new_space / gaussian_width)**2), axis=1)
-        return gr
-
-    @staticmethod
-    @numba.njit
-    def _broadening_unrolled(hist, r_space, gaussian_width):
-        """ Add Gaussian broadening to the PDF by convolving the distance histogram with
-        the radial space and summing. Unrolled loop to save memory.
-
-
-        Parameters:
-            hist (numpy.ndarray): histogram of pairwise frequencies.
-            r_space (numpy.ndarray): radial grid
-            gaussian_width (float): amount of gaussian broadening.
-
-        Returns:
-            gr (numpy.ndarray): the unnormalised PDF.
-
-        """
-        gr = np.zeros_like(r_space)
-        for ind, _ in enumerate(hist):
-            if hist[ind] != 0:
-                gr += hist[ind] * np.exp(-((r_space-r_space[ind]) / gaussian_width)**2)
-        return gr
 
     @staticmethod
     @numba.njit
@@ -423,7 +363,7 @@ class PDF(Fingerprint):
         plot_pdf(self, **kwargs)
 
 
-class PDFFactory:
+class PDFFactory(FingerprintFactory):
     """ This class computes PDF objects from a list of structures,
     as concurrently as possible. The PDFs are stored under the `pdf`
     key inside each structure dict.
@@ -432,107 +372,8 @@ class PDFFactory:
         nprocs (int): number of concurrent processes.
 
     """
-
-    def __init__(self, cursor, debug=False, concurrency='pool', **pdf_args):
-        """ Compute PDFs over n processes, where n is set by either
-        SLURM_NTASKS, OMP_NUM_THREADS or physical core count.
-
-        Parameters:
-            cursor (list of dict): list of matador structures
-
-        Keyword arguments:
-            concurrency (str): either 'pool' or 'queue'
-            pdf_args (dict): arguments to pass to the PDF calculator
-
-        """
-        import multiprocessing as mp
-        import os
-        # create list of empty (lazy) PDF objects
-        if 'lazy' in pdf_args:
-            del pdf_args['lazy']
-        for doc in cursor:
-            doc['pdf'] = PDF(doc, lazy=True, **pdf_args)
-
-        # how many processes to use? either SLURM_NTASKS, OMP_NUM_THREADS or total num CPUs
-        if os.environ.get('SLURM_NTASKS') is not None:
-            self.nprocs = int(os.environ.get('SLURM_NTASKS'))
-            env = '$SLURM_NTASKS'
-        elif os.environ.get('OMP_NUM_THREADS') is not None:
-            self.nprocs = int(os.environ.get('OMP_NUM_THREADS'))
-            env = '$OMP_NUM_THREADS'
-        else:
-            self.nprocs = mp.cpu_count()
-            env = 'core count'
-        print_notify('Running {} jobs on {} processes in {} mode, set by {}.'.format(len(cursor),
-                                                                                     self.nprocs,
-                                                                                     concurrency,
-                                                                                     env))
-
-        if debug:
-            print('Initialising worker {}...'.format(concurrency))
-
-        start = time.time()
-        if self.nprocs == 1:
-            import tqdm
-            for ind, doc in tqdm.tqdm(enumerate(cursor)):
-                cursor[ind]['pdf'].calc_pdf()
-        else:
-            pool = mp.Pool(processes=self.nprocs)
-            pdf_cursor = []
-            results = pool.map_async(calc_pdf_pool_wrapper,
-                                     cursor,
-                                     callback=pdf_cursor.extend,
-                                     error_callback=print,
-                                     chunksize=1)  # set chunksize to 1 as PDFs will vary in cost to compute
-            pool.close()
-            width = len(str(len(cursor)))
-            total = len(cursor)
-            while not results.ready():
-                sys.stdout.write('{done:{width}d} / {total:{width}d}  {percentage:3d}%\r'
-                                 .format(width=width, done=total-results._number_left,
-                                         total=total, percentage=int(100*(total-results._number_left)/total)))
-                sys.stdout.flush()
-                time.sleep(1)
-
-            if len(pdf_cursor) != len(cursor):
-                raise RuntimeError('There was an error calculating the desired PDFs')
-
-            for ind, doc in enumerate(cursor):
-                cursor[ind]['pdf'] = pdf_cursor[ind]['pdf']
-
-        elapsed = time.time() - start
-        if debug:
-            print('Compute time: {:.4f} s'.format(elapsed))
-            print('Work complete!')
-
-
-def calc_pdf_queue_wrapper(cursor, i, queue):
-    """ Evaluate PDFs of a cursor where a lazy init of each doc's PDF object has
-    already been made. The result is parcelled into a dictionary with key i
-    and pushed to the queue.
-
-    Parameters:
-        cursor (list of dict): list of matador structures with empty PDF
-            objects stored under `pdf`.
-        i (int): position of cursor in overall subcursor array
-        queue (multiprocessing.Queue): processing queue.
-
-    """
-    for ind, _ in enumerate(cursor):
-        cursor[ind]['pdf'].calc_pdf()
-    queue.put({i: cursor})
-
-
-def calc_pdf_pool_wrapper(doc):
-    """ Evaluate PDF of a structure where a lazy init of the doc's PDF object has
-    already been made.
-
-    Parameters:
-        doc (dict): matador structures with empty PDF
-
-    """
-    doc['pdf'].calc_pdf()
-    return {'pdf': doc['pdf']}
+    default_key = 'pdf'
+    fingerprint = PDF
 
 
 class PDFOverlap:
