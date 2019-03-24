@@ -3,7 +3,8 @@
 structural similarity metrics.
 """
 # matador modules
-from matador.similarity.pdf_similarity import PDF, PDFFactory
+from matador.similarity.fingerprint import FingerprintFactory
+from matador.similarity.pdf_similarity import PDF
 from matador.utils.cursor_utils import get_array_from_cursor, get_guess_doc_provenance
 # external libraries
 import numpy as np
@@ -12,7 +13,7 @@ from collections import defaultdict
 
 
 def get_uniq_cursor(cursor, fingerprint=PDF, sim_tol=0.1, energy_tol=1e-2,
-                    enforce_same_stoich=True, projected=True,
+                    enforce_same_stoich=True,
                     debug=False, **fingerprint_calc_args):
     """ Uses fingerprint to filter cursor into unique structures to some
     tolerance sim_tol, additionally returning a dict of duplicates and the
@@ -23,21 +24,22 @@ def get_uniq_cursor(cursor, fingerprint=PDF, sim_tol=0.1, energy_tol=1e-2,
         cursor (list) : matador cursor to be filtered
 
     Keyword Arguments:
-
-        fingerprint (Fingerprint) : fingerprint object type to compare (DEFAULT: PDF)
-        sim_tol (float/bool) : tolerance in similarity distance for duplicates (if True, default value of 0.1 used)
-        energy_tol (float) : compare only structures within a certain energy tolerance (if enforce_same_stoich is False, this is disabled)
-        enforce_same_stoich (bool) : compare only structures of the same stoichiometry
-        projected (bool) : use element-projected PDF to calculate similarity
-        debug (bool) : print timings and list similarities
-        fingerprint_calc_args (dict) : kwargs to pass to fingerprint
+        fingerprint (Fingerprint): fingerprint object type to compare
+            (DEFAULT: PDF)
+        sim_tol (float/bool): tolerance in similarity distance for
+            duplicates (if True, default value of 0.1 used)
+        energy_tol (float): compare only structures within a certain
+            energy tolerance (1e20 if enforce_same_stoich is False)
+        enforce_same_stoich (bool): compare only structures of the same
+            stoichiometry
+        debug (bool): print timings and list similarities
+        fingerprint_calc_args (dict): kwargs to pass to fingerprint
 
     Returns:
-
-        distinct_set (set) : a set of indices of unique documents
-        dupe_dict (dict) : a dict with keys from distinct_set, listing duplicates
-        fingerprint_list (list) : a list of <Fingerprint> objects
-        sim_mat (np.ndarray) : the correlation matrix of pair similarity distances
+        distinct_set (set): a set of indices of unique documents
+        dupe_dict (dict): a dict with keys from distinct_set, listing duplicates
+        fingerprint_list (list): a list of <Fingerprint> objects
+        sim_mat (np.ndarray): the correlation matrix of pair similarity distances
 
     """
     fingerprint_list = []
@@ -49,12 +51,12 @@ def get_uniq_cursor(cursor, fingerprint=PDF, sim_tol=0.1, energy_tol=1e-2,
     if debug:
         import time
         start = time.time()
-    PDFFactory(cursor, **fingerprint_calc_args)
+    factory = FingerprintFactory(cursor, **fingerprint_calc_args)
     if debug:
         completed = time.time() - start
-        print('PDFs of {} structures completed in {:0.1f} s'.format(len(cursor), completed))
+        print('{} of {} structures completed in {:0.1f} s'.format(fingerprint, len(cursor), completed))
 
-    fingerprint_list = [doc['pdf'] for doc in cursor]
+    fingerprint_list = [doc[fingerprint.key] for doc in cursor]
     sim_mat = np.ones((len(fingerprint_list), len(fingerprint_list)))
     print('Assessing similarities...')
     for i in range(len(fingerprint_list)):
