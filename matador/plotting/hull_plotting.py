@@ -186,7 +186,7 @@ def plot_2d_hull(hull, ax=None, show=False, plot_points=True,
                 cbar.ax.yaxis.set_ticks_position('right')
                 cbar.ax.set_frame_on(False)
                 cbar.outline.set_visible(False)
-                cbar.set_label('Distance from hull (eV)')
+                cbar.set_label('Distance from hull (eV/atom)')
 
         elif hull.hull_cutoff != 0:
             # if specified hull cutoff colour those below
@@ -583,7 +583,7 @@ def plot_ternary_hull(hull, axis=None, show=False, plot_points=True, hull_cutoff
         colours_list = np.asarray(colours_list)
         ax.scatter(scale*stable, marker='o', color=hull.colours[1], edgecolors='black', zorder=9999999,
                    s=150, lw=1.5)
-        ax.scatter(scale*concs, colormap=cmap, colorbar=True, cbarlabel='Distance from hull (meV/atom)',
+        ax.scatter(scale*concs, colormap=cmap, colorbar=True, cbarlabel='Distance from hull (eV/atom)',
                    c=colour_metric, vmax=max_cut, vmin=min_cut, zorder=1000, s=40, alpha=0)
         for i, _ in enumerate(concs):
             ax.scatter(
