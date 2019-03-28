@@ -13,21 +13,34 @@ from matador.plotting.plotting import plotting_function
 
 
 @plotting_function
-def plot_pxrd(pxrds):
+def plot_pxrd(pxrds, two_theta_range=(10, 70), figsize=None):
     """ Plot PXRD or PXRDs.
 
     Parameters:
         pxrds (list or matador.similarity.pxrd.PXRD): the PXRD
             or list of PXRDs to plot.
 
+    Keyword arguments:
+        two_theta_range (tuple): plotting limits for 2theta
+        figsize (tuple): specify a figure size, the default
+            scales with the number of PXRDs to be plotted.
+
     """
+    if figsize is None:
+        figsize = (8, 0.5*len(pxrds))
     if isinstance(pxrds, PXRD):
         pxrds = [pxrds]
     import matplotlib.pyplot as plt
-    fig = plt.figure(figsize=(10, 6))
+    fig = plt.figure(figsize=figsize)
     for ind, pxrd in enumerate(pxrds):
         ax = fig.add_subplot(111)
-        ax.plot(pxrd.two_thetas, pxrd.spectrum + ind, label='{} ({})'.format(pxrd.formula, pxrd.spg))
+        ax.plot(pxrd.two_thetas, 0.9*pxrd.spectrum + ind)
+        ax.text(0.95, ind+0.1, '{} ({})'.format(pxrd.formula, pxrd.spg),
+                transform=ax.get_yaxis_transform(),
+                horizontalalignment='right')
+
+    ax.set_yticks([])
+    ax.set_ylim(0 - len(pxrds)*0.01, len(pxrds))
+    ax.set_xlim(*two_theta_range)
     ax.set_ylabel('Relative intensity')
     ax.set_xlabel('$2\\theta$')
-    ax.legend()
