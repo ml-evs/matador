@@ -738,7 +738,8 @@ class QueryConvexHull:
             if self.from_cursor:
                 species = list({atom for doc in self.cursor for atom in doc['atom_types']})
             else:
-                raise RuntimeError('Unable to determine species in hull, please specify.')
+                raise RuntimeError("Unable to determine species in hull, please specify with "
+                                   "e.g. `elements=['Li', 'P']")
 
         # handles when species is e.g. ['LiCo2:Sn2S']
         if isinstance(species, str):

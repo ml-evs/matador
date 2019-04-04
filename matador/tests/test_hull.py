@@ -296,6 +296,15 @@ class HullTest(unittest.TestCase):
         self.assertAlmostEqual(new_cursor[0]['concentration'][0], 0.5, msg='Concentrations do not match')
         self.assertAlmostEqual(new_cursor[0]['concentration'][1], 1.5/7.0, msg='Concentrations do not match')
 
+    def test_pseudoternary_hull(self):
+        cursor, s = res2dict(REAL_PATH + 'data/hull-LLZO/*.res')
+        print()
+        print(80*'-')
+        self.assertEqual(len(cursor), 12, 'Error with test res files, please check installation...')
+        with self.assertRaises(RuntimeError):
+            hull = QueryConvexHull(cursor=cursor,
+                                   no_plot=True)
+
 
 class EnsembleHullTest(unittest.TestCase):
     """ Test of Ensemble Hulls for BEEF/temperature. """
