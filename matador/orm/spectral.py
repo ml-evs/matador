@@ -7,9 +7,9 @@ spectra, with or without projector_weights.
 
 """
 
-import copy
 import numpy as np
 from matador.utils.cell_utils import real2recip, frac2cart
+from matador.orm.orm import DataContainer
 
 EPS = 1e-6
 
@@ -19,12 +19,15 @@ class Spectrum:
     spectra, e.g. DOS and dispersion.
 
     """
-    # TODO write this class
     def __init__(self):
         raise NotImplementedError
 
 
-class Dispersion:
+class DensityOfStates(DataContainer):
+    pass
+
+
+class Dispersion(DataContainer):
     """ Parent class for continuous spectra in reciprocal space, i.e.
     electronic and vibrational bandstructures.
 
@@ -35,28 +38,6 @@ class Dispersion:
         used to generate the underlying wavefunction or dynamical matrix.
 
     """
-    def __init__(self, data):
-        """ Initalise copy of raw data. """
-        self._data = copy.deepcopy(data)
-
-    def __getitem__(self, key):
-        """ Allow properties to be used with key access.
-
-        Raises a KeyError if property or key can't be found.
-
-        """
-        try:
-            return getattr(self, key)
-        except AttributeError:
-            pass
-
-        return self._data[key]
-
-    @property
-    def source(self):
-        """ List of source files. """
-        return self._data['source']
-
     @property
     def lattice_cart(self):
         """ The Cartesian lattice vectors of the real space lattice. """
@@ -532,9 +513,6 @@ class VibrationalDispersion(Dispersion):
 
 
 # TODO finish these
-# class DensityOfStates:
-    # def __init__(self, dos_dict=None):
-        # pass
 
 # class VibrationalDOS(DensityOfStates):
     # def __init__(self):

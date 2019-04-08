@@ -2,8 +2,11 @@
 # standard library
 import unittest
 from os.path import realpath
+
+import numpy as np
+
 # matador modules
-from matador.crystal import Crystal
+from matador.crystal.crystal import Crystal, UnitCell
 from matador.scrapers.castep_scrapers import castep2dict
 from matador.scrapers.magres_scrapers import magres2dict
 
@@ -11,6 +14,48 @@ from matador.scrapers.magres_scrapers import magres2dict
 REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
 
 imported_vornet = False
+
+class UnitCellTest(unittest.TestCase):
+
+
+    def test_cart_init(self):
+        lattice_cart = [[3, 0, 0], [0, 3, 0], [0, 0, 3]]
+        lat_tup = tuple(tuple(vec) for vec in lattice_cart)
+        cell = UnitCell(lattice_cart)
+        self.assertEqual(cell.lattice_cart, lat_tup)
+        self.assertEqual(cell.lattice_abc, ((3, 3, 3), (90, 90, 90)))
+        self.assertEqual(cell.volume, 27)
+        self.assertEqual(cell.lengths, (3, 3, 3))
+        self.assertEqual(cell.angles, (90, 90, 90))
+
+        lattice_cart = np.asarray([[3, 0, 0], [0, 3, 0], [0, 0, 3]])
+        cell = UnitCell(lattice_cart)
+        self.assertAlmostEqual(cell.lattice_cart, lat_tup)
+        self.assertAlmostEqual(cell.lattice_abc,((3, 3, 3), (90, 90, 90)))
+        self.assertEqual(cell.volume, 27)
+        self.assertAlmostEqual(cell.lengths, (3, 3, 3))
+        self.assertAlmostEqual(cell.angles, (90, 90, 90))
+
+        lattice_cart = [[10, 0, 0], [0, 10, 0], [0, 0, 10]]
+        cell.lattice_cart = lattice_cart
+        lat_tup = tuple(tuple(vec) for vec in lattice_cart)
+        self.assertEqual(cell.lattice_cart, lat_tup)
+        lattice_cart = 'aadsfadsf'
+        self.assertEqual(cell.lattice_cart, lat_tup)
+        self.assertEqual(cell.lattice_abc, ((10, 10, 10), (90, 90, 90)))
+        self.assertEqual(cell.volume, 1000)
+
+    def test_abc_init(self):
+        lattice_abc = [[2, 3, 4], [60, 60, 60]]
+        lat_tup = tuple(tuple(elem) for elem in lattice_abc)
+        cell = UnitCell(lattice_abc)
+        self.assertAlmostEqual(cell.lattice_abc, lat_tup)
+        cell.lengths = [10, 10, 10]
+        self.assertEqual(cell.lattice_abc, ((10, 10, 10), (60, 60, 60)))
+        cell.angles = [90, 90, 90]
+        self.assertEqual(cell.lattice_abc, ((10, 10, 10), (90, 90, 90)))
+        lattice_cart = ((10, 0, 0), (0, 10, 0), (0, 0, 10))
+        self.assertEqual(cell.lattice_cart, lattice_cart)
 
 
 class CrystalTest(unittest.TestCase):
