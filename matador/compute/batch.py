@@ -23,11 +23,12 @@ from matador.compute.errors import InputError, CalculationError, MaxMemoryEstima
 class BatchRun:
     """ A class that implements the running of multiple generic jobs on
     a series of files without collisions with other nodes using the
-    FullRelaxer class. Jobs that have started are listed in jobs.txt,
-    failed jobs are moved to bad_castep, completed jobs are moved to
-    completed and listed in finished_cleanly.txt.
+    FullRelaxer class. Jobs that have been started are listed in
+    `jobs.txt`, failed jobs are moved to `bad_castep/`, completed jobs
+    are moved to `completed/`.
 
-    Based on run.pl, run2.pl and PyAIRSS class CastepRunner.
+    Interface initially inspired by on run.pl, run2.pl and PyAIRSS class
+    CastepRunner.
 
     """
 

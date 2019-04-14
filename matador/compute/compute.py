@@ -492,9 +492,9 @@ class ComputeTask:
 
                 while self._process.poll() is None:
                     proc_elapsed = time.time() - proc_clock
-                    if proc_elapsed > 2*self.polltime:
-                        # if no CASTEP file made within 2*polltime (e.g. 60 seconds), then raise error
-                        # or if the file has not been written to in the last 60 seconds
+                    if proc_elapsed > 3*self.polltime:
+                        # if no CASTEP file made within 3 poll times, or if this process
+                        # hasn't written to it, then raise error
                         if not os.path.isfile(seed + '.castep'):
                             msg = ('CASTEP file was not created, please check your executable: {}.'
                                    .format(self.executable))
