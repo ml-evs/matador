@@ -1,9 +1,8 @@
 # coding: utf-8
 # Distributed under the terms of the MIT license.
 
-""" This file implements the Spectrum class and it children, used for
-storing collections of electronic and vibrational reciprocal space
-spectra, with or without projector_weights.
+""" This file implements classes to store and manipulate electronic and
+vibrational reciprocal space spectra, with or without projection data.
 
 """
 
@@ -12,15 +11,6 @@ from matador.utils.cell_utils import real2recip, frac2cart
 from matador.orm.orm import DataContainer
 
 EPS = 1e-6
-
-
-class Spectrum:
-    """ Container object for different types of electronic and vibrational
-    spectra, e.g. DOS and dispersion.
-
-    """
-    def __init__(self):
-        raise NotImplementedError
 
 
 class DensityOfStates(DataContainer):
