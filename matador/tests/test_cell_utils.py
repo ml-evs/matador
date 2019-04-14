@@ -6,7 +6,7 @@ from matador.utils.cell_utils import abc2cart, cart2abc, cart2volume, create_sim
 from matador.utils.cell_utils import cart2frac, frac2cart
 from matador.utils.cell_utils import doc2spg, cart2abcstar, real2recip
 from matador.scrapers.castep_scrapers import castep2dict, res2dict, cell2dict, bands2dict
-from matador.similarity.pdf_similarity import PDF, PDFOverlap
+from matador.fingerprints.pdf import PDF, PDFOverlap
 from matador.export import doc2cell
 
 VERBOSITY = 0

@@ -1,8 +1,8 @@
 # coding: utf-8
 # Distributed under the terms of the MIT License.
 
-""" This file defines PDF and PDFOverlap as ways of calculating
-the similarity between two structures.
+""" This submodule defines classes for computing, combining
+and convolving pair distribution functions.
 
 """
 
@@ -18,7 +18,7 @@ import numba
 
 from matador.utils.cell_utils import frac2cart, cart2volume
 from matador.utils.cell_utils import standardize_doc_cell
-from matador.similarity.fingerprint import Fingerprint, FingerprintFactory
+from matador.fingerprints.fingerprint import Fingerprint, FingerprintFactory
 
 
 class PDF(Fingerprint):
@@ -31,8 +31,10 @@ class PDF(Fingerprint):
         dr (float): real-space grid spacing in Å
         rmax (float): extent of real-space grid in Å
         label (str): structure label
-        elem_gr (dict): dict with pairs of element symbol keys, containing 1-D arrays of projected PDFs (if calculated)
-        number_density (float): number density for renormalisation and comparison with other PDFs
+        elem_gr (dict): dict with pairs of element symbol keys,
+            containing 1-D arrays of projected PDFs (if calculated)
+        number_density (float): number density for renormalisation and
+            comparison with other PDFs
         kwargs (dict): arguments used to create PDF
 
     """

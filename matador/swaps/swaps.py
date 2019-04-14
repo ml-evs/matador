@@ -49,7 +49,7 @@ class AtomicSwapper:
             print_warning('No swaps performed.')
 
         if self.args.get('uniq'):
-            from matador.similarity.similarity import get_uniq_cursor
+            from matador.fingerprints.similarity import get_uniq_cursor
             print('Filtering for unique structures...')
             unique_set, _, _, _ = get_uniq_cursor(self.cursor,
                                                   debug=self.args.get('debug'),

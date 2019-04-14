@@ -10,7 +10,7 @@ manipulation and analysis of the lattice.
 from copy import deepcopy
 from matador.utils import cell_utils
 from matador.orm.orm import DataContainer
-from matador.similarity.pdf_similarity import PDF
+from matador.fingerprints.pdf import PDF
 from matador.crystal.crystal_site import Site
 from matador.utils.chem_utils import get_concentration
 
@@ -388,7 +388,7 @@ class Crystal(DataContainer):
     @property
     def unique_sites(self):
         """ Return unique sites using Voronoi decomposition. """
-        from matador.similarity.voronoi_similarity import get_unique_sites
+        from matador.plugins.voronoi_interface.voronoi_similarity import get_unique_sites
         get_unique_sites(self._data)
         return self._data['similar_sites']
 

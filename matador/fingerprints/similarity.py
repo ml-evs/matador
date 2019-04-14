@@ -1,9 +1,13 @@
 # coding: utf-8
-""" This file implements the general wrapper to
-structural similarity metrics.
+# Distributed under the terms of the MIT License.
+
+""" This submodule implements filtering based on Fingerprint objects,
+although only PDF has been implemented so far.
+
 """
+
 # matador modules
-from matador.similarity.pdf_similarity import PDF, PDFFactory
+from matador.fingerprints.pdf import PDF, PDFFactory
 from matador.utils.cursor_utils import get_array_from_cursor, get_guess_doc_provenance
 # external libraries
 import numpy as np

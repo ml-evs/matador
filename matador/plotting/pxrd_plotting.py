@@ -3,12 +3,12 @@
 
 """ This file implements plotting routines specifically
 for the PXRD objects defined in the
-matador.similarity.pxrd module.
+matador.fingerprints.pxrd module.
 
 """
 
 
-from matador.similarity.pxrd import PXRD
+from matador.fingerprints.pxrd import PXRD
 from matador.plotting.plotting import plotting_function
 
 
@@ -17,7 +17,7 @@ def plot_pxrd(pxrds, two_theta_range=(10, 70), figsize=None):
     """ Plot PXRD or PXRDs.
 
     Parameters:
-        pxrds (list or matador.similarity.pxrd.PXRD): the PXRD
+        pxrds (list or matador.fingerprints.pxrd.PXRD): the PXRD
             or list of PXRDs to plot.
 
     Keyword arguments:

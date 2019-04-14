@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import unittest
-from matador.similarity.pdf_similarity import PDF, PDFOverlap, PDFFactory
+from matador.fingerprints.pdf import PDF, PDFOverlap, PDFFactory
 from matador.scrapers.castep_scrapers import res2dict
 from matador.utils.cell_utils import abc2cart, cart2volume
 import numpy as np

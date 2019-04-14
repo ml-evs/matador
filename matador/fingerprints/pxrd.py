@@ -10,7 +10,7 @@ import copy
 import os
 import numpy as np
 
-from matador.similarity.fingerprint import Fingerprint, FingerprintFactory
+from matador.fingerprints.fingerprint import Fingerprint, FingerprintFactory
 from matador.utils.cell_utils import frac2cart, standardize_doc_cell
 from matador.utils.chem_utils import get_formula_from_stoich
 

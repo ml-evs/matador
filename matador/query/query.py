@@ -126,7 +126,7 @@ class DBQuery:
             if not self._create_hull:
                 # only filter for uniqueness if not eventually making a hull
                 if self.args.get('uniq'):
-                    from matador.similarity.similarity import get_uniq_cursor
+                    from matador.fingerprints.similarity import get_uniq_cursor
                     print_notify('Filtering for unique structures...')
                     if self.args.get('top') is not None:
                         top = self.top

@@ -3,12 +3,12 @@
 
 """ This file implements plotting routines specifically
 for the PDF and PDFOverlap objects defined in the
-matador.similarity.pdf_similarity module.
+matador.fingerprints.pdf module.
 
 """
 
 
-from matador.similarity.pdf_similarity import PDF
+from matador.fingerprints.pdf import PDF
 from matador.plotting.plotting import plotting_function
 
 
@@ -17,7 +17,7 @@ def plot_pdf(pdf, other_pdfs=None):
     """ Plot PDFs.
 
     Parameters:
-        pdf (matador.similarity.pdf_similarity.PDF): the main PDF to plot.
+        pdf (matador.fingerprints.pdf.PDF): the main PDF to plot.
 
     Keyword arguments:
         other_pdfs (list of PDF): other PDFs to add to the plot.
@@ -48,7 +48,7 @@ def plot_projected_pdf(pdf, keys=None, other_pdfs=None, vlines=None):
     """ Plot projected PDFs.
 
     Parameters:
-        pdf (matador.similarity.pdf_similarity.PDF): the main PDF to plot.
+        pdf (matador.fingerprints.pdf.PDF): the main PDF to plot.
 
     Keyword arguments:
         keys (list): plot only a subset of projections, e.g. [('K', )].
@@ -91,7 +91,7 @@ def plot_diff_overlap(pdf_overlap):
     """ Simple plot for comparing two PDFs.
 
     Parameters:
-        pdf_overlap (matador.similarity.pdf_similarity.PDFOverlap): the
+        pdf_overlap (matador.fingerprints.pdf.PDFOverlap): the
         overlap object to plot.
 
     """
@@ -128,7 +128,7 @@ def plot_projected_diff_overlap(pdf_overlap):
     """ Simple plot for comparing two PDFs.
 
     Parameters:
-        pdf_overlap (matador.similarity.pdf_similarity.PDFOverlap): the
+        pdf_overlap (matador.fingerprints.pdf.PDFOverlap): the
             overlap object to plot.
 
     """

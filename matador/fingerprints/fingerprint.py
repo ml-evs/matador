@@ -25,6 +25,7 @@ class Fingerprint(abc.ABC):
 
     fingerprint = None
     default_key = None
+
     @abc.abstractmethod
     def __init__(self, doc, lazy=True, *args, **kwargs):
         pass
@@ -35,7 +36,6 @@ class Fingerprint(abc.ABC):
 
     # TODO: wrap these broadening methods with heuristics to decide which to use
     # TODO: Lorentzian broadening as an option
-
     @staticmethod
     @numba.njit
     def _broadening_space_dominated(distances, r_space, gaussian_width):

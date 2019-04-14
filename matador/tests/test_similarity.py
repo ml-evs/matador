@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import unittest
-from matador.similarity.similarity import get_uniq_cursor
+from matador.fingerprints.similarity import get_uniq_cursor
 from matador.utils.cell_utils import cart2volume, abc2cart
 from matador.scrapers.castep_scrapers import res2dict
 from os.path import realpath

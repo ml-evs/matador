@@ -797,6 +797,15 @@ class ComputeTest(unittest.TestCase):
             except InputError:
                 errors[ind] = True
 
+        for path in PATHS_TO_DEL:
+            if os.path.isdir(path):
+                files = glob.glob(path + '/*')
+                for file in files:
+                    os.remove(file)
+                os.removedirs(path)
+
+        _ = [os.remove(txt) for txt in glob.glob('*.txt')]
+
         os.chdir(ROOT_DIR)
         self.assertTrue(all(errors))
 

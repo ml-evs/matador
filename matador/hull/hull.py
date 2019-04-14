@@ -171,7 +171,7 @@ class QueryConvexHull:
             self.plot_hull(**self.args['plot_kwargs'], debug=self.args.get('debug'))
 
         if self.args.get('uniq') and self.args['subcmd'] != 'swaps':
-            from matador.similarity.similarity import get_uniq_cursor
+            from matador.fingerprints.similarity import get_uniq_cursor
             if self.args.get('uniq') is True:
                 sim_tol = 0.1
             else:

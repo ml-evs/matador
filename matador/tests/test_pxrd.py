@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import unittest
-from matador.similarity.pxrd import PXRD, PXRDFactory
+from matador.fingerprints.pxrd import PXRD, PXRDFactory
 from matador.scrapers.castep_scrapers import res2dict
 import numpy as np
 from os.path import realpath
