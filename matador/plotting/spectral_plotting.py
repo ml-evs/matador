@@ -11,7 +11,7 @@ import os
 import numpy as np
 from matador.utils.viz_utils import get_element_colours
 from matador.plotting.plotting import plotting_function
-from matador.scrapers import optados2dict, phonon2dict, bands2dict
+from matador.scrapers import optados2dict, phonon2dict, bands2dict, phonon_dos2dict
 from matador.scrapers import cell2dict, res2dict
 from matador.orm.spectral import ElectronicDispersion, VibrationalDispersion
 
@@ -306,7 +306,7 @@ def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
         ylabel = r'Energy (eV)'
     ax_dispersion.set_ylabel(ylabel)
     ax_dispersion.set_xlim(0, 1)
-    _add_path_labels(seed, dispersion, ax_dispersion, path, seed_ind, kwargs)
+    _add_path_labels(seed, dispersion, ax_dispersion, path, 0, kwargs)
 
     return ax_dispersion
 
@@ -341,15 +341,16 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                 else:
                     dos_seed = kwargs.get('dos')
 
+                # If bands_dos exists, do some manual broadening:
+                # .bands_dos is a file written by run3 when doing a
+                # full spectral calculation, it is simply the .bands
+                # file output from a DOS calculation
                 if dos_seed.endswith('.bands_dos'):
-                    # if bands_dos exists, do some manual broadening
                     dos_data, s = bands2dict(dos_seed)
-                    raw_weights = []
-                    space_size = 1000
-                    gaussian_width = kwargs.get('gaussian_width')
-                    if gaussian_width is None:
-                        gaussian_width = 0.1
 
+                    gaussian_width = kwargs.get('gaussian_width', 0.1)
+
+                    raw_weights = []
                     raw_eigenvalues = []
                     for kind, qpt in enumerate(dos_data['eigenvalues_k_s']):
                         weight = dos_data['kpoint_weights'][kind]
@@ -357,16 +358,11 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                             raw_weights.append(weight)
                             raw_eigenvalues.append(eig)
                     raw_eigenvalues = np.asarray(raw_eigenvalues)
-                    hist, energies = np.histogram(raw_eigenvalues, bins=space_size)
-                    # shift bin edges to bin centres
-                    energies -= energies[1] - energies[0]
-                    energies = energies[:-1]
-                    new_energies = np.reshape(energies, (1, len(energies)))
-                    new_energies = new_energies - np.reshape(energies, (1, len(energies))).T
-                    dos = np.sum(hist * np.exp(-(new_energies)**2 / gaussian_width), axis=1)
-                    dos = np.divide(dos, np.sqrt(2 * np.pi * gaussian_width**2))
-                    dos_data['dos'] = dos
-                    dos_data['energies'] = energies
+                    raw_weights = np.asarray(raw_weights)
+
+                    dos_data['dos'], dos_data['energies'] = _cheap_broaden(raw_weights,
+                                                                           raw_eigenvalues,
+                                                                           gaussian_width=gaussian_width)
                 else:
                     dos_data, s = optados2dict(dos_seed, verbosity=0)
 
@@ -383,7 +379,8 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                     max_density = max(np.max(np.abs(dos_data['spin_dos']['down'][np.where(energies > kwargs['plot_window'][0])])),
                                       np.max(np.abs(dos_data['spin_dos']['up'][np.where(energies > kwargs['plot_window'][0])])))
                 else:
-                    max_density = np.max(dos[np.where(np.logical_and(energies < kwargs['plot_window'][1], energies > kwargs['plot_window'][0]))])
+                    max_density = np.max(dos[np.where(np.logical_and(energies < kwargs['plot_window'][1],
+                                                      energies > kwargs['plot_window'][0]))])
 
                 if kwargs['plot_pdos']:
                     pdos_seed = '{}.pdos.dat'.format(seed)
@@ -395,67 +392,30 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                         dos_data['pdos'] = pdos_data
             else:
                 if not os.path.isfile(seed + '.phonon_dos'):
+                    # if no phonon_dos file exists, we can calculate the DOS with some broadening
                     phonon_data, s = phonon2dict(seed + '.phonon')
                     if not s:
                         raise RuntimeError(phonon_data)
                     else:
                         if kwargs['plot_window'] is None:
                             kwargs['plot_window'] = [min(-10, np.min(phonon_data['eigenvalues_q']) - 10), np.max(phonon_data['eigenvalues_q'])]
-                        space_size = 1000
-                        gaussian_width = kwargs.get('gaussian_width', 100)
-                        raw_weights = []
-                        raw_eigenvalues = []
-                        for qind, qpt in enumerate(phonon_data['eigenvalues_q']):
-                            weight = phonon_data['qpoint_weights'][qind]
-                            for eig in qpt:
-                                raw_weights.append(weight)
-                                raw_eigenvalues.append(eig)
-                        hist, energies = np.histogram(raw_eigenvalues, weights=raw_weights, bins=space_size)
-                        # shift bin edges to bin centres
-                        energies -= energies[1] - energies[0]
-                        energies = energies[:-1]
-                        new_energies = np.reshape(energies, (1, len(energies)))
-                        new_energies -= np.reshape(energies, (1, len(energies))).T
-                        dos = np.sum(hist * np.exp(-(new_energies)**2 / gaussian_width), axis=1)
-                        dos = np.divide(dos, np.sqrt(2 * np.pi * gaussian_width**2))
-                        max_density = np.max(dos)
+
                         phonon_data['freq_unit'] = phonon_data['freq_unit'].replace('-1', '$^{-1}$')
                         ax_dos.axvline(phonon_data['softest_mode_freq'], ls='--', c='r',
                                        label=(r'$\omega_\mathrm{{min}} = {:5.3f}$ {}'
                                               .format(phonon_data['softest_mode_freq'],
                                                       phonon_data['freq_unit'])))
                 else:
-                    with open(seed + '.phonon_dos', 'r') as f:
-                        flines = f.readlines()
-                    for ind, line in enumerate(flines):
-                        if 'begin dos' in line.lower():
-                            projector_labels = line.split()[5:]
-                            projector_labels = [(label, None) for label in projector_labels]
-                            begin = ind + 1
-                            break
-                    data_flines = flines[begin:-1]
-                    with open(seed + '.phonon_dos_tmp', 'w') as f:
-                        for line in data_flines:
-                            f.write(line + '\n')
-                    raw_data = np.loadtxt(seed + '.phonon_dos_tmp')
-                    energies = raw_data[:, 0]
-                    dos = raw_data[:, 1]
-                    dos_data = {}
-                    dos_data['dos'] = dos
-                    max_density = np.max(dos)
-                    dos_data['energies'] = energies
+                    # otherwise, just read the phonon_dos file
+                    dos_data, s = phonon_dos2dict(seed + '.phonon_dos')
+                    dos = dos_data['dos']
+                    energies = dos_data['energies']
+                    max_density = np.max(dos_data['dos'])
                     if kwargs['plot_window'] is None:
-                        kwargs['plot_window'] = [np.min(energies[np.where(dos > 1e-3)]) - 10, np.max(energies[np.where(dos > 1e-3)])]
-
+                        kwargs['plot_window'] = [np.min(energies[np.where(dos_data['dos'] > 1e-3)]) - 10,
+                                                 np.max(energies[np.where(dos_data['dos'] > 1e-3)])]
                     if kwargs['plot_pdos']:
-                        dos_data['pdos'] = dict()
-                        for i, label in enumerate(projector_labels):
-                            dos_data['pdos'][label] = raw_data[:, i + 2]
-                        pdos = dos_data['pdos']
                         pdos_data = dos_data
-
-                    from os import remove
-                    remove(seed + '.phonon_dos_tmp')
 
             if kwargs['phonons']:
                 ylabel = 'Phonon DOS'
@@ -629,6 +589,37 @@ def projected_bandstructure_plot(dispersion, ax, path, bbox_extra_artists, inter
         bbox_extra_artists.append(legend)
 
     return ax
+
+
+def _cheap_broaden(eigs, weights=None, gaussian_width=None):
+    """ Quickly broaden and bin a set of eigenvalues.
+
+    Parameters:
+        eigs (numpy.ndarray): eigenvalue array.
+        weights (numpy.ndarray): array of weights.
+
+    Keyword arguments:
+        gaussian_width (float): width of gaussian broadening
+            to apply.
+
+    Returns:
+        Two arrays containing the DOS and energies.
+
+    """
+    if gaussian_width is None:
+        gaussian_width = 0.1
+
+    hist, energies = np.histogram(eigs, weights=weights, bins=501)
+
+    # shift bin edges to bin centres
+    energies -= energies[1] - energies[0]
+    energies = energies[:-1]
+    new_energies = np.reshape(energies, (1, len(energies)))
+    new_energies = new_energies - np.reshape(energies, (1, len(energies))).T
+    dos = np.sum(hist * np.exp(-(new_energies)**2 / gaussian_width), axis=1)
+    dos = np.divide(dos, np.sqrt(2 * np.pi * gaussian_width**2))
+
+    return dos, energies
 
 
 def _ordered_scatter(path, eigs, pdis, branches, ax=None, colours=None, interpolation_factor=2, point_scale=25):

@@ -912,6 +912,40 @@ def phonon2dict(seed, **kwargs):
     return ph, True
 
 
+@scraper_function
+def phonon_dos2dict(seed, **kwargs):
+    """ Parse a CASTEP phonon_dos file into a dictionary.
+
+    Parameters:
+        seed (str/list): phonon_dos filename or list of filenames.
+
+    Returns:
+        (tuple): containing either dict/str containing data or error, and a bool stating
+            if the scrape was successful.
+
+    """
+    with open(seed, 'r') as f:
+        flines = f.readlines()
+    for ind, line in enumerate(flines):
+        if 'begin dos' in line.lower():
+            projector_labels = line.split()[5:]
+            projector_labels = [(label, None) for label in projector_labels]
+            begin = ind + 1
+
+    dos_data = {}
+    # remove header and "END"
+    flines = flines[begin:-1]
+    raw_data = np.genfromtxt(flines)
+    dos_data['energies'] = raw_data[:, 0]
+    dos_data['dos'] = raw_data[:, 1]
+    dos_data['pdos'] = dict()
+
+    for i, label in enumerate(projector_labels):
+        dos_data['pdos'][label] = raw_data[:, i + 2]
+
+    return dos_data, True
+
+
 def usp2dict(seed, **kwargs):
     """ Extract pseudopotential string from a CASTEP
     OTF .USP file.

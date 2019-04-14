@@ -28,16 +28,17 @@ class SpectralPlotTests(unittest.TestCase):
         sys.argv = ['dispersion', 'K3P-OQMD_4786-CollCode25550', '--png',
                     '-scale', '10', '-interp', '2', '-pw', '-5', '5', '--gap',
                     '--preserve_kspace_distance', '--figsize', '10', '10']
-        error = False
+        errored = False
         try:
             matador.cli.dispersion.main()
         except Exception as exc:
+            errored = True
             error = exc
         file_exists = os.path.isfile(expected_file)
         if file_exists:
             os.remove(expected_file)
         os.chdir(ROOT_DIR)
-        if error:
+        if errored:
             raise error
         self.assertTrue(file_exists)
 
@@ -50,17 +51,17 @@ class SpectralPlotTests(unittest.TestCase):
         sys.argv = ['dispersion', 'K3P-OQMD_4786-CollCode25550', '--png',
                     '--dos_only',
                     '--figsize', '10', '10']
-        error = False
+        errored = False
         try:
             matador.cli.dispersion.main()
         except Exception as exc:
+            errored = True
             error = exc
-            pass
         file_exists = os.path.isfile(expected_file)
         if file_exists:
             os.remove(expected_file)
         os.chdir(ROOT_DIR)
-        if error:
+        if errored:
             raise error
         self.assertTrue(file_exists)
 
@@ -73,16 +74,17 @@ class SpectralPlotTests(unittest.TestCase):
                     '--png',
                     '--labels', 'PBE, LDA',
                     '--figsize', '10', '10']
-        error = False
+        errored = False
         try:
             matador.cli.dispersion.main()
         except Exception as exc:
+            errored = True
             error = exc
         file_exists = os.path.isfile(expected_file)
         if file_exists:
             os.remove(expected_file)
         os.chdir(ROOT_DIR)
-        if error:
+        if errored:
             raise error
         self.assertTrue(file_exists)
 
@@ -92,33 +94,35 @@ class SpectralPlotTests(unittest.TestCase):
         sys.argv = ['dispersion', 'K3P-OQMD_4786-CollCode25550',
                     '--dos_only', '--cmap', 'viridis',
                     '--figsize', '10', '10']
-        error = False
+        errored = False
         try:
             matador.cli.dispersion.main()
         except Exception as exc:
+            errored = True
             error = exc
         os.chdir(ROOT_DIR)
-        if error:
+        if errored:
             raise error
 
-    def test_phonon(self):
+    def test_phonon_dispersion(self):
         """ Test phonon dispersion plot. """
-        os.chdir(REAL_PATH + '/data')
-        expected_file = 'K8SnP4_spectral.png'
+        os.chdir(REAL_PATH + '/data/phonon_dispersion')
+        expected_file = 'K3P_spectral.png'
         if os.path.isfile(expected_file):
             os.remove(expected_file)
-        sys.argv = ['dispersion', 'K8SnP4', '--png', '-ph', '--band_colour', 'k',
+        sys.argv = ['dispersion', 'K3P', '--png', '-ph', '--band_colour', 'k',
                     '--figsize', '10', '10']
-        error = False
+        errored = False
         try:
             matador.cli.dispersion.main()
         except Exception as exc:
+            errored = True
             error = exc
         file_exists = os.path.isfile(expected_file)
         if file_exists:
             os.remove(expected_file)
         os.chdir(ROOT_DIR)
-        if error:
+        if errored:
             raise error
         self.assertTrue(file_exists)
 
@@ -183,6 +187,7 @@ class HullPlotTests(unittest.TestCase):
                 os.remove(expected_file)
 
         cursor, s = castep2dict(REAL_PATH + 'data/beef_files/*.castep', db=False)
+        self.assertEqual(len(s), 0)
 
         beef_hull = EnsembleHull(cursor, '_beef',
                                  elements=['K', 'P'],

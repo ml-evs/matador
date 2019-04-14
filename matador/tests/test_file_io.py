@@ -7,7 +7,7 @@ import glob
 import numpy as np
 
 from matador.scrapers import castep2dict, res2dict, cell2dict
-from matador.scrapers import cif2dict, param2dict, phonon2dict, optados2dict
+from matador.scrapers import cif2dict, param2dict, phonon2dict, optados2dict, phonon_dos2dict
 from matador.scrapers import arbitrary2dict, bands2dict, pwout2dict, magres2dict
 from matador.scrapers.castep_scrapers import usp2dict, get_seed_metadata
 from matador.export import doc2res, doc2param, doc2cell
@@ -582,6 +582,19 @@ class ScraperMiscTest(unittest.TestCase):
             self.assertEqual(ph_dict['kpoint_branches'][1][-1], 76)
             self.assertEqual(ph_dict['kpoint_branches'][-1][0], 77)
             self.assertEqual(ph_dict['kpoint_branches'][-1][-1], 109)
+
+    def test_phonon_dos_scraper(self):
+        phonon_fname = REAL_PATH + 'data/phonon_dispersion/K3P.phonon_dos'
+        self.assertTrue(os.path.isfile(phonon_fname), msg='Failed to open test case {} - please check installation.'.format(phonon_fname))
+        dos_data, s = phonon_dos2dict(phonon_fname)
+        self.assertTrue(s)
+        self.assertEqual(len(dos_data['dos']), 10001)
+        self.assertEqual(len(dos_data['energies']), 10001)
+        self.assertEqual(len(dos_data['pdos']), 2)
+        print(dos_data['pdos'].keys())
+        self.assertEqual(len(dos_data['pdos'][('K', None)]), 10001)
+        self.assertEqual(len(dos_data['pdos'][('P', None)]), 10001)
+
 
     def test_optados_dos_scraper(self):
         odo_fname = REAL_PATH + 'data/optados_files/K3P.adaptive.dat'
