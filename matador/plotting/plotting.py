@@ -43,13 +43,25 @@ def plotting_function(function):
         try:
             import matplotlib.pyplot as plt
             style = settings.get('plotting', {}).get('default_style')
-            if style is None or style == 'matador':
-                style = '/'.join(__file__.split('/')[:-1]) + '/../config/matador.mplstyle'
-            plt.style.use(style)
+            if kwargs.get('style'):
+                style = kwargs['style']
+            if style is not None and not isinstance(style, list):
+                style = [style]
+            if style is None:
+                style = ['matador']
+            if 'matador' in style:
+                for ind, styles in enumerate(style):
+                    if styles == 'matador':
+                        style[ind] = '/'.join(__file__.split('/')[:-1]) + '/../config/matador.mplstyle'
+
             if kwargs.get('debug'):
                 print('Using style {}'.format(style))
                 print(plt.rcParams)
-            result = function(*args, **kwargs)
+
+            # now actually call the function
+            with plt.style.context(style):
+                result = function(*args, **kwargs)
+
         except TclError as exc:
             print_failure('Caught exception: {}'.format(type(exc).__name__))
             print_warning('Error message was: {}'.format(exc))
