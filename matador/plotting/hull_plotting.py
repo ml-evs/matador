@@ -407,7 +407,7 @@ def plot_ternary_hull(hull, axis=None, show=False, plot_points=True, hull_cutoff
     ticks = [float(val) for val in np.linspace(0, 1, 6)]
     ax.ticks(axis='lbr', linewidth=1, offset=0.02, fontsize=fontsize-2, locations=ticks,
              ticks=ticks, tick_formats='%.1f')
-    ax.set_title('-'.join(['({})'.format(label) for label in chempot_labels]), fontsize=fontsize + 2, y=1.02)
+    ax.set_title('-'.join(['{}'.format(label) for label in chempot_labels]), fontsize=fontsize + 2, y=1.02)
     ax.left_axis_label(chempot_labels[2], fontsize=fontsize + 2)
     ax.right_axis_label(chempot_labels[1], fontsize=fontsize + 2)
     ax.bottom_axis_label(chempot_labels[0], fontsize=fontsize + 2)
