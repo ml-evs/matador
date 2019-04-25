@@ -7,7 +7,7 @@ with the compute module.
 """
 
 import os
-from matador.calculators.calculators import Calculator
+from matador.calculators.calculator import Calculator
 from matador.compute.errors import InputError, CalculationError
 
 VALID_PSPOT_LIBS = ['C7', 'C8', 'C9', 'C17', 'C18', 'MS', 'HARD',

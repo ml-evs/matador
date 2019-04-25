@@ -9,7 +9,7 @@ https://wiki.fysik.dtu.dk/ase/ase/calculators/calculators.html
 
 """
 
-from matador.calculators.calculators import Calculator
+from matador.calculators.calculator import Calculator
 
 
 class ASECalculator(Calculator):
