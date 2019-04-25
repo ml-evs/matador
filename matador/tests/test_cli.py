@@ -61,6 +61,12 @@ class IntegrationTest(unittest.TestCase):
         self.assertEqual(len(manifest_flines), 0, msg='Failed to report successes correctly')
         self.assertEqual(len(query.cursor), 3, msg='Failed to import structures correctly')
 
+        query, files_to_delete, err_flines, manifest_flines = import_castep(extra_flags='--recent_only')
+        self.assertEqual(len(files_to_delete), 2, msg='Failed to write spatula files')
+        self.assertEqual(len(err_flines), 5, msg='Failed to report errors correctly')
+        self.assertEqual(len(manifest_flines), 0, msg='Failed to report successes correctly')
+        self.assertEqual(len(query.cursor), 3, msg='Failed to import structures correctly')
+
         query_1, query_2, files_to_delete = import_res()
         self.assertEqual(len(query_1.cursor), 7, msg='Failed to import res files')
         self.assertEqual(len(query_2.cursor), 4, msg='Failed to import res files')
@@ -164,11 +170,11 @@ class IntegrationTest(unittest.TestCase):
         self.assertTrue(coll_name not in MONGO_CLIENT.crystals.list_collection_names())
 
 
-def import_castep():
+def import_castep(extra_flags=None):
     """ Import from castep files, returning data to be checked. """
     # import from CASTEP files only
     os.chdir(REAL_PATH + '/data/castep_files')
-    sys.argv = ['matador', 'import', '--db', DB_NAME]
+    sys.argv = ['matador', 'import', '--force', '--db', DB_NAME]
 
     if CONFIG_FNAME is not None:
         sys.argv += ['--config', CONFIG_FNAME]
@@ -198,7 +204,7 @@ def import_res():
     # import from combined res/cell/param files
     os.chdir(REAL_PATH + '/data/res_files')
 
-    sys.argv = ['matador', 'import', '--db', DB_NAME]
+    sys.argv = ['matador', 'import', '--force', '--db', DB_NAME]
 
     if CONFIG_FNAME is not None:
         sys.argv += ['--config', CONFIG_FNAME]
@@ -223,7 +229,7 @@ def import_res():
 def pseudoternary_hull():
     """ Import some other res files ready to make a hull. """
     os.chdir(REAL_PATH + '/data/hull-LLZO')
-    sys.argv = ['matador', 'import', '--db', DB_NAME]
+    sys.argv = ['matador', 'import', '--force', '--db', DB_NAME]
 
     if CONFIG_FNAME is not None:
         sys.argv += ['--config', CONFIG_FNAME]

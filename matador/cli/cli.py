@@ -419,8 +419,10 @@ def main(override=False):
     import_flags.add_argument('-v', '--verbosity', action='count', help='enable verbose output')
     import_flags.add_argument('-f', '--force', action='store_true', help='override main database protection')
     import_flags.add_argument('-t', '--tags', nargs='+', type=str, help='set user tags, e.g. nanotube, project name')
+    import_flags.add_argument('--recent_only', action='store_true', help='sort files by creation date (st_ctime) and '
+                              'stop importing after a duplicate is found in the database.')
     import_flags.add_argument('-s', '--scan', action='store_true',
-                              help='only scan the database for new structures, do not dictify')
+                              help='only scan the database for new structures, do not import new structures')
     import_flags.add_argument('-p', '--prototype', action='store_true',
                               help='create a database of prototype structures that contain no DFT calculations')
 

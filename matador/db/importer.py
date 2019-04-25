@@ -19,6 +19,7 @@ from matador.scrapers.castep_scrapers import castep2dict, param2dict, cell2dict
 from matador.scrapers.castep_scrapers import res2dict
 from matador.utils.cell_utils import calc_mp_spacing
 from matador.utils.chem_utils import get_root_source
+from matador.utils.cursor_utils import recursive_get
 from matador.db import make_connection_to_collection
 from matador.config import load_custom_settings
 from matador import __version__
@@ -31,20 +32,55 @@ class Spatula:
 
     Files types that can be read are:
 
-        * CASTEP output
-        * CASTEP .param, .cell input
-        * SHELX (from airss.pl / pyAIRSS) .res output
+        * CASTEP `.castep` output
+        * SHELX (from airss.pl / pyAIRSS) `.res` output
+        * CASTEP `.param`, `.cell` input
+
+    This class will recursively scan directories from the cwd to
+    find the files types above. Base filenames will be matched
+    to prevent duplication of data from e.g. `.castep` and `.res`
+    files. The following directory structures are recommended:
+
+    - One `.res` file per structure and template `.cell` and
+    `.param` files that provide all CASTEP parameters that structures
+    in this folder were ran at.
+
+    - One `.castep` file per structure, containing all information. If
+    pseudopotential information is not present in the CASTEP file, this
+    class will check for the corresponding `.usp` files and try to scrape
+    those.
 
     """
     def __init__(self, *args):
-        """ Set up arguments and initialise DB client. """
+        """ Set up arguments and initialise DB client.
+
+        Notes:
+            Several arguments can be passed to this class from the command-line,
+            and here are interpreted through *args:
+
+        Parameters:
+            db (str): the name of the collection to import to.
+            scan (bool): whether or not to just scan the directory, rather
+                than importing (automatically sets dryrun to true).
+            dryrun (bool): perform whole process, up to actually importing to
+                the database.
+            tags (str): apply this tag to each structure added to database.
+            force (bool): override rules about which folders can be imported
+                into main database.
+            recent_only (bool): if true, sort file lists by modification
+                date and stop scanning when a file that already exists in
+                database is found.
+
+        """
+
         self.args = args[0]
         self.dryrun = self.args['dryrun']
         self.scan = self.args['scan']
+        self.recent_only = self.args['recent_only']
         if self.scan:
             self.dryrun = True
         self.debug = self.args['debug']
-        self.verbosity = self.args['verbosity'] if self.args['verbosity'] is not None else 0
+        self.verbosity = self.args['verbosity'] or 0
         self.config_fname = self.args.get('config')
         self.tags = self.args['tags']
         self.prototype = self.args['prototype']
@@ -68,14 +104,14 @@ class Spatula:
                 mdate = str(mdate).split()[0]
                 os.rename(manifest_name, manifest_name + '.' + str(mdate).split()[0])
 
-            wordfile = open(os.path.dirname(os.path.realpath(__file__)) + '/../scrapers/words', 'r')
-            nounfile = open(os.path.dirname(os.path.realpath(__file__)) + '/../scrapers/nouns', 'r')
-            self.wlines = wordfile.readlines()
+            base = os.path.dirname(os.path.realpath(__file__))
+            with open(base + '/../scrapers/words', 'r') as f:
+                self.wlines = f.readlines()
+            with open(base + '/../scrapers/nouns', 'r') as f:
+                self.nlines = f.readlines()
+
             self.num_words = len(self.wlines)
-            self.nlines = nounfile.readlines()
             self.num_nouns = len(self.nlines)
-            wordfile.close()
-            nounfile.close()
 
         elif not self.scan:
             logfile_name = 'spatula.err.dryrun'
@@ -85,7 +121,10 @@ class Spatula:
             self.logfile = open(logfile_name, 'w')
             self.manifest = open(manifest_name, 'w')
 
-        self.settings = load_custom_settings(config_fname=self.config_fname, debug=self.debug, override=self.args.get('override'))
+        self.settings = load_custom_settings(config_fname=self.config_fname,
+                                             debug=self.debug,
+                                             override=self.args.get('override'))
+
         result = make_connection_to_collection(self.args.get('db'),
                                                check_collection=False,
                                                import_mode=True,
@@ -97,11 +136,11 @@ class Spatula:
         assert len(self.collections) == 1, 'Can only import to one collection.'
         self.repo = list(self.collections.values())[0]
 
-        if self.args.get('db') is None and not self.dryrun and not self.args.get('force'):
+        if self.args.get('db') and not self.dryrun and not self.args.get('force'):
             # if using default collection, check we are in the correct path
-            if 'mongo' in self.settings and 'default_collection_file_path' in self.settings['mongo']:
-                if not os.getcwd().startswith(
-                        os.path.expanduser(self.settings['mongo']['default_collection_file_path'])):
+            default_file_path = recursive_get(self.settings, ['mongo', 'default_collection_file_path'])
+            if default_file_path is not None:
+                if not os.getcwd().startswith(os.path.expanduser(default_file_path)):
                     import time
                     print('PERMISSION DENIED... and...')
                     time.sleep(3)
@@ -137,12 +176,14 @@ class Spatula:
 
         # scan directory on init
         self.file_lists = self._scan_dir()
+        self.skipped = 0
         # if import, as opposed to rebuild, scan for duplicates and remove from list
         if self.args['subcmd'] == 'import':
-            self.file_lists = self._scan_dupes(self.file_lists)
+            self.file_lists, skipped = self._scan_dupes(self.file_lists)
+            self.skipped += skipped
 
         # print number of files found
-        _display_import(self.file_lists)
+        self._display_import()
 
         # only create dicts if not just scanning
         if not self.scan:
@@ -444,8 +485,7 @@ class Spatula:
                         self.logfile.write(msg)
                         raise RuntimeError(msg)
 
-                    if ('kpoints_mp_spacing' not in final_struct and
-                            'kpoints_mp_grid' in final_struct):
+                    if 'kpoints_mp_spacing' not in final_struct and 'kpoints_mp_grid' in final_struct:
                         final_struct['kpoints_mp_spacing'] = calc_mp_spacing(final_struct['lattice_cart'],
                                                                              final_struct['mp_grid'])
                     final_struct['source'] = struct_dict['source']
@@ -595,13 +635,14 @@ class Spatula:
         structures already in the database by matching sources.
 
         Parameters:
-            file_lists: dictionary of directory names containing file names and
-                filetype counts.
+            file_lists (dict): dict with directory name keys containing
+                file names and filetype counts.
 
         Returns:
             dict: the input dict minus duplicates.
 
         """
+        skipped = 0
         new_file_lists = copy.deepcopy(file_lists)
         for _, root in enumerate(file_lists):
             # per folder delete list
@@ -611,8 +652,13 @@ class Spatula:
             delete_list['res'] = set()
             types = ['castep', 'res']
             for structure_type in types:
-                assert len(set(new_file_lists[root][structure_type])) == len(new_file_lists[root][structure_type])
-                for _, _file in enumerate(new_file_lists[root][structure_type]):
+                if self.recent_only:
+                    try:
+                        new_file_lists[root][structure_type].sort(key=lambda x: os.stat(x).st_ctime)
+                    except Exception:
+                        print('Unable to sort files by creation date, ignoring `recent_only=True`')
+
+                for file_ind, _file in enumerate(new_file_lists[root][structure_type]):
                     # find number of entries with same root filename in database
                     structure_exts = ['.castep', '.res', '.history', '.history.gz']
                     ext = [_ext for _ext in structure_exts if _file.endswith(_ext)]
@@ -622,26 +668,21 @@ class Spatula:
                     for other_ext in structure_exts:
                         structure_count += self.repo.count_documents(
                             {'source': {'$in': [_file.replace(ext, other_ext)]}})
-                    if structure_count > 1 and self.debug:
-                        print('Duplicates', structure_count, _file)
-
-                    # if duplicate found, don't reimport
-                    if structure_count >= 1:
-                        for _type in structure_exts:
-                            if _type.startswith('.'):
-                                _type = _type[1:]
-                            fname_trial = _file.replace(_file.split('.')[-1], _type)
-                            if _type in ['history', 'history.gz']:
-                                list_type = 'castep'
-                            else:
-                                list_type = _type.replace('.', '')
-                            if fname_trial in new_file_lists[root][list_type] and fname_trial not in delete_list[list_type]:
-                                delete_list[list_type].add(fname_trial)
-                                new_file_lists[root][list_type + '_count'] -= 1
 
                     if structure_count > 1:
                         print('Found double in database, this needs to be dealt with manually')
                         print(_file)
+
+                    # if duplicate found, don't reimport
+                    if structure_count >= 1:
+                        # need to loop over possible file types to get correct fname
+                        _add_to_delete_lists(_file, root, new_file_lists, delete_list)
+                        if self.recent_only:
+                            skipping = len(new_file_lists[root][structure_type][file_ind:])
+                            skipped += skipping
+                            for other_file in new_file_lists[root][structure_type][file_ind:]:
+                                _add_to_delete_lists(other_file, root, new_file_lists, delete_list)
+                            break
 
             for _type in types:
                 new_file_lists[root][_type] = [_file for _file in new_file_lists[root][_type]
@@ -649,25 +690,38 @@ class Spatula:
 
             for file_type in types:
                 if len(new_file_lists[root][file_type]) != new_file_lists[root][file_type + '_count']:
-                    raise RuntimeError('{} count does not match number of files'.format(file_type))
+                    raise RuntimeError('{} count {} does not match number of files {}'
+                                       .format(file_type,
+                                               len(new_file_lists[root][file_type]),
+                                               new_file_lists[root][file_type + '_count']))
 
-        return new_file_lists
+        return new_file_lists, skipped
 
+    def _display_import(self):
+        """ Display number of files to be imported and a breakdown of
+        their types.
 
-def _display_import(file_lists):
-    """ Display number of files to be imported and
-    a breakdown of their types.
+        """
+        exts = ['res', 'cell', 'castep', 'param', 'synth', 'expt']
+        counts = {ext: 0 for ext in exts}
+        for root in self.file_lists:
+            for ext in exts:
+                counts[ext] += self.file_lists[root]['{}_count'.format(ext)]
 
-    Parameters:
-        file_lists (dict): containing keys `<extension>_count`.
+        print('\n\n')
+        if self.recent_only:
+            print('\t\tSkipped {} files filtered by creation date (st_ctime).'.format(self.skipped))
 
-    """
-    exts = ['res', 'cell', 'castep', 'param', 'synth', 'expt']
-    counts = {ext: 0 for ext in exts}
-    for root in file_lists:
         for ext in exts:
-            counts[ext] += file_lists[root]['{}_count'.format(ext)]
+            print('\t\t{:8d}\t\t.{} files'.format(counts[ext], ext))
 
-    print('\n\n')
-    for ext in exts:
-        print('\t\t{:8d}\t\t.{} files'.format(counts[ext], ext))
+
+def _add_to_delete_lists(_file, root, new_file_lists, delete_list):
+    """ Add files to the delete list, with the correct file types. """
+    structure_exts = {'castep': 'castep', 'res': 'res', 'history': 'castep', 'history.gz': 'castep'}
+    for _type in structure_exts:
+        fname_trial = _file.replace(_file.split('.')[-1], _type)
+        list_type = structure_exts[_type]
+        if fname_trial in new_file_lists[root][list_type] and fname_trial not in delete_list[list_type]:
+            delete_list[list_type].add(fname_trial)
+            new_file_lists[root][list_type + '_count'] -= 1
