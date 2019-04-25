@@ -57,6 +57,22 @@ class ChemUtilsTest(unittest.TestCase):
         self.assertEqual(round(8*Q[2], 3), round(Q[3], 3))
         self.assertEqual(round(Q[2], 3), round(2*Q[4], 3))
 
+    def test_get_concentration(self):
+        doc = [['Na', 3], ['P', 1]]
+        conc = get_concentration(doc, ['Na', 'P'])
+        self.assertEqual(conc, [0.75])
+        conc = get_concentration(doc, ['Na', 'P'], include_end=True)
+        self.assertEqual(conc, [0.75, 0.25])
+        conc = get_concentration(doc, ['K', 'P'], include_end=True)
+        self.assertEqual(conc, [0.0, 0.25])
+
+        doc = {'stoichiometry': [['Na', 3], ['P', 1]]}
+        conc = get_concentration(doc, ['Na', 'P'])
+        self.assertEqual(conc, [0.75])
+        conc = get_concentration(doc, ['Na', 'P'], include_end=True)
+        self.assertEqual(conc, [0.75, 0.25])
+
+
     def test_volumetric_capacity(self):
         initial_doc = dict()
         final_doc = dict()

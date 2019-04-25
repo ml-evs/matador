@@ -2,3 +2,5 @@ sphinx
 sphinx-argparse
 sphinx-rtd-theme
 sphinxcontrib-napoleon
+ipykernel
+nbsphinx
