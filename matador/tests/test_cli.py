@@ -46,7 +46,7 @@ for _file in glob.glob('*spatula*'):
 @unittest.skipIf(not MONGO_PRESENT, 'MongoDB instance not found, skipping tests...')
 class IntegrationTest(unittest.TestCase):
     """ Test functionality acting on local database. """
-    def testIntegration(self):
+    def test_integration(self):
         """ Test import and query. """
         query, files_to_delete, err_flines, manifest_flines = import_castep()
         self.assertEqual(len(files_to_delete), 2, msg='Failed to write spatula files')
@@ -168,7 +168,6 @@ class IntegrationTest(unittest.TestCase):
         drop(coll_name)
         self.assertTrue(DB_NAME not in MONGO_CLIENT.crystals.list_collection_names())
         self.assertTrue(coll_name not in MONGO_CLIENT.crystals.list_collection_names())
-
 
 def import_castep(extra_flags=None):
     """ Import from castep files, returning data to be checked. """

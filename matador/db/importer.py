@@ -51,7 +51,7 @@ class Spatula:
     those.
 
     """
-    def __init__(self, *args):
+    def __init__(self, *args, settings=None):
         """ Set up arguments and initialise DB client.
 
         Notes:
@@ -72,21 +72,22 @@ class Spatula:
                 database is found.
 
         """
-
         self.args = args[0]
-        self.dryrun = self.args['dryrun']
-        self.scan = self.args['scan']
-        self.recent_only = self.args['recent_only']
+        self.dryrun = self.args.get('dryrun')
+        self.scan = self.args.get('scan')
+        self.recent_only = self.args.get('recent_only')
         if self.scan:
             self.dryrun = True
-        self.debug = self.args['debug']
-        self.verbosity = self.args['verbosity'] or 0
+        self.debug = self.args.get('debug')
+        self.verbosity = self.args.get('verbosity') or 0
         self.config_fname = self.args.get('config')
-        self.tags = self.args['tags']
-        self.prototype = self.args['prototype']
+        self.tags = self.args.get('tags')
+        self.prototype = self.args.get('prototype')
         self.tag_dict = dict()
         self.tag_dict['tags'] = self.tags
         self.import_count = 0
+        self.skipped = 0
+        self.errors = 0
         self.struct_list = []
         self.path_list = []
         # I/O files
@@ -121,9 +122,12 @@ class Spatula:
             self.logfile = open(logfile_name, 'w')
             self.manifest = open(manifest_name, 'w')
 
-        self.settings = load_custom_settings(config_fname=self.config_fname,
-                                             debug=self.debug,
-                                             override=self.args.get('override'))
+        if settings is None:
+            self.settings = load_custom_settings(config_fname=self.config_fname,
+                                                 debug=self.debug,
+                                                 override=self.args.get('override'))
+        else:
+            self.settings = settings
 
         result = make_connection_to_collection(self.args.get('db'),
                                                check_collection=False,
@@ -136,26 +140,27 @@ class Spatula:
         assert len(self.collections) == 1, 'Can only import to one collection.'
         self.repo = list(self.collections.values())[0]
 
-        if self.args.get('db') and not self.dryrun and not self.args.get('force'):
-            # if using default collection, check we are in the correct path
-            default_file_path = recursive_get(self.settings, ['mongo', 'default_collection_file_path'])
-            if default_file_path is not None:
-                if not os.getcwd().startswith(os.path.expanduser(default_file_path)):
-                    import time
-                    print('PERMISSION DENIED... and...')
-                    time.sleep(3)
-                    for _ in range(30):
-                        print('YOU DIDN\'T SAY THE MAGIC WORD')
-                        time.sleep(0.05)
-                    print(80 * '!')
-                    print('You shouldn\'t be importing to the default database from this folder!')
-                    print('Please use --db <YourDBName> to create a new collection,')
-                    print('or copy these files to the correct place!')
-                    print(80 * '!')
-                    raise RuntimeError('Failed to import')
+        # if trying to import to the default repo, without doing a dryrun or forcing it, then
+        # check if we're in the protected directory, i.e. the only one that is allowed to import
+        # to the default collection
+        default_collection = recursive_get(self.settings, ['mongo', 'default_collection'])
+        default_file_path = recursive_get(self.settings, ['mongo', 'default_collection_file_path'])
+        if self.args.get('db') is None or self.args.get('db') == default_collection:
+            if not self.dryrun and not self.args.get('force'):
+                # if using default collection, check we are in the correct path
+                if default_file_path is not None:
+                    if not os.getcwd().startswith(os.path.expanduser(default_file_path)):
+                        print(80 * '!')
+                        print('You shouldn\'t be importing to the default database from this folder! '
+                              'Please use --db <YourDBName> to create a new collection, '
+                              'or copy these files to the correct place!')
+                        print(80 * '!')
+                        raise RuntimeError('Failed to import to default collection from '
+                                           'current directory, import must be called from {}'
+                                           .format(default_file_path))
         else:
-            if self.args['db'] is not None:
-                if any(['oqmd' in db for db in self.args['db']]):
+            if self.args.get('db') is not None:
+                if any(['oqmd' in db for db in self.args.get('db')]):
                     exit('Cannot import directly to oqmd repo')
                 elif len(self.args.get('db')) > 1:
                     exit('Can only import to one collection.')
@@ -176,9 +181,8 @@ class Spatula:
 
         # scan directory on init
         self.file_lists = self._scan_dir()
-        self.skipped = 0
         # if import, as opposed to rebuild, scan for duplicates and remove from list
-        if self.args['subcmd'] == 'import':
+        if not self.args.get('subcmd') == 'rebuild':
             self.file_lists, skipped = self._scan_dupes(self.file_lists)
             self.skipped += skipped
 
@@ -224,6 +228,7 @@ class Spatula:
         if not self.scan:
             self.logfile = open(logfile_name, 'r')
             errors = sum(1 for line in self.logfile)
+            self.errors += errors
             if errors == 1:
                 print('There is 1 error to view in', logfile_name)
             elif errors == 0:
