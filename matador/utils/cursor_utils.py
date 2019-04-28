@@ -25,6 +25,11 @@ def recursive_get(data, keys, top=True):
         data (dict): nested dictionary to get from.
         keys (list): list of keys/indices to delve into.
 
+    Raises:
+        KeyError: if any in chain keys are missing,
+        IndexError: if any element of a sublist is
+            missing.
+
     """
     if not isinstance(keys, (list, tuple)):
         return data[keys]

@@ -144,12 +144,16 @@ class Spatula:
         # check if we're in the protected directory, i.e. the only one that is allowed to import
         # to the default collection
         default_collection = recursive_get(self.settings, ['mongo', 'default_collection'])
-        default_file_path = recursive_get(self.settings, ['mongo', 'default_collection_file_path'])
+        try:
+            default_collection_file_path = recursive_get(self.settings, ['mongo', 'default_collection_file_path'])
+        except KeyError:
+            default_collection_file_path = None
+
         if self.args.get('db') is None or self.args.get('db') == default_collection:
             if not self.dryrun and not self.args.get('force'):
                 # if using default collection, check we are in the correct path
-                if default_file_path is not None:
-                    if not os.getcwd().startswith(os.path.expanduser(default_file_path)):
+                if default_collection_file_path is not None:
+                    if not os.getcwd().startswith(os.path.expanduser(default_collection_file_path)):
                         print(80 * '!')
                         print('You shouldn\'t be importing to the default database from this folder! '
                               'Please use --db <YourDBName> to create a new collection, '
@@ -157,7 +161,7 @@ class Spatula:
                         print(80 * '!')
                         raise RuntimeError('Failed to import to default collection from '
                                            'current directory, import must be called from {}'
-                                           .format(default_file_path))
+                                           .format(default_collection_file_path))
         else:
             if self.args.get('db') is not None:
                 if any(['oqmd' in db for db in self.args.get('db')]):
