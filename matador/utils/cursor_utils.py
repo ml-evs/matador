@@ -441,13 +441,23 @@ def display_results(cursor,
     print(total_string)
 
 
-def loading_bar(iterable):
+def loading_bar(iterable, width=80):
     """ Checks if tqdm exists and makes a loading bar, otherwise
     just returns initial iterable.
+
+    Parameters:
+        iterable (iterable): the thing to be iterated over.
+
+    Keyword arguments:
+        width (int): maximum number of columns to use on screen.
+
+    Returns:
+        iterable: the decorated iterator.
+
     """
     try:
         import tqdm
-        return tqdm.tqdm(iterable)
+        return tqdm.tqdm(iterable, ncols=width)
     except ImportError:
         return iterable
 
