@@ -8,6 +8,8 @@ and interfaces with the MongoDB client.
 
 
 import os
+import collections
+import tempfile
 import random
 import datetime
 import copy
@@ -87,23 +89,13 @@ class Spatula:
         self.tag_dict['tags'] = self.tags
         self.import_count = 0
         self.skipped = 0
+        self.exclude_patterns = ['bad_castep', 'input']
         self.errors = 0
         self.struct_list = []
         self.path_list = []
+
         # I/O files
         if not self.dryrun:
-            logfile_name = 'spatula.err'
-            manifest_name = 'spatula.manifest'
-            if os.path.isfile(logfile_name):
-                mtime = os.path.getmtime(logfile_name)
-                mdate = datetime.datetime.fromtimestamp(mtime)
-                mdate = str(mdate).split()[0]
-                os.rename(logfile_name, logfile_name + '.' + str(mdate).split()[0])
-            if os.path.isfile(manifest_name):
-                mtime = os.path.getmtime(manifest_name)
-                mdate = datetime.datetime.fromtimestamp(mtime)
-                mdate = str(mdate).split()[0]
-                os.rename(manifest_name, manifest_name + '.' + str(mdate).split()[0])
 
             base = os.path.dirname(os.path.realpath(__file__))
             with open(base + '/../scrapers/words', 'r') as f:
@@ -114,13 +106,9 @@ class Spatula:
             self.num_words = len(self.wlines)
             self.num_nouns = len(self.nlines)
 
-        elif not self.scan:
-            logfile_name = 'spatula.err.dryrun'
-            manifest_name = 'spatula.manifest.dryrun'
-
         if not self.scan:
-            self.logfile = open(logfile_name, 'w')
-            self.manifest = open(manifest_name, 'w')
+            self.logfile = tempfile.NamedTemporaryFile(mode='w+t', delete=False)
+            self.manifest = tempfile.NamedTemporaryFile(mode='w+t', delete=False)
 
         if settings is None:
             self.settings = load_custom_settings(config_fname=self.config_fname,
@@ -223,23 +211,27 @@ class Spatula:
                 print('Done!')
         elif self.dryrun:
             print('Dryrun complete!')
+
         if not self.scan:
-            self.logfile.close()
-            self.manifest.close()
-        if not self.dryrun:
-            # set log file to read only
-            os.chmod(logfile_name, 0o550)
-        if not self.scan:
-            self.logfile = open(logfile_name, 'r')
+            self.logfile.seek(0)
             errors = sum(1 for line in self.logfile)
             self.errors += errors
             if errors == 1:
-                print('There is 1 error to view in', logfile_name)
+                print('There is 1 error to view in', self.logfile.name)
             elif errors == 0:
-                print('There were no errors.')
+                print('There are no errors to view in', self.logfile.name)
             elif errors > 1:
-                print('There are', errors, 'errors to view in', logfile_name)
+                print('There are', errors, 'errors to view in', self.logfile.name)
+
+        try:
             self.logfile.close()
+        except Exception:
+            pass
+        try:
+            self.manifest.close()
+        except Exception:
+            pass
+
         if not self.dryrun:
             # construct dictionary in spatula_report collection to hold info
             report_dict = dict()
@@ -492,7 +484,6 @@ class Spatula:
                     if 'lattice_cart' not in final_struct and 'lattice_abc' not in final_struct:
                         msg = '! {} missing lattice'.format(file)
                         self.logfile.write(msg)
-                        raise RuntimeError(msg)
 
                     if 'kpoints_mp_spacing' not in final_struct and 'kpoints_mp_grid' in final_struct:
                         final_struct['kpoints_mp_spacing'] = calc_mp_spacing(final_struct['lattice_cart'],
@@ -583,12 +574,14 @@ class Spatula:
                 and filetype counts.
 
         """
-        import collections
         file_lists = dict()
         topdir = '.'
         topdir_string = os.getcwd().split('/')[-1]
         print('Scanning', topdir_string, 'for CASTEP/AIRSS output files... ', end='')
         for root, _, files in os.walk(topdir, followlinks=True, topdown=True):
+            for pattern in self.exclude_patterns:
+                if pattern in root:
+                    print('Skipping directory {} as it matched exclude pattern {}'.format(root, pattern))
             # get absolute path for rebuilds
             root = os.path.abspath(root)
             file_lists[root] = collections.defaultdict(list)
@@ -692,6 +685,8 @@ class Spatula:
                             for other_file in new_file_lists[root][structure_type][file_ind:]:
                                 _add_to_delete_lists(other_file, root, new_file_lists, delete_list)
                             break
+
+                        assert len(new_file_lists[root][structure_type]) == len(file_lists[root][structure_type]) + skipped
 
             for _type in types:
                 new_file_lists[root][_type] = [_file for _file in new_file_lists[root][_type]

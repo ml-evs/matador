@@ -50,9 +50,11 @@ def scraper_function(function):
                 raise oops
             except Exception as oops:
                 success = False
-                msg = '{}: {} {}'.format(_seed, type(oops), oops)
-                print(msg)
                 result = type(oops)('{}: {}\n'.format(_seed, oops))
+
+                msg = '{}: {} {}'.format(_seed, type(oops), oops)
+                if kwargs.get('verbosity') > 0:
+                    print(msg)
 
             if len(seed) == 1:
                 if success and not isinstance(result, dict):

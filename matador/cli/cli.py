@@ -416,7 +416,7 @@ def main(override=False):
     import_flags = argparse.ArgumentParser(add_help=False)
     import_flags.add_argument('-d', '--dryrun', action='store_true',
                               help='run the importer without connecting to the database')
-    import_flags.add_argument('-v', '--verbosity', action='count', help='enable verbose output')
+    import_flags.add_argument('-v', '--verbosity', action='count', help='enable verbose output', default=0)
     import_flags.add_argument('-f', '--force', action='store_true', help='override main database protection')
     import_flags.add_argument('-t', '--tags', nargs='+', type=str, help='set user tags, e.g. nanotube, project name')
     import_flags.add_argument('--recent_only', action='store_true', help='sort files by creation date (st_ctime) and '
