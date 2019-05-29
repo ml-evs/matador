@@ -681,6 +681,12 @@ class DBQuery:
             if '{' in elem or '}' in elem:
                 or_preference = True
 
+        elements_tmp = [element for ind, element in enumerate(elements)
+                    if element not in elements[:ind]]
+        if len(elements_tmp) < len(elements):
+            print('Ignoring duplicate element...')
+        elements = elements_tmp
+
         if self.args.get('intersection'):
             if or_preference:
                 raise RuntimeError('Intersection not implemented for overlapping sets, e.g. {}')

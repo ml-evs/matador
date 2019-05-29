@@ -251,6 +251,25 @@ class QueryTest(unittest.TestCase):
         self.assertDictEqual(query.query_dict, query2.query_dict)
         self.assertEqual(query._chempots, ['Li4Ge', 'Fe2Be'])
 
+    def test_duplicate_elements(self):
+        kwargs = {'composition': 'PPPPP',
+                  'testing': True}
+        query = DBQuery(**kwargs)
+        test_dict = ({
+            '$and': [
+                {'$and': [
+                    {'elems': {'$in': ['P']}},
+                    {'stoichiometry': {'$size': 1}}
+                ]},
+                {'$or': [
+                    {'quality': {'$gt': 0}},
+                    {'quality': {'$exists': False}}
+                ]},
+            ]
+        })
+
+        self.assertDictEqual(query.query_dict, test_dict)
+
     def test_parse_element_strings(self):
         arg = '[VII][Fe,Ru,Os][I]'
         elements = parse_element_string(arg)
