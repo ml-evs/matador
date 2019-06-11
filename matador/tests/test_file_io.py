@@ -962,6 +962,8 @@ class CifTests(MatadorUnitTest):
             self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(cif_fname))
 
         with self.assertRaises(RuntimeError):
+            if not failed_open:
+                f.close()
             test_dict, s = cif2dict(cif_fname, verbosity=VERBOSITY)
             raise test_dict
 
@@ -1148,7 +1150,6 @@ class ExportTest(MatadorUnitTest):
             for ext in exts:
                 self.assertTrue(os.path.isfile('query/{}.{}'.format(name, ext)),
                                 msg='Missing {}.{}'.format(name, ext))
-
 
     def compare_json_with_res(self, json_fname, test_fname):
         with open(json_fname, 'r') as f:
