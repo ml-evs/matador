@@ -6,15 +6,156 @@ vibrational reciprocal space spectra, with or without projection data.
 
 """
 
+import warnings
 import numpy as np
+import scipy.integrate
+import scipy.interpolate
 from matador.utils.cell_utils import real2recip, frac2cart
 from matador.orm.orm import DataContainer
+from matador.utils.chem_utils import KELVIN_TO_EV
 
 EPS = 1e-6
+INVERSE_CM_TO_EV = 1.24e-4
 
 
 class DensityOfStates(DataContainer):
     pass
+
+class VibrationalDOS(DensityOfStates):
+
+    def __init__(self, data):
+        """ Initialise the VDOS and trim the DOS data arrays.
+
+        Parameters:
+            data (dict): dictionary containing the phonon dos data.
+
+        """
+
+        super().__init__(data)
+        self._trim_dos()
+
+    @property
+    def zero_point_energy(self):
+        """ Computes the zero-point energy for the vibrational DOS,
+        using
+
+        .. math::
+
+            E_{zp} = \\frac{1}{2}\int F(\\omega)\\hbar\\omega\\,\\mathrm{d}\\omega.
+
+        where .. math:: F(\\omega)
+        is the vibrational density of states.
+
+        """
+        warnings.warn(
+            'Imaginary frequency phonons found in this structure, ZP energy '
+            'calculation will be unreliable',
+            Warning
+        )
+
+        def integrand(omega):
+            return self.vdos_function(omega) * INVERSE_CM_TO_EV * omega
+
+        result = scipy.integrate.quad(
+            integrand,
+            self.sample_energies[0],
+            self.sample_energies[-1]
+        )
+
+        return 0.5 * result[0]
+
+    def vibrational_free_energy(self, temperatures=None):
+        """ Computes the vibrational contribution to the free energy
+        at a given set of temperatures, using
+
+        .. math::
+
+            F_{\\text{vib}}(T) = kT \\int F(\\omega) \\ln{\\left[1 - \\exp{-\\frac{\\hbar\\omega}{kT}}\\right]\\, \\mathrm{d}\\omega,
+
+        Keyword arguments:
+            temperature (list): list, array or float of temperatures.
+
+        """
+        if temperatures is None:
+            temperatures = np.linspace(0, 600, num=5)
+
+        temperatures = np.asarray(temperatures)
+        free_energy = np.zeros_like(temperatures)
+        errs = np.zeros_like(free_energy)
+
+        min_energy = self.sample_energies[0]
+        max_energy = self.sample_energies[-1]
+        if min_energy < 0:
+            warnings.warn(
+                'Imaginary frequency phonons found in this structure, free energy '
+                'calculation will be unreliable, using 0 K as lower limit of integration.',
+                Warning
+            )
+            min_energy = 1e-5
+
+        for ind, temperature in enumerate(temperatures):
+
+            # if 0 K is requested, return 0 and move on
+            if temperature == 0:
+                free_energy[ind] = 0.0
+                errs[ind] = 0.0
+                continue
+
+            kT = KELVIN_TO_EV * temperature
+
+            def integrand(omega):
+                return self.vdos_function(omega) * np.log(1 - np.exp(- INVERSE_CM_TO_EV * omega/kT))
+
+            result = scipy.integrate.quad(
+                integrand,
+                min_energy,
+                max_energy
+            )
+
+            free_energy[ind] = INVERSE_CM_TO_EV * kT * result[0]
+            errs[ind] = result[1]
+
+        if len(temperatures) == 1:
+            return free_energy[0]
+
+        return temperatures, free_energy
+
+    @property
+    def vdos_function(self):
+        """ From the data arrays :attr:`sample_energies` and :attr:`sample_dos`,
+        return an interpolated function to integrate.
+
+        """
+        return scipy.interpolate.interp1d(
+            self.sample_energies,
+            self.sample_dos,
+            fill_value=(0, 0),
+            bounds_error=False,
+            copy=False
+        )
+
+    def _trim_dos(self):
+        """ Trim the density of states/frequencies to only include the non-zero
+        section of the vDOS.
+
+        """
+        first_index = np.argmax(self._data['dos'] > EPS)
+        last_index = len(self._data['dos']) - np.argmax(self._data['dos'][::-1] > EPS)
+        self._trimmed_dos = self._data['dos'][first_index:last_index]
+        self._trimmed_energies = self._data['energies'][first_index:last_index]
+
+    @property
+    def sample_dos(self):
+        """ Return the calculated density of states, trimmed at each end to
+        only include non-zero values.
+
+        """
+
+        return self._trimmed_dos
+
+    @property
+    def sample_energies(self):
+        return self._trimmed_energies
 
 
 class Dispersion(DataContainer):
