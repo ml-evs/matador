@@ -588,6 +588,7 @@ class ScraperMiscTest(unittest.TestCase):
         self.assertTrue(os.path.isfile(phonon_fname), msg='Failed to open test case {} - please check installation.'.format(phonon_fname))
         dos_data, s = phonon_dos2dict(phonon_fname)
         self.assertTrue(s)
+        self.assertEqual(dos_data['source'], [phonon_fname])
         self.assertEqual(len(dos_data['dos']), 10001)
         self.assertEqual(len(dos_data['energies']), 10001)
         self.assertEqual(len(dos_data['pdos']), 2)
@@ -883,7 +884,6 @@ class ScraperMiscTest(unittest.TestCase):
         pdis, s = cell2dict(cell_fname, db=False, lattice=True, verbosity=VERBOSITY)
         self.assertTrue(s)
 
-    @unittest.skipIf(True, 'CIF tests temporarily disabled...')
     def test_cif(self):
         cif_fname = REAL_PATH + 'data/cif_files/AgBiI.cif'
         failed_open = False
@@ -897,9 +897,9 @@ class ScraperMiscTest(unittest.TestCase):
             test_dict, s = cif2dict(cif_fname)
             self.assertTrue(s, 'Failed entirely, oh dear! {}'.format(test_dict))
             self.assertAlmostEqual(test_dict['num_atoms'], 46.623999999999995, msg='Failed to read num_atoms!', places=5)
-            self.assertTrue(['Bi', 1.0] in test_dict['stoichiometry'], msg='Wrong stoichiometry!')
-            self.assertTrue(['I', 4.0] in test_dict['stoichiometry'], msg='Wrong stoichiometry!')
-            self.assertTrue(sorted(test_dict['stoichiometry']) == test_dict['stoichiometry'], msg='Wrong stoichiometry!')
+            Bi_ratio = [elem[1] for elem in test_dict['stoichiometry'] if elem[0] == 'Bi'][0]
+            I_ratio = [elem[1] for elem in test_dict['stoichiometry'] if elem[0] == 'I'][0]
+            self.assertEqual(I_ratio/Bi_ratio, 4)
             self.assertAlmostEqual(test_dict['cell_volume'], 1826.0028753, msg='Wrong cell volume!', places=3)
             self.assertEqual(test_dict['space_group'], 'Fd-3m', msg='Wrong space group!')
             self.assertEqual(len(test_dict['atom_types']), 64)
@@ -917,7 +917,7 @@ class ScraperMiscTest(unittest.TestCase):
             f.close()
             errored = False
             test_dict, s = cif2dict(cif_fname)
-            errored = isinstance(test_dict, RuntimeError) and 'RuntimeError' in test_dict
+            errored = isinstance(test_dict, RuntimeError) or 'RuntimeError' in test_dict
             self.assertTrue(errored, 'WARNING: malicious attack is possible through symops')
             self.assertFalse(s, 'This should have failed entirely, oh dear!')
 
