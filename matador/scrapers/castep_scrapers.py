@@ -933,6 +933,7 @@ def phonon_dos2dict(seed, **kwargs):
             begin = ind + 1
 
     dos_data = {}
+    dos_data['source'] = [seed.replace('.phonon_dos', '') + '.phonon_dos']
     # remove header and "END"
     flines = flines[begin:-1]
     raw_data = np.genfromtxt(flines)

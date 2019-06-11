@@ -567,7 +567,7 @@ def get_root_source(source):
         sources = copy.deepcopy(source)
     src_list = set()
     for src in sources:
-        if src.endswith('.res') or src.endswith('.castep') or src.endswith('.history') or src.endswith('.history.gz'):
+        if '.' in src.split('/')[-1]:
             src_list.add('.'.join(src.split('/')[-1].split('.')[0:-1]))
         elif 'OQMD' in src.upper():
             src_list.add('_'.join(src.split()))

@@ -53,7 +53,7 @@ def scraper_function(function):
                 result = type(oops)('{}: {}\n'.format(_seed, oops))
 
                 msg = '{}: {} {}'.format(_seed, type(oops), oops)
-                if kwargs.get('verbosity') > 0:
+                if kwargs.get('verbosity', 0) > 0:
                     print(msg)
 
             if len(seed) == 1:
