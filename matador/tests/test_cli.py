@@ -338,7 +338,6 @@ def id_query():
     return query
 
 
-
 def drop(collname):
     """ Drop collection. """
     sys.argv = ['matador', 'stats', '--delete', '--db', collname]
