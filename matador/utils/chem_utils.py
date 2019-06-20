@@ -8,8 +8,9 @@ constants, with a focus on battery materials.
 
 
 import copy
-import numpy as np
 import warnings
+
+import numpy as np
 from scipy.constants import physical_constants
 
 FARADAY_CONSTANT_Cpermol = physical_constants['Faraday constant'][0]
@@ -29,6 +30,7 @@ EPS = 1e-12
 
 
 def get_iupac_ordering():
+    """ Stub for implementing IUPAC chemical ordering in formulae. """
     raise NotImplementedError
 
 
@@ -186,7 +188,7 @@ def get_binary_volumetric_capacity(initial_doc, final_doc):
 
     num_ions_per_initial_fu = num_ion / num_B
     volume_per_fu_cm3 = initial_doc['cell_volume'] * ANGSTROM_CUBED_TO_CENTIMETRE_CUBED / initial_doc['num_fu']
-    return ((num_ions_per_initial_fu / volume_per_fu_cm3) * (ELECTRON_CHARGE * Cperg_to_mAhperg))
+    return (num_ions_per_initial_fu / volume_per_fu_cm3) * (ELECTRON_CHARGE * Cperg_to_mAhperg)
 
 
 def get_atoms_per_fu(doc):
@@ -198,8 +200,7 @@ def get_atoms_per_fu(doc):
     """
     if isinstance(doc, dict):
         return sum([elem[1] for elem in doc['stoichiometry']])
-    else:
-        return sum([elem[1] for elem in doc])
+    return sum([elem[1] for elem in doc])
 
 
 def get_formation_energy(chempots, doc, energy_key='enthalpy_per_atom'):
@@ -285,7 +286,7 @@ def get_number_of_chempots(stoich, chempot_stoichs):
     # find all elements present in the chemical potentials
     elements = set()
     for mu in chempot_stoichs:
-        for elem, num in mu:
+        for elem, _ in mu:
             elements.add(elem)
     elements = sorted(list(elements))
 
@@ -440,8 +441,8 @@ def get_stoich_from_formula(formula: str, sort=True):
     stoich = [[elements[ind], fraction[ind]] for ind, _ in enumerate(elements)]
     if sort:
         return sorted(stoich)
-    else:
-        return stoich
+
+    return stoich
 
 
 def parse_element_string(elements_str, stoich=False):
