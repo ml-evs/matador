@@ -60,14 +60,14 @@ class UnitCellTest(unittest.TestCase):
 
 class CrystalTest(unittest.TestCase):
     def testSites(self):
-        doc, s = castep2dict(REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep')
+        doc, s = castep2dict(REAL_PATH + 'data/Na3Zn4-swap-ReOs-OQMD_759599.castep')
         del doc['lattice_cart']
         crystal = Crystal(doc)
         print(crystal)
         assert [atom for atom in crystal] == [atom[1] for atom in enumerate(crystal)]
 
     def testSpg(self):
-        doc, s = castep2dict(REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep')
+        doc, s = castep2dict(REAL_PATH + 'data/Na3Zn4-swap-ReOs-OQMD_759599.castep')
         crystal = Crystal(doc)
         print(crystal.get_space_group(symprec=0.01))
         print(crystal.get_space_group(symprec=0.001))

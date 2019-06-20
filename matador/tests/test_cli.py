@@ -11,8 +11,9 @@ import unittest
 import os
 import sys
 import glob
-import pymongo as pm
 import getpass
+
+import pymongo as pm
 
 import matador.cli.cli
 from matador.config import load_custom_settings
@@ -48,29 +49,19 @@ class IntegrationTest(unittest.TestCase):
     """ Test functionality acting on local database. """
     def test_integration(self):
         """ Test import and query. """
-        query, files_to_delete, err_flines, manifest_flines = import_castep()
-        self.assertEqual(len(files_to_delete), 2, msg='Failed to write spatula files')
-        self.assertEqual(len(err_flines), 5, msg='Failed to report errors correctly')
-        self.assertEqual(len(manifest_flines), 3, msg='Failed to report successes correctly')
+        query = import_castep()
         self.assertEqual(len(query.cursor), 3, msg='Failed to import structures correctly')
 
         # run again and hopefully nothing will change, i.e. no duplication
-        query, files_to_delete, err_flines, manifest_flines = import_castep()
-        self.assertEqual(len(files_to_delete), 2, msg='Failed to write spatula files')
-        self.assertEqual(len(err_flines), 5, msg='Failed to report errors correctly')
-        self.assertEqual(len(manifest_flines), 0, msg='Failed to report successes correctly')
+        query = import_castep()
         self.assertEqual(len(query.cursor), 3, msg='Failed to import structures correctly')
 
-        query, files_to_delete, err_flines, manifest_flines = import_castep(extra_flags='--recent_only')
-        self.assertEqual(len(files_to_delete), 2, msg='Failed to write spatula files')
-        self.assertEqual(len(err_flines), 5, msg='Failed to report errors correctly')
-        self.assertEqual(len(manifest_flines), 0, msg='Failed to report successes correctly')
+        query = import_castep(extra_flags='--recent_only')
         self.assertEqual(len(query.cursor), 3, msg='Failed to import structures correctly')
 
-        query_1, query_2, files_to_delete = import_res()
+        query_1, query_2 = import_res()
         self.assertEqual(len(query_1.cursor), 7, msg='Failed to import res files')
         self.assertEqual(len(query_2.cursor), 4, msg='Failed to import res files')
-        self.assertEqual(len(files_to_delete), 2, msg='Failed to write spatula files')
         self.assertEqual(query_2.cursor[0]['species_pot']['K'], "2|1.5|9|10|11|30U:40:31(qc=6)", msg='Failed to scrape OTF with weird name')
         self.assertEqual(query_2.cursor[0]['species_pot']['Sn'], "2|2|2|1.6|9.6|10.8|11.7|50U=-0.395U=+0.25:51U=-0.14U=+0.25", msg='Failed to scrape OTF with linebreak')
         self.assertFalse(any(['Sb' in doc['species_pot'] for doc in query_2.cursor]), msg='pspots over-scraped!')
@@ -95,9 +86,9 @@ class IntegrationTest(unittest.TestCase):
         expected_files = [
             'query-ci_test/query-ci_test.md',
             'query-ci_test/query-ci_test.tex',
-            'query-ci_test/Na3Zn4-OQMD_759599.pdb',
-            'query-ci_test/Na3Zn4-OQMD_759599.xsf',
-            'query-ci_test/Na3Zn4-OQMD_759599.json',
+            'query-ci_test/Na3Zn4-swap-ReOs-OQMD_759599.pdb',
+            'query-ci_test/Na3Zn4-swap-ReOs-OQMD_759599.xsf',
+            'query-ci_test/Na3Zn4-swap-ReOs-OQMD_759599.json',
             'query-ci_test/Na-edgecase-CollCode10101.pdb',
             'query-ci_test/Na-edgecase-CollCode10101.xsf',
             'query-ci_test/Na-edgecase-CollCode10101.json',
@@ -118,7 +109,7 @@ class IntegrationTest(unittest.TestCase):
         self.assertTrue(dir_exists, msg='Failed to create output directory')
         self.assertTrue(files_exist, msg='Some files missing from export')
 
-        query, hull, files_to_delete = pseudoternary_hull()
+        query, hull = pseudoternary_hull()
         self.assertTrue(query.args.get('intersection'))
         self.assertTrue(query._non_elemental)
         self.assertTrue(query._create_hull)
@@ -155,6 +146,9 @@ class IntegrationTest(unittest.TestCase):
 
         stats()
 
+        query = id_query()
+        self.assertEqual(len(query.cursor), 0)
+
         errored = False
         try:
             drop(DB_NAME)
@@ -168,6 +162,7 @@ class IntegrationTest(unittest.TestCase):
         drop(coll_name)
         self.assertTrue(DB_NAME not in MONGO_CLIENT.crystals.list_collection_names())
         self.assertTrue(coll_name not in MONGO_CLIENT.crystals.list_collection_names())
+
 
 def import_castep(extra_flags=None):
     """ Import from castep files, returning data to be checked. """
@@ -185,17 +180,12 @@ def import_castep(extra_flags=None):
 
     query = DBQuery(db=DB_NAME, config=CONFIG_FNAME, details=True, source=True)
 
-    with open('spatula.err', 'r') as err_file:
-        err_flines = err_file.readlines()
-    with open('spatula.manifest', 'r') as manifest_file:
-        manifest_flines = manifest_file.readlines()
-
     files_to_delete = glob.glob('*spatula*')
     for f in files_to_delete:
         os.remove(f)
     os.chdir(REAL_PATH)
 
-    return query, files_to_delete, err_flines, manifest_flines
+    return query
 
 
 def import_res():
@@ -222,7 +212,7 @@ def import_res():
 
     os.chdir(REAL_PATH)
 
-    return query_1, query_2, files_to_delete
+    return query_1, query_2
 
 
 def pseudoternary_hull():
@@ -241,13 +231,9 @@ def pseudoternary_hull():
     query = DBQuery(db=DB_NAME, composition='La2O3:Li2O:ZrO2', config=CONFIG_FNAME, details=True, source=True, subcmd='hull', no_plot=True)
     hull = QueryConvexHull(query=query)
 
-    files_to_delete = glob.glob('*spatula*')
-    for f in files_to_delete:
-        os.remove(f)
-
     os.chdir(REAL_PATH)
 
-    return query, hull, files_to_delete
+    return query, hull
 
 
 def stats():
@@ -256,7 +242,6 @@ def stats():
     if CONFIG_FNAME is not None:
         sys.argv += ['--config', CONFIG_FNAME]
     matador.cli.cli.main()
-    return
 
 
 def swaps():
@@ -272,7 +257,7 @@ def swaps():
     elem_successes = []
     if output_folder_exists:
         os.chdir(expected_dir)
-        expected_files = ['LiSi-swap-NaP_intermediates', 'LiSn-swap-Na3Zn4-OQMD_759599', 'Li-swap-Na-edgecase-CollCode10101']
+        expected_files = ['LiSi-swap-NaP_intermediates', 'LiSn-swap-Na3Zn4-ReOs-OQMD_759599', 'Li-swap-Na-edgecase-CollCode10101']
         target_elems = ['Li', 'Si', 'Sn']
 
         for files in expected_files:
@@ -340,7 +325,7 @@ def uniq():
     matador.cli.cli.main(override=True)
 
 
-def id():
+def id_query():
     """ Test a simple ID query, and that nothing is found... """
     sys.argv = ['matador', 'query', '--db', DB_NAME, '-i', 'testing testing']
 
@@ -348,6 +333,10 @@ def id():
         sys.argv += ['--config', CONFIG_FNAME]
 
     matador.cli.cli.main(override=True)
+
+    query = DBQuery(db=DB_NAME, config=CONFIG_FNAME, id='testing testing')
+    return query
+
 
 
 def drop(collname):

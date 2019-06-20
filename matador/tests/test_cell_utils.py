@@ -26,7 +26,7 @@ class CellUtilTest(unittest.TestCase):
     """ Tests cell util functions. """
 
     def testCart2AbcConversions(self):
-        castep_fname = REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep'
+        castep_fname = REAL_PATH + 'data/Na3Zn4-swap-ReOs-OQMD_759599.castep'
         failed_open = False
         try:
             f = open(castep_fname, 'r')
@@ -55,7 +55,7 @@ class CellUtilTest(unittest.TestCase):
                 raise AssertionError
 
     def testCart2AbcStar(self):
-        castep_fname = REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep'
+        castep_fname = REAL_PATH + 'data/Na3Zn4-swap-ReOs-OQMD_759599.castep'
         failed_open = False
         try:
             with open(castep_fname, 'r'):
@@ -98,7 +98,7 @@ class CellUtilTest(unittest.TestCase):
 
     def testConversionTransitivity(self):
         """ Test that cart2frac(frac2cart(A)) == A. """
-        castep_fname = REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep'
+        castep_fname = REAL_PATH + 'data/Na3Zn4-swap-ReOs-OQMD_759599.castep'
         test_doc, s = castep2dict(castep_fname, db=True, verbosity=VERBOSITY)
         lattice_cart = test_doc['lattice_cart']
         positions_frac = test_doc['positions_frac']
@@ -109,7 +109,7 @@ class CellUtilTest(unittest.TestCase):
         amplitude does.
         """
         from matador.utils.cell_utils import add_noise
-        castep_fname = REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep'
+        castep_fname = REAL_PATH + 'data/Na3Zn4-swap-ReOs-OQMD_759599.castep'
         test_doc, s = castep2dict(castep_fname, db=True, verbosity=VERBOSITY)
 
         init_positions_frac = test_doc['positions_frac']
@@ -171,7 +171,7 @@ class SymmetriesAndSupercellsTest(unittest.TestCase):
     """ Tests cell util functions. """
 
     def testSupercellCreator(self):
-        castep_fname = REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep'
+        castep_fname = REAL_PATH + 'data/Na3Zn4-swap-ReOs-OQMD_759599.castep'
         failed_open = False
         num_tests = 3
         try:
@@ -245,7 +245,7 @@ class SymmetriesAndSupercellsTest(unittest.TestCase):
     @unittest.skipIf(not IMPORTED_SEEKPATH, 'Seekpath package not found in this distribution')
     def testKPointPath(self):
 
-        cell, s = castep2dict(REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep')
+        cell, s = castep2dict(REAL_PATH + 'data/Na3Zn4-swap-ReOs-OQMD_759599.castep')
         std_cell, path, seekpath_results = get_seekpath_kpoint_path(cell, spacing=0.01, debug=False)
         self.assertEqual(539, len(path))
 
@@ -297,7 +297,7 @@ class SymmetriesAndSupercellsTest(unittest.TestCase):
     def testSpgStandardize(self):
         from matador.utils.cell_utils import standardize_doc_cell
         import glob
-        doc, s = castep2dict(REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep')
+        doc, s = castep2dict(REAL_PATH + 'data/Na3Zn4-swap-ReOs-OQMD_759599.castep')
         std_doc = standardize_doc_cell(doc)
         dist = pdf_sim_dist(doc, std_doc)
         self.assertLess(dist, 0.01)

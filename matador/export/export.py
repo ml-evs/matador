@@ -130,7 +130,9 @@ def query2files(cursor, **kwargs):
         for source in doc['source']:
             source = str(source)
             if '.res' in source or '.castep' in source or '.history' in source:
+                root_fname = source.split('/')[-1].split('.')[0]
                 if kwargs.get('subcmd') == 'swaps':
+                    root_fname = root_fname.replace('-swap-', '-')
                     comp_string = ''
                     comp_list = []
                     for atom in doc['atom_types']:
@@ -138,7 +140,6 @@ def query2files(cursor, **kwargs):
                             comp_list.append(atom)
                             comp_string += atom
                     name = comp_string + '-swap-'
-                root_fname = source.split('/')[-1].split('.')[0].replace('-swap-', '')
                 name += root_fname
             elif 'OQMD' in source:
                 formula = get_formula_from_stoich(doc['stoichiometry'])

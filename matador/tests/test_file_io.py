@@ -124,7 +124,7 @@ class CellScraperTests(unittest.TestCase):
 class CastepScraperTests(unittest.TestCase):
     """ Test CASTEP scrapers. """
     def test_castep16(self):
-        castep_fname = REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep'
+        castep_fname = REAL_PATH + 'data/Na3Zn4-swap-ReOs-OQMD_759599.castep'
         failed_open = False
         try:
             f = open(castep_fname, 'r')
@@ -292,7 +292,7 @@ class CastepScraperTests(unittest.TestCase):
         castep_fname += [REAL_PATH + 'data/castep_files/NaP_intermediates.castep']
         castep_fname += [REAL_PATH + 'data/___not_a_file']
         castep_fname += [REAL_PATH + 'data/KP-castep17.castep']
-        castep_fname += [REAL_PATH + 'data/Na3Zn4-OQMD_759599.castep']
+        castep_fname += [REAL_PATH + 'data/Na3Zn4-swap-ReOs-OQMD_759599.castep']
 
         error = False
         try:
@@ -301,7 +301,7 @@ class CastepScraperTests(unittest.TestCase):
             error = True
 
     def test_history(self):
-        castep_fname = REAL_PATH + 'data/castep_files/Na3Zn4-OQMD_759599.history'
+        castep_fname = REAL_PATH + 'data/castep_files/Na3Zn4-swap-ReOs-OQMD_759599.history'
         test_dict, s = castep2dict(castep_fname, db=True)
         self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(test_dict))
         self.assertEqual(test_dict['pressure'], 0.0763, msg='Failed to read pressure!')
@@ -322,7 +322,7 @@ class CastepScraperTests(unittest.TestCase):
         self.assertEqual(test_dict['estimated_mem_MB'], 345.1)
 
     def test_history_gz(self):
-        castep_fname = REAL_PATH + 'data/castep_files/Na3Zn4-OQMD_759599.history.gz'
+        castep_fname = REAL_PATH + 'data/castep_files/Na3Zn4-swap-ReOs-OQMD_759599.history.gz'
         test_dict, s = castep2dict(castep_fname, db=True)
         self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(test_dict))
         self.assertEqual(test_dict['pressure'], 0.0763, msg='Failed to read pressure!')
@@ -525,7 +525,7 @@ class ScraperMiscTest(unittest.TestCase):
         castep_fname += [REAL_PATH + 'data/castep_files/NaP_intermediates.castep']
         castep_fname += [REAL_PATH + 'data/castep_files/Na-edgecase-CollCode10101.castep']
         castep_fname += [REAL_PATH + 'data/castep_files/KP-castep17.castep']
-        castep_fname += [REAL_PATH + 'data/castep_files/Na3Zn4-OQMD_759599.castep']
+        castep_fname += [REAL_PATH + 'data/castep_files/Na3Zn4-swap-ReOs-OQMD_759599.castep']
         castep_fname += [REAL_PATH + 'data/castep_files/TiO2_unconverged-MP-10101.castep']
 
         cursor, failures = castep2dict(castep_fname, db=True)
