@@ -605,7 +605,6 @@ class ScraperMiscTest(unittest.TestCase):
         self.assertEqual(len(dos_data['pdos'][('K', None)]), 10001)
         self.assertEqual(len(dos_data['pdos'][('P', None)]), 10001)
 
-
     def test_optados_dos_scraper(self):
         odo_fname = REAL_PATH + 'data/optados_files/K3P.adaptive.dat'
         failed_open = False
@@ -1006,6 +1005,18 @@ class ExportTest(unittest.TestCase):
         self.assertEqual(len(dummy_files), 2)
         for _f in dummy_files:
             os.remove(_f)
+
+    def test_doc2cell_partial_occ_fail(self):
+        cell_name = REAL_PATH + 'data/cell_files/kpoint_path.cell'
+        cell, s = cell2dict(cell_name, db=False)
+
+        cell['site_occupancy'] = []
+        for site in cell['positions_frac']:
+            cell['site_occupancy'].append(0.1)
+
+        self.assertTrue(s)
+        with self.assertRaises(RuntimeError):
+            doc2cell(cell,'dummy')
 
     def test_doc2cell_kpoint_path(self):
         cell_name = REAL_PATH + 'data/cell_files/kpoint_path.cell'
