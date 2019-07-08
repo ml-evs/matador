@@ -2,7 +2,7 @@
 # Distributed under the terms of the MIT license.
 
 """ This file implements the BatchRun class for chaining
-FullRelaxer instances across several structures with
+ComputeTask instances across several structures with
 high-throughput.
 
 """
@@ -16,14 +16,14 @@ import time
 from matador.utils.print_utils import print_failure, print_warning
 from matador.compute.queue import get_queue_env, get_queue_walltime, get_queue_manager
 from matador.scrapers.castep_scrapers import cell2dict, param2dict
-from matador.compute.compute import FullRelaxer
+from matador.compute.compute import ComputeTask
 from matador.compute.errors import InputError, CalculationError, MaxMemoryEstimateExceeded
 
 
 class BatchRun:
     """ A class that implements the running of multiple generic jobs on
     a series of files without collisions with other nodes using the
-    FullRelaxer class. Jobs that have been started are listed in
+    ComputeTask class. Jobs that have been started are listed in
     `jobs.txt`, failed jobs are moved to `bad_castep/`, completed jobs
     are moved to `completed/`.
 
@@ -53,9 +53,9 @@ class BatchRun:
             Exhaustive list found in argparse parser inside `matador/cli/run3.py`.
 
         """
-        # parse args, then co-opt them for passing directly into FullRelaxer
+        # parse args, then co-opt them for passing directly into ComputeTask
         prop_defaults = {'ncores': None, 'nprocesses': 1, 'nnodes': 1,
-                         'executable': 'castep', 'no_reopt': False,
+                         'executable': 'castep', 'no_reopt': False, 'mode': None,
                          'redirect': None, 'debug': False, 'custom_params': False,
                          'verbosity': 0, 'archer': False, 'slurm': False,
                          'intel': False, 'conv_cutoff': False, 'conv_kpt': False,
@@ -67,10 +67,11 @@ class BatchRun:
         self.args.update(prop_defaults)
         self.args.update(kwargs)
         self.debug = self.args.get('debug')
+
         self.seed = seed
         # if only one seed, check if it is a file, and if so treat
         # this run as a generic run, not a CASTEP cell/param run
-        if len(self.seed) == 1:
+        if len(self.seed) == 1 and isinstance(self.seed, list):
             if '*' in self.seed[0]:
                 self.seed = glob.glob(self.seed[0])
             elif not os.path.isfile(self.seed[0]):
@@ -80,10 +81,14 @@ class BatchRun:
         if self.args.get('scratch_prefix') not in [None, '.']:
             self.compute_dir = '{}/{}'.format(self.args['scratch_prefix'], self.compute_dir).replace('//', '/')
 
-        if isinstance(self.seed, str):
-            self.mode = 'castep'
+        if self.args.get('mode') is not None:
+            self.mode = self.args.get('mode')
         else:
-            self.mode = 'generic'
+            if isinstance(self.seed, str):
+                self.mode = 'castep'
+            else:
+                self.mode = 'generic'
+        del self.args['mode']
 
         if self.args.get('no_reopt'):
             self.args['reopt'] = False
@@ -174,7 +179,7 @@ class BatchRun:
         """ Spawn processes to perform calculations.
 
         Keyword arguments:
-            join (bool): whether or not to attach to FullRelaxer
+            join (bool): whether or not to attach to ComputeTask
                 process. Useful for testing.
 
         """
@@ -184,8 +189,8 @@ class BatchRun:
         for proc_id in range(self.nprocesses):
             procs.append(mp.Process(target=self.perform_new_calculations,
                                     args=(sample(self.file_lists['res'],
-                                                 len(self.file_lists['res']))
-                                          if self.mode == 'castep' else self.seed, error_queue, proc_id)))
+                                                 len(self.file_lists['res'])),
+                                          error_queue, proc_id)))
         for proc in procs:
             proc.start()
             if join:
@@ -261,7 +266,7 @@ class BatchRun:
 
                     # create full relaxer object for creation and running of job
                     job_count += 1
-                    relaxer = FullRelaxer(node=None, res=res,
+                    relaxer = ComputeTask(node=None, res=res,
                                           param_dict=self.param_dict,
                                           cell_dict=self.cell_dict,
                                           mode=self.mode, paths=self.paths, compute_dir=self.compute_dir,
@@ -316,6 +321,10 @@ class BatchRun:
         """ Undo things that are set ready for CASTEP jobs... """
         self.cell_dict = None
         self.param_dict = None
+
+        # scan directory for files to run
+        self.file_lists = defaultdict(list)
+        self.file_lists['res'] = [file.name for file in os.scandir() if file.name.endswith('.res')]
 
     def castep_setup(self):
         """ Set up CASTEP jobs from res files, and $seed.cell/param. """
@@ -426,7 +435,7 @@ def reset_job_folder(debug=False):
     ready for job restart.
 
     Note:
-        This should be not called by a FullRelaxer instance, in case
+        This should be not called by a ComputeTask instance, in case
         other instances are running.
 
     Returns:

@@ -135,7 +135,11 @@ class ComputeTask:
 
         # save all keyword arguments as attributes
         self.__dict__.update(prop_defaults)
-        self.__dict__.update(kwargs)
+        for arg in kwargs:
+            if arg not in prop_defaults:
+                logging.warning('Argument {} not supported, ignoring...'.format(arg))
+            else:
+                self.__dict__.update({arg: kwargs[arg]})
 
         if self.profile:
             import cProfile
@@ -220,8 +224,10 @@ class ComputeTask:
             self.max_walltime = self.timings[0]
             self.start_time = self.timings[1]
 
-        logging.debug('Starting at {start}, max walltime allowed is {walltime}'.format(
-            start=self.start_time, walltime=self.max_walltime))
+        if self.max_walltime is not None:
+            logging.debug('Starting at {start}, max walltime allowed is {walltime}'.format(
+                start=self.start_time, walltime=self.max_walltime))
+            logging.debug('{} s remaining.'.format(self.max_walltime - (time.time() - self.start_time)))
 
         self._redirect_filename = None
 
@@ -509,7 +515,8 @@ class ComputeTask:
                     if self.max_walltime is not None:
                         run_elapsed = time.time() - self.start_time
                         # leave 1 minute to clean up
-                        if run_elapsed > abs(self.max_walltime - 3*self.polltime):
+                        logging.debug('{} remaining seconds...'.format(self.max_walltime - run_elapsed))
+                        if run_elapsed > abs(self.max_walltime - 5*self.polltime):
                             msg = 'About to run out of time on seed {}, killing early...'.format(self.seed)
                             logging.info(msg)
                             raise WalltimeError(msg)
@@ -821,8 +828,11 @@ class ComputeTask:
 
         """
         logging.info('Testing executable {executable}.'.format(executable=self.executable))
+
         try:
-            proc = self.run_command('--version', exec_test=True)
+            proc = self.run_command('--version')
+            out, errs = proc.communicate()
+
         except FileNotFoundError:
             logging.critical('Unable to call mpirun/aprun/srun, currently selected: {}'.format(self.mpi_library))
             message = 'Please check initialistion of FullRelaxer object/CLI args.'
@@ -846,7 +856,7 @@ class ComputeTask:
                 self.test_exec()
 
             else:
-                err_string = 'Executable {} failed testing. Is it on your PATH?'.format(self.executable)
+                err_string = 'Executable `{}` failed testing: does it support --version?'.format(self.executable)
                 logging.critical(err_string)
                 logging.critical('stdout: {stdout}'.format(stdout=out.decode('utf-8')))
                 logging.critical('sterr: {stderr}'.format(stderr=errs.decode('utf-8')))
@@ -941,7 +951,7 @@ class ComputeTask:
 
         logging.debug('Running CASTEP dryrun.')
         self.executable += ' --dryrun'
-        process = self.run_command(memcheck_seed, exec_test=False)
+        process = self.run_command(memcheck_seed)
         process.communicate()
         self.executable = self.executable.replace(' --dryrun', '')
 
@@ -965,16 +975,12 @@ class ComputeTask:
 
         return estimate
 
-    def run_command(self, seed, exec_test=False):
+    def run_command(self, seed):
         """ Calls executable on seed with desired number of cores.
 
         Parameters:
             seed (str): seedname to pass append to CASTEP command,
                 e.g. <seed> or --version.
-
-        Keyword arguments:
-            exec_test (bool): run executable in test mode, with output
-                piped to stdout.
 
         Returns:
             subprocess.Popen: process to run.
@@ -989,7 +995,7 @@ class ComputeTask:
             elif self.mpi_library == 'slurm':
                 command = ['srun', '--exclusive', '-N', '1', '-n', str(self.ncores)] + command
             elif self.mpi_library == 'intel':
-                command = ['mpirun', '-n', str(self.ncores), '-ppn', str(self.ncores)] + command
+                command = ['mpirun', '-n', str(self.ncores)] + command
             elif self.node is not None:
                 cwd = os.getcwd()
                 command = ['ssh', '{}'.format(self.node), 'cd', '{};'.format(cwd), 'mpirun', '-n',
@@ -1020,14 +1026,13 @@ class ComputeTask:
             redirect_file = open(self._redirect_filename, 'w')
             stdout = redirect_file
 
+        logging.info('Running {}'.format(command))
         process = sp.Popen(command, shell=False, stdout=stdout, stderr=stderr)
         try:
             redirect_file.close()
         except Exception:
             pass
 
-        if not exec_test:
-            logging.debug('Running {}'.format(command))
         return process
 
     def _catch_castep_errors(self):
@@ -1135,8 +1140,13 @@ class ComputeTask:
         """
         completed_dir = self.root_folder + '/' + completed_dir
         logging.info('Moving files to completed: {completed}.'.format(completed=completed_dir))
+
+        if seed.endswith('.res'):
+            seed = str(seed.replace('.res', ''))
+
         if not os.path.exists(completed_dir):
             os.makedirs(completed_dir, exist_ok=True)
+
         for _file in glob.glob(seed + '*_bak') + glob.glob(seed + '*.lock'):
             os.remove(_file)
         if keep:
