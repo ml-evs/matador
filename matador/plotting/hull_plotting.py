@@ -66,9 +66,9 @@ def get_hull_labels(hull, label_cutoff=None, num_species=None, exclude_edges=Tru
 
 
 @plotting_function
-def plot_2d_hull(hull, ax=None, show=False, plot_points=True,
+def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
                  plot_hull_points=True, labels=None, label_cutoff=None, colour_by_source=False,
-                 sources=None, source_labels=None, title=True, plot_fname=None,
+                 sources=None, source_labels=None, title=True, plot_fname=None, show_cbar=True,
                  **kwargs):
     """ Plot calculated hull, returning ax and fig objects for further editing.
 
@@ -101,7 +101,7 @@ def plot_2d_hull(hull, ax=None, show=False, plot_points=True,
 
     if ax is None:
         fig = plt.figure(facecolor=None, figsize=(8, 6))
-        ax = fig.add_subplot(111)
+        ax = fig.add_subplot(111, facecolor=None)
 
     hull.colours = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])
     hull.default_cmap_list = get_linear_cmap(hull.colours[1:4], list_only=True)
@@ -171,14 +171,15 @@ def plot_2d_hull(hull, ax=None, show=False, plot_points=True,
                                      zorder=10000,
                                      cmap=cmap, norm=colours.LogNorm(0.02, 2))
 
-                cbar = plt.colorbar(scatter, aspect=30, pad=0.02,
-                                    ticks=[0, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28])
-                cbar.ax.tick_params(length=0)
-                cbar.ax.set_yticklabels([0, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28])
-                cbar.ax.yaxis.set_ticks_position('right')
-                cbar.ax.set_frame_on(False)
-                cbar.outline.set_visible(False)
-                cbar.set_label('Distance from hull (eV/atom)')
+                if show_cbar:
+                    cbar = plt.colorbar(scatter, aspect=30, pad=0.02,
+                                        ticks=[0, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28])
+                    cbar.ax.tick_params(length=0)
+                    cbar.ax.set_yticklabels([0, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28])
+                    cbar.ax.yaxis.set_ticks_position('right')
+                    cbar.ax.set_frame_on(False)
+                    cbar.outline.set_visible(False)
+                    cbar.set_label('Distance from hull (eV/atom)')
 
         elif hull.hull_cutoff != 0:
             # if specified hull cutoff colour those below
@@ -255,7 +256,7 @@ def plot_2d_hull(hull, ax=None, show=False, plot_points=True,
             ax.set_title(r'({d[0]})$_\mathrm{{x}}$({d[1]})$_\mathrm{{1-x}}$'.format(d=chempot_labels))
         else:
             ax.set_title(r'{d[0]}$_\mathrm{{x}}${d[1]}$_\mathrm{{1-x}}$'.format(d=chempot_labels))
-    elif title:
+    elif isinstance(title, str) and title != '':
         ax.set_title(title)
 
     plt.locator_params(nbins=3)
@@ -270,15 +271,16 @@ def plot_2d_hull(hull, ax=None, show=False, plot_points=True,
     ax.set_xticklabels(ax.get_xticks())
     ax.set_ylabel('Formation energy (eV/atom)')
 
-    if hull.savefig:
+    exts = ['pdf', 'svg', 'png']
+    if hull.savefig or any([kwargs.get(ext) for ext in exts]):
         fname = plot_fname or ''.join(hull.species) + '_hull'
-        exts = ['pdf', 'svg', 'png']
         for ext in exts:
-            if hull.args.get(ext):
+            if hull.args.get(ext) or kwargs.get(ext):
                 plt.savefig('{}.{}'.format(fname, ext),
                             dpi=500, bbox_inches='tight', transparent=True)
                 print('Wrote {}.{}'.format(fname, ext))
-    elif show:
+
+    if show:
         plt.show()
 
     return ax
@@ -330,7 +332,7 @@ def plot_ensemble_hull(hull, parameter, ax=None, plot_points=True, plot_hulls=Tr
 
 
 @plotting_function
-def plot_ternary_hull(hull, axis=None, show=False, plot_points=True, hull_cutoff=None,
+def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=None,
                       label_cutoff=None, expecting_cbar=True, labels=None, plot_fname=None, **kwargs):
     """ Plot calculated ternary hull as a 2D projection.
 

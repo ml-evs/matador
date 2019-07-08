@@ -31,7 +31,8 @@ def plotting_function(function):
             for arg in args:
                 if arg.savefig:
                     import matplotlib
-                    matplotlib.use('Agg')
+                    # don't warn as backend might have been set externally by e.g. Jupyter
+                    matplotlib.use('Agg', warn=False)
                     saving = True
                     break
         except AttributeError:
@@ -39,7 +40,7 @@ def plotting_function(function):
         if not saving:
             if any([kwargs.get('pdf'), kwargs.get('svg'), kwargs.get('png')]):
                 import matplotlib
-                matplotlib.use('Agg')
+                matplotlib.use('Agg', warn=False)
                 saving = True
 
         settings = load_custom_settings(kwargs.get('config_fname'), quiet=True, override=kwargs.get('override'))
@@ -57,12 +58,12 @@ def plotting_function(function):
                     if styles == 'matador':
                         style[ind] = '/'.join(__file__.split('/')[:-1]) + '/../config/matador.mplstyle'
 
-            if kwargs.get('debug'):
-                print('Using style {}'.format(style))
-                print(plt.rcParams)
-
             # now actually call the function
             with plt.style.context(style):
+                if kwargs.get('debug'):
+                    print('Using style {}'.format(style))
+                    print(plt.rcParams)
+
                 result = function(*args, **kwargs)
 
         except TclError as exc:
