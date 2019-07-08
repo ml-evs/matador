@@ -4,8 +4,14 @@
 """ Some simple utilities for making DB connections. """
 
 
+import getpass
+import os
+import pwd
+from traceback import print_exc
+
 import pymongo as pm
 from matador.config import load_custom_settings
+
 
 
 def make_connection_to_collection(coll_names, check_collection=False, allow_changelog=False,
@@ -37,9 +43,12 @@ def make_connection_to_collection(coll_names, check_collection=False, allow_chan
     if not quiet:
         print('Trying to connect to {host}:{port}/{db}'.format(**settings['mongo']))
 
-    client = pm.MongoClient(
-        host=settings['mongo']['host'],
-        port=settings['mongo']['port'],
+    host = settings['mongo']['host']
+    port = settings['mongo']['port']
+    user = settings['mongo'].get('user', pwd.getpwuid(os.getuid())[0])
+    password = getpass.getpass()
+
+    client = pm.MongoClient('mongodb://{}:{}@{}:{}'.format(user, password, host, port),
         connect=False,
         maxIdleTimeMS=600000,  # disconnect after 10 minutes idle
         socketTimeoutMS=3600000,  # give up on database after 1 hr without results
@@ -50,22 +59,31 @@ def make_connection_to_collection(coll_names, check_collection=False, allow_chan
         database_names = client.list_database_names()
         if not quiet:
             print('Success!')
+    except pm.errors.OperationFailure:
+        database_names = []
+        print('Unable to list all database names.')
+
     except pm.errors.ServerSelectionTimeoutError as exc:
         print('{}: {}'.format(type(exc).__name__, exc))
-        raise SystemExit('Unable to connect to {host}:{port}/{db}, exiting...'.format(**settings['mongo']))
+        raise SystemExit('Unable to connect to {host}:{port}, exiting...'.format(**settings['mongo']))
 
     if settings['mongo']['db'] not in database_names:
-        if override:
-            response = 'y'
-        else:
-            response = input('Database {db} does not exist at {host}:{port}/{db}, '
-                             'would you like to create it? (y/n) '
-                             .format(**settings['mongo']))
+        raise SystemExit('Desired database {db} does not exist at {host}:{port}.'.format(**settings['mongo']))
+        # try:
+            # client[settings['mongo']['db']].auth({'user': user})
+        # except:
+            # print_exc()
+            # if override:
+                # response = 'y'
+            # else:
+                # response = input('Database {db} does not exist at {host}:{port}/{db}, '
+                                 # 'would you like to create it? (y/n) '
+                                 # .format(**settings['mongo']))
 
-        if response.lower() != 'y':
-            raise SystemExit('Exiting...')
-        else:
-            print('Creating database {}'.format(settings['mongo']['db']))
+            # if response.lower() != 'y':
+                # raise SystemExit('Exiting...')
+            # else:
+                # print('Creating database {}'.format(settings['mongo']['db']))
 
     db = client[settings['mongo']['db']]
     possible_collections = [name for name in db.list_collection_names() if not name.startswith('__')]
