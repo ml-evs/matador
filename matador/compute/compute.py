@@ -831,7 +831,6 @@ class ComputeTask:
 
         try:
             proc = self.run_command('--version')
-            out, errs = proc.communicate()
 
         except FileNotFoundError:
             logging.critical('Unable to call mpirun/aprun/srun, currently selected: {}'.format(self.mpi_library))
