@@ -135,7 +135,8 @@ class DBQuery:
                     # filter for uniqueness
                     unique_set, dupe_dict, _, _ = get_uniq_cursor(self.cursor[:top],
                                                                   debug=self.args.get('debug'),
-                                                                  sim_tol=self.args.get('uniq'))
+                                                                  sim_tol=self.args.get('uniq'),
+                                                                  energy_tol=1e20)
                     print('Filtered {} down to {}'.format(len(self.cursor[:top]), len(unique_set)))
 
                     display_cursor = []
