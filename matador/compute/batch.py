@@ -13,6 +13,7 @@ import multiprocessing as mp
 import os
 import glob
 import time
+import random
 from matador.utils.print_utils import print_failure, print_warning
 from matador.compute.queue import get_queue_env, get_queue_walltime, get_queue_manager
 from matador.scrapers.castep_scrapers import cell2dict, param2dict
@@ -183,14 +184,20 @@ class BatchRun:
                 process. Useful for testing.
 
         """
-        from random import sample
         procs = []
         error_queue = mp.Queue()
         for proc_id in range(self.nprocesses):
-            procs.append(mp.Process(target=self.perform_new_calculations,
-                                    args=(sample(self.file_lists['res'],
-                                                 len(self.file_lists['res'])),
-                                          error_queue, proc_id)))
+            procs.append(
+                mp.Process(
+                    target=self.perform_new_calculations,
+                    args=(
+                        random.sample(self.file_lists['res'],
+                                      len(self.file_lists['res'])),
+                        error_queue,
+                        proc_id
+                    )
+                )
+            )
         for proc in procs:
             proc.start()
             if join:
@@ -240,6 +247,11 @@ class BatchRun:
             res_list = [res_list]
         for res in res_list:
             try:
+                # probe once then sleep for a random amount up to 5 seconds
+                # before checking again for a lock file, just to protect
+                # against collisions in large array jobs on slower parallel file systems
+                _ = os.path.isfile('{}.lock'.format(res))
+                time.sleep(5 * random.random())
                 locked = os.path.isfile('{}.lock'.format(res))
                 if not self.args.get('ignore_jobs_file'):
                     listed = self._check_jobs_file(res)
@@ -294,11 +306,11 @@ class BatchRun:
                             job_file.write(res + '\n')
 
             # ignore individual calculation errors
-            except CalculationError as err:
+            except CalculationError:
                 continue
 
             # catch memory errors and reset so another node can try
-            except MaxMemoryEstimateExceeded as err:
+            except MaxMemoryEstimateExceeded:
                 reset_single_seed(res)
                 continue
             # reset txt/lock for an input error, but throw it to prevent other calcs
@@ -332,7 +344,7 @@ class BatchRun:
         exts = ['cell', 'param']
         for ext in exts:
             if not os.path.isfile('{}.{}'.format(self.seed, ext)):
-                raise InputError('Failed to find {} file, {}.{}'.format(ext, self.seed, ext))
+                raise InputError('Failed to find {ext} file, {seed}.{ext}'.format(ext=ext, seed=self.seed))
         self.cell_dict, cell_success = cell2dict(self.seed + '.cell',
                                                  db=False, lattice=False, positions=False)
         if not cell_success:
@@ -347,8 +359,8 @@ class BatchRun:
         self.file_lists = defaultdict(list)
         self.file_lists['res'] = [file.name for file in os.scandir() if file.name.endswith('.res')]
         if self.seed in (file.replace('.res', '') for file in self.file_lists['res']):
-            error = ("Found .res file with same name as seed: {}.res. This will wreak havoc on your calculations!".format(self.seed) +
-                     "Please rename either your seed.cell/seed.param files, or rename the offending .res")
+            error = ("Found .res file with same name as seed: {}.res. This will wreak havoc on your calculations!\n".format(self.seed)
+                     + "Please rename either your seed.cell/seed.param files, or rename the offending {}.res".format(self.seed))
             raise InputError(error)
 
         if not self.file_lists['res']:
@@ -358,15 +370,15 @@ class BatchRun:
             )
             raise InputError(error)
 
-        if (len(self.file_lists['res']) < self.nprocesses and
-                (not self.args.get('conv_cutoff') and not self.args.get('conv_kpt'))):
+        if (len(self.file_lists['res']) < self.nprocesses
+                and not any([self.args.get('conv_cutoff'), self.args.get('conv_kpt')])):
             raise InputError('Requested more processes than there are jobs to run!')
 
         # do some prelim checks of parameters
         if self.param_dict['task'].upper() in ['GEOMETRYOPTIMISATION', 'GEOMETRYOPTIMIZATION']:
             if 'geom_max_iter' not in self.param_dict:
                 raise InputError('geom_max_iter is unset, please fix this.')
-            elif int(self.param_dict['geom_max_iter']) <= 0:
+            if int(self.param_dict['geom_max_iter']) <= 0:
                 raise InputError('geom_max_iter is only {}!'.format(self.param_dict['geom_max_iter']))
 
         # parse convergence args and set them up
@@ -427,7 +439,6 @@ class BundledErrors(Exception):
     """ Raise this after collecting all exceptions from
     processes.
     """
-    pass
 
 
 def reset_job_folder(debug=False):
