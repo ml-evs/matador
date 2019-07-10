@@ -26,6 +26,8 @@ from matador.compute.errors import CriticalError, WalltimeError, InputError, Cal
 
 MATADOR_CUSTOM_TASKS = ['bulk_modulus', 'projected_bandstructure', 'pdispersion', 'all']
 
+LOG = logging.getLogger('run3')
+
 
 class ComputeTask:
     """ The main use of this class is to call an executable on a given
@@ -177,22 +179,21 @@ class ComputeTask:
         if not os.path.isdir('logs'):
             os.mkdir('logs')
 
-        logging.basicConfig(level=logging.DEBUG)
-        logging.getLogger().handlers = []
+        LOG.handlers = []
 
-        stdout_handler = logging.StreamHandler(sys.stdout)
-        stdout_handler.setLevel(loglevel)
-        stdout_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)8s: %(message)s'))
-        logging.getLogger().addHandler(stdout_handler)
+        if self.verbosity > 1:
+            stdout_handler = logging.StreamHandler(sys.stdout)
+            stdout_handler.setLevel(loglevel)
+            stdout_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)|%(levelname)8s: %(message)s'))
+            LOG.addHandler(stdout_handler)
 
         logname = os.path.abspath('logs/{}.log'.format(self.seed))
         file_handler = logging.FileHandler(logname, mode='a')
-        file_handler.setLevel(loglevel)
-        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)8s: %(message)s'))
-        logging.getLogger().addHandler(file_handler)
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)|%(levelname)8s: %(message)s'))
+        LOG.addHandler(file_handler)
 
-        splash_screen = r""" Run started for seed {}.
-
+        splash_screen = r"""
                            _____
           _ __ _   _ _ __ |___ /
          | '__| | | | '_ \  |_ \
@@ -200,14 +201,11 @@ class ComputeTask:
          |_|   \__,_|_| |_|____/
 
 
-        """.format(self.seed)
+        """
 
-        # at every other verbosity level, logging also writes to stdout
-        if self.verbosity == 1:
-            print(splash_screen)
-
-        logging.info(splash_screen)
-        logging.info('Initialising FullRelaxer object for {seed}'.format(seed=self.seed))
+        LOG.info(splash_screen)
+        LOG.info('Run started for seed {}'.format(self.seed))
+        LOG.info('Initialising FullRelaxer object for {seed}'.format(seed=self.seed))
 
         # set up compute parameters
         self.ncores = ncores
@@ -225,9 +223,9 @@ class ComputeTask:
             self.start_time = self.timings[1]
 
         if self.max_walltime is not None:
-            logging.debug('Starting at {start}, max walltime allowed is {walltime}'.format(
+            LOG.debug('Starting at {start}, max walltime allowed is {walltime}'.format(
                 start=self.start_time, walltime=self.max_walltime))
-            logging.debug('{} s remaining.'.format(self.max_walltime - (time.time() - self.start_time)))
+            LOG.debug('{} s remaining.'.format(self.max_walltime - (time.time() - self.start_time)))
 
         self._redirect_filename = None
 
@@ -250,19 +248,19 @@ class ComputeTask:
 
         # errors that matter only for the current structure
         except CalculationError as exc:
-            logging.error('Process raised {} with message {}.'.format(type(exc), exc))
+            LOG.error('Process raised {} with message {}.'.format(type(exc), exc))
             self.success = False
             self._finalise_result()
             raise exc
         # errors that need to be passed upwards to kill future jobs
         except RuntimeError as exc:
-            logging.error('Process raised {} with message {}.'.format(type(exc), exc))
+            LOG.error('Process raised {} with message {}.'.format(type(exc), exc))
             raise exc
         except MaxMemoryEstimateExceeded as exc:
-            logging.error(exc)
+            LOG.error(exc)
             raise exc
         except Exception as exc:
-            logging.error('Caught unexpected error {}: {}'.format(type(exc), exc))
+            LOG.error('Caught unexpected error {}: {}'.format(type(exc), exc))
             raise exc
 
         if self.profile:
@@ -275,9 +273,9 @@ class ComputeTask:
                 stats.print_stats()
 
         if self.success:
-            logging.info('FullRelaxer finished successfully for {seed}'.format(seed=self.seed))
+            LOG.info('FullRelaxer finished successfully for {seed}'.format(seed=self.seed))
         else:
-            logging.info('FullRelaxer failed cleanly for {seed}'.format(seed=self.seed))
+            LOG.info('FullRelaxer failed cleanly for {seed}'.format(seed=self.seed))
 
     def run_castep(self, res):
         """ Set up and run CASTEP calculation.
@@ -299,7 +297,7 @@ class ComputeTask:
                 unless every calculation fails.
 
         """
-        logging.info('Calling CASTEP on {seed}'.format(seed=self.seed))
+        LOG.info('Calling CASTEP on {seed}'.format(seed=self.seed))
 
         success = False
 
@@ -308,7 +306,7 @@ class ComputeTask:
 
         # pre-processing
         if self.kpts_1D:
-            logging.debug('1D kpoint grid requested.')
+            LOG.debug('1D kpoint grid requested.')
             if 'kpoints_mp_spacing' not in self.cell_dict:
                 raise CriticalError('kpoints_mp_spacing not found, but kpts_1D requested...')
             self._target_spacing = deepcopy(self.cell_dict['kpoints_mp_spacing'])
@@ -318,14 +316,14 @@ class ComputeTask:
             self.res_dict, success = res2dict(res, db=False)
             if not success:
                 msg = 'Unable to parse initial res file, error: {res_dict}'.format(res_dict=self.res_dict)
-                logging.error(msg)
+                LOG.error(msg)
                 raise CalculationError(msg)
         elif isinstance(res, dict):
             self.res_dict = res
 
         if self.noise:
             from matador.utils.cell_utils import add_noise
-            logging.info('Adding noise to the positions in the cell')
+            LOG.info('Adding noise to the positions in the cell')
             self.res_dict = add_noise(self.res_dict, amplitude=0.1)
 
         calc_doc = deepcopy(self.res_dict)
@@ -348,7 +346,7 @@ class ComputeTask:
             memory_usage_estimate = self.do_memcheck(calc_doc, self.seed)
             mem_string = ('Memory estimate / Available memory (MB): {:8.0f} / {:8.0f}'
                           .format(memory_usage_estimate, self.maxmem))
-            logging.info(mem_string)
+            LOG.info(mem_string)
 
             if memory_usage_estimate > 0.9 * self.maxmem:
                 msg = 'Structure {} failed memcheck, skipping... '.format(self.seed) + mem_string
@@ -381,14 +379,14 @@ class ComputeTask:
                     success = self.scf(calc_doc, self.seed, keep=True)
 
                 if self.compute_dir is not None:
-                    logging.debug('Cleaning up after relaxation.')
+                    LOG.debug('Cleaning up after relaxation.')
                     # always cd back to root folder
                     os.chdir(self.root_folder)
                     self.remove_compute_dir_if_finished(self.compute_dir)
                 self._first_run = False
 
         except Exception as err:
-            logging.debug('Cleaning up after catching error {}.'.format(err))
+            LOG.debug('Cleaning up after catching error {}.'.format(err))
             if self.compute_dir is not None:
                 # always cd back to root folder
                 os.chdir(self.root_folder)
@@ -416,7 +414,7 @@ class ComputeTask:
             bool: True if calculations progressed without error.
 
         """
-        logging.info('Calling executable {exe} MPI program on {seed}'.format(exe=self.executable, seed=self.seed))
+        LOG.info('Calling executable {exe} MPI program on {seed}'.format(exe=self.executable, seed=self.seed))
         try:
             self.seed = seed
             if '.' in self.seed:
@@ -435,16 +433,16 @@ class ComputeTask:
                 raise CalculationError(message)
 
             if not intermediate:
-                logging.info('Writing results of generic call to res file and tidying up.')
+                LOG.info('Writing results of generic call to res file and tidying up.')
                 self.mv_to_completed(seed, keep=True, completed_dir=self.paths['completed_dir'])
 
-            logging.info('Executable {exe} finished cleanly.'.format(exe=self.executable))
+            LOG.info('Executable {exe} finished cleanly.'.format(exe=self.executable))
             self._first_run = False
             return True
 
         except Exception as err:
             self._first_run = False
-            logging.error('Caught error inside run_generic: {error}.'.format(error=err))
+            LOG.error('Caught error inside run_generic: {error}.'.format(error=err))
             if mv_bad_on_failure:
                 self.mv_to_bad(seed)
             raise err
@@ -463,7 +461,7 @@ class ComputeTask:
             WalltimeError: if walltime was reached, and jobs need to stop.
 
         """
-        logging.info('Attempting to relax {}'.format(self.seed))
+        LOG.info('Attempting to relax {}'.format(self.seed))
 
         try:
             self._setup_relaxation()
@@ -477,7 +475,7 @@ class ComputeTask:
                     # if we're now reoptimising after a success in last step
                     # use the fine iter value
                     num_iter = self.fine_iter
-                    logging.info('Last step was successful, performing one last relaxation...')
+                    LOG.info('Last step was successful, performing one last relaxation...')
 
                 # update the geom_max_iter to use with either the number in iter_list, or the overriden value
                 self.calc_doc['geom_max_iter'] = num_iter
@@ -491,10 +489,10 @@ class ComputeTask:
 
                 if self.max_walltime is not None and self.start_time is None:
                     msg = 'Somehow initial start time was not found'
-                    logging.critical(msg)
+                    LOG.critical(msg)
                     raise CriticalError(msg)
 
-                logging.info('Polling process every {} s'.format(self.polltime))
+                LOG.info('Polling process every {} s'.format(self.polltime))
 
                 while self._process.poll() is None:
                     proc_elapsed = time.time() - proc_clock
@@ -504,21 +502,21 @@ class ComputeTask:
                         if not os.path.isfile(seed + '.castep'):
                             msg = ('CASTEP file was not created, please check your executable: {}.'
                                    .format(self.executable))
-                            logging.critical(msg)
+                            LOG.critical(msg)
                             raise CalculationError(msg)
                         elif os.path.getmtime(seed + '.castep') - proc_clock < 0:
                             msg = ('CASTEP file present, but too old to be made by this process. Please check your executable: {}.'
                                    .format(self.executable))
-                            logging.critical(msg)
+                            LOG.critical(msg)
                             raise CalculationError(msg)
 
                     if self.max_walltime is not None:
                         run_elapsed = time.time() - self.start_time
                         # leave 1 minute to clean up
-                        logging.debug('{} remaining seconds...'.format(self.max_walltime - run_elapsed))
+                        LOG.debug('{} remaining seconds...'.format(self.max_walltime - run_elapsed))
                         if run_elapsed > abs(self.max_walltime - 5*self.polltime):
                             msg = 'About to run out of time on seed {}, killing early...'.format(self.seed)
-                            logging.info(msg)
+                            LOG.info(msg)
                             raise WalltimeError(msg)
 
                     time.sleep(self.polltime)
@@ -526,7 +524,7 @@ class ComputeTask:
                 self._process.communicate()
 
                 opti_dict, success = castep2dict(seed + '.castep', db=False, verbosity=self.verbosity)
-                logging.debug('Process returned {}'.format(self._process.returncode))
+                LOG.debug('Process returned {}'.format(self._process.returncode))
 
                 # check for errors and try to correct for them
                 errors_present, errors, remedy = self._catch_castep_errors()
@@ -535,22 +533,22 @@ class ComputeTask:
                 if errors_present:
                     msg = 'Failed to optimise {} as CASTEP crashed with error:'.format(seed)
                     msg += errors
-                    logging.warning(msg)
+                    LOG.warning(msg)
                     if isinstance(opti_dict, dict):
                         self._update_output_files(opti_dict)
                     if remedy is not None and self._num_retries <= self._max_num_retries:
-                        logging.warning('Attempting to recover using {}'.format(remedy))
+                        LOG.warning('Attempting to recover using {}'.format(remedy))
                     else:
                         raise CalculationError(msg)
 
                 if not success and remedy is None and isinstance(opti_dict, Exception):
                     msg = 'Failed to parse CASTEP file... {}'.format(opti_dict)
-                    logging.warning(msg)
+                    LOG.warning(msg)
                     raise CalculationError(msg)
                 elif isinstance(opti_dict, Exception) and remedy is not None:
                     opti_dict = {'optimised': False}
 
-                logging.debug('Intermediate calculation completed successfully: num_iter = {} '.format(num_iter))
+                LOG.debug('Intermediate calculation completed successfully: num_iter = {} '.format(num_iter))
 
                 # scrub keys that need to be rescraped
                 keys_to_remove = ['kpoints_mp_spacing', 'kpoints_mp_grid', 'species_pot', 'sedc_apply', 'sedc_scheme']
@@ -574,14 +572,14 @@ class ComputeTask:
 
                     # or did the relaxation complete successfuly, including rerun?
                     elif (not self.reopt or rerun) and opti_dict['optimised']:
-                        logging.info('Successfully relaxed {}'.format(seed))
+                        LOG.info('Successfully relaxed {}'.format(seed))
                         self._update_output_files(opti_dict)
                         break
 
                     # reached maximum number of steps
                     elif ind == len(self._geom_max_iter_list) - 1:
                         msg = 'Failed to optimise {} after {} steps'.format(seed, sum(self._geom_max_iter_list))
-                        logging.info(msg)
+                        LOG.info(msg)
                         raise CalculationError(msg)
 
                     # if we weren't successful, then preprocess the next step
@@ -598,16 +596,16 @@ class ComputeTask:
                         if success:
                             opti_dict['lattice_cart'] = list(cell_dict['lattice_cart'])
 
-                    logging.debug('N = {iters:03d} | |F| = {d[max_force_on_atom]:5.5f} eV/A | '
-                                  'S = {d[pressure]:5.5f} GPa | H = {d[enthalpy_per_atom]:5.5f} eV/atom'
-                                  .format(d=opti_dict, iters=sum(self._geom_max_iter_list[:ind+1])))
+                    LOG.debug('N = {iters:03d} | |F| = {d[max_force_on_atom]:5.5f} eV/A | '
+                              'S = {d[pressure]:5.5f} GPa | H = {d[enthalpy_per_atom]:5.5f} eV/atom'
+                              .format(d=opti_dict, iters=sum(self._geom_max_iter_list[:ind+1])))
 
                 # if there were errors that can be remedied, now is the time to do it
                 # this will normally involve changing a parameter to avoid future failures
                 self.calc_doc.update(opti_dict)
 
                 if remedy is not None:
-                    logging.info('Trying to remedy error...')
+                    LOG.info('Trying to remedy error...')
                     remedy(self.calc_doc)
                     self._num_retries += 1
 
@@ -615,14 +613,14 @@ class ComputeTask:
 
         # catch WalltimeErrors and reset the job folder ready for continuation
         except WalltimeError as err:
-            logging.error('WalltimeError thrown; calling times_up')
+            LOG.error('WalltimeError thrown; calling times_up')
             self.times_up(self._process)
             raise err
 
         # All other errors mean something bad has happened, so we should clean up this job
         # more jobs will run unless this exception is either CriticalError or KeyboardInterrupt
         except Exception as err:
-            logging.error('Error caught: terminating job for {}. Error = {}'.format(self.seed, err))
+            LOG.error('Error caught: terminating job for {}. Error = {}'.format(self.seed, err))
             try:
                 self._process.terminate()
             except AttributeError:
@@ -650,7 +648,7 @@ class ComputeTask:
             bool: True iff SCF completed successfully, False otherwise.
 
         """
-        logging.info('Performing single-shot CASTEP run on {}, with task: {}'.format(seed, calc_doc['task']))
+        LOG.info('Performing single-shot CASTEP run on {}, with task: {}'.format(seed, calc_doc['task']))
         try:
             self.cp_to_input(seed)
 
@@ -667,16 +665,16 @@ class ComputeTask:
             errors_present, errors, _ = self._catch_castep_errors()
             if errors_present:
                 msg = 'CASTEP run on {} failed with errors: {}'.format(seed, errors)
-                logging.error(msg)
+                LOG.error(msg)
                 raise CalculationError(msg)
 
             if not success:
                 msg = 'Error scraping CASTEP file {}: {}'.format(seed, results_dict)
-                logging.error(msg)
+                LOG.error(msg)
                 raise CalculationError(msg)
 
             if not intermediate:
-                logging.info('Writing results of singleshot CASTEP run to res file and tidying up.')
+                LOG.info('Writing results of singleshot CASTEP run to res file and tidying up.')
                 doc2res(results_dict, seed, hash_dupe=False, overwrite=True)
                 self.mv_to_completed(seed, keep=keep, completed_dir=self.paths['completed_dir'])
                 if not keep:
@@ -685,7 +683,7 @@ class ComputeTask:
             return success
 
         except Exception as err:
-            logging.error('Caught error: {}'.format(err))
+            LOG.error('Caught error: {}'.format(err))
             self.mv_to_bad(seed)
             if not keep:
                 self.tidy_up(seed)
@@ -729,14 +727,14 @@ class ComputeTask:
                 and list containing the kpoints.
 
         """
-        logging.info('Getting seekpath cell and kpoint path.')
+        LOG.info('Getting seekpath cell and kpoint path.')
         from matador.utils.cell_utils import get_seekpath_kpoint_path
         from matador.crystal import Crystal
-        logging.debug('Old lattice: {}'.format(Crystal(calc_doc)))
+        LOG.debug('Old lattice: {}'.format(Crystal(calc_doc)))
         prim_doc, kpt_path, _ = get_seekpath_kpoint_path(calc_doc,
                                                          spacing=spacing,
                                                          debug=debug)
-        logging.debug('New lattice: {}'.format(Crystal(calc_doc)))
+        LOG.debug('New lattice: {}'.format(Crystal(calc_doc)))
         return prim_doc, kpt_path
 
     def run_convergence_tests(self, calc_doc):
@@ -750,15 +748,15 @@ class ComputeTask:
             bool: True unless every single calculation failed.
 
         """
-        logging.info('Performing convergence tests...')
+        LOG.info('Performing convergence tests...')
         from matador.utils.cell_utils import get_best_mp_offset_for_cell
         successes = []
         cached_cutoff = calc_doc['cut_off_energy']
         if self.conv_cutoff_bool:
             # run series of singlepoints for various cutoffs
-            logging.info('Running cutoff convergence...')
+            LOG.info('Running cutoff convergence...')
             for cutoff in self.conv_cutoff:
-                logging.info('{} eV... '.format(cutoff))
+                LOG.info('{} eV... '.format(cutoff))
                 calc_doc.update({'cut_off_energy': cutoff})
                 self.paths['completed_dir'] = 'completed_cutoff'
                 seed = self.seed + '_' + str(cutoff) + 'eV'
@@ -767,13 +765,13 @@ class ComputeTask:
                 successes.append(success)
         if self.conv_kpt_bool:
             # run series of singlepoints for various cutoffs
-            logging.info('Running kpt convergence tests...')
+            LOG.info('Running kpt convergence tests...')
             calc_doc['cut_off_energy'] = cached_cutoff
             for kpt in self.conv_kpt:
-                logging.info('{} 1/A... '.format(kpt))
+                LOG.info('{} 1/A... '.format(kpt))
                 calc_doc.update({'kpoints_mp_spacing': kpt})
                 calc_doc['kpoints_mp_offset'] = get_best_mp_offset_for_cell(calc_doc)
-                logging.debug('Using offset {}'.format(calc_doc['kpoints_mp_offset']))
+                LOG.debug('Using offset {}'.format(calc_doc['kpoints_mp_offset']))
                 self.paths['completed_dir'] = 'completed_kpts'
                 seed = self.seed + '_' + str(kpt) + 'A'
                 self._update_input_files(seed, calc_doc)
@@ -816,7 +814,7 @@ class ComputeTask:
         else:
             self._redirect_filename = None
 
-        logging.debug('Executable string parsed as {}'.format(command))
+        LOG.debug('Executable string parsed as {}'.format(command))
 
         return command
 
@@ -827,15 +825,15 @@ class ComputeTask:
             CriticalError: if executable not found.
 
         """
-        logging.info('Testing executable {executable}.'.format(executable=self.executable))
+        LOG.info('Testing executable {executable}.'.format(executable=self.executable))
 
         try:
             proc = self.run_command('--version')
 
         except FileNotFoundError:
-            logging.critical('Unable to call mpirun/aprun/srun, currently selected: {}'.format(self.mpi_library))
+            LOG.critical('Unable to call mpirun/aprun/srun, currently selected: {}'.format(self.mpi_library))
             message = 'Please check initialistion of FullRelaxer object/CLI args.'
-            logging.debug('Raising CriticalError with message: {message}'.format(message=message))
+            LOG.debug('Raising CriticalError with message: {message}'.format(message=message))
             raise CriticalError(message)
 
         out, errs = proc.communicate()
@@ -845,9 +843,9 @@ class ComputeTask:
             if 'not enough slots' in errs.decode('utf-8'):
                 err_string = ('MPI library tried to use too many cores and failed, '
                               'rescaling core count and re-running with {} cores...'.format(int(self.ncores/2)))
-                logging.warning(err_string)
-                logging.warning('stdout: {stdout}'.format(stdout=out.decode('utf-8')))
-                logging.warning('sterr: {stderr}'.format(stderr=errs.decode('utf-8')))
+                LOG.warning(err_string)
+                LOG.warning('stdout: {stdout}'.format(stdout=out.decode('utf-8')))
+                LOG.warning('sterr: {stderr}'.format(stderr=errs.decode('utf-8')))
                 if self.ncores >= 2:
                     self.ncores = int(self.ncores/2)
                 else:
@@ -855,23 +853,23 @@ class ComputeTask:
                 self.test_exec()
 
             else:
-                err_string = 'Executable `{}` failed testing: does it support --version?'.format(self.executable)
-                logging.critical(err_string)
-                logging.critical('stdout: {stdout}'.format(stdout=out.decode('utf-8')))
-                logging.critical('sterr: {stderr}'.format(stderr=errs.decode('utf-8')))
-                logging.debug('Raising CriticalError.')
+                err_string = 'Executable `{}` failed testing: does it support --version flag?'.format(self.executable)
+                LOG.critical(err_string)
+                LOG.critical('stdout: {stdout}'.format(stdout=out.decode('utf-8')))
+                LOG.critical('sterr: {stderr}'.format(stderr=errs.decode('utf-8')))
+                LOG.debug('Raising CriticalError.')
                 raise CriticalError(err_string)
 
         if errs:
-            logging.info('Executable {} passed test, but stderr contains the following:'.format(self.executable))
-            logging.info(errs.decode('utf-8'))
+            LOG.info('Executable {} passed test, but stderr contains the following:'.format(self.executable))
+            LOG.info(errs.decode('utf-8'))
 
     @property
     def mpi_library(self):
         """ Property to store/compute desired MPI library. """
         if self._mpi_library is None:
             self._mpi_library = self.set_mpi_library()
-            logging.info('Detected {mpi} MPI.'.format(mpi=self._mpi_library))
+            LOG.info('Detected {mpi} MPI.'.format(mpi=self._mpi_library))
         return self._mpi_library
 
     def set_mpi_library(self):
@@ -880,7 +878,7 @@ class ComputeTask:
         """
         if sum([self.archer, self.intel, self.slurm]) > 1:
             message = 'Conflicting command-line arguments for MPI library have been supplied, exiting.'
-            logging.critical(message)
+            LOG.critical(message)
             raise CriticalError(message)
         elif self.archer:
             return 'archer'
@@ -904,12 +902,12 @@ class ComputeTask:
             try:
                 mpi_version_string = str(sp.check_output('mpirun --version', shell=True))
             except sp.CalledProcessError:
-                logging.info('Failed to find mpirun, checking aprun...')
+                LOG.info('Failed to find mpirun, checking aprun...')
                 mpi_version_string = str(sp.check_output('aprun --version', shell=True))
         except Exception as exc:
             msg = 'Failed to find mpirun or aprun.'
-            logging.critical(msg)
-            logging.debug('Error message: {exc}'.format(exc=exc))
+            LOG.critical(msg)
+            LOG.debug('Error message: {exc}'.format(exc=exc))
             raise CriticalError(msg)
         if 'Intel' in mpi_version_string:
             mpi_version = 'intel'
@@ -918,11 +916,11 @@ class ComputeTask:
         elif 'Open MPI' in mpi_version_string:
             mpi_version = 'default'
         else:
-            logging.debug('Could not detect MPI library so using default (OpenMPI), version string was: {response}'
-                          .format(response=mpi_version_string))
+            LOG.debug('Could not detect MPI library so using default (OpenMPI), version string was: {response}'
+                      .format(response=mpi_version_string))
             mpi_version = 'default'
 
-        logging.info('Using {version} MPI library.'.format(version=mpi_version))
+        LOG.info('Using {version} MPI library.'.format(version=mpi_version))
         return mpi_version
 
     def do_memcheck(self, calc_doc, seed):
@@ -937,7 +935,7 @@ class ComputeTask:
                 `self.maxmem`, if set
 
         """
-        logging.info('Performing memory check for {seed}'.format(seed=seed))
+        LOG.info('Performing memory check for {seed}'.format(seed=seed))
         memcheck_seed = seed + '_memcheck'
 
         memcheck_doc = deepcopy(calc_doc)
@@ -948,7 +946,7 @@ class ComputeTask:
         doc2param(memcheck_doc, memcheck_seed, hash_dupe=False)
         doc2cell(memcheck_doc, memcheck_seed, hash_dupe=False, copy_pspots=False)
 
-        logging.debug('Running CASTEP dryrun.')
+        LOG.debug('Running CASTEP dryrun.')
         self.executable += ' --dryrun'
         process = self.run_command(memcheck_seed)
         process.communicate()
@@ -987,14 +985,15 @@ class ComputeTask:
         """
         command = self.parse_executable(seed)
         if self.nnodes is None or self.nnodes == 1:
-            if self.ncores == 1 and self.node is None:
-                command = ['nice', '-n', '15'] + command
-            elif self.mpi_library == 'archer':
-                command = ['aprun', '-n', str(self.ncores)] + command
-            elif self.mpi_library == 'slurm':
-                command = ['srun', '--exclusive', '-N', '1', '-n', str(self.ncores)] + command
-            elif self.mpi_library == 'intel':
-                command = ['mpirun', '-n', str(self.ncores)] + command
+            if self.node is None:
+                if self.ncores == 1 and self.node is None:
+                    command = ['nice', '-n', '15'] + command
+                elif self.mpi_library == 'archer':
+                    command = ['aprun', '-n', str(self.ncores)] + command
+                elif self.mpi_library == 'slurm':
+                    command = ['srun', '--exclusive', '-N', '1', '-n', str(self.ncores)] + command
+                elif self.mpi_library == 'intel':
+                    command = ['mpirun', '-n', str(self.ncores)] + command
             elif self.node is not None:
                 cwd = os.getcwd()
                 command = ['ssh', '{}'.format(self.node), 'cd', '{};'.format(cwd), 'mpirun', '-n',
@@ -1021,11 +1020,11 @@ class ComputeTask:
         stderr = sp.PIPE
 
         if self._redirect_filename is not None:
-            logging.info('Redirecting output to {redirect}'.format(redirect=self._redirect_filename))
+            LOG.info('Redirecting output to {redirect}'.format(redirect=self._redirect_filename))
             redirect_file = open(self._redirect_filename, 'w')
             stdout = redirect_file
 
-        logging.info('Running {}'.format(command))
+        LOG.info('Running {}'.format(command))
         process = sp.Popen(command, shell=False, stdout=stdout, stderr=stderr)
         try:
             redirect_file.close()
@@ -1066,11 +1065,11 @@ class ComputeTask:
 
                 for line in flines:
                     if 'Work-around was successful, continuing with calculation.' in line:
-                        logging.info('Found LAPACK issue that was circumvented, removing error file.')
+                        LOG.info('Found LAPACK issue that was circumvented, removing error file.')
                         os.remove(globbed)
                         break
                     elif 'ERROR in cell constraints: attempt to fix' in line:
-                        logging.info('Trying to remedy CASTEP symmetry error...')
+                        LOG.info('Trying to remedy CASTEP symmetry error...')
                         remedy = self._remedy_castep_symmetry_error
                 else:
                     error_str += ' '.join(flines)
@@ -1105,25 +1104,25 @@ class ComputeTask:
         """
         try:
             bad_dir = self.root_folder + '/bad_castep'
-            logging.info('Moving files to bad_castep: {bad}.'.format(bad=bad_dir))
+            LOG.info('Moving files to bad_castep: {bad}.'.format(bad=bad_dir))
             if not os.path.exists(bad_dir):
                 os.makedirs(bad_dir, exist_ok=True)
             seed_files = glob.glob(seed + '.*') + glob.glob(seed + '-out.cell*')
             if seed_files:
-                logging.debug('Files to move: {seed}'.format(seed=seed_files))
+                LOG.debug('Files to move: {seed}'.format(seed=seed_files))
                 for _file in seed_files:
                     try:
                         shutil.copy2(_file, bad_dir)
                         os.remove(_file)
                     except Exception as exc:
-                        logging.warning('Error moving files to bad: {error}'.format(error=exc))
+                        LOG.warning('Error moving files to bad: {error}'.format(error=exc))
             # check root folder for any matching files and remove them
             fname = '{}/{}'.format(self.root_folder, seed)
             for ext in ['.res', '.res.lock', '.castep', '-out.cell']:
                 if os.path.isfile('{}{}'.format(fname, ext)):
                     os.remove('{}{}'.format(fname, ext))
         except Exception as exc:
-            logging.warning('Error moving files to bad: {error}'.format(error=exc))
+            LOG.warning('Error moving files to bad: {error}'.format(error=exc))
 
     def mv_to_completed(self, seed, completed_dir='completed', keep=False):
         """ Move all associated files to completed, removing any
@@ -1138,7 +1137,7 @@ class ComputeTask:
 
         """
         completed_dir = self.root_folder + '/' + completed_dir
-        logging.info('Moving files to completed: {completed}.'.format(completed=completed_dir))
+        LOG.info('Moving files to completed: {completed}.'.format(completed=completed_dir))
 
         if seed.endswith('.res'):
             seed = str(seed.replace('.res', ''))
@@ -1151,7 +1150,7 @@ class ComputeTask:
         if keep:
             seed_files = glob.glob(seed + '.*') + glob.glob(seed + '-out.cell*')
             if seed_files:
-                logging.debug('Files to move: {files}.'.format(files=seed_files))
+                LOG.debug('Files to move: {files}.'.format(files=seed_files))
                 for _file in seed_files:
                     shutil.move(_file, completed_dir)
         else:
@@ -1169,7 +1168,7 @@ class ComputeTask:
                 try:
                     shutil.move('{}{}'.format(seed, ext), completed_dir)
                 except Exception as exc:
-                    logging.warning('Error moving files to completed: {error}'.format(error=exc))
+                    LOG.warning('Error moving files to completed: {error}'.format(error=exc))
 
         # delete whatever is left
         wildcard_fnames = glob.glob('{}/{}.*'.format(self.root_folder, seed))
@@ -1191,19 +1190,19 @@ class ComputeTask:
         if not self._first_run:
             return
         input_dir = self.root_folder + '/input'
-        logging.debug('Copying file to input_dir: {input}'.format(input=input_dir))
+        LOG.debug('Copying file to input_dir: {input}'.format(input=input_dir))
         if not os.path.exists(input_dir):
             os.makedirs(input_dir, exist_ok=True)
         if glob_files:
             files = glob.glob('{}*'.format(seed))
-            logging.debug('Files to copy: {files}'.format(files=files))
+            LOG.debug('Files to copy: {files}'.format(files=files))
             for f in files:
                 if f.endswith('.lock'):
                     continue
                 if not os.path.isfile(f):
                     shutil.copy2('{}'.format(f), input_dir)
         else:
-            logging.debug('File to copy: {file}'.format(file='{}.{}'.format(seed, ext)))
+            LOG.debug('File to copy: {file}'.format(file='{}.{}'.format(seed, ext)))
             if os.path.isfile('{}.{}'.format(seed, ext)):
                 if not os.path.isfile('{}/{}.{}'.format(input_dir, seed, ext)):
                     shutil.copy2('{}.{}'.format(seed, ext), input_dir)
@@ -1219,9 +1218,9 @@ class ComputeTask:
 
         """
 
-        logging.info('Preparing to relax {seed}'.format(seed=self.seed))
+        LOG.info('Preparing to relax {seed}'.format(seed=self.seed))
         if self.compute_dir is not None:
-            logging.info('Using compute_dir: {compute}'.format(compute=self.compute_dir))
+            LOG.info('Using compute_dir: {compute}'.format(compute=self.compute_dir))
             if not os.path.isdir(self.compute_dir):
                 os.makedirs(self.compute_dir)
             # if compute_dir isn't simply inside this folder, make a symlink that is
@@ -1233,7 +1232,7 @@ class ComputeTask:
                     os.symlink(self.compute_dir, link_name)
 
             # copy pspots and any intermediate calcs to compute_dir
-            logging.info('Copying pspots into compute_dir')
+            LOG.info('Copying pspots into compute_dir')
             pspots = glob.glob('*.usp')
             for pspot in pspots:
                 shutil.copy2(pspot, self.compute_dir)
@@ -1243,7 +1242,7 @@ class ComputeTask:
 
         # update res file with intermediate calculation if castep file is newer than res
         if os.path.isfile(self.seed + '.castep') and os.path.isfile(self.seed + '.res'):
-            logging.info('Trying to update res file with result from intermediate CASTEP file found in root_dir')
+            LOG.info('Trying to update res file with result from intermediate CASTEP file found in root_dir')
             if self.compute_dir is not None:
                 shutil.copy2(self.seed + '.castep', self.compute_dir)
             castep_dict, success = castep2dict(self.seed + '.castep', db=False)
@@ -1251,14 +1250,14 @@ class ComputeTask:
                 self.res_dict['geom_iter'] = castep_dict.get('geom_iter')
 
             if os.path.getmtime(self.seed + '.res') < os.path.getmtime(self.seed + '.castep'):
-                logging.info('CASTEP file was updated more recently than res file, using intermediate structure...')
+                LOG.info('CASTEP file was updated more recently than res file, using intermediate structure...')
                 self.res_dict.update(castep_dict)
 
         if self.compute_dir is not None:
             os.chdir(self.compute_dir)
 
         # copy initial res file to seed
-        logging.info('Writing fresh res file to start calculation from.')
+        LOG.info('Writing fresh res file to start calculation from.')
         doc2res(self.res_dict, self.seed, info=False, hash_dupe=False, overwrite=True)
         self.cp_to_input(self.seed)
 
@@ -1271,7 +1270,7 @@ class ComputeTask:
 
         if self.res_dict['geom_iter'] > self.calc_doc['geom_max_iter']:
             msg = '{} iterations already performed on structure, exiting...'.format(self.res_dict['geom_iter'])
-            logging.critical(msg)
+            LOG.critical(msg)
             raise CalculationError(msg)
 
         # number of steps in fine and rough calcs respectively
@@ -1292,11 +1291,11 @@ class ComputeTask:
                 num_fine_iter = 1
             self._geom_max_iter_list.extend(num_fine_iter * [fine_iter])
 
-        logging.info('Geometry optimisation iteration scheme set to {}'.format(self._geom_max_iter_list))
+        LOG.info('Geometry optimisation iteration scheme set to {}'.format(self._geom_max_iter_list))
 
         if not self._geom_max_iter_list:
             msg = 'Could not divide up relaxation; consider increasing geom_max_iter'
-            logging.critical(msg)
+            LOG.critical(msg)
             raise CriticalError(msg)
 
     def _update_input_files(self, seed, calc_doc):
@@ -1338,7 +1337,7 @@ class ComputeTask:
         """
         files = glob.glob(seed + '.*')
         if files:
-            logging.info('Tidying up remaining files: {files}'.format(files=files))
+            LOG.info('Tidying up remaining files: {files}'.format(files=files))
             for f in files:
                 if not (f.endswith('.res') or f.endswith('.castep')):
                     os.remove(f)
@@ -1351,7 +1350,7 @@ class ComputeTask:
             opti_dict (dict): intermediate calculation results.
 
         """
-        logging.info('Updating .res and .castep files in root_dir with new results')
+        LOG.info('Updating .res and .castep files in root_dir with new results')
         if os.path.isfile(self.seed + '.res'):
             os.rename('{}.res'.format(self.seed), '{}.res_bak'.format(self.seed))
         try:
@@ -1374,15 +1373,15 @@ class ComputeTask:
             bool: True is relaxation was successful, False otherwise.
 
         """
-        logging.info('Finalising calculation...')
+        LOG.info('Finalising calculation...')
         try:
             success = self.res_dict.get('optimised', False)
         except AttributeError:
             success = False
 
-        logging.info('Was calculation successful? {success}'.format(success=success))
+        LOG.info('Was calculation successful? {success}'.format(success=success))
         if self.output_queue is not None:
-            logging.info('Pushing results to output queue')
+            LOG.info('Pushing results to output queue')
             self.output_queue.put(self.res_dict)
         if success:
             self.mv_to_completed(self.seed, completed_dir=self.paths['completed_dir'])
@@ -1404,15 +1403,15 @@ class ComputeTask:
             subprocess.Popen: running process to be killed.
 
         """
-        logging.info('Ending process early for seed: {seed}'.format(seed=self.seed))
+        LOG.info('Ending process early for seed: {seed}'.format(seed=self.seed))
         process.terminate()
-        logging.info('Ended process early for seed: {seed}'.format(seed=self.seed))
+        LOG.info('Ended process early for seed: {seed}'.format(seed=self.seed))
         if self.compute_dir is not None:
-            logging.info('Cleaning up compute_dir: {dir}'.format(dir=self.compute_dir))
+            LOG.info('Cleaning up compute_dir: {dir}'.format(dir=self.compute_dir))
             for f in glob.glob('{}.*'.format(self.seed)):
                 shutil.copy2(f, self.root_folder)
                 os.remove(f)
-        logging.info('Removing lock file so calculation can be continued.')
+        LOG.info('Removing lock file so calculation can be continued.')
         if os.path.isfile('{}/{}{}'.format(self.root_folder, self.seed, '.res.lock')):
             os.remove('{}/{}{}'.format(self.root_folder, self.seed, '.res.lock'))
 
@@ -1429,21 +1428,21 @@ class ComputeTask:
                 were found, otherwise False.
 
         """
-        logging.info('Checking if compute_dir still contains calculations...')
+        LOG.info('Checking if compute_dir still contains calculations...')
         if not os.path.isdir(compute_dir):
             return False
 
         files = glob.glob(compute_dir + '/*')
-        logging.debug('Found {files} in {dir}'.format(files=files, dir=compute_dir))
+        LOG.debug('Found {files} in {dir}'.format(files=files, dir=compute_dir))
 
         for fname in files:
             if fname.endswith('.res') or fname.endswith('.castep'):
-                logging.debug('Not removing {dir} as it still contains calculation {fname}'.format(
+                LOG.debug('Not removing {dir} as it still contains calculation {fname}'.format(
                     dir=compute_dir, fname=fname))
                 return False
 
         # remove files in directory, then delete directory
-        logging.debug('Deleting files {files} from {dir}'.format(files=files, dir=compute_dir))
+        LOG.debug('Deleting files {files} from {dir}'.format(files=files, dir=compute_dir))
         for fname in files:
             if os.path.isfile(fname):
                 try:
@@ -1452,7 +1451,7 @@ class ComputeTask:
                     pass
 
         if os.path.isdir(compute_dir):
-            logging.debug('Deleting directory {dir}'.format(dir=compute_dir))
+            LOG.debug('Deleting directory {dir}'.format(dir=compute_dir))
             os.rmdir(compute_dir)
 
         if os.path.islink(compute_dir.split('/')[-1]):
