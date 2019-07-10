@@ -564,7 +564,7 @@ class ComputeTest(unittest.TestCase):
         dirs = ['completed', 'input', 'logs']
         dirs_exist = all([isdir(_dir) for _dir in dirs])
 
-        self.assertTrue(elapsed < 5, 'Sluggish to quit!')
+        self.assertTrue(elapsed < 15, 'Sluggish to quit!')
         self.assertTrue(completed_files_exist)
         self.assertTrue(dirs_exist)
         self.assertTrue(txt_files_exist)
