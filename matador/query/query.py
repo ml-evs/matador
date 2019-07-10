@@ -351,9 +351,10 @@ class DBQuery:
                                 print('Multiple stoichiometries in cursor, unable to filter by energy.')
                             else:
                                 gs_enthalpy = self.cursor[0]['enthalpy_per_atom']
-                                self._num_to_display = \
-                                    1 + sum([1 for doc in self.cursor[1:]
-                                             if doc['enthalpy_per_atom'] - gs_enthalpy > self.args.get('delta_E')])
+                                for ind, doc in enumerate(self.cursor[1:]):
+                                    if abs(doc['enthalpy_per_atom'] - gs_enthalpy) > self.args.get('delta_E'):
+                                        self._num_to_display = ind + 1
+                                        break
                                 cursor_count = self._num_to_display
                         elif self.top == -1 or self.top is None:
                             self._num_to_display = cursor_count
