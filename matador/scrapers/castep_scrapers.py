@@ -1655,6 +1655,7 @@ def _castep_scrape_devel_code(flines, castep):
         castep (dict): dictionary to update with BEEF output.
 
     """
+    last_devel_code = len(flines)
     for line_no, line in enumerate(flines):
         if line.startswith(' *') and '**** Developer Code ****' in line:
             last_devel_code = line_no
