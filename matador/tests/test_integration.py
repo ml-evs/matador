@@ -36,18 +36,35 @@ try:
 except pm.errors.ServerSelectionTimeoutError:
     MONGO_PRESENT = False
 
-MONGO_CLIENT.crystals[DB_NAME].drop()
-MONGO_CLIENT.crystals[getpass.getuser() + '_' + DB_NAME].drop()
-
-MONGO_CLIENT.crystals['__changelog_' + DB_NAME].drop()
-
-for _file in glob.glob('*spatula*'):
-    os.remove(_file)
-
 
 @unittest.skipIf(not MONGO_PRESENT, 'MongoDB instance not found, skipping tests...')
 class IntegrationTest(unittest.TestCase):
     """ Test functionality acting on local database. """
+
+    def tearDown(self):
+        errored = False
+        try:
+            drop(DB_NAME)
+        except SystemExit:
+            errored = True
+        self.assertTrue(DB_NAME in MONGO_CLIENT.crystals.list_collection_names())
+        self.assertTrue(errored)
+
+        coll_name = '{}_{}'.format(getpass.getuser(), DB_NAME)
+        MONGO_CLIENT.crystals[DB_NAME].rename(coll_name)
+        drop(coll_name)
+        self.assertTrue(DB_NAME not in MONGO_CLIENT.crystals.list_collection_names())
+        self.assertTrue(coll_name not in MONGO_CLIENT.crystals.list_collection_names())
+
+    def setUp(self):
+        MONGO_CLIENT.crystals[DB_NAME].drop()
+        MONGO_CLIENT.crystals[getpass.getuser() + '_' + DB_NAME].drop()
+
+        MONGO_CLIENT.crystals['__changelog_' + DB_NAME].drop()
+
+        for _file in glob.glob('*spatula*'):
+            os.remove(_file)
+
     def test_integration(self):
         """ Test import and query. """
         query = import_castep()
@@ -150,24 +167,9 @@ class IntegrationTest(unittest.TestCase):
         query = id_query()
         self.assertEqual(len(query.cursor), 0)
 
-        errored = False
-        try:
-            drop(DB_NAME)
-        except SystemExit:
-            errored = True
-        self.assertTrue(DB_NAME in MONGO_CLIENT.crystals.list_collection_names())
-        self.assertTrue(errored)
-
-        coll_name = '{}_{}'.format(getpass.getuser(), DB_NAME)
-        MONGO_CLIENT.crystals[DB_NAME].rename(coll_name)
-        drop(coll_name)
-        self.assertTrue(DB_NAME not in MONGO_CLIENT.crystals.list_collection_names())
-        self.assertTrue(coll_name not in MONGO_CLIENT.crystals.list_collection_names())
-
         cursor = refine().cursor
         self.assertTrue(all([doc['doi'] == ['10/12345'] for doc in cursor]))
-        self.assertTrue(all([doc['tags'] == ['test_integration'] for doc in cursor]))
-        self.assertTrue(all([doc['space_group'] == 'P1' for doc in cursor]))
+        self.assertTrue(all([doc['tags'] == ['integration_test'] for doc in cursor]))
         self.assertTrue(all([doc['root_source'] == get_root_source(doc) for doc in cursor]))
         self.assertTrue(all([isinstance(doc['_raw'], dict) for doc in cursor]))
 
@@ -313,7 +315,7 @@ def changes():
 
 def refine():
     """ Test various matador refine tasks. """
-    sys.argv = ['matador', 'refine', '--db', DB_NAME, '--task', 'sym', '--symprec', 1e-20, '--mode', 'overwrite']
+    sys.argv = ['matador', 'refine', '--db', DB_NAME, '--task', 'sym', '--mode', 'overwrite']
     if CONFIG_FNAME is not None:
         sys.argv += ['--config', CONFIG_FNAME]
     matador.cli.cli.main(override=True)
@@ -328,12 +330,7 @@ def refine():
         sys.argv += ['--config', CONFIG_FNAME]
     matador.cli.cli.main(override=True)
 
-    sys.argv = ['matador', 'refine', '--db', DB_NAME, '--task', 'tag', '--mode', 'set', '--new_tag', 'integration_test']
-    if CONFIG_FNAME is not None:
-        sys.argv += ['--config', CONFIG_FNAME]
-    matador.cli.cli.main(override=True)
-
-    sys.argv = ['matador', 'refine', '--db', DB_NAME, '--task', 'raw', '--mode', 'set']
+    sys.argv = ['matador', 'refine', '--db', DB_NAME, '--task', 'tag', '--mode', 'overwrite', '--new_tag', 'integration_test']
     if CONFIG_FNAME is not None:
         sys.argv += ['--config', CONFIG_FNAME]
     matador.cli.cli.main(override=True)
@@ -343,7 +340,13 @@ def refine():
         sys.argv += ['--config', CONFIG_FNAME]
     matador.cli.cli.main(override=True)
 
+    sys.argv = ['matador', 'refine', '--db', DB_NAME, '--task', 'raw', '--mode', 'overwrite']
+    if CONFIG_FNAME is not None:
+        sys.argv += ['--config', CONFIG_FNAME]
+    matador.cli.cli.main(override=True)
+
     query = DBQuery(db=DB_NAME, config=CONFIG_FNAME)
+
     return query
 
 

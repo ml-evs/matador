@@ -241,7 +241,7 @@ class Refiner:
 
         for _, doc in enumerate(self.cursor):
             try:
-                sources = doc['sources']
+                sources = doc['source']
                 raw_files = {}
                 for source in sources:
                     if os.path.isfile(source):
@@ -249,6 +249,8 @@ class Refiner:
                             raw_files[source] = f.readlines()
 
                 doc['_raw'] = raw_files
+                self.diff_cursor.append(doc)
+                self.changed_count += 1
             except Exception as error:
                 print(repr(error))
                 self.failed_count += 1
