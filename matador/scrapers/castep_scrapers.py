@@ -1677,6 +1677,9 @@ def _castep_scrape_devel_code(flines, castep):
             if 'radius' in line.lower():
                 castep['cnt_radius'] = float(line.strip().split()[-1])
 
+    # store as string rather than list
+    castep['devel_code'] = devel_code
+
 
 def get_seed_metadata(doc, seed):
     """ For a given document and seedname, look for

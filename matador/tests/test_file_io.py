@@ -418,7 +418,7 @@ class CastepScraperTests(unittest.TestCase):
         self.assertEqual(test_dict['atom_types'], 12*['Se'])
         self.assertEqual(test_dict['encapsulated'], True)
         self.assertEqual(test_dict['cnt_radius'], 4.69825)
-        self.assertEqual(len(test_dict['devel_code']), 9)
+        self.assertEqual(len(test_dict['devel_code']), 195)
 
 
 class ResScraperTests(unittest.TestCase):
