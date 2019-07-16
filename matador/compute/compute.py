@@ -184,13 +184,13 @@ class ComputeTask:
         if self.verbosity > 1:
             stdout_handler = logging.StreamHandler(sys.stdout)
             stdout_handler.setLevel(loglevel)
-            stdout_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)|%(levelname)8s: %(message)s'))
+            stdout_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s | %(levelname)8s: %(message)s'))
             LOG.addHandler(stdout_handler)
 
         logname = os.path.abspath('logs/{}.log'.format(self.seed))
         file_handler = logging.FileHandler(logname, mode='a')
         file_handler.setLevel(logging.DEBUG)
-        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)|%(levelname)8s: %(message)s'))
+        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s | %(levelname)8s: %(message)s'))
         LOG.addHandler(file_handler)
 
         splash_screen = r"""
