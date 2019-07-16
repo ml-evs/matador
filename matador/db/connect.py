@@ -87,7 +87,7 @@ def make_connection_to_collection(coll_names, check_collection=False, allow_chan
                         client.close()
                         raise SystemExit('Collection {} not found!'.format(collection))
                     else:
-                        print('Collection not found, did you mean one of these?')
+                        print('Collection {} not found, did you mean one of these?'.format(collection))
                         for ind, value in enumerate(options[:10]):
                             print('({}):\t{}'.format(ind, value))
                         if check_collection:

@@ -194,30 +194,31 @@ class MatadorCommandLine:
                 raise SystemExit('I will only delete one collection at a time...')
             if target is None:
                 raise SystemExit('Please specify a collection to delete.')
-            elif target not in self.db.collection_names():
+            if target not in self.db.collection_names():
                 raise SystemExit('No collection named {} was found'.format(target))
+
+            from getpass import getuser
+            user = getuser()
+            if user not in target:
+                raise SystemExit('I cannot delete a collection that\'s name does not start with '
+                                 'your username, {}'.format(user))
+            stats = self.db.command('collstats', target)
+
+            if self.args.get('override'):
+                answer = 'y'
             else:
-                from getpass import getuser
-                user = getuser()
-                if user not in target:
-                    raise SystemExit('I cannot delete a collection that\'s name does not start with '
-                                     'your username, {}'.format(user))
-                stats = self.db.command('collstats', target)
-                if self.args.get('override'):
-                    answer = 'y'
-                else:
-                    answer = input('Are you sure you want to delete collection {} containing {} '
-                                   'structures? [y/n]\n'.format(target, stats['count']))
-                if answer.lower() == 'y':
-                    if target == 'repo':
-                        raise SystemExit('I\'m sorry Dave, I\'m afraid I can\'t do that...')
-                    else:
-                        print('Deleting collection {}...'.format(target))
-                        self.db[target].drop()
-                        print('and its changelog...')
-                        self.db['__changelog_{}'.format(target)].drop()
-                else:
-                    raise SystemExit('Nevermind then!')
+                answer = input('Are you sure you want to delete collection {} containing {} '
+                               'structures? [y/n]\n'.format(target, stats['count']))
+            if answer.lower() == 'y':
+                if target == 'repo':
+                    raise SystemExit('I\'m sorry Dave, I\'m afraid I can\'t do that...')
+                print('Deleting collection {}...'.format(target))
+                self.db[target].drop()
+                print('and its changelog...')
+                self.db['__changelog_{}'.format(target)].drop()
+            else:
+                raise SystemExit('Nevermind then!')
+
         else:
             comp_list = dict()
             stats_dict = dict()
@@ -497,7 +498,8 @@ def main(override=False):
     pdffit_flags.add_argument('-np', '--num_processes', type=int, help='number of concurrent fits to perform.')
 
     refine_flags = argparse.ArgumentParser(add_help=False)
-    refine_flags.add_argument('-task', '--task', type=str, help='refine subtask to perform: options are spg or sub')
+    refine_flags.add_argument('-task', '--task', type=str,
+                              help='refine subtask to perform: options are spg, elem_set, tag, doi, source, pspot or raw or sub')
     refine_flags.add_argument('-mode', '--mode', type=str,
                               help='mode of refinement: options are display, set and overwrite')
     refine_flags.add_argument('-symprec', '--symprec', type=float, help='spglib symmetry precision for refinement')

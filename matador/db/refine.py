@@ -10,7 +10,10 @@ created with older matador versions.
 
 
 from traceback import print_exc
+import os
+
 import pymongo as pm
+
 from matador.utils.print_utils import print_notify, print_warning, print_failure
 
 
@@ -33,7 +36,7 @@ class Refiner:
             mode (str): one of 'display', 'overwrite', 'set'.
 
         """
-        possible_tasks = ['sym', 'spg', 'elem_set', 'tag', 'doi', 'source', 'pspot']
+        possible_tasks = ['sym', 'spg', 'elem_set', 'tag', 'doi', 'source', 'pspot', 'raw']
         possible_modes = ['display', 'overwrite', 'set']
 
         if mode not in possible_modes:
@@ -43,7 +46,7 @@ class Refiner:
             raise SystemExit('Impossible to overwite or set without db collection, exiting...')
         if task is None:
             raise SystemExit('No specified task, exiting...')
-        elif task not in possible_tasks:
+        if task not in possible_tasks:
             raise SystemExit('Did not understand task, please choose one of ' + ', '.join(possible_tasks))
         if task == 'tag' and mode == 'set':
             raise SystemExit('Task "tags" and mode "set" will not alter the database, please use mode "overwrite".')
@@ -85,6 +88,9 @@ class Refiner:
         elif task == 'pspot':
             self.field = 'species_pot'
             self.tidy_pspots()
+        elif task == 'raw':
+            self.field = '_raw'
+            self.add_raw_data()
 
         print(self.changed_count, '/', len(self.cursor), 'to be changed.')
         print(self.failed_count, '/', len(self.cursor), 'failed.')
@@ -223,6 +229,26 @@ class Refiner:
                     del doc['species_pot'][elem]
                     self.diff_cursor.append(doc)
                     self.changed_count += 1
+            except Exception as error:
+                print(repr(error))
+                self.failed_count += 1
+
+    def add_raw_data(self):
+        """ Loop over all documents in the query and try to open the files
+        listed under their `source` fields, storing them under the `_raw` key.
+
+        """
+
+        for _, doc in enumerate(self.cursor):
+            try:
+                sources = doc['sources']
+                raw_files = {}
+                for source in sources:
+                    if os.path.isfile(source):
+                        with open(source, 'r') as f:
+                            raw_files[source] = f.readlines()
+
+                doc['_raw'] = raw_files
             except Exception as error:
                 print(repr(error))
                 self.failed_count += 1

@@ -20,6 +20,7 @@ from matador.config import load_custom_settings
 from matador.query import DBQuery
 from matador.hull import QueryConvexHull
 from matador.scrapers.castep_scrapers import cell2dict, res2dict
+from matador.utils.chem_utils import get_root_source
 
 REAL_PATH = '/'.join(os.path.realpath(__file__).split('/')[:-1]) + '/'
 CONFIG_FNAME = None
@@ -163,6 +164,13 @@ class IntegrationTest(unittest.TestCase):
         self.assertTrue(DB_NAME not in MONGO_CLIENT.crystals.list_collection_names())
         self.assertTrue(coll_name not in MONGO_CLIENT.crystals.list_collection_names())
 
+        cursor = refine().cursor
+        self.assertTrue(all([doc['doi'] == ['10/12345'] for doc in cursor]))
+        self.assertTrue(all([doc['tags'] == ['test_integration'] for doc in cursor]))
+        self.assertTrue(all([doc['space_group'] == 'P1' for doc in cursor]))
+        self.assertTrue(all([doc['root_source'] == get_root_source(doc) for doc in cursor]))
+        self.assertTrue(all([isinstance(doc['_raw'], dict) for doc in cursor]))
+
 
 def import_castep(extra_flags=None):
     """ Import from castep files, returning data to be checked. """
@@ -301,6 +309,42 @@ def changes():
     changes_count = MONGO_CLIENT.crystals['__changelog_' + DB_NAME].count_documents({})
 
     return query_1, query_2, changes_count
+
+
+def refine():
+    """ Test various matador refine tasks. """
+    sys.argv = ['matador', 'refine', '--db', DB_NAME, '--task', 'sym', '--symprec', 1e-20, '--mode', 'overwrite']
+    if CONFIG_FNAME is not None:
+        sys.argv += ['--config', CONFIG_FNAME]
+    matador.cli.cli.main(override=True)
+
+    sys.argv = ['matador', 'refine', '--db', DB_NAME, '--task', 'source', '--mode', 'set']
+    if CONFIG_FNAME is not None:
+        sys.argv += ['--config', CONFIG_FNAME]
+    matador.cli.cli.main(override=True)
+
+    sys.argv = ['matador', 'refine', '--db', DB_NAME, '--task', 'doi', '--mode', 'set', '--new_doi', '10/12345']
+    if CONFIG_FNAME is not None:
+        sys.argv += ['--config', CONFIG_FNAME]
+    matador.cli.cli.main(override=True)
+
+    sys.argv = ['matador', 'refine', '--db', DB_NAME, '--task', 'tag', '--mode', 'set', '--new_tag', 'integration_test']
+    if CONFIG_FNAME is not None:
+        sys.argv += ['--config', CONFIG_FNAME]
+    matador.cli.cli.main(override=True)
+
+    sys.argv = ['matador', 'refine', '--db', DB_NAME, '--task', 'raw', '--mode', 'set']
+    if CONFIG_FNAME is not None:
+        sys.argv += ['--config', CONFIG_FNAME]
+    matador.cli.cli.main(override=True)
+
+    sys.argv = ['matador', 'refine', '--db', DB_NAME, '--task', 'pspot', '--mode', 'overwrite']
+    if CONFIG_FNAME is not None:
+        sys.argv += ['--config', CONFIG_FNAME]
+    matador.cli.cli.main(override=True)
+
+    query = DBQuery(db=DB_NAME, config=CONFIG_FNAME)
+    return query
 
 
 def export():
