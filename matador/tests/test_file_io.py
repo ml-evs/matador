@@ -395,7 +395,7 @@ class CastepScraperTests(unittest.TestCase):
     def test_castep_beef_scraper(self):
         from matador.utils.chem_utils import HARTREE_TO_EV
         castep_fname = REAL_PATH + 'data/beef_files/K3P_BEEF.castep'
-        self.assertTrue(os.path.isfile(castep_fname), msg='Failed to open tes  case {} - please check installation'.format(castep_fname))
+        self.assertTrue(os.path.isfile(castep_fname), msg='Failed to open test case {} - please check installation'.format(castep_fname))
         test_dict, s = castep2dict(castep_fname, db=False, verbosity=VERBOSITY)
         self.assertTrue(s)
         self.assertEqual(test_dict['task'], 'singlepointenergy')
@@ -408,6 +408,17 @@ class CastepScraperTests(unittest.TestCase):
         self.assertAlmostEqual(test_dict['_beef']['std_dev_total_energy'], 2.2674151843 * HARTREE_TO_EV)
         self.assertAlmostEqual(test_dict['_beef']['mean_total_energy_per_atom'], -190.6571830577 * HARTREE_TO_EV / 8)
         self.assertAlmostEqual(test_dict['_beef']['std_dev_total_energy_per_atom'], 2.2674151843 * HARTREE_TO_EV / 8)
+
+    def test_castep_encap_scraper(self):
+        castep_fname = REAL_PATH + 'data/encap_files/Se.castep'
+        self.assertTrue(os.path.isfile(castep_fname), msg='Failed to find test case {}, please check installation'.format(castep_fname))
+        test_dict, s = castep2dict(castep_fname, db=False, verbosity=VERBOSITY)
+        self.assertTrue(s)
+        self.assertEqual(test_dict['task'], 'geometryoptimization')
+        self.assertEqual(test_dict['atom_types'], 12*['Se'])
+        self.assertEqual(test_dict['encapsulated'], True)
+        self.assertEqual(test_dict['cnt_radius'], 4.69825)
+        self.assertEqual(len(test_dict['devel_code']), 9)
 
 
 class ResScraperTests(unittest.TestCase):

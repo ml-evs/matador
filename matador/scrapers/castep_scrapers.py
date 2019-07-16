@@ -603,6 +603,9 @@ def castep2dict(seed, db=True, intermediates=False, **kwargs):
     # scrape any BEEF post-processing
     _castep_scrape_beef(flines, castep)
 
+    # scrape any AJM group-specific devel codes
+    _castep_scrape_devel_code(flines, castep)
+
     if 'positions_frac' not in castep or not castep['positions_frac']:
         raise CalculationError('Could not find positions')
 
@@ -1638,6 +1641,40 @@ def _castep_scrape_beef(flines, castep):
     castep['_beef']['mean_total_energy_per_atom'] = np.mean(castep['_beef']['total_energy']) / castep['num_atoms']
     castep['_beef']['std_dev_total_energy'] = np.std(castep['_beef']['total_energy'])
     castep['_beef']['std_dev_total_energy_per_atom'] = np.std(castep['_beef']['total_energy']) / castep['num_atoms']
+
+
+def _castep_scrape_devel_code(flines, castep):
+    """ Scrape the contents of the developer code block and
+    extract any information about nanotube encapsulation.
+    Searches for then scrapes the last occurence of "Developer
+    Code". If nanotube information is found, the `encapsulated`
+    flag is set to True.
+
+    Parameters:
+        flines (list): CASTEP output flines to scrape.
+        castep (dict): dictionary to update with BEEF output.
+
+    """
+    for line_no, line in enumerate(flines):
+        if line.startswith(' *') and '**** Developer Code ****' in line:
+            last_devel_code = line_no
+
+    castep['devel_code'] = []
+    for line_no, line in enumerate(flines[last_devel_code+1:]):
+        # look for end of block
+        if '*************' in line.strip():
+            break
+
+        line = line.strip()
+        if line:
+            castep['devel_code'].append(line)
+
+    devel_code = '\n'.join(castep['devel_code'])
+    if 'gaussian_cylinder' in devel_code.lower():
+        castep['encapsulated'] = True
+        for line in castep['devel_code']:
+            if 'radius' in line.lower():
+                castep['cnt_radius'] = float(line.strip().split()[-1])
 
 
 def get_seed_metadata(doc, seed):

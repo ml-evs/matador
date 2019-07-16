@@ -376,7 +376,8 @@ def display_results(cursor,
                     source_string[-1] += (len(u"└────────────── ") + 11) * ' ' + u'└──'
                 elif num != 0:
                     source_string[-1] += (len(u"└────────────── ") + 11) * ' ' + u'├──'
-                source_string[-1] += ' ' + file.split('structure_repository')[-1]
+                # source_string[-1] += ' ' + file.split('structure_repository')[-1]
+                source_string[-1] += ' ' + file
                 if num != len(doc['source']) - 1:
                     source_string[-1] += '\n'
 
