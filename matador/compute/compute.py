@@ -876,18 +876,35 @@ class ComputeTask:
         """ Combines command-line MPI arguments into string and calls
         MPI library detection is no args are present.
         """
+        guessed_version = self.detect_mpi()
         if sum([self.archer, self.intel, self.slurm]) > 1:
             message = 'Conflicting command-line arguments for MPI library have been supplied, exiting.'
             LOG.critical(message)
             raise CriticalError(message)
-        elif self.archer:
-            return 'archer'
-        elif self.intel:
-            return 'intel'
-        elif self.slurm:
+
+        if self.archer:
+            if guessed_version != 'archer':
+                message = 'Detected {} MPI, but user asked to use aprun... please check your environment.'
+                LOG.critical(message)
+                raise CriticalError(message)
+            else:
+                return 'archer'
+
+        if self.intel:
+            if guessed_version != 'intel':
+                message = 'Detected {} MPI, but user asked to use Intel MPI... please check your environment.'
+                LOG.critical(message)
+                raise CriticalError(message)
+            else:
+                return 'intel'
+
+        if self.slurm:
+            if guessed_version != 'slurm':
+                message = 'Detected {} MPI, but user asked to use srun... continuing with srun.'
+                LOG.warning(message)
             return 'slurm'
-        else:
-            return self.detect_mpi()
+
+        return guessed_version
 
     @staticmethod
     def detect_mpi():
