@@ -104,6 +104,7 @@ class PhaseDiagram:
         self.hull_dist = self.get_hull_distances(structures, precompute=True)
         set_cursor_from_array(self.cursor, self.hull_dist, 'hull_distance')
         self.structures = structures
+        self.stable_structures = [doc for doc in self.cursor if doc['hull_distance'] < EPS]
 
     def __str__(self):
         """ Print underlying phase diagram. """
