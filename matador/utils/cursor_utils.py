@@ -552,6 +552,8 @@ def get_guess_doc_provenance(sources, icsd=None):
                 prov = 'ICSD'
             elif '-mp-' in fname:
                 prov = 'MP'
+            elif '-sm-' in fname:
+                prov = 'SM'
             elif '-doi-' in fname:
                 prov = 'DOI'
 
