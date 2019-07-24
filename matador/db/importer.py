@@ -263,7 +263,7 @@ class Spatula:
             # if any missing info at all, score = 0
             # include elem set for faster querying
             if 'elems' not in struct:
-                struct['elems'] = list(set(struct['atom_types']))
+                struct['elems'] = sorted(list(set(struct['atom_types'])))
 
             # check basic DFT params if we're not in a prototype DB
             if not self.args.get('prototype'):
