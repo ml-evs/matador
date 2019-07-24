@@ -449,6 +449,7 @@ def main(override=False):
     query_flags.add_argument('-d', '--details', action='store_true',
                              help='show as much detail about calculation as possible')
     query_flags.add_argument('-pa', '--per_atom', action='store_true', help='show quantities per atom not per fu.')
+    query_flags.add_argument('-ef', '--eform', action='store_true', help='print formation energy not hull distance.')
     query_flags.add_argument('-dt', '--time', type=int, help='query only structures added before this time in days')
     query_flags.add_argument('-avail', '--available_values', type=str, help='list all values of field in query results')
     query_flags.add_argument('--use_source', action='store_true', help='show the source rather than database ID')

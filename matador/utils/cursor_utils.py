@@ -168,7 +168,10 @@ def display_results(cursor,
         header_string += "{:^11}".format('Volume/fu')
     units_string += "{:^11}".format('(Ang^3)')
 
-    if hull:
+    if hull and args.get('eform'):
+        header_string += "{:^18}".format('Formation energy')
+        units_string += "{:^18}".format('(eV/atom)')
+    elif hull:
         header_string += "{:^18}".format('Hull dist.')
         units_string += "{:^18}".format('(meV/atom)')
     elif args.get('per_atom'):
@@ -257,9 +260,13 @@ def display_results(cursor,
         except Exception:
             struct_string[-1] += "{:^11}".format('xxx')
         try:
-            if hull:
+            if hull and args.get('eform'):
+                struct_string[-1] += "{:>13.3f}".format(
+                    doc['formation_' + energy_key]
+                )
+            elif hull:
                 struct_string[-1] += "{:>13.1f}".format(
-                    0 if doc.get('hull_distance') <= 1e-12 else 1000 * doc.get('hull_distance')
+                    1000 * doc['hull_distance']
                 )
             elif args.get('per_atom'):
                 struct_string[-1] += "{:>18.5f}".format(recursive_get(doc, energy_key) - gs_enthalpy)
