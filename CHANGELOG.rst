@@ -7,16 +7,16 @@ New in development version (rolling) (0.9a)
 -------------------------------------------
 
 - Much improved code structure and many additional classes that wrap the raw calculation dictionaries for e.g. `Crystal` and spectral classes. 
-- New features in :module:`matador.hull` module:
+- New features in :mod:`matador.hull` module:
   + Pseudo-ternary phase diagrams (building towards arbitrary n-dimensional phase diagrams).
   + :class:`matador.hull.EnsembleHull` class and submodule to support the Bayesian Error Estimate Functional (BEEF) and finite temperature phase diagrams.
   + Refactoring of hull calculation into light-weight :class:`matador.hull.PhaseDiagram` class.
-- Refactored old PDF `similarity` module into new module :module:`matador.fingerprints`. 
+- Refactored old PDF `similarity` module into new module :mod:`matador.fingerprints`. 
   + Added new fingerprint class, :class:`matador.fingerprints.PXRD`, with associated plots (thanks for James Darby for some initial code).
   + :class:`matador.fingerprints.PDF` sped up by an order of magnitude using `numba`.
 - :class:`matador.workflows.castep.CastepSpectralWorkflow` extended to include latest projected dispersion curve developments from OptaDOS, with associated projected dispersion plots (see tutorial).
   + Updated dispersion script to automatically perform naive Gaussian smearing if OptaDOS output not detected.
-- Abstracted and simplified :module:`matador.compute` module to allow for extension to new codes via :module:`matador.compute.calculators` submodule.
+- Abstracted and simplified :mod:`matador.compute` module to allow for extension to new codes via :mod:`matador.compute.calculators` submodule.
   + Should now be more robust and transferrable, with many HPC environments automatically detected.
   + Added ``--scratch_prefix`` to run3 to allow for temporary files to e.g. be written to faster filesystem with appropriate symlinks to work folder.
 - Several new tests: coverage now around 75% when CASTEP is available.
