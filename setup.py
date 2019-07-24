@@ -20,7 +20,7 @@ with open('requirements/pip_requirements.txt', 'r') as f:
     requirements += [line.strip() for line in f.readlines()]
 
 extra_requirements = dict(all=[])
-for subreq in ['docs', 'test', 'plotting', 'viz', 'crystal', 'optional']:
+for subreq in ['docs', 'test', 'plotting', 'viz', 'crystal', 'pip']:
     with open('requirements/{}_requirements.txt'.format(subreq), 'r') as f:
         extra_requirements[subreq] = [line.strip() for line in f.readlines()]
         extra_requirements['all'] += extra_requirements[subreq]
