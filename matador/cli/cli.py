@@ -233,13 +233,12 @@ class MatadorCommandLine:
                 stats_dict['storageSize'] += db_stats_dict['storageSize']
                 stats_dict['totalIndexSize'] += db_stats_dict['totalIndexSize']
             print(("The collection(s) queried in {} contain {} structures at {:.1f} kB each "
-                   "totalling {} when padding and indices are included.")
+                   "totalling {:.1f} MB with a further {:.1f} MB of indexes.")
                   .format(self.db.name,
                           stats_dict['count'],
-                          stats_dict['avgObjSize'] /
-                          (1024 * len(self.collections)),
-                          (stats_dict['totalIndexSize'] + stats_dict['storageSize']) /
-                          (1024**2)))
+                          stats_dict['avgObjSize'] / (1024),
+                          stats_dict['storageSize'] / (1024**2),
+                          stats_dict['totalIndexSize'] / (1024**2)))
             for collname in self.collections:
                 cursor = self.collections[collname].find()
                 for doc in cursor:
