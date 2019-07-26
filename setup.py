@@ -3,6 +3,7 @@
 
 
 import subprocess as sp
+import os
 from setuptools import setup, find_packages
 from glob import glob
 
@@ -39,7 +40,7 @@ setup(name='matador',
       packages=find_packages(),
       python_requires='>=3.6',
       install_requires=requirements,
-      scripts=glob('bin/*') + glob('scripts/*'),
+      scripts=glob('bin/*') + [script for script in glob('scripts/*') if os.path.isfile(script)],
       test_suite='matador.tests',
       include_package_data=True,
       extras_require=extra_requirements,
