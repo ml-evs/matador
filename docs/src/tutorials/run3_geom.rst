@@ -165,14 +165,12 @@ In this job, we will submit a run3 job that performs CASTEP calculations across 
     # (assuming installation guide followed at 
     #  https://matador-db.readthedocs.io/en/latest/install.html) 
 
-    source activate matador 
-    run3 -nc 48 --intel -v 4 --executable castep.mpi --ignore_jobs_file TiO2
+    source activate matador  
+    run3 -nc 48 -v 4 --executable castep.mpi --ignore_jobs_file TiO2
 
 Let's unpick a few of the flags used to call run3 here:
 
 * ``-nc/--ncores``: the number of cores to use per structure, per calculation. It is often worth specifying this if more than one node is being used, as the correctness of run3's core counter is queue/machine-specific.
-* ``--intel``: use Intel-style ``mpirun`` calls. Again, run3 should be able to detect this, but worth specifying.
-* ``--executable``: by default run3 will try to call an executable called simply ``castep``. On many machines, CASTEP is installed as ``castep.mpi``.
 * ``-v 4``: sets the verbosity in the log file to the highest level.
 * ``--ignore_jobs_file``: by default run3 will for both ``<structure>.lock`` files and entries in ``jobs.txt`` before running a new structure. It is often worth disabling the ``jobs.txt`` check if it is not expected that all structures complete in one job submission (see below).
   
@@ -224,6 +222,6 @@ Instructions are almost identical to the above, but the array job script looks a
 
     run3 --archer -v 4 -nc 48 KSnP
 
-Notice here we have specified ``--archer`` instead of ``--intel``: again, run3 should be able to detect that ``mpirun`` is missing and thus try ``aprun``, but it can be worth specifying just in case. With PBS, the whole array can be submitted with just::
+Notice here we have specified ``--archer``: again, run3 should be able to detect that ``mpirun`` is missing and thus try ``aprun``, but it can be worth specifying just in case. With PBS, the whole array can be submitted with just::
 
     $ qsub run3.job
