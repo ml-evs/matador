@@ -243,6 +243,8 @@ def cell2dict(seed, db=False, lattice=True, positions=True, **kwargs):
         elif 'kpoints_mp_grid' in line.lower() or 'kpoint_mp_grid' in line.lower():
             if 'spectral_kpoints_mp_grid' in line.lower() or 'spectral_kpoint_mp_grid' in line.lower():
                 cell['spectral_kpoints_mp_grid'] = list(map(int, line.split()[-3:]))
+            # these two keywords do not have a corresponding "kpoints" alias (instead of kpoint)
+            # so must remain unpluralised (see below for other phonon keyword exceptions)
             elif 'phonon_kpoints_mp_grid' in line.lower() or 'phonon_kpoint_mp_grid' in line.lower():
                 cell['phonon_kpoint_mp_grid'] = list(map(int, line.split()[-3:]))
             elif 'phonon_fine_kpoints_mp_grid' in line.lower() or 'phonon_fine_kpoint_mp_grid' in line.lower():
@@ -1292,7 +1294,6 @@ def _castep_scrape_final_structure(flines, castep, db=True):
             elif ' Forces **' in line:
                 castep['forces'] = []
                 i = 1
-                max_force = 0
                 forces = False
                 while True:
                     if forces:
@@ -1304,15 +1305,12 @@ def _castep_scrape_final_structure(flines, castep, db=True):
                             castep['forces'].append([])
                             for j in range(3):
                                 temp = final_flines[line_no + i].replace('(cons\'d)', '')
-                                force_on_atom += f90_float_parse(temp.split()[3 + j])**2
                                 castep['forces'][-1].append(f90_float_parse(temp.split()[3 + j]))
-                            if force_on_atom > max_force:
-                                max_force = force_on_atom
                     elif 'x' in final_flines[line_no + i]:
                         i += 1  # skip next blank line
                         forces = True
                     i += 1
-                castep['max_force_on_atom'] = pow(max_force, 0.5)
+                castep['max_force_on_atom'] = np.max(np.linalg.norm(castep['forces'], axis=-1))
             elif 'Stress Tensor' in line:
                 i = 1
                 while i < 20:
