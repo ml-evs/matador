@@ -575,6 +575,45 @@ class ComputeTest(unittest.TestCase):
         self.assertTrue(dirs_exist)
         self.assertTrue(txt_files_exist)
 
+    def test_generic_batch_threaded(self):
+        """ Run a calculation in generic mode, check that res files
+        are cycled over and not repeated by multiple threads. Multiple
+        threads competing for the same job.
+
+        """
+
+        executable = 'echo'
+        files = glob.glob(REAL_PATH + '/data/structures/*.res')
+        _file = files[0]
+        copy(_file, '.')
+
+        runner = BatchRun(seed='*.res', debug=False, mode='generic',
+                          verbosity=4, ncores=1, nprocesses=4, executable=executable)
+
+        runner.spawn(join=True)
+
+        completed_files_exist = isfile('completed/' + _file.split('/')[-1])
+        txt_files_exist = all([isfile(_file) for _file in ['jobs.txt', 'finished_cleanly.txt']])
+        dirs = ['completed', 'input', 'logs']
+        dirs_exist = all([isdir(_dir) for _dir in dirs])
+
+        logs = glob.glob('logs/*.log')
+        num_logs = len(logs)
+        log_lines = []
+        for log in logs:
+            with open(log, 'r') as f:
+                log_lines.append(len(f.readlines()))
+
+        with open('jobs.txt', 'r') as f:
+            jobs_len = len(f.readlines())
+
+        self.assertEqual(num_logs, 1, msg='Not enough log files!')
+        self.assertTrue(all(lines > 5 for lines in log_lines), msg='Log files were too short!')
+        self.assertEqual(jobs_len, 1)
+        self.assertTrue(dirs_exist)
+        self.assertTrue(completed_files_exist)
+        self.assertTrue(txt_files_exist)
+
     def test_batch_nothing_todo(self):
         """ Check that nothing is done when there's nothing to do... """
         for file in glob.glob(REAL_PATH + 'data/nothing_to_do/*.*'):

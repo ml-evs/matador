@@ -18,7 +18,10 @@ from matador.utils.print_utils import print_failure, print_warning
 from matador.compute.queue import get_queue_env, get_queue_walltime, get_queue_manager
 from matador.scrapers.castep_scrapers import cell2dict, param2dict
 from matador.compute.compute import ComputeTask
-from matador.compute.errors import InputError, CalculationError, MaxMemoryEstimateExceeded
+from matador.compute.errors import (
+    InputError, CalculationError,
+    MaxMemoryEstimateExceeded, NodeCollisionError
+)
 
 
 class BatchRun:
@@ -264,13 +267,14 @@ class BatchRun:
                         error_queue.put((proc_id, job_count, res))
                         return
 
-                    # write lock file
-                    if not os.path.isfile('{}.lock'.format(res)):
-                        with open(res + '.lock', 'a') as job_file:
-                            pass
-                    else:
-                        print('Another node wrote this file when I wanted to, skipping...')
-                        continue
+                    # check 3 more times if a lock exists with random up to 1 second
+                    # waits each time
+                    for _ in range(3):
+                        time.sleep(random.random())
+                        if os.path.isfile('{}.lock'.format(res)):
+                            raise NodeCollisionError('Another node wrote this file when I wanted to, skipping...')
+                    with open(res + '.lock', 'a') as job_file:
+                        pass
 
                     # write to jobs file
                     with open(self.paths['jobs_fname'], 'a') as job_file:
@@ -305,8 +309,8 @@ class BatchRun:
                         with open(self.paths['failures_fname'], 'a') as job_file:
                             job_file.write(res + '\n')
 
-            # ignore individual calculation errors
-            except CalculationError:
+            # ignore individual calculation errors or node collisions that were caught here
+            except (CalculationError, NodeCollisionError):
                 continue
 
             # catch memory errors and reset so another node can try

@@ -34,3 +34,11 @@ class WalltimeError(RuntimeError):
 
     """
     pass
+
+
+class NodeCollisionError(Exception):
+    """ Dummy exception to raise when one node has tried to run
+    a calculation that another node is performing.
+
+    """
+    pass
