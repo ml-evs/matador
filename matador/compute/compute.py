@@ -26,7 +26,8 @@ from matador.compute.errors import CriticalError, WalltimeError, InputError, Cal
 
 MATADOR_CUSTOM_TASKS = ['bulk_modulus', 'projected_bandstructure', 'pdispersion', 'all']
 
-LOG = logging.getLogger()
+LOG = logging.getLogger('run3')
+LOG.setLevel(logging.DEBUG)
 
 
 class ComputeTask:
