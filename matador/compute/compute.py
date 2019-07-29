@@ -26,7 +26,7 @@ from matador.compute.errors import CriticalError, WalltimeError, InputError, Cal
 
 MATADOR_CUSTOM_TASKS = ['bulk_modulus', 'projected_bandstructure', 'pdispersion', 'all']
 
-LOG = logging.getLogger('run3')
+LOG = logging.getLogger()
 
 
 class ComputeTask:
@@ -138,9 +138,7 @@ class ComputeTask:
         # save all keyword arguments as attributes
         self.__dict__.update(prop_defaults)
         for arg in kwargs:
-            if arg not in prop_defaults:
-                logging.warning('Argument {} not supported, ignoring...'.format(arg))
-            else:
+            if arg in prop_defaults:
                 self.__dict__.update({arg: kwargs[arg]})
 
         if self.profile:
@@ -179,19 +177,22 @@ class ComputeTask:
         if not os.path.isdir('logs'):
             os.mkdir('logs')
 
-        LOG.handlers = []
+        # LOG.handlers = []
 
         if self.verbosity > 1:
             stdout_handler = logging.StreamHandler(sys.stdout)
             stdout_handler.setLevel(loglevel)
+            print('setting up stdout handler')
             stdout_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s | %(levelname)8s: %(message)s'))
             LOG.addHandler(stdout_handler)
+            print(LOG.handlers)
 
         logname = os.path.abspath('logs/{}.log'.format(self.seed))
         file_handler = logging.FileHandler(logname, mode='a')
         file_handler.setLevel(logging.DEBUG)
         file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s | %(levelname)8s: %(message)s'))
         LOG.addHandler(file_handler)
+        print(LOG.handlers)
 
         splash_screen = r"""
                            _____

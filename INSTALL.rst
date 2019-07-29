@@ -19,9 +19,7 @@ Optional (but recommended) steps:
 
 Required steps:
 
-4. Run ``pip install .`` from inside the top-level matador directory, or ``pip install -e .`` for an editable developer install. 
-Note: On some machines  (e.g. ARCHER/Thomas) you may receive permissions errors at this stage; if so, try moving matador's `.git` and install again: 
-   ``mv .git $HOME/matador_git_stash; pip install . ; mv $HOME/matador_git_stash .git``
-5. You now have a basic matador API installation, if you wish to use all matador features, install extra dependencies from the other requirements files inside ``requirements/`` using either conda (preferably) or pip. e.g. for plotting, running your own database and Jupyter notebook visualisation functionality, use ``pip install .[plotting,db,viz]``. If you wish to just install everything use ``pip install .[all]``.
-6. To use matador, you will need to activate the conda environment from step 2, by running ``conda activate matador``. You will also need this in e.g. any job scripts.
-7. You can test your installation using ``python -m unittest discover`` or simply ``py.test`` (if you have it installed). By default this will look for an executable called `castep` to run CASTEP tests, which are probably the most useful.
+5. Run ``pip install .`` from inside the top-level matador directory, or ``pip install -e .`` for an editable developer install. 
+Note: On some machines (e.g. ARCHER/Thomas) you may receive permissions errors at this stage; if so, try moving matador's `.git` and install again (``mv .git $HOME/matador_git_stash; pip install . ; mv $HOME/matador_git_stash .git``)
+6. You now have a basic matador API installation, if you wish to use all matador features, install extra dependencies from the other requirements files inside ``requirements/`` using either conda (preferably) or pip. e.g. for plotting, running your own database and Jupyter notebook visualisation functionality, use ``pip install .[plotting,db,viz]``. If you wish to just install everything use ``pip install .[all]``.
+7. To use matador, you will need to activate the conda environment from step 2, by running ``conda activate matador``. You will also need this in e.g. any job scripts. You can test your installation using ``python -m unittest discover`` or simply ``py.test`` (if you have it installed). By default this will look for an executable called `castep` to run CASTEP tests, which are probably the most useful.
