@@ -25,8 +25,8 @@ REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
 TMP_DIR = 'tmp_test'
 ROOT_DIR = getcwd()
 VERBOSITY = 4
-EXECUTABLE = 'castep18.1'
-print(80*'*')
+EXECUTABLE = 'castep'
+
 
 try:
     with open('/dev/null', 'w') as devnull:
@@ -553,17 +553,24 @@ class ComputeTest(unittest.TestCase):
             copy(_file, '.')
 
         runner = BatchRun(seed='*.res', debug=False, mode='generic',
-                          verbosity=VERBOSITY, ncores=1, executable=executable)
+                          verbosity=4, ncores=1, executable=executable)
 
-        start = time.time()
         runner.spawn(join=True)
-        elapsed = time.time() - start
 
         completed_files_exist = all([isfile('completed/' + _file.split('/')[-1]) for _file in files])
         txt_files_exist = all([isfile(_file) for _file in ['jobs.txt', 'finished_cleanly.txt']])
         dirs = ['completed', 'input', 'logs']
         dirs_exist = all([isdir(_dir) for _dir in dirs])
 
+        logs = glob.glob('logs/*.log')
+        num_logs = len(logs)
+        log_lines = []
+        for log in logs:
+            with open(log, 'r') as f:
+                log_lines.append(len(f.readlines()))
+
+        self.assertEqual(num_logs, len(files), msg='Not enough log files!')
+        self.assertTrue(all(lines > 5 for lines in log_lines), msg='Log files were too short!')
         self.assertTrue(completed_files_exist)
         self.assertTrue(dirs_exist)
         self.assertTrue(txt_files_exist)
