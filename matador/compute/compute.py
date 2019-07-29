@@ -183,17 +183,14 @@ class ComputeTask:
         if self.verbosity > 1:
             stdout_handler = logging.StreamHandler(sys.stdout)
             stdout_handler.setLevel(loglevel)
-            print('setting up stdout handler')
             stdout_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s | %(levelname)8s: %(message)s'))
             LOG.addHandler(stdout_handler)
-            print(LOG.handlers)
 
         logname = os.path.abspath('logs/{}.log'.format(self.seed))
         file_handler = logging.FileHandler(logname, mode='a')
         file_handler.setLevel(logging.DEBUG)
         file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s | %(levelname)8s: %(message)s'))
         LOG.addHandler(file_handler)
-        print(LOG.handlers)
 
         splash_screen = r"""
                            _____
@@ -506,7 +503,7 @@ class ComputeTask:
                                    .format(self.executable))
                             LOG.critical(msg)
                             raise CalculationError(msg)
-                        elif os.path.getmtime(seed + '.castep') - proc_clock < 0:
+                        if os.path.getmtime(seed + '.castep') - proc_clock < 0:
                             msg = ('CASTEP file present, but too old to be made by this process. Please check your executable: {}.'
                                    .format(self.executable))
                             LOG.critical(msg)
@@ -547,7 +544,7 @@ class ComputeTask:
                     msg = 'Failed to parse CASTEP file... {}'.format(opti_dict)
                     LOG.warning(msg)
                     raise CalculationError(msg)
-                elif isinstance(opti_dict, Exception) and remedy is not None:
+                if isinstance(opti_dict, Exception) and remedy is not None:
                     opti_dict = {'optimised': False}
 
                 LOG.debug('Intermediate calculation completed successfully: num_iter = {} '.format(num_iter))
@@ -889,16 +886,14 @@ class ComputeTask:
                 message = 'Detected {} MPI, but user asked to use aprun... please check your environment.'
                 LOG.critical(message)
                 raise CriticalError(message)
-            else:
-                return 'archer'
+            return 'archer'
 
         if self.intel:
             if guessed_version != 'intel':
                 message = 'Detected {} MPI, but user asked to use Intel MPI... please check your environment.'
                 LOG.critical(message)
                 raise CriticalError(message)
-            else:
-                return 'intel'
+            return 'intel'
 
         if self.slurm:
             if guessed_version != 'slurm':
