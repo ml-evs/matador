@@ -179,7 +179,7 @@ def display_results(cursor,
         units_string += "{:^18}".format('(eV/atom)')
     else:
         header_string += "{:^18}".format(' '.join(energy_key.replace('_per_atom', '').split('_')).title())
-        units_string += "{:^18}".format('(meV/fu)')
+        units_string += "{:^18}".format('(eV/fu)')
 
     header_string += "{:^13}".format('Space group')
     header_string += "{:^15}".format('Formula')
@@ -345,7 +345,7 @@ def display_results(cursor,
             if 'species_pot' in doc:
                 try:
                     for species in doc['species_pot']:
-                        detail_substring[-1] += doc['species_pot'][species] + ', '
+                        detail_substring[-1] += '{}: {}, '.format(species, doc['species_pot'][species])
                 except KeyError:
                     pass
             if 'icsd' in doc:
