@@ -32,7 +32,8 @@ class Refiner:
 
         Keyword arguments:
             collection (Collection): mongodb collection to query/edit.
-            task (str): one of 'sym', 'spg', 'elem_set', 'tag', 'doi' or 'source'.
+            task (str/callable): one of 'sym', 'spg', 'elem_set', 'tag', 'doi' or 'source',
+                or a custom function that takes in and returns a cursor and field to modify.
             mode (str): one of 'display', 'overwrite', 'set'.
 
         """
@@ -46,7 +47,7 @@ class Refiner:
             raise SystemExit('Impossible to overwite or set without db collection, exiting...')
         if task is None:
             raise SystemExit('No specified task, exiting...')
-        if task not in possible_tasks:
+        if task not in possible_tasks and not callable(task):
             raise SystemExit('Did not understand task, please choose one of ' + ', '.join(possible_tasks))
         if task == 'tag' and mode == 'set':
             raise SystemExit('Task "tags" and mode "set" will not alter the database, please use mode "overwrite".')
@@ -91,7 +92,11 @@ class Refiner:
         elif task == 'raw':
             self.field = '_raw'
             self.add_raw_data()
+        elif callable(task):
+            print('Using custom task function: {}'.format(task))
+            self.diff_cursor, self.field = task(self.cursor)
 
+        self.changed_count = len(self.diff_cursor)
         print(self.changed_count, '/', len(self.cursor), 'to be changed.')
         print(self.failed_count, '/', len(self.cursor), 'failed.')
 
