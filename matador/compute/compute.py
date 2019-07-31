@@ -22,7 +22,7 @@ from matador.scrapers.castep_scrapers import cell2dict
 from matador.scrapers.castep_scrapers import res2dict, castep2dict
 from matador.calculators import CastepCalculator
 from matador.export import doc2cell, doc2param, doc2res
-from matador.compute.errors import CriticalError, WalltimeError, InputError, CalculationError, MaxMemoryEstimateExceeded
+from matador.utils.errors import CriticalError, WalltimeError, InputError, CalculationError, MaxMemoryEstimateExceeded
 
 MATADOR_CUSTOM_TASKS = ['bulk_modulus', 'projected_bandstructure', 'pdispersion', 'all']
 

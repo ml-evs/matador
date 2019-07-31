@@ -18,11 +18,10 @@ writing slurm job submission files.
 """
 
 
-__all__ = ['ComputeTask', 'BatchRun', 'reset_job_folder', 'FullRelaxer', 'CriticalError', 'WalltimeError', 'InputError', 'CalculationError']
+__all__ = ['ComputeTask', 'BatchRun', 'reset_job_folder', 'FullRelaxer']
 __author__ = 'Matthew Evans'
 __maintainer__ = 'Matthew Evans'
 
 
 from matador.compute.compute import FullRelaxer, ComputeTask
-from matador.compute.errors import CriticalError, WalltimeError, InputError, CalculationError
 from matador.compute.batch import BatchRun, reset_job_folder

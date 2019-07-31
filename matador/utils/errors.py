@@ -1,17 +1,18 @@
 # coding: utf-8
 # Distributed under the terms of the MIT license.
 
-""" This module implements some useful exceptions. """
+""" This submodule module implements some useful exception types,
+mostly for use in the :mod:`compute` and :mod:`calculator` submodules.
+
+"""
 
 
 class CalculationError(Exception):
     """ Raised when a particular calculation fails, for non-fatal reasons. """
-    pass
 
 
 class MaxMemoryEstimateExceeded(Exception):
     """ Raised when a structure is estimated to exceed the max memory. """
-    pass
 
 
 class CriticalError(RuntimeError):
@@ -20,12 +21,10 @@ class CriticalError(RuntimeError):
     SystemExit.
 
     """
-    pass
 
 
 class InputError(RuntimeError):
     """ Raise this when there is an issue with the input files. """
-    pass
 
 
 class WalltimeError(RuntimeError):
@@ -33,7 +32,6 @@ class WalltimeError(RuntimeError):
     because they're about to exceed the max walltime.
 
     """
-    pass
 
 
 class NodeCollisionError(Exception):
@@ -41,4 +39,3 @@ class NodeCollisionError(Exception):
     a calculation that another node is performing.
 
     """
-    pass

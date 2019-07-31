@@ -12,7 +12,7 @@ from os import getcwd, uname
 from os.path import realpath, isfile, isdir
 
 
-from matador.compute.errors import (
+from matador.utils.errors import (
     CalculationError, MaxMemoryEstimateExceeded, CriticalError,
     WalltimeError, InputError
 )

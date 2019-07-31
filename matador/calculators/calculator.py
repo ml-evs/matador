@@ -6,7 +6,7 @@ with compute.
 
 """
 import abc
-from matador.compute.errors import CalculationError
+from matador.utils.errors import CalculationError
 
 
 class Calculator:
