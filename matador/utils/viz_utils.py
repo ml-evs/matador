@@ -7,6 +7,8 @@ and some colour definitions scraped from VESTA configs.
 
 """
 
+from matador.utils.ase_utils import doc2ase
+
 
 def viz(doc):
     """ Quick and dirty ase-gui visualisation from matador doc. """
@@ -79,12 +81,3 @@ def nb_viz(doc, repeat=1, bonds=None):
     view.background = '#FFFFFF'
     view.center()
     return view
-
-
-def doc2ase(doc):
-    """ Convert matador document to simple ASE object. """
-    from ase import Atoms
-    return Atoms(symbols=doc['atom_types'],
-                 scaled_positions=doc['positions_frac'],
-                 cell=doc['lattice_cart'],
-                 pbc=True)
