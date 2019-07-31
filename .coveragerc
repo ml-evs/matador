@@ -10,7 +10,6 @@ ignore_errors = True
 omit = 
     *matador/workflows*
     *matador/plugins*
-    *matador/tests*
     *matador/cli/run3.py
 exclude_lines = 
     pragma: no cover
