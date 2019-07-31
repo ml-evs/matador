@@ -58,12 +58,12 @@ class QueryConvexHull:
 
         Keyword arguments:
             query (matador.query.DBQuery): object containing structures,
-            cursor (list(dict)): alternatively specify list of matador recursive_get(doc, self.energy_key).
+            cursor (list(dict)): alternatively specify list of matador documents.
             species (list(str)): list of elements/chempots to use, used to provide a useful order,
-            elements (list(str)): deprecated form of the above.
+            energy_key (str): key under which the desired energy *per atom* is stored.
             subcmd (str): either 'hull' or 'voltage',
-            lazy (bool): if True, do not create hull until self.create_hull() is called
-            energy_key (str): key under which the desired energy_per_atom is stored.
+            lazy (bool): if True, do not create hull until `self.create_hull()` is called
+            elements (list(str)): deprecated form `species`.
             kwargs (dict): mostly CLI arguments, see matador hull --help for full options.
             plot_kwargs (dict): arguments to pass to plot_hull function
 
@@ -253,9 +253,11 @@ class QueryConvexHull:
         self.cursor = filter_cursor_by_chempots(self.species, self.cursor)
 
         formation_key = 'formation_{}'.format(self.energy_key)
+        extensive_formation_key = 'formation_{}'.format(self._extensive_energy_key)
         for ind, doc in enumerate(self.cursor):
             self.cursor[ind][formation_key] = get_formation_energy(self.chempot_cursor, doc,
                                                                    energy_key=self.energy_key)
+            self.cursor[ind][extensive_formation_key] = doc[formation_key] * doc['num_atoms']
 
         if not self._non_elemental:
             self._setup_per_b_fields()
@@ -294,7 +296,7 @@ class QueryConvexHull:
     def set_chempots(self):
         """ Search for chemical potentials that match the structures in
         the query cursor and add them to the cursor. Also set the concentration
-        of chemical potentials in cursor, if not already set.
+        of chemical potentials in :attr:`cursor`, if not already set.
 
         """
         query = self._query
@@ -317,10 +319,6 @@ class QueryConvexHull:
 
             if len(self.chempot_cursor) != len(self.species):
                 raise RuntimeError('Found {} of {} required chemical potentials'.format(len(self.chempot_cursor), len(self.species)))
-
-            # for ind, doc in enumerate(self.chempot_cursor):
-                # self.chempot_cursor[ind][self._extensive_energy_key + '_per_b'] = doc[self.energy_key]
-                # self.chempot_cursor[ind]['cell_volume_per_b'] = float('inf') if ind == 0 else 0.0
 
             if self.args.get('debug'):
                 print([mu['stoichiometry'] for mu in self.chempot_cursor])
@@ -372,7 +370,7 @@ class QueryConvexHull:
                     raise RuntimeError('No possible chem pots available for {}.'.format(elem))
 
             for i, mu in enumerate(self.chempot_cursor):
-                self.chempot_cursor[i][self._extensive_energy_key + 'per_b'] = mu[self.energy_key]
+                self.chempot_cursor[i][self._extensive_energy_key + '_per_b'] = mu[self.energy_key]
                 self.chempot_cursor[i]['num_a'] = 0
 
             self.chempot_cursor[0]['num_a'] = float('inf')
