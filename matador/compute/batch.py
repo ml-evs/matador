@@ -18,7 +18,7 @@ from matador.utils.print_utils import print_failure, print_warning
 from matador.compute.queue import get_queue_env, get_queue_walltime, get_queue_manager
 from matador.scrapers.castep_scrapers import cell2dict, param2dict
 from matador.compute.compute import ComputeTask
-from matador.compute.errors import (
+from matador.utils.errors import (
     InputError, CalculationError,
     MaxMemoryEstimateExceeded, NodeCollisionError
 )
