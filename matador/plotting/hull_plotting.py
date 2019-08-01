@@ -8,9 +8,8 @@ diagrams generally.
 
 
 import numpy as np
-from matador.utils.chem_utils import get_concentration
 from matador.utils.chem_utils import get_stoich_from_formula, get_formula_from_stoich
-from matador.plotting.plotting import plotting_function, get_linear_cmap
+from matador.plotting.plotting import plotting_function, get_linear_cmap, SAVE_EXTS
 
 EPS = 1e-12
 
@@ -37,12 +36,12 @@ def get_hull_labels(hull, label_cutoff=None, num_species=None, exclude_edges=Tru
     if isinstance(label_cutoff, list) and len(label_cutoff) == 2:
         label_cutoff = sorted(label_cutoff)
         # first, only apply upper limit as we need to filter by stoich aftewards
-        label_cursor = [doc for doc in hull.hull_cursor if doc['hull_distance'] <= label_cutoff[1]]
+        label_cursor = [doc for doc in hull.cursor if doc['hull_distance'] <= label_cutoff[1]]
     else:
         if isinstance(label_cutoff, list):
             assert len(label_cutoff) == 1, 'Incorrect number of label_cutoff values passed, should be 1 or 2.'
             label_cutoff = label_cutoff[0]
-        label_cursor = [doc for doc in hull.hull_cursor if doc['hull_distance'] <= label_cutoff + eps]
+        label_cursor = [doc for doc in hull.cursor if doc['hull_distance'] <= label_cutoff + eps]
 
     num_labels = len({get_formula_from_stoich(doc['stoichiometry']) for doc in label_cursor})
     if num_labels < len(label_cursor):
@@ -134,28 +133,33 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
     # annotate hull structures
     if labels or label_cutoff is not None:
         label_cursor = get_hull_labels(hull, num_species=2, label_cutoff=label_cutoff)
+        already_labelled = []
         for ind, doc in enumerate(label_cursor):
-            arrowprops = dict(arrowstyle="-|>", lw=2, alpha=1, zorder=1, shrinkA=2, shrinkB=4)
-            min_comp = tie_line[np.argmin(tie_line[:, 1]), 0]
-            e_f = label_cursor[ind]['formation_' + str(hull.energy_key)]
-            conc = label_cursor[ind]['concentration'][0]
-            if conc < min_comp:
-                position = (0.8 * conc, 1.15 * (e_f - 0.05))
-            elif label_cursor[ind]['concentration'][0] == min_comp:
-                position = (conc, 1.15 * (e_f - 0.05))
-            else:
-                position = (min(1.1 * conc + 0.15, 0.95), 1.15 * (e_f - 0.05))
-            ax.annotate(get_formula_from_stoich(doc['stoichiometry'],
-                                                latex_sub_style=r'\mathregular',
-                                                tex=True,
-                                                sort=False),
-                        xy=(conc, e_f),
-                        xytext=position,
-                        textcoords='data',
-                        ha='right',
-                        va='bottom',
-                        arrowprops=arrowprops,
-                        zorder=1)
+            formula = get_formula_from_stoich(doc['stoichiometry'], sort=True)
+            if formula not in already_labelled:
+                arrowprops = dict(arrowstyle="-|>", lw=2, alpha=1, zorder=1, shrinkA=2, shrinkB=4)
+                min_comp = tie_line[np.argmin(tie_line[:, 1]), 0]
+                e_f = label_cursor[ind]['formation_' + str(hull.energy_key)]
+                conc = label_cursor[ind]['concentration'][0]
+                if conc < min_comp:
+                    position = (0.8 * conc, 1.15 * (e_f - 0.05))
+                elif label_cursor[ind]['concentration'][0] == min_comp:
+                    position = (conc, 1.15 * (e_f - 0.05))
+                else:
+                    position = (min(1.1 * conc + 0.15, 0.95), 1.15 * (e_f - 0.05))
+                ax.annotate(get_formula_from_stoich(doc['stoichiometry'],
+                                                    latex_sub_style=r'\mathregular',
+                                                    tex=True,
+                                                    elements=hull.species,
+                                                    sort=False),
+                            xy=(conc, e_f),
+                            xytext=position,
+                            textcoords='data',
+                            ha='right',
+                            va='bottom',
+                            arrowprops=arrowprops,
+                            zorder=1)
+                already_labelled.append(formula)
 
     # points for off hull structures; we either colour by source or by energy
     if plot_points and not colour_by_source:
@@ -200,7 +204,7 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
     elif colour_by_source:
         from matador.utils.cursor_utils import get_guess_doc_provenance
         if sources is None:
-            sources = ['AIRSS', 'GA', 'OQMD', 'SWAPS', 'ICSD']
+            sources = ['AIRSS', 'GA', 'OQMD', 'SWAPS', 'ICSD', 'SM', 'Other']
         if source_labels is None:
             source_labels = sources
         else:
@@ -218,8 +222,9 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
                 colours.append(hull.colours[-2])
                 if 'Other' not in sources:
                     sources.append('Other')
-                    labels.append('Other')
+                    source_labels.append('Other')
                     colour_choices['Other'] = hull.colours[-2]
+                    source = 'Other'
             else:
                 colours.append(colour_choices[source])
             zorders.append(sources.index(source))
@@ -267,17 +272,24 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
 
     ax.grid(False)
     ax.set_xlim(-0.05, 1.05)
-    ax.set_xticks([0, 0.25, 0.33, 0.5, 0.66, 0.75, 1])
+    ax.set_xticks([0, 0.25, 0.5, 0.75, 1])
     ax.set_xticklabels(ax.get_xticks())
     ax.set_ylabel('Formation energy (eV/atom)')
 
-    exts = ['pdf', 'svg', 'png']
-    if hull.savefig or any([kwargs.get(ext) for ext in exts]):
+    if hull.savefig or any([kwargs.get(ext) for ext in SAVE_EXTS]):
+        import os
         fname = plot_fname or ''.join(hull.species) + '_hull'
-        for ext in exts:
+        for ext in SAVE_EXTS:
             if hull.args.get(ext) or kwargs.get(ext):
+                fname_tmp = fname
+                ind = 0
+                while os.path.isfile('{}.{}'.format(fname_tmp, ext)):
+                    ind += 1
+                    fname_tmp = fname + str(ind)
+
+                fname = fname_tmp
                 plt.savefig('{}.{}'.format(fname, ext),
-                            dpi=500, bbox_inches='tight', transparent=True)
+                            bbox_inches='tight', transparent=True)
                 print('Wrote {}.{}'.format(fname, ext))
 
     if show:
@@ -536,7 +548,7 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
         from matador.utils.hull_utils import barycentric2cart
         for ind, doc in enumerate(label_cursor):
             conc = np.asarray(doc['concentration'] + [1 - sum(doc['concentration'])])
-            formula = get_formula_from_stoich(doc['stoichiometry'], tex=True, latex_sub_style=r'\mathregular')
+            formula = get_formula_from_stoich(doc['stoichiometry'], sort=False, tex=True, latex_sub_style=r'\mathregular', elements=hull.species)
             arrowprops = dict(arrowstyle="-|>", color='k', lw=2, alpha=0.5, zorder=1, shrinkA=2, shrinkB=4)
             cart = barycentric2cart([doc['concentration'] + [0]])[0][:2]
             min_dist = 1e20
@@ -558,9 +570,8 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
 
     if hull.savefig:
         fname = plot_fname or ''.join(hull.species) + '_hull'
-        exts = ['pdf', 'svg', 'png']
-        for ext in exts:
-            if hull.args.get(ext):
+        for ext in SAVE_EXTS:
+            if hull.args.get(ext) or kwargs.get(ext):
                 plt.savefig('{}.{}'.format(fname, ext),
                             bbox_inches='tight', transparent=True)
                 print('Wrote {}.{}'.format(fname, ext))

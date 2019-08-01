@@ -9,6 +9,8 @@ voltage).
 
 """
 
+SAVE_EXTS = ['pdf', 'png', 'svg']
+
 
 def plotting_function(function):
     """ Wrapper for plotting functions to safely fail on X-forwarding
@@ -38,7 +40,7 @@ def plotting_function(function):
         except AttributeError:
             pass
         if not saving:
-            if any([kwargs.get('pdf'), kwargs.get('svg'), kwargs.get('png')]):
+            if any(kwargs.get(ext) for ext in SAVE_EXTS):
                 import matplotlib
                 matplotlib.use('Agg', warn=False)
                 saving = True

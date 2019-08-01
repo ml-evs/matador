@@ -8,12 +8,12 @@ such as voltages and volume expansions.
 
 import numpy as np
 from matador.utils.chem_utils import get_formula_from_stoich
-from matador.plotting.plotting import plotting_function
+from matador.plotting.plotting import plotting_function, SAVE_EXTS
 from matador.plotting.hull_plotting import get_hull_labels
 
 
 @plotting_function
-def plot_voltage_curve(hull, ax=None, show=False):
+def plot_voltage_curve(hull, ax=None, show=False, **kwargs):
     """ Plot voltage curve calculated for phase diagram.
 
     Parameters:
@@ -27,13 +27,11 @@ def plot_voltage_curve(hull, ax=None, show=False):
     import matplotlib.pyplot as plt
     hull.colours = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])
     if ax is None:
-        if hull.savefig:
-            if len(hull.voltage_data['voltages']) != 1:
-                fig = plt.figure(facecolor=None, figsize=(4, 3.5))
-            else:
-                fig = plt.figure(facecolor=None, figsize=(4, 3.5))
+        if hull.savefig or any([kwargs.get(ext) for ext in SAVE_EXTS]):
+            fig = plt.figure(facecolor=None, figsize=(4, 3.5))
         else:
             fig = plt.figure(facecolor=None)
+
         ax_volt = fig.add_subplot(111)
     else:
         ax_volt = ax
@@ -80,14 +78,13 @@ def plot_voltage_curve(hull, ax=None, show=False):
     ax_volt.grid(False)
     plt.tight_layout(pad=0.0, h_pad=1.0, w_pad=0.2)
 
-    if hull.savefig:
+
+    if hull.savefig or any([kwargs.get(ext) for ext in SAVE_EXTS]):
         fname = ''.join(hull.elements) + '_voltage'
-        if hull.args.get('pdf'):
-            plt.savefig(fname + '.pdf', transparent=True)
-        if hull.args.get('svg'):
-            plt.savefig(fname + '.svg', transparent=True)
-        if hull.args.get('png'):
-            plt.savefig(fname + '.png', transparent=True)
+        for ext in SAVE_EXTS:
+            if hull.args.get(ext) or kwargs.get(ext):
+                plt.savefig('{}.{}'.format(fname, ext), transparent=True)
+                print('Wrote {}.{}'.format(fname, ext))
     elif show:
         plt.show()
 
@@ -125,7 +122,7 @@ def add_voltage_curve(capacities, voltages, ax_volt, label=None, **kwargs):
 
 
 @plotting_function
-def plot_volume_curve(hull, show=False):
+def plot_volume_curve(hull, ax=None, show=False, **kwargs):
     """ Plot volume curve calculated for phase diagram.
 
     Parameters:
@@ -140,11 +137,15 @@ def plot_volume_curve(hull, show=False):
     from matador.utils.chem_utils import get_generic_grav_capacity
     hull.colours = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])
 
-    if hull.savefig:
-        fig = plt.figure(facecolor=None, figsize=(4, 3.5))
+    if ax is None:
+        if hull.savefig or any([kwargs.get(ext) for ext in SAVE_EXTS]):
+            fig = plt.figure(facecolor=None, figsize=(4, 3.5))
+        else:
+            fig = plt.figure(facecolor=None)
+        ax = fig.add_subplot(111)
     else:
-        fig = plt.figure(facecolor=None)
-    ax = fig.add_subplot(111)
+        ax = ax
+
     stable_hull_dist = get_array_from_cursor(hull.hull_cursor, 'hull_distance')
 
     hull_vols = []
@@ -198,12 +199,13 @@ def plot_volume_curve(hull, show=False):
         ax2.spines[spine].set_linewidth(0.5)
     # ax.yaxis.set_ticks(range(0, int(end)+1, 5))
     plt.tight_layout(pad=0.0, h_pad=1.0, w_pad=0.2)
-    if hull.savefig:
-        if hull.args.get('pdf'):
-            plt.savefig(hull.elements[0] + hull.elements[1] + '_volume.pdf', dpi=300)
-        if hull.args.get('svg'):
-            plt.savefig(hull.elements[0] + hull.elements[1] + '_volume.svg', dpi=300)
-        if hull.args.get('png'):
-            plt.savefig(hull.elements[0] + hull.elements[1] + '_volume.png', dpi=300, bbox_inches='tight')
-    elif show:
+    fname = '{}_volume'.format(''.join(hull.elements))
+
+    if hull.savefig or any([kwargs.get(ext) for ext in SAVE_EXTS]):
+        for ext in SAVE_EXTS:
+            if hull.args.get(ext) or kwargs.get(ext):
+                plt.savefig('{}.{}'.format(fname, ext), transparent=True)
+                print('Wrote {}.{}'.format(fname, ext))
+
+    if show:
         plt.show()
