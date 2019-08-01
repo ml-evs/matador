@@ -217,7 +217,7 @@ class PhaseDiagram:
                     else:
                         barycentric_structure = barycentric2cart(structure.reshape(1, 3)).T
                         barycentric_structure[-1, :] = 1
-                        plane_barycentric_structure = np.matrix(cart_planes_inv[ind]) * np.matrix(barycentric_structure)
+                        plane_barycentric_structure = cart_planes_inv[ind] @ barycentric_structure
                         if (plane_barycentric_structure >= 0 - 1e-12).all():
                             structures_finished[idx] = True
                             hull_dist[idx] = planes_height_fn[ind](structure)

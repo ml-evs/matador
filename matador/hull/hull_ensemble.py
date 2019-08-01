@@ -6,7 +6,7 @@
 
 from matador.hull import PhaseDiagram, QueryConvexHull
 from matador.utils.cursor_utils import filter_cursor_by_chempots, recursive_get, recursive_set, set_cursor_from_array
-from matador.utils.chem_utils import get_formation_energy
+from matador.utils.chem_utils import get_formation_energy, get_root_source
 
 
 class EnsembleHull(QueryConvexHull):
@@ -16,28 +16,28 @@ class EnsembleHull(QueryConvexHull):
 
     Data must be stored in the following way under each document in cursor:
 
-    ```
-    {...,
-     data_key: {
-                parameter_key: <list of parameter values>,
-                energy_key: <list of energies at parameter values>,
-               },
-     ...
-    }
-    ```
+        ```
+        {...,
+         data_key: {
+                    parameter_key: <list of parameter values>,
+                    energy_key: <list of energies at parameter values>,
+                   },
+         ...
+        }
+        ```
     Hull data will be stored as arrays per document under `doc[data_key]['hull_distance']`
-    and `doc[data_key]['formation_' + energy_key]`.
+    and ``doc[data_key]['formation_' + energy_key]``.
 
     Inherits the attributes of matador.hull.QueryConvexHull, with many set to
     None.
 
     Attributes:
-        phase_diagrams (list[matador.hull.PhaseDiagram]): list of phase diagram
+        phase_diagrams (list of :obj:`matador.hull.PhaseDiagram`): list of phase diagram
             objects for each parameter value.
 
     """
     def __init__(self, cursor, data_key, energy_key='enthalpy_per_atom', num_samples=None,
-                 parameter_key=None, species=None, subcmd='hull', **kwargs):
+                 parameter_key=None, species=None, subcmd='hull', verbosity=None, **kwargs):
         """ Initialise EnsembleHull from a cursor, with other keywords
         following QueryConvexHull.
 
@@ -60,7 +60,13 @@ class EnsembleHull(QueryConvexHull):
             kwargs (dict): other arguments to pass to QueryConvexHull.
 
         """
-        super().__init__(cursor=cursor, energy_key=energy_key, species=species, subcmd=subcmd, no_plot=True, lazy=False, **kwargs)
+        super().__init__(cursor=cursor,
+                         energy_key=energy_key,
+                         species=species,
+                         subcmd=subcmd,
+                         no_plot=True,
+                         lazy=False,
+                         **kwargs)
 
         if self.phase_diagram is None:
             del self.phase_diagram
@@ -70,6 +76,7 @@ class EnsembleHull(QueryConvexHull):
             del self.hull_dist
 
         self.from_cursor = True
+        self.verbosity = verbosity
 
         # set up relative keys
         self.formation_key = 'formation_' + self.energy_key
@@ -103,6 +110,13 @@ class EnsembleHull(QueryConvexHull):
             recursive_set(doc, self.formation_key, [None] * len(recursive_get(doc, self.energy_key)))
             recursive_set(doc, self.hulldist_key, [None] * len(recursive_get(doc, self.energy_key)))
 
+        n_hulls = len(parameter_iterable)
+        if num_samples is not None:
+            parameter_iterable = parameter_iterable[:num_samples]
+            print('Using {} out of {} possible phase diagrams.'.format(num_samples, n_hulls))
+        else:
+            num_samples = n_hulls
+
         for param_ind, parameter in enumerate(parameter_iterable):
             for ind, doc in enumerate(self.cursor):
                 if parameter_key is not None:
@@ -117,6 +131,20 @@ class EnsembleHull(QueryConvexHull):
             set_cursor_from_array(self.cursor,
                                   self.phase_diagrams[-1].hull_dist,
                                   self.hulldist_key + [param_ind])
+
+        self.stability_histogram = self.generate_stability_statistics()
+
+    def generate_stability_statistics(self):
+        """ Creates a histogram that counts how many times each structure
+        is found to be stable in the ensemble.
+
+        """
+        from collections import defaultdict
+        histogram = defaultdict(int)
+        for pd in self.phase_diagrams:
+            for doc in pd.stable_structures:
+                histogram[get_root_source(doc)] += 1
+        return histogram
 
     def plot_hull(self, **kwargs):
         """ Hull plot helper function. """
