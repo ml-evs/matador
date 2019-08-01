@@ -299,7 +299,15 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
 
 
 @plotting_function
-def plot_ensemble_hull(hull, parameter, ax=None, plot_points=True, plot_hulls=True, voltages=False, show=True, plot_fname=None, **kwargs):
+def plot_ensemble_hull(hull, parameter,
+                       ax=None,
+                       plot_points=True,
+                       alpha_scale=0.25,
+                       plot_hulls=True,
+                       voltages=False,
+                       show=True,
+                       plot_fname=None,
+                       **kwargs):
     """ Plot and generate an ensemble of hulls with associated
     Bayesian Error Estimate functionals (BEEF). If axis not requested,
     a histogram of frequency of a particular concentration appearing on
@@ -311,6 +319,7 @@ def plot_ensemble_hull(hull, parameter, ax=None, plot_points=True, plot_hulls=Tr
 
     Keyword arguments:
         ax (matplotlib.axes.Axes): matplotlib axis object on which to plot.
+        alpha_scale (float): value by which to scale transparency of hulls.
         plot_points (bool): whether to plot the hull points for each hull in the ensemble.
         plot_hulls (bool): whether to plot the hull tie-lines for each hull in the ensemble.
         voltages (bool): compute average voltage and heatmaps.
@@ -318,26 +327,28 @@ def plot_ensemble_hull(hull, parameter, ax=None, plot_points=True, plot_hulls=Tr
     """
     import matplotlib.pyplot as plt
 
-    fig = plt.figure(figsize=(7, 10))
-    ax = fig.add_subplot(111)
+    if ax is None:
+        fig = plt.figure(figsize=(7, 10))
+        ax = fig.add_subplot(111)
 
     n_beef = len(hull.phase_diagrams)
-    plot_2d_hull(hull, ax=ax, plot_points=False, plot_hull_points=True)
+    plot_2d_hull(hull, ax=ax, plot_points=False, plot_hull_points=True, show=False)
     min_ef = 0
     for ind, phase_diagram in enumerate(hull.phase_diagrams):
         hull_cursor = [doc for doc in hull.cursor if doc[parameter]['hull_distance'][ind] <= 0.0 + EPS]
         min_ef = np.min([doc[parameter]['formation_total_energy_per_atom'][ind] for doc in hull_cursor] + [min_ef])
         if plot_hulls:
+            alpha = min([1, max([1/(alpha_scale*n_beef), 0.01])])
             ax.plot([doc['concentration'][0] for doc in hull_cursor],
                     [doc[parameter]['formation_total_energy_per_atom'][ind] for doc in hull_cursor],
-                    alpha=min([1, max([1/(0.25*n_beef), 0.01])]), c='k', lw=0.5, zorder=0)
+                    alpha=alpha, c='k', lw=0.5, zorder=0)
 
     ax.set_ylim(min_ef)
-    exts = ['pdf', 'svg', 'png']
-    if hull.savefig or any(kwargs.get(ext) for ext in exts):
+
+    if hull.savefig or any(kwargs.get(ext) for ext in SAVE_EXTS):
         fname = plot_fname or ''.join(hull.species) + parameter + '_hull'
-        for ext in exts:
-            if kwargs.get(ext):
+        for ext in SAVE_EXTS:
+            if hull.args.get(ext) or kwargs.get(ext):
                 plt.savefig('{}.{}'.format(fname, ext),
                             bbox_inches='tight', transparent=True)
                 print('Wrote {}.{}'.format(fname, ext))

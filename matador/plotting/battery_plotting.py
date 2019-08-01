@@ -209,3 +209,53 @@ def plot_volume_curve(hull, ax=None, show=False, **kwargs):
 
     if show:
         plt.show()
+
+def plot_beef_voltage(hull, **kwargs):
+    raise NotImplementedError
+
+    beef_cursor = deepcopy(hull.cursor)
+    n_beef = len(beef_cursor[0]['_beef']['thetas'])
+    if kwargs.get('n_beef') is not None:
+        n_beef = min([n_beef, kwargs.get('n_beef')])
+
+    # parameters for voltage heat map
+    max_voltage = 2
+    min_voltage = 0
+    max_q = 1.5*max(hull.voltage_data['Q'][0])
+    min_q = 0
+    grid_scale = kwargs.get('grid_scale', 100)
+    voltage_heatmap = np.zeros((grid_scale, grid_scale), dtype=np.int)
+    q_grid, v_grid = np.meshgrid(np.linspace(min_q, max_q, num=grid_scale), np.linspace(min_voltage, max_voltage, num=grid_scale))
+
+    print('Calculating voltage heat map from {} to {} V'.format(min_voltage, max_voltage))
+
+    # collect minimum formation energy for ylimits
+    min_ef = 0
+
+    for beef_ind in range(n_beef):
+        previous_qindex = 0
+        V = beef_hull.voltage_data['voltages'][0]
+        Q = beef_hull.voltage_data['Q'][0]
+        for step, (qs, vs) in enumerate(zip(Q, V)):
+            if step == len(V) - 1 or np.isnan(qs) or np.isnan(vs):
+                continue
+            v_index = max([0, min([int((vs-min_voltage)/(max_voltage-min_voltage) * grid_scale), grid_scale-1])])
+            q_index = max([0, min([int((qs-min_q)/(max_q-min_q)*grid_scale), grid_scale-1])])
+            voltage_heatmap[v_index, previous_qindex:q_index+1] += 1
+            if kwargs.get('hist_vertical'):
+                if not np.isnan(V[step+1]):
+                    next_vindex = max([0, min([int(V[step+1]/(max_voltage-min_voltage) * grid_scale), grid_scale-1])])
+                    voltage_heatmap[next_vindex+1:v_index, q_index] += 1
+            previous_qindex = q_index
+
+        for doc in beef_hull.hull_cursor[1:-1]:
+            hull_concs[doc['_formula']] += 1
+
+    ax.set_ylim(min_ef)
+
+    ax_volt.pcolor(q_grid, v_grid, voltage_heatmap, cmap='viridis')#, norm=mpl.colors.LogNorm(vmin=1, vmax=np.max(voltage_heatmap)))
+
+    voltage_curve = calculate_average_voltage_from_heatmap(voltage_heatmap, v_grid, q_grid)
+    ax_volt.plot(q_grid[0, :], voltage_curve, c='white', zorder=1e20, lw=3, ls='--')
+    c = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])[1]
+    add_voltage_curve(hull.voltage_data['Q'][0], hull.voltage_data['voltages'][0], ax_volt, lw=5, ls='--', c=c)
