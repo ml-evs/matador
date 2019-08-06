@@ -534,7 +534,11 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
         for (i, j, k) in simplex_iterator(scale):
             energies[(i, j, k)] = -1 * plane_energies[ind]
             ind += 1
-        ax.heatmap(energies, style="hexagonal", cbarlabel='Formation energy (eV/atom)', vmax=0, cmap='bone')
+        if isinstance(hull.args.get('efmap'), str):
+            efmap = hull.args.get('efmap')
+        else:
+            efmap = 'PuBu_r'
+        ax.heatmap(energies, style="hexagonal", cbarlabel='Formation energy (eV/atom)', vmax=0, cmap=efmap)
     elif hull.args.get('sampmap'):
         sampling = dict()
         from ternary.helpers import simplex_iterator
