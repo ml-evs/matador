@@ -1006,14 +1006,14 @@ class ComputeTask:
                     command = ['aprun', '-n', str(self.ncores)] + command
                 elif self.mpi_library == 'slurm':
                     command = ['srun', '--exclusive', '-N', '1', '-n', str(self.ncores)] + command
-                elif self.mpi_library == 'intel':
+                elif self.mpi_library in ['intel', 'default']:
+                    command = ['mpirun', '-n', str(self.ncores)] + command
+                else:
                     command = ['mpirun', '-n', str(self.ncores)] + command
             elif self.node is not None:
                 cwd = os.getcwd()
                 command = ['ssh', '{}'.format(self.node), 'cd', '{};'.format(cwd), 'mpirun', '-n',
                            str(self.ncores)] + command
-            else:
-                command = ['nice', '-n', '15', 'mpirun', '-n', str(self.ncores)] + command
         else:
             if self.mpi_library == 'archer':
                 command = [
