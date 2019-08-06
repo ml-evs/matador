@@ -868,7 +868,7 @@ class ComputeTask:
         """ Property to store/compute desired MPI library. """
         if self._mpi_library is None:
             self._mpi_library = self.set_mpi_library()
-            LOG.info('Detected {mpi} MPI.'.format(mpi=self._mpi_library))
+            LOG.info('Detected {} MPI.'.format(self._mpi_library))
         return self._mpi_library
 
     def set_mpi_library(self):
@@ -1029,6 +1029,9 @@ class ComputeTask:
                 command = ['mpirun', '-n', str(self.ncores * self.nnodes), '-ppn', str(self.ncores)] + command
             else:
                 command = ['mpirun', '-n', str(self.ncores * self.nnodes), '-npernode', str(self.ncores)] + command
+
+        if self.ncores > 1 and 'run' not in command:
+            raise RuntimeError('Issue running command {} in parallel, this is probably a matador bug!'.format(command))
 
         stdout = sp.PIPE
         stderr = sp.PIPE
