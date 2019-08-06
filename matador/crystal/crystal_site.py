@@ -11,7 +11,7 @@ from matador.utils.cell_utils import cart2frac, frac2cart
 
 
 class Site:
-    def __init__(self, species, position, lattice_cart,
+    def __init__(self, species: str, position: list, lattice_cart,
                  position_unit='fractional', **site_data):
 
         self.lattice = lattice_cart
@@ -27,7 +27,7 @@ class Site:
         self.site_data.update(site_data)
 
     def __str__(self):
-        site_str = '{species:<3} {pos[0]:4.4f} {pos[1]:4.4f} {pos[2]:4.4f}'.format(species=self.species, pos=self.coords)
+        site_str = '{species} {pos[0]:4.4f} {pos[1]:4.4f} {pos[2]:4.4f}'.format(species=self.species, pos=self.coords)
         for key in self.site_data:
             site_str += '\n{} = {}'.format(key, self.site_data[key])
         return site_str
@@ -49,6 +49,8 @@ class Site:
         return Site(species, position, lattice, position_unit='fractional', **site_data)
 
     def set_position(self, position, units):
+        if len(position) != 3 or not all(isinstance(pos, float) for pos in position):
+            raise RuntimeError('CrystalSite position has wrong shape: {}'.format(position))
         if '_coords' not in self.__dict__:
             self._coords = dict()
         if units == 'fractional':

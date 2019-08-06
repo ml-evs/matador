@@ -6,6 +6,7 @@ the Atomic Simulation Environment (ASE).
 
 """
 import copy
+import matador.crystal
 
 
 def ase2dict(atoms):
@@ -29,8 +30,18 @@ def ase2dict(atoms):
     return doc
 
 
-def doc2ase(doc):
-    """ Convert matador document to simple ASE object. """
+def doc2ase(doc, add_keys_to_info=True):
+    """ Convert matador document to simple ASE object.
+
+    Parameters:
+        doc (dict/:obj:`matador.crystal.Crystal`): matador document  or
+            `Crystal` containing the structure.
+
+    Keyword arguments:
+        add_keys_to_info (bool): whether or not to add the keys from the
+            matador document to the info section of the Atoms object.
+
+    """
     from ase import Atoms
 
     atoms = Atoms(symbols=doc['atom_types'],
@@ -38,8 +49,12 @@ def doc2ase(doc):
                   cell=doc['lattice_cart'],
                   pbc=True)
 
-    atoms.info['matador'] = copy.deepcopy(doc)
-    if '_id' in atoms.info['matador']:
-        atoms.info['matador']['_id'] = str(atoms.info['matador']['_id'])
+    if add_keys_to_info:
+        if isinstance(doc, matador.crystal.Crystal):
+            atoms.info['matador'] = doc._data
+        else:
+            atoms.info['matador'] = copy.deepcopy(doc)
+        if '_id' in atoms.info['matador']:
+            atoms.info['matador']['_id'] = str(atoms.info['matador']['_id'])
 
     return atoms

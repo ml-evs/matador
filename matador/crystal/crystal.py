@@ -109,6 +109,8 @@ class Crystal(DataContainer):
 
     @staticmethod
     def _validate_doc(doc):
+        if isinstance(doc, Crystal):
+            raise RuntimeError('Cannot make Crystal out of existing Crystal.')
         if not any(key in doc for key in ['lattice_cart', 'lattice_abc']):
             raise RuntimeError('No lattice information found, cannot create Crystal.')
         if 'atom_types' not in doc:
@@ -151,6 +153,7 @@ class Crystal(DataContainer):
         self._network = None
         self._bond_lengths = None
         self._bonding_stats = None
+        self._ase = None
 
         # assume default value for symprec
         if 'space_group' in self._data:
@@ -170,7 +173,7 @@ class Crystal(DataContainer):
         if isinstance(key, int):
             return self.sites[key]
         else:
-            super().__getitem__(key)
+            return super().__getitem__(key)
 
     def __str__(self):
         repr_string = "{root_source}: {formula}\n".format(root_source=self.root_source, formula=self.formula)
@@ -196,7 +199,7 @@ class Crystal(DataContainer):
 
         """
         for ind, species in enumerate(self.atom_types):
-            position = self._data['positions_frac'][ind]
+            position = self.positions_frac[ind]
             site_data = {}
             if 'site_occupancy' in self._data:
                 if len(self._data['site_occupancy']) == len(self._data['atom_types']):
@@ -233,6 +236,9 @@ class Crystal(DataContainer):
     @property
     def positions_frac(self):
         """ Return list of fractional positions. """
+        from matador.utils.cell_utils import cart2frac
+        if 'positions_frac' not in self._data:
+            self._data['positions_frac'] = cart2frac(self.cell.lattice_cart, self.positions_abs)
         return self._data['positions_frac']
 
     @property
@@ -361,6 +367,17 @@ class Crystal(DataContainer):
             self._coordination_stats = coordination_stats
 
         return self._coordination_stats
+
+    @property
+    def ase_atoms(self):
+        """ Returns an ASE Atoms representation of
+        the crystal.
+
+        """
+        from matador.utils.ase_utils import doc2ase
+        if self._ase is None:
+            self._ase = doc2ase(self, add_keys_to_info=False)
+        return self._ase
 
     @property
     def coordination_lists(self):

@@ -59,18 +59,33 @@ class UnitCellTest(unittest.TestCase):
 
 
 class CrystalTest(unittest.TestCase):
+
+    def test_getters_setters(self):
+        doc, s = castep2dict(REAL_PATH + 'data/Na3Zn4-swap-ReOs-OQMD_759599.castep')
+        crystal = Crystal(doc)
+        self.assertEqual(list(crystal.lattice_cart[0]), [9.0397727, 0.0081202, 0.0000000])
+        self.assertEqual(crystal.num_atoms, 14)
+        with self.assertRaises(AttributeError):
+            crystal['positions_frac'] = [[0, 1, 2]]
+
     def testSites(self):
         doc, s = castep2dict(REAL_PATH + 'data/Na3Zn4-swap-ReOs-OQMD_759599.castep')
         del doc['lattice_cart']
         crystal = Crystal(doc)
         print(crystal)
-        assert [atom for atom in crystal] == [atom[1] for atom in enumerate(crystal)]
+        self.assertEqual(crystal[0].coords, [0.776467, 0.466319, 0.0])
+        with self.assertRaises(RuntimeError):
+            crystal[0].set_position([0.5, 0.6, 0.7, 0.8], 'fractional')
+        with self.assertRaises(RuntimeError):
+            crystal[0].set_position([[1, 2, 3], [4, 5, 6], [7, 8, 9]], 'fractional')
+        self.assertEqual([atom for atom in crystal], [atom[1] for atom in enumerate(crystal)])
 
     def testSpg(self):
         doc, s = castep2dict(REAL_PATH + 'data/Na3Zn4-swap-ReOs-OQMD_759599.castep')
         crystal = Crystal(doc)
         print(crystal.get_space_group(symprec=0.01))
         print(crystal.get_space_group(symprec=0.001))
+        self.assertEqual(crystal.get_space_group(symprec=0.0000001), 'Pm')
 
     def testFromMagres(self):
         doc, s = magres2dict(REAL_PATH + 'data/NaP_QE6.magres')
