@@ -37,14 +37,16 @@ class DataContainer:
             raise AttributeError('Object has no data or implementation for requested {}'
                                  .format(key))
 
-    def __setitem__(self, key, item):
+    def __delitem__(self, key: str):
+        raise AttributeError('Object does not support deletion of keys in `_data`.')
+
+    def __setitem__(self, key: str, item):
         if key not in self._data:
             raise AttributeError('Cannot set value of {} inside DataContainer.'
                                  .format(key))
             # self._data[key] = item
-        else:
-            raise AttributeError('Cannot assign value to existing key {}'
-                                 .format(key))
+        raise AttributeError('Cannot assign value to existing key {}'
+                             .format(key))
 
     def __contains__(self, key):
         if key in self._data:
