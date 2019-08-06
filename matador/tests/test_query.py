@@ -148,7 +148,7 @@ class QueryTest(unittest.TestCase):
                     {'tags': {'$in': ['Bar']}}
                 ]},
                 {'doi': {'$in': ['1001/4001']}},
-                {'icsd': {'$eq': '100020'}},
+                {'icsd': {'$eq': 100020}},
                 {'cut_off_energy': {'$eq': 300}},
                 {'spin_polarized': True},
                 {'$or': [
