@@ -862,7 +862,7 @@ class DBQuery:
         if self.args.get('icsd') == 0 or self.args.get('icsd') is True:
             query_dict['icsd']['$exists'] = True
         else:
-            query_dict['icsd']['$eq'] = str(icsd[0])
+            query_dict['icsd']['$eq'] = icsd[0]
         return query_dict
 
     def _query_source(self):

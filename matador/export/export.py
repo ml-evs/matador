@@ -157,7 +157,7 @@ def query2files(cursor, **kwargs):
                     name = comp_string + '-' + name
                 # grab OQMD entry_id
                 if 'icsd' in doc and 'CollCode' not in source:
-                    name += '-CollCode' + doc['icsd']
+                    name += '-CollCode{}'.format(doc['icsd'])
         path += name
         if param:
             doc2param(doc, path, hash_dupe=hash_dupe)
