@@ -105,13 +105,13 @@ def qmpy_entry_to_doc(entry):
     doc['xc_functional'] = 'PBE'
 
     doc['forces'] = ef_calc.output.forces
-    doc['pressure'] = -0.1 * (ef_calc.output.sxx + ef_calc.output.syy + ef_calc.output.szz)/3.0
+    doc['pressure'] = 0.0
+    doc['stress'] = -0.1 * (ef_calc.output.sxx + ef_calc.output.syy + ef_calc.output.szz)/3.0
     try:
         doc['max_force_on_atom'] = np.max(np.linalg.norm(doc['forces'], axis=-1))
     except:
         print(entry.id, doc['forces'])
     doc['forces'] = doc['forces'].tolist()
-
 
     return doc
 
