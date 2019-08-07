@@ -54,7 +54,9 @@ def qmpy_entry_to_doc(entry):
 
     doc = dict()
 
-    if entry.duplicate_of.id != entry.id:
+    if entry is None:
+        raise RuntimeError('Entry is None.')
+    if entry.duplicate_of is not None and entry.duplicate_of.id != entry.id:
         raise RuntimeError('Structure is a duplicate.')
 
     doc['task'] = 'geometryoptimization'
@@ -173,6 +175,7 @@ class OQMDConverter:
         """
         self.import_count = 0
         self.success_count = 0
+        self.limit = 50000
         self.num_scraped = 0
         self.dryrun = dryrun
         self.debug = debug
@@ -236,7 +239,7 @@ class OQMDConverter:
         all_structures = qmpy.Entry.objects.all().count()
         print('Expecting {} structures total'.format(all_structures))
 
-        while self.num_scraped < all_structures:
+        while self.num_scraped < all_structures and self.import_count < self.limit:
             chunk_min = self.start_id + chunk_iter * self.chunk_size
             chunk_max = chunk_min + self.chunk_size
             chunk_iter += 1
@@ -261,6 +264,7 @@ class OQMDConverter:
                     doc = {}
                     doc = qmpy_entry_to_doc(entry)
                 except RuntimeError:
+                    print_exc()
                     continue
                 except Exception:
                     print_exc()
@@ -283,6 +287,8 @@ class OQMDConverter:
             print('Successfully scraped', success_count, '/',
                   'structures.')
         if not self.dryrun:
+            if self.import_count == 0:
+                raise RuntimeError('Nothing imported.')
             print('Successfully imported', self.import_count, '/',
                   'structures.')
         return
