@@ -97,8 +97,19 @@ def qmpy_entry_to_doc(entry):
     doc['stable'] = entry.stable
 
     # some entries have multiple E_f, choose the last one,
-    # which should match entry.energy
-    ef_calc = entry.formationenergy_set.last().calculation
+    # which should match entry.energy: OR SO I THOUGHT
+    # instead, we need to loop over the formation energies and find
+    # the matching one. This is potentially the lowest one every time.
+    efs = entry.formationenergy_set.all()
+    for ef in efs:
+        if abs(ef.delta_e - entry.energy) < 1e-6:
+            eform = ef
+            break
+    else:
+        print('Unable to match formation energy for entry.id={}'.format(entry.id))
+        raise RuntimeError
+    doc['hull_distance'] = min(0, eform.stability)
+    ef_calc = eform.calculation
     oqmd_calc_settings = ef_calc.settings
     doc['cut_off_energy'] = oqmd_calc_settings['encut']
     doc['spin_polarized'] = bool(oqmd_calc_settings['ispin'] - 1)
