@@ -364,8 +364,8 @@ def plot_both(plot_cutoff=False, plot_kpt=False, cutoff_data={}, kpt_data={}, lo
                 ax_kpt.set_ylim(0, kwargs['energy_range'])
 
     plt.figlegend(lines, labels, loc='upper center', fontsize=10, ncol=2, frameon=True, fancybox=True, shadow=True)
-    plt.show()
     plt.savefig('conv.png', bbox_inches='tight')
+    plt.show()
 
 
 if __name__ == '__main__':
