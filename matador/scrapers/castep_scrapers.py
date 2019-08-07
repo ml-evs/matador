@@ -1282,7 +1282,7 @@ def _castep_scrape_final_structure(flines, castep, db=True):
                         atoms = True
                     i += 1
             # don't check if final_energy exists, as this will update for each GO step
-            elif 'Final energy, E' in line:
+            elif 'Final energy =' in line or 'Final energy, E' in line:
                 castep['total_energy'] = f90_float_parse(line.split('=')[1].split()[0])
                 castep['total_energy_per_atom'] = castep['total_energy'] / castep['num_atoms']
             elif 'Final free energy' in line:
@@ -1301,7 +1301,6 @@ def _castep_scrape_final_structure(flines, castep, db=True):
                             forces = False
                             break
                         else:
-                            force_on_atom = 0
                             castep['forces'].append([])
                             for j in range(3):
                                 temp = final_flines[line_no + i].replace('(cons\'d)', '')
@@ -1450,7 +1449,7 @@ def _castep_find_final_structure(flines):
 
     # now wind back to get final total energies and non-symmetrised forces
     for count, line in enumerate(reversed(flines[:finish_line])):
-        if 'Final energy, E' in line:
+        if 'Final energy, E' in line or 'Final energy =' in line:
             finish_line -= count + 2
             break
 
@@ -1549,7 +1548,7 @@ def _castep_scrape_all_snapshots(flines):
                 snapshot['stoichiometry'] = get_stoich(snapshot['atom_types'])
 
             # don't check if final_energy exists, as this will update for each GO step
-            elif 'Final energy, E' in line:
+            elif 'Final energy, E' in line or 'Final energy =' in line:
                 snapshot['total_energy'] = f90_float_parse(line.split('=')[1].split()[0])
             elif 'Final free energy' in line:
                 snapshot['free_energy'] = f90_float_parse(line.split('=')[1].split()[0])
