@@ -1030,7 +1030,7 @@ class ComputeTask:
             else:
                 command = ['mpirun', '-n', str(self.ncores * self.nnodes), '-npernode', str(self.ncores)] + command
 
-        if self.ncores > 1 and 'run' not in command:
+        if self.ncores > 1 and 'run' not in ' '.join(command):
             raise RuntimeError('Issue running command {} in parallel, this is probably a matador bug!'.format(command))
 
         stdout = sp.PIPE
