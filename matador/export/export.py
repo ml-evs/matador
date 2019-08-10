@@ -438,14 +438,15 @@ def doc2cell(doc, *args, **kwargs):
         flines.append((''.join(str(doc['cell_constraints'][1]).strip('[]'))).replace(',', ''))
         flines.append('%ENDBLOCK CELL_CONSTRAINTS')
 
-    if 'fix_com' in doc:
-        flines.append('FIX_COM')
-    if 'fix_all_cell' in doc:
-        flines.append('FIX_ALL_CELL')
-    if 'fix_all_ions' in doc:
-        flines.append('FIX_ALL_IONS')
-    if 'fix_vol' in doc:
-        flines.append('FIX_VOL')
+    if doc.get('fix_com'):
+        flines.append('FIX_COM: TRUE')
+    if doc.get('fix_all_cell'):
+        flines.append('FIX_ALL_CELL: TRUE')
+    if doc.get('fix_all_ions'):
+        flines.append('FIX_ALL_IONS: TRUE')
+    if doc.get('fix_vol'):
+        flines.append('FIX_VOL: TRUE')
+
     if 'symmetry_generate' in doc:
         flines.append('SYMMETRY_GENERATE')
     if 'snap_to_symmetry' in doc:
