@@ -420,6 +420,18 @@ class CastepScraperTests(unittest.TestCase):
         self.assertEqual(test_dict['cnt_radius'], 4.69825)
         self.assertEqual(len(test_dict['devel_code']), 195)
 
+    def test_castep_fixed_cell_scraper(self):
+        castep_fname = REAL_PATH + 'data/fix_cell_test/TiNb2O7-JVAa6LNI-0K-prim.castep'
+        self.assertTrue(os.path.isfile(castep_fname), msg='Failed to find test case {}, please check installation'.format(castep_fname))
+        test_dict, s = castep2dict(castep_fname, db=False, verbosity=VERBOSITY)
+        self.assertTrue(s)
+        self.assertEqual(test_dict['positions_frac'][0], [0.501184, 0.501184, 0.997063])
+        self.assertEqual(test_dict['positions_frac'][-1], [0.182069, 0.182069, 0.989013])
+        self.assertEqual(test_dict['lattice_abc'][0], [10.360830, 10.360830, 11.883000])
+        self.assertEqual(test_dict['lattice_abc'][1], [119.631200, 119.631200, 21.144990])
+        self.assertTrue(test_dict['fix_all_cell'])
+        self.assertEqual(test_dict['cell_constraints'], [0, 0, 0, 0, 0, 0])
+
 
 class ResScraperTests(unittest.TestCase):
 

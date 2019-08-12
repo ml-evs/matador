@@ -580,8 +580,10 @@ def castep2dict(seed, db=True, intermediates=False, **kwargs):
     # wrangle castep file for parameters in 3 passes:
     # once forwards to get number and types of atoms
     _castep_scrape_atoms(flines, castep)
+    print(castep)
     # once backwards to get the final parameter set for the calculation
     _castep_scrape_final_parameters(flines, castep)
+    print(castep)
 
     # task specific options
     if db and 'geometry' not in castep['task']:
@@ -590,12 +592,14 @@ def castep2dict(seed, db=True, intermediates=False, **kwargs):
     if not db and 'thermo' in castep['task'].lower():
         _castep_scrape_thermo_data(flines, castep)
 
-    # only scrape snapshots/number of intermediates if requested,
-    # or if not in db mode
-    if intermediates or not db:
-        snapshots, castep['geom_iter'] = _castep_scrape_all_snapshots(flines)
-        if intermediates:
-            castep['intermediates'] = snapshots
+    # only scrape snapshots/number of intermediates if requested
+    if intermediates:
+        try:
+            snapshots, castep['geom_iter'] = _castep_scrape_all_snapshots(flines)
+            if intermediates:
+                castep['intermediates'] = snapshots
+        except RuntimeError as exc:
+            raise RuntimeError('Failed to scrape intermediates: {}'.format(exc))
 
     _castep_scrape_metadata(flines, castep)
 
@@ -1070,6 +1074,19 @@ def _castep_scrape_atoms(flines, castep):
                     temp_line = flines[line_no + i].split()[0:3]
                     castep['lattice_cart'].append(list(map(f90_float_parse, temp_line)))
                 i += 1
+        elif 'Lattice parameters' in line:
+            castep['lattice_abc'] = []
+            i = 1
+            castep['lattice_abc'].append(
+                list(map(f90_float_parse,
+                         [flines[line_no+i].split('=')[1].strip().split(' ')[0],
+                          flines[line_no+i+1].split('=')[1].strip().split(' ')[0],
+                          flines[line_no+i+2].split('=')[1].strip().split(' ')[0]])))
+            castep['lattice_abc'].append(
+                list(map(f90_float_parse,
+                         [flines[line_no+i].split('=')[-1].strip(),
+                          flines[line_no+i+1].split('=')[-1].strip(),
+                          flines[line_no+i+2].split('=')[-1].strip()])))
         if 'atom types' not in castep and 'Cell Contents' in line:
             castep['atom_types'] = []
             castep['positions_frac'] = []
@@ -1149,6 +1166,10 @@ def _castep_scrape_final_parameters(flines, castep):
             castep['sedc_scheme'] = flines[line_no + 1].split(':')[1].split()[0]
         elif 'space_group' not in castep and 'Space group of crystal' in line:
             castep['space_group'] = line.split(':')[-1].split(',')[0].strip().replace(" ", "")
+        elif 'Cell constraints are' in line and 'cell_constraints' not in castep:
+            castep['cell_constraints'] = [int(val) for val in line.split(':')[-1].split()]
+            if all(val == 0 for val in castep['cell_constraints']):
+                castep['fix_all_cell'] = True
         elif 'external_pressure' not in castep and 'External pressure/stress' in line:
             try:
                 castep['external_pressure'] = []
@@ -1244,14 +1265,14 @@ def _castep_scrape_final_structure(flines, castep, db=True):
             if 'Real Lattice' in line:
                 castep['lattice_cart'] = []
                 i = 1
-                while True:
+                while i < 4:
                     if not final_flines[line_no + i].strip():
                         break
                     else:
                         temp_line = final_flines[line_no + i].split()[0:3]
                         castep['lattice_cart'].append(list(map(f90_float_parse, temp_line)))
                     i += 1
-            elif 'Lattice parameters' in line:
+            if 'Lattice parameters' in line:
                 castep['lattice_abc'] = []
                 i = 1
                 castep['lattice_abc'].append(
@@ -1374,9 +1395,9 @@ def _castep_scrape_final_structure(flines, castep, db=True):
 
         except DFTError as exc:
             raise exc
-        except Exception as oops:
-            msg = 'Error on line {}, contents: {}, error: {}'.format(line_no, line, oops)
-            raise RuntimeError(msg)
+        # except Exception as oops:
+            # msg = 'Error on line {}, contents: {}, error: {}'.format(line_no, line, oops)
+            # raise RuntimeError(msg)
 
     # calculate kpoint spacing if not found
     if 'kpoints_mp_grid' in castep and 'kpoints_mp_spacing' not in castep and 'lattice_cart' in castep:
