@@ -1170,6 +1170,7 @@ def _castep_scrape_final_parameters(flines, castep):
             castep['cell_constraints'] = [int(val) for val in line.split(':')[-1].split()]
             if all(val == 0 for val in castep['cell_constraints']):
                 castep['fix_all_cell'] = True
+                del castep['cell_constraints']
         elif 'external_pressure' not in castep and 'External pressure/stress' in line:
             try:
                 castep['external_pressure'] = []

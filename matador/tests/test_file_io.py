@@ -430,7 +430,7 @@ class CastepScraperTests(unittest.TestCase):
         self.assertEqual(test_dict['lattice_abc'][0], [10.360830, 10.360830, 11.883000])
         self.assertEqual(test_dict['lattice_abc'][1], [119.631200, 119.631200, 21.144990])
         self.assertTrue(test_dict['fix_all_cell'])
-        self.assertEqual(test_dict['cell_constraints'], [0, 0, 0, 0, 0, 0])
+        self.assertTrue('cell_constraints' not in test_dict)
 
 
 class ResScraperTests(unittest.TestCase):
