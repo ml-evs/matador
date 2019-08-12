@@ -580,10 +580,8 @@ def castep2dict(seed, db=True, intermediates=False, **kwargs):
     # wrangle castep file for parameters in 3 passes:
     # once forwards to get number and types of atoms
     _castep_scrape_atoms(flines, castep)
-    print(castep)
     # once backwards to get the final parameter set for the calculation
     _castep_scrape_final_parameters(flines, castep)
-    print(castep)
 
     # task specific options
     if db and 'geometry' not in castep['task']:
@@ -1074,7 +1072,7 @@ def _castep_scrape_atoms(flines, castep):
                     temp_line = flines[line_no + i].split()[0:3]
                     castep['lattice_cart'].append(list(map(f90_float_parse, temp_line)))
                 i += 1
-        elif 'Lattice parameters' in line:
+        if 'Lattice parameters' in line:
             castep['lattice_abc'] = []
             i = 1
             castep['lattice_abc'].append(
@@ -1087,6 +1085,8 @@ def _castep_scrape_atoms(flines, castep):
                          [flines[line_no+i].split('=')[-1].strip(),
                           flines[line_no+i+1].split('=')[-1].strip(),
                           flines[line_no+i+2].split('=')[-1].strip()])))
+        if 'Current cell volume' in line:
+            castep['cell_volume'] = f90_float_parse(line.split('=')[1].split()[0].strip())
         if 'atom types' not in castep and 'Cell Contents' in line:
             castep['atom_types'] = []
             castep['positions_frac'] = []
