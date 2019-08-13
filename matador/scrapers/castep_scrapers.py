@@ -1176,6 +1176,10 @@ def _castep_scrape_final_parameters(flines, castep):
             elif all(val == 0 for val in castep['cell_constraints']):
                 castep['fix_all_cell'] = True
                 del castep['cell_constraints']
+            if 'cell_constraints' in castep:
+                if len(castep['cell_constraints']) != 6:
+                    raise RuntimeError('Unable to read cell constraints block.')
+                castep['cell_constraints'] = [castep['cell_constraints'][0:3], castep['cell_constraints'][3:]]
         elif 'external_pressure' not in castep and 'External pressure/stress' in line:
             try:
                 castep['external_pressure'] = []
