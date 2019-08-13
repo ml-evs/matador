@@ -198,6 +198,9 @@ def cell2dict(seed, db=False, lattice=True, positions=True, **kwargs):
             cell['cell_constraints'] = []
             for j in range(2):
                 cell['cell_constraints'].append(list(map(int, flines[line_no + j + 1].split())))
+            if (any(len(cell['cell_constraints'][i]) != 3 for i in range(2))
+                    or len(cell['cell_constraints']) != 2):
+                raise RuntimeError('Invalid cell constraints block.')
         elif '%block hubbard_u' in line.lower():
             cell['hubbard_u'] = defaultdict(list)
             i = 0
@@ -1168,7 +1171,9 @@ def _castep_scrape_final_parameters(flines, castep):
             castep['space_group'] = line.split(':')[-1].split(',')[0].strip().replace(" ", "")
         elif 'Cell constraints are' in line and 'cell_constraints' not in castep:
             castep['cell_constraints'] = [int(val) for val in line.split(':')[-1].split()]
-            if all(val == 0 for val in castep['cell_constraints']):
+            if castep['cell_constraints'] == [1, 2, 3, 4, 5, 6]:
+                del castep['cell_constraints']
+            elif all(val == 0 for val in castep['cell_constraints']):
                 castep['fix_all_cell'] = True
                 del castep['cell_constraints']
         elif 'external_pressure' not in castep and 'External pressure/stress' in line:

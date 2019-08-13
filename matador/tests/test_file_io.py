@@ -120,7 +120,7 @@ class CellScraperTests(unittest.TestCase):
         np.testing.assert_array_almost_equal(cell['positions_frac'][95], [0.8125, 0.9166666, 0.8987889])
         np.testing.assert_array_almost_equal(cell['positions_frac'][-1], [0.625, 0.8333333, 0.26989619])
 
-    def test_cell_ionic_constraints(self):
+    def test_cell_ionic_cell_constraints(self):
         cell_name = REAL_PATH + 'data/cell_files/ionic_constraints.cell'
         cell, s = cell2dict(cell_name, db=False)
 
@@ -128,6 +128,8 @@ class CellScraperTests(unittest.TestCase):
         self.assertEqual(cell['ionic_constraints'][0], '1 C 1 0 0 1')
         self.assertEqual(cell['ionic_constraints'][1], '2 C 1 0 1 0')
         self.assertEqual(cell['ionic_constraints'][2], '3 C 1 1 0 0')
+        self.assertEqual(cell['cell_constraints'][0], [1, 1, 3])
+        self.assertEqual(cell['cell_constraints'][1], [0, 0, 0])
 
 
 class CastepScraperTests(unittest.TestCase):
@@ -1012,6 +1014,7 @@ class ExportTest(unittest.TestCase):
         self.assertEqual(test_dict['phonon_supercell_matrix'][0], [3, 0, 1])
         self.assertEqual(test_dict['phonon_supercell_matrix'][1], [0, 3, 0])
         self.assertEqual(test_dict['phonon_supercell_matrix'][2], [0, 0, 9])
+        self.assertEqual(test_dict['cell_constraints'], [[1, 2, 3], [4, 4, 4]])
         # test that overwrite overwrites
         doc['phonon_supercell_matrix'][2] = [0, 0, 140]
         doc2cell(doc, test_fname, overwrite=True)

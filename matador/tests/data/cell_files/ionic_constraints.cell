@@ -19,6 +19,11 @@ C               0.333256        0.666746        0.002511
 3 C 1 1 0 0
 %endblock ionic_constraints
 
+%block cell_constraints
+1 1 3
+0 0 0
+%endblock cell_constraints
+
 %block species_pot
 C18
 %endblock species_pot

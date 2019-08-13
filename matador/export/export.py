@@ -434,8 +434,8 @@ def doc2cell(doc, *args, **kwargs):
 
     if 'cell_constraints' in doc:
         flines.append('\n%BLOCK CELL_CONSTRAINTS')
-        flines.append((''.join(str(doc['cell_constraints'][0]).strip('[]'))).replace(',', ''))
-        flines.append((''.join(str(doc['cell_constraints'][1]).strip('[]'))).replace(',', ''))
+        flines.append('{d[0]} {d[1]} {d[2]}'.format(d=doc['cell_constraints'][0]))
+        flines.append('{d[0]} {d[1]} {d[2]}'.format(d=doc['cell_constraints'][1]))
         flines.append('%ENDBLOCK CELL_CONSTRAINTS')
 
     if doc.get('fix_com'):

@@ -55,3 +55,8 @@ PHONON_FINE_KPOINT_PATH_SPACING : 0.01
 0 3 0
 0 0 9
 %ENDBLOCK PHONON_SUPERCELL_MATRIX
+
+%BLOCK cell_constraints
+1 2 3
+4 4 4
+%endblock cell_constraints
