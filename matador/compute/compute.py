@@ -596,8 +596,10 @@ class ComputeTask:
                             opti_dict['lattice_cart'] = list(cell_dict['lattice_cart'])
 
                     LOG.debug('N = {iters:03d} | |F| = {d[max_force_on_atom]:5.5f} eV/A | '
-                              'S = {d[pressure]:5.5f} GPa | H = {d[enthalpy_per_atom]:5.5f} eV/atom'
-                              .format(d=opti_dict, iters=sum(self._geom_max_iter_list[:ind+1])))
+                              'S = {pressure:5.5f} GPa | H = {d[enthalpy_per_atom]:5.5f} eV/atom'
+                              .format(d=opti_dict,
+                                      pressure=opti_dict.get('pressure', 0.0),
+                                      iters=sum(self._geom_max_iter_list[:ind+1])))
 
                 # if there were errors that can be remedied, now is the time to do it
                 # this will normally involve changing a parameter to avoid future failures
@@ -619,6 +621,8 @@ class ComputeTask:
         # All other errors mean something bad has happened, so we should clean up this job
         # more jobs will run unless this exception is either CriticalError or KeyboardInterrupt
         except Exception as err:
+            from traceback import print_exc
+            print_exc()
             LOG.error('Error caught: terminating job for {}. Error = {}'.format(self.seed, err))
             try:
                 self._process.terminate()
