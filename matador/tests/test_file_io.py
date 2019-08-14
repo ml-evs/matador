@@ -954,6 +954,26 @@ class ScraperMiscTest(unittest.TestCase):
             self.assertTrue(errored, 'WARNING: malicious attack is possible through symops')
             self.assertFalse(s, 'This should have failed entirely, oh dear!')
 
+        cif_fname = REAL_PATH + 'data/cif_files/SiO_n001_CollCode1109.cif'
+        failed_open = False
+        try:
+            f = open(cif_fname, 'r')
+        except FileNotFoundError:
+            failed_open = True
+            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(cif_fname))
+        if not failed_open:
+            f.close()
+            errored = False
+            test_dict, s = cif2dict(cif_fname)
+            self.assertTrue(s, 'Failed entirely, oh dear! {}'.format(test_dict))
+            self.assertAlmostEqual(test_dict['cell_volume'], 2110.2, msg='Wrong cell volume!', places=1)
+            self.assertAlmostEqual(test_dict['lattice_abc'][0], [18.4940, 4.991, 23.758], places=3)
+            self.assertAlmostEqual(test_dict['lattice_abc'][1], [90, 105.79, 90], places=3)
+            self.assertEqual(len(test_dict['atom_types']), 144)
+            self.assertEqual(test_dict['num_atoms'], 144)
+            self.assertEqual(len(test_dict['positions_frac']), 144)
+            self.assertEqual(len(test_dict['site_occupancy']), 144)
+
 
 class ExportTest(unittest.TestCase):
     """ Test file export functions. """
@@ -1042,7 +1062,7 @@ class ExportTest(unittest.TestCase):
 
         self.assertTrue(s)
         with self.assertRaises(RuntimeError):
-            doc2cell(cell,'dummy')
+            doc2cell(cell, 'dummy')
 
     def test_doc2cell_kpoint_path(self):
         cell_name = REAL_PATH + 'data/cell_files/kpoint_path.cell'
