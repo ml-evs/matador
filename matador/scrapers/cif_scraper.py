@@ -9,6 +9,7 @@
 import numpy as np
 from matador.scrapers.utils import scraper_function
 from matador.utils.cell_utils import get_spacegroup_spg
+from matador.utils.cell_utils import abc2cart, cart2volume
 
 EPS = 1e-13
 
@@ -66,7 +67,6 @@ def cif2dict(seed, **kwargs):
                                     cif_dict['_cell_angle_beta'],
                                     cif_dict['_cell_angle_gamma']]))]
 
-    from matador.utils.cell_utils import abc2cart, cart2volume
     doc['lattice_cart'] = abc2cart(doc['lattice_abc'])
     doc['cell_volume'] = cart2volume(doc['lattice_cart'])
     doc['stoichiometry'] = _cif_disordered_stoichiometry(doc)
@@ -183,8 +183,12 @@ def _cif_parse_raw(flines):
                             raw = raw[:start] + [' '.join(raw[start:end+1]).replace('\'', '')] + raw[end+1:]
                     data.extend(raw)
                     jnd += 1
-                for index, datum in enumerate(data):
-                    cif_dict[keys[index]].append(datum)
+                try:
+                    for index, datum in enumerate(data):
+                        cif_dict[keys[index]].append(datum)
+                except Exception:
+                    print('Failed to scrape one of {}'.format(keys))
+                    pass
 
         ind += jnd
 
