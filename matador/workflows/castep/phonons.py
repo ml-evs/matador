@@ -19,10 +19,10 @@ multiple steps (only when necessary):
 """
 
 
-import logging
 import os
 import copy
-from matador.workflows import Workflow
+import json
+from matador.workflows.workflows import Workflow, LOG
 
 
 def castep_full_phonon(relaxer, calc_doc, seed):
@@ -90,7 +90,7 @@ class CastepPhononWorkflow(Workflow):
         # prepare to do pre-relax if there's no check file
         if os.path.isfile(self.seed + '.check'):
             todo['relax'] = False
-            logging.info('Restarting from {}.check, so not performing re-relaxation'.format(self.seed))
+            LOG.info('Restarting from {}.check, so not performing re-relaxation'.format(self.seed))
 
         for key in todo:
             if todo[key]:
@@ -114,9 +114,9 @@ class CastepPhononWorkflow(Workflow):
             offset = shift_to_include_gamma(grid)
             if offset != [0, 0, 0]:
                 self.calc_doc['phonon_kpoint_mp_offset'] = offset
-                logging.debug('Set phonon MP grid offset to {}'.format(offset))
+                LOG.debug('Set phonon MP grid offset to {}'.format(offset))
 
-        logging.info('Preprocessing completed: run3 phonon options {}'.format(todo))
+        LOG.info('Preprocessing completed: run3 phonon options {}'.format(todo))
 
 
 def castep_phonon_prerelax(relaxer, calc_doc, seed):
@@ -130,7 +130,7 @@ def castep_phonon_prerelax(relaxer, calc_doc, seed):
         seed (str): root filename of structure.
 
     """
-    logging.info('Performing CASTEP phonon pre-relax...')
+    LOG.info('Performing CASTEP phonon pre-relax...')
     relax_doc = copy.deepcopy(calc_doc)
     relax_doc['write_checkpoint'] = 'ALL'
     if 'geom_max_iter' not in relax_doc:
@@ -145,7 +145,7 @@ def castep_phonon_prerelax(relaxer, calc_doc, seed):
 
     relaxer.validate_calc_doc(relax_doc, required, forbidden)
 
-    return relaxer.scf(relax_doc, seed, keep=True, intermediate=True)
+    relaxer.scf(relax_doc, seed, keep=True, intermediate=True)
 
 
 def castep_phonon_dynmat(relaxer, calc_doc, seed):
@@ -157,7 +157,7 @@ def castep_phonon_dynmat(relaxer, calc_doc, seed):
         seed (str): root filename of structure.
 
     """
-    logging.info('Performing CASTEP dynmat calculation...')
+    LOG.info('Performing CASTEP dynmat calculation...')
     relax_doc = copy.deepcopy(calc_doc)
     relax_doc['write_checkpoint'] = 'ALL'
     relax_doc['continuation'] = 'default'
@@ -183,7 +183,7 @@ def castep_phonon_dos(relaxer, calc_doc, seed):
         seed (str): root filename of structure.
 
     """
-    logging.info('Performing CASTEP phonon DOS calculation...')
+    LOG.info('Performing CASTEP phonon DOS calculation...')
     dos_doc = copy.deepcopy(calc_doc)
     dos_doc['task'] = 'phonon'
     dos_doc['phonon_calculate_dos'] = True
@@ -208,7 +208,7 @@ def castep_phonon_dispersion(relaxer, calc_doc, seed):
         seed (str): root filename of structure.
 
     """
-    logging.info('Performing CASTEP phonon dispersion calculation...')
+    LOG.info('Performing CASTEP phonon dispersion calculation...')
     disp_doc = copy.deepcopy(calc_doc)
     disp_doc['task'] = 'phonon'
     disp_doc['phonon_calculate_dos'] = False
@@ -233,7 +233,7 @@ def castep_phonon_thermodynamics(relaxer, calc_doc, seed):
         seed (str): root filename of structure.
 
     """
-    logging.info('Performing CASTEP thermodynamics calculation...')
+    LOG.info('Performing CASTEP thermodynamics calculation...')
     thermo_doc = copy.deepcopy(calc_doc)
     thermo_doc['continuation'] = 'default'
     thermo_doc['task'] = 'thermodynamics'

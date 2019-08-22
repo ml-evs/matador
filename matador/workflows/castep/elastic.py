@@ -8,10 +8,9 @@ calculations (i.e. varying volume from equilibrium) have been implemented.
 """
 
 
-import logging
 import copy
 import numpy as np
-from matador.workflows import Workflow
+from matador.workflows import Workflow, LOG
 
 
 def castep_elastic(relaxer, calc_doc, seed):
@@ -64,7 +63,7 @@ class CastepElasticWorkflow(Workflow):
         self.volume_rescale = np.cbrt(np.geomspace(0.7, 1.2, num=num_volumes, endpoint=True)).tolist()
         self.volume_rescale.append(1.0)
         self._completed_volumes = []
-        logging.info('Preprocessing completed: run3 bulk modulus calculation options {}'
+        LOG.info('Preprocessing completed: run3 bulk modulus calculation options {}'
                      .format(self.volume_rescale))
 
         self.add_step(castep_elastic_prerelax, 'relax')
@@ -85,7 +84,7 @@ def castep_rescaled_volume_scf(relaxer, calc_doc, seed, rescale=1):
 
     """
     assert rescale > 0
-    logging.info('Performing CASTEP SCF on volume rescaled by {}.'.format(rescale**3))
+    LOG.info('Performing CASTEP SCF on volume rescaled by {}.'.format(rescale**3))
     scf_doc = copy.deepcopy(calc_doc)
     for i in range(3):
         for k in range(3):
@@ -104,7 +103,7 @@ def castep_elastic_prerelax(relaxer, calc_doc, seed):
         seed (str): root filename of structure.
 
     """
-    logging.info('Performing CASTEP elastic pre-relax...')
+    LOG.info('Performing CASTEP elastic pre-relax...')
     relax_doc = copy.deepcopy(calc_doc)
     relax_doc['write_checkpoint'] = 'ALL'
     if 'geom_max_iter' not in relax_doc:

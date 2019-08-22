@@ -6,8 +6,9 @@ of chaining up different calculations at high-throughput.
 
 """
 
-import logging
 import abc
+from matador.compute.compute import LOG
+from matador.utils.print_utils import dumps
 
 
 class Workflow:
@@ -51,13 +52,13 @@ class Workflow:
         self.success = None
         self.steps = []
 
-        logging.info('Performing Workflow of type {} on {}'.format(self.label, self.seed))
+        LOG.info('Performing Workflow of type {} on {}'.format(self.label, self.seed))
 
         self.preprocess()
         try:
             self.run_steps()
         except RuntimeError as exc:
-            logging.critical('Workflow failed: calling postprocess()')
+            LOG.critical('Workflow failed: calling postprocess()')
             self.postprocess()
             raise exc
 
@@ -78,10 +79,10 @@ class Workflow:
 
         """
         if self.success:
-            logging.info('Writing results of Workflow {} run to res file and tidying up.'.format(self.label))
+            LOG.info('Writing results of Workflow {} run to res file and tidying up.'.format(self.label))
             self.relaxer.mv_to_completed(self.seed, keep=True)
         else:
-            logging.info('Writing results of failed Workflow {} run to res file and tidying up.'.format(self.label))
+            LOG.info('Writing results of failed Workflow {} run to res file and tidying up.'.format(self.label))
             self.relaxer.mv_to_bad(self.seed)
 
     def add_step(self, function, name, input_exts=None, output_exts=None, **func_kwargs):
@@ -103,10 +104,12 @@ class Workflow:
         try:
             if not self.steps:
                 msg = 'No steps added to Workflow!'
-                logging.error(msg)
+                LOG.error(msg)
                 raise RuntimeError(msg)
 
             for step in self.steps:
+                LOG.info("Running step {step.name}: {step.function}".format(step=step))
+                LOG.debug("Current state: \n" + dumps(self.calc_doc, indent=2))
                 step.run_step(self.relaxer, self.calc_doc, self.seed)
 
             self.success = True
@@ -114,7 +117,7 @@ class Workflow:
         except RuntimeError:
             self.success = False
             msg = '{} workflow exiting...'.format(self.label)
-            logging.error(msg)
+            LOG.error(msg)
             raise RuntimeError(msg)
 
 
@@ -133,7 +136,7 @@ class WorkflowStep:
     """
     def __init__(self, function, name, input_exts=None, output_exts=None, **func_kwargs):
         """ Construct a WorkflowStep from a function. """
-        logging.debug('Constructing WorkflowStep: {}'.format(name))
+        LOG.debug('Constructing WorkflowStep: {}'.format(name))
         self.function = function
         self.name = name
         self.func_kwargs = func_kwargs
@@ -163,11 +166,11 @@ class WorkflowStep:
                 dst = src + '_{}'.format(self.name)
                 if os.path.isfile(src):
                     shutil.copy2(src, dst, follow_symlinks=True)
-                    logging.info('Backed up {} file {} to {}.'.format(mode, src, dst))
+                    LOG.info('Backed up {} file {} to {}.'.format(mode, src, dst))
                 else:
                     if mode == 'in':
                         error = 'Failed to cache input file {} for step {}.'.format(src, self.name)
-                        logging.warning(error)
+                        LOG.warning(error)
 
     def _cache_inputs(self, seed):
         """ Save any input files for the WorkflowStep with appropriate suffix
@@ -220,23 +223,23 @@ class WorkflowStep:
 
         """
         try:
-            logging.info('WorkflowStep {} starting...'.format(self.name))
+            LOG.info('WorkflowStep {} starting...'.format(self.name))
             success = self.function(relaxer, calc_doc, seed, **self.func_kwargs)
         except RuntimeError as exc:
             msg = 'WorkflowStep {} failed with error {}.'.format(self.name, exc)
-            logging.error(msg)
+            LOG.error(msg)
             success = False
             self.cache_files(seed)
             raise exc
 
         if success is None:
-            logging.info('WorkflowStep {} skipped, did you provide all the input files?'.format(self.name))
+            LOG.info('WorkflowStep {} skipped, did you provide all the input files?'.format(self.name))
             return success
 
         if success:
-            logging.info('WorkflowStep {} completed successfully.'.format(self.name))
+            LOG.info('WorkflowStep {} completed successfully.'.format(self.name))
         else:
-            logging.warning('WorkflowStep {} was unsuccessful.'.format(self.name))
+            LOG.warning('WorkflowStep {} was unsuccessful.'.format(self.name))
 
         self.cache_files(seed)
 
