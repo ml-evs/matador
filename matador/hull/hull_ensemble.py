@@ -3,7 +3,7 @@
 
 """ This submodule implements parameterised phase diagrams. """
 
-
+import tqdm
 from matador.hull import PhaseDiagram, QueryConvexHull
 from matador.utils.cursor_utils import filter_cursor_by_chempots, recursive_get, recursive_set, set_cursor_from_array
 from matador.utils.chem_utils import get_formation_energy, get_root_source
@@ -14,17 +14,15 @@ class EnsembleHull(QueryConvexHull):
     hulls from cursor data. The variable energies must be stored under a given
     key, e.g. `doc['_beef'][energy_key][beef_index]`, as specified by init.
 
-    Data must be stored in the following way under each document in cursor:
+    Data must be stored in the following way under each document in cursor::
 
-        ```
         {...,
          data_key: {
-                    parameter_key: <list of parameter values>,
-                    energy_key: <list of energies at parameter values>,
-                   },
-         ...
+            parameter_key: "<list of parameter values>",
+            energy_key: "<list of energies at parameter values>",
+         },
         }
-        ```
+
     Hull data will be stored as arrays per document under `doc[data_key]['hull_distance']`
     and ``doc[data_key]['formation_' + energy_key]``.
 
@@ -80,35 +78,34 @@ class EnsembleHull(QueryConvexHull):
 
         # set up relative keys
         self.formation_key = 'formation_' + self.energy_key
-        if isinstance(data_key, str):
-            self.data_key = [data_key]
+        self.data_key = data_key
+        self.parameter_key = parameter_key
+
+        if self.parameter_key is None:
+            self._parameter_keys = None
         else:
-            self.data_key = data_key
-        if parameter_key is None:
-            self.parameter_key = None
-        else:
-            self.parameter_key = self.data_key + [parameter_key]
-        self.formation_key = self.data_key + [self.formation_key]
-        self.hulldist_key = self.data_key + ['hull_distance']
-        self.energy_key = self.data_key + [self.energy_key]
+            self._parameter_keys = [self.data_key] + [parameter_key]
+        self._formation_keys = [self.data_key] + [self.formation_key]
+        self._hulldist_keys = [self.data_key] + ['hull_distance']
+        self._energy_keys = [self.data_key] + [self.energy_key]
 
         self.phase_diagrams = []
 
         self.set_chempots()
         self.cursor = sorted(filter_cursor_by_chempots(self.species, self.cursor),
-                             key=lambda doc: (recursive_get(doc, self.energy_key), doc['concentration']))
+                             key=lambda doc: (recursive_get(doc, self._energy_keys), doc['concentration']))
 
-        if parameter_key is None:
-            parameter_iterable = recursive_get(self.chempot_cursor[0], self.energy_key)
+        if self.parameter_key is None:
+            parameter_iterable = recursive_get(self.chempot_cursor[0], self._energy_keys)
         else:
-            parameter_iterable = recursive_get(self.chempot_cursor[0], self.parameter_key)
+            parameter_iterable = recursive_get(self.chempot_cursor[0], self._parameter_keys)
 
         print('Found {} entries under data key: {}.'.format(len(parameter_iterable), self.data_key))
 
         # allocate formation energy and hull distance arrays
         for ind, doc in enumerate(self.cursor):
-            recursive_set(doc, self.formation_key, [None] * len(recursive_get(doc, self.energy_key)))
-            recursive_set(doc, self.hulldist_key, [None] * len(recursive_get(doc, self.energy_key)))
+            recursive_set(doc, self._formation_keys, [None] * len(recursive_get(doc, self._energy_keys)))
+            recursive_set(doc, self._hulldist_keys, [None] * len(recursive_get(doc, self._energy_keys)))
 
         n_hulls = len(parameter_iterable)
         if num_samples is not None:
@@ -117,20 +114,20 @@ class EnsembleHull(QueryConvexHull):
         else:
             num_samples = n_hulls
 
-        for param_ind, parameter in enumerate(parameter_iterable):
+        for param_ind, parameter in enumerate(tqdm.tqdm(parameter_iterable)):
             for ind, doc in enumerate(self.cursor):
-                if parameter_key is not None:
-                    assert recursive_get(doc, self.parameter_key + [param_ind]) == parameter
+                if self.parameter_key is not None:
+                    assert recursive_get(doc, self._parameter_keys + [param_ind]) == parameter
 
                 formation_energy = get_formation_energy(self.chempot_cursor, doc,
-                                                        energy_key=self.energy_key + [param_ind])
-                recursive_set(self.cursor[ind], self.formation_key + [param_ind], formation_energy)
+                                                        energy_key=self._energy_keys + [param_ind])
+                recursive_set(self.cursor[ind], self._formation_keys + [param_ind], formation_energy)
             self.phase_diagrams.append(PhaseDiagram(self.cursor,
-                                                    self.formation_key + [param_ind],
+                                                    self._formation_keys + [param_ind],
                                                     self._dimension))
             set_cursor_from_array(self.cursor,
                                   self.phase_diagrams[-1].hull_dist,
-                                  self.hulldist_key + [param_ind])
+                                  self._hulldist_keys + [param_ind])
 
         self.stability_histogram = self.generate_stability_statistics()
 
@@ -149,4 +146,4 @@ class EnsembleHull(QueryConvexHull):
     def plot_hull(self, **kwargs):
         """ Hull plot helper function. """
         from matador.plotting.hull_plotting import plot_ensemble_hull
-        plot_ensemble_hull(self, '_beef', **kwargs)
+        plot_ensemble_hull(self, self.data_key, formation_energy_key=self.formation_key, **kwargs)
