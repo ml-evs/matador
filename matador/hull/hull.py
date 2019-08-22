@@ -259,10 +259,8 @@ class QueryConvexHull:
                                                                    energy_key=self.energy_key)
             self.cursor[ind][extensive_formation_key] = doc[formation_key] * doc['num_atoms']
 
-        if not self._non_elemental:
-            self._setup_per_b_fields()
-        elif self.args.get('subcmd') in ['voltage', 'volume']:
-            raise NotImplementedError('Pseudo-binary/ternary voltages not yet implemented.')
+        if self._non_elemental and self.args.get('subcmd') in ['voltage', 'volume']:
+            raise NotImplementedError('Pseudo-binary/pseudo-ternary voltages not yet implemented.')
 
         self.phase_diagram = PhaseDiagram(self.cursor, formation_key, self._dimension)
         # aliases for data stored in phase diagram
@@ -446,6 +444,8 @@ class QueryConvexHull:
             hull_cursor (list(dict)): list of structures to include in the voltage curve.
 
         """
+        if not self._non_elemental:
+            self._setup_per_b_fields()
         if self._dimension == 2:
             self._calculate_binary_voltage_curve(hull_cursor)
         elif self._dimension == 3:
@@ -481,6 +481,8 @@ class QueryConvexHull:
 
         """
 
+        if not self._non_elemental:
+            self._setup_per_b_fields()
         if self._dimension == 2:
             self._calculate_binary_volume_curve()
         else:
