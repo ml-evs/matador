@@ -53,13 +53,13 @@ class ComputeTask:
 
         Parameters:
             res (str/dict): filename or input structure dict
-            param_dict (dict): dictionary of CASTEP parameters
-            cell_dict (dict): dictionary of CASTEP cell options
             ncores (int): number of cores *per node* for mpirun call
             nnodes (int): number of nodes for mpirun call (if None, use 1)
             node (str): node name to run on (if None, run on localhost)
 
         Keyword arguments:
+            param_dict (dict): dictionary of CASTEP parameters
+            cell_dict (dict): dictionary of CASTEP cell options
             executable (str): name of binary to execute (DEFAULT: 'castep').
                 Special string $seed will be parsed as the seedname,
                 e.g. executable = 'pw6.x -i $seed.in > $seed.out' (requires mode='generic').
@@ -178,7 +178,7 @@ class ComputeTask:
         if not os.path.isdir('logs'):
             os.mkdir('logs')
 
-        # LOG.handlers = []
+        LOG.handlers = []
 
         if self.verbosity > 1:
             stdout_handler = logging.StreamHandler(sys.stdout)
