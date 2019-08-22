@@ -299,8 +299,9 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
 
 
 @plotting_function
-def plot_ensemble_hull(hull, parameter,
+def plot_ensemble_hull(hull, data_key,
                        ax=None,
+                       formation_energy_key='formation_enthalpy_per_atom',
                        plot_points=True,
                        alpha_scale=0.25,
                        plot_hulls=True,
@@ -308,17 +309,18 @@ def plot_ensemble_hull(hull, parameter,
                        show=True,
                        plot_fname=None,
                        **kwargs):
-    """ Plot and generate an ensemble of hulls with associated
-    Bayesian Error Estimate functionals (BEEF). If axis not requested,
+    """ Plot and generate an ensemble of hulls. If axis not requested,
     a histogram of frequency of a particular concentration appearing on
     the convex hull is also generated as a second axis.
 
     Parameters:
         hull (QueryConvexHull): hull object created with a cursor that
-            contains the ``_beef`` key for all entries in hull.cursor.
+            contains the data key for all entries in hull.cursor.
+        data_key (str): the key under which ensemble data is stored.
 
     Keyword arguments:
         ax (matplotlib.axes.Axes): matplotlib axis object on which to plot.
+        formation_energy_key (str): the key under which formation energies have been stored.
         alpha_scale (float): value by which to scale transparency of hulls.
         plot_points (bool): whether to plot the hull points for each hull in the ensemble.
         plot_hulls (bool): whether to plot the hull tie-lines for each hull in the ensemble.
@@ -328,25 +330,33 @@ def plot_ensemble_hull(hull, parameter,
     import matplotlib.pyplot as plt
 
     if ax is None:
-        fig = plt.figure(figsize=(7, 10))
+        fig = plt.figure(figsize=(8, 6))
         ax = fig.add_subplot(111)
 
-    n_beef = len(hull.phase_diagrams)
+    n_hulls = len(hull.phase_diagrams)
     plot_2d_hull(hull, ax=ax, plot_points=False, plot_hull_points=True, show=False)
     min_ef = 0
-    for ind, phase_diagram in enumerate(hull.phase_diagrams):
-        hull_cursor = [doc for doc in hull.cursor if doc[parameter]['hull_distance'][ind] <= 0.0 + EPS]
-        min_ef = np.min([doc[parameter]['formation_total_energy_per_atom'][ind] for doc in hull_cursor] + [min_ef])
+    colours_list = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])
+    for ind, _ in enumerate(hull.phase_diagrams):
+        hull_cursor = [doc for doc in hull.cursor if doc[data_key]['hull_distance'][ind] <= 0.0 + EPS]
+        min_ef = np.min([doc[data_key][formation_energy_key][ind] for doc in hull_cursor] + [min_ef])
         if plot_hulls:
-            alpha = min([1, max([1/(alpha_scale*n_beef), 0.01])])
+            alpha = min([1, max([1/(alpha_scale*n_hulls), 0.01])])
             ax.plot([doc['concentration'][0] for doc in hull_cursor],
-                    [doc[parameter]['formation_total_energy_per_atom'][ind] for doc in hull_cursor],
+                    [doc[data_key][formation_energy_key][ind] for doc in hull_cursor],
                     alpha=alpha, c='k', lw=0.5, zorder=0)
+            if plot_points:
+                ax.scatter([doc['concentration'][0] for doc in hull_cursor],
+                           [doc[data_key][formation_energy_key][ind] for doc in hull_cursor],
+                           alpha=alpha, marker='o', c=colours_list[1], lw=0, zorder=0)
+                ax.scatter([doc['concentration'][0] for doc in hull.cursor],
+                           [doc[data_key][formation_energy_key][ind] for doc in hull.cursor],
+                           alpha=alpha, marker='o', c='k', s=5, lw=0, zorder=0)
 
     ax.set_ylim(min_ef)
 
     if hull.savefig or any(kwargs.get(ext) for ext in SAVE_EXTS):
-        fname = plot_fname or ''.join(hull.species) + parameter + '_hull'
+        fname = plot_fname or ''.join(hull.species) + data_key + '_hull'
         for ext in SAVE_EXTS:
             if hull.args.get(ext) or kwargs.get(ext):
                 plt.savefig('{}.{}'.format(fname, ext),
