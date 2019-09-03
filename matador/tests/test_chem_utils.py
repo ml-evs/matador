@@ -72,7 +72,6 @@ class ChemUtilsTest(unittest.TestCase):
         conc = get_concentration(doc, ['Na', 'P'], include_end=True)
         self.assertEqual(conc, [0.75, 0.25])
 
-
     def test_volumetric_capacity(self):
         initial_doc = dict()
         final_doc = dict()
@@ -142,12 +141,8 @@ class ChemUtilsTest(unittest.TestCase):
         elements = ['F']
         self.assertEqual(get_padded_composition(stoich, elements), [8])
         elements = ['Fe', 'Ba', 'Ca']
-        errored = False
-        try:
+        with self.assertRaises(RuntimeError):
             get_padded_composition(stoich, elements)
-        except RuntimeError:
-            errored = True
-        self.assertTrue(errored)
 
     def test_formation_energy_binary(self):
         chempots = []
@@ -196,12 +191,8 @@ class ChemUtilsTest(unittest.TestCase):
         ef_400 = get_formation_energy(chempots, cursor[0], energy_key=['temperature', 'free_energy_per_atom', '400'])
         self.assertEqual(ef_400, -150)
 
-        errored = False
-        try:
+        with self.assertRaises(KeyError):
             get_formation_energy(chempots, cursor[0], energy_key=['temperature', 'free_energy_per_atom', '450'])
-        except KeyError:
-            errored = True
-        self.assertTrue(errored)
 
     def test_formation_energy_nonbinary(self):
         from matador.utils.chem_utils import get_formation_energy
@@ -260,9 +251,17 @@ class ChemUtilsTest(unittest.TestCase):
     def test_get_number_of_chempots(self):
         from matador.utils.chem_utils import get_number_of_chempots
 
+        stoich = [['V', 2]]
+        chempots = [[['Na', 1]], [['S', 1], ['O', 4]], [['V', 1]]]
+        self.assertEqual(get_number_of_chempots(stoich, chempots), [0, 0, 2])
+
         stoich = [['Li', 7], ['La', 3], ['Zr', 2], ['O', 12]]
         chempots = [[['Li', 2], ['O', 1]], [['Zr', 1], ['O', 2]], [['La', 2], ['O', 3]]]
         self.assertEqual(get_number_of_chempots(stoich, chempots), [3.5, 2, 1.5])
+
+        stoich = [['Li', 7], ['La', 3], ['Zr', 2], ['O', 12]]
+        chempots = [[['Li', 2], ['O', 1]], [['Zr', 1], ['O', 2]], [['La', 2], ['O', 3]]]
+        np.testing.assert_array_almost_equal(get_number_of_chempots(stoich, chempots, precision=None), [3.5, 2, 1.5])
 
         stoich = [['Li', 8], ['Zr', 3], ['O', 10]]
         chempots = [[['Li', 2], ['O', 1]], [['Zr', 1], ['O', 2]], [['La', 2], ['O', 3]]]
@@ -282,12 +281,37 @@ class ChemUtilsTest(unittest.TestCase):
 
         stoich = [['Li', 1], ['P', 1], ['O', 3]]
         chempots = [[['Li', 2], ['S', 1]], [['P', 2], ['O', 5]], [['P', 2], ['S', 5]]]
-        errored = False
-        try:
+        with self.assertRaises(RuntimeError):
             get_number_of_chempots(stoich, chempots)
-        except RuntimeError:
-            errored = True
-        self.assertTrue(errored)
+
+        stoich = [['Na', 1], ['B', 1], ['S', 1], ['O', 4]]
+        chempots = [[['Na', 1]], [['B', 1]], [['S', 1], ['O', 4]]]
+        self.assertEqual(get_number_of_chempots(stoich, chempots), [1, 1, 1])
+
+        stoich = [['Na', 1]]
+        chempots = [[['Na', 1]], [['B', 1]], [['S', 1], ['O', 4]]]
+        self.assertEqual(get_number_of_chempots(stoich, chempots), [1, 0, 0])
+
+        stoich = [['B', 1]]
+        chempots = [[['Na', 1]], [['B', 1]], [['S', 1], ['O', 4]]]
+        self.assertEqual(get_number_of_chempots(stoich, chempots), [0, 1, 0])
+
+        stoich = [['S', 2], ['O', 8]]
+        chempots = [[['Na', 1]], [['B', 1]], [['S', 1], ['O', 4]]]
+        self.assertEqual(get_number_of_chempots(stoich, chempots), [0, 0, 2])
+
+        stoich = [['B', 2], ['Na', 9]]
+        chempots = [[['Na', 1]], [['S', 1], ['O', 4]], [['B', 1]]]
+        self.assertEqual(get_number_of_chempots(stoich, chempots), [9, 0, 2])
+
+        stoich = [['B', 2], ['Na', 9]]
+        chempots = [[['Na', 1]], [['S', 1], ['O', 4]], [['B', 2]]]
+        self.assertEqual(get_number_of_chempots(stoich, chempots), [9, 0, 1])
+
+        stoich = [['A', 1], ['B', 2]]
+        chempots = [[['A', 1], ['B', 2], ['C', 3]]]
+        with self.assertRaises(RuntimeError):
+            get_number_of_chempots(stoich, chempots)
 
     def test_ratios_from_stoich(self):
         stoich = [['Li', 12], ['N', 18], ['P', 1]]
@@ -326,12 +350,8 @@ class ChemUtilsTest(unittest.TestCase):
         self.assertEqual(src, get_root_source(source))
 
         source = ['KP.cell', 'KP.param', 'abcd-123.fdasf/efgf/KP-0.02.-1234-abcd.castep', 'KP-1234-abcde.res']
-        failed = False
-        try:
+        with self.assertRaises(RuntimeError):
             src = get_root_source(source)
-        except RuntimeError:
-            failed = True
-        self.assertTrue(failed)
 
 
 if __name__ == '__main__':

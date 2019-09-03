@@ -26,7 +26,7 @@ ANGSTROM_CUBED_TO_CENTIMETRE_CUBED = 1e-24
 ELECTRON_CHARGE = physical_constants['elementary charge'][0]
 KELVIN_TO_EV = physical_constants['kelvin-electron volt relationship'][0]
 
-EPS = 1e-12
+EPS = 1e-8
 
 
 def get_iupac_ordering():
@@ -257,15 +257,21 @@ def get_formation_energy(chempots, doc, energy_key='enthalpy_per_atom'):
     return formation
 
 
-def get_number_of_chempots(stoich, chempot_stoichs):
+def get_number_of_chempots(stoich, chempot_stoichs, precision=5):
     """ Return the required number of each (arbitrary) chemical potentials
-    to construct one formula unit of the input stoichiometry.
+    to construct one formula unit of the input stoichiometry. Uses least-squares
+    as implemented by `numpy.linalg.lstsq` and rounds the output precision based
+    on the `precision` kwarg.
 
     Parameters:
         stoich (list/dict): matador-style stoichiometry,
             e.g. [['Li', 3], ['P', 1]], or the full document.
         chempot_stoichs (list/dict): list of stoichiometries of the input
             chemical potentials, or the full documents.
+
+    Keyword arguments:
+        precision (int/None): number of decimal places to round answer to. None
+            maintains the precision from `numpy.linalg.lstsq`.
 
     Returns:
         list: number of each chemical potential required to create
@@ -291,7 +297,6 @@ def get_number_of_chempots(stoich, chempot_stoichs):
     elements = sorted(list(elements))
 
     chempot_matrix = np.asarray([get_padded_composition(mu, elements) for mu in chempot_stoichs])
-    num_extraneous_equations = max(np.shape(chempot_matrix)) - min(np.shape(chempot_matrix))
 
     try:
         solution = np.asarray(get_padded_composition(stoich, elements))
@@ -299,21 +304,28 @@ def get_number_of_chempots(stoich, chempot_stoichs):
         raise RuntimeError('Stoichiometry {} could not be created from chemical potentials {}: missing chempot'
                            .format(stoich, chempot_stoichs))
 
-    if num_extraneous_equations == 0:
-        num_chempots = scipy.linalg.solve(chempot_matrix.T, solution)
-    else:
-        num_chempots = scipy.linalg.solve(chempot_matrix[:, :-num_extraneous_equations].T, solution[:-num_extraneous_equations])
-        # clean near zero float values
+    try:
+        num_chempots, residuals, _, _ = np.linalg.lstsq(chempot_matrix.T, solution, rcond=None)
+    except np.linalg.LinAlgError:
+        raise RuntimeError('Stoichiometry {} could not be created from chemical potentials {}: numpy LinAlg error'
+                           .format(stoich, chempot_stoichs))
+
+    # check if lstsq actually found a "solution"
+    if np.abs(np.sum(residuals)) > EPS:
+        raise RuntimeError('Stoichiometry {} could not be created from chemical potentials {}: inconsistent chemical potentials'
+                           .format(stoich, chempot_stoichs))
+
+    # round output array based on user-specified precision
+    if precision is not None:
         num_chempots[np.where(np.abs(num_chempots) < EPS)] = 0.0
-        if np.min(np.sign(num_chempots)) == -1:
-            raise RuntimeError('Stoichiometry {} could not be created from chemical potentials {}: stoichiometry inconsistent with chempots'
-                               .format(stoich, chempot_stoichs))
-        # check equations are consistent
-        for i in range(1, num_extraneous_equations+1):
-            verify = sum(num_chempots * chempot_matrix[:, -i])
-            if np.abs(verify - solution[-i]) > EPS:
-                raise RuntimeError('Stoichiometry {} could not be created from chemical potentials {}: stoichiometry inconsistent with chempots'
-                                   .format(stoich, chempot_stoichs))
+        for i, val in enumerate(num_chempots):
+            if np.abs(val - round(val, precision)) < EPS:
+                num_chempots[i] = round(val, precision)
+
+    # check for sensible numbers in output
+    if np.min(np.sign(num_chempots)) == -1:
+        raise RuntimeError('Stoichiometry {} could not be created from chemical potentials {}: stoichiometry inconsistent with chempots'
+                           .format(stoich, chempot_stoichs))
 
     return num_chempots.tolist()
 
