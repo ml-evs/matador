@@ -12,7 +12,7 @@ import numpy as np
 
 from matador.hull import QueryConvexHull
 from matador.query import DBQuery
-from matador.scrapers.castep_scrapers import res2dict
+from matador.scrapers.castep_scrapers import res2dict, castep2dict
 from matador.export import generate_hash
 
 # grab abs path for accessing test data
@@ -99,6 +99,17 @@ class HullTest(unittest.TestCase):
                 break
         else:
             raise RuntimeError('Did not find cubic-LLZO in cursor')
+
+    def test_pseudoternary_hull_NaVSO4(self):
+        cursor, s = castep2dict(REAL_PATH + 'data/hull-NaVSO4/*.castep')
+        print(80*'-')
+        self.assertEqual(len(cursor), 9, 'Error with test castep files, please check installation...')
+        hull = QueryConvexHull(cursor=cursor,
+                               elements=['Na', 'V', 'SO4'],
+                               chempots=[-999, -999, 100],
+                               no_plot=True)
+        self.assertEqual(len(hull.cursor), 8)
+        self.assertEqual(len(hull.hull_cursor), 6)
 
     def test_pseudoternary_hull_with_custom_chempots(self):
         cursor, s = res2dict(REAL_PATH + 'data/hull-LLZO/*.res')
