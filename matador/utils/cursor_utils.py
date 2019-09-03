@@ -172,8 +172,8 @@ def display_results(cursor,
         header_string += "{:^18}".format('Formation energy')
         units_string += "{:^18}".format('(eV/atom)')
     elif hull:
-        header_string += "{:^18}".format('Hull dist.')
-        units_string += "{:^18}".format('(meV/atom)')
+        header_string += "{:^13}".format('Hull dist.')
+        units_string += "{:^13}".format('(meV/atom)')
     elif args.get('per_atom'):
         header_string += "{:^18}".format(' '.join(energy_key.replace('_per_atom', '').split('_')).title())
         units_string += "{:^18}".format('(eV/atom)')
