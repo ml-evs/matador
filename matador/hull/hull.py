@@ -63,6 +63,7 @@ class QueryConvexHull:
             energy_key (str): key under which the desired energy *per atom* is stored.
             subcmd (str): either 'hull' or 'voltage',
             lazy (bool): if True, do not create hull until `self.create_hull()` is called
+            chempots (list(float)): list of chemical potential values to use.
             elements (list(str)): deprecated form `species`.
             kwargs (dict): mostly CLI arguments, see matador hull --help for full options.
             plot_kwargs (dict): arguments to pass to plot_hull function
@@ -207,6 +208,7 @@ class QueryConvexHull:
 
         """
         self.chempot_cursor = []
+        print('Generating fake chempots...')
 
         if custom_elem is None:
             custom_elem = self.species
