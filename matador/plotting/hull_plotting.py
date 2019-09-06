@@ -366,7 +366,7 @@ def plot_ensemble_hull(hull, data_key,
 
 @plotting_function
 def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=None,
-                      label_cutoff=None, expecting_cbar=True, labels=None, plot_fname=None, **kwargs):
+                      label_cutoff=None, label_corners=True, expecting_cbar=True, labels=None, plot_fname=None, **kwargs):
     """ Plot calculated ternary hull as a 2D projection.
 
     Parameters:
@@ -381,6 +381,7 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
         expecting_cbar (bool): whether or not to space out the plot to preserve
             aspect ratio if a colourbar is present.
         labels (bool): whether or not to label on-hull structures
+        label_corners (bool): whether or not to put axis labels on corners or edges.
         png/pdf/svg (bool): whether or not to write the plot to a file.
         plot_fname (str): filename to write plot to.
 
@@ -440,12 +441,21 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
 
     ax.gridlines(color='black', multiple=scale * 0.1, linewidth=0.5)
     ticks = [float(val) for val in np.linspace(0, 1, 6)]
-    ax.ticks(axis='lbr', linewidth=1, offset=0.02, fontsize=fontsize-2, locations=ticks,
+    if label_corners:
+        # remove 0 and 1 ticks when labelling corners
+        ticks = ticks[1:-1]
+        ax.left_corner_label(chempot_labels[2], fontsize=fontsize + 4)
+        ax.right_corner_label(chempot_labels[0], fontsize=fontsize + 4)
+        ax.top_corner_label(chempot_labels[1], fontsize=fontsize + 4, offset=0.16)
+    else:
+        ax.left_axis_label(chempot_labels[2], fontsize=fontsize + 2, offset=0.12)
+        ax.right_axis_label(chempot_labels[1], fontsize=fontsize + 2, offset=0.12)
+        ax.bottom_axis_label(chempot_labels[0], fontsize=fontsize + 2, offset=0.08)
+        ax.set_title('-'.join(['{}'.format(label) for label in chempot_labels]), fontsize=fontsize + 2, y=1.02)
+
+    ax.ticks(axis='lbr', linewidth=1, offset=0.02, fontsize=fontsize-2,
+             locations=(scale * np.asarray(ticks)).tolist(),
              ticks=ticks, tick_formats='%.1f')
-    ax.set_title('-'.join(['{}'.format(label) for label in chempot_labels]), fontsize=fontsize + 2, y=1.02)
-    ax.left_axis_label(chempot_labels[2], fontsize=fontsize + 2)
-    ax.right_axis_label(chempot_labels[1], fontsize=fontsize + 2)
-    ax.bottom_axis_label(chempot_labels[0], fontsize=fontsize + 2)
 
     concs = np.zeros((len(hull.structures), 3))
     concs[:, :-1] = hull.structures[:, :-1]
@@ -547,7 +557,7 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
         if isinstance(hull.args.get('efmap'), str):
             efmap = hull.args.get('efmap')
         else:
-            efmap = 'PuBu_r'
+            efmap = 'BuPu_r'
         ax.heatmap(energies, style="hexagonal", cbarlabel='Formation energy (eV/atom)', vmax=0, cmap=efmap)
     elif hull.args.get('sampmap'):
         sampling = dict()
@@ -601,6 +611,7 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
                             bbox_inches='tight', transparent=True)
                 print('Wrote {}.{}'.format(fname, ext))
     elif show:
+        print('Showing plot...')
         plt.show()
 
     return ax
