@@ -9,8 +9,11 @@ calculations (i.e. varying volume from equilibrium) have been implemented.
 
 
 import copy
+import logging
 import numpy as np
-from matador.workflows import Workflow, LOG
+from matador.workflows import Workflow
+
+LOG = logging.getLogger('run3')
 
 
 def castep_elastic(relaxer, calc_doc, seed):
@@ -64,7 +67,7 @@ class CastepElasticWorkflow(Workflow):
         self.volume_rescale.append(1.0)
         self._completed_volumes = []
         LOG.info('Preprocessing completed: run3 bulk modulus calculation options {}'
-                     .format(self.volume_rescale))
+                 .format(self.volume_rescale))
 
         self.add_step(castep_elastic_prerelax, 'relax')
         for volume in self.volume_rescale:

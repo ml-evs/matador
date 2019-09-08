@@ -22,7 +22,10 @@ multiple steps (only when necessary):
 import os
 import copy
 import json
-from matador.workflows.workflows import Workflow, LOG
+import logging
+from matador.workflows.workflows import Workflow
+
+LOG = logging.getLogger('run3')
 
 
 def castep_full_phonon(relaxer, calc_doc, seed):

@@ -7,8 +7,10 @@ of chaining up different calculations at high-throughput.
 """
 
 import abc
-from matador.compute.compute import LOG
+import logging
 from matador.utils.print_utils import dumps
+
+LOG = logging.getLogger('run3')
 
 
 class Workflow:

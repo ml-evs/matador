@@ -18,8 +18,11 @@ spectral calculations with CASTEP in multiple steps:
 import os
 import copy
 import glob
-from matador.workflows import Workflow, LOG
+import logging
+from matador.workflows import Workflow
 from matador.scrapers import arbitrary2dict
+
+LOG = logging.getLogger('run3')
 
 
 def castep_full_spectral(relaxer, calc_doc, seed):
