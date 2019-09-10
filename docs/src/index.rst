@@ -8,5 +8,4 @@
     getting_started
     changelog
     examples_index
-    tutorials_index
     Python API <modules>

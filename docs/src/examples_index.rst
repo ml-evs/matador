@@ -2,8 +2,11 @@
 
 .. _examples_index:
 
-Example notebooks
-=================
+Tutorials and example notebooks
+===============================
+
+Example Jupyter notebooks
+-------------------------
 
 .. toctree::
 
@@ -11,3 +14,12 @@ Example notebooks
     notebooks/hull
     notebooks/matador_plot_styles
     notebooks/voltage_from_res_files
+
+Tutorials
+---------
+
+.. toctree::
+    :maxdepth: 2
+
+    tutorials/run3
+    tutorials/mongo

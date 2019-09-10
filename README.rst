@@ -6,9 +6,10 @@ matador
 
 matador is an aggregator, manipulator and runner of first-principles
 calculations, written with a bent towards battery electrode materials. 
-The source can be found on `Bitbucket <https://bitbucket.org/ml-evs/matador>`_.
+The source can be found on `Bitbucket <https://bitbucket.org/ml-evs/matador>`_
+and online documentation is hosted on `ReadTheDocs <https://matador-db.readthedocs.io>`_.
 
-Written by `Matthew Evans <https://www.ml-evs.github.io>`_ (2016-). 
+Written by `Matthew Evans <https://www.ml-evs.science>`_ (2016-). 
 
 
 .. image:: docs/src/img/lipzn.png
@@ -43,9 +44,9 @@ in the examples and API documentation.
 Usage
 ------
 
-For basic command-line usage, please explore the help system for each sub-command. Common workflows can be found under ``examples/`` and :ref:`tutorials_index`.
+For basic command-line usage, please explore the help system for each sub-command. Common workflows can be found inside ``examples/`` and in the `online docs <http://matador-db.readthedocs.io/en/develop/examples_index.html`_.
 
-The full Python API documentation can be found under :ref:`modules`.
+Please consult the full `Python API documentation <http://matador-db.readthedocs.io/en/develop/modules.html`_ for programmatic usage.
 
 .. code-block:: text
 
