@@ -236,7 +236,7 @@ def _cif_set_unreduced_sites(doc):
     unreduced_occupancies = []
     unreduced_species = []
     for species in species_sites:
-        unreduced_sites_spec, indices = np.unique(species_sites[species],
+        unreduced_sites_spec, indices = np.unique(np.around(species_sites[species], decimals=5),
                                                   return_index=True, axis=0)
         unreduced_occupancies_spec = np.asarray(species_occ[species])[indices].tolist()
         unreduced_occupancies.extend(unreduced_occupancies_spec)
