@@ -351,7 +351,7 @@ def calc_mp_spacing(real_lat, mp_grid, prec=3):
     return round(max_spacing + 0.5*10**exponent, prec)
 
 
-def get_seekpath_kpoint_path(doc, spacing=0.01, threshold=1e-4, debug=False):
+def get_seekpath_kpoint_path(doc, spacing=0.01, threshold=1e-7, debug=False, symmetry_tol=None):
     """ Return the conventional kpoint path of the relevant crystal system
     according to the definitions by "HKPOT" in
     Comp. Mat. Sci. 128, 2017:
@@ -364,6 +364,7 @@ def get_seekpath_kpoint_path(doc, spacing=0.01, threshold=1e-4, debug=False):
     Keyword arguments:
         spacing (float): desired kpoint spacing
         threshold (float): internal seekpath threshold
+        symmetry_tol (float): spglib symmetry tolerance
 
     Returns:
         dict: standardized version of input doc
@@ -372,11 +373,15 @@ def get_seekpath_kpoint_path(doc, spacing=0.01, threshold=1e-4, debug=False):
 
     """
     from seekpath import get_explicit_k_path
-    spg_doc = standardize_doc_cell(doc)
+    from matador.crystal import Crystal
+    if symmetry_tol is None:
+        symmetry_tol = 1e-5
+    spg_doc = standardize_doc_cell(doc, symprec=symmetry_tol)
     spg_structure = doc2spg(spg_doc)
     seekpath_results = get_explicit_k_path(spg_structure,
                                            reference_distance=spacing,
                                            with_time_reversal=True,
+                                           symprec=symmetry_tol,
                                            threshold=threshold)
 
     kpt_path = seekpath_results['explicit_kpoints_rel']

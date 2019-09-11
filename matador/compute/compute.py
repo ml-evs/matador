@@ -606,7 +606,7 @@ class ComputeTask:
                 self.calc_doc.update(opti_dict)
 
                 if remedy is not None:
-                    LOG.info('Trying to remedy error...')
+                    LOG.info('Trying to remedy error with {}'.format(remedy))
                     remedy(self.calc_doc)
                     self._num_retries += 1
 
@@ -736,6 +736,7 @@ class ComputeTask:
         LOG.debug('Old lattice: {}'.format(Crystal(calc_doc)))
         prim_doc, kpt_path, _ = get_seekpath_kpoint_path(calc_doc,
                                                          spacing=spacing,
+                                                         symmetry_tol=calc_doc.get('symmetry_tol'),
                                                          debug=debug)
         LOG.debug('New lattice: {}'.format(Crystal(calc_doc)))
         return prim_doc, kpt_path
@@ -1090,8 +1091,11 @@ class ComputeTask:
                         os.remove(globbed)
                         break
                     elif 'ERROR in cell constraints: attempt to fix' in line:
-                        LOG.info('Trying to remedy CASTEP symmetry error...')
                         remedy = self._remedy_castep_symmetry_error
+                        break
+                    elif 'Symmetry matrix not integer' in line:
+                        remedy = self._remedy_symmetry_matrix_not_integer
+                        break
                 else:
                     error_str += ' '.join(flines)
                     error_str += '\n'
@@ -1108,12 +1112,19 @@ class ComputeTask:
             opti_dict (dict): the dictionary of parameters to change.
 
         """
+        LOG.info('Trying to remedy CASTEP symmetry error...')
         if 'symmetry_generate' in opti_dict:
             del opti_dict['symmetry_generate']
         if 'symmetry_tol' in opti_dict:
             del opti_dict['symmetry_tol']
         if 'snap_to_symmetry' in opti_dict:
             del opti_dict['snap_to_symmetry']
+
+    def _remedy_symmetry_matrix_not_integer(self, opti_dict):
+        LOG.info('Trying to remedy symmetry matrix not integer bug: symmetry tol now = {}'
+                 .format(opti_dict['symmetry_tol']))
+        if 'symmetry_tol' in opti_dict:
+            opti_dict['symmetry_tol'] /= 10
 
     def mv_to_bad(self, seed):
         """ Move all files associated with "seed" to bad_castep, from both
