@@ -312,7 +312,7 @@ class ComputeTask:
 
         # read in initial structure and skip if failed
         if isinstance(res, str):
-            self.res_dict, success = res2dict(res, db=False)
+            self.res_dict, success = res2dict(res, db=False, verbosity=self.verbosity)
             if not success:
                 msg = 'Unable to parse initial res file, error: {res_dict}'.format(res_dict=self.res_dict)
                 LOG.error(msg)
@@ -662,7 +662,7 @@ class ComputeTask:
             self._process.communicate()
 
             # scrape dict but ignore the results
-            results_dict, success = castep2dict(seed + '.castep', db=False)
+            results_dict, success = castep2dict(seed + '.castep', db=False, verbosity=self.verbosity)
 
             # check for errors and try to correct for them
             errors_present, errors, _ = self._catch_castep_errors()
@@ -971,7 +971,7 @@ class ComputeTask:
         process.communicate()
         self.executable = self.executable.replace(' --dryrun', '')
 
-        results, success = castep2dict(memcheck_seed + '.castep', db=False)
+        results, success = castep2dict(memcheck_seed + '.castep', db=False, verbosity=self.verbosity)
 
         for _file in glob.glob(memcheck_seed + '*'):
             if _file.endswith('.res'):
@@ -1277,7 +1277,7 @@ class ComputeTask:
             LOG.info('Trying to update res file with result from intermediate CASTEP file found in root_dir')
             if self.compute_dir is not None:
                 shutil.copy2(self.seed + '.castep', self.compute_dir)
-            castep_dict, success = castep2dict(self.seed + '.castep', db=False)
+            castep_dict, success = castep2dict(self.seed + '.castep', db=False, verbosity=self.verbosity)
             if success:
                 self.res_dict['geom_iter'] = castep_dict.get('geom_iter')
 

@@ -8,6 +8,7 @@ like custom errors and a scraper function wrapper.
 
 
 import glob
+from traceback import print_exc
 
 
 def scraper_function(function):
@@ -53,7 +54,8 @@ def scraper_function(function):
                 result = type(oops)('{}: {}\n'.format(_seed, oops))
 
                 msg = '{}: {} {}'.format(_seed, type(oops), oops)
-                if kwargs.get('verbosity', 0) > 0:
+                if kwargs.get('verbosity', 1) > 0:
+                    print_exc()
                     print(msg)
 
             if len(seed) == 1:
