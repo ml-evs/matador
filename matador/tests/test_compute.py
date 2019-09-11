@@ -334,6 +334,7 @@ class ComputeTest(unittest.TestCase):
             ComputeTask(ncores=NCORES, nnodes=None, node=node,
                         res=seed, param_dict=param_dict, cell_dict=cell_dict,
                         verbosity=VERBOSITY, killcheck=True, memcheck=False,
+                        exec_test=False,
                         reopt=True, executable=executable, max_walltime=5,
                         start=True)
         except CalculationError:
