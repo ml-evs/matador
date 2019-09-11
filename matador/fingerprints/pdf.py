@@ -155,6 +155,7 @@ class PDF(Fingerprint):
                                            self._image_vec,
                                            self._lattice,
                                            self.rmax,
+                                           filter_zero=True,
                                            compress=True,
                                            poscart_b=poscart_b,
                                            debug=self.kwargs.get('debug'))
@@ -302,7 +303,7 @@ class PDF(Fingerprint):
             if length > max_trans:
                 max_trans = length
 
-        unit_vector_lengths = np.sqrt(np.sum(lattice**2, axis=1))
+        unit_vector_lengths = np.sqrt(np.sum(_lattice**2, axis=1))
         limits = [int((dr + rmax + max_trans) / length) for length in unit_vector_lengths]
         products = itertools.product(*(range(-lim, lim+1) for lim in limits))
         for prod in products:
