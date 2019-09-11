@@ -351,7 +351,7 @@ def calc_mp_spacing(real_lat, mp_grid, prec=3):
     return round(max_spacing + 0.5*10**exponent, prec)
 
 
-def get_seekpath_kpoint_path(doc, spacing=0.01, threshold=1e-7, debug=False):
+def get_seekpath_kpoint_path(doc, spacing=0.01, threshold=1e-4, debug=False):
     """ Return the conventional kpoint path of the relevant crystal system
     according to the definitions by "HKPOT" in
     Comp. Mat. Sci. 128, 2017:
@@ -372,7 +372,8 @@ def get_seekpath_kpoint_path(doc, spacing=0.01, threshold=1e-7, debug=False):
 
     """
     from seekpath import get_explicit_k_path
-    spg_structure = doc2spg(doc)
+    spg_doc = standardize_doc_cell(doc)
+    spg_structure = doc2spg(spg_doc)
     seekpath_results = get_explicit_k_path(spg_structure,
                                            reference_distance=spacing,
                                            with_time_reversal=True,
@@ -420,7 +421,7 @@ def doc2spg(doc):
     return cell
 
 
-def standardize_doc_cell(doc, primitive=True, symprec=1e-5):
+def standardize_doc_cell(doc, primitive=True, symprec=1e-2):
     """ Return standardized cell data from matador doc.
 
     Parameters:
@@ -504,7 +505,8 @@ def add_noise(doc, amplitude=0.1):
 
 
 def calc_pairwise_distances_pbc(poscart, images, lattice, rmax,
-                                poscart_b=None, compress=False, debug=False):
+                                poscart_b=None, compress=False, debug=False,
+                                filter_zero=False):
     """ Calculate PBC distances with SciPy's cdist, given the
     image cell vectors.
 
@@ -522,6 +524,8 @@ def calc_pairwise_distances_pbc(poscart, images, lattice, rmax,
         debug (bool): print timing data and how many distances were masked.
         compress (bool): whether or not to compressed the output array,
             useful when e.g. creating PDFs but not when atom ID is important.
+        filter_zero (bool): whether or not to filter out the "self-interaction"
+            zero distances.
 
     Returns:
         distances (numpy.ndarray): pairwise 2-D d_ij masked array with values
@@ -547,7 +551,9 @@ def calc_pairwise_distances_pbc(poscart, images, lattice, rmax,
 
     # mask by rmax/0 and remove masked values
     distances = np.ma.masked_where(distances > rmax, distances, copy=False)
-    distances = np.ma.masked_where(distances < EPS, distances, copy=False)
+    if filter_zero:
+        distances = np.ma.masked_where(distances < EPS, distances, copy=False)
+
 
     if debug:
         print('Calculated: {}, Used: {}, Ignored: {}'.format(len(distances),
