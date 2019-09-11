@@ -917,7 +917,11 @@ class ScraperMiscTest(unittest.TestCase):
         pdis, s = cell2dict(cell_fname, db=False, lattice=True, verbosity=VERBOSITY)
         self.assertTrue(s)
 
-    def test_cif(self):
+
+class CifTests(unittest.TestCase):
+    """ These tests check the cif scraper for correctness. """
+
+    def test_cif_partial_occ(self):
         cif_fname = REAL_PATH + 'data/cif_files/AgBiI.cif'
         failed_open = False
         try:
@@ -927,7 +931,7 @@ class ScraperMiscTest(unittest.TestCase):
             self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(cif_fname))
         if not failed_open:
             f.close()
-            test_dict, s = cif2dict(cif_fname)
+            test_dict, s = cif2dict(cif_fname, verbosity=VERBOSITY)
             self.assertTrue(s, 'Failed entirely, oh dear! {}'.format(test_dict))
             self.assertAlmostEqual(test_dict['num_atoms'], 46.623999999999995, msg='Failed to read num_atoms!', places=5)
             Bi_ratio = [elem[1] for elem in test_dict['stoichiometry'] if elem[0] == 'Bi'][0]
@@ -939,6 +943,7 @@ class ScraperMiscTest(unittest.TestCase):
             self.assertEqual(len(test_dict['positions_frac']), 64)
             self.assertEqual(len(test_dict['site_occupancy']), 64)
 
+    def test_malicious_cif(self):
         cif_fname = REAL_PATH + 'data/cif_files/malicious.cif'
         failed_open = False
         try:
@@ -946,14 +951,12 @@ class ScraperMiscTest(unittest.TestCase):
         except FileNotFoundError:
             failed_open = True
             self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(cif_fname))
-        if not failed_open:
-            f.close()
-            errored = False
-            test_dict, s = cif2dict(cif_fname)
-            errored = isinstance(test_dict, RuntimeError) or 'RuntimeError' in test_dict
-            self.assertTrue(errored, 'WARNING: malicious attack is possible through symops')
-            self.assertFalse(s, 'This should have failed entirely, oh dear!')
 
+        with self.assertRaises(RuntimeError):
+            test_dict, s = cif2dict(cif_fname, verbosity=VERBOSITY)
+            raise test_dict
+
+    def test_high_symmetry_cif(self):
         cif_fname = REAL_PATH + 'data/cif_files/SiO_n001_CollCode1109.cif'
         failed_open = False
         try:
@@ -963,8 +966,7 @@ class ScraperMiscTest(unittest.TestCase):
             self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(cif_fname))
         if not failed_open:
             f.close()
-            errored = False
-            test_dict, s = cif2dict(cif_fname)
+            test_dict, s = cif2dict(cif_fname, verbosity=VERBOSITY)
             self.assertTrue(s, 'Failed entirely, oh dear! {}'.format(test_dict))
             self.assertAlmostEqual(test_dict['cell_volume'], 2110.2, msg='Wrong cell volume!', places=1)
             self.assertAlmostEqual(test_dict['lattice_abc'][0], [18.4940, 4.991, 23.758], places=3)
@@ -973,6 +975,23 @@ class ScraperMiscTest(unittest.TestCase):
             self.assertEqual(test_dict['num_atoms'], 144)
             self.assertEqual(len(test_dict['positions_frac']), 144)
             self.assertEqual(len(test_dict['site_occupancy']), 144)
+            self.assertEqual(sum(test_dict['site_multiplicity']), test_dict['num_atoms'])
+            print(test_dict['site_multiplicity'])
+
+    def test_problematic_cif(self):
+        cif_fname = REAL_PATH + 'data/cif_files/SiO_n002_CollCode62404.cif'
+        failed_open = False
+        try:
+            f = open(cif_fname, 'r')
+        except FileNotFoundError:
+            failed_open = True
+            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(cif_fname))
+        f.close()
+        test_dict, s = cif2dict(cif_fname, verbosity=VERBOSITY)
+        self.assertTrue(s, 'Failed entirely, oh dear! {}'.format(test_dict))
+        self.assertEqual(sum(test_dict['site_multiplicity']), test_dict['num_atoms'])
+        self.assertEqual(sum(test_dict['site_occupancy']), test_dict['num_atoms'])
+        self.assertEqual(len(test_dict['positions_frac']), test_dict['num_atoms'])
 
 
 class ExportTest(unittest.TestCase):

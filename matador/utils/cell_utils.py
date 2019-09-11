@@ -511,7 +511,7 @@ def add_noise(doc, amplitude=0.1):
 
 def calc_pairwise_distances_pbc(poscart, images, lattice, rmax,
                                 poscart_b=None, compress=False, debug=False,
-                                filter_zero=False):
+                                filter_zero=False, per_image=False):
     """ Calculate PBC distances with SciPy's cdist, given the
     image cell vectors.
 
@@ -531,10 +531,13 @@ def calc_pairwise_distances_pbc(poscart, images, lattice, rmax,
             useful when e.g. creating PDFs but not when atom ID is important.
         filter_zero (bool): whether or not to filter out the "self-interaction"
             zero distances.
+        per_image (bool): return a list of distances per image, as opposed to
+            one large flat. This preserves atom IDs for use elsewhere.
 
     Returns:
         distances (numpy.ndarray): pairwise 2-D d_ij masked array with values
-            or stripped 1-D array containing just the distances.
+            or stripped 1-D array containing just the distances, or a list of
+            numpy arrays if per_image is True.
 
     """
     from scipy.spatial.distance import cdist
@@ -543,29 +546,38 @@ def calc_pairwise_distances_pbc(poscart, images, lattice, rmax,
         start = time.time()
     _lattice = np.asarray(lattice)
     _poscart = np.asarray(poscart)
+    image_distances = []
     if poscart_b is None:
         _poscart_b = _poscart
     else:
         _poscart_b = np.asarray(poscart_b)
 
-    distances = np.empty((len(_poscart)*len(images)*len(_poscart_b)))
     num_pairs = len(_poscart) * len(_poscart_b)
 
-    for image_ind, prod in enumerate(images):
-        distances[image_ind*num_pairs:(image_ind+1)*num_pairs] = cdist(_poscart, _poscart_b + prod @ _lattice).flatten()
+    if per_image:
+        for image_ind, prod in enumerate(images):
+            distances = cdist(_poscart, _poscart_b + prod @ _lattice)
+            distances = np.ma.masked_where(distances > rmax, distances, copy=False)
+            image_distances.append(distances)
 
-    # mask by rmax/0 and remove masked values
-    distances = np.ma.masked_where(distances > rmax, distances, copy=False)
-    if filter_zero:
-        distances = np.ma.masked_where(distances < EPS, distances, copy=False)
+        distances = image_distances
 
+    else:
+        array_size = (len(_poscart) * len(images) * len(_poscart_b))
+        distances = np.empty(array_size)
+        for image_ind, prod in enumerate(images):
+            distances[image_ind*num_pairs:(image_ind+1)*num_pairs] = cdist(_poscart, _poscart_b + prod @ _lattice).flatten()
 
-    if debug:
-        print('Calculated: {}, Used: {}, Ignored: {}'.format(len(distances),
-                                                             np.ma.count(distances),
-                                                             np.ma.count_masked(distances)))
-    if compress:
-        distances = distances.compressed()
+        distances = np.ma.masked_where(distances > rmax, distances, copy=False)
+        if filter_zero:
+            distances = np.ma.masked_where(distances < EPS, distances, copy=False)
+
+        if debug:
+            print('Calculated: {}, Used: {}, Ignored: {}'.format(len(distances),
+                                                                 np.ma.count(distances),
+                                                                 np.ma.count_masked(distances)))
+        if compress:
+            distances = distances.compressed()
 
     if debug:
         end = time.time()
