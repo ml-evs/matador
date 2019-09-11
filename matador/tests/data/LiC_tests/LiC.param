@@ -5,19 +5,19 @@ spin_polarized       : false
 fix_occupancy        : false 
 metals_method        : dm 
 max_scf_cycles       : 100
-cut_off_energy       : 300 eV
+cut_off_energy       : 150 eV
 opt_strategy         : speed 
 page_wvfns           : 0
-perc_extra_bands     : 40
+nextra_bands        : 4
 num_dump_cycles      : 0 
 backup_interval      : 0 
 geom_method          : LBFGS 
 geom_max_iter        : 200
-geom_force_tol       : 0.1
-mix_history_length   : 20 
+geom_force_tol       : 0.5
+elec_energy_tol      : 1e-4
 finite_basis_corr    : 0
 fixed_npw            : false
 write_checkpoint     : none
 write_bib            : false
 bs_write_eigenvalues : false
-calculate_stress     : true
+calculate_stress     : false

@@ -26,6 +26,7 @@ TMP_DIR = 'tmp_test'
 ROOT_DIR = getcwd()
 VERBOSITY = 10
 EXECUTABLE = 'castep'
+RUN_SLOW_TESTS = False
 
 
 try:
@@ -386,6 +387,7 @@ class ComputeTest(unittest.TestCase):
         self.assertTrue(correct_files)
 
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
+    @unittest.skipIf(not RUN_SLOW_TESTS, 'this is a slow test, skipping')
     def test_batch_relax(self):
         """ Batch relax structures from file to file. """
 
