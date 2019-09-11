@@ -1,24 +1,24 @@
 #!/usr/bin/env python
 import unittest
+from os.path import realpath
 from matador.fingerprints.similarity import get_uniq_cursor
 from matador.utils.cell_utils import cart2volume, abc2cart
 from matador.scrapers.castep_scrapers import res2dict
-from os.path import realpath
 
 REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
 
 
 class SimilarityFilterTest(unittest.TestCase):
     """ Test similarity filter. """
-    def testICSDPriority(self):
+    def test_icsd_priority(self):
         test_docs = []
         i = 0
         while i < 10:
             test_doc, success = res2dict(REAL_PATH + 'data/KP_primitive.res', db=False)
             test_doc['text_id'] = ['primitive', 'cell']
-            test_doc['lattice_cart'] = abc2cart(test_doc['lattice_abc'])
-            test_doc['cell_volume'] = cart2volume(test_doc['lattice_cart'])
-            test_doc['enthalpy_per_atom'] = 0
+            # test_doc['lattice_cart'] = abc2cart(test_doc['lattice_abc'])
+            # test_doc['cell_volume'] = cart2volume(test_doc['lattice_cart'])
+            # test_doc['enthalpy_per_atom'] = 0
             test_docs.append(test_doc)
             i += 1
 
@@ -33,7 +33,49 @@ class SimilarityFilterTest(unittest.TestCase):
                                                      **{'dr': 0.1, 'gaussian_width': 0.1})
         self.assertEqual(uniq_inds, {6})
 
-    def testUniqFilterWithHierarchy(self):
+    def test_k3p_uniq_default(self):
+        import glob
+        cursor, status = res2dict(REAL_PATH + 'data/K3P_uniq/*.res')
+        cursor = sorted(cursor, key=lambda x: x['enthalpy_per_atom'])
+        uniq_inds, dupe_dict, _, _ = get_uniq_cursor(cursor)
+        filtered_cursor = [cursor[ind] for ind in uniq_inds]
+        self.assertEqual(len(cursor), 11)
+        self.assertEqual(len(filtered_cursor), 5)
+        found = []
+        correct_structures = [
+            'K3P-OQMD_4786-CollCode25550',
+            'K3P-mode-follow-swap-Na3N-OQMD_21100-CollCode165992',
+            'KP-fvsqdf',
+            'PK-NNa3-OQMD_21100-CollCode165992',
+            'KP-yzcni8'
+        ]
+        for struct in correct_structures:
+            for doc in filtered_cursor:
+                if struct in doc['source'][0]:
+                    found.append(True)
+                    break
+            else:
+                found.append(False)
+
+        self.assertTrue(all(found))
+
+    def test_volume_rescale(self):
+        import numpy as np
+        test_doc, success = res2dict(REAL_PATH + 'data/KP_primitive.res', db=False)
+        self.assertTrue(success)
+        test_docs = []
+        rescale = np.linspace(0.1, 10, 8)
+        lattice = np.asarray(test_doc['lattice_abc'])
+        for val in rescale:
+            test_docs.append(test_doc)
+            test_docs[-1]['lattice_abc'] = lattice
+            test_docs[-1]['lattice_abc'][0] *= val
+            test_docs[-1]['lattice_abc'] = test_docs[-1]['lattice_abc'].tolist()
+            print('lattice_abc', test_docs[-1]['lattice_abc'])
+        uniq_inds, _, _, _ = get_uniq_cursor(test_docs)
+        self.assertEqual(uniq_inds, {0})
+
+    def test_uniq_filter_with_hierarchy(self):
         import glob
         files = glob.glob(REAL_PATH + 'data/uniqueness_hierarchy/*.res')
         cursor = [res2dict(f)[0] for f in files]
@@ -46,7 +88,7 @@ class SimilarityFilterTest(unittest.TestCase):
         self.assertTrue('KP-NaP-OQMD_2817-CollCode14009' in filtered_cursor[0]['source'][0])
         self.assertTrue('KP-NaP-CollCode421420' in filtered_cursor[1]['source'][0])
 
-    def testUniqFilterWithHierarchy_ICSD_vs_AIRSS(self):
+    def test_uniq_filter_with_hierarchy_2(self):
         import glob
         cursor, failures = res2dict(REAL_PATH + 'data/hull-LLZO/*LLZO*.res')
         cursor = sorted(cursor, key=lambda x: x['enthalpy_per_atom'])[0:10]
@@ -57,7 +99,7 @@ class SimilarityFilterTest(unittest.TestCase):
         self.assertEqual(len(filtered_cursor), 1)
         self.assertTrue('cubic-LLZO-CollCode999999' in filtered_cursor[0]['source'][0])
 
-    def testDoubleUniquenessHierarchy(self):
+    def test_double_uniqueness_hierarchy(self):
         import glob
         files = glob.glob(REAL_PATH + 'data/uniqueness_hierarchy/*.res')
         files += glob.glob(REAL_PATH + 'data/hull-LLZO/*LLZO*.res')
@@ -73,7 +115,7 @@ class SimilarityFilterTest(unittest.TestCase):
         self.assertTrue('KP-NaP-OQMD_2817-CollCode14009' in filtered_cursor[1]['source'][0])
         self.assertTrue('KP-NaP-CollCode421420' in filtered_cursor[2]['source'][0])
 
-    def testNoUniquenessRetainsAllStructures(self):
+    def test_no_overlap_retains_all_structures(self):
         import glob
         files = glob.glob(REAL_PATH + 'data/uniqueness_hierarchy/*.res')
         cursor = [res2dict(f)[0] for f in files]
