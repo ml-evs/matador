@@ -24,7 +24,7 @@ PATHS_TO_DEL = ['completed', 'bad_castep', 'input', 'logs', HOSTNAME]
 REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
 TMP_DIR = 'tmp_test'
 ROOT_DIR = getcwd()
-VERBOSITY = 4
+VERBOSITY = 10
 EXECUTABLE = 'castep'
 
 
@@ -314,7 +314,6 @@ class ComputeTest(unittest.TestCase):
         self.assertTrue(bad_exists, "couldn't find output file!")
         self.assertEqual(num, 0)
 
-    @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
     def test_dont_restart_completed_calc(self):
         """ Set a relaxation up to fail. """
 
@@ -334,7 +333,7 @@ class ComputeTest(unittest.TestCase):
             ComputeTask(ncores=NCORES, nnodes=None, node=node,
                         res=seed, param_dict=param_dict, cell_dict=cell_dict,
                         verbosity=VERBOSITY, killcheck=True, memcheck=False,
-                        reopt=True, executable=executable,
+                        reopt=True, executable=executable, max_walltime=5,
                         start=True)
         except CalculationError:
             errored = True
@@ -519,22 +518,18 @@ class ComputeTest(unittest.TestCase):
         copy(REAL_PATH + 'data/max_walltime/LiAs.cell', '.')
         copy(REAL_PATH + 'data/max_walltime/LiAs.param', '.')
 
-        walltime_error = False
         runner = BatchRun(seed=['LiAs'], debug=False, no_reopt=True,
                           verbosity=VERBOSITY, ncores=2, nprocesses=2, executable=EXECUTABLE,
-                          max_walltime=15, polltime=1)
-        try:
+                          max_walltime=15, polltime=0.5)
+        with self.assertRaises(WalltimeError):
             runner.spawn()
-        except WalltimeError:
-            walltime_error = True
 
         castep_exists = isfile('LiAs_testcase.castep')
         bad_castep_exists = isfile('LiAs_testcase_bad.castep')
         res_exists = isfile('LiAs_testcase.res') and isfile('LiAs_testcase_bad.res')
-        lock_exists = isfile('LiAs_testcase.res.lock') and isfile('LiAs_testcase_bad.res.lock')
+        lock_exists = isfile('LiAs_testcase.res.lock') or isfile('LiAs_testcase_bad.res.lock')
         compute_dir_exist = isdir(HOSTNAME)
 
-        self.assertTrue(walltime_error, 'Walltime error was not raised')
         self.assertTrue(castep_exists, 'Could not find castep file!')
         self.assertTrue(bad_castep_exists, 'Could not find bad castep file!')
         self.assertTrue(res_exists, 'Could not find res file!')

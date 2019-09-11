@@ -595,13 +595,12 @@ def castep2dict(seed, db=True, intermediates=False, **kwargs):
         _castep_scrape_thermo_data(flines, castep)
 
     # only scrape snapshots/number of intermediates if requested
-    if intermediates:
-        try:
-            snapshots, castep['geom_iter'] = _castep_scrape_all_snapshots(flines)
-            if intermediates:
-                castep['intermediates'] = snapshots
-        except RuntimeError as exc:
-            raise RuntimeError('Failed to scrape intermediates: {}'.format(exc))
+    try:
+        snapshots, castep['geom_iter'] = _castep_scrape_all_snapshots(flines)
+        if intermediates:
+            castep['intermediates'] = snapshots
+    except RuntimeError as exc:
+        raise RuntimeError('Failed to scrape intermediates: {}'.format(exc))
 
     _castep_scrape_metadata(flines, castep)
 

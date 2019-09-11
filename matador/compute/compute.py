@@ -493,9 +493,10 @@ class ComputeTask:
 
                 LOG.info('Polling process every {} s'.format(self.polltime))
 
+                checked_castep_exists = False
                 while self._process.poll() is None:
                     proc_elapsed = time.time() - proc_clock
-                    if proc_elapsed > 3*self.polltime:
+                    if not checked_castep_exists and proc_elapsed > 3*self.polltime:
                         # if no CASTEP file made within 3 poll times, or if this process
                         # hasn't written to it, then raise error
                         if not os.path.isfile(seed + '.castep'):
@@ -508,6 +509,7 @@ class ComputeTask:
                                    .format(self.executable))
                             LOG.critical(msg)
                             raise CalculationError(msg)
+                        checked_castep_exists = True
 
                     if self.max_walltime is not None:
                         run_elapsed = time.time() - self.start_time
@@ -1279,7 +1281,7 @@ class ComputeTask:
                 shutil.copy2(self.seed + '.castep', self.compute_dir)
             castep_dict, success = castep2dict(self.seed + '.castep', db=False, verbosity=self.verbosity)
             if success:
-                self.res_dict['geom_iter'] = castep_dict.get('geom_iter')
+                self.res_dict['geom_iter'] = castep_dict.get('geom_iter', 0)
 
             if os.path.getmtime(self.seed + '.res') < os.path.getmtime(self.seed + '.castep'):
                 LOG.info('CASTEP file was updated more recently than res file, using intermediate structure...')
@@ -1295,7 +1297,7 @@ class ComputeTask:
 
         # set up geom opt iteration options based on input/scraped parameters
         self._max_iter = self.calc_doc['geom_max_iter']
-        if 'geom_iter' in self.res_dict:
+        if self.res_dict.get('geom_iter'):
             self._max_iter -= self.res_dict['geom_iter']
         else:
             self.res_dict['geom_iter'] = 0
