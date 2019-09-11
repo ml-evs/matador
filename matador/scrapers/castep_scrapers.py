@@ -11,9 +11,10 @@ from collections import defaultdict
 import os
 import glob
 import gzip
+import warnings
 import pwd
 import numpy as np
-from matador.utils.cell_utils import abc2cart, calc_mp_spacing, cart2volume, wrap_frac_coords, cart2abc, frac2cart, cart2frac, real2recip
+from matador.utils.cell_utils import abc2cart, calc_mp_spacing, cart2volume, wrap_frac_coords, cart2abc, cart2frac
 from matador.utils.chem_utils import get_stoich
 from matador.scrapers.utils import DFTError, CalculationError, scraper_function, f90_float_parse
 
@@ -63,7 +64,7 @@ def res2dict(seed, db=True, **kwargs):
             remark = line.split()
     if cell == '':
         raise RuntimeError('missing CELL info')
-    elif titl == '' and db:
+    if titl == '' and db:
         raise RuntimeError('missing TITL')
     if db:
         res['pressure'] = f90_float_parse(titl[2])
@@ -1151,6 +1152,13 @@ def _castep_scrape_final_parameters(flines, castep):
                 castep['xc_functional'] = 'HSE03'
             elif 'hybrid HSE06' in xc_string:
                 castep['xc_functional'] = 'HSE06'
+            elif 'RSCAN' in xc_string:
+                castep['xc_functional'] = 'RSCAN'
+            else:
+                castep['xc_functional'] = xc_string.split(':')[-1]
+                warnings.warn('Unrecognised functional {xc}: scraping as {xc}.'
+                              'This may lead to incompatible param files.'
+                              .format(xc=castep['xc_functional']))
         elif 'cut_off_energy' not in castep and 'plane wave basis set' in line:
             castep['cut_off_energy'] = f90_float_parse(line.split(':')[-1].split()[0])
         elif 'finite_basis_corr' not in castep and 'finite basis set correction  ' in line:
