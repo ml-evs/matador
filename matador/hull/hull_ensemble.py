@@ -5,6 +5,8 @@
 
 import tqdm
 from matador.hull import PhaseDiagram, QueryConvexHull
+from matador.plotting.plotting import plotting_function
+import matplotlib.pyplot as plt
 from matador.utils.cursor_utils import filter_cursor_by_chempots, recursive_get, recursive_set, set_cursor_from_array
 from matador.utils.chem_utils import get_formation_energy, get_root_source, get_formula_from_stoich
 
@@ -154,6 +156,35 @@ class EnsembleHull(QueryConvexHull):
                 else:
                     histogram[get_root_source(doc)] += 1
         return histogram
+
+    @plotting_function
+    def plot_composition_stability(self):
+        # Here we are trying to make a bar chart of x-axis chempot where a structure 
+        # is stable and y axis bars of that structure
+        from collections import defaultdict
+        histogram = defaultdict(list)
+        for hull in self.phase_diagrams:
+            for doc in hull.stable_structures:
+                #if the structure is not yet been seen add it to the hist
+                form = get_formula_from_stoich(doc.get('stoichiometry'))
+                if len(doc.get('stoichiometry')) is not 1:
+                    histogram['%s %s'%(form,doc.get('space_group'))].append(space[hull.formation_key[2]])
+
+        fig, ax = plt.subplots()
+
+        ys = 1
+        yticks = ['']
+        for struct in histogram:
+            yticks.append(struct)
+            plt.broken_barh([(histogram[struct][0],histogram[struct][-1])],(ys,.5),edgecolor='black')
+            ys+=1
+
+        ax.set_xlabel('%s range'%self.data_key)
+        ax.set_ylim(auto=True)
+        ax.set_yticks(np.arange(0.25,ys+.25))
+        ax.set_yticklabels(yticks)
+        plt.show
+        return
 
     def plot_hull(self, **kwargs):
         """ Hull plot helper function. """
