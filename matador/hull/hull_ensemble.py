@@ -187,7 +187,13 @@ class EnsembleHull(QueryConvexHull):
                 if len(doc.get('stoichiometry')) != 1:
                     histogram['%s %s'%(form,doc.get('space_group'))].append(space[hull.formation_key[2]])
 
-        return histogram
+        return chempot, histogram
+    
+    def plot_composition_stability(self, **kwargs):
+        """Plots stable structures at each chempot in bar graph form"""
+        from matador.plotting.hull_plotting import plot_ensemble_stability
+        chempot, hist = self.generate_composition_stability()
+        plot_ensemble_stability(self, self.data_key, chempot, hist, **kwargs)
 
     def plot_hull(self, **kwargs):
         """ Hull plot helper function. """
