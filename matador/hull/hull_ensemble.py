@@ -157,12 +157,10 @@ class EnsembleHull(QueryConvexHull):
                     histogram[get_root_source(doc)] += 1
         return histogram
 
-    @plotting_function
-    def plot_composition_stability(self):
+    def generate_composition_stability(self):
         # Here we are trying to make a bar chart of x-axis chempot where a structure 
         # is stable and y axis bars of that structure
         from collections import defaultdict
-        import numpy as np
         histogram = defaultdict(list)
         chempot = ''
         space = []
@@ -188,27 +186,8 @@ class EnsembleHull(QueryConvexHull):
                 form = get_formula_from_stoich(doc.get('stoichiometry'))
                 if len(doc.get('stoichiometry')) != 1:
                     histogram['%s %s'%(form,doc.get('space_group'))].append(space[hull.formation_key[2]])
-        # Now plot the figure
-        fig, ax = plt.subplots()
 
-        ys = 1
-        yticks = ['']
-        xmin = 0
-        xmax = -1E21
-        for struct in histogram:
-            if max(histogram[struct]) > xmax:
-                xmax = max(histogram[struct])
-            if min(histogram[struct]) < xmin:
-                xmin = min(histogram[struct])
-            yticks.append(struct)
-            ax.broken_barh([(histogram[struct][0],histogram[struct][-1]-histogram[struct][0])],(ys,.5),edgecolor='black')
-            ys+=1
-            
-        ax.set_xlabel('%s %s range'%(chempot,self.data_key))
-        ax.set_yticks(np.arange(0.25,ys+.25))
-        ax.set_yticklabels(yticks)
-        plt.show()
-        return
+        return histogram
 
     def plot_hull(self, **kwargs):
         """ Hull plot helper function. """
