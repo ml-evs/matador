@@ -188,7 +188,6 @@ class EnsembleHull(QueryConvexHull):
                 form = get_formula_from_stoich(doc.get('stoichiometry'))
                 if len(doc.get('stoichiometry')) != 1:
                     histogram['%s %s'%(form,doc.get('space_group'))].append(space[hull.formation_key[2]])
-
         # Now plot the figure
         fig, ax = plt.subplots()
 
@@ -202,11 +201,9 @@ class EnsembleHull(QueryConvexHull):
             if min(histogram[struct]) < xmin:
                 xmin = min(histogram[struct])
             yticks.append(struct)
-            print(histogram[struct][-1])
-            ax.broken_barh([(histogram[struct][-1],histogram[struct][0])],(ys,.5),edgecolor='black')
+            ax.broken_barh([(histogram[struct][0],histogram[struct][-1]-histogram[struct][0])],(ys,.5),edgecolor='black')
             ys+=1
             
-        ax.set_xlim(xmin - 1,xmax)
         ax.set_xlabel('%s %s range'%(chempot,self.data_key))
         ax.set_yticks(np.arange(0.25,ys+.25))
         ax.set_yticklabels(yticks)
