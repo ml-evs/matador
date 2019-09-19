@@ -75,6 +75,10 @@ def make_connection_to_collection(coll_names, check_collection=False, allow_chan
     if coll_names is not None:
         if not isinstance(coll_names, list):
             coll_names = [coll_names]
+
+        if len(coll_names) > 1:
+            raise NotImplementedError("Querying multiple collections is no longer supported.")
+
         for collection in coll_names:
 
             if not allow_changelog:
