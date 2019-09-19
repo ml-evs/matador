@@ -167,24 +167,19 @@ class EnsembleHull(QueryConvexHull):
         
         # First identify the chemical potential that has been altered, and get the 'space'
         # i.e. range along which it has been altered
-        for hull in self.phase_diagrams:
-            for doc in hull.stable_structures:
-                #if the structure is not yet been seen add it to the hist
-                
-                form = get_formula_from_stoich(doc.get('stoichiometry'))
-                if len(doc.get('stoichiometry')) is 1:
-                    ranges = doc[self.data_key][self.energy_key]
-                    diff = (ranges[0]-ranges[-1])/len(ranges)
-                    if diff != 0:
-                        chempot = form
-                        space = ranges
-                        break
+        for mu in self.chempot_cursor:
+            energies = mu[self.data_key][self.energy_key]
+            if (energies[1]-energies[-1])/len(energies) != 0:
+                chempot = get_formula_from_stoich(mu.get('stoichiometry'))
+                space = energies
+                break
+
         # now create a histogram of all the structures and uner which chempot theyre stable
         for hull in self.phase_diagrams:
             for doc in hull.stable_structures:
                 #if the structure is not yet been seen add it to the hist        
                 form = get_formula_from_stoich(doc.get('stoichiometry'))
-                if len(doc.get('stoichiometry')) != 1:
+                if doc not in self.chempot_cursor:
                     histogram['%s %s'%(form,doc.get('space_group'))].append(space[hull.formation_key[2]])
 
         return chempot, histogram
