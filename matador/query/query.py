@@ -19,7 +19,7 @@ from bson.json_util import dumps
 from bson.objectid import ObjectId
 
 from matador.utils.print_utils import print_warning, print_success, print_notify
-from matador.utils.chem_utils import get_periodic_table, get_formula_from_stoich
+from matador.utils.chem_utils import get_periodic_table
 from matador.utils.chem_utils import parse_element_string, get_stoich_from_formula
 from matador.utils.cursor_utils import display_results, filter_cursor_by_chempots
 from matador.db import make_connection_to_collection
@@ -31,7 +31,8 @@ class DBQuery:
     structure database.
 
     Attributes:
-        cursor (list of dict): list of structures matching query.
+        cursor (list of dict or :obj:`pymongo.Cursor`): list or cursor of structures
+            matching query.
         args (dict): contains all keyword arguments used to construct
             the query (see matador query --help) for list.
         query_dict (dict): dictionary passed to database for query
@@ -103,7 +104,7 @@ class DBQuery:
             self._client = client
             self._db = client.crystals
         if collections is not False:
-            self._collections = collections
+            _collections = collections
 
         if (not collections or not client) and not self.args.get('testing'):
             if mongo_settings:
@@ -111,7 +112,12 @@ class DBQuery:
             else:
                 self.mongo_settings = load_custom_settings(config_fname=self.args.get('config'), debug=self.args.get('debug'))
             result = make_connection_to_collection(self.args.get('db'), mongo_settings=self.mongo_settings)
-            self._client, self._db, self._collections = result
+            self._client, self._db, _collections = result
+
+        if len(_collections) > 1:
+            raise NotImplementedError("Querying multiple collections is no longer supported.")
+        else:
+            self._collection = _collections.items()[0][1]
 
         # define some periodic table macros
         self._periodic_table = get_periodic_table()
@@ -220,21 +226,28 @@ class DBQuery:
             self._empty_query = False
 
         if self.args.get('field') is not None:
-            for ind, field in enumerate(self.args.get('field')):
-                _filter = self.args.get('filter')[ind]
-                try:
-                    for i, value in enumerate(_filter):
-                        _filter[i] = float(value)
-                    filter_type = 'float'
-                except ValueError:
-                    filter_type = 'string'
+            try:
+                for ind, field in enumerate(self.args.get('field')):
+                    _filter = self.args.get('filter')[ind]
+                    try:
+                        for i, value in enumerate(_filter):
+                            _filter[i] = float(value)
+                        filter_type = 'float'
+                    except ValueError:
+                        filter_type = 'string'
 
-                if filter_type == 'float':
-                    self.query_dict['$and'].append(self._query_float_range(
-                        field, _filter))
-                else:
-                    self.query_dict['$and'].append(self._query_string(
-                        field, _filter))
+                    if filter_type == 'float':
+                        self.query_dict['$and'].append(self._query_float_range(
+                            field, _filter))
+                    else:
+                        self.query_dict['$and'].append(self._query_string(
+                            field, _filter))
+            except Exception:
+                raise RuntimeError(
+                    "Unexpected field/filter format. Both must be "
+                    "provided as lists, even if only one field is being filtered."
+                )
+            self._empty_query = False
 
         if self.args.get('cutoff') is not None:
             self.query_dict['$and'].append(self._query_float_range(
@@ -312,64 +325,74 @@ class DBQuery:
             self.query_dict['$and'].append(self._query_time(self.args.get('since') or False))
             self._empty_query = False
 
+    def _perform_empty_query(self):
+        """ No parameters were asked for, so just return a cursor
+        that contains the entire collection currently stored as
+        :attr:`repo`.
+
+        Returns:
+            :obj:`pymongo.Cursor`: the results of the query.
+
+
+        """
+        cursor = self.repo.find().sort('enthalpy_per_atom', pm.ASCENDING)
+        num_documents = self.cursor.count_documents({})
+        if self.debug:
+            print('Empty query, showing all...')
+
+        return cursor, num_documents
+
     def perform_query(self):
         """ Find results that match the query_dict
         inside the MongoDB database.
         """
         # if no query submitted, find all
-        if self._empty_query:
-            if self.args.get('id') is None:
-                for collection in self._collections:
-                    self.repo = self._collections[collection]
-                    if self.debug:
-                        print('Empty query, showing all...')
-                    self.cursor, count = self._find_and_sort(as_list=True)
-                    if self.top == -1 or self.top is None:
-                        self.top = count
-                    if self.cursor:
-                        display_results(self.cursor[:self.top], **self.args)
+        if self._empty_query and self.args.get('id') is None:
+            self.repo = self._collection
+            self.cursor, cursor_count = self._perform_empty_query()
 
         # if no special query has been made already, begin executing the query
         if not self._empty_query:
-            for collection in self._collections:
-                self.repo = self._collections[collection]
-                if self.debug:
-                    print('Query dict:')
-                    print(dumps(self.query_dict, indent=1))
+            self.repo = self._collection
+            if self.debug:
+                print('Query dict:')
+                print(dumps(self.query_dict, indent=1))
 
-                # execute query
-                self.cursor, cursor_count = self._find_and_sort(self.query_dict)
-                if self._non_elemental:
-                    self.cursor = filter_cursor_by_chempots(self._chempots, self.cursor)
+            # execute query
+            self.cursor, cursor_count = self._find_and_sort(self.query_dict)
+            if self._non_elemental:
+                self.cursor = filter_cursor_by_chempots(self._chempots, self.cursor)
 
-                # if called as script, always print results
-                print(cursor_count, 'results found for query in', collection + '.')
+        print('{} results found for query in {}.'.format(cursor_count, self.repo.name))
+        if self.args.get('subcmd') != 'swaps' and not self._create_hull:
+            self.filter_results(cursor_count)
+        self._display_results()
 
-                if self.args.get('subcmd') != 'swaps' and not self._create_hull:
-                    if cursor_count >= 1:
-                        self._num_to_display = cursor_count
-                        if self.args.get('delta_E') is not None:
-                            self.cursor = list(self.cursor)
-                            if len({get_formula_from_stoich(doc['stoichiometry']) for doc in self.cursor}) != 1:
-                                print('Multiple stoichiometries in cursor, unable to filter by energy.')
-                            else:
-                                gs_enthalpy = self.cursor[0]['enthalpy_per_atom']
-                                ind = 0
-                                for ind, doc in enumerate(self.cursor[1:]):
-                                    if abs(doc['enthalpy_per_atom'] - gs_enthalpy) > self.args.get('delta_E'):
-                                        break
-                                self._num_to_display = ind + 1
-                                cursor_count = self._num_to_display
-                        elif self.top == -1 or self.top is None:
-                            self._num_to_display = cursor_count
-                            self.top = cursor_count
-                        elif cursor_count > self.top:
-                            self._num_to_display = self.top
+    def _display_results(self):
+        display_results(self.cursor[:self._num_to_display], args=self.args)
 
-                        display_results(list(self.cursor)[:self._num_to_display], **self.args)
+    def _set_filter_display_results(self, cursor_count):
+        """ Filter and display the results based on the command line parameters. """
+        if self.args.get('delta_E') is not None:
+            if any(doc['stoichiometry'] != self.cursor[0]['stoichiometry'] for doc in self.cursor):
+                print('Multiple stoichiometries in cursor, unable to filter by energy with --delta_E.')
+            else:
+                self.cursor.rewind()
+                gs_enthalpy = self.cursor[0]['enthalpy_per_atom']
+                for ind, doc in enumerate(self.cursor[1:]):
+                    if abs(doc['enthalpy_per_atom'] - gs_enthalpy) > self.args.get('delta_E'):
+                        self._num_to_display = ind + 1
+                        break
+                self.cursor.rewind()
+        elif self.top == -1 or self.top is None:
+            self._num_to_display = cursor_count
+            self.top = cursor_count
+        elif cursor_count > self.top:
+            self._num_to_display = self.top
 
-                if self.args.get('delta_E') is not None:
-                    self.cursor = self.cursor[:self._num_to_display]
+        # if delta_E was requested, remove any structures above the threshold
+        if self.args.get('delta_E') is not None:
+            self.cursor = self.cursor[:self._num_to_display]
 
     def _find_and_sort(self, query_filter=None, as_list=True, **kwargs):
         """ Query `self.repo` using Pymongo arguments/kwargs. Sorts based
@@ -405,8 +428,8 @@ class DBQuery:
             SystemExit: if no structures are found for hull.
 
         """
-        for collection in self._collections:
-            self.repo = self._collections[collection]
+        if self._collection is not None:
+            self.repo = self._collection
             print('Creating hull from structures in query results.')
             if self.args.get('biggest'):
                 print('\nFinding biggest calculation set for hull...\n')
@@ -507,16 +530,13 @@ class DBQuery:
         """
 
         self.cursor = []
-        for collection in self._collections:
-            query_dict = dict()
-            query_dict['$and'] = []
-            query_dict['$and'].append(self._query_id())
-            if not self.args.get('ignore_warnings'):
-                query_dict['$and'].append(self._query_quality())
-            self.repo = self._collections[collection]
-            temp_cursor = self._find_and_sort(query_dict)
-            for doc in temp_cursor:
-                self.cursor.append(doc)
+        query_dict = dict()
+        query_dict['$and'] = []
+        query_dict['$and'].append(self._query_id())
+        if not self.args.get('ignore_warnings'):
+            query_dict['$and'].append(self._query_quality())
+        self.repo = self._collection
+        self.cursor = list(self._find_and_sort(query_dict))
 
         if not self.cursor:
             raise RuntimeError('Could not find a match with {} try widening your search.'.format(self.args.get('id')))
@@ -911,7 +931,7 @@ class DBQuery:
         elif icsd[0] == 0:
             query_dict['icsd']['$exists'] = True
         else:
-            query_dict['icsd']['$eq'] = icsd[0]
+            query_dict['icsd']['$eq'] = str(icsd[0])
         return query_dict
 
     def _query_source(self):
