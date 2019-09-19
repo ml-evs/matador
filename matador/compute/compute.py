@@ -514,7 +514,7 @@ class ComputeTask:
                     if self.max_walltime is not None:
                         run_elapsed = time.time() - self.start_time
                         # leave 1 minute to clean up
-                        LOG.debug('{} remaining seconds...'.format(self.max_walltime - run_elapsed))
+                        # LOG.debug('{} remaining seconds...'.format(self.max_walltime - run_elapsed))
                         if run_elapsed > abs(self.max_walltime - 5*self.polltime):
                             msg = 'About to run out of time on seed {}, killing early...'.format(self.seed)
                             LOG.info(msg)
@@ -549,7 +549,8 @@ class ComputeTask:
                 if isinstance(opti_dict, Exception) and remedy is not None:
                     opti_dict = {'optimised': False}
 
-                LOG.debug('Intermediate calculation completed successfully: num_iter = {} '.format(num_iter))
+                LOG.info('Intermediate calculation completed successfully: total relaxation steps now = {} '
+                          .format(opti_dict.get('geom_iter')))
 
                 # scrub keys that need to be rescraped
                 keys_to_remove = ['kpoints_mp_spacing', 'kpoints_mp_grid', 'species_pot', 'sedc_apply', 'sedc_scheme']
@@ -597,11 +598,11 @@ class ComputeTask:
                         if success:
                             opti_dict['lattice_cart'] = list(cell_dict['lattice_cart'])
 
-                    LOG.debug('N = {iters:03d} | |F| = {d[max_force_on_atom]:5.5f} eV/A | '
-                              'S = {pressure:5.5f} GPa | H = {d[enthalpy_per_atom]:5.5f} eV/atom'
-                              .format(d=opti_dict,
-                                      pressure=opti_dict.get('pressure', 0.0),
-                                      iters=sum(self._geom_max_iter_list[:ind+1])))
+                    LOG.info('N = {iters:03d} | |F| = {d[max_force_on_atom]:5.5f} eV/A | '
+                             'S = {pressure:5.5f} GPa | H = {d[enthalpy_per_atom]:5.5f} eV/atom'
+                             .format(d=opti_dict,
+                                     pressure=opti_dict.get('pressure', 0.0),
+                                     iters=opti_dict.get('geom_iter', 0)))
 
                 # if there were errors that can be remedied, now is the time to do it
                 # this will normally involve changing a parameter to avoid future failures
