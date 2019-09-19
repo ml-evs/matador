@@ -225,6 +225,7 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
                 eform_limits[1] if eform_limits[0] >= 0 else 0.1)
     else:
         lims = sorted(eform_limits)
+
     ax.set_ylim(lims)
 
     if isinstance(title, bool) and title:
