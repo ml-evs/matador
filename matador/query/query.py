@@ -42,7 +42,7 @@ class DBQuery:
 
     """
 
-    def __init__(self, client=False, collections=False, subcmd='query', debug=False, quiet=False, **kwargs):
+    def __init__(self, client=False, collections=False, subcmd='query', debug=False, quiet=False, mongo_settings=None, **kwargs):
         """ Parse arguments from matador or API call before calling
         query.
 
@@ -97,7 +97,10 @@ class DBQuery:
             self._collections = collections
 
         if (not collections or not client) and not self.args.get('testing'):
-            self.mongo_settings = load_custom_settings(config_fname=self.args.get('config'), debug=self.args.get('debug'))
+            if mongo_settings:
+                self.mongo_settings = mongo_settings
+            else:
+                self.mongo_settings = load_custom_settings(config_fname=self.args.get('config'), debug=self.args.get('debug'))
             result = make_connection_to_collection(self.args.get('db'), mongo_settings=self.mongo_settings)
             self._client, self._db, self._collections = result
 
