@@ -113,6 +113,11 @@ class CrystalTest(unittest.TestCase):
         crystal = Crystal(doc)
         print(crystal.bond_lengths)
 
+    def testBondStats(self):
+        doc, s = magres2dict(REAL_PATH + 'data/NaP_QE6.magres')
+        crystal = Crystal(doc)
+        print(crystal.bonding_stats)
+
 
 class ElasticCrystalTest(unittest.TestCase):
     """ Test the elastic functionality of the Crystal module. """
