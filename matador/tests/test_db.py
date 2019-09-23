@@ -22,13 +22,13 @@ MONGO_PRESENT = True
 try:
     MONGO_CLIENT = pm.MongoClient(SETTINGS['mongo']['host'], serverSelectionTimeoutMS=1000)
     MONGO_DB_NAMES = MONGO_CLIENT.list_database_names()
+    MONGO_CLIENT.crystals[DB_NAME].drop()
+    MONGO_CLIENT.crystals[getpass.getuser() + '_' + DB_NAME].drop()
 except pm.errors.ServerSelectionTimeoutError:
     MONGO_PRESENT = False
 
-MONGO_CLIENT.crystals[DB_NAME].drop()
-MONGO_CLIENT.crystals[getpass.getuser() + '_' + DB_NAME].drop()
 
-
+@unittest.skipIf(not MONGO_PRESENT, 'MongoDB not found, skipping')
 class TestDatabase(unittest.TestCase):
     """ Tests the Spatula class. """
     def test_failed_import(self):
