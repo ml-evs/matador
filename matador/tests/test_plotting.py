@@ -16,7 +16,14 @@ from matador.hull import QueryConvexHull
 REAL_PATH = '/'.join(os.path.realpath(__file__).split('/')[:-1]) + '/'
 ROOT_DIR = os.getcwd()
 
+try:
+    import matplotlib
+    MATPLOTLIB_PRESENT = True
+except ImportError:
+    MATPLOTLIB_PRESENT = False
 
+
+@unittest.skipIf(not MATPLOTLIB_PRESENT, 'Skipping plotting tests.')
 class SpectralPlotTests(unittest.TestCase):
     """ Test Dispersion script. """
     def test_pdis_plot(self):
@@ -127,6 +134,7 @@ class SpectralPlotTests(unittest.TestCase):
         self.assertTrue(file_exists)
 
 
+@unittest.skipIf(not MATPLOTLIB_PRESENT, 'Skipping plotting tests.')
 class HullPlotTests(unittest.TestCase):
     """ Tests for plotting phase diagrams. """
     def test_binary_hull_plot(self):
