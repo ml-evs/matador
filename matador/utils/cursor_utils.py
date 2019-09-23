@@ -168,7 +168,7 @@ def display_results(cursor,
         header_string += "{:^11}".format('Volume/fu')
     units_string += "{:^11}".format('(Ang^3)')
 
-    if hull and args.get('eform'):
+    if args.get('eform'):
         header_string += "{:^18}".format('Formation energy')
         units_string += "{:^18}".format('(eV/atom)')
     elif hull:
@@ -185,6 +185,9 @@ def display_results(cursor,
     header_string += "{:^15}".format('Formula')
     header_string += "{:^8}".format('# fu')
     header_string += "{:^8}".format('Prov.')
+
+    if args.get('summary'):
+        header_string += '{:^12}'.format('Occurrences')
 
     # ensure cursor is sorted by enthalpy
     if not no_sort:
@@ -404,24 +407,28 @@ def display_results(cursor,
 
     if args.get('summary'):
         current_formula = ''
-        formula_list = []
-        count = 0
+        formula_list = {}
+        summary_formula_string = {}
         for ind, substring in enumerate(formula_string):
             if substring != current_formula and substring not in formula_list:
-                count += 1
+                current_formula = substring
+                formula_list[substring] = 0
                 if markdown:
                     markdown_string += struct_string[ind] + '\n'
                 elif latex:
                     latex_string += latex_struct_string[ind]
                 else:
-                    total_string += ('{}\n'.format(struct_string[ind]))
+                    summary_formula_string[current_formula] = []
+                    summary_formula_string[current_formula].append('{}'.format(struct_string[ind]))
                 if details and not markdown:
-                    total_string += detail_string[ind] + '\n'
-                    total_string += detail_substring[ind] + '\n'
+                    summary_formula_string[current_formula].append(detail_string[ind])
+                    summary_formula_string[current_formula].append(detail_substring[ind])
                 if args.get('source') and not markdown:
-                    total_string += source_string[ind] + '\n'
-                current_formula = substring
-                formula_list.append(substring)
+                    summary_formula_string[current_formula].append(source_string[ind])
+            formula_list[substring] += 1
+        for formula in summary_formula_string:
+            summary_formula_string[formula][0] += '{:^12}'.format(formula_list[formula])
+            total_string += '\n'.join(summary_formula_string[formula]) + '\n'
     else:
         for ind, substring in enumerate(struct_string):
             if markdown:
