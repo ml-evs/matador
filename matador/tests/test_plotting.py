@@ -199,6 +199,7 @@ class HullPlotTests(unittest.TestCase):
 
         beef_hull = EnsembleHull(cursor, '_beef',
                                  elements=['K', 'P'],
+                                 num_samples=10,
                                  energy_key='total_energy_per_atom',
                                  parameter_key='thetas')
 

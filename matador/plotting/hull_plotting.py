@@ -337,11 +337,11 @@ def plot_ensemble_hull(hull, data_key,
     plot_2d_hull(hull, ax=ax, plot_points=False, plot_hull_points=True, show=False)
     min_ef = 0
     colours_list = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])
+    alpha = min([1, max([1/(alpha_scale*n_hulls), 0.01])])
     for ind, _ in enumerate(hull.phase_diagrams):
         hull_cursor = [doc for doc in hull.cursor if doc[data_key]['hull_distance'][ind] <= 0.0 + EPS]
         min_ef = np.min([doc[data_key][formation_energy_key][ind] for doc in hull_cursor] + [min_ef])
         if plot_hulls:
-            alpha = min([1, max([1/(alpha_scale*n_hulls), 0.01])])
             ax.plot([doc['concentration'][0] for doc in hull_cursor],
                     [doc[data_key][formation_energy_key][ind] for doc in hull_cursor],
                     alpha=alpha, c='k', lw=0.5, zorder=0)

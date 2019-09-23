@@ -182,7 +182,7 @@ class ComputeTest(unittest.TestCase):
         relaxer = ComputeTask(ncores=ncores, nnodes=None, node=node,
                               res=seed, param_dict=param_dict, cell_dict=cell_dict,
                               verbosity=VERBOSITY, executable=executable,
-                              exec_test=False, compute_dir=None,
+                              exec_test=False, compute_dir=None, polltime=0.01,
                               start=False)
         errored = False
         try:
