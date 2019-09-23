@@ -61,6 +61,8 @@ class DBQuery:
             self.args['subcmd'] = subcmd
         if self.args.get('testing') is None:
             self.args['testing'] = False
+        if self.args.get('as_crystals') is None:
+            self.args['as_crystals'] = False
 
         if subcmd in ['hull', 'hulldiff', 'voltage'] and self.args.get('composition') is None:
             raise RuntimeError('{} requires composition query'.format(subcmd))
@@ -316,7 +318,7 @@ class DBQuery:
                     self.repo = self._collections[collection]
                     if self.debug:
                         print('Empty query, showing all...')
-                    self.cursor = self.repo.find().sort('enthalpy_per_atom', pm.ASCENDING)
+                    self.cursor = self._find_and_sort()
                     if self.top == -1 or self.top is None:
                         self.top = self.cursor.count()
                     self.cursor = list(self.cursor)
@@ -332,7 +334,7 @@ class DBQuery:
                     print(dumps(self.query_dict, indent=1))
 
                 # execute query
-                self.cursor = list(self.repo.find(SON(self.query_dict)).sort('enthalpy_per_atom', pm.ASCENDING))
+                self.cursor = self._find_and_sort(SON(self.query_dict))
                 if self._non_elemental:
                     self.cursor = filter_cursor_by_chempots(self._chempots, self.cursor)
 
@@ -366,6 +368,20 @@ class DBQuery:
 
                 if self.args.get('delta_E') is not None:
                     self.cursor = self.cursor[:self._num_to_display]
+
+    def _find_and_sort(self, as_list=True, *args, **kwargs):
+        """ Query `self.repo` using Pymongo arguments/kwargs. Sorts based
+        on enthalpy_per_atom and optionally returns list of Crystals.
+
+        """
+        from matador.crystal import Crystal
+        cursor = self.repo.find(*args, **kwargs).sort('enthalpy_per_atom', pm.ASCENDING)
+        if self.args.get('as_crystals'):
+            return [Crystal(doc) for doc in cursor]
+        if as_list:
+            return list(cursor)
+        else:
+            return cursor
 
     def perform_hull_query(self):
         """ Perform the multiple queries necessary to find possible
@@ -402,7 +418,7 @@ class DBQuery:
                 # then do some random samples
                 else:
                     ind = np.random.randint(rand_sample if rand_sample < count - 1 else 0, count - 1)
-                id_cursor = list(self.repo.find({'text_id': self.cursor[ind]['text_id']}))
+                id_cursor = self._find_and_sort({'text_id': self.cursor[ind]['text_id']})
                 if len(id_cursor) > 1:
                     print_warning(
                         'WARNING: matched multiple structures with text_id ' + id_cursor[0]['text_id'][0] + ' ' +
@@ -420,8 +436,8 @@ class DBQuery:
                             self.query_dict['$and'].append(self._query_quality())
                         test_query_dict.append(self.query_dict)
                         test_cursors.append(
-                            list(self.repo.find(SON(test_query_dict[-1])).sort('enthalpy_per_atom',
-                                                                               pm.ASCENDING)))
+                            self._find_and_sort(SON(test_query_dict[-1]))
+                        )
                         if self._non_elemental:
                             test_cursors[-1] = filter_cursor_by_chempots(self._chempots, test_cursors[-1])
                         test_cursor_count.append(len(test_cursors[-1]))
@@ -479,7 +495,7 @@ class DBQuery:
             if not self.args.get('ignore_warnings'):
                 query_dict['$and'].append(self._query_quality())
             self.repo = self._collections[collection]
-            temp_cursor = self.repo.find(query_dict)
+            temp_cursor = self._find_and_sort(query_dict)
             for doc in temp_cursor:
                 self.cursor.append(doc)
         if not self.cursor:
