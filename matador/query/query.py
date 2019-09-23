@@ -164,6 +164,7 @@ class DBQuery:
                                     hull=None, args=self.args)
 
             if self.args.get('available_values') is not None:
+                print('Querying available values...')
                 self._query_available_values(self.args.get('available_values'), self.cursor)
 
             if not client and not self.args.get('testing'):
@@ -917,8 +918,16 @@ class DBQuery:
             cursor (list): the cursor to query.
 
         """
+        supported_fields = [
+            'doi',
+            'tags',
+            'root_source',
+            'cnt_vector',
+            'castep_version',
+            'cut_off_energy'
+        ]
         number_containing_field = sum([1 for doc in cursor if field in doc])
-        if field in ['doi', 'tags', 'cnt_vector', 'castep_version'] and number_containing_field != 0:
+        if field in supported_fields and number_containing_field != 0:
             value_degeneracy = dict()
             for doc in cursor:
                 if doc.get(field) is not None:
@@ -938,9 +947,10 @@ class DBQuery:
 
             print('Set of values under key {}:'.format(field))
             for value in sorted(value_degeneracy, key=value_degeneracy.get):
-                print('{:<10}: {:>10} entries'.format(value, value_degeneracy[value]))
+                print('{:<10} -> {:<10}'.format(value_degeneracy[value], value))
         else:
-            print('No querying available values for field {}'.format(field))
+            print('Field {} unsupported for finding all possible values, must be one of {}'
+                  .format(field, supported_fields))
             print('{}/{} contain field {}'.format(number_containing_field, len(cursor), field))
 
     @staticmethod
