@@ -23,7 +23,6 @@ def get_uniq_cursor(cursor, sim_tol=0.1, energy_tol=1e-2,
     correlation matrix.
 
     Parameters:
-
         cursor (list) : matador cursor to be filtered
 
     Keyword Arguments:
@@ -39,7 +38,7 @@ def get_uniq_cursor(cursor, sim_tol=0.1, energy_tol=1e-2,
         fingerprint_calc_args (dict): kwargs to pass to fingerprint
 
     Returns:
-        distinct_set (set): a set of indices of unique documents
+        distinct_set (list): ordered list indices of unique documents
         dupe_dict (dict): a dict with keys from distinct_set, listing duplicates
         fingerprint_list (list): a list of <Fingerprint> objects
         sim_mat (np.ndarray): the correlation matrix of pair similarity distances
@@ -117,7 +116,7 @@ def get_uniq_cursor(cursor, sim_tol=0.1, energy_tol=1e-2,
         del dupe_dict[i]
 
     print('Done!')
-    return distinct_set, dupe_dict, fingerprint_list, sim_mat
+    return sorted(list(distinct_set)), dupe_dict, fingerprint_list, sim_mat
 
 
 def plot_similarity_energy_correlation_matrix(cursor, sim_mat, sim_vmin=0.05, sim_vmax=0.5):

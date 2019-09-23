@@ -2,7 +2,6 @@
 import unittest
 from os.path import realpath
 from matador.fingerprints.similarity import get_uniq_cursor
-from matador.utils.cell_utils import cart2volume, abc2cart
 from matador.scrapers.castep_scrapers import res2dict
 
 REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
@@ -14,30 +13,26 @@ class SimilarityFilterTest(unittest.TestCase):
         test_docs = []
         i = 0
         while i < 10:
-            test_doc, success = res2dict(REAL_PATH + 'data/KP_primitive.res', db=False)
+            test_doc, _ = res2dict(REAL_PATH + 'data/KP_primitive.res', db=False)
             test_doc['text_id'] = ['primitive', 'cell']
-            # test_doc['lattice_cart'] = abc2cart(test_doc['lattice_abc'])
-            # test_doc['cell_volume'] = cart2volume(test_doc['lattice_cart'])
-            # test_doc['enthalpy_per_atom'] = 0
             test_docs.append(test_doc)
             i += 1
 
-        uniq_inds, dupe_dict, _, _ = get_uniq_cursor(test_docs)
-        self.assertEqual(uniq_inds, {0})
+        uniq_inds, _, _, _ = get_uniq_cursor(test_docs)
+        self.assertEqual(uniq_inds, [0])
 
         test_docs[6]['source'] = ['KP-CollCode999999.res']
         test_docs[6]['icsd'] = 999999
         test_docs[6]['text_id'] = ['keep', 'this']
 
-        uniq_inds, dupe_dict, _, _ = get_uniq_cursor(test_docs,
-                                                     **{'dr': 0.1, 'gaussian_width': 0.1})
-        self.assertEqual(uniq_inds, {6})
+        uniq_inds, _, _, _ = get_uniq_cursor(test_docs,
+                                             **{'dr': 0.1, 'gaussian_width': 0.1})
+        self.assertEqual(uniq_inds, [6])
 
     def test_k3p_uniq_default(self):
-        import glob
-        cursor, status = res2dict(REAL_PATH + 'data/K3P_uniq/*.res')
+        cursor, _ = res2dict(REAL_PATH + 'data/K3P_uniq/*.res')
         cursor = sorted(cursor, key=lambda x: x['enthalpy_per_atom'])
-        uniq_inds, dupe_dict, _, _ = get_uniq_cursor(cursor)
+        uniq_inds, _, _, _ = get_uniq_cursor(cursor)
         filtered_cursor = [cursor[ind] for ind in uniq_inds]
         self.assertEqual(len(cursor), 11)
         self.assertEqual(len(filtered_cursor), 5)
@@ -71,9 +66,8 @@ class SimilarityFilterTest(unittest.TestCase):
             test_docs[-1]['lattice_abc'] = lattice
             test_docs[-1]['lattice_abc'][0] *= val
             test_docs[-1]['lattice_abc'] = test_docs[-1]['lattice_abc'].tolist()
-            print('lattice_abc', test_docs[-1]['lattice_abc'])
         uniq_inds, _, _, _ = get_uniq_cursor(test_docs)
-        self.assertEqual(uniq_inds, {0})
+        self.assertEqual(uniq_inds, [0])
 
     def test_uniq_filter_with_hierarchy(self):
         import glob
@@ -89,8 +83,7 @@ class SimilarityFilterTest(unittest.TestCase):
         self.assertTrue('KP-NaP-CollCode421420' in filtered_cursor[1]['source'][0])
 
     def test_uniq_filter_with_hierarchy_2(self):
-        import glob
-        cursor, failures = res2dict(REAL_PATH + 'data/hull-LLZO/*LLZO*.res')
+        cursor, f_ = res2dict(REAL_PATH + 'data/hull-LLZO/*LLZO*.res')
         cursor = sorted(cursor, key=lambda x: x['enthalpy_per_atom'])[0:10]
         uniq_inds, _, _, _ = get_uniq_cursor(cursor, sim_tol=0.1, energy_tol=1e10, projected=True,
                                              **{'dr': 0.01, 'gaussian_width': 0.1})
