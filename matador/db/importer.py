@@ -304,6 +304,7 @@ class Spatula:
                 struct['species_pot'] = {}
 
             root_src = get_root_source(struct)
+            struct['root_source'] = root_src
             exts = ['.castep', '.res', '.history', '.history.gz']
             for ext in exts:
                 for src in struct['source']:
