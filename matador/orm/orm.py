@@ -38,8 +38,8 @@ class DataContainer:
         try:
             return self._data[key]
         except KeyError:
-                raise AttributeError('Object has no data or implementation for requested {}'
-                                     .format(key))
+            raise AttributeError('Object has no data or implementation for requested key: "{}"'
+                                 .format(key))
 
     def __delitem__(self, key: str):
         raise AttributeError('Object does not support deletion of keys in `_data`.')
@@ -57,7 +57,7 @@ class DataContainer:
             return True
         return False
 
-    def get(self, key, default=None):
+    def get(self, *args):
         """ Overload dictionary.get() method.
 
         Parameters:
@@ -70,4 +70,12 @@ class DataContainer:
             :attr:`_data[key]` if it exists, else None.
 
         """
-        return self._data.get(key, default=default)
+        key = args[0]
+        if len(args) > 1:
+            default = args[1]
+        else:
+            default = None
+        if len(args) > 2:
+            raise TypeError('get() takes up to 2 arguments, not {}'.format(len(args)))
+
+        return self._data.get(key, default)
