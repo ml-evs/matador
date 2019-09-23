@@ -23,7 +23,11 @@ class DataContainer:
     def __getitem__(self, key):
         """ Allow properties to be used with key access.
 
-        Raises a KeyError if property or key can't be found.
+        Parameters:
+            key (str): name of key or attribute to get.
+
+        Raises:
+            AttributeError: if key or attribute can't be found.
 
         """
         try:
@@ -34,8 +38,8 @@ class DataContainer:
         try:
             return self._data[key]
         except KeyError:
-            raise AttributeError('Object has no data or implementation for requested {}'
-                                 .format(key))
+                raise AttributeError('Object has no data or implementation for requested {}'
+                                     .format(key))
 
     def __delitem__(self, key: str):
         raise AttributeError('Object does not support deletion of keys in `_data`.')
@@ -53,14 +57,17 @@ class DataContainer:
             return True
         return False
 
-    def get(self, key):
+    def get(self, key, default=None):
         """ Overload dictionary.get() method.
 
         Parameters:
             key (str): key to try and obtain.
 
+        Keyword arguments:
+            default: return value raise if key is not present.
+
         Returns:
             :attr:`_data[key]` if it exists, else None.
 
         """
-        return self._data.get(key)
+        return self._data.get(key, default=default)
