@@ -31,11 +31,13 @@ RUN_SLOW_TESTS = False
 
 try:
     with open('/dev/null', 'w') as devnull:
-        sp.Popen([EXECUTABLE, '--version'], stdout=devnull, stderr=devnull).communicate()
+        out, errs = sp.Popen([EXECUTABLE, '--version'], stdout=devnull, stderr=devnull).communicate()
+    if errs:
+        raise RuntimeError
     if VERBOSITY > 0:
         print('Successfully detected CASTEP')
     CASTEP_PRESENT = True
-except FileNotFoundError:
+except Exception:
     if VERBOSITY > 0:
         print('Failed to detect CASTEP')
     CASTEP_PRESENT = False
