@@ -61,8 +61,8 @@ class DBQuery:
             self.args['subcmd'] = subcmd
         if self.args.get('testing') is None:
             self.args['testing'] = False
-        if self.args.get('as_crystals') is None:
-            self.args['as_crystals'] = False
+        if self.args.get('as_crystal') is None:
+            self.args['as_crystal'] = False
 
         if subcmd in ['hull', 'hulldiff', 'voltage'] and self.args.get('composition') is None:
             raise RuntimeError('{} requires composition query'.format(subcmd))
@@ -334,7 +334,7 @@ class DBQuery:
                     print(dumps(self.query_dict, indent=1))
 
                 # execute query
-                self.cursor = self._find_and_sort(SON(self.query_dict))
+                self.cursor = self._find_and_sort(self.query_dict)
                 if self._non_elemental:
                     self.cursor = filter_cursor_by_chempots(self._chempots, self.cursor)
 
@@ -369,14 +369,14 @@ class DBQuery:
                 if self.args.get('delta_E') is not None:
                     self.cursor = self.cursor[:self._num_to_display]
 
-    def _find_and_sort(self, as_list=True, *args, **kwargs):
+    def _find_and_sort(self, *args, as_list=True, **kwargs):
         """ Query `self.repo` using Pymongo arguments/kwargs. Sorts based
         on enthalpy_per_atom and optionally returns list of Crystals.
 
         """
         from matador.crystal import Crystal
         cursor = self.repo.find(*args, **kwargs).sort('enthalpy_per_atom', pm.ASCENDING)
-        if self.args.get('as_crystals'):
+        if self.args.get('as_crystal'):
             return [Crystal(doc) for doc in cursor]
         if as_list:
             return list(cursor)
