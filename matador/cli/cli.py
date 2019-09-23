@@ -175,9 +175,9 @@ class MatadorCommandLine:
     def stats(self):
         """ Print some useful stats about the database. """
         if self.args.get('list'):
-            print_notify(str(len(self.db.collection_names())) + ' collections found in database:\n')
+            print_notify(str(len(self.db.list_collection_names())) + ' collections found in database:\n')
             collstats_list = []
-            for name in self.db.collection_names():
+            for name in self.db.list_collection_names():
                 collstats_list.append(self.db.command('collstats', name))
                 collstats_list[-1]['name'] = name
             collstats_list = sorted(collstats_list, key=lambda k: k['count'], reverse=True)
@@ -194,7 +194,7 @@ class MatadorCommandLine:
                 raise SystemExit('I will only delete one collection at a time...')
             if target is None:
                 raise SystemExit('Please specify a collection to delete.')
-            if target not in self.db.collection_names():
+            if target not in self.db.list_collection_names():
                 raise SystemExit('No collection named {} was found'.format(target))
 
             from getpass import getuser
