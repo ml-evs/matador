@@ -30,9 +30,17 @@ def plot_pdf(pdf, other_pdfs=None):
     ax1.set_ylabel('Pair distribution function, $g(r)$')
     ax1.set_xlim(0, pdf.rmax)
     if other_pdfs is not None:
-        if isinstance(other_pdfs, PDF):
+        if not isinstance(other_pdfs, list):
             other_pdfs = [other_pdfs]
         for _pdf in other_pdfs:
+            # check if we have a Crystal object without importing
+            try:
+                _pdf = _pdf.pdf
+            except AttributeError:
+                pass
+            # check if we have a normal matador doc
+            if isinstance(_pdf, dict) and 'pdf' in _pdf:
+                _pdf = _pdf['pdf']
             if isinstance(_pdf, PDF):
                 ax1.plot(_pdf.r_space, _pdf.gr, label=_pdf.label, ls='--', alpha=1)
             elif isinstance(_pdf, tuple):
