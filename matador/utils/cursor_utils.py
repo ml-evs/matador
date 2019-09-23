@@ -41,8 +41,7 @@ def recursive_get(data, keys, top=True):
     except (KeyError, IndexError) as exc:
         if top:
             raise type(exc)('Recursive keys {} missing'.format(keys))
-        else:
-            raise exc
+        raise exc
 
 
 def recursive_set(data, keys, value):
@@ -240,10 +239,10 @@ def display_results(cursor,
             try:
                 if doc.get('prototype'):
                     struct_string[-1] += "{:^5}".format('*p*')
-                elif doc['quality'] == 0:
+                elif doc.get('quality', 5) == 0:
                     struct_string[-1] += "{:^5}".format('!!!')
                 else:
-                    struct_string[-1] += "{:^5}".format((5 - doc['quality']) * '?')
+                    struct_string[-1] += "{:^5}".format((5 - doc.get('quality', 5)) * '?')
             except KeyError:
                 struct_string[-1] += "{:^5}".format(' ')
         else:
