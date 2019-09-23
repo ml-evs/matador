@@ -5,31 +5,29 @@ import os
 import glob
 import getpass
 import pymongo as pm
+import mongomock
 
 from matador.config import load_custom_settings
 from matador.db.importer import Spatula
+from matador.query import DBQuery
 
 REAL_PATH = '/'.join(os.path.realpath(__file__).split('/')[:-1]) + '/'
 CONFIG_FNAME = None
 DB_NAME = 'ci_test'
 ROOT_DIR = os.getcwd()
-SETTINGS = load_custom_settings(config_fname=CONFIG_FNAME, override=True)
+SETTINGS = load_custom_settings(config_fname=CONFIG_FNAME, override=True, debug=True)
 SETTINGS['mongo']['default_collection'] = DB_NAME
 SETTINGS['mongo']['default_collection_file_path'] = '/data/'
+SETTINGS['mongo']['host'] = 'mongo_test.com'
+SETTINGS['mongo']['port'] = 99999
+
 
 DEBUG = False
-MONGO_PRESENT = True
-try:
-    MONGO_CLIENT = pm.MongoClient(SETTINGS['mongo']['host'], serverSelectionTimeoutMS=1000)
-    MONGO_DB_NAMES = MONGO_CLIENT.list_database_names()
-    MONGO_CLIENT.crystals[DB_NAME].drop()
-    MONGO_CLIENT.crystals[getpass.getuser() + '_' + DB_NAME].drop()
-except pm.errors.ServerSelectionTimeoutError:
-    MONGO_PRESENT = False
+MONGO_CLIENT = mongomock.MongoClient()
 
 
-@unittest.skipIf(not MONGO_PRESENT, 'MongoDB not found, skipping')
-class TestDatabase(unittest.TestCase):
+@mongomock.patch(servers=(('mongo_test.com', 99999), ))
+class TestDatabaseImport(unittest.TestCase):
     """ Tests the Spatula class. """
     def test_failed_import(self):
         """ Try to import to the default collection from some
@@ -73,3 +71,15 @@ class TestDatabase(unittest.TestCase):
         self.assertEqual(importer.import_count, 0)
         for _file in glob.glob('spatula.*'):
             os.remove(_file)
+
+        query = DBQuery(db=DB_NAME, mongo_settings=SETTINGS)
+        self.assertEqual(len(query.cursor), 3)
+
+        query = DBQuery(db=DB_NAME, mongo_settings=SETTINGS, available_values='root_source')
+        self.assertEqual(len(query.cursor), 3)
+
+        query = DBQuery(db=DB_NAME, mongo_settings=SETTINGS, root_src='Na3Zn4-swap-ReOs-OQMD_759599')
+        self.assertEqual(len(query.cursor), 1)
+
+        query = DBQuery(db=DB_NAME, mongo_settings=SETTINGS, id='no chance')
+        self.assertEqual(len(query.cursor), 0)

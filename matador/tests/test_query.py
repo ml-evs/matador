@@ -6,7 +6,7 @@ from matador.query import DBQuery
 from matador.utils.chem_utils import parse_element_string
 
 
-class QueryTest(unittest.TestCase):
+class QueryParseTest(unittest.TestCase):
     """ Test query functionality. """
 
     def test_basic_queries(self):
