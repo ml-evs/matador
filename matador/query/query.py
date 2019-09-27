@@ -704,7 +704,7 @@ class DBQuery:
                 or_preference = True
 
         elements_tmp = [element for ind, element in enumerate(elements)
-                    if element not in elements[:ind]]
+                        if element not in elements[:ind]]
         if len(elements_tmp) < len(elements):
             print('Ignoring duplicate element...')
         elements = elements_tmp
@@ -716,8 +716,16 @@ class DBQuery:
             query_dict = dict()
             query_dict['$or'] = []
             size = len(elements)
-            # iterate over all combinations
-            for rlen in range(1, len(elements) + 1):
+            # iterate over all combinations, limited by num species
+            if self.args.get('num_species'):
+                max_num = self.args.get('num_species')
+                min_num = max_num
+            else:
+                max_num = 8
+                min_num = 1
+                if len(elements) > max_num:
+                    print('Limiting query to up to {} elements per structure...'.format(max_num))
+            for rlen in range(min_num, max_num+1):
                 for combi in combinations(elements, r=rlen):
                     list_combi = list(combi)
                     types_dict = dict()
