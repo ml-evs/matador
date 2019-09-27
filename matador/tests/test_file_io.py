@@ -44,6 +44,15 @@ class CellScraperTests(unittest.TestCase):
         self.assertTrue(os.path.isfile(cell_fname), msg='Failed to open test case {} - please check installation.'.format(cell_fname))
         test_dict, s = cell2dict(cell_fname, db=False, lattice=True, verbosity=VERBOSITY)
         self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(test_dict))
+        self.assertEqual(test_dict['cell_constraints'], [[1, 1, 3], [4, 4, 6]])
+        self.assertEqual(test_dict['external_pressure'], [[10.0, 0.0, 0.0], [0.0, 10.0, 0.0], [0.0, 0.0, 10.0]])
+        tmp_name = REAL_PATH + 'data/tmp.cell'
+        doc2cell(test_dict, tmp_name)
+        new_test_dict, s = cell2dict(tmp_name, db=False, lattice=True, verbosity=VERBOSITY)
+        new_test_dict['source'] = test_dict['source']
+        self.assertEqual(test_dict['external_pressure'], new_test_dict['external_pressure'])
+        os.remove(tmp_name)
+
 
     def test_cell_phonon(self):
         cell_fname = REAL_PATH + 'data/K5P4-phonon.cell'
@@ -110,7 +119,6 @@ class CellScraperTests(unittest.TestCase):
         self.assertEqual(cell['lattice_cart'][0], [21.84, 0, 0])
         self.assertEqual(cell['lattice_cart'][1], [0, 16.38, 0])
         self.assertEqual(cell['lattice_cart'][2], [0, 0, 40.46])
-        print(cell['positions_abs'][95])
 
         self.assertEqual(cell['positions_abs'][0], [0, 0, 0])
         self.assertEqual(cell['positions_abs'][95], [17.745, 15.015, -4.095])
@@ -626,7 +634,6 @@ class ScraperMiscTest(unittest.TestCase):
         self.assertEqual(len(dos_data['dos']), 10001)
         self.assertEqual(len(dos_data['energies']), 10001)
         self.assertEqual(len(dos_data['pdos']), 2)
-        print(dos_data['pdos'].keys())
         self.assertEqual(len(dos_data['pdos'][('K', None)]), 10001)
         self.assertEqual(len(dos_data['pdos'][('P', None)]), 10001)
 
@@ -976,7 +983,6 @@ class CifTests(unittest.TestCase):
             self.assertEqual(len(test_dict['positions_frac']), 144)
             self.assertEqual(len(test_dict['site_occupancy']), 144)
             self.assertEqual(sum(test_dict['site_multiplicity']), test_dict['num_atoms'])
-            print(test_dict['site_multiplicity'])
 
     def test_problematic_cif(self):
         cif_fname = REAL_PATH + 'data/cif_files/SiO_n002_CollCode62404.cif'

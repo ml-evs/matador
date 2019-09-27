@@ -219,13 +219,19 @@ def cell2dict(seed, db=False, lattice=True, positions=True, **kwargs):
                     cell['hubbard_u'][atom][orbital] = shift
                     i += 1
         elif '%block external_pressure' in line.lower():
-            cell['external_pressure'] = []
+            cell['external_pressure'] = np.zeros((3, 3))
             i = 1
+            j = 0
             while 'endblock' not in flines[line_no+i].lower():
-                if not flines[line_no + i].strip()[0].isalpha():
+                if not flines[line_no+i].strip()[0].isalpha():
                     flines[line_no+i] = flines[line_no+i].replace(',', '')
-                    cell['external_pressure'].append(list(map(f90_float_parse, flines[line_no+i].split())))
+                    vals = list(map(f90_float_parse, flines[line_no+i].split()))
+                    if len(vals) != (3-j):
+                        raise RuntimeError('External pressure should be specified as upper triangular matrix.')
+                    cell['external_pressure'][j] = np.asarray(j*[0.0] + vals).reshape(3)
+                    j += 1
                 i += 1
+            cell['external_pressure'] = cell['external_pressure'].tolist()
         elif '%block ionic_constraints' in line.lower():
             cell['ionic_constraints'] = []
             i = 1
