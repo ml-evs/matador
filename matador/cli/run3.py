@@ -55,6 +55,8 @@ def main():
                         help='either castep or generic')
     parser.add_argument('--noise', action='store_true',
                         help='add 0.1 A of random noise to positions on every cell, useful for converging forces (DEFAULT: off)')
+    parser.add_argument('--squeeze', action='store_true',
+                        help='add external pressure to the rough steps of geom opts')
     parser.add_argument('--ignore_jobs_file', action='store_true',
                         help='whether to use the jobs.txt file to avoid clashes')
     parser.add_argument('-d', '--debug', action='store_true', default=False,

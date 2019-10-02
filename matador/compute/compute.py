@@ -80,6 +80,8 @@ class ComputeTask:
                 to use for SCF convergence test
             kpts_1D (bool): treat z-direction as special and create
                 kpt_grid [1 1 n_kz] (DEFAULT: False)
+            noise (bool): add noise to the positions (DEFAULT: False)
+            squeeze (bool/float): add an external pressure to the first steps (DEFAULT: False)
             archer (bool): force use of aprun over mpirun (DEFAULT: False)
             slurm (bool): force use of srun over mpirun (DEFAULT: False)
             intel (bool): force use of Intel mpirun-style calls (DEFAULT: False)
@@ -115,7 +117,7 @@ class ComputeTask:
         # set defaults and update class with desired values
         prop_defaults = {'paths': None, 'param_dict': None, 'cell_dict': None, 'mode': 'castep', 'executable': 'castep',
                          'memcheck': False, 'rough': 4, 'rough_iter': 2, 'fine_iter': 20, 'spin': None,
-                         'output_queue': None, 'redirect': None, 'reopt': False, 'compute_dir': None, 'noise': False,
+                         'output_queue': None, 'redirect': None, 'reopt': False, 'compute_dir': None, 'noise': False, 'squeeze': False,
                          'custom_params': False, 'archer': False, 'maxmem': None, 'killcheck': True, 'kpts_1D': False,
                          'conv_cutoff': False, 'conv_kpt': False, 'profile': False, 'slurm': False, 'intel': False,
                          'exec_test': True, 'timings': (None, None), 'start': True, 'verbosity': 1, 'polltime': 30,
@@ -480,7 +482,12 @@ class ComputeTask:
                 self.calc_doc['geom_max_iter'] = num_iter
 
                 # delete any existing files and write new ones
-                self._update_input_files(self.seed, self.calc_doc)
+                if self._squeeze_list[ind]:
+                    squeeze = 1
+                else:
+                    squeeze = None
+
+                self._update_input_files(self.seed, self.calc_doc, squeeze=squeeze)
 
                 # run CASTEP
                 self._process = self.run_command(seed)
@@ -550,7 +557,7 @@ class ComputeTask:
                     opti_dict = {'optimised': False}
 
                 LOG.info('Intermediate calculation completed successfully: total relaxation steps now = {} '
-                          .format(opti_dict.get('geom_iter')))
+                         .format(opti_dict.get('geom_iter')))
 
                 # scrub keys that need to be rescraped
                 keys_to_remove = ['kpoints_mp_spacing', 'kpoints_mp_grid', 'species_pot', 'sedc_apply', 'sedc_scheme']
@@ -1318,6 +1325,8 @@ class ComputeTask:
                 rough_iter = 3
         self._geom_max_iter_list = (num_rough_iter * [rough_iter])
         self._max_iter -= num_rough_iter * rough_iter
+        if self.squeeze:
+            self._squeeze_list = [True for val in self._geom_max_iter_list]
 
         num_fine_iter = ceil(int(self._max_iter) / fine_iter)
         if self._max_iter > 0:
@@ -1325,6 +1334,7 @@ class ComputeTask:
                 fine_iter = self._max_iter
                 num_fine_iter = 1
             self._geom_max_iter_list.extend(num_fine_iter * [fine_iter])
+            self._squeeze_list.extend(num_fine_iter * [False])
 
         LOG.info('Geometry optimisation iteration scheme set to {}'.format(self._geom_max_iter_list))
 
@@ -1333,34 +1343,42 @@ class ComputeTask:
             LOG.critical(msg)
             raise CriticalError(msg)
 
-    def _update_input_files(self, seed, calc_doc):
+    def _update_input_files(self, seed, calc_doc, squeeze=None):
         """ Update the cell and param files for the next relaxation.
 
         Parameters:
             seed (str): the seedname to update.
             calc_doc (dict): the calculation dictionary to write to file.
 
-        """
+        Keyword arguments:
+            squeeze (float): external pressure to add this step
 
+        """
         if seed is None:
             seed = self.seed
+
+        this_calc_doc = deepcopy(calc_doc)
+
         # update cell
         if os.path.isfile(seed + '.cell'):
             os.remove(seed + '.cell')
+        if squeeze is not None:
+            LOG.info('Applying pressure {} GPa to this calculation.'.format(squeeze))
+            this_calc_doc['external_pressure'] = [[squeeze, 0, 0], [0, squeeze, 0], [0, 0, squeeze]]
         if self.kpts_1D:
-            n_kz = ceil(1 / (calc_doc['lattice_abc'][0][2] * self._target_spacing))
+            n_kz = ceil(1 / (this_calc_doc['lattice_abc'][0][2] * self._target_spacing))
             if n_kz % 2 == 1:
                 n_kz += 1
-            calc_doc['kpoints_mp_grid'] = [1, 1, n_kz]
+            this_calc_doc['kpoints_mp_grid'] = [1, 1, n_kz]
             if 'kpoints_mp_spacing' in calc_doc:
                 del calc_doc['kpoints_mp_spacing']
-        doc2cell(calc_doc, seed, hash_dupe=False, copy_pspots=False, spin=self.spin)
+        doc2cell(this_calc_doc, seed, hash_dupe=False, copy_pspots=False, spin=self.spin)
 
         # update param
         if not self.custom_params:
             if os.path.isfile(seed + '.param'):
                 os.remove(seed + '.param')
-            doc2param(calc_doc, seed, hash_dupe=False, spin=self.spin)
+            doc2param(this_calc_doc, seed, hash_dupe=False, spin=self.spin)
 
     @staticmethod
     def tidy_up(seed):
