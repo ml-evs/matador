@@ -331,7 +331,8 @@ def doc2cell(doc, path, *args, **kwargs):
         flines.append('%ENDBLOCK POSITIONS_FRAC')
 
     if 'external_pressure' in doc:
-        assert np.asarray(doc['external_pressure']).shape == (3, 3)
+        if np.asarray(doc['external_pressure']).shape != (3, 3):
+            raise RuntimeError('External pressure has wrong shape: {}'.format(doc['external_pressure']))
         flines.append('\n%BLOCK EXTERNAL_PRESSURE')
         flines.append('{d[0][0]} {d[0][1]} {d[0][2]}'.format(d=doc['external_pressure']))
         flines.append('{d[1][1]} {d[1][2]}'.format(d=doc['external_pressure']))

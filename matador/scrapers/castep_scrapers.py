@@ -399,7 +399,7 @@ def cell2dict(seed, db=False, lattice=True, positions=True, **kwargs):
                     cell['kpoints_path_spacing'] = f90_float_parse(line.split()[-1])
 
     if 'external_pressure' not in cell or not cell['external_pressure']:
-        cell['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0], [0.0]]
+        cell['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
 
     if lattice:
         if 'lattice_cart' not in cell and 'lattice_abc' in cell:
