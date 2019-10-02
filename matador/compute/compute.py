@@ -1327,6 +1327,8 @@ class ComputeTask:
         self._max_iter -= num_rough_iter * rough_iter
         if self.squeeze:
             self._squeeze_list = [True for val in self._geom_max_iter_list]
+        else:
+            self._squeeze_list = [False for val in self._geom_max_iter_list]
 
         num_fine_iter = ceil(int(self._max_iter) / fine_iter)
         if self._max_iter > 0:
