@@ -1197,9 +1197,11 @@ def _castep_scrape_final_parameters(flines, castep):
         elif 'external_pressure' not in castep and 'External pressure/stress' in line:
             try:
                 castep['external_pressure'] = []
-                castep['external_pressure'].append(list(map(f90_float_parse, flines[line_no + 1].split())))
-                castep['external_pressure'].append(list(map(f90_float_parse, flines[line_no + 2].split())))
-                castep['external_pressure'].append(list(map(f90_float_parse, flines[line_no + 3].split())))
+                for i in range(3):
+                    parsed_line = list(map(f90_float_parse, flines[line_no + i + 1].split()))
+                    if len(parsed_line) != 3:
+                        parsed_line = i * [0.0] + parsed_line
+                    castep['external_pressure'].append(parsed_line)
             except ValueError:
                 castep['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
         elif 'spin_polarized' not in castep and 'treating system as spin-polarized' in line:
@@ -1258,7 +1260,7 @@ def _castep_scrape_final_parameters(flines, castep):
                 i += 1
     # write zero pressure if not found in file
     if 'external_pressure' not in castep:
-        castep['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0], [0.0]]
+        castep['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
     if 'spin_polarized' not in castep:
         castep['spin_polarized'] = False
 

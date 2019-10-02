@@ -169,6 +169,7 @@ class CastepScraperTests(unittest.TestCase):
             self.assertEqual(test_dict['lattice_abc'][1][2], 59.971185, msg='Wrong lattice constants!')
             self.assertEqual(test_dict['geom_force_tol'], 0.05, msg='Wrong geom force tol')
             self.assertEqual(test_dict['castep_version'], '16.11')
+            self.assertEqual(test_dict['external_pressure'], [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
             self.assertEqual(test_dict['estimated_mem_MB'], 345.1)
 
     def test_castep17(self):
