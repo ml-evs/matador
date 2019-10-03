@@ -254,7 +254,11 @@ class BatchRun:
                 # before checking again for a lock file, just to protect
                 # against collisions in large array jobs on slower parallel file systems
                 _ = os.path.isfile('{}.lock'.format(res))
-                time.sleep(5 * random.random())
+                time.sleep(2 * random.random())
+                # wait some additional time if this is a slurm array job
+                if self._queue_env is not None:
+                    extra_wait = self._queue_env.get('SLURM_ARRAY_TASK_ID', 0) % 10
+                    time.sleep(extra_wait)
                 locked = os.path.isfile('{}.lock'.format(res))
                 if not self.args.get('ignore_jobs_file'):
                     listed = self._check_jobs_file(res)
@@ -481,8 +485,7 @@ def reset_job_folder(debug=False):
                 if line in res_list:
                     print('Excluding {}'.format(line))
                     continue
-                else:
-                    f.write(line)
+                f.write(line)
             f.truncate()
             flines = f.readlines()
             if debug:
@@ -507,8 +510,7 @@ def reset_single_seed(seed):
                 line = line.strip()
                 if seed in line:
                     continue
-                else:
-                    f.write(line)
+                f.write(line)
             f.truncate()
             flines = f.readlines()
     if os.path.isfile(seed + '.lock'):
