@@ -6,7 +6,6 @@ calculations on a single structure.
 
 """
 
-
 import os
 import sys
 import shutil
@@ -23,6 +22,7 @@ from matador.scrapers.castep_scrapers import res2dict, castep2dict
 from matador.calculators import CastepCalculator
 from matador.export import doc2cell, doc2param, doc2res
 from matador.utils.errors import CriticalError, WalltimeError, InputError, CalculationError, MaxMemoryEstimateExceeded
+import matador.utils.print_utils
 
 MATADOR_CUSTOM_TASKS = ['bulk_modulus', 'projected_bandstructure', 'pdispersion', 'all']
 
@@ -298,8 +298,6 @@ class ComputeTask:
                 unless every calculation fails.
 
         """
-        LOG.info('Calling CASTEP on {seed}'.format(seed=self.seed))
-
         success = False
 
         if self.exec_test:
@@ -338,6 +336,16 @@ class ComputeTask:
 
         # this is now a dict containing the exact calculation we are going to run
         self.calc_doc = calc_doc
+
+        try:
+            from matador.crystal import Crystal
+            LOG.info('Struture: {}'.format(Crystal(self.calc_doc)))
+        except Exception as exc:
+            LOG.warning('Unable to convert structure to Crystal... {}'.format(exc))
+
+        LOG.debug('Calculation dictionary: {}'
+                  .format(matador.utils.print_utils.dumps(self.calc_doc,
+                                                          indent=2)))
 
         # now verify the structure itself
         self.calculator.verify_simulation_cell(self.res_dict)
@@ -462,8 +470,6 @@ class ComputeTask:
             WalltimeError: if walltime was reached, and jobs need to stop.
 
         """
-        LOG.info('Attempting to relax {}'.format(self.seed))
-
         try:
             self._setup_relaxation()
             seed = self.seed
@@ -839,7 +845,7 @@ class ComputeTask:
             CriticalError: if executable not found.
 
         """
-        LOG.info('Testing executable {executable}.'.format(executable=self.executable))
+        LOG.info('Testing executable "{executable}".'.format(executable=self.executable))
 
         try:
             proc = self.run_command('--version')
@@ -883,7 +889,6 @@ class ComputeTask:
         """ Property to store/compute desired MPI library. """
         if self._mpi_library is None:
             self._mpi_library = self.set_mpi_library()
-            LOG.info('Detected {} MPI.'.format(self._mpi_library))
         return self._mpi_library
 
     def set_mpi_library(self):
@@ -891,6 +896,7 @@ class ComputeTask:
         MPI library detection is no args are present.
         """
         guessed_version = self.detect_mpi()
+        LOG.info('Detected {} MPI.'.format(guessed_version))
         if sum([self.archer, self.intel, self.slurm]) > 1:
             message = 'Conflicting command-line arguments for MPI library have been supplied, exiting.'
             LOG.critical(message)
@@ -898,21 +904,21 @@ class ComputeTask:
 
         if self.archer:
             if guessed_version != 'archer':
-                message = 'Detected {} MPI, but user asked to use aprun... please check your environment.'
+                message = 'Detected {} MPI, but user asked to use aprun... please check your environment.'.format(self._mpi_library)
                 LOG.critical(message)
                 raise CriticalError(message)
             return 'archer'
 
         if self.intel:
             if guessed_version != 'intel':
-                message = 'Detected {} MPI, but user asked to use Intel MPI... please check your environment.'
+                message = 'Detected {} MPI, but user asked to use Intel MPI... please check your environment.'.format(self._mpi_library)
                 LOG.critical(message)
                 raise CriticalError(message)
             return 'intel'
 
         if self.slurm:
             if guessed_version != 'slurm':
-                message = 'Detected {} MPI, but user asked to use srun... continuing with srun.'
+                message = 'Detected {} MPI, but user asked to use srun... continuing with srun.'.format(self._mpi_library)
                 LOG.warning(message)
             return 'slurm'
 
