@@ -119,7 +119,7 @@ class ComputeTest(unittest.TestCase):
         relaxer = ComputeTask(ncores=NCORES, nnodes=None, node=node,
                               res=seed, param_dict=param_dict, cell_dict=cell_dict,
                               verbosity=VERBOSITY, executable=executable,
-                              exec_test=False, compute_dir=None, polltime=1,
+                              exec_test=False, polltime=1,
                               start=False)
         errored = False
 
@@ -151,7 +151,7 @@ class ComputeTest(unittest.TestCase):
         relaxer = ComputeTask(ncores=NCORES, nnodes=None, node=node,
                               res=seed, param_dict=param_dict, cell_dict=cell_dict,
                               verbosity=VERBOSITY, executable=executable,
-                              exec_test=False, compute_dir=None, polltime=1,
+                              exec_test=False, polltime=1,
                               start=False)
         errored = False
 
@@ -182,7 +182,7 @@ class ComputeTest(unittest.TestCase):
         relaxer = ComputeTask(ncores=ncores, nnodes=None, node=node,
                               res=seed, param_dict=param_dict, cell_dict=cell_dict,
                               verbosity=VERBOSITY, executable=executable,
-                              exec_test=False, compute_dir=None, polltime=0.01,
+                              exec_test=False, polltime=0.01,
                               start=False)
         errored = False
         try:
@@ -504,6 +504,8 @@ class ComputeTest(unittest.TestCase):
         cruft = glob.glob('_Li*')
         cruft_doesnt_exist = bool(len(cruft))
 
+        compute_dir_exist = isdir(HOSTNAME)
+
         num = reset_job_folder()
 
         self.assertEqual(num, 0)
@@ -511,6 +513,21 @@ class ComputeTest(unittest.TestCase):
         self.assertTrue(bad_castep_folder_exists, "couldn't find bad_castep")
         self.assertTrue(output_files_exist, "couldn't find both outputs")
         self.assertFalse(cruft_doesnt_exist, "found some cruft {}".format(cruft))
+        self.assertFalse(compute_dir_exist, 'Compute dir not cleaned up!')
+
+    def test_failed_compute_dir_scf(self):
+        """ Check that using a garbage path for compute dir causes a safe crash. """
+        copy(REAL_PATH + 'data/structures/Li.res', '_Li.res')
+        copy(REAL_PATH + 'data/structures/LiC.res', '_LiC.res')
+        copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
+        copy(REAL_PATH + 'data/pspots/C_00PBE.usp', '.')
+        copy(REAL_PATH + 'data/fail_scf/LiC_scf.cell', '.')
+        copy(REAL_PATH + 'data/fail_scf/LiC_scf.param', '.')
+
+        runner = BatchRun(seed=['LiC_scf'], debug=False, no_reopt=True, scratch_prefix='/this/drive/doesnt/exist',
+                          verbosity=VERBOSITY, ncores=NCORES, executable=EXECUTABLE)
+        with self.assertRaises(CriticalError):
+            runner.spawn()
 
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
     def test_batch_max_walltime_threaded(self):
