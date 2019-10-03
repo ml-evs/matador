@@ -131,6 +131,7 @@ class ComputeTask:
         self._process = None
         self._first_run = True
         self._geom_max_iter_list = None
+        self._squeeze_list = None
         self._max_iter = None
         self._num_rough_iter = None
         self._num_retries = 0
@@ -311,6 +312,9 @@ class ComputeTask:
                 raise CriticalError('kpoints_mp_spacing not found, but kpts_1D requested...')
             self._target_spacing = deepcopy(self.cell_dict['kpoints_mp_spacing'])
 
+        if self.squeeze:
+            self._target_pressure = deepcopy(self.cell_dict['external_pressure'])
+
         # read in initial structure and skip if failed
         if isinstance(res, str):
             self.res_dict, success = res2dict(res, db=False, verbosity=self.verbosity)
@@ -487,11 +491,10 @@ class ComputeTask:
                 self.calc_doc['geom_max_iter'] = num_iter
 
                 # delete any existing files and write new ones
-                if self._squeeze_list[ind]:
-                    squeeze = 1
+                if self.squeeze:
+                    squeeze = int(self._squeeze_list[ind]) * float(self.squeeze)
                 else:
                     squeeze = None
-
                 self._update_input_files(self.seed, self.calc_doc, squeeze=squeeze)
 
                 # run CASTEP
@@ -581,6 +584,10 @@ class ComputeTask:
                     # then set prepare to do one more full relaxation
                     if self.reopt and not rerun and opti_dict['optimised']:
                         rerun = True
+
+                        # disable squeezing if we've already reached optimisation
+                        if self.squeeze:
+                            self._squeeze_list[ind:] = False
                         self._update_output_files(opti_dict)
 
                     # or did the relaxation complete successfuly, including rerun?
@@ -1336,6 +1343,8 @@ class ComputeTask:
             self._squeeze_list.extend(num_fine_iter * [False])
 
         LOG.info('Geometry optimisation iteration scheme set to {}'.format(self._geom_max_iter_list))
+        if self.squeeze:
+            LOG.info('Squeeze scheme set to {}'.format(self._geom_max_iter_list))
 
         if not self._geom_max_iter_list:
             msg = 'Could not divide up relaxation; consider increasing geom_max_iter'
@@ -1362,8 +1371,13 @@ class ComputeTask:
         if os.path.isfile(seed + '.cell'):
             os.remove(seed + '.cell')
         if squeeze is not None:
-            LOG.info('Applying pressure {} GPa to this calculation.'.format(squeeze))
-            this_calc_doc['external_pressure'] = [[squeeze, 0, 0], [0, squeeze, 0], [0, 0, squeeze]]
+            if squeeze:
+                LOG.info('Applying pressure of {} GPa to this calculation'.format(squeeze))
+                this_calc_doc['external_pressure'] = [[squeeze, 0, 0], [0, squeeze, 0], [0, 0, squeeze]]
+            else:
+                LOG.info('Pressure reset to {}'.format(self._target_pressure))
+                this_calc_doc['external_pressure'] = self._target_pressure
+
         if self.kpts_1D:
             n_kz = ceil(1 / (this_calc_doc['lattice_abc'][0][2] * self._target_spacing))
             if n_kz % 2 == 1:
