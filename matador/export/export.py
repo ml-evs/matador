@@ -700,6 +700,8 @@ def doc2res(doc, path, info=True, spoof_titl=False, sort_atoms=True, **kwargs):
                 titl += str(doc['enthalpy']) + ' '
             elif '0K_energy' in doc:
                 titl += str(doc['0K_energy']) + ' '
+            elif 'total_energy' in doc:
+                titl += str(doc['total_energy']) + ' '
             else:
                 raise KeyError('No energy field found.')
             titl += '0 0 '             # spin
