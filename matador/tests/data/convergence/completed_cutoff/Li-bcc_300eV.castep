@@ -1,0 +1,398 @@
+ +-------------------------------------------------+
+ |                                                 |
+ |      CCC   AA    SSS  TTTTT  EEEEE  PPPP        |
+ |     C     A  A  S       T    E      P   P       |
+ |     C     AAAA   SS     T    EEE    PPPP        |
+ |     C     A  A     S    T    E      P           |
+ |      CCC  A  A  SSS     T    EEEEE  P           |
+ |                                                 |
+ +-------------------------------------------------+
+ |                                                 |
+ | Welcome to Academic Release CASTEP version 18.1 |          
+ | Ab Initio Total Energy Program                  |
+ |                                                 |
+ | Authors:                                        |
+ | M. Segall, M. Probert, C. Pickard, P. Hasnip,   |
+ | S. Clark, K. Refson, J. R. Yates, M. Payne      |
+ |                                                 |
+ | Contributors:                                   |
+ | P. Lindan, P. Haynes, J. White, V. Milman,      |
+ | N. Govind, M. Gibson, P. Tulip, V. Cocula,      |
+ | B. Montanari, D. Quigley, M. Glover,            |
+ | L. Bernasconi, A. Perlov, M. Plummer,           |
+ | E. McNellis, J. Meyer, J. Gale, D. Jochym       |
+ | J. Aarons, B. Walker, R. Gillen, D. Jones       |
+ | T. Green, I. J. Bush, C. J. Armstrong,          |
+ | E. J. Higgins, E. L. Brown, M. S. McFly,        |
+ | J. Wilkins, B-C. Shih, P. J. P. Byrne           |
+ |                                                 |
+ | Copyright (c) 2000 - 2017                       |
+ |                                                 |
+ |     Distributed under the terms of an           |
+ |     Agreement between the United Kingdom        |
+ |     Car-Parrinello (UKCP) Consortium,           |
+ |     Daresbury Laboratory and Accelrys, Inc.     |
+ |                                                 |
+ | Please cite                                     |
+ |                                                 |
+ |     "First principles methods using CASTEP"     |
+ |                                                 |
+ |         Zeitschrift fuer Kristallographie       |
+ |           220(5-6) pp. 567-570 (2005)           |
+ |                                                 |
+ | S. J. Clark, M. D. Segall, C. J. Pickard,       |
+ | P. J. Hasnip, M. J. Probert, K. Refson,         |
+ | M. C. Payne                                     |
+ |                                                 |
+ |       in all publications arising from          |
+ |              your use of CASTEP                 |
+ |                                                 |
+ +-------------------------------------------------+
+ 
+ 
+ Compiled for linux_x86_64_ifort17-TCM on Fri, 20 Apr 2018 19:07:16 +0100
+ from code version baee3ec33e17+  Mon, 11 Dec 2017 11:05:17 +0000
+ Compiler: Intel Fortran 17.0.5.239; Optimisation: fast
+ MATHLIBS: Intel MKL(2017.0.4) (LAPACK version 3.7.0)
+ FFT Lib : mkl
+ Fundamental constants values: CODATA 2014
+ 
+ Run started: Thu, 03 Oct 2019 16:41:32 +0100
+ 
+ Atomic calculation performed for Li: 1s2 2s1
+ 
+ Converged in 46 iterations to an ae energy of -199.592 eV
+ 
+   ============================================================                
+   | Pseudopotential Report - Date of generation  3-10-2019   |                
+   ------------------------------------------------------------                
+   | Element: Li Ionic charge:  3.00 Level of theory: LDA     |                
+   | Atomic Solver: Koelling-Harmon                           |                
+   |                                                          |                
+   |               Reference Electronic Structure             |                
+   |         Orbital         Occupation         Energy        |                
+   |            1s              2.000           -1.878        |                
+   |            2s              1.000           -0.106        |                
+   |                                                          |                
+   |                 Pseudopotential Definition               |                
+   |        Beta     l      e      Rc     scheme   norm       |                
+   |          1      0   -1.878   1.296     qc      0         |                
+   |          2      0   -0.106   1.296     qc      0         |                
+   |          3      0    0.250   1.296     qc      0         |                
+   |         loc     1    0.000   1.296     pn      0         |                
+   |                                                          |                
+   | Augmentation charge Rinner = 0.913                       |                
+   | No partial core correction                               |                
+   ------------------------------------------------------------                
+   | "1|1.3|8|9|10|10U:20(qc=5)"                              |                
+   ------------------------------------------------------------                
+   |      Author: Chris J. Pickard, Cambridge University      |                
+   ============================================================                
+ 
+ Pseudo atomic calculation performed for Li 1s2 2s1
+ 
+ Converged in 13 iterations to a total energy of -193.6532 eV
+ 
+ Calculation parallelised over 2 processes.
+ Data is distributed by k-point(2-way)
+
+ ************************************ Title ************************************
+ 
+
+ ***************************** General Parameters ******************************
+  
+ output verbosity                               : normal  (1)
+ write checkpoint data to                       : Li-bcc_300eV.check
+ type of calculation                            : single point energy
+ stress calculation                             : off
+ density difference calculation                 : off
+ electron localisation func (ELF) calculation   : off
+ Hirshfeld analysis                             : off
+ unlimited duration calculation
+ timing information                             : on
+ memory usage estimate                          : on
+ write extra output files                       : on
+ write final potential to formatted file        : off
+ write final density to formatted file          : off
+ write BibTeX reference list                    : on
+ write OTFG pseudopotential files               : on
+ write electrostatic potential file             : on
+ write bands file                               : on
+ checkpoint writing                             : both castep_bin and check files
+  
+ output         length unit                     : A
+ output           mass unit                     : amu
+ output           time unit                     : ps
+ output         charge unit                     : e
+ output           spin unit                     : hbar/2
+ output         energy unit                     : eV
+ output          force unit                     : eV/A
+ output       velocity unit                     : A/ps
+ output       pressure unit                     : GPa
+ output     inv_length unit                     : 1/A
+ output      frequency unit                     : cm-1
+ output force constant unit                     : eV/A**2
+ output         volume unit                     : A**3
+ output   IR intensity unit                     : (D/A)**2/amu
+ output         dipole unit                     : D
+ output         efield unit                     : eV/A/e
+ output        entropy unit                     : J/mol/K
+  
+ wavefunctions paging                           : none
+ random number generator seed                   : randomised (164132864)
+ data distribution                              : optimal for this architecture
+ optimization strategy                          : balance speed and memory
+
+ *********************** Exchange-Correlation Parameters ***********************
+  
+ using functional                               : Local Density Approximation
+ relativistic treatment                         : Koelling-Harmon
+ DFT+D: Semi-empirical dispersion correction    : off
+
+ ************************* Pseudopotential Parameters **************************
+  
+ pseudopotential representation                 : reciprocal space
+ <beta|phi> representation                      : reciprocal space
+ spin-orbit coupling                            : off
+
+ **************************** Basis Set Parameters *****************************
+  
+ plane wave basis set cut-off                   :   300.0000   eV
+ size of standard grid                          :     1.7500
+ size of   fine   gmax                          :    15.5288   1/A
+ finite basis set correction                    : none
+
+ **************************** Electronic Parameters ****************************
+  
+ number of  electrons                           :  3.000    
+ net charge of system                           :  0.000    
+ net spin   of system                           :  1.000    
+ number of  up  spins                           :  2.000    
+ number of down spins                           :  1.000    
+ treating system as spin-polarized
+ number of bands                                :          6
+
+ ********************* Electronic Minimization Parameters **********************
+  
+ Method: Treating system as metallic with density mixing treatment of electrons,
+         and number of  SD  steps               :          1
+         and number of  CG  steps               :          4
+  
+ total energy / atom convergence tol.           : 0.1000E-04   eV
+ eigen-energy convergence tolerance             : 0.1000E-05   eV
+ max force / atom convergence tol.              : ignored
+ convergence tolerance window                   :          3   cycles
+ max. number of SCF cycles                      :         30
+ number of fixed-spin iterations                :         10
+ smearing scheme                                : Gaussian
+ smearing width                                 : 0.2000       eV
+ Fermi energy convergence tolerance             : 0.2721E-13   eV
+ periodic dipole correction                     : NONE
+
+ ************************** Density Mixing Parameters **************************
+  
+ density-mixing scheme                          : Broyden
+ max. length of mixing history                  :         20
+ charge density mixing amplitude                : 0.8000    
+   spin density mixing amplitude                :  2.000    
+ cut-off energy for mixing                      :  300.0       eV
+
+ *********************** Population Analysis Parameters ************************
+  
+ Population analysis with cutoff                :  3.000       A
+ Population analysis output                     : summary and pdos components
+
+ *******************************************************************************
+  
+ 
+                           -------------------------------
+                                      Unit Cell
+                           -------------------------------
+        Real Lattice(A)                      Reciprocal Lattice(1/A)
+     3.0656080     0.0000000     0.0000000        2.049572322   1.183321132   0.836734397
+    -1.5328040     2.6548944     0.0000000        0.000000000   2.366642264   1.673468793
+     0.0000000    -1.7699296     2.5030585        0.000000000   0.000000000   2.510203190
+ 
+                       Lattice parameters(A)       Cell Angles
+                    a =      3.065608          alpha =  120.000000
+                    b =      3.065608          beta  =   90.000000
+                    c =      3.065608          gamma =  120.000000
+ 
+                       Current cell volume =            20.372056       A**3
+                                   density =             0.340712   AMU/A**3
+                                           =             0.565765     g/cm^3
+ 
+                           -------------------------------
+                                     Cell Contents
+                           -------------------------------
+                         Total number of ions in cell =    1
+                      Total number of species in cell =    1
+                        Max number of any one species =    1
+ 
+            xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+            x  Element    Atom        Fractional coordinates of atoms  x
+            x            Number           u          v          w      x
+            x----------------------------------------------------------x
+            x  Li           1         0.000000   0.000000   0.000000   x 
+            xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+ 
+ 
+                         No user defined ionic velocities
+ 
+                           -------------------------------
+                                   Details of Species
+                           -------------------------------
+ 
+                               Mass of species in AMU
+                                    Li    6.9410000
+ 
+                          Electric Quadrupole Moment (Barn)
+                                    Li   -0.0401000 Isotope  7
+ 
+                          Files used for pseudopotentials:
+                                    Li 1|1.3|8|9|10|10U:20(qc=5)
+ 
+                           -------------------------------
+                              k-Points For BZ Sampling
+                           -------------------------------
+                       MP grid size for SCF calculation is  4  5  4
+                            with an offset of   0.000  0.000  0.000
+                       Number of kpoints used =            40
+ 
+                           -------------------------------
+                               Symmetry and Constraints
+                           -------------------------------
+ 
+                      Maximum deviation from symmetry =  0.00000         ANG
+ 
+                      Number of symmetry operations   =           1
+                      Number of ionic constraints     =           3
+                      Point group of crystal =     1: C1, 1, 1
+                      Space group of crystal =   225: Fm-3m, -F 4 2 3
+ 
+             Set iprint > 1 for details on symmetry rotations/translations
+ 
+                         Centre of mass is constrained
+             Set iprint > 1 for details of linear ionic constraints
+ 
+                         Number of cell constraints= 0
+                         Cell constraints are:  1 2 3 4 5 6
+ 
+                         External pressure/stress (GPa)
+                          0.00000   0.00000   0.00000
+                                    0.00000   0.00000
+                                              0.00000
+  
++---------------- MEMORY AND SCRATCH DISK ESTIMATES PER PROCESS --------------+
+|                                                     Memory          Disk    |
+| Baseline code, static data and system overhead      336.0 MB         0.0 MB |
+| BLAS internal memory storage                          0.0 MB         0.0 MB |
+| Model and support data                                3.6 MB         0.2 MB |
+| Electronic energy minimisation requirements           3.2 MB         0.0 MB |
+| Force calculation requirements                        0.7 MB         0.0 MB |
+|                                               ----------------------------- |
+| Approx. total storage required per process          342.9 MB         0.2 MB |
+|                                                                             |
+| Requirements will fluctuate during execution and may exceed these estimates |
++-----------------------------------------------------------------------------+
+Calculating total energy with cut-off of  300.000 eV.
+------------------------------------------------------------------------ <-- SCF
+SCF loop      Energy           Fermi           Energy gain       Timer   <-- SCF
+                               energy          per atom          (sec)   <-- SCF
+------------------------------------------------------------------------ <-- SCF
+Initial  -6.87610445E+001  0.00000000E+000                         1.26  <-- SCF
+      1  -1.90110478E+002 -9.87252424E+000   1.21349433E+002       1.56  <-- SCF
+      2  -1.94098285E+002 -1.18109918E+001   3.98780733E+000       1.80  <-- SCF
+      3  -1.94150643E+002  8.96965006E-001   5.23577208E-002       2.03  <-- SCF
+      4  -1.93403507E+002  1.19955653E+000  -7.47135163E-001       2.28  <-- SCF
+      5  -1.94921691E+002  1.24725576E+000   1.51818343E+000       2.53  <-- SCF
+      6  -1.95041578E+002  1.07266528E+000   1.19887426E-001       2.77  <-- SCF
+      7  -1.95044119E+002  1.16307306E+000   2.54029968E-003       3.02  <-- SCF
+      8  -1.95043580E+002  1.20220138E+000  -5.38848670E-004       3.26  <-- SCF
+      9  -1.95046526E+002  1.16337813E+000   2.94663606E-003       3.46  <-- SCF
+     10  -1.95309602E+002  1.05066164E+000   2.63075700E-001       3.66  <-- SCF
+     11  -1.95781375E+002  6.64099879E-001   4.71772811E-001       3.90  <-- SCF
+     12  -1.95773011E+002  6.74475697E-001  -8.36359995E-003       4.16  <-- SCF
+     13  -1.95811567E+002  5.18783187E-001   3.85558165E-002       4.40  <-- SCF
+     14  -1.95811599E+002  5.17984709E-001   3.19251126E-005       4.60  <-- SCF
+     15  -1.95811600E+002  5.17611154E-001   1.25261440E-006       4.76  <-- SCF
+     16  -1.95811603E+002  5.17530757E-001   3.12811937E-006       4.92  <-- SCF
+------------------------------------------------------------------------ <-- SCF
+ 
+Integrated Spin Density     =   -0.689069E-03 hbar/2                        
+Integrated |Spin Density|   =    0.695145E-03 hbar/2                        
+ 
+Final energy, E             =  -195.8028837183     eV
+Final free energy (E-TS)    =  -195.8116033957     eV
+(energies not corrected for finite basis set)
+ 
+NB est. 0K energy (E-0.5TS)      =  -195.8072435570     eV
+ 
+
+Writing analysis data to Li-bcc_300eV.castep_bin
+
+Writing model to Li-bcc_300eV.check
+ 
+ ************************** Forces **************************
+ *                                                          *
+ *               Cartesian components (eV/A)                *
+ * -------------------------------------------------------- *
+ *                         x            y            z      *
+ *                                                          *
+ * Li              1      0.00000      0.00000      0.00000 *
+ *                                                          *
+ ************************************************************
+ 
+ Pseudo atomic calculation performed for Li 1s2 2s1
+ 
+ Converged in 13 iterations to a total energy of -193.6532 eV
+ 
+Charge spilling parameter for spin component 1 = 0.04%
+Charge spilling parameter for spin component 2 = 0.04%
+ 
+                   Orbital Populations                  
+  ---------------------------------------------------------------
+     Ion    Atom   Orbital              Up        Down      Spin
+  ---------------------------------------------------------------
+     Li     1      S                    1.002     1.002    -0.000
+     Li     1      S                   -0.029    -0.029    -0.000
+     Li     1      Px                   0.178     0.178    -0.000
+     Li     1      Py                   0.170     0.170    -0.000
+     Li     1      Pz                   0.180     0.180    -0.000
+  ---------------------------------------------------------------
+                           Total:       1.500     1.500    -0.000
+  ---------------------------------------------------------------
+ 
+     Atomic Populations (Mulliken)
+     -----------------------------
+Species          Ion Spin      s      p      d      f     Total  Charge(e)   Spin(hbar/2)
+=========================================================================================
+  Li              1   up:     0.97   0.53   0.00   0.00   1.50     0.00       -0.00
+                  1   dn:     0.97   0.53   0.00   0.00   1.50
+=========================================================================================
+ 
+                 Bond                   Population        Spin       Length (A)
+================================================================================
+================================================================================
+ 
+
+Writing analysis data to Li-bcc_300eV.castep_bin
+
+Writing model to Li-bcc_300eV.check
+ 
+ A BibTeX formatted list of references used in this run has been written to 
+ Li-bcc_300eV.bib
+ 
+Initialisation time =      1.16 s
+Calculation time    =      3.90 s
+Finalisation time   =      0.02 s
+Total time          =      5.08 s
+Peak Memory Use     = 391172 kB
+  
+Overall parallel efficiency rating: Very good (82%)                             
+  
+Data was distributed by:-
+k-point (2-way); efficiency rating: Very good (88%)                             
+  
+Parallel notes:
+1) Calculation only took 5.1 s, so efficiency estimates may be inaccurate.      

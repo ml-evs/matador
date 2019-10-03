@@ -5,7 +5,10 @@ this should read data from a run3 convergence test and plot it.
 
 from os.path import isdir
 from traceback import print_exc
-from matador.plotting.convergence_plotting import plot_cutoff_kpt_grid, get_files, get_data
+from matador.plotting.convergence_plotting import (
+    plot_cutoff_kpt_grid, get_convergence_files,
+    get_convergence_data, combine_convergence_data
+)
 
 
 if __name__ == '__main__':
@@ -38,30 +41,23 @@ if __name__ == '__main__':
             exit('Could not find any completed_$x folders!')
         if isdir('completed_cutoff'):
             print('Parsing cutoffs...')
-            cutoff_structure_files = get_files('completed_cutoff', only=kwargs.get('only'))
-            cutoff_data = get_data(cutoff_structure_files, conv_parameter='cut_off_energy', species=kwargs['species'])
+            cutoff_structure_files = get_convergence_files('completed_cutoff', only=kwargs.get('only'))
+            cutoff_data = get_convergence_data(cutoff_structure_files, conv_parameter='cut_off_energy', species=kwargs['species'])
             cutoff = True
         if isdir('completed_kpts'):
             print('Parsing kpts...')
-            kpt_structure_files = get_files('completed_kpts', only=kwargs.get('only'))
-            kpt_data = get_data(kpt_structure_files, conv_parameter='kpoints_mp_spacing', species=kwargs['species'])
+            kpt_structure_files = get_convergence_files('completed_kpts', only=kwargs.get('only'))
+            kpt_data = get_convergence_data(kpt_structure_files, conv_parameter='kpoints_mp_spacing', species=kwargs['species'])
             kpts = True
 
-        data = {}
         if cutoff and kpts:
-            for key in cutoff_data:
-                data[key] = cutoff_data[key]
-                if key in kpt_data:
-                    data[key].update(kpt_data[key])
-            for key in kpt_data:
-                if key not in data:
-                    data[key] = kpt_data[key]
+            data = combine_convergence_data(kpt_data, cutoff_data)
         elif cutoff:
             data = cutoff_data
         else:
             data = kpt_data
 
-        plot_cutoff_kpt_grid(data, forces=False, show=True, **kwargs)
+        plot_cutoff_kpt_grid(data, forces=False, show=True, png=True, **kwargs)
     except Exception:
         print_exc()
         print('This script is rubbish, please contact me388@cam.ac.uk and tell him to fix it.')

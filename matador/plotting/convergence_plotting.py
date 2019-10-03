@@ -127,28 +127,13 @@ def plot_field(data,
             colourmap[formula] = next(ax._get_lines.prop_cycler)['color']
 
     for ind, key in enumerate(data):
+
+        formula = get_formula_from_stoich(data[key]['stoichiometry'])
         try:
-            values = data[key][parameter][field]
-            parameters = data[key][parameter][parameter]
+            values, parameters = get_convergence_values(data[key], parameter, field, reference=reference, log=log)
         except Exception:
             print('Missing data for {}->{}->{}'.format(key, parameter, field))
             continue
-
-        if len(values) != len(parameters):
-            print(key, parameter, field)
-            raise RuntimeError('Mismatched convergence data: {} {} {}'.format(key, parameters, values))
-
-        values = np.asarray(values)
-        parameters = np.asarray(parameters)
-        formula = get_formula_from_stoich(data[key]['stoichiometry'])
-
-        if reference == 'last':
-            values -= values[-1]
-            values *= 1000
-            values = np.abs(values)
-
-        if log:
-            values = np.log10(values)
 
         label = None
         if colour_by == 'formula':
@@ -188,7 +173,7 @@ def round(n, prec):
         return float(Decimal(str(n)).quantize(Decimal('0.05'), rounding=ROUND_UP))
 
 
-def get_files(path, only=None):
+def get_convergence_files(path, only=None):
     """ Find all CASTEP files in the directory. """
     structure_files = defaultdict(list)
     files = glob.glob(path + '/*.castep')
@@ -206,7 +191,7 @@ def get_files(path, only=None):
     return structure_files
 
 
-def get_data(structure_files, conv_parameter='cut_off_energy', species=None):
+def get_convergence_data(structure_files, conv_parameter='cut_off_energy', species=None):
     """ Parse cutoff energy/kpt spacing convergence calculations from list of files.
 
     Parameters:
@@ -320,5 +305,40 @@ def get_data(structure_files, conv_parameter='cut_off_energy', species=None):
             if field != 'stoichiometry':
                 data[key][conv_parameter][field] = [data[key][conv_parameter][field][ind] for ind in inds]
 
+    return data
+
+
+def get_convergence_values(data, parameter, field, reference='last', log=False):
+    """ Extract the data to plot for the given dictionary. """
+
+    values = data[parameter][field]
+    parameters = data[parameter][parameter]
+    if len(values) != len(parameters):
+        raise RuntimeError('Mismatched convergence data for {}->{}: {}'.format(field, parameter, data))
+
+    values = np.asarray(values)
+    parameters = np.asarray(parameters)
+
+    if reference == 'last':
+        values -= values[-1]
+        values *= 1000
+        values = np.abs(values)
+
+    if log:
+        values = np.log10(values)
+
+    return values, parameters
+
+
+def combine_convergence_data(data_A, data_B):
+    """ Combine dictionaries with potentially overlapping keys. """
+    data = {}
+    for key in data_A:
+        data[key] = data_A[key]
+        if key in data_B:
+            data[key].update(data_B[key])
+    for key in data_B:
+        if key not in data:
+            data[key] = data_B[key]
 
     return data

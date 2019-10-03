@@ -9,6 +9,7 @@ import unittest
 import os
 import sys
 from glob import glob
+import numpy as np
 import matador.cli.dispersion
 from matador.scrapers import res2dict
 from matador.hull import QueryConvexHull
@@ -205,5 +206,49 @@ class HullPlotTests(unittest.TestCase):
 
         beef_hull.plot_hull(svg=True)
         self.assertTrue(os.path.isfile(expected_file))
+        for expected_file in expected_files:
+            os.remove(expected_file)
+
+
+@unittest.skipIf(not MATPLOTLIB_PRESENT, 'Skipping plotting tests.')
+class ConvergencePlotTest(unittest.TestCase):
+    """ Test the ability to read convergence data and make plots. """
+
+    def setUp(self):
+        os.chdir(REAL_PATH + '/data/convergence/')
+
+    def tearDown(self):
+        os.chdir(ROOT_DIR)
+
+    def test_scraping_and_plotting(self):
+        from matador.plotting.convergence_plotting import (
+            get_convergence_data, get_convergence_files,
+            combine_convergence_data, get_convergence_values,
+        )
+        from matador.plotting.convergence_plotting import plot_cutoff_kpt_grid
+
+        kpt_files = get_convergence_files('completed_kpts')
+        cutoff_files = get_convergence_files('completed_cutoff')
+        kpt_data = get_convergence_data(kpt_files, conv_parameter='kpoints_mp_spacing', species=['Li'])
+        cutoff_data = get_convergence_data(cutoff_files, conv_parameter='cut_off_energy', species=['Li'])
+        data = combine_convergence_data(kpt_data, cutoff_data)
+        self.assertEquals(data['Li-bcc']['kpoints_mp_spacing']['kpoints_mp_spacing'], [0.1, 0.07])
+        self.assertEquals(data['Li-bcc']['cut_off_energy']['cut_off_energy'], [300, 400])
+        values, parameters = get_convergence_values(data['Li-bcc'], 'cut_off_energy', 'formation_energy_per_atom', log=True)
+        self.assertEqual(parameters.tolist(), [300.0, 400.0])
+        self.assertEqual(values.tolist()[0], 0.7291198427497395)
+        self.assertEqual(values.tolist()[1], -np.inf)
+        self.data = data
+
+        expected_files = ['conv.svg']
+        for expected_file in expected_files:
+            if os.path.isfile(expected_file):
+                os.remove(expected_file)
+
+        plot_cutoff_kpt_grid(self.data, svg=True)
+
+        for file in expected_files:
+            self.assertTrue(os.path.isfile(file))
+
         for expected_file in expected_files:
             os.remove(expected_file)
