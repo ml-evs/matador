@@ -236,7 +236,7 @@ class ConvergencePlotTest(unittest.TestCase):
         self.assertEquals(data['Li-bcc']['cut_off_energy']['cut_off_energy'], [300, 400])
         values, parameters = get_convergence_values(data['Li-bcc'], 'cut_off_energy', 'formation_energy_per_atom', log=True)
         self.assertEqual(parameters.tolist(), [300.0, 400.0])
-        self.assertEqual(values.tolist()[0], 0.7291198427497395)
+        self.assertAlmostEqual(values.tolist()[0], 0.7291198427497395, places=6)
         self.assertEqual(values.tolist()[1], -np.inf)
         self.data = data
 
