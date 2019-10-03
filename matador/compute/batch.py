@@ -104,6 +104,8 @@ class BatchRun:
         del self.args['nprocesses']
         self.limit = self.args.get('limit')
         del self.args['limit']
+        self.maxmem = self.args.get('maxmem')
+        del self.args['maxmem']
 
         # detect and scrape queue settings
         self._queue_env = None
@@ -121,6 +123,10 @@ class BatchRun:
 
             if self._queue_env is not None:
                 self._queue_walltime = get_queue_walltime(self._queue_env, queue_mgr)
+
+            self.maxmem = self._queue_env.get('SLURM_MEM_PER_CPU', None)
+            if self.maxmem is not None:
+                self.maxmem *= self._queue_env.get('SLURM_NTASKS', 1)
 
         # handle user-specified walltime and queue walltimes
         if self.args.get('max_walltime') is not None:
@@ -290,7 +296,7 @@ class BatchRun:
                                           param_dict=self.param_dict,
                                           cell_dict=self.cell_dict,
                                           mode=self.mode, paths=self.paths, compute_dir=self.compute_dir,
-                                          timings=(self.max_walltime, self.start_time),
+                                          timings=(self.max_walltime, self.start_time), maxmem=self.maxmem,
                                           **self.args)
                     # if memory check failed, let other nodes have a go
                     if not relaxer.enough_memory:
