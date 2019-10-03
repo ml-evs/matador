@@ -126,6 +126,7 @@ class ComputeTask:
         self.paths = None
         self.output_queue = None
         self.final_result = None
+        self.executable = None
 
         self._process = None
         self._first_run = True
@@ -388,8 +389,6 @@ class ComputeTask:
                     success = self.scf(calc_doc, self.seed, keep=True)
 
                 if self.compute_dir is not None:
-                    LOG.debug('Cleaning up after relaxation.')
-                    # always cd back to root folder
                     os.chdir(self.root_folder)
                     self.remove_compute_dir_if_finished(self.compute_dir)
                 self._first_run = False
@@ -527,7 +526,6 @@ class ComputeTask:
                     if self.max_walltime is not None:
                         run_elapsed = time.time() - self.start_time
                         # leave 1 minute to clean up
-                        # LOG.debug('{} remaining seconds...'.format(self.max_walltime - run_elapsed))
                         if run_elapsed > abs(self.max_walltime - 5*self.polltime):
                             msg = 'About to run out of time on seed {}, killing early...'.format(self.seed)
                             LOG.info(msg)
@@ -670,8 +668,11 @@ class ComputeTask:
         LOG.info('Performing single-shot CASTEP run on {}, with task: {}'.format(seed, calc_doc['task']))
         try:
             self.cp_to_input(seed)
-
+            self._setup_compute_dir(self.seed, self.compute_dir, custom_params=self.custom_params)
+            if self.compute_dir is not None:
+                os.chdir(self.compute_dir)
             self._update_input_files(seed, calc_doc)
+            doc2res(calc_doc, self.seed, info=False, hash_dupe=False, overwrite=True)
 
             # run CASTEP
             self._process = self.run_command(seed)
@@ -699,6 +700,12 @@ class ComputeTask:
                 if not keep:
                     self.tidy_up(seed)
 
+            if self.compute_dir is not None:
+                os.chdir(self.root_folder)
+                LOG.debug('Cleaning up after relaxation.')
+                # always cd back to root folder
+                self.remove_compute_dir_if_finished(self.compute_dir)
+
             return success
 
         except Exception as err:
@@ -706,6 +713,11 @@ class ComputeTask:
             self.mv_to_bad(seed)
             if not keep:
                 self.tidy_up(seed)
+            if self.compute_dir is not None:
+                os.chdir(self.root_folder)
+                LOG.debug('Cleaning up after relaxation.')
+                # always cd back to root folder
+                self.remove_compute_dir_if_finished(self.compute_dir)
             raise err
 
     @staticmethod
@@ -780,7 +792,6 @@ class ComputeTask:
                 calc_doc.update({'cut_off_energy': cutoff})
                 self.paths['completed_dir'] = 'completed_cutoff'
                 seed = self.seed + '_' + str(cutoff) + 'eV'
-                self._update_input_files(seed, calc_doc)
                 success = self.scf(calc_doc, seed, keep=False)
                 successes.append(success)
         if self.conv_kpt_bool:
@@ -794,7 +805,6 @@ class ComputeTask:
                 LOG.debug('Using offset {}'.format(calc_doc['kpoints_mp_offset']))
                 self.paths['completed_dir'] = 'completed_kpts'
                 seed = self.seed + '_' + str(kpt) + 'A'
-                self._update_input_files(seed, calc_doc)
                 success = self.scf(calc_doc, seed, keep=False)
                 successes.append(success)
         return any(successes)
@@ -1267,26 +1277,7 @@ class ComputeTask:
         """
 
         LOG.info('Preparing to relax {seed}'.format(seed=self.seed))
-        if self.compute_dir is not None:
-            LOG.info('Using compute_dir: {compute}'.format(compute=self.compute_dir))
-            if not os.path.isdir(self.compute_dir):
-                os.makedirs(self.compute_dir)
-            # if compute_dir isn't simply inside this folder, make a symlink that is
-            if '/' in self.compute_dir:
-                link_name = self.compute_dir.split('/')[-1]
-                if not os.path.isfile(link_name) and not os.path.isdir(link_name):
-                    if os.path.islink(link_name):
-                        os.remove(link_name)
-                    os.symlink(self.compute_dir, link_name)
-
-            # copy pspots and any intermediate calcs to compute_dir
-            LOG.info('Copying pspots into compute_dir')
-            pspots = glob.glob('*.usp')
-            for pspot in pspots:
-                shutil.copy2(pspot, self.compute_dir)
-
-            if self.custom_params:
-                shutil.copy2(self.seed + '.param', self.compute_dir)
+        self._setup_compute_dir(self.seed, self.compute_dir, custom_params=self.custom_params)
 
         # update res file with intermediate calculation if castep file is newer than res
         if os.path.isfile(self.seed + '.castep') and os.path.isfile(self.seed + '.res'):
@@ -1519,6 +1510,46 @@ class ComputeTask:
             os.remove(compute_dir.split('/')[-1])
 
         return True
+
+    @staticmethod
+    def _setup_compute_dir(seed, compute_dir, custom_params=False):
+        """ Create the desired directory if it doens't exist,
+        and try to link to it in the current folder.
+
+        Parameters:
+            seed (str): name of seed.
+            compute_dir (str): name of directory to make.
+
+        Keyword arguments:
+            custom_params (bool): whether to try to copy custom
+                param files into this directory.
+
+        """
+        if compute_dir is None:
+            return
+
+        LOG.info('Using compute_dir: {}'.format(compute_dir))
+        if not os.path.isdir(compute_dir):
+            try:
+                os.makedirs(compute_dir)
+            except PermissionError as exc:
+                raise CriticalError('Invalid compute dir requested: {} {}'.format(exc, compute_dir))
+        # if compute_dir isn't simply inside this folder, make a symlink that is
+        if '/' in compute_dir:
+            link_name = compute_dir.split('/')[-1]
+            if not os.path.isfile(link_name) and not os.path.isdir(link_name):
+                if os.path.islink(link_name):
+                    os.remove(link_name)
+                os.symlink(compute_dir, link_name)
+
+        # copy pspots and any intermediate calcs to compute_dir
+        LOG.info('Copying pspots into compute_dir')
+        pspots = glob.glob('*.usp')
+        for pspot in pspots:
+            shutil.copy2(pspot, compute_dir)
+
+        if custom_params and compute_dir is not None:
+            shutil.copy2(seed + '.param', compute_dir)
 
 
 class FullRelaxer(ComputeTask):
