@@ -27,30 +27,26 @@ def file_writer_function(function):
     def wrapped_writer(*args, **kwargs):
         """ Wrap and return the writer function. """
         path = args[1]
-        known_types = ['param', 'cell', 'res', 'xsf', 'cif', 'pdb', 'odi', 'odo', 'in', 'out']
-        if os.path.isfile(path):
-            if kwargs.get('overwrite'):
-                os.remove(path)
-            elif kwargs.get('hash_dupe'):
-                print('File name already exists, generating hash...')
-                req_ext = ''
-                for ext in known_types:
-                    if path.endswith('.{}'.format(ext)):
-                        req_ext = '.{}'.format(ext)
-                        path.replace('.{}'.format(ext), '')
-                path += '-' + generate_hash() + req_ext
-            else:
-                print('File name already exists! Skipping!')
-                raise RuntimeError('Duplicate file!')
-
         try:
             flines, ext = function(*args, **kwargs)
             if ext is not None and not path.endswith(ext):
                 path += '.{}'.format(ext)
+
+            if os.path.isfile(path):
+                if kwargs.get('overwrite'):
+                    os.remove(path)
+                elif kwargs.get('hash_dupe'):
+                    print('File name already exists, generating hash...')
+                    path = '{}-{}.{}'.format(path.replace(ext, ''), generate_hash(), ext)
+                else:
+                    print('File name already exists! Skipping!')
+                    raise RuntimeError('Duplicate file!')
+
             with open(path, 'w') as f:
                 for line in flines:
                     f.write(line + '\n')
             return flines
+
         except Exception as exc:
             print_exc()
             raise type(exc)('Failed to write {}: {}'.format(path, exc))
