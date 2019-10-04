@@ -587,7 +587,8 @@ class ComputeTask:
 
                         # disable squeezing if we've already reached optimisation
                         if self.squeeze:
-                            self._squeeze_list[ind:] = False
+                            for jnd in range(ind, len(self._squeeze_list)):
+                                self._squeeze_list[jnd] = False
                         self._update_output_files(opti_dict)
 
                     # or did the relaxation complete successfuly, including rerun?
