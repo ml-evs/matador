@@ -126,7 +126,8 @@ class BatchRun:
 
             self.maxmem = self._queue_env.get('SLURM_MEM_PER_CPU', None)
             if self.maxmem is not None:
-                self.maxmem *= self._queue_env.get('SLURM_NTASKS', 1)
+                self.maxmem = int(self.maxmem)
+                self.maxmem *= int(self._queue_env.get('SLURM_NTASKS', 1))
 
         # handle user-specified walltime and queue walltimes
         if self.args.get('max_walltime') is not None:
@@ -153,6 +154,7 @@ class BatchRun:
         if self.all_cores < self.nprocesses:
             raise InputError('Requesting more processes than available cores.')
 
+        # scrape input cell/param/other files
         if self.mode == 'castep':
             self.castep_setup()
         else:
