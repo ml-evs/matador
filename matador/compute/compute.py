@@ -1014,7 +1014,7 @@ class ComputeTask:
             msg = 'CASTEP dryrun failed with output {results}'.format(results=results)
             raise MaxMemoryEstimateExceeded(msg)
 
-        estimate = results['estimated_mem_MB']
+        estimate = results['estimated_mem_per_process_MB']
         if self.ncores is not None:
             estimate *= self.ncores
         if self.nnodes is not None:
@@ -1041,7 +1041,7 @@ class ComputeTask:
                 elif self.mpi_library == 'archer':
                     command = ['aprun', '-n', str(self.ncores)] + command
                 elif self.mpi_library == 'slurm':
-                    command = ['srun', '--exclusive', '-N', '1', '-n', str(self.ncores)] + command
+                    command = ['srun'] + command
                 elif self.mpi_library in ['intel', 'default']:
                     command = ['mpirun', '-n', str(self.ncores)] + command
                 else:
@@ -1058,9 +1058,7 @@ class ComputeTask:
                     str(self.ncores), '-S', '12', '-d', '1'
                 ] + command
             elif self.mpi_library == 'slurm':
-                command = ['srun', '--exclusive', '-N',
-                           str(self.nnodes), '-n',
-                           str(self.ncores * self.nnodes)] + command
+                command = ['srun'] + command
             elif self.mpi_library == 'intel':
                 command = ['mpirun', '-n', str(self.ncores * self.nnodes), '-ppn', str(self.ncores)] + command
             else:
