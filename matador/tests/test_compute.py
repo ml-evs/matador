@@ -3,7 +3,6 @@
 """ Some tests for high-throughput calculations. """
 
 import unittest
-import os
 import subprocess as sp
 import glob
 import time
@@ -29,7 +28,7 @@ TMP_DIR = 'tmp_test'
 ROOT_DIR = getcwd()
 VERBOSITY = 10
 EXECUTABLE = 'castep'
-RUN_SLOW_TESTS = (os.uname()[1] == 'cluster2')
+RUN_SLOW_TESTS = (HOSTNAME == 'cluster2')
 
 
 try:
@@ -123,16 +122,11 @@ class ComputeTest(unittest.TestCase):
                               res=seed, param_dict=param_dict, cell_dict=cell_dict,
                               verbosity=VERBOSITY, executable=executable,
                               exec_test=False, polltime=1,
-                              start=True)
-        errored = False
-
-        try:
-            relaxer.relax()
-        except CalculationError:
-            errored = True
+                              start=False)
+        with self.assertRaises(CalculationError):
+            relaxer.begin()
 
         self.assertTrue(relaxer.final_result is None)
-        self.assertTrue(errored)
 
     def test_old_file(self):
         """ Run a calculation with an executable that only does "sleep", in the
@@ -155,16 +149,11 @@ class ComputeTest(unittest.TestCase):
                               res=seed, param_dict=param_dict, cell_dict=cell_dict,
                               verbosity=VERBOSITY, executable=executable,
                               exec_test=False, polltime=1,
-                              start=True)
-        errored = False
+                              start=False)
 
-        try:
-            relaxer.relax()
-        except CalculationError:
-            errored = True
-
+        with self.assertRaises(CalculationError):
+            relaxer.begin()
         self.assertTrue(relaxer.final_result is None)
-        self.assertTrue(errored)
 
     def test_faked_error_recovery(self):
         """ Run a calculation that *should* throw a symmetry error, and try to
@@ -180,27 +169,22 @@ class ComputeTest(unittest.TestCase):
         ncores = 1
         executable = REAL_PATH + 'data/symmetry_failure/monkey_patch_move.sh'
         node = None
-        errored = False
 
         relaxer = ComputeTask(ncores=ncores, nnodes=None, node=node,
                               res=seed, param_dict=param_dict, cell_dict=cell_dict,
                               verbosity=VERBOSITY, executable=executable,
                               exec_test=False, polltime=0.01,
-                              start=True)
-        errored = False
-        try:
-            relaxer.relax()
-        except CalculationError:
-            errored = True
+                              start=False)
+
+        with self.assertRaises(CalculationError):
+            relaxer.begin()
 
         bad_castep_exists = isdir('bad_castep')
         completed_exists = isdir('completed')
 
-        self.assertTrue(errored)
         self.assertTrue(bad_castep_exists)
         self.assertFalse(completed_exists)
         self.assertTrue(relaxer.final_result is None)
-        self.assertTrue(errored)
         self.assertEqual(relaxer._num_retries, 3)
         self.assertTrue('symmetry_generate' not in relaxer.calc_doc)
         self.assertTrue('snap_to_symmetry' not in relaxer.calc_doc)
@@ -209,7 +193,6 @@ class ComputeTest(unittest.TestCase):
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
     def test_relax_to_queue(self):
         """ Mimic GA and test Queue relaxations. """
-        import multiprocessing as mp
 
         newborn, s = res2dict(REAL_PATH + '/data/structures/LiAs_testcase.res', verbosity=VERBOSITY, db=False)
         assert s
@@ -304,14 +287,10 @@ class ComputeTest(unittest.TestCase):
                               res=seed, param_dict=param_dict, cell_dict=cell_dict,
                               verbosity=VERBOSITY, killcheck=True, memcheck=False,
                               reopt=True, executable=executable, rough=0, fine_iter=3,
-                              start=True)
+                              start=False)
 
-        errored = False
-        try:
-            relaxer.relax()
-        except CalculationError:
-            errored = True
-        self.assertTrue(errored, 'error not raised!')
+        with self.assertRaises(CalculationError):
+            relaxer.begin()
 
         bad_exists = isfile('bad_castep/_LiAs_testcase.res')
 
@@ -333,17 +312,13 @@ class ComputeTest(unittest.TestCase):
         executable = 'castep'
         node = None
         seed = 'NaP_intermediates_stopped_early'
-        errored = False
-
-        try:
+        with self.assertRaises(CalculationError):
             ComputeTask(ncores=NCORES, nnodes=None, node=node,
                         res=seed, param_dict=param_dict, cell_dict=cell_dict,
                         verbosity=VERBOSITY, killcheck=True, memcheck=False,
                         exec_test=False,
                         reopt=True, executable=executable, max_walltime=5,
                         start=True)
-        except CalculationError:
-            errored = True
 
         print('Process completed!')
 
@@ -353,9 +328,7 @@ class ComputeTest(unittest.TestCase):
         bad_exists = all(bad_exists)
         good_exists = all(isdir(path) for path in ['input', 'bad_castep', 'logs'])
 
-        self.assertTrue(errored)
         self.assertTrue(bad_exists)
-        self.assertTrue(errored)
         self.assertTrue(good_exists)
 
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
@@ -704,7 +677,6 @@ class BenchmarkCastep(unittest.TestCase):
 
         """
         from os import makedirs
-        import shutil
         seed = '_LiC.res'
         copy(REAL_PATH + 'data/structures/LiC.res', '_LiC.res')
 
