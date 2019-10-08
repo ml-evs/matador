@@ -13,15 +13,19 @@ import subprocess as sp
 import glob
 import time
 import logging
+import traceback as tb
 from copy import deepcopy
 from math import ceil
 from psutil import virtual_memory
 
+from matador import __version__
 from matador.scrapers.castep_scrapers import cell2dict
 from matador.scrapers.castep_scrapers import res2dict, castep2dict
 from matador.calculators import CastepCalculator
+from matador.crystal import Crystal
 from matador.export import doc2cell, doc2param, doc2res
 from matador.utils.errors import CriticalError, WalltimeError, InputError, CalculationError, MaxMemoryEstimateExceeded
+from matador.utils.chem_utils import get_root_source
 import matador.utils.print_utils
 
 MATADOR_CUSTOM_TASKS = ['bulk_modulus', 'projected_bandstructure', 'pdispersion', 'all']
@@ -134,11 +138,15 @@ class ComputeTask:
         self._squeeze_list = None
         self._max_iter = None
         self._num_rough_iter = None
+        self._target_spacing = None
+        self._target_pressure = None
         self._num_retries = 0
         self._max_num_retries = 2
         self.maxmem = None
         self.cell_dict = None
         self.param_dict = None
+        self.res_dict = None
+        self.calc_doc = None
 
         # save all keyword arguments as attributes
         self.__dict__.update(prop_defaults)
@@ -150,7 +158,6 @@ class ComputeTask:
             import cProfile
             import pstats
             from sys import version_info
-            from matador import __version__
             profile = cProfile.Profile()
             profile.enable()
 
@@ -158,15 +165,12 @@ class ComputeTask:
             self.maxmem = float(virtual_memory().available) / 1024**2
 
         # scrape and save seed name
-        self.res = res
-        if isinstance(self.res, str):
-            self.seed = self.res
+        if isinstance(res, str):
+            self.seed = res
+            self.seed = self.seed.split('/')[-1].replace('.res', '')
         else:
-            assert isinstance(self.res['source'], list)
-            assert len(self.res['source']) == 1
-            self.seed = self.res['source'][0]
-
-        self.seed = self.seed.split('/')[-1].replace('.res', '')
+            self.seed = get_root_source(res)
+        self._input_res = res
 
         # set up logging; by default, write DEBUG level into a file called logs/$seed.log
         # and write desired verbosity to stdout (default WARN).
@@ -203,12 +207,12 @@ class ComputeTask:
          | |  | |_| | | | |___) |
          |_|   \__,_|_| |_|____/
 
-
         """
 
         LOG.info(splash_screen)
+        LOG.info('matador version: {}'.format(__version__))
+        LOG.info('Host info: {}.'.format('-'.join(os.uname())))
         LOG.info('Run started for seed {}'.format(self.seed))
-        LOG.info('Initialising FullRelaxer object for {seed}'.format(seed=self.seed))
 
         # set up compute parameters
         self.ncores = ncores
@@ -235,40 +239,16 @@ class ComputeTask:
         if self.paths is None:
             self.paths = {}
             self.paths['completed_dir'] = 'completed'
-        else:
-            assert 'completed_dir' in self.paths
+        elif 'completed_dir' not in self.paths:
+            raise RuntimeError('Invalid paths: {}'.format(self.paths))
 
-        # actually run the calculations, catching only CalculationErrors
-        try:
-            # run through CASTEP specific features
-            if self.mode == 'castep':
-                calculation_parameters = {**self.cell_dict, **self.param_dict}
-                self.calculator = CastepCalculator(calculation_parameters)
-                self.success = self.run_castep(res)
-            # otherwise run generic script
-            else:
-                self.success = self.run_generic(res)
+        self.set_input_structure(res)
 
-        # errors that matter only for the current structure
-        except CalculationError as exc:
-            LOG.error('Process raised {} with message {}.'.format(type(exc), exc))
-            self.success = False
-            self._finalise_result()
-            raise exc
-        # errors that need to be passed upwards to kill future jobs
-        except RuntimeError as exc:
-            LOG.error('Process raised {} with message {}.'.format(type(exc), exc))
-            raise exc
-        except MaxMemoryEstimateExceeded as exc:
-            LOG.error(exc)
-            raise exc
-        except Exception as exc:
-            LOG.error('Caught unexpected error {}: {}'.format(type(exc), exc))
-            raise exc
+        self.begin()
 
         if self.profile:
             profile.disable()
-            fname = 'relaxer-{}-{}-{}.{}.{}'.format(__version__, os.hostname()[1], version_info.major,
+            fname = 'relaxer-{}-{}-{}.{}.{}'.format(__version__, os.uname()[1], version_info.major,
                                                     version_info.minor, version_info.micro)
             profile.dump_stats(fname + '.prof')
             with open(fname + '.pstats', 'w') as fp:
@@ -280,12 +260,65 @@ class ComputeTask:
         else:
             LOG.info('FullRelaxer failed cleanly for {seed}'.format(seed=self.seed))
 
-    def run_castep(self, res):
-        """ Set up and run CASTEP calculation.
+    def set_input_structure(self, res):
+        """ Set the input structure to the given dictionary, or read it from
+        the given file.
 
         Parameters:
-            res (str/dict): either the filename or a dict
-                containing the structure.
+            res (str/dict): either the scraped structure or the filename of a res file.
+
+        """
+
+        # read in initial structure and skip if failed
+        if isinstance(res, str):
+            self.res_dict, success = res2dict(res, db=False, verbosity=self.verbosity)
+            if not success:
+                msg = 'Unable to parse initial res file, error: {res_dict}'.format(res_dict=self.res_dict)
+                raise CalculationError(msg)
+
+        elif isinstance(res, dict):
+            # check res is a valid crystal
+            try:
+                Crystal(res)
+            except Exception as exc:
+                msg = 'Unable to convert res to Crystal: {}'.format(exc)
+                LOG.error(msg)
+                LOG.error('Traceback:\n{}'.format(tb.format_exc()))
+                raise CalculationError(msg)
+
+            self.res_dict = res
+
+    def begin(self):
+        """ Run the prepared ComputeTask. Catches CalculationError objects
+        and cleans up, passing all other errors upwards.
+
+        """
+
+        try:
+            try:
+                # run through CASTEP specific features
+                if self.mode == 'castep':
+                    calculation_parameters = {**self.cell_dict, **self.param_dict}
+                    self.calculator = CastepCalculator(calculation_parameters)
+                    self.success = self.run_castep()
+                # otherwise run generic script
+                else:
+                    self.success = self.run_generic()
+
+            except CalculationError as exc:
+                self.success = False
+                self._finalise_result()
+                raise exc
+
+        except Exception as exc:
+            LOG.error('Process raised {} with message {}.'.format(type(exc), exc))
+            LOG.error('Full traceback:\n{}'.format(tb.format_exc()))
+            raise exc
+
+    def run_castep(self):
+        """ Set up and run CASTEP calculation on the prepared structure,
+        `self.res_dict`, using the parameters in `self.cell_dict` and
+        `self.param_dict`.
 
         Raises:
             WalltimeError: if max_walltime is exceeded.
@@ -315,16 +348,6 @@ class ComputeTask:
         if self.squeeze:
             self._target_pressure = deepcopy(self.cell_dict['external_pressure'])
 
-        # read in initial structure and skip if failed
-        if isinstance(res, str):
-            self.res_dict, success = res2dict(res, db=False, verbosity=self.verbosity)
-            if not success:
-                msg = 'Unable to parse initial res file, error: {res_dict}'.format(res_dict=self.res_dict)
-                LOG.error(msg)
-                raise CalculationError(msg)
-        elif isinstance(res, dict):
-            self.res_dict = res
-
         if self.noise:
             from matador.utils.cell_utils import add_noise
             LOG.info('Adding noise to the positions in the cell')
@@ -343,7 +366,6 @@ class ComputeTask:
         self.calc_doc = calc_doc
 
         try:
-            from matador.crystal import Crystal
             LOG.info('Struture: {}'.format(Crystal(self.calc_doc)))
         except Exception as exc:
             LOG.warning('Unable to convert structure to Crystal... {}'.format(exc))
@@ -407,13 +429,10 @@ class ComputeTask:
 
         return success
 
-    def run_generic(self, seed, intermediate=False, mv_bad_on_failure=True):
+    def run_generic(self, intermediate=False, mv_bad_on_failure=True):
         """ Run a generic mpi program on the given seed. Files from
         completed runs are moved to "completed" (unless intermediate
         is True) and failed runs to "bad_castep".
-
-        Parameters:
-            seed (str): filename of structure
 
         Keyword arguments:
             intermediate (bool): whether we want to run more calculations
@@ -428,14 +447,14 @@ class ComputeTask:
         """
         LOG.info('Calling executable {exe} MPI program on {seed}'.format(exe=self.executable, seed=self.seed))
         try:
-            self.seed = seed
-            if '.' in self.seed:
-                self.seed = self.seed.split('.')[-2]
-                self.input_ext = self.seed.split('.')[-1]
+            seed = self._input_res
+            if '.' in seed:
+                seed = seed.split('.')[-2]
+                input_ext = seed.split('.')[-1]
             else:
-                self.input_ext = ''
-            assert isinstance(self.seed, str)
-            self.cp_to_input(seed, ext=self.input_ext, glob_files=True)
+                input_ext = ''
+            assert isinstance(seed, str)
+            self.cp_to_input(seed, ext=input_ext, glob_files=True)
             self._process = self.run_command(seed)
             out, errs = self._process.communicate()
             if self._process.returncode != 0 or errs:
@@ -643,9 +662,7 @@ class ComputeTask:
         # All other errors mean something bad has happened, so we should clean up this job
         # more jobs will run unless this exception is either CriticalError or KeyboardInterrupt
         except Exception as err:
-            from traceback import print_exc
-            print_exc()
-            LOG.error('Error caught: terminating job for {}. Error = {}'.format(self.seed, err))
+            LOG.error('Error caught: terminating job for {}. Error = {}'.format(self.seed, tb.format_exc()))
             try:
                 self._process.terminate()
             except AttributeError:
@@ -717,7 +734,7 @@ class ComputeTask:
             return success
 
         except Exception as err:
-            LOG.error('Caught error: {}'.format(err))
+            LOG.error('Error caught: terminating job for {}. Error = {}'.format(self.seed, tb.format_exc()))
             self.mv_to_bad(seed)
             if not keep:
                 self.tidy_up(seed)
@@ -768,7 +785,6 @@ class ComputeTask:
         """
         LOG.info('Getting seekpath cell and kpoint path.')
         from matador.utils.cell_utils import get_seekpath_kpoint_path
-        from matador.crystal import Crystal
         LOG.debug('Old lattice: {}'.format(Crystal(calc_doc)))
         prim_doc, kpt_path, _ = get_seekpath_kpoint_path(calc_doc,
                                                          spacing=spacing,

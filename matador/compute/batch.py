@@ -321,14 +321,15 @@ class BatchRun:
                         with open(self.paths['failures_fname'], 'a') as job_file:
                             job_file.write(res + '\n')
 
-            # ignore individual calculation errors or node collisions that were caught here
-            except (CalculationError, NodeCollisionError):
-                continue
-
             # catch memory errors and reset so another node can try
             except MaxMemoryEstimateExceeded:
                 reset_single_seed(res)
                 continue
+
+            # ignore any other individual calculation errors or node collisions that were caught here
+            except CalculationError:
+                continue
+
             # reset txt/lock for an input error, but throw it to prevent other calcs
             except InputError as err:
                 reset_single_seed(res)
@@ -338,7 +339,7 @@ class BatchRun:
             except RuntimeError as err:
                 error_queue.put((proc_id, err, res))
                 return
-            # finally catch any other generic error, normally caused by me
+            # finally catch any other generic error in e.g. the above code, normally caused by me
             except Exception as err:
                 error_queue.put((proc_id, err, res))
                 return

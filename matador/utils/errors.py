@@ -34,7 +34,7 @@ class WalltimeError(RuntimeError):
     """
 
 
-class NodeCollisionError(Exception):
+class NodeCollisionError(CalculationError):
     """ Dummy exception to raise when one node has tried to run
     a calculation that another node is performing.
 
