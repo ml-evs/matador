@@ -89,7 +89,6 @@ class ComputeTask:
             archer (bool): force use of aprun over mpirun (DEFAULT: False)
             slurm (bool): force use of srun over mpirun (DEFAULT: False)
             intel (bool): force use of Intel mpirun-style calls (DEFAULT: False)
-            profile (bool): use cProfile to profile runtime (DEFAULT: False)
             redirect (str): file to redirect stdout to (DEFAULT: /dev/null unless debug).
             exec_test (bool): test executable with `<exec> --version`
                 before progressing (DEFAULT: True)
@@ -123,7 +122,7 @@ class ComputeTask:
                          'memcheck': False, 'rough': 4, 'rough_iter': 2, 'fine_iter': 20, 'spin': None,
                          'output_queue': None, 'redirect': None, 'reopt': False, 'compute_dir': None, 'noise': False, 'squeeze': False,
                          'custom_params': False, 'archer': False, 'maxmem': None, 'killcheck': True, 'kpts_1D': False,
-                         'conv_cutoff': False, 'conv_kpt': False, 'profile': False, 'slurm': False, 'intel': False,
+                         'conv_cutoff': False, 'conv_kpt': False, 'slurm': False, 'intel': False,
                          'exec_test': True, 'timings': (None, None), 'start': True, 'verbosity': 1, 'polltime': 30,
                          'optados_executable': 'optados', 'run3_settings': None}
 
@@ -153,13 +152,6 @@ class ComputeTask:
         for arg in kwargs:
             if arg in prop_defaults:
                 self.__dict__.update({arg: kwargs[arg]})
-
-        if self.profile:
-            import cProfile
-            import pstats
-            from sys import version_info
-            profile = cProfile.Profile()
-            profile.enable()
 
         if self.maxmem is None and self.memcheck:
             self.maxmem = float(virtual_memory().available) / 1024**2
@@ -244,21 +236,8 @@ class ComputeTask:
 
         self.set_input_structure(res)
 
-        self.begin()
-
-        if self.profile:
-            profile.disable()
-            fname = 'relaxer-{}-{}-{}.{}.{}'.format(__version__, os.uname()[1], version_info.major,
-                                                    version_info.minor, version_info.micro)
-            profile.dump_stats(fname + '.prof')
-            with open(fname + '.pstats', 'w') as fp:
-                stats = pstats.Stats(profile, stream=fp).sort_stats('cumulative')
-                stats.print_stats()
-
-        if self.success:
-            LOG.info('FullRelaxer finished successfully for {seed}'.format(seed=self.seed))
-        else:
-            LOG.info('FullRelaxer failed cleanly for {seed}'.format(seed=self.seed))
+        if self.start:
+            self.begin()
 
     def set_input_structure(self, res):
         """ Set the input structure to the given dictionary, or read it from
@@ -313,7 +292,16 @@ class ComputeTask:
         except Exception as exc:
             LOG.error('Process raised {} with message {}.'.format(type(exc), exc))
             LOG.error('Full traceback:\n{}'.format(tb.format_exc()))
+            for handler in LOG.handlers[:]:
+                handler.close()
             raise exc
+
+        if self.success:
+            LOG.info('FullRelaxer finished successfully for {seed}'.format(seed=self.seed))
+        else:
+            LOG.info('FullRelaxer failed cleanly for {seed}'.format(seed=self.seed))
+        for handler in LOG.handlers[:]:
+            handler.close()
 
     def run_castep(self):
         """ Set up and run CASTEP calculation on the prepared structure,
@@ -389,7 +377,6 @@ class ComputeTask:
                 raise MaxMemoryEstimateExceeded(msg)
 
         try:
-            if self.start:
                 # run convergence tests
                 if any([self.conv_cutoff_bool, self.conv_kpt_bool]):
                     success = self.run_convergence_tests(calc_doc)
@@ -420,7 +407,6 @@ class ComputeTask:
                 self._first_run = False
 
         except Exception as err:
-            LOG.debug('Cleaning up after catching error {}.'.format(err))
             if self.compute_dir is not None:
                 # always cd back to root folder
                 os.chdir(self.root_folder)
@@ -662,7 +648,7 @@ class ComputeTask:
         # All other errors mean something bad has happened, so we should clean up this job
         # more jobs will run unless this exception is either CriticalError or KeyboardInterrupt
         except Exception as err:
-            LOG.error('Error caught: terminating job for {}. Error = {}'.format(self.seed, tb.format_exc()))
+            LOG.error('{} caught: terminating job for {}.'.format(type(err), self.seed))
             try:
                 self._process.terminate()
             except AttributeError:
@@ -710,12 +696,10 @@ class ComputeTask:
             errors_present, errors, _ = self._catch_castep_errors()
             if errors_present:
                 msg = 'CASTEP run on {} failed with errors: {}'.format(seed, errors)
-                LOG.error(msg)
                 raise CalculationError(msg)
 
             if not success:
                 msg = 'Error scraping CASTEP file {}: {}'.format(seed, results_dict)
-                LOG.error(msg)
                 raise CalculationError(msg)
 
             if not intermediate:
@@ -727,20 +711,18 @@ class ComputeTask:
 
             if self.compute_dir is not None:
                 os.chdir(self.root_folder)
-                LOG.debug('Cleaning up after relaxation.')
                 # always cd back to root folder
                 self.remove_compute_dir_if_finished(self.compute_dir)
 
             return success
 
         except Exception as err:
-            LOG.error('Error caught: terminating job for {}. Error = {}'.format(self.seed, tb.format_exc()))
+            LOG.error('{} caught: terminating job for {}.'.format(type(err), self.seed))
             self.mv_to_bad(seed)
             if not keep:
                 self.tidy_up(seed)
             if self.compute_dir is not None:
                 os.chdir(self.root_folder)
-                LOG.debug('Cleaning up after relaxation.')
                 # always cd back to root folder
                 self.remove_compute_dir_if_finished(self.compute_dir)
             raise err
@@ -1186,11 +1168,11 @@ class ComputeTask:
         """
         try:
             bad_dir = self.root_folder + '/bad_castep'
-            LOG.info('Moving files to bad_castep: {bad}.'.format(bad=bad_dir))
             if not os.path.exists(bad_dir):
                 os.makedirs(bad_dir, exist_ok=True)
             seed_files = glob.glob(seed + '.*') + glob.glob(seed + '-out.cell*')
             if seed_files:
+                LOG.info('Moving files to bad_castep: {bad}.'.format(bad=bad_dir))
                 LOG.debug('Files to move: {seed}'.format(seed=seed_files))
                 for _file in seed_files:
                     try:
