@@ -258,6 +258,8 @@ class BatchRun:
             res_list = [res_list]
         for res in res_list:
             try:
+                if not os.path.isfile(res):
+                    continue
                 # probe once then sleep for a random amount up to 5 seconds
                 # before checking again for a lock file, just to protect
                 # against collisions in large array jobs on slower parallel file systems
@@ -265,7 +267,7 @@ class BatchRun:
                 time.sleep(2 * random.random())
                 # wait some additional time if this is a slurm array job
                 if self._queue_env is not None:
-                    extra_wait = self._queue_env.get('SLURM_ARRAY_TASK_ID', 0) % 10
+                    extra_wait = int(self._queue_env.get('SLURM_ARRAY_TASK_ID', 0)) % 10
                     time.sleep(extra_wait)
                 locked = os.path.isfile('{}.lock'.format(res))
                 if not self.args.get('ignore_jobs_file'):
@@ -353,7 +355,7 @@ class BatchRun:
 
         # scan directory for files to run
         self.file_lists = defaultdict(list)
-        self.file_lists['res'] = [file.name for file in os.scandir() if file.name.endswith('.res')]
+        self.file_lists['res'] = glob.glob('*.res')
 
     def castep_setup(self):
         """ Set up CASTEP jobs from res files, and $seed.cell/param. """
@@ -374,8 +376,8 @@ class BatchRun:
 
         # scan directory for files to run
         self.file_lists = defaultdict(list)
-        self.file_lists['res'] = [file.name for file in os.scandir() if file.name.endswith('.res')]
-        if self.seed in (file.replace('.res', '') for file in self.file_lists['res']):
+        self.file_lists['res'] = glob.glob('*.res')
+        if any(self.seed == file.replace('.res', '') for file in self.file_lists['res']):
             error = ("Found .res file with same name as seed: {}.res. This will wreak havoc on your calculations!\n".format(self.seed)
                      + "Please rename either your seed.cell/seed.param files, or rename the offending {}.res".format(self.seed))
             raise InputError(error)
