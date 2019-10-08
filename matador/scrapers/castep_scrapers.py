@@ -1441,29 +1441,62 @@ def _castep_scrape_metadata(flines, castep):
     """
     from time import strptime
     # computing metadata, i.e. parallelism, time, memory, version
+    if 'total_time_secs' not in castep:
+        castep['total_time_secs'] = 0
+    if 'total_time_hrs' not in castep:
+        castep['total_time_hrs'] = 0
+
     for ind, line in enumerate(flines):
         if 'Release CASTEP version' in line:
             castep['castep_version'] = line.replace('|', '').split()[-1]
-        try:
-            if 'Run started:' in line:
+        if 'Run started:' in line:
+            try:
                 year = line.split()[5]
                 month = str(strptime(line.split()[4], '%b').tm_mon)
                 day = line.split()[3]
                 castep['date'] = day + '-' + month + '-' + year
-            elif 'compiled for' in line.lower():
+            except (IndexError, ValueError):
+                castep['date'] = 'unknown'
+        elif 'compiled for' in line.lower():
+            try:
                 castep['_compiler_architecture'] = line.split()[2]
-            elif 'from code version' in line.lower():
+            except IndexError:
+                castep['_compiler_architecture'] = 'unknown'
+        elif 'from code version' in line.lower():
+            try:
                 castep['_castep_commit'] = ' '.join(flines[ind:ind+2]).split()[3]
-            elif 'Total time' in line and 'matrix elements' not in line:
-                castep['total_time_hrs'] = f90_float_parse(line.split()[-2]) / 3600
-            elif 'Peak Memory Use' in line:
+            except (IndexError, ValueError):
+                castep['_castep_commit'] = 'unknown'
+        elif 'Total time' in line and 'matrix elements' not in line:
+            try:
+                time = f90_float_parse(line.split()[-2])
+                castep['total_time_secs'] += time
+                castep['total_time_hrs'] += time / 3600
+            except (IndexError, ValueError):
+                castep['final_calculation_time_secs'] = 0
+        elif 'Calculation only took' in line:
+            castep['_time_estimated'] = f90_float_parse(line.split()[4])
+        elif 'Peak Memory Use' in line:
+            try:
                 castep['peak_mem_MB'] = int(f90_float_parse(line.split()[-2]) / 1024)
-            elif 'total storage required per process' in line:
-                castep['estimated_mem_MB'] = f90_float_parse(line.split()[-5])
+            except (IndexError, ValueError):
+                castep['peak_mem_MB'] = -1
+        elif 'total storage required per process' in line:
+            try:
+                castep['estimated_mem_per_process_MB'] = f90_float_parse(line.split()[-5])
+            except (IndexError, ValueError):
+                castep['estimated_mem_per_process_MB'] = 0
+        elif 'Calculation parallelised over' in line:
+            try:
+                castep['num_mpi_processes'] = int(f90_float_parse(line.split()[3]))
+            except:
+                castep['num_mpi_processes'] = 1
+        elif 'Calculation not parall' in line:
+            castep['num_mpi_processes'] = 1
 
-        # if any of these error, don't worry too much (at all)
-        except (IndexError, ValueError):
-            pass
+        if 'num_mpi_processes' in castep and 'estimated_mem_per_process_MB' in castep:
+            castep['estimated_mem_MB'] = castep['estimated_mem_per_process_MB'] * castep['num_mpi_processes']
+
 
 
 def _castep_find_final_structure(flines):

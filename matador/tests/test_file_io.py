@@ -169,8 +169,13 @@ class CastepScraperTests(unittest.TestCase):
             self.assertEqual(test_dict['lattice_abc'][1][2], 59.971185, msg='Wrong lattice constants!')
             self.assertEqual(test_dict['geom_force_tol'], 0.05, msg='Wrong geom force tol')
             self.assertEqual(test_dict['castep_version'], '16.11')
+            self.assertEqual(test_dict['_castep_commit'], '203e84763863+')
+            self.assertAlmostEqual(test_dict['total_time_secs'], 1291.14, places=2)
+            self.assertEqual(test_dict['geom_iter'], 8)
             self.assertEqual(test_dict['external_pressure'], [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
-            self.assertEqual(test_dict['estimated_mem_MB'], 345.1)
+            self.assertEqual(test_dict['estimated_mem_per_process_MB'], 345.1)
+            self.assertEqual(test_dict['peak_mem_MB'], int(675372 / 1024))
+            self.assertEqual(test_dict['num_mpi_processes'], 15)
 
     def test_castep17(self):
         castep_fname = REAL_PATH + 'data/KP-castep17.castep'
@@ -202,7 +207,7 @@ class CastepScraperTests(unittest.TestCase):
             self.assertEqual(test_dict['_compiler_architecture'], 'linux_x86_64_ifort17')
             self.assertEqual(test_dict['_castep_commit'], '056e886bd5a1+')
             self.assertEqual(test_dict['optimised'], True)
-            self.assertEqual(test_dict['estimated_mem_MB'], 300.1)
+            self.assertEqual(test_dict['estimated_mem_per_process_MB'], 300.1)
             self.assertEqual(test_dict['species_pot']['K'], '2|1.5|9|10|11|30U:40:31(qc=6)', msg='Failed to scrape K_OTF.usp file')
             self.assertEqual(test_dict['species_pot']['P'], '3|1.8|4|4|5|30:31:32', msg='Failed to scrape P_OTF.usp file')
 
@@ -339,7 +344,7 @@ class CastepScraperTests(unittest.TestCase):
         self.assertEqual(test_dict['lattice_abc'][1][2], 59.971185, msg='Wrong lattice constants!')
         self.assertEqual(test_dict['geom_force_tol'], 0.05, msg='Wrong geom force tol')
         self.assertEqual(test_dict['castep_version'], '16.11')
-        self.assertEqual(test_dict['estimated_mem_MB'], 345.1)
+        self.assertEqual(test_dict['estimated_mem_per_process_MB'], 345.1)
 
     def test_history_gz(self):
         castep_fname = REAL_PATH + 'data/castep_files/Na3Zn4-swap-ReOs-OQMD_759599.history.gz'
@@ -587,7 +592,7 @@ class ScraperMiscTest(unittest.TestCase):
         self.assertEqual(len(failures), 1)
 
     def test_phonon_scraper(self):
-        phonon_fname = REAL_PATH + 'data/K8SnP4.phonon'
+        phonon_fname = REAL_PATH + 'data/phonon_dispersion/K3P.phonon'
         failed_open = False
         try:
             f = open(phonon_fname, 'r')
@@ -598,33 +603,32 @@ class ScraperMiscTest(unittest.TestCase):
             f.close()
             ph_dict, s = phonon2dict(phonon_fname, verbosity=VERBOSITY)
             self.assertTrue(s, msg='Failed to read phonon file')
-            self.assertEqual(ph_dict['num_atoms'], 26)
-            self.assertEqual(ph_dict['num_branches'], 78)
-            self.assertEqual(ph_dict['num_modes'], 78)
-            self.assertEqual(ph_dict['num_kpoints'], 110)
+            self.assertEqual(ph_dict['num_atoms'], 8)
+            self.assertEqual(ph_dict['num_branches'], 24)
+            self.assertEqual(ph_dict['num_modes'], 24)
+            self.assertEqual(ph_dict['num_kpoints'], 250)
             self.assertEqual(ph_dict['freq_unit'], 'cm-1')
-            self.assertEqual(ph_dict['lattice_cart'][0], [7.621987, 7.621987, 0.00000])
-            self.assertEqual(ph_dict['lattice_cart'][1], [-7.621987, 7.621987, 0.00000])
-            self.assertEqual(ph_dict['lattice_cart'][2], [-7.621987, 0.000000, 7.621987])
-            self.assertEqual(ph_dict['positions_frac'][0], [0.725087, 0.725075, 0.549843])
+            self.assertEqual(ph_dict['lattice_cart'][0], [4.961529, 2.864318, -0.00000])
+            self.assertEqual(ph_dict['lattice_cart'][1], [-4.961529, 2.864318, 0.00000])
+            self.assertEqual(ph_dict['lattice_cart'][2], [0.000000, 0.000000, 10.127257])
+            self.assertEqual(ph_dict['positions_frac'][0], [0.666699, 0.333301, 0.750129])
             self.assertEqual(ph_dict['atom_types'][0], 'P')
-            self.assertEqual(ph_dict['atom_types'][14], 'K')
-            self.assertEqual(ph_dict['atom_types'][-1], 'Sn')
+            self.assertEqual(ph_dict['atom_types'][2], 'K')
             self.assertEqual(ph_dict['atom_masses'][0], 30.97376)
-            self.assertEqual(ph_dict['atom_masses'][14], 39.0983)
-            self.assertEqual(ph_dict['atom_masses'][-1], 118.710)
-            self.assertEqual(ph_dict['softest_mode_freq'], -0.021599)
+            self.assertEqual(ph_dict['atom_masses'][2], 39.0983)
+            self.assertEqual(ph_dict['softest_mode_freq'], -23.654487)
 
             disp = VibrationalDispersion(ph_dict)
             ph_dict['kpoint_branches'] = disp.kpoint_branches
             ph_dict['kpoint_path_spacing'] = disp.kpoint_path_spacing
             self.assertAlmostEqual(ph_dict['kpoint_path_spacing'], 0.021, places=2)
             self.assertEqual(ph_dict['kpoint_branches'][0][0], 0)
-            self.assertEqual(ph_dict['kpoint_branches'][0][-1], 28)
-            self.assertEqual(ph_dict['kpoint_branches'][1][0], 29)
-            self.assertEqual(ph_dict['kpoint_branches'][1][-1], 76)
-            self.assertEqual(ph_dict['kpoint_branches'][-1][0], 77)
-            self.assertEqual(ph_dict['kpoint_branches'][-1][-1], 109)
+            self.assertEqual(ph_dict['kpoint_branches'][0][-1], 35)
+            self.assertEqual(ph_dict['kpoint_branches'][1][0], 36)
+            self.assertEqual(ph_dict['kpoint_branches'][1][-1], 134)
+            self.assertEqual(ph_dict['kpoint_branches'][-2][0], 135)
+            self.assertEqual(ph_dict['kpoint_branches'][-1][0], 185)
+            self.assertEqual(ph_dict['kpoint_branches'][-1][-1], 249)
 
     def test_phonon_dos_scraper(self):
         phonon_fname = REAL_PATH + 'data/phonon_dispersion/K3P.phonon_dos'

@@ -61,7 +61,7 @@ def scraper_function(function):
             if len(seed) == 1:
                 if success and not isinstance(result, dict):
                     raise AssertionError('Scraping succeeded, but dict not returned for {}'.format(seed))
-                elif not success and isinstance(result, dict):
+                if not success and isinstance(result, dict):
                     raise AssertionError('Scraping failed, but dict returned for {}'.format(seed))
 
                 return result, success
