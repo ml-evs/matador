@@ -6,6 +6,8 @@ import unittest
 import subprocess as sp
 import glob
 import time
+import warnings
+import multiprocessing as mp
 
 from shutil import copy
 from os import getcwd, uname
@@ -54,7 +56,7 @@ except FileNotFoundError:
     MPI_PRESENT = False
 
 if CASTEP_PRESENT and MPI_PRESENT:
-    NCORES = 4
+    NCORES = mp.cpu_count() - 2
 else:
     NCORES = 1
 
@@ -675,6 +677,109 @@ class ComputeTest(unittest.TestCase):
                 errors[ind] = True
 
         self.assertTrue(all(errors))
+
+
+class BenchmarkCastep(unittest.TestCase):
+    """ Run some short CASTEP calculations and compare the timings
+    to single core & multicore references.
+
+    """
+
+    def tearDown(self):
+        from shutil import rmtree
+        from os import chdir
+        chdir(REAL_PATH)
+        if isdir(TMP_DIR):
+            rmtree(TMP_DIR)
+
+        chdir(ROOT_DIR)
+
+    def setUp(self):
+        from os import chdir, makedirs
+        chdir(REAL_PATH)
+        makedirs(TMP_DIR, exist_ok=True)
+        chdir(TMP_DIR)
+
+    @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
+    def test_benchmark_dual_core_scf(self):
+        """ Test the time taken to perform a set number of SCF steps
+        on 2 cores. CASTEP prints no total timing data for single core jobs.
+
+        """
+        from os import makedirs
+        import shutil
+        seed = '_LiC.res'
+        copy(REAL_PATH + 'data/structures/LiC.res', '_LiC.res')
+
+        cell_dict, s = cell2dict(REAL_PATH + '/data/benchmark/LiC_scf/LiC_scf.cell', verbosity=VERBOSITY, db=False)
+        self.assertTrue(s)
+        param_dict, s = param2dict(REAL_PATH + '/data/benchmark/LiC_scf/LiC_scf.param', verbosity=VERBOSITY, db=False)
+        self.assertTrue(s)
+
+        copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
+        copy(REAL_PATH + 'data/pspots/C_00PBE.usp', '.')
+        with self.assertRaises(CalculationError):
+            ComputeTask(ncores=2, nnodes=None, node=None,
+                        res=seed, param_dict=param_dict, cell_dict=cell_dict,
+                        verbosity=0,
+                        executable=EXECUTABLE,
+                        start=True)
+
+        outputs_exist = [isfile('bad_castep/_LiC.res'),
+                         isfile('bad_castep/_LiC.castep')]
+
+        results, s = castep2dict('bad_castep/_LiC.castep', db=False)
+        makedirs(REAL_PATH + '/data/benchmark/results', exist_ok=True)
+        copy('bad_castep/_LiC.castep',
+             REAL_PATH + '/data/benchmark/results/_LiC_2core_castep{}.castep'
+             .format(results.get('castep_version', 'xxx')))
+
+        self.assertTrue(all(outputs_exist), "couldn't find output files!")
+        self.assertTrue(s, "couldn't read output files!")
+        self.assertLess(results['_time_estimated'], 8)
+
+    @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
+    def test_benchmark_manycore_scf(self):
+        """ Test the time taken to perform a set number of SCF steps
+        on many cores.
+
+        """
+        from os import makedirs
+        seed = '_LiC.res'
+        copy(REAL_PATH + 'data/structures/LiC.res', '_LiC.res')
+
+        cell_dict, s = cell2dict(REAL_PATH + '/data/benchmark/LiC_scf/LiC_scf.cell', verbosity=VERBOSITY, db=False)
+        self.assertTrue(s)
+        param_dict, s = param2dict(REAL_PATH + '/data/benchmark/LiC_scf/LiC_scf.param', verbosity=VERBOSITY, db=False)
+        self.assertTrue(s)
+
+        copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
+        copy(REAL_PATH + 'data/pspots/C_00PBE.usp', '.')
+        with self.assertRaises(CalculationError):
+            ComputeTask(ncores=NCORES, nnodes=None, node=None,
+                        res=seed, param_dict=param_dict, cell_dict=cell_dict,
+                        verbosity=0,
+                        executable=EXECUTABLE,
+                        start=True)
+
+        outputs_exist = [isfile('bad_castep/_LiC.res'),
+                         isfile('bad_castep/_LiC.castep')]
+
+        results, s = castep2dict('bad_castep/_LiC.castep', db=False)
+        makedirs(REAL_PATH + '/data/benchmark/results', exist_ok=True)
+        copy('bad_castep/_LiC.castep',
+             REAL_PATH + '/data/benchmark/results/_LiC_{}core_castep{}.castep'
+             .format(results.get('num_mpi_processes', 0), results.get('castep_version', 'xxx')))
+
+        self.assertTrue(all(outputs_exist), "couldn't find output files!")
+        self.assertTrue(s, "couldn't read output files!")
+        print(results['_time_estimated'])
+        benchmark_data = {2: 2*7.4, 4: 4*4.0, 12: 16.8, 14: 22.4, 18: 23.4}
+        warnings.warn(RuntimeWarning('Run took {} s with {} MPI processes, with cumulative CPU time of {:.1f} s. Benchmark data\n = {}'
+                                     .format(results['_time_estimated'],
+                                             results['num_mpi_processes'],
+                                             results['_time_estimated'] * results['num_mpi_processes'],
+                                             benchmark_data)))
 
 
 if __name__ == '__main__':
