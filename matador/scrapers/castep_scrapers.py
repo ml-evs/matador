@@ -16,7 +16,7 @@ import pwd
 import numpy as np
 from matador.utils.cell_utils import abc2cart, calc_mp_spacing, cart2volume, wrap_frac_coords, cart2abc, cart2frac
 from matador.utils.chem_utils import get_stoich
-from matador.scrapers.utils import DFTError, CalculationError, scraper_function, f90_float_parse
+from matador.scrapers.utils import DFTError, ComputationError, scraper_function, f90_float_parse
 
 
 @scraper_function
@@ -579,8 +579,12 @@ def castep2dict(seed, db=True, intermediates=False, **kwargs):
         with gzip.open(seed, 'r') as f:
             flines = [line.decode('utf-8') for line in f.readlines()]
     else:
-        with open(seed, 'r') as f:
-            flines = f.readlines()
+        try:
+            with open(seed, 'r', encoding='utf-8') as f:
+                flines = f.readlines()
+        except:
+            with open(seed, 'r', encoding='latin1') as f:
+                flines = f.readlines()
     # set source tag to castep file
     castep['source'] = []
     castep['source'].append(seed)
@@ -621,7 +625,7 @@ def castep2dict(seed, db=True, intermediates=False, **kwargs):
     _castep_scrape_devel_code(flines, castep)
 
     if 'positions_frac' not in castep or not castep['positions_frac']:
-        raise CalculationError('Could not find positions')
+        raise ComputationError('Could not find positions')
 
     # unfortunately CASTEP does not write forces when there is only one atom
     if 'forces' not in castep and castep['num_atoms'] == 1 and 'geometry' in castep['task']:
@@ -1122,7 +1126,7 @@ def _castep_scrape_atoms(flines, castep):
             castep['num_fu'] = castep['num_atoms'] / sum([elem[1] for elem in castep['stoichiometry']])
             break
     else:
-        raise CalculationError('Unable to find atoms in CASTEP file.')
+        raise ComputationError('Unable to find atoms in CASTEP file.')
 
 
 def _castep_scrape_final_parameters(flines, castep):
@@ -1287,143 +1291,136 @@ def _castep_scrape_final_structure(flines, castep, db=True):
 
     final_flines = flines[finish_line + 1:]
     for line_no, line in enumerate(final_flines):
-        try:
-            if 'Real Lattice' in line:
-                castep['lattice_cart'] = []
-                i = 1
-                while i < 4:
-                    if not final_flines[line_no + i].strip():
+        if 'Real Lattice' in line:
+            castep['lattice_cart'] = []
+            i = 1
+            while i < 4:
+                if not final_flines[line_no + i].strip():
+                    break
+                else:
+                    temp_line = final_flines[line_no + i].split()[0:3]
+                    castep['lattice_cart'].append(list(map(f90_float_parse, temp_line)))
+                i += 1
+        if 'Lattice parameters' in line:
+            castep['lattice_abc'] = []
+            i = 1
+            castep['lattice_abc'].append(
+                list(map(f90_float_parse,
+                         [final_flines[line_no+i].split('=')[1].strip().split(' ')[0],
+                          final_flines[line_no+i+1].split('=')[1].strip().split(' ')[0],
+                          final_flines[line_no+i+2].split('=')[1].strip().split(' ')[0]])))
+            castep['lattice_abc'].append(
+                list(map(f90_float_parse,
+                         [final_flines[line_no+i].split('=')[-1].strip(),
+                          final_flines[line_no+i+1].split('=')[-1].strip(),
+                          final_flines[line_no+i+2].split('=')[-1].strip()])))
+        elif 'Current cell volume' in line:
+            castep['cell_volume'] = f90_float_parse(line.split('=')[1].split()[0].strip())
+        elif 'Cell Contents' in line:
+            castep['positions_frac'] = []
+            i = 1
+            atoms = False
+            while True:
+                if atoms:
+                    if 'xxxxxxxxx' in final_flines[line_no + i]:
+                        atoms = False
                         break
                     else:
-                        temp_line = final_flines[line_no + i].split()[0:3]
-                        castep['lattice_cart'].append(list(map(f90_float_parse, temp_line)))
-                    i += 1
-            if 'Lattice parameters' in line:
-                castep['lattice_abc'] = []
-                i = 1
-                castep['lattice_abc'].append(
-                    list(map(f90_float_parse,
-                             [final_flines[line_no+i].split('=')[1].strip().split(' ')[0],
-                              final_flines[line_no+i+1].split('=')[1].strip().split(' ')[0],
-                              final_flines[line_no+i+2].split('=')[1].strip().split(' ')[0]])))
-                castep['lattice_abc'].append(
-                    list(map(f90_float_parse,
-                             [final_flines[line_no+i].split('=')[-1].strip(),
-                              final_flines[line_no+i+1].split('=')[-1].strip(),
-                              final_flines[line_no+i+2].split('=')[-1].strip()])))
-            elif 'Current cell volume' in line:
-                castep['cell_volume'] = f90_float_parse(line.split('=')[1].split()[0].strip())
-            elif 'Cell Contents' in line:
-                castep['positions_frac'] = []
-                i = 1
-                atoms = False
-                while True:
-                    if atoms:
-                        if 'xxxxxxxxx' in final_flines[line_no + i]:
-                            atoms = False
-                            break
-                        else:
-                            temp_frac = final_flines[line_no + i].split()[3:6]
-                            castep['positions_frac'].append(list(map(f90_float_parse, temp_frac)))
-                    if 'x------' in final_flines[line_no + i]:
-                        atoms = True
-                    i += 1
-            # don't check if final_energy exists, as this will update for each GO step
-            elif 'Final energy =' in line or 'Final energy, E' in line:
-                castep['total_energy'] = f90_float_parse(line.split('=')[1].split()[0])
-                castep['total_energy_per_atom'] = castep['total_energy'] / castep['num_atoms']
-            elif 'Final free energy' in line:
-                castep['free_energy'] = f90_float_parse(line.split('=')[1].split()[0])
-                castep['free_energy_per_atom'] = castep['free_energy'] / castep['num_atoms']
-            elif '0K energy' in line:
-                castep['0K_energy'] = f90_float_parse(line.split('=')[1].split()[0])
-                castep['0K_energy_per_atom'] = castep['0K_energy'] / castep['num_atoms']
-            elif ' Forces **' in line:
-                castep['forces'] = []
-                i = 1
-                forces = False
-                while True:
-                    if forces:
-                        if '*' in final_flines[line_no + i].split()[1]:
-                            forces = False
-                            break
-                        else:
-                            castep['forces'].append([])
-                            for j in range(3):
-                                temp = final_flines[line_no + i].replace('(cons\'d)', '')
-                                castep['forces'][-1].append(f90_float_parse(temp.split()[3 + j]))
-                    elif 'x' in final_flines[line_no + i]:
-                        i += 1  # skip next blank line
-                        forces = True
-                    i += 1
-                castep['max_force_on_atom'] = np.max(np.linalg.norm(castep['forces'], axis=-1))
-            elif 'Stress Tensor' in line:
-                i = 1
-                while i < 20:
-                    if 'Cartesian components' in final_flines[line_no + i]:
-                        castep['stress'] = []
+                        temp_frac = final_flines[line_no + i].split()[3:6]
+                        castep['positions_frac'].append(list(map(f90_float_parse, temp_frac)))
+                if 'x------' in final_flines[line_no + i]:
+                    atoms = True
+                i += 1
+        # don't check if final_energy exists, as this will update for each GO step
+        elif 'Final energy =' in line or 'Final energy, E' in line:
+            castep['total_energy'] = f90_float_parse(line.split('=')[1].split()[0])
+            castep['total_energy_per_atom'] = castep['total_energy'] / castep['num_atoms']
+        elif 'Final free energy' in line:
+            castep['free_energy'] = f90_float_parse(line.split('=')[1].split()[0])
+            castep['free_energy_per_atom'] = castep['free_energy'] / castep['num_atoms']
+        elif '0K energy' in line:
+            castep['0K_energy'] = f90_float_parse(line.split('=')[1].split()[0])
+            castep['0K_energy_per_atom'] = castep['0K_energy'] / castep['num_atoms']
+        elif ' Forces **' in line:
+            castep['forces'] = []
+            i = 1
+            forces = False
+            while True:
+                if forces:
+                    if '*' in final_flines[line_no + i].split()[1]:
+                        forces = False
+                        break
+                    else:
+                        castep['forces'].append([])
                         for j in range(3):
-                            castep['stress'].append(list(map(f90_float_parse, (final_flines[line_no + i + j + 4].split()[2:5]))))
-                    elif 'Pressure' in final_flines[line_no + i]:
-                        try:
-                            castep['pressure'] = f90_float_parse(final_flines[line_no + i].split()[-2])
-                        except ValueError:
-                            pass
-                        break
-                    i += 1
-            elif 'Integrated Spin Density' in line:
-                castep['integrated_spin_density'] = f90_float_parse(line.split()[-2])
-            elif 'Integrated |Spin Density|' in line:
-                castep['integrated_mod_spin_density'] = f90_float_parse(line.split()[-2])
-            elif 'Atomic Populations (Mulliken)' in line:
-                # population format seems to change every CASTEP version...
-                if float(castep.get('castep_version', 0.0)) >= 17:
-                    if castep['spin_polarized']:
-                        castep['mulliken_spins'] = []
-                        castep['mulliken_net_spin'] = 0.0
-                        castep['mulliken_abs_spin'] = 0.0
-                    castep['mulliken_charges'] = []
+                            temp = final_flines[line_no + i].replace('(cons\'d)', '')
+                            castep['forces'][-1].append(f90_float_parse(temp.split()[3 + j]))
+                elif 'x' in final_flines[line_no + i]:
+                    i += 1  # skip next blank line
+                    forces = True
+                i += 1
+            castep['max_force_on_atom'] = np.max(np.linalg.norm(castep['forces'], axis=-1))
+        elif 'Stress Tensor' in line:
+            i = 1
+            while i < 20:
+                if 'Cartesian components' in final_flines[line_no + i]:
+                    castep['stress'] = []
+                    for j in range(3):
+                        castep['stress'].append(list(map(f90_float_parse, (final_flines[line_no + i + j + 4].split()[2:5]))))
+                elif 'Pressure' in final_flines[line_no + i]:
+                    try:
+                        castep['pressure'] = f90_float_parse(final_flines[line_no + i].split()[-2])
+                    except ValueError:
+                        pass
+                    break
+                i += 1
+        elif 'Integrated Spin Density' in line:
+            castep['integrated_spin_density'] = f90_float_parse(line.split()[-2])
+        elif 'Integrated |Spin Density|' in line:
+            castep['integrated_mod_spin_density'] = f90_float_parse(line.split()[-2])
+        elif 'Atomic Populations (Mulliken)' in line:
+            # population format seems to change every CASTEP version...
+            if float(castep.get('castep_version', 0.0)) >= 17:
+                if castep['spin_polarized']:
                     castep['mulliken_spins'] = []
-                    i = 0
-                    ind = 0
-                    while ind < len(castep['atom_types']):
-                        if castep['spin_polarized']:
-                            castep['mulliken_charges'].append(f90_float_parse(final_flines[line_no + i + 4].split()[-2]))
-                            castep['mulliken_spins'].append(f90_float_parse(final_flines[line_no + i + 4].split()[-1]))
-                            castep['mulliken_net_spin'] += castep['mulliken_spins'][-1]
-                            castep['mulliken_abs_spin'] += abs(castep['mulliken_spins'][-1])
-                            i += 2
-                        else:
-                            castep['mulliken_charges'].append(f90_float_parse(final_flines[line_no + i + 4].split()[-1]))
-                            i += 1
-                        ind += 1
-            elif 'Final Enthalpy' in line:
-                castep['enthalpy'] = f90_float_parse(line.split('=')[-1].split()[0])
-                castep['enthalpy_per_atom'] = (f90_float_parse(line.split('=')[-1].split()[0]) / castep['num_atoms'])
-            elif 'Final bulk modulus' in line:
-                try:
-                    castep['bulk_modulus'] = f90_float_parse(line.split('=')[-1].split()[0])
-                except ValueError:
-                    # the above will fail if bulk modulus was not printed (i.e. if it was unchanged)
-                    pass
+                    castep['mulliken_net_spin'] = 0.0
+                    castep['mulliken_abs_spin'] = 0.0
+                castep['mulliken_charges'] = []
+                castep['mulliken_spins'] = []
+                i = 0
+                ind = 0
+                while ind < len(castep['atom_types']):
+                    if castep['spin_polarized']:
+                        castep['mulliken_charges'].append(f90_float_parse(final_flines[line_no + i + 4].split()[-2]))
+                        castep['mulliken_spins'].append(f90_float_parse(final_flines[line_no + i + 4].split()[-1]))
+                        castep['mulliken_net_spin'] += castep['mulliken_spins'][-1]
+                        castep['mulliken_abs_spin'] += abs(castep['mulliken_spins'][-1])
+                        i += 2
+                    else:
+                        castep['mulliken_charges'].append(f90_float_parse(final_flines[line_no + i + 4].split()[-1]))
+                        i += 1
+                    ind += 1
+        elif 'Final Enthalpy' in line:
+            castep['enthalpy'] = f90_float_parse(line.split('=')[-1].split()[0])
+            castep['enthalpy_per_atom'] = (f90_float_parse(line.split('=')[-1].split()[0]) / castep['num_atoms'])
+        elif 'Final bulk modulus' in line:
+            try:
+                castep['bulk_modulus'] = f90_float_parse(line.split('=')[-1].split()[0])
+            except ValueError:
+                # the above will fail if bulk modulus was not printed (i.e. if it was unchanged)
+                pass
 
-            elif 'Chemical Shielding and Electric Field Gradient Tensors'.lower() in line.lower():
-                i = 5
-                castep['chemical_shifts'] = []
-                while True:
-                    # break when the line containing just '=' is reached
-                    if len(flines[line_no + i].split()) == 1:
-                        break
-                    castep['chemical_shifts'].append(flines[line_no + i].split()[3])
-                    i += 1
-                if len(castep['chemical_shifts']) != len(castep['atom_types']):
-                    raise RuntimeError('Found fewer chemical shifts than atoms (or vice versa)!')
-
-        except DFTError as exc:
-            raise exc
-        # except Exception as oops:
-            # msg = 'Error on line {}, contents: {}, error: {}'.format(line_no, line, oops)
-            # raise RuntimeError(msg)
+        elif 'Chemical Shielding and Electric Field Gradient Tensors'.lower() in line.lower():
+            i = 5
+            castep['chemical_shifts'] = []
+            while True:
+                # break when the line containing just '=' is reached
+                if len(flines[line_no + i].split()) == 1:
+                    break
+                castep['chemical_shifts'].append(flines[line_no + i].split()[3])
+                i += 1
+            if len(castep['chemical_shifts']) != len(castep['atom_types']):
+                raise RuntimeError('Found fewer chemical shifts than atoms (or vice versa)!')
 
     # calculate kpoint spacing if not found
     if 'kpoints_mp_grid' in castep and 'kpoints_mp_spacing' not in castep and 'lattice_cart' in castep:

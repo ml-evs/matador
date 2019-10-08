@@ -3,12 +3,11 @@
 
 """ This file defines some useful scraper functionality,
 like custom errors and a scraper function wrapper.
-
 """
 
 
 import glob
-from traceback import print_exc
+import traceback as tb
 
 
 def scraper_function(function):
@@ -47,15 +46,16 @@ def scraper_function(function):
             # scraper function only has one arg
             try:
                 result, success = function(_seed, **kwargs)
-            except FileNotFoundError as oops:
+            # UnicodeDecodeErrors require 5 arguments, so handle these separately
+            except (FileNotFoundError, UnicodeError) as oops:
                 raise oops
             except Exception as oops:
                 success = False
-                result = type(oops)('{}: {}\n'.format(_seed, oops))
+                result = type(oops)('{}: {}'.format(_seed, oops))
 
                 msg = '{}: {} {}'.format(_seed, type(oops), oops)
                 if kwargs.get('verbosity', 1) > 0:
-                    print_exc()
+                    tb.print_exc()
                     print(msg)
 
             if len(seed) == 1:
@@ -102,14 +102,12 @@ class DFTError(Exception):
     non-useful calculations.
 
     """
-    pass
 
 
-class CalculationError(Exception):
+class ComputationError(Exception):
     """ Raised when the calculation fails to do the DFT.
     Distinct from DFTError as this is an issue of numerics
     or chemistry, where this is raised for technical issues,
     e.g. CASTEP crashes.
 
     """
-    pass
