@@ -51,7 +51,7 @@ def scraper_function(function):
                 raise oops
             except Exception as oops:
                 success = False
-                result = type(oops)('{}: {}'.format(_seed, oops))
+                result = type(oops)('{}: {}\n'.format(_seed, oops))
 
                 msg = '{}: {} {}'.format(_seed, type(oops), oops)
                 if kwargs.get('verbosity', 1) > 0:
