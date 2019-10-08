@@ -34,7 +34,7 @@ class SimilarityFilterTest(unittest.TestCase):
         cursor = sorted(cursor, key=lambda x: x['enthalpy_per_atom'])
         uniq_inds, _, _, _ = get_uniq_cursor(cursor)
         filtered_cursor = [cursor[ind] for ind in uniq_inds]
-        self.assertEqual(len(cursor), 11)
+        self.assertEqual(len(cursor), 10)
         self.assertEqual(len(filtered_cursor), 5)
         found = []
         correct_structures = [
