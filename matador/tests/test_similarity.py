@@ -52,6 +52,9 @@ class SimilarityFilterTest(unittest.TestCase):
             else:
                 found.append(False)
 
+        if not all(found):
+            print([doc['source'][0] for doc in filtered_cursor])
+
         self.assertTrue(all(found))
 
     def test_volume_rescale(self):

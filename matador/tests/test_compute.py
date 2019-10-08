@@ -3,6 +3,7 @@
 """ Some tests for high-throughput calculations. """
 
 import unittest
+import os
 import subprocess as sp
 import glob
 import time
@@ -28,7 +29,7 @@ TMP_DIR = 'tmp_test'
 ROOT_DIR = getcwd()
 VERBOSITY = 10
 EXECUTABLE = 'castep'
-RUN_SLOW_TESTS = False
+RUN_SLOW_TESTS = (os.uname()[1] == 'cluster2')
 
 
 try:
@@ -122,7 +123,7 @@ class ComputeTest(unittest.TestCase):
                               res=seed, param_dict=param_dict, cell_dict=cell_dict,
                               verbosity=VERBOSITY, executable=executable,
                               exec_test=False, polltime=1,
-                              start=False)
+                              start=True)
         errored = False
 
         try:
@@ -154,7 +155,7 @@ class ComputeTest(unittest.TestCase):
                               res=seed, param_dict=param_dict, cell_dict=cell_dict,
                               verbosity=VERBOSITY, executable=executable,
                               exec_test=False, polltime=1,
-                              start=False)
+                              start=True)
         errored = False
 
         try:
@@ -185,7 +186,7 @@ class ComputeTest(unittest.TestCase):
                               res=seed, param_dict=param_dict, cell_dict=cell_dict,
                               verbosity=VERBOSITY, executable=executable,
                               exec_test=False, polltime=0.01,
-                              start=False)
+                              start=True)
         errored = False
         try:
             relaxer.relax()
@@ -229,7 +230,7 @@ class ComputeTest(unittest.TestCase):
                               res=newborn, param_dict=param_dict, cell_dict=cell_dict,
                               verbosity=VERBOSITY, killcheck=True,
                               reopt=False, executable=executable, output_queue=queue,
-                              start=False)
+                              start=True)
         # store proc object with structure ID, node name, output queue and number of cores
         proc = (1, node, mp.Process(target=relaxer.relax), NCORES)
         proc[2].start()
@@ -303,7 +304,7 @@ class ComputeTest(unittest.TestCase):
                               res=seed, param_dict=param_dict, cell_dict=cell_dict,
                               verbosity=VERBOSITY, killcheck=True, memcheck=False,
                               reopt=True, executable=executable, rough=0, fine_iter=3,
-                              start=False)
+                              start=True)
 
         errored = False
         try:
@@ -370,14 +371,11 @@ class ComputeTest(unittest.TestCase):
         param_dict, s = param2dict(REAL_PATH + 'data/LiAs_tests/LiAs.param', verbosity=VERBOSITY, db=False)
         self.assertTrue(s)
 
-        raised_error = False
-        try:
+        with self.assertRaises(MaxMemoryEstimateExceeded):
             ComputeTask(ncores=NCORES, nnodes=None, node=None,
                         res='_LiAs_testcase', param_dict=param_dict, cell_dict=cell_dict,
                         verbosity=VERBOSITY, killcheck=True, memcheck=True, maxmem=1,
-                        start=False)
-        except MaxMemoryEstimateExceeded:
-            raised_error = True
+                        start=True)
 
         files_that_should_not_exist = ['_LiAs_testcase.res.lock', 'jobs.txt']
         folders_that_should_exist = ['logs']
@@ -387,7 +385,6 @@ class ComputeTest(unittest.TestCase):
         correct_folders = all([isdir(folder) for folder in folders_that_should_exist])
         correct_folders *= all([not isdir(folder) for folder in folders_that_should_not_exist])
 
-        self.assertTrue(raised_error)
         self.assertTrue(correct_folders)
         self.assertTrue(correct_files)
 

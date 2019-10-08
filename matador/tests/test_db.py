@@ -50,6 +50,7 @@ class TestDatabaseImport(unittest.TestCase):
 
         args = {'dryrun': True, 'override': True}
         importer = Spatula(args, settings=SETTINGS)
+        print(importer.errors)
         self.assertEqual(importer.import_count, 0)
         self.assertEqual(importer.skipped, 0)
         self.assertEqual(importer.errors, 3)
