@@ -238,6 +238,8 @@ class ComputeTask:
 
         if self.start:
             self.begin()
+        else:
+            LOG.info('Waiting for `begin()` method to be called...')
 
     def set_input_structure(self, res):
         """ Set the input structure to the given dictionary, or read it from
@@ -341,17 +343,14 @@ class ComputeTask:
             LOG.info('Adding noise to the positions in the cell')
             self.res_dict = add_noise(self.res_dict, amplitude=0.1)
 
-        calc_doc = deepcopy(self.res_dict)
+        self.calc_doc = deepcopy(self.res_dict)
 
         # update global doc with cell and param dicts for folder, and verify
         bad_keys = ['atom_types', 'positions_frac', 'positions_abs', 'lattice_cart', 'lattice_abc']
         self.cell_dict = {key: self.cell_dict[key] for key in self.cell_dict if key not in bad_keys}
-        calc_doc.update(self.cell_dict)
-        calc_doc.update(self.param_dict)
-        self.calculator.verify_calculation_parameters(calc_doc, self.res_dict)
-
-        # this is now a dict containing the exact calculation we are going to run
-        self.calc_doc = calc_doc
+        self.calc_doc.update(self.cell_dict)
+        self.calc_doc.update(self.param_dict)
+        self.calculator.verify_calculation_parameters(self.calc_doc, self.res_dict)
 
         try:
             LOG.info('Struture: {}'.format(Crystal(self.calc_doc)))
@@ -367,7 +366,7 @@ class ComputeTask:
 
         # do memcheck, if desired, and only continue if enough memory is free
         if self.memcheck:
-            memory_usage_estimate = self.do_memcheck(calc_doc, self.seed)
+            memory_usage_estimate = self.do_memcheck(self.calc_doc, self.seed)
             mem_string = ('Memory estimate / Available memory (MB): {:8.0f} / {:8.0f}'
                           .format(memory_usage_estimate, self.maxmem))
             LOG.info(mem_string)
@@ -377,34 +376,34 @@ class ComputeTask:
                 raise MaxMemoryEstimateExceeded(msg)
 
         try:
-                # run convergence tests
-                if any([self.conv_cutoff_bool, self.conv_kpt_bool]):
-                    success = self.run_convergence_tests(calc_doc)
+            # run convergence tests
+            if any([self.conv_cutoff_bool, self.conv_kpt_bool]):
+                success = self.run_convergence_tests(self.calc_doc)
 
-                # perform relaxation
-                elif calc_doc['task'].upper() in ['GEOMETRYOPTIMISATION', 'GEOMETRYOPTIMIZATION']:
-                    success = self.relax()
+            # perform relaxation
+            elif self.calc_doc['task'].upper() in ['GEOMETRYOPTIMISATION', 'GEOMETRYOPTIMIZATION']:
+                success = self.relax()
 
-                elif calc_doc['task'].upper() in ['PHONON', 'THERMODYNAMICS']:
-                    from matador.workflows.castep import castep_full_phonon
-                    success = castep_full_phonon(self, calc_doc, self.seed)
+            elif self.calc_doc['task'].upper() in ['PHONON', 'THERMODYNAMICS']:
+                from matador.workflows.castep import castep_full_phonon
+                success = castep_full_phonon(self, self.calc_doc, self.seed)
 
-                elif calc_doc['task'].upper() in ['SPECTRAL']:
-                    from matador.workflows.castep import castep_full_spectral
-                    success = castep_full_spectral(self, calc_doc, self.seed)
+            elif self.calc_doc['task'].upper() in ['SPECTRAL']:
+                from matador.workflows.castep import castep_full_spectral
+                success = castep_full_spectral(self, self.calc_doc, self.seed)
 
-                elif calc_doc['task'].upper() in ['BULK_MODULUS']:
-                    from matador.workflows.castep import castep_elastic
-                    success = castep_elastic(self, calc_doc, self.seed)
+            elif self.calc_doc['task'].upper() in ['BULK_MODULUS']:
+                from matador.workflows.castep import castep_elastic
+                success = castep_elastic(self, self.calc_doc, self.seed)
 
-                # run in SCF mode, i.e. just call CASTEP on the seeds
-                else:
-                    success = self.scf(calc_doc, self.seed, keep=True)
+            # run in SCF mode, i.e. just call CASTEP on the seeds
+            else:
+                success = self.scf(self.calc_doc, self.seed, keep=True)
 
-                if self.compute_dir is not None:
-                    os.chdir(self.root_folder)
-                    self.remove_compute_dir_if_finished(self.compute_dir)
-                self._first_run = False
+            if self.compute_dir is not None:
+                os.chdir(self.root_folder)
+                self.remove_compute_dir_if_finished(self.compute_dir)
+            self._first_run = False
 
         except Exception as err:
             if self.compute_dir is not None:
