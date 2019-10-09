@@ -15,7 +15,7 @@ import glob
 import time
 import random
 from matador.utils.print_utils import print_failure, print_warning
-from matador.compute.queue import get_queue_env, get_queue_walltime, get_queue_manager
+from matador.compute.queueing import get_queue_manager
 from matador.scrapers.castep_scrapers import cell2dict, param2dict
 from matador.compute.compute import ComputeTask
 from matador.utils.errors import (
@@ -106,36 +106,16 @@ class BatchRun:
         del self.args['limit']
         self.maxmem = self.args.get('maxmem')
         del self.args['maxmem']
+        self.max_walltime = self.args.get('max_walltime')
 
         # detect and scrape queue settings
-        self._queue_env = None
-        self._queue_walltime = None
-        self._queue_available_tasks = None
-        queue_mgr = get_queue_manager()
-        if queue_mgr is not None:
-            self._queue_env = get_queue_env(token=queue_mgr)
-            if queue_mgr == 'slurm':
-                self._queue_available_tasks = int(self._queue_env.get('SLURM_NTASKS', 0))
-            elif queue_mgr == 'pbs':
-                # PBS docs are unclear whether this is actually available
-                self._queue_available_tasks = int(self._queue_env.get('PBS_TASKNUM', 0))
-                self._queue_available_tasks = None
+        self.queue_mgr = get_queue_manager()
 
-            if self._queue_env is not None:
-                self._queue_walltime = get_queue_walltime(self._queue_env, queue_mgr)
-
-            self.maxmem = self._queue_env.get('SLURM_MEM_PER_CPU', None)
-            if self.maxmem is not None:
-                self.maxmem = int(self.maxmem)
-                self.maxmem *= int(self._queue_env.get('SLURM_NTASKS', 1))
-
-        # handle user-specified walltime and queue walltimes
-        if self.args.get('max_walltime') is not None:
-            self.max_walltime = self.args.get('max_walltime')
-        elif self._queue_walltime is not None:
-            self.max_walltime = self._queue_walltime
-        else:
-            self.max_walltime = None
+        if self.queue_mgr is not None:
+            if self.maxmem is None:
+                self.maxmem = self.queue_mgr.max_memory
+            if self.max_walltime is None:
+                self.max_walltime = self.queue_mgr.walltime
 
         self.start_time = None
         if self.max_walltime is not None:
@@ -144,10 +124,10 @@ class BatchRun:
         # assign number of cores
         self.all_cores = mp.cpu_count()
         if self.args.get('ncores') is None:
-            if self._queue_available_tasks is None:
+            if self.queue_mgr is None:
                 self.args['ncores'] = int(self.all_cores / self.nprocesses)
             else:
-                self.args['ncores'] = int(self._queue_available_tasks / self.nprocesses)
+                self.args['ncores'] = int(self.queue_mgr.ntasks / self.nprocesses)
 
         if self.args['nnodes'] < 1 or self.args['ncores'] < 1 or self.nprocesses < 1:
             raise InputError('Invalid number of cores, nodes or processes.')
@@ -266,8 +246,8 @@ class BatchRun:
                 _ = os.path.isfile('{}.lock'.format(res))
                 time.sleep(2 * random.random())
                 # wait some additional time if this is a slurm array job
-                if self._queue_env is not None:
-                    extra_wait = int(self._queue_env.get('SLURM_ARRAY_TASK_ID', 0)) % 10
+                if self.queue_mgr is not None:
+                    extra_wait = self.queue_mgr.array_id % 10 if self.queue_mgr.array_id else 0
                     time.sleep(extra_wait)
                 locked = os.path.isfile('{}.lock'.format(res))
                 if not self.args.get('ignore_jobs_file'):

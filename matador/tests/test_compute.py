@@ -4,12 +4,14 @@
 
 import unittest
 import subprocess as sp
+import os
 import glob
+import copy
+import shutil
 import time
 import warnings
 import multiprocessing as mp
 
-from shutil import copy
 from os import getcwd, uname
 from os.path import realpath, isfile, isdir
 
@@ -19,6 +21,8 @@ from matador.utils.errors import (
     WalltimeError, InputError
 )
 from matador.compute import ComputeTask, BatchRun, reset_job_folder
+from matador.compute.slurm import SlurmQueueManager
+from matador.compute.pbs import PBSQueueManager
 from matador.scrapers.castep_scrapers import cell2dict, param2dict, res2dict, castep2dict
 
 HOSTNAME = uname()[1]
@@ -205,8 +209,8 @@ class ComputeTest(unittest.TestCase):
         executable = 'castep'
         newborn['source'] = [REAL_PATH + '/data/GA_TESTCASE.res']
 
-        copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
-        copy(REAL_PATH + 'data/pspots/As_00PBE.usp', '.')
+        shutil.copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
+        shutil.copy(REAL_PATH + 'data/pspots/As_00PBE.usp', '.')
 
         queue = mp.Queue()
         relaxer = ComputeTask(ncores=NCORES, nnodes=None, node=node,
@@ -235,7 +239,7 @@ class ComputeTest(unittest.TestCase):
         input_exists = isfile('input/GA_TESTCASE.res')
 
         self.assertTrue(completed_exists, "couldn't find output file!")
-        self.assertTrue(input_exists, "couldn't find copy of input file!")
+        self.assertTrue(input_exists, "couldn't find shutil.copy of input file!")
         self.assertTrue(success, "couldn't parse output file!")
         self.assertTrue(all([match_dict[key] for key in match_dict]))
 
@@ -243,7 +247,7 @@ class ComputeTest(unittest.TestCase):
     def test_relax_to_file(self):
         """ Relax structure from file to file. """
         seed = '_Li.res'
-        copy(REAL_PATH + 'data/structures/Li.res', '_Li.res')
+        shutil.copy(REAL_PATH + 'data/structures/Li.res', '_Li.res')
 
         cell_dict, s = cell2dict(REAL_PATH + '/data/LiAs_tests/LiAs.cell', verbosity=VERBOSITY, db=False)
         assert s
@@ -252,8 +256,8 @@ class ComputeTest(unittest.TestCase):
         executable = 'castep'
         node = None
 
-        copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
-        copy(REAL_PATH + 'data/pspots/As_00PBE.usp', '.')
+        shutil.copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
+        shutil.copy(REAL_PATH + 'data/pspots/As_00PBE.usp', '.')
 
         ComputeTask(ncores=NCORES, nnodes=None, node=node,
                     res=seed, param_dict=param_dict, cell_dict=cell_dict,
@@ -270,7 +274,7 @@ class ComputeTest(unittest.TestCase):
     def test_failed_relaxation(self):
         """ Set a relaxation up to fail. """
         seed = '_LiAs_testcase.res'
-        copy(REAL_PATH + 'data/structures/LiAs_testcase_bad.res', '_LiAs_testcase.res')
+        shutil.copy(REAL_PATH + 'data/structures/LiAs_testcase_bad.res', '_LiAs_testcase.res')
 
         cell_dict, s = cell2dict(REAL_PATH + '/data/LiAs_tests/LiAs.cell', verbosity=VERBOSITY, db=False)
         assert s
@@ -280,8 +284,8 @@ class ComputeTest(unittest.TestCase):
         executable = 'castep'
         node = None
 
-        copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
-        copy(REAL_PATH + 'data/pspots/As_00PBE.usp', '.')
+        shutil.copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
+        shutil.copy(REAL_PATH + 'data/pspots/As_00PBE.usp', '.')
 
         relaxer = ComputeTask(ncores=NCORES, nnodes=None, node=node,
                               res=seed, param_dict=param_dict, cell_dict=cell_dict,
@@ -302,8 +306,8 @@ class ComputeTest(unittest.TestCase):
     def test_dont_restart_completed_calc(self):
         """ Set a relaxation up to fail. """
 
-        copy(REAL_PATH + 'data/no_steps_left_todo/cache/NaP_intermediates_stopped_early.res', '.')
-        copy(REAL_PATH + 'data/no_steps_left_todo/cache/NaP_intermediates_stopped_early.castep', '.')
+        shutil.copy(REAL_PATH + 'data/no_steps_left_todo/cache/NaP_intermediates_stopped_early.res', '.')
+        shutil.copy(REAL_PATH + 'data/no_steps_left_todo/cache/NaP_intermediates_stopped_early.castep', '.')
 
         cell_dict, s = cell2dict(REAL_PATH + 'data/no_steps_left_todo/NaP.cell', verbosity=VERBOSITY, db=False)
         self.assertTrue(s)
@@ -335,9 +339,9 @@ class ComputeTest(unittest.TestCase):
     def test_memcheck(self):
         """ Test the memory checker will not proceed with huge jobs. """
 
-        copy(REAL_PATH + 'data/structures/LiAs_testcase.res', '_LiAs_testcase.res')
-        copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
-        copy(REAL_PATH + 'data/pspots/As_00PBE.usp', '.')
+        shutil.copy(REAL_PATH + 'data/structures/LiAs_testcase.res', '_LiAs_testcase.res')
+        shutil.copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
+        shutil.copy(REAL_PATH + 'data/pspots/As_00PBE.usp', '.')
 
         cell_dict, s = cell2dict(REAL_PATH + 'data/LiAs_tests/LiAs.cell', verbosity=VERBOSITY, db=False)
         self.assertTrue(s)
@@ -366,12 +370,12 @@ class ComputeTest(unittest.TestCase):
     def test_batch_relax(self):
         """ Batch relax structures from file to file. """
 
-        copy(REAL_PATH + 'data/structures/LiC.res', '_LiC.res')
-        copy(REAL_PATH + 'data/LiC_tests/LiC.cell', '.')
-        copy(REAL_PATH + 'data/LiC_tests/LiC.param', '.')
+        shutil.copy(REAL_PATH + 'data/structures/LiC.res', '_LiC.res')
+        shutil.copy(REAL_PATH + 'data/LiC_tests/LiC.cell', '.')
+        shutil.copy(REAL_PATH + 'data/LiC_tests/LiC.param', '.')
 
-        copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
-        copy(REAL_PATH + 'data/pspots/C_00PBE.usp', '.')
+        shutil.copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
+        shutil.copy(REAL_PATH + 'data/pspots/C_00PBE.usp', '.')
 
         runner = BatchRun(seed=['LiC'], debug=False, no_reopt=True, verbosity=VERBOSITY, ncores=NCORES, executable=EXECUTABLE)
         runner.spawn(join=False)
@@ -386,11 +390,92 @@ class ComputeTest(unittest.TestCase):
         self.assertTrue(completed_exists, "couldn't find output file!")
         self.assertFalse(cruft_doesnt_exist, "found some cruft {}".format(cruft))
 
+    def test_batch_queues(self):
+        """ Test the scraping of queuing environments. """
+
+        shutil.copy(REAL_PATH + 'data/structures/LiC.res', '_LiC.res')
+        shutil.copy(REAL_PATH + 'data/LiC_tests/LiC.cell', '.')
+        shutil.copy(REAL_PATH + 'data/LiC_tests/LiC.param', '.')
+
+        shutil.copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
+        shutil.copy(REAL_PATH + 'data/pspots/C_00PBE.usp', '.')
+
+        slurm_env = {
+            'SLURM_NTASKS': '120',
+            'SLURM_JOB_ID': '123456',
+            'SLURM_ARRAY_TASK_ID': '123123',
+            'SLURM_MEM_PER_CPU': '1024',
+            'SLURM_RANDOM_STRING': 'hello',
+            'blah': 'abc'
+        }
+
+        pbs_env = {
+            'PBS_TASKNUM': '120',
+            'PBS_JOB_ID': '999',
+            'PBS_ARRAYID': '123123',
+        }
+
+        old_env = copy.deepcopy(os.environ)
+        os.environ.update(slurm_env)
+
+        runner = BatchRun(seed=['LiC'],
+                          debug=False,
+                          ncores=NCORES,
+                          verbosity=VERBOSITY,
+                          executable=EXECUTABLE)
+
+        self.assertEqual(runner.args['ncores'], 4)
+        self.assertEqual(type(runner.queue_mgr), SlurmQueueManager)
+        self.assertEqual(runner.maxmem, 1024*120)
+        self.assertEqual(runner.queue_mgr.max_memory, 1024*120)
+        self.assertEqual(runner.queue_mgr.array_id, 123123)
+        self.assertEqual(runner.queue_mgr.env['SLURM_RANDOM_STRING'], 'hello')
+        self.assertTrue('blah' not in runner.queue_mgr.env)
+
+        runner = BatchRun(seed=['LiC'],
+                          debug=False,
+                          ncores=None,
+                          verbosity=VERBOSITY,
+                          executable=EXECUTABLE)
+
+        self.assertEqual(runner.args['ncores'], 120)
+        self.assertEqual(type(runner.queue_mgr), SlurmQueueManager)
+        self.assertEqual(runner.maxmem, 1024*120)
+        self.assertEqual(runner.queue_mgr.max_memory, 1024*120)
+        self.assertEqual(runner.queue_mgr.array_id, 123123)
+
+        os.environ = copy.deepcopy(old_env)
+        os.environ.update(pbs_env)
+
+        runner = BatchRun(seed=['LiC'],
+                          debug=False,
+                          ncores=None,
+                          verbosity=VERBOSITY,
+                          executable=EXECUTABLE)
+
+        print(runner.queue_mgr)
+
+        self.assertEqual(runner.args['ncores'], 120)
+        self.assertEqual(type(runner.queue_mgr), PBSQueueManager)
+        self.assertEqual(runner.maxmem, None)
+        self.assertEqual(runner.queue_mgr.max_memory, None)
+        self.assertEqual(runner.queue_mgr.array_id, 123123)
+
+        os.environ.update(slurm_env)
+        with self.assertRaises(RuntimeError):
+            runner = BatchRun(seed=['LiC'],
+                              debug=False,
+                              ncores=None,
+                              verbosity=VERBOSITY,
+                              executable=EXECUTABLE)
+
+        os.environ = copy.deepcopy(old_env)
+
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
     def test_scf(self):
         """ Perform SCF on structure from file. """
         seed = '_LiC.res'
-        copy(REAL_PATH + 'data/structures/LiC.res', '_LiC.res')
+        shutil.copy(REAL_PATH + 'data/structures/LiC.res', '_LiC.res')
 
         cell_dict, s = cell2dict(REAL_PATH + '/data/LiC_tests/LiC_scf.cell', verbosity=VERBOSITY, db=False)
         assert s
@@ -399,8 +484,8 @@ class ComputeTest(unittest.TestCase):
         executable = 'castep'
         node = None
 
-        copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
-        copy(REAL_PATH + 'data/pspots/C_00PBE.usp', '.')
+        shutil.copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
+        shutil.copy(REAL_PATH + 'data/pspots/C_00PBE.usp', '.')
 
         ComputeTask(ncores=NCORES, nnodes=None, node=node,
                     res=seed, param_dict=param_dict, cell_dict=cell_dict,
@@ -417,11 +502,11 @@ class ComputeTest(unittest.TestCase):
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
     def test_convergence_runner(self):
         """ Check that convergence tests run to completion. """
-        copy(REAL_PATH + 'data/structures/Li.res', '_LiAs_testcase.res')
-        copy(REAL_PATH + 'data/LiAs_tests/LiAs_scf.cell', '.')
-        copy(REAL_PATH + 'data/LiAs_tests/LiAs_scf.param', '.')
-        copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
-        copy(REAL_PATH + 'data/pspots/As_00PBE.usp', '.')
+        shutil.copy(REAL_PATH + 'data/structures/Li.res', '_LiAs_testcase.res')
+        shutil.copy(REAL_PATH + 'data/LiAs_tests/LiAs_scf.cell', '.')
+        shutil.copy(REAL_PATH + 'data/LiAs_tests/LiAs_scf.param', '.')
+        shutil.copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
+        shutil.copy(REAL_PATH + 'data/pspots/As_00PBE.usp', '.')
 
         with open('kpt.conv', 'w') as f:
             f.write('0.08\n')
@@ -456,12 +541,12 @@ class ComputeTest(unittest.TestCase):
     def test_batch_failed_scf(self):
         """ Check that SCF failures don't kill everything... """
 
-        copy(REAL_PATH + 'data/structures/Li.res', '_Li.res')
-        copy(REAL_PATH + 'data/structures/LiC.res', '_LiC.res')
-        copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
-        copy(REAL_PATH + 'data/pspots/C_00PBE.usp', '.')
-        copy(REAL_PATH + 'data/fail_scf/LiC_scf.cell', '.')
-        copy(REAL_PATH + 'data/fail_scf/LiC_scf.param', '.')
+        shutil.copy(REAL_PATH + 'data/structures/Li.res', '_Li.res')
+        shutil.copy(REAL_PATH + 'data/structures/LiC.res', '_LiC.res')
+        shutil.copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
+        shutil.copy(REAL_PATH + 'data/pspots/C_00PBE.usp', '.')
+        shutil.copy(REAL_PATH + 'data/fail_scf/LiC_scf.cell', '.')
+        shutil.copy(REAL_PATH + 'data/fail_scf/LiC_scf.param', '.')
 
         runner = BatchRun(seed=['LiC_scf'], debug=False, no_reopt=True,
                           verbosity=VERBOSITY, ncores=NCORES, executable=EXECUTABLE)
@@ -489,12 +574,12 @@ class ComputeTest(unittest.TestCase):
 
     def test_failed_compute_dir_scf(self):
         """ Check that using a garbage path for compute dir causes a safe crash. """
-        copy(REAL_PATH + 'data/structures/Li.res', '_Li.res')
-        copy(REAL_PATH + 'data/structures/LiC.res', '_LiC.res')
-        copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
-        copy(REAL_PATH + 'data/pspots/C_00PBE.usp', '.')
-        copy(REAL_PATH + 'data/fail_scf/LiC_scf.cell', '.')
-        copy(REAL_PATH + 'data/fail_scf/LiC_scf.param', '.')
+        shutil.copy(REAL_PATH + 'data/structures/Li.res', '_Li.res')
+        shutil.copy(REAL_PATH + 'data/structures/LiC.res', '_LiC.res')
+        shutil.copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
+        shutil.copy(REAL_PATH + 'data/pspots/C_00PBE.usp', '.')
+        shutil.copy(REAL_PATH + 'data/fail_scf/LiC_scf.cell', '.')
+        shutil.copy(REAL_PATH + 'data/fail_scf/LiC_scf.param', '.')
 
         runner = BatchRun(seed=['LiC_scf'], debug=False, no_reopt=True, scratch_prefix='/this/drive/doesnt/exist',
                           verbosity=VERBOSITY, ncores=NCORES, executable=EXECUTABLE)
@@ -505,12 +590,12 @@ class ComputeTest(unittest.TestCase):
     def test_batch_max_walltime_threaded(self):
         """ Check that WallTimeErrors do kill everything... """
 
-        copy(REAL_PATH + 'data/structures/LiAs_testcase.res', '.')
-        copy(REAL_PATH + 'data/structures/LiAs_testcase_bad.res', '.')
-        copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
-        copy(REAL_PATH + 'data/pspots/As_00PBE.usp', '.')
-        copy(REAL_PATH + 'data/max_walltime/LiAs.cell', '.')
-        copy(REAL_PATH + 'data/max_walltime/LiAs.param', '.')
+        shutil.copy(REAL_PATH + 'data/structures/LiAs_testcase.res', '.')
+        shutil.copy(REAL_PATH + 'data/structures/LiAs_testcase_bad.res', '.')
+        shutil.copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
+        shutil.copy(REAL_PATH + 'data/pspots/As_00PBE.usp', '.')
+        shutil.copy(REAL_PATH + 'data/max_walltime/LiAs.cell', '.')
+        shutil.copy(REAL_PATH + 'data/max_walltime/LiAs.param', '.')
 
         runner = BatchRun(seed=['LiAs'], debug=False, no_reopt=True,
                           verbosity=VERBOSITY, ncores=2, nprocesses=2, executable=EXECUTABLE,
@@ -539,7 +624,7 @@ class ComputeTest(unittest.TestCase):
         executable = 'echo'
         files = glob.glob(REAL_PATH + '/data/structures/*.res')
         for _file in files:
-            copy(_file, '.')
+            shutil.copy(_file, '.')
 
         runner = BatchRun(seed='*.res', debug=False, mode='generic',
                           verbosity=4, ncores=1, executable=executable)
@@ -574,7 +659,7 @@ class ComputeTest(unittest.TestCase):
         executable = 'echo'
         files = glob.glob(REAL_PATH + '/data/structures/*.res')
         _file = files[0]
-        copy(_file, '.')
+        shutil.copy(_file, '.')
 
         runner = BatchRun(seed='*.res', debug=False, mode='generic',
                           verbosity=4, ncores=1, nprocesses=4, executable=executable)
@@ -606,7 +691,7 @@ class ComputeTest(unittest.TestCase):
     def test_batch_nothing_todo(self):
         """ Check that nothing is done when there's nothing to do... """
         for file in glob.glob(REAL_PATH + 'data/nothing_to_do/*.*'):
-            copy(file, '.')
+            shutil.copy(file, '.')
 
         runner = BatchRun(seed=['LiAs'], debug=False, no_reopt=True,
                           verbosity=VERBOSITY, ncores=2, nprocesses=2, executable=EXECUTABLE)
@@ -617,9 +702,9 @@ class ComputeTest(unittest.TestCase):
 
     def test_res_name_collision(self):
         """ Check that run3 safely falls over if there is a file called <seed>.res. """
-        copy(REAL_PATH + 'data/file_collision/LiAs.cell', '.')
-        copy(REAL_PATH + 'data/file_collision/LiAs.res', '.')
-        copy(REAL_PATH + 'data/file_collision/LiAs.param', '.')
+        shutil.copy(REAL_PATH + 'data/file_collision/LiAs.cell', '.')
+        shutil.copy(REAL_PATH + 'data/file_collision/LiAs.res', '.')
+        shutil.copy(REAL_PATH + 'data/file_collision/LiAs.param', '.')
 
         failed_safely = False
         try:
@@ -634,7 +719,7 @@ class ComputeTest(unittest.TestCase):
     def test_missing_basics(self):
         """" Check that run3 falls over when e.g. xc_functional is missing. """
         for file in glob.glob(REAL_PATH + 'data/misisng_basics/*.*'):
-            copy(file, '.')
+            shutil.copy(file, '.')
 
         tests = ['missing_cutoff', 'missing_kpts', 'missing_xc', 'missing_pspot']
         errors = [False for test in tests]
@@ -678,15 +763,15 @@ class BenchmarkCastep(unittest.TestCase):
         """
         from os import makedirs
         seed = '_LiC.res'
-        copy(REAL_PATH + 'data/structures/LiC.res', '_LiC.res')
+        shutil.copy(REAL_PATH + 'data/structures/LiC.res', '_LiC.res')
 
         cell_dict, s = cell2dict(REAL_PATH + '/data/benchmark/LiC_scf/LiC_scf.cell', verbosity=VERBOSITY, db=False)
         self.assertTrue(s)
         param_dict, s = param2dict(REAL_PATH + '/data/benchmark/LiC_scf/LiC_scf.param', verbosity=VERBOSITY, db=False)
         self.assertTrue(s)
 
-        copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
-        copy(REAL_PATH + 'data/pspots/C_00PBE.usp', '.')
+        shutil.copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
+        shutil.copy(REAL_PATH + 'data/pspots/C_00PBE.usp', '.')
         with self.assertRaises(CalculationError):
             ComputeTask(ncores=2, nnodes=None, node=None,
                         res=seed, param_dict=param_dict, cell_dict=cell_dict,
@@ -699,7 +784,7 @@ class BenchmarkCastep(unittest.TestCase):
 
         results, s = castep2dict('bad_castep/_LiC.castep', db=False)
         makedirs(REAL_PATH + '/data/benchmark/results', exist_ok=True)
-        copy('bad_castep/_LiC.castep',
+        shutil.copy('bad_castep/_LiC.castep',
              REAL_PATH + '/data/benchmark/results/_LiC_2core_castep{}.castep'
              .format(results.get('castep_version', 'xxx')))
 
@@ -715,15 +800,15 @@ class BenchmarkCastep(unittest.TestCase):
         """
         from os import makedirs
         seed = '_LiC.res'
-        copy(REAL_PATH + 'data/structures/LiC.res', '_LiC.res')
+        shutil.copy(REAL_PATH + 'data/structures/LiC.res', '_LiC.res')
 
         cell_dict, s = cell2dict(REAL_PATH + '/data/benchmark/LiC_scf/LiC_scf.cell', verbosity=VERBOSITY, db=False)
         self.assertTrue(s)
         param_dict, s = param2dict(REAL_PATH + '/data/benchmark/LiC_scf/LiC_scf.param', verbosity=VERBOSITY, db=False)
         self.assertTrue(s)
 
-        copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
-        copy(REAL_PATH + 'data/pspots/C_00PBE.usp', '.')
+        shutil.copy(REAL_PATH + 'data/pspots/Li_00PBE.usp', '.')
+        shutil.copy(REAL_PATH + 'data/pspots/C_00PBE.usp', '.')
         with self.assertRaises(CalculationError):
             ComputeTask(ncores=NCORES, nnodes=None, node=None,
                         res=seed, param_dict=param_dict, cell_dict=cell_dict,
@@ -736,9 +821,9 @@ class BenchmarkCastep(unittest.TestCase):
 
         results, s = castep2dict('bad_castep/_LiC.castep', db=False)
         makedirs(REAL_PATH + '/data/benchmark/results', exist_ok=True)
-        copy('bad_castep/_LiC.castep',
-             REAL_PATH + '/data/benchmark/results/_LiC_{}core_castep{}.castep'
-             .format(results.get('num_mpi_processes', 0), results.get('castep_version', 'xxx')))
+        shutil.copy('bad_castep/_LiC.castep',
+                    REAL_PATH + '/data/benchmark/results/_LiC_{}core_castep{}.castep'
+                    .format(results.get('num_mpi_processes', 0), results.get('castep_version', 'xxx')))
 
         self.assertTrue(all(outputs_exist), "couldn't find output files!")
         self.assertTrue(s, "couldn't read output files!")

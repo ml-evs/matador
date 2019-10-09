@@ -7,54 +7,64 @@ cancelling jobs.
 
 """
 
-from matador.compute.queue import get_queue_env
+from matador.compute.queueing import get_queue_env, QueueManager
 
 
-def get_slurm_env():
-    """ Scrape SLURM environment variables from current env.
-    This function can be used when called inside an active slurm job.
+class SlurmQueueManager(QueueManager):
+    """ Wrapper for the Slurm queueing system. """
 
-    Returns:
-        dict: dictionary containing all the currently set SLURM environment variables.
+    token = 'slurm'
 
-    """
-    return get_queue_env(token='slurm')
+    def get_array_id(self):
+        if self.env.get('SLURM_ARRAY_TASK_ID') is not None:
+            return int(self.env['SLURM_ARRAY_TASK_ID'])
+        return None
 
+    def get_ntasks(self):
+        return int(self.env['SLURM_NTASKS'])
 
-def get_slurm_walltime(slurm_dict):
-    """ Query available walltime with scontrol on the current job.
+    def get_max_memory(self):
+        if self.env.get('SLURM_MEM_PER_CPU') is None:
+            return None
+        else:
+            return float(self.env['SLURM_MEM_PER_CPU']) * self.ntasks
 
-    Parameters:
-        slurm_dict (dict): slurm env parameters to query.
+    def get_walltime(self):
+        """ Query available walltime with scontrol on the current job.
 
-    Raises:
-        RuntimeError: if SLURM_JOB_ID not present in slurm env.
-        subprocess.CalledProcessError: if unable to use scontrol.
+        Parameters:
+            slurm_dict (dict): slurm env parameters to query.
 
-    Returns:
-        int: maximum allowed walltime time in seconds.
+        Raises:
+            RuntimeError: if SLURM_JOB_ID not present in slurm env.
+            subprocess.CalledProcessError: if unable to use scontrol.
 
-    """
-    import subprocess as sp
-    job_id = slurm_dict.get('SLURM_JOB_ID')
-    if job_id is not None:
+        Returns:
+            int: maximum allowed walltime time in seconds.
+
+        """
+        import subprocess as sp
+        slurm_dict = self.env
+        job_id = slurm_dict.get('SLURM_JOB_ID')
+        if job_id is None:
+            return None
+
         output = sp.check_output('scontrol show job={}'.format(job_id), shell=True).decode('utf-8')
+        output_dict = {line.split('=')[0].lower(): line.split('=')[-1] for line in output.split()}
 
-    output_dict = {line.split('=')[0].lower(): line.split('=')[-1] for line in output.split()}
+        walltime = output_dict.get('timelimit')
+        hrs = 0
+        if '-' in walltime:
+            days = int(walltime.split('-')[0])
+            walltime = walltime.split('-')[1]
+            hrs += days * 24
 
-    walltime = output_dict.get('timelimit')
-    hrs = 0
-    if '-' in walltime:
-        days = int(walltime.split('-')[0])
-        walltime = walltime.split('-')[1]
-        hrs += days * 24
+        hrs += int(walltime.split(':')[0])
+        mins = int(walltime.split(':')[1])
+        secs = int(walltime.split(':')[2])
+        walltime_in_seconds = (60 * hrs + mins) * 60 + secs
 
-    hrs += int(walltime.split(':')[0])
-    mins = int(walltime.split(':')[1])
-    secs = int(walltime.split(':')[2])
-    walltime_in_seconds = (60 * hrs + mins) * 60 + secs
-
-    return walltime_in_seconds
+        return walltime_in_seconds
 
 
 def scancel_all_matching_jobs(name=None):
