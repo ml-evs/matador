@@ -293,7 +293,8 @@ class ComputeTask:
 
         except Exception as exc:
             LOG.error('Process raised {} with message {}.'.format(type(exc), exc))
-            LOG.error('Full traceback:\n{}'.format(tb.format_exc()))
+            if type(exc) != CalculationError:
+                LOG.error('Full traceback:\n{}'.format(tb.format_exc()))
             for handler in LOG.handlers[:]:
                 handler.close()
             raise exc
@@ -571,7 +572,7 @@ class ComputeTask:
                          .format(opti_dict.get('geom_iter')))
 
                 # scrub keys that need to be rescraped
-                keys_to_remove = ['kpoints_mp_spacing', 'kpoints_mp_grid', 'species_pot', 'sedc_apply', 'sedc_scheme']
+                keys_to_remove = ['kpoints_mp_spacing', 'kpoints_mp_grid', 'species_pot', 'sedc_apply', 'sedc_scheme', 'cell_constraints']
                 for key in keys_to_remove:
                     if key in opti_dict:
                         del opti_dict[key]
@@ -612,6 +613,11 @@ class ComputeTask:
                     # set atomic_init_spins with value from CASTEP file, if it exists
                     if 'mulliken_spins' in opti_dict:
                         self.calc_doc['atomic_init_spins'] = opti_dict['mulliken_spins']
+
+                    # CASTEP prints cell constraints in castep file when running with symmetry
+                    # its useful to disable these and use either the initial constraints, or none
+                    if 'cell_constraints' in self.cell_dict:
+                        self.calc_doc['cell_constraints'] = self.cell_dict['cell_constraints']
 
                     # if writing out cell, use it for higher precision lattice_cart
                     if self.calc_doc.get('write_cell_structure') and os.path.isfile('{}-out.cell'.format(seed)):
