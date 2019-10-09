@@ -358,10 +358,6 @@ class ComputeTask:
         except Exception as exc:
             LOG.warning('Unable to convert structure to Crystal... {}'.format(exc))
 
-        LOG.debug('Calculation dictionary: {}'
-                  .format(matador.utils.print_utils.dumps(self.calc_doc,
-                                                          indent=2)))
-
         # now verify the structure itself
         self.calculator.verify_simulation_cell(self.res_dict)
 
@@ -1394,6 +1390,10 @@ class ComputeTask:
             if os.path.isfile(seed + '.param'):
                 os.remove(seed + '.param')
             doc2param(this_calc_doc, seed, hash_dupe=False, spin=self.spin)
+
+        LOG.debug('Calculation dictionary: {}'
+                  .format(matador.utils.print_utils.dumps(this_calc_doc,
+                                                          indent=2)))
 
     @staticmethod
     def tidy_up(seed):
