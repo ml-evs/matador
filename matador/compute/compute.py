@@ -703,6 +703,8 @@ class ComputeTask:
                 msg = 'Error scraping CASTEP file {}: {}'.format(seed, results_dict)
                 raise CalculationError(msg)
 
+            self._update_output_files()
+
             if not intermediate:
                 LOG.info('Writing results of singleshot CASTEP run to res file and tidying up.')
                 doc2res(results_dict, seed, hash_dupe=False, overwrite=True)
@@ -1410,29 +1412,30 @@ class ComputeTask:
                 if not (f.endswith('.res') or f.endswith('.castep')):
                     os.remove(f)
 
-    def _update_output_files(self, opti_dict):
+    def _update_output_files(self, opti_dict=None):
         """ Copy new data to output files and update
          the results dict.
 
-        Parameters:
+        Keyword arguments:
             opti_dict (dict): intermediate calculation results.
 
         """
         LOG.info('Updating .res and .castep files in root_dir with new results')
-        if os.path.isfile(self.seed + '.res'):
-            os.rename('{}.res'.format(self.seed), '{}.res_bak'.format(self.seed))
-        try:
-            doc2res(opti_dict, self.seed, hash_dupe=False)
-        except CalculationError:
-            doc2res(opti_dict, self.seed, hash_dupe=False, info=False)
-        if os.path.isfile(self.seed + '.res_bak'):
-            os.remove(self.seed + '.res_bak')
+        if opti_dict is not None:
+            if os.path.isfile(self.seed + '.res'):
+                os.rename('{}.res'.format(self.seed), '{}.res_bak'.format(self.seed))
+            try:
+                doc2res(opti_dict, self.seed, hash_dupe=False)
+            except CalculationError:
+                doc2res(opti_dict, self.seed, hash_dupe=False, info=False)
+            if os.path.isfile(self.seed + '.res_bak'):
+                os.remove(self.seed + '.res_bak')
+            self.res_dict.update(opti_dict)
 
         if self.compute_dir is not None:
             shutil.copy2(self.seed + '.res', self.root_folder)
             if os.path.isfile(self.seed + '.castep'):
                 shutil.copy2(self.seed + '.castep', self.root_folder)
-        self.res_dict.update(opti_dict)
 
     def _finalise_result(self):
         """ Push to queue if necessary and return status.
