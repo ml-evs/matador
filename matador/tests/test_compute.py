@@ -424,7 +424,7 @@ class ComputeTest(unittest.TestCase):
                           verbosity=VERBOSITY,
                           executable=EXECUTABLE)
 
-        self.assertEqual(runner.args['ncores'], 4)
+        self.assertEqual(runner.args['ncores'], NCORES)
         self.assertEqual(type(runner.queue_mgr), SlurmQueueManager)
         self.assertEqual(runner.maxmem, 1024*120)
         self.assertEqual(runner.queue_mgr.max_memory, 1024*120)
