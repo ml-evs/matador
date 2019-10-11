@@ -13,7 +13,7 @@ from matador.plotting.hull_plotting import get_hull_labels
 
 
 @plotting_function
-def plot_voltage_curve(hull, ax=None, show=False, **kwargs):
+def plot_voltage_curve(hull, ax=None, show=False, curve_label=None, line_kwargs=None, **kwargs):
     """ Plot voltage curve calculated for phase diagram.
 
     Parameters:
@@ -46,16 +46,24 @@ def plot_voltage_curve(hull, ax=None, show=False, **kwargs):
 
         dft_label = 'DFT (this work)'
 
+    if curve_label is not None:
+        dft_label = curve_label
+
     for ind, (capacities, voltages) in enumerate(zip(hull.voltage_data['Q'], hull.voltage_data['voltages'])):
         if dft_label is None and len(hull.voltage_data['voltages']) > 1:
             stoich_label = get_formula_from_stoich(hull.voltage_data['endstoichs'][ind], tex=True)
         else:
             stoich_label = None
         label = stoich_label if dft_label is None else dft_label
-        add_voltage_curve(capacities, voltages, ax_volt, c=hull.colours[ind], label=label)
+        if line_kwargs is None:
+            line_kwargs = {}
+        add_voltage_curve(capacities, voltages, ax_volt, label=label, **line_kwargs)
 
     if hull.args.get('labels') or hull.args.get('label_cutoff') is not None:
         label_cursor = get_hull_labels(hull, num_species=2)
+        # for testing purposes only
+        if 'label_cursor' in kwargs:
+            kwargs['label_cursor'].extend(label_cursor)
         for i, doc in enumerate(label_cursor):
             ax_volt.annotate(get_formula_from_stoich(doc['stoichiometry'],
                                                      elements=hull.elements, tex=True),
@@ -77,7 +85,6 @@ def plot_voltage_curve(hull, ax=None, show=False, **kwargs):
     ax_volt.set_xlim(0, 1.1 * end)
     ax_volt.grid(False)
     plt.tight_layout(pad=0.0, h_pad=1.0, w_pad=0.2)
-
 
     if hull.savefig or any([kwargs.get(ext) for ext in SAVE_EXTS]):
         fname = ''.join(hull.elements) + '_voltage'

@@ -61,13 +61,15 @@ def get_hull_labels(hull, label_cutoff=None, num_species=None, exclude_edges=Tru
         label_cursor = [doc for doc in label_cursor if (all(doc['concentration']) > 0 and
                                                         sum(doc['concentration']) <= 1 - 1e-6)]
 
+    label_cursor = sorted(label_cursor, key=lambda doc: doc['concentration'])
+
     return label_cursor
 
 
 @plotting_function
 def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
                  plot_hull_points=True, labels=None, label_cutoff=None, colour_by_source=False,
-                 sources=None, source_labels=None, title=True, plot_fname=None, show_cbar=True,
+                 sources=None, hull_label=None, source_labels=None, title=True, plot_fname=None, show_cbar=True,
                  **kwargs):
     """ Plot calculated hull, returning ax and fig objects for further editing.
 
@@ -102,7 +104,8 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
         fig = plt.figure(facecolor=None, figsize=(8, 6))
         ax = fig.add_subplot(111, facecolor=None)
 
-    hull.colours = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])
+    if not hasattr(hull, 'colours'):
+        hull.colours = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])
     hull.default_cmap_list = get_linear_cmap(hull.colours[1:4], list_only=True)
     hull.default_cmap = get_linear_cmap(hull.colours[1:4], list_only=False)
 
@@ -113,8 +116,8 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
 
     scale = 1
     scatter = []
-    # TODO: think this might cause things to go out of order?
-    chempot_labels = [get_formula_from_stoich(get_stoich_from_formula(species, sort=False), tex=True) for species in hull.species]
+    chempot_labels = [get_formula_from_stoich(get_stoich_from_formula(species, sort=False), tex=True)
+                      for species in hull.species]
     tie_line = hull.structure_slice[hull.convex_hull.vertices]
 
     # plot hull structures
@@ -123,8 +126,13 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
                    c=hull.colours[1],
                    marker='o', zorder=99999, edgecolor='k',
                    s=scale*40, lw=1.5)
-    ax.plot(np.sort(tie_line[:, 0]), tie_line[np.argsort(tie_line[:, 0]), 1],
-            c=hull.colours[0], zorder=1)
+        ax.plot(np.sort(tie_line[:, 0]), tie_line[np.argsort(tie_line[:, 0]), 1],
+                c=hull.colours[0], zorder=1, label=hull_label,
+                marker='o', markerfacecolor=hull.colours[0],
+                markeredgecolor='k', markeredgewidth=1.5, markersize=np.sqrt(scale*40))
+    else:
+        ax.plot(np.sort(tie_line[:, 0]), tie_line[np.argsort(tie_line[:, 0]), 1],
+                c=hull.colours[0], zorder=1, label=hull_label, markersize=0)
 
     if hull.hull_cutoff > 0:
         ax.plot(np.sort(tie_line[:, 0]), tie_line[np.argsort(tie_line[:, 0]), 1] + hull.hull_cutoff,
@@ -302,7 +310,8 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
 def plot_ensemble_hull(hull, data_key,
                        ax=None,
                        formation_energy_key='formation_enthalpy_per_atom',
-                       plot_points=True,
+                       plot_points=False,
+                       plot_hull_points=True,
                        alpha_scale=0.25,
                        plot_hulls=True,
                        voltages=False,
@@ -334,7 +343,7 @@ def plot_ensemble_hull(hull, data_key,
         ax = fig.add_subplot(111)
 
     n_hulls = len(hull.phase_diagrams)
-    plot_2d_hull(hull, ax=ax, plot_points=False, plot_hull_points=True, show=False)
+    plot_2d_hull(hull, ax=ax, plot_points=False, plot_hull_points=True, show=False, **kwargs)
     min_ef = 0
     colours_list = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])
     alpha = min([1, max([1/(alpha_scale*n_hulls), 0.01])])
@@ -345,13 +354,14 @@ def plot_ensemble_hull(hull, data_key,
             ax.plot([doc['concentration'][0] for doc in hull_cursor],
                     [doc[data_key][formation_energy_key][ind] for doc in hull_cursor],
                     alpha=alpha, c='k', lw=0.5, zorder=0)
-            if plot_points:
-                ax.scatter([doc['concentration'][0] for doc in hull_cursor],
-                           [doc[data_key][formation_energy_key][ind] for doc in hull_cursor],
-                           alpha=alpha, marker='o', c=colours_list[1], lw=0, zorder=0)
-                ax.scatter([doc['concentration'][0] for doc in hull.cursor],
-                           [doc[data_key][formation_energy_key][ind] for doc in hull.cursor],
-                           alpha=alpha, marker='o', c='k', s=5, lw=0, zorder=0)
+        if plot_hull_points:
+            ax.scatter([doc['concentration'][0] for doc in hull_cursor],
+                       [doc[data_key][formation_energy_key][ind] for doc in hull_cursor],
+                       alpha=alpha, marker='o', c=colours_list[1], lw=0, zorder=0)
+        if plot_points:
+            ax.scatter([doc['concentration'][0] for doc in hull.cursor],
+                       [doc[data_key][formation_energy_key][ind] for doc in hull.cursor],
+                       alpha=alpha, marker='o', c='k', s=5, lw=0, zorder=0)
 
     ax.set_ylim(min_ef)
 

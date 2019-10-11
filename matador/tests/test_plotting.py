@@ -13,6 +13,8 @@ import numpy as np
 import matador.cli.dispersion
 from matador.scrapers import res2dict
 from matador.hull import QueryConvexHull
+from matador.plotting.battery_plotting import plot_voltage_curve
+from matador.utils.chem_utils import get_formula_from_stoich
 
 REAL_PATH = '/'.join(os.path.realpath(__file__).split('/')[:-1]) + '/'
 ROOT_DIR = os.getcwd()
@@ -169,6 +171,29 @@ class HullPlotTests(unittest.TestCase):
             self.assertTrue(os.path.isfile(expected_file))
         for expected_file in expected_files:
             os.remove(expected_file)
+
+    def test_voltage_labels(self):
+        expected_files = ['KP_voltage.png']
+        for expected_file in expected_files:
+            if os.path.isfile(expected_file):
+                os.remove(expected_file)
+        res_list = glob(REAL_PATH + 'data/hull-KP-KSnP_pub/*.res')
+        self.assertEqual(len(res_list), 295, 'Could not find test res files, please check installation...')
+        cursor = [res2dict(res)[0] for res in res_list]
+        hull = QueryConvexHull(cursor=cursor, species='KP', no_plot=True, subcmd='voltage',
+                               labels=True)
+
+        label_cursor = []
+        plot_voltage_curve(hull, label_cursor=label_cursor, png=True)
+        labels = [get_formula_from_stoich(doc['stoichiometry'], elements=hull.elements, tex=False)
+                  for doc in label_cursor]
+
+        self.assertEqual(labels, ['KP7', 'K3P7', 'K2P3', 'KP', 'K5P4'])
+        for expected_file in expected_files:
+            self.assertTrue(os.path.isfile(expected_file))
+        for expected_file in expected_files:
+            os.remove(expected_file)
+
 
     def test_ternary_hull_plot(self):
         """ Test plotting ternary hull. """
