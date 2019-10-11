@@ -93,7 +93,7 @@ class QueryConvexHull:
             if self._query.args['subcmd'] not in ['hull', 'voltage', 'hulldiff']:
                 print_warning('Query was not prepared with subcmd=hull, so cannot guarantee consistent formation energies.')
         else:
-            self.cursor = list(deepcopy(cursor))
+            self.cursor = list(cursor)
             self.from_cursor = True
             self.args['use_source'] = True
 
