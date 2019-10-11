@@ -4,9 +4,13 @@
 """ This file implements some light wrappers to
 the Atomic Simulation Environment (ASE).
 
+TODO: Use Crystal class to automate filling.
+
 """
 import copy
 import matador.crystal
+from matador.utils.chem_utils import get_stoich
+from matador.utils.cell_utils import get_spacegroup_spg
 
 
 def ase2dict(atoms):
@@ -22,11 +26,23 @@ def ase2dict(atoms):
     """
     from matador.utils.cell_utils import cart2abc
     doc = {}
+
+    # sort atoms, then their positions
     doc['atom_types'] = atoms.get_chemical_symbols()
-    doc['lattice_cart'] = atoms.get_cell()
+    inds = [i[0] for i in sorted(enumerate(doc['atom_types']), key=lambda x: x[1])]
+    doc['positions_frac'] = atoms.get_scaled_positions().tolist()
+    doc['positions_frac'] = [doc['positions_frac'][ind] for ind in inds]
+    doc['atom_types'] = [doc['atom_types'][ind] for ind in inds]
+
+    doc['lattice_cart'] = atoms.get_cell().array.tolist()
     doc['lattice_abc'] = cart2abc(doc['lattice_cart'])
-    doc['positions_frac'] = atoms.get_scaled_positions()
     doc['num_atoms'] = len(doc['atom_types'])
+    doc['stoichiometry'] = get_stoich(doc['atom_types'])
+    doc['cell_volume'] = atoms.get_volume()
+    doc['elems'] = {atom for atom in doc['atom_types']}
+    doc['num_fu'] = doc['num_atoms'] / int(sum(doc['stoichiometry'][i][1] for i in range(len(doc['stoichiometry']))))
+    doc['space_group'] = get_spacegroup_spg(doc, symprec=0.001)
+
     return doc
 
 

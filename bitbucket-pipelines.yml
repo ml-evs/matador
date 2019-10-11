@@ -13,6 +13,7 @@ pipelines:
           - cp matador/tests/data/matador_pipelines_conf.yml $HOME/.matadorrc
           - pip install .[test]
           - pip install .[plotting]
+          - pip install .[optional]
           - py.test --cov-config .coveragerc --cov=matador --durations=0
           - codecov --token=$CODECOV_TOKEN
         services:
