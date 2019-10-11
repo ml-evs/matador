@@ -108,7 +108,7 @@ def qmpy_entry_to_doc(entry):
     else:
         print('Unable to match formation energy for entry.id={}'.format(entry.id))
         raise RuntimeError
-    doc['hull_distance'] = min(0, eform.stability)
+    doc['hull_distance'] = max(0, eform.stability)
     ef_calc = eform.calculation
     oqmd_calc_settings = ef_calc.settings
     doc['cut_off_energy'] = oqmd_calc_settings['encut']
