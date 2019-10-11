@@ -45,7 +45,6 @@ def file_writer_function(function):
             with open(path, 'w') as f:
                 for line in flines:
                     f.write(line + '\n')
-            return flines
 
         except Exception as exc:
             print_exc()
