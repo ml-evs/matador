@@ -26,10 +26,11 @@ def plot_pxrd(pxrds, two_theta_range=(10, 70), figsize=None):
             scales with the number of PXRDs to be plotted.
 
     """
-    if figsize is None:
-        figsize = (8, 0.5*len(pxrds))
     if isinstance(pxrds, PXRD):
         pxrds = [pxrds]
+    if figsize is None:
+        height = max(0.5, 5/len(pxrds))
+        figsize = (8, height)
     import matplotlib.pyplot as plt
     fig = plt.figure(figsize=figsize)
     for ind, pxrd in enumerate(pxrds):

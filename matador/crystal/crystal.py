@@ -10,7 +10,6 @@ manipulation and analysis of the lattice.
 from copy import deepcopy
 from matador.utils import cell_utils
 from matador.orm.orm import DataContainer
-from matador.fingerprints.pdf import PDF
 from matador.crystal.crystal_site import Site
 from matador.utils.chem_utils import get_concentration
 
@@ -344,8 +343,19 @@ class Crystal(DataContainer):
         are passed.
 
         """
+        from matador.fingerprints.pdf import PDF
         self._data['pdf'] = PDF(self._data, **kwargs)
         return self._data['pdf']
+
+    @property
+    def pxrd(self, **kwargs):
+        """ Returns a PXRD object (powder xray diffraction) containing
+        the XRD pattern for the structure.
+
+        """
+        from matador.fingerprints.pxrd import PXRD
+        self._data['pxrd'] = PXRD(self._data, **kwargs)
+        return self._data['pxrd']
 
     @property
     def coordination_stats(self):
