@@ -212,7 +212,7 @@ def get_formation_energy(chempots, doc, energy_key='enthalpy_per_atom'):
         the target doc and the chemical potentials.
 
     Parameters:
-        chempots (list of dict): list of chempot structures.
+        chempots (list of dict): list of chempot structures, must be unique.
         doc (dict): structure to evaluate.
 
     Keyword arguments:
@@ -584,6 +584,8 @@ def get_root_source(source):
             src_list.add('.'.join(src.split('/')[-1].split('.')[0:-1]))
         elif 'OQMD' in src.upper():
             src_list.add('_'.join(src.split()))
+        elif 'MP-' in src.upper():
+            src_list.add(src)
         elif len(sources) == 1:
             src_list.add(src)
         elif src == 'command_line':
