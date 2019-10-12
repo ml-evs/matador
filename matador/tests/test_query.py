@@ -158,7 +158,7 @@ class QueryParseTest(unittest.TestCase):
         })
         self.assertDictEqual(test_dict, query.query_dict)
 
-        kwargs = {'composition': 'LiFeBe', 'icsd': 0, 'ignore_warnings': True,
+        kwargs = {'composition': 'LiFeBe', 'icsd': True, 'ignore_warnings': True,
                   'src_str': '/Foo/bar/foo/Bar.res', 'pressure': 5, 'pressure_tolerance': 1,
                   'cutoff': [300, 400], 'encapsulated': True, 'cnt_radius': 5.21,
                   'sedc': 'null', 'mp_spacing': [0.05], 'spin': 0,
@@ -185,7 +185,7 @@ class QueryParseTest(unittest.TestCase):
         })
         self.assertDictEqual(test_dict, query.query_dict)
 
-        kwargs = {'composition': 'LiFeBe', 'icsd': 0, 'ignore_warnings': True,
+        kwargs = {'composition': 'LiFeBe', 'icsd': False, 'ignore_warnings': True,
                   'src_str': '/Foo/bar/foo/Bar.res', 'pressure': 5, 'pressure_tolerance': None, 'kpoint_tolerance': None,
                   'cutoff': [300, 400], 'encapsulated': True, 'cnt_radius': 5.21,
                   'sedc': 'null', 'mp_spacing': [0.05], 'spin': 'any',
@@ -199,7 +199,7 @@ class QueryParseTest(unittest.TestCase):
                     {'elems': {'$in': ['Be']}},
                     {'stoichiometry': {'$size': 3}}
                 ]},
-                {'icsd': {'$exists': True}},
+                {'icsd': {'$exists': False}},
                 {'cut_off_energy': {'$gte': 300, '$lte': 400}},
                 {'source': {'$in': [re.compile('/Foo/bar/foo/Bar.res')]}},
                 {'pressure': {'$lte': 5.5, '$gte': 4.5}},
@@ -211,7 +211,7 @@ class QueryParseTest(unittest.TestCase):
         })
         self.assertDictEqual(test_dict, query.query_dict)
 
-        kwargs = {'composition': 'LiFeBe', 'icsd': 0, 'ignore_warnings': True,
+        kwargs = {'composition': 'LiFeBe', 'icsd': True, 'ignore_warnings': True,
                   'src_str': '/Foo/bar/foo/Bar.res', 'pressure': 5, 'pressure_tolerance': 10, 'kpoint_tolerance': 0.02,
                   'cutoff': [300, 400], 'encapsulated': True, 'cnt_radius': 5.21,
                   'sedc': 'null', 'mp_spacing': [0.04, 0.05], 'spin': 'any',
