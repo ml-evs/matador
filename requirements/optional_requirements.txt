@@ -1,2 +1,2 @@
-pymatgen==2019
+pymatgen>=2019.10.4
 ase>=3.18

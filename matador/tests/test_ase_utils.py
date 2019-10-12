@@ -12,6 +12,7 @@ except ImportError:
 from matador.utils.ase_utils import ase2dict, doc2ase
 
 
+@unittest.skipIf(not ASE_IMPORTED, 'ASE not found')
 class AseUtilTest(unittest.TestCase):
     """ Tests cursor util functions. """
 

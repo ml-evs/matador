@@ -21,10 +21,13 @@ with open('requirements/pip_requirements.txt', 'r') as f:
     requirements += [line.strip() for line in f.readlines()]
 
 extra_requirements = dict(all=[])
-for subreq in ['docs', 'test', 'plotting', 'viz', 'crystal', 'pip']:
-    with open('requirements/{}_requirements.txt'.format(subreq), 'r') as f:
-        extra_requirements[subreq] = [line.strip() for line in f.readlines()]
-        extra_requirements['all'] += extra_requirements[subreq]
+req_files = glob('requirements/*.txt')
+for _file in req_files:
+    if _file != 'requirements/requirements.txt':
+        with open(_file, 'r') as f:
+            subreq = _file.split('/')[-1].split('_')[0]
+            extra_requirements[subreq] = [line.strip() for line in f.readlines()]
+            extra_requirements['all'] += extra_requirements[subreq]
 
 
 setup(name='matador',
