@@ -13,6 +13,12 @@ from matador.scrapers.magres_scrapers import magres2dict
 # grab abs path for accessing test data
 REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
 
+try:
+    import networkx
+    imported_networkx = True
+except ImportError:
+    imported_networkx = False
+
 imported_vornet = False
 
 class UnitCellTest(unittest.TestCase):
@@ -108,11 +114,13 @@ class CrystalTest(unittest.TestCase):
         crystal = Crystal(doc)
         print(crystal.unique_sites)
 
+    @unittest.skipIf(not imported_networkx, 'NetworkX missing')
     def testBondLengths(self):
         doc, s = magres2dict(REAL_PATH + 'data/NaP_QE6.magres')
         crystal = Crystal(doc)
         print(crystal.bond_lengths)
 
+    @unittest.skipIf(not imported_networkx, 'NetworkX missing')
     def testBondStats(self):
         doc, s = magres2dict(REAL_PATH + 'data/NaP_QE6.magres')
         crystal = Crystal(doc)
