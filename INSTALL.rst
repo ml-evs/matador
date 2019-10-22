@@ -19,13 +19,13 @@ Optional (but recommended) steps:
 
 Required steps:
 
-5. Run ``pip install .`` from inside the top-level matador directory, or ``pip install -e .`` for an editable developer install. 
-Note: On some machines (e.g. ARCHER/Thomas) you may receive permissions errors at this stage; if so, try moving matador's `.git` and install again (``mv .git $HOME/matador_git_stash; pip install . ; mv $HOME/matador_git_stash .git``)
-6. You now have a basic matador API installation, if you wish to use all matador features, install extra dependencies from the other requirements files inside ``requirements/`` using either conda (preferably) or pip. e.g. for plotting, running your own database and Jupyter notebook visualisation functionality, use ``pip install .[plotting,db,viz]``. If you wish to just install everything use ``pip install .[all]``.
-7. To use matador, you will need to activate the conda environment from step 2, by running ``conda activate matador``. You will also need this in e.g. any job scripts. You can test your installation using ``python -m unittest discover`` or simply ``py.test`` (if you have it installed). By default this will look for an executable called `castep` to run CASTEP tests, which are probably the most useful.
+5. Run ``pip install .`` from inside the top-level matador directory, or ``pip install -e .`` for an editable developer install.  
+6. You now have a basic matador API installation, if you wish to use all matador features, install extra dependencies from the other requirements files inside ``requirements/`` using either conda (preferably) or pip. e.g. for plotting, running your own database and Jupyter notebook visualisation functionality, use ``pip install .[plotting,db,viz]``. If you wish to just install everything use ``pip install .[all]``.  
+7. To use matador, you will need to activate the conda environment from step 2, by running ``conda activate matador``. You will also need this in e.g. any job scripts. You can test your installation using ``python -m unittest discover -v -b`` or simply ``py.test`` (if you have it installed). By default this will look for an executable called `castep` to run CASTEP tests, which are probably the most useful.  
 
 Troubleshooting
 ---------------
 
 1. (10/09/2019) When installing with ``conda``, if you receive the following error (or
    similar): ``/home/#####/.local/conda/envs/matador/compiler_compat/ld: build/temp.linux-x86_64-3.6/psutil/_psutil_common.o: unable to initialize decompress status for section .debug_info``, then you are using a modern compiler that breaks ``conda``'s attempts to be backwards compatibile (in this case it was GCC 9). The simple fix is to rename/remove the copy of ``ld`` inside your conda environment (path in the message above) such that your system ``ld`` is used.
+2. (10/10/2017) On some machines (e.g. ARCHER/Thomas) you may receive permissions errors at step 5; if so, try moving matador's `.git` and install again (``mv .git $HOME/matador_git_stash; pip install . ; mv $HOME/matador_git_stash .git``).
