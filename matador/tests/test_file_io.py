@@ -1006,7 +1006,7 @@ class ExportTest(MatadorUnitTest):
     """ Test file export functions. """
     def test_doc2res(self):
         res_fname = REAL_PATH + 'data/LiPZn-r57des.res'
-        test_fname = REAL_PATH + 'data/doc2res.res'
+        test_fname = 'doc2res.res'
         doc, s = res2dict(res_fname)
         doc2res(doc, test_fname, hash_dupe=False, overwrite=True)
         doc_exported, s = res2dict(test_fname)
@@ -1143,9 +1143,11 @@ class ExportTest(MatadorUnitTest):
         self.assertEqual(len(cell_files), 3)
         fnames = ['CuSr-MP_1025402-CollCode629305', 'H-MP_632250', 'BaS3Te-OQMD_1606-CollCode8']
         exts = ['cell', 'res']
+        print(glob.glob('query/*'))
         for name in fnames:
             for ext in exts:
-                self.assertTrue(os.path.isfile('query/{}.{}'.format(name, ext)), msg='Missing {}.{}'.format(name, ext))
+                self.assertTrue(os.path.isfile('query/{}.{}'.format(name, ext)),
+                                msg='Missing {}.{}'.format(name, ext))
 
 
     def compare_json_with_res(self, json_fname, test_fname):

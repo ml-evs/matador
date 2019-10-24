@@ -583,7 +583,7 @@ def get_root_source(source):
         if any([src.endswith(ext) for ext in ['.res', '.castep', '.history', '.history.gz']]):
             src_list.add('.'.join(src.split('/')[-1].split('.')[0:-1]))
         elif 'OQMD' in src.upper():
-            src_list.add('_'.join(src.split()))
+            src_list.add(src)
         elif 'MP-' in src.upper():
             src_list.add(src)
         elif len(sources) == 1:
