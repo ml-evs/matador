@@ -429,7 +429,8 @@ class QueryConvexHull:
                 self.cursor[ind]['cell_volume_per_b'] = 12345e5
             else:
                 self.cursor[ind][self._extensive_energy_key + '_per_b'] = doc[self._extensive_energy_key] / (num_b * num_fu)
-                self.cursor[ind]['cell_volume_per_b'] = doc['cell_volume'] / (num_b * num_fu)
+                if 'cell_volume' in doc:
+                    self.cursor[ind]['cell_volume_per_b'] = doc['cell_volume'] / (num_b * num_fu)
 
         capacities = np.zeros((len(self.cursor)))
         for i, doc in enumerate(self.cursor):
