@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """ Test file scraping and writing functionality. """
+
 import unittest
 import json
 import os
@@ -10,16 +11,14 @@ from matador.scrapers import castep2dict, res2dict, cell2dict
 from matador.scrapers import cif2dict, param2dict, phonon2dict, optados2dict, phonon_dos2dict
 from matador.scrapers import arbitrary2dict, bands2dict, pwout2dict, magres2dict
 from matador.scrapers.castep_scrapers import usp2dict, get_seed_metadata
-from matador.export import doc2res, doc2param, doc2cell
+from matador.export import doc2res, doc2param, doc2cell, query2files
 from matador.orm.spectral import ElectronicDispersion, VibrationalDispersion
+from matador.tests.utils import REAL_PATH, MatadorUnitTest
 
-
-# grab abs path for accessing test data
-REAL_PATH = '/'.join(os.path.realpath(__file__).split('/')[:-1]) + '/'
 VERBOSITY = 10
 
 
-class CellScraperTests(unittest.TestCase):
+class CellScraperTests(MatadorUnitTest):
     """ Test cell scraper functions. """
     def test_standard_cell_scraper(self):
         cell_fname = REAL_PATH + 'data/LiP2Zn-0bm995-a_9-out.cell'
@@ -46,13 +45,11 @@ class CellScraperTests(unittest.TestCase):
         self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(test_dict))
         self.assertEqual(test_dict['cell_constraints'], [[1, 1, 3], [4, 4, 6]])
         self.assertEqual(test_dict['external_pressure'], [[10.0, 0.0, 0.0], [0.0, 10.0, 0.0], [0.0, 0.0, 10.0]])
-        tmp_name = REAL_PATH + 'data/tmp.cell'
+        tmp_name = 'tmp.cell'
         doc2cell(test_dict, tmp_name)
         new_test_dict, s = cell2dict(tmp_name, db=False, lattice=True, verbosity=VERBOSITY)
         new_test_dict['source'] = test_dict['source']
         self.assertEqual(test_dict['external_pressure'], new_test_dict['external_pressure'])
-        os.remove(tmp_name)
-
 
     def test_cell_phonon(self):
         cell_fname = REAL_PATH + 'data/K5P4-phonon.cell'
@@ -140,7 +137,7 @@ class CellScraperTests(unittest.TestCase):
         self.assertEqual(cell['cell_constraints'][1], [0, 0, 0])
 
 
-class CastepScraperTests(unittest.TestCase):
+class CastepScraperTests(MatadorUnitTest):
     """ Test CASTEP scrapers. """
     def test_castep16(self):
         castep_fname = REAL_PATH + 'data/Na3Zn4-swap-ReOs-OQMD_759599.castep'
@@ -449,7 +446,7 @@ class CastepScraperTests(unittest.TestCase):
         self.assertTrue('cell_constraints' not in test_dict)
 
 
-class ResScraperTests(unittest.TestCase):
+class ResScraperTests(MatadorUnitTest):
 
     def test_res(self):
         failed_open = False
@@ -504,7 +501,7 @@ class ResScraperTests(unittest.TestCase):
         self.assertTrue(s, msg='Failed entirely: {}'.format(res))
 
 
-class ParamScraperTests(unittest.TestCase):
+class ParamScraperTests(MatadorUnitTest):
     """ Test CASTEP param scrapers. """
 
     def test_param(self):
@@ -561,7 +558,7 @@ class ParamScraperTests(unittest.TestCase):
             self.assertEqual(len(test_dict), 14)
 
 
-class ScraperMiscTest(unittest.TestCase):
+class ScraperMiscTest(MatadorUnitTest):
     """ Test miscellaneous other scrapers. """
 
     def test_batch_loading(self):
@@ -930,7 +927,7 @@ class ScraperMiscTest(unittest.TestCase):
         self.assertTrue(s)
 
 
-class CifTests(unittest.TestCase):
+class CifTests(MatadorUnitTest):
     """ These tests check the cif scraper for correctness. """
 
     def test_cif_partial_occ(self):
@@ -1005,7 +1002,7 @@ class CifTests(unittest.TestCase):
         self.assertEqual(len(test_dict['positions_frac']), test_dict['num_atoms'])
 
 
-class ExportTest(unittest.TestCase):
+class ExportTest(MatadorUnitTest):
     """ Test file export functions. """
     def test_doc2res(self):
         res_fname = REAL_PATH + 'data/LiPZn-r57des.res'
@@ -1015,34 +1012,29 @@ class ExportTest(unittest.TestCase):
         doc_exported, s = res2dict(test_fname)
         self.assertTrue(s, msg='Failed entirely, oh dear!')
         self.compare_res_with_res(doc, doc_exported)
-        os.remove(test_fname)
 
     def test_doc2param(self):
         param_fname = REAL_PATH + 'data/param_test.param'
-        test_fname = REAL_PATH + 'data/dummy.param'
+        test_fname = 'dummy.param'
         doc, s = param2dict(param_fname, db=False, debug=True, verbosity=VERBOSITY)
         self.assertTrue(s, msg='Failed entirely: {}'.format(doc))
         doc2param(doc, test_fname, hash_dupe=False, overwrite=True)
         doc_exported, s = param2dict(test_fname, db=False)
-        os.remove(test_fname)
         self.assertTrue(s, msg='Failed entirely: {}'.format(doc_exported))
         self.assertEqual(len(doc_exported), len(doc))
         self.assertEqual(doc['devel_code'], doc_exported['devel_code'])
 
         param_fname = REAL_PATH + 'data/nmr.param'
-        test_fname = REAL_PATH + 'data/dummy.param'
+        test_fname = 'dummy2.param'
         doc, s = param2dict(param_fname, db=False)
         doc2param(doc, test_fname, hash_dupe=False, overwrite=True)
         doc_exported, s = param2dict(test_fname, db=False)
-        os.remove(test_fname)
         self.assertTrue(s, msg='Failed entirely, oh dear!')
         self.assertEqual(len(doc_exported), len(doc))
 
     def test_doc2cell(self):
         cell_fname = REAL_PATH + 'data/K5P4-phonon.cell'
-        test_fname = REAL_PATH + 'data/dummy1.cell'
-        for _f in glob.glob(REAL_PATH + 'data/dummy*.cell'):
-            os.remove(_f)
+        test_fname = 'dummy1.cell'
 
         doc, s = cell2dict(cell_fname, db=False, lattice=True, verbosity=VERBOSITY, positions=False)
         doc2cell(doc, test_fname, debug=True)
@@ -1077,10 +1069,8 @@ class ExportTest(unittest.TestCase):
         test_dict, s = cell2dict(test_fname, db=False, lattice=True, positions=False)
         self.assertEqual(test_dict['phonon_supercell_matrix'][2], [0, 0, 140])
 
-        dummy_files = glob.glob(REAL_PATH + 'data/dummy*.cell')
+        dummy_files = glob.glob('dummy*.cell')
         self.assertEqual(len(dummy_files), 2)
-        for _f in dummy_files:
-            os.remove(_f)
 
     def test_doc2cell_partial_occ_fail(self):
         cell_name = REAL_PATH + 'data/cell_files/kpoint_path.cell'
@@ -1096,13 +1086,11 @@ class ExportTest(unittest.TestCase):
 
     def test_doc2cell_kpoint_path(self):
         cell_name = REAL_PATH + 'data/cell_files/kpoint_path.cell'
-        dummy_name = REAL_PATH + 'dummy2.cell'
+        dummy_name = 'dummy2.cell'
         cell, s = cell2dict(cell_name, db=False)
 
         doc2cell(cell, dummy_name)
         cell, s = cell2dict(dummy_name, db=False)
-
-        os.remove(dummy_name)
 
         self.assertTrue(s)
         self.assertEqual(cell['spectral_kpoints_path'], [[0.0, 0.0, 0.0], [0.0, 0.0, 0.5], [0.0, 0.5, 0.0], [0.5, 0.0, 0.0]])
@@ -1112,7 +1100,7 @@ class ExportTest(unittest.TestCase):
     def test_doc2cell_and_param_with_spin(self):
 
         cell_fname = REAL_PATH + 'data/K5P4-phonon.cell'
-        test_fname = REAL_PATH + 'data/dummy3'
+        test_fname = 'dummy3'
         test_param = {'xc_functional': 'PBE', 'task': 'geometryoptimisation', 'spin_polarized': False}
 
         doc, s = cell2dict(cell_fname, db=False, lattice=True, verbosity=VERBOSITY, positions=True)
@@ -1123,9 +1111,6 @@ class ExportTest(unittest.TestCase):
         param_doc, s = param2dict(test_fname + '.param')
         cell_doc, s = cell2dict(test_fname + '.cell', db=False, lattice=True, positions=True)
 
-        os.remove(test_fname + '.param')
-        os.remove(test_fname + '.cell')
-
         self.assertTrue(param_doc['spin_polarized'])
         self.assertEqual(param_doc['spin'], 10)
 
@@ -1133,12 +1118,12 @@ class ExportTest(unittest.TestCase):
 
     def test_doc2res_from_json(self):
         json_fname = REAL_PATH + 'data/doc2res.json'
-        test_fname = REAL_PATH + 'data/doc2res.res'
+        test_fname = 'doc2res.res'
         self.compare_json_with_res(json_fname, test_fname)
 
     def test_doc2res_from_json_encap(self):
         json_fname = REAL_PATH + 'data/doc2res_encap.json'
-        test_fname = REAL_PATH + 'data/doc2res_encap.res'
+        test_fname = 'doc2res_encap.res'
         self.compare_json_with_res(json_fname, test_fname)
 
     def test_query2files(self):
@@ -1170,7 +1155,6 @@ class ExportTest(unittest.TestCase):
             doc_exported, s = res2dict(test_fname)
             self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(doc_exported))
             self.compare_res_with_res(doc, doc_exported)
-        os.remove(test_fname)
 
     def compare_res_with_res(self, doc, doc_exported):
         for key in doc_exported:

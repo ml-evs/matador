@@ -5,16 +5,13 @@
 import unittest
 import subprocess as sp
 import os
+from os.path import isfile, isdir
 import glob
 import copy
 import shutil
 import time
 import warnings
 import multiprocessing as mp
-
-from os import getcwd, uname
-from os.path import realpath, isfile, isdir
-
 
 from matador.utils.errors import (
     CalculationError, MaxMemoryEstimateExceeded, CriticalError,
@@ -24,12 +21,10 @@ from matador.compute import ComputeTask, BatchRun, reset_job_folder
 from matador.compute.slurm import SlurmQueueManager
 from matador.compute.pbs import PBSQueueManager
 from matador.scrapers.castep_scrapers import cell2dict, param2dict, res2dict, castep2dict
+from matador.tests.utils import REAL_PATH, MatadorUnitTest
 
-HOSTNAME = uname()[1]
+HOSTNAME = os.uname()[1]
 PATHS_TO_DEL = ['completed', 'bad_castep', 'input', 'logs', HOSTNAME]
-REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
-TMP_DIR = 'tmp_test'
-ROOT_DIR = getcwd()
 VERBOSITY = 10
 EXECUTABLE = 'castep'
 RUN_SLOW_TESTS = (HOSTNAME == 'cluster2')
@@ -65,26 +60,11 @@ else:
     NCORES = 1
 
 
-class ComputeTest(unittest.TestCase):
+class ComputeTest(MatadorUnitTest):
     """ Run tests equivalent to using the run3 script for
     various artificial setups.
 
     """
-    def tearDown(self):
-        from shutil import rmtree
-        from os import chdir
-        chdir(REAL_PATH)
-        if isdir(TMP_DIR):
-            rmtree(TMP_DIR)
-
-        chdir(ROOT_DIR)
-
-    def setUp(self):
-        from os import chdir, makedirs
-        chdir(REAL_PATH)
-        makedirs(TMP_DIR, exist_ok=True)
-        chdir(TMP_DIR)
-
     def test_missing_exec(self):
         """ Ensure failure if exec misses. """
         cell_dict, s = cell2dict(REAL_PATH + '/data/LiAs_tests/LiAs.cell', verbosity=VERBOSITY, db=False)
@@ -734,26 +714,11 @@ class ComputeTest(unittest.TestCase):
         self.assertTrue(all(errors))
 
 
-class BenchmarkCastep(unittest.TestCase):
+class BenchmarkCastep(MatadorUnitTest):
     """ Run some short CASTEP calculations and compare the timings
     to single core & multicore references.
 
     """
-
-    def tearDown(self):
-        from shutil import rmtree
-        from os import chdir
-        chdir(REAL_PATH)
-        if isdir(TMP_DIR):
-            rmtree(TMP_DIR)
-
-        chdir(ROOT_DIR)
-
-    def setUp(self):
-        from os import chdir, makedirs
-        chdir(REAL_PATH)
-        makedirs(TMP_DIR, exist_ok=True)
-        chdir(TMP_DIR)
 
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
     def test_benchmark_dual_core_scf(self):
@@ -785,8 +750,8 @@ class BenchmarkCastep(unittest.TestCase):
         results, s = castep2dict('bad_castep/_LiC.castep', db=False)
         makedirs(REAL_PATH + '/data/benchmark/results', exist_ok=True)
         shutil.copy('bad_castep/_LiC.castep',
-             REAL_PATH + '/data/benchmark/results/_LiC_2core_castep{}.castep'
-             .format(results.get('castep_version', 'xxx')))
+                    REAL_PATH + '/data/benchmark/results/_LiC_2core_castep{}.castep'
+                    .format(results.get('castep_version', 'xxx')))
 
         self.assertTrue(all(outputs_exist), "couldn't find output files!")
         self.assertTrue(s, "couldn't read output files!")
