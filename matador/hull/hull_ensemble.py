@@ -6,7 +6,7 @@
 import tqdm
 from matador.hull import PhaseDiagram, QueryConvexHull
 from matador.utils.cursor_utils import filter_cursor_by_chempots, recursive_get, recursive_set, set_cursor_from_array
-from matador.utils.chem_utils import get_formation_energy, get_root_source
+from matador.utils.chem_utils import get_formation_energy, get_root_source, get_formula_from_stoich
 
 
 class EnsembleHull(QueryConvexHull):
@@ -131,16 +131,22 @@ class EnsembleHull(QueryConvexHull):
 
         self.stability_histogram = self.generate_stability_statistics()
 
-    def generate_stability_statistics(self):
+    def generate_stability_statistics(self, group_by='structure'):
         """ Creates a histogram that counts how many times each structure
         is found to be stable in the ensemble.
+
+        Keyword arguments:
+            group_by (str): either 'structure' or 'formula' for bar groupings.
 
         """
         from collections import defaultdict
         histogram = defaultdict(int)
         for pd in self.phase_diagrams:
             for doc in pd.stable_structures:
-                histogram[get_root_source(doc)] += 1
+                if group_by == 'formula':
+                    histogram[get_formula_from_stoich(doc['stoichiometry'])] += 1
+                else:
+                    histogram[get_root_source(doc)] += 1
         return histogram
 
     def plot_hull(self, **kwargs):
