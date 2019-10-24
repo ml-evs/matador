@@ -1141,6 +1141,28 @@ class ExportTest(unittest.TestCase):
         test_fname = REAL_PATH + 'data/doc2res_encap.res'
         self.compare_json_with_res(json_fname, test_fname)
 
+    def test_query2files(self):
+        """ Test that MP/ICSD/OQMD structures get written correctly. """
+        import glob
+        import json
+        json_files = glob.glob(REAL_PATH + 'data/json_query_files/*.json')
+        cursor = []
+        for f in json_files:
+            with open(f, 'r') as _f:
+                cursor.append(json.load(_f))
+        query2files(cursor, res=True, cell=True, cif=True)
+        self.assertTrue(os.path.isdir('query'))
+        res_files = glob.glob('query/*.res')
+        cell_files = glob.glob('query/*.cell')
+        self.assertEqual(len(res_files), 3)
+        self.assertEqual(len(cell_files), 3)
+        fnames = ['CuSr-MP_1025402-CollCode629305', 'H-MP_632250', 'BaS3Te-OQMD_1606-CollCode8']
+        exts = ['cell', 'res']
+        for name in fnames:
+            for ext in exts:
+                self.assertTrue(os.path.isfile('query/{}.{}'.format(name, ext)), msg='Missing {}.{}'.format(name, ext))
+
+
     def compare_json_with_res(self, json_fname, test_fname):
         with open(json_fname, 'r') as f:
             doc = json.load(f)
