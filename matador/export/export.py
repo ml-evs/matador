@@ -125,12 +125,14 @@ def query2files(cursor, **kwargs):
         path = directory + '/'
         # write either cell, res or both
         root_source = get_root_source(doc)
-        root_source = root_source.replace('-swap-', '-')
-        name = root_source
         formula = get_formula_from_stoich(doc['stoichiometry'])
 
-        if 'OQMD' in root_source:
-            name = '{formula}-OQMD_{src}'.format(formula=formula, src=root_source.split('_')[-1])
+        if kwargs.get('subcmd') == 'swaps':
+            root_source = root_source.replace('-swap-', '-')
+        name = root_source
+
+        if 'OQMD ' in root_source:
+            name = '{formula}-OQMD_{src}'.format(formula=formula, src=root_source.split(' ')[-1])
         elif 'mp-' in root_source:
             name = '{formula}-MP_{src}'.format(formula=formula, src=root_source.split('-')[-1])
         if 'icsd' in doc and 'CollCode' not in name:
