@@ -887,8 +887,10 @@ class DBQuery:
             icsd = self.args.get('icsd')
         query_dict = dict()
         query_dict['icsd'] = dict()
-        if isinstance(self.args.get('icsd'), bool):
-            query_dict['icsd']['$exists'] = self.args.get('icsd')
+        if isinstance(icsd[0], bool):
+            query_dict['icsd']['$exists'] = icsd[0]
+        elif icsd[0] == 0:
+            query_dict['icsd']['$exists'] = True
         else:
             query_dict['icsd']['$eq'] = icsd[0]
         return query_dict
