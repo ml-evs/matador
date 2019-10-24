@@ -131,7 +131,6 @@ def query2files(cursor, **kwargs):
             root_source = root_source.replace('-swap-', '-')
         name = root_source
 
-        print(root_source, formula, name)
         if 'OQMD ' in root_source:
             name = '{formula}-OQMD_{src}'.format(formula=formula, src=root_source.split(' ')[-1])
         elif 'mp-' in root_source:
