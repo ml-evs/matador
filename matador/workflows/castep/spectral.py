@@ -137,7 +137,7 @@ class CastepSpectralWorkflow(Workflow):
         if 'spectral_kpoints_list' not in self.calc_doc and 'spectral_kpoints_path' not in self.calc_doc:
             from matador.utils.cell_utils import cart2abc
             prim_doc, kpt_path = self.relaxer.get_seekpath_compliant_input(
-                self.calc_doc, self.calc_doc['spectral_kpoints_path_spacing'])
+                self.calc_doc, self.calc_doc.get('spectral_kpoints_path_spacing', 0.05))
             self.calc_doc.update(prim_doc)
             self.calc_doc['lattice_abc'] = cart2abc(self.calc_doc['lattice_cart'])
             if todo['dispersion']:
