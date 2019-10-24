@@ -33,8 +33,10 @@ def ase2dict(atoms):
     doc['positions_frac'] = atoms.get_scaled_positions().tolist()
     doc['positions_frac'] = [doc['positions_frac'][ind] for ind in inds]
     doc['atom_types'] = [doc['atom_types'][ind] for ind in inds]
-
-    doc['lattice_cart'] = atoms.get_cell().array.tolist()
+    try:
+        doc['lattice_cart'] = atoms.get_cell().tolist()
+    except AttributeError:
+        doc['lattice_cart'] = atoms.get_cell().array.tolist()
     doc['lattice_abc'] = cart2abc(doc['lattice_cart'])
     doc['num_atoms'] = len(doc['atom_types'])
     doc['stoichiometry'] = get_stoich(doc['atom_types'])
