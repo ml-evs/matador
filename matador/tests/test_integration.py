@@ -122,6 +122,8 @@ class IntegrationTest(unittest.TestCase):
                 os.remove(_file)
 
         if os.path.isdir(expected_dir):
+            for _file in glob.glob(expected_dir + '/*'):
+                os.remove(_file)
             os.removedirs(expected_dir)
 
         self.assertTrue(dir_exists, msg='Failed to create output directory')
@@ -153,9 +155,6 @@ class IntegrationTest(unittest.TestCase):
         if os.path.isdir(expected_dir):
             for _file in glob.glob(expected_dir + '/*'):
                 os.remove(_file)
-            os.removedirs(expected_dir)
-
-        if os.path.isdir(expected_dir):
             os.removedirs(expected_dir)
 
         self.assertTrue(dir_exists, msg='Failed to create output directory, uniq')
@@ -267,7 +266,7 @@ def swaps():
     elem_successes = []
     if output_folder_exists:
         os.chdir(expected_dir)
-        expected_files = ['LiSi-swap-NaP_intermediates', 'LiSn-swap-Na3Zn4-ReOs-OQMD_759599', 'Li-swap-Na-edgecase-CollCode10101']
+        expected_files = ['Li3Si2-swap-NaP_intermediates', 'Li3Sn4-swap-Na3Zn4-ReOs-OQMD_759599', 'Li-swap-Na-edgecase-CollCode10101']
         target_elems = ['Li', 'Si', 'Sn']
 
         for files in expected_files:
