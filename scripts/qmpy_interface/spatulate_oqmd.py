@@ -27,7 +27,6 @@ to clear the memory.
 from random import randint
 from os.path import dirname, realpath
 import argparse
-import qmpy
 import getpass
 from traceback import print_exc
 import numpy as np
@@ -38,6 +37,7 @@ import tqdm
 def qmpy_parse_kpoints(string):
     """ Parse VASP kpoint block into grid (ignores offset). """
     return [int(i) for i in string.split('\n')[-2].split(' ')]
+
 
 def qmpy_entry_to_doc(entry):
     """ Parse a qmpy entry object into a matador document,
@@ -93,6 +93,7 @@ def qmpy_entry_to_doc(entry):
     for atom in entry.structure.atoms:
         doc['atom_types'].append(atom.species)
     doc['cell_volume'] = entry.structure.volume
+    doc['task'] = 'geometryoptimization'
     doc['species_pot'] = {elem: 'OQMD' for elem in doc['elems']}
     doc['stable'] = entry.stable
 
@@ -176,11 +177,8 @@ def real2recip(real_lat):
     return recip_lat.tolist()
 
 
-class OQMDConverter:
-    """ The OQMDConverter class implements methods to scrape
-    the OQMD SQL database for all entries using the qmpy interface.
-    """
-    def __init__(self, dryrun=False, debug=False, verbosity=0, db_name='oqmd_1.2', append=False, start_id=0, chunk_size=1000, restart=True):
+class DBConverter:
+    def __init__(self, host=None, client=None, dryrun=False, debug=False, verbosity=0, db_name='oqmd_1.2', append=False, start_id=0, chunk_size=1000, restart=True):
         """ Connect to the relevant databases and
         set off the scraper.
         """
@@ -192,6 +190,7 @@ class OQMDConverter:
         self.debug = debug
         self.chunk_size = chunk_size
         self.db_name = db_name
+        self.client = client
         self.verbosity = verbosity
         self.append = append
         self.restart = restart
@@ -208,40 +207,88 @@ class OQMDConverter:
             wordfile.close()
             nounfile.close()
 
-        # if not dryrunning, connect to OQMD or scratch MongoDB
-        if not self.dryrun:
-            self.client = pm.MongoClient()
-            try:
-                input = raw_input
-            except NameError:
-                pass
+            if self.client is None:
+                print('connecting to {}'.format(host))
+                self.client = pm.MongoClient(host)
 
             self.db = self.client.crystals
             current_collections = self.db.list_collection_names()
             if self.db_name in current_collections and not self.append:
-                raise SystemExit('Desired db_name {} already exists!'.format(self.db_name))
+                raise SystemExit('Desired db_name already exists!')
 
             self.repo = self.db[self.db_name]
-            # create unique index for oqmd ID to allow for repeated imports
-            self.repo.create_index([('enthalpy_per_atom', pm.ASCENDING)])
-            self.repo.create_index([('stoichiometry', pm.ASCENDING)])
-            self.repo.create_index([('elems', pm.ASCENDING)])
-            self.repo.create_index('_oqmd_entry_id', unique=True)
-            self.repo.create_index([('source', pm.ASCENDING)])
+            self.create_indices()
+            self.build_mongo()
 
-            self.num_scraped = self.repo.count_documents({})
-            print('Currently {} documents in {}'.format(self.num_scraped, self.db_name))
+    def create_indices(self):
+        # create unique index for oqmd ID to allow for repeated imports
+        self.repo.create_index([('enthalpy_per_atom', pm.ASCENDING)])
+        self.repo.create_index([('stoichiometry', pm.ASCENDING)])
+        self.repo.create_index([('elems', pm.ASCENDING)])
+        self.repo.create_index([('source', pm.ASCENDING)])
+        self.create_extra_indices()
 
-            try:
-                self.start_id = self.repo.find().sort('_oqmd_entry_id', pm.DESCENDING).limit(1)[0]['_oqmd_entry_id']
-                print('Restarting from entry.id={}'.format(self.start_id))
-            except IndexError:
-                self.start_id = 0
+    def struct2db(self, struct):
+        """ Insert completed Python dictionary into chosen
+        database, with generated text_id.
+        """
+        plain_text_id = [self.wlines[randint(0, self.num_words-1)].strip(),
+                         self.nlines[randint(0, self.num_nouns-1)].strip()]
+        struct['text_id'] = plain_text_id
+        if '_id' in struct:
+            raise RuntimeError('{}'.format(struct))
+        try:
+            struct_id = self.repo.insert_one(struct)
+        except pm.errors.DuplicateKeyError:
+            return 0
 
-        # scrape structures from SQL database
-        self.oqmd2mongo()
+        return 1
 
-    def oqmd2mongo(self):
+
+class MPConverter(DBConverter):
+
+    def __init__(self, cursor, *args, **kwargs):
+        self.cursor = cursor
+        super().__init__(*args, **kwargs)
+
+    def create_extra_indices(self):
+        # create unique index for MP ID to allow for repeated imports
+        self.repo.create_index('_mp_id', unique=True)
+
+    def build_mongo(self):
+        for doc in self.cursor:
+            doc = self.doc2entry(doc)
+            self.import_count += self.struct2db(doc)
+
+        print(self.import_count, '/', len(self.cursor))
+
+    def doc2entry(self, doc):
+        if 'task' not in doc:
+            doc['task'] = 'geometryoptimization'
+        if 'species_pot' not in doc:
+            doc['species_pot'] = {elem: 'OQMD' for elem in doc['elems']}
+        for key in doc:
+            if isinstance(doc[key], np.ndarray):
+                doc[key] = doc[key].tolist()
+            elif isinstance(doc[key], set):
+                doc[key] = sorted(list(doc[key]))
+
+        return doc
+
+
+class OQMDConverter(DBConverter):
+    """ The OQMDConverter class implements methods to scrape
+    the OQMD SQL database for all entries using the qmpy interface.
+    """
+    def __init__(self, *args, **kwargs):
+        import qmpy
+        super().__init__(*args, **kwargs)
+
+    def create_extra_indices(self):
+        # create unique index for oqmd ID to allow for repeated imports
+        self.repo.create_index('_oqmd_entry_id', unique=True)
+
+    def build_mongo(self):
         """ Perform QMPY query for all entries, and scrape them into a MongoDB. """
         # start by scraping all converged structures with chosen label
         finished = False
@@ -249,6 +296,12 @@ class OQMDConverter:
         chunk_iter = 0
         all_structures = qmpy.Entry.objects.all().count()
         print('Expecting {} structures total'.format(all_structures))
+
+        try:
+            self.start_id = self.repo.find().sort('_oqmd_entry_id', pm.DESCENDING).limit(1)[0]['_oqmd_entry_id']
+            print('Restarting from entry.id={}'.format(self.start_id))
+        except IndexError:
+            self.start_id = 0
 
         while self.num_scraped < all_structures and self.import_count < self.limit:
             chunk_min = self.start_id + chunk_iter * self.chunk_size
@@ -283,7 +336,7 @@ class OQMDConverter:
 
                 self.success_count += 1
                 if not self.dryrun:
-                    self.import_count += self.oqmd_struct2db(doc)
+                    self.import_count += self.struct2db(doc)
 
             # seems like this keeps memory down in Python 2.7, otherwise it can balloon
             del cursor
@@ -304,21 +357,6 @@ class OQMDConverter:
                   'structures.')
         return
 
-    def oqmd_struct2db(self, struct):
-        """ Insert completed Python dictionary into chosen
-        database, with generated text_id.
-        """
-        plain_text_id = [self.wlines[randint(0, self.num_words-1)].strip(),
-                         self.nlines[randint(0, self.num_nouns-1)].strip()]
-        struct['text_id'] = plain_text_id
-        if '_id' in struct:
-            raise RuntimeError('{}'.format(struct))
-        try:
-            struct_id = self.repo.insert_one(struct)
-        except pm.errors.DuplicateKeyError:
-            return 0
-
-        return 1
 
 if __name__ == '__main__':
     # importer = QMPYConverter()
