@@ -13,7 +13,7 @@ import numpy as np
 from matador.utils.cell_utils import cart2abcstar, frac2cart, cart2abc
 from matador.utils.cell_utils import abc2cart, calc_mp_grid
 from matador.utils.cursor_utils import display_results
-from matador.utils.chem_utils import get_formula_from_stoich
+from matador.utils.chem_utils import get_formula_from_stoich, get_stoich, get_root_source
 
 EPS = 1e-8
 
@@ -124,35 +124,34 @@ def query2files(cursor, **kwargs):
         name = prefix
         path = directory + '/'
         # write either cell, res or both
-        for source in doc['source']:
-            source = str(source)
-            if '.res' in source or '.castep' in source or '.history' in source:
-                root_fname = source.split('/')[-1].split('.')[0]
-                if kwargs.get('subcmd') == 'swaps':
-                    root_fname = root_fname.replace('-swap-', '-')
-                    comp_string = ''
-                    comp_list = []
-                    for atom in doc['atom_types']:
-                        if atom not in comp_list:
-                            comp_list.append(atom)
-                            comp_string += atom
-                    name = comp_string + '-swap-'
-                name += root_fname
-            elif 'OQMD' in source:
-                formula = get_formula_from_stoich(doc['stoichiometry'])
-                name = formula + '-OQMD_' + source.split(' ')[-1]
-                # if swaps, prepend new composition
-                if kwargs.get('subcmd') == 'swaps':
-                    comp_string = ''
-                    comp_list = []
-                    for atom in doc['atom_types']:
-                        if atom not in comp_list:
-                            comp_list.append(atom)
-                            comp_string += atom
-                    name = comp_string + '-' + name
-                # grab OQMD entry_id
-                if 'icsd' in doc and 'CollCode' not in source:
-                    name += '-CollCode{}'.format(doc['icsd'])
+        root_source = get_root_source(doc)
+        root_source = root_source.replace('-swap-', '-')
+        name = root_source
+        formula = get_formula_from_stoich(doc['stoichiometry'])
+
+        if 'OQMD' in root_source:
+            name = '{formula}-OQMD_{src}'.format(formula=formula, src=root_source.split('_')[-1])
+        elif 'mp-' in root_source:
+            name = '{formula}-MP_{src}'.format(formula=formula, src=root_source.split('-')[-1])
+        if 'icsd' in doc and 'CollCode' not in name:
+            name += '-CollCode{}'.format(doc['icsd'])
+        else:
+            pf_id = None
+            for source in doc['source']:
+                if 'pf-' in source:
+                    pf_id = source.split('-')[-1]
+                    break
+            else:
+                if 'pf_ids' in doc:
+                    pf_id = doc['pf_ids'][0]
+            if pf_id is not None:
+                name += '-PF-{}'.format(pf_id)
+
+        # if swaps, prepend new composition
+        if kwargs.get('subcmd') == 'swaps':
+            new_formula = get_formula_from_stoich(get_stoich(doc['atom_types']))
+            name = '{}-swap-{}'.format(new_formula, name)
+
         path += name
         if param:
             doc2param(doc, path, hash_dupe=hash_dupe)
@@ -690,7 +689,10 @@ def doc2res(doc, path, info=True, spoof_titl=False, sort_atoms=True, **kwargs):
                 titl += '0.00 '
             else:
                 titl += str(doc['pressure']) + ' '
-            titl += str(doc['cell_volume']) + ' '
+            if 'cell_volume' not in doc:
+                titl += '0.0 '
+            else:
+                titl += str(doc['cell_volume']) + ' '
             if 'enthalpy' in doc and not isinstance(doc['enthalpy'], str):
                 titl += str(doc['enthalpy']) + ' '
             elif '0K_energy' in doc:
