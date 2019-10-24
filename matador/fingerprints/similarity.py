@@ -93,11 +93,11 @@ def get_uniq_cursor(cursor, sim_tol=0.1, energy_tol=1e-2,
 
     assert len(cursor) == len(set([key for key in dupe_dict] + [item for key in dupe_dict for item in dupe_dict[key]]))
 
+    swapped = []
     for i in dupe_dict:
         to_compare = [i]
         to_compare.extend(dupe_dict[i])
         hierarchy = ['ICSD', 'OQMD', 'SWAPS', 'AIRSS', 'GA']
-        swapped = []
         for provenance in hierarchy:
             found = False
             for k in to_compare:
