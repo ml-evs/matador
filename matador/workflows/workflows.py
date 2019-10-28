@@ -7,6 +7,7 @@ of chaining up different calculations at high-throughput.
 """
 
 import abc
+import os
 import logging
 from matador.utils.print_utils import dumps
 
@@ -51,6 +52,7 @@ class Workflow:
         self.calc_doc = calc_doc
         self.seed = seed
         self.label = self.__class__.__name__
+        self.compute_dir = relaxer.compute_dir
         self.success = None
         self.steps = []
 
@@ -80,12 +82,17 @@ class Workflow:
         other post-processing.
 
         """
+        cwd = os.getcwd()
+        if self.compute_dir:
+            os.chdir(self.compute_dir)
         if self.success:
             LOG.info('Writing results of Workflow {} run to res file and tidying up.'.format(self.label))
             self.relaxer.mv_to_completed(self.seed, keep=True)
         else:
             LOG.info('Writing results of failed Workflow {} run to res file and tidying up.'.format(self.label))
             self.relaxer.mv_to_bad(self.seed)
+        if self.compute_dir:
+            os.chdir(cwd)
 
     def add_step(self, function, name, input_exts=None, output_exts=None, **func_kwargs):
         """ Add a step to the workflow.
@@ -98,7 +105,7 @@ class Workflow:
 
         """
         self.steps.append(WorkflowStep(function, name,
-                                       input_exts, output_exts,
+                                       self.compute_dir, input_exts, output_exts,
                                        **func_kwargs))
 
     def run_steps(self):
@@ -131,16 +138,18 @@ class WorkflowStep:
     Attributes:
         function (function): the function to call.
         name (str): the human-readable name of the step.
+        compute_dir (str): the folder that relaxer will perform the calculation in.
         func_kwargs (dict): any extra kwargs to pass to the function.
         input_exts (list): list of input file extensions to cache after running.
         output_exts (list): list of output file extensions to cache after running.
 
     """
-    def __init__(self, function, name, input_exts=None, output_exts=None, **func_kwargs):
+    def __init__(self, function, name, compute_dir=None, input_exts=None, output_exts=None, **func_kwargs):
         """ Construct a WorkflowStep from a function. """
         LOG.debug('Constructing WorkflowStep: {}'.format(name))
         self.function = function
         self.name = name
+        self.compute_dir = compute_dir
         self.func_kwargs = func_kwargs
         self.input_exts = input_exts
         self.output_exts = output_exts
@@ -156,14 +165,13 @@ class WorkflowStep:
 
         """
         import shutil
-        import os
         import glob
+
         for ext in exts:
             if '*' in ext:
                 srcs = glob.glob('{}{}'.format(seed, ext))
             else:
                 srcs = ['{}{}'.format(seed, ext)]
-            print(ext, srcs)
             for src in srcs:
                 dst = src + '_{}'.format(self.name)
                 if os.path.isfile(src):
@@ -205,11 +213,15 @@ class WorkflowStep:
         """ Wrapper for calling both _cache_inputs and _cache_outputs, without
         throwing any errors.
         """
-        # try:
+        cwd = os.getcwd()
+        if self.compute_dir is not None:
+            os.chdir(self.compute_dir)
+
         self._cache_inputs(seed)
         self._cache_outputs(seed)
-        # except Exception:
-            # pass
+
+        if self.compute_dir:
+            os.chdir(cwd)
 
     def run_step(self, relaxer, calc_doc, seed):
         """ Run the workflow step.

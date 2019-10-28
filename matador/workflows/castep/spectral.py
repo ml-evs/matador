@@ -112,9 +112,11 @@ class CastepSpectralWorkflow(Workflow):
         odi_fname = _get_optados_fname(self.seed)
         if odi_fname is not None:
             odi_dict, _ = arbitrary2dict(odi_fname)
-            todo['pdis'] = 'pdispersion' in odi_dict
-            todo['broadening'] = 'broadening' in odi_dict
-            todo['pdos'] = 'pdos' in odi_dict
+            if todo['dispersion']:
+                todo['pdis'] = 'pdispersion' in odi_dict
+            if todo['dos']:
+                todo['broadening'] = 'broadening' in odi_dict
+                todo['pdos'] = 'pdos' in odi_dict
 
         for key in todo:
             if todo[key]:
@@ -251,7 +253,7 @@ def castep_spectral_dispersion(relaxer, calc_doc, seed):
         relaxer.ncores = 1
         relaxer.executable = 'orbitals2bands'
         try:
-            success = relaxer.run_generic(seed, intermediate=True, mv_bad_on_failure=False)
+            success = relaxer.run_generic(intermediate=True, mv_bad_on_failure=False)
         except Exception as exc:
             relaxer.executable = _cache_executable
             relaxer.ncores = _cache_core
@@ -353,7 +355,11 @@ def _run_optados(relaxer, odi_dict, seed, suffix=None):
     """
 
     from matador.export import doc2arbitrary
-    doc2arbitrary(odi_dict, seed + '.odi', overwrite=True)
+    odi_path = '{}.odi'.format(seed)
+    if relaxer.compute_dir is not None:
+        odi_path = relaxer.compute_dir + '/' + odi_path
+    doc2arbitrary(odi_dict, odi_path, overwrite=True)
+
     if suffix is not None:
         _get_correct_files_for_optados(seed, suffix=suffix)
 
@@ -366,7 +372,7 @@ def _run_optados(relaxer, odi_dict, seed, suffix=None):
     success = False
 
     try:
-        success = relaxer.run_generic(seed, intermediate=True, mv_bad_on_failure=False)
+        success = relaxer.run_generic(intermediate=True, mv_bad_on_failure=False)
     except Exception as exc:
         LOG.warning('Failed to call optados with error: {}'.format(exc))
 

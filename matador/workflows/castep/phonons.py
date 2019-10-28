@@ -21,7 +21,6 @@ multiple steps (only when necessary):
 
 import os
 import copy
-import json
 import logging
 from matador.workflows.workflows import Workflow
 
