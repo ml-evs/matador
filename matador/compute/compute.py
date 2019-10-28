@@ -124,7 +124,7 @@ class ComputeTask:
                          'custom_params': False, 'archer': False, 'maxmem': None, 'killcheck': True, 'kpts_1D': False,
                          'conv_cutoff': False, 'conv_kpt': False, 'slurm': False, 'intel': False,
                          'exec_test': True, 'timings': (None, None), 'start': True, 'verbosity': 1, 'polltime': 30,
-                         'optados_executable': 'optados', 'run3_settings': None}
+                         'optados_executable': 'optados', 'run3_settings': dict()}
 
         self.paths = None
         self.output_queue = None
@@ -437,6 +437,11 @@ class ComputeTask:
                 input_ext = ''
             assert isinstance(seed, str)
             self.cp_to_input(seed, ext=input_ext, glob_files=True)
+
+            self._setup_compute_dir(self.seed, self.compute_dir)
+            if self.compute_dir is not None:
+                os.chdir(self.compute_dir)
+
             self._process = self.run_command(seed)
             out, errs = self._process.communicate()
             if self._process.returncode != 0 or errs:
@@ -451,6 +456,10 @@ class ComputeTask:
 
             LOG.info('Executable {exe} finished cleanly.'.format(exe=self.executable))
             self._first_run = False
+
+            if self.compute_dir is not None:
+                os.chdir(self.root_folder)
+
             return True
 
         except Exception as err:
@@ -458,6 +467,8 @@ class ComputeTask:
             LOG.error('Caught error inside run_generic: {error}.'.format(error=err))
             if mv_bad_on_failure:
                 self.mv_to_bad(seed)
+            if self.compute_dir is not None:
+                os.chdir(self.root_folder)
             raise err
 
     def relax(self):
@@ -683,6 +694,7 @@ class ComputeTask:
             self._setup_compute_dir(self.seed, self.compute_dir, custom_params=self.custom_params)
             if self.compute_dir is not None:
                 os.chdir(self.compute_dir)
+
             self._update_input_files(seed, calc_doc)
             doc2res(calc_doc, self.seed, info=False, hash_dupe=False, overwrite=True)
 
@@ -714,8 +726,6 @@ class ComputeTask:
 
             if self.compute_dir is not None:
                 os.chdir(self.root_folder)
-                # always cd back to root folder
-                self.remove_compute_dir_if_finished(self.compute_dir)
 
             return success
 
@@ -726,8 +736,6 @@ class ComputeTask:
                 self.tidy_up(seed)
             if self.compute_dir is not None:
                 os.chdir(self.root_folder)
-                # always cd back to root folder
-                self.remove_compute_dir_if_finished(self.compute_dir)
             raise err
 
     @staticmethod
