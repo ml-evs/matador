@@ -637,9 +637,9 @@ class ComputeTest(MatadorUnitTest):
         """
 
         executable = 'echo'
-        files = glob.glob(REAL_PATH + '/data/structures/*.res')
-        _file = files[0]
-        shutil.copy(_file, '.')
+        files = glob.glob(REAL_PATH + '/data/structures/*.res')[0:2]
+        for _file in files:
+            shutil.copy(_file, '.')
 
         runner = BatchRun(seed='*.res', debug=False, mode='generic',
                           verbosity=4, ncores=1, nprocesses=4, executable=executable)
@@ -661,9 +661,11 @@ class ComputeTest(MatadorUnitTest):
         with open('jobs.txt', 'r') as f:
             jobs_len = len(f.readlines())
 
-        self.assertEqual(num_logs, 1, msg='Not enough log files!')
+        self.assertEqual(num_logs, len(files), msg='Not enough log files!')
+        for f in files:
+            self.assertTrue(os.path.isfile('input/{}'.format(f.split('/')[-1])))
         self.assertTrue(all(lines > 5 for lines in log_lines), msg='Log files were too short!')
-        self.assertEqual(jobs_len, 1)
+        self.assertEqual(jobs_len, len(files))
         self.assertTrue(dirs_exist)
         self.assertTrue(completed_files_exist)
         self.assertTrue(txt_files_exist)

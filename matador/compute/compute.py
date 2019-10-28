@@ -435,10 +435,11 @@ class ComputeTask:
                 input_ext = seed.split('.')[-1]
             else:
                 input_ext = ''
+
             assert isinstance(seed, str)
             self.cp_to_input(seed, ext=input_ext, glob_files=True)
 
-            self._setup_compute_dir(self.seed, self.compute_dir)
+            self._setup_compute_dir(self.seed, self.compute_dir, generic=True)
             if self.compute_dir is not None:
                 os.chdir(self.compute_dir)
 
@@ -1267,12 +1268,12 @@ class ComputeTask:
         if not os.path.exists(input_dir):
             os.makedirs(input_dir, exist_ok=True)
         if glob_files:
-            files = glob.glob('{}*'.format(seed))
+            files = glob.glob('{}.*'.format(seed))
             LOG.debug('Files to copy: {files}'.format(files=files))
             for f in files:
                 if f.endswith('.lock'):
                     continue
-                if not os.path.isfile(f):
+                if not os.path.isfile(input_dir + '/' + f):
                     shutil.copy2('{}'.format(f), input_dir)
         else:
             LOG.debug('File to copy: {file}'.format(file='{}.{}'.format(seed, ext)))
@@ -1539,7 +1540,7 @@ class ComputeTask:
         return True
 
     @staticmethod
-    def _setup_compute_dir(seed, compute_dir, custom_params=False):
+    def _setup_compute_dir(seed, compute_dir, custom_params=False, generic=False):
         """ Create the desired directory if it doens't exist,
         and try to link to it in the current folder.
 
@@ -1568,6 +1569,11 @@ class ComputeTask:
                 if os.path.islink(link_name):
                     os.remove(link_name)
                 os.symlink(compute_dir, link_name)
+
+        if generic:
+            # if generic, copy all seed files to compute dir
+            for f in glob.glob(seed + '*'):
+                shutil.copy2(f, compute_dir)
 
         # copy pspots and any intermediate calcs to compute_dir
         LOG.info('Copying pspots into compute_dir')
