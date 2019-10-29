@@ -64,7 +64,7 @@ class PhononWorkflowTest(MatadorUnitTest):
         cell_dict, _ = cell2dict("Si.cell", db=False)
         param_dict, _ = param2dict("Si.param", db=False)
         _ = ComputeTask(
-            res="Si2",
+            res="Si2.res",
             ncores=NCORES,
             nnodes=None,
             node=None,
@@ -97,7 +97,7 @@ class SpectralWorkflowTest(MatadorUnitTest):
         cell_dict, _ = cell2dict("Si.cell", db=False)
         param_dict, _ = param2dict("Si.param", db=False)
         _ = ComputeTask(
-            res="Si2",
+            res="Si2.res",
             ncores=NCORES,
             nnodes=None,
             node=None,
@@ -169,7 +169,7 @@ class SpectralWorkflowTest(MatadorUnitTest):
         del cell_dict['spectral_kpoints_path_spacing']
         param_dict, _ = param2dict("Si.param", db=False)
         _ = ComputeTask(
-            res="Si2",
+            res="Si2.res",
             ncores=NCORES,
             nnodes=None,
             node=None,
@@ -234,7 +234,6 @@ class SpectralWorkflowTest(MatadorUnitTest):
         self.assertTrue(os.path.isfile("completed/Si2.pdos_bin_pdos"))
         self.assertTrue(os.path.isfile("completed/Si2.res"))
 
-
     def test_full_spectral(self):
         for _f in glob.glob(REAL_PATH + "data/spectral_workflow/*"):
             shutil.copy(_f, ".")
@@ -242,7 +241,7 @@ class SpectralWorkflowTest(MatadorUnitTest):
         cell_dict, _ = cell2dict("Si.cell")
         param_dict, _ = param2dict("Si.param", db=False)
         _ = ComputeTask(
-            res="Si2",
+            res="Si2.res",
             ncores=NCORES,
             nnodes=None,
             node=None,

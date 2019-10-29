@@ -676,8 +676,7 @@ def bands2dict(seed, **kwargs):
     header = flines[:9]
     data = flines[9:]
 
-    seed = seed.replace('.bands', '')
-    bs['source'] = [seed + '.bands']
+    bs['source'] = [seed]
     bs['raw'] = flines
 
     bs['num_kpoints'] = int(header[0].split()[-1])

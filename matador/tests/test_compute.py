@@ -295,7 +295,7 @@ class ComputeTest(MatadorUnitTest):
         self.assertTrue(s)
         executable = 'castep'
         node = None
-        seed = 'NaP_intermediates_stopped_early'
+        seed = 'NaP_intermediates_stopped_early.res'
         with self.assertRaises(CalculationError):
             ComputeTask(ncores=NCORES, nnodes=None, node=node,
                         res=seed, param_dict=param_dict, cell_dict=cell_dict,
@@ -330,7 +330,7 @@ class ComputeTest(MatadorUnitTest):
 
         with self.assertRaises(MaxMemoryEstimateExceeded):
             ComputeTask(ncores=NCORES, nnodes=None, node=None,
-                        res='_LiAs_testcase', param_dict=param_dict, cell_dict=cell_dict,
+                        res='_LiAs_testcase.res', param_dict=param_dict, cell_dict=cell_dict,
                         verbosity=VERBOSITY, killcheck=True, memcheck=True, maxmem=1,
                         start=True)
 
