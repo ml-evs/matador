@@ -161,11 +161,11 @@ In this job, we will submit a run3 job that performs CASTEP calculations across 
     module load mpi/impi/2017.1.132-iccifort-2017.1.132
     unset I_MPI_PMI_LIBRARY
     
-    # RUN3 COMMANDS 
-    # (assuming installation guide followed at 
-    #  https://matador-db.readthedocs.io/en/latest/install.html) 
+    # RUN3 COMMANDS
+    # (assuming installation guide followed at
+    #  https://matador-db.readthedocs.io/en/latest/install.html)
 
-    source activate matador  
+    source activate matador
     run3 -nc 48 -v 4 --executable castep.mpi --ignore_jobs_file TiO2
 
 Let's unpick a few of the flags used to call run3 here:
