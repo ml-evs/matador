@@ -118,7 +118,7 @@ class Workflow:
 
             for step in self.steps:
                 LOG.info("Running step {step.name}: {step.function}".format(step=step))
-                LOG.debug("Current state: \n" + dumps(self.calc_doc, indent=2))
+                LOG.debug("Current state: " + dumps(self.calc_doc, indent=None))
                 step.run_step(self.relaxer, self.calc_doc, self.seed)
 
             self.success = True

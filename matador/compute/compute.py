@@ -445,10 +445,12 @@ class ComputeTask:
 
             self._process = self.run_command(seed)
             out, errs = self._process.communicate()
+            out = out.decode('utf-8')
+            errs = errs.decode('utf-8')
             if self._process.returncode != 0 or errs:
                 message = 'Process returned error code {}'.format(self._process.returncode)
-                message += '\nstdout: {}'.format(out.decode('utf-8'))
-                message += '\nstderr: {}'.format(errs.decode('utf-8'))
+                message += '\nstdout: {}'.format(out)
+                message += '\nstderr: {}'.format(errs)
                 raise CalculationError(message)
 
             if not intermediate:
@@ -885,15 +887,17 @@ class ComputeTask:
             raise CriticalError(message)
 
         out, errs = proc.communicate()
-        if 'CASTEP version' not in out.decode('utf-8'):
+        out = out.decode('utf-8')
+        errs = errs.decode('utf-8')
+        if 'CASTEP version' not in out:
             # this is an OpenMPI error that occurs when hyperthreading is enabled
             # best way to handle is to half the number of procs available
-            if 'not enough slots' in errs.decode('utf-8'):
+            if 'not enough slots' in errs:
                 err_string = ('MPI library tried to use too many cores and failed, '
                               'rescaling core count and re-running with {} cores...'.format(int(self.ncores/2)))
                 LOG.warning(err_string)
-                LOG.warning('stdout: {stdout}'.format(stdout=out.decode('utf-8')))
-                LOG.warning('sterr: {stderr}'.format(stderr=errs.decode('utf-8')))
+                LOG.warning('stdout: {stdout}'.format(stdout=out))
+                LOG.warning('sterr: {stderr}'.format(stderr=errs))
                 if self.ncores >= 2:
                     self.ncores = int(self.ncores/2)
                 else:
@@ -903,14 +907,27 @@ class ComputeTask:
             else:
                 err_string = 'Executable `{}` failed testing: does it support --version flag?'.format(self.executable)
                 LOG.critical(err_string)
-                LOG.critical('stdout: {stdout}'.format(stdout=out.decode('utf-8')))
-                LOG.critical('sterr: {stderr}'.format(stderr=errs.decode('utf-8')))
+                LOG.critical('stdout: {stdout}'.format(stdout=out))
+                LOG.critical('sterr: {stderr}'.format(stderr=errs))
                 LOG.debug('Raising CriticalError.')
                 raise CriticalError(err_string)
 
         if errs:
             LOG.info('Executable {} passed test, but stderr contains the following:'.format(self.executable))
-            LOG.info(errs.decode('utf-8'))
+            LOG.info(errs)
+
+        try:
+            version_string = out.split('\n')
+            for line in version_string:
+                if 'CASTEP version' in line:
+                    version = line.strip().split(' ')[-1]
+                    version = float(version)
+
+            LOG.info('CASTEP version: {}'.format(version))
+            if version < 18:
+                LOG.warning('Using CASTEP version {}: some features may not work, consider updating to at least CASTEP 18'.format(version))
+        except Exception:
+            LOG.warning('Unable to detect CASTEP version; some features may not work unless you are using at least version 18.')
 
     @property
     def mpi_library(self):
@@ -1404,7 +1421,7 @@ class ComputeTask:
 
         LOG.debug('Calculation dictionary: {}'
                   .format(matador.utils.print_utils.dumps(this_calc_doc,
-                                                          indent=2)))
+                                                          indent=None)))
 
     @staticmethod
     def tidy_up(seed):
