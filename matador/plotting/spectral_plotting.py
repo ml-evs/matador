@@ -350,18 +350,26 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
 
                     gaussian_width = kwargs.get('gaussian_width', 0.1)
 
-                    raw_weights = []
-                    raw_eigenvalues = []
-                    for kind, qpt in enumerate(dos_data['eigenvalues_k_s']):
-                        weight = dos_data['kpoint_weights'][kind]
-                        for eig in qpt:
-                            raw_weights.append(weight)
-                            raw_eigenvalues.append(eig)
-                    raw_eigenvalues = np.asarray(raw_eigenvalues)
-                    raw_weights = np.asarray(raw_weights)
+                    raw_eigs = np.asarray(dos_data['eigenvalues_k_s']) - dos_data['fermi_energy']
+                    raw_weights = np.zeros_like(raw_eigs)
+                    for sind, _ in enumerate(dos_data['eigenvalues_k_s']):
+                        for kind, _ in enumerate(dos_data['eigenvalues_k_s'][sind]):
+                            raw_weights[sind, kind, :] = dos_data['kpoint_weights'][kind]
 
-                    dos_data['dos'], dos_data['energies'] = _cheap_broaden(raw_weights,
-                                                                           raw_eigenvalues,
+                    if len(raw_weights) != 1:
+                        if len(raw_weights) > 2:
+                            raise NotImplementedError('Non-collinear spin not supported')
+                        dos_data['spin_dos'] = dict()
+                        keys = ['up', 'down']
+                        for sind in range(len(raw_weights)):
+                            dos_data[keys[sind]], dos_data['energies'] = _cheap_broaden(
+                                dos_data['eigenvalues'][sind].flatten(),
+                                weights=raw_weights[sind].flatten(),
+                                gaussian_width=gaussian_width
+                            )
+
+                    dos_data['dos'], dos_data['energies'] = _cheap_broaden(raw_eigs.flatten(),
+                                                                           weights=raw_weights.flatten(),
                                                                            gaussian_width=gaussian_width)
                 else:
                     dos_data, s = optados2dict(dos_seed, verbosity=0)
@@ -444,7 +452,7 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                 if 'spin_dos' not in dos_data:
                     ax_dos.plot(dos, energies, ls=kwargs['ls'][seed_ind],
                                 color='grey', zorder=1e10, label='Total DOS')
-                    if not kwargs['plot_dos']:
+                    if not kwargs['plot_pdos']:
                         ax_dos.fill_betweenx(energies[np.where(energies > 0)], 0, dos[np.where(energies > 0)], alpha=0.2, color=kwargs['conduction'])
                         ax_dos.fill_betweenx(energies[np.where(energies <= 0)], 0, dos[np.where(energies <= 0)], alpha=0.2, color=kwargs['valence'])
 
@@ -462,7 +470,7 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                 if 'spin_dos' not in dos_data:
                     ax_dos.plot(energies, dos, ls=kwargs['ls'][seed_ind], alpha=1,
                                 c='grey', zorder=1e10, label='Total DOS')
-                    if not kwargs['plot_dos']:
+                    if not kwargs['plot_pdos']:
                         ax_dos.fill_between(energies[np.where(energies > 0)], 0, dos[np.where(energies > 0)], alpha=0.2, color=kwargs['conduction'])
                         ax_dos.fill_between(energies[np.where(energies <= 0)], 0, dos[np.where(energies <= 0)], alpha=0.2, color=kwargs['valence'])
 
@@ -609,7 +617,7 @@ def _cheap_broaden(eigs, weights=None, gaussian_width=None):
     if gaussian_width is None:
         gaussian_width = 0.1
 
-    hist, energies = np.histogram(eigs, weights=weights, bins=501)
+    hist, energies = np.histogram(eigs, weights=weights, bins=1001)
 
     # shift bin edges to bin centres
     energies -= energies[1] - energies[0]
