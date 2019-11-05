@@ -12,7 +12,7 @@ Example 1.1: Using run3 locally
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-In this example, we will suppose that you want to perform a geometry optimisation on several different polymorphs of TiO<sub>2</sub> from the ICSD. The files for this example can be found in ``examples/run3_tutorial``, `here <https://bitbucket.org/ml-evs/matador/src/examples/run3_tutorial>`_.
+In this example, we will suppose that you want to perform a geometry optimisation on several different polymorphs of TiO\ :sub:`2` from the ICSD. The files for this example can be found in ``examples/run3_tutorial``, `here <https://bitbucket.org/ml-evs/matador/src/examples/run3_tutorial>`_.
 
 Setting up the files
 ^^^^^^^^^^^^^^^^^^^^
