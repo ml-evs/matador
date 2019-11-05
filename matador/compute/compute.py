@@ -293,7 +293,7 @@ class ComputeTask:
 
         except Exception as exc:
             LOG.error('Process raised {} with message {}.'.format(type(exc), exc))
-            if type(exc) != CalculationError:
+            if isinstance(exc, CalculationError):
                 LOG.error('Full traceback:\n{}'.format(tb.format_exc()))
             for handler in LOG.handlers[:]:
                 handler.close()
@@ -474,10 +474,15 @@ class ComputeTask:
                 os.chdir(self.root_folder)
             raise err
 
-    def relax(self):
+    def relax(self, intermediate=False):
         """ Set up a structural relaxation that is restarted intermittently
         in order to re-mesh the kpoint grid. Completed calculations are moved
         to the "completed" folder, and failures to "bad_castep".
+
+        Keyword arguments:
+            intermediate (bool): whether we want to run more calculations
+                on the output of this, i.e. whether to move to completed
+                or not.
 
         Returns:
             bool: True iff structure was optimised, False otherwise.
@@ -524,32 +529,35 @@ class ComputeTask:
                 LOG.info('Polling process every {} s'.format(self.polltime))
 
                 checked_castep_exists = False
+                i = 0
                 while self._process.poll() is None:
-                    proc_elapsed = time.time() - proc_clock
-                    if not checked_castep_exists and proc_elapsed > 3*self.polltime:
-                        # if no CASTEP file made within 3 poll times, or if this process
-                        # hasn't written to it, then raise error
-                        if not os.path.isfile(seed + '.castep'):
-                            msg = ('CASTEP file was not created, please check your executable: {}.'
-                                   .format(self.executable))
-                            LOG.critical(msg)
-                            raise CalculationError(msg)
-                        if os.path.getmtime(seed + '.castep') - proc_clock < 0:
-                            msg = ('CASTEP file present, but too old to be made by this process. Please check your executable: {}.'
-                                   .format(self.executable))
-                            LOG.critical(msg)
+                    if i % self.polltime == 0:
+                        proc_elapsed = time.time() - proc_clock
+                        if not checked_castep_exists and proc_elapsed > 3*self.polltime:
+                            # if no CASTEP file made within 3 poll times, or if this process
+                            # hasn't written to it, then raise error
+                            if not os.path.isfile(seed + '.castep'):
+                                msg = ('CASTEP file was not created, please check your executable: {}.'
+                                       .format(self.executable))
+                                LOG.critical(msg)
+                                raise CalculationError(msg)
+                            if os.path.getmtime(seed + '.castep') - proc_clock < 0:
+                                msg = ('CASTEP file present, but too old to be made by this process. Please check your executable: {}.'
+                                       .format(self.executable))
+                                LOG.critical(msg)
                             raise CalculationError(msg)
                         checked_castep_exists = True
 
-                    if self.max_walltime is not None:
-                        run_elapsed = time.time() - self.start_time
-                        # leave 1 minute to clean up
-                        if run_elapsed > abs(self.max_walltime - 5*self.polltime):
-                            msg = 'About to run out of time on seed {}, killing early...'.format(self.seed)
-                            LOG.info(msg)
-                            raise WalltimeError(msg)
+                        if self.max_walltime is not None:
+                            run_elapsed = time.time() - self.start_time
+                            # leave 1 minute to clean up
+                            if run_elapsed > abs(self.max_walltime - 5*self.polltime):
+                                msg = 'About to run out of time on seed {}, killing early...'.format(self.seed)
+                                LOG.info(msg)
+                                raise WalltimeError(msg)
 
-                    time.sleep(self.polltime)
+                    time.sleep(1)
+                    i += 1
 
                 self._process.communicate()
 
@@ -565,7 +573,7 @@ class ComputeTask:
                     msg += errors
                     LOG.warning(msg)
                     if isinstance(opti_dict, dict):
-                        self._update_output_files(opti_dict)
+                        self._update_output_files(seed, opti_dict)
                     if remedy is not None and self._num_retries <= self._max_num_retries:
                         LOG.warning('Attempting to recover using {}'.format(remedy))
                     else:
@@ -593,7 +601,7 @@ class ComputeTask:
                     # then reset, and go again...
                     if self.reopt and rerun and not opti_dict['optimised']:
                         rerun = False
-                        self._update_output_files(opti_dict)
+                        self._update_output_files(seed, opti_dict)
 
                     # are we optimised, but haven't yet rerun?
                     # then set prepare to do one more full relaxation
@@ -604,12 +612,12 @@ class ComputeTask:
                         if self.squeeze:
                             for jnd in range(ind, len(self._squeeze_list)):
                                 self._squeeze_list[jnd] = False
-                        self._update_output_files(opti_dict)
+                        self._update_output_files(seed, opti_dict)
 
                     # or did the relaxation complete successfuly, including rerun?
                     elif (not self.reopt or rerun) and opti_dict['optimised']:
                         LOG.info('Successfully relaxed {}'.format(seed))
-                        self._update_output_files(opti_dict)
+                        self._update_output_files(seed, opti_dict)
                         break
 
                     # reached maximum number of steps
@@ -652,12 +660,14 @@ class ComputeTask:
                     remedy(self.calc_doc)
                     self._num_retries += 1
 
-            return self._finalise_result()
+            return self._finalise_result(intermediate=intermediate)
 
         # catch WalltimeErrors and reset the job folder ready for continuation
         except WalltimeError as err:
             LOG.error('WalltimeError thrown; calling times_up')
             self.times_up(self._process)
+            if self.compute_dir is not None:
+                os.chdir(self.root_folder)
             raise err
 
         # All other errors mean something bad has happened, so we should clean up this job
@@ -668,7 +678,9 @@ class ComputeTask:
                 self._process.terminate()
             except AttributeError:
                 pass
-            self._finalise_result()
+            self._finalise_result(intermediate)
+            if self.compute_dir is not None:
+                os.chdir(self.root_folder)
             raise err
 
     def scf(self, calc_doc, seed, keep=True, intermediate=False):
@@ -718,7 +730,7 @@ class ComputeTask:
                 msg = 'Error scraping CASTEP file {}: {}'.format(seed, results_dict)
                 raise CalculationError(msg)
 
-            self._update_output_files()
+            self._update_output_files(seed)
 
             if not intermediate:
                 LOG.info('Writing results of singleshot CASTEP run to res file and tidying up.')
@@ -1215,7 +1227,7 @@ class ComputeTask:
         except Exception as exc:
             LOG.warning('Error moving files to bad: {error}'.format(error=exc))
 
-    def mv_to_completed(self, seed, completed_dir='completed', keep=False):
+    def mv_to_completed(self, seed, completed_dir='completed', keep=False, skip_existing=False):
         """ Move all associated files to completed, removing any
         remaining files in the root_folder and compute_dir.
 
@@ -1225,6 +1237,8 @@ class ComputeTask:
         Keyword arguments:
             completed_dir (str): folder for completed jobs.
             keep (bool): whether to also move intermediate files.
+            skip_existing (bool): if True, skip files that already exist,
+                otherwise throw an error.
 
         """
         completed_dir = self.root_folder + '/' + completed_dir
@@ -1243,7 +1257,10 @@ class ComputeTask:
             if seed_files:
                 LOG.debug('Files to move: {files}.'.format(files=seed_files))
                 for _file in seed_files:
-                    shutil.move(_file, completed_dir)
+                    if skip_existing and os.path.isfile(completed_dir + '/' + _file):
+                        continue
+                    else:
+                        shutil.move(_file, completed_dir)
         else:
             # move castep/param/res/out_cell files to completed
             file_exts = ['.castep']
@@ -1438,7 +1455,7 @@ class ComputeTask:
                 if not (f.endswith('.res') or f.endswith('.castep')):
                     os.remove(f)
 
-    def _update_output_files(self, opti_dict=None):
+    def _update_output_files(self, seed, opti_dict=None):
         """ Copy new data to output files and update
          the results dict.
 
@@ -1448,23 +1465,28 @@ class ComputeTask:
         """
         LOG.info('Updating .res and .castep files in root_dir with new results')
         if opti_dict is not None:
-            if os.path.isfile(self.seed + '.res'):
-                os.rename('{}.res'.format(self.seed), '{}.res_bak'.format(self.seed))
+            if os.path.isfile(seed + '.res'):
+                os.rename('{}.res'.format(seed), '{}.res_bak'.format(seed))
             try:
-                doc2res(opti_dict, self.seed, hash_dupe=False)
+                doc2res(opti_dict, seed, hash_dupe=False)
             except CalculationError:
-                doc2res(opti_dict, self.seed, hash_dupe=False, info=False)
-            if os.path.isfile(self.seed + '.res_bak'):
-                os.remove(self.seed + '.res_bak')
+                doc2res(opti_dict, seed, hash_dupe=False, info=False)
+            if os.path.isfile(seed + '.res_bak'):
+                os.remove(seed + '.res_bak')
             self.res_dict.update(opti_dict)
 
         if self.compute_dir is not None:
-            shutil.copy2(self.seed + '.res', self.root_folder)
-            if os.path.isfile(self.seed + '.castep'):
-                shutil.copy2(self.seed + '.castep', self.root_folder)
+            shutil.copy2(seed + '.res', self.root_folder)
+            if os.path.isfile(seed + '.castep'):
+                shutil.copy2(seed + '.castep', self.root_folder)
 
-    def _finalise_result(self):
+    def _finalise_result(self, intermediate=False):
         """ Push to queue if necessary and return status.
+
+        Keyword arguments:
+            intermediate (bool): whether we want to run more calculations
+                on the output of this, i.e. whether to move to completed
+                or not.
 
         Returns:
             bool: True is relaxation was successful, False otherwise.
@@ -1481,14 +1503,17 @@ class ComputeTask:
             LOG.info('Pushing results to output queue')
             self.output_queue.put(self.res_dict)
         if success:
-            self.mv_to_completed(self.seed, completed_dir=self.paths['completed_dir'])
+            if not intermediate:
+                self.mv_to_completed(self.seed, completed_dir=self.paths['completed_dir'])
         else:
             self.mv_to_bad(self.seed)
 
         if success:
             self.final_result = self.res_dict
-        # clean up rest of files
-        self.tidy_up(self.seed)
+
+        if not intermediate:
+            # clean up rest of files
+            self.tidy_up(self.seed)
 
         return success
 
@@ -1575,6 +1600,8 @@ class ComputeTask:
 
         LOG.info('Using compute_dir: {}'.format(compute_dir))
         if not os.path.isdir(compute_dir):
+            if os.getcwd().endswith(compute_dir):
+                raise RuntimeError('Called set up compute_dir from inside compute dir!')
             try:
                 os.makedirs(compute_dir)
             except PermissionError as exc:
@@ -1582,8 +1609,8 @@ class ComputeTask:
         # if compute_dir isn't simply inside this folder, make a symlink that is
         if '/' in compute_dir:
             link_name = compute_dir.split('/')[-1]
-            if not os.path.isfile(link_name) and not os.path.isdir(link_name):
-                if os.path.islink(link_name):
+            if not os.path.exists(link_name):
+                if os.path.lexists(link_name):
                     os.remove(link_name)
                 os.symlink(compute_dir, link_name)
 
@@ -1596,7 +1623,10 @@ class ComputeTask:
         LOG.info('Copying pspots into compute_dir')
         pspots = glob.glob('*.usp')
         for pspot in pspots:
-            shutil.copy2(pspot, compute_dir)
+            try:
+                shutil.copy2(pspot, compute_dir)
+            except shutil.SameFileError:
+                pass
 
         if custom_params and compute_dir is not None:
             shutil.copy2(seed + '.param', compute_dir)
