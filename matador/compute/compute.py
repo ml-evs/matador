@@ -531,7 +531,7 @@ class ComputeTask:
                 checked_castep_exists = False
                 i = 0
                 while self._process.poll() is None:
-                    if i % self.polltime == 0:
+                    if i % max(int(self.polltime), 1) == 0:
                         proc_elapsed = time.time() - proc_clock
                         if not checked_castep_exists and proc_elapsed > 3*self.polltime:
                             # if no CASTEP file made within 3 poll times, or if this process
@@ -545,10 +545,11 @@ class ComputeTask:
                                 msg = ('CASTEP file present, but too old to be made by this process. Please check your executable: {}.'
                                        .format(self.executable))
                                 LOG.critical(msg)
-                            raise CalculationError(msg)
-                        checked_castep_exists = True
+                                raise CalculationError(msg)
+                            checked_castep_exists = True
 
                         if self.max_walltime is not None:
+                            print(self.max_walltime, self.polltime)
                             run_elapsed = time.time() - self.start_time
                             # leave 1 minute to clean up
                             if run_elapsed > abs(self.max_walltime - 5*self.polltime):
@@ -556,8 +557,8 @@ class ComputeTask:
                                 LOG.info(msg)
                                 raise WalltimeError(msg)
 
-                    time.sleep(1)
                     i += 1
+                    time.sleep(1)
 
                 self._process.communicate()
 
