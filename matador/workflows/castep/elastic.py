@@ -12,6 +12,7 @@ import copy
 import logging
 import numpy as np
 from matador.workflows import Workflow
+from matador.crystal.elastic import get_equation_of_state
 
 LOG = logging.getLogger('run3')
 
@@ -57,6 +58,7 @@ class CastepElasticWorkflow(Workflow):
         bulk_modulus_only (bool): only calculate the bulk modulus.
 
     """
+
     def preprocess(self):
         """ Decide which parts of the Workflow need to be performed,
         and set the appropriate CASTEP parameters.
@@ -69,9 +71,20 @@ class CastepElasticWorkflow(Workflow):
         LOG.info('Preprocessing completed: run3 bulk modulus calculation options {}'
                  .format(self.volume_rescale))
 
-        self.add_step(castep_elastic_prerelax, 'relax')
+        # clean up after geometry step as seed is going to change
+        self.add_step(castep_elastic_prerelax, 'relax', clean_after=True)
         for volume in self.volume_rescale:
             self.add_step(castep_rescaled_volume_scf, 'rescaled_volume_scf', rescale=volume)
+
+    def postprocess(self):
+        """ Fit some equations of state, then save a plot and a datafile. """
+        results = get_equation_of_state(self.seed + '_bulk_mod', plot=True)
+        if 'summary' in results:
+            for line in results['summary']:
+                print(line)
+            print('Writing summary to {seed}_bulk_mod.results'.format(seed=self.seed))
+            with open(self.seed + '_bulk_mod.results', 'w') as f:
+                f.writelines(results['summary'])
 
 
 def castep_rescaled_volume_scf(relaxer, calc_doc, seed, rescale=1):
@@ -87,14 +100,16 @@ def castep_rescaled_volume_scf(relaxer, calc_doc, seed, rescale=1):
 
     """
     assert rescale > 0
-    LOG.info('Performing CASTEP SCF on volume rescaled by {}.'.format(rescale**3))
+    LOG.info('Performing CASTEP SCF on volume rescaled by {:.2f}.'.format(rescale**3))
     scf_doc = copy.deepcopy(calc_doc)
     for i in range(3):
         for k in range(3):
             scf_doc['lattice_cart'][i][k] *= rescale
     scf_doc['task'] = 'singlepoint'
+    bulk_mod_seed = seed + '_bulk_mod'
+    relaxer.seed = bulk_mod_seed
 
-    return relaxer.scf(scf_doc, seed, keep=True, intermediate=True)
+    return relaxer.scf(scf_doc, bulk_mod_seed, keep=True, intermediate=True)
 
 
 def castep_elastic_prerelax(relaxer, calc_doc, seed):
@@ -108,17 +123,13 @@ def castep_elastic_prerelax(relaxer, calc_doc, seed):
     """
     LOG.info('Performing CASTEP elastic pre-relax...')
     relax_doc = copy.deepcopy(calc_doc)
-    relax_doc['write_checkpoint'] = 'ALL'
     if 'geom_max_iter' not in relax_doc:
-        relax_doc['geom_max_iter'] = 20
+        relax_doc['geom_max_iter'] = 100
     relax_doc['task'] = 'geometryoptimisation'
-
-    relax_seed = seed + '_relax'
 
     required = []
     forbidden = []
     relaxer.validate_calc_doc(relax_doc, required, forbidden)
     relaxer.calc_doc = relax_doc
-    relaxer.seed = relax_seed
 
-    return relaxer.relax()
+    return relaxer.relax(intermediate=True)
