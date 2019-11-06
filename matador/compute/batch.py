@@ -84,6 +84,8 @@ class BatchRun:
         self.compute_dir = os.uname()[1]
         if self.args.get('scratch_prefix') not in [None, '.']:
             self.compute_dir = '{}/{}'.format(self.args['scratch_prefix'], self.compute_dir).replace('//', '/')
+        elif self.args.get('scratch_prefix') == '.':
+            self.compute_dir = None
 
         if self.args.get('mode') is not None:
             self.mode = self.args.get('mode')
