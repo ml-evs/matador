@@ -56,6 +56,7 @@ class Workflow:
         self.success = None
         self.steps = []
         self.clean_after_step = []
+        self.workflow_params = workflow_kwargs
 
         LOG.info('Performing Workflow of type {} on {}'.format(self.label, self.seed))
 

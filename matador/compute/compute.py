@@ -124,7 +124,7 @@ class ComputeTask:
                          'custom_params': False, 'archer': False, 'maxmem': None, 'killcheck': True, 'kpts_1D': False,
                          'conv_cutoff': False, 'conv_kpt': False, 'slurm': False, 'intel': False,
                          'exec_test': True, 'timings': (None, None), 'start': True, 'verbosity': 1, 'polltime': 30,
-                         'optados_executable': 'optados', 'run3_settings': dict()}
+                         'optados_executable': 'optados', 'run3_settings': dict(), 'workflow_kwargs': dict()}
 
         self.paths = None
         self.output_queue = None
@@ -383,15 +383,15 @@ class ComputeTask:
 
             elif self.calc_doc['task'].upper() in ['PHONON', 'THERMODYNAMICS']:
                 from matador.workflows.castep import castep_full_phonon
-                success = castep_full_phonon(self, self.calc_doc, self.seed)
+                success = castep_full_phonon(self, self.calc_doc, self.seed, **self.workflow_kwargs)
 
             elif self.calc_doc['task'].upper() in ['SPECTRAL']:
                 from matador.workflows.castep import castep_full_spectral
-                success = castep_full_spectral(self, self.calc_doc, self.seed)
+                success = castep_full_spectral(self, self.calc_doc, self.seed, **self.workflow_kwargs)
 
             elif self.calc_doc['task'].upper() in ['BULK_MODULUS']:
                 from matador.workflows.castep import castep_elastic
-                success = castep_elastic(self, self.calc_doc, self.seed)
+                success = castep_elastic(self, self.calc_doc, self.seed, **self.workflow_kwargs)
 
             # run in SCF mode, i.e. just call CASTEP on the seeds
             else:

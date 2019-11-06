@@ -25,7 +25,7 @@ from matador.scrapers import arbitrary2dict
 LOG = logging.getLogger('run3')
 
 
-def castep_full_spectral(relaxer, calc_doc, seed):
+def castep_full_spectral(relaxer, calc_doc, seed, **kwargs):
     """ Perform a "full" spectral calculation on a system, i.e. first
     perform an SCF then interpolate to different kpoint paths/grids to
     form DOS and dispersions. Optionally use OptaDOS for post-processing

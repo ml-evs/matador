@@ -27,7 +27,7 @@ from matador.workflows.workflows import Workflow
 LOG = logging.getLogger('run3')
 
 
-def castep_full_phonon(relaxer, calc_doc, seed):
+def castep_full_phonon(relaxer, calc_doc, seed, **kwargs):
     """ Perform a "full" phonon calculation on a system, i.e.
     first perform a relaxation in a standardised unit cell,
     then compute the dynamical matrix, then finally interpolate
@@ -47,7 +47,7 @@ def castep_full_phonon(relaxer, calc_doc, seed):
         bool: True if Workflow completed successfully, or False otherwise.
 
     """
-    workflow = CastepPhononWorkflow(relaxer, calc_doc, seed)
+    workflow = CastepPhononWorkflow(relaxer, calc_doc, seed, **kwargs)
     return workflow.success
 
 

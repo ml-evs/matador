@@ -17,7 +17,7 @@ from matador.crystal.elastic import get_equation_of_state
 LOG = logging.getLogger('run3')
 
 
-def castep_elastic(relaxer, calc_doc, seed):
+def castep_elastic(relaxer, calc_doc, seed, **kwargs):
     """ Perform a calculation of the elastic tensor on a system.
     Currently only calculation of the bulk modulus is implemented.
 
@@ -34,7 +34,7 @@ def castep_elastic(relaxer, calc_doc, seed):
         bool: True if Workflow completed successfully, or False otherwise.
 
     """
-    workflow = CastepElasticWorkflow(relaxer, calc_doc, seed, bulk_modulus_only=True)
+    workflow = CastepElasticWorkflow(relaxer, calc_doc, seed, **kwargs)
     return workflow.success
 
 
@@ -54,9 +54,6 @@ class CastepElasticWorkflow(Workflow):
         success (bool): the status of the Workflow: only set to True after
             post-processing method completes.
 
-    Keyword arguments:
-        bulk_modulus_only (bool): only calculate the bulk modulus.
-
     """
 
     def preprocess(self):
@@ -64,7 +61,9 @@ class CastepElasticWorkflow(Workflow):
         and set the appropriate CASTEP parameters.
 
         """
-        num_volumes = 9
+        num_volumes = self.workflow_params.get('num_volumes', 9)
+        self.plot = self.workflow_params.get('plot', True)
+
         self.volume_rescale = np.cbrt(np.geomspace(0.7, 1.2, num=num_volumes, endpoint=True)).tolist()
         self.volume_rescale.append(1.0)
         self._completed_volumes = []
@@ -78,7 +77,7 @@ class CastepElasticWorkflow(Workflow):
 
     def postprocess(self):
         """ Fit some equations of state, then save a plot and a datafile. """
-        results = get_equation_of_state(self.seed + '_bulk_mod', plot=True)
+        results = get_equation_of_state(self.seed + '_bulk_mod', plot=self.plot)
         if 'summary' in results:
             for line in results['summary']:
                 print(line)
