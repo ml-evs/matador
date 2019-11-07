@@ -136,7 +136,7 @@ def castep_phonon_prerelax(relaxer, calc_doc, seed):
     relax_doc = copy.deepcopy(calc_doc)
     relax_doc['write_checkpoint'] = 'ALL'
     if 'geom_max_iter' not in relax_doc:
-        relax_doc['geom_max_iter'] = 20
+        relax_doc['geom_max_iter'] = 100
     relax_doc['task'] = 'geometryoptimisation'
 
     required = []
@@ -146,8 +146,9 @@ def castep_phonon_prerelax(relaxer, calc_doc, seed):
                  'phonon_fine_kpoint_path_spacing']
 
     relaxer.validate_calc_doc(relax_doc, required, forbidden)
+    relaxer.calc_doc = relax_doc
 
-    relaxer.scf(relax_doc, seed, keep=True, intermediate=True)
+    relaxer.relax(intermediate=True)
 
 
 def castep_phonon_dynmat(relaxer, calc_doc, seed):
@@ -160,10 +161,9 @@ def castep_phonon_dynmat(relaxer, calc_doc, seed):
 
     """
     LOG.info('Performing CASTEP dynmat calculation...')
-    relax_doc = copy.deepcopy(calc_doc)
-    relax_doc['write_checkpoint'] = 'ALL'
-    relax_doc['continuation'] = 'default'
-    relax_doc['task'] = 'phonon'
+    dynmat_doc = copy.deepcopy(calc_doc)
+    dynmat_doc['write_checkpoint'] = 'ALL'
+    dynmat_doc['task'] = 'phonon'
 
     required = []
     forbidden = ['phonon_fine_kpoint_list',
@@ -171,8 +171,8 @@ def castep_phonon_dynmat(relaxer, calc_doc, seed):
                  'phonon_fine_kpoint_mp_spacing',
                  'phonon_fine_kpoint_path_spacing']
 
-    relaxer.validate_calc_doc(relax_doc, required, forbidden)
-    return relaxer.scf(relax_doc, seed, keep=True, intermediate=True)
+    relaxer.validate_calc_doc(dynmat_doc, required, forbidden)
+    return relaxer.scf(dynmat_doc, seed, keep=True, intermediate=True)
 
 
 def castep_phonon_dos(relaxer, calc_doc, seed):
@@ -189,6 +189,7 @@ def castep_phonon_dos(relaxer, calc_doc, seed):
     dos_doc = copy.deepcopy(calc_doc)
     dos_doc['task'] = 'phonon'
     dos_doc['phonon_calculate_dos'] = True
+    dos_doc['continuation'] = 'default'
 
     required = ['phonon_fine_kpoint_mp_spacing']
     forbidden = ['phonon_fine_kpoint_list',
@@ -214,6 +215,7 @@ def castep_phonon_dispersion(relaxer, calc_doc, seed):
     disp_doc = copy.deepcopy(calc_doc)
     disp_doc['task'] = 'phonon'
     disp_doc['phonon_calculate_dos'] = False
+    disp_doc['continuation'] = 'default'
 
     required = ['phonon_fine_kpoint_list']
     forbidden = ['phonon_fine_kpoint_mp_spacing',
