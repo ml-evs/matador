@@ -21,7 +21,7 @@ from matador.compute import ComputeTask, BatchRun, reset_job_folder
 from matador.compute.slurm import SlurmQueueManager
 from matador.compute.pbs import PBSQueueManager
 from matador.scrapers.castep_scrapers import cell2dict, param2dict, res2dict, castep2dict
-from matador.tests.utils import REAL_PATH, MatadorUnitTest
+from matador.tests.utils import REAL_PATH, MatadorUnitTest, detect_program
 
 HOSTNAME = os.uname()[1]
 PATHS_TO_DEL = ['completed', 'bad_castep', 'input', 'logs', HOSTNAME]
@@ -29,30 +29,8 @@ VERBOSITY = 10
 EXECUTABLE = 'castep'
 RUN_SLOW_TESTS = (HOSTNAME == 'cluster2')
 
-
-try:
-    with open('/dev/null', 'w') as devnull:
-        out, errs = sp.Popen([EXECUTABLE, '--version'], stdout=devnull, stderr=devnull).communicate()
-    if errs:
-        raise RuntimeError
-    if VERBOSITY > 0:
-        print('Successfully detected CASTEP')
-    CASTEP_PRESENT = True
-except Exception:
-    if VERBOSITY > 0:
-        print('Failed to detect CASTEP')
-    CASTEP_PRESENT = False
-
-try:
-    with open('/dev/null', 'w') as devnull:
-        sp.Popen(['mpirun', '--version'], stdout=devnull, stderr=devnull).communicate()
-    if VERBOSITY > 0:
-        print('Successfully detected mpirun')
-    MPI_PRESENT = True
-except FileNotFoundError:
-    if VERBOSITY > 0:
-        print('Failed to detect mpirun')
-    MPI_PRESENT = False
+CASTEP_PRESENT = detect_program(EXECUTABLE)
+MPI_PRESENT = detect_program('mpirun')
 
 if CASTEP_PRESENT and MPI_PRESENT:
     NCORES = mp.cpu_count() - 2

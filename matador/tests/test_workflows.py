@@ -5,47 +5,26 @@
 import unittest
 import subprocess as sp
 import os
+from unittest import mock
 import multiprocessing as mp
 import shutil
 import glob
 
-from matador.tests.utils import MatadorUnitTest, REAL_PATH
+import numpy as np
+
+from matador.tests.utils import MatadorUnitTest, REAL_PATH, detect_program
 from matador.compute import ComputeTask
-from matador.scrapers import cell2dict, param2dict
+from matador.scrapers import cell2dict, param2dict, phonon2dict
 
 
 HOSTNAME = os.uname()[1]
 PATHS_TO_DEL = ["completed", "bad_castep", "input", "logs", HOSTNAME]
 VERBOSITY = 2
 EXECUTABLE = "castep"
-RUN_SLOW_TESTS = HOSTNAME == "cluster2"
 
 
-try:
-    with open("/dev/null", "w") as devnull:
-        out, errs = sp.Popen(
-            [EXECUTABLE, "--version"], stdout=devnull, stderr=devnull
-        ).communicate()
-    if errs:
-        raise RuntimeError
-    if VERBOSITY > 0:
-        print("Successfully detected CASTEP")
-    CASTEP_PRESENT = True
-except Exception:
-    if VERBOSITY > 0:
-        print("Failed to detect CASTEP")
-    CASTEP_PRESENT = False
-
-try:
-    with open("/dev/null", "w") as devnull:
-        sp.Popen(["mpirun", "--version"], stdout=devnull, stderr=devnull).communicate()
-    if VERBOSITY > 0:
-        print("Successfully detected mpirun")
-    MPI_PRESENT = True
-except FileNotFoundError:
-    if VERBOSITY > 0:
-        print("Failed to detect mpirun")
-    MPI_PRESENT = False
+CASTEP_PRESENT = detect_program(EXECUTABLE)
+MPI_PRESENT = detect_program('mpirun')
 
 if CASTEP_PRESENT and MPI_PRESENT:
     NCORES = mp.cpu_count() - 2
