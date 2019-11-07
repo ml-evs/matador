@@ -1267,7 +1267,7 @@ class ComputeTask:
 
         """
         completed_dir = self.root_folder + '/' + completed_dir
-        LOG.info('Moving files to completed: {completed}.'.format(completed=completed_dir))
+        LOG.info('Moving files to completed: {completed}'.format(completed=completed_dir))
 
         if seed.endswith('.res'):
             seed = str(seed.replace('.res', ''))
@@ -1283,8 +1283,7 @@ class ComputeTask:
                 LOG.debug('Files to move: {files}.'.format(files=seed_files))
                 for _file in seed_files:
                     if skip_existing and os.path.isfile(completed_dir + '/' + _file):
-                        LOG.warning('File already found, deleting this version: {}'.format(_file))
-                        os.remove(_file)
+                        LOG.warning('File already found {}...'.format(_file))
                     else:
                         shutil.move(_file, completed_dir)
         else:
@@ -1305,11 +1304,8 @@ class ComputeTask:
                     LOG.warning('Error moving files to completed: {error}'.format(error=exc))
 
         # delete whatever is left
-        wildcard_fnames = glob.glob('{}/{}.*'.format(self.root_folder, seed))
-        wildcard_fnames += glob.glob('{}/{}-out.*'.format(self.root_folder, seed))
-        if self.compute_dir is not None:
-            wildcard_fnames += glob.glob('{}/{}.*'.format(self.compute_dir, seed))
-            wildcard_fnames += glob.glob('{}/{}-out.*'.format(self.compute_dir, seed))
+        wildcard_fnames = glob.glob(seed + '.*')
+        wildcard_fnames += glob.glob(seed + '-out.*')
         for fname in wildcard_fnames:
             os.remove(fname)
 
@@ -1505,7 +1501,8 @@ class ComputeTask:
             self.res_dict.update(opti_dict)
 
         if self.compute_dir is not None:
-            shutil.copy2(seed + '.res', self.root_folder)
+            if os.path.isfile(seed + '.res'):
+                shutil.copy2(seed + '.res', self.root_folder)
             if os.path.isfile(seed + '.castep'):
                 shutil.copy2(seed + '.castep', self.root_folder)
 

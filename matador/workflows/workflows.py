@@ -98,21 +98,23 @@ class Workflow:
         cwd = os.getcwd()
         if success is None:
             success = self.success
-        if success:
-            LOG.info('Writing results of Workflow {} run to completed folder and tidying up.'.format(self.label))
-            self.relaxer.mv_to_completed(self.relaxer.seed, keep=True)
-        else:
-            LOG.info('Writing results of failed Workflow {} run to bad_castep folder and tidying up.'.format(self.label))
-            self.relaxer.mv_to_bad(self.relaxer.seed)
 
         if self.compute_dir:
             os.chdir(self.compute_dir)
             if success:
                 LOG.info('Writing results from compute dir of Workflow {} run to completed folder and tidying up.'.format(self.label))
-                self.relaxer.mv_to_completed(self.relaxer.seed, keep=True, skip_existing=True)
+                self.relaxer.mv_to_completed(self.relaxer.seed, keep=True, skip_existing=False)
             else:
                 LOG.info('Writing results from compute dir of failed Workflow {} run to bad_castep folder and tidying up.'.format(self.label))
-        os.chdir(cwd)
+                self.relaxer.mv_to_bad(self.relaxer.seed)
+            os.chdir(cwd)
+
+        if success:
+            LOG.info('Writing results of Workflow {} run to completed folder and tidying up.'.format(self.label))
+            self.relaxer.mv_to_completed(self.relaxer.seed, keep=True, skip_existing=True)
+        else:
+            LOG.info('Writing results of failed Workflow {} run to bad_castep folder and tidying up.'.format(self.label))
+            self.relaxer.mv_to_bad(self.relaxer.seed)
 
     def add_step(self, function, name, input_exts=None, output_exts=None, clean_after=False, **func_kwargs):
         """ Add a step to the workflow.
@@ -183,7 +185,7 @@ class WorkflowStep:
         self.input_exts = input_exts
         self.output_exts = output_exts
 
-    def _cache_files(self, seed, exts, mode):
+    def _cache_files(self, seed, exts, mode, directory=None):
         """ Copy any files <seed>.<ext> for ext in exts to
         <seed>.<ext>_<label>.
 
@@ -249,7 +251,7 @@ class WorkflowStep:
         self._cache_inputs(seed)
         self._cache_outputs(seed)
 
-        if self.compute_dir:
+        if self.compute_dir is not None:
             os.chdir(cwd)
 
     def run_step(self, relaxer, calc_doc, seed):
