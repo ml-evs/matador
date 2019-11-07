@@ -54,6 +54,45 @@ else:
 
 
 @unittest.skipIf(not CASTEP_PRESENT, 'CASTEP not found.')
+class ElasticWorkflowTest(MatadorUnitTest):
+    """ Run a spectral workflow calculation. """
+
+    def test_bulk_mod(self):
+        for _f in glob.glob(REAL_PATH + "data/elastic_workflow/*"):
+            shutil.copy(_f, ".")
+
+        cell_dict, _ = cell2dict("bulk_mod.cell", db=False)
+        param_dict, _ = param2dict("bulk_mod.param", db=False)
+        _ = ComputeTask(
+            res="Si2.res",
+            ncores=NCORES,
+            nnodes=None,
+            node=None,
+            cell_dict=cell_dict,
+            param_dict=param_dict,
+            verbosity=VERBOSITY,
+            compute_dir="/tmp/scratch_test",
+            workflow_kwargs={'plot': False, 'num_volumes': 3}
+        )
+
+        self.assertFalse(os.path.isfile("completed/Si2.bib"))
+        self.assertFalse(os.path.isfile("completed/Si2.check"))
+
+        self.assertTrue(os.path.isfile("completed/Si2.bulk_mod.results"))
+        self.assertTrue(os.path.isfile("completed/Si2.bulk_mod.res"))
+        self.assertTrue(os.path.isfile("completed/Si2.bulk_mod.castep"))
+        self.assertFalse(os.path.isfile("completed/Si2.bulk_mod.png"))
+
+        self.assertTrue(os.path.isfile("completed/Si2.res"))
+        self.assertTrue(os.path.isfile("completed/Si2.geom"))
+        self.assertTrue(os.path.isfile("completed/Si2.castep"))
+
+        self.assertTrue(os.path.isfile("completed/Si2.bulk_mod.cell"))
+        self.assertFalse(os.path.exists('/tmp/scratch_test'))
+        self.assertFalse(os.path.exists('scratch_test_link'))
+
+
+@unittest.skipIf(not CASTEP_PRESENT, 'CASTEP not found.')
 class PhononWorkflowTest(MatadorUnitTest):
     """ Run a spectral workflow calculation. """
 
@@ -81,6 +120,10 @@ class PhononWorkflowTest(MatadorUnitTest):
         self.assertTrue(os.path.isfile("completed/Si2.castep"))
         self.assertTrue(os.path.isfile("completed/Si2.phonon"))
         self.assertTrue(os.path.isfile("completed/Si2.phonon_dos"))
+
+        phon, s = phonon2dict("completed/Si2.phonon")
+        self.assertTrue(s, msg='Failed to read phonon file')
+        self.assertGreater(np.min(phon['eigenvalues_q']), -0.05)
 
         self.assertTrue(os.path.isfile("completed/Si2.cell"))
         self.assertTrue(os.path.isfile("completed/Si2.res"))
