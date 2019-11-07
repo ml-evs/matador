@@ -1,11 +1,8 @@
 task             : phonon 
 phonon_method    : finitedisplacement
 phonon_fine_method : supercell 
-cut_off_energy   : 200 eV
+cut_off_energy   : 300 eV
 spin_polarized: false
-geom_max_iter   : 10
-geom_force_tol  : 0.1
-geom_stress_tol : 1
 xc_functional    : PBE 
 fix_occupancy    : false
 max_scf_cycles   : 50
