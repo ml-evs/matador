@@ -494,174 +494,10 @@ class ComputeTask:
 
         """
         try:
-            self._setup_relaxation()
-            seed = self.seed
-            rerun = False
-            # iterate over geom iter blocks
-            for ind, num_iter in enumerate(self._geom_max_iter_list):
-
-                # preprocess last step that did not finish geom opt
-                if self.reopt and rerun:
-                    # if we're now reoptimising after a success in last step
-                    # use the fine iter value
-                    num_iter = self.fine_iter
-                    LOG.info('Last step was successful, performing one last relaxation...')
-
-                # update the geom_max_iter to use with either the number in iter_list, or the overriden value
-                self.calc_doc['geom_max_iter'] = num_iter
-
-                # delete any existing files and write new ones
-                if self.squeeze:
-                    squeeze = int(self._squeeze_list[ind]) * float(self.squeeze)
-                else:
-                    squeeze = None
-                self._update_input_files(self.seed, self.calc_doc, squeeze=squeeze)
-
-                # run CASTEP
-                self._process = self.run_command(seed)
-                proc_clock = time.time()
-
-                if self.max_walltime is not None and self.start_time is None:
-                    msg = 'Somehow initial start time was not found'
-                    LOG.critical(msg)
-                    raise CriticalError(msg)
-
-                LOG.info('Polling process every {} s'.format(self.polltime))
-
-                checked_castep_exists = False
-                i = 0
-                while self._process.poll() is None:
-                    if i % max(int(self.polltime), 1) == 0:
-                        proc_elapsed = time.time() - proc_clock
-                        if not checked_castep_exists and proc_elapsed > 3*self.polltime:
-                            # if no CASTEP file made within 3 poll times, or if this process
-                            # hasn't written to it, then raise error
-                            if not os.path.isfile(seed + '.castep'):
-                                msg = ('CASTEP file was not created, please check your executable: {}.'
-                                       .format(self.executable))
-                                LOG.critical(msg)
-                                raise CalculationError(msg)
-                            if os.path.getmtime(seed + '.castep') - proc_clock < 0:
-                                msg = ('CASTEP file present, but too old to be made by this process. Please check your executable: {}.'
-                                       .format(self.executable))
-                                LOG.critical(msg)
-                                raise CalculationError(msg)
-                            checked_castep_exists = True
-
-                        if self.max_walltime is not None:
-                            print(self.max_walltime, self.polltime)
-                            run_elapsed = time.time() - self.start_time
-                            # leave 1 minute to clean up
-                            if run_elapsed > abs(self.max_walltime - 5*self.polltime):
-                                msg = 'About to run out of time on seed {}, killing early...'.format(self.seed)
-                                LOG.info(msg)
-                                raise WalltimeError(msg)
-
-                    i += 1
-                    time.sleep(1)
-
-                self._process.communicate()
-
-                opti_dict, success = castep2dict(seed + '.castep', db=False, verbosity=self.verbosity)
-                LOG.debug('Process returned {}'.format(self._process.returncode))
-
-                # check for errors and try to correct for them
-                errors_present, errors, remedy = self._catch_castep_errors()
-                skip_postprocess = remedy is not None
-
-                if errors_present:
-                    msg = 'Failed to optimise {} as CASTEP crashed with error:'.format(seed)
-                    msg += errors
-                    LOG.warning(msg)
-                    if isinstance(opti_dict, dict):
-                        self._update_output_files(seed, opti_dict)
-                    if remedy is not None and self._num_retries <= self._max_num_retries:
-                        LOG.warning('Attempting to recover using {}'.format(remedy))
-                    else:
-                        raise CalculationError(msg)
-
-                if not success and remedy is None and isinstance(opti_dict, Exception):
-                    msg = 'Failed to parse CASTEP file... {}'.format(opti_dict)
-                    LOG.warning(msg)
-                    raise CalculationError(msg)
-                if isinstance(opti_dict, Exception) and remedy is not None:
-                    opti_dict = {'optimised': False}
-
-                LOG.info('Intermediate calculation completed successfully: total relaxation steps now = {} '
-                         .format(opti_dict.get('geom_iter')))
-
-                # scrub keys that need to be rescraped
-                keys_to_remove = ['kpoints_mp_spacing', 'kpoints_mp_grid', 'species_pot', 'sedc_apply', 'sedc_scheme', 'cell_constraints']
-                for key in keys_to_remove:
-                    if key in opti_dict:
-                        del opti_dict[key]
-
-                if not skip_postprocess:
-                    # now post-process the last step
-                    # did we try to rerun, and are now no longer optimised?
-                    # then reset, and go again...
-                    if self.reopt and rerun and not opti_dict['optimised']:
-                        rerun = False
-                        self._update_output_files(seed, opti_dict)
-
-                    # are we optimised, but haven't yet rerun?
-                    # then set prepare to do one more full relaxation
-                    if self.reopt and not rerun and opti_dict['optimised']:
-                        rerun = True
-
-                        # disable squeezing if we've already reached optimisation
-                        if self.squeeze:
-                            for jnd in range(ind, len(self._squeeze_list)):
-                                self._squeeze_list[jnd] = False
-                        self._update_output_files(seed, opti_dict)
-
-                    # or did the relaxation complete successfuly, including rerun?
-                    elif (not self.reopt or rerun) and opti_dict['optimised']:
-                        LOG.info('Successfully relaxed {}'.format(seed))
-                        self._update_output_files(seed, opti_dict)
-                        break
-
-                    # reached maximum number of steps
-                    elif ind == len(self._geom_max_iter_list) - 1:
-                        msg = 'Failed to optimise {} after {} steps'.format(seed, sum(self._geom_max_iter_list))
-                        LOG.info(msg)
-                        raise CalculationError(msg)
-
-                    # if we weren't successful, then preprocess the next step
-
-                    # set atomic_init_spins with value from CASTEP file, if it exists
-                    if 'mulliken_spins' in opti_dict:
-                        self.calc_doc['atomic_init_spins'] = opti_dict['mulliken_spins']
-
-                    # CASTEP prints cell constraints in castep file when running with symmetry
-                    # its useful to disable these and use either the initial constraints, or none
-                    if 'cell_constraints' in self.cell_dict:
-                        self.calc_doc['cell_constraints'] = self.cell_dict['cell_constraints']
-
-                    # if writing out cell, use it for higher precision lattice_cart
-                    if self.calc_doc.get('write_cell_structure') and os.path.isfile('{}-out.cell'.format(seed)):
-                        cell_dict, success = cell2dict('{}-out.cell'.format(seed),
-                                                       verbosity=self.verbosity,
-                                                       db=False, positions=True, lattice=True)
-                        if success:
-                            opti_dict['lattice_cart'] = list(cell_dict['lattice_cart'])
-
-                    LOG.info('N = {iters:03d} | |F| = {d[max_force_on_atom]:5.5f} eV/A | '
-                             'S = {pressure:5.5f} GPa | H = {d[enthalpy_per_atom]:5.5f} eV/atom'
-                             .format(d=opti_dict,
-                                     pressure=opti_dict.get('pressure', 0.0),
-                                     iters=opti_dict.get('geom_iter', 0)))
-
-                # if there were errors that can be remedied, now is the time to do it
-                # this will normally involve changing a parameter to avoid future failures
-                self.calc_doc.update(opti_dict)
-
-                if remedy is not None:
-                    LOG.info('Trying to remedy error with {}'.format(remedy))
-                    remedy(self.calc_doc)
-                    self._num_retries += 1
-
-            return self._finalise_result(intermediate=intermediate)
+            result = self._relax(intermediate=intermediate)
+            if self.compute_dir is not None:
+                os.chdir(self.root_folder)
+            return result
 
         # catch WalltimeErrors and reset the job folder ready for continuation
         except WalltimeError as err:
@@ -683,6 +519,194 @@ class ComputeTask:
             if self.compute_dir is not None:
                 os.chdir(self.root_folder)
             raise err
+
+    def _relax(self, intermediate=False):
+        """ Set up a structural relaxation that is restarted intermittently
+        in order to re-mesh the kpoint grid. Completed calculations are moved
+        to the "completed" folder, and failures to "bad_castep".
+
+        Keyword arguments:
+            intermediate (bool): whether we want to run more calculations
+                on the output of this, i.e. whether to move to completed
+                or not.
+
+        Returns:
+            bool: True iff structure was optimised, False otherwise.
+
+        Raises:
+            CalculationError: if structure-level error occured.
+            CriticalError: if fatal global error occured.
+            WalltimeError: if walltime was reached, and jobs need to stop.
+
+        """
+        self._setup_relaxation()
+        seed = self.seed
+        rerun = False
+        # iterate over geom iter blocks
+        for ind, num_iter in enumerate(self._geom_max_iter_list):
+
+            # preprocess last step that did not finish geom opt
+            if self.reopt and rerun:
+                # if we're now reoptimising after a success in last step
+                # use the fine iter value
+                num_iter = self.fine_iter
+                LOG.info('Last step was successful, performing one last relaxation...')
+
+            # update the geom_max_iter to use with either the number in iter_list, or the overriden value
+            self.calc_doc['geom_max_iter'] = num_iter
+
+            # delete any existing files and write new ones
+            if self.squeeze:
+                squeeze = int(self._squeeze_list[ind]) * float(self.squeeze)
+            else:
+                squeeze = None
+            self._update_input_files(self.seed, self.calc_doc, squeeze=squeeze)
+
+            # run CASTEP
+            self._process = self.run_command(seed)
+            proc_clock = time.time()
+
+            if self.max_walltime is not None and self.start_time is None:
+                msg = 'Somehow initial start time was not found'
+                LOG.critical(msg)
+                raise CriticalError(msg)
+
+            LOG.info('Polling process every {} s'.format(self.polltime))
+
+            checked_castep_exists = False
+            i = 0
+            while self._process.poll() is None:
+                if i % max(int(self.polltime), 1) == 0:
+                    proc_elapsed = time.time() - proc_clock
+                    if not checked_castep_exists and proc_elapsed > 3*self.polltime:
+                        # if no CASTEP file made within 3 poll times, or if this process
+                        # hasn't written to it, then raise error
+                        if not os.path.isfile(seed + '.castep'):
+                            msg = ('CASTEP file was not created, please check your executable: {}.'
+                                   .format(self.executable))
+                            LOG.critical(msg)
+                            raise CalculationError(msg)
+                        if os.path.getmtime(seed + '.castep') - proc_clock < 0:
+                            msg = ('CASTEP file present, but too old to be made by this process. Please check your executable: {}.'
+                                   .format(self.executable))
+                            LOG.critical(msg)
+                            raise CalculationError(msg)
+                        checked_castep_exists = True
+
+                    if self.max_walltime is not None:
+                        print(self.max_walltime, self.polltime)
+                        run_elapsed = time.time() - self.start_time
+                        # leave 1 minute to clean up
+                        if run_elapsed > abs(self.max_walltime - 5*self.polltime):
+                            msg = 'About to run out of time on seed {}, killing early...'.format(self.seed)
+                            LOG.info(msg)
+                            raise WalltimeError(msg)
+
+                i += 1
+                time.sleep(1)
+
+            self._process.communicate()
+
+            opti_dict, success = castep2dict(seed + '.castep', db=False, verbosity=self.verbosity)
+            LOG.debug('Process returned {}'.format(self._process.returncode))
+
+            # check for errors and try to correct for them
+            errors_present, errors, remedy = self._catch_castep_errors()
+            skip_postprocess = remedy is not None
+
+            if errors_present:
+                msg = 'Failed to optimise {} as CASTEP crashed with error:'.format(seed)
+                msg += errors
+                LOG.warning(msg)
+                if isinstance(opti_dict, dict):
+                    self._update_output_files(seed, opti_dict)
+                if remedy is not None and self._num_retries <= self._max_num_retries:
+                    LOG.warning('Attempting to recover using {}'.format(remedy))
+                else:
+                    raise CalculationError(msg)
+
+            if not success and remedy is None and isinstance(opti_dict, Exception):
+                msg = 'Failed to parse CASTEP file... {}'.format(opti_dict)
+                LOG.warning(msg)
+                raise CalculationError(msg)
+            if isinstance(opti_dict, Exception) and remedy is not None:
+                opti_dict = {'optimised': False}
+
+            LOG.info('Intermediate calculation completed successfully: total relaxation steps now = {} '
+                     .format(opti_dict.get('geom_iter')))
+
+            # scrub keys that need to be rescraped
+            keys_to_remove = ['kpoints_mp_spacing', 'kpoints_mp_grid', 'species_pot', 'sedc_apply', 'sedc_scheme', 'cell_constraints']
+            for key in keys_to_remove:
+                if key in opti_dict:
+                    del opti_dict[key]
+
+            if not skip_postprocess:
+                # now post-process the last step
+                # did we try to rerun, and are now no longer optimised?
+                # then reset, and go again...
+                if self.reopt and rerun and not opti_dict['optimised']:
+                    rerun = False
+                    self._update_output_files(seed, opti_dict)
+
+                # are we optimised, but haven't yet rerun?
+                # then set prepare to do one more full relaxation
+                if self.reopt and not rerun and opti_dict['optimised']:
+                    rerun = True
+
+                    # disable squeezing if we've already reached optimisation
+                    if self.squeeze:
+                        for jnd in range(ind, len(self._squeeze_list)):
+                            self._squeeze_list[jnd] = False
+                    self._update_output_files(seed, opti_dict)
+
+                # or did the relaxation complete successfuly, including rerun?
+                elif (not self.reopt or rerun) and opti_dict['optimised']:
+                    LOG.info('Successfully relaxed {}'.format(seed))
+                    self._update_output_files(seed, opti_dict)
+                    break
+
+                # reached maximum number of steps
+                elif ind == len(self._geom_max_iter_list) - 1:
+                    msg = 'Failed to optimise {} after {} steps'.format(seed, sum(self._geom_max_iter_list))
+                    LOG.info(msg)
+                    raise CalculationError(msg)
+
+                # if we weren't successful, then preprocess the next step
+
+                # set atomic_init_spins with value from CASTEP file, if it exists
+                if 'mulliken_spins' in opti_dict:
+                    self.calc_doc['atomic_init_spins'] = opti_dict['mulliken_spins']
+
+                # CASTEP prints cell constraints in castep file when running with symmetry
+                # its useful to disable these and use either the initial constraints, or none
+                if 'cell_constraints' in self.cell_dict:
+                    self.calc_doc['cell_constraints'] = self.cell_dict['cell_constraints']
+
+                # if writing out cell, use it for higher precision lattice_cart
+                if self.calc_doc.get('write_cell_structure') and os.path.isfile('{}-out.cell'.format(seed)):
+                    cell_dict, success = cell2dict('{}-out.cell'.format(seed),
+                                                   verbosity=self.verbosity,
+                                                   db=False, positions=True, lattice=True)
+                    if success:
+                        opti_dict['lattice_cart'] = list(cell_dict['lattice_cart'])
+
+                LOG.info('N = {iters:03d} | |F| = {d[max_force_on_atom]:5.5f} eV/A | '
+                         'S = {pressure:5.5f} GPa | H = {d[enthalpy_per_atom]:5.5f} eV/atom'
+                         .format(d=opti_dict,
+                                 pressure=opti_dict.get('pressure', 0.0),
+                                 iters=opti_dict.get('geom_iter', 0)))
+
+            # if there were errors that can be remedied, now is the time to do it
+            # this will normally involve changing a parameter to avoid future failures
+            self.calc_doc.update(opti_dict)
+
+            if remedy is not None:
+                LOG.info('Trying to remedy error with {}'.format(remedy))
+                remedy(self.calc_doc)
+                self._num_retries += 1
+
+        return self._finalise_result(intermediate=intermediate)
 
     def scf(self, calc_doc, seed, keep=True, intermediate=False):
         """ Perform a single-shot calculation with CASTEP.
@@ -1259,7 +1283,8 @@ class ComputeTask:
                 LOG.debug('Files to move: {files}.'.format(files=seed_files))
                 for _file in seed_files:
                     if skip_existing and os.path.isfile(completed_dir + '/' + _file):
-                        continue
+                        LOG.warning('File already found, deleting this version: {}'.format(_file))
+                        os.remove(_file)
                     else:
                         shutil.move(_file, completed_dir)
         else:
@@ -1282,6 +1307,9 @@ class ComputeTask:
         # delete whatever is left
         wildcard_fnames = glob.glob('{}/{}.*'.format(self.root_folder, seed))
         wildcard_fnames += glob.glob('{}/{}-out.*'.format(self.root_folder, seed))
+        if self.compute_dir is not None:
+            wildcard_fnames += glob.glob('{}/{}.*'.format(self.compute_dir, seed))
+            wildcard_fnames += glob.glob('{}/{}-out.*'.format(self.compute_dir, seed))
         for fname in wildcard_fnames:
             os.remove(fname)
 
@@ -1575,10 +1603,13 @@ class ComputeTask:
 
         if os.path.isdir(compute_dir):
             LOG.debug('Deleting directory {dir}'.format(dir=compute_dir))
-            os.rmdir(compute_dir)
+            try:
+                os.rmdir(compute_dir)
+            except OSError:
+                LOG.debug('Unable to delete directory {} as it still contains files.'.format(compute_dir))
 
-        if os.path.islink(compute_dir.split('/')[-1]):
-            os.remove(compute_dir.split('/')[-1])
+        if os.path.islink(compute_dir.split('/')[-1] + '_link'):
+            os.remove(compute_dir.split('/')[-1] + '_link')
 
         return True
 
@@ -1601,18 +1632,14 @@ class ComputeTask:
 
         LOG.info('Using compute_dir: {}'.format(compute_dir))
         if not os.path.isdir(compute_dir):
-            if os.getcwd().endswith(compute_dir):
-                raise RuntimeError('Called set up compute_dir from inside compute dir!')
             try:
                 os.makedirs(compute_dir)
             except PermissionError as exc:
-                raise CriticalError('Invalid compute dir requested: {} {}'.format(exc, compute_dir))
+                raise CriticalError('Invalid compute dir requested: {} {}'.format(compute_dir, exc))
         # if compute_dir isn't simply inside this folder, make a symlink that is
-        if '/' in compute_dir:
-            link_name = compute_dir.split('/')[-1]
+        if compute_dir.startswith('/'):
+            link_name = compute_dir.split('/')[-1] + '_link'
             if not os.path.exists(link_name):
-                if os.path.lexists(link_name):
-                    os.remove(link_name)
                 os.symlink(compute_dir, link_name)
 
         if generic:
