@@ -77,12 +77,12 @@ class CastepElasticWorkflow(Workflow):
 
     def postprocess(self):
         """ Fit some equations of state, then save a plot and a datafile. """
-        results = get_equation_of_state(self.seed + '_bulk_mod', plot=self.plot)
+        results = get_equation_of_state(self.seed + '.bulk_mod', plot=self.plot)
         if 'summary' in results:
             for line in results['summary']:
                 print(line)
-            print('Writing summary to {seed}_bulk_mod.results'.format(seed=self.seed))
-            with open(self.seed + '_bulk_mod.results', 'w') as f:
+            print('Writing summary to {seed}.bulk_mod.results'.format(seed=self.seed))
+            with open(self.seed + '.bulk_mod.results', 'w') as f:
                 f.writelines(results['summary'])
 
 
@@ -105,7 +105,7 @@ def castep_rescaled_volume_scf(relaxer, calc_doc, seed, rescale=1):
         for k in range(3):
             scf_doc['lattice_cart'][i][k] *= rescale
     scf_doc['task'] = 'singlepoint'
-    bulk_mod_seed = seed + '_bulk_mod'
+    bulk_mod_seed = seed + '.bulk_mod'
     relaxer.seed = bulk_mod_seed
 
     return relaxer.scf(scf_doc, bulk_mod_seed, keep=True, intermediate=True)
