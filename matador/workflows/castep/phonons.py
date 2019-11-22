@@ -100,14 +100,15 @@ class CastepPhononWorkflow(Workflow):
 
         # always standardise the cell so that any phonon calculation can have
         # post-processing performed after the fact
-        from matador.utils.cell_utils import cart2abc
-        prim_doc, kpt_path = self.relaxer.get_seekpath_compliant_input(
-            self.calc_doc, self.calc_doc.get('phonon_fine_kpoint_path_spacing', 0.02))
-        self.calc_doc.update(prim_doc)
-        self.calc_doc['lattice_abc'] = cart2abc(self.calc_doc['lattice_cart'])
+        if 'phonon_fine_kpoint_list' not in self.calc_doc and 'phonon_fine_kpoint_path' not in self.calc_doc:
+            from matador.utils.cell_utils import cart2abc
+            prim_doc, kpt_path = self.relaxer.get_seekpath_compliant_input(
+                self.calc_doc, self.calc_doc.get('phonon_fine_kpoint_path_spacing', 0.02))
+            self.calc_doc.update(prim_doc)
+            self.calc_doc['lattice_abc'] = cart2abc(self.calc_doc['lattice_cart'])
 
-        if todo['dispersion']:
-            self.calc_doc['phonon_fine_kpoint_list'] = kpt_path
+            if todo['dispersion']:
+                self.calc_doc['phonon_fine_kpoint_list'] = kpt_path
 
         # always shift phonon grid to include Gamma
         if 'phonon_kpoint_mp_spacing' in self.calc_doc:
