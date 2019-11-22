@@ -80,7 +80,7 @@ def plot_spectral(seeds, **kwargs):
                      'n_colours': 4, 'spin_only': None, 'figsize': None,
                      'pdis_interpolation_factor': 2, 'pdis_point_scale': 25,
                      'no_stacked_pdos': False, 'preserve_kspace_distance': False,
-                     'band_reorder': None, 'title': None,
+                     'band_reorder': None, 'title': None, 'show': True,
                      'verbosity': 0, 'highlight_bands': None, 'pdos_hide_tot': True}
     for key in kwargs:
         if kwargs[key] is not None:
@@ -197,8 +197,9 @@ def plot_spectral(seeds, **kwargs):
 
     else:
         plt.tight_layout()
-        print('Displaying plot...')
-        plt.show()
+        if kwargs['show']:
+            print('Displaying plot...')
+            plt.show()
 
 
 def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
@@ -474,7 +475,11 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                         ax_dos.fill_between(energies[np.where(energies > 0)], 0, dos[np.where(energies > 0)], alpha=0.2, color=kwargs['conduction'])
                         ax_dos.fill_between(energies[np.where(energies <= 0)], 0, dos[np.where(energies <= 0)], alpha=0.2, color=kwargs['valence'])
 
-            if kwargs['plot_pdos'] and len(seeds) == 1:
+            if kwargs['plot_pdos'] and len(seeds) == 1 and not (kwargs['phonons'] and len(pdos_data['pdos']) <= 1):
+
+                if 'spin_dos' in dos_data:
+                    raise NotImplementedError("Projected DOS for different spin channels is not currently implemented.")
+
                 pdos = pdos_data['pdos']
                 energies = pdos_data['energies']
                 stack = np.zeros_like(pdos[list(pdos.keys())[0]])
