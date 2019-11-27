@@ -797,12 +797,12 @@ def optados2dict(seed, **kwargs):
         projectors = []
         # get pdos labels
         for ind, line in enumerate(header):
-            if 'Projector:' in line:
+            if 'Projector:' in line or 'Column:' in line:
                 # skip current line and column headings
                 j = 2
                 elements = []
                 ang_mom_channels = []
-                while ind + j + 1 < len(header) and 'Projector:' not in header[ind + j + 1]:
+                while ind + j + 1 < len(header) and ('Projector:' not in header[ind + j + 1] and 'Column:' not in header[ind + j + 1]):
                     elements.append(header[ind + j].split()[1])
                     ang_mom_channels.append(header[ind + j].split()[3])
                     j += 1
