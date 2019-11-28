@@ -542,7 +542,7 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                         ax_dos.plot(energies, dos_data['spin_dos']['up'], ls=kwargs['ls'][seed_ind], color='r', zorder=1e10, label='spin-up channel')
                         ax_dos.fill_between(energies, 0, dos_data['spin_dos']['up'], alpha=0.2, color='r')
 
-            if len(seeds) == 1:
+            if len(seeds) == 1 and not (kwargs['phonons'] and len(pdos_data['pdos']) <= 1):
                 if kwargs['plot_bandstructure']:
                     dos_legend = ax_dos.legend(bbox_to_anchor=(1, 1),
                                                frameon=True, fancybox=False, shadow=False)
