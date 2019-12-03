@@ -380,6 +380,9 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
 
                 energies = dos_data['energies']
                 dos = dos_data['dos']
+                if 'spin_dos' in dos_data:
+                    dosUP = dos_data['spin_dos']['up']
+                    dosDown = dos_data['spin_dos']['down']
 
                 if kwargs['plot_window'] is None:
                     kwargs['plot_window'] = [-10, 10]
@@ -456,6 +459,11 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                     if not kwargs['plot_pdos']:
                         ax_dos.fill_betweenx(energies[np.where(energies > 0)], 0, dos[np.where(energies > 0)], alpha=0.2, color=kwargs['conduction'])
                         ax_dos.fill_betweenx(energies[np.where(energies <= 0)], 0, dos[np.where(energies <= 0)], alpha=0.2, color=kwargs['valence'])
+                else:
+                    ax_dos.plot(dosUP, energies, ls=kwargs['ls'][seed_ind], alpha=1,
+                                c='grey', zorder=1e10, label='Total DOS')
+                    ax_dos.plot(dosDown, energies, ls=kwargs['ls'][seed_ind], alpha=1,
+                                c='grey', zorder=1e10)
 
             else:
                 ax_dos.set_xlabel(xlabel)
@@ -474,6 +482,11 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                     if not kwargs['plot_pdos']:
                         ax_dos.fill_between(energies[np.where(energies > 0)], 0, dos[np.where(energies > 0)], alpha=0.2, color=kwargs['conduction'])
                         ax_dos.fill_between(energies[np.where(energies <= 0)], 0, dos[np.where(energies <= 0)], alpha=0.2, color=kwargs['valence'])
+                else:
+                    ax_dos.plot(dosUP, energies, ls=kwargs['ls'][seed_ind], alpha=1,
+                                c='grey', zorder=1e10, label='Total DOS')
+                    ax_dos.plot(dosDown, energies, ls=kwargs['ls'][seed_ind], alpha=1,
+                                c='grey', zorder=1e10)
 
             if kwargs['plot_pdos'] and len(seeds) == 1 and not (kwargs['phonons'] and len(pdos_data['pdos']) <= 1):
 
