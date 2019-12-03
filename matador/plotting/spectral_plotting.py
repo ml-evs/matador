@@ -442,7 +442,7 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
             if kwargs['plot_bandstructure']:
                 ax_dos.set_xlabel(ylabel)
                 ax_dos.axhline(0, c='grey', ls='--', lw=1)
-                if 'spin_dos' in dos_data:
+                if 'spin_dos' in dos_data or 'Down' in dos_data:
                     ax_dos.set_xlim(-max_density*1.2, max_density * 1.2)
                 else:
                     ax_dos.set_xlim(0, max_density * 1.2)
@@ -484,19 +484,29 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                 energies = pdos_data['energies']
                 stack = np.zeros_like(pdos[list(pdos.keys())[0]])
                 projector_labels, dos_colours = _get_projector_info([projector for projector in pdos])
+                SpinState = None
                 for ind, projector in enumerate(pdos):
+                    lastSpin = SpinState
+                    SpinState = projector[2]
+                    if ind == 0 or not lastSpin == SpinState:
+                        stack = np.zeros_like(pdos[projector])
 
                     if not kwargs['no_stacked_pdos']:
                         alpha = 0.8
                     else:
                         alpha = 0.7
 
-                    # mask negative contributions with 0
-                    pdos[projector] = np.ma.masked_where(pdos[projector] < 0, pdos[projector], copy=True)
-                    np.ma.set_fill_value(pdos[projector], 0)
-                    pdos[projector] = np.ma.filled(pdos[projector])
+                    if 'Down' not in projector:
+                        # mask negative contributions with 0
+                        pdos[projector] = np.ma.masked_where(pdos[projector] < 0, pdos[projector], copy=True)
+                        np.ma.set_fill_value(pdos[projector], 0)
+                        pdos[projector] = np.ma.filled(pdos[projector])
+                    elif 'Down' in projector:
+                        pdos[projector] = np.ma.masked_where(pdos[projector] > 0, pdos[projector], copy=True)
+                        np.ma.set_fill_value(pdos[projector], 0)
+                        pdos[projector] = np.ma.filled(pdos[projector])
 
-                    if not np.max(pdos[projector]) < 1e-8:
+                    if not np.max(abs(pdos[projector])) < 1e-8:
 
                         if kwargs['plot_bandstructure']:
                             label = None
@@ -521,6 +531,14 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
 
                         if not kwargs['no_stacked_pdos']:
                             stack += pdos[projector]
+
+                if not kwargs['pdos_hide_tot'] and not kwargs['no_stacked_pdos'] and projector[2] is None:
+                    if kwargs['plot_bandstructure']:
+                        ax_dos.plot(stack, energies,
+                                    ls='--', alpha=1, color='black', zorder=1e10, label='Sum pDOS')
+                    else:
+                        ax_dos.plot(energies, stack,
+                                    ls='--', alpha=1, color='black', zorder=1e10, label='Sum pDOS')
 
             elif 'spin_dos' in dos_data:
                 if kwargs['plot_bandstructure']:
@@ -891,12 +909,20 @@ def _get_projector_info(projectors):
     projector_labels = []
     dos_colours = []
     for ind, projector in enumerate(projectors):
-        if projector[0] is None:
+        if projector[0] is None and projector[2] is None:
             projector_label = '${}$-character'.format(projector[1])
-        elif projector[1] is None:
+        elif projector[1] is None and projector[2] is None:
             projector_label = projector[0]
-        else:
+        elif projector[0] is None and projector[1] is None:
+            projector_label = '${}$-character'.format(projector[2])
+        elif projector[2] is None:
             projector_label = '{p[0]} (${p[1]}$)'.format(p=projector)
+        elif projector[1] is None:
+            projector_label = '{p[0]} (${p[2]}$)'.format(p=projector)
+        elif projector[0] is None:
+            projector_label = '{p[1]} (${p[2]}$)'.format(p=projector)
+        else:
+            projector_label = '{p[0]} (${p[1]}$) (${p[2]}$)'.format(p=projector)
         projector_labels.append(projector_label)
 
         # if species-projected only, then use VESTA colours

@@ -802,18 +802,28 @@ def optados2dict(seed, **kwargs):
                 j = 2
                 elements = []
                 ang_mom_channels = []
+                if 'Spin' in header[ind + 1]:
+                    spin_pol = True
+                else:
+                    spin_pol = False
+                spin_channels = []
                 while ind + j + 1 < len(header) and ('Projector:' not in header[ind + j + 1] and 'Column:' not in header[ind + j + 1]):
                     elements.append(header[ind + j].split()[1])
                     ang_mom_channels.append(header[ind + j].split()[3])
+                    if spin_pol:
+                        spin_channels.append(header[ind + j].split()[4])
                     j += 1
                 projector_label = []
                 if len(set(elements)) == 1:
                     projector_label.append(elements[0])
                 else:
                     projector_label.append(None)
-
                 if len(set(ang_mom_channels)) == 1:
                     projector_label.append(ang_mom_channels[0])
+                else:
+                    projector_label.append(None)
+                if len(spin_channels) > 0:
+                    projector_label.append(spin_channels[0])
                 else:
                     projector_label.append(None)
 
@@ -870,6 +880,7 @@ def optados2dict(seed, **kwargs):
 
     else:
         optados['dos'] = data[:, 1]
+
 
     return optados, True
 
