@@ -81,8 +81,7 @@ class CastepPhononWorkflow(Workflow):
                  'thermodynamics': castep_phonon_thermodynamics}
 
         if self.calc_doc.get('task').lower() in ['phonon', 'thermodynamics']:
-            if (('phonon_fine_kpoint_path' not in self.calc_doc and 'phonon_fine_kpoint_list' not in self.calc_doc) and
-                    'phonon_fine_kpoint_path_spacing' in self.calc_doc):
+            if 'phonon_fine_kpoint_path' in self.calc_doc or 'phonon_fine_kpoint_list' in self.calc_doc or 'phonon_fine_kpoint_path_spacing' in self.calc_doc:
                 todo['dispersion'] = True
             if 'phonon_fine_kpoint_mp_spacing' in self.calc_doc:
                 todo['dos'] = True
@@ -99,16 +98,20 @@ class CastepPhononWorkflow(Workflow):
                 self.add_step(steps[key], key)
 
         # always standardise the cell so that any phonon calculation can have
-        # post-processing performed after the fact
+        # post-processing performed after the fact, unless a path has been provided
         if 'phonon_fine_kpoint_list' not in self.calc_doc and 'phonon_fine_kpoint_path' not in self.calc_doc:
             from matador.utils.cell_utils import cart2abc
             prim_doc, kpt_path = self.relaxer.get_seekpath_compliant_input(
                 self.calc_doc, self.calc_doc.get('phonon_fine_kpoint_path_spacing', 0.02))
             self.calc_doc.update(prim_doc)
             self.calc_doc['lattice_abc'] = cart2abc(self.calc_doc['lattice_cart'])
-
             if todo['dispersion']:
                 self.calc_doc['phonon_fine_kpoint_list'] = kpt_path
+
+        elif todo['dispersion'] and 'phonon_fine_kpoint_path' in self.calc_doc:
+            self._user_defined_kpt_path = True
+            LOG.warning('Using user-defined k-point path for all structures.')
+            self.calc_doc['phonon_fine_kpoint_spacing'] = self.calc_doc.get('phonon_fine_kpoint_path_spacing', 0.05)
 
         # always shift phonon grid to include Gamma
         if 'phonon_kpoint_mp_spacing' in self.calc_doc:
@@ -218,10 +221,8 @@ def castep_phonon_dispersion(relaxer, calc_doc, seed):
     disp_doc['phonon_calculate_dos'] = False
     disp_doc['continuation'] = 'default'
 
-    required = ['phonon_fine_kpoint_list']
-    forbidden = ['phonon_fine_kpoint_mp_spacing',
-                 'phonon_fine_kpoint_path',
-                 'phonon_fine_kpoint_path_spacing']
+    required = []
+    forbidden = ['phonon_fine_kpoint_mp_spacing']
 
     relaxer.validate_calc_doc(disp_doc, required, forbidden)
 
