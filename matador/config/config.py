@@ -132,6 +132,7 @@ def quickstart_settings():
         print(hline)
 
     if not flines:
+        print('Okay, there is no config file to be made and I will keep using the defaults.')
         return None
 
     with open(fname, 'a') as f:
