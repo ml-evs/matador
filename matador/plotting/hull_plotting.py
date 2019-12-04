@@ -212,7 +212,7 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
     elif colour_by_source:
         from matador.utils.cursor_utils import get_guess_doc_provenance
         if sources is None:
-            sources = ['AIRSS', 'GA', 'OQMD', 'SWAPS', 'ICSD', 'SM', 'Other']
+            sources = ['AIRSS', 'GA', 'OQMD', 'SWAPS', 'ICSD', 'DOI', 'SM', 'Other']
         if source_labels is None:
             source_labels = sources
         else:
@@ -366,7 +366,10 @@ def plot_ensemble_hull(hull, data_key,
     ax.set_ylim(min_ef)
 
     if hull.savefig or any(kwargs.get(ext) for ext in SAVE_EXTS):
-        fname = plot_fname or ''.join(hull.species) + data_key + '_hull'
+        if plot_fname is not None:
+            fname = plot_fname
+        else:
+            fname = ''.join(hull.species) + data_key + '_hull'
         for ext in SAVE_EXTS:
             if hull.args.get(ext) or kwargs.get(ext):
                 plt.savefig('{}.{}'.format(fname, ext),
