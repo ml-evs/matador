@@ -1163,6 +1163,8 @@ def _castep_scrape_final_parameters(flines, castep):
                 castep['xc_functional'] = 'HSE06'
             elif 'RSCAN' in xc_string:
                 castep['xc_functional'] = 'RSCAN'
+            elif 'Screened Hartree-Fock' in xc_string:
+                castep['xc_functional'] = 'SHF-LDA'
             else:
                 castep['xc_functional'] = xc_string.split(':')[-1]
                 warnings.warn('Unrecognised functional {xc}: scraping as {xc}.'
@@ -1186,6 +1188,10 @@ def _castep_scrape_final_parameters(flines, castep):
             castep['sedc_scheme'] = flines[line_no + 1].split(':')[1].split()[0]
         elif 'space_group' not in castep and 'Space group of crystal' in line:
             castep['space_group'] = line.split(':')[-1].split(',')[0].strip().replace(" ", "")
+        elif 'nelectrons' not in castep and 'number of  electrons' in line:
+            castep['nelectrons'] = f90_float_parse(line.split(':')[-1])
+        elif 'nelectrons' not in castep and 'number of bands' in line:
+            castep['nbands'] = int(line.split(':')[-1])
         elif 'Cell constraints are' in line and 'cell_constraints' not in castep:
             castep['cell_constraints'] = [int(val) for val in line.split(':')[-1].split()]
             if castep['cell_constraints'] == [1, 2, 3, 4, 5, 6]:
@@ -1495,7 +1501,6 @@ def _castep_scrape_metadata(flines, castep):
 
         if 'num_mpi_processes' in castep and 'estimated_mem_per_process_MB' in castep:
             castep['estimated_mem_MB'] = castep['estimated_mem_per_process_MB'] * castep['num_mpi_processes']
-
 
 
 def _castep_find_final_structure(flines):
