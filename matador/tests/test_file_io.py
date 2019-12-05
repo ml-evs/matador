@@ -670,10 +670,36 @@ class ScraperMiscTest(MatadorUnitTest):
             self.assertEqual(len(od_dict['sum_pdos']), 53684)
             self.assertEqual(len(od_dict['energies']), 53684)
             self.assertEqual(od_dict['num_projectors'], 4)
-            self.assertEqual(len(od_dict['pdos'][('K', 's')]), 53684)
-            self.assertEqual(len(od_dict['pdos'][('K', 'p')]), 53684)
-            self.assertEqual(len(od_dict['pdos'][('P', 's')]), 53684)
-            self.assertEqual(len(od_dict['pdos'][('P', 'p')]), 53684)
+            self.assertEqual(len(od_dict['pdos'][('K', 's', None)]), 53684)
+            self.assertEqual(len(od_dict['pdos'][('K', 'p', None)]), 53684)
+            self.assertEqual(len(od_dict['pdos'][('P', 's', None)]), 53684)
+            self.assertEqual(len(od_dict['pdos'][('P', 'p', None)]), 53684)
+
+    def test_optados_spin_pdos_scraper(self):
+        odo_fname = REAL_PATH + 'data/optados_files/EDASOS-Cr.pdos.dat'
+        failed_open = False
+        try:
+            f = open(odo_fname, 'r')
+        except Exception:
+            failed_open = True
+            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(odo_fname))
+        if not failed_open:
+            f.close()
+            od_dict, s = optados2dict(odo_fname)
+            self.assertTrue(s)
+            self.assertEqual(len(od_dict['sum_pdos']), 17366)
+            self.assertEqual(len(od_dict['energies']), 17366)
+            self.assertEqual(od_dict['num_projectors'], 10)
+            self.assertEqual(len(od_dict['pdos'][('H', None, 'up')]), 17366)
+            self.assertEqual(len(od_dict['pdos'][('C', None, 'up')]), 17366)
+            self.assertEqual(len(od_dict['pdos'][('N', None, 'up')]), 17366)
+            self.assertEqual(len(od_dict['pdos'][('Cl', None, 'up')]), 17366)
+            self.assertEqual(len(od_dict['pdos'][('Cr', None, 'up')]), 17366)
+            self.assertEqual(len(od_dict['pdos'][('H', None, 'down')]), 17366)
+            self.assertEqual(len(od_dict['pdos'][('C', None, 'down')]), 17366)
+            self.assertEqual(len(od_dict['pdos'][('N', None, 'down')]), 17366)
+            self.assertEqual(len(od_dict['pdos'][('Cl', None, 'down')]), 17366)
+            self.assertEqual(len(od_dict['pdos'][('Cr', None, 'down')]), 17366)
 
     def test_optados_pdis_scraper(self):
         odo_fname = REAL_PATH + 'data/optados_files/Si2.pdis.dat'
@@ -693,10 +719,10 @@ class ScraperMiscTest(MatadorUnitTest):
             self.assertEqual(od_dict['num_projectors'], 4)
             self.assertEqual(np.shape(od_dict['pdis']), (166, 23, 4))
             self.assertEqual(np.shape(od_dict['eigenvalues']), (166, 23))
-            self.assertEqual(od_dict['projectors'][0], ('Si', 's'))
-            self.assertEqual(od_dict['projectors'][1], ('Si', 'p'))
-            self.assertEqual(od_dict['projectors'][2], ('Si', 'd'))
-            self.assertEqual(od_dict['projectors'][3], ('Si', 'f'))
+            self.assertEqual(od_dict['projectors'][0], ('Si', 's', None))
+            self.assertEqual(od_dict['projectors'][1], ('Si', 'p', None))
+            self.assertEqual(od_dict['projectors'][2], ('Si', 'd', None))
+            self.assertEqual(od_dict['projectors'][3], ('Si', 'f', None))
             self.assertEqual(od_dict['pdis'][0][0][0], 0.99654675)
             self.assertEqual(od_dict['eigenvalues'][0][0], -12.110537)
             self.assertEqual(od_dict['eigenvalues'][0][-1], 24.862777)
@@ -722,10 +748,10 @@ class ScraperMiscTest(MatadorUnitTest):
             self.assertEqual(od_dict['num_projectors'], 4)
             self.assertEqual(np.shape(od_dict['pdis']), (942, 30, 4))
             self.assertEqual(np.shape(od_dict['eigenvalues']), (942, 30))
-            self.assertEqual(od_dict['projectors'][0], ('C', 's'))
-            self.assertEqual(od_dict['projectors'][1], ('C', 'p'))
-            self.assertEqual(od_dict['projectors'][2], ('C', 'd'))
-            self.assertEqual(od_dict['projectors'][3], ('C', 'f'))
+            self.assertEqual(od_dict['projectors'][0], ('C', 's', None))
+            self.assertEqual(od_dict['projectors'][1], ('C', 'p', None))
+            self.assertEqual(od_dict['projectors'][2], ('C', 'd', None))
+            self.assertEqual(od_dict['projectors'][3], ('C', 'f', None))
             self.assertEqual(od_dict['pdis'][29][3][1], 0.85401752)
             self.assertEqual(od_dict['pdis'][30][3][1], 0.84705066)
             self.assertEqual(od_dict['pdis'][31][3][1], 0.84004878)
@@ -962,6 +988,8 @@ class CifTests(MatadorUnitTest):
             self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(cif_fname))
 
         with self.assertRaises(RuntimeError):
+            if not failed_open:
+                f.close()
             test_dict, s = cif2dict(cif_fname, verbosity=VERBOSITY)
             raise test_dict
 
@@ -1148,7 +1176,6 @@ class ExportTest(MatadorUnitTest):
             for ext in exts:
                 self.assertTrue(os.path.isfile('query/{}.{}'.format(name, ext)),
                                 msg='Missing {}.{}'.format(name, ext))
-
 
     def compare_json_with_res(self, json_fname, test_fname):
         with open(json_fname, 'r') as f:

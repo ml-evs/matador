@@ -794,34 +794,8 @@ def optados2dict(seed, **kwargs):
         optados['energies'] = data[:, 0]
 
     if is_pdos or is_pdis:
-        projectors = []
-        # get pdos labels
-        for ind, line in enumerate(header):
-            if 'Projector:' in line or 'Column:' in line:
-                # skip current line and column headings
-                j = 2
-                elements = []
-                ang_mom_channels = []
-                while ind + j + 1 < len(header) and ('Projector:' not in header[ind + j + 1] and 'Column:' not in header[ind + j + 1]):
-                    elements.append(header[ind + j].split()[1])
-                    ang_mom_channels.append(header[ind + j].split()[3])
-                    j += 1
-                projector_label = []
-                if len(set(elements)) == 1:
-                    projector_label.append(elements[0])
-                else:
-                    projector_label.append(None)
-
-                if len(set(ang_mom_channels)) == 1:
-                    projector_label.append(ang_mom_channels[0])
-                else:
-                    projector_label.append(None)
-
-                projector_label = tuple(projector_label)
-                projectors.append(projector_label)
-
-        optados['num_projectors'] = len(projectors)
-        optados['projectors'] = projectors
+        optados['projectors'] = _optados_get_projector_labels(header)
+        optados['num_projectors'] = len(optados['projectors'])
 
     if dos_unit_label is not None:
         optados['dos_unit_label'] = dos_unit_label
@@ -830,8 +804,12 @@ def optados2dict(seed, **kwargs):
         # get pdos values
         optados['pdos'] = dict()
         optados['sum_pdos'] = np.zeros_like(data[:, 0])
-        for i, projector in enumerate(projectors):
-            optados['pdos'][projector] = data[:, i + 1]
+        for i, projector in enumerate(optados['projectors']):
+            # optados spin-down projectors are negative, unfortunately
+            if 'down' in projector:
+                optados['pdos'][projector] = -data[:, i + 1]
+            else:
+                optados['pdos'][projector] = data[:, i + 1]
             optados['sum_pdos'] += data[:, i + 1]
 
     elif is_spin_dos:
@@ -1757,6 +1735,62 @@ def _castep_scrape_devel_code(flines, castep):
 
     # store as string rather than list
     castep['devel_code'] = devel_code
+
+
+def _optados_get_projector_labels(header):
+    """ Get OptaDOS projector labels from a pdos.dat or pdis.dat file,
+    returning None-padded labels as `('species', 'ang_mom', 'spin channel')`,
+    e.g. ('Li', 's', None) or ('Cr', None, 'up').
+
+    Parameters:
+        header (str): the file header containing projector labels.
+
+    Returns:
+        list(tuple(str, str, str)): projector labels formatted as above.
+
+    """
+    projectors = []
+    for ind, line in enumerate(header):
+        separators = ['Projector:', 'Column:']
+        if any(sep in line for sep in separators):
+            is_spin_pdos = 'Spin' in header[ind+1]
+            # skip current line and column headings
+            j = 2
+            elements = []
+            ang_mom_channels = []
+            spin_channels = []
+            # loop over file finding projector header blocks
+            while ind + j + 1 < len(header) and not any(keyword in header[ind+j+1] for keyword in separators):
+                elements.append(header[ind + j].split()[1])
+                ang_mom_channels.append(header[ind + j].split()[3])
+                if is_spin_pdos:
+                    spin_channels.append(header[ind + j].split()[4].lower())
+                j += 1
+
+            projector_label = []
+
+            # check that this projector contains exactly 1 species
+            if len(set(elements)) == 1:
+                projector_label.append(elements[0])
+            else:
+                projector_label.append(None)
+
+            # check that this projector has exactly 1 ang mom channel
+            if len(set(ang_mom_channels)) == 1:
+                projector_label.append(ang_mom_channels[0])
+            else:
+                projector_label.append(None)
+
+            # check that this projector has exactly 1 spin channel
+            if len(set(spin_channels)) == 1:
+                projector_label.append(spin_channels[0])
+            else:
+                projector_label.append(None)
+
+            projector_label = tuple(projector_label)
+            projectors.append(projector_label)
+
+    return projectors
 
 
 def get_seed_metadata(doc, seed):

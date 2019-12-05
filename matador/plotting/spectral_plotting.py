@@ -56,7 +56,7 @@ def plot_spectral(seeds, **kwargs):
             (e.g. hexcode or html colour name) to use for all bands (DEFAULT: 'occ').
         cmap (str): matplotlib colourmap name to use for the bands
         n_colours (int): number of colours to use from cmap (DEFAULT: 4).
-        no_stacked_pdos (bool): whether to plot projected DOS as stack or overlapping.
+        unstacked_pdos (bool): whether to plot projected DOS as stack or overlapping.
         spin_only (str): either 'up' or 'down' to only plot one spin channel.
         preserve_kspace_distance (bool): whether to preserve distances in reciprocal space when
             linearising the kpoint path. If False, bandstructures of different lattice parameters
@@ -79,7 +79,7 @@ def plot_spectral(seeds, **kwargs):
                      'labels': None, 'cmap': None, 'band_colour': 'occ',
                      'n_colours': 4, 'spin_only': None, 'figsize': None,
                      'pdis_interpolation_factor': 2, 'pdis_point_scale': 25,
-                     'no_stacked_pdos': False, 'preserve_kspace_distance': False,
+                     'unstacked_pdos': False, 'preserve_kspace_distance': False,
                      'band_reorder': None, 'title': None, 'show': True,
                      'verbosity': 0, 'highlight_bands': None, 'pdos_hide_tot': True}
     for key in kwargs:
@@ -148,7 +148,7 @@ def plot_spectral(seeds, **kwargs):
         ax_grid[2].axis('off')
     elif not kwargs['plot_bandstructure'] and kwargs['plot_dos']:
         if figsize is None:
-            figsize = (6, 3)
+            figsize = (9, 4)
         fig, ax_dos = plt.subplots(1, figsize=figsize)
 
     kwargs['valence'] = kwargs['colours'][0]
@@ -426,6 +426,9 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                     if kwargs['plot_pdos']:
                         pdos_data = dos_data
 
+            # plotting pdos depends on these other factors too
+            plotting_pdos = (kwargs['plot_pdos'] and len(seeds) == 1 and not (kwargs['phonons'] and len(pdos_data['pdos']) <= 1))
+
             if kwargs['phonons']:
                 ylabel = 'Phonon DOS'
                 xlabel = 'Wavenumber (cm$^{{-1}}$)'
@@ -456,7 +459,6 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                     if not kwargs['plot_pdos']:
                         ax_dos.fill_betweenx(energies[np.where(energies > 0)], 0, dos[np.where(energies > 0)], alpha=0.2, color=kwargs['conduction'])
                         ax_dos.fill_betweenx(energies[np.where(energies <= 0)], 0, dos[np.where(energies <= 0)], alpha=0.2, color=kwargs['valence'])
-
             else:
                 ax_dos.set_xlabel(xlabel)
                 ax_dos.set_ylabel(ylabel)
@@ -471,22 +473,61 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                 if 'spin_dos' not in dos_data:
                     ax_dos.plot(energies, dos, ls=kwargs['ls'][seed_ind], alpha=1,
                                 c='grey', zorder=1e10, label='Total DOS')
-                    if not kwargs['plot_pdos']:
+                    if not plotting_pdos:
                         ax_dos.fill_between(energies[np.where(energies > 0)], 0, dos[np.where(energies > 0)], alpha=0.2, color=kwargs['conduction'])
                         ax_dos.fill_between(energies[np.where(energies <= 0)], 0, dos[np.where(energies <= 0)], alpha=0.2, color=kwargs['valence'])
 
-            if kwargs['plot_pdos'] and len(seeds) == 1 and not (kwargs['phonons'] and len(pdos_data['pdos']) <= 1):
+            if 'spin_dos' in dos_data and not kwargs['pdos_hide_tot']:
+                if kwargs['plot_bandstructure']:
+                    if kwargs.get('spin_only') in [None, 'down']:
+                        if not plotting_pdos:
+                            ax_dos.fill_betweenx(energies, 0, dos_data['spin_dos']['down'], alpha=0.2, color='b')
+                        ax_dos.plot(dos_data['spin_dos']['down'], energies, ls=kwargs['ls'][seed_ind], color='b', zorder=1e10, label='spin-down Total DOS')
+                    if kwargs.get('spin_only') in [None, 'up']:
+                        if not plotting_pdos:
+                            ax_dos.fill_betweenx(energies, 0, dos_data['spin_dos']['up'], alpha=0.2, color='r')
+                        ax_dos.plot(dos_data['spin_dos']['up'], energies, ls=kwargs['ls'][seed_ind], color='r', zorder=1e10, label='spin-up Total DOS')
+                else:
+                    if kwargs.get('spin_only') in [None, 'down']:
+                        ax_dos.plot(energies, dos_data['spin_dos']['down'], ls=kwargs['ls'][seed_ind], color='b', zorder=1e10, label='spin-down Total DOS')
+                        if not plotting_pdos:
+                            ax_dos.fill_between(energies, 0, dos_data['spin_dos']['down'], alpha=0.2, color='b')
+                    if kwargs.get('spin_only') in [None, 'up']:
+                        ax_dos.plot(energies, dos_data['spin_dos']['up'], ls=kwargs['ls'][seed_ind], color='r', zorder=1e10, label='spin-up Total DOS')
+                        if not plotting_pdos:
+                            ax_dos.fill_between(energies, 0, dos_data['spin_dos']['up'], alpha=0.2, color='r')
 
-                if 'spin_dos' in dos_data:
-                    raise NotImplementedError("Projected DOS for different spin channels is not currently implemented.")
+            if plotting_pdos:
 
                 pdos = pdos_data['pdos']
                 energies = pdos_data['energies']
-                stack = np.zeros_like(pdos[list(pdos.keys())[0]])
+
+                stacks = dict()
                 projector_labels, dos_colours = _get_projector_info([projector for projector in pdos])
+                unique_labels = set()
                 for ind, projector in enumerate(pdos):
 
-                    if not kwargs['no_stacked_pdos']:
+                    # don't break PDOS label down by spin
+                    if projector_labels[ind] in unique_labels:
+                        projector_labels[ind] = ''
+                    else:
+                        unique_labels.add(projector_labels[ind])
+
+                    # split stacked pdos by spin channel
+                    stack_key = None
+                    if len(projector) > 2:
+                        stack_key = projector[2]
+
+                    if stack_key not in stacks:
+                        stacks[stack_key] = np.zeros_like(pdos[projector])
+
+                    stack = stacks[stack_key]
+                    if kwargs['unstacked_pdos']:
+                        stack = 0
+                    else:
+                        stack = stacks[stack_key]
+
+                    if not kwargs['unstacked_pdos']:
                         alpha = 0.8
                     else:
                         alpha = 0.7
@@ -496,11 +537,14 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                     np.ma.set_fill_value(pdos[projector], 0)
                     pdos[projector] = np.ma.filled(pdos[projector])
 
-                    if not np.max(pdos[projector]) < 1e-8:
+                    # flip sign of down spin energies for spin polarised plot
+                    if 'down' in projector:
+                        pdos[projector] *= -1
 
+                    if not np.max(np.abs(pdos[projector])) < 1e-8:
                         if kwargs['plot_bandstructure']:
                             label = None
-                            if not kwargs['no_stacked_pdos']:
+                            if not kwargs['unstacked_pdos']:
                                 ax_dos.fill_betweenx(energies, stack, stack+pdos[projector],
                                                      alpha=alpha, label=projector_labels[ind],
                                                      color=dos_colours[ind])
@@ -510,7 +554,7 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                                         alpha=1, color=dos_colours[ind], label=label)
                         else:
                             label = None
-                            if not kwargs['no_stacked_pdos']:
+                            if not kwargs['unstacked_pdos']:
                                 ax_dos.fill_between(energies, stack, stack+pdos[projector],
                                                     alpha=alpha, label=projector_labels[ind],
                                                     color=dos_colours[ind])
@@ -519,35 +563,28 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                             ax_dos.plot(energies, stack + pdos[projector],
                                         alpha=1, color=dos_colours[ind], label=label)
 
-                        if not kwargs['no_stacked_pdos']:
-                            stack += pdos[projector]
+                        stacks[stack_key] += pdos[projector]
 
-            elif 'spin_dos' in dos_data:
-                if kwargs['plot_bandstructure']:
-                    if kwargs.get('spin_only') in [None, 'down']:
-                        print('Plotting only spin down channel...')
-                        ax_dos.fill_betweenx(energies, 0, dos_data['spin_dos']['down'], alpha=0.2, color='b')
-                        ax_dos.plot(dos_data['spin_dos']['down'], energies, ls=kwargs['ls'][seed_ind], color='b', zorder=1e10, label='spin-down channel')
-                    if kwargs.get('spin_only') in [None, 'up']:
-                        print('Plotting only spin up channel...')
-                        ax_dos.fill_betweenx(energies, 0, dos_data['spin_dos']['up'], alpha=0.2, color='r')
-                        ax_dos.plot(dos_data['spin_dos']['up'], energies, ls=kwargs['ls'][seed_ind], color='r', zorder=1e10, label='spin-up channel')
-                else:
-                    if kwargs.get('spin_only') in [None, 'down']:
-                        print('Plotting only spin down channel...')
-                        ax_dos.plot(energies, dos_data['spin_dos']['down'], ls=kwargs['ls'][seed_ind], color='b', zorder=1e10, label='spin-down channel')
-                        ax_dos.fill_between(energies, 0, dos_data['spin_dos']['down'], alpha=0.2, color='b')
-                    if kwargs.get('spin_only') in [None, 'up']:
-                        print('Plotting only spin up channel...')
-                        ax_dos.plot(energies, dos_data['spin_dos']['up'], ls=kwargs['ls'][seed_ind], color='r', zorder=1e10, label='spin-up channel')
-                        ax_dos.fill_between(energies, 0, dos_data['spin_dos']['up'], alpha=0.2, color='r')
+                if not kwargs['pdos_hide_tot'] and kwargs['unstacked_pdos']:
+                    for stack_key in stacks:
+                        if stack_key is None:
+                            label = 'Sum pDOS'
+                        else:
+                            label = 'Sum pDOS: spin-{}'.format(stack_key)
+                        if kwargs['plot_bandstructure']:
+                            ax_dos.plot(stacks[stack_key], energies,
+                                        ls='--', alpha=1, color='black', zorder=1e9, label=label)
+                        else:
+                            ax_dos.plot(energies, stacks[stack_key],
+                                        ls='--', alpha=1, color='black', zorder=1e9, label=label)
 
-            if len(seeds) == 1 and not (kwargs['phonons'] and len(pdos_data['pdos']) <= 1):
+            if len(seeds) == 1:
                 if kwargs['plot_bandstructure']:
                     dos_legend = ax_dos.legend(bbox_to_anchor=(1, 1),
                                                frameon=True, fancybox=False, shadow=False)
                 else:
-                    dos_legend = ax_dos.legend(frameon=True, fancybox=False, shadow=False)
+                    dos_legend = ax_dos.legend(bbox_to_anchor=(1, 0.5), loc='center left',
+                                               frameon=True, fancybox=False, shadow=False)
                 bbox_extra_artists.append(dos_legend)
 
     return ax_dos
@@ -891,19 +928,47 @@ def _get_projector_info(projectors):
     projector_labels = []
     dos_colours = []
     for ind, projector in enumerate(projectors):
-        if projector[0] is None:
-            projector_label = '${}$-character'.format(projector[1])
-        elif projector[1] is None:
-            projector_label = projector[0]
+
+        # pad out projectors for e.g. phonon case
+        species = projector[0]
+        if len(projector) > 1:
+            ang_mom = projector[1]
         else:
-            projector_label = '{p[0]} (${p[1]}$)'.format(p=projector)
+            ang_mom = None
+        if len(projector) > 2:
+            spin = projector[2]
+        else:
+            spin = None
+
+        # (species, None, None)
+        if species is not None and ang_mom is None and spin is None:
+            projector_label = species
+        # (None, ang mom, None)
+        if species is None and ang_mom is not None and spin is None:
+            projector_label = '${}$'.format(ang_mom)
+        # (None, None, spin)
+        elif species is None and ang_mom is None and spin is not None:
+            projector_label = ''
+        # (species, ang_mom, None/spin)
+        elif species is not None and ang_mom is not None:
+            projector_label = '{} (${}$)'.format(species, ang_mom)
+        # (species, None, None/spin)
+        elif species is not None and ang_mom is None:
+            projector_label = '{}'.format(species)
+        # (None, ang_mom, None/spin)
+        elif species is None and ang_mom is not None:
+            projector_label = '${}$'.format(ang_mom)
+        # (species, ang_mom, None/spin)
+        else:
+            projector_label = '{} (${}$)'.format(species, ang_mom)
+
         projector_labels.append(projector_label)
 
         # if species-projected only, then use VESTA colours
-        if projector[0] is not None and projector[1] is None:
+        if species is not None and ang_mom is None:
             dos_colours.append(element_colours.get(projector[0]))
         # if species_ang-projected, then use VESTA colours but lightened
-        elif projector[0] is not None and projector[1] is not None:
+        elif species is not None and ang_mom is not None:
             from copy import deepcopy
             dos_colour = deepcopy(element_colours.get(projector[0]))
             multi = ['s', 'p', 'd', 'f'].index(projector[1]) - 1
