@@ -798,10 +798,6 @@ def optados2dict(seed, **kwargs):
         # get pdos labels
         for ind, line in enumerate(header):
             if 'Projector:' in line or 'Column:' in line:
-                if 'Spin' in header[ind + 1]:
-                    spin_pol = True
-                else:
-                    spin_pol = False
                 # skip current line and column headings
                 j = 2
                 elements = []
