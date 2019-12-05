@@ -805,7 +805,11 @@ def optados2dict(seed, **kwargs):
         optados['pdos'] = dict()
         optados['sum_pdos'] = np.zeros_like(data[:, 0])
         for i, projector in enumerate(optados['projectors']):
-            optados['pdos'][projector] = data[:, i + 1]
+            # optados spin-down projectors are negative, unfortunately
+            if 'down' in projector:
+                optados['pdos'][projector] = -data[:, i + 1]
+            else:
+                optados['pdos'][projector] = data[:, i + 1]
             optados['sum_pdos'] += data[:, i + 1]
 
     elif is_spin_dos:
@@ -1755,13 +1759,12 @@ def _optados_get_projector_labels(header):
             elements = []
             ang_mom_channels = []
             spin_channels = []
-            next_line = header[ind+j+1]
             # loop over file finding projector header blocks
-            while ind + j + 1 < len(header) and not any(keyword in next_line for keyword in separators):
+            while ind + j + 1 < len(header) and not any(keyword in header[ind+j+1] for keyword in separators):
                 elements.append(header[ind + j].split()[1])
                 ang_mom_channels.append(header[ind + j].split()[3])
                 if is_spin_pdos:
-                    spin_channels.append(header[ind + j].split()[4])
+                    spin_channels.append(header[ind + j].split()[4].lower())
                 j += 1
 
             projector_label = []
