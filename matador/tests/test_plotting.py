@@ -215,10 +215,9 @@ class HullPlotTests(unittest.TestCase):
         from matador.hull import EnsembleHull
         from matador.scrapers import castep2dict
 
-        expected_files = ['KP_beef_hull.svg']
-        for expected_file in expected_files:
-            if os.path.isfile(expected_file):
-                os.remove(expected_file)
+        expected_file = 'KP_beef_hull.svg'
+        if os.path.isfile(expected_file):
+            os.remove(expected_file)
 
         cursor, s = castep2dict(REAL_PATH + 'data/beef_files/*.castep', db=False)
         self.assertEqual(len(s), 0)
@@ -231,8 +230,7 @@ class HullPlotTests(unittest.TestCase):
 
         beef_hull.plot_hull(svg=True)
         self.assertTrue(os.path.isfile(expected_file))
-        for expected_file in expected_files:
-            os.remove(expected_file)
+        os.remove(expected_file)
 
 
 @unittest.skipIf(not MATPLOTLIB_PRESENT, 'Skipping plotting tests.')
