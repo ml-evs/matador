@@ -10,7 +10,7 @@ jobs:
     strategy:
       max-parallel: 2
       matrix:
-        python-version: [3.6, 3.7]
+        python-version: [3.6]
         
     services: 
        mongodb:
@@ -38,9 +38,10 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with pytest
       run: |
-        py.test --cov-config .coveragerc --cov=matador
+        py.test --cov-config .coveragerc --cov=matador --cov-report=xml
     - name: Upload coverage to Codecov  
       uses: codecov/codecov-action@v1
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
         yml: ./codecov.yml 
+        file: ./codecov.xml
