@@ -39,6 +39,8 @@ jobs:
     - name: Test with pytest
       run: |
         py.test --cov-config .coveragerc --cov=matador
-    - name: Upload results to codecov
-      run: |
-        codecov --token= ${{ secrets.CODECOV_TOKEN }}
+    - name: Upload coverage to Codecov  
+      uses: codecov/codecov-action@v1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        yml: ./codecov.yml 
