@@ -380,9 +380,6 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
 
                 energies = dos_data['energies']
                 dos = dos_data['dos']
-                if 'spin_dos' in dos_data:
-                    dosUP = dos_data['spin_dos']['up']
-                    dosDown = dos_data['spin_dos']['down']
 
                 if kwargs['plot_window'] is None:
                     kwargs['plot_window'] = [-10, 10]
