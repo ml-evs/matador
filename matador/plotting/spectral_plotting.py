@@ -56,7 +56,7 @@ def plot_spectral(seeds, **kwargs):
             (e.g. hexcode or html colour name) to use for all bands (DEFAULT: 'occ').
         cmap (str): matplotlib colourmap name to use for the bands
         n_colours (int): number of colours to use from cmap (DEFAULT: 4).
-        no_stacked_pdos (bool): whether to plot projected DOS as stack or overlapping.
+        unstacked_pdos (bool): whether to plot projected DOS as stack or overlapping.
         spin_only (str): either 'up' or 'down' to only plot one spin channel.
         preserve_kspace_distance (bool): whether to preserve distances in reciprocal space when
             linearising the kpoint path. If False, bandstructures of different lattice parameters
@@ -79,7 +79,7 @@ def plot_spectral(seeds, **kwargs):
                      'labels': None, 'cmap': None, 'band_colour': 'occ',
                      'n_colours': 4, 'spin_only': None, 'figsize': None,
                      'pdis_interpolation_factor': 2, 'pdis_point_scale': 25,
-                     'no_stacked_pdos': False, 'preserve_kspace_distance': False,
+                     'unstacked_pdos': False, 'preserve_kspace_distance': False,
                      'band_reorder': None, 'title': None, 'show': True,
                      'verbosity': 0, 'highlight_bands': None, 'pdos_hide_tot': True}
     for key in kwargs:
@@ -504,7 +504,14 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
 
                 stacks = dict()
                 projector_labels, dos_colours = _get_projector_info([projector for projector in pdos])
+                unique_labels = set()
                 for ind, projector in enumerate(pdos):
+
+                    # don't break PDOS label down by spin
+                    if projector_labels[ind] in unique_labels:
+                        projector_labels[ind] = ''
+                    else:
+                        unique_labels.add(projector_labels[ind])
 
                     # split stacked pdos by spin channel
                     stack_key = None
@@ -515,8 +522,12 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                         stacks[stack_key] = np.zeros_like(pdos[projector])
 
                     stack = stacks[stack_key]
+                    if kwargs['unstacked_pdos']:
+                        stack = 0
+                    else:
+                        stack = stacks[stack_key]
 
-                    if not kwargs['no_stacked_pdos']:
+                    if not kwargs['unstacked_pdos']:
                         alpha = 0.8
                     else:
                         alpha = 0.7
@@ -533,7 +544,7 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                     if not np.max(np.abs(pdos[projector])) < 1e-8:
                         if kwargs['plot_bandstructure']:
                             label = None
-                            if not kwargs['no_stacked_pdos']:
+                            if not kwargs['unstacked_pdos']:
                                 ax_dos.fill_betweenx(energies, stack, stack+pdos[projector],
                                                      alpha=alpha, label=projector_labels[ind],
                                                      color=dos_colours[ind])
@@ -543,7 +554,7 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                                         alpha=1, color=dos_colours[ind], label=label)
                         else:
                             label = None
-                            if not kwargs['no_stacked_pdos']:
+                            if not kwargs['unstacked_pdos']:
                                 ax_dos.fill_between(energies, stack, stack+pdos[projector],
                                                     alpha=alpha, label=projector_labels[ind],
                                                     color=dos_colours[ind])
@@ -552,16 +563,20 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                             ax_dos.plot(energies, stack + pdos[projector],
                                         alpha=1, color=dos_colours[ind], label=label)
 
-                        if not kwargs['no_stacked_pdos']:
-                            stack += pdos[projector]
+                        stacks[stack_key] += pdos[projector]
 
-                if not kwargs['pdos_hide_tot'] and not kwargs['no_stacked_pdos'] and projector[2] is None:
-                    if kwargs['plot_bandstructure']:
-                        ax_dos.plot(stack, energies,
-                                    ls='--', alpha=1, color='black', zorder=1e10, label='Sum pDOS')
-                    else:
-                        ax_dos.plot(energies, stack,
-                                    ls='--', alpha=1, color='black', zorder=1e10, label='Sum pDOS')
+                if not kwargs['pdos_hide_tot'] and kwargs['unstacked_pdos']:
+                    for stack_key in stacks:
+                        if stack_key is None:
+                            label = 'Sum pDOS'
+                        else:
+                            label = 'Sum pDOS: spin-{}'.format(stack_key)
+                        if kwargs['plot_bandstructure']:
+                            ax_dos.plot(stacks[stack_key], energies,
+                                        ls='--', alpha=1, color='black', zorder=1e9, label=label)
+                        else:
+                            ax_dos.plot(energies, stacks[stack_key],
+                                        ls='--', alpha=1, color='black', zorder=1e9, label=label)
 
             if len(seeds) == 1:
                 if kwargs['plot_bandstructure']:
@@ -933,19 +948,19 @@ def _get_projector_info(projectors):
             projector_label = '${}$'.format(ang_mom)
         # (None, None, spin)
         elif species is None and ang_mom is None and spin is not None:
-            projector_label = 'spin-{}'.format(spin)
-        # (species, ang_mom, None)
-        elif species is not None and ang_mom is not None and spin is None:
+            projector_label = ''
+        # (species, ang_mom, None/spin)
+        elif species is not None and ang_mom is not None:
             projector_label = '{} (${}$)'.format(species, ang_mom)
-        # (species, None, ang_mom)
-        elif species is not None and ang_mom is None and spin is not None:
-            projector_label = '{} (spin-{})'.format(species, spin)
-        # (None, ang_mom, spin)
-        elif species is None and ang_mom is not None and spin is not None:
-            projector_label = '${}$ (spin-{})'.format(ang_mom, spin)
-        # (species, ang_mom, spin)
+        # (species, None, None/spin)
+        elif species is not None and ang_mom is None:
+            projector_label = '{}'.format(species)
+        # (None, ang_mom, None/spin)
+        elif species is None and ang_mom is not None:
+            projector_label = '${}$'.format(ang_mom)
+        # (species, ang_mom, None/spin)
         else:
-            projector_label = '{} (${}$, spin-{})'.format(species, ang_mom, spin)
+            projector_label = '{} (${}$)'.format(species, ang_mom)
 
         projector_labels.append(projector_label)
 
