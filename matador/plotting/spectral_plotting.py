@@ -908,27 +908,47 @@ def _get_projector_info(projectors):
     projector_labels = []
     dos_colours = []
     for ind, projector in enumerate(projectors):
-        if projector[0] is None and projector[2] is None:
-            projector_label = '${}$-character'.format(projector[1])
-        elif projector[1] is None and projector[2] is None:
-            projector_label = projector[0]
-        elif projector[0] is None and projector[1] is None:
-            projector_label = '${}$-character'.format(projector[2])
-        elif projector[2] is None:
-            projector_label = '{p[0]} (${p[1]}$)'.format(p=projector)
-        elif projector[1] is None:
-            projector_label = '{p[0]} (${p[2]}$)'.format(p=projector)
-        elif projector[0] is None:
-            projector_label = '{p[1]} (${p[2]}$)'.format(p=projector)
+
+        # pad out projectors for e.g. phonon case
+        species = projector[0]
+        if len(projector) > 1:
+            ang_mom = projector[1]
         else:
-            projector_label = '{p[0]} (${p[1]}$) (${p[2]}$)'.format(p=projector)
+            ang_mom = None
+        if len(projector) > 2:
+            spin = projector[2]
+        else:
+            spin = None
+
+        # (species, None, None)
+        if species is not None and ang_mom is None and spin is None:
+            projector_label = species
+        # (None, ang mom, None)
+        if species is None and ang_mom is not None and spin is None:
+            projector_label = '${}$'.format(ang_mom)
+        # (None, None, spin)
+        elif species is None and ang_mom is None and spin is not None:
+            projector_label = 'spin-{}'.format(spin)
+        # (species, ang_mom, None)
+        elif species is not None and ang_mom is not None and spin is None:
+            projector_label = '{} (${}$)'.format(species, ang_mom)
+        # (species, None, ang_mom)
+        elif species is not None and ang_mom is None and spin is not None:
+            projector_label = '{} (spin-{})'.format(species, spin)
+        # (None, ang_mom, spin)
+        elif species is None and ang_mom is not None and spin is not None:
+            projector_label = '${}$ (spin-{})'.format(ang_mom, spin)
+        # (species, ang_mom, spin)
+        else:
+            projector_label = '{} (${}$, spin-{})'.format(species, ang_mom, spin)
+
         projector_labels.append(projector_label)
 
         # if species-projected only, then use VESTA colours
-        if projector[0] is not None and projector[1] is None:
+        if species is not None and ang_mom is None:
             dos_colours.append(element_colours.get(projector[0]))
         # if species_ang-projected, then use VESTA colours but lightened
-        elif projector[0] is not None and projector[1] is not None:
+        elif species is not None and ang_mom is not None:
             from copy import deepcopy
             dos_colour = deepcopy(element_colours.get(projector[0]))
             multi = ['s', 'p', 'd', 'f'].index(projector[1]) - 1
