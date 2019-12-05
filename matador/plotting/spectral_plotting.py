@@ -507,10 +507,14 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                 for ind, projector in enumerate(pdos):
 
                     # split stacked pdos by spin channel
-                    if projector[2] not in stacks:
-                        stacks[projector[2]] = np.zeros_like(pdos[projector])
+                    stack_key = None
+                    if len(projector) > 2:
+                        stack_key = projector[2]
 
-                    stack = stacks[projector[2]]
+                    if stack_key not in stacks:
+                        stacks[stack_key] = np.zeros_like(pdos[projector])
+
+                    stack = stacks[stack_key]
 
                     if not kwargs['no_stacked_pdos']:
                         alpha = 0.8
