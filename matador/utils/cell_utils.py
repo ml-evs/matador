@@ -399,6 +399,11 @@ def get_seekpath_kpoint_path(doc, spacing=0.01, threshold=1e-7, debug=False, sym
         print('New lattice:\n', np.asarray(primitive_doc['lattice_cart']))
         print('Contains {} atoms'.format(primitive_doc['num_atoms']))
         print('k-point path contains {} points.'.format(len(kpt_path)))
+    if 'site_occupancy' in doc:
+        if min(doc['site_occupancy']) < 1 - EPS:
+            print('Ignoring any site occupancy found in this cell.')
+        primitive_doc['site_occupancy'] = [1 for atom in primitive_doc['atom_types']]
+
 
     return primitive_doc, kpt_path, seekpath_results
 

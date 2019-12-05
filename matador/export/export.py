@@ -741,9 +741,12 @@ def doc2res(doc, path, info=True, spoof_titl=False, sort_atoms=True, **kwargs):
     flines.append('LATT -1')
 
     # enforce correct order by elements, sorting only the atom_types, not the positions inside them
-    assert len(doc['positions_frac']) == len(doc['atom_types'])
+    if len(doc['positions_frac']) != len(doc['atom_types']):
+        raise RuntimeError('Atom/position array mismatch!')
+
     if 'site_occupancy' in doc:
-        assert len(doc['site_occupancy']) == len(doc['positions_frac'])
+        if len(doc['site_occupancy']) != len(doc['positions_frac']):
+            raise RuntimeError('Occupancy/position array mismatch!')
 
     if 'site_occupancy' not in doc:
         occupancies = [1.0] * len(doc['positions_frac'])
@@ -756,14 +759,13 @@ def doc2res(doc, path, info=True, spoof_titl=False, sort_atoms=True, **kwargs):
             occupancies, _atom_types = zip(*[(occ, types) for (types, occ) in
                                              sorted(zip(doc['atom_types'], doc['site_occupancy']),
                                                     key=lambda k: k[0])])
-            assert len(_atom_types) == len(doc['atom_types'])
 
     else:
         positions_frac = doc['positions_frac']
         atom_types = doc['atom_types']
 
-    assert len(positions_frac) == len(doc['positions_frac'])
-    assert len(atom_types) == len(doc['atom_types'])
+    if len(positions_frac) != len(doc['positions_frac']) or len(atom_types) != len(doc['atom_types']):
+        raise RuntimeError('Site occupancy mismatch!')
 
     written_atoms = []
     sfac_str = 'SFAC \t'
