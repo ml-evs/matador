@@ -426,6 +426,9 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                     if kwargs['plot_pdos']:
                         pdos_data = dos_data
 
+            # plotting pdos depends on these other factors too
+            plotting_pdos = (kwargs['plot_pdos'] and len(seeds) == 1 and not (kwargs['phonons'] and len(pdos_data['pdos']) <= 1))
+
             if kwargs['phonons']:
                 ylabel = 'Phonon DOS'
                 xlabel = 'Wavenumber (cm$^{{-1}}$)'
@@ -470,63 +473,60 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                 if 'spin_dos' not in dos_data:
                     ax_dos.plot(energies, dos, ls=kwargs['ls'][seed_ind], alpha=1,
                                 c='grey', zorder=1e10, label='Total DOS')
-                    if not kwargs['plot_pdos']:
+                    if not plotting_pdos:
                         ax_dos.fill_between(energies[np.where(energies > 0)], 0, dos[np.where(energies > 0)], alpha=0.2, color=kwargs['conduction'])
                         ax_dos.fill_between(energies[np.where(energies <= 0)], 0, dos[np.where(energies <= 0)], alpha=0.2, color=kwargs['valence'])
 
-            if 'spin_dos' in dos_data:
+            if 'spin_dos' in dos_data and not kwargs['pdos_hide_tot']:
                 if kwargs['plot_bandstructure']:
                     if kwargs.get('spin_only') in [None, 'down']:
-                        print('Plotting only spin down channel...')
-                        ax_dos.fill_betweenx(energies, 0, dos_data['spin_dos']['down'], alpha=0.2, color='b')
+                        if not plotting_pdos:
+                            ax_dos.fill_betweenx(energies, 0, dos_data['spin_dos']['down'], alpha=0.2, color='b')
                         ax_dos.plot(dos_data['spin_dos']['down'], energies, ls=kwargs['ls'][seed_ind], color='b', zorder=1e10, label='spin-down Total DOS')
                     if kwargs.get('spin_only') in [None, 'up']:
-                        print('Plotting only spin up channel...')
-                        ax_dos.fill_betweenx(energies, 0, dos_data['spin_dos']['up'], alpha=0.2, color='r')
+                        if not plotting_pdos:
+                            ax_dos.fill_betweenx(energies, 0, dos_data['spin_dos']['up'], alpha=0.2, color='r')
                         ax_dos.plot(dos_data['spin_dos']['up'], energies, ls=kwargs['ls'][seed_ind], color='r', zorder=1e10, label='spin-up Total DOS')
                 else:
                     if kwargs.get('spin_only') in [None, 'down']:
-                        print('Plotting only spin down channel...')
                         ax_dos.plot(energies, dos_data['spin_dos']['down'], ls=kwargs['ls'][seed_ind], color='b', zorder=1e10, label='spin-down Total DOS')
-                        ax_dos.fill_between(energies, 0, dos_data['spin_dos']['down'], alpha=0.2, color='b')
+                        if not plotting_pdos:
+                            ax_dos.fill_between(energies, 0, dos_data['spin_dos']['down'], alpha=0.2, color='b')
                     if kwargs.get('spin_only') in [None, 'up']:
-                        print('Plotting only spin up channel...')
                         ax_dos.plot(energies, dos_data['spin_dos']['up'], ls=kwargs['ls'][seed_ind], color='r', zorder=1e10, label='spin-up Total DOS')
-                        ax_dos.fill_between(energies, 0, dos_data['spin_dos']['up'], alpha=0.2, color='r')
+                        if not plotting_pdos:
+                            ax_dos.fill_between(energies, 0, dos_data['spin_dos']['up'], alpha=0.2, color='r')
 
-            if kwargs['plot_pdos'] and len(seeds) == 1 and not (kwargs['phonons'] and len(pdos_data['pdos']) <= 1):
-
-                if 'spin_dos' in dos_data:
-                    raise NotImplementedError("Projected DOS for different spin channels is not currently implemented.")
+            if plotting_pdos:
 
                 pdos = pdos_data['pdos']
                 energies = pdos_data['energies']
-                stack = np.zeros_like(pdos[list(pdos.keys())[0]])
+
+                stacks = dict()
                 projector_labels, dos_colours = _get_projector_info([projector for projector in pdos])
-                SpinState = None
                 for ind, projector in enumerate(pdos):
-                    lastSpin = SpinState
-                    SpinState = projector[2]
-                    if ind == 0 or not lastSpin == SpinState:
-                        stack = np.zeros_like(pdos[projector])
+
+                    # split stacked pdos by spin channel
+                    if projector[2] not in stacks:
+                        stacks[projector[2]] = np.zeros_like(pdos[projector])
+
+                    stack = stacks[projector[2]]
 
                     if not kwargs['no_stacked_pdos']:
                         alpha = 0.8
                     else:
                         alpha = 0.7
 
-                    if 'Down' not in projector:
-                        # mask negative contributions with 0
-                        pdos[projector] = np.ma.masked_where(pdos[projector] < 0, pdos[projector], copy=True)
-                        np.ma.set_fill_value(pdos[projector], 0)
-                        pdos[projector] = np.ma.filled(pdos[projector])
-                    elif 'Down' in projector:
-                        pdos[projector] = np.ma.masked_where(pdos[projector] > 0, pdos[projector], copy=True)
-                        np.ma.set_fill_value(pdos[projector], 0)
-                        pdos[projector] = np.ma.filled(pdos[projector])
+                    # mask negative contributions with 0
+                    pdos[projector] = np.ma.masked_where(pdos[projector] < 0, pdos[projector], copy=True)
+                    np.ma.set_fill_value(pdos[projector], 0)
+                    pdos[projector] = np.ma.filled(pdos[projector])
 
-                    if not np.max(np.abs(pdos[projector])) < 1e-8 :
+                    # flip sign of down spin energies for spin polarised plot
+                    if 'down' in projector:
+                        pdos[projector] *= -1
 
+                    if not np.max(np.abs(pdos[projector])) < 1e-8:
                         if kwargs['plot_bandstructure']:
                             label = None
                             if not kwargs['no_stacked_pdos']:
