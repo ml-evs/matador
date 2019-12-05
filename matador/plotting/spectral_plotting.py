@@ -148,7 +148,7 @@ def plot_spectral(seeds, **kwargs):
         ax_grid[2].axis('off')
     elif not kwargs['plot_bandstructure'] and kwargs['plot_dos']:
         if figsize is None:
-            figsize = (6, 3)
+            figsize = (9, 4)
         fig, ax_dos = plt.subplots(1, figsize=figsize)
 
     kwargs['valence'] = kwargs['colours'][0]
@@ -568,7 +568,8 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                     dos_legend = ax_dos.legend(bbox_to_anchor=(1, 1),
                                                frameon=True, fancybox=False, shadow=False)
                 else:
-                    dos_legend = ax_dos.legend(frameon=True, fancybox=False, shadow=False)
+                    dos_legend = ax_dos.legend(bbox_to_anchor=(1, 0.5), loc='center left',
+                                               frameon=True, fancybox=False, shadow=False)
                 bbox_extra_artists.append(dos_legend)
 
     return ax_dos
