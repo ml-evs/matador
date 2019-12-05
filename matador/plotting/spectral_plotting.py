@@ -445,7 +445,7 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
             if kwargs['plot_bandstructure']:
                 ax_dos.set_xlabel(ylabel)
                 ax_dos.axhline(0, c='grey', ls='--', lw=1)
-                if 'spin_dos' in dos_data or 'Down' in dos_data:
+                if 'spin_dos' in dos_data:
                     ax_dos.set_xlim(-max_density*1.2, max_density * 1.2)
                 else:
                     ax_dos.set_xlim(0, max_density * 1.2)
@@ -459,12 +459,6 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                     if not kwargs['plot_pdos']:
                         ax_dos.fill_betweenx(energies[np.where(energies > 0)], 0, dos[np.where(energies > 0)], alpha=0.2, color=kwargs['conduction'])
                         ax_dos.fill_betweenx(energies[np.where(energies <= 0)], 0, dos[np.where(energies <= 0)], alpha=0.2, color=kwargs['valence'])
-                else:
-                    ax_dos.plot(dosUP, energies, ls=kwargs['ls'][seed_ind], alpha=1,
-                                c='grey', zorder=1e10, label='Total DOS')
-                    ax_dos.plot(dosDown, energies, ls=kwargs['ls'][seed_ind], alpha=1,
-                                c='grey', zorder=1e10)
-
             else:
                 ax_dos.set_xlabel(xlabel)
                 ax_dos.set_ylabel(ylabel)
@@ -482,11 +476,26 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                     if not kwargs['plot_pdos']:
                         ax_dos.fill_between(energies[np.where(energies > 0)], 0, dos[np.where(energies > 0)], alpha=0.2, color=kwargs['conduction'])
                         ax_dos.fill_between(energies[np.where(energies <= 0)], 0, dos[np.where(energies <= 0)], alpha=0.2, color=kwargs['valence'])
+
+            if 'spin_dos' in dos_data:
+                if kwargs['plot_bandstructure']:
+                    if kwargs.get('spin_only') in [None, 'down']:
+                        print('Plotting only spin down channel...')
+                        ax_dos.fill_betweenx(energies, 0, dos_data['spin_dos']['down'], alpha=0.2, color='b')
+                        ax_dos.plot(dos_data['spin_dos']['down'], energies, ls=kwargs['ls'][seed_ind], color='b', zorder=1e10, label='spin-down Total DOS')
+                    if kwargs.get('spin_only') in [None, 'up']:
+                        print('Plotting only spin up channel...')
+                        ax_dos.fill_betweenx(energies, 0, dos_data['spin_dos']['up'], alpha=0.2, color='r')
+                        ax_dos.plot(dos_data['spin_dos']['up'], energies, ls=kwargs['ls'][seed_ind], color='r', zorder=1e10, label='spin-up Total DOS')
                 else:
-                    ax_dos.plot(dosUP, energies, ls=kwargs['ls'][seed_ind], alpha=1,
-                                c='grey', zorder=1e10, label='Total DOS')
-                    ax_dos.plot(dosDown, energies, ls=kwargs['ls'][seed_ind], alpha=1,
-                                c='grey', zorder=1e10)
+                    if kwargs.get('spin_only') in [None, 'down']:
+                        print('Plotting only spin down channel...')
+                        ax_dos.plot(energies, dos_data['spin_dos']['down'], ls=kwargs['ls'][seed_ind], color='b', zorder=1e10, label='spin-down Total DOS')
+                        ax_dos.fill_between(energies, 0, dos_data['spin_dos']['down'], alpha=0.2, color='b')
+                    if kwargs.get('spin_only') in [None, 'up']:
+                        print('Plotting only spin up channel...')
+                        ax_dos.plot(energies, dos_data['spin_dos']['up'], ls=kwargs['ls'][seed_ind], color='r', zorder=1e10, label='spin-up Total DOS')
+                        ax_dos.fill_between(energies, 0, dos_data['spin_dos']['up'], alpha=0.2, color='r')
 
             if kwargs['plot_pdos'] and len(seeds) == 1 and not (kwargs['phonons'] and len(pdos_data['pdos']) <= 1):
 
@@ -519,7 +528,7 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                         np.ma.set_fill_value(pdos[projector], 0)
                         pdos[projector] = np.ma.filled(pdos[projector])
 
-                    if not np.max(abs(pdos[projector])) < 1e-8:
+                    if not np.max(np.abs(pdos[projector])) < 1e-8 :
 
                         if kwargs['plot_bandstructure']:
                             label = None
@@ -553,27 +562,7 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                         ax_dos.plot(energies, stack,
                                     ls='--', alpha=1, color='black', zorder=1e10, label='Sum pDOS')
 
-            elif 'spin_dos' in dos_data:
-                if kwargs['plot_bandstructure']:
-                    if kwargs.get('spin_only') in [None, 'down']:
-                        print('Plotting only spin down channel...')
-                        ax_dos.fill_betweenx(energies, 0, dos_data['spin_dos']['down'], alpha=0.2, color='b')
-                        ax_dos.plot(dos_data['spin_dos']['down'], energies, ls=kwargs['ls'][seed_ind], color='b', zorder=1e10, label='spin-down channel')
-                    if kwargs.get('spin_only') in [None, 'up']:
-                        print('Plotting only spin up channel...')
-                        ax_dos.fill_betweenx(energies, 0, dos_data['spin_dos']['up'], alpha=0.2, color='r')
-                        ax_dos.plot(dos_data['spin_dos']['up'], energies, ls=kwargs['ls'][seed_ind], color='r', zorder=1e10, label='spin-up channel')
-                else:
-                    if kwargs.get('spin_only') in [None, 'down']:
-                        print('Plotting only spin down channel...')
-                        ax_dos.plot(energies, dos_data['spin_dos']['down'], ls=kwargs['ls'][seed_ind], color='b', zorder=1e10, label='spin-down channel')
-                        ax_dos.fill_between(energies, 0, dos_data['spin_dos']['down'], alpha=0.2, color='b')
-                    if kwargs.get('spin_only') in [None, 'up']:
-                        print('Plotting only spin up channel...')
-                        ax_dos.plot(energies, dos_data['spin_dos']['up'], ls=kwargs['ls'][seed_ind], color='r', zorder=1e10, label='spin-up channel')
-                        ax_dos.fill_between(energies, 0, dos_data['spin_dos']['up'], alpha=0.2, color='r')
-
-            if len(seeds) == 1 and not (kwargs['phonons'] and len(pdos_data['pdos']) <= 1):
+            if len(seeds) == 1:
                 if kwargs['plot_bandstructure']:
                     dos_legend = ax_dos.legend(bbox_to_anchor=(1, 1),
                                                frameon=True, fancybox=False, shadow=False)
