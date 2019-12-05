@@ -33,7 +33,7 @@ CASTEP_PRESENT = detect_program(EXECUTABLE)
 MPI_PRESENT = detect_program('mpirun')
 
 if CASTEP_PRESENT and MPI_PRESENT:
-    NCORES = mp.cpu_count() - 2
+    NCORES = max(mp.cpu_count() - 2, 1)
 else:
     NCORES = 1
 
@@ -135,7 +135,7 @@ class ComputeTest(MatadorUnitTest):
         relaxer = ComputeTask(ncores=ncores, nnodes=None, node=node,
                               res=seed, param_dict=param_dict, cell_dict=cell_dict,
                               verbosity=VERBOSITY, executable=executable,
-                              exec_test=False, polltime=0.01,
+                              exec_test=False, polltime=1,
                               start=False)
 
         with self.assertRaises(CalculationError):
@@ -620,7 +620,7 @@ class ComputeTest(MatadorUnitTest):
             shutil.copy(_file, '.')
 
         runner = BatchRun(seed='*.res', debug=False, mode='generic',
-                          verbosity=4, ncores=1, nprocesses=4, executable=executable)
+                          verbosity=4, ncores=1, nprocesses=2, executable=executable)
 
         runner.spawn(join=True)
 

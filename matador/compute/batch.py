@@ -134,7 +134,7 @@ class BatchRun:
         if self.args['nnodes'] < 1 or self.args['ncores'] < 1 or self.nprocesses < 1:
             raise InputError('Invalid number of cores, nodes or processes.')
         if self.all_cores < self.nprocesses:
-            raise InputError('Requesting more processes than available cores.')
+            raise InputError('Requesting more processes than available cores: {} vs {}'.format(self.all_cores, self.nprocesses))
 
         # scrape input cell/param/other files
         if self.mode == 'castep':
