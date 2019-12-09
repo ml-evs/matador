@@ -1363,7 +1363,7 @@ def _castep_scrape_final_structure(flines, castep, db=True):
             castep['integrated_mod_spin_density'] = f90_float_parse(line.split()[-2])
         elif 'Atomic Populations (Mulliken)' in line:
             # population format seems to change every CASTEP version...
-            if float(castep.get('castep_version', 0.0)) >= 17:
+            if float(castep.get('castep_version', 0.0)) >= 18:
                 if castep['spin_polarized']:
                     castep['mulliken_spins'] = []
                     castep['mulliken_net_spin'] = 0.0
