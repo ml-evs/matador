@@ -19,12 +19,11 @@ INVERSE_CM_TO_EV = 1.24e-4
 
 
 class DensityOfStates(DataContainer):
-    pass
 
-class VibrationalDOS(DensityOfStates):
+    phonon = False
 
     def __init__(self, data):
-        """ Initialise the VDOS and trim the DOS data arrays.
+        """ Initialise the DOS and trim the DOS data arrays.
 
         Parameters:
             data (dict): dictionary containing the phonon dos data.
@@ -33,6 +32,38 @@ class VibrationalDOS(DensityOfStates):
 
         super().__init__(data)
         self._trim_dos()
+
+    def _trim_dos(self):
+        """ Trim the density of states/frequencies to only include the non-zero
+        section of the DOS.
+
+        """
+        first_index = np.argmax(self._data['dos'] > EPS)
+        last_index = len(self._data['dos']) - np.argmax(self._data['dos'][::-1] > EPS)
+        self._trimmed_dos = self._data['dos'][first_index:last_index]
+        self._trimmed_energies = self._data['energies'][first_index:last_index]
+
+    @property
+    def sample_dos(self):
+        """ Return the calculated density of states, trimmed at each end to
+        only include non-zero values.
+
+        """
+
+        return self._trimmed_dos
+
+    @property
+    def sample_energies(self):
+        return self._trimmed_energies
+
+    def plot(self, **kwargs):
+        from matador.plotting.spectral_plotting import plot_spectral
+        plot_spectral(self, phonons=self.phonon, plot_dos=True, plot_bandstructure=False, **kwargs)
+
+
+class VibrationalDOS(DensityOfStates):
+
+    phonon = True
 
     @property
     def zero_point_energy(self):
@@ -134,28 +165,9 @@ class VibrationalDOS(DensityOfStates):
             copy=False
         )
 
-    def _trim_dos(self):
-        """ Trim the density of states/frequencies to only include the non-zero
-        section of the vDOS.
 
-        """
-        first_index = np.argmax(self._data['dos'] > EPS)
-        last_index = len(self._data['dos']) - np.argmax(self._data['dos'][::-1] > EPS)
-        self._trimmed_dos = self._data['dos'][first_index:last_index]
-        self._trimmed_energies = self._data['energies'][first_index:last_index]
-
-    @property
-    def sample_dos(self):
-        """ Return the calculated density of states, trimmed at each end to
-        only include non-zero values.
-
-        """
-
-        return self._trimmed_dos
-
-    @property
-    def sample_energies(self):
-        return self._trimmed_energies
+class ElectronicDOS(DensityOfStates):
+    pass
 
 
 class Dispersion(DataContainer):
@@ -169,6 +181,9 @@ class Dispersion(DataContainer):
         used to generate the underlying wavefunction or dynamical matrix.
 
     """
+
+    phonon = False
+
     @property
     def lattice_cart(self):
         """ The Cartesian lattice vectors of the real space lattice. """
@@ -358,6 +373,10 @@ class Dispersion(DataContainer):
                         converged = True
 
             self.eigs[channel_ind] = eigs.reshape(1, self.num_bands, len(eigs[0]))
+
+    def plot(self, **kwargs):
+        from matador.plotting.spectral_plotting import plot_spectral
+        plot_spectral(self, phonons=self.phonon, plot_dos=False, plot_bandstructure=True, **kwargs)
 
 
 class ElectronicDispersion(Dispersion):
@@ -601,6 +620,8 @@ class VibrationalDispersion(Dispersion):
 
     """
 
+    phonon = True
+
     @property
     def num_atoms(self):
         """ Number of atoms in cell. """
@@ -641,14 +662,3 @@ class VibrationalDispersion(Dispersion):
 
         """
         return np.min(self.eigs)
-
-
-# TODO finish these
-
-# class VibrationalDOS(DensityOfStates):
-    # def __init__(self):
-        # pass
-
-# class ElectronicDOS(DensityOfStates):
-    # def __init__(self):
-        # pass
