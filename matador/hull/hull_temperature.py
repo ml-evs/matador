@@ -213,7 +213,7 @@ class TDHull:
 
         """
 
-        tie_line = hull.structure_slice[hull.hull.vertices]
+        tie_line = hull.structure_slice[hull.convex_hull.vertices]
         if plot_points:
             ax.scatter(hull.structures[np.argsort(hull.hull_dist), 0][::-1],
                        hull.structures[np.argsort(hull.hull_dist), -1][::-1],
