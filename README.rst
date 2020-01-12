@@ -9,10 +9,10 @@ calculations, written with a bent towards battery electrode materials.
 The source can be found on `Bitbucket <https://bitbucket.org/ml-evs/matador>`_
 and online documentation is hosted on `ReadTheDocs <https://matador-db.readthedocs.io>`_.
 
-Written by `Matthew Evans <https://www.ml-evs.science>`_ (2016-). 
+Written & maintained by `Matthew Evans <https://www.ml-evs.science>`_ (2016-). 
 
 
-.. image:: docs/src/img/lipzn.png
+.. image:: docs/src/docs/src/img/lipzn.png
    :name: LiPZn
    :align: center
 
@@ -44,9 +44,9 @@ in the examples and API documentation.
 Usage
 ------
 
-For basic command-line usage, please explore the help system for each sub-command. Common workflows can be found inside ``examples/`` and in the `online docs <http://matador-db.readthedocs.io/en/develop/examples_index.html`_.
+For basic command-line usage, please explore the help system for each sub-command. Common workflows can be found inside ``examples/`` and in the `online docs <http://matador-db.readthedocs.io/en/develop/examples_index.html>`_.
 
-Please consult the full `Python API documentation <http://matador-db.readthedocs.io/en/develop/modules.html`_ for programmatic usage.
+Please consult the full `Python API documentation <http://matador-db.readthedocs.io/en/develop/modules.html>`_ for programmatic usage.
 
 .. code-block:: text
 
