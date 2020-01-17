@@ -144,7 +144,23 @@ class QueryConvexHull:
         post-processing specified by initial arguments.
 
         """
+
         self.construct_phase_diagram()
+
+        if self.args.get('uniq') and self.args['subcmd'] != 'swaps':
+            from matador.utils.cursor_utils import filter_unique_structures
+            if self.args.get('uniq') is True:
+                sim_tol = 0.1
+            else:
+                sim_tol = self.args.get('uniq')
+            print_notify('Filtering for unique structures...')
+            self.cursor = filter_unique_structures(
+                self.cursor,
+                args=self.args,
+                sim_tol=sim_tol,
+                hull=True,
+                energy_key=self.energy_key
+            )
 
         if not self.hull_cursor:
             print_warning('No structures on hull with chosen chemical potentials.')
@@ -170,19 +186,6 @@ class QueryConvexHull:
 
         if self.args['subcmd'] == 'hull' and not self.args.get('no_plot'):
             self.plot_hull(**self.args['plot_kwargs'], debug=self.args.get('debug'))
-
-        if self.args.get('uniq') and self.args['subcmd'] != 'swaps':
-            from matador.fingerprints.similarity import get_uniq_cursor
-            if self.args.get('uniq') is True:
-                sim_tol = 0.1
-            else:
-                sim_tol = self.args.get('uniq')
-            print_notify('Filtering for unique structures...')
-            unique_set, _, _, _ = get_uniq_cursor(self.hull_cursor, debug=self.args.get('debug'), sim_tol=sim_tol)
-            old_cursor_len = len(self.hull_cursor)
-            self.hull_cursor = [self.hull_cursor[ind] for ind in unique_set]
-            display_results(self.hull_cursor, hull=True, args=self.args, energy_key=self.energy_key)
-            print('Filtered {} down to {}'.format(old_cursor_len, len(unique_set)))
 
     @property
     def savefig(self):

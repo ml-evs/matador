@@ -572,6 +572,43 @@ def get_guess_doc_provenance(sources, icsd=None):
     return prov
 
 
+def filter_unique_structures(cursor, quiet=False, **kwargs):
+    """ Wrapper for `matador.fingerprints.similarity.get_uniq_cursor` that
+    displays the results and returns the filtered cursor.
+
+    """
+    from matador.fingerprints.similarity import get_uniq_cursor
+    uniq_inds, dupe_dict, _, _ = get_uniq_cursor(cursor)
+    filtered_cursor = [cursor[ind] for ind in uniq_inds]
+
+    if not quiet:
+        display_cursor = []
+        additions = []
+        deletions = []
+        for key in dupe_dict:
+            additions.append(len(display_cursor))
+            display_cursor.append(cursor[key])
+            if dupe_dict[key]:
+                for _, jnd in enumerate(dupe_dict[key]):
+                    deletions.append(len(display_cursor))
+                    display_cursor.append(cursor[jnd])
+
+        if not display_cursor:
+            display_cursor = filtered_cursor
+
+        display_results(
+            display_cursor,
+            additions=additions,
+            deletions=deletions,
+            no_sort=False,
+            **kwargs
+        )
+
+        print('Filtered {} down to {}'.format(len(cursor), len(uniq_inds)))
+
+    return filtered_cursor
+
+
 def filter_cursor(cursor, key, vals, verbosity=0):
     """ Returns a cursor obeying the filter on the given key. Any
     documents that are missing the key will not be returned. Any

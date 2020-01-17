@@ -131,37 +131,19 @@ class DBQuery:
             if not self._create_hull:
                 # only filter for uniqueness if not eventually making a hull
                 if self.args.get('uniq'):
-                    from matador.fingerprints.similarity import get_uniq_cursor
+                    from matador.utils.cursor_utils import filter_unique_structures
                     print_notify('Filtering for unique structures...')
                     if self.args.get('top') is not None:
                         top = self.top
                     else:
                         top = len(self.cursor)
                     # filter for uniqueness
-                    unique_set, dupe_dict, _, _ = get_uniq_cursor(self.cursor[:top],
-                                                                  debug=self.args.get('debug'),
-                                                                  sim_tol=self.args.get('uniq'),
-                                                                  energy_tol=1e20)
-                    print('Filtered {} down to {}'.format(len(self.cursor[:top]), len(unique_set)))
-
-                    display_cursor = []
-                    additions = []
-                    deletions = []
-                    for key in dupe_dict:
-                        additions.append(len(display_cursor))
-                        display_cursor.append(self.cursor[key])
-                        if dupe_dict[key]:
-                            for _, jnd in enumerate(dupe_dict[key]):
-                                deletions.append(len(display_cursor))
-                                display_cursor.append(self.cursor[jnd])
-
-                    self.cursor = [self.cursor[:top][ind] for ind in unique_set]
-
-                    display_results(display_cursor,
-                                    additions=additions,
-                                    deletions=deletions,
-                                    no_sort=True,
-                                    hull=None, args=self.args)
+                    self.cursor = filter_unique_structures(
+                        self.cursor[:top],
+                        debug=self.args.get('debug'),
+                        sim_tol=self.args.get('uniq'),
+                        energy_tol=1e20
+                    )
 
             if self.args.get('available_values') is not None:
                 print('Querying available values...')
