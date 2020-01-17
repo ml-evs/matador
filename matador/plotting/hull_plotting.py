@@ -70,6 +70,7 @@ def get_hull_labels(hull, label_cutoff=None, num_species=None, exclude_edges=Tru
 def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
                  plot_hull_points=True, labels=None, label_cutoff=None, colour_by_source=False,
                  sources=None, hull_label=None, source_labels=None, title=True, plot_fname=None, show_cbar=True,
+                 label_offset=(1.15, 0.05), eform_limits=None,
                  **kwargs):
     """ Plot calculated hull, returning ax and fig objects for further editing.
 
@@ -150,11 +151,11 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
                 e_f = label_cursor[ind]['formation_' + str(hull.energy_key)]
                 conc = label_cursor[ind]['concentration'][0]
                 if conc < min_comp:
-                    position = (0.8 * conc, 1.15 * (e_f - 0.05))
+                    position = (0.8 * conc, label_offset[0] * (e_f - label_offset[1]))
                 elif label_cursor[ind]['concentration'][0] == min_comp:
-                    position = (conc, 1.15 * (e_f - 0.05))
+                    position = (conc, label_offset[0] * (e_f - label_offset[1]))
                 else:
-                    position = (min(1.1 * conc + 0.15, 0.95), 1.15 * (e_f - 0.05))
+                    position = (min(1.1 * conc + 0.15, 0.95), label_offset[0] * (e_f - label_offset[1]))
                 ax.annotate(get_formula_from_stoich(doc['stoichiometry'],
                                                     latex_sub_style=r'\mathregular',
                                                     tex=True,
@@ -210,58 +211,16 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
                            edgecolor='k', zorder=10)
 
     elif colour_by_source:
-        from matador.utils.cursor_utils import get_guess_doc_provenance
-        if sources is None:
-            sources = ['AIRSS', 'GA', 'OQMD', 'SWAPS', 'ICSD', 'DOI', 'SM', 'Other']
-        if source_labels is None:
-            source_labels = sources
-        else:
-            assert len(source_labels) == len(sources)
+        _scatter_plot_by_source(
+            hull, ax, scale, kwargs,
+            sources=None, source_labels=None, plot_hull_points=plot_hull_points)
 
-        colour_choices = {source: hull.colours[ind + 1] for ind, source in enumerate(sources)}
-        colours = []
-        concs = []
-        energies = []
-        zorders = []
-        for doc in hull.cursor:
-            source = get_guess_doc_provenance(doc['source'])
-            if source not in sources:
-                # use grey for undesired sources
-                colours.append(hull.colours[-2])
-                if 'Other' not in sources:
-                    sources.append('Other')
-                    source_labels.append('Other')
-                    colour_choices['Other'] = hull.colours[-2]
-                    source = 'Other'
-            else:
-                colours.append(colour_choices[source])
-            zorders.append(sources.index(source))
-            concs.append(doc['concentration'])
-            energies.append(doc['formation_{}'.format(hull.energy_key)])
-
-        alpha = kwargs.get('alpha')
-        if alpha is None:
-            alpha = 0.2
-
-        for ind, conc in enumerate(concs):
-            if hull.cursor[ind]['hull_distance'] <= 0 + 1e-9 and not plot_hull_points:
-                ax.scatter(conc, energies[ind],
-                           c=colours[ind], alpha=alpha, s=scale*40,
-                           zorder=zorders[ind]+1e5, lw=1.5)
-            else:
-                ax.scatter(conc, energies[ind],
-                           c=colours[ind], alpha=alpha, s=scale*20,
-                           zorder=zorders[ind]+100)
-
-        for ind, source in enumerate(sources):
-            ax.scatter(1e10, 1e10, c=colour_choices[source], label=source_labels[ind], alpha=alpha, lw=1)
-
-        legend = ax.legend(loc=9, facecolor='w', frameon=True, fancybox=False, shadow=False)
-        legend.set_zorder(1e20)
-
-    eform_limits = (np.min(hull.structures[:, 1]), np.max(hull.structures[:, 1]))
-    lims = (-0.1 if eform_limits[0] >= 0 else 1.4*eform_limits[0],
-            eform_limits[1] if eform_limits[0] >= 0 else 0.1)
+    if eform_limits is None:
+        eform_limits = (np.min(hull.structures[:, 1]), np.max(hull.structures[:, 1]))
+        lims = (-0.1 if eform_limits[0] >= 0 else 1.4*eform_limits[0],
+                eform_limits[1] if eform_limits[0] >= 0 else 0.1)
+    else:
+        lims = sorted(eform_limits)
     ax.set_ylim(lims)
 
     if isinstance(title, bool) and title:
@@ -626,5 +585,71 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
     elif show:
         print('Showing plot...')
         plt.show()
+
+    return ax
+
+
+def _scatter_plot_by_source(hull, ax, scale, kwargs,
+                            sources=None, source_labels=None, plot_hull_points=True):
+    """ Add scatter points to the hull depending on the guessed
+    provenance of a structure.
+
+    """
+    from matador.utils.cursor_utils import get_guess_doc_provenance
+    if sources is None:
+        sources = ['AIRSS', 'GA', 'OQMD', 'SWAPS', 'ICSD', 'DOI', 'SM', 'MP', 'PF', 'Other']
+    if source_labels is None:
+        source_labels = sources
+    else:
+        assert len(source_labels) == len(sources)
+
+    # hack: double length of hull colours
+    hull.colours.extend(hull.colours)
+
+    colour_choices = {source: hull.colours[ind + 1] for ind, source in enumerate(sources)}
+    colours = []
+    concs = []
+    energies = []
+    zorders = []
+    for doc in hull.cursor:
+        source = get_guess_doc_provenance(doc['source'])
+        if source not in sources:
+            # use grey for undesired sources
+            colours.append(hull.colours[-2])
+            source = 'Other'
+            if 'Other' not in sources:
+                sources.append('Other')
+                source_labels.append('Other')
+                colour_choices['Other'] = hull.colours[-2]
+        else:
+            colours.append(source)
+        zorders.append(sources.index(source))
+        concs.append(doc['concentration'])
+        energies.append(doc['formation_{}'.format(hull.energy_key)])
+
+    sources_present = set(colours)
+    sources_present = [source for source in sources if source in sources_present]
+    colour_choices = {source: hull.colours[ind + 1] for ind, source in enumerate(sources_present)}
+    colours = [colour_choices[src] for src in colours]
+
+    alpha = kwargs.get('alpha')
+    if alpha is None:
+        alpha = 0.2
+
+    for ind, conc in enumerate(concs):
+        if hull.cursor[ind]['hull_distance'] <= 0 + 1e-9 and not plot_hull_points:
+            ax.scatter(conc, energies[ind],
+                       c=colours[ind], alpha=1, s=scale*40, edgecolor='k',
+                       zorder=zorders[ind]+1e5, lw=1.5)
+        else:
+            ax.scatter(conc, energies[ind],
+                       c=colours[ind], alpha=alpha, s=scale*20,
+                       zorder=zorders[ind]+100)
+
+    for ind, source in enumerate(sources_present):
+        ax.scatter(1e10, 1e10, c=colour_choices[source], label=sources_present[ind], alpha=alpha, lw=1)
+
+    legend = ax.legend(loc='lower right', facecolor='w', frameon=True, fancybox=False, shadow=False, ncol=2)
+    legend.set_zorder(1e20)
 
     return ax
