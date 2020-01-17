@@ -590,7 +590,7 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
     return ax_dos
 
 
-def projected_bandstructure_plot(dispersion, ax, path, bbox_extra_artists, interpolation_factor=2, point_scale=25, **kwargs):
+def projected_bandstructure_plot(dispersion, ax, path, bbox_extra_artists, pdis_interpolation_factor=2, pdis_point_scale=25, **kwargs):
     """ Plot projected bandstructure with weightings from OptaDOS pdis.dat file.
 
     Parameters:
@@ -625,7 +625,7 @@ def projected_bandstructure_plot(dispersion, ax, path, bbox_extra_artists, inter
     fermi_energy = kwargs.get('external_efermi') or dispersion.fermi_energy
 
     _ordered_scatter(path, dispersion.eigs_s_k[0].T - fermi_energy, pdis, dispersion.kpoint_branches,
-                     interpolation_factor=interpolation_factor, point_scale=point_scale,
+                     interpolation_factor=pdis_interpolation_factor, point_scale=pdis_point_scale,
                      ax=ax, colours=dos_colours)
 
     if not kwargs['plot_pdos']:
