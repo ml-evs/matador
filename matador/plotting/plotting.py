@@ -10,6 +10,13 @@ voltage).
 """
 
 SAVE_EXTS = ['pdf', 'png', 'svg']
+MATADOR_STYLE = '/'.join(__file__.split('/')[:-1]) + '/../config/matador.mplstyle'
+
+def set_style(style=None):
+    import matplotlib.pyplot as plt
+    if style is None:
+        style = MATADOR_STYLE
+    plt.style.use(style)
 
 
 def plotting_function(function):
@@ -58,7 +65,7 @@ def plotting_function(function):
             if 'matador' in style:
                 for ind, styles in enumerate(style):
                     if styles == 'matador':
-                        style[ind] = '/'.join(__file__.split('/')[:-1]) + '/../config/matador.mplstyle'
+                        style[ind] = MATADOR_STYLE
 
             # now actually call the function
             with plt.style.context(style):
