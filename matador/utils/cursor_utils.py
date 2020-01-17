@@ -68,7 +68,7 @@ def recursive_set(data, keys, value):
 
 def display_results(cursor,
                     energy_key='enthalpy_per_atom', args=None, argstr=None, additions=None, deletions=None, no_sort=False,
-                    hull=False, markdown=False, latex=False, colour=True, return_str=False):
+                    hull=False, markdown=False, latex=False, colour=True, return_str=False, **kwargs):
     """ Print query results in a cryan-like fashion, optionally
     in a markdown format.
 
@@ -534,7 +534,9 @@ def get_guess_doc_provenance(sources, icsd=None):
     'AIRSS', 'MP' or 'PF'.
     """
     prov = 'AIRSS'
-    if sources is str:
+    if isinstance(sources, dict):
+        sources = sources['source']
+    elif isinstance(sources, str):
         sources = [sources]
     for fname in sources:
         fname_with_folder = fname
@@ -558,11 +560,9 @@ def get_guess_doc_provenance(sources, icsd=None):
                 prov = 'OQMD'
             elif '-icsd' in fname:
                 prov = 'ICSD'
-            elif 'pf-' in fname:
+            elif 'pf-' in fname and prov is None:
                 prov = 'PF'
-            elif 'mp-' in fname:
-                if prov == 'PF':
-                    continue
+            elif 'mp-' in fname and prov != 'PF':
                 prov = 'MP'
             elif '-sm-' in fname:
                 prov = 'SM'

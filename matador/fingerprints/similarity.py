@@ -97,7 +97,7 @@ def get_uniq_cursor(cursor, sim_tol=0.1, energy_tol=1e-2,
     for i in dupe_dict:
         to_compare = [i]
         to_compare.extend(dupe_dict[i])
-        hierarchy = ['ICSD', 'OQMD', 'SWAPS', 'AIRSS', 'GA']
+        hierarchy = ['ICSD', 'DOI', 'OQMD', 'MP', 'PF', 'SWAPS', 'AIRSS', 'GA']
         for provenance in hierarchy:
             found = False
             for k in to_compare:
