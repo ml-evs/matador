@@ -146,7 +146,7 @@ def load_custom_settings(config_fname=None, quiet=False, debug=False, override=T
     """ Load mongodb settings dict from file given by fname, or from
     defaults. Hierarchy of filenames to check:
 
-        1. ./.matadorrc
+        1. .matadorrc
         2. ~/.matadorrc
         3. ~/.config/matadorrc
 
@@ -164,7 +164,7 @@ def load_custom_settings(config_fname=None, quiet=False, debug=False, override=T
 
     if config_fname is None:
         trial_user_fnames = [
-            os.path('.matadorc'),
+            '.matadorrc',
             os.path.expanduser("~/.matadorrc"),
             os.path.expanduser("~/.config/matadorrc"),
             '/'.join(__file__.split('/')[:-1]) + 'matadorrc.yml'
