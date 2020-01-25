@@ -146,8 +146,9 @@ def load_custom_settings(config_fname=None, quiet=False, debug=False, override=T
     """ Load mongodb settings dict from file given by fname, or from
     defaults. Hierarchy of filenames to check:
 
-        1. ~/.matadorrc
-        2. ~/.config/matadorrc
+        1. ./.matadorrc
+        2. ~/.matadorrc
+        3. ~/.config/matadorrc
 
     Keyword Arguments:
         fname (str): filename of custom settings file.
@@ -158,20 +159,22 @@ def load_custom_settings(config_fname=None, quiet=False, debug=False, override=T
     """
     import yaml
 
+    if SETTINGS is not None:
+        return SETTINGS
+
     if config_fname is None:
         trial_user_fnames = [
+            os.path('.matadorc'),
             os.path.expanduser("~/.matadorrc"),
             os.path.expanduser("~/.config/matadorrc"),
             '/'.join(__file__.split('/')[:-1]) + 'matadorrc.yml'
         ]
-        if sum([os.path.isfile(fname) for fname in trial_user_fnames]) > 1:
-            print_warning("Found multiple user config files {}"
-                          .format([val for val in trial_user_fnames if os.path.isfile(val)]))
 
         # use first file that exists in hierarchy
         for fname in trial_user_fnames:
             if os.path.isfile(fname):
                 config_fname = fname
+                print('Using config from {}'.format(config_fname))
                 break
         else:
             # otherwise offer to create one, or use default
@@ -217,7 +220,11 @@ def load_custom_settings(config_fname=None, quiet=False, debug=False, override=T
         import json
         print(json.dumps(settings, indent=2))
 
-    global SETTINGS
-    SETTINGS = settings
+    set_settings(settings)
 
     return settings
+
+def set_settings(settings):
+    print('Overriding settings as {}'.format(settings))
+    global SETTINGS
+    SETTINGS = settings
