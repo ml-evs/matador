@@ -12,7 +12,7 @@ import getpass
 
 from pymatgen.io.ase import AseAtomsAdaptor
 from pymatgen import MPRester
-from matador.utils.ase_utils import ase2dict
+from matador.utils.ase_utils import ase2dict, doc2ase
 from matador.utils.cell_utils import calc_mp_spacing
 
 REQ_PROPERTIES = [
@@ -71,6 +71,15 @@ def get_chemsys(elements, dumpfile=None):
     print('PF structures: {}'.format(sum(1 for doc in cursor if '_mp_pf_ids' in doc)))
 
     return cursor, count
+
+
+def doc2pmg(doc):
+    """ Converts matador document to a pymatgen structure,
+    via ASE.
+
+    """
+    ase_atoms = doc2ase(doc)
+    return AseAtomsAdaptor.get_structure(ase_atoms)
 
 
 def mp2dict(response):

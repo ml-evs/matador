@@ -12,6 +12,8 @@ import matador.crystal
 from matador.utils.chem_utils import get_stoich
 from matador.utils.cell_utils import get_spacegroup_spg
 
+__all__ = ['ase2dict', 'doc2ase']
+
 
 def ase2dict(atoms):
     """ Return a simple matador-style dictionary from
