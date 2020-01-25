@@ -108,8 +108,6 @@ class Crystal(DataContainer):
 
     @staticmethod
     def _validate_doc(doc):
-        if isinstance(doc, Crystal):
-            raise RuntimeError('Cannot make Crystal out of existing Crystal.')
         if not any(key in doc for key in ['lattice_cart', 'lattice_abc']):
             raise RuntimeError('No lattice information found, cannot create Crystal.')
         if 'atom_types' not in doc:
@@ -131,6 +129,9 @@ class Crystal(DataContainer):
         """
 
         self._validate_doc(doc)
+        if isinstance(doc, Crystal):
+            doc = deepcopy(doc._data)
+
         super().__init__(doc)
 
         self.elems = sorted(list(set(self._data['atom_types'])))
@@ -152,7 +153,6 @@ class Crystal(DataContainer):
         self._network = None
         self._bond_lengths = None
         self._bonding_stats = None
-        self._ase = None
 
         # assume default value for symprec
         if 'space_group' in self._data:
@@ -189,6 +189,19 @@ class Crystal(DataContainer):
 
         return repr_string
 
+    def set_positions(self, new_positions, fractional=True):
+        import numpy as np
+        if len(new_positions) != self.num_atoms:
+            raise RuntimeError('Cannot change size of positions array!')
+        if fractional:
+            self._data['positions_frac'] = new_positions
+            self._data.pop('positions_abs', None)
+        else:
+            self._data['positions_abs'] = new_positions
+            self._data.pop('positions_frac', None)
+
+        self._construct_sites()
+
     def _construct_sites(self, voronoi=False):
         """ Constructs the list of Site objects stored in self.sites.
 
@@ -197,6 +210,7 @@ class Crystal(DataContainer):
                 of each site.
 
         """
+        self.sites = []
         for ind, species in enumerate(self.atom_types):
             position = self.positions_frac[ind]
             site_data = {}
@@ -385,9 +399,16 @@ class Crystal(DataContainer):
 
         """
         from matador.utils.ase_utils import doc2ase
-        if self._ase is None:
-            self._ase = doc2ase(self, add_keys_to_info=False)
-        return self._ase
+        return doc2ase(self, add_keys_to_info=False)
+
+    @property
+    def pmg_structure(self):
+        """ Returns the pymatgen structure representation of
+        the crystal.
+
+        """
+        from matador.utils.pmg_utils import doc2pmg
+        return doc2pmg(self)
 
     @property
     def coordination_lists(self):

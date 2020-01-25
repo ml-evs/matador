@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # standard library
 import unittest
+import copy
 from os.path import realpath
 
 import numpy as np
@@ -73,6 +74,25 @@ class CrystalTest(unittest.TestCase):
         self.assertEqual(crystal.num_atoms, 14)
         with self.assertRaises(AttributeError):
             crystal['positions_frac'] = [[0, 1, 2]]
+
+    def test_set_positions(self):
+        doc, s = castep2dict(REAL_PATH + 'data/Na3Zn4-swap-ReOs-OQMD_759599.castep')
+        doc = Crystal(doc)
+
+        copydoc = copy.deepcopy(doc)
+        old_pos = np.asarray(doc.positions_frac)
+        copydoc.set_positions(np.zeros_like(old_pos), fractional=True)
+
+        np.testing.assert_array_almost_equal(
+            np.asarray(copydoc.positions_frac),
+            np.zeros_like(old_pos)
+        )
+        np.testing.assert_array_almost_equal(
+            np.asarray(copydoc.positions_abs),
+            np.zeros_like(old_pos)
+        )
+
+        self.assertNotAlmostEqual(doc.positions_frac[-1][0], 0.0)
 
     def testSites(self):
         doc, s = castep2dict(REAL_PATH + 'data/Na3Zn4-swap-ReOs-OQMD_759599.castep')
