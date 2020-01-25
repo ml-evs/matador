@@ -57,7 +57,7 @@ def plot_voltage_curve(hull, ax=None, show=False, curve_label=None, line_kwargs=
         label = stoich_label if dft_label is None else dft_label
         if line_kwargs is None:
             line_kwargs = {}
-        add_voltage_curve(capacities, voltages, ax_volt, label=label, **line_kwargs)
+        _add_voltage_curve(capacities, voltages, ax_volt, label=label, **line_kwargs)
 
     if hull.args.get('labels') or hull.args.get('label_cutoff') is not None:
         label_cursor = get_hull_labels(hull, num_species=2)
@@ -98,7 +98,7 @@ def plot_voltage_curve(hull, ax=None, show=False, curve_label=None, line_kwargs=
     return ax_volt
 
 
-def add_voltage_curve(capacities, voltages, ax_volt, label=None, **kwargs):
+def _add_voltage_curve(capacities, voltages, ax_volt, label=None, **kwargs):
     """ Add the voltage curves stored under hull['voltage_data'] to the plot.
 
     Parameters:
@@ -265,4 +265,4 @@ def plot_beef_voltage(hull, **kwargs):
     voltage_curve = calculate_average_voltage_from_heatmap(voltage_heatmap, v_grid, q_grid)
     ax_volt.plot(q_grid[0, :], voltage_curve, c='white', zorder=1e20, lw=3, ls='--')
     c = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])[1]
-    add_voltage_curve(hull.voltage_data['Q'][0], hull.voltage_data['voltages'][0], ax_volt, lw=5, ls='--', c=c)
+    _add_voltage_curve(hull.voltage_data['Q'][0], hull.voltage_data['voltages'][0], ax_volt, lw=5, ls='--', c=c)
