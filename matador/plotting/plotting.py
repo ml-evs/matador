@@ -12,11 +12,21 @@ voltage).
 SAVE_EXTS = ['pdf', 'png', 'svg']
 MATADOR_STYLE = '/'.join(__file__.split('/')[:-1]) + '/../config/matador.mplstyle'
 
+
 def set_style(style=None):
+    """ Set the matplotlib style for all future plots, manually. This
+    will conflict with the context manager used by the `plotting_function`
+    wrapper.
+
+    """
     import matplotlib.pyplot as plt
-    if style is None:
+    if style is None or style == 'matador':
         style = MATADOR_STYLE
-    plt.style.use(style)
+    if not isinstance(style, list):
+        style = [style]
+    # apply multiple compound styles, if present
+    for styles in style:
+        plt.style.use(styles)
 
 
 def plotting_function(function):
