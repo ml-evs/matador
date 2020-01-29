@@ -8,6 +8,13 @@ like custom errors and a scraper function wrapper.
 
 import glob
 import traceback as tb
+import warnings
+
+from matador.orm.spectral import VibrationalDOS
+
+MODEL_REGISTRY = {
+    "phonon_dos2dict": VibrationalDOS
+}
 
 
 def scraper_function(function):
@@ -69,7 +76,21 @@ def scraper_function(function):
             if not success:
                 failures += [_seed]
             else:
-                cursor.append(result)
+
+                if kwargs.get('as_model'):
+                    model = MODEL_REGISTRY.get(function.__name__)
+                    orm = None
+                    if model is not None:
+                        try:
+                            orm = model(result)
+                            cursor.append(orm)
+                        except Exception:
+                            print('Unable to convert scraped dict to model {}'.format(model.__name__))
+                    else:
+                        warnings.warn('as_model keyword not supported for {}'.format(function.__name__))
+
+                if not kwargs.get('as_model') or orm is None:
+                    cursor.append(result)
 
         return cursor, failures
 
@@ -79,7 +100,7 @@ def scraper_function(function):
 def f90_float_parse(val):
     """ Wrapper to float that handles Fortran's horrible behaviour for
     float exponents <= 100, e.g. 1e-100 -> 1.0000000-100 rather than
-    1.000000E-100.
+    1.000000E-100. Also handles "+" signs in front of numbers.
 
     Parameters:
         val (str): the string to cast to a float.
@@ -94,6 +115,8 @@ def f90_float_parse(val):
         # if there's a minus sign after the first char, but no E...
         if len(val) > 1 and '-' in val[1:]:
             val = val[0] + val[1:].replace('-', 'E-')
+        if val.startswith('+'):
+            val = val[1:]
         return float(val)
 
 
