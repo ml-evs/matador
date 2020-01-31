@@ -7,13 +7,12 @@ vibrational bandstructures, with or without projection data.
 """
 
 import numpy as np
-from matador.utils.cell_utils import real2recip, frac2cart
-from matador.orm.orm import DataContainer
+from matador.orm.spectral.spectral import Spectral
 
 EPS = 1e-6
 
 
-class Dispersion(DataContainer):
+class Dispersion(Spectral):
     """ Parent class for continuous spectra in reciprocal space, i.e.
     electronic and vibrational bandstructures.
 
@@ -24,54 +23,6 @@ class Dispersion(DataContainer):
         used to generate the underlying wavefunction or dynamical matrix.
 
     """
-
-    @property
-    def lattice_cart(self):
-        """ The Cartesian lattice vectors of the real space lattice. """
-        return self._data['lattice_cart']
-
-    @property
-    def num_kpoints(self):
-        """ Number of dispersion k-points sampled. """
-        return self._data['num_kpoints']
-
-    @property
-    def num_qpoints(self):
-        """ Alias for number of kpoints. """
-        return self.num_kpoints
-
-    @property
-    def projectors(self):
-        """ Return list of projector labels in the format
-        `(element, l-channel)`.
-
-        """
-        return self._data.get('projectors')
-
-    @property
-    def projector_weights(self):
-        """ Return the array of projector weights per eigval, with shape
-        (num_projectors, num_kpoints, num_bands).
-
-        """
-        return self._data.get('projector_weights')
-
-    @property
-    def num_projectors(self):
-        """ Return the number of projectors. """
-        if self.projectors is None:
-            return 0
-        return len(self.projectors)
-
-    @property
-    def kpoint_branches(self):
-        """ Return the k-point branches in the older format, which
-        contained a list of lists of continous indices.
-
-        """
-        if self._data.get('kpoint_branches') is None:
-            self._data['kpoint_branches'] = self.find_full_kpt_branch()
-        return self._data['kpoint_branches']
 
     def find_full_kpt_branch(self):
         """ Find all branch indices from branch start indices. """
@@ -87,41 +38,6 @@ class Dispersion(DataContainer):
                                'not match number in branches')
 
         return branch_inds
-
-    @property
-    def kpoint_branch_start(self):
-        """ Return the indices of the start of branches. """
-        if not self._data.get('kpoint_branch_start'):
-            self.set_branches_and_spacing()
-        return self._data['kpoint_branch_start']
-
-    @property
-    def kpoint_path_spacing(self):
-        """ An estimated kpoint spacing. """
-        if not self._data.get('kpoint_path_spacing'):
-            self.set_branches_and_spacing()
-        return self._data['kpoint_path_spacing']
-
-    @property
-    def kpoint_path(self):
-        """ The fractional sampling path in reciprocal space. """
-        return np.asarray(self._data['kpoint_path'])
-
-    @property
-    def kpoint_path_cartesian(self):
-        """ The reicprocal space sampling path in Cartesian coordinates. """
-        return np.asarray(frac2cart(real2recip(self.lattice_cart),
-                                    self.kpoint_path))
-
-    @property
-    def num_spins(self):
-        """ Dummy number of spins. """
-        return 1
-
-    @property
-    def spin_fermi_energy(self):
-        """ Dummy Fermi energy per spin channel. """
-        return [0]
 
     def set_branches_and_spacing(self):
         """ Set the relevant kpoint spacing and branch attributes. """
@@ -527,11 +443,6 @@ class VibrationalDispersion(Dispersion):
 
         """
         return np.asarray(self._data['eigs_q'])
-
-    @property
-    def eigs(self):
-        """ Alias for `self.eigs_q`. """
-        return self.eigs_q
 
     @property
     def softest_mode_freq(self):
