@@ -8,9 +8,10 @@ children.
 """
 
 import copy
+from abc import ABC
 
 
-class DataContainer:
+class DataContainer(ABC):
     """ Base class for matador data classes. This class is a read-only
     store of the underlying dictionary of raw data; its children can
     implement useful methods to inspect and analyse the underlying data.
