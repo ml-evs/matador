@@ -30,7 +30,7 @@ class DensityOfStates(Dispersion, DataContainer):
                 a dispersion object to convert.
 
         """
-        if isinstance(data, Dispersion):
+        if isinstance(data, Dispersion) or 'dos' not in data:
             data = self._from_dispersion(data, **kwargs)
 
         super().__init__(data)
@@ -104,8 +104,8 @@ class DensityOfStates(Dispersion, DataContainer):
         raw_weights = np.ones_like(raw_eigs)
         if 'kpoint_weights' in bands:
             for sind, _ in enumerate(bands[eigs_key]):
-                for kind, _ in enumerate(bands[eigs_key][sind]):
-                    raw_weights[sind, kind, :] = bands['kpoint_weights'][kind]
+                for kind, _ in enumerate(bands[eigs_key][sind][0]):
+                    raw_weights[sind, :, kind] = bands['kpoint_weights'][kind]
 
         if len(raw_weights) != 1:
             if len(raw_weights) > 2:
@@ -177,6 +177,7 @@ class VibrationalDOS(DensityOfStates):
         is the vibrational density of states.
 
         """
+        raise NotImplementedError('Function is now defunct.')
         warnings.warn(
             'Imaginary frequency phonons found in this structure, ZP energy '
             'calculation will be unreliable',
