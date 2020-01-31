@@ -1366,8 +1366,8 @@ def _castep_scrape_final_structure(flines, castep, db=True):
             castep['total_energy'] = f90_float_parse(line.split('=')[1].split()[0])
             castep['total_energy_per_atom'] = castep['total_energy'] / castep['num_atoms']
         elif 'Final free energy' in line:
-            castep['free_energy'] = f90_float_parse(line.split('=')[1].split()[0])
-            castep['free_energy_per_atom'] = castep['free_energy'] / castep['num_atoms']
+            castep['smeared_free_energy'] = f90_float_parse(line.split('=')[1].split()[0])
+            castep['smeared_free_energy_per_atom'] = castep['smeared_free_energy'] / castep['num_atoms']
         elif '0K energy' in line:
             castep['0K_energy'] = f90_float_parse(line.split('=')[1].split()[0])
             castep['0K_energy_per_atom'] = castep['0K_energy'] / castep['num_atoms']
@@ -1589,7 +1589,7 @@ def _castep_scrape_all_snapshots(flines):
                         snapshot['positions_frac'] = intermediates[-1]['positions_frac']
                         snapshot['atom_types'] = intermediates[-1]['atom_types']
                         snapshot['num_atoms'] = len(snapshot['positions_frac'])
-                    snapshot['free_energy_per_atom'] = snapshot['free_energy'] / snapshot['num_atoms']
+                    snapshot['smeared_free_energy_per_atom'] = snapshot['smeared_free_energy'] / snapshot['num_atoms']
                     snapshot['total_energy_per_atom'] = snapshot['total_energy'] / snapshot['num_atoms']
                     snapshot['0K_energy_per_atom'] = snapshot['0K_energy'] / snapshot['num_atoms']
                     # handle single atom forces edge-case
@@ -1657,7 +1657,7 @@ def _castep_scrape_all_snapshots(flines):
             elif 'Final energy, E' in line or 'Final energy =' in line:
                 snapshot['total_energy'] = f90_float_parse(line.split('=')[1].split()[0])
             elif 'Final free energy' in line:
-                snapshot['free_energy'] = f90_float_parse(line.split('=')[1].split()[0])
+                snapshot['smeared_free_energy'] = f90_float_parse(line.split('=')[1].split()[0])
             elif '0K energy' in line:
                 snapshot['0K_energy'] = f90_float_parse(line.split('=')[1].split()[0])
             elif ' Forces **' in line:
