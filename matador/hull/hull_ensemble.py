@@ -1,7 +1,7 @@
 # coding: utf-8
 # Distributed under the terms of the MIT License.
 
-""" This submodule implements parameterised phase diagrams. """
+""" This submodule implements the base class for parameterised phase diagrams. """
 
 import tqdm
 from matador.hull import PhaseDiagram, QueryConvexHull
@@ -34,8 +34,8 @@ class EnsembleHull(QueryConvexHull):
             objects for each parameter value.
 
     """
-    def __init__(self, cursor, data_key, energy_key='enthalpy_per_atom', num_samples=None,
-                 parameter_key=None, species=None, subcmd='hull', verbosity=None, **kwargs):
+    def __init__(self, cursor, data_key, energy_key='enthalpy_per_atom', chempot_energy_key='enthalpy_per_atom',
+                 num_samples=None, parameter_key=None, species=None, subcmd='hull', verbosity=None, **kwargs):
         """ Initialise EnsembleHull from a cursor, with other keywords
         following QueryConvexHull.
 
@@ -48,6 +48,7 @@ class EnsembleHull(QueryConvexHull):
         Keyword arguments:
             energy_key (str): the key under `parameter_key` to use to create
                 the hulls.
+            chempot_energy_key (str): the key used to create the first convex hull.
             parameter_key (str): the key pertaining to the variable parameter
                 itself, e.g. `temperature` or `thetas`.
             num_samples (int): use up to this many samples in creating the hull.
@@ -58,13 +59,21 @@ class EnsembleHull(QueryConvexHull):
             kwargs (dict): other arguments to pass to QueryConvexHull.
 
         """
+        # sometimes the first hull needs to be made with a different key
+        if chempot_energy_key != energy_key:
+            self.chempot_energy_key = chempot_energy_key
+        else:
+            self.chempot_energy_key = energy_key
+
         super().__init__(cursor=cursor,
-                         energy_key=energy_key,
+                         energy_key=self.chempot_energy_key,
                          species=species,
                          subcmd=subcmd,
                          no_plot=True,
                          lazy=False,
                          **kwargs)
+
+        self.energy_key = energy_key
 
         if self.phase_diagram is None:
             del self.phase_diagram
@@ -75,7 +84,6 @@ class EnsembleHull(QueryConvexHull):
 
         self.from_cursor = True
         self.verbosity = verbosity
-
         # set up relative keys
         self.formation_key = 'formation_' + self.energy_key
         self.data_key = data_key
@@ -91,9 +99,9 @@ class EnsembleHull(QueryConvexHull):
 
         self.phase_diagrams = []
 
-        self.set_chempots()
-        self.cursor = sorted(filter_cursor_by_chempots(self.species, self.cursor),
-                             key=lambda doc: (recursive_get(doc, self._energy_keys), doc['concentration']))
+        self.set_chempots(energy_key=self.chempot_energy_key)
+        self.cursor = filter_cursor_by_chempots(self.species, self.cursor)
+        self.cursor = sorted(self.cursor, key=lambda doc: (recursive_get(doc, self.chempot_energy_key), doc['concentration']))
 
         if self.parameter_key is None:
             parameter_iterable = recursive_get(self.chempot_cursor[0], self._energy_keys)
@@ -152,4 +160,4 @@ class EnsembleHull(QueryConvexHull):
     def plot_hull(self, **kwargs):
         """ Hull plot helper function. """
         from matador.plotting.hull_plotting import plot_ensemble_hull
-        plot_ensemble_hull(self, self.data_key, formation_energy_key=self.formation_key, **kwargs)
+        return plot_ensemble_hull(self, self.data_key, formation_energy_key=self.formation_key, **kwargs)
