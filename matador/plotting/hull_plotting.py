@@ -67,7 +67,7 @@ def get_hull_labels(hull, label_cutoff=None, num_species=None, exclude_edges=Tru
 
 
 @plotting_function
-def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
+def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
                  plot_hull_points=True, labels=None, label_cutoff=None, colour_by_source=False,
                  sources=None, hull_label=None, source_labels=None, title=True, plot_fname=None, show_cbar=True,
                  label_offset=(1.15, 0.05), eform_limits=None,
@@ -127,11 +127,12 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True,
                    c=hull.colours[1],
                    marker='o', zorder=99999, edgecolor='k',
                    s=scale*40, lw=1.5)
-        ax.plot(np.sort(tie_line[:, 0]), tie_line[np.argsort(tie_line[:, 0]), 1],
-                c=hull.colours[0], zorder=1, label=hull_label,
-                marker='o', markerfacecolor=hull.colours[0],
-                markeredgecolor='k', markeredgewidth=1.5, markersize=np.sqrt(scale*40))
-    else:
+        if plot_tie_line:
+            ax.plot(np.sort(tie_line[:, 0]), tie_line[np.argsort(tie_line[:, 0]), 1],
+                    c=hull.colours[0], zorder=1, label=hull_label,
+                    marker='o', markerfacecolor=hull.colours[0],
+                    markeredgecolor='k', markeredgewidth=1.5, markersize=np.sqrt(scale*40))
+    if plot_tie_line:
         ax.plot(np.sort(tie_line[:, 0]), tie_line[np.argsort(tie_line[:, 0]), 1],
                 c=hull.colours[0], zorder=1, label=hull_label, markersize=0)
 
@@ -322,7 +323,7 @@ def plot_ensemble_hull(hull, data_key,
                        [doc[data_key][formation_energy_key][ind] for doc in hull.cursor],
                        alpha=alpha, marker='o', c='k', s=5, lw=0, zorder=0)
 
-    ax.set_ylim(min_ef)
+    ax.set_ylim(1.1*min_ef)
 
     if hull.savefig or any(kwargs.get(ext) for ext in SAVE_EXTS):
         if plot_fname is not None:
@@ -334,6 +335,116 @@ def plot_ensemble_hull(hull, data_key,
                 plt.savefig('{}.{}'.format(fname, ext),
                             bbox_inches='tight', transparent=True)
                 print('Wrote {}.{}'.format(fname, ext))
+
+
+@plotting_function
+def plot_temperature_hull(
+    hull,
+    cmap='plasma',
+    cmap_limits=(0.2, 0.8),
+    ax=None,
+    formation_energy_key='formation_free_energy_per_atom',
+    plot_points=False,
+    plot_hull_points=True,
+    alpha_scale=0.25,
+    lw_scale=1,
+    plot_hulls=True,
+    voltages=False,
+    show=True,
+    plot_fname=None,
+    **kwargs
+):
+    """ Plot and generate an ensemble of hulls. If axis not requested,
+    a histogram of frequency of a particular concentration appearing on
+    the convex hull is also generated as a second axis.
+
+    Parameters:
+        hull (QueryConvexHull): hull object created with a cursor that
+            contains the data key for all entries in hull.cursor.
+
+    Keyword arguments:
+        ax (matplotlib.axes.Axes): matplotlib axis object on which to plot.
+        formation_energy_key (str): the key under which formation energies have been stored.
+        alpha_scale (float): value by which to scale transparency of hulls.
+        plot_points (bool): whether to plot the hull points for each hull in the ensemble.
+        plot_hulls (bool): whether to plot the hull tie-lines for each hull in the ensemble.
+        voltages (bool): compute average voltage and heatmaps.
+
+    """
+    import matplotlib.pyplot as plt
+    data_key = hull.data_key
+
+    if ax is None:
+        fig = plt.figure(figsize=(8, 6))
+        ax = fig.add_subplot(111)
+
+    n_hulls = len(hull.phase_diagrams)
+    colours = plt.cm.get_cmap(cmap)(np.linspace(*cmap_limits, n_hulls))
+    min_ef = 0
+    alpha = alpha_scale
+
+    # hack the energy key so that labels work
+    _cached_key = hull.energy_key
+    hull.energy_key = hull.chempot_energy_key
+    # set up initial plot without plotting tie line
+    ax = plot_2d_hull(
+        hull, ax=ax,
+        plot_tie_line=False,
+        plot_points=False,
+        plot_hull_points=False,
+        show=False,
+        **kwargs
+    )
+    hull.energy_key = _cached_key
+
+    ax.plot([doc['concentration'][0] for doc in hull.hull_cursor],
+            [doc['formation_' + hull.chempot_energy_key] for doc in hull.hull_cursor],
+            marker='o',
+            alpha=1, c='k', lw=2*lw_scale, ls='--', label='Static', zorder=1e5)
+
+    ind = 0
+    hull_cursor = [doc for doc in hull.cursor if doc[data_key]['hull_distance'][ind] <= 0.0 + EPS]
+    ax.plot([doc['concentration'][0] for doc in hull_cursor],
+            [doc[data_key][formation_energy_key][ind] for doc in hull_cursor],
+            marker='o', alpha=1, c=colours[ind], lw=2*lw_scale,
+            markeredgewidth=1.5, markeredgecolor='k',
+            ls='--', zorder=1e5, label='Static + ZPE')
+
+    # plot remaining temperatures
+    for ind, _ in enumerate(hull.phase_diagrams[1:]):
+        hull_cursor = [doc for doc in hull.cursor if doc[data_key]['hull_distance'][ind] <= 0.0 + EPS]
+        min_ef = np.min([doc[data_key][formation_energy_key][ind] for doc in hull_cursor] + [min_ef])
+        if plot_hulls:
+            ax.plot([doc['concentration'][0] for doc in hull_cursor],
+                    [doc[data_key][formation_energy_key][ind] for doc in hull_cursor],
+                    alpha=alpha, c=colours[ind], lw=1*lw_scale, zorder=0)
+        if plot_hull_points:
+            ax.scatter([doc['concentration'][0] for doc in hull_cursor],
+                       [doc[data_key][formation_energy_key][ind] for doc in hull_cursor],
+                       alpha=alpha, marker='o', c=colours[ind], lw=0.5,
+                       edgecolor='k',
+                       zorder=1e4)
+        if plot_points:
+            ax.scatter([doc['concentration'][0] for doc in hull.cursor],
+                       [doc[data_key][formation_energy_key][ind] for doc in hull.cursor],
+                       alpha=alpha, marker='o', c=colours[ind], lw=0, zorder=1e-3)
+
+    ax.set_ylim(1.1*min_ef)
+
+    if hull.savefig or any(kwargs.get(ext) for ext in SAVE_EXTS):
+        if plot_fname is not None:
+            fname = plot_fname
+        else:
+            fname = ''.join(hull.species) + data_key + '_hull'
+        for ext in SAVE_EXTS:
+            if hull.args.get(ext) or kwargs.get(ext):
+                plt.savefig('{}.{}'.format(fname, ext),
+                            bbox_inches='tight', transparent=True)
+                print('Wrote {}.{}'.format(fname, ext))
+
+    ax.legend()
+
+    return ax
 
 
 @plotting_function
