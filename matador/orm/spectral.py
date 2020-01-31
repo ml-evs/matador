@@ -20,8 +20,6 @@ INVERSE_CM_TO_EV = 1.24e-4
 
 class DensityOfStates(DataContainer):
 
-    phonon = False
-
     def __init__(self, data):
         """ Initialise the DOS and trim the DOS data arrays.
 
@@ -56,14 +54,19 @@ class DensityOfStates(DataContainer):
     def sample_energies(self):
         return self._trimmed_energies
 
-    def plot(self, **kwargs):
+    def plot_dos(self, **kwargs):
+        """ Plot the density of states. """
         from matador.plotting.spectral_plotting import plot_spectral
-        plot_spectral(self, phonons=self.phonon, plot_dos=True, plot_bandstructure=False, **kwargs)
+        plot_spectral(
+            self,
+            phonons='Vibrational' in self.__class__.__name__,
+            plot_dos=True,
+            plot_bandstructure=False,
+            **kwargs
+        )
 
 
 class VibrationalDOS(DensityOfStates):
-
-    phonon = True
 
     @property
     def zero_point_energy(self):
@@ -165,6 +168,19 @@ class VibrationalDOS(DensityOfStates):
             copy=False
         )
 
+    def plot_free_energy(self, temperatures=None, ax=None, **kwargs):
+        """ Plot G(T) on the array of given temperatures. Default T is [0, 800].
+
+        Keyword arguments:
+            temperatures (list/np.ndarray): list or array of temperatures to plot.
+                If the array/list has length 2, use these as the start and endpoints
+                with 21 plotting points.
+            ax (matplotlib.pyplot.Axis): axis object to plot onto.
+
+        """
+        from matador.plotting.temperature_plotting import plot_free_energy
+        plot_free_energy(self, temperatures=temperatures, ax=ax, **kwargs)
+
 
 class ElectronicDOS(DensityOfStates):
     pass
@@ -182,8 +198,6 @@ class Dispersion(DataContainer):
 
     """
 
-    phonon = False
-
     @property
     def lattice_cart(self):
         """ The Cartesian lattice vectors of the real space lattice. """
@@ -195,9 +209,14 @@ class Dispersion(DataContainer):
         return self._data['num_kpoints']
 
     @property
+    def num_qpoints(self):
+        """ Alias for number of kpoints. """
+        return self.num_kpoints
+
+    @property
     def projectors(self):
         """ Return list of projector labels in the format
-        (`element`, `l-channel`).
+        `(element, l-channel)`.
 
         """
         return self._data.get('projectors')
@@ -223,7 +242,7 @@ class Dispersion(DataContainer):
         contained a list of lists of continous indices.
 
         """
-        if not self._data.get('kpoint_branches'):
+        if self._data.get('kpoint_branches') is None:
             self._data['kpoint_branches'] = self.find_full_kpt_branch()
         return self._data['kpoint_branches']
 
@@ -259,7 +278,7 @@ class Dispersion(DataContainer):
     @property
     def kpoint_path(self):
         """ The fractional sampling path in reciprocal space. """
-        return self._data['kpoint_path']
+        return np.asarray(self._data['kpoint_path'])
 
     @property
     def kpoint_path_cartesian(self):
@@ -374,9 +393,32 @@ class Dispersion(DataContainer):
 
             self.eigs[channel_ind] = eigs.reshape(1, self.num_bands, len(eigs[0]))
 
-    def plot(self, **kwargs):
+    def plot_dispersion(self, **kwargs):
+        """ Make a plot of the band structure, with projections, if found. """
         from matador.plotting.spectral_plotting import plot_spectral
-        plot_spectral(self, phonons=self.phonon, plot_dos=False, plot_bandstructure=True, **kwargs)
+        plot_spectral(
+            self,
+            phonons='Vibrational' in self.__class__.__name__,
+            plot_dos=False,
+            plot_bandstructure=True,
+            **kwargs
+        )
+
+    def _reshaped_eigs(self, eigs, shape):
+        """ Attempts to reshape the eigenvalues into the desired shape.
+
+        Parameters:
+            eigs (np.ndarray): the eigs to reshape.
+            shape (tuple): the desired shape.
+
+        Returns:
+            np.ndarray: the reshaped eigs.
+
+        """
+        raise NotImplementedError(
+            'Wrong eigenvalue shape passed, and reshape function is not yet implemented. '
+            'Eigs should have shape {}, not {}'.format(shape, np.shape(eigs))
+        )
 
 
 class ElectronicDispersion(Dispersion):
@@ -428,6 +470,10 @@ class ElectronicDispersion(Dispersion):
         else:
             self._data['projectors'] = None
             self._data['projector_weights'] = None
+
+        shape = (self.num_spins, self.num_bands, self.num_kpoints)
+        if np.shape(self._data['eigs_s_k']) != shape:
+            self._data['eigs_s_k'] = self._reshaped_eigs(self._data['eigs_s_k'], shape)
 
     @property
     def num_spins(self):
@@ -609,7 +655,7 @@ class VibrationalDispersion(Dispersion):
         num_kpoints (int): number of kpoints.
         num_atoms (int): number of atoms.
         num_modes (int): number of phonon modes.
-        eigs_k (numpy.ndarray):  eigenvalue array of shape
+        eigs (numpy.ndarray):  eigenvalue array of shape
             (1, num_modes, num_kpoints), in frequency units below, with
             first index denoting the single "spin channel" for phonons.
         freq_unit (str): human-readable frequency unit used for eig array.
@@ -620,7 +666,12 @@ class VibrationalDispersion(Dispersion):
 
     """
 
-    phonon = True
+    def __init__(self, data):
+        super().__init__(data)
+
+        shape = (1, self.num_modes, self.num_qpoints)
+        if np.shape(self._data['eigs_q']) != shape:
+            self._data['eigs_q'] = self._reshaped_eigs(self._data['eigs_q'], shape)
 
     @property
     def num_atoms(self):
@@ -648,7 +699,7 @@ class VibrationalDispersion(Dispersion):
         (1, num_modes, num_kpoints).
 
         """
-        return self._data['eigs_q']
+        return np.asarray(self._data['eigs_q'])
 
     @property
     def eigs(self):
