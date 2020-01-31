@@ -1079,6 +1079,7 @@ def _castep_scrape_phonon_frequencies(flines, castep):
     phonons['eigs_q'] = np.asarray(phonons['eigs_q']).T
     phonons['eigs_q'] = phonons['eigs_q'].reshape(1, *np.shape(phonons['eigs_q']))
     phonons['kpoint_path'] = phonons['phonon_fine_kpoint_list']
+    phonons['kpoint_weights'] = phonons['phonon_fine_kpoint_weights']
     phonons['num_kpoints'] = len(phonons['phonon_fine_kpoint_list'])
     phonons['num_qpoints'] = len(phonons['phonon_fine_kpoint_list'])
 
