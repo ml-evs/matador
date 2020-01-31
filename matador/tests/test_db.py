@@ -15,7 +15,7 @@ REAL_PATH = '/'.join(os.path.realpath(__file__).split('/')[:-1]) + '/'
 CONFIG_FNAME = None
 DB_NAME = 'ci_test'
 ROOT_DIR = os.getcwd()
-SETTINGS = load_custom_settings(config_fname=CONFIG_FNAME, override=True, debug=True)
+SETTINGS = load_custom_settings(config_fname=CONFIG_FNAME, debug=True)
 SETTINGS['mongo']['default_collection'] = DB_NAME
 SETTINGS['mongo']['default_collection_file_path'] = '/data/'
 SETTINGS['mongo']['host'] = 'mongo_test.com'

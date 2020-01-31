@@ -36,7 +36,8 @@ FILE_PATHS = {
 }
 
 # this global gets set by load_custom_settings, each time it is called
-SETTINGS = None
+from matador.config.settings import Settings
+SETTINGS = Settings()
 
 
 def quickstart_settings():
@@ -142,7 +143,7 @@ def quickstart_settings():
     return fname
 
 
-def load_custom_settings(config_fname=None, quiet=False, debug=False, override=True):
+def load_custom_settings(config_fname=None, quiet=False, debug=False, no_quickstart=True):
     """ Load mongodb settings dict from file given by fname, or from
     defaults. Hierarchy of filenames to check:
 
@@ -153,14 +154,11 @@ def load_custom_settings(config_fname=None, quiet=False, debug=False, override=T
     Keyword Arguments:
         fname (str): filename of custom settings file.
         quiet (bool): print nothing on loading.
-        override (bool): for testing purposes, override any questions.
+        no_quickstart (bool): for testing purposes, override any questions.
         debug (bool): print settings on loading.
 
     """
     import yaml
-
-    if SETTINGS is not None:
-        return SETTINGS
 
     if config_fname is None:
         trial_user_fnames = [
@@ -178,7 +176,7 @@ def load_custom_settings(config_fname=None, quiet=False, debug=False, override=T
                 break
         else:
             # otherwise offer to create one, or use default
-            if not override:
+            if not no_quickstart:
                 config_fname = quickstart_settings()
             if config_fname is None:
                 # otherwise load default
@@ -220,11 +218,16 @@ def load_custom_settings(config_fname=None, quiet=False, debug=False, override=T
         import json
         print(json.dumps(settings, indent=2))
 
-    set_settings(settings)
+    set_settings(settings, override=False)
+    return SETTINGS
 
-    return settings
+def set_settings(settings, override=True):
 
-def set_settings(settings):
-    print('Overriding settings as {}'.format(settings))
-    global SETTINGS
-    SETTINGS = settings
+    if SETTINGS.set and not override:
+        return
+
+    for key in SETTINGS.settings:
+        if key not in settings:
+            SETTINGS.settings.pop(key)
+    for key in settings:
+        SETTINGS.settings[key] = settings[key]

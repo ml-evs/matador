@@ -2,7 +2,7 @@
 import unittest
 import os
 import shutil
-from matador.config import load_custom_settings
+from matador.config import load_custom_settings, set_settings
 from matador.config.config import DEFAULT_SETTINGS
 
 DUMMY_SETTINGS = {'mongo': {'host': 'blah', 'port': 666},
@@ -17,8 +17,13 @@ class ConfigTest(unittest.TestCase):
     """ Test config loading. """
     def testLoadNamedCustomSettings(self):
         """ Test custom config. """
-        settings = load_custom_settings(config_fname=(REAL_PATH+'data/custom_config.yml'), override=True)
-        self.assertEqual(settings, DUMMY_SETTINGS)
+        settings = load_custom_settings(config_fname=(REAL_PATH+'data/custom_config.yml'), no_quickstart=True)
+        self.assertEqual(settings.settings, DUMMY_SETTINGS)
+
+    def testSetSettings(self):
+        set_settings(DUMMY_SETTINGS)
+        from matador.config import SETTINGS
+        self.assertEqual(SETTINGS.settings, DUMMY_SETTINGS)
 
     def testLoadUserDefaultSettings(self):
         """ Test default config. """
@@ -28,8 +33,8 @@ class ConfigTest(unittest.TestCase):
                 exists = True
                 shutil.copy(os.path.expanduser('~/.matadorrc'), os.path.expanduser('~/.matadorrc_bak'))
             shutil.copy(REAL_PATH + 'data/custom_config.yml', os.path.expanduser('~/.matadorrc'))
-            settings = load_custom_settings(override=True)
-            self.assertEqual(settings, DUMMY_SETTINGS)
+            settings = load_custom_settings(no_quickstart=True)
+            self.assertEqual(settings.settings, DUMMY_SETTINGS)
             os.remove(os.path.expanduser('~/.matadorrc'))
             if exists:
                 shutil.copy(os.path.expanduser('~/.matadorrc_bak'), os.path.expanduser('~/.matadorrc'))
@@ -42,8 +47,8 @@ class ConfigTest(unittest.TestCase):
 
     def testLoadDefaultSettings(self):
         """ Test default config. """
-        settings = load_custom_settings(config_fname='definitely_doesnt_exist.yml', override=True)
-        self.assertEqual(settings, DEFAULT_SETTINGS)
+        settings = load_custom_settings(config_fname='definitely_doesnt_exist.yml', no_quickstart=True)
+        self.assertEqual(settings.settings, DEFAULT_SETTINGS)
 
 
 if __name__ == '__main__':

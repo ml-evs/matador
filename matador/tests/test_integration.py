@@ -26,7 +26,7 @@ REAL_PATH = '/'.join(os.path.realpath(__file__).split('/')[:-1]) + '/'
 CONFIG_FNAME = None
 DB_NAME = 'ci_test'
 ROOT_DIR = os.getcwd()
-SETTINGS = load_custom_settings(config_fname=CONFIG_FNAME, override=True)
+SETTINGS = load_custom_settings(config_fname=CONFIG_FNAME)
 
 DEBUG = False
 MONGO_PRESENT = True

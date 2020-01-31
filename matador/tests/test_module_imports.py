@@ -21,7 +21,6 @@ class ImportTest(unittest.TestCase):
     def test_config(self):
         from matador.config import load_custom_settings, SETTINGS
         self.assertTrue(load_custom_settings)
-        self.assertEqual(SETTINGS, None)
 
     def test_crystal(self):
         from matador.crystal import Crystal
