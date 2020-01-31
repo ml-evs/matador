@@ -25,7 +25,7 @@ AVOGADROS_NUMBER = physical_constants['Avogadro constant'][0]
 ANGSTROM_CUBED_TO_CENTIMETRE_CUBED = 1e-24
 ELECTRON_CHARGE = physical_constants['elementary charge'][0]
 KELVIN_TO_EV = physical_constants['kelvin-electron volt relationship'][0]
-INVERSE_CM_TO_EV = physical_constants['inverse meter-electron volt relationship'] * 100
+INVERSE_CM_TO_EV = physical_constants['inverse meter-electron volt relationship'][0] * 100
 
 EPS = 1e-8
 
