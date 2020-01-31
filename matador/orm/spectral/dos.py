@@ -228,10 +228,10 @@ class VibrationalDOS(DensityOfStates):
                 if 'kpoint_weights' in self._data:
                     contrib *= self.kpoint_weights[qpt_ind]
                 else:
-                    contrib /= self._data['num_qpoints']
+                    contrib /= self.num_qpoints
                 zpe += contrib
 
-        return 0.5 * zpe
+        return 0.5 * zpe / (self.num_modes / 3)
 
     def vibrational_free_energy(self, temperatures=None):
         """ Computes and returns the vibrational contribution to the free
@@ -278,17 +278,19 @@ class VibrationalDOS(DensityOfStates):
 
             kT = KELVIN_TO_EV * temperature
 
-            for mode_ind in range(self._data['num_modes']):
-                for qpt_ind in range(self._data['num_qpoints']):
+            for mode_ind in range(self.num_modes):
+                for qpt_ind in range(self.num_qpoints):
                     freq = eigs[mode_ind][qpt_ind]
                     if freq > freq_cutoff and freq / kT < 32:
                         contrib = kT * np.log(1 - np.exp(-freq/kT))
                         if 'kpoint_weights' in self._data:
-                            contrib *= self._data['kpoint_weights'][qpt_ind]
+                            contrib *= self.kpoint_weights[qpt_ind]
                         else:
-                            contrib /= self._data['num_qpoints']
+                            contrib /= self.num_qpoints
 
                         free_energy[ind] += contrib
+
+        free_energy /= (self.num_modes / 3)
 
         if len(temperatures) == 1:
             return free_energy[0]
