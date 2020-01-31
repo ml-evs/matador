@@ -47,9 +47,7 @@ class DataContainer(ABC):
 
     def __setitem__(self, key: str, item):
         if key not in self._data:
-            raise AttributeError('Cannot set value of {} inside DataContainer.'
-                                 .format(key))
-            # self._data[key] = item
+            self._data[key] = item
         raise AttributeError('Cannot assign value to existing key {}'
                              .format(key))
 
