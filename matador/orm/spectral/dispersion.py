@@ -8,6 +8,7 @@ vibrational bandstructures, with or without projection data.
 
 import numpy as np
 from matador.orm.spectral.spectral import Spectral
+from matador.utils.chem_utils import INVERSE_CM_TO_EV, KELVIN_TO_EV
 
 EPS = 1e-6
 
@@ -451,3 +452,13 @@ class VibrationalDispersion(Dispersion):
 
         """
         return np.min(self.eigs)
+
+    @property
+    def debye_temperature(self):
+        """ Returns the Debye temperature in K. """
+        return self.debye_freq * INVERSE_CM_TO_EV / KELVIN_TO_EV
+
+    @property
+    def debye_freq(self):
+        """ Returns the Debye frequency in cm^-1. """
+        return np.max(self.eigs)

@@ -195,6 +195,16 @@ class VibrationalDOS(DensityOfStates):
         return 0.5 * result[0]
 
     @property
+    def debye_temperature(self):
+        """ Returns the Debye temperature in K. """
+        return self.debye_freq / KELVIN_TO_EV
+
+    @property
+    def debye_freq(self):
+        """ Returns the Debye frequency in eV. """
+        return np.max(self.eigs) * INVERSE_CM_TO_EV
+
+    @property
     def zero_point_energy(self):
         """ Computes and return the zero-point energy from frequency data. """
 
