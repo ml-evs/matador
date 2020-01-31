@@ -296,12 +296,14 @@ class QueryConvexHull:
 
         self.hull_cursor = hull_cursor
 
-    def set_chempots(self):
+    def set_chempots(self, energy_key=None):
         """ Search for chemical potentials that match the structures in
         the query cursor and add them to the cursor. Also set the concentration
         of chemical potentials in :attr:`cursor`, if not already set.
 
         """
+        if energy_key is None:
+            energy_key = self.energy_key
         query = self._query
         query_dict = dict()
         species_stoich = [sorted(get_stoich_from_formula(spec, sort=False)) for spec in self.species]
@@ -312,7 +314,7 @@ class QueryConvexHull:
 
         elif self.from_cursor:
             chempot_cursor = sorted([doc for doc in self.cursor if doc['stoichiometry'] in species_stoich],
-                                    key=lambda doc: recursive_get(doc, self.energy_key))
+                                    key=lambda doc: recursive_get(doc, energy_key))
 
             for species in species_stoich:
                 for doc in chempot_cursor:
@@ -347,7 +349,7 @@ class QueryConvexHull:
                 if query.args.get('tags') is not None:
                     query_dict['$and'].append(query.query_tags())
 
-                mu_cursor = query.repo.find(SON(query_dict)).sort(self.energy_key, pm.ASCENDING)
+                mu_cursor = query.repo.find(SON(query_dict)).sort(energy_key, pm.ASCENDING)
                 if mu_cursor.count() == 0:
                     print_notify('Failed... searching without spin polarization field...')
                     scanned = False
@@ -359,7 +361,7 @@ class QueryConvexHull:
                                     break
                             if idx == len(query_dict['$and']) - 1:
                                 scanned = True
-                    mu_cursor = query.repo.find(SON(query_dict)).sort(self.energy_key, pm.ASCENDING)
+                    mu_cursor = query.repo.find(SON(query_dict)).sort(energy_key, pm.ASCENDING)
 
                 if mu_cursor.count() == 0:
                     raise RuntimeError('No chemical potentials found for {}...'.format(elem))
@@ -373,7 +375,7 @@ class QueryConvexHull:
                     raise RuntimeError('No possible chem pots available for {}.'.format(elem))
 
             for i, mu in enumerate(self.chempot_cursor):
-                self.chempot_cursor[i][self._extensive_energy_key + '_per_b'] = mu[self.energy_key]
+                self.chempot_cursor[i][self._extensive_energy_key + '_per_b'] = mu[energy_key]
                 self.chempot_cursor[i]['num_a'] = 0
 
             self.chempot_cursor[0]['num_a'] = float('inf')
