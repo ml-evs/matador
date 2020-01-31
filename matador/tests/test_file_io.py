@@ -939,6 +939,9 @@ class ScraperMiscTest(MatadorUnitTest):
             self.assertEqual(test_dict['thermo_heat_cap'][i], thermo_db_compare['thermo_heat_cap'][num],
                              msg='Wrong heat capacity %f' % test_dict['thermo_heat_cap'][i])
 
+        self.assertEqual(len(test_dict['phonon_fine_kpoint_list']), 310)
+        self.assertEqual(np.shape(test_dict['eigs_q']), (1, 9, 310))
+
     def test_fortran_e100_bug(self):
         """ Test whether the scraper handles improperly formatted floats
         by Fortran when e.g. exponent < -99.

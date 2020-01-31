@@ -604,6 +604,9 @@ def castep2dict(seed, db=True, intermediates=False, **kwargs):
     if not db and 'thermo' in castep['task'].lower():
         _castep_scrape_thermo_data(flines, castep)
 
+    if not db and 'thermo' in castep['task'].lower() or 'phonon' in castep['task'].lower():
+        _castep_scrape_phonon_frequencies(flines, castep)
+
     # only scrape snapshots/number of intermediates if requested
     try:
         snapshots, castep['geom_iter'] = _castep_scrape_all_snapshots(flines)
@@ -1038,6 +1041,49 @@ def _castep_scrape_thermo_data(flines, castep):
                     castep['thermo_entropy'][f90_float_parse(temp_line[0])] = f90_float_parse(temp_line[3])
                     castep['thermo_heat_cap'][f90_float_parse(temp_line[0])] = f90_float_parse(temp_line[4])
                 i += 1
+
+def _castep_scrape_phonon_frequencies(flines, castep):
+    """ Iterate through flines to scrape the phonon frequencies
+    from this CASTEP calculation. Will only scrape the *final* set
+    of frequencies in the CASTEP file, ignoring any others.
+
+    """
+    phonons = {}
+
+    phonons['phonon_fine_kpoint_list'] = []
+    phonons['phonon_fine_kpoint_weights'] = []
+    phonons['eigs_q'] = []
+
+    # first find the last block of frequencies
+    for line_no, line in enumerate(flines):
+        if "Performing frequency calculation at " in line:
+            start_line_no = line_no + 2
+
+    q_pt_ind = 0
+    for line_no, line in enumerate(flines[start_line_no:]):
+        if '============' in line:
+            break
+        if 'q-pt=' in line:
+            q_pt = [f90_float_parse(val) for val in line.split('(')[-1].split(')')[0].split()]
+            phonons['phonon_fine_kpoint_list'].append(q_pt)
+            phonons['phonon_fine_kpoint_weights'].append(f90_float_parse(line.split()[-2]))
+            phonons['eigs_q'].append([])
+
+            for freq_line_no, freq_line in enumerate(flines[start_line_no:][line_no+6:]):
+                if '.........................' in freq_line:
+                    break
+                phonons['eigs_q'][q_pt_ind].append(f90_float_parse(freq_line.split()[2]))
+            q_pt_ind += 1
+
+    phonons['num_modes'] = len(phonons['eigs_q'][0])
+    phonons['eigs_q'] = np.asarray(phonons['eigs_q']).T
+    phonons['eigs_q'] = phonons['eigs_q'].reshape(1, *np.shape(phonons['eigs_q']))
+    phonons['kpoint_path'] = phonons['phonon_fine_kpoint_list']
+    phonons['num_kpoints'] = len(phonons['phonon_fine_kpoint_list'])
+    phonons['num_qpoints'] = len(phonons['phonon_fine_kpoint_list'])
+
+    for key in phonons:
+        castep[key] = phonons[key]
 
 
 def _castep_scrape_atoms(flines, castep):
