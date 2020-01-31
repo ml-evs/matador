@@ -16,7 +16,7 @@ from matador.scrapers import cell2dict, res2dict
 from matador.orm.spectral import (
     ElectronicDispersion, ElectronicDOS,
     VibrationalDispersion, VibrationalDOS,
-    Dispersion
+    Dispersion, DensityOfStates
 )
 
 
@@ -380,7 +380,7 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
         dos = dos_data['dos']
 
         # plotting pdos depends on these other factors too
-        plotting_pdos = (kwargs['plot_pdos'] and len(seeds) == 1 and not (kwargs['phonons'] and len(dos_data['pdos']) <= 1))
+        plotting_pdos = (kwargs['plot_pdos'] and len(seeds) == 1 and not (kwargs['phonons'] and len(dos_data.get('pdos', [])) <= 1))
 
         if kwargs['phonons']:
             ylabel = 'Phonon DOS'
@@ -592,37 +592,6 @@ def projected_bandstructure_plot(dispersion, ax, path, bbox_extra_artists, pdis_
         bbox_extra_artists.append(legend)
 
     return ax
-
-
-def _cheap_broaden(eigs, weights=None, gaussian_width=None):
-    """ Quickly broaden and bin a set of eigenvalues.
-
-    Parameters:
-        eigs (numpy.ndarray): eigenvalue array.
-        weights (numpy.ndarray): array of weights.
-
-    Keyword arguments:
-        gaussian_width (float): width of gaussian broadening
-            to apply.
-
-    Returns:
-        Two arrays containing the DOS and energies.
-
-    """
-    if gaussian_width is None:
-        gaussian_width = 0.1
-
-    hist, energies = np.histogram(eigs, weights=weights, bins=1001)
-
-    # shift bin edges to bin centres
-    energies -= energies[1] - energies[0]
-    energies = energies[:-1]
-    new_energies = np.reshape(energies, (1, len(energies)))
-    new_energies = new_energies - np.reshape(energies, (1, len(energies))).T
-    dos = np.sum(hist * np.exp(-(new_energies)**2 / gaussian_width), axis=1)
-    dos = np.divide(dos, np.sqrt(2 * np.pi * gaussian_width**2))
-
-    return dos, energies
 
 
 def _ordered_scatter(path, eigs, pdis, branches, ax=None, colours=None, interpolation_factor=2, point_scale=25):
@@ -977,30 +946,14 @@ def _load_electronic_dos(seed, kwargs):
     # file output from a DOS calculation
     if dos_seed.endswith('.bands_dos'):
         dos_data, s = bands2dict(dos_seed)
-
         gaussian_width = kwargs.get('gaussian_width', 0.1)
+        dos_data['dos'], dos_data['energies'] = DensityOfStates.bands_as_dos(
+            dos_data, gaussian_width=gaussian_width
+        )
 
-        raw_eigs = np.asarray(dos_data['eigenvalues_k_s']) - dos_data['fermi_energy']
-        raw_weights = np.zeros_like(raw_eigs)
-        for sind, _ in enumerate(dos_data['eigenvalues_k_s']):
-            for kind, _ in enumerate(dos_data['eigenvalues_k_s'][sind]):
-                raw_weights[sind, kind, :] = dos_data['kpoint_weights'][kind]
+        if len(dos_data['dos']) != 1:
+            dos_data['spin_dos'] = dos_data.pop('dos')
 
-        if len(raw_weights) != 1:
-            if len(raw_weights) > 2:
-                raise NotImplementedError('Non-collinear spin not supported')
-            dos_data['spin_dos'] = dict()
-            keys = ['up', 'down']
-            for sind, _ in enumerate(raw_weights):
-                dos_data[keys[sind]], dos_data['energies'] = _cheap_broaden(
-                    dos_data['eigenvalues'][sind].flatten(),
-                    weights=raw_weights[sind].flatten(),
-                    gaussian_width=gaussian_width
-                )
-
-        dos_data['dos'], dos_data['energies'] = _cheap_broaden(raw_eigs.flatten(),
-                                                               weights=raw_weights.flatten(),
-                                                               gaussian_width=gaussian_width)
     else:
         dos_data, s = optados2dict(dos_seed, verbosity=0)
 

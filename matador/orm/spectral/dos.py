@@ -10,23 +10,28 @@ import warnings
 import numpy as np
 import scipy.integrate
 import scipy.interpolate
+
 from matador.orm.orm import DataContainer
-from matador.utils.chem_utils import KELVIN_TO_EV
-from matador.utils.chem_utils import INVERSE_CM_TO_EV
+from matador.utils.chem_utils import KELVIN_TO_EV, INVERSE_CM_TO_EV
+
+from .dispersion import Dispersion
 
 EPS = 1e-6
 
 
-class DensityOfStates(DataContainer):
+class DensityOfStates(Dispersion, DataContainer):
     """ Generic class for density of states. """
 
-    def __init__(self, data):
+    def __init__(self, data, **kwargs):
         """ Initialise the DOS and trim the DOS data arrays.
 
         Parameters:
-            data (dict): dictionary containing the phonon dos data.
+            data (dict/Dispersion): dictionary containing the phonon dos data, or
+                a dispersion object to convert.
 
         """
+        if isinstance(data, Dispersion):
+            data = self._from_dispersion(data, **kwargs)
 
         super().__init__(data)
         self._trim_dos()
