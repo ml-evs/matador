@@ -23,9 +23,8 @@ jobs:
       run: |
         cp matador/tests/data/matador_pipelines_conf.yml $HOME/.matadorrc
         python -m pip install --upgrade pip
-        pip install -r requirements/requirements.txt
-        pip install -r requirements/test_requirements.txt
-        pip install -e .
+        pip install -e .[test,plotting]
+        pip install ase
     - name: Lint with flake8
       run: |
         pip install flake8
