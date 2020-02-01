@@ -15,7 +15,6 @@ import glob
 import mongomock
 
 import matador.cli.cli
-from matador.config import load_custom_settings
 from matador.query import DBQuery
 from matador.hull import QueryConvexHull
 from matador.scrapers.castep_scrapers import cell2dict, res2dict
@@ -25,21 +24,27 @@ REAL_PATH = '/'.join(os.path.realpath(__file__).split('/')[:-1]) + '/'
 CONFIG_FNAME = None
 DB_NAME = 'ci_test'
 ROOT_DIR = os.getcwd()
-SETTINGS = load_custom_settings(config_fname=CONFIG_FNAME)
-SETTINGS['mongo']['default_collection'] = DB_NAME
-SETTINGS['mongo']['default_collection_file_path'] = '/data/'
-SETTINGS['mongo']['host'] = 'mongo_test.com'
-SETTINGS['mongo']['port'] = 99999
-
 DEBUG = False
 MONGO_CLIENT = mongomock.MongoClient()
 
 
-@mongomock.patch(servers=((SETTINGS['mongo']['host'], SETTINGS['mongo']['port']),))
+@mongomock.patch(servers=(('mongo_test.com', 99999),))
 class IntegrationTest(unittest.TestCase):
     """ Test functionality acting on local database. """
 
+    def tearDown(self):
+        self.settings.reset()
+
     def setUp(self):
+        from matador.config import load_custom_settings, SETTINGS
+        SETTINGS.reset()
+        _ = load_custom_settings(config_fname=CONFIG_FNAME)
+        SETTINGS['mongo']['default_collection'] = DB_NAME
+        SETTINGS['mongo']['default_collection_file_path'] = '/data/'
+        SETTINGS['mongo']['host'] = 'mongo_test.com'
+        SETTINGS['mongo']['port'] = 99999
+        self.settings = SETTINGS
+
         for _file in glob.glob('*spatula*'):
             os.remove(_file)
 

@@ -15,6 +15,15 @@ REAL_PATH = '/'.join(__file__.split('/')[:-1]) + '/'
 
 class ConfigTest(unittest.TestCase):
     """ Test config loading. """
+
+    def tearDown(self):
+        from matador.config import SETTINGS
+        SETTINGS.reset()
+
+    def setUp(self):
+        from matador.config import SETTINGS
+        SETTINGS.reset()
+
     def testLoadNamedCustomSettings(self):
         """ Test custom config. """
         settings = load_custom_settings(config_fname=(REAL_PATH+'data/custom_config.yml'), no_quickstart=True)
@@ -31,7 +40,6 @@ class ConfigTest(unittest.TestCase):
         SETTINGS['backend'] = 'mongo'
         self.assertEqual(SETTINGS.settings['backend'], 'mongo')
         SETTINGS.reset()
-
 
     def testLoadUserDefaultSettings(self):
         """ Test default config. """
