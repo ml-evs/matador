@@ -21,6 +21,7 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual(settings.settings, DUMMY_SETTINGS)
         from matador.config import SETTINGS
         self.assertEqual(SETTINGS.settings, DUMMY_SETTINGS)
+        SETTINGS.reset()
 
     def testSetSettings(self):
         set_settings(DUMMY_SETTINGS)
@@ -29,6 +30,7 @@ class ConfigTest(unittest.TestCase):
 
         SETTINGS['backend'] = 'mongo'
         self.assertEqual(SETTINGS.settings['backend'], 'mongo')
+        SETTINGS.reset()
 
 
     def testLoadUserDefaultSettings(self):
@@ -56,6 +58,4 @@ class ConfigTest(unittest.TestCase):
         settings = load_custom_settings(config_fname='definitely_doesnt_exist.yml', no_quickstart=True)
         self.assertEqual(settings.settings, DEFAULT_SETTINGS)
 
-
-if __name__ == '__main__':
-    unittest.main()
+        settings.reset()

@@ -23,3 +23,7 @@ class Settings:
 
     def __repr__(self):
         return str(self.settings)
+
+    def reset(self):
+        self.settings = defaultdict(dict)
+        self.set = False
