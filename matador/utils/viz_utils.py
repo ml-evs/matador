@@ -27,7 +27,7 @@ def get_element_colours():
     from matador.config import load_custom_settings, SETTINGS
     # check if element_colours has been given as an absolute path
     if SETTINGS:
-        colours_fname = SETTINGS.get('plotting', {}).get_element_colours('element_colours')
+        colours_fname = SETTINGS.get('plotting', {}).get('element_colours')
     else:
         colours_fname = load_custom_settings().get('plotting', {}).get('element_colours')
 

@@ -15,6 +15,9 @@ class Settings:
     def __getitem__(self, key):
         return self.settings[key]
 
+    def get(self, key, default=None):
+        return self.settings.get(key, default)
+
     def __setitem__(self, key, val):
         if isinstance(val, dict):
             self.settings[key].update(val)
