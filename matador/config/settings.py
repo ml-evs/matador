@@ -4,11 +4,10 @@ from collections import defaultdict
 class Settings:
     """ Light wrapper for global matador settings. """
     def __init__(self, settings=None):
+        self.settings = defaultdict(dict)
         self.set = False
-        if settings is None:
-            self.settings = defaultdict(dict)
-        else:
-            self.settings = defaultdict(dict)
+
+        if settings is not None:
             for key in settings:
                 self.settings[key] = settings[key]
             self.set = True
@@ -17,4 +16,10 @@ class Settings:
         return self.settings[key]
 
     def __setitem__(self, key, val):
-        self.settings[key] = val
+        if isinstance(val, dict):
+            self.settings[key].update(val)
+        else:
+            self.settings[key] = val
+
+    def __repr__(self):
+        return str(self.settings)

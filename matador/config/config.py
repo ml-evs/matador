@@ -221,6 +221,7 @@ def load_custom_settings(config_fname=None, quiet=False, debug=False, no_quickst
     set_settings(settings, override=False)
     return SETTINGS
 
+
 def set_settings(settings, override=True):
 
     if SETTINGS.set and not override:
@@ -229,5 +230,8 @@ def set_settings(settings, override=True):
     for key in SETTINGS.settings:
         if key not in settings:
             SETTINGS.settings.pop(key)
+
     for key in settings:
-        SETTINGS.settings[key] = settings[key]
+        SETTINGS[key] = settings[key]
+
+    SETTINGS.set = True
