@@ -40,4 +40,4 @@ jobs:
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
         yml: ./codecov.yml 
-        file: ./codecov.xml
+        file: ./coverage.xml
