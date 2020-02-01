@@ -62,7 +62,7 @@ def plotting_function(function):
                 matplotlib.use('Agg', warn=False)
                 saving = True
 
-        settings = load_custom_settings(kwargs.get('config_fname'), quiet=True, override=kwargs.get('override'))
+        settings = load_custom_settings(kwargs.get('config_fname'), quiet=True, no_quickstart=True)
         try:
             import matplotlib.pyplot as plt
             style = settings.get('plotting', {}).get('default_style')
