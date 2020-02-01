@@ -19,11 +19,17 @@ class ConfigTest(unittest.TestCase):
         """ Test custom config. """
         settings = load_custom_settings(config_fname=(REAL_PATH+'data/custom_config.yml'), no_quickstart=True)
         self.assertEqual(settings.settings, DUMMY_SETTINGS)
+        from matador.config import SETTINGS
+        self.assertEqual(SETTINGS.settings, DUMMY_SETTINGS)
 
     def testSetSettings(self):
         set_settings(DUMMY_SETTINGS)
         from matador.config import SETTINGS
         self.assertEqual(SETTINGS.settings, DUMMY_SETTINGS)
+
+        SETTINGS['backend'] = 'mongo'
+        self.assertEqual(SETTINGS.settings['backend'], 'mongo')
+
 
     def testLoadUserDefaultSettings(self):
         """ Test default config. """
