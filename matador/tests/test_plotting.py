@@ -25,6 +25,11 @@ try:
 except ImportError:
     MATPLOTLIB_PRESENT = False
 
+try:
+    import _tkinter
+except Exception:
+    MATPLOTLIB_PRESENT = False
+
 
 @unittest.skipIf(not MATPLOTLIB_PRESENT, 'Skipping plotting tests.')
 class SpectralPlotTests(unittest.TestCase):
