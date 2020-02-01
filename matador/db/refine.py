@@ -247,11 +247,11 @@ class Refiner:
         for _, doc in enumerate(self.cursor):
             try:
                 sources = doc['source']
-                raw_files = {}
+                raw_files = []
                 for source in sources:
                     if os.path.isfile(source):
                         with open(source, 'r') as f:
-                            raw_files[source] = f.readlines()
+                            raw_files.append((source, f.readlines()))
 
                 doc['_raw'] = raw_files
                 self.diff_cursor.append(doc)
