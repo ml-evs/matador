@@ -113,14 +113,14 @@ class Spatula:
         if settings is None:
             self.settings = load_custom_settings(config_fname=self.config_fname,
                                                  debug=self.debug,
-                                                 override=self.args.get('override'))
+                                                 no_quickstart=self.args.get('no_quickstart'))
         else:
             self.settings = settings
 
         result = make_connection_to_collection(self.args.get('db'),
                                                check_collection=False,
                                                import_mode=True,
-                                               override=self.args.get('override'),
+                                               override=self.args.get('no_quickstart'),
                                                mongo_settings=self.settings)
 
         self.client, self.db, self.collections = result

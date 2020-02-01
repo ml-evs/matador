@@ -26,7 +26,7 @@ DEBUG = False
 MONGO_CLIENT = mongomock.MongoClient()
 
 
-@mongomock.patch(servers=(('mongo_test.com', 99999), ))
+@mongomock.patch(servers=((SETTINGS['mongo']['host'], SETTINGS['mongo']['port']),))
 class TestDatabaseImport(unittest.TestCase):
     """ Tests the Spatula class. """
     def test_failed_import(self):
@@ -36,19 +36,19 @@ class TestDatabaseImport(unittest.TestCase):
         """
         os.chdir(REAL_PATH + '/data/castep_files')
 
-        args = {'override': True}
+        args = {'no_quickstart': True}
         with self.assertRaises(RuntimeError):
             importer = Spatula(args, settings=SETTINGS)
         for _file in glob.glob('spatula.*'):
             os.remove(_file)
 
-        args = {'db': DB_NAME, 'override': True}
+        args = {'db': DB_NAME, 'no_quickstart': True}
         with self.assertRaises(RuntimeError):
             importer = Spatula(args, settings=SETTINGS)
         for _file in glob.glob('spatula.*'):
             os.remove(_file)
 
-        args = {'dryrun': True, 'override': True}
+        args = {'dryrun': True, 'no_quickstart': True}
         importer = Spatula(args, settings=SETTINGS)
         print(importer.errors)
         self.assertEqual(importer.import_count, 0)
@@ -57,7 +57,7 @@ class TestDatabaseImport(unittest.TestCase):
         for _file in glob.glob('spatula.*'):
             os.remove(_file)
 
-        args = {'force': True, 'override': True}
+        args = {'force': True, 'no_quickstart': True}
         importer = Spatula(args, settings=SETTINGS)
         self.assertEqual(importer.import_count, 3)
         self.assertEqual(importer.skipped, 0)
@@ -65,7 +65,7 @@ class TestDatabaseImport(unittest.TestCase):
         for _file in glob.glob('spatula.*'):
             os.remove(_file)
 
-        args = {'force': True, 'recent_only': True, 'override': True}
+        args = {'force': True, 'recent_only': True, 'no_quickstart': True}
         importer = Spatula(args, settings=SETTINGS)
         # this can be fiddly and a bit system dependent, just check errors+skips are constant
         self.assertEqual(importer.skipped+importer.errors, 8)

@@ -24,7 +24,7 @@ class MatadorCommandLine:
         # read args
         self.kwargs = kwargs
         self.args = vars(args[0])
-        self.args['override'] = self.kwargs.get('override')
+        self.args['no_quickstart'] = self.kwargs.get('no_quickstart')
         self.argstr = kwargs.get('argstr')
 
         file_exts = ['cell', 'res', 'pdb', 'markdown', 'latex', 'param', 'xsf']
@@ -33,7 +33,7 @@ class MatadorCommandLine:
         if self.args['subcmd'] != 'import':
             self.settings = load_custom_settings(config_fname=self.args.get('config'),
                                                  debug=self.args.get('debug'),
-                                                 override=self.args.get('override'))
+                                                 no_quickstart=self.args.get('no_quickstart'))
             result = make_connection_to_collection(self.args.get('db'),
                                                    check_collection=True,
                                                    mongo_settings=self.settings)
@@ -112,7 +112,7 @@ class MatadorCommandLine:
                                 changeset_ind=changeset,
                                 action=action,
                                 mongo_settings=self.settings,
-                                override=self.args.get('override'))
+                                override=kwargs.get('no_quickstart'))
 
             if self.args['subcmd'] == 'hulldiff':
                 from matador.hull.hull_diff import diff_hulls
@@ -204,7 +204,7 @@ class MatadorCommandLine:
                                  'your username, {}'.format(user))
             stats = self.db.command('collstats', target)
 
-            if self.args.get('override'):
+            if self.args.get('no_quickstart'):
                 answer = 'y'
             else:
                 answer = input('Are you sure you want to delete collection {} containing {} '
@@ -284,11 +284,11 @@ class MatadorCommandLine:
                     print(comp)
 
 
-def main(override=False):
+def main(no_quickstart=False):
     """ Parse all user args and construct a MatadorCommandLine object.
 
     Keyword arguments:
-        override: override all stdin with sensible defaults.
+        no_quickstart: no_quickstart all stdin with sensible defaults.
 
     """
     import argparse
@@ -593,7 +593,7 @@ def main(override=False):
         profiler = cProfile.Profile()
         profiler.enable()
 
-    MatadorCommandLine(parsed_args, argstr=argv[1:], override=override)
+    MatadorCommandLine(parsed_args, argstr=argv[1:], no_quickstart=no_quickstart)
 
     if vars_args.get('profile'):
         profiler.disable()
