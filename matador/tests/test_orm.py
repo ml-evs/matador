@@ -28,5 +28,4 @@ class ORMTest(unittest.TestCase):
         with self.assertRaises(AttributeError):
             container['lattice_abc'] = [[1, 2, 3], [4, 5, 6]]
 
-        with self.assertRaises(AttributeError):
-            container['extra_data'] = [1, 2, 3]
+        container['extra_data'] = [1, 2, 3]
