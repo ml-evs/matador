@@ -187,6 +187,9 @@ class QueryConvexHull:
         if self.args['subcmd'] == 'hull' and not self.args.get('no_plot'):
             self.plot_hull(**self.args['plot_kwargs'], debug=self.args.get('debug'))
 
+    def __repr__(self):
+        return display_results(self.hull_cursor, args=self.args, hull=True, energy_key=self.energy_key, return_str=True)
+
     @property
     def savefig(self):
         """ True if any figure type argument was passed. """
