@@ -34,7 +34,7 @@ class EnsembleHull(QueryConvexHull):
             objects for each parameter value.
 
     """
-    def __init__(self, cursor, data_key, energy_key='enthalpy_per_atom', chempot_energy_key='enthalpy_per_atom',
+    def __init__(self, cursor, data_key, energy_key='enthalpy_per_atom', chempot_energy_key=None,
                  num_samples=None, parameter_key=None, species=None, subcmd='hull', verbosity=None, **kwargs):
         """ Initialise EnsembleHull from a cursor, with other keywords
         following QueryConvexHull.
@@ -60,7 +60,7 @@ class EnsembleHull(QueryConvexHull):
 
         """
         # sometimes the first hull needs to be made with a different key
-        if chempot_energy_key != energy_key:
+        if chempot_energy_key is not None:
             self.chempot_energy_key = chempot_energy_key
         else:
             self.chempot_energy_key = energy_key
