@@ -499,6 +499,9 @@ class DBQuery:
             # to avoid deep recursion, and since this is always called first
             # don't append, just set
             self.query_dict = self._query_calc(self.cursor[0])
+            if self.args.get('composition'):
+                self.args['intersection'] = True
+                self.query_dict['$and'].append(self._query_composition())
             self.calc_dict['$and'] = list(self.query_dict['$and'])
 
     def query_stoichiometry(self, **kwargs):
