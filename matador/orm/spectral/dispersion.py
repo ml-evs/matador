@@ -196,9 +196,22 @@ class ElectronicDispersion(Dispersion):
         projector_weights will only work with one spin channel.
 
     """
-    def __init__(self, data, projection_data=None):
-        super().__init__(data)
-        if projection_data is not None:
+
+    required_keys = [
+        'num_kpoints',
+        'num_spins',
+        'num_bands',
+        'num_electrons',
+        'eigs_s_k',
+        'kpoint_path'
+    ]
+
+    def __init__(self, *args, **kwargs):
+
+        super().__init__(*args, **kwargs)
+
+        if kwargs.get('projection_data') is not None:
+            projection_data = kwargs.get('projection_data')
             if self.num_spins != 1:
                 raise NotImplementedError('Projected dispersion not implemented'
                                           ' for multiple spin channels')
@@ -223,11 +236,6 @@ class ElectronicDispersion(Dispersion):
     def num_spins(self):
         """ Number of spin channels in spectrum. """
         return self._data['num_spins']
-
-    @property
-    def num_bands(self):
-        """ Number of eigenvalues per spin, per k-point. """
-        return self._data['num_bands']
 
     @property
     def num_electrons(self):
@@ -410,8 +418,15 @@ class VibrationalDispersion(Dispersion):
 
     """
 
-    def __init__(self, data):
-        super().__init__(data)
+    required_keys = [
+        'num_kpoints',
+        'num_modes',
+        'eigs_q',
+        'kpoint_path'
+    ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
         shape = (1, self.num_modes, self.num_qpoints)
         if np.shape(self._data['eigs_q']) != shape:
@@ -426,16 +441,6 @@ class VibrationalDispersion(Dispersion):
     def num_modes(self):
         """ Number of phonon modes. """
         return self._data['num_modes']
-
-    @property
-    def num_bands(self):
-        """ Alias for `self.num_modes`. """
-        return self.num_modes
-
-    @property
-    def freq_unit(self):
-        """ The units for the `self.eigs_q` array. """
-        return self._data['freq_unit']
 
     @property
     def eigs_q(self):
