@@ -10,7 +10,7 @@ The source can be found on `GitHub <https://github.com/ml-evs/matador>`_
 and online documentation is hosted on `ReadTheDocs <https://matador-db.readthedocs.io>`_.
 
 Example Jupyter notebooks and tutorials can be found online at
-`ReadTheDocs <https://matador-db.readthedocs.io/en/develop/examples_index.html>_` or in the `examples/` folder of the matador source code.
+`ReadTheDocs <https://matador-db.readthedocs.io/en/develop/examples_index.html>`_ or in the ``examples/`` folder of the matador source code.
 
 Written & maintained by `Matthew Evans <https://ml-evs.science>`_ (2016-). 
 

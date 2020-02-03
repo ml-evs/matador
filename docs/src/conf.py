@@ -88,6 +88,14 @@ todo_include_todos = False
 def run_apidoc(_):
     import subprocess
     import glob
+    import shutil
+    import os
+    try:
+        if not os.path.isfile('docs/src/img/lipzn.png'):
+            os.makedirs('docs/src/img')
+            shutil.copy('img/lipzn.png', 'docs/src/img/lipzn.png')
+    except Exception:
+        pass
     src_dir = os.path.abspath(os.path.dirname(__file__))
     excludes = glob.glob(os.path.join(src_dir, '../../matador/tests/'))
     module = os.path.join(src_dir, '../../matador')
