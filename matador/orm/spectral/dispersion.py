@@ -443,6 +443,11 @@ class VibrationalDispersion(Dispersion):
         return self._data['num_modes']
 
     @property
+    def num_bands(self):
+        """Alias for number of modes. """
+        return self._data['num_modes']
+
+    @property
     def eigs_q(self):
         """ Eigenvalues in frequency units `self.freq_unit`, with shape
         (1, num_modes, num_kpoints).
