@@ -12,7 +12,7 @@ import scipy.integrate
 import scipy.interpolate
 
 from matador.orm.orm import DataContainer
-from matador.utils.chem_utils import KELVIN_TO_EV, INVERSE_CM_TO_EV
+from matador.utils.chem_utils import KELVIN_TO_EV
 
 from .dispersion import Dispersion
 
@@ -22,7 +22,9 @@ EPS = 1e-6
 class DensityOfStates(Dispersion, DataContainer):
     """ Generic class for density of states. """
 
-    def __init__(self, data, **kwargs):
+    required_keys = ['dos', 'energies']
+
+    def __init__(self, *args, **kwargs):
         """ Initialise the DOS and trim the DOS data arrays.
 
         Parameters:
@@ -30,8 +32,14 @@ class DensityOfStates(Dispersion, DataContainer):
                 a dispersion object to convert.
 
         """
+        if args and isinstance(args[0], dict):
+            data = args[0]
+        else:
+            data = kwargs
+        # as we can also construct a DOS from arbitarary kpoint/energy data,
+        # check that we've been passed this first
         if isinstance(data, Dispersion) or 'dos' not in data:
-            data = self._from_dispersion(data, **kwargs)
+            data = self._from_dispersion(data)
 
         super().__init__(data)
         self._trim_dos()
@@ -49,7 +57,7 @@ class DensityOfStates(Dispersion, DataContainer):
     def _from_dispersion(self, data, **kwargs):
         """ Convert a Dispersion instance to a DOS. """
         _data = {}
-        dos, energies = self.bands_as_dos(data, **kwargs)
+        dos, energies = self.bands_as_dos(data, gaussian_width=self.gaussian_width)
 
         for key in [
                 'eigs_s_k', 'eigs_q',
@@ -73,7 +81,7 @@ class DensityOfStates(Dispersion, DataContainer):
     @property
     def sample_energies(self):
         """ Return the energies corresponding to the trimmed DOS. """
-        return self._trimmed_energies * INVERSE_CM_TO_EV
+        return self._trimmed_energies
 
     def plot_dos(self, **kwargs):
         """ Plot the density of states. """
@@ -87,16 +95,12 @@ class DensityOfStates(Dispersion, DataContainer):
         )
 
     @staticmethod
-    def bands_as_dos(bands, gaussian_width=None):
+    def bands_as_dos(bands, gaussian_width=0.1):
         """ Convert bands data to DOS data. """
         if 'eigs_s_k' in bands:
             eigs_key = 'eigs_s_k'
-            if gaussian_width is None:
-                gaussian_width = 0.1
         elif 'eigs_q' in bands:
             eigs_key = 'eigs_q'
-            if gaussian_width is None:
-                gaussian_width = 10
         else:
             raise RuntimeError('Missing eigenvalue keys from bands data.')
 
@@ -164,6 +168,8 @@ class DensityOfStates(Dispersion, DataContainer):
 class VibrationalDOS(DensityOfStates):
     """ Specific class for phonon DOS data, including free energy integration. """
 
+    gaussian_width = 10
+
     @property
     def zero_point_energy_from_dos(self):
         """ Computes the zero-point energy for the vibrational DOS,
@@ -185,7 +191,7 @@ class VibrationalDOS(DensityOfStates):
         )
 
         def integrand(omega):
-            return self.vdos_function(omega) * INVERSE_CM_TO_EV * omega
+            return self.vdos_function(omega) * omega
 
         result = scipy.integrate.quad(
             integrand,
@@ -203,35 +209,65 @@ class VibrationalDOS(DensityOfStates):
     @property
     def debye_freq(self):
         """ Returns the Debye frequency in eV. """
-        return np.max(self.eigs) * INVERSE_CM_TO_EV
+        return np.max(self.eigs)
 
     @property
-    def zero_point_energy(self):
-        """ Computes and return the zero-point energy from frequency data. """
+    def zpe(self):
+        """ The zero-point energy per atom as computed from frequency data. """
+        if 'zero_point_energy_per_atom' not in self._data:
+            if 'eigs_q' not in self._data:
+                raise RuntimeError('Unable to compute ZPE without frequency data.')
 
-        if 'eigs_q' not in self._data:
-            raise RuntimeError('Unable to compute free energies without frequency data.')
+            zpe = self._compute_zero_point_energy(self.eigs, self.num_kpoints, kpoint_weights=self.kpoint_weights)
+            self['zero_point_energy'] = zpe
+            self['zero_point_energy_per_atom'] = zpe / (self.num_modes / 3)
 
-        eigs = self.eigs[0] * INVERSE_CM_TO_EV
+        return self._data['zero_point_energy_per_atom']
+
+    @staticmethod
+    def _compute_zero_point_energy(eigs, num_kpoints, kpoint_weights=None):
+        """ Computes and returns the zero-point energy of the cell
+        in eV from frequency data.
+
+        Parameters:
+            eigs (np.ndarray): phonon eigenvalues (in eV) array
+                in any shape. If `kpoint_weights` is passed, then
+                at least one axis of eigs must match the length
+                of `kpoint_weights`.
+            num_kpoints (int): the number of kpoints at which
+                these eigenvalues were calculated.
+
+        Keyword arguments:
+            kpoint_weights (np.ndarray): array of weights to use
+                for each kpoint.
+
+        """
         min_energy = np.min(eigs)
-        freq_cutoff = 1e-3
-        if min_energy < freq_cutoff:
+        if min_energy < -0.1:
             warnings.warn(
-                'Imaginary frequency phonons found in this structure, free energy '
-                'calculation will be unreliable, using 0 K as lower limit of integration.'
+                'Imaginary frequency phonons found in this structure, ZPE '
+                'calculation will be unreliable, using 0 eV as lower limit of integration.'
             )
 
-        zpe = 0.0
-        for mode_ind in range(self.num_modes):
-            for qpt_ind in range(self.num_qpoints):
-                contrib = eigs[mode_ind][qpt_ind]
-                if 'kpoint_weights' in self._data:
-                    contrib *= self.kpoint_weights[qpt_ind]
-                else:
-                    contrib /= self.num_qpoints
-                zpe += contrib
+        if kpoint_weights is not None:
+            # if kpoint weights are all the same, discard them
+            # and just normalise by number of kpoints
+            if len(np.unique(kpoint_weights)) == 1:
+                kpoint_weights = None
+            else:
+                eigs_shape = np.shape(eigs)
+                if not any(len(kpoint_weights) == axis for axis in eigs_shape):
+                    raise RuntimeError(
+                        'Unable to match eigs with shape {} with kpoint weights of length {}'
+                        .format(eigs_shape, len(kpoint_weights))
+                    )
+        _eigs = np.copy(eigs)
+        if kpoint_weights is not None:
+            _eigs = _eigs * kpoint_weights
+        else:
+            _eigs /= num_kpoints
 
-        return 0.5 * zpe / (self.num_modes / 3)
+        return 0.5 * np.sum(np.ma.masked_where(_eigs < 0.0, _eigs, copy=False))
 
     def vibrational_free_energy(self, temperatures=None):
         """ Computes and returns the vibrational contribution to the free
@@ -251,26 +287,25 @@ class VibrationalDOS(DensityOfStates):
 
         try:
             _ = len(temperatures)
-        except AttributeError:
+        except TypeError:
             temperatures = [temperatures]
 
         if 'eigs_q' not in self._data:
             raise RuntimeError('Unable to compute free energies without frequency data.')
 
-        eigs = self._data['eigs_q'][0] * INVERSE_CM_TO_EV
+        eigs = self._data['eigs_q'][0]
 
         temperatures = np.asarray(temperatures)
         free_energy = np.zeros_like(temperatures, dtype=np.float64)
 
         min_energy = np.min(eigs)
-        freq_cutoff = 1e-3
+        freq_cutoff = 1e-12
         if min_energy < freq_cutoff:
             warnings.warn(
                 'Imaginary frequency phonons found in this structure, free energy '
-                'calculation will be unreliable, using 0 K as lower limit of integration.'
+                'calculation will be unreliable, using {} eV as lower limit of integration.'
+                .format(freq_cutoff)
             )
-
-        free_energy += self.zero_point_energy
 
         for ind, temperature in enumerate(temperatures):
             if temperature < 1e-6:
@@ -290,7 +325,11 @@ class VibrationalDOS(DensityOfStates):
 
                         free_energy[ind] += contrib
 
+        # normalize by number of atoms
         free_energy /= (self.num_modes / 3)
+
+        # add on zpe per atom
+        free_energy += self.zpe
 
         if len(temperatures) == 1:
             return free_energy[0]
@@ -319,12 +358,13 @@ class VibrationalDOS(DensityOfStates):
         min_energy = self.sample_energies[0]
         max_energy = self.sample_energies[-1]
         if min_energy < 0:
+            min_energy = 1e-3
             warnings.warn(
                 'Imaginary frequency phonons found in this structure, free energy '
-                'calculation will be unreliable, using 0 K as lower limit of integration.',
+                'calculation will be unreliable, using {} eV as lower limit of integration.'
+                .format(min_energy),
                 Warning
             )
-            min_energy = 1e-3
 
         for ind, temperature in enumerate(temperatures):
 
@@ -383,4 +423,4 @@ class VibrationalDOS(DensityOfStates):
 
 class ElectronicDOS(DensityOfStates):
     """ Specific class for electronic DOS data. """
-    pass
+    gaussian_width = 0.1
