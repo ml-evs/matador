@@ -64,7 +64,6 @@ def plotting_function(function):
 
         settings = load_custom_settings(kwargs.get('config_fname'), quiet=True, no_quickstart=True)
         try:
-            import matplotlib.pyplot as plt
             style = settings.get('plotting', {}).get('default_style')
             if kwargs.get('style'):
                 style = kwargs['style']
@@ -78,12 +77,8 @@ def plotting_function(function):
                         style[ind] = MATADOR_STYLE
 
             # now actually call the function
-            with plt.style.context(style):
-                if kwargs.get('debug'):
-                    print('Using style {}'.format(style))
-                    print(plt.rcParams)
-
-                result = function(*args, **kwargs)
+            set_style(style)
+            result = function(*args, **kwargs)
 
         except TclError as exc:
             print_failure('Caught exception: {}'.format(type(exc).__name__))
