@@ -14,7 +14,7 @@ with the plotting.default_style option in user's matadorrc.
 
 
 __all__ = ['plot_spectral', 'plot_voltage_curve', 'plot_thermo_curves', 'plot_volume_curve',
-           'plot_2d_hull', 'plot_ternary_hull', 'get_linear_cmap',
+           'plot_2d_hull', 'plot_ternary_hull', 'get_linear_cmap', 'plot_free_energy',
            'plot_pdf', 'plot_projected_pdf', 'plot_diff_overlap', 'plot_projected_diff_overlap',
            'plot_pxrd', 'set_style']
 
@@ -26,6 +26,6 @@ from matador.plotting.plotting import get_linear_cmap, set_style
 from matador.plotting.spectral_plotting import plot_spectral
 from matador.plotting.battery_plotting import plot_voltage_curve, plot_volume_curve
 from matador.plotting.hull_plotting import plot_2d_hull, plot_ternary_hull
-from matador.plotting.temperature_plotting import plot_thermo_curves
+from matador.plotting.temperature_plotting import plot_thermo_curves, plot_free_energy
 from matador.plotting.pdf_plotting import plot_pdf, plot_projected_pdf, plot_diff_overlap, plot_projected_diff_overlap
 from matador.plotting.pxrd_plotting import plot_pxrd

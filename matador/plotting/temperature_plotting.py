@@ -9,6 +9,8 @@ capacities.
 
 from matador.plotting.plotting import plotting_function
 
+__all__ = ['plot_free_energy', 'plot_thermo_curves']
+
 
 @plotting_function
 def plot_free_energy(model, temperatures=None, ax=None, line_kwargs=None, **kwargs):
