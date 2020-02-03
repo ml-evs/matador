@@ -7,6 +7,7 @@ vibrational DOS, with or without projection data.
 """
 
 import warnings
+import functools
 import numpy as np
 import scipy.integrate
 import scipy.interpolate
@@ -293,37 +294,58 @@ class VibrationalDOS(DensityOfStates):
         if 'eigs_q' not in self._data:
             raise RuntimeError('Unable to compute free energies without frequency data.')
 
-        eigs = self._data['eigs_q'][0]
-
         temperatures = np.asarray(temperatures)
         free_energy = np.zeros_like(temperatures, dtype=np.float64)
 
-        min_energy = np.min(eigs)
+        min_energy = np.min(self._data['eigs_q'][0])
         freq_cutoff = 1e-12
         if min_energy < freq_cutoff:
             warnings.warn(
                 'Imaginary frequency phonons found in this structure, free energy '
                 'calculation will be unreliable, using {} eV as lower limit of integration.'
-                .format(freq_cutoff)
-            )
+                .format(freq_cutoff))
 
         for ind, temperature in enumerate(temperatures):
-            if temperature < 1e-6:
-                continue
+            free_energy[ind] = self.compute_free_energy(temperature, freq_cutoff=freq_cutoff)
 
-            kT = KELVIN_TO_EV * temperature
+        if len(temperatures) == 1:
+            return free_energy[0]
 
-            for mode_ind in range(self.num_modes):
-                for qpt_ind in range(self.num_qpoints):
-                    freq = eigs[mode_ind][qpt_ind]
-                    if freq > freq_cutoff and freq / kT < 32:
-                        contrib = kT * np.log(1 - np.exp(-freq/kT))
-                        if 'kpoint_weights' in self._data:
-                            contrib *= self.kpoint_weights[qpt_ind]
-                        else:
-                            contrib /= self.num_qpoints
+        return temperatures, free_energy
 
-                        free_energy[ind] += contrib
+    @functools.lru_cache(100)
+    def compute_free_energy(self, temperature, freq_cutoff=1e-12):
+        """ Compute the vibrational free energy at the given temperature, using
+        lru_cache to avoid doing much extra work. Uses minimum temperature cutoff
+        of 1e-9, below which it returns just the ZPE (unless T < 0 K).
+
+        Raises:
+            RuntimeError: if temperature is < 0 K.
+
+        Returns:
+            float: vibrational free energy per atom, including ZP correction.
+
+        """
+
+        free_energy = 0.0
+        kT = KELVIN_TO_EV * temperature
+        if temperature < 0.0:
+            raise RuntimeError('Not calculating free energies at T = {} K < 0 K'.format(temperature))
+
+        if temperature < 1e-9:
+            return self.zpe
+
+        for mode_ind in range(self.num_modes):
+            for qpt_ind in range(self.num_qpoints):
+                freq = self._data['eigs_q'][0][mode_ind][qpt_ind]
+                if freq > freq_cutoff and freq / kT < 32:
+                    contrib = kT * np.log(1 - np.exp(-freq/kT))
+                    if 'kpoint_weights' in self._data:
+                        contrib *= self.kpoint_weights[qpt_ind]
+                    else:
+                        contrib /= self.num_qpoints
+
+                    free_energy += contrib
 
         # normalize by number of atoms
         free_energy /= (self.num_modes / 3)
@@ -331,10 +353,7 @@ class VibrationalDOS(DensityOfStates):
         # add on zpe per atom
         free_energy += self.zpe
 
-        if len(temperatures) == 1:
-            return free_energy[0]
-
-        return temperatures, free_energy
+        return free_energy
 
     def vibrational_free_energy_from_dos(self, temperatures=None):
         """ Computes the vibrational contribution to the free energy
