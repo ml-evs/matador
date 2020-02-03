@@ -99,7 +99,9 @@ class Spectral(DataContainer):
 
     @property
     def kpoint_weights(self):
-        return np.asarray(self._data['kpoint_weights'])
+        if 'kpoint_weights' in self._data:
+            return np.asarray(self._data['kpoint_weights'])
+        return None
 
     @property
     def kpoint_path_cartesian(self):
