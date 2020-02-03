@@ -79,7 +79,7 @@ Please consult the full `Python API documentation <http://matador-db.readthedocs
                             specified --task
 
 
-.. |GH Actions| images:: https://github.com/ml-evs/matador/workflows/Run%20tests/badge.svg
+.. |GH Actions| image:: https://github.com/ml-evs/matador/workflows/Run%20tests/badge.svg
    :target: https://github.com/ml-evs/matador/actions?query=branch%3Adevelop 
 .. |MIT License| image:: https://img.shields.io/badge/license-MIT-blue.svg
    :target: https://github.com/ml-evs/matador/blob/master/LICENSE
