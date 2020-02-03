@@ -247,8 +247,6 @@ def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
                     raise RuntimeError(dispersion)
 
                 dispersion = VibrationalDispersion(dispersion)
-                # convert from internal eV frequencies to cm^-1
-                eigs = dispersion.eigs / INVERSE_CM_TO_EV
 
             elif os.path.isfile('{}.bands'.format(seed)):
                 dispersion, s = bands2dict(seed + '.bands',
@@ -263,11 +261,15 @@ def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
                 else:
                     pdis_data = None
 
-                dispersion = ElectronicDispersion(dispersion, pdis_data)
-                eigs = dispersion.eigs
+                dispersion = ElectronicDispersion(dispersion, projection_data=pdis_data)
 
             else:
                 raise RuntimeError('{}.bands/.phonon not found.'.format(seed))
+
+        eigs = dispersion.eigs
+        if kwargs['phonons']:
+            # convert from internal eV frequencies to cm^-1
+            eigs = dispersion.eigs / INVERSE_CM_TO_EV
 
         if kwargs['plot_window'] is None:
             if kwargs['phonons']:
