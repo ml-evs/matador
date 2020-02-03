@@ -9,7 +9,7 @@ Installing with conda/pip
 
 The tl;dr way to install matador, on e.g. a computing cluster, is as follows:
 
-1. Clone the matador source onto your local machine ``git clone https://bitbucket.org/ml-evs/matador.git``.
+1. Clone the matador source onto your local machine ``git clone https://github.com/ml-evs/matador.git``.
 
 Optional (but recommended) steps:
 
