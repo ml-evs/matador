@@ -17,9 +17,33 @@ class DataContainer(ABC):
     implement useful methods to inspect and analyse the underlying data.
 
     """
-    def __init__(self, data):
+
+    required_keys = []
+
+    def __init__(self, data=None, **kwargs):
         """ Initalise copy of raw data. """
-        self._data = copy.deepcopy(data)
+        if isinstance(data, dict):
+            self._data = copy.deepcopy(data)
+        else:
+            self._data = {key: kwargs[key] for key in kwargs}
+
+        self._validate_inputs()
+
+    def _validate_inputs(self):
+        """ Validate the incoming data by checking the existence
+        of the required keys for the subclass.
+
+        """
+        missing_keys = []
+        for key in self.required_keys:
+            if key not in self._data:
+                missing_keys.append(key)
+
+        if missing_keys:
+            raise RuntimeError(
+                "Unable to create object of type {} as the following keys are missing: {}"
+                .format(type(self).__name__, missing_keys)
+            )
 
     def __getitem__(self, key):
         """ Allow properties to be used with key access.
