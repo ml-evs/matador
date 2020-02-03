@@ -47,5 +47,7 @@ def plot_free_energy(model, temperatures=None, ax=None, line_kwargs=None, **kwar
 
     t, e = model.vibrational_free_energy(temperatures=_temperatures)
     ax.plot(t, e, **line_kwargs)
-    ax.set_ylabel("Vibrational free energy")
+    ax.set_ylabel("Vibrational free energy (eV/atom)")
     ax.set_xlabel("Temperature (K)")
+
+    return ax
