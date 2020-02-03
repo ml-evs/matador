@@ -951,7 +951,7 @@ def phonon_dos2dict(seed, **kwargs):
     # remove header and "END"
     flines = flines[begin:-1]
     raw_data = np.genfromtxt(flines)
-    dos_data['energies'] = raw_data[:, 0]
+    dos_data['energies'] = raw_data[:, 0] * INVERSE_CM_TO_EV
     dos_data['dos'] = raw_data[:, 1]
     dos_data['pdos'] = dict()
 
