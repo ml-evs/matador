@@ -227,7 +227,8 @@ def set_settings(settings, override=True):
     if SETTINGS.set and not override:
         return
 
-    for key in SETTINGS.settings:
+    keys = list(SETTINGS.settings.keys())
+    for key in keys:
         if key not in settings:
             SETTINGS.settings.pop(key)
 
