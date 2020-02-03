@@ -358,13 +358,6 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
             if kwargs['plot_window'] is None:
                 kwargs['plot_window'] = [-10, 10]
 
-            if 'spin_dos' in dos_data:
-                max_density = max(np.max(np.abs(dos_data['spin_dos']['down'][np.where(dos_data['energies'] > kwargs['plot_window'][0])])),
-                                  np.max(np.abs(dos_data['spin_dos']['up'][np.where(dos_data['energies'] > kwargs['plot_window'][0])])))
-            else:
-                max_density = np.max(dos_data['dos'][np.where(np.logical_and(dos_data['energies'] < kwargs['plot_window'][1],
-                                                                             dos_data['energies'] > kwargs['plot_window'][0]))])
-
             if kwargs['plot_pdos']:
                 pdos_seed = '{}.pdos.dat'.format(seed)
                 pdos_data = {}
@@ -380,13 +373,20 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                 pdos_data = dos_data
 
         energies = dos_data['energies']
-
         # change unit of phonon energies and set plot window
         if kwargs['phonons']:
             energies /= INVERSE_CM_TO_EV
             if kwargs['plot_window'] is None:
-                kwargs['plot_window'] = [np.min(dos_data['energies'][np.where(dos_data['dos'] > 1e-3)]) - 10,
-                                         np.max(dos_data['energies'][np.where(dos_data['dos'] > 1e-3)])]
+                kwargs['plot_window'] = [np.min(energies[np.where(dos_data['dos'] > 1e-3)]) - 10,
+                                         np.max(energies[np.where(dos_data['dos'] > 1e-3)])]
+
+        if 'spin_dos' in dos_data:
+            max_density = max(np.max(np.abs(dos_data['spin_dos']['down'][np.where(energies > kwargs['plot_window'][0])])),
+                              np.max(np.abs(dos_data['spin_dos']['up'][np.where(energies > kwargs['plot_window'][0])])))
+        else:
+            max_density = np.max(dos_data['dos'][np.where(np.logical_and(energies < kwargs['plot_window'][1],
+                                                                         energies > kwargs['plot_window'][0]))])
+
         dos = dos_data['dos']
 
         # plotting pdos depends on these other factors too
@@ -463,7 +463,6 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
         if plotting_pdos:
 
             pdos = pdos_data['pdos']
-            energies = pdos_data['energies']
 
             stacks = dict()
             projector_labels, dos_colours = _get_projector_info([projector for projector in pdos])
@@ -541,7 +540,7 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                         ax_dos.plot(energies, stacks[stack_key],
                                     ls='--', alpha=1, color='black', zorder=1e9, label=label)
 
-        if len(seeds) == 1:
+        if len(seeds) == 1 and plotting_pdos:
             if kwargs['plot_bandstructure']:
                 dos_legend = ax_dos.legend(bbox_to_anchor=(1, 1))
 
