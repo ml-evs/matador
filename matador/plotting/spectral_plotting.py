@@ -18,6 +18,9 @@ from matador.orm.spectral import (
     VibrationalDispersion, VibrationalDOS,
     Dispersion, DensityOfStates
 )
+from matador.utils.chem_utils import INVERSE_CM_TO_EV
+
+__all__ = ['plot_spectral']
 
 
 @plotting_function
@@ -244,6 +247,8 @@ def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
                     raise RuntimeError(dispersion)
 
                 dispersion = VibrationalDispersion(dispersion)
+                # convert from internal eV frequencies to cm^-1
+                eigs = dispersion.eigs / INVERSE_CM_TO_EV
 
             elif os.path.isfile('{}.bands'.format(seed)):
                 dispersion, s = bands2dict(seed + '.bands',
@@ -259,13 +264,14 @@ def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
                     pdis_data = None
 
                 dispersion = ElectronicDispersion(dispersion, pdis_data)
+                eigs = dispersion.eigs
 
             else:
                 raise RuntimeError('{}.bands/.phonon not found.'.format(seed))
 
         if kwargs['plot_window'] is None:
             if kwargs['phonons']:
-                kwargs['plot_window'] = [min(-10, np.min(dispersion.eigs) - 10), np.max(dispersion.eigs)]
+                kwargs['plot_window'] = [min(-10, np.min(eigs) - 10), np.max(eigs)]
             else:
                 kwargs['plot_window'] = [-10, 10]
 
@@ -276,7 +282,7 @@ def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
             print('Reordering bands based on local gradients...')
             dispersion.reorder_bands()
 
-        if dispersion.projectors and len(seeds) == 1 and kwargs['plot_pdis']:
+        if dispersion.projectors and len(seeds) == 1 and kwargs['plot_pdis'] and not kwargs['phonons']:
             ax_dispersion = projected_bandstructure_plot(dispersion, ax_dispersion, path,
                                                          bbox_extra_artists,
                                                          **kwargs)
@@ -308,7 +314,7 @@ def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
                         colour, alpha, label = _get_lineprops(dispersion, spin_fermi_energy, nb, ns, branch, branch_ind, seed_ind, kwargs)
 
                         ax_dispersion.plot(path[(np.asarray(branch)-branch_ind).tolist()],
-                                           dispersion.eigs[ns][nb][branch] - spin_fermi_energy[ns],
+                                           eigs[ns][nb][branch] - spin_fermi_energy[ns],
                                            c=colour, ls=kwargs['ls'][seed_ind], alpha=alpha, label=label)
 
     if len(seeds) > 1:
@@ -372,11 +378,14 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
             if kwargs['plot_pdos']:
                 pdos_data = dos_data
 
+        energies = dos_data['energies']
+
+        # change unit of phonon energies and set plot window
+        if kwargs['phonons']:
+            energies /= INVERSE_CM_TO_EV
             if kwargs['plot_window'] is None:
                 kwargs['plot_window'] = [np.min(dos_data['energies'][np.where(dos_data['dos'] > 1e-3)]) - 10,
                                          np.max(dos_data['energies'][np.where(dos_data['dos'] > 1e-3)])]
-
-        energies = dos_data['energies']
         dos = dos_data['dos']
 
         # plotting pdos depends on these other factors too

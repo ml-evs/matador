@@ -13,6 +13,7 @@ from matador.scrapers import arbitrary2dict, bands2dict, pwout2dict, magres2dict
 from matador.scrapers.castep_scrapers import usp2dict, get_seed_metadata
 from matador.export import doc2res, doc2param, doc2cell, query2files
 from matador.orm.spectral import ElectronicDispersion, VibrationalDispersion
+from matador.utils.chem_utils import INVERSE_CM_TO_EV
 from matador.tests.utils import REAL_PATH, MatadorUnitTest
 
 VERBOSITY = 10
@@ -613,7 +614,7 @@ class ScraperMiscTest(MatadorUnitTest):
             self.assertEqual(ph_dict['atom_types'][2], 'K')
             self.assertEqual(ph_dict['atom_masses'][0], 30.97376)
             self.assertEqual(ph_dict['atom_masses'][2], 39.0983)
-            self.assertEqual(ph_dict['softest_mode_freq'], -23.654487)
+            self.assertEqual(ph_dict['softest_mode_freq'], -23.654487 * INVERSE_CM_TO_EV)
 
             disp = VibrationalDispersion(ph_dict)
             ph_dict['kpoint_branches'] = disp.kpoint_branches
@@ -915,11 +916,11 @@ class ScraperMiscTest(MatadorUnitTest):
         test_dict, s = castep2dict(castep_fname, db=False, verbosity=VERBOSITY)
         self.assertTrue(s, msg='Failed entirely, oh dear!\n{}'.format(test_dict))
         self.assertEqual(test_dict['task'].lower(), 'thermodynamicscalculation', msg='This is not a Thermodynamics calculation...')
-        self.assertEqual(test_dict['temp_final'], 1000.0, msg='Wrong final temp!')
-        self.assertEqual(test_dict['temp_init'], 50.0, msg='Wrong initial temp!')
-        self.assertEqual(test_dict['temp_spacing'], 100.0, msg='Wrong temp spacing!')
-        self.assertEqual(test_dict['num_temp_vals'], 11, msg='Wrong number of temps!')
-        self.assertEqual(test_dict['zero_point_E'], 0.093412, msg='Wrong zero point energy!')
+        self.assertEqual(test_dict['thermo_temp_final'], 1000.0, msg='Wrong final temp!')
+        self.assertEqual(test_dict['thermo_temp_init'], 50.0, msg='Wrong initial temp!')
+        self.assertEqual(test_dict['thermo_temp_spacing'], 100.0, msg='Wrong temp spacing!')
+        self.assertEqual(test_dict['thermo_num_temp_vals'], 11, msg='Wrong number of temps!')
+        self.assertEqual(test_dict['thermo_zero_point_energy'], 0.093412, msg='Wrong zero point energy!')
 
         thermo_db_compare = {'thermo_temps': [50.0, 145.0, 240.0, 335.0, 430.0, 525.0, 620.0, 715.0, 810.0, 905.0, 1000.0],
                              'thermo_enthalpy': [0.098557, 0.142535, 0.204959, 0.273022, 0.343308, 0.414672, 0.486634, 0.558962, 0.63153, 0.704262, 0.777113],

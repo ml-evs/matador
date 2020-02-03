@@ -15,7 +15,7 @@ import warnings
 import pwd
 import numpy as np
 from matador.utils.cell_utils import abc2cart, calc_mp_spacing, cart2volume, wrap_frac_coords, cart2abc, cart2frac
-from matador.utils.chem_utils import get_stoich
+from matador.utils.chem_utils import get_stoich, INVERSE_CM_TO_EV
 from matador.scrapers.utils import DFTError, ComputationError, scraper_function, f90_float_parse
 
 
@@ -916,6 +916,7 @@ def phonon2dict(seed, **kwargs):
 
     ph['kpoint_path'] = np.asarray([qpt[0:3] for qpt in ph['phonon_kpoint_list']])
     ph['kpoint_weights'] = [qpt[3] for qpt in ph['phonon_kpoint_list']]
+    ph['eigenvalues_q'] *= INVERSE_CM_TO_EV
     ph['softest_mode_freq'] = np.min(ph['eigenvalues_q'])
     ph['eigs_q'] = ph['eigenvalues_q']
 
@@ -1014,15 +1015,15 @@ def _castep_scrape_thermo_data(flines, castep):
     """
     for line_no, line in enumerate(flines):
         if 'Number of temperature values' in line:
-            castep['num_temp_vals'] = int(line.split(':')[-1].strip())
+            castep['thermo_num_temp_vals'] = int(line.split(':')[-1].strip())
         elif 'Initial temperature' in line:
-            castep['temp_init'] = f90_float_parse(line.split(':')[1].strip().split(' ')[0])
+            castep['thermo_temp_init'] = f90_float_parse(line.split(':')[1].strip().split(' ')[0])
         elif 'Final temperature' in line:
-            castep['temp_final'] = f90_float_parse(line.split(':')[1].strip().split(' ')[0])
+            castep['thermo_temp_final'] = f90_float_parse(line.split(':')[1].strip().split(' ')[0])
         elif 'Spacing between temperature values' in line:
-            castep['temp_spacing'] = f90_float_parse(line.split(':')[1].strip().split(' ')[0])
+            castep['thermo_temp_spacing'] = f90_float_parse(line.split(':')[1].strip().split(' ')[0])
         elif 'Zero-point energy' in line:
-            castep['zero_point_E'] = f90_float_parse(line.split("=")[1].strip().split(' ')[0])
+            castep['thermo_zero_point_energy'] = f90_float_parse(line.split("=")[1].strip().split(' ')[0])
         elif 'T(K)' and 'E(eV)' in line:
             castep['thermo_temps'] = []  # temperatures calculation was done at
             castep['thermo_enthalpy'] = {}  # enthalpy E(eV)
@@ -1041,6 +1042,7 @@ def _castep_scrape_thermo_data(flines, castep):
                     castep['thermo_entropy'][f90_float_parse(temp_line[0])] = f90_float_parse(temp_line[3])
                     castep['thermo_heat_cap'][f90_float_parse(temp_line[0])] = f90_float_parse(temp_line[4])
                 i += 1
+
 
 def _castep_scrape_phonon_frequencies(flines, castep):
     """ Iterate through flines to scrape the phonon frequencies
@@ -1077,7 +1079,7 @@ def _castep_scrape_phonon_frequencies(flines, castep):
 
     phonons['num_modes'] = len(phonons['eigs_q'][0])
     phonons['eigs_q'] = np.asarray(phonons['eigs_q']).T
-    phonons['eigs_q'] = phonons['eigs_q'].reshape(1, *np.shape(phonons['eigs_q']))
+    phonons['eigs_q'] = INVERSE_CM_TO_EV * phonons['eigs_q'].reshape(1, *np.shape(phonons['eigs_q']))
     phonons['kpoint_path'] = phonons['phonon_fine_kpoint_list']
     phonons['kpoint_weights'] = phonons['phonon_fine_kpoint_weights']
     phonons['num_kpoints'] = len(phonons['phonon_fine_kpoint_list'])
