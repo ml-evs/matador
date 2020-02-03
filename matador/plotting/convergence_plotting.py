@@ -15,6 +15,8 @@ from matador.plotting.plotting import plotting_function, SAVE_EXTS
 from matador.scrapers.castep_scrapers import castep2dict
 from matador.utils.chem_utils import get_formula_from_stoich
 
+__all__ = ['plot_cutoff_kpt_grid']
+
 
 @plotting_function
 def plot_cutoff_kpt_grid(data, forces=False, max_energy=50, legend=True, colour_by='formula', **kwargs):
@@ -47,8 +49,7 @@ def plot_cutoff_kpt_grid(data, forces=False, max_energy=50, legend=True, colour_
 
     if len(labels) < 30 and legend:
         plt.figlegend(lines, labels,
-                      loc='upper center', fontsize=10, ncol=5,
-                      frameon=True, fancybox=True, shadow=True)
+                      loc='upper center', fontsize=10, ncol=5)
 
     plot_field(
         data,

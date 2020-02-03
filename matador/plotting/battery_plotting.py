@@ -9,7 +9,9 @@ such as voltages and volume expansions.
 import numpy as np
 from matador.utils.chem_utils import get_formula_from_stoich
 from matador.plotting.plotting import plotting_function, SAVE_EXTS
-from matador.plotting.hull_plotting import get_hull_labels
+from matador.plotting.hull_plotting import _get_hull_labels
+
+__all__ = ['plot_voltage_curve', 'plot_volume_curve', 'plot_beef_voltage']
 
 
 @plotting_function
@@ -60,7 +62,7 @@ def plot_voltage_curve(hull, ax=None, show=False, curve_label=None, line_kwargs=
         _add_voltage_curve(capacities, voltages, ax_volt, label=label, **line_kwargs)
 
     if hull.args.get('labels') or hull.args.get('label_cutoff') is not None:
-        label_cursor = get_hull_labels(hull, num_species=2)
+        label_cursor = _get_hull_labels(hull, num_species=2)
         # for testing purposes only
         if 'label_cursor' in kwargs:
             kwargs['label_cursor'].extend(label_cursor)
@@ -217,10 +219,11 @@ def plot_volume_curve(hull, ax=None, show=False, **kwargs):
     if show:
         plt.show()
 
+
 def plot_beef_voltage(hull, **kwargs):
     raise NotImplementedError
-
-    beef_cursor = deepcopy(hull.cursor)
+    import copy
+    beef_cursor = copy.deepcopy(hull.cursor)
     n_beef = len(beef_cursor[0]['_beef']['thetas'])
     if kwargs.get('n_beef') is not None:
         n_beef = min([n_beef, kwargs.get('n_beef')])
