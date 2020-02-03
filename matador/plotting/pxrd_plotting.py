@@ -11,6 +11,8 @@ matador.fingerprints.pxrd module.
 from matador.fingerprints.pxrd import PXRD
 from matador.plotting.plotting import plotting_function
 
+__all__ = ['plot_pxrd']
+
 
 @plotting_function
 def plot_pxrd(pxrds, two_theta_range=(10, 70), figsize=None):

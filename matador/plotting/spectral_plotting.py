@@ -320,8 +320,7 @@ def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
                                            c=colour, ls=kwargs['ls'][seed_ind], alpha=alpha, label=label)
 
     if len(seeds) > 1:
-        disp_legend = ax_dispersion.legend(loc='upper center',
-                                           frameon=True, fancybox=False, shadow=False, framealpha=1)
+        disp_legend = ax_dispersion.legend(loc='upper center')
         bbox_extra_artists.append(disp_legend)
 
     ax_dispersion.axhline(0, ls='--', lw=1, c='grey')
@@ -544,11 +543,11 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
 
         if len(seeds) == 1:
             if kwargs['plot_bandstructure']:
-                dos_legend = ax_dos.legend(bbox_to_anchor=(1, 1),
-                                           frameon=True, fancybox=False, shadow=False)
+                dos_legend = ax_dos.legend(bbox_to_anchor=(1, 1))
+
             else:
-                dos_legend = ax_dos.legend(bbox_to_anchor=(1, 0.5), loc='center left',
-                                           frameon=True, fancybox=False, shadow=False)
+                dos_legend = ax_dos.legend(bbox_to_anchor=(1, 0.5), loc='center left')
+
             bbox_extra_artists.append(dos_legend)
 
     return ax_dos
@@ -598,7 +597,7 @@ def projected_bandstructure_plot(dispersion, ax, path, bbox_extra_artists, pdis_
                 ax.scatter(1e20, 0, facecolor=dos_colours[ind],
                            label=projector_labels[ind], lw=0)
 
-        legend = ax.legend(loc=1, frameon=True, fancybox=False, shadow=False)
+        legend = ax.legend(loc=1)
         legend.set_zorder(1e20)
         bbox_extra_artists.append(legend)
 

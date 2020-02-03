@@ -13,8 +13,10 @@ from matador.plotting.plotting import plotting_function, get_linear_cmap, SAVE_E
 
 EPS = 1e-12
 
+__all__ = ['plot_2d_hull', 'plot_ternary_hull', 'plot_ensemble_hull', 'plot_temperature_hull']
 
-def get_hull_labels(hull, label_cutoff=None, num_species=None, exclude_edges=True):
+
+def _get_hull_labels(hull, label_cutoff=None, num_species=None, exclude_edges=True):
     """ Return list of structures to labels on phase diagram.
 
     Parameters:
@@ -142,7 +144,7 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
 
     # annotate hull structures
     if labels or label_cutoff is not None:
-        label_cursor = get_hull_labels(hull, num_species=2, label_cutoff=label_cutoff)
+        label_cursor = _get_hull_labels(hull, num_species=2, label_cutoff=label_cutoff)
         already_labelled = []
         for ind, doc in enumerate(label_cursor):
             formula = get_formula_from_stoich(doc['stoichiometry'], sort=True)
@@ -657,7 +659,7 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
 
     # add labels
     if labels:
-        label_cursor = get_hull_labels(hull, label_cutoff=label_cutoff)
+        label_cursor = _get_hull_labels(hull, label_cutoff=label_cutoff)
         if len(label_cursor) == 1:
             label_coords = [[0.25, 0.5]]
         else:
@@ -760,7 +762,7 @@ def _scatter_plot_by_source(hull, ax, scale, kwargs,
     for ind, source in enumerate(sources_present):
         ax.scatter(1e10, 1e10, c=colour_choices[source], label=sources_present[ind], alpha=alpha, lw=1)
 
-    legend = ax.legend(loc='lower right', facecolor='w', frameon=True, fancybox=False, shadow=False, ncol=2)
+    legend = ax.legend(loc='lower right', ncol=2)
     legend.set_zorder(1e20)
 
     return ax

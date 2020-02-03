@@ -11,6 +11,8 @@ matador.fingerprints.pdf module.
 from matador.fingerprints.pdf import PDF
 from matador.plotting.plotting import plotting_function
 
+__all__ = ['plot_pdf', 'plot_projected_pdf', 'plot_diff_overlap', 'plot_projected_diff_overlap']
+
 
 @plotting_function
 def plot_pdf(pdf, other_pdfs=None):
