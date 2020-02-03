@@ -9,10 +9,10 @@ calculations, written with a bent towards battery electrode materials.
 The source can be found on `GitHub <https://github.com/ml-evs/matador>`_
 and online documentation is hosted on `ReadTheDocs <https://matador-db.readthedocs.io>`_.
 
-Written & maintained by `Matthew Evans <https://www.ml-evs.science>`_ (2016-). 
+Written & maintained by `Matthew Evans <https://ml-evs.science>`_ (2016-). 
 
 
-.. image:: docs/src/docs/src/img/lipzn.png
+.. image:: docs/src/img/lipzn.png
    :name: LiPZn
    :align: center
 
