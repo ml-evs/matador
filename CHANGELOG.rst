@@ -1,17 +1,25 @@
 Changelog
 =========
 
-For planned developments, please see the `Boards tab <https://bitbucket.org/ml-evs/matador/addon/trello/trello-board>`_ on Bitbucket.
-
 New in development version (rolling) (0.9a)
 -------------------------------------------
 
 - Much improved code structure and many additional classes that wrap the raw calculation dictionaries for e.g. :class:`matador.crystal.Crystal` and spectral classes. 
+- New module :mod:`matador.orm` containing useful models for data handling.
+ 
+  - :class:`matador.orm.orm.DataContainer` as a base class that allows for easy
+    access to underlying dictionaries.
+  - :mod:`matador.orm.spectral` module that contains many useful classes for
+    manipulating and plotting e.g. bandstructures, DOS and finite temperature
+    properties.
+
 - New features in :mod:`matador.hull` module:
 
   - Pseudo-ternary phase diagrams (building towards arbitrary n-dimensional phase diagrams).
   - :class:`matador.hull.EnsembleHull` class and submodule to support the Bayesian Error Estimate Functional (BEEF) and finite temperature phase diagrams.
   - Refactoring of hull calculation into light-weight :class:`matador.hull.PhaseDiagram` class.
+  - Finite temperature hulls based on :class:`matador.hull.EnsembleHull` with
+    :class:`matador.hull.TemperatureDependentHull`.
 
 - Refactored old PDF `similarity` module into new module :mod:`matador.fingerprints`. 
 

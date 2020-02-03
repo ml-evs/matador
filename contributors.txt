@@ -1,5 +1,5 @@
 Primary author and maintainer:
-    Matthew Evans <https://www.bitbucket.org/ml-evs> or <https://www.github.com/ml-evs>
+    Matthew Evans <https://www.github.com/ml-evs>
 
 Project conception and supervision:
     Andrew J Morris <www.andrewjmorris.org>
@@ -8,4 +8,4 @@ First pass at ternary voltages:
     James Darby <https://www.bitbucket.org/jpd47>
 
 Temperature-dependent hulls and thermodynamics scraping:
-    Angela Harper <https://www.bitbucket.org/harperaf13>
+    Angela Harper <https://www.github.com/harpaf13>

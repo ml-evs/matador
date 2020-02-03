@@ -2,11 +2,11 @@
 matador
 =======
 
-|Bitbucket Pipelines| |Develop Pipelines| |Coverage Status| |Documentation Status| |MIT License|
+|GH Actions| |Coverage Status| |Documentation Status| |MIT License|
 
 matador is an aggregator, manipulator and runner of first-principles
 calculations, written with a bent towards battery electrode materials. 
-The source can be found on `Bitbucket <https://bitbucket.org/ml-evs/matador>`_
+The source can be found on `GitHub <https://github.com/ml-evs/matador>`_
 and online documentation is hosted on `ReadTheDocs <https://matador-db.readthedocs.io>`_.
 
 Written & maintained by `Matthew Evans <https://www.ml-evs.science>`_ (2016-). 
@@ -78,17 +78,11 @@ Please consult the full `Python API documentation <http://matador-db.readthedocs
         refine              update structures in the database according to
                             specified --task
 
-License
---------
 
-matador is available under the `MIT License <https://bitbucket.org/ml-evs/matador/src/master/LICENSE>`_.
-
-.. |Bitbucket Pipelines| image:: https://img.shields.io/bitbucket/pipelines/ml-evs/matador/master.svg?label=master
-   :target: https://bitbucket.org/ml-evs/matador/addon/pipelines/home#!/results/branch/master/page/1
-.. |Develop Pipelines| image:: https://img.shields.io/bitbucket/pipelines/ml-evs/matador/develop.svg?label=develop
-   :target: https://bitbucket.org/ml-evs/matador/addon/pipelines/home#!/results/branch/develop/page/1
+.. |GH Actions| images:: https://github.com/ml-evs/matador/workflows/Run%20tests/badge.svg
+   :target: https://github.com/ml-evs/matador/actions?query=branch%3Adevelop 
 .. |MIT License| image:: https://img.shields.io/badge/license-MIT-blue.svg
-   :target: https://bitbucket.org/ml-evs/matador/src/master/LICENSE
+   :target: https://github.com/ml-evs/matador/blob/master/LICENSE
 .. |Coverage Status| image:: https://codecov.io/bb/ml-evs/matador/branch/develop/graph/badge.svg
   :target: https://codecov.io/bb/ml-evs/matador
 .. |Documentation Status| image:: https://readthedocs.org/projects/matador-db/badge/?version=latest
