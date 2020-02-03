@@ -69,18 +69,6 @@ axes.grid                     : False
 axes.grid.which               : major
 axes.grid.axis                : both
 
-legend.fancybox               : False
-legend.loc                    : best
-legend.numpoints              : 1
-legend.scatterpoints          : 1
-legend.markerscale            : 1.0
-legend.shadow                 : False
-legend.frameon                : True
-legend.framealpha             : 0.8
-legend.borderpad              : 0.4
-legend.facecolor              : inherit
-legend.edgecolor              : 0.8
-
 xtick.labelsize               : small
 ytick.labelsize               : small
 xtick.major.size              : 3.0
