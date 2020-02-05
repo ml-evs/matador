@@ -95,8 +95,10 @@ def display_results(cursor,
     if args is None:
         args = dict()
 
-    details = args.get('details')
+    args.update(kwargs)
+
     use_source = args.get('use_source')
+    details = args.get('details')
 
     add_index_mode = False
     del_index_mode = False
@@ -302,8 +304,8 @@ def display_results(cursor,
                                                                  if doc.get('hull_distance', 0.1) == 0 else ''))
             latex_struct_string[-1] += ("{:^20.0f} & ".format(doc.get('hull_distance') * 1000)
                                         if doc.get('hull_distance', 0) > 0 else '{:^20} &'.format('-'))
-            latex_struct_string[-1] += ("{:^20.0f} & ".format(doc.get('gravimetric_capacity', '-'))
-                                        if doc.get('hull_distance', 0.1) == 0 else '{:^20} &'.format('-'))
+            # latex_struct_string[-1] += ("{:^20.0f} & ".format(doc.get('gravimetric_capacity', '-'))
+                                        # if doc.get('hull_distance', 0.1) == 0 else '{:^20} &'.format('-'))
             latex_struct_string[-1] += "{:^20} & ".format(get_spacegroup_spg(doc))
             prov = get_guess_doc_provenance(doc['source'], doc.get('icsd'))
             if doc.get('icsd'):
