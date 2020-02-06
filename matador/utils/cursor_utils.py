@@ -280,9 +280,7 @@ def display_results(cursor,
             struct_string[-1] += "{:^18}".format('xxx')
 
         if 'space_group' in doc:
-            struct_string[-1] += "{:^13}".format(doc['space_group'])
-        else:
-            struct_string[-1] += "{:^13}".format('xxx')
+            struct_string[-1] += "{:^13}".format(doc.get('space_group', 'xxx'))
 
         struct_string[-1] += "{:^15}".format(formula_substring)
 
@@ -306,7 +304,7 @@ def display_results(cursor,
                                         if doc.get('hull_distance', 0) > 0 else '{:^20} &'.format('-'))
             # latex_struct_string[-1] += ("{:^20.0f} & ".format(doc.get('gravimetric_capacity', '-'))
                                         # if doc.get('hull_distance', 0.1) == 0 else '{:^20} &'.format('-'))
-            latex_struct_string[-1] += "{:^20} & ".format(get_spacegroup_spg(doc))
+            latex_struct_string[-1] += "{:^20} & ".format(doc.get('space_group', 'xxx'))
             prov = get_guess_doc_provenance(doc['source'], doc.get('icsd'))
             if doc.get('icsd'):
                 prov += ' {}'.format(doc['icsd'])
