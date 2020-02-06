@@ -304,10 +304,9 @@ class DBQuery:
                     self.repo = self._collections[collection]
                     if self.debug:
                         print('Empty query, showing all...')
-                    self.cursor = self._find_and_sort()
+                    self.cursor, count = self._find_and_sort(as_list=True)
                     if self.top == -1 or self.top is None:
-                        self.top = self.cursor.count()
-                    self.cursor = list(self.cursor)
+                        self.top = count
                     if self.cursor:
                         display_results(self.cursor[:self.top], args=self.args)
 
@@ -320,12 +319,9 @@ class DBQuery:
                     print(dumps(self.query_dict, indent=1))
 
                 # execute query
-                self.cursor = self._find_and_sort(self.query_dict)
+                self.cursor, cursor_count = self._find_and_sort(self.query_dict)
                 if self._non_elemental:
                     self.cursor = filter_cursor_by_chempots(self._chempots, self.cursor)
-
-                # self.cursors.append(self.cursor)
-                cursor_count = len(self.cursor)
 
                 # if called as script, always print results
                 print(cursor_count, 'results found for query in', collection + '.')
@@ -339,10 +335,11 @@ class DBQuery:
                                 print('Multiple stoichiometries in cursor, unable to filter by energy.')
                             else:
                                 gs_enthalpy = self.cursor[0]['enthalpy_per_atom']
+                                ind = 0
                                 for ind, doc in enumerate(self.cursor[1:]):
                                     if abs(doc['enthalpy_per_atom'] - gs_enthalpy) > self.args.get('delta_E'):
-                                        self._num_to_display = ind + 1
                                         break
+                                self._num_to_display = ind + 1
                                 cursor_count = self._num_to_display
                         elif self.top == -1 or self.top is None:
                             self._num_to_display = cursor_count
@@ -355,19 +352,31 @@ class DBQuery:
                 if self.args.get('delta_E') is not None:
                     self.cursor = self.cursor[:self._num_to_display]
 
-    def _find_and_sort(self, *args, as_list=True, **kwargs):
+    def _find_and_sort(self, query_filter=None, as_list=True, **kwargs):
         """ Query `self.repo` using Pymongo arguments/kwargs. Sorts based
         on enthalpy_per_atom and optionally returns list of Crystals.
 
+        Keyword arguments:
+            query_filter (dict): the query to use. If None, perform a blank query.
+            as_list (bool): whether to return a list of a pm.Cursor object.
+
+        Returns:
+            list/pm.Cursor: the results of the query.
+            int: the number of results in the query.
+
         """
         from matador.crystal import Crystal
-        cursor = self.repo.find(*args, **kwargs).sort('enthalpy_per_atom', pm.ASCENDING)
+        if query_filter is None:
+            query_filter = {}
+        count = self.repo.count_documents(query_filter, **kwargs)
+        cursor = self.repo.find(query_filter, **kwargs).sort('enthalpy_per_atom', pm.ASCENDING)
+
         if self.args.get('as_crystal'):
-            return [Crystal(doc) for doc in cursor]
+            return [Crystal(doc) for doc in cursor], count
         if as_list:
-            return list(cursor)
-        else:
-            return cursor
+            return list(cursor), count
+
+        return cursor, count
 
     def perform_hull_query(self):
         """ Perform the multiple queries necessary to find possible
@@ -404,8 +413,8 @@ class DBQuery:
                 # then do some random samples
                 else:
                     ind = np.random.randint(rand_sample if rand_sample < count - 1 else 0, count - 1)
-                id_cursor = self._find_and_sort({'text_id': self.cursor[ind]['text_id']})
-                if len(id_cursor) > 1:
+                id_cursor, id_count = self._find_and_sort({'text_id': self.cursor[ind]['text_id']})
+                if id_count > 1:
                     print_warning(
                         'WARNING: matched multiple structures with text_id ' + id_cursor[0]['text_id'][0] + ' ' +
                         id_cursor[0]['text_id'][1] + '.' + ' Skipping this set...')
@@ -422,7 +431,7 @@ class DBQuery:
                             self.query_dict['$and'].append(self._query_quality())
                         test_query_dict.append(self.query_dict)
                         test_cursors.append(
-                            self._find_and_sort(SON(test_query_dict[-1]))
+                            self._find_and_sort(SON(test_query_dict[-1]))[0]
                         )
                         if self._non_elemental:
                             test_cursors[-1] = filter_cursor_by_chempots(self._chempots, test_cursors[-1])
@@ -484,10 +493,11 @@ class DBQuery:
             temp_cursor = self._find_and_sort(query_dict)
             for doc in temp_cursor:
                 self.cursor.append(doc)
+
         if not self.cursor:
             raise RuntimeError('Could not find a match with {} try widening your search.'.format(self.args.get('id')))
 
-        elif len(self.cursor) >= 1:
+        if len(self.cursor) >= 1:
             display_results(list(self.cursor)[:self.top], args=self.args)
 
             if len(self.cursor) > 1:
@@ -979,8 +989,8 @@ class DBQuery:
         query_dict = dict()
         if not isinstance(self.args.get('cnt_vector'), list) or len(self.args.get('cnt_vector')) != 2:
             raise SystemExit('CNT vector query needs to be of form [n, m]')
-        else:
-            chiral_vec = self.args.get('cnt_vector')
+
+        chiral_vec = self.args.get('cnt_vector')
         query_dict['cnt_chiral'] = dict()
         query_dict['cnt_chiral']['$eq'] = chiral_vec
 
@@ -1142,6 +1152,6 @@ class EmptyCursor:
     """ Empty cursor class for failures. """
 
     @staticmethod
-    def count():
+    def count_documents(*args, **kwargs):
         """ Dummy function always returns 0. """
         return 0
