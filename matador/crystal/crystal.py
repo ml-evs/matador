@@ -19,6 +19,11 @@ class UnitCell:
     Cartesian lattice vectors or lattice parameters, in Å.
 
     """
+
+    _lattice_abc = None
+    _lattice_cart = None
+    _volume = None
+
     def __init__(self, lattice):
         """ Initialise the cell from either Cartesian lattice vectors
         [[x1, y1, z1], [x2, y2, z2], [x3, y3, z3]], or lattice
@@ -35,11 +40,13 @@ class UnitCell:
         if len(lattice) == 3:
             if any(len(vec) != 3 for vec in lattice):
                 raise RuntimeError('Unable to cast {} into lattice_cart'.format(lattice))
-            self._lattice_cart = lattice
+            self.lattice_cart = lattice
         elif len(lattice) == 2:
             if any(len(vec) != 3 for vec in lattice):
                 raise RuntimeError('Unable to cast {} into lattice_abc'.format(lattice))
-            self._lattice_abc = lattice
+            self.lattice_abc = lattice
+        else:
+            raise RuntimeError("Unable to create UnitCell from lattice {}".format(lattice))
 
     @property
     def lattice_cart(self):
@@ -120,7 +127,9 @@ class Crystal(DataContainer):
         and any additional abstractions, e.g. voronoi or CrystalGraph.
 
         Parameters:
-            doc (dict): matador document containing structural information
+            doc (dict): document containing structural information, minimal requirement
+                is for `atom_types`, one of `lattice_abc` or `lattice_cart`, and one of
+                `positions_frac` or `positions_abs` to be present.
 
         Keyword Arguments:
            voronoi (bool): whether to compute Voronoi substructure for each site
@@ -162,17 +171,18 @@ class Crystal(DataContainer):
 
         # set root source to structure filename
         from matador.utils.chem_utils import get_root_source
+        self.root_source = 'unknown'
         try:
-            self.root_source = get_root_source(self._data['source'])
+            if 'source' in self._data:
+                self.root_source = get_root_source(self._data['source'])
         except RuntimeError:
-            self.root_source = 'xxx'
+            pass
 
     def __getitem__(self, key):
         """ If integer key is requested, return index into site array. """
         if isinstance(key, int):
             return self.sites[key]
-        else:
-            return super().__getitem__(key)
+        return super().__getitem__(key)
 
     def __str__(self):
         repr_string = "{root_source}: {formula}\n".format(root_source=self.root_source, formula=self.formula)
@@ -190,7 +200,6 @@ class Crystal(DataContainer):
         return repr_string
 
     def set_positions(self, new_positions, fractional=True):
-        import numpy as np
         if len(new_positions) != self.num_atoms:
             raise RuntimeError('Cannot change size of positions array!')
         if fractional:
@@ -279,7 +288,11 @@ class Crystal(DataContainer):
     def concentration(self):
         """ Return concentration of each species in stoichiometry. """
         if 'concentration' not in self._data:
-            self._data['concentration'] = get_concentration(self.stoichiometry, [elem[0] for elem in self.stoichiometry])
+            self._data['concentration'] = get_concentration(
+                self.stoichiometry,
+                [elem[0] for elem in self.stoichiometry],
+                include_end=True
+            )
         return self._data['concentration']
 
     @property
