@@ -54,7 +54,6 @@ class Site:
         if '_coords' not in self.__dict__:
             self._coords = dict()
         if units == 'fractional':
-            print('pos', position)
             self._coords['fractional'] = [float(pos) for pos in position]
             self._coords['cartesian'] = frac2cart(self.lattice, self.coords)
         elif units == 'cartesian':
