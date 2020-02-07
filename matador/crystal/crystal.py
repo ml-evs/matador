@@ -35,11 +35,11 @@ class UnitCell:
         if len(lattice) == 3:
             if any(len(vec) != 3 for vec in lattice):
                 raise RuntimeError('Unable to cast {} into lattice_cart'.format(lattice))
-            self.lattice_cart = lattice
+            self._lattice_cart = lattice
         elif len(lattice) == 2:
             if any(len(vec) != 3 for vec in lattice):
                 raise RuntimeError('Unable to cast {} into lattice_abc'.format(lattice))
-            self.lattice_abc = lattice
+            self._lattice_abc = lattice
 
     @property
     def lattice_cart(self):
@@ -286,7 +286,7 @@ class Crystal(DataContainer):
     def formula(self):
         """ Returns chemical formula of structure. """
         from matador.utils.chem_utils import get_formula_from_stoich
-        return get_formula_from_stoich(self._data['stoichiometry'], tex=False)
+        return get_formula_from_stoich(self.stoichiometry, tex=False)
 
     @property
     def cell_volume(self):
