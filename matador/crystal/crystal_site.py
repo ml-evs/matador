@@ -49,15 +49,16 @@ class Site:
         return Site(species, position, lattice, position_unit='fractional', **site_data)
 
     def set_position(self, position, units):
-        if len(position) != 3 or not all(isinstance(pos, float) for pos in position):
+        if len(position) != 3 or not all(isinstance(p, (float, int)) for p in position):
             raise RuntimeError('CrystalSite position has wrong shape: {}'.format(position))
         if '_coords' not in self.__dict__:
             self._coords = dict()
         if units == 'fractional':
-            self._coords['fractional'] = position
+            print('pos', position)
+            self._coords['fractional'] = [float(pos) for pos in position]
             self._coords['cartesian'] = frac2cart(self.lattice, self.coords)
         elif units == 'cartesian':
-            self._coords['cartesian'] = position
+            self._coords['cartesian'] = [float(pos) for pos in position]
             self._coords['fractional'] = cart2frac(self.lattice, self.coords(units='cartesian'))
         else:
             raise RuntimeError('Unit system {} not understood, expecting `fractional`/`cartesian`'.format(units))
