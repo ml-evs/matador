@@ -36,12 +36,16 @@ class UnitCellTest(unittest.TestCase):
         self.assertEqual(cell.angles, (90, 90, 90))
 
         lattice_cart = np.asarray([[3, 0, 0], [0, 3, 0], [0, 0, 3]])
-        cell = UnitCell(lattice_cart)
-        self.assertAlmostEqual(cell.lattice_cart, lat_tup)
-        self.assertAlmostEqual(cell.lattice_abc,((3, 3, 3), (90, 90, 90)))
+        cell_2 = UnitCell(lattice_cart)
+        self.assertAlmostEqual(cell_2.lattice_cart, lat_tup)
+        self.assertAlmostEqual(cell_2.lattice_abc,((3, 3, 3), (90, 90, 90)))
+        self.assertEqual(cell_2.volume, 27)
+        self.assertAlmostEqual(cell_2.lengths, (3, 3, 3))
+        self.assertAlmostEqual(cell_2.angles, (90, 90, 90))
+        self.assertEqual(cell.lattice_cart, lat_tup)
+        self.assertEqual(cell.lattice_abc, ((3, 3, 3), (90, 90, 90)))
         self.assertEqual(cell.volume, 27)
-        self.assertAlmostEqual(cell.lengths, (3, 3, 3))
-        self.assertAlmostEqual(cell.angles, (90, 90, 90))
+        self.assertEqual(cell.lengths, (3, 3, 3))
 
         lattice_cart = [[10, 0, 0], [0, 10, 0], [0, 0, 10]]
         cell.lattice_cart = lattice_cart
@@ -93,6 +97,45 @@ class CrystalTest(unittest.TestCase):
         )
 
         self.assertNotAlmostEqual(doc.positions_frac[-1][0], 0.0)
+
+    def test_minimal_init(self):
+        doc = Crystal(dict(
+            lattice_abc=[[3, 3, 3], [90, 90, 90]],
+            atom_types=['Na', 'Cl'],
+            positions_frac=[[0, 0, 0], [0.5, 0.5, 0.5]])
+        )
+        self.assertEqual(doc.stoichiometry, [['Cl', 1.0], ['Na', 1.0]])
+        self.assertEqual(doc.lattice_abc, ((3.0, 3.0, 3.0), (90.0, 90.0, 90.0)))
+        self.assertEqual(doc.lattice_cart, ((3.0, 0.0, 0.0), (0.0, 3.0, 0.0), (0.0, 0.0, 3.0)))
+        self.assertEqual(len(doc.sites), 2)
+        self.assertEqual(doc.num_atoms, 2)
+        self.assertEqual(doc.concentration, [0.5, 0.5])
+        self.assertEqual(doc.positions_abs, [[0, 0, 0], [1.5, 1.5, 1.5]])
+        self.assertEqual(doc.positions_frac, [[0, 0, 0], [0.5, 0.5, 0.5]])
+        self.assertEqual(doc.formula, "ClNa")
+        self.assertEqual(doc.cell_volume, 27.0)
+        self.assertEqual(doc.bond_lengths[0][0], ('Na', 'Cl'))
+        self.assertAlmostEqual(doc.bond_lengths[0][1], 2.5981, places=4)
+        self.assertEqual(doc.space_group, 'Pm-3m')
+
+        doc = Crystal(dict(
+            lattice_cart=((3.0, 0.0, 0.0), (0.0, 3.0, 0.0), (0.0, 0.0, 3.0)),
+            atom_types=['Na', 'Cl'],
+            positions_abs=[[0, 0, 0], [1.5, 1.5, 1.5]])
+        )
+        self.assertEqual(doc.lattice_abc, ((3.0, 3.0, 3.0), (90.0, 90.0, 90.0)))
+        self.assertEqual(doc.lattice_cart, ((3.0, 0.0, 0.0), (0.0, 3.0, 0.0), (0.0, 0.0, 3.0)))
+        self.assertEqual(doc.stoichiometry, [['Cl', 1.0], ['Na', 1.0]])
+        self.assertEqual(len(doc.sites), 2)
+        self.assertEqual(doc.num_atoms, 2)
+        self.assertEqual(doc.concentration, [0.5, 0.5])
+        self.assertEqual(doc.positions_abs, [[0.0, 0.0, 0.0], [1.5, 1.5, 1.5]])
+        self.assertEqual(doc.positions_frac, [[0, 0, 0], [0.5, 0.5, 0.5]])
+        self.assertEqual(doc.formula, "ClNa")
+        self.assertEqual(doc.cell_volume, 27.0)
+        self.assertEqual(doc.bond_lengths[0][0], ('Na', 'Cl'))
+        self.assertAlmostEqual(doc.bond_lengths[0][1], 2.5981, places=4)
+        self.assertEqual(doc.space_group, 'Pm-3m')
 
     def testSites(self):
         doc, s = castep2dict(REAL_PATH + 'data/Na3Zn4-swap-ReOs-OQMD_759599.castep')
