@@ -21,12 +21,11 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
       run: |
-        sudo apt install python-tk
         cp matador/tests/data/matador_pipelines_conf.yml $HOME/.matadorrc
         python -m pip install --upgrade pip
         pip install -e .[test,plotting,crystal]
         pip install ase
-    - name: Lint with flake8
+    - name: Lint with flake8 
       run: |
         pip install flake8
         # stop the build if there are Python syntax errors or undefined names
@@ -35,5 +34,11 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with pytest and upload coverage
       run: |
-        py.test --cov-config .coveragerc --cov=./matador/ --cov-report=xml --durations=0
-        bash <(curl -s https://codecov.io/bash) -t ${{ secrets.CODECOV_TOKEN }}
+        py.test -rs --cov-config .coveragerc --cov=./matador/ --cov-report=xml
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        file: ./coverage.xml
+        flags: unittests
+        yml: ./codecov.yml
