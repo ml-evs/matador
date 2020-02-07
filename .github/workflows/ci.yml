@@ -24,7 +24,7 @@ jobs:
         sudo apt install python-tk
         cp matador/tests/data/matador_pipelines_conf.yml $HOME/.matadorrc
         python -m pip install --upgrade pip
-        pip install -e .[test,plotting]
+        pip install -e .[test,plotting,crystal]
         pip install ase
     - name: Lint with flake8
       run: |
