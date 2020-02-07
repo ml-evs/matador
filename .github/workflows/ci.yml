@@ -2,7 +2,13 @@ name: Run tests
 
 on:
   pull_request:
+    branches:
+      - develop
+      - master
   push:
+    branches:
+      - develop
+      - master
 
 jobs:
   build:
@@ -35,6 +41,7 @@ jobs:
     - name: Test with pytest and upload coverage
       run: |
         py.test -rs --cov-config .coveragerc --cov=./matador/ --cov-report=xml
+        ls -altr
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v1
       with:
