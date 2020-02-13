@@ -941,7 +941,6 @@ def phonon2dict(seed, **kwargs):
         for i in range(1, ph['num_modes'] + 1):
             ph['eigenvalues_q'][0][i - 1][qind] = f90_float_parse(data[qind * line_offset + i].split()[1])
 
-
     if dos_present:
         # remove header and "END"
         flines = flines[begin_dos:-1]
@@ -965,6 +964,7 @@ def phonon2dict(seed, **kwargs):
     return ph, True
 
 
+@scraper_function
 def phonon_dos2dict(*args, **kwargs):
     """ Wrapper for old phonon DOS scraper, which has since been merged
     with `phonon2dict`. Note that this function still has a different
@@ -972,6 +972,8 @@ def phonon_dos2dict(*args, **kwargs):
     be cast into a :class:`VibrationalDOS` object.
 
     """
+    if kwargs.get('as_model'):
+        kwargs['as_model'] = False
     return phonon2dict(*args, **kwargs)
 
 

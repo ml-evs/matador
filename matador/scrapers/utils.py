@@ -73,11 +73,7 @@ def scraper_function(function):
                     print(msg)
 
             if len(seed) == 1:
-                if success and not isinstance(result, dict):
-                    raise AssertionError('Scraping succeeded, but dict not returned for {}'.format(seed))
-                if not success and isinstance(result, dict):
-                    raise AssertionError('Scraping failed, but dict returned for {}'.format(seed))
-                if kwargs.get('as_model'):
+                if success and kwargs.get('as_model'):
                     orm = _as_model(result, function)
                     if orm is not None:
                         result = orm
@@ -88,7 +84,7 @@ def scraper_function(function):
                 failures += [_seed]
             else:
                 if kwargs.get('as_model'):
-                    orm = _as_model(result, function)
+                    orm = _as_model(result, function, debug=kwargs.get('debug'))
                 if not kwargs.get('as_model') or orm is None:
                     cursor.append(result)
 
@@ -97,7 +93,7 @@ def scraper_function(function):
     return wrapped_scraper_function
 
 
-def _as_model(doc, function):
+def _as_model(doc, function, debug=False):
     """ Convert the document to the appropriate orm model. """
     model = MODEL_REGISTRY.get(function.__name__)
     orm = None
