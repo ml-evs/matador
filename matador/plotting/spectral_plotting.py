@@ -372,7 +372,7 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
             if kwargs['plot_pdos']:
                 pdos_data = dos_data
 
-        energies = dos_data['energies']
+        energies = np.copy(dos_data['energies'])
         # change unit of phonon energies and set plot window
         if kwargs['phonons']:
             energies /= INVERSE_CM_TO_EV
