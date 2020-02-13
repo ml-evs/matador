@@ -972,9 +972,7 @@ def phonon_dos2dict(*args, **kwargs):
     be cast into a :class:`VibrationalDOS` object.
 
     """
-    if kwargs.get('as_model'):
-        kwargs['as_model'] = False
-    return phonon2dict(*args, **kwargs)
+    return phonon2dict(*args, no_wrap=True, **kwargs)
 
 
 def usp2dict(seed, **kwargs):

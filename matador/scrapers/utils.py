@@ -40,6 +40,9 @@ def scraper_function(function):
 
         """
 
+        if kwargs.get('no_wrap'):
+            return function(*args, **kwargs)
+
         result = None
         seed = args[0]
         if isinstance(seed, str):
@@ -80,11 +83,13 @@ def scraper_function(function):
 
                 return result, success
 
+
             if not success:
                 failures += [_seed]
             else:
                 if kwargs.get('as_model'):
                     orm = _as_model(result, function, debug=kwargs.get('debug'))
+                    cursor.append(orm)
                 if not kwargs.get('as_model') or orm is None:
                     cursor.append(result)
 
