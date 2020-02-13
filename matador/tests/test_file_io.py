@@ -12,7 +12,7 @@ from matador.scrapers import cif2dict, param2dict, phonon2dict, optados2dict, ph
 from matador.scrapers import arbitrary2dict, bands2dict, pwout2dict, magres2dict
 from matador.scrapers.castep_scrapers import usp2dict, get_seed_metadata
 from matador.export import doc2res, doc2param, doc2cell, query2files
-from matador.orm.spectral import ElectronicDispersion, VibrationalDispersion
+from matador.orm.spectral import ElectronicDispersion, ElectronicDOS, VibrationalDispersion, VibrationalDOS
 from matador.utils.chem_utils import INVERSE_CM_TO_EV
 from matador.tests.utils import REAL_PATH, MatadorUnitTest
 
@@ -591,42 +591,36 @@ class ScraperMiscTest(MatadorUnitTest):
 
     def test_phonon_scraper(self):
         phonon_fname = REAL_PATH + 'data/phonon_dispersion/K3P.phonon'
-        failed_open = False
-        try:
-            f = open(phonon_fname, 'r')
-        except Exception:
-            failed_open = True
-            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(phonon_fname))
-        if not failed_open:
-            f.close()
-            ph_dict, s = phonon2dict(phonon_fname, verbosity=VERBOSITY)
-            self.assertTrue(s, msg='Failed to read phonon file')
-            self.assertEqual(ph_dict['num_atoms'], 8)
-            self.assertEqual(ph_dict['num_branches'], 24)
-            self.assertEqual(ph_dict['num_modes'], 24)
-            self.assertEqual(ph_dict['num_kpoints'], 250)
-            self.assertEqual(ph_dict['freq_unit'], 'cm-1')
-            self.assertEqual(ph_dict['lattice_cart'][0], [4.961529, 2.864318, -0.00000])
-            self.assertEqual(ph_dict['lattice_cart'][1], [-4.961529, 2.864318, 0.00000])
-            self.assertEqual(ph_dict['lattice_cart'][2], [0.000000, 0.000000, 10.127257])
-            self.assertEqual(ph_dict['positions_frac'][0], [0.666699, 0.333301, 0.750129])
-            self.assertEqual(ph_dict['atom_types'][0], 'P')
-            self.assertEqual(ph_dict['atom_types'][2], 'K')
-            self.assertEqual(ph_dict['atom_masses'][0], 30.97376)
-            self.assertEqual(ph_dict['atom_masses'][2], 39.0983)
-            self.assertEqual(ph_dict['softest_mode_freq'], -23.654487 * INVERSE_CM_TO_EV)
+        self.assertTrue(os.path.isfile(phonon_fname), msg='Failed to open test case {} - please check installation.'.format(phonon_fname))
+        ph_dict, s = phonon2dict(phonon_fname, verbosity=VERBOSITY)
+        self.assertTrue(s, msg='Failed to read phonon file')
+        self.assertEqual(ph_dict['num_atoms'], 8)
+        self.assertEqual(ph_dict['num_branches'], 24)
+        self.assertEqual(ph_dict['num_modes'], 24)
+        self.assertEqual(ph_dict['num_kpoints'], 250)
+        self.assertEqual(ph_dict['freq_unit'], 'cm-1')
+        self.assertEqual(ph_dict['lattice_cart'][0], [4.961529, 2.864318, -0.00000])
+        self.assertEqual(ph_dict['lattice_cart'][1], [-4.961529, 2.864318, 0.00000])
+        self.assertEqual(ph_dict['lattice_cart'][2], [0.000000, 0.000000, 10.127257])
+        self.assertEqual(ph_dict['positions_frac'][0], [0.666699, 0.333301, 0.750129])
+        self.assertEqual(ph_dict['atom_types'][0], 'P')
+        self.assertEqual(ph_dict['atom_types'][2], 'K')
+        self.assertEqual(ph_dict['atom_masses'][0], 30.97376)
+        self.assertEqual(ph_dict['atom_masses'][2], 39.0983)
+        self.assertEqual(ph_dict['softest_mode_freq'], -23.654487 * INVERSE_CM_TO_EV)
 
-            disp = VibrationalDispersion(ph_dict)
-            ph_dict['kpoint_branches'] = disp.kpoint_branches
-            ph_dict['kpoint_path_spacing'] = disp.kpoint_path_spacing
-            self.assertAlmostEqual(ph_dict['kpoint_path_spacing'], 0.021, places=2)
-            self.assertEqual(ph_dict['kpoint_branches'][0][0], 0)
-            self.assertEqual(ph_dict['kpoint_branches'][0][-1], 35)
-            self.assertEqual(ph_dict['kpoint_branches'][1][0], 36)
-            self.assertEqual(ph_dict['kpoint_branches'][1][-1], 134)
-            self.assertEqual(ph_dict['kpoint_branches'][-2][0], 135)
-            self.assertEqual(ph_dict['kpoint_branches'][-1][0], 185)
-            self.assertEqual(ph_dict['kpoint_branches'][-1][-1], 249)
+        disp, s = phonon2dict(phonon_fname, verbosity=VERBOSITY, as_model=True)
+        self.assertTrue(isinstance(disp, VibrationalDispersion))
+        ph_dict['kpoint_branches'] = disp.kpoint_branches
+        ph_dict['kpoint_path_spacing'] = disp.kpoint_path_spacing
+        self.assertAlmostEqual(ph_dict['kpoint_path_spacing'], 0.021, places=2)
+        self.assertEqual(ph_dict['kpoint_branches'][0][0], 0)
+        self.assertEqual(ph_dict['kpoint_branches'][0][-1], 35)
+        self.assertEqual(ph_dict['kpoint_branches'][1][0], 36)
+        self.assertEqual(ph_dict['kpoint_branches'][1][-1], 134)
+        self.assertEqual(ph_dict['kpoint_branches'][-2][0], 135)
+        self.assertEqual(ph_dict['kpoint_branches'][-1][0], 185)
+        self.assertEqual(ph_dict['kpoint_branches'][-1][-1], 249)
 
     def test_phonon_dos_scraper(self):
         phonon_fname = REAL_PATH + 'data/phonon_dispersion/K3P.phonon_dos'
@@ -640,21 +634,19 @@ class ScraperMiscTest(MatadorUnitTest):
         self.assertEqual(len(dos_data['pdos'][('K', None)]), 10001)
         self.assertEqual(len(dos_data['pdos'][('P', None)]), 10001)
 
+        dos, s = phonon_dos2dict(phonon_fname, as_model=True)
+        self.assertTrue(isinstance(dos, VibrationalDOS))
+
     def test_optados_dos_scraper(self):
         odo_fname = REAL_PATH + 'data/optados_files/K3P.adaptive.dat'
-        failed_open = False
-        try:
-            f = open(odo_fname, 'r')
-        except Exception:
-            failed_open = True
-            self.assertFalse(failed_open, msg='Failed to open test case {} - please check installation.'.format(odo_fname))
-        if not failed_open:
-            f.close()
-            od_dict, s = optados2dict(odo_fname)
-            self.assertTrue(s)
-            self.assertEqual(len(od_dict['dos']), 529)
-            self.assertEqual(len(od_dict['energies']), 529)
-            self.assertEqual(od_dict['dos_unit_label'], 'DOS (electrons per eV/A^3)')
+        self.assertTrue(os.path.isfile(odo_fname), msg='Failed to open test case {} - please check installation.'.format(odo_fname))
+        od_dict, s = optados2dict(odo_fname)
+        self.assertTrue(s)
+        self.assertEqual(len(od_dict['dos']), 529)
+        self.assertEqual(len(od_dict['energies']), 529)
+        self.assertEqual(od_dict['dos_unit_label'], 'DOS (electrons per eV/A^3)')
+        od, s = optados2dict(odo_fname, as_model=True)
+        self.assertTrue(isinstance(od, ElectronicDOS))
 
     def test_optados_pdos_scraper(self):
         odo_fname = REAL_PATH + 'data/optados_files/KP.pdos.adaptive.dat'
@@ -831,6 +823,8 @@ class ScraperMiscTest(MatadorUnitTest):
         self.assertAlmostEqual(bs_dict['eigs_s_k'][1][0][0], -1.84666287*HARTREE_TO_EV, places=4)
         self.assertAlmostEqual(bs_dict['eigs_s_k'][-1][-1][-1], 0.64283955*HARTREE_TO_EV, places=4)
         self.assertAlmostEqual(bs_dict['eigs_s_k'][0][-1][-1], 0.63571135*HARTREE_TO_EV, places=4)
+        bs, s = bands2dict(bands_fname, as_model=True)
+        self.assertTrue(isinstance(bs, ElectronicDispersion))
 
     def test_qe_magres(self):
         magres_fname = REAL_PATH + 'data/NaP_QE6.magres'
