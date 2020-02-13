@@ -207,7 +207,7 @@ def castep_phonon_dos(relaxer, calc_doc, seed):
     LOG.info('Performing CASTEP phonon DOS calculation...')
     dos_doc = copy.deepcopy(calc_doc)
     dos_doc['task'] = 'phonon'
-    dos_doc['phonon_calculate_dos'] = False
+    dos_doc['phonon_calculate_dos'] = True
     dos_doc['continuation'] = 'default'
 
     required = ['phonon_fine_kpoint_mp_spacing']

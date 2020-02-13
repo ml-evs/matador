@@ -582,7 +582,7 @@ def castep2dict(seed, db=True, intermediates=False, **kwargs):
         try:
             with open(seed, 'r', encoding='utf-8') as f:
                 flines = f.readlines()
-        except:
+        except Exception:
             with open(seed, 'r', encoding='latin1') as f:
                 flines = f.readlines()
     # set source tag to castep file
@@ -875,8 +875,16 @@ def phonon2dict(seed, **kwargs):
     verbosity = kwargs.get('verbosity', 0)
 
     ph = dict()
-    seed = seed.replace('.phonon', '')
-    ph['source'] = [seed + '.phonon']
+
+    if 'phonon_dos' in seed:
+        seed = seed.replace('.phonon_dos', '')
+        ph['source'] = [seed + '.phonon_dos']
+    else:
+        seed = seed.replace('.phonon', '')
+        ph['source'] = [seed + '.phonon']
+
+    dos_present = False
+    data_start = 0
 
     for line_no, line in enumerate(flines):
         line = line.lower()
@@ -904,15 +912,46 @@ def phonon2dict(seed, **kwargs):
                 ph['atom_masses'].append(f90_float_parse(flines[line_no + i].split()[-1]))
                 i += 1
         elif 'end header' in line:
-            data = flines[line_no + 1:]
+            data_start = line_no + 1
+        elif 'begin dos' in line:
+            dos_present = True
+            projector_labels = flines[line_no].split()[5:]
+            projector_labels = [(label, None) for label in projector_labels]
+            begin_dos = line_no + 1
+
+        elif 'q-pt' in line:
+            last_qpt_ind = int(line.split()[1])
+
+    if dos_present:
+        # extra header line with GRADIENTS written when dos is present
+        data_start += 1
+        # no eigenvectors written when dos is present
+        line_offset = ph['num_modes'] + 1
+    else:
+        line_offset = ph['num_modes'] * (ph['num_atoms'] + 1) + 3
+
+    data = flines[data_start:]
 
     ph['phonon_kpoint_list'] = []
+    if 'num_kpoints' not in ph:
+        ph['num_kpoints'] = last_qpt_ind
     ph['eigenvalues_q'] = np.zeros((1, ph['num_modes'], ph['num_kpoints']))
-    line_offset = ph['num_modes'] * (ph['num_atoms'] + 1) + 3
     for qind in range(ph['num_kpoints']):
         ph['phonon_kpoint_list'].append([f90_float_parse(elem) for elem in data[qind * line_offset].split()[2:]])
         for i in range(1, ph['num_modes'] + 1):
-            ph['eigenvalues_q'][0][i - 1][qind] = f90_float_parse(data[qind * line_offset + i].split()[-1])
+            ph['eigenvalues_q'][0][i - 1][qind] = f90_float_parse(data[qind * line_offset + i].split()[1])
+
+
+    if dos_present:
+        # remove header and "END"
+        flines = flines[begin_dos:-1]
+        raw_data = np.genfromtxt(flines)
+        ph['energies'] = raw_data[:, 0] * INVERSE_CM_TO_EV
+        ph['dos'] = raw_data[:, 1]
+        ph['pdos'] = dict()
+
+        for i, label in enumerate(projector_labels):
+            ph['pdos'][label] = raw_data[:, i + 2]
 
     ph['kpoint_path'] = np.asarray([qpt[0:3] for qpt in ph['phonon_kpoint_list']])
     ph['kpoint_weights'] = [qpt[3] for qpt in ph['phonon_kpoint_list']]
@@ -926,39 +965,14 @@ def phonon2dict(seed, **kwargs):
     return ph, True
 
 
-@scraper_function
-def phonon_dos2dict(seed, **kwargs):
-    """ Parse a CASTEP phonon_dos file into a dictionary.
-
-    Parameters:
-        seed (str/list): phonon_dos filename or list of filenames.
-
-    Returns:
-        (tuple): containing either dict/str containing data or error, and a bool stating
-            if the scrape was successful.
+def phonon_dos2dict(*args, **kwargs):
+    """ Wrapper for old phonon DOS scraper, which has since been merged
+    with `phonon2dict`. Note that this function still has a different
+    effect to `phonon2dict` when `as_model` is used as the results will
+    be cast into a :class:`VibrationalDOS` object.
 
     """
-    with open(seed, 'r') as f:
-        flines = f.readlines()
-    for ind, line in enumerate(flines):
-        if 'begin dos' in line.lower():
-            projector_labels = line.split()[5:]
-            projector_labels = [(label, None) for label in projector_labels]
-            begin = ind + 1
-
-    dos_data = {}
-    dos_data['source'] = [seed.replace('.phonon_dos', '') + '.phonon_dos']
-    # remove header and "END"
-    flines = flines[begin:-1]
-    raw_data = np.genfromtxt(flines)
-    dos_data['energies'] = raw_data[:, 0] * INVERSE_CM_TO_EV
-    dos_data['dos'] = raw_data[:, 1]
-    dos_data['pdos'] = dict()
-
-    for i, label in enumerate(projector_labels):
-        dos_data['pdos'][label] = raw_data[:, i + 2]
-
-    return dos_data, True
+    return phonon2dict(*args, **kwargs)
 
 
 def usp2dict(seed, **kwargs):
@@ -1071,7 +1085,7 @@ def _castep_scrape_phonon_frequencies(flines, castep):
             phonons['phonon_fine_kpoint_weights'].append(f90_float_parse(line.split()[-2]))
             phonons['eigs_q'].append([])
 
-            for freq_line_no, freq_line in enumerate(flines[start_line_no:][line_no+6:]):
+            for _, freq_line in enumerate(flines[start_line_no:][line_no+6:]):
                 if '.........................' in freq_line:
                     break
                 phonons['eigs_q'][q_pt_ind].append(f90_float_parse(freq_line.split()[2]))
@@ -1521,7 +1535,7 @@ def _castep_scrape_metadata(flines, castep):
         elif 'Calculation parallelised over' in line:
             try:
                 castep['num_mpi_processes'] = int(f90_float_parse(line.split()[3]))
-            except:
+            except Exception:
                 castep['num_mpi_processes'] = 1
         elif 'Calculation not parall' in line:
             castep['num_mpi_processes'] = 1
