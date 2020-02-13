@@ -10,10 +10,17 @@ import glob
 import traceback as tb
 import warnings
 
-from matador.orm.spectral import VibrationalDOS
+from matador.orm.spectral import VibrationalDOS, VibrationalDispersion
+from matador.orm.spectral import ElectronicDOS, ElectronicDispersion
+from matador.crystal import Crystal
 
 MODEL_REGISTRY = {
-    "phonon_dos2dict": VibrationalDOS
+    "phonon_dos2dict": VibrationalDOS,
+    "phonon2dict": VibrationalDispersion,
+    "optados2dict": ElectronicDOS,
+    "bands2dict": ElectronicDispersion,
+    "castep2dict": Crystal,
+    "res2dict": Crystal,
 }
 
 
@@ -70,31 +77,39 @@ def scraper_function(function):
                     raise AssertionError('Scraping succeeded, but dict not returned for {}'.format(seed))
                 if not success and isinstance(result, dict):
                     raise AssertionError('Scraping failed, but dict returned for {}'.format(seed))
+                if kwargs.get('as_model'):
+                    orm = _as_model(result, function)
+                    if orm is not None:
+                        result = orm
 
                 return result, success
 
             if not success:
                 failures += [_seed]
             else:
-
                 if kwargs.get('as_model'):
-                    model = MODEL_REGISTRY.get(function.__name__)
-                    orm = None
-                    if model is not None:
-                        try:
-                            orm = model(result)
-                            cursor.append(orm)
-                        except Exception:
-                            print('Unable to convert scraped dict to model {}'.format(model.__name__))
-                    else:
-                        warnings.warn('as_model keyword not supported for {}'.format(function.__name__))
-
+                    orm = _as_model(result, function)
                 if not kwargs.get('as_model') or orm is None:
                     cursor.append(result)
 
         return cursor, failures
 
     return wrapped_scraper_function
+
+
+def _as_model(doc, function):
+    """ Convert the document to the appropriate orm model. """
+    model = MODEL_REGISTRY.get(function.__name__)
+    orm = None
+    if model is not None:
+        try:
+            orm = model(doc)
+        except Exception:
+            print('Unable to convert scraped dict to model {}'.format(model.__name__))
+    else:
+        print('as_model keyword not supported for {}, not converting'.format(function.__name__))
+
+    return orm
 
 
 def f90_float_parse(val):
