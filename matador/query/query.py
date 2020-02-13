@@ -1074,6 +1074,28 @@ class DBQuery:
                 temp_dict['spin_polarized'] = dict()
                 temp_dict['spin_polarized']['$ne'] = True
                 query_dict['$and'].append(temp_dict)
+        if doc.get('grid_scale', 1.75) == 1.75:
+            temp_dict = dict()
+            temp_dict['$or'] = []
+            temp_dict['$or'].append({'grid_scale': {'$exists': False}})
+            temp_dict['$or'].append({'grid_scale': {'$eq': 1.75}})
+            query_dict['$and'].append(temp_dict)
+        else:
+            temp_dict = dict()
+            temp_dict['$or'] = []
+            temp_dict['$or'].append({'grid_scale': {'$eq': doc.get('grid_scale')}})
+            query_dict['$and'].append(temp_dict)
+        if doc.get('fine_grid_scale', 1.75) == 1.75:
+            temp_dict = dict()
+            temp_dict['$or'] = []
+            temp_dict['$or'].append({'fine_grid_scale': {'$exists': False}})
+            temp_dict['$or'].append({'fine_grid_scale': {'$eq': 1.75}})
+            query_dict['$and'].append(temp_dict)
+        else:
+            temp_dict = dict()
+            temp_dict['$or'] = []
+            temp_dict['$or'].append({'fine_grid_scale': {'$eq': doc.get('fine_grid_scale')}})
+            query_dict['$and'].append(temp_dict)
         if 'geom_force_tol' in doc and doc['geom_force_tol'] != 0.05:
             temp_dict = dict()
             temp_dict['geom_force_tol'] = doc['geom_force_tol']
