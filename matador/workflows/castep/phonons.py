@@ -80,6 +80,19 @@ class CastepPhononWorkflow(Workflow):
                  'dispersion': castep_phonon_dispersion,
                  'thermodynamics': castep_phonon_thermodynamics}
 
+        exts = {
+            'relax':
+                {'input': ['.cell', '.param'], 'output': ['.castep', '-out.cell', '.*err']},
+            'dynmat':
+                {'input': ['.cell', '.param'], 'output': ['.castep', '.*err']},
+            'dos':
+                {'input': ['.cell', '.param'], 'output': ['.castep', '.phonon', '.*err']},
+            'dispersion':
+                {'input': ['.cell', '.param'], 'output': ['.castep', '.phonon', '.*err']},
+            'thermodynamics':
+                {'input': ['.cell', '.param'], 'output': ['.castep', '.*err']}
+        }
+
         if self.calc_doc.get('task').lower() in ['phonon', 'thermodynamics']:
             if 'phonon_fine_kpoint_path' in self.calc_doc or 'phonon_fine_kpoint_list' in self.calc_doc or 'phonon_fine_kpoint_path_spacing' in self.calc_doc:
                 todo['dispersion'] = True
@@ -95,7 +108,9 @@ class CastepPhononWorkflow(Workflow):
 
         for key in todo:
             if todo[key]:
-                self.add_step(steps[key], key)
+                self.add_step(steps[key], key,
+                              input_exts=exts[key].get('input'),
+                              output_exts=exts[key].get('output'))
 
         # always standardise the cell so that any phonon calculation can have
         # post-processing performed after the fact, unless a path has been provided
@@ -192,7 +207,7 @@ def castep_phonon_dos(relaxer, calc_doc, seed):
     LOG.info('Performing CASTEP phonon DOS calculation...')
     dos_doc = copy.deepcopy(calc_doc)
     dos_doc['task'] = 'phonon'
-    dos_doc['phonon_calculate_dos'] = True
+    dos_doc['phonon_calculate_dos'] = False
     dos_doc['continuation'] = 'default'
 
     required = ['phonon_fine_kpoint_mp_spacing']
