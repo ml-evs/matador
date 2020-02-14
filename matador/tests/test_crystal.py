@@ -114,8 +114,6 @@ class CrystalTest(unittest.TestCase):
         self.assertEqual(doc.positions_frac, [[0, 0, 0], [0.5, 0.5, 0.5]])
         self.assertEqual(doc.formula, "ClNa")
         self.assertEqual(doc.cell_volume, 27.0)
-        self.assertEqual(doc.bond_lengths[0][0], ('Na', 'Cl'))
-        self.assertAlmostEqual(doc.bond_lengths[0][1], 2.5981, places=4)
         self.assertEqual(doc.space_group, 'Pm-3m')
 
         doc = Crystal(dict(
@@ -133,8 +131,6 @@ class CrystalTest(unittest.TestCase):
         self.assertEqual(doc.positions_frac, [[0, 0, 0], [0.5, 0.5, 0.5]])
         self.assertEqual(doc.formula, "ClNa")
         self.assertEqual(doc.cell_volume, 27.0)
-        self.assertEqual(doc.bond_lengths[0][0], ('Na', 'Cl'))
-        self.assertAlmostEqual(doc.bond_lengths[0][1], 2.5981, places=4)
         self.assertEqual(doc.space_group, 'Pm-3m')
 
     def testSites(self):
