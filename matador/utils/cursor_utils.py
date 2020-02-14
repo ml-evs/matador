@@ -578,7 +578,7 @@ def filter_unique_structures(cursor, quiet=False, **kwargs):
 
     """
     from matador.fingerprints.similarity import get_uniq_cursor
-    uniq_inds, dupe_dict, _, _ = get_uniq_cursor(cursor)
+    uniq_inds, dupe_dict, _, _ = get_uniq_cursor(cursor, **kwargs)
     filtered_cursor = [cursor[ind] for ind in uniq_inds]
 
     if not quiet:
