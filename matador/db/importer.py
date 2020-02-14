@@ -23,6 +23,7 @@ from matador.utils.cell_utils import calc_mp_spacing
 from matador.utils.chem_utils import get_root_source
 from matador.utils.cursor_utils import recursive_get
 from matador.db import make_connection_to_collection
+from matador.utils.db_utils import WORDS, NOUNS
 from matador.config import load_custom_settings
 from matador import __version__
 
@@ -98,13 +99,9 @@ class Spatula:
         if not self.dryrun:
 
             base = os.path.dirname(os.path.realpath(__file__))
-            with open(base + '/../scrapers/words', 'r') as f:
-                self.wlines = f.readlines()
-            with open(base + '/../scrapers/nouns', 'r') as f:
-                self.nlines = f.readlines()
 
-            self.num_words = len(self.wlines)
-            self.num_nouns = len(self.nlines)
+            self.num_words = len(WORDS)
+            self.num_nouns = len(NOUNS)
 
         if not self.scan:
             self.logfile = tempfile.NamedTemporaryFile(mode='w+t', delete=False)
@@ -254,8 +251,8 @@ class Spatula:
 
         """
         try:
-            plain_text_id = [self.wlines[random.randint(0, self.num_words-1)].strip(),
-                             self.nlines[random.randint(0, self.num_nouns-1)].strip()]
+            plain_text_id = [WORDS[random.randint(0, self.num_words-1)].strip(),
+                             NOUNS[random.randint(0, self.num_nouns-1)].strip()]
             struct['text_id'] = plain_text_id
             if 'tags' in self.tag_dict:
                 struct['tags'] = self.tag_dict['tags']
