@@ -46,7 +46,11 @@ def res2dict(seed, db=True, **kwargs):
     res['source'] = []
     res['source'].append(seed + '.res')
     # grab file owner username
-    res['user'] = pwd.getpwuid(os.stat(seed + '.res').st_uid).pw_name
+    try:
+        res['user'] = pwd.getpwuid(os.stat(seed + '.res').st_uid).pw_name
+    except Exception:
+        pass
+
     get_seed_metadata(res, seed)
     # alias special lines in res file
     titl = ''
@@ -589,7 +593,10 @@ def castep2dict(seed, db=True, intermediates=False, **kwargs):
     castep['source'] = []
     castep['source'].append(seed)
     # grab file owner
-    castep['user'] = pwd.getpwuid(os.stat(seed).st_uid).pw_name
+    try:
+        castep['user'] = pwd.getpwuid(os.stat(seed).st_uid).pw_name
+    except Exception:
+        pass
     get_seed_metadata(castep, seed.replace('.' + ftype, ''))
     # wrangle castep file for parameters in 3 passes:
     # once forwards to get number and types of atoms
