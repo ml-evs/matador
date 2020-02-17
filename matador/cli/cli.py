@@ -35,7 +35,7 @@ class MatadorCommandLine:
                                                  debug=self.args.get('debug'),
                                                  no_quickstart=self.args.get('no_quickstart'))
             result = make_connection_to_collection(self.args.get('db'),
-                                                   check_collection=True,
+                                                   check_collection=(self.args['subcmd'] != "stats"),
                                                    mongo_settings=self.settings)
             self.client, self.db, self.collections = result
 
