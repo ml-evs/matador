@@ -9,6 +9,7 @@ matador.fingerprints.pdf module.
 
 
 from matador.fingerprints.pdf import PDF
+from matador.crystal import Crystal
 from matador.plotting.plotting import plotting_function
 
 __all__ = ['plot_pdf', 'plot_projected_pdf', 'plot_diff_overlap', 'plot_projected_diff_overlap']
@@ -35,13 +36,9 @@ def plot_pdf(pdf, other_pdfs=None):
         if not isinstance(other_pdfs, list):
             other_pdfs = [other_pdfs]
         for _pdf in other_pdfs:
-            # check if we have a Crystal object without importing
-            try:
+            if isinstance(_pdf, Crystal):
                 _pdf = _pdf.pdf
-            except AttributeError:
-                pass
-            # check if we have a normal matador doc
-            if isinstance(_pdf, dict) and 'pdf' in _pdf:
+            elif isinstance(_pdf, dict) and 'pdf' in _pdf:
                 _pdf = _pdf['pdf']
             if isinstance(_pdf, PDF):
                 ax1.plot(_pdf.r_space, _pdf.gr, label=_pdf.label, ls='--', alpha=1)
@@ -49,7 +46,7 @@ def plot_pdf(pdf, other_pdfs=None):
                 ax1.plot(_pdf[0], _pdf[1], alpha=1, ls='--')
             else:
                 raise RuntimeError('Wrong PDF format specified, please either pass a PDF object or (r, g(r)) tuple.')
-    ax1.set_xlabel('$r$ (Angstrom)')
+    ax1.set_xlabel('$r$ ($\\AA$)')
     ax1.legend()
 
 

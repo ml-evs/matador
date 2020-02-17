@@ -92,10 +92,11 @@ class PDF(Fingerprint):
         self.gr = None
         self.elem_gr = None
 
-        if 'text_id' in structure:
+        self.label = None
+        if self.kwargs.get('label'):
+            self.label = self.kwargs["label"]
+        elif 'text_id' in structure:
             self.label = ' '.join(structure['text_id'])
-        else:
-            self.label = 'null'
 
         if not lazy:
             if self.kwargs.get('timing'):

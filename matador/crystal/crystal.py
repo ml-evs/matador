@@ -302,6 +302,12 @@ class Crystal(DataContainer):
         return get_formula_from_stoich(self.stoichiometry, tex=False)
 
     @property
+    def formula_tex(self):
+        """ Returns chemical formula of structure in LaTeX format. """
+        from matador.utils.chem_utils import get_formula_from_stoich
+        return get_formula_from_stoich(self.stoichiometry, tex=True)
+
+    @property
     def cell_volume(self):
         """ Returns cell volume in Å³. """
         return self.cell.volume
@@ -364,14 +370,14 @@ class Crystal(DataContainer):
         return self._space_group[symprec]
 
     @property
-    def pdf(self, **kwargs):
+    def pdf(self):
         """ Returns a PDF object (pair distribution function) for the
-        structure, calculated with default PDF settings, unless kwargs
-        are passed.
+        structure, calculated with default PDF settings.
 
         """
         from matador.fingerprints.pdf import PDF
-        self._data['pdf'] = PDF(self._data, **kwargs)
+        if 'pdf' not in self._data:
+            self._data['pdf'] = PDF(self._data, label=self.formula_tex)
         return self._data['pdf']
 
     @property
