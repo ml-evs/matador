@@ -137,8 +137,11 @@ def display_results(cursor,
         latex_string = (
             "\\begin{tabular}{l r r c l l}\n"
             "\\rowcolor{gray!20}\n"
-            "formula & \\thead{$\\Delta E$\\\\(meV/atom)} & \\thead{$Q_m$\\\\(mAh/g)} & "
-            "spacegroup & provenance & description \\\\ \n\n"
+            "formula & "
+            "\\thead{$\\Delta E$\\\\(meV/atom)} & "
+            "spacegroup & "
+            "provenance & "
+            "description \\\\ \n\n"
         )
         latex_struct_string = []
 
@@ -304,8 +307,6 @@ def display_results(cursor,
                                                                  if doc.get('hull_distance', 0.1) == 0 else ''))
             latex_struct_string[-1] += ("{:^20.0f} & ".format(doc.get('hull_distance') * 1000)
                                         if doc.get('hull_distance', 0) > 0 else '{:^20} &'.format('-'))
-            # latex_struct_string[-1] += ("{:^20.0f} & ".format(doc.get('gravimetric_capacity', '-'))
-                                        # if doc.get('hull_distance', 0.1) == 0 else '{:^20} &'.format('-'))
             latex_struct_string[-1] += "{:^20} & ".format(doc.get('space_group', 'xxx'))
             prov = get_guess_doc_provenance(doc['source'], doc.get('icsd'))
             if doc.get('icsd'):
