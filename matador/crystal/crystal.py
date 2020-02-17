@@ -12,6 +12,7 @@ from matador.utils import cell_utils
 from matador.orm.orm import DataContainer
 from matador.crystal.crystal_site import Site
 from matador.utils.chem_utils import get_concentration
+from matador.utils.cell_utils import real2recip
 
 
 class UnitCell:
@@ -81,6 +82,10 @@ class UnitCell:
             raise RuntimeError('Expected list of 3 floats for cell vector lengths, received {}'
                                .format(new_lengths))
         self.lattice_abc = [new_lengths, self._lattice_abc[1]]
+
+    @property
+    def recip_lattice_cart(self):
+        return real2recip(self.lattice_cart)
 
     @property
     def angles(self):
