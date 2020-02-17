@@ -373,7 +373,6 @@ def get_seekpath_kpoint_path(doc, spacing=0.01, threshold=1e-7, debug=False, sym
 
     """
     from seekpath import get_explicit_k_path
-    from matador.crystal import Crystal
     if symmetry_tol is None:
         symmetry_tol = 1e-5
     spg_doc = standardize_doc_cell(doc, symprec=symmetry_tol)
@@ -404,7 +403,6 @@ def get_seekpath_kpoint_path(doc, spacing=0.01, threshold=1e-7, debug=False, sym
             print('Ignoring any site occupancy found in this cell.')
         primitive_doc['site_occupancy'] = [1 for atom in primitive_doc['atom_types']]
 
-
     return primitive_doc, kpt_path, seekpath_results
 
 
@@ -429,6 +427,51 @@ def doc2spg(doc):
         raise RuntimeError('doc2spg failed, matador document was missing data!')
 
     return cell
+
+
+def get_space_group_label_latex(label):
+    """ Return the LaTeX format of the passed space group label. Takes
+    any string, leaves the first character upright, italicses the rest,
+    handles subscripts and bars over numbers.
+
+    Parameters:
+        label (str): a given space group in "standard" plain text format,
+        e.g. P-63m.
+
+    Returns:
+        str: the best attempt to convert the label to LaTeX.
+
+    """
+    latex_label = ''
+    bravais_list = ['P', 'I', 'F', 'A', 'B', 'C', 'R']
+    if not isinstance(label, str):
+        raise RuntimeError("Space group label must be a string, not {}".format(label))
+
+    if label[0] in bravais_list:
+        latex_label += "$\\text{" + label[0] + "}"
+    else:
+        raise RuntimeError(
+            "Invalid Bravais lattice symbol {} in given space group label. Must be one of {}."
+            .format(label[0], label, bravais_list)
+        )
+
+    skip = False
+    for ind, char in enumerate(label[1:]):
+        if skip:
+            skip = False
+            continue
+
+        if char == '-':
+            # add the next char inside the bar
+            latex_label += "\\bar{" + label[1+ind+1] + "}"
+            skip = True
+
+        else:
+            latex_label += char
+
+    latex_label += "$"
+
+    return latex_label
 
 
 def standardize_doc_cell(doc, primitive=True, symprec=1e-2):

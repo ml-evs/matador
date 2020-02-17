@@ -10,7 +10,6 @@ displaying, extracting and refining results from a Mongo cursor/list.
 from time import strftime
 
 import numpy as np
-from matador.utils.cell_utils import get_spacegroup_spg
 from matador.utils.chem_utils import get_formula_from_stoich, get_root_source, get_stoich_from_formula
 from matador import __version__
 
@@ -279,7 +278,10 @@ def display_results(cursor,
         except KeyError:
             struct_string[-1] += "{:^18}".format('xxx')
 
-        if 'space_group' in doc:
+        if latex:
+            from matador.utils.cell_utils import get_space_group_label_latex
+            struct_string[-1] += "{:^13}".format(get_space_group_label_latex(doc.get('space_group', 'xxx')))
+        else:
             struct_string[-1] += "{:^13}".format(doc.get('space_group', 'xxx'))
 
         struct_string[-1] += "{:^15}".format(formula_substring)

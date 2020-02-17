@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import unittest
-import numpy as np
 from os.path import realpath
+import numpy as np
 from matador.utils.cell_utils import abc2cart, cart2abc, cart2volume, create_simple_supercell
 from matador.utils.cell_utils import cart2frac, frac2cart
 from matador.utils.cell_utils import doc2spg, cart2abcstar, real2recip
@@ -15,7 +15,7 @@ try:
     from matador.utils.cell_utils import get_seekpath_kpoint_path
     from seekpath import get_path
     IMPORTED_SEEKPATH = True
-except:
+except Exception:
     IMPORTED_SEEKPATH = False
 
 # grab abs path for accessing test data
@@ -165,6 +165,17 @@ class CellUtilTest(unittest.TestCase):
         mp_grid = calc_mp_grid(lattice_cart, spacing)
         self.assertEqual(mp_grid, [4, 2, 2])
         self.assertEqual(shift_to_include_gamma(mp_grid), [0.125, 0.25, 0.25])
+
+    def testSpaceGroupLabel(self):
+        from matador.utils.cell_utils import get_space_group_label_latex
+
+        test_cases = ["P-63m", "Fm-3m", "I4/mmm", "P4_2/mmc"]
+        results = ["$\\text{P}\\bar{6}3m$", "$\\text{F}m\\bar{3}m$", "$\\text{I}4/mmm$", "$\\text{P}4_2/mmc$"]
+        for res, test in zip(results, test_cases):
+            self.assertEqual(
+                res,
+                get_space_group_label_latex(test)
+            )
 
 
 class SymmetriesAndSupercellsTest(unittest.TestCase):
