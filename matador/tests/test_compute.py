@@ -226,7 +226,9 @@ class ComputeTest(MatadorUnitTest):
         print('Process completed!')
 
         completed_exists = isfile('completed/_Li.res')
+        base_files_exist = [isfile('_Li.res'), isfile('_Li.res.lock'), isfile('_Li.castep')]
         self.assertTrue(completed_exists, "couldn't find output file!")
+        self.assertFalse(base_files_exist, "couldn't clean input files")
 
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
     def test_failed_relaxation(self):
@@ -448,13 +450,15 @@ class ComputeTest(MatadorUnitTest):
         ComputeTask(ncores=NCORES, nnodes=None, node=node,
                     res=seed, param_dict=param_dict, cell_dict=cell_dict,
                     verbosity=VERBOSITY, killcheck=True,
-                    reopt=True, executable=executable,
+                    reopt=True, executable=executable, compute_dir="/tmp/compute_test",
                     start=True)
 
         completed_exists = [isfile('completed/_LiC.res'),
                             isfile('completed/_LiC.castep'),
                             isfile('completed/_LiC-out.cell')]
+        base_file_exists = [isfile('_LiC.res'), isfile('_LiC.castep'), isfile('_LiC.res.lock')]
 
+        self.assertFalse(all(base_file_exists), "failed to clean up files!")
         self.assertTrue(all(completed_exists), "couldn't find output files!")
 
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
