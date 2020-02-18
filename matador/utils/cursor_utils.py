@@ -607,7 +607,7 @@ def filter_unique_structures(cursor, quiet=False, **kwargs):
             **kwargs
         )
 
-        print('Filtered {} down to {}'.format(len(cursor), len(uniq_inds)))
+    print('Filtered {} down to {}'.format(len(cursor), len(uniq_inds)))
 
     return filtered_cursor
 
