@@ -72,7 +72,7 @@ def _get_hull_labels(hull, label_cutoff=None, num_species=None, exclude_edges=Tr
 def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
                  plot_hull_points=True, labels=None, label_cutoff=None, colour_by_source=False,
                  sources=None, hull_label=None, source_labels=None, title=True, plot_fname=None, show_cbar=True,
-                 label_offset=(1.15, 0.05), eform_limits=None,
+                 label_offset=(1.15, 0.05), eform_limits=None, legend_kwargs=None,
                  **kwargs):
     """ Plot calculated hull, returning ax and fig objects for further editing.
 
@@ -216,7 +216,8 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
     elif colour_by_source:
         _scatter_plot_by_source(
             hull, ax, scale, kwargs,
-            sources=None, source_labels=None, plot_hull_points=plot_hull_points)
+            sources=sources, source_labels=source_labels,
+            plot_hull_points=plot_hull_points, legend_kwargs=legend_kwargs)
 
     if eform_limits is None:
         eform_limits = (np.min(hull.structures[:, 1]), np.max(hull.structures[:, 1]))
@@ -703,7 +704,7 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
 
 
 def _scatter_plot_by_source(hull, ax, scale, kwargs,
-                            sources=None, source_labels=None, plot_hull_points=True):
+                            sources=None, source_labels=None, plot_hull_points=True, legend_kwargs=None):
     """ Add scatter points to the hull depending on the guessed
     provenance of a structure.
 
@@ -762,7 +763,10 @@ def _scatter_plot_by_source(hull, ax, scale, kwargs,
     for ind, source in enumerate(sources_present):
         ax.scatter(1e10, 1e10, c=colour_choices[source], label=sources_present[ind], alpha=alpha, lw=1)
 
-    legend = ax.legend(loc='lower right', ncol=2)
+    if legend_kwargs is not None:
+        legend = ax.legend(**legend_kwargs)
+    else:
+        legend = ax.legend(ncol=2)
     legend.set_zorder(1e20)
 
     return ax
