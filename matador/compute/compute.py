@@ -231,6 +231,13 @@ class ComputeTask:
         if self.paths is None:
             self.paths = {}
             self.paths['completed_dir'] = 'completed'
+            self.paths['failed_dir'] = 'bad_castep'
+            self.paths['memory_fname'] = 'memory_exceeded.txt'
+            self.paths['jobs_fname'] = 'jobs.txt'
+            self.paths['completed_fname'] = 'finished_cleanly.txt'
+            self.paths['failures_fname'] = 'failures.txt'
+            self.paths['memory_fname'] = 'memory_exceeded.txt'
+
         elif 'completed_dir' not in self.paths:
             raise RuntimeError('Invalid paths: {}'.format(self.paths))
 
@@ -370,6 +377,9 @@ class ComputeTask:
 
             if memory_usage_estimate > 0.9 * self.maxmem:
                 msg = 'Structure {} failed memcheck, skipping... '.format(self.seed) + mem_string
+                with open(self.paths['memory_fname'], 'a') as f:
+                    f.write("{} {}GB/{}GB".format(self.seed, memory_usage_estimate / 1024, self.maxmem / 1024))
+
                 raise MaxMemoryEstimateExceeded(msg)
 
         try:
@@ -1231,7 +1241,7 @@ class ComputeTask:
 
         """
         try:
-            bad_dir = self.root_folder + '/bad_castep'
+            bad_dir = self.root_folder + '/' + self.paths["failed_dir"]
             if not os.path.exists(bad_dir):
                 os.makedirs(bad_dir, exist_ok=True)
             seed_files = glob.glob(seed + '.*') + glob.glob(seed + '-out.cell*')
