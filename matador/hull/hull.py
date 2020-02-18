@@ -144,9 +144,6 @@ class QueryConvexHull:
         post-processing specified by initial arguments.
 
         """
-
-        self.construct_phase_diagram()
-
         if self.args.get('uniq') and self.args['subcmd'] != 'swaps':
             from matador.utils.cursor_utils import filter_unique_structures
             if self.args.get('uniq') is True:
@@ -157,10 +154,13 @@ class QueryConvexHull:
             self.cursor = filter_unique_structures(
                 self.cursor,
                 args=self.args,
+                quiet=True,
                 sim_tol=sim_tol,
                 hull=True,
                 energy_key=self.energy_key
             )
+
+        self.construct_phase_diagram()
 
         if not self.hull_cursor:
             print_warning('No structures on hull with chosen chemical potentials.')
