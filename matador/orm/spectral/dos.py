@@ -7,6 +7,7 @@ vibrational DOS, with or without projection data.
 """
 
 import warnings
+import copy
 import functools
 import numpy as np
 import scipy.integrate
@@ -33,6 +34,7 @@ class DensityOfStates(Dispersion, DataContainer):
                 a dispersion object to convert.
 
         """
+
         if args and isinstance(args[0], dict):
             data = args[0]
         else:
@@ -41,6 +43,8 @@ class DensityOfStates(Dispersion, DataContainer):
         # check that we've been passed this first
         if isinstance(data, Dispersion) or 'dos' not in data:
             data = self._from_dispersion(data)
+        elif isinstance(data, DensityOfStates):
+            data = copy.deepcopy(DensityOfStates._data)
 
         super().__init__(data)
         self._trim_dos()
@@ -60,12 +64,8 @@ class DensityOfStates(Dispersion, DataContainer):
         _data = {}
         dos, energies = self.bands_as_dos(data, gaussian_width=self.gaussian_width)
 
-        for key in [
-                'eigs_s_k', 'eigs_q',
-                'kpoint_path', 'kpoint_weights',
-                'num_kpoints', 'num_qpoints', 'num_modes']:
-            if key in data:
-                _data[key] = data[key]
+        for key in data:
+            _data[key] = data[key]
 
         _data['dos'] = dos
         _data['energies'] = energies

@@ -51,6 +51,8 @@ class Spectral(DataContainer):
     @property
     def num_bands(self):
         """ Number of eigenvalues per q/k-point. """
+        if 'Vibrational' in self.__class__.__name__:
+            return self._data['num_modes']
         return self._data['num_bands']
 
     @property
