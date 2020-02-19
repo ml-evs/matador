@@ -771,8 +771,7 @@ class ComputeTask:
                 LOG.info('Writing results of singleshot CASTEP run to res file and tidying up.')
                 doc2res(results_dict, seed, hash_dupe=False, overwrite=True)
                 self.mv_to_completed(seed, keep=keep, completed_dir=self.paths['completed_dir'])
-                if not keep:
-                    self.tidy_up(seed)
+                self.tidy_up(seed)
 
             if self.compute_dir is not None:
                 os.chdir(self.root_folder)
@@ -1475,8 +1474,7 @@ class ComputeTask:
                   .format(matador.utils.print_utils.dumps(this_calc_doc,
                                                           indent=None)))
 
-    @staticmethod
-    def tidy_up(seed):
+    def tidy_up(self, seed):
         """ Delete all created files before quitting.
 
         Parameters:
@@ -1484,10 +1482,15 @@ class ComputeTask:
 
         """
         files = glob.glob(seed + '.*')
+        if self.compute_dir is not None:
+            files += glob.glob(self.root_folder + '/' + seed + '.*')
         if files:
             LOG.info('Tidying up remaining files: {files}'.format(files=files))
             for f in files:
-                if not (f.endswith('.res') or f.endswith('.castep')):
+                # if we're working in a compute dir, then delete any remaining files in base dir
+                # otherwise, only delete things that we dont care about, i.e. non-res/castep in
+                # case they were not correctly moved to completed/bad_castep by the other routines
+                if self.compute_dir is not None or (not (f.endswith('.res') or f.endswith('.castep'))):
                     os.remove(f)
 
     def _update_output_files(self, seed, opti_dict=None):

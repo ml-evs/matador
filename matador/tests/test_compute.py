@@ -3,7 +3,6 @@
 """ Some tests for high-throughput calculations. """
 
 import unittest
-import subprocess as sp
 import os
 from os.path import isfile, isdir
 import glob
@@ -228,7 +227,7 @@ class ComputeTest(MatadorUnitTest):
         completed_exists = isfile('completed/_Li.res')
         base_files_exist = [isfile('_Li.res'), isfile('_Li.res.lock'), isfile('_Li.castep')]
         self.assertTrue(completed_exists, "couldn't find output file!")
-        self.assertFalse(base_files_exist, "couldn't clean input files")
+        self.assertFalse(any(base_files_exist), "couldn't clean input files")
 
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
     def test_failed_relaxation(self):
@@ -458,7 +457,7 @@ class ComputeTest(MatadorUnitTest):
                             isfile('completed/_LiC-out.cell')]
         base_file_exists = [isfile('_LiC.res'), isfile('_LiC.castep'), isfile('_LiC.res.lock')]
 
-        self.assertFalse(all(base_file_exists), "failed to clean up files!")
+        self.assertFalse(any(base_file_exists), "failed to clean up files!")
         self.assertTrue(all(completed_exists), "couldn't find output files!")
 
     @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), 'castep or mpirun executable not found in PATH')
