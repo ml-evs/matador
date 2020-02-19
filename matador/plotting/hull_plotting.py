@@ -745,7 +745,6 @@ def _scatter_plot_by_source(hull, ax, scale, kwargs,
     sources_present = [source for source in sources if source in sources_present]
     colour_choices = {source: hull.colours[ind + 1] for ind, source in enumerate(sources_present)}
     colours = [colour_choices[src] for src in colours]
-
     alpha = kwargs.get('alpha')
     if alpha is None:
         alpha = 0.2
@@ -761,7 +760,7 @@ def _scatter_plot_by_source(hull, ax, scale, kwargs,
                        zorder=zorders[ind]+100)
 
     for ind, source in enumerate(sources_present):
-        ax.scatter(1e10, 1e10, c=colour_choices[source], label=sources_present[ind], alpha=alpha, lw=1)
+        ax.scatter(1e10, 1e10, c=colour_choices[source], label=source_labels[ind], alpha=alpha, lw=1)
 
     if legend_kwargs is not None:
         legend = ax.legend(**legend_kwargs)
