@@ -590,15 +590,15 @@ def projected_bandstructure_plot(dispersion, ax, path, bbox_extra_artists, pdis_
                      interpolation_factor=pdis_interpolation_factor, point_scale=pdis_point_scale,
                      ax=ax, colours=dos_colours)
 
-    if not kwargs['plot_pdos']:
-        for ind, _ in enumerate(projectors):
-            if ind in keep_inds:
-                ax.scatter(1e20, 0, facecolor=dos_colours[ind],
-                           label=projector_labels[ind], lw=0)
+    # if not kwargs['plot_pdos']:
+    for ind, _ in enumerate(projectors):
+        if ind in keep_inds:
+            ax.scatter(1e20, 0, facecolor=dos_colours[ind],
+                       label=projector_labels[ind], lw=0)
 
-        legend = ax.legend(loc=1)
-        legend.set_zorder(1e20)
-        bbox_extra_artists.append(legend)
+    legend = ax.legend(loc=1)
+    legend.set_zorder(1e20)
+    bbox_extra_artists.append(legend)
 
     return ax
 
