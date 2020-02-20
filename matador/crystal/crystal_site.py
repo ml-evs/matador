@@ -7,7 +7,7 @@ atomic sites.
 """
 
 import numpy as np
-from matador.utils.cell_utils import cart2frac, frac2cart
+from matador.utils.cell_utils import cart2frac, frac2cart, wrap_frac_coords
 
 
 class Site:
@@ -51,11 +51,17 @@ class Site:
         if '_coords' not in self.__dict__:
             self._coords = dict()
         if units == 'fractional':
-            self._coords['fractional'] = [float(pos) for pos in position]
+            self._coords['fractional'] = wrap_frac_coords(
+                [float(pos) for pos in position],
+                remove=False
+            )
             self._coords['cartesian'] = frac2cart(self.lattice, self.coords)
         elif units == 'cartesian':
             self._coords['cartesian'] = [float(pos) for pos in position]
-            self._coords['fractional'] = cart2frac(self.lattice, self.coords(units='cartesian'))
+            self._coords['fractional'] = wrap_frac_coords(
+                cart2frac(self.lattice, self.coords(units='cartesian')),
+                remove=False
+            )
         else:
             raise RuntimeError('Unit system {} not understood, expecting `fractional`/`cartesian`'.format(units))
 
@@ -92,4 +98,6 @@ class Site:
         return np.asarray(self.get_coords(units='cartesian')) - np.asarray(other_site.get_coords(units='cartesian'))
 
     def distance_between_sites(self, other_site):
-        return np.linalg.norm(self.displacement_between_sites(other_site))
+        return np.linalg.norm(
+            self.displacement_between_sites(other_site)
+        )

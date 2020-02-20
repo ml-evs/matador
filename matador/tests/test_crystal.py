@@ -16,15 +16,15 @@ from matador.scrapers.magres_scrapers import magres2dict
 REAL_PATH = '/'.join(realpath(__file__).split('/')[:-1]) + '/'
 
 try:
-    import networkx
+    import networkx # noqa
     imported_networkx = True
 except ImportError:
     imported_networkx = False
 
 imported_vornet = False
 
-class UnitCellTest(unittest.TestCase):
 
+class UnitCellTest(unittest.TestCase):
 
     def test_cart_init(self):
         lattice_cart = [[3, 0, 0], [0, 3, 0], [0, 0, 3]]
@@ -39,7 +39,7 @@ class UnitCellTest(unittest.TestCase):
         lattice_cart = np.asarray([[3, 0, 0], [0, 3, 0], [0, 0, 3]])
         cell_2 = UnitCell(lattice_cart)
         self.assertAlmostEqual(cell_2.lattice_cart, lat_tup)
-        self.assertAlmostEqual(cell_2.lattice_abc,((3, 3, 3), (90, 90, 90)))
+        self.assertAlmostEqual(cell_2.lattice_abc, ((3, 3, 3), (90, 90, 90)))
         self.assertEqual(cell_2.volume, 27)
         self.assertAlmostEqual(cell_2.lengths, (3, 3, 3))
         self.assertAlmostEqual(cell_2.angles, (90, 90, 90))
@@ -135,7 +135,6 @@ class CrystalTest(unittest.TestCase):
         self.assertEqual(doc.space_group, 'Pm-3m')
 
     def testSites(self):
-        from copy import deepcopy
         doc, s = castep2dict(REAL_PATH + 'data/Na3Zn4-swap-ReOs-OQMD_759599.castep')
         del doc['lattice_cart']
         crystal = Crystal(doc)
@@ -148,14 +147,21 @@ class CrystalTest(unittest.TestCase):
         self.assertEqual([atom for atom in crystal], [atom[1] for atom in enumerate(crystal)])
 
         atom = Site(species='Cl', position=[0.2, 0.5, 0.2], lattice_cart=[[10, 0, 0], [0, 10, 0], [0, 0, 10]])
-
         atom2 = copy.deepcopy(atom)
-
         atom2.species = "Br"
 
         self.assertEqual(atom.species, "Cl")
         self.assertEqual(atom2.species, "Br")
 
+        atom2.set_position([1.2, -0.5, 0.2], "fractional")
+        np.testing.assert_array_almost_equal(atom2.displacement_between_sites(atom), [0.0, 0.0, 0.0], decimal=10)
+        self.assertAlmostEqual(atom2.distance_between_sites(atom), 0.0, places=10)
+        atom2.set_position([1.3, -0.5, 0.2], "fractional")
+        np.testing.assert_array_almost_equal(atom2.displacement_between_sites(atom), [1.0, 0.0, 0.0], decimal=10)
+        self.assertAlmostEqual(atom2.distance_between_sites(atom), 1.0, places=10)
+        atom2.set_position([1.3, -0.5, 0.3], "fractional")
+        np.testing.assert_array_almost_equal(atom2.displacement_between_sites(atom), [1.0, 0.0, 1.0], decimal=10)
+        self.assertAlmostEqual(atom2.distance_between_sites(atom), np.sqrt(2), places=10)
 
     def testSpg(self):
         doc, s = castep2dict(REAL_PATH + 'data/Na3Zn4-swap-ReOs-OQMD_759599.castep')
