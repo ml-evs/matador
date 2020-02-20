@@ -70,8 +70,8 @@ class DataContainer(ABC):
         try:
             return self._data[key]
         except KeyError:
-            raise AttributeError('Object has no data or implementation for requested key: "{}"'
-                                 .format(key))
+            raise KeyError('Object has no data or implementation for requested key: "{}"'
+                           .format(key))
 
     def __delitem__(self, key: str):
         raise AttributeError('Object does not support deletion of keys in `_data`.')
