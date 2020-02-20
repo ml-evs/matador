@@ -58,7 +58,8 @@ def main():
     parser.add_argument('-ph', '--phonons', action='store_true', default=False,
                         help='plot phonon calculation, rather than electronic')
     parser.add_argument('-gw', '--gaussian_width', type=float,
-                        help='smearing width for DOS from .bands_dos (default: 0.1 eV) or .phonon_dos files (default: 10 1/cm)')
+                        help=('smearing width for DOS from .bands_dos (default: 0.1 eV) or '
+                              '.phonon_dos files (default: 10 1/cm)'))
     parser.add_argument('--highlight_bands', nargs='+', type=int,
                         help='specify band numbres to highlight in plot')
     parser.add_argument('-v', '--verbosity', type=int, default=0,

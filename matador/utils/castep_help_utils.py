@@ -54,7 +54,8 @@ def scrape_castep_params(executable):
     blocks = list(sorted(list(blocks)))
     cell = [keyword for keyword in cell if keyword not in blocks]
 
-    version_string = str(subprocess.check_output('{} --version'.format(executable), shell=True)).split('\\n')[0].split()[-1].strip()
+    version_string = str(subprocess.check_output('{} --version'
+                         .format(executable), shell=True)).split('\\n')[0].split()[-1].strip()
     return cell, blocks, params, version_string
 
 

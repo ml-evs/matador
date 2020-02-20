@@ -219,7 +219,8 @@ def display_results(cursor,
             if use_source:
                 src = get_root_source(doc['source'])
                 max_len = 34
-                struct_string.append("  {:<38.{max_len}}".format(src if len(src) < max_len else src[:max_len-4]+'[..]', max_len=max_len))
+                struct_string.append(
+                    "  {:<38.{max_len}}".format(src if len(src) < max_len else src[:max_len-4]+'[..]', max_len=max_len))
             else:
                 struct_string.append("  {:^26.22}".format(' '.join(doc.get('text_id', ['xxx', 'yyy']))))
             if hull and np.abs(doc.get('hull_distance')) <= 0.0 + 1e-12:
@@ -277,7 +278,8 @@ def display_results(cursor,
             elif args.get('per_atom'):
                 struct_string[-1] += "{:>18.5f}".format(recursive_get(doc, energy_key) - gs_enthalpy)
             else:
-                struct_string[-1] += "{:>18.5f}".format(recursive_get(doc, energy_key) * doc['num_atoms'] / doc['num_fu'] - gs_enthalpy)
+                struct_string[-1] += ("{:>18.5f}"
+                                      .format(recursive_get(doc, energy_key) * doc['num_atoms'] / doc['num_fu'] - gs_enthalpy))
         except KeyError:
             struct_string[-1] += "{:^18}".format('xxx')
 

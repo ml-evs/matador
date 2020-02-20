@@ -256,7 +256,8 @@ def get_convergence_data(structure_files, conv_parameter='cut_off_energy', speci
         for value in chempots_dict:
             for elem in elems:
                 if elem not in chempots_dict[value]:
-                    print('WARNING: {} chemical potential missing at {} = {} eV, skipping this value.'.format(elem, conv_parameter, value))
+                    print('WARNING: {} chemical potential missing at {} = {} eV, skipping this value.'
+                          .format(elem, conv_parameter, value))
 
     for key in structure_files:
         skip = False

@@ -357,11 +357,7 @@ class VibrationalDOS(DensityOfStates):
 
     def vibrational_free_energy_from_dos(self, temperatures=None):
         """ Computes the vibrational contribution to the free energy
-        at a given set of temperatures, using
-
-        .. math::
-
-            F_{\\text{vib}}(T) = kT \\int F(\\omega) \\ln{\\left[1 - \\exp{-\\frac{\\hbar\\omega}{kT}}\\right]\\, \\mathrm{d}\\omega,
+        at a given set of temperatures.
 
         Keyword arguments:
             temperature (list): list, array or float of temperatures.

@@ -516,7 +516,8 @@ def param2dict(seed, db=True, **kwargs):
                             if temp_cut_off[1] == 'ev':
                                 param['cut_off_energy'] = f90_float_parse(temp_cut_off[0])
                             elif db:
-                                raise RuntimeError('cut_off_energy units must be eV or blank in db mode, not {}'.format(temp_cut_off[1]))
+                                raise RuntimeError('cut_off_energy units must be eV or blank in db mode, not {}'
+                                                   .format(temp_cut_off[1]))
                             else:
                                 param['cut_off_energy'] = '{} {}'.format(temp_cut_off[0], temp_cut_off[1])
                         else:
@@ -1749,7 +1750,8 @@ def _castep_scrape_beef(flines, castep):
     else:
         return
 
-    castep['_beef'] = {'thetas': [], 'xc_energy': [], 'total_energy': [], 'total_energy_per_atom': [], 'xc_energy_per_atom': []}
+    castep['_beef'] = {'thetas': [], 'xc_energy': [], 'total_energy': [],
+                       'total_energy_per_atom': [], 'xc_energy_per_atom': []}
 
     for line_no, line in enumerate(flines[beef_start:]):
         if '<-- BEEF' in line:

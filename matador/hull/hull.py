@@ -220,7 +220,8 @@ class QueryConvexHull:
             custom_elem = self.species
 
         if len(custom_elem) != len(self.species):
-            raise RuntimeError('Wrong number of compounds/chemical potentials specified: {} vs {}'.format(custom_elem, self.args.get('chempots')))
+            raise RuntimeError('Wrong number of compounds/chemical potentials specified: {} vs {}'
+                               .format(custom_elem, self.args.get('chempots')))
         for i, _ in enumerate(self.args.get('chempots')):
             self.chempot_cursor.append(dict())
             self.chempot_cursor[i]['stoichiometry'] = get_stoich_from_formula(custom_elem[i])
@@ -326,7 +327,8 @@ class QueryConvexHull:
                         break
 
             if len(self.chempot_cursor) != len(self.species):
-                raise RuntimeError('Found {} of {} required chemical potentials'.format(len(self.chempot_cursor), len(self.species)))
+                raise RuntimeError('Found {} of {} required chemical potentials'
+                                   .format(len(self.chempot_cursor), len(self.species)))
 
             if self.args.get('debug'):
                 print([mu['stoichiometry'] for mu in self.chempot_cursor])
@@ -649,7 +651,8 @@ class QueryConvexHull:
 
             # if tie line runs from fully de-lithiated to pure lithium (for example), then print and skip
             if len(intersections) == 0:
-                print_notify('No intermediate structures found for starting point {}.'.format(get_formula_from_stoich(endstoichs[reaction_ind])))
+                print_notify('No intermediate structures found for starting point {}.'
+                             .format(get_formula_from_stoich(endstoichs[reaction_ind])))
                 continue
 
             intersections = np.asarray(intersections)
@@ -658,7 +661,8 @@ class QueryConvexHull:
             ends_of_rows = []
             min_values = []
             rows_to_keep = []
-            # remove row corresponding to largest triangle, i.e. chempots only, and near duplicates (i.e. points with multiple tie-lines)
+            # remove row corresponding to largest triangle, i.e. chempots only, and near duplicates
+            # (i.e. points with multiple tie-lines)
             for ind, row in enumerate(intersections):
                 if not (row[1:].tolist() == [0, 1] or row[1:].tolist() in ends_of_rows or
                         np.any(np.isclose(row.tolist()[1], [val for val in min_values]))):

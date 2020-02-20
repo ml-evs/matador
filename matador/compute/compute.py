@@ -119,8 +119,8 @@ class ComputeTask:
         """
         # set defaults and update class with desired values
         prop_defaults = {'paths': None, 'param_dict': None, 'cell_dict': None, 'mode': 'castep', 'executable': 'castep',
-                         'memcheck': False, 'rough': 4, 'rough_iter': 2, 'fine_iter': 20, 'spin': None,
-                         'output_queue': None, 'redirect': None, 'reopt': False, 'compute_dir': None, 'noise': False, 'squeeze': False,
+                         'memcheck': False, 'rough': 4, 'rough_iter': 2, 'fine_iter': 20, 'spin': None, 'squeeze': False,
+                         'output_queue': None, 'redirect': None, 'reopt': False, 'compute_dir': None, 'noise': False,
                          'custom_params': False, 'archer': False, 'maxmem': None, 'killcheck': True, 'kpts_1D': False,
                          'conv_cutoff': False, 'conv_kpt': False, 'slurm': False, 'intel': False,
                          'exec_test': True, 'timings': (None, None), 'start': True, 'verbosity': 1, 'polltime': 30,
@@ -597,7 +597,8 @@ class ComputeTask:
                             LOG.critical(msg)
                             raise CalculationError(msg)
                         if os.path.getmtime(seed + '.castep') - proc_clock < 0:
-                            msg = ('CASTEP file present, but too old to be made by this process. Please check your executable: {}.'
+                            msg = ('CASTEP file present, but too old to be made by this process. '
+                                   'Please check your executable: {}.'
                                    .format(self.executable))
                             LOG.critical(msg)
                             raise CalculationError(msg)
@@ -646,7 +647,8 @@ class ComputeTask:
                      .format(opti_dict.get('geom_iter')))
 
             # scrub keys that need to be rescraped
-            keys_to_remove = ['kpoints_mp_spacing', 'kpoints_mp_grid', 'species_pot', 'sedc_apply', 'sedc_scheme', 'cell_constraints']
+            keys_to_remove = ['kpoints_mp_spacing', 'kpoints_mp_grid', 'species_pot',
+                              'sedc_apply', 'sedc_scheme', 'cell_constraints']
             for key in keys_to_remove:
                 if key in opti_dict:
                     del opti_dict[key]
@@ -971,9 +973,11 @@ class ComputeTask:
 
             LOG.info('CASTEP version: {}'.format(version))
             if version < 18:
-                LOG.warning('Using CASTEP version {}: some features may not work, consider updating to at least CASTEP 18'.format(version))
+                LOG.warning('Using CASTEP version {}: '
+                            'some features may not work, consider updating to at least CASTEP 18'.format(version))
         except Exception:
-            LOG.warning('Unable to detect CASTEP version; some features may not work unless you are using at least version 18.')
+            LOG.warning('Unable to detect CASTEP version: '
+                        'some features may not work unless you are using at least version 18.')
 
     @property
     def mpi_library(self):
@@ -995,14 +999,16 @@ class ComputeTask:
 
         if self.archer:
             if guessed_version != 'archer':
-                message = 'Detected {} MPI, but user asked to use aprun... please check your environment.'.format(self._mpi_library)
+                message = ('Detected {} MPI, but user asked to use aprun... please check your environment.'
+                           .format(self._mpi_library))
                 LOG.critical(message)
                 raise CriticalError(message)
             return 'archer'
 
         if self.intel:
             if guessed_version != 'intel':
-                message = 'Detected {} MPI, but user asked to use Intel MPI... please check your environment.'.format(self._mpi_library)
+                message = ('Detected {} MPI, but user asked to use Intel MPI... please check your environment.'
+                           .format(self._mpi_library))
                 LOG.critical(message)
                 raise CriticalError(message)
             return 'intel'

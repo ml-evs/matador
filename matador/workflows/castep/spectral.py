@@ -78,18 +78,32 @@ class CastepSpectralWorkflow(Workflow):
                  'dispersion': castep_spectral_dispersion,
                  'pdis': optados_pdispersion}
 
-        exts = {'scf':
-                {'input': ['.cell', '.param'], 'output': ['.castep', '.*err', '-out.cell']},
-                'dos':
-                {'input': ['.cell', '.param'], 'output': ['.castep', '.bands', '.pdos_bin', '.dome_bin', '.*err', '-out.cell']},
-                'dispersion':
-                {'input': ['.cell', '.param'], 'output': ['.castep', '.bands', '.pdos_bin', '.dome_bin', '.*err', '-out.cell']},
-                'pdis':
-                {'input': ['.odi', '.pdos_bin'], 'output': ['.odo', '.*err']},
-                'pdos':
-                {'input': ['.odi', '.pdos_bin', '.dome_bin'], 'output': ['.odo', '.*err']},
-                'broadening':
-                {'input': ['.odi', '.pdos_bin', '.dome_bin'], 'output': ['.odo', '.*err']}}
+        exts = {
+            'scf': {
+                'input': ['.cell', '.param'],
+                'output': ['.castep', '.*err', '-out.cell']
+            },
+            'dos': {
+                'input': ['.cell', '.param'],
+                'output': ['.castep', '.bands', '.pdos_bin', '.dome_bin', '.*err', '-out.cell']
+            },
+            'dispersion': {
+                'input': ['.cell', '.param'],
+                'output': ['.castep', '.bands', '.pdos_bin', '.dome_bin', '.*err', '-out.cell']
+            },
+            'pdis': {
+                'input': ['.odi', '.pdos_bin'],
+                'output': ['.odo', '.*err']
+            },
+            'pdos': {
+                'input': ['.odi', '.pdos_bin', '.dome_bin'],
+                'output': ['.odo', '.*err']
+            },
+            'broadening': {
+                'input': ['.odi', '.pdos_bin', '.dome_bin'],
+                'output': ['.odo', '.*err']
+            }
+        }
 
         if os.path.isfile(self.seed + '.check'):
             LOG.info('Found {}.check, so skipping initial SCF.'.format(self.seed))

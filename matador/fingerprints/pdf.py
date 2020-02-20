@@ -328,7 +328,9 @@ class PDF(Fingerprint):
 
         """
         if self._num_images == 'auto':
-            self._image_vec = self._get_image_trans_vectors_auto(self._lattice, self.rmax, self.dr, max_num_images=self.kwargs.get('max_num_images'))
+            self._image_vec = self._get_image_trans_vectors_auto(
+                self._lattice, self.rmax, self.dr, max_num_images=self.kwargs.get('max_num_images')
+            )
         else:
             self._image_vec = list(itertools.product(range(-self._num_images, self._num_images + 1), repeat=3))
 

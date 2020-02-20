@@ -275,7 +275,9 @@ def _cif_set_unreduced_sites(doc):
     doc['site_occupancy'] = unreduced_occupancies
     doc['atom_types'] = unreduced_species
 
-    doc['site_occupancy'] = [doc['site_occupancy'][ind] for ind, atom in enumerate(doc['positions_frac']) if ind not in dupe_set]
+    doc['site_occupancy'] = [
+        doc['site_occupancy'][ind] for ind, atom in enumerate(doc['positions_frac']) if ind not in dupe_set
+    ]
     doc['atom_types'] = [doc['atom_types'][ind] for ind, atom in enumerate(doc['positions_frac']) if ind not in dupe_set]
     doc['positions_frac'] = [atom for ind, atom in enumerate(doc['positions_frac']) if ind not in dupe_set]
 
@@ -283,8 +285,11 @@ def _cif_set_unreduced_sites(doc):
     if abs(tmp - round(tmp, 0)) < EPS:
         tmp = round(tmp, 0)
     doc['num_atoms'] = tmp
-    assert len(doc['site_occupancy']) == len(doc['positions_frac']), 'Size mismatch between positions and occs, {} vs {}'.format(len(doc['site_occupancy']), len(doc['positions_frac']))
-    assert len(doc['positions_frac']) == len(doc['atom_types']), 'Size mismatch between positions and types'
+    if len(doc['site_occupancy']) != len(doc['positions_frac']):
+        raise RuntimeError('Size mismatch between positions and occs, {} vs {}'
+                           .format(len(doc['site_occupancy']), len(doc['positions_frac'])))
+    if len(doc['positions_frac']) != len(doc['atom_types']):
+        raise RuntimeError('Size mismatch between positions and types')
 
 
 def _cif_line_contains_data(line):

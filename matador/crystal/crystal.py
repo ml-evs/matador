@@ -512,8 +512,14 @@ class Crystal(DataContainer):
 
                 bond_length = data[2]['dist']
                 is_image = bool(data[2]['image'])
-                bonding_dict[atom_1]['bonds'].append({'species': site_2.species, 'index': atom_2, 'length': bond_length, 'is_image': is_image, 'position': site_2.coords})
-                bonding_dict[atom_2]['bonds'].append({'species': site_1.species, 'index': atom_1, 'length': bond_length, 'is_image': is_image, 'position': site_1.coords})
+                bonding_dict[atom_1]['bonds'].append(
+                    {'species': site_2.species, 'index': atom_2, 'length': bond_length,
+                     'is_image': is_image, 'position': site_2.coords}
+                )
+                bonding_dict[atom_2]['bonds'].append(
+                    {'species': site_1.species, 'index': atom_1, 'length': bond_length,
+                     'is_image': is_image, 'position': site_1.coords}
+                )
 
             for key in bonding_dict:
                 bonding_dict[key]['bonds'] = sorted(bonding_dict[key]['bonds'], key=lambda x: x['index'])
