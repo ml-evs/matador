@@ -57,6 +57,8 @@ def main():
                         help='plot position and size of band gap')
     parser.add_argument('-ph', '--phonons', action='store_true', default=False,
                         help='plot phonon calculation, rather than electronic')
+    parser.add_argument('-ir', '--infrared', action='store_true', default=False,
+                        help='plot infrared spectrum from file')
     parser.add_argument('-gw', '--gaussian_width', type=float,
                         help='smearing width for DOS from .bands_dos (default: 0.1 eV) or .phonon_dos files (default: 10 1/cm)')
     parser.add_argument('--highlight_bands', nargs='+', type=int,
@@ -85,6 +87,7 @@ def main():
 
     verbosity = kwargs.get('verbosity')
     phonons = kwargs.get('phonons')
+    ir = kwargs.get('ir')
     if kwargs.get('labels'):
         labels = ' '.join(kwargs.get('labels')).split(',')
     else:
@@ -107,7 +110,7 @@ def main():
     else:
         band_reorder = None
 
-    from matador.plotting import plot_spectral
+    from matador.plotting import plot_spectral, plot_ir_spectrum
 
     del kwargs['seed']
     del kwargs['verbosity']
@@ -120,7 +123,7 @@ def main():
     from matador.utils.print_utils import print_failure
 
     for seed in seeds:
-        if not phonons:
+        if not phonons and not ir:
             bs_seed = seed + '.bands'
             bandstructure = isfile(bs_seed)
             dos_seeds = glob.glob(seed + '*.dat')
@@ -128,7 +131,7 @@ def main():
                 dos_seeds.append(seed + '.bands_dos')
             dos = any([isfile(dos_seed) for dos_seed in dos_seeds])
 
-        elif phonons:
+        elif phonons and not ir:
             phonon_seed = seed + '.phonon'
             bandstructure = isfile(phonon_seed)
             dos_seed = seed + '.phonon_dos'
@@ -147,18 +150,21 @@ def main():
     if kwargs.get('bs_only') and bandstructure:
         dos = False
 
-    plot_spectral(seeds,
-                  plot_bandstructure=bandstructure,
-                  plot_dos=dos,
-                  plot_pdis=plot_pdis,
-                  cell=cell,
-                  gap=gap,
-                  verbosity=verbosity,
-                  labels=labels,
-                  cmap=cmap,
-                  band_reorder=band_reorder,
-                  band_colour=band_colour,
-                  **kwargs)
+    if not ir:
+        plot_spectral(seeds,
+                      plot_bandstructure=bandstructure,
+                      plot_dos=dos,
+                      plot_pdis=plot_pdis,
+                      cell=cell,
+                      gap=gap,
+                      verbosity=verbosity,
+                      labels=labels,
+                      cmap=cmap,
+                      band_reorder=band_reorder,
+                      band_colour=band_colour,
+                      **kwargs)
+    else:
+        plot_ir_spectrum(seed)
 
 
 if __name__ == '__main__':
