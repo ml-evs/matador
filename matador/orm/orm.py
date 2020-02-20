@@ -29,6 +29,13 @@ class DataContainer(ABC):
 
         self._validate_inputs()
 
+    @property
+    def source(self):
+        """ Return the source of the data. """
+        if 'source' not in self._data:
+            return 'unknown'
+        return self._data['source']
+
     def _validate_inputs(self):
         """ Validate the incoming data by checking the existence
         of the required keys for the subclass.
