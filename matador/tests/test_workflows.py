@@ -3,9 +3,7 @@
 """ Some tests for high-throughput calculations. """
 
 import unittest
-import subprocess as sp
 import os
-from unittest import mock
 import multiprocessing as mp
 import shutil
 import glob
@@ -24,7 +22,7 @@ EXECUTABLE = "castep"
 
 
 CASTEP_PRESENT = detect_program(EXECUTABLE)
-MPI_PRESENT = detect_program('mpirun')
+MPI_PRESENT = detect_program("mpirun")
 
 if CASTEP_PRESENT and MPI_PRESENT:
     NCORES = mp.cpu_count() - 2
@@ -32,7 +30,7 @@ else:
     NCORES = 1
 
 
-@unittest.skipIf(not CASTEP_PRESENT, 'CASTEP not found.')
+@unittest.skipIf(not CASTEP_PRESENT, "CASTEP not found.")
 class ElasticWorkflowTest(MatadorUnitTest):
     """ Run a spectral workflow calculation. """
 
@@ -51,7 +49,7 @@ class ElasticWorkflowTest(MatadorUnitTest):
             param_dict=param_dict,
             verbosity=VERBOSITY,
             compute_dir="/tmp/scratch_test",
-            workflow_kwargs={'plot': False, 'num_volumes': 3}
+            workflow_kwargs={"plot": False, "num_volumes": 3},
         )
 
         self.assertFalse(os.path.isfile("completed/Si2.bib"))
@@ -67,11 +65,11 @@ class ElasticWorkflowTest(MatadorUnitTest):
         self.assertTrue(os.path.isfile("completed/Si2.castep"))
 
         self.assertTrue(os.path.isfile("completed/Si2.bulk_mod.cell"))
-        self.assertFalse(os.path.exists('/tmp/scratch_test'))
-        self.assertFalse(os.path.exists('scratch_test_link'))
+        self.assertFalse(os.path.exists("/tmp/scratch_test"))
+        self.assertFalse(os.path.exists("scratch_test_link"))
 
 
-@unittest.skipIf(not CASTEP_PRESENT, 'CASTEP not found.')
+@unittest.skipIf(not CASTEP_PRESENT, "CASTEP not found.")
 class PhononWorkflowTest(MatadorUnitTest):
     """ Run a spectral workflow calculation. """
 
@@ -101,14 +99,14 @@ class PhononWorkflowTest(MatadorUnitTest):
         self.assertTrue(os.path.isfile("completed/Si2.phonon_dos"))
 
         phon, s = phonon2dict("completed/Si2.phonon")
-        self.assertTrue(s, msg='Failed to read phonon file')
-        self.assertGreater(np.min(phon['eigenvalues_q']), -0.05)
+        self.assertTrue(s, msg="Failed to read phonon file")
+        self.assertGreater(np.min(phon["eigenvalues_q"]), -0.05)
 
         self.assertTrue(os.path.isfile("completed/Si2.cell"))
         self.assertTrue(os.path.isfile("completed/Si2.res"))
 
 
-@unittest.skipIf(not CASTEP_PRESENT, 'CASTEP not found.')
+@unittest.skipIf(not CASTEP_PRESENT, "CASTEP not found.")
 class SpectralWorkflowTest(MatadorUnitTest):
     """ Run a spectral workflow calculation. """
 
@@ -188,7 +186,7 @@ class SpectralWorkflowTest(MatadorUnitTest):
             shutil.copy(_f, ".")
 
         cell_dict, _ = cell2dict("Si.cell", db=False)
-        del cell_dict['spectral_kpoints_path_spacing']
+        del cell_dict["spectral_kpoints_path_spacing"]
         param_dict, _ = param2dict("Si.param", db=False)
         _ = ComputeTask(
             res="Si2.res",
