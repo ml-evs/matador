@@ -3,7 +3,7 @@ the results of infrared and Raman spectroscopy calculations.
 
 """
 
-from matador.plotting import plotting_function
+from matador.plotting.plotting import plotting_function
 
 
 def read_ir_file(seed):
@@ -27,7 +27,7 @@ def read_ir_file(seed):
 @plotting_function
 def plot_ir_spectrum(seed):
     """ This function plots the IR spectrum found in the given file.
-    
+
     """
 
     raise NotImplementedError
