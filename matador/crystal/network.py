@@ -4,7 +4,6 @@ into CrystalGraph objects.
 import networkx as nx
 import numpy as np
 import itertools
-import copy
 
 EPS = 1e-12
 
@@ -215,7 +214,7 @@ def draw_network(structure, layout=None, edge_labels=False, node_index=False, cu
     element_colours = get_element_colours()
     try:
         network = structure.network
-    except:
+    except Exception:
         network = structure
     if layout is None:
         pos = nx.spring_layout(network)

@@ -6,7 +6,6 @@ such that there are no clashes.
 """
 import os
 import argparse
-from traceback import print_exc
 from matador import __version__
 from matador.utils.print_utils import print_notify
 from matador.utils.errors import InputError

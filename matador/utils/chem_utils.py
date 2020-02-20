@@ -283,7 +283,6 @@ def get_number_of_chempots(stoich, chempot_stoichs, precision=5):
             with the given chemical potentials.
 
     """
-    import scipy.linalg
 
     if isinstance(stoich, dict):
         stoich = stoich['stoichiometry']
