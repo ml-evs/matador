@@ -81,12 +81,11 @@ Please consult the full `Python API documentation <http://matador-db.readthedocs
         refine              update structures in the database according to
                             specified --task
 
-
-.. |GH Actions| image:: https://github.com/ml-evs/matador/workflows/Run%20tests/badge.svg
-   :target: https://github.com/ml-evs/matador/actions?query=branch%3Adevelop 
+.. |GH Actions| image:: https://img.shields.io/github/workflow/status/ml-evs/matador/Run%20tests/develop?label=develop&logo=github
+   :target: https://github.com/ml-evs/matador/actions?query=branch%3Adevelop
 .. |MIT License| image:: https://img.shields.io/badge/license-MIT-blue.svg
    :target: https://github.com/ml-evs/matador/blob/master/LICENSE
-.. |Coverage Status| image:: https://codecov.io/bb/ml-evs/matador/branch/develop/graph/badge.svg
-  :target: https://codecov.io/bb/ml-evs/matador
+.. |Coverage Status| image:: https://img.shields.io/codecov/c/gh/ml-evs/matador/develop?logo=codecov
+  :target: https://codecov.io/gh/ml-evs/matador
 .. |Documentation Status| image:: https://readthedocs.org/projects/matador-db/badge/?version=latest
    :target: https://matador-db.readthedocs.io/en/latest/?badge=latest
