@@ -37,10 +37,7 @@ class Site:
             return self.key
         if key in self.site_data:
             return self.site_data[key]
-        if key == '__deepcopy__':
-            return self.__deepcopy__(memo)
-        else:
-            raise AttributeError
+        raise AttributeError
 
     def __deepcopy__(self, memo):
         from copy import deepcopy
