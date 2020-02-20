@@ -8,6 +8,7 @@ import numpy as np
 
 # matador modules
 from matador.crystal.crystal import Crystal, UnitCell
+from matador.crystal.crystal_site import Site
 from matador.scrapers.castep_scrapers import castep2dict
 from matador.scrapers.magres_scrapers import magres2dict
 
@@ -134,6 +135,7 @@ class CrystalTest(unittest.TestCase):
         self.assertEqual(doc.space_group, 'Pm-3m')
 
     def testSites(self):
+        from copy import deepcopy
         doc, s = castep2dict(REAL_PATH + 'data/Na3Zn4-swap-ReOs-OQMD_759599.castep')
         del doc['lattice_cart']
         crystal = Crystal(doc)
@@ -144,6 +146,16 @@ class CrystalTest(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             crystal[0].set_position([[1, 2, 3], [4, 5, 6], [7, 8, 9]], 'fractional')
         self.assertEqual([atom for atom in crystal], [atom[1] for atom in enumerate(crystal)])
+
+        atom = Site(species='Cl', position=[0.2, 0.5, 0.2], lattice_cart=[[10, 0, 0], [0, 10, 0], [0, 0, 10]])
+
+        atom2 = copy.deepcopy(atom)
+
+        atom2.species = "Br"
+
+        self.assertEqual(atom.species, "Cl")
+        self.assertEqual(atom2.species, "Br")
+
 
     def testSpg(self):
         doc, s = castep2dict(REAL_PATH + 'data/Na3Zn4-swap-ReOs-OQMD_759599.castep')

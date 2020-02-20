@@ -27,11 +27,11 @@ to clear the memory.
 from random import randint
 from os.path import dirname, realpath
 import argparse
-import getpass
 from traceback import print_exc
 import numpy as np
 import pymongo as pm
 import tqdm
+import qmpy
 
 
 def qmpy_parse_kpoints(string):
@@ -82,7 +82,7 @@ def qmpy_entry_to_doc(entry):
         doc['icsd'] = int(entry.label.split('-')[-1])
         try:
             doc['reference'] = str(entry.reference.citation)
-        except:
+        except Exception:
             pass
 
     doc['space_group'] = entry.spacegroup.hm
@@ -123,11 +123,12 @@ def qmpy_entry_to_doc(entry):
     doc['stress'] = -0.1 * (ef_calc.output.sxx + ef_calc.output.syy + ef_calc.output.szz)/3.0
     try:
         doc['max_force_on_atom'] = np.max(np.linalg.norm(doc['forces'], axis=-1))
-    except:
+    except Exception:
         print(entry.id, doc['forces'])
     doc['forces'] = doc['forces'].tolist()
 
     return doc
+
 
 def calc_mp_spacing(real_lat, mp_grid, prec=3):
     """ Convert real lattice in Cartesian basis and the
@@ -145,7 +146,6 @@ def calc_mp_spacing(real_lat, mp_grid, prec=3):
         float: mp_spacing rounded to `prec`.
 
     """
-    import numpy as np
     recip_lat = real2recip(real_lat)
     recip_len = np.zeros((3))
     recip_len = np.sqrt(np.sum(np.power(recip_lat, 2), axis=1))
@@ -153,6 +153,7 @@ def calc_mp_spacing(real_lat, mp_grid, prec=3):
     max_spacing = np.max(spacing)
     exponent = round(np.log10(max_spacing) - prec)
     return round(max_spacing + 0.5*10**exponent, prec)
+
 
 def real2recip(real_lat):
     """ Convert the real lattice in Cartesian basis to
@@ -238,7 +239,7 @@ class DBConverter:
         if '_id' in struct:
             raise RuntimeError('{}'.format(struct))
         try:
-            struct_id = self.repo.insert_one(struct)
+            _ = self.repo.insert_one(struct)
         except pm.errors.DuplicateKeyError:
             return 0
 
@@ -281,7 +282,6 @@ class OQMDConverter(DBConverter):
     the OQMD SQL database for all entries using the qmpy interface.
     """
     def __init__(self, *args, **kwargs):
-        import qmpy
         super().__init__(*args, **kwargs)
 
     def create_extra_indices(self):
@@ -291,8 +291,6 @@ class OQMDConverter(DBConverter):
     def build_mongo(self):
         """ Perform QMPY query for all entries, and scrape them into a MongoDB. """
         # start by scraping all converged structures with chosen label
-        finished = False
-        finished_once = False
         chunk_iter = 0
         all_structures = qmpy.Entry.objects.all().count()
         print('Expecting {} structures total'.format(all_structures))
@@ -315,9 +313,9 @@ class OQMDConverter(DBConverter):
                 break
 
             cursor = (qmpy.Entry.objects
-                .filter(id__gte=chunk_min)
-                .filter(id__lt=chunk_max)
-            )
+                      .filter(id__gte=chunk_min)
+                      .filter(id__lt=chunk_max))
+
             num_structures = cursor.count()
             if num_structures < 1:
                 continue
@@ -348,14 +346,13 @@ class OQMDConverter(DBConverter):
                 break
 
         if self.dryrun:
-            print('Successfully scraped', success_count, '/',
+            print('Successfully scraped', self.success_count, '/',
                   'structures.')
         if not self.dryrun:
             if self.import_count == 0:
                 raise RuntimeError('Nothing imported.')
             print('Successfully imported', self.import_count, '/',
                   'structures.')
-        return
 
 
 if __name__ == '__main__':

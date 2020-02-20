@@ -169,7 +169,10 @@ def plot_spectral(seeds, **kwargs):
         kwargs['ls'] = ['-'] * len(seeds)
         kwargs['colour_by_seed'] = True
         if kwargs.get('labels') is None:
-            kwargs['labels'] = [seed.split('/')[-1].split('.')[0] for seed in seeds]
+            try:
+                kwargs['labels'] = [seed.split('/')[-1].split('.')[0] for seed in seeds]
+            except AttributeError:
+                kwargs['labels'] = [seed.source for seed in seeds]
 
     kwargs['ls'] = []
     for i in range(len(seeds)):
@@ -331,7 +334,7 @@ def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
         ylabel = r'Energy (eV)'
     ax_dispersion.set_ylabel(ylabel)
     ax_dispersion.set_xlim(0, 1)
-    _add_path_labels(seed, dispersion, ax_dispersion, path, 0, kwargs)
+    _add_path_labels(seeds[-1], dispersion, ax_dispersion, path, 0, kwargs)
 
     return ax_dispersion
 
@@ -365,7 +368,7 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                     pdos_data, s = optados2dict(pdos_seed, verbosity=0)
                     if not s:
                         raise RuntimeError(pdos_data)
-                    dos_data._data['pdos'] = pdos_data
+                    dos_data['pdos'] = pdos_data
         else:
             dos_data = _load_phonon_dos(seed, kwargs)
             max_density = np.max(dos_data['dos'])
@@ -629,10 +632,8 @@ def _ordered_scatter(path, eigs, pdis, branches, ax=None, colours=None, interpol
     for nb in range(len(eigs[0])):
         for branch_ind, branch in enumerate(branches):
             k = path[(np.asarray(branch) - branch_ind).tolist()]
-            e = eigs[branch, nb]
             projections = pdis[branch, nb]
-
-            ek_fn = interp1d(k, e)
+            ek_fn = interp1d(k, eigs[branch, nb])
             k_interp = np.linspace(np.min(k), np.max(k), num=int(interpolation_factor*len(k)))
             ek_interp = ek_fn(k_interp)
             projections = projections.T
@@ -745,7 +746,7 @@ def _add_path_labels(seed, dispersion, ax_dispersion, path, seed_ind, kwargs):
         spg_structure = None
         if isinstance(dispersion, Dispersion):
             try:
-                spg_structure = doc2spg(dispersion._data)
+                spg_structure = doc2spg(dispersion)
             except (KeyError, RuntimeError):
                 pass
 
@@ -988,7 +989,7 @@ def _load_phonon_dos(seed, kwargs):
 
     if isinstance(seed, dict):
         return VibrationalDOS(seed)
-    if isinstance(seed, VibrationalDOS):
+    if isinstance(seed, DensityOfStates):
         return seed
 
     # otherwise, just read the phonon_dos file
