@@ -72,7 +72,6 @@ def query2files(cursor, **kwargs):
     pdb = kwargs.get('pdb')
     json = kwargs.get('json')
     xsf = kwargs.get('xsf')
-    md = kwargs.get('markdown')
     tex = kwargs.get('latex')
     argstr = kwargs.get('argstr')
     multiple_files = cell or param or res or pdb or xsf
