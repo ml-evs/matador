@@ -574,10 +574,11 @@ def get_root_source(source):
             'KP_specific_structure.res'] then root = 'KP_specific_structure'.
 
     """
-    if isinstance(source, dict):
+    try:
         sources = copy.deepcopy(source['source'])
-    else:
+    except (KeyError, TypeError):
         sources = copy.deepcopy(source)
+
     src_list = set()
     for src in sources:
         if any([src.endswith(ext) for ext in ['.res', '.castep', '.history', '.history.gz']]):
