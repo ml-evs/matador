@@ -169,12 +169,11 @@ def query2files(cursor, **kwargs):
             doc2xsf(doc, path)
 
     hull = kwargs.get('subcmd') in ['hull', 'voltage']
-    if md:
-        md_path = path.split('/')[0] + '/' + path.split('/')[0] + '.md'
-        print('Writing markdown file', md_path + '...')
-        md_string = display_results(cursor, args=kwargs, argstr=argstr, markdown=True, hull=hull)
-        with open(md_path, 'w') as f:
-            f.write(md_string)
+    md_path = path.split('/')[0] + '/' + path.split('/')[0] + '.md'
+    print('Writing markdown file', md_path + '...')
+    md_string = display_results(cursor, args=kwargs, argstr=argstr, markdown=True, hull=hull)
+    with open(md_path, 'w') as f:
+        f.write(md_string)
     if tex:
         tex_path = path.split('/')[0] + '/' + path.split('/')[0] + '.tex'
         print('Writing LaTeX file', tex_path + '...')
