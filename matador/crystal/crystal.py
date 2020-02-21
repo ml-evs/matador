@@ -152,7 +152,7 @@ class Crystal(DataContainer):
         self.sites = []
 
         # use lattice_cart to construct cell if present, otherwise abc
-        self.cell = UnitCell(doc.get('lattice_cart') or doc['lattice_abc'])
+        self.cell = UnitCell(doc.get('lattice_cart', doc.get('lattice_abc')))
 
         self._construct_sites(voronoi=voronoi)
 

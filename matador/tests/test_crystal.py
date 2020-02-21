@@ -74,7 +74,9 @@ class CrystalTest(unittest.TestCase):
     def test_getters_setters(self):
         doc, s = castep2dict(REAL_PATH + "data/Na3Zn4-swap-ReOs-OQMD_759599.castep")
         crystal = Crystal(doc)
-        self.assertEqual(list(crystal.lattice_cart[0]), [9.0397727, 0.0081202, 0.0000000])
+        self.assertEqual(
+            list(crystal.lattice_cart[0]), [9.0397727, 0.0081202, 0.0000000]
+        )
         self.assertEqual(crystal.num_atoms, 14)
         with self.assertRaises(AttributeError):
             crystal["positions_frac"] = [[0, 1, 2]]
@@ -87,18 +89,28 @@ class CrystalTest(unittest.TestCase):
         old_pos = np.asarray(doc.positions_frac)
         copydoc.set_positions(np.zeros_like(old_pos), fractional=True)
 
-        np.testing.assert_array_almost_equal(np.asarray(copydoc.positions_frac), np.zeros_like(old_pos))
-        np.testing.assert_array_almost_equal(np.asarray(copydoc.positions_abs), np.zeros_like(old_pos))
+        np.testing.assert_array_almost_equal(
+            np.asarray(copydoc.positions_frac), np.zeros_like(old_pos)
+        )
+        np.testing.assert_array_almost_equal(
+            np.asarray(copydoc.positions_abs), np.zeros_like(old_pos)
+        )
 
         self.assertNotAlmostEqual(doc.positions_frac[-1][0], 0.0)
 
     def test_minimal_init(self):
         doc = Crystal(
-            dict(lattice_abc=[[3, 3, 3], [90, 90, 90]], atom_types=["Na", "Cl"], positions_frac=[[0, 0, 0], [0.5, 0.5, 0.5]])
+            dict(
+                lattice_abc=np.asarray([[3, 3, 3], [90, 90, 90]]),
+                atom_types=["Na", "Cl"],
+                positions_frac=[[0, 0, 0], [0.5, 0.5, 0.5]],
+            )
         )
         self.assertEqual(doc.stoichiometry, [["Cl", 1.0], ["Na", 1.0]])
         self.assertEqual(doc.lattice_abc, ((3.0, 3.0, 3.0), (90.0, 90.0, 90.0)))
-        self.assertEqual(doc.lattice_cart, ((3.0, 0.0, 0.0), (0.0, 3.0, 0.0), (0.0, 0.0, 3.0)))
+        self.assertEqual(
+            doc.lattice_cart, ((3.0, 0.0, 0.0), (0.0, 3.0, 0.0), (0.0, 0.0, 3.0))
+        )
         self.assertEqual(len(doc.sites), 2)
         self.assertEqual(doc.num_atoms, 2)
         self.assertEqual(doc.concentration, [0.5, 0.5])
@@ -116,7 +128,9 @@ class CrystalTest(unittest.TestCase):
             )
         )
         self.assertEqual(doc.lattice_abc, ((3.0, 3.0, 3.0), (90.0, 90.0, 90.0)))
-        self.assertEqual(doc.lattice_cart, ((3.0, 0.0, 0.0), (0.0, 3.0, 0.0), (0.0, 0.0, 3.0)))
+        self.assertEqual(
+            doc.lattice_cart, ((3.0, 0.0, 0.0), (0.0, 3.0, 0.0), (0.0, 0.0, 3.0))
+        )
         self.assertEqual(doc.stoichiometry, [["Cl", 1.0], ["Na", 1.0]])
         self.assertEqual(len(doc.sites), 2)
         self.assertEqual(doc.num_atoms, 2)
@@ -137,9 +151,15 @@ class CrystalTest(unittest.TestCase):
             crystal[0].set_position([0.5, 0.6, 0.7, 0.8], "fractional")
         with self.assertRaises(RuntimeError):
             crystal[0].set_position([[1, 2, 3], [4, 5, 6], [7, 8, 9]], "fractional")
-        self.assertEqual([atom for atom in crystal], [atom[1] for atom in enumerate(crystal)])
+        self.assertEqual(
+            [atom for atom in crystal], [atom[1] for atom in enumerate(crystal)]
+        )
 
-        atom = Site(species="Cl", position=[0.2, 0.5, 0.2], lattice_cart=[[10, 0, 0], [0, 10, 0], [0, 0, 10]])
+        atom = Site(
+            species="Cl",
+            position=[0.2, 0.5, 0.2],
+            lattice_cart=[[10, 0, 0], [0, 10, 0], [0, 0, 10]],
+        )
         atom2 = copy.deepcopy(atom)
         atom2.species = "Br"
 
@@ -147,14 +167,22 @@ class CrystalTest(unittest.TestCase):
         self.assertEqual(atom2.species, "Br")
 
         atom2.set_position([1.2, -0.5, 0.2], "fractional")
-        np.testing.assert_array_almost_equal(atom2.displacement_between_sites(atom), [0.0, 0.0, 0.0], decimal=10)
+        np.testing.assert_array_almost_equal(
+            atom2.displacement_between_sites(atom), [0.0, 0.0, 0.0], decimal=10
+        )
         self.assertAlmostEqual(atom2.distance_between_sites(atom), 0.0, places=10)
         atom2.set_position([1.3, -0.5, 0.2], "fractional")
-        np.testing.assert_array_almost_equal(atom2.displacement_between_sites(atom), [1.0, 0.0, 0.0], decimal=10)
+        np.testing.assert_array_almost_equal(
+            atom2.displacement_between_sites(atom), [1.0, 0.0, 0.0], decimal=10
+        )
         self.assertAlmostEqual(atom2.distance_between_sites(atom), 1.0, places=10)
         atom2.set_position([1.3, -0.5, 0.3], "fractional")
-        np.testing.assert_array_almost_equal(atom2.displacement_between_sites(atom), [1.0, 0.0, 1.0], decimal=10)
-        self.assertAlmostEqual(atom2.distance_between_sites(atom), np.sqrt(2), places=10)
+        np.testing.assert_array_almost_equal(
+            atom2.displacement_between_sites(atom), [1.0, 0.0, 1.0], decimal=10
+        )
+        self.assertAlmostEqual(
+            atom2.distance_between_sites(atom), np.sqrt(2), places=10
+        )
 
     def testSpg(self):
         doc, s = castep2dict(REAL_PATH + "data/Na3Zn4-swap-ReOs-OQMD_759599.castep")
@@ -203,7 +231,9 @@ class ElasticCrystalTest(unittest.TestCase):
     def testKBulkModulus(self):
         from matador.crystal.elastic import get_equation_of_state
 
-        results = get_equation_of_state(REAL_PATH + "/data/bulk_modulus/K-bulk_modulus", plot=False)
+        results = get_equation_of_state(
+            REAL_PATH + "/data/bulk_modulus/K-bulk_modulus", plot=False
+        )
         self.assertTrue("eos" in results)
         self.assertEqual(len(results["eos"]), 3)
         self.assertAlmostEqual(results["eos"][0].bulk_modulus, 3.696117355)
