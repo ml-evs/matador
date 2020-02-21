@@ -385,6 +385,13 @@ class Crystal(DataContainer):
             self._data['pdf'] = PDF(self._data, label=self.formula_tex)
         return self._data['pdf']
 
+    @pdf.setter
+    def pdf(self, pdf):
+        """ Set the PDF to the given PDF object (or None). """
+        from matador.fingerprints.pdf import PDF
+        if isinstance(pdf, PDF) or pdf is None:
+            self._data['pdf'] = pdf
+
     @property
     def pxrd(self, **kwargs):
         """ Returns a PXRD object (powder xray diffraction) containing

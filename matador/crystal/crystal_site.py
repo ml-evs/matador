@@ -7,6 +7,7 @@ atomic sites.
 """
 
 import numpy as np
+import copy
 from matador.utils.cell_utils import cart2frac, frac2cart, wrap_frac_coords
 
 
@@ -14,7 +15,7 @@ class Site:
     def __init__(self, species: str, position: list, lattice_cart,
                  position_unit='fractional', **site_data):
 
-        self.lattice = lattice_cart
+        self.lattice = copy.deepcopy(lattice_cart)
         self.set_position(position, position_unit)
         self.species = species
         self.site_data = {}
@@ -31,13 +32,6 @@ class Site:
         for key in self.site_data:
             site_str += '\n{} = {}'.format(key, self.site_data[key])
         return site_str
-
-    def __getattr__(self, key):
-        if key in self.__dict__:
-            return self.key
-        if key in self.site_data:
-            return self.site_data[key]
-        raise AttributeError
 
     def __deepcopy__(self, memo):
         from copy import deepcopy
