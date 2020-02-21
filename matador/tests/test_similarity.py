@@ -128,6 +128,29 @@ class SimilarityFilterTest(unittest.TestCase):
         filtered_cursor = [cursor[ind] for ind in uniq_inds]
         self.assertEqual(len(filtered_cursor), len(cursor))
 
+    def test_with_crystals(self):
+        from matador.crystal import Crystal
+        import glob
+
+        files = glob.glob(REAL_PATH + "data/uniqueness_hierarchy/*.res")
+        cursor = [Crystal(res2dict(f)[0]) for f in files]
+        uniq_inds, _, _, _ = get_uniq_cursor(
+            cursor, sim_tol=0, energy_tol=1e20, projected=True, debug=True, **{"dr": 0.1, "gaussian_width": 0.1}
+        )
+        filtered_cursor = [cursor[ind] for ind in uniq_inds]
+        self.assertEqual(len(filtered_cursor), len(cursor))
+
+    def test_with_skips(self):
+        from matador.crystal import Crystal
+        from matador.utils.cursor_utils import filter_unique_structures
+        import glob
+        files = glob.glob(REAL_PATH + "data/uniqueness_hierarchy/*.res")
+        cursor = [Crystal(res2dict(f)[0]) for f in files]
+        filtered_cursor = filter_unique_structures(cursor, energy_tol=0)
+        self.assertEqual(len(filtered_cursor), len(cursor))
+        for doc in filtered_cursor:
+            self.assertEqual(doc['pdf'], None)
+
 
 if __name__ == "__main__":
     unittest.main()
