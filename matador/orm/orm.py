@@ -77,7 +77,7 @@ class DataContainer(ABC):
         raise AttributeError('Object does not support deletion of keys in `_data`.')
 
     def __setitem__(self, key: str, item):
-        if key not in self._data:
+        if key not in self._data or self._data[key] is None:
             self._data[key] = item
         else:
             raise AttributeError('Cannot assign value to existing key {}'
