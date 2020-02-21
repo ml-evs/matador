@@ -135,8 +135,10 @@ class FingerprintFactory:
         """
         if required_inds is None:
             required_inds = list(range(len(cursor)))
+        elif len(required_inds) == 0:
+            return
         else:
-            print("Skipping {} structures out of {}".format(len(required_inds), len(cursor)))
+            print("Skipping {} structures out of {}".format(len(cursor) - len(required_inds), len(cursor)))
 
         if self.fingerprint is None or self.default_key is None:
             # TODO: is this the right way of doing this?
@@ -154,11 +156,7 @@ class FingerprintFactory:
             else:
                 doc[self.default_key] = None
 
-        # Crystals will fail to serialize, so take the data dict
-        if isinstance(cursor[0], Crystal):
-            compute_list = [doc for ind, doc in enumerate(cursor) if ind in required_inds]
-        else:
-            compute_list = [doc for ind, doc in enumerate(cursor)]
+        compute_list = [doc for ind, doc in enumerate(cursor) if ind in required_inds]
 
         # how many processes to use? either SLURM_NTASKS, OMP_NUM_THREADS or total num CPUs
         if os.environ.get('SLURM_NTASKS') is not None:
@@ -170,9 +168,9 @@ class FingerprintFactory:
         else:
             self.nprocs = mp.cpu_count()
             env = 'core count'
-        print_notify('Running {} jobs on {} processes, set by {}.'.format(len(required_inds),
-                                                                          self.nprocs,
-                                                                          env))
+        print_notify('Running {} jobs on at most {} processes, set by {}.'
+                     .format(len(required_inds), self.nprocs, env))
+        self.nprocs = min(len(compute_list), self.nprocs)
 
         start = time.time()
         if self.nprocs == 1:
@@ -208,6 +206,7 @@ class FingerprintFactory:
             fprint_ind = 0
             for ind, doc in enumerate(cursor):
                 if ind in required_inds:
+                    print(ind, fprint_ind)
                     if isinstance(cursor[ind], Crystal):
                         cursor[ind]._data.pop(self.default_key, None)
                     cursor[ind][self.default_key] = fprint_cursor[fprint_ind][self.default_key]

@@ -2,6 +2,7 @@
 import unittest
 from os.path import realpath
 from matador.fingerprints.similarity import get_uniq_cursor
+from matador.fingerprints import Fingerprint
 from matador.scrapers.castep_scrapers import res2dict
 
 REAL_PATH = "/".join(realpath(__file__).split("/")[:-1]) + "/"
@@ -148,8 +149,16 @@ class SimilarityFilterTest(unittest.TestCase):
         cursor = [Crystal(res2dict(f)[0]) for f in files]
         filtered_cursor = filter_unique_structures(cursor, energy_tol=0)
         self.assertEqual(len(filtered_cursor), len(cursor))
-        for doc in filtered_cursor:
-            self.assertEqual(doc['pdf'], None)
+
+        cursor = sorted([res2dict(f)[0] for f in files], key=lambda doc: doc['enthalpy_per_atom'])[0:10]
+        for ind, doc in enumerate(cursor):
+            doc['enthalpy_per_atom'] = float(-ind)
+
+        cursor[8]['enthalpy_per_atom'] = -5.0
+        cursor[9]['enthalpy_per_atom'] = -5.0001
+
+        filtered_cursor = filter_unique_structures(cursor, energy_tol=0.003)
+        self.assertEqual(len(filtered_cursor), 8)
 
 
 if __name__ == "__main__":
