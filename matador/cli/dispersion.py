@@ -59,6 +59,10 @@ def main():
                         help='plot phonon calculation, rather than electronic')
     parser.add_argument('-ir', '--infrared', action='store_true', default=False,
                         help='plot infrared spectrum from file')
+    parser.add_argument('-ir_ss', '--infrared_step_size', nargs='?', default=1, type=int,
+                        help='step size on x-axis for IR plots; must be > 0, default is 1')
+    parser.add_argument('-ir_bs', '--infrared_bin_scaler', default=1, type=int,
+                        help='scales the size of bins on x-axis for IR plots, default is 1')
     parser.add_argument('-gw', '--gaussian_width', type=float,
                         help='smearing width for DOS from .bands_dos (default: 0.1 eV) or .phonon_dos files (default: 10 1/cm)')
     parser.add_argument('--highlight_bands', nargs='+', type=int,
@@ -87,7 +91,7 @@ def main():
 
     verbosity = kwargs.get('verbosity')
     phonons = kwargs.get('phonons')
-    ir = kwargs.get('ir')
+    ir = kwargs.get('infrared')
     if kwargs.get('labels'):
         labels = ' '.join(kwargs.get('labels')).split(',')
     else:
@@ -140,9 +144,7 @@ def main():
     cell_seed = seed + '.cell'
     cell = isfile(cell_seed)
 
-    if not dos and not bandstructure:
-        print_failure('Could not find files for specified seed {}.'.format(seed))
-        exit()
+
 
     if kwargs.get('dos_only') and dos:
         bandstructure = False
@@ -163,8 +165,14 @@ def main():
                       band_reorder=band_reorder,
                       band_colour=band_colour,
                       **kwargs)
+    if ir:
+        print(seed)
+        plot_ir_spectrum(seed, kwargs.get('infrared_step_size'), kwargs.get('infrared_bin_scaler'))
+
+
     else:
-        plot_ir_spectrum(seed)
+        print_failure('Could not find files for specified seed {}.'.format(seed))
+        exit()
 
 
 if __name__ == '__main__':
