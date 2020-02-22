@@ -78,7 +78,7 @@ class IntegrationTest(unittest.TestCase):
         )
         self.assertFalse(any(["Sb" in doc["species_pot"] for doc in query_2.cursor]), msg="pspots over-scraped!")
 
-        print("SWAPS")
+        print("SWAP")
         output_folder_exists, successes, elem_successes = swaps()
         self.assertTrue(output_folder_exists, msg="No folder created")
         self.assertTrue(all(successes), msg="Failed to even read files")
@@ -297,6 +297,8 @@ def swaps():
 
             os.remove(files + ".cell")
             os.remove(files + ".res")
+
+        os.remove("swaps-NaPZn-ci_test-NaLi:PSi:ZnSn.md")
 
         os.chdir(REAL_PATH)
         os.rmdir(expected_dir)

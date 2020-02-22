@@ -195,7 +195,7 @@ class CrystalTest(unittest.TestCase):
         doc, s = magres2dict(REAL_PATH + "data/NaP_QE6.magres")
         crystal = Crystal(doc)
         for atom in crystal:
-            print(atom, atom.magres_shift)
+            print(atom, atom.site_data['magres_shift'])
 
     @unittest.skipIf(not imported_vornet, "Voronoi code not found in this distribution")
     def testCoordination(self):
