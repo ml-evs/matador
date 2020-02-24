@@ -1582,13 +1582,18 @@ def _castep_find_final_structure(flines):
     finish_line = 0
     success_string = 'Geometry optimization completed successfully'
     failure_string = 'Geometry optimization failed to converge after'
+    annoying_string = 'WARNING - there is nothing to optimise - skipping relaxation'
     # look for final "success/failure" string in file for geometry optimisation
     for line_no, line in enumerate(reversed(flines)):
         if success_string in line:
             finish_line = len(flines) - line_no
             optimised = True
             break
-        elif failure_string in line:
+        if annoying_string in line:
+            finish_line = len(flines) - line_no
+            optimised = True
+            break
+        if failure_string in line:
             finish_line = len(flines) - line_no
             optimised = False
             break

@@ -704,9 +704,10 @@ class ComputeTask:
                         opti_dict['lattice_cart'] = list(cell_dict['lattice_cart'])
 
                 LOG.info('N = {iters:03d} | |F| = {d[max_force_on_atom]:5.5f} eV/A | '
-                         'S = {pressure:5.5f} GPa | H = {d[enthalpy_per_atom]:5.5f} eV/atom'
+                         'S = {pressure:5.5f} GPa | H = {enthalpy_per_atom:5.5f} eV/atom'
                          .format(d=opti_dict,
                                  pressure=opti_dict.get('pressure', 0.0),
+                                 enthalpy_per_atom=opti_dict.get('enthalpy_per_atom', 0.0),
                                  iters=opti_dict.get('geom_iter', 0)))
 
             # if there were errors that can be remedied, now is the time to do it
