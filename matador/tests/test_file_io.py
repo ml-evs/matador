@@ -1133,12 +1133,12 @@ class ScraperMiscTest(MatadorUnitTest):
         pdis, s = cell2dict(cell_fname, db=False, lattice=True, verbosity=VERBOSITY)
         self.assertTrue(s)
 
-
 class CifTests(MatadorUnitTest):
     """ These tests check the cif scraper for correctness. """
 
     def test_cif_partial_occ(self):
         cif_fname = REAL_PATH + "data/cif_files/AgBiI.cif"
+
         failed_open = False
         try:
             f = open(cif_fname, "r")
