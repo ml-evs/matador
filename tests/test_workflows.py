@@ -10,7 +10,7 @@ import glob
 
 import numpy as np
 
-from matador.tests.utils import MatadorUnitTest, REAL_PATH, detect_program
+from .utils import MatadorUnitTest, REAL_PATH, detect_program
 from matador.compute import ComputeTask
 from matador.scrapers import cell2dict, param2dict, phonon2dict
 

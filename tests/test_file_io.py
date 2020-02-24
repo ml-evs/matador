@@ -14,7 +14,7 @@ from matador.scrapers.castep_scrapers import usp2dict, get_seed_metadata
 from matador.export import doc2res, doc2param, doc2cell, query2files
 from matador.orm.spectral import ElectronicDispersion, ElectronicDOS, VibrationalDispersion, VibrationalDOS
 from matador.utils.chem_utils import INVERSE_CM_TO_EV
-from matador.tests.utils import REAL_PATH, MatadorUnitTest
+from .utils import REAL_PATH, MatadorUnitTest
 
 VERBOSITY = 10
 
