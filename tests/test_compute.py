@@ -17,7 +17,7 @@ from matador.compute import ComputeTask, BatchRun, reset_job_folder
 from matador.compute.slurm import SlurmQueueManager
 from matador.compute.pbs import PBSQueueManager
 from matador.scrapers.castep_scrapers import cell2dict, param2dict, res2dict, castep2dict
-from matador.tests.utils import REAL_PATH, MatadorUnitTest, detect_program
+from .utils import REAL_PATH, MatadorUnitTest, detect_program
 
 HOSTNAME = os.uname()[1]
 PATHS_TO_DEL = ["completed", "bad_castep", "input", "logs", HOSTNAME]
