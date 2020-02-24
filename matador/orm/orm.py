@@ -29,6 +29,15 @@ class DataContainer(ABC):
 
         self._validate_inputs()
 
+        # set root source to source filename
+        from matador.utils.chem_utils import get_root_source
+        self.root_source = 'unknown'
+        try:
+            if 'source' in self._data:
+                self.root_source = get_root_source(self._data['source'])
+        except RuntimeError:
+            pass
+
     @property
     def source(self):
         """ Return the source of the data. """
