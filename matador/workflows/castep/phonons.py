@@ -72,11 +72,11 @@ class CastepPhononWorkflow(Workflow):
 
         """
         # default todo
-        todo = {'relax': True, 'dynmat': True, 'dos': False, 'dispersion': False, 'thermodynamics': False}
+        todo = {'relax': True, 'dynmat': True, 'vdos': False, 'dispersion': False, 'thermodynamics': False}
         # definition of steps and names
         steps = {'relax': castep_phonon_prerelax,
                  'dynmat': castep_phonon_dynmat,
-                 'dos': castep_phonon_dos,
+                 'vdos': castep_phonon_dos,
                  'dispersion': castep_phonon_dispersion,
                  'thermodynamics': castep_phonon_thermodynamics}
 
@@ -85,8 +85,8 @@ class CastepPhononWorkflow(Workflow):
                 {'input': ['.cell', '.param'], 'output': ['.castep', '-out.cell', '.*err']},
             'dynmat':
                 {'input': ['.cell', '.param'], 'output': ['.castep', '.*err']},
-            'dos':
-                {'input': ['.cell', '.param'], 'output': ['.castep', '.phonon', '.*err']},
+            'vdos':
+                {'input': ['.cell', '.param'], 'output': ['.castep', '.phonon', '.phonon_dos', '.*err']},
             'dispersion':
                 {'input': ['.cell', '.param'], 'output': ['.castep', '.phonon', '.*err']},
             'thermodynamics':
@@ -98,7 +98,7 @@ class CastepPhononWorkflow(Workflow):
                     or 'phonon_fine_kpoint_path_spacing' in self.calc_doc):
                 todo['dispersion'] = True
             if 'phonon_fine_kpoint_mp_spacing' in self.calc_doc:
-                todo['dos'] = True
+                todo['vdos'] = True
             if self.calc_doc['task'].lower() == 'thermodynamics':
                 todo['thermodynamics'] = True
 
