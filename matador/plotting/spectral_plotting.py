@@ -172,7 +172,7 @@ def plot_spectral(seeds, **kwargs):
             try:
                 kwargs['labels'] = [seed.split('/')[-1].split('.')[0] for seed in seeds]
             except AttributeError:
-                kwargs['labels'] = [seed.source for seed in seeds]
+                kwargs['labels'] = [seed.root_source for seed in seeds]
 
     kwargs['ls'] = []
     for i in range(len(seeds)):
