@@ -6,7 +6,7 @@
 Example 2: Spectral calculations with CASTEP and run3
 -----------------------------------------------------
 
-In this example, we will go from a crystal structure to a dispersion and DOS plot using run3, CASTEP and `OptaDOS <https://github.com/optados-developers/optados>`_. For this use case, run3 uses the `SeeKPath library <https://github.com/giovannipizzi/seekpath>`_ to generate standardised band paths through reciprocal space to automatically compute a useful bandstructure for all crystal types.
+In this example, we will go from a crystal structure to a dispersion and DOS plot using run3, CASTEP and `OptaDOS <https://github.com/optados-developers/optados>`_. For this use case, run3 uses the `SeeK-path library <https://github.com/giovannipizzi/seekpath>`_ to generate standardised band paths through reciprocal space to automatically compute a useful bandstructure for all crystal types.
 
 Spectral calculations follow a similar setup to geometry optimisations: run3 expects to find a folder containing .res files with lattice/atomic position data, and one .cell and one .param file specifying the CASTEP options. Standard run3 rules apply: if a ``<seed>.res.lock`` file is found, or if the .res file is listed in ``jobs.txt``, the structure will be skipped. Such a folder can be found in ``examples/bandstructure+dos/simple`` which contains some LiCoO\ :sub:`2` polymorphs. The Jupyter
 notebook ``simple_spectral.ipynb`` will also show you exactly how to run a standard BS/DOS calculation and plot the results with the API. The files in ``examples/bandstructure+dos/projected`` will show you how to use matador and OptaDOS to get projected densities of states and bandstructures. Here, we shall run through some more simple cases first.
