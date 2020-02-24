@@ -27,6 +27,8 @@ def plot_free_energy(model, temperatures=None, ax=None, line_kwargs=None, **kwar
     import numpy as np
     import matplotlib.pyplot as plt
 
+    legend = isinstance(line_kwargs, dict) and 'label' in line_kwargs and ax is not None
+
     if line_kwargs is None:
         line_kwargs = {}
 
@@ -49,5 +51,7 @@ def plot_free_energy(model, temperatures=None, ax=None, line_kwargs=None, **kwar
     ax.plot(t, e, **line_kwargs)
     ax.set_ylabel("Vibrational free energy (eV/atom)")
     ax.set_xlabel("Temperature (K)")
+    if legend:
+        ax.legend()
 
     return ax
