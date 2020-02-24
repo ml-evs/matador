@@ -433,7 +433,7 @@ class VibrationalDOS(DensityOfStates):
 
         """
         from matador.plotting.temperature_plotting import plot_free_energy
-        plot_free_energy(self, temperatures=temperatures, ax=ax, **kwargs)
+        return plot_free_energy(self, temperatures=temperatures, ax=ax, **kwargs)
 
 
 class ElectronicDOS(DensityOfStates):
