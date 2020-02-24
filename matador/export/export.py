@@ -29,7 +29,7 @@ def file_writer_function(function):
         path = args[1]
         try:
             flines, ext = function(*args, **kwargs)
-            if ext is not None and not path.endswith(ext):
+            if ext is not None and not path.endswith('.' + ext):
                 path += '.{}'.format(ext)
 
             if os.path.isfile(path):
