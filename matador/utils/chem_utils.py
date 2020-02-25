@@ -11,21 +11,7 @@ import copy
 import warnings
 
 import numpy as np
-from scipy.constants import physical_constants
-
-FARADAY_CONSTANT_Cpermol = physical_constants['Faraday constant'][0]
-HARTREE_TO_EV = physical_constants['Hartree energy in eV'][0]
-Cperg_to_mAhperg = 2.778e-1
-C_TO_mAh = Cperg_to_mAhperg
-BOHR_TO_ANGSTROM = physical_constants['Bohr radius'][0] * 1e10
-RY_TO_EV = physical_constants['Rydberg constant times hc in eV'][0]
-KBAR_TO_GPA = 0.1
-eV_PER_ANGSTROM_CUBED_TO_GPa = 160.21776
-AVOGADROS_NUMBER = physical_constants['Avogadro constant'][0]
-ANGSTROM_CUBED_TO_CENTIMETRE_CUBED = 1e-24
-ELECTRON_CHARGE = physical_constants['elementary charge'][0]
-KELVIN_TO_EV = physical_constants['kelvin-electron volt relationship'][0]
-INVERSE_CM_TO_EV = physical_constants['inverse meter-electron volt relationship'][0] * 100
+from matador.data.constants import * # noqa
 
 EPS = 1e-8
 
@@ -251,8 +237,8 @@ def get_formation_energy(chempots, doc, energy_key='enthalpy_per_atom'):
         try:
             mu_energy = recursive_get(mu, energy_key)
         except KeyError as exc:
-            print('Chemical potential {} missing key {}'.format(mu['source'], energy_key))
-            raise exc
+            raise exc('Chemical potential {} missing key {}'.format(mu['source'], energy_key))
+
         formation -= mu_energy * num_chempots[ind] * num_atoms_per_mu / num_atoms_per_fu
 
     return formation
