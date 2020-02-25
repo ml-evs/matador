@@ -1,8 +1,7 @@
 recursive-include matador/config *
 recursive-include docs *
 recursive-include matador/tests/data *
-include matador/scrapers/words
-include matador/scrapers/nouns
+recursive-include matador/data *
 include README.rst
 include CHANGELOG.rst
 include INSTALL.rst

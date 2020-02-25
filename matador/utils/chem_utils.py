@@ -283,7 +283,6 @@ def get_number_of_chempots(stoich, chempot_stoichs, precision=5):
             with the given chemical potentials.
 
     """
-    import scipy.linalg
 
     if isinstance(stoich, dict):
         stoich = stoich['stoichiometry']
@@ -313,7 +312,7 @@ def get_number_of_chempots(stoich, chempot_stoichs, precision=5):
 
     # check if lstsq actually found a "solution"
     if np.abs(np.sum(residuals)) > EPS:
-        raise RuntimeError('Stoichiometry {} could not be created from chemical potentials {}: inconsistent chemical potentials'
+        raise RuntimeError('Stoichiometry {} could not be created from chemical potentials {}'
                            .format(stoich, chempot_stoichs))
 
     # round output array based on user-specified precision
@@ -325,7 +324,7 @@ def get_number_of_chempots(stoich, chempot_stoichs, precision=5):
 
     # check for sensible numbers in output
     if np.min(np.sign(num_chempots)) == -1:
-        raise RuntimeError('Stoichiometry {} could not be created from chemical potentials {}: stoichiometry inconsistent with chempots'
+        raise RuntimeError('Stoichiometry {} could not be created from chemical potentials {}'
                            .format(stoich, chempot_stoichs))
 
     return num_chempots.tolist()
@@ -575,10 +574,11 @@ def get_root_source(source):
             'KP_specific_structure.res'] then root = 'KP_specific_structure'.
 
     """
-    if isinstance(source, dict):
+    try:
         sources = copy.deepcopy(source['source'])
-    else:
+    except (KeyError, TypeError):
         sources = copy.deepcopy(source)
+
     src_list = set()
     for src in sources:
         if any([src.endswith(ext) for ext in ['.res', '.castep', '.history', '.history.gz']]):

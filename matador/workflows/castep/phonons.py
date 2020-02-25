@@ -94,7 +94,8 @@ class CastepPhononWorkflow(Workflow):
         }
 
         if self.calc_doc.get('task').lower() in ['phonon', 'thermodynamics']:
-            if 'phonon_fine_kpoint_path' in self.calc_doc or 'phonon_fine_kpoint_list' in self.calc_doc or 'phonon_fine_kpoint_path_spacing' in self.calc_doc:
+            if ('phonon_fine_kpoint_path' in self.calc_doc or 'phonon_fine_kpoint_list' in self.calc_doc
+                    or 'phonon_fine_kpoint_path_spacing' in self.calc_doc):
                 todo['dispersion'] = True
             if 'phonon_fine_kpoint_mp_spacing' in self.calc_doc:
                 todo['dos'] = True

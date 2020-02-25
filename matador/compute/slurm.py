@@ -7,7 +7,7 @@ cancelling jobs.
 
 """
 
-from matador.compute.queueing import get_queue_env, QueueManager
+from matador.compute.queueing import QueueManager
 
 
 class SlurmQueueManager(QueueManager):

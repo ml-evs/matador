@@ -169,7 +169,10 @@ def plot_spectral(seeds, **kwargs):
         kwargs['ls'] = ['-'] * len(seeds)
         kwargs['colour_by_seed'] = True
         if kwargs.get('labels') is None:
-            kwargs['labels'] = [seed.split('/')[-1].split('.')[0] for seed in seeds]
+            try:
+                kwargs['labels'] = [seed.split('/')[-1].split('.')[0] for seed in seeds]
+            except AttributeError:
+                kwargs['labels'] = [seed.source for seed in seeds]
 
     kwargs['ls'] = []
     for i in range(len(seeds)):
@@ -313,7 +316,8 @@ def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
                         continue
 
                     for nb in range(dispersion.num_bands):
-                        colour, alpha, label = _get_lineprops(dispersion, spin_fermi_energy, nb, ns, branch, branch_ind, seed_ind, kwargs)
+                        colour, alpha, label = _get_lineprops(
+                            dispersion, spin_fermi_energy, nb, ns, branch, branch_ind, seed_ind, kwargs)
 
                         ax_dispersion.plot(path[(np.asarray(branch)-branch_ind).tolist()],
                                            eigs[ns][nb][branch] - spin_fermi_energy[ns],
@@ -331,7 +335,7 @@ def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
         ylabel = r'Energy (eV)'
     ax_dispersion.set_ylabel(ylabel)
     ax_dispersion.set_xlim(0, 1)
-    _add_path_labels(seed, dispersion, ax_dispersion, path, 0, kwargs)
+    _add_path_labels(seeds[-1], dispersion, ax_dispersion, path, 0, kwargs)
 
     return ax_dispersion
 
@@ -365,7 +369,7 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                     pdos_data, s = optados2dict(pdos_seed, verbosity=0)
                     if not s:
                         raise RuntimeError(pdos_data)
-                    dos_data._data['pdos'] = pdos_data
+                    dos_data['pdos'] = pdos_data
         else:
             dos_data = _load_phonon_dos(seed, kwargs)
             max_density = np.max(dos_data['dos'])
@@ -390,7 +394,8 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
         dos = dos_data['dos']
 
         # plotting pdos depends on these other factors too
-        plotting_pdos = (kwargs['plot_pdos'] and len(seeds) == 1 and not (kwargs['phonons'] and len(dos_data.get('pdos', [])) <= 1))
+        plotting_pdos = (kwargs['plot_pdos'] and len(seeds) == 1
+                         and not (kwargs['phonons'] and len(dos_data.get('pdos', [])) <= 1))
 
         if kwargs['phonons']:
             ylabel = 'Phonon DOS'
@@ -420,8 +425,10 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                 ax_dos.plot(dos, energies, ls=kwargs['ls'][seed_ind],
                             color='grey', zorder=1e10, label='Total DOS')
                 if not kwargs['plot_pdos']:
-                    ax_dos.fill_betweenx(energies[np.where(energies > 0)], 0, dos[np.where(energies > 0)], alpha=0.2, color=kwargs['conduction'])
-                    ax_dos.fill_betweenx(energies[np.where(energies <= 0)], 0, dos[np.where(energies <= 0)], alpha=0.2, color=kwargs['valence'])
+                    ax_dos.fill_betweenx(energies[np.where(energies > 0)], 0, dos[np.where(energies > 0)],
+                                         alpha=0.2, color=kwargs['conduction'])
+                    ax_dos.fill_betweenx(energies[np.where(energies <= 0)], 0, dos[np.where(energies <= 0)],
+                                         alpha=0.2, color=kwargs['valence'])
         else:
             ax_dos.set_xlabel(xlabel)
             ax_dos.set_ylabel(ylabel)
@@ -437,26 +444,32 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                 ax_dos.plot(energies, dos, ls=kwargs['ls'][seed_ind], alpha=1,
                             c='grey', zorder=1e10, label='Total DOS')
                 if not plotting_pdos:
-                    ax_dos.fill_between(energies[np.where(energies > 0)], 0, dos[np.where(energies > 0)], alpha=0.2, color=kwargs['conduction'])
-                    ax_dos.fill_between(energies[np.where(energies <= 0)], 0, dos[np.where(energies <= 0)], alpha=0.2, color=kwargs['valence'])
+                    ax_dos.fill_between(energies[np.where(energies > 0)], 0, dos[np.where(energies > 0)],
+                                        alpha=0.2, color=kwargs['conduction'])
+                    ax_dos.fill_between(energies[np.where(energies <= 0)], 0, dos[np.where(energies <= 0)],
+                                        alpha=0.2, color=kwargs['valence'])
 
         if 'spin_dos' in dos_data and not kwargs['pdos_hide_tot']:
             if kwargs['plot_bandstructure']:
                 if kwargs.get('spin_only') in [None, 'down']:
                     if not plotting_pdos:
                         ax_dos.fill_betweenx(energies, 0, dos_data['spin_dos']['down'], alpha=0.2, color='b')
-                    ax_dos.plot(dos_data['spin_dos']['down'], energies, ls=kwargs['ls'][seed_ind], color='b', zorder=1e10, label='spin-down Total DOS')
+                    ax_dos.plot(dos_data['spin_dos']['down'], energies,
+                                ls=kwargs['ls'][seed_ind], color='b', zorder=1e10, label='spin-down Total DOS')
                 if kwargs.get('spin_only') in [None, 'up']:
                     if not plotting_pdos:
                         ax_dos.fill_betweenx(energies, 0, dos_data['spin_dos']['up'], alpha=0.2, color='r')
-                    ax_dos.plot(dos_data['spin_dos']['up'], energies, ls=kwargs['ls'][seed_ind], color='r', zorder=1e10, label='spin-up Total DOS')
+                    ax_dos.plot(dos_data['spin_dos']['up'], energies,
+                                ls=kwargs['ls'][seed_ind], color='r', zorder=1e10, label='spin-up Total DOS')
             else:
                 if kwargs.get('spin_only') in [None, 'down']:
-                    ax_dos.plot(energies, dos_data['spin_dos']['down'], ls=kwargs['ls'][seed_ind], color='b', zorder=1e10, label='spin-down Total DOS')
+                    ax_dos.plot(energies, dos_data['spin_dos']['down'],
+                                ls=kwargs['ls'][seed_ind], color='b', zorder=1e10, label='spin-down Total DOS')
                     if not plotting_pdos:
                         ax_dos.fill_between(energies, 0, dos_data['spin_dos']['down'], alpha=0.2, color='b')
                 if kwargs.get('spin_only') in [None, 'up']:
-                    ax_dos.plot(energies, dos_data['spin_dos']['up'], ls=kwargs['ls'][seed_ind], color='r', zorder=1e10, label='spin-up Total DOS')
+                    ax_dos.plot(energies, dos_data['spin_dos']['up'],
+                                ls=kwargs['ls'][seed_ind], color='r', zorder=1e10, label='spin-up Total DOS')
                     if not plotting_pdos:
                         ax_dos.fill_between(energies, 0, dos_data['spin_dos']['up'], alpha=0.2, color='r')
 
@@ -552,7 +565,9 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
     return ax_dos
 
 
-def projected_bandstructure_plot(dispersion, ax, path, bbox_extra_artists, pdis_interpolation_factor=2, pdis_point_scale=25, **kwargs):
+def projected_bandstructure_plot(
+    dispersion, ax, path, bbox_extra_artists, pdis_interpolation_factor=2, pdis_point_scale=25, **kwargs
+):
     """ Plot projected bandstructure with weightings from OptaDOS pdis.dat file.
 
     Parameters:
@@ -629,10 +644,8 @@ def _ordered_scatter(path, eigs, pdis, branches, ax=None, colours=None, interpol
     for nb in range(len(eigs[0])):
         for branch_ind, branch in enumerate(branches):
             k = path[(np.asarray(branch) - branch_ind).tolist()]
-            e = eigs[branch, nb]
             projections = pdis[branch, nb]
-
-            ek_fn = interp1d(k, e)
+            ek_fn = interp1d(k, eigs[branch, nb])
             k_interp = np.linspace(np.min(k), np.max(k), num=int(interpolation_factor*len(k)))
             ek_interp = ek_fn(k_interp)
             projections = projections.T
@@ -745,7 +758,7 @@ def _add_path_labels(seed, dispersion, ax_dispersion, path, seed_ind, kwargs):
         spg_structure = None
         if isinstance(dispersion, Dispersion):
             try:
-                spg_structure = doc2spg(dispersion._data)
+                spg_structure = doc2spg(dispersion)
             except (KeyError, RuntimeError):
                 pass
 
@@ -988,7 +1001,7 @@ def _load_phonon_dos(seed, kwargs):
 
     if isinstance(seed, dict):
         return VibrationalDOS(seed)
-    if isinstance(seed, VibrationalDOS):
+    if isinstance(seed, DensityOfStates):
         return seed
 
     # otherwise, just read the phonon_dos file

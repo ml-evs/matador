@@ -358,7 +358,9 @@ class ElectronicDispersion(Dispersion):
             self._data['spin_band_gap'][ispin] = cbm - vbm
             self._data['spin_band_gap_path'][ispin] = [self.kpoint_path[cbm_pos], self.kpoint_path[vbm_pos]]
             self._data['spin_band_gap_path_inds'][ispin] = [cbm_pos, vbm_pos]
-            self._data['spin_gap_momentum'][ispin] = np.linalg.norm(self.kpoint_path_cartesian[cbm_pos] - self.kpoint_path_cartesian[vbm_pos])
+            self._data['spin_gap_momentum'][ispin] = np.linalg.norm(
+                self.kpoint_path_cartesian[cbm_pos] - self.kpoint_path_cartesian[vbm_pos]
+            )
 
             # calculate direct gap
             direct_gaps = np.zeros(self.num_kpoints)
@@ -377,8 +379,12 @@ class ElectronicDispersion(Dispersion):
                 direct_cbms[ind] = direct_cbm
                 direct_vbms[ind] = direct_vbm
             self._data['spin_direct_gap'][ispin] = np.min(direct_gaps)
-            self._data['spin_direct_conduction_band_max'][ispin] = direct_cbms[np.argmin(direct_gaps)] + self.spin_fermi_energy[ispin]
-            self._data['spin_direct_valence_band_min'][ispin] = direct_vbms[np.argmin(direct_gaps)] + self.spin_fermi_energy[ispin]
+            self._data['spin_direct_conduction_band_max'][ispin] = (
+                direct_cbms[np.argmin(direct_gaps)] + self.spin_fermi_energy[ispin]
+            )
+            self._data['spin_direct_valence_band_min'][ispin] = (
+                direct_vbms[np.argmin(direct_gaps)] + self.spin_fermi_energy[ispin]
+            )
             self._data['spin_direct_gap'][ispin] = np.min(direct_gaps)
             self._data['spin_direct_gap_path'][ispin] = 2 * [self.kpoint_path[np.argmin(direct_gaps)]]
             self._data['spin_direct_gap_path_inds'][ispin] = 2 * [np.argmin(direct_gaps)]
@@ -390,7 +396,9 @@ class ElectronicDispersion(Dispersion):
                 cbm_pos = self._data['spin_direct_gap_path_inds'][ispin][0]
                 vbm_pos = self._data['spin_direct_gap_path_inds'][ispin][1]
                 self._data['spin_band_gap_path'][ispin] = self._data['spin_direct_gap_path'][ispin]
-                self._data['spin_gap_momentum'][ispin] = np.linalg.norm(self.kpoint_path_cartesian[cbm_pos] - self.kpoint_path_cartesian[vbm_pos])
+                self._data['spin_gap_momentum'][ispin] = (
+                    np.linalg.norm(self.kpoint_path_cartesian[cbm_pos] - self.kpoint_path_cartesian[vbm_pos])
+                )
 
         spin_gap_index = np.argmin(self._data['spin_band_gap'])
         # use smallest spin channel gap data for standard non-spin data access

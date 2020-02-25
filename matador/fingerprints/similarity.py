@@ -51,12 +51,13 @@ def get_uniq_cursor(cursor, sim_tol=0.1, energy_tol=1e-2,
     if debug:
         import time
         start = time.time()
-    factory = PDFFactory(cursor, **fingerprint_calc_args)
     if debug:
         completed = time.time() - start
         print('{} of {} structures completed in {:0.1f} s'.format(fingerprint, len(cursor), completed))
 
-    fingerprint_list = [doc[factory.default_key] for doc in cursor]
+    fingerprint_list = [None for doc in cursor]
+    fingerprints_required = [False for doc in cursor]
+    required_inds = set()
     sim_mat = np.ones((len(fingerprint_list), len(fingerprint_list)))
     print('Assessing similarities...')
     for i in range(len(fingerprint_list)):
@@ -66,13 +67,24 @@ def get_uniq_cursor(cursor, sim_tol=0.1, energy_tol=1e-2,
             if (enforce_same_stoich is False or
                 (sorted(cursor[j]['stoichiometry']) == sorted(cursor[i]['stoichiometry']) and
                  np.abs(cursor[j].get('enthalpy_per_atom', 0) - cursor[i].get('enthalpy_per_atom', 0)) < energy_tol)):
-                sim = fingerprint_list[i].get_sim_distance(fingerprint_list[j])
-                sim_mat[i, j] = sim
-                sim_mat[j, i] = sim
+                fingerprints_required[i] = True
+                fingerprints_required[j] = True
+                required_inds.add(i)
+                required_inds.add(j)
             else:
                 sim = 1e10
                 sim_mat[i, j] = sim
                 sim_mat[i, j] = sim
+
+    factory = PDFFactory(cursor, required_inds=list(required_inds), **fingerprint_calc_args)
+
+    for i in range(len(cursor)):
+        for j in range(i+1, len(cursor)):
+            if fingerprints_required[i] and fingerprints_required[j]:
+                sim = cursor[i][factory.default_key].get_sim_distance(cursor[j][factory.default_key])
+                sim_mat[i, j] = sim
+                sim_mat[j, i] = sim
+
     rows, cols = np.where(sim_mat <= sim_tol)
     distinct_set = set()
     dupe_set = set()

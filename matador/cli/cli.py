@@ -499,7 +499,8 @@ def main(no_quickstart=False):
 
     refine_flags = argparse.ArgumentParser(add_help=False)
     refine_flags.add_argument('-task', '--task', type=str,
-                              help='refine subtask to perform: options are spg, elem_set, tag, doi, source, pspot or raw or sub')
+                              help=('refine subtask to perform: options are spg, elem_set, tag, doi, source, '
+                                    'pspot or raw or sub'))
     refine_flags.add_argument('-mode', '--mode', type=str,
                               help='mode of refinement: options are display, set and overwrite')
     refine_flags.add_argument('-symprec', '--symprec', type=float, help='spglib symmetry precision for refinement')

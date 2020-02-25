@@ -31,13 +31,13 @@ def scrape_castep_params(executable):
             try:
                 if len(param) > 1:
                     params.add(str(param.split()[0]))
-            except:
+            except Exception:
                 pass
         for keyword in output.split('PARAMETERS')[0].split('\\n')[1:]:
             try:
                 if len(keyword) > 1:
                     cell.add(str(keyword.split()[0]))
-            except:
+            except Exception:
                 pass
 
     output = str(subprocess.check_output('{} -s block'.format(executable), shell=True))
@@ -46,7 +46,7 @@ def scrape_castep_params(executable):
         try:
             if len(keyword) > 1:
                 blocks.add(str(keyword.split()[0]))
-        except:
+        except Exception:
             pass
 
     params = list(sorted(list(params)))
@@ -54,7 +54,8 @@ def scrape_castep_params(executable):
     blocks = list(sorted(list(blocks)))
     cell = [keyword for keyword in cell if keyword not in blocks]
 
-    version_string = str(subprocess.check_output('{} --version'.format(executable), shell=True)).split('\\n')[0].split()[-1].strip()
+    version_string = str(subprocess.check_output('{} --version'
+                         .format(executable), shell=True)).split('\\n')[0].split()[-1].strip()
     return cell, blocks, params, version_string
 
 

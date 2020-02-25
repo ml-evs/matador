@@ -10,7 +10,9 @@ for database collections.
 import os
 from traceback import print_exc
 from matador.utils.print_utils import print_warning, print_success
+from matador.config.settings import Settings
 
+SETTINGS = Settings()
 
 DEFAULT_SETTINGS = {
     "mongo": {
@@ -34,10 +36,6 @@ FILE_PATHS = {
     'mongo': ['default_collection_file_path'],
     'plotting': ['element_colours']
 }
-
-# this global gets set by load_custom_settings, each time it is called
-from matador.config.settings import Settings
-SETTINGS = Settings()
 
 
 def quickstart_settings():

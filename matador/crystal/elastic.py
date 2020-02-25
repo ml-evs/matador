@@ -65,7 +65,8 @@ def get_equation_of_state(seed, plot=False):
         results['summary'].append(eos_type.__name__ + '\n')
         results['summary'].append('fitting parameters = {d[0]:.6f}, {d[1]:.6f}\n'.format(d=eos.fit_parameters))
         results['summary'].append('rrrmsd = {:10.10f} %\n'.format(eos.rrmsd))
-        results['summary'].append('bulk modulus = {d[0]:.6f} +/- {d[1]:.6f} GPa\n'.format(d=(eos.bulk_modulus, eos.bulk_modulus_err)))
+        results['summary'].append('bulk modulus = {d[0]:.6f} +/- {d[1]:.6f} GPa\n'
+                                  .format(d=(eos.bulk_modulus, eos.bulk_modulus_err)))
         results['summary'].append(80*'-' + '\n')
         probes = np.linspace(min(volumes), max(volumes), num=100)
         fitted_curve = eos.evaluate(probes, *eos.popt)

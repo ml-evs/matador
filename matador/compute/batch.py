@@ -134,7 +134,8 @@ class BatchRun:
         if self.args['nnodes'] < 1 or self.args['ncores'] < 1 or self.nprocesses < 1:
             raise InputError('Invalid number of cores, nodes or processes.')
         if self.all_cores < self.nprocesses:
-            raise InputError('Requesting more processes than available cores: {} vs {}'.format(self.all_cores, self.nprocesses))
+            raise InputError('Requesting more processes than available cores: {} vs {}'
+                             .format(self.all_cores, self.nprocesses))
 
         # scrape input cell/param/other files
         if self.mode == 'castep':
@@ -360,8 +361,10 @@ class BatchRun:
         self.file_lists = defaultdict(list)
         self.file_lists['res'] = glob.glob('*.res')
         if any(self.seed == file.replace('.res', '') for file in self.file_lists['res']):
-            error = ("Found .res file with same name as seed: {}.res. This will wreak havoc on your calculations!\n".format(self.seed)
-                     + "Please rename either your seed.cell/seed.param files, or rename the offending {}.res".format(self.seed))
+            error = ("Found .res file with same name as seed: {}.res. This will wreak havoc on your calculations!\n"
+                     .format(self.seed)
+                     + "Please rename either your seed.cell/seed.param files, or rename the offending {}.res"
+                     .format(self.seed))
             raise InputError(error)
 
         if not self.file_lists['res']:

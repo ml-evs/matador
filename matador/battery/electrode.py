@@ -6,8 +6,6 @@ relevant electrode properties from phase diagrams.
 
 """
 
-from enum import Enum
-
 
 class Electrode:
     """ The Electrode class wraps phase diagrams of battery electrode
