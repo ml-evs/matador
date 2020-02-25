@@ -59,8 +59,8 @@ def main():
                         help='plot phonon calculation, rather than electronic')
     parser.add_argument('-ir', '--infrared', action='store_true', default=False,
                         help='plot infrared spectrum from file')
-    parser.add_argument('-ir_ss', '--infrared_step_size', nargs='?', default=1, type=int,
-                        help='step size on x-axis for IR plots; must be > 0, default is 1')
+    parser.add_argument('-ir_ss', '--infrared_step_size', type=float, nargs='?', default=1.0,
+                        help='step size in cm^{-1} on x-axis for IR plots; must be > 0, default is 1')
     parser.add_argument('-gw', '--gaussian_width', type=float,
                         help=('smearing width for DOS from .bands_dos (default: 0.1 eV) or '
                               '.phonon_dos files (default: 10 1/cm)'))
@@ -123,8 +123,7 @@ def main():
     del kwargs['band_reorder']
     del kwargs['no_band_reorder']
 
-    from matador.utils.print_utils import print_failure
-
+    bandstructure = False
     for seed in seeds:
         if not phonons and not ir:
             bs_seed = seed + '.bands'
@@ -140,10 +139,14 @@ def main():
             dos_seed = seed + '.phonon_dos'
             dos = isfile(dos_seed)
 
-    cell_seed = seed + '.cell'
-    cell = isfile(cell_seed)
+        elif ir:
+            if len(seeds) > 1:
+                exit('Multiple seeds not supported for IR plot.')
+            ir_seed = seed + '.phonon'
 
-
+    if bandstructure:
+        cell_seed = seed + '.cell'
+        cell = isfile(cell_seed)
 
     if kwargs.get('dos_only') and dos:
         bandstructure = False
@@ -164,14 +167,12 @@ def main():
                       band_reorder=band_reorder,
                       band_colour=band_colour,
                       **kwargs)
-    if ir:
-        print(seed)
-        plot_ir_spectrum(seed, kwargs.get('infrared_step_size'))
 
+    if ir:
+        plot_ir_spectrum(ir_seed, bin_width=kwargs['infrared_step_size'], **kwargs)
 
     else:
-        print_failure('Could not find files for specified seed {}.'.format(seed))
-        exit()
+        exit('Could not find files for specified seed {}.'.format(seed))
 
 
 if __name__ == '__main__':

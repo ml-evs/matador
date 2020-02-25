@@ -86,5 +86,19 @@ def plot_ir_spectrum(seed, bin_width=1.0, ax=None, show=True, **kwargs):
 
     plt.title(seed)
 
-    plt.show()
-    #return ax
+    if any([kwargs.get('pdf'), kwargs.get('svg'), kwargs.get('png')]):
+        filename = seed.split('/')[-1].replace('.phonon', '') + '_ir'
+        if kwargs.get('pdf'):
+            plt.savefig('{}.pdf'.format(filename),
+                        bbox_inches='tight', transparent=True)
+        if kwargs.get('svg'):
+            plt.savefig('{}.svg'.format(filename),
+                        bbox_inches='tight', transparent=True)
+        if kwargs.get('png'):
+            plt.savefig('{}.png'.format(filename),
+                        bbox_inches='tight', transparent=True)
+
+    elif show:
+        plt.show()
+
+    return ax
