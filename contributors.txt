@@ -9,3 +9,6 @@ First pass at ternary voltages:
 
 Temperature-dependent hulls and thermodynamics scraping:
     Angela Harper <https://www.github.com/harpaf13>
+
+IR/Raman scraping and plotting:
+    Jordan Dorrell <https://www.github.com/JorD04>
