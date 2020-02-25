@@ -18,13 +18,8 @@ def read_ir_file(seed):
 
     """
 
-<<<<<<< HEAD
     if seed.endswith('phonon'):
         seed = seed.replace('.phonon', '')
-=======
-    if seed.endswith('.phonon'):
-         seed = seed.replace('.phonon', '')
->>>>>>> 8cec7f935fa35e1e9f2607ec71710340ec7230ef
     with open(seed + '.phonon', 'r') as f:
         flines = f.readlines()
     for ind, line in enumerate(flines):
@@ -62,24 +57,11 @@ def read_ir_file(seed):
 @plotting_function
 def plot_ir_spectrum(seed, step_size):
     """ This function plots the IR spectrum found in the given file.
-
-<<<<<<< HEAD
     Parameters:
         bin_width(float): The width of the wavenumber bin in cm^-1. Determined by step_size and bin_scaler
 
     Keyword Arguments:
         step_size(float): change in wavenumber between points on x-axis,
-=======
-        Parameters:
-        bin_width (float): The width of the wavenumber bin in cm^-1. Determined by step_size and bin_scaler
-
-    Keyword Arguments:
-        step_size (float): change in wavenumber between points on x-axis,
-        bin_scaler (float): scaled to the step_size (1 is minimum vale); used for gaussian broadening,
-        
-        step_size: change in wavenumber between points on x-axis,
-        bin_scaler: scaled to the step_size (1 is minimum vale); used for gaussian broadening,
->>>>>>> 8cec7f935fa35e1e9f2607ec71710340ec7230ef
     """
     import matplotlib.pyplot as plt
 
