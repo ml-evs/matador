@@ -2,7 +2,6 @@
 import unittest
 from os.path import realpath
 from matador.fingerprints.similarity import get_uniq_cursor
-from matador.fingerprints import Fingerprint
 from matador.scrapers.castep_scrapers import res2dict
 
 REAL_PATH = "/".join(realpath(__file__).split("/")[:-1]) + "/"
