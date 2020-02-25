@@ -685,9 +685,9 @@ class ScraperMiscTest(MatadorUnitTest):
         )
         data, s = phonon2dict(phonon_fname, VERBOSITY=VERBOSITY)
         self.assertTrue(s)
-        self.assertTrue("ir_intensity" in data)
+        self.assertTrue("infrared_intensity" in data)
         self.assertTrue("raman_intensity" in data)
-        self.assertEqual(np.shape(data["eigenvalues_q"]), np.shape(data["ir_intensity"]))
+        self.assertEqual(np.shape(data["eigenvalues_q"]), np.shape(data["infrared_intensity"]))
         self.assertEqual(np.shape(data["eigenvalues_q"]), np.shape(data["raman_intensity"]))
 
     def test_phonon_dos_scraper(self):
