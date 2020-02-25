@@ -147,6 +147,8 @@ def main():
     if bandstructure:
         cell_seed = seed + '.cell'
         cell = isfile(cell_seed)
+    else:
+        cell = False
 
     if kwargs.get('dos_only') and dos:
         bandstructure = False
@@ -155,24 +157,30 @@ def main():
         dos = False
 
     if not ir:
-        plot_spectral(seeds,
-                      plot_bandstructure=bandstructure,
-                      plot_dos=dos,
-                      plot_pdis=plot_pdis,
-                      cell=cell,
-                      gap=gap,
-                      verbosity=verbosity,
-                      labels=labels,
-                      cmap=cmap,
-                      band_reorder=band_reorder,
-                      band_colour=band_colour,
-                      **kwargs)
+        return plot_spectral(
+            seeds,
+            plot_bandstructure=bandstructure,
+            plot_dos=dos,
+            plot_pdis=plot_pdis,
+            cell=cell,
+            gap=gap,
+            verbosity=verbosity,
+            labels=labels,
+            cmap=cmap,
+            band_reorder=band_reorder,
+            band_colour=band_colour,
+            **kwargs
+        )
 
     if ir:
-        plot_ir_spectrum(ir_seed, bin_width=kwargs['infrared_step_size'], **kwargs)
+        return plot_ir_spectrum(
+            ir_seed,
+            bin_width=kwargs['infrared_step_size'],
+            **kwargs
+        )
 
-    else:
-        exit('Could not find files for specified seed {}.'.format(seed))
+    exit("Issue plotting {}: did you specify -ph/-ir appropriately?"
+         .format(seeds))
 
 
 if __name__ == '__main__':
