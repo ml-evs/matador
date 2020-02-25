@@ -58,7 +58,7 @@ def plot_ir_spectrum(seed, ir_ss, ir_bs):
     """ This function plots the IR spectrum found in the given file.
 
         Parameters:
-        bin_width: The width of the wavenumber bin in cm^-1. Determined by step_size and bin_scaler
+        bin_width (float): The width of the wavenumber bin in cm^-1. Determined by step_size and bin_scaler
 
         Keyword Arguments:
         step_size: change in wavenumber between points on x-axis,
