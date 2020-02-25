@@ -8,3 +8,6 @@ max-line-length = 127
 exclude = docs,plugins,castep_params 
 # unfortunately complexity is a harsh requirement on some of this project...
 max-complexity = -1
+# ignore star imports in chem utils that bring in all constants
+per-file-ignores =
+    matador/utils/chem_utils.py:F405
