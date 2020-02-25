@@ -152,7 +152,7 @@ class Crystal(DataContainer):
         self.sites = []
 
         # use lattice_cart to construct cell if present, otherwise abc
-        self.cell = UnitCell(doc.get('lattice_cart') or doc['lattice_abc'])
+        self.cell = UnitCell(doc.get('lattice_cart', doc.get('lattice_abc')))
 
         self._construct_sites(voronoi=voronoi)
 
@@ -385,6 +385,13 @@ class Crystal(DataContainer):
             self._data['pdf'] = PDF(self._data, label=self.formula_tex)
         return self._data['pdf']
 
+    @pdf.setter
+    def pdf(self, pdf):
+        """ Set the PDF to the given PDF object (or None). """
+        from matador.fingerprints.pdf import PDF
+        if isinstance(pdf, PDF) or pdf is None:
+            self._data['pdf'] = pdf
+
     @property
     def pxrd(self, **kwargs):
         """ Returns a PXRD object (powder xray diffraction) containing
@@ -512,8 +519,14 @@ class Crystal(DataContainer):
 
                 bond_length = data[2]['dist']
                 is_image = bool(data[2]['image'])
-                bonding_dict[atom_1]['bonds'].append({'species': site_2.species, 'index': atom_2, 'length': bond_length, 'is_image': is_image, 'position': site_2.coords})
-                bonding_dict[atom_2]['bonds'].append({'species': site_1.species, 'index': atom_1, 'length': bond_length, 'is_image': is_image, 'position': site_1.coords})
+                bonding_dict[atom_1]['bonds'].append(
+                    {'species': site_2.species, 'index': atom_2, 'length': bond_length,
+                     'is_image': is_image, 'position': site_2.coords}
+                )
+                bonding_dict[atom_2]['bonds'].append(
+                    {'species': site_1.species, 'index': atom_1, 'length': bond_length,
+                     'is_image': is_image, 'position': site_1.coords}
+                )
 
             for key in bonding_dict:
                 bonding_dict[key]['bonds'] = sorted(bonding_dict[key]['bonds'], key=lambda x: x['index'])

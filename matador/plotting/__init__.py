@@ -27,7 +27,7 @@ __maintainer__ = 'Matthew Evans'
 from matador.plotting.plotting import get_linear_cmap, set_style
 from matador.plotting.spectral_plotting import plot_spectral
 from matador.plotting.convergence_plotting import plot_cutoff_kpt_grid
-from matador.plotting.battery_plotting import plot_voltage_curve, plot_volume_curve, plot_beef_voltage
+from matador.plotting.battery_plotting import plot_voltage_curve, plot_volume_curve
 from matador.plotting.hull_plotting import plot_2d_hull, plot_ternary_hull, plot_temperature_hull, plot_ensemble_hull
 from matador.plotting.temperature_plotting import plot_free_energy
 from matador.plotting.pdf_plotting import plot_pdf, plot_projected_pdf, plot_diff_overlap, plot_projected_diff_overlap

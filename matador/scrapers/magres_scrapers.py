@@ -89,9 +89,13 @@ def magres2dict(seed, **kwargs):
                         magres['chemical_shifts'][-1] += magres['magnetic_shielding_tensor'][-1][j][j] / 3
 
                     # find eigenvalues of symmetric part of shielding and order them to calc anisotropy eta
-                    symmetric_shielding = 0.5 * (magres['magnetic_shielding_tensor'][-1] + np.asarray(magres['magnetic_shielding_tensor'][-1]).T)
+                    symmetric_shielding = (
+                        0.5 *
+                        (magres['magnetic_shielding_tensor'][-1] + np.asarray(magres['magnetic_shielding_tensor'][-1]).T)
+                    )
                     eig_vals, eig_vecs = np.linalg.eig(symmetric_shielding)
-                    eig_vals, eig_vecs = zip(*sorted(zip(eig_vals, eig_vecs), key=lambda eig: abs(eig[0] - magres['chemical_shifts'][-1])))
+                    eig_vals, eig_vecs = zip(*sorted(zip(eig_vals, eig_vecs),
+                                                     key=lambda eig: abs(eig[0] - magres['chemical_shifts'][-1])))
                     # Haeberlen convention: |s_zz - s_iso| >= |s_xx - s_iso| >= |s_yy - s_iso|
                     s_yy, s_xx, s_zz = eig_vals
                     s_iso = magres['chemical_shifts'][-1]

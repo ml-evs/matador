@@ -19,6 +19,7 @@ import numba
 import numpy as np
 
 from matador.utils.print_utils import print_notify
+from matador.crystal import Crystal
 
 
 class Fingerprint(abc.ABC):
@@ -119,7 +120,7 @@ class FingerprintFactory:
     fingerprint = None
     default_key = None
 
-    def __init__(self, cursor, debug=False, **fprint_args):
+    def __init__(self, cursor, required_inds=None, debug=False, **fprint_args):
         """ Compute PDFs over n processes, where n is set by either
         SLURM_NTASKS, OMP_NUM_THREADS or physical core count.
 
@@ -128,9 +129,17 @@ class FingerprintFactory:
             fingerprint (Fingerprint): class to compute for each structure
 
         Keyword arguments:
-            pdf_args (dict): arguments to pass to the PDF calculator
+            pdf_args (dict): arguments to pass to the fingerprint calculator
+            required_inds (list(int)): indices in cursor to skip.
 
         """
+        if required_inds is None:
+            required_inds = list(range(len(cursor)))
+        elif len(required_inds) == 0:
+            return
+        else:
+            print("Skipping {} structures out of {}".format(len(cursor) - len(required_inds), len(cursor)))
+
         if self.fingerprint is None or self.default_key is None:
             # TODO: is this the right way of doing this?
             raise NotImplementedError('Do not create FingerprintFactory directly, '
@@ -139,8 +148,15 @@ class FingerprintFactory:
         if 'lazy' in fprint_args:
             del fprint_args['lazy']
 
-        for doc in cursor:
-            doc[self.default_key] = self.fingerprint(doc, lazy=True, **fprint_args)
+        for ind, doc in enumerate(cursor):
+            if isinstance(doc, Crystal):
+                doc._data.pop(self.default_key, None)
+            if ind in required_inds:
+                doc[self.default_key] = self.fingerprint(doc, lazy=True, **fprint_args)
+            else:
+                doc[self.default_key] = None
+
+        compute_list = [doc for ind, doc in enumerate(cursor) if ind in required_inds]
 
         # how many processes to use? either SLURM_NTASKS, OMP_NUM_THREADS or total num CPUs
         if os.environ.get('SLURM_NTASKS') is not None:
@@ -152,21 +168,22 @@ class FingerprintFactory:
         else:
             self.nprocs = mp.cpu_count()
             env = 'core count'
-        print_notify('Running {} jobs on {} processes, set by {}.'.format(len(cursor),
-                                                                          self.nprocs,
-                                                                          env))
+        print_notify('Running {} jobs on at most {} processes, set by {}.'
+                     .format(len(required_inds), self.nprocs, env))
+        self.nprocs = min(len(compute_list), self.nprocs)
 
         start = time.time()
         if self.nprocs == 1:
             import tqdm
             for ind, doc in tqdm.tqdm(enumerate(cursor)):
-                cursor[ind][self.default_key].calculate()
+                if cursor[ind][self.default_key] is not None:
+                    cursor[ind][self.default_key].calculate()
         else:
             pool = mp.Pool(processes=self.nprocs)
             fprint_cursor = []
             results = pool.map_async(functools.partial(_calc_fprint_pool_wrapper,
                                                        key=self.default_key),
-                                     cursor,
+                                     compute_list,
                                      callback=fprint_cursor.extend,
                                      error_callback=print,
                                      # set chunksize to 1 as Fingerprints will often be O(N^2)
@@ -174,8 +191,8 @@ class FingerprintFactory:
                                      # the start
                                      chunksize=1)
             pool.close()
-            width = len(str(len(cursor)))
-            total = len(cursor)
+            width = len(str(len(required_inds)))
+            total = len(required_inds)
             while not results.ready():
                 sys.stdout.write('{done:{width}d} / {total:{width}d}  {percentage:3d}%\r'
                                  .format(width=width, done=total-results._number_left,
@@ -183,11 +200,17 @@ class FingerprintFactory:
                 sys.stdout.flush()
                 time.sleep(1)
 
-            if len(fprint_cursor) != len(cursor):
+            if len(fprint_cursor) != len(required_inds):
                 raise RuntimeError('There was an error calculating the desired Fingerprint')
 
+            fprint_ind = 0
             for ind, doc in enumerate(cursor):
-                cursor[ind][self.default_key] = fprint_cursor[ind][self.default_key]
+                if ind in required_inds:
+                    print(ind, fprint_ind)
+                    if isinstance(cursor[ind], Crystal):
+                        cursor[ind]._data.pop(self.default_key, None)
+                    cursor[ind][self.default_key] = fprint_cursor[fprint_ind][self.default_key]
+                    fprint_ind += 1
 
         elapsed = time.time() - start
         if debug:

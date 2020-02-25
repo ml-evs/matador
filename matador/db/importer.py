@@ -97,9 +97,6 @@ class Spatula:
 
         # I/O files
         if not self.dryrun:
-
-            base = os.path.dirname(os.path.realpath(__file__))
-
             self.num_words = len(WORDS)
             self.num_nouns = len(NOUNS)
 
@@ -154,7 +151,7 @@ class Spatula:
                 elif len(self.args.get('db')) > 1:
                     exit('Can only import to one collection.')
 
-        num_prototypes_in_db = self.repo.count_documents({'prototype':True})
+        num_prototypes_in_db = self.repo.count_documents({'prototype': True})
         num_objects_in_db = self.repo.count_documents({})
         if self.args.get('prototype'):
             if num_prototypes_in_db != num_objects_in_db:

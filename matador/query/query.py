@@ -42,7 +42,16 @@ class DBQuery:
 
     """
 
-    def __init__(self, client=False, collections=False, subcmd='query', debug=False, quiet=False, mongo_settings=None, **kwargs):
+    def __init__(
+        self,
+        client=False,
+        collections=False,
+        subcmd='query',
+        debug=False,
+        quiet=False,
+        mongo_settings=None,
+        **kwargs
+    ):
         """ Parse arguments from matador or API call before calling
         query.
 
@@ -413,7 +422,10 @@ class DBQuery:
                 # then do some random samples
                 else:
                     ind = np.random.randint(rand_sample if rand_sample < count - 1 else 0, count - 1)
-                id_cursor, id_count = self._find_and_sort({'text_id': self.cursor[ind]['text_id']})
+
+                doc = self.cursor[ind]
+
+                id_cursor, id_count = self._find_and_sort({'text_id': doc['text_id']})
                 if id_count > 1:
                     print_warning(
                         'WARNING: matched multiple structures with text_id ' + id_cursor[0]['text_id'][0] + ' ' +
@@ -436,15 +448,17 @@ class DBQuery:
                         if self._non_elemental:
                             test_cursors[-1] = filter_cursor_by_chempots(self._chempots, test_cursors[-1])
                         test_cursor_count.append(len(test_cursors[-1]))
-                        print("{:^24}".format(self.cursor[ind]['text_id'][0] + ' ' +
-                                              self.cursor[ind]['text_id'][1]) +
-                              ': matched ' + str(test_cursor_count[-1]), 'structures.', end='\t-> ')
-                        print('S-' if self.cursor[ind].get('spin_polarized') else '',
-                              self.cursor[ind]['sedc_scheme'] + '-' if self.cursor[ind].get('sedc_scheme') is not None else '',
-                              self.cursor[ind]['xc_functional'] + ', ',
-                              self.cursor[ind]['cut_off_energy'], ' eV, ',
-                              self.cursor[ind]['geom_force_tol'] if self.cursor[ind].get('geom_force_tol') is not None else 'xxx', ' eV/A, ',
-                              self.cursor[ind]['kpoints_mp_spacing'] if self.cursor[ind].get('kpoints_mp_spacing') is not None else 'xxx', ' 1/A', sep='')
+                        print("{:^24}: matched {} structures."
+                              .format(' '.join(doc['text_id']), test_cursor_count[-1]),
+                              end='\t-> ')
+                        print('{spin}{sedc}{functional} {cutoff} eV, {geom_force_tol} eV/A, {kpoints} 1/A.'
+                              .format(spin="S-" if doc.get('spin_polarized') else '',
+                                      sedc="+" + doc.get('sedc') + "+" if doc.get('sedc') else "",
+                                      functional=doc["xc_functional"],
+                                      cutoff=doc["cut_off_energy"],
+                                      geom_force_tol=doc.get('geom_force_tol', 'xxx'),
+                                      kpoints=doc.get('kpoints_mp_spacing', 'xxx')))
+
                         if test_cursor_count[-1] == count:
                             print('Matched all structures...')
                             break

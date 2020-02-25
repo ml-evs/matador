@@ -5,6 +5,7 @@ DOS and dispersion data.
 
 from .dos import VibrationalDOS, ElectronicDOS, DensityOfStates
 from .dispersion import VibrationalDispersion, ElectronicDispersion, Dispersion
+from .spectral import Spectral
 
 
 __all__ = [
@@ -13,5 +14,6 @@ __all__ = [
     'DensityOfStates',
     'VibrationalDispersion',
     'ElectronicDispersion',
-    'Dispersion'
+    'Dispersion',
+    'Spectral'
 ]

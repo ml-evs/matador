@@ -236,7 +236,8 @@ class PhaseDiagram:
                 if not structure:
                     failed_structures.append(ind)
             if failed_structures:
-                raise RuntimeError('There were issues calculating the hull distance for {} structures.'.format(len(failed_structures)))
+                raise RuntimeError('There were issues calculating the hull distance for {} structures.'
+                                   .format(len(failed_structures)))
 
             hull_dist = hull_dist[:-1]
 
@@ -244,25 +245,25 @@ class PhaseDiagram:
         else:
             raise NotImplementedError
             # self.hull.planes = [[self.structure_slice[vertex] for vertex in simplex]
-                                # for simplex in self.hull.simplices]
+            #                     for simplex in self.hull.simplices]
             # for idx, structure in enumerate(structures):
-                # if precompute and get_formula_from_stoich(self.cursor[idx]['stoichiometry'],
-                                                          # tex=False) in cached_formula_dists:
-                    # formula = get_formula_from_stoich(self.cursor[idx]['stoichiometry'], tex=False)
-                    # if formula in cached_formula_dists:
-                        # cache_hits += 1
-                        # hull_dist[idx] = (structures[idx, -1] - cached_formula_dists[formula][0] +
-                                          # cached_formula_dists[formula][1])
-                    # structures_finished[idx] = True
-                # else:
-                    # if point_in_polygon(structure[:-1], plane):
-                        # hull_dist[idx] = 0
-                        # continue
+            #     if precompute and get_formula_from_stoich(self.cursor[idx]['stoichiometry'],
+            #                                               tex=False) in cached_formula_dists:
+            #         formula = get_formula_from_stoich(self.cursor[idx]['stoichiometry'], tex=False)
+            #         if formula in cached_formula_dists:
+            #             cache_hits += 1
+            #             hull_dist[idx] = (structures[idx, -1] - cached_formula_dists[formula][0] +
+            #                               cached_formula_dists[formula][1])
+            #         structures_finished[idx] = True
+            #     else:
+            #         if point_in_polygon(structure[:-1], plane):
+            #             hull_dist[idx] = 0
+            #             continue
 
             # loop over compositions
-                # loop over planes
-                    # check if point is interior to plane
-                        # if so, compute "height" above plane, using equation of hyperplane from scipy
+            #   loop over planes
+            #       check if point is interior to plane
+            #           if so, compute "height" above plane, using equation of hyperplane from scipy
 
         return hull_dist
 

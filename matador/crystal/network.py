@@ -4,7 +4,6 @@ into CrystalGraph objects.
 import networkx as nx
 import numpy as np
 import itertools
-import copy
 
 EPS = 1e-12
 
@@ -122,8 +121,9 @@ class CrystalGraph(nx.MultiDiGraph):
         subgraphs = [nx.MultiGraph() for i in range(size)]
 
         for node in partition:
-            subgraphs[partition[node]].add_node(node,
-                                                species=list(self.nodes(data=True))[list(self.nodes()).index(node)][1]['species'])
+            subgraphs[partition[node]].add_node(
+                node, species=list(self.nodes(data=True))[list(self.nodes()).index(node)][1]['species']
+            )
         for edge in self.edges():
             if partition[edge[0]] == partition[edge[1]]:
                 subgraphs[partition[edge[0]]].add_edge(edge[0], edge[1])
@@ -207,7 +207,9 @@ def are_graphs_the_same(g1, g2, edge_match=None):
                             edge_match=edge_match)
 
 
-def draw_network(structure, layout=None, edge_labels=False, node_index=False, curved_edges=True, node_colour='elem', partition=None, ax=None):
+def draw_network(structure,
+                 layout=None, edge_labels=False, node_index=False,
+                 curved_edges=True, node_colour='elem', partition=None, ax=None):
     import networkx as nx
     from matador.utils.viz_utils import get_element_colours
     import matplotlib.pyplot as plt
@@ -215,7 +217,7 @@ def draw_network(structure, layout=None, edge_labels=False, node_index=False, cu
     element_colours = get_element_colours()
     try:
         network = structure.network
-    except:
+    except Exception:
         network = structure
     if layout is None:
         pos = nx.spring_layout(network)

@@ -523,7 +523,9 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
     ax.boundary(linewidth=2.0, zorder=99)
     ax.clear_matplotlib_ticks()
 
-    chempot_labels = [get_formula_from_stoich(get_stoich_from_formula(species, sort=False), sort=False, tex=True) for species in hull.species]
+    chempot_labels = [get_formula_from_stoich(
+        get_stoich_from_formula(species, sort=False), sort=False, tex=True) for species in hull.species
+    ]
 
     ax.gridlines(color='black', multiple=scale * 0.1, linewidth=0.5)
     ticks = [float(val) for val in np.linspace(0, 1, 6)]
@@ -669,7 +671,9 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
         from matador.utils.hull_utils import barycentric2cart
         for ind, doc in enumerate(label_cursor):
             conc = np.asarray(doc['concentration'] + [1 - sum(doc['concentration'])])
-            formula = get_formula_from_stoich(doc['stoichiometry'], sort=False, tex=True, latex_sub_style=r'\mathregular', elements=hull.species)
+            formula = get_formula_from_stoich(
+                doc['stoichiometry'], sort=False, tex=True, latex_sub_style=r'\mathregular', elements=hull.species
+            )
             arrowprops = dict(arrowstyle="-|>", color='k', lw=2, alpha=0.5, zorder=1, shrinkA=2, shrinkB=4)
             cart = barycentric2cart([doc['concentration'] + [0]])[0][:2]
             min_dist = 1e20

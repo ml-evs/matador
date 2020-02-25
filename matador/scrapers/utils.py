@@ -8,7 +8,6 @@ like custom errors and a scraper function wrapper.
 
 import glob
 import traceback as tb
-import warnings
 
 from matador.orm.spectral import VibrationalDOS, VibrationalDispersion
 from matador.orm.spectral import ElectronicDOS, ElectronicDispersion
@@ -82,7 +81,6 @@ def scraper_function(function):
                         result = orm
 
                 return result, success
-
 
             if not success:
                 failures += [_seed]

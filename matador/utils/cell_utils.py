@@ -135,7 +135,8 @@ def wrap_frac_coords(positions, remove=False):
     """ Wrap the given fractional coordinates back into the cell.
 
     Parameters:
-        positions (list): list of fractional position vectors.
+        positions (list): list of fractional position vectors, or
+            a single position.
 
     Keyword arguments:
         remove (bool): if True, removes points exterior to the cell.
@@ -146,9 +147,13 @@ def wrap_frac_coords(positions, remove=False):
     """
     from copy import deepcopy
     wrapped = deepcopy(positions)
+    single = False
+    if len(wrapped) == 3 and isinstance(wrapped[0], float):
+        wrapped = [wrapped]
+        single = True
     if remove:
         to_remove = len(wrapped)*[False]
-    for ind, pos in enumerate(positions):
+    for ind, pos in enumerate(wrapped):
         for k in range(3):
             if pos[k] >= 1 or pos[k] < 0:
                 if remove:
@@ -158,6 +163,9 @@ def wrap_frac_coords(positions, remove=False):
                     wrapped[ind][k] %= 1
     if remove:
         wrapped = [wrapped[ind] for ind, res in enumerate(to_remove) if not res]
+    if single:
+        return wrapped[0]
+
     return wrapped
 
 

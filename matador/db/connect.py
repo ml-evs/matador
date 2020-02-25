@@ -94,7 +94,7 @@ def make_connection_to_collection(coll_names, check_collection=False, allow_chan
                             try:
                                 choice = int(input('Please enter your choice: '))
                                 collection = options[choice]
-                            except:
+                            except Exception:
                                 raise SystemExit('Invalid choice. Exiting...')
                         elif import_mode:
                             if override:
@@ -106,7 +106,7 @@ def make_connection_to_collection(coll_names, check_collection=False, allow_chan
                                 try:
                                     choice = int(input('Then please enter your choice from above: '))
                                     collection = options[choice]
-                                except:
+                                except Exception:
                                     raise SystemExit('Invalid choice. Exiting...')
 
             collections[collection] = db[collection]

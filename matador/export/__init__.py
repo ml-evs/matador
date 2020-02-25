@@ -16,7 +16,10 @@ Currently supported formats:
 """
 
 
-__all__ = ['doc2param', 'doc2cell', 'doc2pdb', 'doc2pwscf', 'doc2res', 'doc2xsf', 'generate_hash', 'query2files', 'doc2arbitrary']
+__all__ = [
+    'doc2param', 'doc2cell', 'doc2pdb', 'doc2pwscf', 'doc2res',
+    'doc2xsf', 'generate_hash', 'query2files', 'doc2arbitrary'
+]
 __author__ = 'Matthew Evans'
 __maintainer__ = 'Matthew Evans'
 

@@ -102,10 +102,12 @@ class Workflow:
         if self.compute_dir:
             os.chdir(self.compute_dir)
             if success:
-                LOG.info('Writing results from compute dir of Workflow {} run to completed folder and tidying up.'.format(self.label))
+                LOG.info('Writing results from compute dir of Workflow {} run to completed folder and tidying up.'
+                         .format(self.label))
                 self.relaxer.mv_to_completed(self.relaxer.seed, keep=True, skip_existing=False)
             else:
-                LOG.info('Writing results from compute dir of failed Workflow {} run to bad_castep folder and tidying up.'.format(self.label))
+                LOG.info('Writing results from compute dir of failed Workflow {} run to bad_castep folder and tidying up.'
+                         .format(self.label))
                 self.relaxer.mv_to_bad(self.relaxer.seed)
             os.chdir(cwd)
 
