@@ -1133,6 +1133,7 @@ class ScraperMiscTest(MatadorUnitTest):
         pdis, s = cell2dict(cell_fname, db=False, lattice=True, verbosity=VERBOSITY)
         self.assertTrue(s)
 
+
 class CifTests(MatadorUnitTest):
     """ These tests check the cif scraper for correctness. """
 
