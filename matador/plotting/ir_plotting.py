@@ -18,6 +18,8 @@ def read_ir_file(seed):
 
     """
 
+    if seed.endswith('.phonon'):
+         seed = seed.replace('.phonon', '')
     with open(seed + '.phonon', 'r') as f:
         flines = f.readlines()
     for ind, line in enumerate(flines):
