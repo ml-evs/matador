@@ -678,6 +678,18 @@ class ScraperMiscTest(MatadorUnitTest):
         self.assertEqual(ph_dict["kpoint_branches"][-1][0], 185)
         self.assertEqual(ph_dict["kpoint_branches"][-1][-1], 249)
 
+    def test_phonon_scraper_ir(self):
+        phonon_fname = REAL_PATH + "data/phonon_ir/h-BN_IRR.phonon"
+        self.assertTrue(
+            os.path.isfile(phonon_fname), msg="Failed to open test case {} - please check installation.".format(phonon_fname)
+        )
+        data, s = phonon2dict(phonon_fname, VERBOSITY=VERBOSITY)
+        self.assertTrue(s)
+        self.assertTrue("ir_intensity" in data)
+        self.assertTrue("raman_intensity" in data)
+        self.assertEqual(np.shape(data["eigenvalues_q"]), np.shape(data["ir_intensity"]))
+        self.assertEqual(np.shape(data["eigenvalues_q"]), np.shape(data["raman_intensity"]))
+
     def test_phonon_dos_scraper(self):
         phonon_fname = REAL_PATH + "data/phonon_dispersion/K3P.phonon_dos"
         self.assertTrue(

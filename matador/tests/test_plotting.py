@@ -161,6 +161,27 @@ class SpectralPlotTests(unittest.TestCase):
             raise error
         self.assertTrue(file_exists)
 
+    def test_phonon_ir(self):
+        """ Test phonon IR/Raman plot. """
+        os.chdir(REAL_PATH + "/data/phonon_ir")
+        expected_file = "h-BN_IRR_ir.svg"
+        if os.path.isfile(expected_file):
+            os.remove(expected_file)
+        sys.argv = ["dispersion", "h-BN_IRR", "--svg", "-ir", "--figsize", "5", "5"]
+        errored = False
+        try:
+            matador.cli.dispersion.main()
+        except Exception as exc:
+            errored = True
+            error = exc
+        file_exists = os.path.isfile(expected_file)
+        if file_exists:
+            os.remove(expected_file)
+        os.chdir(ROOT_DIR)
+        if errored:
+            raise error
+        self.assertTrue(file_exists)
+
 
 @unittest.skipIf(not MATPLOTLIB_PRESENT, "Skipping plotting tests.")
 class HullPlotTests(unittest.TestCase):
