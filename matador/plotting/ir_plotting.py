@@ -62,7 +62,10 @@ def plot_ir_spectrum(seed, ir_ss, ir_bs):
         Parameters:
         bin_width (float): The width of the wavenumber bin in cm^-1. Determined by step_size and bin_scaler
 
-        Keyword Arguments:
+    Keyword Arguments:
+        step_size (float): change in wavenumber between points on x-axis,
+        bin_scaler (float): scaled to the step_size (1 is minimum vale); used for gaussian broadening,
+        
         step_size: change in wavenumber between points on x-axis,
         bin_scaler: scaled to the step_size (1 is minimum vale); used for gaussian broadening,
     """
