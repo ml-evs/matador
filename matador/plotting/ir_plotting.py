@@ -115,7 +115,7 @@ def plot_ir_spectrum(seed, ir_ss, ir_bs):
     fig, ax1 = plt.subplots(figsize = (14,8))
     plt.title(seed)
     ax1.plot(wavenumbers_plot, ir_plot, color='#EE3425')
-    ax1.set_xlabel('Wavenumbers (cm^-1)')
+    ax1.set_xlabel('Wavenumbers (cm$^{-1}$)')
     ax1.set_ylabel('IR intensities  ((D/A)**2/amu)', color='#EE3425')
     plt.gca().invert_yaxis()
     plt.gca().invert_xaxis()
