@@ -24,7 +24,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
       run: |
-        cp matador/tests/data/matador_pipelines_conf.yml $HOME/.matadorrc
+        cp tests/data/matador_pipelines_conf.yml $HOME/.matadorrc
         python -m pip install --upgrade pip
         pip install flake8
     - name: Check for syntax errors and lint with flake8
@@ -50,7 +50,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
       run: |
-        cp matador/tests/data/matador_pipelines_conf.yml $HOME/.matadorrc
+        cp tests/data/matador_pipelines_conf.yml $HOME/.matadorrc
         python -m pip install --upgrade pip
         pip install -e .[test,plotting,crystal]
         pip install ase
