@@ -32,7 +32,7 @@ def plot_ir_spectrum(seed, bin_width=1.0, ax=None, show=True, **kwargs):
     import matplotlib.pyplot as plt
 
     if ax is None:
-        fig, ax_ir = plt.subplots()
+        fig, ax_ir = plt.subplots(figsize=kwargs.get('figsize'))
     else:
         ax_ir = ax
 
@@ -68,8 +68,8 @@ def plot_ir_spectrum(seed, bin_width=1.0, ax=None, show=True, **kwargs):
     bins = 0.5 * (bin_edges[1:] + bin_edges[:-1])
 
     ax_ir.plot(bins, ir_spectrum, color='#EE3425')
-    ax_ir.set_xlabel('Wavenumbers (cm$^{-1}$)')
-    ax_ir.set_ylabel('Relative IR intensities', color='#EE3425')
+    ax_ir.set_xlabel('Wavenumber (cm$^{-1}$)')
+    ax_ir.set_ylabel('Relative IR intensity', color='#EE3425')
     plt.gca().invert_yaxis()
     plt.gca().invert_xaxis()
     ir_max = np.max(ir_spectrum)
