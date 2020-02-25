@@ -18,6 +18,8 @@ def read_ir_file(seed):
 
     """
 
+    if seed.endswith('phonon'):
+        seed = seed.replace('.phonon', '')
     with open(seed + '.phonon', 'r') as f:
         flines = f.readlines()
     for ind, line in enumerate(flines):
@@ -31,8 +33,7 @@ def read_ir_file(seed):
     for line in flines[header_end+2:header_end+no_branches+2]:
         line_split = line.split()
         if len(line_split) < 2:
-            print_failure('Failed to read IR data. Check .phonon file.')
-            exit()
+            raise RuntimeError ('Failed to read IR data. Check .phonon file.')
         wavenumber = float(line_split[1])
         ir = float(line_split[2])
         # checks for raman data
@@ -48,27 +49,25 @@ def read_ir_file(seed):
             else:
                 ir_dat[wavenumber] = [ir]
 
-    return(ir_dat)
+    return ir_dat
 
 # this decorator will automatically set the style of the plot
 # to match the user's config/matador defaults, and safely handles
 # e.g. X-forwarding and file writing
 @plotting_function
-def plot_ir_spectrum(seed, ir_ss, ir_bs):
+def plot_ir_spectrum(seed, step_size):
     """ This function plots the IR spectrum found in the given file.
 
-        Parameters:
-        bin_width: The width of the wavenumber bin in cm^-1. Determined by step_size and bin_scaler
+    Parameters:
+        bin_width(float): The width of the wavenumber bin in cm^-1. Determined by step_size and bin_scaler
 
-        Keyword Arguments:
-        step_size: change in wavenumber between points on x-axis,
-        bin_scaler: scaled to the step_size (1 is minimum vale); used for gaussian broadening,
+    Keyword Arguments:
+        step_size(float): change in wavenumber between points on x-axis,
     """
     import matplotlib.pyplot as plt
 
-    step_size = ir_ss
-    bin_scaler = ir_bs
-    bin_width = step_size * bin_scaler
+    # by default, the bin width is the same size as the step size but can be modified if needed
+    bin_width = step_size * 1
 
     # read IR output
     ir_dat = read_ir_file(seed)
@@ -91,11 +90,11 @@ def plot_ir_spectrum(seed, ir_ss, ir_bs):
         for j in wavenumbers_castep:
             if j >= (i-(0.5*bin_width)) and j < (i+(0.5*bin_width)):
                 ir_intensity = ir_intensity + ir_dat[j][0]
-                if raman == True:
+                if raman:
                     raman_intensity = raman_intensity + ir_dat[j][1]
                 pass
         ir_plot.append(ir_intensity)
-        if raman == True:
+        if raman:
             raman_plot.append(raman_intensity)
 
     ir_max = 0
@@ -103,19 +102,19 @@ def plot_ir_spectrum(seed, ir_ss, ir_bs):
     for i in wavenumbers_castep:
         if ir_dat[i][0] > ir_max:
             ir_max = ir_dat[i][0]
-        if raman == True:
+        if raman:
             if ir_dat[i][1] > raman_max:
                 raman_max = ir_dat[i][1]
 
     fig, ax1 = plt.subplots(figsize = (14,8))
     plt.title(seed)
     ax1.plot(wavenumbers_plot, ir_plot, color='#EE3425')
-    ax1.set_xlabel('Wavenumbers (cm^-1)')
+    ax1.set_xlabel('Wavenumbers (cm$^{-1}$)')
     ax1.set_ylabel('IR intensities  ((D/A)**2/amu)', color='#EE3425')
     plt.gca().invert_yaxis()
     plt.gca().invert_xaxis()
 
-    if raman == True:
+    if raman:
         ax1.set_ylim(2.1*ir_max,-(ir_max*0.05))
         ax2 = ax1.twinx()
         ax2.plot(wavenumbers_plot, raman_plot, color='#236DE8')
