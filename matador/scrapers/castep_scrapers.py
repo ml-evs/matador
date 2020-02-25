@@ -944,10 +944,26 @@ def phonon2dict(seed, **kwargs):
     if 'num_kpoints' not in ph:
         ph['num_kpoints'] = last_qpt_ind
     ph['eigenvalues_q'] = np.zeros((1, ph['num_modes'], ph['num_kpoints']))
+    raman_intensity = np.zeros_like(ph['eigenvalues_q'])
+    infrared_intensity = np.zeros_like(ph['eigenvalues_q'])
+    raman = False
+    ir = False
     for qind in range(ph['num_kpoints']):
         ph['phonon_kpoint_list'].append([f90_float_parse(elem) for elem in data[qind * line_offset].split()[2:]])
         for i in range(1, ph['num_modes'] + 1):
-            ph['eigenvalues_q'][0][i - 1][qind] = f90_float_parse(data[qind * line_offset + i].split()[1])
+            line_split = data[qind * line_offset + i].split()
+            ph['eigenvalues_q'][0][i - 1][qind] = f90_float_parse(line_split[1])
+            if len(line_split) > 2:
+                infrared_intensity[0][i - 1][qind] = f90_float_parse(line_split[2])
+                ir = True
+            if len(line_split) > 3:
+                raman_intensity[0][i - 1][qind] = f90_float_parse(line_split[3])
+                raman = True
+
+    if ir:
+        ph['infrared_intensity'] = infrared_intensity
+    if raman:
+        ph['raman_intensity'] = raman_intensity
 
     if dos_present:
         # remove header and "END"
