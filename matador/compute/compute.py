@@ -236,7 +236,6 @@ class ComputeTask:
             self.paths['jobs_fname'] = 'jobs.txt'
             self.paths['completed_fname'] = 'finished_cleanly.txt'
             self.paths['failures_fname'] = 'failures.txt'
-            self.paths['memory_fname'] = 'memory_exceeded.txt'
 
         elif 'completed_dir' not in self.paths:
             raise RuntimeError('Invalid paths: {}'.format(self.paths))
@@ -378,7 +377,7 @@ class ComputeTask:
             if memory_usage_estimate > 0.9 * self.maxmem:
                 msg = 'Structure {} failed memcheck, skipping... '.format(self.seed) + mem_string
                 with open(self.paths['memory_fname'], 'a') as f:
-                    f.write("{} {}GB/{}GB".format(self.seed, memory_usage_estimate / 1024, self.maxmem / 1024))
+                    f.write("{} {:.2f}GB/{:.2f}GB\n".format(self.seed, memory_usage_estimate / 1024, self.maxmem / 1024))
 
                 raise MaxMemoryEstimateExceeded(msg)
 
