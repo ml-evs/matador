@@ -42,6 +42,9 @@ def get_uniq_cursor(cursor, sim_tol=0.1, energy_tol=1e-2,
 
     """
 
+    if isinstance(sim_tol, bool):
+        sim_tol = 0.1
+
     fingerprint_list = []
     if not enforce_same_stoich:
         energy_tol = 1e20

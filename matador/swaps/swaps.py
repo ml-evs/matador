@@ -6,8 +6,8 @@
 
 import re
 from copy import deepcopy
-from matador.utils.print_utils import print_success, print_warning, print_failure
-from matador.utils.chem_utils import get_periodic_table
+from matador.utils.print_utils import print_success, print_warning
+from matador.utils.chem_utils import get_periodic_table, get_stoich
 
 
 class AtomicSwapper:
@@ -15,47 +15,60 @@ class AtomicSwapper:
     queries that have swapped atoms.
 
     """
-    def __init__(self, cursor, **kwargs):
+    def __init__(
+            self, cursor, swap_args=None, uniq=False, top=None, maintain_num_species=True, debug=False):
         """ Initialise class with query cursor and arguments.
 
         Parameters:
             cursor (list): cursor of documents to swap.
+            swap_args (str): specification of swaps to perform, e.g.
+                "LiP:KSn" will swap all Li->P and all K->Sn in the
+                cursor.
+
+        Keyword arguments:
+            uniq (bool/float): filter documents by similarity with
+                the default sim_tol (True) or the value provided here.
+            top (int): only swap from the first `top` structures in
+                the cursor.
+            maintain_num_species (bool): only perform swaps that maintain
+                the number of species in the structure
+            debug (bool): enable debug output
 
         """
-        self.args = kwargs
         # define some swap macros
         self.periodic_table = get_periodic_table()
+        self.maintain_num_species = maintain_num_species
         self.swap_dict_list = None
+        self.swap_args = swap_args
         del self.periodic_table['X']
         self.template_structure = None
         self.cursor = list(cursor)
-        if self.args.get('top') is not None:
-            self.cursor = self.cursor[:self.args.get('top')]
+        if top is not None:
+            self.cursor = self.cursor[:top]
 
-        # parse new parameters
-        self.cell_dict, self.param_dict = {}, {}
+        if len(self.cursor) == 0:
+            return
+
         self.swap_counter = 0
-        self.parse_swaps()
+        self.parse_swaps(self.swap_args)
         swap_cursor = []
-        for doc in self.cursor[:]:
+        for doc in self.cursor:
             docs, counter = self.atomic_swaps(doc)
             self.swap_counter += counter
             if counter > 0:
                 swap_cursor.extend(docs)
         self.cursor = swap_cursor
         if self.swap_counter > 0:
-            print_success('Performed ' + str(self.swap_counter) + ' swaps.')
+            print_success('Performed {} swaps.'.format(self.swap_counter))
         else:
             print_warning('No swaps performed.')
 
-        if self.args.get('uniq'):
-            from matador.fingerprints.similarity import get_uniq_cursor
+        if uniq:
+            from matador.utils.cursor_utils import filter_unique_structures
             print('Filtering for unique structures...')
-            unique_set, _, _, _ = get_uniq_cursor(self.cursor,
-                                                  debug=self.args.get('debug'),
-                                                  sim_tol=self.args.get('uniq'))
-            print('Filtered {} down to {}'.format(len(self.cursor), len(unique_set)))
-            self.cursor = [self.cursor[ind] for ind in unique_set]
+            filtered_cursor = filter_unique_structures(self.cursor, debug=debug, sim_tol=uniq)
+            print('Filtered {} down to {}'.format(len(self.cursor), len(filtered_cursor)))
+            self.cursor = filtered_cursor
 
     def parse_swaps(self, swap_args=None):
         """ Parse command line options into valid atomic species swaps.
@@ -74,18 +87,22 @@ class AtomicSwapper:
         """
 
         self.swap_pairs = []
+
         if swap_args is None:
-            swap_args = self.args.get('swap')
+            swap_args = self.swap_args
+
         if isinstance(swap_args, str):
             swap_args = [swap_args.strip()]
+
+        print(swap_args)
+
         if len(swap_args) > 1:
-            print_failure('Detected whitespace in your input, ' +
-                          'clear it and try again.')
-            exit()
+            raise RuntimeError('Detected whitespace in your input clear it and try again.')
+
         swap_list = swap_args[0].split(':')
         for swap in swap_list:
             if len(swap) <= 1:
-                exit('Not enough arguments for swap!')
+                raise RuntimeError('Not enough arguments for swap!')
             # check is both options are groups
             if '][' in swap:
                 tmp_list = [x for x in swap.split('][') if x != '']
@@ -148,16 +165,21 @@ class AtomicSwapper:
             source_doc (dict): matador doc to swap from.
 
         """
-        doc = source_doc
-        new_doc = deepcopy(doc)
+        new_doc = deepcopy(source_doc)
         swapped_docs = []
         swapped = False
+        unswapped_num_species = len(set(source_doc['atom_types']))
         for swap in self.swap_dict_list:
-            for ind, source_atom in enumerate(doc['atom_types']):
+            for ind, source_atom in enumerate(source_doc['atom_types']):
                 if source_atom in swap:
                     new_doc['atom_types'][ind] = swap[source_atom]
                     swapped = True
+            new_doc['stoichiometry'] = get_stoich(new_doc['atom_types'])
+            new_doc['elems'] = set(new_doc['atom_types'])
+            new_doc['num_species'] = len(new_doc['elems'])
             if swapped:
-                swapped_doc = deepcopy(new_doc)
-                swapped_docs.append(swapped_doc)
+                if not self.maintain_num_species or new_doc['num_species'] == unswapped_num_species:
+                    swapped_doc = deepcopy(new_doc)
+                    swapped_docs.append(swapped_doc)
+
         return swapped_docs, len(swapped_docs)
