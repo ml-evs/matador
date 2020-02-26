@@ -6,13 +6,10 @@ although only PDF has been implemented so far.
 
 """
 
-# matador modules
-from matador.fingerprints.pdf import PDF, PDFFactory
-from matador.utils.cursor_utils import get_array_from_cursor, get_guess_doc_provenance
-# external libraries
-import numpy as np
-# standard library
 from collections import defaultdict
+import numpy as np
+from matador.fingerprints.pdf import PDF, PDFFactory
+from matador.utils.cursor_utils import get_guess_doc_provenance
 
 
 def get_uniq_cursor(cursor, sim_tol=0.1, energy_tol=1e-2,
@@ -44,6 +41,7 @@ def get_uniq_cursor(cursor, sim_tol=0.1, energy_tol=1e-2,
         sim_mat (np.ndarray): the correlation matrix of pair similarity distances
 
     """
+
     fingerprint_list = []
     if not enforce_same_stoich:
         energy_tol = 1e20
@@ -56,55 +54,57 @@ def get_uniq_cursor(cursor, sim_tol=0.1, energy_tol=1e-2,
         print('{} of {} structures completed in {:0.1f} s'.format(fingerprint, len(cursor), completed))
 
     fingerprint_list = [None for doc in cursor]
-    fingerprints_required = [False for doc in cursor]
     required_inds = set()
-    sim_mat = np.ones((len(fingerprint_list), len(fingerprint_list)))
+
+    # scipy sparse matrices dont seem to allow non-zero default values, so we'll use a defaultdict
+    sim_mat = defaultdict(lambda: 1e10)
     print('Assessing similarities...')
     for i in range(len(fingerprint_list)):
-        sim_mat[i, i] = 0
         for j in range(i+1, len(fingerprint_list)):
             # are we checking stoichiometries, if so, ensure they're the same
             if (enforce_same_stoich is False or
-                (sorted(cursor[j]['stoichiometry']) == sorted(cursor[i]['stoichiometry']) and
-                 np.abs(cursor[j].get('enthalpy_per_atom', 0) - cursor[i].get('enthalpy_per_atom', 0)) < energy_tol)):
-                fingerprints_required[i] = True
-                fingerprints_required[j] = True
+                    (sorted(cursor[j]['stoichiometry']) == sorted(cursor[i]['stoichiometry']) and
+                     np.abs(cursor[j].get('enthalpy_per_atom', 0) - cursor[i].get('enthalpy_per_atom', 0)) < energy_tol)):
+                # need to set both to zero so we can iterate over the dict later
+                sim_mat[i, j] = None
+                sim_mat[j, i] = None
                 required_inds.add(i)
                 required_inds.add(j)
-            else:
-                sim = 1e10
-                sim_mat[i, j] = sim
-                sim_mat[i, j] = sim
 
     factory = PDFFactory(cursor, required_inds=list(required_inds), **fingerprint_calc_args)
 
-    for i in range(len(cursor)):
-        for j in range(i+1, len(cursor)):
-            if fingerprints_required[i] and fingerprints_required[j]:
-                sim = cursor[i][factory.default_key].get_sim_distance(cursor[j][factory.default_key])
-                sim_mat[i, j] = sim
-                sim_mat[j, i] = sim
+    for i, j in sim_mat:
+        if sim_mat[i, j] is None:
+            sim = cursor[i][factory.default_key].get_sim_distance(cursor[j][factory.default_key])
+            sim_mat[i, j] = sim
+            sim_mat[j, i] = sim
 
-    rows, cols = np.where(sim_mat <= sim_tol)
     distinct_set = set()
     dupe_set = set()
-    dupe_dict = defaultdict(list)
+    dupe_dict = dict()
     prov = [get_guess_doc_provenance(doc['source']) for doc in cursor]
-    for i in range(len(sim_mat)):
+    for i in range(len(cursor)):
         distinct_set.add(i)
         dupe_dict[i] = []
-    for i, j in zip(rows, cols):
-        if i == j:
-            continue
-        elif i not in dupe_set:
-            if j in distinct_set:
-                distinct_set.remove(j)
-                del dupe_dict[j]
-            dupe_set.add(j)
-            dupe_dict[i].append(j)
 
-    assert len(cursor) == len(set([key for key in dupe_dict] + [item for key in dupe_dict for item in dupe_dict[key]]))
+    # loop over the similarity matrix and construct the set of "unique" structures
+    # and a dictionary containing their duplicates
+    for i, j in sim_mat:
+        if sim_mat[i, j] <= sim_tol:
+            if i not in dupe_set:
+                if j in distinct_set:
+                    distinct_set.remove(j)
+                    del dupe_dict[j]
+                dupe_set.add(j)
+                dupe_dict[i].append(j)
 
+    if not all(i in distinct_set for i in dupe_dict):
+        raise RuntimeError("Something went wrong: distinct set size does not match dupe dict!")
+
+    if len(cursor) != len(set([key for key in dupe_dict] + [item for key in dupe_dict for item in dupe_dict[key]])):
+        raise RuntimeError("Something went wrong: dupe dict had wrong size from cursor!")
+
+    # reorganise the duplicate dictionaries based on the provenance of the structure
     swapped = []
     for i in dupe_dict:
         to_compare = [i]
