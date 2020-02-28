@@ -44,10 +44,14 @@ class DensityOfStates(Dispersion, DataContainer):
             data = kwargs
         # as we can also construct a DOS from arbitarary kpoint/energy data,
         # check that we've been passed this first
-        if isinstance(data, Dispersion) or 'dos' not in data:
+        if isinstance(data, Dispersion) or ('dos' not in data and 'spin_dos' not in data):
             data = self._from_dispersion(data)
         elif isinstance(data, DensityOfStates):
             data = copy.deepcopy(DensityOfStates._data)
+
+        # trigger generation of dos key from spin dos
+        if 'dos' not in data and 'spin_dos' in data:
+            data["dos"] = np.asarray(data["spin_dos"]["up"]) + np.asarray(data["spin_dos"]["down"])
 
         super().__init__(data)
         self._trim_dos()
@@ -57,9 +61,10 @@ class DensityOfStates(Dispersion, DataContainer):
         section of the DOS.
 
         """
-        first_index = np.argmax(self._data['dos'] > EPS)
-        last_index = len(self._data['dos']) - np.argmax(self._data['dos'][::-1] > EPS)
-        self._trimmed_dos = self._data['dos'][first_index:last_index]
+        dos = self._data['dos']
+        first_index = np.argmax(dos > EPS)
+        last_index = len(dos) - np.argmax(dos[::-1] > EPS)
+        self._trimmed_dos = dos[first_index:last_index]
         self._trimmed_energies = self._data['energies'][first_index:last_index]
 
     def _from_dispersion(self, data, **kwargs):
@@ -127,11 +132,17 @@ class DensityOfStates(Dispersion, DataContainer):
                     gaussian_width=gaussian_width
                 )
 
+                if 'spin_fermi_energy' in bands:
+                    energies -= bands['spin_fermi_energy'][0]
+
             return spin_dos, energies
 
         dos, energies = DensityOfStates._cheap_broaden(
             raw_eigs.flatten(), weights=raw_weights.flatten(), gaussian_width=gaussian_width
         )
+
+        if 'fermi_energy' in bands:
+            energies -= bands['fermi_energy']
 
         return dos, energies
 
