@@ -1664,7 +1664,7 @@ class ComputeTask:
 
         # copy pspots and any intermediate calcs to compute_dir
         LOG.info('Copying pspots into compute_dir')
-        for pspot in self.cell_dict['species_pot'].values():
+        for pspot in self.cell_dict.get('species_pot', {}).values():
             if os.path.isfile(pspot):
                 try:
                     shutil.copy2(pspot, compute_dir)
