@@ -16,16 +16,16 @@ class AtomicSwapper:
 
     """
     def __init__(
-            self, cursor, swap_args=None, uniq=False, top=None, maintain_num_species=True, debug=False):
+            self, cursor, swap=None, uniq=False, top=None, maintain_num_species=True, debug=False, **kwargs):
         """ Initialise class with query cursor and arguments.
 
         Parameters:
             cursor (list): cursor of documents to swap.
-            swap_args (str): specification of swaps to perform, e.g.
-                "LiP:KSn" will swap all Li->P and all K->Sn in the
-                cursor.
 
         Keyword arguments:
+            swap (str): specification of swaps to perform, e.g.
+                "LiP:KSn" will swap all Li->P and all K->Sn in the
+                cursor.
             uniq (bool/float): filter documents by similarity with
                 the default sim_tol (True) or the value provided here.
             top (int): only swap from the first `top` structures in
@@ -33,13 +33,14 @@ class AtomicSwapper:
             maintain_num_species (bool): only perform swaps that maintain
                 the number of species in the structure
             debug (bool): enable debug output
+            kwargs (dict): dictionary of extra arguments that should be ignored.
 
         """
         # define some swap macros
         self.periodic_table = get_periodic_table()
         self.maintain_num_species = maintain_num_species
         self.swap_dict_list = None
-        self.swap_args = swap_args
+        self.swap_args = swap
         del self.periodic_table['X']
         self.template_structure = None
         self.cursor = list(cursor)
@@ -91,10 +92,11 @@ class AtomicSwapper:
         if swap_args is None:
             swap_args = self.swap_args
 
+        if swap_args is None:
+            raise RuntimeError('No swap arguments passed.')
+
         if isinstance(swap_args, str):
             swap_args = [swap_args.strip()]
-
-        print(swap_args)
 
         if len(swap_args) > 1:
             raise RuntimeError('Detected whitespace in your input clear it and try again.')
