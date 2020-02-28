@@ -448,7 +448,7 @@ class ComputeTask:
             assert isinstance(seed, str)
             self.cp_to_input(seed, ext=input_ext, glob_files=True)
 
-            self._setup_compute_dir(self.seed, self.compute_dir, generic=True)
+            self._setup_compute_dir(self, self.seed, self.compute_dir, generic=True)
             if self.compute_dir is not None:
                 os.chdir(self.compute_dir)
 
@@ -1629,8 +1629,7 @@ class ComputeTask:
 
         return True
 
-    @staticmethod
-    def _setup_compute_dir(seed, compute_dir, custom_params=False, generic=False):
+    def _setup_compute_dir(self, seed, compute_dir, custom_params=False, generic=False):
         """ Create the desired directory if it doens't exist,
         and try to link to it in the current folder.
 
@@ -1665,12 +1664,12 @@ class ComputeTask:
 
         # copy pspots and any intermediate calcs to compute_dir
         LOG.info('Copying pspots into compute_dir')
-        pspots = glob.glob('*.usp')
-        for pspot in pspots:
-            try:
-                shutil.copy2(pspot, compute_dir)
-            except shutil.SameFileError:
-                pass
+        for pspot in self.cell_dict['species_pot'].values():
+            if os.path.isfile(pspot):
+                try:
+                    shutil.copy2(pspot, compute_dir)
+                except shutil.SameFileError:
+                    pass
 
         if custom_params and compute_dir is not None:
             shutil.copy2(seed + '.param', compute_dir)
