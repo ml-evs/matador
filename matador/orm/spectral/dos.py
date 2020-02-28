@@ -14,7 +14,7 @@ import scipy.integrate
 import scipy.interpolate
 
 from matador.orm.orm import DataContainer
-from matador.utils.chem_utils import KELVIN_TO_EV
+from matador.utils.chem_utils import KELVIN_TO_EV, INVERSE_CM_TO_EV
 
 from .dispersion import Dispersion
 
@@ -34,6 +34,9 @@ class DensityOfStates(Dispersion, DataContainer):
                 a dispersion object to convert.
 
         """
+
+        if kwargs.get('gaussian_width') is not None:
+            self.gaussian_width = kwargs['gaussian_width']
 
         if args and isinstance(args[0], dict):
             data = args[0]
@@ -169,7 +172,7 @@ class DensityOfStates(Dispersion, DataContainer):
 class VibrationalDOS(DensityOfStates):
     """ Specific class for phonon DOS data, including free energy integration. """
 
-    gaussian_width = 10
+    gaussian_width = 10 * INVERSE_CM_TO_EV
 
     @property
     def zero_point_energy_from_dos(self):
@@ -438,4 +441,4 @@ class VibrationalDOS(DensityOfStates):
 
 class ElectronicDOS(DensityOfStates):
     """ Specific class for electronic DOS data. """
-    gaussian_width = 0.1
+    gaussian_width = 0.01
