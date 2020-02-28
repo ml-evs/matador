@@ -451,27 +451,27 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
 
         if 'spin_dos' in dos_data and not kwargs['pdos_hide_tot']:
             if kwargs['plot_bandstructure']:
-                if kwargs.get('spin_only') in [None, 'down']:
-                    if not plotting_pdos:
-                        ax_dos.fill_betweenx(energies, 0, -dos_data['spin_dos']['down'], alpha=0.2, color='b')
-                    ax_dos.plot(-dos_data['spin_dos']['down'], energies,
-                                ls=kwargs['ls'][seed_ind], color='b', zorder=1e10, label='$\\downarrow$')
                 if kwargs.get('spin_only') in [None, 'up']:
                     if not plotting_pdos:
                         ax_dos.fill_betweenx(energies, 0, dos_data['spin_dos']['up'], alpha=0.2, color='r')
                     ax_dos.plot(dos_data['spin_dos']['up'], energies,
                                 ls=kwargs['ls'][seed_ind], color='r', zorder=1e10, label='$\\uparrow$')
-            else:
                 if kwargs.get('spin_only') in [None, 'down']:
-                    ax_dos.plot(energies, dos_data['spin_dos']['down'],
-                                ls=kwargs['ls'][seed_ind], color='b', zorder=1e10, label='$\\downarrow$')
                     if not plotting_pdos:
-                        ax_dos.fill_between(energies, 0, dos_data['spin_dos']['down'], alpha=0.2, color='b')
+                        ax_dos.fill_betweenx(energies, 0, -dos_data['spin_dos']['down'], alpha=0.2, color='b')
+                    ax_dos.plot(-dos_data['spin_dos']['down'], energies,
+                                ls=kwargs['ls'][seed_ind], color='b', zorder=1e10, label='$\\downarrow$')
+            else:
                 if kwargs.get('spin_only') in [None, 'up']:
                     ax_dos.plot(energies, dos_data['spin_dos']['up'],
                                 ls=kwargs['ls'][seed_ind], color='r', zorder=1e10, label='$\\uparrow$')
                     if not plotting_pdos:
                         ax_dos.fill_between(energies, 0, dos_data['spin_dos']['up'], alpha=0.2, color='r')
+                if kwargs.get('spin_only') in [None, 'down']:
+                    ax_dos.plot(energies, -dos_data['spin_dos']['down'],
+                                ls=kwargs['ls'][seed_ind], color='b', zorder=1e10, label='$\\downarrow$')
+                    if not plotting_pdos:
+                        ax_dos.fill_between(energies, 0, -dos_data['spin_dos']['down'], alpha=0.2, color='b')
 
         if plotting_pdos:
 

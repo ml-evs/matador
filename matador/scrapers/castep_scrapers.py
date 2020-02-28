@@ -825,7 +825,7 @@ def optados2dict(seed, **kwargs):
     elif is_spin_dos:
         optados['spin_dos'] = dict()
         optados['spin_dos']['up'] = data[:, 1]
-        optados['spin_dos']['down'] = data[:, 2]
+        optados['spin_dos']['down'] = -data[:, 2]
         optados['dos'] = np.abs(optados['spin_dos']['up']) + np.abs(optados['spin_dos']['down'])
 
     elif is_pdis:
