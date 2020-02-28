@@ -206,7 +206,6 @@ class FingerprintFactory:
             fprint_ind = 0
             for ind, doc in enumerate(cursor):
                 if ind in required_inds:
-                    print(ind, fprint_ind)
                     if isinstance(cursor[ind], Crystal):
                         cursor[ind]._data.pop(self.default_key, None)
                     cursor[ind][self.default_key] = fprint_cursor[fprint_ind][self.default_key]
