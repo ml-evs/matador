@@ -477,7 +477,7 @@ def doc2cell(doc, path, *args, **kwargs):
         for elem in doc['species_pot']:
             if elem == 'library':
                 flines.append(doc['species_pot']['library'])
-            else:
+            elif elem in doc['atom_types']:
                 flines.append('{:4} {}'.format(elem, doc['species_pot'][elem]))
         flines.append('%ENDBLOCK SPECIES_POT')
 
