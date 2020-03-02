@@ -103,7 +103,10 @@ def query2files(cursor, dirname=None, **kwargs):
         path = directory + '/'
         # write either cell, res or both
         root_source = get_root_source(doc)
-        formula = get_formula_from_stoich(doc['stoichiometry'])
+        if '_swapped_stoichiometry' in doc:
+            formula = get_formula_from_stoich(doc['_swapped_stoichiometry'])
+        else:
+            formula = get_formula_from_stoich(doc['stoichiometry'])
 
         if kwargs.get('subcmd') == 'swaps':
             root_source = root_source.replace('-swap-', '-')

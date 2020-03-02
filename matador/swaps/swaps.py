@@ -169,17 +169,14 @@ class AtomicSwapper:
         """
         new_doc = deepcopy(source_doc)
         swapped_docs = []
-        swapped = False
         unswapped_num_species = len(set(source_doc['atom_types']))
         for swap in self.swap_dict_list:
-            for ind, source_atom in enumerate(source_doc['atom_types']):
-                if source_atom in swap:
-                    new_doc['atom_types'][ind] = swap[source_atom]
-                    swapped = True
-            new_doc['stoichiometry'] = get_stoich(new_doc['atom_types'])
-            new_doc['elems'] = set(new_doc['atom_types'])
-            new_doc['num_species'] = len(new_doc['elems'])
-            if swapped:
+            if any(key in source_doc['atom_types'] for key in swap):
+                new_doc['atom_types'] = [swap.get(atom, atom) for atom in source_doc['atom_types']]
+                new_doc['_swapped_stoichiometry'] = get_stoich(source_doc['atom_types'])
+                new_doc['stoichiometry'] = get_stoich(new_doc['atom_types'])
+                new_doc['elems'] = set(new_doc['atom_types'])
+                new_doc['num_species'] = len(new_doc['elems'])
                 if not self.maintain_num_species or new_doc['num_species'] == unswapped_num_species:
                     swapped_doc = deepcopy(new_doc)
                     swapped_docs.append(swapped_doc)
