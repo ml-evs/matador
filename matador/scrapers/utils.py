@@ -70,9 +70,9 @@ def scraper_function(function):
                 result = type(oops)('{}: {}\n'.format(_seed, oops))
 
                 msg = '{}: {} {}'.format(_seed, type(oops), oops)
-                if kwargs.get('verbosity', 1) > 0:
+                print(msg)
+                if kwargs.get('verbosity', 0) > 0:
                     tb.print_exc()
-                    print(msg)
 
             if len(seed) == 1:
                 if success and kwargs.get('as_model'):
