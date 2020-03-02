@@ -14,53 +14,22 @@ from matador.utils.cell_utils import cart2abcstar, frac2cart, cart2abc
 from matador.utils.cell_utils import abc2cart, calc_mp_grid
 from matador.utils.cursor_utils import display_results
 from matador.utils.chem_utils import get_formula_from_stoich, get_stoich, get_root_source
+from matador.swaps import AtomicSwapper
+from .utils import file_writer_function, generate_relevant_path, generate_hash
 
 EPS = 1e-8
 
 
-def file_writer_function(function):
-    """ Wrapper for file writers to safely overwrite/hash duplicate files. """
-
-    from functools import wraps
-
-    @wraps(function)
-    def wrapped_writer(*args, **kwargs):
-        """ Wrap and return the writer function. """
-        path = args[1]
-        try:
-            flines, ext = function(*args, **kwargs)
-            if ext is not None and not path.endswith('.' + ext):
-                path += '.{}'.format(ext)
-
-            if os.path.isfile(path):
-                if kwargs.get('overwrite'):
-                    os.remove(path)
-                elif kwargs.get('hash_dupe'):
-                    print('File name already exists, generating hash...')
-                    path = '{}-{}.{}'.format(path.replace(ext, ''), generate_hash(), ext)
-                else:
-                    print('File name already exists! Skipping!')
-                    raise RuntimeError('Duplicate file!')
-
-            with open(path, 'w') as f:
-                for line in flines:
-                    f.write(line + '\n')
-
-        except Exception as exc:
-            print_exc()
-            raise type(exc)('Failed to write {}: {}'.format(path, exc))
-
-    return wrapped_writer
-
-
-def query2files(cursor, **kwargs):
+def query2files(cursor, dirname=None, **kwargs):
     """ Many-to-many convenience function for many structures being written to
     many file types.
 
     Parameters:
-        cursor (:obj:`list` of :obj:`dict`): list of matador dictionaries to write out.
+        cursor (:obj:`list` of :obj:`dict`/:class:`AtomicSwapper`): list of matador dictionaries to write out.
 
     Keyword arguments:
+        dirname (str): the folder to save the results into. Will be created if non-existent.
+            Will have integer appended to it if already existing.
         **kwargs (dict): dictionary of {filetype: bool(whether to write)}. Accepted file types
             are cell, param, res, pdb, json, xsf, markdown and latex.
 
@@ -77,6 +46,11 @@ def query2files(cursor, **kwargs):
     multiple_files = cell or param or res or pdb or xsf
     prefix = (kwargs.get('prefix') + '-') if kwargs.get('prefix') is not None else ''
     pressure = kwargs.get('write_pressure')
+
+    if isinstance(cursor, AtomicSwapper):
+        cursor = cursor.cursor
+        kwargs['subcmd'] = "swaps"
+
     if kwargs.get('subcmd') in ['polish', 'swaps']:
         info = False
         hash_dupe = False
@@ -106,9 +80,13 @@ def query2files(cursor, **kwargs):
                 return
         else:
             write = True
-    dirname = generate_relevant_path(kwargs)
+
+    if dirname is None:
+        dirname = generate_relevant_path(kwargs)
+
     _dir = False
     dir_counter = 0
+    # postfix integer on end of directory name if it exists
     while not _dir:
         if dir_counter != 0:
             directory = dirname + str(dir_counter)
@@ -119,6 +97,7 @@ def query2files(cursor, **kwargs):
             _dir = True
         else:
             dir_counter += 1
+
     for _, doc in enumerate(cursor):
         name = prefix
         path = directory + '/'
@@ -887,42 +866,3 @@ def doc2arbitrary(doc, *args, **kwargs):
     for key in output_doc:
         flines.append("{}: {}".format(key, output_doc[key]))
     return flines, ext
-
-
-def generate_hash(hash_len=6):
-    """ Quick hash generator, based on implementation in PyAIRSS by J. Wynn.
-
-    Keyword arguments:
-        hash_len (int): desired length of hash.
-
-    """
-    hash_chars = [str(x) for x in range(10)] + [chr(97+i) for i in range(25)]
-    _hash = ''
-    for _ in range(hash_len):
-        _hash += np.random.choice(hash_chars)
-    return _hash
-
-
-def generate_relevant_path(args):
-    """ Generates a suitable path name based on query. """
-    dirname = ''
-    if args.get('subcmd') is not None:
-        dirname += args.get('subcmd') + '-'
-    else:
-        dirname = 'query'
-    if args.get('composition') is not None:
-        for comp in args['composition']:
-            dirname += comp
-    elif args.get('formula') is not None:
-        dirname += args.get('formula')[0]
-    if args.get('db') is not None:
-        dirname += '-' + args.get('db')[0]
-    if args.get('swap') is not None:
-        for swap in args['swap']:
-            dirname += '-' + swap
-        if args.get('hull_cutoff') is not None:
-            dirname += '-hull-' + str(args.get('hull_cutoff')) + 'eV'
-    if args.get('id') is not None:
-        dirname += '-' + args.get('id')[0] + '_' + args.get('id')[1]
-    dirname = dirname.replace('--', '-')
-    return dirname

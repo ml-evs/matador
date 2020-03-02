@@ -21,7 +21,6 @@ from matador.utils.chem_utils import get_generic_grav_capacity, get_formula_from
 from matador.utils.chem_utils import get_formation_energy
 from matador.utils.cursor_utils import set_cursor_from_array, get_array_from_cursor
 from matador.utils.cursor_utils import display_results, recursive_get
-from matador.export import generate_hash
 from matador.utils.cursor_utils import filter_cursor_by_chempots
 from matador.hull.phase_diagram import PhaseDiagram
 
@@ -98,6 +97,8 @@ class QueryConvexHull:
             self.args['use_source'] = True
 
         # set up attributes for later
+        self.structures = None
+        self.convex_hull = None
         self.chempot_cursor = None
         self.hull_cursor = None
         self.structure_slice = None
@@ -231,7 +232,7 @@ class QueryConvexHull:
             self.chempot_cursor[i]['num_fu'] = 1
             self.chempot_cursor[i]['num_atoms'] = 1
             self.chempot_cursor[i]['text_id'] = ['command', 'line']
-            self.chempot_cursor[i]['_id'] = generate_hash(hash_len=10)
+            self.chempot_cursor[i]['_id'] = None
             self.chempot_cursor[i]['source'] = ['command_line']
             self.chempot_cursor[i]['space_group'] = 'xxx'
             self.chempot_cursor[i][self._extensive_energy_key + '_per_b'] = self.chempot_cursor[i][self.energy_key]
@@ -388,10 +389,10 @@ class QueryConvexHull:
         # don't check for IDs if we're loading from cursor
         if not self.from_cursor:
             ids = [doc['_id'] for doc in self.cursor]
-            if self.chempot_cursor[0]['_id'] not in ids:
+            if self.chempot_cursor[0]['_id'] is None or self.chempot_cursor[0]['_id'] not in ids:
                 self.cursor.insert(0, self.chempot_cursor[0])
             for match in self.chempot_cursor[1:]:
-                if match['_id'] not in ids:
+                if match['_id'] is None or match['_id'] not in ids:
                     self.cursor.append(match)
 
         # add faked chempots to overall cursor
@@ -623,10 +624,10 @@ class QueryConvexHull:
                     if np.abs(h + g * y0) > EPS:
                         tin = (e * h + g * y0 - f * g) / (h + g * y0)
                         s2 = (y0 - e * y0 - f) / (h + g * y0)
-                        if tin >= 0 and tin <= 1 and s2 >= 0 and s2 <= 1:
+                        if 0 <= tin <= 1 and 0 <= s2 <= 1:
                             tints = np.append(tints, tin)
                             a = 1
-                            # x1-x2 never == 0 on points we care about
+                            # x1-x2 != 0 on points we care about
                             if np.abs(x1 - x2) > EPS:
                                 b = (y1 - y2) / (x1 - x2)
                                 c = (z1 - z2) / (x1 - x2)
