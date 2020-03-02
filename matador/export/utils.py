@@ -14,7 +14,7 @@ def file_writer_function(function):
     from functools import wraps
 
     @wraps(function)
-    def wrapped_writer(*args, **kwargs):
+    def wrapped_writer(*args, overwrite=False, hash_dupe=False, **kwargs):
         """ Wrap and return the writer function. """
         path = args[1]
         try:
@@ -29,8 +29,7 @@ def file_writer_function(function):
                     print('File name already exists, generating hash...')
                     path = '{}-{}.{}'.format(path.replace(ext, ''), generate_hash(), ext)
                 else:
-                    print('File name already exists! Skipping!')
-                    raise RuntimeError('Duplicate file!')
+                    print('File name {} already exists! Skipping!'.format(path))
 
             with open(path, 'w') as f:
                 for line in flines:
