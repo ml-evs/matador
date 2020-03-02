@@ -983,9 +983,6 @@ def _load_electronic_dos(seed, kwargs):
     if not s:
         raise RuntimeError(dos_data)
 
-    print(dos_data['spin_dos'])
-    print(dos_data.get('dos'))
-
     return ElectronicDOS(dos_data)
 
 
