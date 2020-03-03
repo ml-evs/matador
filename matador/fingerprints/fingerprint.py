@@ -138,7 +138,7 @@ class FingerprintFactory:
         elif len(required_inds) == 0:
             return
         else:
-            print("Skipping {} structures out of {}".format(len(cursor) - len(required_inds), len(cursor)))
+            print("Skipping {} structures out of {} as no comparisons are required".format(len(cursor) - len(required_inds), len(cursor)))
 
         if self.fingerprint is None or self.default_key is None:
             # TODO: is this the right way of doing this?
