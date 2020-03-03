@@ -122,7 +122,7 @@ def get_uniq_cursor(cursor, sim_tol=0.1, energy_tol=1e-2,
     print('Applying hierarchy of structures with order: {}'.format(hierarchy_order))
     dupe_dict = _enforce_hierarchy(dupe_dict, hierarchy_values, hierarchy_order)
 
-    total_dupes = len(list(dupe_dict.keys()) + [item for key in dupe_dict for item in dupe_dict[key]])
+    total_dupes = len(set(list(dupe_dict.keys()) + [item for key in dupe_dict for item in dupe_dict[key]]))
     if len(cursor) != total_dupes:
         raise RuntimeError("Something went wrong: dupe dict had wrong size {} compared to cursor {}!"
                            .format(total_dupes, len(cursor)))
