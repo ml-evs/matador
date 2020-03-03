@@ -1239,7 +1239,7 @@ class ExportTest(MatadorUnitTest):
     def test_doc2param(self):
         param_fname = REAL_PATH + "data/param_test.param"
         test_fname = "dummy.param"
-        doc, s = param2dict(param_fname, db=False, debug=True, verbosity=VERBOSITY)
+        doc, s = param2dict(param_fname, db=False, verbosity=VERBOSITY)
         self.assertTrue(s, msg="Failed entirely: {}".format(doc))
         doc2param(doc, test_fname, hash_dupe=False, overwrite=True)
         doc_exported, s = param2dict(test_fname, db=False)
@@ -1260,7 +1260,7 @@ class ExportTest(MatadorUnitTest):
         test_fname = "dummy1.cell"
 
         doc, s = cell2dict(cell_fname, db=False, lattice=True, verbosity=VERBOSITY, positions=False)
-        doc2cell(doc, test_fname, debug=True)
+        doc2cell(doc, test_fname)
         test_dict, s = cell2dict(test_fname, db=False, lattice=True, positions=False)
         self.assertTrue(s, msg="Failed entirely, oh dear!\n{}".format(test_dict))
         self.assertEqual(test_dict["lattice_cart"][0][0], 11.4518745146637, msg="Failed to read lattice vectors.")
@@ -1337,7 +1337,7 @@ class ExportTest(MatadorUnitTest):
         test_param = {"xc_functional": "PBE", "task": "geometryoptimisation", "spin_polarized": False}
 
         doc, s = cell2dict(cell_fname, db=False, lattice=True, verbosity=VERBOSITY, positions=True)
-        doc2cell(doc, test_fname + ".cell", debug=True, spin=10)
+        doc2cell(doc, test_fname + ".cell", spin=10)
 
         doc2param(test_param, test_fname + ".param", spin=10)
 

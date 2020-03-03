@@ -9,23 +9,33 @@ import random
 
 
 def file_writer_function(function):
-    """ Wrapper for file writers to safely overwrite/hash duplicate files. """
+    """ Wrapper for file writers to safely overwrite/hash duplicate files.
+
+    Keyword arguments:
+        overwrite (bool): whether or not to overwrite colliding files.
+        hash_dupe (bool): whether or not to create a unique filename for
+            any colliding files, or just skip writing them.
+
+    """
 
     from functools import wraps
 
     @wraps(function)
-    def wrapped_writer(*args, overwrite=False, hash_dupe=False, **kwargs):
+    def wrapped_writer(doc, path, overwrite=False, hash_dupe=False, **kwargs):
         """ Wrap and return the writer function. """
-        path = args[1]
         try:
-            flines, ext = function(*args, **kwargs)
+            print(kwargs)
+            overwrite = kwargs.pop('overwrite', overwrite)
+            hash_dupe = kwargs.pop('hash_dupe', hash_dupe)
+            print(kwargs)
+            flines, ext = function(doc, path, overwrite=overwrite, hash_dupe=hash_dupe, **kwargs)
             if ext is not None and not path.endswith('.' + ext):
                 path += '.{}'.format(ext)
 
             if os.path.isfile(path):
-                if kwargs.get('overwrite'):
+                if overwrite:
                     os.remove(path)
-                elif kwargs.get('hash_dupe'):
+                elif hash_dupe:
                     print('File name already exists, generating hash...')
                     path = '{}-{}.{}'.format(path.replace(ext, ''), generate_hash(), ext)
                 else:
