@@ -6,6 +6,7 @@ although only PDF has been implemented so far.
 
 """
 
+import copy
 from collections import defaultdict
 import numpy as np
 from matador.fingerprints.pdf import PDF, PDFFactory
@@ -14,10 +15,18 @@ from matador.utils.cursor_utils import get_guess_doc_provenance
 
 def get_uniq_cursor(cursor, sim_tol=0.1, energy_tol=1e-2,
                     enforce_same_stoich=True, fingerprint=PDF,
+                    hierarchy_order=None, hierarchy_values=None,
                     debug=False, **fingerprint_calc_args):
     """ Uses fingerprint to filter cursor into unique structures to some
     tolerance sim_tol, additionally returning a dict of duplicates and the
     correlation matrix.
+
+    The choice of which of the dulpicates is kept in the unique cursor is
+    defined by the "hierarchy". By default, this will guess the provenance
+    of a document and prefer structures from "primary sources", i.e.
+    ICSD -> OQMD -> Materials Project -> SWAPS -> AIRSS -> GA. A custom hiearchy
+    can be provided through `hierarchy_order`, which must be accompanied by a list
+    of values per structure to check against that hierarchy.
 
     Parameters:
         cursor (list) : matador cursor to be filtered
@@ -85,7 +94,6 @@ def get_uniq_cursor(cursor, sim_tol=0.1, energy_tol=1e-2,
     distinct_set = set()
     dupe_set = set()
     dupe_dict = dict()
-    prov = [get_guess_doc_provenance(doc['source']) for doc in cursor]
     for i in range(len(cursor)):
         distinct_set.add(i)
         dupe_dict[i] = []
@@ -101,34 +109,68 @@ def get_uniq_cursor(cursor, sim_tol=0.1, energy_tol=1e-2,
                 dupe_set.add(j)
                 dupe_dict[i].append(j)
 
-    if not all(i in distinct_set for i in dupe_dict):
-        raise RuntimeError("Something went wrong: distinct set size does not match dupe dict!")
+    total_dupes = len(set(list(dupe_dict.keys()) + [item for key in dupe_dict for item in dupe_dict[key]]))
+    if len(cursor) != total_dupes:
+        raise RuntimeError("Something went wrong: dupe dict had wrong size {} compared to cursor {}!"
+                           .format(total_dupes, len(cursor)))
 
-    if len(cursor) != len(set([key for key in dupe_dict] + [item for key in dupe_dict for item in dupe_dict[key]])):
-        raise RuntimeError("Something went wrong: dupe dict had wrong size from cursor!")
+    if hierarchy_order is None:
+        hierarchy_order = ['ICSD', 'DOI', 'OQMD', 'MP', 'PF', 'SWAPS', 'AIRSS', 'GA']
+    if hierarchy_values is None:
+        hierarchy_values = [get_guess_doc_provenance(doc['source']) for doc in cursor]
 
-    # reorganise the duplicate dictionaries based on the provenance of the structure
+    print('Applying hierarchy of structures with order: {}'.format(hierarchy_order))
+    dupe_dict = _enforce_hierarchy(dupe_dict, hierarchy_values, hierarchy_order)
+
+    total_dupes = len(list(dupe_dict.keys()) + [item for key in dupe_dict for item in dupe_dict[key]])
+    if len(cursor) != total_dupes:
+        raise RuntimeError("Something went wrong: dupe dict had wrong size {} compared to cursor {}!"
+                           .format(total_dupes, len(cursor)))
+
+    print('Done!')
+    return sorted(list(dupe_dict.keys())), dupe_dict, fingerprint_list, sim_mat
+
+
+def _enforce_hierarchy(dupe_dict, values, hierarchy):
+    """ Enforce a general hierarchy of which structures to keep, based
+    on the list of values and their importance.
+
+    Parameters:
+        dupe_dict (dict): the dictionary keyed by the index of unique structures
+            that holds lists of duplicates for that structure.
+        values (list): the list of values for each structure on which to enforce
+            the hierarchy.
+        hierarchy (list): the order in which to consider the values, e.g.
+            `['ICSD', 'OQMD']` will promote ICSD structures over OQMD.
+
+    Returns:
+        dict: the reshuffled dictionary of duplicates.
+
+    """
+    if len(values) - 1 != max(list(dupe_dict.keys()) + max(list(dupe_dict.values()))):
+        raise RuntimeError("Number of hierarchy values does not much number of items.")
+
+    new_dupe_dict = copy.deepcopy(dupe_dict)
+
     swapped = []
-    for i in dupe_dict:
-        to_compare = [i]
-        to_compare.extend(dupe_dict[i])
-        hierarchy = ['ICSD', 'DOI', 'OQMD', 'MP', 'PF', 'SWAPS', 'AIRSS', 'GA']
-        for provenance in hierarchy:
+    for i in new_dupe_dict:
+        if not new_dupe_dict[i]:
+            continue
+        for value in hierarchy:
             found = False
-            for k in to_compare:
-                if prov[k] is provenance:
-                    distinct_set.remove(i)
-                    distinct_set.add(k)
+            for k in [i] + new_dupe_dict[i]:
+                if values[k] == value:
                     swapped.append((i, k))
                     found = True
                     break
             if found:
                 break
 
-    for pair in swapped:
-        i, k = pair
-        dupe_dict[k] = [ind for ind in dupe_dict[i] if ind != k] + [i]
-        del dupe_dict[i]
+    for i, k in swapped:
+        if i != k:
+            new_dupe_dict[k] = [ind for ind in new_dupe_dict[i] if ind != k] + [i]
+            del new_dupe_dict[i]
 
-    print('Done!')
-    return sorted(list(distinct_set)), dupe_dict, fingerprint_list, sim_mat
+    print(new_dupe_dict)
+
+    return new_dupe_dict
