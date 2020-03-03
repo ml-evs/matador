@@ -171,6 +171,4 @@ def _enforce_hierarchy(dupe_dict, values, hierarchy):
             new_dupe_dict[k] = [ind for ind in new_dupe_dict[i] if ind != k] + [i]
             del new_dupe_dict[i]
 
-    print(new_dupe_dict)
-
     return new_dupe_dict
