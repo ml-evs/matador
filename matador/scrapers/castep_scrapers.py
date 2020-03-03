@@ -1902,6 +1902,6 @@ def get_seed_metadata(doc, seed):
     elif '-ICSD-' in seed:
         doc['icsd'] = int(seed.split('-ICSD-')[-1].split('-')[0].split('_')[0].split('.')[0])
     if '-MP-' in seed:
-        doc['mp-id'] = int(seed.split('-MP-')[-1].split('-')[0].split('_')[0].split('.')[0])
+        doc['mp_id'] = int(seed.split('-MP_')[-1].split('-')[0].split('_')[0].split('.')[0])
     if '-DOI-' in seed:
         doc['doi'] = seed.split('-DOI-')[-1].split('-')[0].replace('__', '/')
