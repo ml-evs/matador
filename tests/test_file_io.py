@@ -334,7 +334,7 @@ class CastepScraperTests(MatadorUnitTest):
             self.assertEqual(test_dict["castep_version"], "18.1")
             self.assertEqual(test_dict["species_pot"]["Ti"], "3|1.9|8|9|10|30U:40:31:32(qc=5)")
             self.assertEqual(test_dict["species_pot"]["O"], "2|1.5|12|13|15|20:21(qc=5)")
-            self.assertEqual(test_dict["mp-id"], 10101)
+            self.assertEqual(test_dict["mp_id"], 10101)
 
     def test_file_not_found(self):
         """ Ensure that FileNotFound errors fail gracefully. """
@@ -1057,7 +1057,7 @@ class ScraperMiscTest(MatadorUnitTest):
         doc = {}
         seed = "blah/blah/blah4/AgBiI4-spinel-Config5-MP-123456-blah-SnPQ"
         get_seed_metadata(doc, seed)
-        self.assertEqual(doc["mp-id"], 123456)
+        self.assertEqual(doc["mp_id"], 123456)
 
     def test_thermo_castep(self):
         castep_fname = REAL_PATH + "data/CuP-thermo-test.castep"
