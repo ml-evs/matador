@@ -24,10 +24,8 @@ def file_writer_function(function):
     def wrapped_writer(doc, path, overwrite=False, hash_dupe=False, **kwargs):
         """ Wrap and return the writer function. """
         try:
-            print(kwargs)
             overwrite = kwargs.pop('overwrite', overwrite)
             hash_dupe = kwargs.pop('hash_dupe', hash_dupe)
-            print(kwargs)
             flines, ext = function(doc, path, overwrite=overwrite, hash_dupe=hash_dupe, **kwargs)
             if ext is not None and not path.endswith('.' + ext):
                 path += '.{}'.format(ext)

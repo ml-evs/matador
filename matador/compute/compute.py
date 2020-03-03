@@ -1076,7 +1076,7 @@ class ComputeTask:
             memcheck_doc['task'] = 'singlepoint'
 
         doc2param(memcheck_doc, memcheck_seed, hash_dupe=False)
-        doc2cell(memcheck_doc, memcheck_seed, hash_dupe=False, copy_pspots=False)
+        doc2cell(memcheck_doc, memcheck_seed, hash_dupe=False)
 
         LOG.debug('Running CASTEP dryrun.')
         self.executable += ' --dryrun'
@@ -1468,7 +1468,7 @@ class ComputeTask:
             this_calc_doc['kpoints_mp_grid'] = [1, 1, n_kz]
             if 'kpoints_mp_spacing' in calc_doc:
                 del calc_doc['kpoints_mp_spacing']
-        doc2cell(this_calc_doc, seed, hash_dupe=False, copy_pspots=False, spin=self.spin)
+        doc2cell(this_calc_doc, seed, hash_dupe=False, spin=self.spin)
 
         # update param
         if not self.custom_params:
