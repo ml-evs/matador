@@ -96,7 +96,7 @@ def get_uniq_cursor(cursor, sim_tol=0.1, energy_tol=1e-2,
     dupe_dict = dict()
     for i in range(len(cursor)):
         distinct_set.add(i)
-        dupe_dict[i] = []
+        dupe_dict[i] = set()
 
     # loop over the similarity matrix and construct the set of "unique" structures
     # and a dictionary containing their duplicates
@@ -107,12 +107,12 @@ def get_uniq_cursor(cursor, sim_tol=0.1, energy_tol=1e-2,
                     distinct_set.remove(j)
                     del dupe_dict[j]
                 dupe_set.add(j)
-                dupe_dict[i].append(j)
+                dupe_dict[i].add(j)
 
     total_dupes = len(set(list(dupe_dict.keys()) + [item for key in dupe_dict for item in dupe_dict[key]]))
     if len(cursor) != total_dupes:
-        raise RuntimeError("Something went wrong: dupe dict had wrong size {} compared to cursor {}!"
-                           .format(total_dupes, len(cursor)))
+        raise RuntimeError("Something went wrong: dupe dict had wrong size {} compared to cursor {}!\nFull output: {}"
+                           .format(total_dupes, len(cursor), dupe_dict))
 
     if hierarchy_order is None:
         hierarchy_order = ['ICSD', 'DOI', 'OQMD', 'MP', 'PF', 'SWAPS', 'AIRSS', 'GA']
@@ -122,10 +122,12 @@ def get_uniq_cursor(cursor, sim_tol=0.1, energy_tol=1e-2,
     print('Applying hierarchy of structures with order: {}'.format(hierarchy_order))
     dupe_dict = _enforce_hierarchy(dupe_dict, hierarchy_values, hierarchy_order)
 
-    total_dupes = len(set(list(dupe_dict.keys()) + [item for key in dupe_dict for item in dupe_dict[key]]))
-    if len(cursor) != total_dupes:
-        raise RuntimeError("Something went wrong: dupe dict had wrong size {} compared to cursor {}!"
-                           .format(total_dupes, len(cursor)))
+    all_structures = set(list(dupe_dict.keys()) + [item for key in dupe_dict for item in dupe_dict[key]])
+    if len(cursor) != len(all_structures):
+        raise RuntimeError("Something went wrong: dupe dict had wrong size {} compared to cursor {}!\nDifference: {}"
+                           .format(len(all_structures),
+                                   len(cursor),
+                                   all_structures.symmetric_difference({i for i in range(len(cursor))})))
 
     print('Done!')
     return sorted(list(dupe_dict.keys())), dupe_dict, fingerprint_list, sim_mat
@@ -147,18 +149,21 @@ def _enforce_hierarchy(dupe_dict, values, hierarchy):
         dict: the reshuffled dictionary of duplicates.
 
     """
-    if len(values) - 1 != max(list(dupe_dict.keys()) + max(list(dupe_dict.values()))):
-        raise RuntimeError("Number of hierarchy values does not much number of items.")
+    max_val = max(list(dupe_dict.keys()) + [val for t in dupe_dict.values() for val in t])
+
+    if len(values) - 1 != max_val:
+        raise RuntimeError("Number of hierarchy values does not much number of items: {} vs {}"
+                           .format(len(values)-1, max_val))
 
     new_dupe_dict = copy.deepcopy(dupe_dict)
 
     swapped = []
     for i in new_dupe_dict:
-        if not new_dupe_dict[i]:
+        if not list(new_dupe_dict[i]):
             continue
         for value in hierarchy:
             found = False
-            for k in [i] + new_dupe_dict[i]:
+            for k in [i] + list(new_dupe_dict[i]):
                 if values[k] == value:
                     swapped.append((i, k))
                     found = True
@@ -168,7 +173,10 @@ def _enforce_hierarchy(dupe_dict, values, hierarchy):
 
     for i, k in swapped:
         if i != k:
-            new_dupe_dict[k] = [ind for ind in new_dupe_dict[i] if ind != k] + [i]
+            if k in new_dupe_dict:
+                new_dupe_dict[k].update([ind for ind in new_dupe_dict[i] if ind != k] + [i])
+            else:
+                new_dupe_dict[k] = set([ind for ind in new_dupe_dict[i] if ind != k] + [i])
             del new_dupe_dict[i]
 
     return new_dupe_dict
