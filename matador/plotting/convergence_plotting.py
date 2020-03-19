@@ -76,7 +76,6 @@ def plot_cutoff_kpt_grid(data, forces=False, max_energy=50, legend=True, colour_
             ax=ax[3],
             reference='last'
         )
-    plt.show()
 
     if any(kwargs.get(ext) for ext in SAVE_EXTS):
         fname = 'conv'
