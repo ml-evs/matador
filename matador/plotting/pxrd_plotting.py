@@ -15,7 +15,7 @@ __all__ = ['plot_pxrd']
 
 
 @plotting_function
-def plot_pxrd(pxrds, two_theta_range=(10, 70), figsize=None):
+def plot_pxrd(pxrds, two_theta_range=(10, 70), figsize=None, text_offset=0.1, **kwargs):
     """ Plot PXRD or PXRDs.
 
     Parameters:
@@ -38,7 +38,7 @@ def plot_pxrd(pxrds, two_theta_range=(10, 70), figsize=None):
     for ind, pxrd in enumerate(pxrds):
         ax = fig.add_subplot(111)
         ax.plot(pxrd.two_thetas, 0.9*pxrd.spectrum + ind)
-        ax.text(0.95, ind+0.1, '{} ({})'.format(pxrd.formula, pxrd.spg),
+        ax.text(0.95, ind+text_offset, '{} ({})'.format(pxrd.formula, pxrd.spg),
                 transform=ax.get_yaxis_transform(),
                 horizontalalignment='right')
 
@@ -47,3 +47,16 @@ def plot_pxrd(pxrds, two_theta_range=(10, 70), figsize=None):
     ax.set_xlim(*two_theta_range)
     ax.set_ylabel('Relative intensity')
     ax.set_xlabel('$2\\theta$')
+
+    if any([kwargs.get('pdf'), kwargs.get('svg'), kwargs.get('png')]):
+        bbox_extra_artists = None
+        filename = 'pxrd_plot'
+        if kwargs.get('pdf'):
+            plt.savefig('{}.pdf'.format(filename),
+                        bbox_inches='tight', transparent=True, bbox_extra_artists=bbox_extra_artists)
+        if kwargs.get('svg'):
+            plt.savefig('{}.svg'.format(filename),
+                        bbox_inches='tight', transparent=True, bbox_extra_artists=bbox_extra_artists)
+        if kwargs.get('png'):
+            plt.savefig('{}.png'.format(filename),
+                        bbox_inches='tight', transparent=True, bbox_extra_artists=bbox_extra_artists)
