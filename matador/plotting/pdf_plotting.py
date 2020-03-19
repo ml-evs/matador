@@ -16,7 +16,7 @@ __all__ = ['plot_pdf', 'plot_projected_pdf', 'plot_diff_overlap', 'plot_projecte
 
 
 @plotting_function
-def plot_pdf(pdf, other_pdfs=None, labels=None):
+def plot_pdf(pdf, other_pdfs=None, labels=None,maxr=None, **kwargs):
     """ Plot PDFs.
 
     Parameters:
@@ -36,7 +36,11 @@ def plot_pdf(pdf, other_pdfs=None, labels=None):
 
     ax1.plot(pdf.r_space, pdf.gr, label=labels[0] if labels else pdf.label)
     ax1.set_ylabel('Pair distribution function, $g(r)$')
-    ax1.set_xlim(0, pdf.rmax)
+    ax1.get_yaxis().set_ticks([])
+    if maxr is None:
+        ax1.set_xlim(1, pdf.rmax)
+    else:
+        ax1.set_xlim(1,maxr)
     if other_pdfs is not None:
         for ind, _pdf in enumerate(other_pdfs):
             if isinstance(_pdf, Crystal):
@@ -44,13 +48,26 @@ def plot_pdf(pdf, other_pdfs=None, labels=None):
             elif isinstance(_pdf, dict) and 'pdf' in _pdf:
                 _pdf = _pdf['pdf']
             if isinstance(_pdf, PDF):
-                ax1.plot(_pdf.r_space, _pdf.gr, label=labels[ind+1] if labels else _pdf.label, ls='--', alpha=1)
+                ax1.plot(_pdf.r_space, _pdf.gr+20*(ind+1), label=labels[ind+1] if labels else _pdf.label, ls='--', alpha=1)
             elif isinstance(_pdf, tuple):
-                ax1.plot(_pdf[0], _pdf[1], alpha=1, labels=labels[ind+1] if labels else None, ls='--')
+                ax1.plot(_pdf[0], _pdf[1]+20*(ind+1), alpha=1, labels=labels[ind+1] if labels else None, ls='--')
             else:
                 raise RuntimeError('Wrong PDF format specified, please either pass a PDF object or (r, g(r)) tuple.')
     ax1.set_xlabel('$r$ ($\\AA$)')
     ax1.legend()
+
+    if any([kwargs.get('pdf'), kwargs.get('svg'), kwargs.get('png')]):
+        bbox_extra_artists = None
+        filename = 'pdf_plot'
+        if kwargs.get('pdf'):
+            plt.savefig('{}.pdf'.format(filename),
+                        bbox_inches='tight', transparent=True, bbox_extra_artists=bbox_extra_artists)
+        if kwargs.get('svg'):
+            plt.savefig('{}.svg'.format(filename),
+                        bbox_inches='tight', transparent=True, bbox_extra_artists=bbox_extra_artists)
+        if kwargs.get('png'):
+            plt.savefig('{}.png'.format(filename),
+                        bbox_inches='tight', transparent=True, bbox_extra_artists=bbox_extra_artists)
 
 
 @plotting_function
