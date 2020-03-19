@@ -16,7 +16,7 @@ __all__ = ['plot_pdf', 'plot_projected_pdf', 'plot_diff_overlap', 'plot_projecte
 
 
 @plotting_function
-def plot_pdf(pdf, other_pdfs=None, labels=None,maxr=None, **kwargs):
+def plot_pdf(pdf, other_pdfs=None, labels=None,maxr=None,offset=0, **kwargs):
     """ Plot PDFs.
 
     Parameters:
@@ -43,14 +43,15 @@ def plot_pdf(pdf, other_pdfs=None, labels=None,maxr=None, **kwargs):
         ax1.set_xlim(1,maxr)
     if other_pdfs is not None:
         for ind, _pdf in enumerate(other_pdfs):
+            gr_offset = offset*(ind+1)
             if isinstance(_pdf, Crystal):
                 _pdf = _pdf.pdf
             elif isinstance(_pdf, dict) and 'pdf' in _pdf:
                 _pdf = _pdf['pdf']
             if isinstance(_pdf, PDF):
-                ax1.plot(_pdf.r_space, _pdf.gr+20*(ind+1), label=labels[ind+1] if labels else _pdf.label, ls='--', alpha=1)
+                ax1.plot(_pdf.r_space, _pdf.gr+offset, label=labels[ind+1] if labels else _pdf.label, ls='--', alpha=1)
             elif isinstance(_pdf, tuple):
-                ax1.plot(_pdf[0], _pdf[1]+20*(ind+1), alpha=1, labels=labels[ind+1] if labels else None, ls='--')
+                ax1.plot(_pdf[0], _pdf[1]+offset, alpha=1, labels=labels[ind+1] if labels else None, ls='--')
             else:
                 raise RuntimeError('Wrong PDF format specified, please either pass a PDF object or (r, g(r)) tuple.')
     ax1.set_xlabel('$r$ ($\\AA$)')

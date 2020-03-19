@@ -15,7 +15,7 @@ __all__ = ['plot_pxrd']
 
 
 @plotting_function
-def plot_pxrd(pxrds, two_theta_range=(10, 70), figsize=None, **kwargs):
+def plot_pxrd(pxrds, two_theta_range=(10, 70), figsize=None, text_offset=0.1,**kwargs):
     """ Plot PXRD or PXRDs.
 
     Parameters:
@@ -38,7 +38,7 @@ def plot_pxrd(pxrds, two_theta_range=(10, 70), figsize=None, **kwargs):
     for ind, pxrd in enumerate(pxrds):
         ax = fig.add_subplot(111)
         ax.plot(pxrd.two_thetas, 0.9*pxrd.spectrum + ind)
-        ax.text(0.95, ind+0.15, '{} ({})'.format(pxrd.formula, pxrd.spg),
+        ax.text(0.95, ind+text_offset, '{} ({})'.format(pxrd.formula, pxrd.spg),
                 transform=ax.get_yaxis_transform(),
                 horizontalalignment='right')
 
