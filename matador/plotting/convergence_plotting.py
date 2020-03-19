@@ -11,8 +11,6 @@ from decimal import Decimal, ROUND_UP
 from collections import defaultdict
 from traceback import print_exc
 import numpy as np
-import matplotlib
-matplotlib.use('TkAgg')
 from matador.plotting.plotting import plotting_function, SAVE_EXTS
 from matador.scrapers.castep_scrapers import castep2dict
 from matador.utils.chem_utils import get_formula_from_stoich
