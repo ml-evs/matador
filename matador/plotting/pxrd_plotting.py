@@ -32,7 +32,7 @@ def plot_pxrd(pxrds, two_theta_range=(10, 70), figsize=None, **kwargs):
         pxrds = [pxrds]
     if figsize is None:
         height = max(0.5, 5/len(pxrds))
-        figsize = (10, height)
+        figsize = (8, height)
     import matplotlib.pyplot as plt
     fig = plt.figure(figsize=figsize)
     for ind, pxrd in enumerate(pxrds):

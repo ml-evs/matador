@@ -57,7 +57,8 @@ def get_uniq_cursor(cursor, sim_tol=0.1, energy_tol=1e-2,
 
     fingerprint_list = [None for doc in cursor]
     fingerprints_required = [False for doc in cursor]
-    required_inds = set()
+    #required_inds = set()
+    required_inds = None
     sim_mat = np.ones((len(fingerprint_list), len(fingerprint_list)))
     print('Assessing similarities...')
     for i in range(len(fingerprint_list)):
