@@ -61,11 +61,14 @@ def plot_pdf(pdf, other_pdfs=None, labels=None, maxr=None, offset=0, **kwargs):
         bbox_extra_artists = None
         filename = 'pdf_plot'
         if kwargs.get('pdf'):
-            plt.savefig('{}.pdf'.format(filename), bbox_inches='tight', transparent=True, bbox_extra_artists=bbox_extra_artists)
+            plt.savefig('{}.pdf'.format(filename), 
+                bbox_inches='tight', transparent=True, bbox_extra_artists=bbox_extra_artists)
         if kwargs.get('svg'):
-            plt.savefig('{}.svg'.format(filename), bbox_inches='tight', transparent=True, bbox_extra_artists=bbox_extra_artists)
+            plt.savefig('{}.svg'.format(filename), 
+                bbox_inches='tight', transparent=True, bbox_extra_artists=bbox_extra_artists)
         if kwargs.get('png'):
-            plt.savefig('{}.png'.format(filename), bbox_inches='tight', transparent=True, bbox_extra_artists=bbox_extra_artists)
+            plt.savefig('{}.png'.format(filename), 
+                bbox_inches='tight', transparent=True, bbox_extra_artists=bbox_extra_artists)
 
 
 @plotting_function

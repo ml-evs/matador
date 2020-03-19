@@ -15,7 +15,7 @@ __all__ = ['plot_pxrd']
 
 
 @plotting_function
-def plot_pxrd(pxrds, two_theta_range=(10, 70), figsize=None, text_offset=0.1,**kwargs):
+def plot_pxrd(pxrds, two_theta_range=(10, 70), figsize=None, text_offset=0.1, **kwargs):
     """ Plot PXRD or PXRDs.
 
     Parameters:
