@@ -49,9 +49,9 @@ def plot_pdf(pdf, other_pdfs=None, labels=None, maxr=None, offset=0, **kwargs):
             elif isinstance(_pdf, dict) and 'pdf' in _pdf:
                 _pdf = _pdf['pdf']
             if isinstance(_pdf, PDF):
-                ax1.plot(_pdf.r_space, _pdf.gr+gr_offset, label=labels[ind+1] if labels else _pdf.label, ls='--', alpha=1)
+                ax1.plot(_pdf.r_space, _pdf.gr + gr_offset, label=labels[ind+1] if labels else _pdf.label, ls='--', alpha=1)
             elif isinstance(_pdf, tuple):
-                ax1.plot(_pdf[0], _pdf[1]+gr_offset, alpha=1, labels=labels[ind+1] if labels else None, ls='--')
+                ax1.plot(_pdf[0], _pdf[1] + gr_offset, alpha=1, labels=labels[ind+1] if labels else None, ls='--')
             else:
                 raise RuntimeError('Wrong PDF format specified, please either pass a PDF object or (r, g(r)) tuple.')
     ax1.set_xlabel('$r$ ($\\AA$)')
