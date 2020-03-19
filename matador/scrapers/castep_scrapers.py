@@ -688,7 +688,6 @@ def bands2dict(seed, **kwargs):
     data = flines[9:]
 
     bs['source'] = [seed]
-    bs['raw'] = flines
 
     bs['num_kpoints'] = int(header[0].split()[-1])
     bs['num_spins'] = int(header[1].split()[-1])
@@ -826,7 +825,7 @@ def optados2dict(seed, **kwargs):
     elif is_spin_dos:
         optados['spin_dos'] = dict()
         optados['spin_dos']['up'] = data[:, 1]
-        optados['spin_dos']['down'] = data[:, 2]
+        optados['spin_dos']['down'] = -data[:, 2]
         optados['dos'] = np.abs(optados['spin_dos']['up']) + np.abs(optados['spin_dos']['down'])
 
     elif is_pdis:
@@ -944,10 +943,26 @@ def phonon2dict(seed, **kwargs):
     if 'num_kpoints' not in ph:
         ph['num_kpoints'] = last_qpt_ind
     ph['eigenvalues_q'] = np.zeros((1, ph['num_modes'], ph['num_kpoints']))
+    raman_intensity = np.zeros_like(ph['eigenvalues_q'])
+    infrared_intensity = np.zeros_like(ph['eigenvalues_q'])
+    raman = False
+    ir = False
     for qind in range(ph['num_kpoints']):
         ph['phonon_kpoint_list'].append([f90_float_parse(elem) for elem in data[qind * line_offset].split()[2:]])
         for i in range(1, ph['num_modes'] + 1):
-            ph['eigenvalues_q'][0][i - 1][qind] = f90_float_parse(data[qind * line_offset + i].split()[1])
+            line_split = data[qind * line_offset + i].split()
+            ph['eigenvalues_q'][0][i - 1][qind] = f90_float_parse(line_split[1])
+            if len(line_split) > 2:
+                infrared_intensity[0][i - 1][qind] = f90_float_parse(line_split[2])
+                ir = True
+            if len(line_split) > 3:
+                raman_intensity[0][i - 1][qind] = f90_float_parse(line_split[3])
+                raman = True
+
+    if ir:
+        ph['infrared_intensity'] = infrared_intensity
+    if raman:
+        ph['raman_intensity'] = raman_intensity
 
     if dos_present:
         # remove header and "END"
@@ -1566,13 +1581,18 @@ def _castep_find_final_structure(flines):
     finish_line = 0
     success_string = 'Geometry optimization completed successfully'
     failure_string = 'Geometry optimization failed to converge after'
+    annoying_string = 'WARNING - there is nothing to optimise - skipping relaxation'
     # look for final "success/failure" string in file for geometry optimisation
     for line_no, line in enumerate(reversed(flines)):
         if success_string in line:
             finish_line = len(flines) - line_no
             optimised = True
             break
-        elif failure_string in line:
+        if annoying_string in line:
+            finish_line = len(flines) - line_no
+            optimised = True
+            break
+        if failure_string in line:
             finish_line = len(flines) - line_no
             optimised = False
             break
@@ -1881,7 +1901,13 @@ def get_seed_metadata(doc, seed):
         doc['icsd'] = int(seed.split('CollCode')[-1].split('-')[0].split('_')[0].split('.')[0])
     elif '-ICSD-' in seed:
         doc['icsd'] = int(seed.split('-ICSD-')[-1].split('-')[0].split('_')[0].split('.')[0])
+    if '-OQMD-' in seed:
+        doc['oqmd_id'] = int(seed.split('-OQMD-')[-1].split('-')[0].split('_')[0].split('.')[0])
+    elif '-OQMD_' in seed:
+        doc['oqmd_id'] = int(seed.split('-OQMD_')[-1].split('-')[0].split('_')[0].split('.')[0])
     if '-MP-' in seed:
-        doc['mp-id'] = int(seed.split('-MP-')[-1].split('-')[0].split('_')[0].split('.')[0])
+        doc['mp_id'] = int(seed.split('-MP-')[-1].split('-')[0].split('_')[0].split('.')[0])
+    elif '-MP_' in seed:
+        doc['mp_id'] = int(seed.split('-MP_')[-1].split('-')[0].split('_')[0].split('.')[0])
     if '-DOI-' in seed:
         doc['doi'] = seed.split('-DOI-')[-1].split('-')[0].replace('__', '/')

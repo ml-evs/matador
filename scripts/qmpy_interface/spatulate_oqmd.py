@@ -179,7 +179,12 @@ def real2recip(real_lat):
 
 
 class DBConverter:
-    def __init__(self, host=None, client=None, dryrun=False, debug=False, verbosity=0, db_name='oqmd_1.2', append=False, start_id=0, chunk_size=1000, restart=True):
+    def __init__(
+        self,
+        host=None, client=None, dryrun=False, debug=False,
+        verbosity=0, db_name='oqmd_1.2', append=False,
+        start_id=0, chunk_size=1000, restart=True
+    ):
         """ Connect to the relevant databases and
         set off the scraper.
         """

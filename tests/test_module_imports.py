@@ -48,7 +48,6 @@ class ImportTest(unittest.TestCase):
             doc2pwscf,
             doc2res,
             doc2xsf,
-            generate_hash,
             query2files,
             doc2arbitrary,
         )
@@ -59,7 +58,6 @@ class ImportTest(unittest.TestCase):
         self.assertTrue(doc2pwscf)
         self.assertTrue(doc2res)
         self.assertTrue(doc2xsf)
-        self.assertTrue(generate_hash)
         self.assertTrue(query2files)
         self.assertTrue(doc2arbitrary)
 

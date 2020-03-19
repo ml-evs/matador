@@ -548,8 +548,8 @@ def get_guess_doc_provenance(sources, icsd=None):
         fname = fname.split('/')[-1].lower()
         if (fname.endswith('.castep') or fname.endswith('.res') or fname.endswith('.history') or
                 ('oqmd' in fname and fname.count('.') == 0) or
-                ('mp-' in fname and fname.count('.') == 0) or
-                ('pf-' in fname and fname.count('.') == 0)):
+                (any(s in fname for s in ['mp-', 'mp_']) and fname.count('.') == 0) or
+                (any(s in fname for s in ['pf-', 'pf_']) and fname.count('.') == 0)):
             if any(substr in fname for substr in ['collcode', 'colcode', 'collo']):
                 if fname.count('-') == 2 + fname.count('oqmd') or 'swap' in fname:
                     prov = 'SWAPS'
@@ -567,7 +567,7 @@ def get_guess_doc_provenance(sources, icsd=None):
                 prov = 'ICSD'
             elif 'pf-' in fname and prov is None:
                 prov = 'PF'
-            elif 'mp-' in fname and prov != 'PF':
+            elif any(s in fname for s in ['mp-', 'mp_']) and prov != 'PF':
                 prov = 'MP'
             elif '-sm-' in fname:
                 prov = 'SM'

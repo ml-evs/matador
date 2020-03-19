@@ -236,7 +236,6 @@ class ComputeTask:
             self.paths['jobs_fname'] = 'jobs.txt'
             self.paths['completed_fname'] = 'finished_cleanly.txt'
             self.paths['failures_fname'] = 'failures.txt'
-            self.paths['memory_fname'] = 'memory_exceeded.txt'
 
         elif 'completed_dir' not in self.paths:
             raise RuntimeError('Invalid paths: {}'.format(self.paths))
@@ -378,7 +377,7 @@ class ComputeTask:
             if memory_usage_estimate > 0.9 * self.maxmem:
                 msg = 'Structure {} failed memcheck, skipping... '.format(self.seed) + mem_string
                 with open(self.paths['memory_fname'], 'a') as f:
-                    f.write("{} {}GB/{}GB".format(self.seed, memory_usage_estimate / 1024, self.maxmem / 1024))
+                    f.write("{} {:.2f}GB/{:.2f}GB\n".format(self.seed, memory_usage_estimate / 1024, self.maxmem / 1024))
 
                 raise MaxMemoryEstimateExceeded(msg)
 
@@ -704,9 +703,10 @@ class ComputeTask:
                         opti_dict['lattice_cart'] = list(cell_dict['lattice_cart'])
 
                 LOG.info('N = {iters:03d} | |F| = {d[max_force_on_atom]:5.5f} eV/A | '
-                         'S = {pressure:5.5f} GPa | H = {d[enthalpy_per_atom]:5.5f} eV/atom'
+                         'S = {pressure:5.5f} GPa | H = {enthalpy_per_atom:5.5f} eV/atom'
                          .format(d=opti_dict,
                                  pressure=opti_dict.get('pressure', 0.0),
+                                 enthalpy_per_atom=opti_dict.get('enthalpy_per_atom', 0.0),
                                  iters=opti_dict.get('geom_iter', 0)))
 
             # if there were errors that can be remedied, now is the time to do it
@@ -1076,7 +1076,7 @@ class ComputeTask:
             memcheck_doc['task'] = 'singlepoint'
 
         doc2param(memcheck_doc, memcheck_seed, hash_dupe=False)
-        doc2cell(memcheck_doc, memcheck_seed, hash_dupe=False, copy_pspots=False)
+        doc2cell(memcheck_doc, memcheck_seed, hash_dupe=False)
 
         LOG.debug('Running CASTEP dryrun.')
         self.executable += ' --dryrun'
@@ -1468,7 +1468,7 @@ class ComputeTask:
             this_calc_doc['kpoints_mp_grid'] = [1, 1, n_kz]
             if 'kpoints_mp_spacing' in calc_doc:
                 del calc_doc['kpoints_mp_spacing']
-        doc2cell(this_calc_doc, seed, hash_dupe=False, copy_pspots=False, spin=self.spin)
+        doc2cell(this_calc_doc, seed, hash_dupe=False, spin=self.spin)
 
         # update param
         if not self.custom_params:
@@ -1629,8 +1629,7 @@ class ComputeTask:
 
         return True
 
-    @staticmethod
-    def _setup_compute_dir(seed, compute_dir, custom_params=False, generic=False):
+    def _setup_compute_dir(self, seed, compute_dir, custom_params=False, generic=False):
         """ Create the desired directory if it doens't exist,
         and try to link to it in the current folder.
 
@@ -1665,12 +1664,13 @@ class ComputeTask:
 
         # copy pspots and any intermediate calcs to compute_dir
         LOG.info('Copying pspots into compute_dir')
-        pspots = glob.glob('*.usp')
-        for pspot in pspots:
-            try:
-                shutil.copy2(pspot, compute_dir)
-            except shutil.SameFileError:
-                pass
+        if self.cell_dict is not None:
+            for pspot in self.cell_dict.get('species_pot', {}).values():
+                if os.path.isfile(pspot):
+                    try:
+                        shutil.copy2(pspot, compute_dir)
+                    except shutil.SameFileError:
+                        pass
 
         if custom_params and compute_dir is not None:
             shutil.copy2(seed + '.param', compute_dir)

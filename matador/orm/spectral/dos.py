@@ -14,7 +14,7 @@ import scipy.integrate
 import scipy.interpolate
 
 from matador.orm.orm import DataContainer
-from matador.utils.chem_utils import KELVIN_TO_EV
+from matador.utils.chem_utils import KELVIN_TO_EV, INVERSE_CM_TO_EV
 
 from .dispersion import Dispersion
 
@@ -35,16 +35,23 @@ class DensityOfStates(Dispersion, DataContainer):
 
         """
 
+        if kwargs.get('gaussian_width') is not None:
+            self.gaussian_width = kwargs['gaussian_width']
+
         if args and isinstance(args[0], dict):
             data = args[0]
         else:
             data = kwargs
         # as we can also construct a DOS from arbitarary kpoint/energy data,
         # check that we've been passed this first
-        if isinstance(data, Dispersion) or 'dos' not in data:
+        if isinstance(data, Dispersion) or ('dos' not in data and 'spin_dos' not in data):
             data = self._from_dispersion(data)
         elif isinstance(data, DensityOfStates):
             data = copy.deepcopy(DensityOfStates._data)
+
+        # trigger generation of dos key from spin dos
+        if 'dos' not in data and 'spin_dos' in data:
+            data["dos"] = np.asarray(data["spin_dos"]["up"]) + np.asarray(data["spin_dos"]["down"])
 
         super().__init__(data)
         self._trim_dos()
@@ -54,9 +61,10 @@ class DensityOfStates(Dispersion, DataContainer):
         section of the DOS.
 
         """
-        first_index = np.argmax(self._data['dos'] > EPS)
-        last_index = len(self._data['dos']) - np.argmax(self._data['dos'][::-1] > EPS)
-        self._trimmed_dos = self._data['dos'][first_index:last_index]
+        dos = self._data['dos']
+        first_index = np.argmax(dos > EPS)
+        last_index = len(dos) - np.argmax(dos[::-1] > EPS)
+        self._trimmed_dos = dos[first_index:last_index]
         self._trimmed_energies = self._data['energies'][first_index:last_index]
 
     def _from_dispersion(self, data, **kwargs):
@@ -124,11 +132,17 @@ class DensityOfStates(Dispersion, DataContainer):
                     gaussian_width=gaussian_width
                 )
 
+                if 'spin_fermi_energy' in bands:
+                    energies -= bands['spin_fermi_energy'][0]
+
             return spin_dos, energies
 
         dos, energies = DensityOfStates._cheap_broaden(
             raw_eigs.flatten(), weights=raw_weights.flatten(), gaussian_width=gaussian_width
         )
+
+        if 'fermi_energy' in bands:
+            energies -= bands['fermi_energy']
 
         return dos, energies
 
@@ -169,7 +183,7 @@ class DensityOfStates(Dispersion, DataContainer):
 class VibrationalDOS(DensityOfStates):
     """ Specific class for phonon DOS data, including free energy integration. """
 
-    gaussian_width = 10
+    gaussian_width = 10 * INVERSE_CM_TO_EV
 
     @property
     def zero_point_energy_from_dos(self):
@@ -433,9 +447,9 @@ class VibrationalDOS(DensityOfStates):
 
         """
         from matador.plotting.temperature_plotting import plot_free_energy
-        plot_free_energy(self, temperatures=temperatures, ax=ax, **kwargs)
+        return plot_free_energy(self, temperatures=temperatures, ax=ax, **kwargs)
 
 
 class ElectronicDOS(DensityOfStates):
     """ Specific class for electronic DOS data. """
-    gaussian_width = 0.1
+    gaussian_width = 0.01

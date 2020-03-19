@@ -174,15 +174,6 @@ class Crystal(DataContainer):
         else:
             self._space_group = {}
 
-        # set root source to structure filename
-        from matador.utils.chem_utils import get_root_source
-        self.root_source = 'unknown'
-        try:
-            if 'source' in self._data:
-                self.root_source = get_root_source(self._data['source'])
-        except RuntimeError:
-            pass
-
     def __getitem__(self, key):
         """ If integer key is requested, return index into site array. """
         if isinstance(key, int):

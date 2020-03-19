@@ -138,7 +138,8 @@ class FingerprintFactory:
         elif len(required_inds) == 0:
             return
         else:
-            print("Skipping {} structures out of {}".format(len(cursor) - len(required_inds), len(cursor)))
+            print("Skipping {} structures out of {} as no comparisons are required"
+                  .format(len(cursor) - len(required_inds), len(cursor)))
 
         if self.fingerprint is None or self.default_key is None:
             # TODO: is this the right way of doing this?
@@ -206,7 +207,6 @@ class FingerprintFactory:
             fprint_ind = 0
             for ind, doc in enumerate(cursor):
                 if ind in required_inds:
-                    print(ind, fprint_ind)
                     if isinstance(cursor[ind], Crystal):
                         cursor[ind]._data.pop(self.default_key, None)
                     cursor[ind][self.default_key] = fprint_cursor[fprint_ind][self.default_key]

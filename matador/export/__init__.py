@@ -18,7 +18,7 @@ Currently supported formats:
 
 __all__ = [
     'doc2param', 'doc2cell', 'doc2pdb', 'doc2pwscf', 'doc2res',
-    'doc2xsf', 'generate_hash', 'query2files', 'doc2arbitrary'
+    'doc2xsf', 'query2files', 'doc2arbitrary'
 ]
 __author__ = 'Matthew Evans'
 __maintainer__ = 'Matthew Evans'
@@ -26,4 +26,4 @@ __maintainer__ = 'Matthew Evans'
 
 from matador.export.export import doc2param, doc2cell, doc2pdb
 from matador.export.export import doc2pwscf, doc2res, doc2xsf, doc2arbitrary
-from matador.export.export import generate_hash, query2files
+from matador.export.export import query2files

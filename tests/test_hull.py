@@ -13,7 +13,6 @@ import numpy as np
 from matador.hull import QueryConvexHull
 from matador.query import DBQuery
 from matador.scrapers.castep_scrapers import res2dict, castep2dict
-from matador.export import generate_hash
 
 # grab abs path for accessing test data
 REAL_PATH = "/".join(realpath(__file__).split("/")[:-1]) + "/"
@@ -182,7 +181,7 @@ class HullTest(unittest.TestCase):
         fake_query = DBQuery.__new__(DBQuery)
         fake_query.cursor = hull.cursor
         for ind, doc in enumerate(fake_query.cursor):
-            fake_query.cursor[ind]["_id"] = generate_hash(hash_len=20)
+            fake_query.cursor[ind]["_id"] = None
             fake_query.cursor[ind]["text_id"] = [doc["source"][0], "."]
         fake_query._non_elemental = True
         fake_query._create_hull = True
@@ -251,7 +250,7 @@ class HullTest(unittest.TestCase):
         fake_query = DBQuery.__new__(DBQuery)
         fake_query.cursor = hull.cursor
         for ind, doc in enumerate(fake_query.cursor):
-            fake_query.cursor[ind]["_id"] = generate_hash(hash_len=20)
+            fake_query.cursor[ind]["_id"] = None
             fake_query.cursor[ind]["text_id"] = [doc["source"][0], "."]
             del fake_query.cursor[ind]["hull_distance"]
             del fake_query.cursor[ind]["concentration"]

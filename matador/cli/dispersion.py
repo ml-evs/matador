@@ -57,6 +57,10 @@ def main():
                         help='plot position and size of band gap')
     parser.add_argument('-ph', '--phonons', action='store_true', default=False,
                         help='plot phonon calculation, rather than electronic')
+    parser.add_argument('-ir', '--infrared', action='store_true', default=False,
+                        help='plot infrared spectrum from file')
+    parser.add_argument('-ir_ss', '--infrared_step_size', type=float, nargs='?', default=1.0,
+                        help='step size in cm^{-1} on x-axis for IR plots; must be > 0, default is 1')
     parser.add_argument('-gw', '--gaussian_width', type=float,
                         help=('smearing width for DOS from .bands_dos (default: 0.1 eV) or '
                               '.phonon_dos files (default: 10 1/cm)'))
@@ -86,6 +90,7 @@ def main():
 
     verbosity = kwargs.get('verbosity')
     phonons = kwargs.get('phonons')
+    ir = kwargs.get('infrared')
     if kwargs.get('labels'):
         labels = ' '.join(kwargs.get('labels')).split(',')
     else:
@@ -108,7 +113,7 @@ def main():
     else:
         band_reorder = None
 
-    from matador.plotting import plot_spectral
+    from matador.plotting import plot_spectral, plot_ir_spectrum
 
     del kwargs['seed']
     del kwargs['verbosity']
@@ -118,10 +123,9 @@ def main():
     del kwargs['band_reorder']
     del kwargs['no_band_reorder']
 
-    from matador.utils.print_utils import print_failure
-
+    bandstructure = False
     for seed in seeds:
-        if not phonons:
+        if not phonons and not ir:
             bs_seed = seed + '.bands'
             bandstructure = isfile(bs_seed)
             dos_seeds = glob.glob(seed + '*.dat')
@@ -129,18 +133,22 @@ def main():
                 dos_seeds.append(seed + '.bands_dos')
             dos = any([isfile(dos_seed) for dos_seed in dos_seeds])
 
-        elif phonons:
+        elif phonons and not ir:
             phonon_seed = seed + '.phonon'
             bandstructure = isfile(phonon_seed)
             dos_seed = seed + '.phonon_dos'
             dos = isfile(dos_seed)
 
-    cell_seed = seed + '.cell'
-    cell = isfile(cell_seed)
+        elif ir:
+            if len(seeds) > 1:
+                exit('Multiple seeds not supported for IR plot.')
+            ir_seed = seed + '.phonon'
 
-    if not dos and not bandstructure:
-        print_failure('Could not find files for specified seed {}.'.format(seed))
-        exit()
+    if bandstructure:
+        cell_seed = seed + '.cell'
+        cell = isfile(cell_seed)
+    else:
+        cell = False
 
     if kwargs.get('dos_only') and dos:
         bandstructure = False
@@ -148,18 +156,31 @@ def main():
     if kwargs.get('bs_only') and bandstructure:
         dos = False
 
-    plot_spectral(seeds,
-                  plot_bandstructure=bandstructure,
-                  plot_dos=dos,
-                  plot_pdis=plot_pdis,
-                  cell=cell,
-                  gap=gap,
-                  verbosity=verbosity,
-                  labels=labels,
-                  cmap=cmap,
-                  band_reorder=band_reorder,
-                  band_colour=band_colour,
-                  **kwargs)
+    if not ir:
+        return plot_spectral(
+            seeds,
+            plot_bandstructure=bandstructure,
+            plot_dos=dos,
+            plot_pdis=plot_pdis,
+            cell=cell,
+            gap=gap,
+            verbosity=verbosity,
+            labels=labels,
+            cmap=cmap,
+            band_reorder=band_reorder,
+            band_colour=band_colour,
+            **kwargs
+        )
+
+    if ir:
+        return plot_ir_spectrum(
+            ir_seed,
+            bin_width=kwargs['infrared_step_size'],
+            **kwargs
+        )
+
+    exit("Issue plotting {}: did you specify -ph/-ir appropriately?"
+         .format(seeds))
 
 
 if __name__ == '__main__':

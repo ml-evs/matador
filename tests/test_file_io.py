@@ -14,7 +14,7 @@ from matador.scrapers.castep_scrapers import usp2dict, get_seed_metadata
 from matador.export import doc2res, doc2param, doc2cell, query2files
 from matador.orm.spectral import ElectronicDispersion, ElectronicDOS, VibrationalDispersion, VibrationalDOS
 from matador.utils.chem_utils import INVERSE_CM_TO_EV
-from matador.tests.utils import REAL_PATH, MatadorUnitTest
+from .utils import REAL_PATH, MatadorUnitTest
 
 VERBOSITY = 10
 
@@ -334,7 +334,7 @@ class CastepScraperTests(MatadorUnitTest):
             self.assertEqual(test_dict["castep_version"], "18.1")
             self.assertEqual(test_dict["species_pot"]["Ti"], "3|1.9|8|9|10|30U:40:31:32(qc=5)")
             self.assertEqual(test_dict["species_pot"]["O"], "2|1.5|12|13|15|20:21(qc=5)")
-            self.assertEqual(test_dict["mp-id"], 10101)
+            self.assertEqual(test_dict["mp_id"], 10101)
 
     def test_file_not_found(self):
         """ Ensure that FileNotFound errors fail gracefully. """
@@ -677,6 +677,18 @@ class ScraperMiscTest(MatadorUnitTest):
         self.assertEqual(ph_dict["kpoint_branches"][-2][0], 135)
         self.assertEqual(ph_dict["kpoint_branches"][-1][0], 185)
         self.assertEqual(ph_dict["kpoint_branches"][-1][-1], 249)
+
+    def test_phonon_scraper_ir(self):
+        phonon_fname = REAL_PATH + "data/phonon_ir/h-BN_IRR.phonon"
+        self.assertTrue(
+            os.path.isfile(phonon_fname), msg="Failed to open test case {} - please check installation.".format(phonon_fname)
+        )
+        data, s = phonon2dict(phonon_fname, VERBOSITY=VERBOSITY)
+        self.assertTrue(s)
+        self.assertTrue("infrared_intensity" in data)
+        self.assertTrue("raman_intensity" in data)
+        self.assertEqual(np.shape(data["eigenvalues_q"]), np.shape(data["infrared_intensity"]))
+        self.assertEqual(np.shape(data["eigenvalues_q"]), np.shape(data["raman_intensity"]))
 
     def test_phonon_dos_scraper(self):
         phonon_fname = REAL_PATH + "data/phonon_dispersion/K3P.phonon_dos"
@@ -1045,7 +1057,7 @@ class ScraperMiscTest(MatadorUnitTest):
         doc = {}
         seed = "blah/blah/blah4/AgBiI4-spinel-Config5-MP-123456-blah-SnPQ"
         get_seed_metadata(doc, seed)
-        self.assertEqual(doc["mp-id"], 123456)
+        self.assertEqual(doc["mp_id"], 123456)
 
     def test_thermo_castep(self):
         castep_fname = REAL_PATH + "data/CuP-thermo-test.castep"
@@ -1139,6 +1151,7 @@ class CifTests(MatadorUnitTest):
 
     def test_cif_partial_occ(self):
         cif_fname = REAL_PATH + "data/cif_files/AgBiI.cif"
+
         failed_open = False
         try:
             f = open(cif_fname, "r")
@@ -1226,7 +1239,7 @@ class ExportTest(MatadorUnitTest):
     def test_doc2param(self):
         param_fname = REAL_PATH + "data/param_test.param"
         test_fname = "dummy.param"
-        doc, s = param2dict(param_fname, db=False, debug=True, verbosity=VERBOSITY)
+        doc, s = param2dict(param_fname, db=False, verbosity=VERBOSITY)
         self.assertTrue(s, msg="Failed entirely: {}".format(doc))
         doc2param(doc, test_fname, hash_dupe=False, overwrite=True)
         doc_exported, s = param2dict(test_fname, db=False)
@@ -1247,7 +1260,7 @@ class ExportTest(MatadorUnitTest):
         test_fname = "dummy1.cell"
 
         doc, s = cell2dict(cell_fname, db=False, lattice=True, verbosity=VERBOSITY, positions=False)
-        doc2cell(doc, test_fname, debug=True)
+        doc2cell(doc, test_fname)
         test_dict, s = cell2dict(test_fname, db=False, lattice=True, positions=False)
         self.assertTrue(s, msg="Failed entirely, oh dear!\n{}".format(test_dict))
         self.assertEqual(test_dict["lattice_cart"][0][0], 11.4518745146637, msg="Failed to read lattice vectors.")
@@ -1324,7 +1337,7 @@ class ExportTest(MatadorUnitTest):
         test_param = {"xc_functional": "PBE", "task": "geometryoptimisation", "spin_polarized": False}
 
         doc, s = cell2dict(cell_fname, db=False, lattice=True, verbosity=VERBOSITY, positions=True)
-        doc2cell(doc, test_fname + ".cell", debug=True, spin=10)
+        doc2cell(doc, test_fname + ".cell", spin=10)
 
         doc2param(test_param, test_fname + ".param", spin=10)
 
