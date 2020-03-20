@@ -475,11 +475,19 @@ class QueryConvexHull:
                 data_str += '# ' + get_formula_from_stoich(self.voltage_data['endstoichs'][ind]) + '\n'
             else:
                 data_str += '# ' + ''.join(self.species) + '\n'
-            data_str += '# {:^10} \t{:^10} \t{:^10}\n'.format('x', 'Q (mAh/g)', 'Voltage (V)')
+            # only print concentration if it is well defined (i.e. binary hull)
+            if self._dimension == 2:
+                data_str += '# {:^10} \t{:^10} \t{:^10}\n'.format('x', 'Q (mAh/g)', 'Voltage (V)')
+            else:
+                data_str += '# {:^10} \t{:^10}\n'.format('Q (mAh/g)', 'Voltage (V)')
             for idx, _ in enumerate(path):
-                data_str += '{:>10.2f} \t{:>10.2f} \t{:>10.4f}'.format(self.voltage_data['x'][ind][idx],
-                                                                       self.voltage_data['Q'][ind][idx],
-                                                                       self.voltage_data['voltages'][ind][idx])
+                if self._dimension == 2:
+                    data_str += '{:>10.2f} \t{:>10.2f} \t{:>10.4f}'.format(self.voltage_data['x'][ind][idx],
+                                                                           self.voltage_data['Q'][ind][idx],
+                                                                           self.voltage_data['voltages'][ind][idx])
+                else:
+                    data_str += '{:>10.2f} \t{:>10.4f}'.format(self.voltage_data['Q'][ind][idx],
+                                                               self.voltage_data['voltages'][ind][idx])
                 if idx != len(path) - 1:
                     data_str += '\n'
         if self.args.get('csv'):
