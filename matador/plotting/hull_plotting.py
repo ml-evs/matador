@@ -433,7 +433,7 @@ def plot_temperature_hull(
                        alpha=alpha, marker='o', c=colours[ind], lw=0, zorder=1e-3)
 
     ax.set_ylim(1.1*min_ef)
-    
+
     if hull.savefig or any(kwargs.get(ext) for ext in SAVE_EXTS):
         if plot_fname is not None:
             fname = plot_fname
