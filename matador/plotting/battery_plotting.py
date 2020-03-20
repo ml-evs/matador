@@ -58,8 +58,10 @@ def plot_voltage_curve(hull, ax=None, show=False, curve_label=None, line_kwargs=
             stoich_label = None
         label = stoich_label if dft_label is None else dft_label
         if line_kwargs is None:
-            line_kwargs = {}
-        _add_voltage_curve(capacities, voltages, ax_volt, label=label, **line_kwargs)
+            _line_kwargs = {'c': list(plt.rcParams['axes.prop_cycle'].by_key()['color'])[ind+1]}
+        else:
+            _line_kwargs = line_kwargs
+        _add_voltage_curve(capacities, voltages, ax_volt, label=label, **_line_kwargs)
 
     if hull.args.get('labels') or hull.args.get('label_cutoff') is not None:
         label_cursor = _get_hull_labels(hull, num_species=2)
@@ -115,9 +117,7 @@ def _add_voltage_curve(capacities, voltages, ax_volt, label=None, **kwargs):
         alpha (float): transparency of line
 
     """
-    import matplotlib.pyplot as plt
     line_kwargs = {'lw': 2,
-                   'c': list(plt.rcParams['axes.prop_cycle'].by_key()['color'])[0],
                    'alpha': 1}
     line_kwargs.update(kwargs)
 
