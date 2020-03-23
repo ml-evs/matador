@@ -24,8 +24,9 @@ class TemperatureDependentHull(EnsembleHull):
 
     def __init__(self, cursor, energy_key='enthalpy_per_atom', temperatures=None, **kwargs):
 
+        self.temperatures = temperatures
         if temperatures is None:
-            temperatures = np.linspace(0, 800, 21)
+            self.temperatures = np.linspace(0, 800, 21)
 
         _cursor = copy.deepcopy(cursor)
 

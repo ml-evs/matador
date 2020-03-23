@@ -348,8 +348,9 @@ def plot_temperature_hull(
     ax=None,
     formation_energy_key='formation_free_energy_per_atom',
     plot_points=False,
+    show_cbar=True,
     plot_hull_points=True,
-    alpha_scale=0.25,
+    alpha_scale=1,
     lw_scale=1,
     plot_hulls=True,
     voltages=False,
@@ -383,12 +384,14 @@ def plot_temperature_hull(
 
     n_hulls = len(hull.phase_diagrams)
     colours = plt.cm.get_cmap(cmap)(np.linspace(*cmap_limits, n_hulls))
+
     min_ef = 0
     alpha = alpha_scale
 
     # hack the energy key so that labels work
     _cached_key = hull.energy_key
     hull.energy_key = hull.chempot_energy_key
+    max_temperature = max(hull.temperatures)
     # set up initial plot without plotting tie line
     ax = plot_2d_hull(
         hull, ax=ax,
@@ -414,25 +417,41 @@ def plot_temperature_hull(
             ls='--', zorder=1e5, label='Static + ZPE')
 
     # plot remaining temperatures
-    for ind, _ in enumerate(hull.phase_diagrams[1:]):
+    for ind, _ in enumerate(hull.temperatures[1:]):
         hull_cursor = [doc for doc in hull.cursor if doc[data_key]['hull_distance'][ind] <= 0.0 + EPS]
         min_ef = np.min([doc[data_key][formation_energy_key][ind] for doc in hull_cursor] + [min_ef])
+        colour_ind = int(n_hulls * hull.temperatures[ind] / max_temperature)
         if plot_hulls:
             ax.plot([doc['concentration'][0] for doc in hull_cursor],
                     [doc[data_key][formation_energy_key][ind] for doc in hull_cursor],
-                    alpha=alpha, c=colours[ind], lw=1*lw_scale, zorder=0)
+                    alpha=alpha, c=colours[colour_ind], lw=1*lw_scale, zorder=0)
         if plot_hull_points:
             ax.scatter([doc['concentration'][0] for doc in hull_cursor],
                        [doc[data_key][formation_energy_key][ind] for doc in hull_cursor],
-                       alpha=alpha, marker='o', c=colours[ind], lw=0.5,
-                       edgecolor='k',
+                       alpha=1, marker='o', c=colours[colour_ind], lw=0.5,
+                       edgecolor='k', label="Structures on hull" if ind == n_hulls - 2 else None,
                        zorder=1e4)
         if plot_points:
             ax.scatter([doc['concentration'][0] for doc in hull.cursor],
                        [doc[data_key][formation_energy_key][ind] for doc in hull.cursor],
-                       alpha=alpha, marker='o', c=colours[ind], lw=0, zorder=1e-3)
+                       label="Structures above hull" if ind == n_hulls - 2 else None,
+                       alpha=1, marker='o', edgecolor='w', c=colours[colour_ind], lw=0.5, zorder=1e-3)
 
     ax.set_ylim(1.1*min_ef)
+
+    if show_cbar:
+        import matplotlib.colors
+        mappable = plt.cm.ScalarMappable(
+            cmap=matplotlib.colors.LinearSegmentedColormap.from_list('cut', colours),
+            norm=plt.Normalize(vmin=0, vmax=np.max(hull.temperatures))
+        )
+        mappable._A = hull.temperatures
+        cbar = plt.colorbar(mappable, alpha=alpha)
+        cbar.ax.tick_params(length=0)
+        cbar.ax.yaxis.set_ticks_position('right')
+        cbar.ax.set_frame_on(False)
+        cbar.outline.set_visible(False)
+        cbar.set_label('Temperature (K)')
 
     if hull.savefig or any(kwargs.get(ext) for ext in SAVE_EXTS):
         if plot_fname is not None:
