@@ -43,6 +43,7 @@ extensions = ['sphinx.ext.autodoc',
 templates_path = ['_templates']
 
 autodoc_member_order = 'bysource'
+autoclass_content = 'both'
 
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
