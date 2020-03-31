@@ -460,7 +460,7 @@ def display_results(cursor,
     print(total_string)
 
 
-def loading_bar(iterable, width=80):
+def loading_bar(iterable, width=80, verbosity=0):
     """ Checks if tqdm exists and makes a loading bar, otherwise
     just returns initial iterable.
 
@@ -476,8 +476,10 @@ def loading_bar(iterable, width=80):
     """
     try:
         import tqdm
+        if verbosity < 1:
+            raise RuntimeError
         return tqdm.tqdm(iterable, ncols=width)
-    except ImportError:
+    except (ImportError, RuntimeError):
         return iterable
 
 

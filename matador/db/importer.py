@@ -14,6 +14,8 @@ import random
 import datetime
 import copy
 import traceback as tb
+import logging
+import sys
 
 import pymongo as pm
 
@@ -25,6 +27,7 @@ from matador.utils.cursor_utils import recursive_get
 from matador.db import make_connection_to_collection
 from matador.utils.db_utils import WORDS, NOUNS
 from matador.config import load_custom_settings
+from matador.utils.cursor_utils import loading_bar
 from matador import __version__
 
 
@@ -95,6 +98,15 @@ class Spatula:
         self.struct_list = []
         self.path_list = []
 
+        self.log = logging.getLogger('spatula')
+        loglevel = {3: "DEBUG", 2: "INFO", 1: "WARN", 0: "ERROR"}
+        self.log.setLevel(loglevel.get(self.verbosity, "WARN"))
+
+        handler = logging.StreamHandler(sys.stdout)
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        handler.setFormatter(formatter)
+        self.log.addHandler(handler)
+
         # I/O files
         if not self.dryrun:
             self.num_words = len(WORDS)
@@ -153,6 +165,7 @@ class Spatula:
 
         num_prototypes_in_db = self.repo.count_documents({'prototype': True})
         num_objects_in_db = self.repo.count_documents({})
+        self.log.info("Found {} existing objects in database.".format(num_objects_in_db))
         if self.args.get('prototype'):
             if num_prototypes_in_db != num_objects_in_db:
                 raise SystemExit('I will not import prototypes to a non-prototype database!')
@@ -189,10 +202,10 @@ class Spatula:
                 count += 1
             # ignore default id index
             if count > 1:
-                print('Index found, rebuilding...')
+                self.log.info('Index found, rebuilding...')
                 self.repo.reindex()
             else:
-                print('Building index...')
+                self.log.info('Building index...')
                 self.repo.create_index([('enthalpy_per_atom', pm.ASCENDING)])
                 self.repo.create_index([('stoichiometry', pm.ASCENDING)])
                 self.repo.create_index([('cut_off_energy', pm.ASCENDING)])
@@ -202,20 +215,20 @@ class Spatula:
                 self.repo.create_index([('elems', pm.ASCENDING)])
                 # index by source for rebuilds
                 self.repo.create_index([('source', pm.ASCENDING)])
-                print('Done!')
+                self.log.info('Done!')
         elif self.dryrun:
-            print('Dryrun complete!')
+            self.log.info('Dryrun complete!')
 
         if not self.scan:
             self.logfile.seek(0)
             errors = sum(1 for line in self.logfile)
             self.errors += errors
             if errors == 1:
-                print('There is 1 error to view in', self.logfile.name)
+                self.log.warning('There is 1 error to view in {}'.format(self.logfile.name))
             elif errors == 0:
-                print('There are no errors to view in', self.logfile.name)
+                self.log.warning('There are no errors to view in {}'.format(self.logfile.name))
             elif errors > 1:
-                print('There are', errors, 'errors to view in', self.logfile.name)
+                self.log.warning('There are {} errors to view in {}'.format(errors, self.logfile.name))
 
         try:
             self.logfile.close()
@@ -346,8 +359,7 @@ class Spatula:
             root_str = root
             if root_str == '.':
                 root_str = os.getcwd().split('/')[-1]
-            if self.verbosity > 0:
-                print('Dictifying', root_str, '...')
+            self.log.info("Dictifying directory: {}".format(root_str))
 
             if self.args.get('prototype'):
                 self.import_count += self._scrape_prototypes(file_lists, root)
@@ -392,6 +404,7 @@ class Spatula:
         cell = False  # was the cell file successfully scraped?
         param = False  # was the param file successfully scraped?
         import_count = 0  # how many files have been successfully imported?
+        success = False
 
         if file_lists[root]['param_count'] == 1:
             param_dict, success = param2dict(file_lists[root]['param'][0],
@@ -401,8 +414,7 @@ class Spatula:
             if not success:
                 self.logfile.write(param_dict)
         elif file_lists[root]['param_count'] > 1:
-            if self.verbosity > 5:
-                print('Multiple param files found!')
+            self.log.warning('Multiple param files found: {}'.format(file_lists[root]['param']))
             multi = True
         if file_lists[root]['cell_count'] == 1:
             cell_dict, success = cell2dict(file_lists[root]['cell'][0],
@@ -415,9 +427,9 @@ class Spatula:
                 self.logfile.write(str(cell_dict))
         elif file_lists[root]['cell_count'] > 1:
             multi = True
-            if self.verbosity > 5:
-                print('Multiple cell files found - ' 'searching for param file with same name...')
+            self.log.warning('Multiple param files found: {}'.format(file_lists[root]['cell']))
         if multi:
+            found_multi = False
             for param_name in file_lists[root]['param']:
                 for cell_name in file_lists[root]['cell']:
                     if param_name.split('.')[0] in cell_name:
@@ -438,9 +450,12 @@ class Spatula:
                             self.logfile.write(param_dict)
 
                         if success:
-                            if self.verbosity > 0:
-                                print('Found matching cell and param files:', param_name)
+                            found_multi = True
+                            self.log.info('Found matching cell and param files: {}'.format(param_name))
                             break
+
+            if not found_multi:
+                self.log.warning("Unable to find matching cell and param files for {}".format(root))
 
         # combine cell and param dicts for folder
         input_dict = dict()
@@ -452,22 +467,21 @@ class Spatula:
             self.logfile.write('! {} failed to scrape any cell and param \n'.format(root))
 
         # create res dicts and combine them with input_dict
-        from matador.utils.cursor_utils import loading_bar
-        for _, file in enumerate(loading_bar(file_lists[root]['res'])):
+        for _, _file in enumerate(loading_bar(file_lists[root]['res'], verbosity=self.verbosity)):
             exts_with_precedence = ['.castep', '.history', 'history.gz']
             # check if a castep-like file exists instead of scraping res
-            if any([file.replace('.res', ext) in file_lists[root]['castep']
+            if any([_file.replace('.res', ext) in file_lists[root]['castep']
                     for ext in exts_with_precedence]):
                 for ext in exts_with_precedence:
-                    if file.replace('.res', ext) in file_lists[root]['castep']:
-                        struct_dict, success = castep2dict(file.replace('.res', ext),
+                    if _file.replace('.res', ext) in file_lists[root]['castep']:
+                        struct_dict, success = castep2dict(_file.replace('.res', ext),
                                                            debug=False, noglob=True,
                                                            dryrun=self.args.get('dryrun'),
                                                            verbosity=self.verbosity)
                         break
             # otherwise, scrape res file
             else:
-                struct_dict, success = res2dict(file, verbosity=self.verbosity, noglob=True)
+                struct_dict, success = res2dict(_file, verbosity=self.verbosity, noglob=True)
 
             if not success:
                 self.logfile.write('! {}'.format(struct_dict))
@@ -477,7 +491,7 @@ class Spatula:
                     final_struct.update(struct_dict)
                     # calculate kpoint spacing if not found
                     if 'lattice_cart' not in final_struct and 'lattice_abc' not in final_struct:
-                        msg = '! {} missing lattice'.format(file)
+                        msg = '! {} missing lattice'.format(_file)
                         self.logfile.write(msg)
 
                     if 'kpoints_mp_spacing' not in final_struct and 'kpoints_mp_grid' in final_struct:
@@ -492,7 +506,7 @@ class Spatula:
                         import_count += self._struct2db(final_struct)
 
                 except Exception as exc:
-                    print('Unexpected error for {}, {}'.format(file, final_struct))
+                    self.log.error('Unexpected error for {}, {}'.format(_file, final_struct))
                     raise exc
 
         return import_count
@@ -510,8 +524,7 @@ class Spatula:
 
         """
         import_count = 0
-        from matador.utils.cursor_utils import loading_bar
-        for _, file in enumerate(loading_bar(file_lists[root]['castep'])):
+        for _, file in enumerate(loading_bar(file_lists[root]['castep'], verbosity=self.verbosity)):
             castep_dict, success = castep2dict(file, debug=False, verbosity=self.verbosity)
             if not success:
                 self.logfile.write('! {}'.format(castep_dict))
@@ -569,14 +582,15 @@ class Spatula:
                 and filetype counts.
 
         """
+        self.log.info("Scanning for directories...")
         file_lists = dict()
         topdir = '.'
         topdir_string = os.getcwd().split('/')[-1]
-        print('Scanning', topdir_string, 'for CASTEP/AIRSS output files... ', end='')
+        self.log.info('Scanning {} for CASTEP/AIRSS output files... '.format(topdir_string))
         for root, _, files in os.walk(topdir, followlinks=True, topdown=True):
             for pattern in self.exclude_patterns:
                 if pattern in root:
-                    print('Skipping directory {} as it matched exclude pattern {}'.format(root, pattern))
+                    self.log.debug('Skipping directory {} as it matched exclude pattern {}'.format(root, pattern))
             # get absolute path for rebuilds
             root = os.path.abspath(root)
             file_lists[root] = collections.defaultdict(list)
@@ -586,31 +600,30 @@ class Spatula:
             file_lists[root]['castep_count'] = 0
             file_lists[root]['synth_count'] = 0
             file_lists[root]['expt_count'] = 0
-            for file in files:
-                file = root + '/' + file
-                if self.verbosity > 0:
-                    print(file)
-                if file.endswith('.res'):
-                    file_lists[root]['res'].append(file)
+            for _file in files:
+                _file = root + '/' + _file
+                self.log.debug(_file)
+                if _file.endswith('.res'):
+                    file_lists[root]['res'].append(_file)
                     file_lists[root]['res_count'] += 1
-                elif (file.endswith('.castep') or file.endswith('.history') or
-                      file.endswith('.history.gz')):
-                    file_lists[root]['castep'].append(file)
+                elif (_file.endswith('.castep') or _file.endswith('.history') or
+                      _file.endswith('.history.gz')):
+                    file_lists[root]['castep'].append(_file)
                     file_lists[root]['castep_count'] += 1
-                elif file.endswith('.cell'):
-                    if file.endswith('-out.cell'):
+                elif _file.endswith('.cell'):
+                    if _file.endswith('-out.cell'):
                         continue
                     else:
-                        file_lists[root]['cell'].append(file)
+                        file_lists[root]['cell'].append(_file)
                         file_lists[root]['cell_count'] += 1
-                elif file.endswith('.param'):
-                    file_lists[root]['param'].append(file)
+                elif _file.endswith('.param'):
+                    file_lists[root]['param'].append(_file)
                     file_lists[root]['param_count'] += 1
-                elif file.endswith('.synth'):
-                    file_lists[root]['synth'].append(file)
+                elif _file.endswith('.synth'):
+                    file_lists[root]['synth'].append(_file)
                     file_lists[root]['synth_count'] += 1
-                elif file.endswith('.expt'):
-                    file_lists[root]['expt'].append(file)
+                elif _file.endswith('.expt'):
+                    file_lists[root]['expt'].append(_file)
                     file_lists[root]['expt_count'] += 1
 
         # finally, filter the castep list so that history/castep/history.gz duplicates
@@ -625,6 +638,7 @@ class Spatula:
             file_lists[root]['castep'] = [entry for ind, entry in
                                           enumerate(file_lists[root]['castep']) if ind not in duplicates]
 
+        self.log.info("Scanning completed.")
         return file_lists
 
     def _scan_dupes(self, file_lists):
@@ -639,6 +653,7 @@ class Spatula:
             dict: the input dict minus duplicates.
 
         """
+        self.log.info("Scanning for duplicates...")
         skipped = 0
         new_file_lists = copy.deepcopy(file_lists)
         for _, root in enumerate(file_lists):
@@ -653,7 +668,7 @@ class Spatula:
                     try:
                         new_file_lists[root][structure_type].sort(key=lambda x: os.stat(x).st_ctime)
                     except Exception:
-                        print('Unable to sort files by creation date, ignoring `recent_only=True`')
+                        self.log.warning('Unable to sort files by creation date, ignoring `recent_only=True`')
 
                 for file_ind, _file in enumerate(new_file_lists[root][structure_type]):
                     # find number of entries with same root filename in database
@@ -667,8 +682,7 @@ class Spatula:
                             {'source': {'$in': [_file.replace(ext, other_ext)]}})
 
                     if structure_count > 1:
-                        print('Found double in database, this needs to be dealt with manually')
-                        print(_file)
+                        self.log.error('Found double in database, this needs to be dealt with manually: {}'.format(_file))
 
                     # if duplicate found, don't reimport
                     if structure_count >= 1:
@@ -694,6 +708,7 @@ class Spatula:
                                                len(new_file_lists[root][file_type]),
                                                new_file_lists[root][file_type + '_count']))
 
+        self.log.info("Removed duplicates from import list...")
         return new_file_lists, skipped
 
     def _display_import(self):
