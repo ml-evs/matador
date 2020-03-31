@@ -119,3 +119,15 @@ class Electrode:
     @property
     def pxrd_vs_capacity(self):
         pass
+
+    @classmethod
+    def calculate_average_voltage(cls, capacities, voltages):
+        """ For a given set of capacities and voltages, compute
+        the average voltage during charge/discharge.
+
+        """
+        import numpy as np
+        trim = None
+        if np.isnan(capacities[-1]):
+            trim = -1
+        return np.sum(voltages[1:trim] * np.diff(capacities[:trim])) / np.max(capacities[:trim])

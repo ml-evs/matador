@@ -22,6 +22,7 @@ from matador.utils.chem_utils import get_formation_energy
 from matador.utils.cursor_utils import set_cursor_from_array, get_array_from_cursor
 from matador.utils.cursor_utils import display_results, recursive_get
 from matador.utils.cursor_utils import filter_cursor_by_chempots
+from matador.battery import Electrode
 from matador.hull.phase_diagram import PhaseDiagram
 
 EPS = 1e-12
@@ -467,6 +468,15 @@ class QueryConvexHull:
         else:
             raise RuntimeError('Unable to calculate voltage curve for hull of dimension {}'.format(self._dimension))
 
+        self.voltage_summary()
+
+    def voltage_summary(self):
+        """ Prints a voltage data summary.
+
+        If self.args['csv'] is True, save the summary to a file.
+
+        """
+
         data_str = ''
         for ind, path in enumerate(self.voltage_data['Q']):
             if ind != 0:
@@ -555,13 +565,14 @@ class QueryConvexHull:
                 -(stable_enthalpy_per_b[i] - stable_enthalpy_per_b[i-1]) / (x[i] - x[i-1]) + mu_enthalpy[0])
         V[0] = V[1]
         V[-1] = 0
+
+        average_voltage = Electrode.calculate_average_voltage(capacities, V)
+
         # make V, Q and x available for plotting
-        self.voltage_data['voltages'] = []
-        self.voltage_data['voltages'].append(V)
-        self.voltage_data['Q'] = []
-        self.voltage_data['Q'].append(capacities)
-        self.voltage_data['x'] = []
-        self.voltage_data['x'].append(x)
+        self.voltage_data['voltages'] = [V]
+        self.voltage_data['Q'] = [capacities]
+        self.voltage_data['x'] = [x]
+        self.voltage_data['average_voltage'] = [average_voltage]
 
     def _calculate_ternary_voltage_curve(self, hull_cursor):
         """ Calculate tenary voltage curve, setting self.voltage_data.
@@ -597,6 +608,8 @@ class QueryConvexHull:
         _reactions = []
         _voltages = []
         _capacities = []
+        _average_voltages = []
+
         for reaction_ind, endpoint in enumerate(endpoints):
             ratio = endpoint[1] / (1 - endpoint[0] - endpoint[1])
 
@@ -713,6 +726,7 @@ class QueryConvexHull:
             _reactions.append(reactions)
             _capacities.append(capacities)
             _voltages.append(voltages)
+            _average_voltages.append(Electrode.calculate_average_voltage(capacities, voltages))
             print('\n')
         assert len(_capacities) == len(_voltages)
 
@@ -721,6 +735,7 @@ class QueryConvexHull:
         self.voltage_data['voltages'] = _voltages
         self.voltage_data['reactions'] = _reactions
         self.voltage_data['endstoichs'] = endstoichs
+        self.voltage_data['average_voltage'] = _average_voltages
 
     def _calculate_binary_volume_curve(self):
         """ Take stable compositions and volume and calculate volume

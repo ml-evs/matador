@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 """ Test hull routines. """
 
 import unittest
@@ -320,6 +318,7 @@ class VoltageTest(unittest.TestCase):
         np.testing.assert_array_almost_equal(bare_hull.voltage_data["voltages"][0], test_V, decimal=5, verbose=True)
         np.testing.assert_array_almost_equal(bare_hull.voltage_data["x"][0], test_x, decimal=5)
         np.testing.assert_array_almost_equal(bare_hull.voltage_data["Q"][0], test_Q, decimal=5)
+        self.assertAlmostEqual(bare_hull.voltage_data["average_voltage"][0], 0.949184, places=3)
         for ind in range(len(bare_hull.voltage_data["voltages"])):
             self.assertTrue(np.isnan(bare_hull.voltage_data["Q"][ind][-1]))
             self.assertTrue(bare_hull.voltage_data["voltages"][ind][-1] == 0)
@@ -452,6 +451,7 @@ class VoltageTest(unittest.TestCase):
             np.asarray(hull.voltage_data["voltages"][0]), np.asarray([1.1845, 1.1845, 0.8612, 0.2676, 0.000]), decimal=3
         )
         self.assertAlmostEqual(hull.voltage_data["Q"][0][-2], 425.7847612, places=5)
+        self.assertAlmostEqual(hull.voltage_data["average_voltage"][0], 0.58523, places=4)
         for ind in range(len(hull.voltage_data["voltages"])):
             self.assertEqual(len(hull.voltage_data["Q"][ind]), len(hull.voltage_data["voltages"][ind]))
             self.assertTrue(np.isnan(hull.voltage_data["Q"][ind][-1]))
