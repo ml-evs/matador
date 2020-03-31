@@ -368,6 +368,10 @@ def main(no_quickstart=False):
                                  help='specify the min. and optionally max. planewave cutoff.')
     structure_flags.add_argument('-geom', '--geom_force_tol', type=float, nargs='+',
                                  help='force tolerance in eV/Å to query for calc matches.')
+    structure_flags.add_argument('-grid', '--grid_scale', type=float, nargs='+',
+                                 help='grid scale to query for calc matches.')
+    structure_flags.add_argument('-finegrid', '--fine_grid_scale', type=float, nargs='+',
+                                 help='fine grid scale to query for calc matches.')
     structure_flags.add_argument('--sedc', type=str, help='specify the dispersion correction scheme, e.g. TS or null.')
     structure_flags.add_argument('-xc', '--xc_functional', type=str,
                                  help='specify an xc-functional to query (case-insensitive).')
@@ -416,7 +420,7 @@ def main(no_quickstart=False):
     import_flags = argparse.ArgumentParser(add_help=False)
     import_flags.add_argument('-d', '--dryrun', action='store_true',
                               help='run the importer without connecting to the database')
-    import_flags.add_argument('-v', '--verbosity', action='count', help='enable verbose output', default=0)
+    import_flags.add_argument('-v', '--verbosity', type=int, help='enable verbose output', default=0)
     import_flags.add_argument('-f', '--force', action='store_true', help='override main database protection')
     import_flags.add_argument('-t', '--tags', nargs='+', type=str, help='set user tags, e.g. nanotube, project name')
     import_flags.add_argument('--recent_only', action='store_true', help='sort files by creation date (st_ctime) and '

@@ -246,6 +246,16 @@ class DBQuery:
                 'geom_force_tol', self.args.get('geom_force_tol')))
             self._empty_query = False
 
+        if self.args.get('grid_scale') is not None:
+            self.query_dict['$and'].append(self._query_float_range(
+                'grid_scale', self.args.get('grid_scale')))
+            self._empty_query = False
+
+        if self.args.get('fine_grid_scale') is not None:
+            self.query_dict['$and'].append(self._query_float_range(
+                'fine_grid_scale', self.args.get('fine_grid_scale')))
+            self._empty_query = False
+
         if self.args.get('src_str') is not None:
             self.query_dict['$and'].append(self._query_source())
             self._empty_query = False
