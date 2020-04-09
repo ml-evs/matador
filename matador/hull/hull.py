@@ -485,6 +485,7 @@ class QueryConvexHull:
                 data_str += '# ' + get_formula_from_stoich(self.voltage_data['endstoichs'][ind]) + '\n'
             else:
                 data_str += '# ' + ''.join(self.species) + '\n'
+            data_str += "# Average voltage: {:4.2f} V\n".format(self.voltage_data['average_voltage'][ind])
             # only print concentration if it is well defined (i.e. binary hull)
             if self._dimension == 2:
                 data_str += '# {:^10} \t{:^10} \t{:^10}\n'.format('x', 'Q (mAh/g)', 'Voltage (V)')
@@ -500,6 +501,7 @@ class QueryConvexHull:
                                                                self.voltage_data['voltages'][ind][idx])
                 if idx != len(path) - 1:
                     data_str += '\n'
+
         if self.args.get('csv'):
             with open(''.join(self.species) + '_voltage.csv', 'w') as f:
                 f.write(data_str)
