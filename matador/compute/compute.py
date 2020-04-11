@@ -1672,8 +1672,13 @@ class ComputeTask:
                     except shutil.SameFileError:
                         pass
 
-        if custom_params and compute_dir is not None:
+        if custom_params:
             shutil.copy2(seed + '.param', compute_dir)
+
+        # if a checkfile exists, copy it to the new dir
+        # so that it can be restarted from
+        if os.path.isfile(seed + '.check'):
+            shutil.copy2(seed + '.check', compute_dir)
 
 
 class FullRelaxer(ComputeTask):
