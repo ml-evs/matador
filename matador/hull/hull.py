@@ -8,6 +8,7 @@ queries.
 
 
 from copy import deepcopy
+from collections import defaultdict
 import re
 import warnings
 
@@ -106,7 +107,7 @@ class QueryConvexHull:
         self.phase_diagram = None
         self.hull_dist = None
         self.species = None
-        self.voltage_data = {}
+        self.voltage_data = defaultdict(list)
         self.volume_data = {}
         self.elements = []
         self.num_elements = 0
@@ -468,9 +469,9 @@ class QueryConvexHull:
         else:
             raise RuntimeError('Unable to calculate voltage curve for hull of dimension {}'.format(self._dimension))
 
-        self.voltage_summary()
+        self.print_voltage_summary()
 
-    def voltage_summary(self):
+    def print_voltage_summary(self):
         """ Prints a voltage data summary.
 
         If self.args['csv'] is True, save the summary to a file.
@@ -521,6 +522,13 @@ class QueryConvexHull:
             self._calculate_binary_volume_curve()
         else:
             raise NotImplementedError('Volume curves have only been implemented for binary phase diagrams.')
+
+    def print_volume_summary(self):
+        """ Prints a volume data summary.
+
+        If self.args['csv'] is True, save the summary to a file.
+
+        """
 
         data_str = ''
         data_str += '# ' + ''.join(self.species) + '\n'
@@ -584,160 +592,44 @@ class QueryConvexHull:
             hull_cursor (list(dict)): list of structures to include in the voltage curve.
 
         """
+
+        import scipy.spatial
+
+        # construct working array of concentrations and energies
         points = np.hstack((
             get_array_from_cursor(hull_cursor, 'concentration'),
-            get_array_from_cursor(hull_cursor, self.energy_key).reshape(len(hull_cursor), 1)))
+            get_array_from_cursor(hull_cursor, self.energy_key).reshape(len(hull_cursor), 1)
+        ))
         stoichs = get_array_from_cursor(hull_cursor, 'stoichiometry')
-        mu_enthalpy = get_array_from_cursor(self.chempot_cursor, self.energy_key)
-        enthalpy_active_ion = mu_enthalpy[0]
+
         # do another convex hull on just the known hull points, to allow access to useful indices
-        import scipy.spatial
         hull = scipy.spatial.ConvexHull(points)
 
-        endpoints = []
-        endstoichs = []
-        for ind, point in enumerate(points):
-            if point[0] == 0 and point[1] != 0 and point[1] != 1:
-                if not any([point.tolist() == test_point.tolist() for test_point in endpoints]):
-                    endpoints.append(point)
-                    endstoichs.append(stoichs[ind])
+        endpoints, endstoichs = Electrode._find_starting_materials(points, stoichs)
         print('{} starting point(s) found.'.format(len(endstoichs)))
         for endstoich in endstoichs:
             print(get_formula_from_stoich(endstoich), end=' ')
         print('\n')
 
-        # iterate over possible endpoints of delithiation
-        _reactions = []
-        _voltages = []
-        _capacities = []
-        _average_voltages = []
-
+        # iterate over possible delithiated phases
         for reaction_ind, endpoint in enumerate(endpoints):
-            ratio = endpoint[1] / (1 - endpoint[0] - endpoint[1])
-
             print(30 * '-')
             print('Reaction {}, {}:'.format(reaction_ind, get_formula_from_stoich(endstoichs[reaction_ind])))
+            try:
+                reactions, capacities, voltages, average_voltage = self._construct_electrode(
+                    points, hull, endpoint, endstoichs[reaction_ind], hull_cursor
+                )
 
-            y0 = endpoint[1] / (1 - endpoint[0])
-            simp_in = 0
-            intersections = []
-            crossover = []
-            # put starting point into crossover just in case it is not detected
-            sum_conc = sum([int(species[1]) for species in endstoichs[reaction_ind]])
-            conc = [int(species[1]) / sum_conc for species in endstoichs[reaction_ind]]
-            if len(conc) == 2:
-                conc.insert(0, 0.0)
-            crossover.append(conc)
-            for simplex in hull.simplices:
-                tints = []
-                for i in range(3):
-                    j = (i + 1) % 3
-                    e = points[simplex[i], 0]
-                    f = points[simplex[i], 1]
-                    g = points[simplex[j], 0] - points[simplex[i], 0]
-                    h = points[simplex[j], 1] - points[simplex[i], 1]
+                # set voltage data for external use
+                self.voltage_data['x'].append(capacities)
+                self.voltage_data['Q'].append(capacities)
+                self.voltage_data['voltages'].append(voltages)
+                self.voltage_data['reactions'].append(reactions)
+                self.voltage_data['endstoichs'].append(endstoichs[reaction_ind])
+                self.voltage_data['average_voltage'].append(average_voltage)
 
-                    x1 = e
-                    y1 = f
-                    z1 = 1 - x1 - y1
-                    x2 = points[simplex[j], 0]
-                    y2 = points[simplex[j], 1]
-                    z2 = 1 - x2 - y2
-
-                    if np.abs(h + g * y0) > EPS:
-                        tin = (e * h + g * y0 - f * g) / (h + g * y0)
-                        s2 = (y0 - e * y0 - f) / (h + g * y0)
-                        if 0 <= tin <= 1 and 0 <= s2 <= 1:
-                            tints = np.append(tints, tin)
-                            a = 1
-                            # x1-x2 != 0 on points we care about
-                            if np.abs(x1 - x2) > EPS:
-                                b = (y1 - y2) / (x1 - x2)
-                                c = (z1 - z2) / (x1 - x2)
-                                x_cross = tin
-                                y_cross = b * (tin - x1) / a + y1
-                                z_cross = c * (tin - x1) / a + z1
-                                # only append unique points
-                                if (len(crossover) == 0 or not np.any([np.isclose([x_cross, y_cross, z_cross], val)
-                                                                       for val in crossover])):
-                                    if y1 != 0 and y2 != 0 and round(float(z1 / y1), 5) == round(float(
-                                            z2 / y2), 5) and round(float(z1 / y1), 5) == round(ratio, 5):
-                                        pass
-                                    else:
-                                        crossover.append([x_cross, y_cross, z_cross])
-                if len(tints) != 0:
-                    temp = [simp_in, np.amin(tints), np.amax(tints)]
-                    # condition removes the big triangle and the points which only graze the line of interest
-                    if all([temp[2] > EPS, temp[1] < 1, temp[2] - temp[1] > EPS, temp[2] - temp[1] < 1,
-                            temp[1] != temp[2]]):
-                        intersections = np.append(intersections, temp)
-                simp_in += 1
-
-            # if tie line runs from fully de-lithiated to pure lithium (for example), then print and skip
-            if len(intersections) == 0:
-                print_notify('No intermediate structures found for starting point {}.'
-                             .format(get_formula_from_stoich(endstoichs[reaction_ind])))
-                continue
-
-            intersections = np.asarray(intersections)
-            intersections = intersections.reshape(-1, 3)
-            intersections = intersections[intersections[:, 1].argsort()]
-            ends_of_rows = []
-            min_values = []
-            rows_to_keep = []
-            # remove row corresponding to largest triangle, i.e. chempots only, and near duplicates
-            # (i.e. points with multiple tie-lines)
-            for ind, row in enumerate(intersections):
-                if not (row[1:].tolist() == [0, 1] or row[1:].tolist() in ends_of_rows or
-                        np.any(np.isclose(row.tolist()[1], [val for val in min_values]))):
-                    rows_to_keep.append(ind)
-                    ends_of_rows.append(row[1:].tolist())
-                    min_values.append(row.tolist()[1])
-            intersections = intersections[rows_to_keep]
-
-            voltages = []
-            crossover = sorted(crossover)
-            capacities = sorted([get_generic_grav_capacity(point, self.species) for point in crossover])
-            reactions = []
-            reaction = [get_formula_from_stoich(endstoichs[reaction_ind])]
-            reactions.append(reaction)
-            for ind, face in enumerate(intersections):
-                simplex_index = int(face[0])
-                reaction = []
-                reaction = [get_formula_from_stoich(hull_cursor[idx]['stoichiometry'])
-                            for idx in hull.simplices[simplex_index]
-                            if get_formula_from_stoich(hull_cursor[idx]['stoichiometry']) not in reaction]
-                reactions.append(reaction)
-                print('{d[0]} + {d[1]} + {d[2]}'.format(d=reaction))
-                energy_vec = points[hull.simplices[simplex_index], 2]
-                comp = points[hull.simplices[simplex_index], :]
-                comp[:, 2] = 1 - comp[:, 0] - comp[:, 1]
-
-                comp = comp.T
-                comp_inv = np.linalg.inv(comp)
-
-                V = -(comp_inv.dot([1, 0, 0])).dot(energy_vec)
-                V = V + enthalpy_active_ion
-                # double up on first voltage
-                if ind == 0:
-                    voltages.append(V)
-                if ind != len(intersections) - 1:
-                    print(5 * (ind + 1) * ' ' + ' ---> ', end='')
-                voltages.append(V)
-
-            _reactions.append(reactions)
-            _capacities.append(capacities)
-            _voltages.append(voltages)
-            _average_voltages.append(Electrode.calculate_average_voltage(capacities, voltages))
-            print('\n')
-        assert len(_capacities) == len(_voltages)
-
-        self.voltage_data['x'] = _capacities
-        self.voltage_data['Q'] = _capacities
-        self.voltage_data['voltages'] = _voltages
-        self.voltage_data['reactions'] = _reactions
-        self.voltage_data['endstoichs'] = endstoichs
-        self.voltage_data['average_voltage'] = _average_voltages
+            except RuntimeError as exc:
+                print(exc)
 
     def _calculate_binary_volume_curve(self):
         """ Take stable compositions and volume and calculate volume
@@ -747,13 +639,19 @@ class QueryConvexHull:
         stable_comp = get_array_from_cursor(self.hull_cursor, 'concentration')
         for doc in self.hull_cursor:
             if 'cell_volume_per_b' not in doc:
-                print(doc)
+                raise RuntimeError("Document missing key `cell_volume_per_b`: {}".format(doc))
         stable_vol = get_array_from_cursor(self.hull_cursor, 'cell_volume_per_b')
         self.volume_data['x'] = np.asarray([comp / (1 - comp) for comp in stable_comp[:-1]]).flatten()
         self.volume_data['vol_per_y'] = np.asarray([vol for vol in stable_vol[:-1]])
         self.volume_data['bulk_volume'] = self.volume_data['vol_per_y'][0]
         self.volume_data['bulk_species'] = self.species[-1]
         self.volume_data['volume_ratio_with_bulk'] = self.volume_data['vol_per_y'] / self.volume_data['bulk_volume']
+
+    def _calculate_ternary_volume_curve(self):
+        """ Compute the volume per active ion A with respect to capacity for
+        a ternary system A-B-C.
+
+        """
 
     def _set_species(self, species=None, elements=None):
         """ Try to determine species for phase diagram from arguments or
@@ -800,3 +698,133 @@ class QueryConvexHull:
             species = tmp_species
 
         self.species = species
+
+    def _construct_electrode(self, points, hull, endpoint, endstoich, hull_cursor):
+
+        intersections, crossover = self._find_hull_pathway_intersections(
+            points, endpoint, endstoich, hull
+        )
+        return self._compute_voltages_from_intersections(
+            intersections, hull, crossover, points, endstoich, hull_cursor
+        )
+
+    def _find_hull_pathway_intersections(self, points, endpoint, endstoich, hull):
+        ratio = endpoint[1] / (1 - endpoint[0] - endpoint[1])
+        y0 = endpoint[1] / (1 - endpoint[0])
+        simp_in = 0
+        intersections = []
+        crossover = []
+        # put starting point into crossover just in case it is not detected
+        sum_conc = sum([int(species[1]) for species in endstoich])
+        conc = [int(species[1]) / sum_conc for species in endstoich]
+        if len(conc) == 2:
+            conc.insert(0, 0.0)
+        crossover.append(conc)
+        for simplex in hull.simplices:
+            tints = []
+            for i in range(3):
+                j = (i + 1) % 3
+                e = points[simplex[i], 0]
+                f = points[simplex[i], 1]
+                g = points[simplex[j], 0] - points[simplex[i], 0]
+                h = points[simplex[j], 1] - points[simplex[i], 1]
+
+                x1 = e
+                y1 = f
+                z1 = 1 - x1 - y1
+                x2 = points[simplex[j], 0]
+                y2 = points[simplex[j], 1]
+                z2 = 1 - x2 - y2
+
+                if np.abs(h + g * y0) > EPS:
+                    tin = (e * h + g * y0 - f * g) / (h + g * y0)
+                    s2 = (y0 - e * y0 - f) / (h + g * y0)
+                    if 0 <= tin <= 1 and 0 <= s2 <= 1:
+                        tints = np.append(tints, tin)
+                        a = 1
+                        # x1-x2 != 0 on points we care about
+                        if np.abs(x1 - x2) > EPS:
+                            b = (y1 - y2) / (x1 - x2)
+                            c = (z1 - z2) / (x1 - x2)
+                            x_cross = tin
+                            y_cross = b * (tin - x1) / a + y1
+                            z_cross = c * (tin - x1) / a + z1
+                            # only append unique points
+                            if (len(crossover) == 0 or not np.any([np.isclose([x_cross, y_cross, z_cross], val)
+                                                                   for val in crossover])):
+                                if y1 != 0 and y2 != 0 and round(float(z1 / y1), 5) == round(float(
+                                        z2 / y2), 5) and round(float(z1 / y1), 5) == round(ratio, 5):
+                                    pass
+                                else:
+                                    crossover.append([x_cross, y_cross, z_cross])
+            if len(tints) != 0:
+                temp = [simp_in, np.amin(tints), np.amax(tints)]
+                # condition removes the big triangle and the points which only graze the line of interest
+                if all([temp[2] > EPS, temp[1] < 1, temp[2] - temp[1] > EPS, temp[2] - temp[1] < 1,
+                        temp[1] != temp[2]]):
+                    intersections = np.append(intersections, temp)
+            simp_in += 1
+
+        # if tie line runs from fully de-lithiated to pure lithium (for example), then print and skip
+        if len(intersections) == 0:
+            raise RuntimeError(
+                'No intermediate structures found for starting point {}.'
+                .format(get_formula_from_stoich(endstoich))
+            )
+
+        intersections = np.asarray(intersections).reshape(-1, 3)
+        intersections = intersections[intersections[:, 1].argsort()]
+        ends_of_rows = []
+        min_values = []
+        rows_to_keep = []
+        # remove row corresponding to largest triangle, i.e. chempots only, and near duplicates
+        # (i.e. points with multiple tie-lines)
+        for ind, row in enumerate(intersections):
+            if not (row[1:].tolist() == [0, 1] or row[1:].tolist() in ends_of_rows or
+                    np.any(np.isclose(row.tolist()[1], [val for val in min_values]))):
+                rows_to_keep.append(ind)
+                ends_of_rows.append(row[1:].tolist())
+                min_values.append(row.tolist()[1])
+        intersections = intersections[rows_to_keep]
+
+        return intersections, crossover
+
+    def _compute_voltages_from_intersections(
+        self, intersections, hull, crossover, points, endstoich, hull_cursor
+    ):
+
+        voltages = []
+        mu_enthalpy = get_array_from_cursor(self.chempot_cursor, self.energy_key)
+        crossover = sorted(crossover)
+        capacities = sorted([get_generic_grav_capacity(point, self.species) for point in crossover])
+        reactions = []
+        reaction = [get_formula_from_stoich(endstoich)]
+        reactions.append(reaction)
+        for ind, face in enumerate(intersections):
+            simplex_index = int(face[0])
+            reaction = []
+            reaction = [get_formula_from_stoich(hull_cursor[idx]['stoichiometry'])
+                        for idx in hull.simplices[simplex_index]
+                        if get_formula_from_stoich(hull_cursor[idx]['stoichiometry']) not in reaction]
+            reactions.append(reaction)
+            print('{d[0]} + {d[1]} + {d[2]}'.format(d=reaction))
+            energy_vec = points[hull.simplices[simplex_index], 2]
+            comp = points[hull.simplices[simplex_index], :]
+            comp[:, 2] = 1 - comp[:, 0] - comp[:, 1]
+
+            comp = comp.T
+            comp_inv = np.linalg.inv(comp)
+
+            V = -(comp_inv.dot([1, 0, 0])).dot(energy_vec)
+            V = V + mu_enthalpy[0]
+
+            # double up on first voltage
+            if ind == 0:
+                voltages.append(V)
+            if ind != len(intersections) - 1:
+                print(5 * (ind + 1) * ' ' + ' ---> ', end='')
+            voltages.append(V)
+
+        average_voltage = Electrode.calculate_average_voltage(capacities, voltages)
+
+        return reactions, capacities, voltages, average_voltage

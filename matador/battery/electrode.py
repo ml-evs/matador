@@ -131,3 +131,21 @@ class Electrode:
         if np.isnan(capacities[-1]):
             trim = -1
         return np.sum(voltages[1:trim] * np.diff(capacities[:trim])) / np.max(capacities[:trim])
+
+    @classmethod
+    def _find_starting_materials(self, points, stoichs):
+        """ Iterate over an array of compositions and energies to find
+        the starting points of the electrode, i.e. those with zero concentration
+        of the active ion.
+
+        """
+
+        endpoints = []
+        endstoichs = []
+        for ind, point in enumerate(points):
+            if point[0] == 0 and point[1] != 0 and point[1] != 1:
+                if not any([point.tolist() == test_point.tolist() for test_point in endpoints]):
+                    endpoints.append(point)
+                    endstoichs.append(stoichs[ind])
+
+        return endpoints, endstoichs
