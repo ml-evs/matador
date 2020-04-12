@@ -6,6 +6,13 @@ relevant electrode properties from phase diagrams.
 
 """
 
+import numpy as np
+
+from matador.utils.chem_utils import get_generic_grav_capacity, get_formula_from_stoich
+from matador.utils.cursor_utils import get_array_from_cursor
+
+EPS = 1e-12
+
 
 class Electrode:
     """ The Electrode class wraps phase diagrams of battery electrode
@@ -126,7 +133,6 @@ class Electrode:
         the average voltage during charge/discharge.
 
         """
-        import numpy as np
         trim = None
         if np.isnan(capacities[-1]):
             trim = -1

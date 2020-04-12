@@ -13,7 +13,9 @@ import bisect
 import scipy.spatial
 import numpy as np
 
-from matador.utils.hull_utils import barycentric2cart, vertices2plane, vertices2line, FakeHull
+from matador.utils.hull_utils import (
+    barycentric2cart, vertices2plane, vertices2line, FakeHull, is_point_in_triangle
+)
 from matador.utils.chem_utils import get_formula_from_stoich
 from matador.utils.cursor_utils import get_array_from_cursor, display_results, set_cursor_from_array
 
@@ -158,7 +160,8 @@ class PhaseDiagram:
             tie_line_energy = tie_line_energy[np.argsort(tie_line_comp)]
             tie_line_comp = tie_line_comp[np.argsort(tie_line_comp)]
 
-            hull_dist = np.ones((len(structures)))
+            hull_dist = np.empty((len(structures)))
+            hull_dist.fill(np.nan)
             if precompute:
                 for ind, _ in enumerate(structures):
                     formula = get_formula_from_stoich(self.cursor[ind]['stoichiometry'], sort=True, tex=False)
@@ -184,12 +187,14 @@ class PhaseDiagram:
 
         # if ternary, use barycentric coords
         elif self._dimension == 3:
-            # for each plane, convert each point into barycentric coordinates
-            # for that plane and test for negative values
+            # loop through structures and find which plane they correspond to
+            # using barycentric coordinates, if a formula has already been
+            # computed then calculate delta relative to that and skip
             self.convex_hull.planes = [[self.structure_slice[vertex] for vertex in simplex]
                                        for simplex in self.convex_hull.simplices]
             structures_finished = [False] * len(structures)
-            hull_dist = np.ones((len(structures) + 1))
+            hull_dist = np.empty(len(structures))
+            hull_dist.fill(np.nan)
             cart_planes_inv = []
             planes_height_fn = []
             for ind, plane in enumerate(self.convex_hull.planes):
@@ -204,7 +209,7 @@ class PhaseDiagram:
                     planes_height_fn.append(vertices2plane(plane))
             for idx, structure in enumerate(structures):
                 for ind, plane in enumerate(self.convex_hull.planes):
-                    if structures_finished[idx] or cart_planes_inv[ind] is None:
+                    if cart_planes_inv[ind] is None:
                         continue
                     if precompute and get_formula_from_stoich(self.cursor[idx]['stoichiometry'], sort=True,
                                                               tex=False) in cached_formula_dists:
@@ -214,32 +219,28 @@ class PhaseDiagram:
                             hull_dist[idx] = (structures[idx, -1] - cached_formula_dists[formula][0] +
                                               cached_formula_dists[formula][1])
                             structures_finished[idx] = True
-                    else:
-                        barycentric_structure = barycentric2cart(structure.reshape(1, 3)).T
-                        barycentric_structure[-1, :] = 1
-                        plane_barycentric_structure = cart_planes_inv[ind] @ barycentric_structure
-                        if (plane_barycentric_structure >= 0 - 1e-12).all():
-                            structures_finished[idx] = True
-                            hull_dist[idx] = planes_height_fn[ind](structure)
-                            if precompute:
-                                cached_formula_dists[
-                                    get_formula_from_stoich(self.cursor[idx]['stoichiometry'], sort=True,
-                                                            tex=False)] = (structure[-1], hull_dist[idx])
-                                cache_misses += 1
 
-            for idx, dist in enumerate(hull_dist):
-                if np.abs(dist) < EPS:
-                    hull_dist[idx] = 0
+                    elif is_point_in_triangle(structure, cart_planes_inv[ind], preprocessed_triangle=True):
+                        structures_finished[idx] = True
+                        hull_dist[idx] = planes_height_fn[ind](structure)
+                        if precompute:
+                            cached_formula_dists[
+                                get_formula_from_stoich(self.cursor[idx]['stoichiometry'], sort=True,
+                                                        tex=False)] = (structure[-1], hull_dist[idx])
+                            cache_misses += 1
+                        break
+
+            # mask values very close to 0 with 0
+            hull_dist[np.where(np.abs(hull_dist) < EPS)] = 0
 
             failed_structures = []
             for ind, structure in enumerate(structures_finished):
                 if not structure:
                     failed_structures.append(ind)
+
             if failed_structures:
                 raise RuntimeError('There were issues calculating the hull distance for {} structures.'
                                    .format(len(failed_structures)))
-
-            hull_dist = hull_dist[:-1]
 
         # otherwise, set to zero until proper N-d distance can be implemented
         else:
@@ -264,6 +265,8 @@ class PhaseDiagram:
             #   loop over planes
             #       check if point is interior to plane
             #           if so, compute "height" above plane, using equation of hyperplane from scipy
+        if np.isnan(hull_dist).any():
+            raise RuntimeError("Some hull distances failed")
 
         return hull_dist
 

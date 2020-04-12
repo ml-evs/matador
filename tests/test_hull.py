@@ -72,6 +72,58 @@ class HullTest(unittest.TestCase):
         np.testing.assert_array_almost_equal(np.sort(hull_dist_test), np.sort(hull.hull_dist), decimal=3)
         np.testing.assert_array_almost_equal(np.sort(hull.hull_dist), np.sort(precomp_hull_dist), decimal=3)
         np.testing.assert_array_almost_equal(no_precomp_hull_dist, precomp_hull_dist, decimal=5)
+        self.assertFalse(np.isnan(hull.hull_dist).any())
+
+    def test_toy_ternary(self):
+        from matador.utils.chem_utils import get_concentration
+        cursor = [
+            {'stoichiometry': [['K', 1.0]], 'enthalpy_per_atom': 0, 'cell_volume': 100, 'num_atoms': 10},
+            {'stoichiometry': [['Sn', 1.0]], 'enthalpy_per_atom': 0, 'cell_volume': 100, 'num_atoms': 10},
+            {'stoichiometry': [['P', 1.0]], 'enthalpy_per_atom': 0, 'cell_volume': 100, 'num_atoms': 10},
+            {'stoichiometry': [['K', 1.0], ['Sn', 1.0], ['P', 1.0]], 'enthalpy_per_atom': -1, 'cell_volume': 100, 'num_atoms': 30},
+            {'stoichiometry': [['K', 1.0], ['Sn', 1.0], ['P', 1.0]], 'enthalpy_per_atom': -0.5, 'cell_volume': 100, 'num_atoms': 30},
+            {'stoichiometry': [['Sn', 1.0], ['P', 1.0]], 'enthalpy_per_atom': 0.1, 'cell_volume': 100, 'num_atoms': 30},
+            {'stoichiometry': [['K', 4.0], ['Sn', 2.0], ['P', 2.0]], 'enthalpy_per_atom': -0.74, 'cell_volume': 100, 'num_atoms': 30},
+            {'stoichiometry': [['K', 2.0], ['Sn', 2.0], ['P', 4.0]], 'enthalpy_per_atom': -0.74, 'cell_volume': 100, 'num_atoms': 30},
+            {'stoichiometry': [['K', 2.0], ['Sn', 4.0], ['P', 2.0]], 'enthalpy_per_atom': -0.74, 'cell_volume': 100, 'num_atoms': 30},
+            {'stoichiometry': [['Sn', 1.0], ['P', 1.0]], 'enthalpy_per_atom': 0, 'cell_volume': 100, 'num_atoms': 30},
+        ]
+        for ind, doc in enumerate(cursor):
+            cursor[ind]['concentration'] = get_concentration(doc, ['K', 'Sn', 'P'])
+            cursor[ind]['source'] = ['abcde']
+            cursor[ind]['num_fu'] = 10
+            cursor[ind]['enthalpy'] = cursor[ind]['enthalpy_per_atom'] * doc['num_atoms']
+
+        hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'], no_plot=True, subcmd='voltage')
+
+        hull_dists = [doc['hull_distance'] for doc in hull.cursor]
+        np.testing.assert_array_almost_equal(hull_dists, [0, 0, 0, 0, 0.5, 0.1, 0.01, 0.01, 0.01, 0])
+
+    def test_toy_ternary_2(self):
+        from matador.utils.chem_utils import get_concentration
+        cursor = [
+            {'stoichiometry': [['K', 1.0]], 'enthalpy_per_atom': 0, 'cell_volume': 100, 'num_atoms': 10},
+            {'stoichiometry': [['Sn', 1.0]], 'enthalpy_per_atom': 0, 'cell_volume': 100, 'num_atoms': 10},
+            {'stoichiometry': [['P', 1.0]], 'enthalpy_per_atom': 0, 'cell_volume': 100, 'num_atoms': 10},
+            {'stoichiometry': [['K', 1.0], ['Sn', 1.0], ['P', 1.0]], 'enthalpy_per_atom': -1, 'cell_volume': 100, 'num_atoms': 30},
+            {'stoichiometry': [['K', 1.0], ['Sn', 1.0], ['P', 1.0]], 'enthalpy_per_atom': -0.5, 'cell_volume': 100, 'num_atoms': 30},
+            {'stoichiometry': [['Sn', 1.0], ['P', 1.0]], 'enthalpy_per_atom': 0.1, 'cell_volume': 100, 'num_atoms': 30},
+            {'stoichiometry': [['K', 4.0], ['Sn', 2.0], ['P', 2.0]], 'enthalpy_per_atom': -0.74, 'cell_volume': 100, 'num_atoms': 30},
+            {'stoichiometry': [['K', 2.0], ['Sn', 2.0], ['P', 4.0]], 'enthalpy_per_atom': -0.74, 'cell_volume': 100, 'num_atoms': 30},
+            {'stoichiometry': [['K', 2.0], ['Sn', 4.0], ['P', 2.0]], 'enthalpy_per_atom': -0.74, 'cell_volume': 100, 'num_atoms': 30},
+            {'stoichiometry': [['Sn', 2.0], ['P', 1.0]], 'enthalpy_per_atom': 0, 'cell_volume': 100, 'num_atoms': 30},
+        ]
+        for ind, doc in enumerate(cursor):
+            cursor[ind]['concentration'] = get_concentration(doc, ['K', 'Sn', 'P'])
+            cursor[ind]['source'] = ['abcde']
+            cursor[ind]['num_fu'] = 10
+            cursor[ind]['enthalpy'] = cursor[ind]['enthalpy_per_atom'] * doc['num_atoms']
+
+        hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'], no_plot=True, subcmd='voltage')
+
+        hull_dists = [doc['hull_distance'] for doc in hull.cursor]
+        np.testing.assert_array_almost_equal(hull_dists, [0, 0, 0, 0, 0.5, 0.1, 0.01, 0.01, 0.01, 0])
+
 
     def test_pseudoternary_hull(self):
         cursor, s = res2dict(REAL_PATH + "data/hull-LLZO/*.res")

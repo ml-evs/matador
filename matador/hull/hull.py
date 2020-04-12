@@ -708,6 +708,46 @@ class QueryConvexHull:
             intersections, hull, crossover, points, endstoich, hull_cursor
         )
 
+    def _compute_voltages_from_intersections(
+        self, intersections, hull, crossover, points, endstoich, hull_cursor
+    ):
+
+        voltages = []
+        mu_enthalpy = get_array_from_cursor(self.chempot_cursor, self.energy_key)
+        crossover = sorted(crossover)
+        capacities = sorted([get_generic_grav_capacity(point, self.species) for point in crossover])
+        reactions = []
+        reaction = [get_formula_from_stoich(endstoich)]
+        reactions.append(reaction)
+        for ind, face in enumerate(intersections):
+            simplex_index = int(face[0])
+            reaction = []
+            reaction = [get_formula_from_stoich(hull_cursor[idx]['stoichiometry'])
+                        for idx in hull.simplices[simplex_index]
+                        if get_formula_from_stoich(hull_cursor[idx]['stoichiometry']) not in reaction]
+            reactions.append(reaction)
+            print('{d[0]} + {d[1]} + {d[2]}'.format(d=reaction))
+            energy_vec = points[hull.simplices[simplex_index], 2]
+            comp = points[hull.simplices[simplex_index], :]
+            comp[:, 2] = 1 - comp[:, 0] - comp[:, 1]
+
+            comp = comp.T
+            comp_inv = np.linalg.inv(comp)
+
+            V = -(comp_inv.dot([1, 0, 0])).dot(energy_vec)
+            V = V + mu_enthalpy[0]
+
+            # double up on first voltage
+            if ind == 0:
+                voltages.append(V)
+            if ind != len(intersections) - 1:
+                print(5 * (ind + 1) * ' ' + ' ---> ', end='')
+            voltages.append(V)
+
+        average_voltage = Electrode.calculate_average_voltage(capacities, voltages)
+
+        return reactions, capacities, voltages, average_voltage
+
     def _find_hull_pathway_intersections(self, points, endpoint, endstoich, hull):
         ratio = endpoint[1] / (1 - endpoint[0] - endpoint[1])
         y0 = endpoint[1] / (1 - endpoint[0])
@@ -720,7 +760,9 @@ class QueryConvexHull:
         if len(conc) == 2:
             conc.insert(0, 0.0)
         crossover.append(conc)
-        for simplex in hull.simplices:
+
+        for simp_ind, simplex in enumerate(hull.simplices):
+
             tints = []
             for i in range(3):
                 j = (i + 1) % 3
@@ -788,43 +830,3 @@ class QueryConvexHull:
         intersections = intersections[rows_to_keep]
 
         return intersections, crossover
-
-    def _compute_voltages_from_intersections(
-        self, intersections, hull, crossover, points, endstoich, hull_cursor
-    ):
-
-        voltages = []
-        mu_enthalpy = get_array_from_cursor(self.chempot_cursor, self.energy_key)
-        crossover = sorted(crossover)
-        capacities = sorted([get_generic_grav_capacity(point, self.species) for point in crossover])
-        reactions = []
-        reaction = [get_formula_from_stoich(endstoich)]
-        reactions.append(reaction)
-        for ind, face in enumerate(intersections):
-            simplex_index = int(face[0])
-            reaction = []
-            reaction = [get_formula_from_stoich(hull_cursor[idx]['stoichiometry'])
-                        for idx in hull.simplices[simplex_index]
-                        if get_formula_from_stoich(hull_cursor[idx]['stoichiometry']) not in reaction]
-            reactions.append(reaction)
-            print('{d[0]} + {d[1]} + {d[2]}'.format(d=reaction))
-            energy_vec = points[hull.simplices[simplex_index], 2]
-            comp = points[hull.simplices[simplex_index], :]
-            comp[:, 2] = 1 - comp[:, 0] - comp[:, 1]
-
-            comp = comp.T
-            comp_inv = np.linalg.inv(comp)
-
-            V = -(comp_inv.dot([1, 0, 0])).dot(energy_vec)
-            V = V + mu_enthalpy[0]
-
-            # double up on first voltage
-            if ind == 0:
-                voltages.append(V)
-            if ind != len(intersections) - 1:
-                print(5 * (ind + 1) * ' ' + ' ---> ', end='')
-            voltages.append(V)
-
-        average_voltage = Electrode.calculate_average_voltage(capacities, voltages)
-
-        return reactions, capacities, voltages, average_voltage
