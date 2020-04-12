@@ -10,6 +10,7 @@ import numpy as np
 from matador.hull import QueryConvexHull
 from matador.query import DBQuery
 from matador.scrapers.castep_scrapers import res2dict, castep2dict
+from matador.utils.chem_utils import get_concentration
 
 # grab abs path for accessing test data
 REAL_PATH = "/".join(realpath(__file__).split("/")[:-1]) + "/"
@@ -75,7 +76,6 @@ class HullTest(unittest.TestCase):
         self.assertFalse(np.isnan(hull.hull_dist).any())
 
     def test_toy_ternary(self):
-        from matador.utils.chem_utils import get_concentration
         cursor = [
             {'stoichiometry': [['K', 1.0]], 'enthalpy_per_atom': 0, 'cell_volume': 100, 'num_atoms': 10},
             {'stoichiometry': [['Sn', 1.0]], 'enthalpy_per_atom': 0, 'cell_volume': 100, 'num_atoms': 10},
@@ -99,30 +99,38 @@ class HullTest(unittest.TestCase):
         hull_dists = [doc['hull_distance'] for doc in hull.cursor]
         np.testing.assert_array_almost_equal(hull_dists, [0, 0, 0, 0, 0.5, 0.1, 0.01, 0.01, 0.01, 0])
 
-    def test_toy_ternary_2(self):
-        from matador.utils.chem_utils import get_concentration
+    def test_ternary_volumes(self):
         cursor = [
-            {'stoichiometry': [['K', 1.0]], 'enthalpy_per_atom': 0, 'cell_volume': 100, 'num_atoms': 10},
-            {'stoichiometry': [['Sn', 1.0]], 'enthalpy_per_atom': 0, 'cell_volume': 100, 'num_atoms': 10},
-            {'stoichiometry': [['P', 1.0]], 'enthalpy_per_atom': 0, 'cell_volume': 100, 'num_atoms': 10},
-            {'stoichiometry': [['K', 1.0], ['Sn', 1.0], ['P', 1.0]], 'enthalpy_per_atom': -1, 'cell_volume': 100, 'num_atoms': 30},
-            {'stoichiometry': [['K', 1.0], ['Sn', 1.0], ['P', 1.0]], 'enthalpy_per_atom': -0.5, 'cell_volume': 100, 'num_atoms': 30},
-            {'stoichiometry': [['Sn', 1.0], ['P', 1.0]], 'enthalpy_per_atom': 0.1, 'cell_volume': 100, 'num_atoms': 30},
-            {'stoichiometry': [['K', 4.0], ['Sn', 2.0], ['P', 2.0]], 'enthalpy_per_atom': -0.74, 'cell_volume': 100, 'num_atoms': 30},
-            {'stoichiometry': [['K', 2.0], ['Sn', 2.0], ['P', 4.0]], 'enthalpy_per_atom': -0.74, 'cell_volume': 100, 'num_atoms': 30},
-            {'stoichiometry': [['K', 2.0], ['Sn', 4.0], ['P', 2.0]], 'enthalpy_per_atom': -0.74, 'cell_volume': 100, 'num_atoms': 30},
-            {'stoichiometry': [['Sn', 2.0], ['P', 1.0]], 'enthalpy_per_atom': 0, 'cell_volume': 100, 'num_atoms': 30},
+            {'stoichiometry': [['K', 1.0]], 'enthalpy_per_atom': 0, 'cell_volume': 10, 'num_atoms': 10, 'num_fu': 10},
+            {'stoichiometry': [['Sn', 1.0]], 'enthalpy_per_atom': 0, 'cell_volume': 100, 'num_atoms': 10, 'num_fu': 10},
+            {'stoichiometry': [['P', 1.0]], 'enthalpy_per_atom': 0, 'cell_volume': 100, 'num_atoms': 10, 'num_fu': 10},
+            {'stoichiometry': [['K', 1.0], ['Sn', 1.0], ['P', 1.0]], 'enthalpy_per_atom': -1, 'cell_volume': 210, 'num_atoms': 30, 'num_fu': 10},
+            {'stoichiometry': [['Sn', 2.0], ['P', 1.0]], 'enthalpy_per_atom': -0.1, 'cell_volume': 300, 'num_atoms': 30, 'num_fu': 10},
         ]
         for ind, doc in enumerate(cursor):
             cursor[ind]['concentration'] = get_concentration(doc, ['K', 'Sn', 'P'])
             cursor[ind]['source'] = ['abcde']
-            cursor[ind]['num_fu'] = 10
             cursor[ind]['enthalpy'] = cursor[ind]['enthalpy_per_atom'] * doc['num_atoms']
 
         hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'], no_plot=True, subcmd='voltage')
 
-        hull_dists = [doc['hull_distance'] for doc in hull.cursor]
-        np.testing.assert_array_almost_equal(hull_dists, [0, 0, 0, 0, 0.5, 0.1, 0.01, 0.01, 0.01, 0])
+        np.testing.assert_array_almost_equal(hull.volume_data['vol_per_y'][0], [10.0, 0.75*21.0/2 + 0.25*10])
+
+        cursor = [
+            {'stoichiometry': [['K', 1.0]], 'enthalpy_per_atom': 0, 'cell_volume': 10, 'num_atoms': 10, 'num_fu': 10},
+            {'stoichiometry': [['Sn', 1.0]], 'enthalpy_per_atom': 0, 'cell_volume': 100, 'num_atoms': 10, 'num_fu': 10},
+            {'stoichiometry': [['P', 1.0]], 'enthalpy_per_atom': 0, 'cell_volume': 100, 'num_atoms': 10, 'num_fu': 10},
+            {'stoichiometry': [['K', 1.0], ['Sn', 1.0], ['P', 1.0]], 'enthalpy_per_atom': -1, 'cell_volume': 210, 'num_atoms': 30, 'num_fu': 10},
+            {'stoichiometry': [['Sn', 2.0], ['P', 1.0]], 'enthalpy_per_atom': -0.1, 'cell_volume': 150, 'num_atoms': 30, 'num_fu': 10},
+        ]
+        for ind, doc in enumerate(cursor):
+            cursor[ind]['concentration'] = get_concentration(doc, ['K', 'Sn', 'P'])
+            cursor[ind]['source'] = ['abcde']
+            cursor[ind]['enthalpy'] = cursor[ind]['enthalpy_per_atom'] * doc['num_atoms']
+
+        hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'], no_plot=True, subcmd='voltage')
+
+        np.testing.assert_array_almost_equal(hull.volume_data['vol_per_y'][0], [5.0, 0.75*21.0/2 + 0.25*10])
 
 
     def test_pseudoternary_hull(self):

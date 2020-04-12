@@ -108,7 +108,7 @@ class QueryConvexHull:
         self.hull_dist = None
         self.species = None
         self.voltage_data = defaultdict(list)
-        self.volume_data = {}
+        self.volume_data = defaultdict(list)
         self.elements = []
         self.num_elements = 0
 
@@ -178,14 +178,12 @@ class QueryConvexHull:
 
         if self.args['subcmd'] == 'voltage':
             self.voltage_curve([doc for doc in self.hull_cursor if doc['hull_distance'] <= 1e-9])
-            if not self.args.get('no_plot'):
-                plotting.plot_voltage_curve(self)
-                self.plot_hull(**self.args['plot_kwargs'], debug=self.args.get('debug'))
-
-        if self.args.get('volume'):
             self.volume_curve()
             if not self.args.get('no_plot'):
-                plotting.plot_volume_curve(self)
+                plotting.plot_voltage_curve(self)
+                if self.args.get('volume'):
+                    plotting.plot_volume_curve(self)
+                self.plot_hull(**self.args['plot_kwargs'], debug=self.args.get('debug'))
 
         if self.args['subcmd'] == 'hull' and not self.args.get('no_plot'):
             self.plot_hull(**self.args['plot_kwargs'], debug=self.args.get('debug'))
@@ -520,8 +518,13 @@ class QueryConvexHull:
             self._setup_per_b_fields()
         if self._dimension == 2:
             self._calculate_binary_volume_curve()
+        elif self._dimension == 3:
+            # dimension 3 is implemented inside the voltage curve call.
+            pass
         else:
-            raise NotImplementedError('Volume curves have only been implemented for binary phase diagrams.')
+            raise NotImplementedError(
+                "Volume curves have only been implemented for binary and ternary phase diagrams."
+            )
 
     def print_volume_summary(self):
         """ Prints a volume data summary.
@@ -616,7 +619,7 @@ class QueryConvexHull:
             print(30 * '-')
             print('Reaction {}, {}:'.format(reaction_ind, get_formula_from_stoich(endstoichs[reaction_ind])))
             try:
-                reactions, capacities, voltages, average_voltage = self._construct_electrode(
+                reactions, capacities, voltages, average_voltage, volumes = self._construct_electrode(
                     points, hull, endpoint, endstoichs[reaction_ind], hull_cursor
                 )
 
@@ -627,6 +630,11 @@ class QueryConvexHull:
                 self.voltage_data['reactions'].append(reactions)
                 self.voltage_data['endstoichs'].append(endstoichs[reaction_ind])
                 self.voltage_data['average_voltage'].append(average_voltage)
+                if not self._non_elemental:
+                    self.volume_data['x'].append(capacities)
+                    self.volume_data['Q'].append(capacities)
+                    self.volume_data['vol_per_y'].append(volumes)
+                    self.volume_data['volume_ratio_with_bulk'] = np.asarray(volumes) / volumes[0]
 
             except RuntimeError as exc:
                 print(exc)
@@ -641,17 +649,12 @@ class QueryConvexHull:
             if 'cell_volume_per_b' not in doc:
                 raise RuntimeError("Document missing key `cell_volume_per_b`: {}".format(doc))
         stable_vol = get_array_from_cursor(self.hull_cursor, 'cell_volume_per_b')
-        self.volume_data['x'] = np.asarray([comp / (1 - comp) for comp in stable_comp[:-1]]).flatten()
-        self.volume_data['vol_per_y'] = np.asarray([vol for vol in stable_vol[:-1]])
-        self.volume_data['bulk_volume'] = self.volume_data['vol_per_y'][0]
-        self.volume_data['bulk_species'] = self.species[-1]
-        self.volume_data['volume_ratio_with_bulk'] = self.volume_data['vol_per_y'] / self.volume_data['bulk_volume']
-
-    def _calculate_ternary_volume_curve(self):
-        """ Compute the volume per active ion A with respect to capacity for
-        a ternary system A-B-C.
-
-        """
+        self.volume_data['x'].append(np.asarray([comp / (1 - comp) for comp in stable_comp[:-1]]).flatten())
+        self.volume_data['Q'].append(get_array_from_cursor(self.hull_cursor, 'gravimetric_capacity'))
+        self.volume_data['vol_per_y'].append(np.asarray([vol for vol in stable_vol[:-1]]))
+        self.volume_data['bulk_volume'].append(self.volume_data['vol_per_y'][-1][0])
+        self.volume_data['bulk_species'].append(self.species[-1])
+        self.volume_data['volume_ratio_with_bulk'].append(self.volume_data['vol_per_y'][-1] / self.volume_data['bulk_volume'][-1])
 
     def _set_species(self, species=None, elements=None):
         """ Try to determine species for phase diagram from arguments or
@@ -709,13 +712,34 @@ class QueryConvexHull:
         )
 
     def _compute_voltages_from_intersections(
-        self, intersections, hull, crossover, points, endstoich, hull_cursor
+            self, intersections, hull, crossover, points, endstoich, hull_cursor
     ):
+        """ Traverse the composition pathway and its intersections with hull facets
+        and compute the voltage and volume drops along the way, for a ternary system
+        with N 3-phase regions.
 
-        voltages = []
+        Parameters:
+            intersections (np.ndarray): Nx3 array containing the list of face indices
+                crossed by the path.
+            hull (scipy.spatial.ConvexHull): the temporary hull object that is referred
+                to by any indices.
+            crossover (np.ndarray): (N+1)x3 array containing the coordinates at which
+                the composition pathway crosses the hull faces.
+            points (np.ndarray): the points from which the hull was constructed from.
+            endstoich (list): a matador stoichiometry that defines the end of the pathway.
+            hull_cursor (list): the actual structures used to create the hull.
+
+        """
+        if len(crossover) != len(intersections) + 1:
+            raise RuntimeError("Incompatible number of crossovers ({}) and intersections ({})."
+                               .format(np.shape(crossover), np.shape(intersections)))
+        voltages = np.empty(len(intersections) + 1)
+        volumes = np.empty(len(intersections))
         mu_enthalpy = get_array_from_cursor(self.chempot_cursor, self.energy_key)
+        if not self._non_elemental:
+            input_volumes = get_array_from_cursor(hull_cursor, 'cell_volume_per_b')
         crossover = sorted(crossover)
-        capacities = sorted([get_generic_grav_capacity(point, self.species) for point in crossover])
+        capacities = [get_generic_grav_capacity(point, self.species) for point in crossover]
         reactions = []
         reaction = [get_formula_from_stoich(endstoich)]
         reactions.append(reaction)
@@ -737,16 +761,22 @@ class QueryConvexHull:
             V = -(comp_inv.dot([1, 0, 0])).dot(energy_vec)
             V = V + mu_enthalpy[0]
 
+            if not self._non_elemental:
+                if ind <= len(intersections) - 1:
+                    volume_vec = input_volumes[hull.simplices[simplex_index]]
+                    ratios_of_phases = comp_inv @ crossover[ind]
+                    volumes[ind] = np.dot(ratios_of_phases, volume_vec)
+
             # double up on first voltage
             if ind == 0:
-                voltages.append(V)
+                voltages[0] = V
             if ind != len(intersections) - 1:
                 print(5 * (ind + 1) * ' ' + ' ---> ', end='')
-            voltages.append(V)
+            voltages[ind+1] = V
 
         average_voltage = Electrode.calculate_average_voltage(capacities, voltages)
 
-        return reactions, capacities, voltages, average_voltage
+        return reactions, capacities, voltages, average_voltage, volumes
 
     def _find_hull_pathway_intersections(self, points, endpoint, endstoich, hull):
         ratio = endpoint[1] / (1 - endpoint[0] - endpoint[1])

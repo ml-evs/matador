@@ -157,57 +157,36 @@ def plot_volume_curve(hull, ax=None, show=False, **kwargs):
 
     stable_hull_dist = get_array_from_cursor(hull.hull_cursor, 'hull_distance')
 
-    hull_vols = []
-    hull_comps = []
-    for i in range(len(hull.volume_data['vol_per_y'])):
-        if stable_hull_dist[i] <= 0 + 1e-16:
-            hull_vols.append(hull.volume_data['volume_ratio_with_bulk'][i])
-            hull_comps.append(hull.volume_data['x'][i])
-            s = 40
-            zorder = 1000
-            markeredgewidth = 1.5
-            c = hull.colours[1]
-            alpha = 1
-        else:
-            s = 30
-            zorder = 900
-            alpha = 0.3
-            markeredgewidth = 0
-            c = 'grey'
+    for j in range(len(hull.volume_data['vol_per_y'])):
+        if len(stable_hull_dist) != len(hull.volume_data['Q'][j]):
+            raise RuntimeError("This plot does not support --hull_cutoff.")
+        for i in range(len(hull.volume_data['vol_per_y'][j])):
+            if stable_hull_dist[i] <= 0 + 1e-16:
+                s = 40
+                zorder = 1000
+                markeredgewidth = 1.5
+                c = hull.colours[1]
+                alpha = 1
+            else:
+                s = 30
+                zorder = 900
+                alpha = 0.3
+                markeredgewidth = 0
+                c = 'grey'
 
-        ax.scatter(hull.volume_data['x'][i] / (1 + hull.volume_data['x'][i]),
-                   hull.volume_data['volume_ratio_with_bulk'][i],
-                   marker='o', s=s, edgecolor='k',
-                   lw=markeredgewidth, c=c, zorder=zorder, alpha=alpha)
+            ax.scatter(hull.volume_data['Q'][j][i],
+                       hull.volume_data['volume_ratio_with_bulk'][j][i],
+                       marker='o', s=s, edgecolor='k',
+                       lw=markeredgewidth, c=c, zorder=zorder, alpha=alpha)
 
-    hull_comps, hull_vols = np.asarray(hull_comps), np.asarray(hull_vols)
-    ax.plot(hull_comps / (1 + hull_comps), hull_vols, marker='o', lw=4, c=hull.colours[0], zorder=100)
+        ax.plot(
+            [q for ind, q in enumerate(hull.volume_data['Q'][j][:-1]) if stable_hull_dist[ind] == 0],
+            [v for ind, v in enumerate(hull.volume_data['volume_ratio_with_bulk'][j]) if stable_hull_dist[ind] == 0],
+            marker=None, zorder=100
+        )
 
-    ax.set_xlabel(r'$x$ in ' + hull.elements[0] + '$_x$' + hull.elements[1] + '$_{1-x}$')
-    ax.set_ylabel('Volume ratio with bulk {}'.format(hull.volume_data['bulk_species']))
-    ax.set_ylim(0, np.max(hull.volume_data['volume_ratio_with_bulk']))
-    ax.set_xlim(-0.05, 1.05)
-    ax.yaxis.set_label_position('left')
-    ax.grid(False)
-    ax2 = ax.twiny()
-    ax2.set_xlim(ax.get_xlim())
-    tick_locs = [0, 0.2, 0.4, 0.6, 0.8, 1]
-    ax2.set_xticks(tick_locs)
-    new_tick_labels = [int(get_generic_grav_capacity([loc, 1-loc], [hull.elements[0], hull.elements[1]]))
-                       for loc in tick_locs[:-1]]
-    new_tick_labels[0] = 0
-    new_tick_labels.append(r'$\infty$')
-    ax2.set_xlabel('Gravimetric capacity (mAh/g)')
-    ax2.set_xticklabels(new_tick_labels)
-    ax2.grid(False)
-    dark_grey = '#262626'
-    for spine in ['left', 'top', 'right', 'bottom']:
-        ax.spines[spine].set_color(dark_grey)
-        ax2.spines[spine].set_color(dark_grey)
-        ax.spines[spine].set_linewidth(0.5)
-        ax2.spines[spine].set_linewidth(0.5)
-    # ax.yaxis.set_ticks(range(0, int(end)+1, 5))
-    plt.tight_layout(pad=0.0, h_pad=1.0, w_pad=0.2)
+    ax.set_xlabel("Gravimetric capacity (mAh/g)")
+    ax.set_ylabel('Volume ratio with bulk {}'.format(', '.join(hull.volume_data['bulk_species'])))
     fname = '{}_volume'.format(''.join(hull.elements))
 
     if hull.savefig or any([kwargs.get(ext) for ext in SAVE_EXTS]):
