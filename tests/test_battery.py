@@ -263,7 +263,6 @@ class VoltageTest(unittest.TestCase):
             self.assertTrue(hull.voltage_data["voltages"][ind][-1] == 0)
 
 
-
 class VolumeTest(unittest.TestCase):
     """ Test simple binary volume curve. """
 
@@ -273,5 +272,5 @@ class VolumeTest(unittest.TestCase):
         cursor = [res2dict(res)[0] for res in res_list]
         hull = QueryConvexHull(cursor=cursor, elements=["Li", "P"], no_plot=True)
         hull.volume_curve()
-        self.assertEqual(len(hull.volume_data["x"]), len(hull.hull_cursor) - 1)
-        self.assertEqual(len(hull.volume_data["vol_per_y"]), len(hull.hull_cursor) - 1)
+        self.assertEqual(len(hull.volume_data["x"][0]), len(hull.hull_cursor) - 1)
+        self.assertEqual(len(hull.volume_data["vol_per_y"][0]), len(hull.hull_cursor) - 1)
