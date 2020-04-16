@@ -69,6 +69,8 @@ class VoltageTest(unittest.TestCase):
         self.assertTrue(len(hull.voltage_data["voltages"]) == 1)
         np.testing.assert_allclose(hull.voltage_data["voltages"][0], LiP_voltage_curve[:, 1], verbose=True, rtol=1e-4)
         np.testing.assert_allclose(hull.voltage_data["Q"][0], LiP_voltage_curve[:, 0], verbose=True, rtol=1e-4)
+        self.assertTrue(np.isnan(hull.voltage_data["Q"][0][-1]))
+        self.assertEqual(0.0, hull.voltage_data["voltages"][0][-1])
 
     def test_ternary_voltage(self):
         """ Test ternary voltages from cursor. """
@@ -217,19 +219,32 @@ class VoltageTest(unittest.TestCase):
     def test_ternary_voltage_with_single_phase_region(self):
         """ Test ternary voltages with single-phase regions. """
         # load old hull then rejig it to go through a ternary phase
-        res_list = glob(REAL_PATH + "data/hull-LiSiP/*.res")
-        cursor = [res2dict(res)[0] for res in res_list]
-        hull = QueryConvexHull(cursor=cursor, elements=["Li", "Si", "P"], pathways=True, no_plot=True, subcmd="voltage")
+        cursor = res2dict(REAL_PATH + "data/hull-LiSiP/*.res")[0]
+        hull = QueryConvexHull(cursor=cursor, species="LiSiP", no_plot=True, subcmd="voltage")
         self.assertEqual(len(hull.voltage_data["voltages"]), len(hull.voltage_data["Q"]))
         np.testing.assert_array_almost_equal(
             np.asarray(hull.voltage_data["voltages"][0]),
             np.asarray([1.1683, 1.1683, 1.0759, 0.7983, 0.6447, 0.3726, 0.3394, 0.1995, 0.1570, 0.1113, 0.1041, 0.0000]),
             decimal=3,
         )
+        self.assertEqual(len(hull.voltage_data["Q"][0]), 12)
+        self.assertEqual(len(hull.voltage_data["Q"][1]), 11)
         for ind in range(len(hull.voltage_data["voltages"])):
             self.assertEqual(len(hull.voltage_data["voltages"][ind]), len(hull.voltage_data["Q"][ind]))
             self.assertTrue(np.isnan(hull.voltage_data["Q"][ind][-1]))
             self.assertTrue(hull.voltage_data["voltages"][ind][-1] == 0)
+
+    def test_ternary_voltage_problematic(self):
+        """ Test for NaSnP voltages which triggered a bug in the capacity
+        calculation.
+
+        """
+        cursor = res2dict(REAL_PATH + "data/voltage_data/voltage-NaSnP/*.res")[0]
+        hull = QueryConvexHull(cursor=cursor, species="NaSnP", no_plot=True, subcmd="voltage")
+        self.assertEqual(len(hull.voltage_data["voltages"]), 2)
+        self.assertEqual(len(hull.voltage_data["Q"]), 2)
+        self.assertEqual(len(hull.voltage_data["Q"][0]), 12)
+        self.assertEqual(len(hull.voltage_data["Q"][1]), 13)
 
     def test_angelas_awkward_voltage(self):
         """ Test a particular example of Angela's awkward ternary voltages. """
@@ -241,6 +256,12 @@ class VoltageTest(unittest.TestCase):
         self.assertEqual(len(hull.voltage_data["voltages"][0]), 8)
         self.assertEqual(len(hull.voltage_data["voltages"][1]), 5)
         self.assertEqual(len(hull.voltage_data["voltages"][2]), 3)
+
+        for ind in range(len(hull.voltage_data["voltages"])):
+            self.assertEqual(len(hull.voltage_data["voltages"][ind]), len(hull.voltage_data["Q"][ind]))
+            self.assertTrue(np.isnan(hull.voltage_data["Q"][ind][-1]))
+            self.assertTrue(hull.voltage_data["voltages"][ind][-1] == 0)
+
 
 
 class VolumeTest(unittest.TestCase):
