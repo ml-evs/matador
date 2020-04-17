@@ -142,8 +142,7 @@ def plot_volume_curve(hull, ax=None, show=False, **kwargs):
 
     """
     import matplotlib.pyplot as plt
-    from matador.utils.cursor_utils import get_array_from_cursor
-    from matador.utils.chem_utils import get_generic_grav_capacity
+
     hull.colours = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])
 
     if ax is None:
@@ -155,9 +154,8 @@ def plot_volume_curve(hull, ax=None, show=False, **kwargs):
     else:
         ax = ax
 
-    stable_hull_dist = get_array_from_cursor(hull.hull_cursor, 'hull_distance')
-
     for j in range(len(hull.volume_data['vol_per_y'])):
+        stable_hull_dist = hull.volume_data['hull_distances'][j]
         if len(stable_hull_dist) != len(hull.volume_data['Q'][j]):
             raise RuntimeError("This plot does not support --hull_cutoff.")
         for i in range(len(hull.volume_data['vol_per_y'][j])):
@@ -182,11 +180,15 @@ def plot_volume_curve(hull, ax=None, show=False, **kwargs):
         ax.plot(
             [q for ind, q in enumerate(hull.volume_data['Q'][j][:-1]) if stable_hull_dist[ind] == 0],
             [v for ind, v in enumerate(hull.volume_data['volume_ratio_with_bulk'][j]) if stable_hull_dist[ind] == 0],
-            marker=None, zorder=100
+            marker=None,
+            zorder=100,
+            label=("Volume expansion from bulk {}"
+                   .format(get_formula_from_stoich(hull.volume_data['endstoichs'][j], tex=True)))
         )
 
     ax.set_xlabel("Gravimetric capacity (mAh/g)")
-    ax.set_ylabel('Volume ratio with bulk {}'.format(', '.join(hull.volume_data['bulk_species'])))
+    ax.set_ylabel('Volume ratio with starting electrode')
+    ax.legend()
     fname = '{}_volume'.format(''.join(hull.elements))
 
     if hull.savefig or any([kwargs.get(ext) for ext in SAVE_EXTS]):
