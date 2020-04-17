@@ -77,8 +77,6 @@ class EnsembleHull(QueryConvexHull):
 
         if self.phase_diagram is None:
             del self.phase_diagram
-        if self.structure_slice is None:
-            del self.structure_slice
         if self.hull_dist is None:
             del self.hull_dist
 

@@ -31,8 +31,6 @@ class PhaseDiagram:
             make the hull, with the first (num_species-1) columns
             containing normalised concentrations, and the final column
             containing formation energy.
-        structure_slice (numpy.ndarray): the filtered array of points
-            actually used to create the convex hull.
         convex_hull (scipy.spatial.ConvexHull): the actual convex hull
             returned by SciPy.
         formation_key (list): index/key specification of formation energy
@@ -59,47 +57,51 @@ class PhaseDiagram:
             get_array_from_cursor(cursor, 'concentration').reshape(len(cursor), dimension-1),
             get_array_from_cursor(cursor, self.formation_key).reshape(len(cursor), 1)))
 
-        if dimension == 3:
+        # define self._structure_slice as the filtered array of points actually used to create the convex hull
+        # which can include/exclude points from the passed structures. This array is the one indexed by
+        # vertices/simplices in ConvexHull
+
+        if self._dimension == 3:
             # add a point "above" the hull
             # for simple removal of extraneous vertices (e.g. top of 2D hull)
             dummy_point = [0.333, 0.333, 1e5]
             # if ternary, use all structures, not just those with negative eform for compatibility reasons
-            self.structure_slice = np.vstack((structures, dummy_point))
+            self._structure_slice = np.vstack((structures, dummy_point))
         else:
             # filter out those with positive formation energy, to reduce expense computing hull
-            self.structure_slice = structures[np.where(structures[:, -1] <= 0 + EPS)]
+            self._structure_slice = structures[np.where(structures[:, -1] <= 0 + EPS)]
 
-        # filter out "duplicates" in structure_slice
+        # filter out "duplicates" in _structure_slice
         # this prevents breakages if no structures are on the hull and chempots are duplicated
         # but it might be faster to hardcode this case individually
-        self.structure_slice = np.unique(self.structure_slice, axis=0)
+        self._structure_slice = np.unique(self._structure_slice, axis=0)
 
         # if we only have the chempots (or worse) with negative formation energy, don't even make the hull
-        if len(self.structure_slice) <= dimension:
-            if len(self.structure_slice) < dimension:
+        if len(self._structure_slice) <= dimension:
+            if len(self._structure_slice) < dimension:
                 raise RuntimeError('No chemical potentials on hull... either mysterious use of custom chempots, or worry!')
             self.convex_hull = FakeHull()
         else:
             try:
-                self.convex_hull = scipy.spatial.ConvexHull(self.structure_slice)
+                self.convex_hull = scipy.spatial.ConvexHull(self._structure_slice)
             except scipy.spatial.qhull.QhullError:
-                print(self.structure_slice)
+                print(self._structure_slice)
                 print('Error with QHull, plotting formation energies only...')
                 print_exc()
                 self.convex_hull = FakeHull()
 
         # remove vertices that have positive formation energy
-        filtered_vertices = [vertex for vertex in self.convex_hull.vertices if self.structure_slice[vertex, -1] <= 0 + EPS]
-        temp_simplices = self.convex_hull.simplices
-        bad_simplices = []
-        for ind, simplex in enumerate(temp_simplices):
+        filtered_vertices = [vertex for vertex in self.convex_hull.vertices if self._structure_slice[vertex, -1] <= 0 + EPS]
+        bad_simplices = set()
+        for ind, simplex in enumerate(self.convex_hull.simplices):
             for vertex in simplex:
                 if vertex not in filtered_vertices:
-                    bad_simplices.append(ind)
-                    break
-        filtered_simplices = [simplex for ind, simplex in enumerate(temp_simplices) if ind not in bad_simplices]
-        del self.convex_hull
+                    bad_simplices.add(ind)
+
+        filtered_simplices = [simplex for ind, simplex in enumerate(self.convex_hull.simplices) if ind not in bad_simplices]
+
         self.convex_hull = FakeHull()
+        self.convex_hull.points = self._structure_slice
         self.convex_hull.vertices = list(filtered_vertices)
         self.convex_hull.simplices = list(filtered_simplices)
 
@@ -148,14 +150,14 @@ class PhaseDiagram:
             structures = np.asarray(structures)
 
         # if only chem pots on hull, dist = energy
-        if len(self.structure_slice) == self._dimension:
+        if len(self._structure_slice) == self._dimension:
             hull_dist = np.ones((len(structures)))
             hull_dist = structures[:, -1]
 
         # if binary hull, do binary search
         elif self._dimension == 2:
-            tie_line_comp = self.structure_slice[self.convex_hull.vertices, 0]
-            tie_line_energy = self.structure_slice[self.convex_hull.vertices, -1]
+            tie_line_comp = self._structure_slice[self.convex_hull.vertices, 0]
+            tie_line_energy = self._structure_slice[self.convex_hull.vertices, -1]
             tie_line_comp = np.asarray(tie_line_comp)
             tie_line_energy = tie_line_energy[np.argsort(tie_line_comp)]
             tie_line_comp = tie_line_comp[np.argsort(tie_line_comp)]
@@ -190,7 +192,7 @@ class PhaseDiagram:
             # loop through structures and find which plane they correspond to
             # using barycentric coordinates, if a formula has already been
             # computed then calculate delta relative to that and skip
-            self.convex_hull.planes = [[self.structure_slice[vertex] for vertex in simplex]
+            self.convex_hull.planes = [[self._structure_slice[vertex] for vertex in simplex]
                                        for simplex in self.convex_hull.simplices]
             structures_finished = [False] * len(structures)
             hull_dist = np.empty(len(structures))
@@ -245,7 +247,7 @@ class PhaseDiagram:
         # otherwise, set to zero until proper N-d distance can be implemented
         else:
             raise NotImplementedError
-            # self.hull.planes = [[self.structure_slice[vertex] for vertex in simplex]
+            # self.hull.planes = [[self._structure_slice[vertex] for vertex in simplex]
             #                     for simplex in self.hull.simplices]
             # for idx, structure in enumerate(structures):
             #     if precompute and get_formula_from_stoich(self.cursor[idx]['stoichiometry'],

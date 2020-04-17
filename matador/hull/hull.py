@@ -38,9 +38,6 @@ class QueryConvexHull:
         hull_cursor (list): list of all documents within hull_cutoff.
         chempot_cursor (list): list of chemical potential documents.
         structures (numpy.ndarray): all structures used to create hull.
-        structure_slice (numpy.ndarray): array of concentrations and
-            formation energies for each structure with E_F <= 0. The indices
-            in hull correspond to entries of this array.
         hull_dist (np.ndarray): array of distances from hull for each structure.
         species (list): list of chemical potential symbols.
         num_elements (int): number of elements present in the chemical potentials.
@@ -103,7 +100,6 @@ class QueryConvexHull:
         self.convex_hull = None
         self.chempot_cursor = None
         self.hull_cursor = None
-        self.structure_slice = None
         self.phase_diagram = None
         self.hull_dist = None
         self.species = None
@@ -275,7 +271,6 @@ class QueryConvexHull:
         self.phase_diagram = PhaseDiagram(self.cursor, formation_key, self._dimension)
         # aliases for data stored in phase diagram
         self.structures = self.phase_diagram.structures
-        self.structure_slice = self.phase_diagram.structure_slice
         self.hull_dist = self.phase_diagram.hull_dist
         set_cursor_from_array(self.cursor, self.hull_dist, 'hull_distance')
         self.convex_hull = self.phase_diagram.convex_hull
