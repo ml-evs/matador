@@ -156,8 +156,10 @@ def load_custom_settings(config_fname=None, quiet=False, debug=False, no_quickst
         debug (bool): print settings on loading.
 
     """
-    import yaml
+    if SETTINGS.set:
+        return SETTINGS
 
+    import yaml
     if config_fname is None:
         trial_user_fnames = [
             '.matadorrc',
@@ -217,6 +219,7 @@ def load_custom_settings(config_fname=None, quiet=False, debug=False, no_quickst
         print(json.dumps(settings, indent=2))
 
     set_settings(settings, override=False)
+
     return SETTINGS
 
 
