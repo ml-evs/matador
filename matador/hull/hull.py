@@ -26,7 +26,10 @@ from matador.utils.cursor_utils import filter_cursor_by_chempots
 from matador.battery import Electrode
 from matador.hull.phase_diagram import PhaseDiagram
 
-EPS = 1e-12
+# general small number used when comparing energies to zero
+EPS = 1e-8
+# small number used for checking boundaries
+BOUNDARY_EPS = 1e-12
 
 
 class QueryConvexHull:
@@ -591,6 +594,10 @@ class QueryConvexHull:
 
         """
 
+        # construct working array of concentrations and energies
+        stoichs = get_array_from_cursor(hull_cursor, 'stoichiometry')
+
+        # do another convex hull on just the known hull points, to allow access to useful indices
         import scipy.spatial
 
         # construct working array of concentrations and energies
@@ -601,9 +608,11 @@ class QueryConvexHull:
         stoichs = get_array_from_cursor(hull_cursor, 'stoichiometry')
 
         # do another convex hull on just the known hull points, to allow access to useful indices
-        hull = scipy.spatial.ConvexHull(points)
+        convex_hull = scipy.spatial.ConvexHull(points)
 
-        endpoints, endstoichs = Electrode._find_starting_materials(points, stoichs)
+        # convex_hull = PhaseDiagram(hull_cursor, formation_key=formation_key, dimension=self._dimension).convex_hull
+
+        endpoints, endstoichs = Electrode._find_starting_materials(convex_hull.points, stoichs)
         print('{} starting point(s) found.'.format(len(endstoichs)))
         for endstoich in endstoichs:
             print(get_formula_from_stoich(endstoich), end=' ')
@@ -615,7 +624,7 @@ class QueryConvexHull:
             print('Reaction {}, {}:'.format(reaction_ind, get_formula_from_stoich(endstoichs[reaction_ind])))
             try:
                 reactions, capacities, voltages, average_voltage, volumes = self._construct_electrode(
-                    points, hull, endpoint, endstoichs[reaction_ind], hull_cursor
+                    convex_hull, endpoint, endstoichs[reaction_ind], hull_cursor
                 )
 
                 # set voltage data for external use
@@ -697,17 +706,17 @@ class QueryConvexHull:
 
         self.species = species
 
-    def _construct_electrode(self, points, hull, endpoint, endstoich, hull_cursor):
+    def _construct_electrode(self, hull, endpoint, endstoich, hull_cursor):
 
         intersections, crossover = self._find_hull_pathway_intersections(
-            points, endpoint, endstoich, hull
+            endpoint, endstoich, hull
         )
         return self._compute_voltages_from_intersections(
-            intersections, hull, crossover, points, endstoich, hull_cursor
+            intersections, hull, crossover, endstoich, hull_cursor
         )
 
     def _compute_voltages_from_intersections(
-            self, intersections, hull, crossover, points, endstoich, hull_cursor
+            self, intersections, hull, crossover, endstoich, hull_cursor
     ):
         """ Traverse the composition pathway and its intersections with hull facets
         and compute the voltage and volume drops along the way, for a ternary system
@@ -720,7 +729,6 @@ class QueryConvexHull:
                 to by any indices.
             crossover (np.ndarray): (N+1)x3 array containing the coordinates at which
                 the composition pathway crosses the hull faces.
-            points (np.ndarray): the points from which the hull was constructed from.
             endstoich (list): a matador stoichiometry that defines the end of the pathway.
             hull_cursor (list): the actual structures used to create the hull.
 
@@ -728,12 +736,13 @@ class QueryConvexHull:
         if len(crossover) != len(intersections) + 1:
             raise RuntimeError("Incompatible number of crossovers ({}) and intersections ({})."
                                .format(np.shape(crossover), np.shape(intersections)))
+
+        points = hull.points
         voltages = np.empty(len(intersections) + 1)
         volumes = np.empty(len(intersections))
         mu_enthalpy = get_array_from_cursor(self.chempot_cursor, self.energy_key)
         if not self._non_elemental:
             input_volumes = get_array_from_cursor(hull_cursor, 'cell_volume_per_b')
-        crossover = sorted(crossover)
         capacities = [get_generic_grav_capacity(point, self.species) for point in crossover]
         reactions = []
         reaction = [get_formula_from_stoich(endstoich)]
@@ -742,8 +751,7 @@ class QueryConvexHull:
             simplex_index = int(face[0])
             reaction = []
             reaction = [get_formula_from_stoich(hull_cursor[idx]['stoichiometry'])
-                        for idx in hull.simplices[simplex_index]
-                        if get_formula_from_stoich(hull_cursor[idx]['stoichiometry']) not in reaction]
+                        for idx in hull.simplices[simplex_index]]
             reactions.append(reaction)
             print('{d[0]} + {d[1]} + {d[2]}'.format(d=reaction))
             energy_vec = points[hull.simplices[simplex_index], 2]
@@ -773,85 +781,161 @@ class QueryConvexHull:
 
         return reactions, capacities, voltages, average_voltage, volumes
 
-    def _find_hull_pathway_intersections(self, points, endpoint, endstoich, hull):
-        ratio = endpoint[1] / (1 - endpoint[0] - endpoint[1])
-        y0 = endpoint[1] / (1 - endpoint[0])
-        simp_in = 0
-        intersections = []
-        crossover = []
-        # put starting point into crossover just in case it is not detected
-        sum_conc = sum([int(species[1]) for species in endstoich])
-        conc = [int(species[1]) / sum_conc for species in endstoich]
-        if len(conc) == 2:
-            conc.insert(0, 0.0)
-        crossover.append(conc)
+    def _find_hull_pathway_intersections(self, endpoint, endstoich, hull):
+        """ This function traverses a ternary phase diagram on a path from `endpoint`
+        towards [1, 0, 0], i.e. a pure phase of the active ion. The aim is to find
+        all of the faces and intersections along this pathway, making sure to only
+        add unique intersections, and making appropriate (symmetry-breaking) choices
+        of which face to use. We proceed as follows:
+
+            1. Filter out any vertices that contain only binary phases, or that contain
+                only the chemical potentials.
+            2. Loop over all faces of the convex hull and test if the pathway touches/intersects
+                that face. If it does, ascertain where the intersection occurs, and whether
+                it is at one, two or none of the vertices of the face. Create an array of unique
+                intersections for this face and save them for later.
+            3. Loop over the zeros found between for each face. If the pathway only grazes a single
+                point on this face, ignore it. If one of the edges is parallel to the pathway,
+                make sure to include this face and the faces either side of it.
+
+        Parameters:
+            endpoint (np.ndarray): array containing composition (2D) and energy of
+                start point.
+
+        """
+        import scipy.spatial.distance
+        import itertools
+
+        endpoint = endpoint[:-1]
+        compositions = np.zeros_like(hull.points)
+        compositions[:, 0] = hull.points[:, 0]
+        compositions[:, 1] = hull.points[:, 1]
+        compositions[:, 2] = 1 - hull.points[:, 0] - hull.points[:, 1]
+
+        # define the composition pathway through ternary space
+        gradient = endpoint[1] / (endpoint[0] - 1)
+        # has to intersect [1, 0] so c = y0 - m*x0 = -m
+        y0 = -gradient
+
+        # filter the vertices we're going to consider
+        skip_inds = set()
+        for simp_ind, simplex in enumerate(hull.simplices):
+            vertices = np.asarray([compositions[i] for i in simplex])
+            # skip all simplices that contain only binary phases
+            for i in range(3):
+                if np.max(vertices[:, i]) < BOUNDARY_EPS:
+                    skip_inds.add(simp_ind)
+                    continue
+            # skip the outer triangle formed by the chemical potentials
+            if all(np.max(vertices, axis=-1) > 1 - BOUNDARY_EPS):
+                skip_inds.add(simp_ind)
+                continue
+
+        two_phase_crossover = []
+        three_phase_crossover = []
 
         for simp_ind, simplex in enumerate(hull.simplices):
+            if simp_ind in skip_inds:
+                continue
+            vertices = np.asarray([compositions[i] for i in simplex])
 
-            tints = []
-            for i in range(3):
-                j = (i + 1) % 3
-                e = points[simplex[i], 0]
-                f = points[simplex[i], 1]
-                g = points[simplex[j], 0] - points[simplex[i], 0]
-                h = points[simplex[j], 1] - points[simplex[i], 1]
+            # put each vertex of triangle into line equation and test their signs
+            test = vertices[:, 0] * gradient + y0 - vertices[:, 1]
+            test[np.abs(test) < BOUNDARY_EPS] = 0.0
+            test = np.sign(test)
 
-                x1 = e
-                y1 = f
-                z1 = 1 - x1 - y1
-                x2 = points[simplex[j], 0]
-                y2 = points[simplex[j], 1]
-                z2 = 1 - x2 - y2
+            # if there are two different signs in the test array, then the line intersects/grazes this face triangle
+            if len(np.unique(test)) > 1:
+                # now find intersection points and split them into one, two and three-phase crossover regions
+                zeros = [val for zero in np.where(test == 0) for val in zero.tolist()]
+                num_zeros = len(zeros)
+                zero_points = []
+                # skip_vertex = None
+                for zero in zeros:
+                    zero_pos = compositions[simplex[zero]]
+                    if num_zeros == 2:
+                        zero_points.append(zero_pos)
+                        two_phase_crossover.append((zero_pos, simp_ind))
 
-                if np.abs(h + g * y0) > EPS:
-                    tin = (e * h + g * y0 - f * g) / (h + g * y0)
-                    s2 = (y0 - e * y0 - f) / (h + g * y0)
-                    if 0 <= tin <= 1 and 0 <= s2 <= 1:
-                        tints = np.append(tints, tin)
-                        a = 1
-                        # x1-x2 != 0 on points we care about
-                        if np.abs(x1 - x2) > EPS:
-                            b = (y1 - y2) / (x1 - x2)
-                            c = (z1 - z2) / (x1 - x2)
-                            x_cross = tin
-                            y_cross = b * (tin - x1) / a + y1
-                            z_cross = c * (tin - x1) / a + z1
-                            # only append unique points
-                            if (len(crossover) == 0 or not np.any([np.isclose([x_cross, y_cross, z_cross], val)
-                                                                   for val in crossover])):
-                                if y1 != 0 and y2 != 0 and round(float(z1 / y1), 5) == round(float(
-                                        z2 / y2), 5) and round(float(z1 / y1), 5) == round(ratio, 5):
-                                    pass
-                                else:
-                                    crossover.append([x_cross, y_cross, z_cross])
-            if len(tints) != 0:
-                temp = [simp_in, np.amin(tints), np.amax(tints)]
-                # condition removes the big triangle and the points which only graze the line of interest
-                if all([temp[2] > EPS, temp[1] < 1, temp[2] - temp[1] > EPS, temp[2] - temp[1] < 1,
-                        temp[1] != temp[2]]):
-                    intersections = np.append(intersections, temp)
-            simp_in += 1
+                # if we have already found both crossovers, skip to next face
+                if num_zeros == 2:
+                    continue
 
-        # if tie line runs from fully de-lithiated to pure lithium (for example), then print and skip
+                # now find the non-trivial intersections
+                for i, j in itertools.combinations(simplex, r=2):
+                    # if skip_vertex in [i, j]:
+                    #     continue
+
+                    A = compositions[i]
+                    B = compositions[j]
+                    C = endpoint
+                    D = [1, 0]
+
+                    def coeffs(X, Y):
+                        # find line equation for edge AB
+                        # a x + b y = c
+                        return (Y[1] - X[1], X[0] - Y[0])
+
+                    a1, b1 = coeffs(A, B)
+                    c1 = a1 * A[0] + b1 * A[1]
+
+                    a2, b2 = coeffs(C, D)
+                    c2 = a2 * C[0] + b2 * C[1]
+                    det = a1 * b2 - a2 * b1
+                    if det == 0:
+                        continue
+
+                    x = (b2 * c1 - b1 * c2) / det
+                    y = (a1 * c2 - a2 * c1) / det
+                    intersection_point = np.asarray([x, y, 1-x-y])
+
+                    # now have to test whether that intersection point is inside the triangle
+                    # which we can do by testing that is inside the rectangle spanned by AB
+                    x_bound = sorted([A[0], B[0]])
+                    y_bound = sorted([A[1], B[1]])
+                    if (
+                        x_bound[0] - BOUNDARY_EPS/2 <= intersection_point[0] <= x_bound[1] + BOUNDARY_EPS/2 and
+                        y_bound[0] - BOUNDARY_EPS/2 <= intersection_point[1] <= y_bound[1] + BOUNDARY_EPS/2
+                    ):
+                        # three_phase_crossover.append((intersection_point, simp_ind))
+                        zero_points.append(intersection_point)
+
+                unique_zeros = []
+                for zero in zero_points:
+                    if len(unique_zeros) >= 1 and np.any(scipy.spatial.distance.cdist(unique_zeros, zero.reshape(1, 3)) < BOUNDARY_EPS):
+                        pass
+                    else:
+                        unique_zeros.append(zero)
+
+                num_zeros = len(unique_zeros)
+                if num_zeros == 1:
+                    # we never need to use faces which just touch the triangle
+                    continue
+                elif num_zeros == 2:
+                    three_phase_crossover.append((unique_zeros[0], simp_ind))
+                    three_phase_crossover.append((unique_zeros[1], simp_ind))
+
+        # loop over points and only add the unique ones to the crossover array
+        # if a point exists as a two-phase region, then always add that simplex
+        crossover = [[1, 0, 0]]
+        simplices = {}
+        zeros = sorted(two_phase_crossover + three_phase_crossover, key=lambda x: x[0][0])
+        # for multiplicity, zeros in enumerate([one_phase_crossover, two_phase_crossover, three_phase_crossover]):
+        for zero, simp_ind in zeros:
+            if len(crossover) >= 1 and np.any(scipy.spatial.distance.cdist(crossover, zero.reshape(1, 3)) < BOUNDARY_EPS):
+                pass
+            else:
+                if simp_ind not in simplices:
+                    crossover.append(zero)
+                    # if multiplicity > 0:
+                    simplices[simp_ind] = zero[0]
+
+        intersections = sorted(simplices.items(), key=lambda x: x[1])
+
         if len(intersections) == 0:
             raise RuntimeError(
                 'No intermediate structures found for starting point {}.'
                 .format(get_formula_from_stoich(endstoich))
             )
 
-        intersections = np.asarray(intersections).reshape(-1, 3)
-        intersections = intersections[intersections[:, 1].argsort()]
-        ends_of_rows = []
-        min_values = []
-        rows_to_keep = []
-        # remove row corresponding to largest triangle, i.e. chempots only, and near duplicates
-        # (i.e. points with multiple tie-lines)
-        for ind, row in enumerate(intersections):
-            if not (row[1:].tolist() == [0, 1] or row[1:].tolist() in ends_of_rows or
-                    np.any(np.isclose(row.tolist()[1], [val for val in min_values]))):
-                rows_to_keep.append(ind)
-                ends_of_rows.append(row[1:].tolist())
-                min_values.append(row.tolist()[1])
-        intersections = intersections[rows_to_keep]
-
-        return intersections, crossover
+        return intersections, sorted(crossover, key=lambda x: x[0])
