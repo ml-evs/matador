@@ -12,6 +12,7 @@ import numpy as np
 from matador.fingerprints.pdf import PDF
 from matador.crystal import Crystal
 from matador.plotting.plotting import plotting_function
+from matador.utils.cell_utils import get_space_group_label_latex
 
 __all__ = ['plot_pdf', 'plot_projected_pdf', 'plot_diff_overlap', 'plot_projected_diff_overlap']
 
@@ -91,10 +92,8 @@ def plot_pdf(pdfs,
 
         if labels:
             label = labels[ind]
-        elif pdf.label is not None:
-            label = pdf.label
         else:
-            label = None
+            label = get_space_group_label_latex(pdf.spg) + '-' + pdf.formula
 
         ax1.plot(pdf.r_space, pdf.gr + abs_offset * ind, label=label)
         if text_offset is not None:

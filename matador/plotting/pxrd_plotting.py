@@ -11,6 +11,8 @@ matador.fingerprints.pxrd module.
 from matador.fingerprints.pxrd import PXRD
 from matador.plotting.plotting import plotting_function
 from matador.utils.cell_utils import get_space_group_label_latex
+from matador.crystal import Crystal
+
 
 __all__ = ['plot_pxrd']
 
@@ -30,20 +32,33 @@ def plot_pxrd(pxrds, two_theta_range=(10, 70), labels=None, figsize=None, text_o
             scales with the number of PXRDs to be plotted.
 
     """
-    if isinstance(pxrds, PXRD):
+
+    import matplotlib.pyplot as plt
+
+    if not isinstance(pxrds, list):
         pxrds = [pxrds]
+    if labels is not None and not isinstance(labels, list):
+        labels = [labels]
+
     if figsize is None:
         height = len(pxrds) * max(0.5, 5/len(pxrds))
         figsize = (8, height)
-    import matplotlib.pyplot as plt
-    fig = plt.figure(figsize=figsize)
+
+    fig, ax = plt.subplots(figsize=figsize)
+
     for ind, pxrd in enumerate(pxrds):
-        ax = fig.add_subplot(111)
-        ax.plot(pxrd.two_thetas, 0.9*pxrd.spectrum + ind)
-        if labels is not None:
+        if isinstance(pxrd, Crystal):
+            pxrd = pxrd.pxrd
+        elif isinstance(pxrd, dict) and 'pxrd' in pxrd:
+            pxrd = pxrd['pxrd']
+
+        if labels:
             label = labels[ind]
         else:
             label = get_space_group_label_latex(pxrd.spg) + '-' + pxrd.formula
+
+        ax.plot(pxrd.two_thetas, 0.9*pxrd.spectrum + ind)
+
         ax.text(0.95, ind+text_offset, label,
                 transform=ax.get_yaxis_transform(),
                 horizontalalignment='right')
