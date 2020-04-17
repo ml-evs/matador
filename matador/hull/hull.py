@@ -577,11 +577,21 @@ class QueryConvexHull:
             V.append(
                 -(stable_enthalpy_per_b[i] - stable_enthalpy_per_b[i-1]) / (x[i] - x[i-1]) + mu_enthalpy[0])
         V[0] = V[1]
-        V[-1] = 0
+
+        # make V, Q and x available for plotting, stripping NaNs to re-add later
+        # in the edge case of duplicate chemical potentials
+        capacities, unique_caps = np.unique(capacities, return_index=True)
+        non_nan = np.argwhere(np.isfinite(capacities))
+        V = (np.asarray(V)[unique_caps])[non_nan].flatten().tolist()
+        x = (np.asarray(x)[unique_caps])[non_nan].flatten().tolist()
+        capacities = capacities[non_nan].flatten().tolist()
+
+        x.append(np.nan)
+        capacities.append(np.nan)
+        V.append(0.0)
 
         average_voltage = Electrode.calculate_average_voltage(capacities, V)
 
-        # make V, Q and x available for plotting
         self.voltage_data['voltages'] = [V]
         self.voltage_data['Q'] = [capacities]
         self.voltage_data['x'] = [x]
@@ -640,7 +650,9 @@ class QueryConvexHull:
                     self.volume_data['x'].append(capacities)
                     self.volume_data['Q'].append(capacities)
                     self.volume_data['vol_per_y'].append(volumes)
-                    self.volume_data['volume_ratio_with_bulk'] = np.asarray(volumes) / volumes[0]
+                    self.volume_data['endstoichs'].append(endstoichs[reaction_ind])
+                    self.volume_data['volume_ratio_with_bulk'].append(np.asarray(volumes) / volumes[0])
+                    self.volume_data['hull_distances'].append(np.zeros_like(capacities))
 
             except RuntimeError as exc:
                 print(exc)
@@ -651,16 +663,22 @@ class QueryConvexHull:
 
         """
         stable_comp = get_array_from_cursor(self.hull_cursor, 'concentration')
+        stable_comp, unique_comp_inds = np.unique(stable_comp, return_index=True)
         for doc in self.hull_cursor:
             if 'cell_volume_per_b' not in doc:
                 raise RuntimeError("Document missing key `cell_volume_per_b`: {}".format(doc))
-        stable_vol = get_array_from_cursor(self.hull_cursor, 'cell_volume_per_b')
-        self.volume_data['x'].append(np.asarray([comp / (1 - comp) for comp in stable_comp[:-1]]).flatten())
-        self.volume_data['Q'].append(get_array_from_cursor(self.hull_cursor, 'gravimetric_capacity'))
-        self.volume_data['vol_per_y'].append(np.asarray([vol for vol in stable_vol[:-1]]))
-        self.volume_data['bulk_volume'].append(self.volume_data['vol_per_y'][-1][0])
-        self.volume_data['bulk_species'].append(self.species[-1])
-        self.volume_data['volume_ratio_with_bulk'].append(self.volume_data['vol_per_y'][-1] / self.volume_data['bulk_volume'][-1])
+        stable_stoichs = get_array_from_cursor(self.hull_cursor, 'stoichiometry')[unique_comp_inds]
+        stable_vol = get_array_from_cursor(self.hull_cursor, 'cell_volume_per_b')[unique_comp_inds]
+        stable_cap = get_array_from_cursor(self.hull_cursor, 'gravimetric_capacity')[unique_comp_inds]
+        hull_distances = get_array_from_cursor(self.hull_cursor, 'hull_distance')[unique_comp_inds]
+        stable_x = stable_comp / (1 - stable_comp)
+        non_nans = np.argwhere(np.isfinite(stable_x))
+        self.volume_data['x'].append(stable_x[non_nans].flatten())
+        self.volume_data['Q'].append(stable_cap[non_nans].flatten())
+        self.volume_data['vol_per_y'].append(stable_vol[non_nans].flatten())
+        self.volume_data['volume_ratio_with_bulk'].append((stable_vol[non_nans] / stable_vol[0]).flatten())
+        self.volume_data['hull_distances'].append(hull_distances[non_nans].flatten())
+        self.volume_data['endstoichs'].append(stable_stoichs[non_nans].flatten()[0])
 
     def _set_species(self, species=None, elements=None):
         """ Try to determine species for phase diagram from arguments or
