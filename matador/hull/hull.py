@@ -534,12 +534,14 @@ class QueryConvexHull:
         """
         for reaction_idx, _ in enumerate(self.volume_data['Q']):
             data_str = '# Reaction {} \n'.format(reaction_idx)
-            data_str += '# ' + ''.join(self.species) + '\n'
-            data_str += '# {:>10},\t{:>10}\n'.format('Q (mAh/g)'.format(d=self.species),
-                                                     'Volume per {} (Ang^3)'.format(self.species[0]))
+            data_str += '# ' + ''.join(get_formula_from_stoich(self.volume_data['endstoichs'][reaction_idx])) + '\n'
+            data_str += '# {:>10} \t{:>14} \t{:>14}\n'.format('Q (mAh/g)'.format(d=self.species),
+                                                              'Volume per {} (Ang^3)'.format(self.species[0]),
+                                                              'Volume ratio with bulk')
             for idx, _ in enumerate(self.volume_data['vol_per_y'][reaction_idx]):
-                data_str += '{:>10.4f} \t{:>10.4f}'.format(self.volume_data['Q'][reaction_idx][idx],
-                                                           self.volume_data['vol_per_y'][reaction_idx][idx])
+                data_str += '{:>10.2f} \t{:>14.2f} \t{:14.2f}'.format(self.volume_data['Q'][reaction_idx][idx],
+                                                                      self.volume_data['vol_per_y'][reaction_idx][idx],
+                                                                      self.volume_data['volume_ratio_with_bulk'][reaction_idx][idx])
                 if idx != len(self.volume_data['Q'][reaction_idx]) - 1:
                     data_str += '\n'
             if self.args.get('csv'):
