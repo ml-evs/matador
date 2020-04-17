@@ -18,6 +18,7 @@ import numba
 
 from matador.utils.cell_utils import frac2cart, cart2volume
 from matador.utils.cell_utils import standardize_doc_cell
+from matador.utils.chem_utils import get_formula_from_stoich
 from matador.fingerprints.fingerprint import Fingerprint, FingerprintFactory
 
 
@@ -54,7 +55,7 @@ class PDF(Fingerprint):
             max_num_images (int) : cutoff number of unit cells before crashing (DEFAULT: 50)
             rmax (float) : maximum distance cutoff for PDF (Angstrom) (DEFAULT: 15)
             projected (bool) : optionally calculate the element-projected PDF
-            standardize (bool) : optionally standardize cell before calculating PDF
+            standardize (bool) : standardize cell before calculating PDF
             lazy (bool) : if True, calculator is not called when initializing PDF object
             timing (bool) : if True, print the total time taken to calculate the PDF
 
@@ -62,7 +63,7 @@ class PDF(Fingerprint):
 
         prop_defaults = {'dr': 0.01, 'gaussian_width': 0.1, 'rmax': 15, 'num_images': 'auto',
                          'style': 'smear', 'debug': False, 'timing': False, 'low_mem': False, 'projected': True,
-                         'max_num_images': 50, 'standardize': False}
+                         'max_num_images': 50, 'standardize': True}
 
         # read and store kwargs
         self.kwargs = prop_defaults
@@ -70,10 +71,11 @@ class PDF(Fingerprint):
                             for key in kwargs
                             if kwargs[key] is not None})
 
-        # standardize cell
+        self.spg = None
         structure = copy.deepcopy(doc)
         if self.kwargs.get('standardize'):
             structure = standardize_doc_cell(structure)
+            self.spg = structure['space_group']
 
         # private variables
         self._num_images = self.kwargs.get('num_images')
