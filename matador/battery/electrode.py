@@ -8,9 +8,6 @@ relevant electrode properties from phase diagrams.
 
 import numpy as np
 
-from matador.utils.chem_utils import get_generic_grav_capacity, get_formula_from_stoich
-from matador.utils.cursor_utils import get_array_from_cursor
-
 EPS = 1e-12
 
 

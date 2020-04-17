@@ -539,9 +539,10 @@ class QueryConvexHull:
                                                               'Volume per {} (Ang^3)'.format(self.species[0]),
                                                               'Volume ratio with bulk')
             for idx, _ in enumerate(self.volume_data['vol_per_y'][reaction_idx]):
-                data_str += '{:>10.2f} \t{:>14.2f} \t{:14.2f}'.format(self.volume_data['Q'][reaction_idx][idx],
-                                                                      self.volume_data['vol_per_y'][reaction_idx][idx],
-                                                                      self.volume_data['volume_ratio_with_bulk'][reaction_idx][idx])
+                data_str += ('{:>10.2f} \t{:>14.2f} \t{:14.2f}'
+                             .format(self.volume_data['Q'][reaction_idx][idx],
+                                     self.volume_data['vol_per_y'][reaction_idx][idx],
+                                     self.volume_data['volume_ratio_with_bulk'][reaction_idx][idx]))
                 if idx != len(self.volume_data['Q'][reaction_idx]) - 1:
                     data_str += '\n'
             if self.args.get('csv'):
@@ -924,7 +925,8 @@ class QueryConvexHull:
 
                 unique_zeros = []
                 for zero in zero_points:
-                    if len(unique_zeros) >= 1 and np.any(scipy.spatial.distance.cdist(unique_zeros, zero.reshape(1, 3)) < BOUNDARY_EPS):
+                    if (len(unique_zeros) >= 1 and
+                            np.any(scipy.spatial.distance.cdist(unique_zeros, zero.reshape(1, 3)) < BOUNDARY_EPS)):
                         pass
                     else:
                         unique_zeros.append(zero)
