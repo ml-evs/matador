@@ -8,6 +8,7 @@ from matador.utils.cell_utils import doc2spg, cart2abcstar, real2recip
 from matador.scrapers.castep_scrapers import castep2dict, res2dict, cell2dict, bands2dict
 from matador.fingerprints.pdf import PDF, PDFOverlap
 from matador.export import doc2cell
+from matador.crystal import Crystal
 
 VERBOSITY = 0
 
@@ -284,6 +285,10 @@ class SymmetriesAndSupercellsTest(unittest.TestCase):
             dist = pdf_sim_dist(doc, std_doc)
             self.assertLess(dist, 0.01)
 
+        doc = Crystal(castep2dict(REAL_PATH + "data/Na3Zn4-swap-ReOs-OQMD_759599.castep")[0])
+        std_doc = standardize_doc_cell(doc)
+        dist = pdf_sim_dist(doc, std_doc)
+        self.assertLess(dist, 0.01)
 
 def pdf_sim_dist(doc_test, doc_supercell):
     doc_test["text_id"] = ["test", "cell"]
