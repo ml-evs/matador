@@ -144,6 +144,7 @@ class Crystal(DataContainer):
 
         self._validate_doc(doc)
         if isinstance(doc, Crystal):
+            print("Doing copy constructor")
             doc = deepcopy(doc._data)
 
         super().__init__(doc)

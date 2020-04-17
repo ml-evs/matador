@@ -488,12 +488,16 @@ def standardize_doc_cell(doc, primitive=True, symprec=1e-2):
 
     """
     import spglib as spg
+    from matador.crystal import Crystal
     from matador.utils.chem_utils import get_atomic_symbol
     from copy import deepcopy
 
     spg_cell = doc2spg(doc)
     spg_standardized = spg.standardize_cell(spg_cell, to_primitive=primitive, symprec=symprec)
-    std_doc = deepcopy(doc)
+    if not isinstance(doc, Crystal):
+        std_doc = deepcopy(doc)
+    else:
+        std_doc = deepcopy(doc._data)
     std_doc['lattice_cart'] = [list(vec) for vec in spg_standardized[0]]
     std_doc['lattice_abc'] = cart2abc(std_doc['lattice_cart'])
     std_doc['positions_frac'] = [list(atom) for atom in spg_standardized[1]]
@@ -501,6 +505,9 @@ def standardize_doc_cell(doc, primitive=True, symprec=1e-2):
     std_doc['site_occupancy'] = len(std_doc['positions_frac']) * [1]
     std_doc['cell_volume'] = cart2volume(std_doc['lattice_cart'])
     std_doc['space_group'] = get_spacegroup_spg(std_doc, symprec=symprec)
+    # if the original document was a crystal, return a new one
+    if isinstance(doc, Crystal):
+        std_doc = Crystal(std_doc)
 
     return std_doc
 
