@@ -289,9 +289,10 @@ class VolumeTest(unittest.TestCase):
             cursor[ind]['source'] = ['abcde']
             cursor[ind]['enthalpy'] = cursor[ind]['enthalpy_per_atom'] * doc['num_atoms']
 
-        hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'], no_plot=True, subcmd='voltage')
+        hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'], no_plot=False, subcmd='voltage')
 
         np.testing.assert_array_almost_equal(hull.volume_data['vol_per_y'][0], [10.0, 0.75*21.0/2 + 0.25*10])
+        np.testing.assert_array_almost_equal(hull.volume_data['volume_ratio_with_bulk'][0], [1, 1.0375])
 
         cursor = [
             {'stoichiometry': [['K', 1.0]], 'enthalpy_per_atom': 0, 'cell_volume': 10, 'num_atoms': 10, 'num_fu': 10},
@@ -308,3 +309,4 @@ class VolumeTest(unittest.TestCase):
         hull = QueryConvexHull(cursor=cursor, elements=['K', 'Sn', 'P'], no_plot=True, subcmd='voltage')
 
         np.testing.assert_array_almost_equal(hull.volume_data['vol_per_y'][0], [5.0, 0.75*21.0/2 + 0.25*10])
+        np.testing.assert_array_almost_equal(hull.volume_data['volume_ratio_with_bulk'][0], [1, 2*1.0375])
