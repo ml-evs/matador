@@ -81,7 +81,45 @@ def vertices2line(points):
     gradient = (energy_pair[1] - energy_pair[0]) / (comp_pair[1] - comp_pair[0])
     intercept = ((energy_pair[1] + energy_pair[0]) -
                  gradient * (comp_pair[1] + comp_pair[0])) / 2
+
     return gradient, intercept
+
+
+def is_point_in_triangle(point, triangle, preprocessed_triangle=False):
+    """ Check whether a point is inside a triangle.
+
+    Parameters:
+        point (np.ndarray): 3x1 array containing the coordinates of the
+            point.
+        triangle (np.ndarray): 3x3 array specifying the coordinates of
+            the triangle vertices.
+
+    Keyword arguments:
+        preprocessed_triangle (bool): if True, treat the input triangle
+            as already processed, i.e. the array contains the inverse of
+            the barycentric coordinate array.
+
+    Returns:
+        bool: whether or not the point is found to lie inside the
+            triangle. If all vertices of the triangle lie on the same
+            line, return False.
+
+    """
+
+    if not preprocessed_triangle:
+        cart_planes = barycentric2cart(triangle).T
+        cart_planes[-1, :] = 1
+        if np.linalg.det(cart_planes) == 0:
+            return False
+        cart_plane_inv = np.linalg.inv(cart_planes)
+    else:
+        cart_plane_inv = triangle
+
+    barycentric_structure = barycentric2cart(point.reshape(1, 3)).T
+    barycentric_structure[-1, :] = 1
+    plane_barycentric_structure = cart_plane_inv @ barycentric_structure
+
+    return (plane_barycentric_structure >= 0 - EPS).all()
 
 
 def barycentric2cart(structures):
@@ -106,6 +144,7 @@ def barycentric2cart(structures):
     coords[:, 0] = structures[:, 0] + structures[:, 1] * cos60
     coords[:, 1] = structures[:, 1] * cos30
     coords[:, 2] = structures[:, -1]
+
     return coords
 
 

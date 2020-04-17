@@ -121,7 +121,7 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
     scatter = []
     chempot_labels = [get_formula_from_stoich(get_stoich_from_formula(species, sort=False), tex=True)
                       for species in hull.species]
-    tie_line = hull.structure_slice[hull.convex_hull.vertices]
+    tie_line = hull.convex_hull.points[hull.convex_hull.vertices]
 
     # plot hull structures
     if plot_hull_points:
