@@ -450,28 +450,19 @@ def get_space_group_label_latex(label):
         str: the best attempt to convert the label to LaTeX.
 
     """
-    latex_label = ''
-    bravais_list = ['P', 'I', 'F', 'A', 'B', 'C', 'R']
+    latex_label = '$'
     if not isinstance(label, str):
         raise RuntimeError("Space group label must be a string, not {}".format(label))
 
-    if label[0] in bravais_list:
-        latex_label += "$\\text{" + label[0] + "}"
-    else:
-        raise RuntimeError(
-            "Invalid Bravais lattice symbol {} in given space group label. Must be one of {}."
-            .format(label[0], label, bravais_list)
-        )
-
     skip = False
-    for ind, char in enumerate(label[1:]):
+    for ind, char in enumerate(label):
         if skip:
             skip = False
             continue
 
         if char == '-':
             # add the next char inside the bar
-            latex_label += "\\bar{" + label[1+ind+1] + "}"
+            latex_label += "\\bar{" + label[ind+1] + "}"
             skip = True
 
         else:
