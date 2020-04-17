@@ -49,6 +49,23 @@ class HullTest(unittest.TestCase):
         )
         self.assertEqual(len(hull.hull_cursor), 16)
 
+    def test_hull_with_crystal_models(self):
+        """ Loading hull structures from files. """
+        cursor, failures = res2dict(REAL_PATH + "data/hull-KPSn-KP/*.res", as_model=True)
+        self.assertEqual(
+            len(cursor),
+            87,
+            "Could not find all test res files, please check installation...",
+        )
+        cursor = [doc for doc in cursor if doc.num_elements != 1]
+        hull = QueryConvexHull(
+            cursor=cursor,
+            elements=["K", "Sn", "P"],
+            no_plot=True,
+            chempots=[-791.456765, -928.045026 / 2.0, 878.326441 / 4.0],
+        )
+        self.assertEqual(len(hull.hull_cursor), 16)
+
     def test_hull_from_file_with_extraneous_elements(self):
         """ Loading hull structures from files with too many elements. """
         res_list = glob(REAL_PATH + "data/hull-KPSn-KP/*.res")

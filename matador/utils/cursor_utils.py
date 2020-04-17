@@ -675,6 +675,7 @@ def filter_cursor_by_chempots(species, cursor):
         list: the filtered cursor.
 
     """
+    from matador.utils.chem_utils import get_number_of_chempots
     # filter out structures with any elements with missing chem pots
     chempot_stoichiometries = []
     for label in species:
@@ -682,9 +683,13 @@ def filter_cursor_by_chempots(species, cursor):
 
     inds_to_remove = set()
     for ind, doc in enumerate(cursor):
-        from matador.utils.chem_utils import get_number_of_chempots
         try:
             cursor[ind]['num_chempots'] = get_number_of_chempots(doc, chempot_stoichiometries)
+        except RuntimeError:
+            import traceback
+            traceback.print_exc()
+            inds_to_remove.add(ind)
+        else:
             cursor[ind]['concentration'] = (cursor[ind]['num_chempots'][:-1] /
                                             np.sum(cursor[ind]['num_chempots'])).tolist()
             for idx, conc in enumerate(cursor[ind]['concentration']):
@@ -692,8 +697,5 @@ def filter_cursor_by_chempots(species, cursor):
                     cursor[ind]['concentration'][idx] = 0.0
                 elif conc > 1 - EPS:
                     cursor[ind]['concentration'][idx] = 1.0
-
-        except RuntimeError:
-            inds_to_remove.add(ind)
 
     return [doc for ind, doc in enumerate(cursor) if ind not in inds_to_remove]

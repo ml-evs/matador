@@ -111,6 +111,9 @@ class QueryConvexHull:
         self.elements = []
         self.num_elements = 0
 
+        # tracker for whether per_b fields have been setup
+        self._per_b_done = False
+
         self.energy_key = energy_key
         if not self.energy_key.endswith('_per_atom'):
             warnings.warn('Appending per_atom to energy_key {}'.format(self.energy_key))
@@ -275,7 +278,6 @@ class QueryConvexHull:
         # aliases for data stored in phase diagram
         self.structures = self.phase_diagram.structures
         self.hull_dist = self.phase_diagram.hull_dist
-        set_cursor_from_array(self.cursor, self.hull_dist, 'hull_distance')
         self.convex_hull = self.phase_diagram.convex_hull
 
         # ensure hull cursor is sorted by enthalpy_per_atom,
@@ -424,6 +426,8 @@ class QueryConvexHull:
 
     def _setup_per_b_fields(self):
         """ Calculate the enthalpy and volume per "B" in A_x B. """
+        if self._per_b_done:
+            return
         for ind, doc in enumerate(self.cursor):
             nums_b = len(self.species[1:]) * [0]
             for elem in doc['stoichiometry']:
@@ -447,6 +451,7 @@ class QueryConvexHull:
             concs = get_padded_composition(doc['stoichiometry'], self.elements)
             capacities[i] = get_generic_grav_capacity(concs, self.elements)
         set_cursor_from_array(self.cursor, capacities, 'gravimetric_capacity')
+        self._per_b_done = True
 
     def voltage_curve(self, hull_cursor):
         """ Take a computed convex hull and calculate voltages for either binary or ternary
@@ -512,7 +517,7 @@ class QueryConvexHull:
 
         """
 
-        if not self._non_elemental:
+        if not self._non_elemental and not self._per_b_done:
             self._setup_per_b_fields()
         if self._dimension == 2:
             self._calculate_binary_volume_curve()
