@@ -119,7 +119,7 @@ def is_point_in_triangle(point, triangle, preprocessed_triangle=False):
     barycentric_structure[-1, :] = 1
     plane_barycentric_structure = cart_plane_inv @ barycentric_structure
 
-    return (plane_barycentric_structure >= 0 - 1e-12).all()
+    return (plane_barycentric_structure >= 0 - EPS).all()
 
 
 def barycentric2cart(structures):
