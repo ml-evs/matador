@@ -252,6 +252,11 @@ class Crystal(DataContainer):
         return len(self.sites)
 
     @property
+    def num_elements(self):
+        """ Return number of species in the structure. """
+        return len(self.elems)
+
+    @property
     def positions_frac(self):
         """ Return list of fractional positions. """
         from matador.utils.cell_utils import cart2frac

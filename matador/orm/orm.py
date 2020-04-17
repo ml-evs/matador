@@ -89,8 +89,8 @@ class DataContainer(ABC):
         if key not in self._data or self._data[key] is None:
             self._data[key] = item
         else:
-            raise AttributeError('Cannot assign value to existing key {}'
-                                 .format(key))
+            raise AttributeError('Cannot assign value {} to existing key {} with value {}'
+                                 .format(item, key, self._data[key]))
 
     def __contains__(self, key):
         if key in self._data:

@@ -185,7 +185,7 @@ def get_atoms_per_fu(doc):
         doc (list/dict): structure to evaluate OR matador-style stoichiometry.
 
     """
-    if isinstance(doc, dict):
+    if 'stoichiometry' in doc:
         return sum([elem[1] for elem in doc['stoichiometry']])
     return sum([elem[1] for elem in doc])
 
@@ -270,10 +270,15 @@ def get_number_of_chempots(stoich, chempot_stoichs, precision=5):
 
     """
 
-    if isinstance(stoich, dict):
+    # need to support dict, list and Crystal inputs
+    try:
         stoich = stoich['stoichiometry']
-    if isinstance(chempot_stoichs[0], dict):
+    except (TypeError, ValueError):
+        pass
+    try:
         chempot_stoichs = [mu['stoichiometry'] for mu in chempot_stoichs]
+    except (TypeError, ValueError):
+        pass
 
     # find all elements present in the chemical potentials
     elements = set()

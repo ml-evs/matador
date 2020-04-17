@@ -376,6 +376,20 @@ class VoltageTest(unittest.TestCase):
         self.assertEqual(len(hull.voltage_data["Q"][0]), 13)
         self.assertEqual(len(hull.voltage_data["Q"][1]), 12)
 
+    def test_ternary_voltage_problematic_with_crystal_models(self):
+        """ Test for NaSnP voltages which triggered a bug in the capacity
+        calculation.
+
+        """
+        cursor = res2dict(REAL_PATH + "data/voltage_data/voltage-NaSnP/*.res", as_model=True)[0]
+        hull = QueryConvexHull(
+            cursor=cursor, species="NaSnP", no_plot=True, subcmd="voltage", volume=True
+        )
+        self.assertEqual(len(hull.voltage_data["voltages"]), 2)
+        self.assertEqual(len(hull.voltage_data["Q"]), 2)
+        self.assertEqual(len(hull.voltage_data["Q"][0]), 13)
+        self.assertEqual(len(hull.voltage_data["Q"][1]), 12)
+
     def test_angelas_awkward_voltage(self):
         """ Test a particular example of Angela's awkward ternary voltages. """
         # test data from NaFeP
@@ -462,7 +476,7 @@ class VolumeTest(unittest.TestCase):
             )
 
         hull = QueryConvexHull(
-            cursor=cursor, elements=["K", "Sn", "P"], no_plot=False, subcmd="voltage"
+            cursor=cursor, elements=["K", "Sn", "P"], no_plot=True, subcmd="voltage"
         )
 
         np.testing.assert_array_almost_equal(
