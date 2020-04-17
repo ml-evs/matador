@@ -490,11 +490,11 @@ class QueryConvexHull:
                 data_str += '# {:^10} \t{:^10}\n'.format('Q (mAh/g)', 'Voltage (V)')
             for idx, _ in enumerate(path):
                 if self._dimension == 2:
-                    data_str += '{:>10.2f} \t{:>10.2f} \t{:>10.4f}'.format(self.voltage_data['x'][ind][idx],
+                    data_str += '{:>10.4f} \t{:>10.4f} \t{:>10.4f}'.format(self.voltage_data['x'][ind][idx],
                                                                            self.voltage_data['Q'][ind][idx],
                                                                            self.voltage_data['voltages'][ind][idx])
                 else:
-                    data_str += '{:>10.2f} \t{:>10.4f}'.format(self.voltage_data['Q'][ind][idx],
+                    data_str += '{:>10.2f} \t{:>10.8f}'.format(self.voltage_data['Q'][ind][idx],
                                                                self.voltage_data['voltages'][ind][idx])
                 if idx != len(path) - 1:
                     data_str += '\n'
@@ -524,27 +524,29 @@ class QueryConvexHull:
                 "Volume curves have only been implemented for binary and ternary phase diagrams."
             )
 
+        self.print_volume_summary()
+
     def print_volume_summary(self):
         """ Prints a volume data summary.
 
         If self.args['csv'] is True, save the summary to a file.
 
         """
-
-        data_str = ''
-        data_str += '# ' + ''.join(self.species) + '\n'
-        data_str += '# {:>10},\t{:>10}\n'.format('x in {d[0]}x{d[1]}'.format(d=self.species),
-                                                 'Volume per {} (Ang^3)'.format(self.species[1]))
-        for idx, _ in enumerate(self.volume_data['x']):
-            data_str += '{:>10.2f},\t{:>10.4f}'.format(self.volume_data['x'][idx],
-                                                       self.volume_data['vol_per_y'][idx])
-            if idx != len(self.volume_data['x']) - 1:
-                data_str += '\n'
-        if self.args.get('csv'):
-            with open(''.join(self.species) + '_volume.csv', 'w') as f:
-                f.write(data_str)
-        print('\nVolume data:')
-        print('\n' + data_str)
+        for reaction_idx, _ in enumerate(self.volume_data['Q']):
+            data_str = '# Reaction {} \n'.format(reaction_idx)
+            data_str += '# ' + ''.join(self.species) + '\n'
+            data_str += '# {:>10},\t{:>10}\n'.format('Q (mAh/g)'.format(d=self.species),
+                                                     'Volume per {} (Ang^3)'.format(self.species[0]))
+            for idx, _ in enumerate(self.volume_data['vol_per_y'][reaction_idx]):
+                data_str += '{:>10.4f} \t{:>10.4f}'.format(self.volume_data['Q'][reaction_idx][idx],
+                                                           self.volume_data['vol_per_y'][reaction_idx][idx])
+                if idx != len(self.volume_data['Q'][reaction_idx]) - 1:
+                    data_str += '\n'
+            if self.args.get('csv'):
+                with open(''.join(self.species) + '_volume.csv', 'w') as f:
+                    f.write(data_str)
+            print('\nVolume data:')
+            print('\n' + data_str)
 
     def get_hull_distances(self, *args, **kwargs):
         """ Wrapper to PhaseDiagram.get_hull_distances. """
