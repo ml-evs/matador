@@ -174,7 +174,7 @@ class CellUtilTest(unittest.TestCase):
         from matador.utils.cell_utils import get_space_group_label_latex
 
         test_cases = ["P-63m", "Fm-3m", "I4/mmm", "P4_2/mmc"]
-        results = ["$\\text{P}\\bar{6}3m$", "$\\text{F}m\\bar{3}m$", "$\\text{I}4/mmm$", "$\\text{P}4_2/mmc$"]
+        results = ["$P\\bar{6}3m$", "$Fm\\bar{3}m$", "$I4/mmm$", "$P4_2/mmc$"]
         for res, test in zip(results, test_cases):
             self.assertEqual(res, get_space_group_label_latex(test))
 
