@@ -187,18 +187,13 @@ class SpectralPlotTests(unittest.TestCase):
 
 
 @unittest.skipIf(not MATPLOTLIB_PRESENT, "Skipping plotting tests.")
-class HullPlotTests(unittest.TestCase):
+class HullPlotTests(MatadorUnitTest):
     """ Tests for plotting phase diagrams. """
 
     def test_binary_hull_plot(self):
         """ Test plotting binary hull. """
         expected_files = ["KP_hull_simple.svg"]
-        for expected_file in expected_files:
-            if os.path.isfile(expected_file):
-                os.remove(expected_file)
-        res_list = glob(REAL_PATH + "data/hull-KP-KSnP_pub/*.res")
-        self.assertEqual(len(res_list), 295, "Could not find test res files, please check installation...")
-        cursor = [res2dict(res)[0] for res in res_list]
+        cursor = res2dict(REAL_PATH + "data/hull-KP-KSnP_pub/*.res")[0]
         QueryConvexHull(
             cursor=cursor,
             elements=["K", "P"],
@@ -209,18 +204,11 @@ class HullPlotTests(unittest.TestCase):
         )
         for expected_file in expected_files:
             self.assertTrue(os.path.isfile(expected_file))
-        for expected_file in expected_files:
-            os.remove(expected_file)
 
     def test_binary_battery_plots(self):
         """ Test plotting binary hull. """
         expected_files = ["KP_hull.png", "KP_voltage.png", "KP_volume.png"]
-        for expected_file in expected_files:
-            if os.path.isfile(expected_file):
-                os.remove(expected_file)
-        res_list = glob(REAL_PATH + "data/hull-KP-KSnP_pub/*.res")
-        self.assertEqual(len(res_list), 295, "Could not find test res files, please check installation...")
-        cursor = [res2dict(res)[0] for res in res_list]
+        cursor = res2dict(REAL_PATH + "data/hull-KP-KSnP_pub/*.res")[0]
         QueryConvexHull(
             cursor=cursor,
             elements=["K", "P"],
@@ -236,17 +224,10 @@ class HullPlotTests(unittest.TestCase):
         )
         for expected_file in expected_files:
             self.assertTrue(os.path.isfile(expected_file))
-        for expected_file in expected_files:
-            os.remove(expected_file)
 
     def test_voltage_labels(self):
         expected_files = ["KP_voltage.png"]
-        for expected_file in expected_files:
-            if os.path.isfile(expected_file):
-                os.remove(expected_file)
-        res_list = glob(REAL_PATH + "data/hull-KP-KSnP_pub/*.res")
-        self.assertEqual(len(res_list), 295, "Could not find test res files, please check installation...")
-        cursor = [res2dict(res)[0] for res in res_list]
+        cursor = res2dict(REAL_PATH + "data/hull-KP-KSnP_pub/*.res")[0]
         hull = QueryConvexHull(cursor=cursor, species="KP", no_plot=True, subcmd="voltage", labels=True)
 
         label_cursor = []
@@ -256,8 +237,6 @@ class HullPlotTests(unittest.TestCase):
         self.assertEqual(labels, ["KP7", "K3P7", "K2P3", "KP", "K5P4"])
         for expected_file in expected_files:
             self.assertTrue(os.path.isfile(expected_file))
-        for expected_file in expected_files:
-            os.remove(expected_file)
 
     def test_ternary_hull_plot(self):
         """ Test plotting ternary hull. """
