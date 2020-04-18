@@ -23,6 +23,7 @@ def plot_pdf(pdfs,
              labels=None, r_min=None, r_max=None,
              offset=1.1, text_offset=(0.0, 0.0),
              legend=False, annotate=True, figsize=None,
+             filename=None,
              **kwargs):
     """ Plot PDFs.
 
@@ -111,7 +112,9 @@ def plot_pdf(pdfs,
 
     if any([kwargs.get('pdf'), kwargs.get('svg'), kwargs.get('png')]):
         bbox_extra_artists = None
-        filename = 'pdf_plot'
+        if filename is None:
+            filename = '-'.join([get_formula_from_stoich(pdf.stoichiometry) for pdf in pdfs]) + '_pdf'
+
         if kwargs.get('pdf'):
             plt.savefig('{}.pdf'.format(filename),
                         bbox_inches='tight', transparent=True, bbox_extra_artists=bbox_extra_artists)
