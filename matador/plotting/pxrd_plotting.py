@@ -8,7 +8,6 @@ matador.fingerprints.pxrd module.
 """
 
 
-from matador.fingerprints.pxrd import PXRD
 from matador.plotting.plotting import plotting_function
 from matador.utils.cell_utils import get_space_group_label_latex
 from matador.crystal import Crystal
@@ -18,7 +17,7 @@ __all__ = ['plot_pxrd']
 
 
 @plotting_function
-def plot_pxrd(pxrds, two_theta_range=(10, 70), labels=None, figsize=None, text_offset=0.1, **kwargs):
+def plot_pxrd(pxrds, two_theta_range=(10, 70), labels=None, figsize=None, text_offset=0.1, filename=None, **kwargs):
     """ Plot PXRD or PXRDs.
 
     Parameters:
@@ -71,7 +70,9 @@ def plot_pxrd(pxrds, two_theta_range=(10, 70), labels=None, figsize=None, text_o
 
     if any([kwargs.get('pdf'), kwargs.get('svg'), kwargs.get('png')]):
         bbox_extra_artists = None
-        filename = 'pxrd_plot'
+        if filename is None:
+            filename = '-'.join([pxrd.formula for pxrd in pxrds]) + '_pxrd'
+
         if kwargs.get('pdf'):
             plt.savefig('{}.pdf'.format(filename),
                         bbox_inches='tight', transparent=True, bbox_extra_artists=bbox_extra_artists)

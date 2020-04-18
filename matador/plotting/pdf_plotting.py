@@ -13,6 +13,7 @@ from matador.fingerprints.pdf import PDF
 from matador.crystal import Crystal
 from matador.plotting.plotting import plotting_function
 from matador.utils.cell_utils import get_space_group_label_latex
+from matador.utils.chem_utils import get_formula_from_stoich
 
 __all__ = ['plot_pdf', 'plot_projected_pdf', 'plot_diff_overlap', 'plot_projected_diff_overlap']
 
@@ -22,6 +23,7 @@ def plot_pdf(pdfs,
              labels=None, r_min=None, r_max=None,
              offset=1.1, text_offset=(0.0, 0.0),
              legend=False, annotate=True, figsize=None,
+             filename=None,
              **kwargs):
     """ Plot PDFs.
 
@@ -93,7 +95,7 @@ def plot_pdf(pdfs,
         if labels:
             label = labels[ind]
         else:
-            label = get_space_group_label_latex(pdf.spg) + '-' + pdf.formula
+            label = get_space_group_label_latex(pdf.spg) + '-' + get_formula_from_stoich(pdf.stoichiometry)
 
         ax1.plot(pdf.r_space, pdf.gr + abs_offset * ind, label=label)
         if text_offset is not None:
@@ -110,7 +112,9 @@ def plot_pdf(pdfs,
 
     if any([kwargs.get('pdf'), kwargs.get('svg'), kwargs.get('png')]):
         bbox_extra_artists = None
-        filename = 'pdf_plot'
+        if filename is None:
+            filename = '-'.join([get_formula_from_stoich(pdf.stoichiometry) for pdf in pdfs]) + '_pdf'
+
         if kwargs.get('pdf'):
             plt.savefig('{}.pdf'.format(filename),
                         bbox_inches='tight', transparent=True, bbox_extra_artists=bbox_extra_artists)

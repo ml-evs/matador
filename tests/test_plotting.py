@@ -14,7 +14,10 @@ import matador.cli.dispersion
 from matador.scrapers import res2dict
 from matador.hull import QueryConvexHull
 from matador.plotting.battery_plotting import plot_voltage_curve
+from matador.plotting.pdf_plotting import plot_pdf
+from matador.plotting.pxrd_plotting import plot_pxrd
 from matador.utils.chem_utils import get_formula_from_stoich
+from .utils import MatadorUnitTest
 
 REAL_PATH = "/".join(os.path.realpath(__file__).split("/")[:-1]) + "/"
 ROOT_DIR = os.getcwd()
@@ -184,18 +187,13 @@ class SpectralPlotTests(unittest.TestCase):
 
 
 @unittest.skipIf(not MATPLOTLIB_PRESENT, "Skipping plotting tests.")
-class HullPlotTests(unittest.TestCase):
+class HullPlotTests(MatadorUnitTest):
     """ Tests for plotting phase diagrams. """
 
     def test_binary_hull_plot(self):
         """ Test plotting binary hull. """
         expected_files = ["KP_hull_simple.svg"]
-        for expected_file in expected_files:
-            if os.path.isfile(expected_file):
-                os.remove(expected_file)
-        res_list = glob(REAL_PATH + "data/hull-KP-KSnP_pub/*.res")
-        self.assertEqual(len(res_list), 295, "Could not find test res files, please check installation...")
-        cursor = [res2dict(res)[0] for res in res_list]
+        cursor = res2dict(REAL_PATH + "data/hull-KP-KSnP_pub/*.res")[0]
         QueryConvexHull(
             cursor=cursor,
             elements=["K", "P"],
@@ -206,18 +204,11 @@ class HullPlotTests(unittest.TestCase):
         )
         for expected_file in expected_files:
             self.assertTrue(os.path.isfile(expected_file))
-        for expected_file in expected_files:
-            os.remove(expected_file)
 
     def test_binary_battery_plots(self):
         """ Test plotting binary hull. """
         expected_files = ["KP_hull.png", "KP_voltage.png", "KP_volume.png"]
-        for expected_file in expected_files:
-            if os.path.isfile(expected_file):
-                os.remove(expected_file)
-        res_list = glob(REAL_PATH + "data/hull-KP-KSnP_pub/*.res")
-        self.assertEqual(len(res_list), 295, "Could not find test res files, please check installation...")
-        cursor = [res2dict(res)[0] for res in res_list]
+        cursor = res2dict(REAL_PATH + "data/hull-KP-KSnP_pub/*.res")[0]
         QueryConvexHull(
             cursor=cursor,
             elements=["K", "P"],
@@ -233,17 +224,10 @@ class HullPlotTests(unittest.TestCase):
         )
         for expected_file in expected_files:
             self.assertTrue(os.path.isfile(expected_file))
-        for expected_file in expected_files:
-            os.remove(expected_file)
 
     def test_voltage_labels(self):
         expected_files = ["KP_voltage.png"]
-        for expected_file in expected_files:
-            if os.path.isfile(expected_file):
-                os.remove(expected_file)
-        res_list = glob(REAL_PATH + "data/hull-KP-KSnP_pub/*.res")
-        self.assertEqual(len(res_list), 295, "Could not find test res files, please check installation...")
-        cursor = [res2dict(res)[0] for res in res_list]
+        cursor = res2dict(REAL_PATH + "data/hull-KP-KSnP_pub/*.res")[0]
         hull = QueryConvexHull(cursor=cursor, species="KP", no_plot=True, subcmd="voltage", labels=True)
 
         label_cursor = []
@@ -253,8 +237,6 @@ class HullPlotTests(unittest.TestCase):
         self.assertEqual(labels, ["KP7", "K3P7", "K2P3", "KP", "K5P4"])
         for expected_file in expected_files:
             self.assertTrue(os.path.isfile(expected_file))
-        for expected_file in expected_files:
-            os.remove(expected_file)
 
     def test_ternary_hull_plot(self):
         """ Test plotting ternary hull. """
@@ -300,6 +282,25 @@ class HullPlotTests(unittest.TestCase):
         beef_hull.plot_hull(svg=True)
         self.assertTrue(os.path.isfile(expected_file))
         os.remove(expected_file)
+
+
+@unittest.skipIf(not MATPLOTLIB_PRESENT, "Skipping plotting tests.")
+class FingerprintPlotTests(MatadorUnitTest):
+    """ Test ability to plot PDF and PXRDs. """
+
+    def test_pdf_plot(self):
+        structure = res2dict(REAL_PATH + "data/res_files/KPSn-OQMD_123456.res", as_model=True)[0]
+        plot_pdf(structure, png=True)
+        self.assertTrue(os.path.isfile('K7PSn_pdf.png'))
+        plot_pdf([structure, structure], filename='test_pdf', rmax=5, png=True)
+        self.assertTrue(os.path.isfile('test_pdf.png'))
+
+    def test_pxrd_plot(self):
+        structure = res2dict(REAL_PATH + "data/res_files/KPSn-OQMD_123456.res", as_model=True)[0]
+        plot_pxrd(structure, png=True)
+        self.assertTrue(os.path.isfile('K7PSn_pxrd.png'))
+        plot_pdf([structure, structure], filename='test_pxrd', png=True)
+        self.assertTrue(os.path.isfile('test_pxrd.png'))
 
 
 @unittest.skipIf(not MATPLOTLIB_PRESENT, "Skipping plotting tests.")
