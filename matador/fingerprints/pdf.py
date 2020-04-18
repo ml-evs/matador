@@ -18,6 +18,7 @@ import numba
 
 from matador.utils.cell_utils import frac2cart, cart2volume
 from matador.utils.cell_utils import standardize_doc_cell
+from matador.utils.chem_utils import get_stoich
 from matador.fingerprints.fingerprint import Fingerprint, FingerprintFactory
 
 
@@ -76,7 +77,7 @@ class PDF(Fingerprint):
         if self.kwargs.get('standardize'):
             structure = standardize_doc_cell(structure)
             self.spg = structure['space_group']
-        self.stoichiometry = structure['stoichiometry']
+        self.stoichiometry = structure.get('stoichiometry', get_stoich(structure['atom_types']))
 
         # private variables
         self._num_images = self.kwargs.get('num_images')
