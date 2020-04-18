@@ -290,6 +290,7 @@ class SymmetriesAndSupercellsTest(unittest.TestCase):
         dist = pdf_sim_dist(doc, std_doc)
         self.assertLess(dist, 0.01)
 
+
 def pdf_sim_dist(doc_test, doc_supercell):
     doc_test["text_id"] = ["test", "cell"]
     doc_supercell["text_id"] = ["super", "cell"]

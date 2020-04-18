@@ -14,7 +14,7 @@ import matador.cli.dispersion
 from matador.scrapers import res2dict
 from matador.hull import QueryConvexHull
 from matador.plotting.battery_plotting import plot_voltage_curve
-from matador.plotting.pdf_plotting import plot_pdf, plot_projected_pdf
+from matador.plotting.pdf_plotting import plot_pdf
 from matador.plotting.pxrd_plotting import plot_pxrd
 from matador.utils.chem_utils import get_formula_from_stoich
 from .utils import MatadorUnitTest
