@@ -540,13 +540,11 @@ class QueryConvexHull:
         for reaction_idx, _ in enumerate(self.volume_data['Q']):
             data_str = '# Reaction {} \n'.format(reaction_idx)
             data_str += '# ' + ''.join(get_formula_from_stoich(self.volume_data['endstoichs'][reaction_idx])) + '\n'
-            data_str += '# {:>10} \t{:>14} \t{:>14}\n'.format('Q (mAh/g)'.format(d=self.species),
-                                                              'Volume per {} (Ang^3)'.format(self.species[0]),
-                                                              'Volume ratio with bulk')
-            for idx, _ in enumerate(self.volume_data['vol_per_y'][reaction_idx]):
-                data_str += ('{:>10.2f} \t{:>14.2f} \t{:14.2f}'
+            data_str += '# {:>10}\t{:>14} \t{:>14}\n'.format('Q (mAh/g)', 'Volume (A^3)', 'Volume ratio with bulk')
+            for idx, _ in enumerate(self.volume_data['electrode_volume'][reaction_idx]):
+                data_str += ('{:>10.2f} \t{:14.2f} \t{:14.2f}'
                              .format(self.volume_data['Q'][reaction_idx][idx],
-                                     self.volume_data['vol_per_y'][reaction_idx][idx],
+                                     self.volume_data['electrode_volume'][reaction_idx][idx],
                                      self.volume_data['volume_ratio_with_bulk'][reaction_idx][idx]))
                 if idx != len(self.volume_data['Q'][reaction_idx]) - 1:
                     data_str += '\n'
@@ -657,7 +655,7 @@ class QueryConvexHull:
                 if not self._non_elemental:
                     self.volume_data['x'].append(capacities)
                     self.volume_data['Q'].append(capacities)
-                    self.volume_data['vol_per_y'].append(volumes)
+                    self.volume_data['electrode_volume'].append(volumes)
                     self.volume_data['endstoichs'].append(endstoichs[reaction_ind])
                     self.volume_data['volume_ratio_with_bulk'].append(np.asarray(volumes) / volumes[0])
                     self.volume_data['hull_distances'].append(np.zeros_like(capacities))
@@ -683,7 +681,7 @@ class QueryConvexHull:
         non_nans = np.argwhere(np.isfinite(stable_x))
         self.volume_data['x'].append(stable_x[non_nans].flatten())
         self.volume_data['Q'].append(stable_cap[non_nans].flatten())
-        self.volume_data['vol_per_y'].append(stable_vol[non_nans].flatten())
+        self.volume_data['electrode_volume'].append(stable_vol[non_nans].flatten())
         self.volume_data['volume_ratio_with_bulk'].append((stable_vol[non_nans] / stable_vol[0]).flatten())
         self.volume_data['hull_distances'].append(hull_distances[non_nans].flatten())
         self.volume_data['endstoichs'].append(stable_stoichs[non_nans].flatten()[0])
@@ -765,47 +763,80 @@ class QueryConvexHull:
             raise RuntimeError("Incompatible number of crossovers ({}) and intersections ({})."
                                .format(np.shape(crossover), np.shape(intersections)))
 
-        points = hull.points
+        # set up output arrays
         voltages = np.empty(len(intersections) + 1)
         volumes = np.empty(len(intersections))
+        reactions = []
+
+        # set up some useful arrays for later
+        points = hull.points
         mu_enthalpy = get_array_from_cursor(self.chempot_cursor, self.energy_key)
         if not self._non_elemental:
-            input_volumes = get_array_from_cursor(hull_cursor, 'cell_volume_per_b')
+            input_volumes = get_array_from_cursor(hull_cursor, 'cell_volume') / get_array_from_cursor(hull_cursor, 'num_atoms')
         capacities = [get_generic_grav_capacity(point, self.species) for point in crossover]
-        reactions = []
-        reaction = [get_formula_from_stoich(endstoich)]
-        reactions.append(reaction)
+
+        # initial composition of one formula unit of the starting material
+        initial_comp = get_padded_composition(endstoich, self.species)
+
+        # loop over intersected faces and compute the voltage and volume at the
+        # crossover with that face
         for ind, face in enumerate(intersections):
+
             simplex_index = int(face[0])
-            reaction = []
-            reaction = [get_formula_from_stoich(hull_cursor[idx]['stoichiometry'])
-                        for idx in hull.simplices[simplex_index]]
-            reactions.append(reaction)
-            print('{d[0]} + {d[1]} + {d[2]}'.format(d=reaction))
+
+            final_stoichs = [hull_cursor[idx]['stoichiometry'] for idx in hull.simplices[simplex_index]]
+            atoms_per_fu = [sum([elem[1] for elem in stoich]) for stoich in final_stoichs]
+
             energy_vec = points[hull.simplices[simplex_index], 2]
             comp = points[hull.simplices[simplex_index], :]
             comp[:, 2] = 1 - comp[:, 0] - comp[:, 1]
 
-            comp = comp.T
-            comp_inv = np.linalg.inv(comp)
+            # normalize the crossover composition to one formula unit of the starting electrode
+            norm = np.asarray(crossover[ind][1:]) / np.asarray(initial_comp[1:])
+            ratios_of_phases = np.linalg.solve(comp.T, crossover[ind] / norm[0])
 
+            # remove small numerical noise
+            ratios_of_phases[np.where(ratios_of_phases < EPS)] = 0
+
+            # create a list containing the sections of the balanced reaction for printing
+            balanced_reaction = []
+            for i, ratio in enumerate(ratios_of_phases):
+                if ratio < EPS:
+                    continue
+                else:
+                    formula = get_formula_from_stoich(final_stoichs[i])
+                    balanced_reaction.append((ratio / atoms_per_fu[i], formula))
+            reactions.append(balanced_reaction)
+
+            # compute the voltage as the difference between the projection of the gradient down to pure active ion,
+            # and the reference chemical potential
+            comp_inv = np.linalg.inv(comp.T)
             V = -(comp_inv.dot([1, 0, 0])).dot(energy_vec)
             V = V + mu_enthalpy[0]
 
+            # compute the volume of the final electrode
             if not self._non_elemental:
                 if ind <= len(intersections) - 1:
                     volume_vec = input_volumes[hull.simplices[simplex_index]]
-                    ratios_of_phases = comp_inv @ crossover[ind]
                     volumes[ind] = np.dot(ratios_of_phases, volume_vec)
 
             # double up on first voltage
             if ind == 0:
                 voltages[0] = V
-            if ind != len(intersections) - 1:
-                print(5 * (ind + 1) * ' ' + ' ---> ', end='')
             voltages[ind+1] = V
 
         average_voltage = Electrode.calculate_average_voltage(capacities, voltages)
+
+        # print the reaction over a few lines, remove 1s and rounded ratios
+        print(
+            ' ---> '.join(
+                [' + '.join(
+                    ["{}{}".format(
+                        str(round(chem[0], 3)) + ' ' if abs(chem[0]) - 1 > EPS else '',
+                        chem[1])
+                     for chem in region])
+                 for region in reactions])
+        )
 
         return reactions, capacities, voltages, average_voltage, volumes
 
