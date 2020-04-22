@@ -131,7 +131,7 @@ def _add_voltage_curve(capacities, voltages, ax_volt, label=None, **kwargs):
 
 
 @plotting_function
-def plot_volume_curve(hull, ax=None, show=False, **kwargs):
+def plot_volume_curve(hull, ax=None, show=True, legend=False, **kwargs):
     """ Plot volume curve calculated for phase diagram.
 
     Parameters:
@@ -154,33 +154,15 @@ def plot_volume_curve(hull, ax=None, show=False, **kwargs):
     else:
         ax = ax
 
-    for j in range(len(hull.volume_data['vol_per_y'])):
+    for j in range(len(hull.volume_data['electrode_volume'])):
         stable_hull_dist = hull.volume_data['hull_distances'][j]
         if len(stable_hull_dist) != len(hull.volume_data['Q'][j]):
             raise RuntimeError("This plot does not support --hull_cutoff.")
-        for i in range(len(hull.volume_data['vol_per_y'][j])):
-            if stable_hull_dist[i] <= 0 + 1e-16:
-                s = 40
-                zorder = 1000
-                markeredgewidth = 1.5
-                c = hull.colours[1]
-                alpha = 1
-            else:
-                s = 30
-                zorder = 900
-                alpha = 0.3
-                markeredgewidth = 0
-                c = 'grey'
-
-            ax.scatter(hull.volume_data['Q'][j][i],
-                       hull.volume_data['volume_ratio_with_bulk'][j][i],
-                       marker='o', s=s, edgecolor='k',
-                       lw=markeredgewidth, c=c, zorder=zorder, alpha=alpha)
 
         ax.plot(
             [q for ind, q in enumerate(hull.volume_data['Q'][j][:-1]) if stable_hull_dist[ind] == 0],
             [v for ind, v in enumerate(hull.volume_data['volume_ratio_with_bulk'][j]) if stable_hull_dist[ind] == 0],
-            marker=None,
+            marker='o', markeredgewidth=1.5, markeredgecolor='w',
             zorder=100,
             label=("Volume expansion from bulk {}"
                    .format(get_formula_from_stoich(hull.volume_data['endstoichs'][j], tex=True)))
@@ -188,7 +170,8 @@ def plot_volume_curve(hull, ax=None, show=False, **kwargs):
 
     ax.set_xlabel("Gravimetric capacity (mAh/g)")
     ax.set_ylabel('Volume ratio with starting electrode')
-    ax.legend()
+    if legend or len(hull.volume_data['Q']) > 1:
+        ax.legend()
     fname = '{}_volume'.format(''.join(hull.elements))
 
     if hull.savefig or any([kwargs.get(ext) for ext in SAVE_EXTS]):
