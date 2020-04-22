@@ -427,7 +427,7 @@ class VolumeTest(unittest.TestCase):
         hull.volume_curve()
         self.assertEqual(len(hull.volume_data["x"][0]), len(hull.hull_cursor) - 1)
         self.assertEqual(
-            len(hull.volume_data["vol_per_y"][0]), len(hull.hull_cursor) - 1
+            len(hull.volume_data["electrode_volume"][0]), len(hull.hull_cursor) - 1
         )
 
     def test_ternary_volume_curve(self):
@@ -480,10 +480,10 @@ class VolumeTest(unittest.TestCase):
         )
 
         np.testing.assert_array_almost_equal(
-            hull.volume_data["vol_per_y"][0], [10.0, 0.75 * 21.0 / 2 + 0.25 * 10]
+            hull.volume_data["electrode_volume"][0], [30, 31]
         )
         np.testing.assert_array_almost_equal(
-            hull.volume_data["volume_ratio_with_bulk"][0], [1, 1.0375]
+            hull.volume_data["volume_ratio_with_bulk"][0], [1, 31/30]
         )
 
         cursor = [
@@ -535,8 +535,8 @@ class VolumeTest(unittest.TestCase):
         )
 
         np.testing.assert_array_almost_equal(
-            hull.volume_data["vol_per_y"][0], [5.0, 0.75 * 21.0 / 2 + 0.25 * 10]
+            hull.volume_data["electrode_volume"][0], [15, 31]
         )
         np.testing.assert_array_almost_equal(
-            hull.volume_data["volume_ratio_with_bulk"][0], [1, 2 * 1.0375]
+            hull.volume_data["volume_ratio_with_bulk"][0], [1, 31/15]
         )
