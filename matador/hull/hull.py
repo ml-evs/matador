@@ -470,6 +470,8 @@ class QueryConvexHull:
         else:
             raise RuntimeError('Unable to calculate voltage curve for hull of dimension {}'.format(self._dimension))
 
+        self._scale_voltages(self.species[0])
+
         self.print_voltage_summary()
 
     def print_voltage_summary(self):
@@ -627,8 +629,6 @@ class QueryConvexHull:
 
         # do another convex hull on just the known hull points, to allow access to useful indices
         convex_hull = scipy.spatial.ConvexHull(points)
-
-        # convex_hull = PhaseDiagram(hull_cursor, formation_key=formation_key, dimension=self._dimension).convex_hull
 
         endpoints, endstoichs = Electrode._find_starting_materials(convex_hull.points, stoichs)
         print('{} starting point(s) found.'.format(len(endstoichs)))
@@ -999,3 +999,20 @@ class QueryConvexHull:
             )
 
         return intersections, sorted(crossover, key=lambda x: x[0])
+
+    def _scale_voltages(self, species):
+        """ Rescale voltages to account for the valence of the active ion,
+        as stored in the Electrode class.
+
+        """
+        valence_factor = Electrode.valence_data.get(species, None)
+
+        if valence_factor is None:
+            warnings.warn("Unable to find valence of species {}, treating it as 1.".format(species))
+            return
+
+        if valence_factor != 1:
+            for ind, start_point in enumerate(self.voltage_data['voltages']):
+                for j in range(len(self.voltage_data['voltages'][ind])):
+                    self.voltage_data['voltages'][ind][j] *= valence_factor
+            self.voltage_data['average_voltage'][ind] *= valence_factor

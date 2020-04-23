@@ -72,6 +72,41 @@ class VoltageTest(unittest.TestCase):
             self.assertTrue(np.isnan(bare_hull.voltage_data["Q"][ind][-1]))
             self.assertTrue(bare_hull.voltage_data["voltages"][ind][-1] == 0)
 
+    def test_multivalent_binary_voltage(self):
+        """ Test simple binary voltage curve. """
+        hull_cursor = []
+        test_x = np.loadtxt(REAL_PATH + "data/voltage_data/LiAs_x.dat")
+        test_Q = np.loadtxt(REAL_PATH + "data/voltage_data/LiAs_Q.dat")
+        test_V = np.loadtxt(REAL_PATH + "data/voltage_data/LiAs_V.dat")
+        for i in range(5):
+            with open(
+                REAL_PATH + "data/voltage_data/hull_data" + str(i) + ".json"
+            ) as f:
+                flines = f.readlines()
+                # replace all Li with Mg
+                flines = [line.replace("Li", "Mg") for line in flines]
+                hull_cursor.append(json.loads("\n".join(flines)))
+        bare_hull = QueryConvexHull(
+            cursor=hull_cursor, species=["Mg", "As"], subcmd="voltage", no_plot=True
+        )
+
+        self.assertTrue(len(bare_hull.voltage_data["voltages"]) == 1)
+        np.testing.assert_array_almost_equal(
+            bare_hull.voltage_data["voltages"][0], 2 * test_V, decimal=5, verbose=True
+        )
+        np.testing.assert_array_almost_equal(
+            bare_hull.voltage_data["x"][0], test_x, decimal=5
+        )
+        np.testing.assert_array_almost_equal(
+            bare_hull.voltage_data["Q"][0], test_Q, decimal=5
+        )
+        self.assertAlmostEqual(
+            bare_hull.voltage_data["average_voltage"][0], 2 * 0.949184, places=3
+        )
+        for ind in range(len(bare_hull.voltage_data["voltages"])):
+            self.assertTrue(np.isnan(bare_hull.voltage_data["Q"][ind][-1]))
+            self.assertTrue(bare_hull.voltage_data["voltages"][ind][-1] == 0)
+
     def test_binary_voltage_mayo(self):
         """ Test binary voltages from cursor for Mayo et al,
         DOI: 10.1021/acs.chemmater.5b04208.

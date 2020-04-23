@@ -34,8 +34,8 @@ class Electrode:
     """
 
     _kinds = ['anode', 'cathode']
-    _valence_data = {'Li': 1, 'Na': 1, 'K': 1,
-                     'Mg': 2, 'Ca': 2}
+    valence_data = {'Li': 1, 'Na': 1, 'K': 1,
+                    'Mg': 2, 'Ca': 2}
 
     def __init__(self, active_ion, base_material, phases, kind='anode', valence=None):
         """ Initialise Electrode material for the given ion from a convex hull.
