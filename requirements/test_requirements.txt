@@ -2,4 +2,4 @@ pytest~=3.10
 pytest-cov
 coverage
 codecov
-mongomock
+mongomock==3.16
