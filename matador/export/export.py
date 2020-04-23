@@ -300,9 +300,17 @@ def doc2cell(doc, path, overwrite=False, hash_dupe=False, spin=False):
             flines.append('{d[0]} {d[1]} {d[2]}'.format(d=vec))
         flines.append('%ENDBLOCK LATTICE_CART')
 
-    if 'atom_types' and 'positions_frac' in doc:
-        flines.append('\n%BLOCK POSITIONS_FRAC')
-        for ind, atom in enumerate(zip(doc['atom_types'], doc['positions_frac'])):
+    if 'atom_types' and ('positions_frac' in doc or 'positions_abs' in doc):
+
+        if 'positions_frac' in doc:
+            title = 'POSITIONS_FRAC'
+            positions = doc['positions_frac']
+        else:
+            title = 'POSITIONS_ABS'
+            positions = doc['positions_abs']
+
+        flines.append('\n%BLOCK {}'.format(title))
+        for ind, atom in enumerate(zip(doc['atom_types'], positions)):
             postfix = ''
             try:
                 if 'atomic_init_spins' in doc and doc['atomic_init_spins'][ind]:
@@ -312,7 +320,8 @@ def doc2cell(doc, path, overwrite=False, hash_dupe=False, spin=False):
 
             flines.append("{0:8s} {1[0]: 15f} {1[1]: 15f} {1[2]: 15f} {2:}".format(
                 atom[0], atom[1], postfix))
-        flines.append('%ENDBLOCK POSITIONS_FRAC')
+
+        flines.append('%ENDBLOCK {}'.format(title))
 
     if 'external_pressure' in doc:
         if np.asarray(doc['external_pressure']).shape != (3, 3):
