@@ -9,7 +9,8 @@ import numpy as np
 # matador modules
 from matador.crystal.crystal import Crystal, UnitCell
 from matador.crystal.crystal_site import Site
-from matador.scrapers.castep_scrapers import castep2dict
+from matador.scrapers.castep_scrapers import castep2dict, res2dict
+from matador.utils.cell_utils import frac2cart
 from matador.scrapers.magres_scrapers import magres2dict
 
 # grab abs path for accessing test data
@@ -97,6 +98,17 @@ class CrystalTest(unittest.TestCase):
         )
 
         self.assertNotAlmostEqual(doc.positions_frac[-1][0], 0.0)
+
+    def test_convert_positions(self):
+        doc = res2dict(REAL_PATH + "data/structures/Li7Sn-Fmmm.res")[0]
+        crystal = res2dict(REAL_PATH + "data/structures/Li7Sn-Fmmm.res", as_model=True)[0]
+
+        doc['positions_abs'] = frac2cart(doc['lattice_cart'], doc['positions_frac'])
+
+        np.testing.assert_array_equal(doc['positions_abs'], crystal.positions_abs)
+        print(crystal.positions_abs)
+        for site in crystal:
+            print(site, site.get_coords('cartesian'))
 
     def test_minimal_init(self):
         doc = Crystal(

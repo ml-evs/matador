@@ -234,12 +234,11 @@ def real2recip(real_lat):
     """
     real_lat = np.asarray(real_lat)
     recip_lat = np.zeros((3, 3))
-    recip_lat[0] = (2*np.pi)*np.cross(real_lat[1], real_lat[2]) / \
-        (np.dot(real_lat[0], np.cross(real_lat[1], real_lat[2])))
-    recip_lat[1] = (2*np.pi)*np.cross(real_lat[2], real_lat[0]) / \
-        (np.dot(real_lat[1], np.cross(real_lat[2], real_lat[0])))
-    recip_lat[2] = (2*np.pi)*np.cross(real_lat[0], real_lat[1]) / \
-        (np.dot(real_lat[2], np.cross(real_lat[0], real_lat[1])))
+    volume = np.dot(real_lat[0], np.cross(real_lat[1], real_lat[2]))
+    recip_lat[0] = (2*np.pi)*np.cross(real_lat[1], real_lat[2])
+    recip_lat[1] = (2*np.pi)*np.cross(real_lat[2], real_lat[0])
+    recip_lat[2] = (2*np.pi)*np.cross(real_lat[0], real_lat[1])
+    recip_lat /= volume
     return recip_lat.tolist()
 
 
