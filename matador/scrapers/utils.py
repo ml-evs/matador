@@ -46,7 +46,7 @@ def scraper_function(function):
         seed = args[0]
         if isinstance(seed, str):
             if '*' in seed and not kwargs.get('noglob'):
-                seed = glob.glob(seed)
+                seed = sorted(glob.glob(seed))
             else:
                 seed = [seed]
 
