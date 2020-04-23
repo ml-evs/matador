@@ -538,7 +538,7 @@ class QueryConvexHull:
 
         """
         for reaction_idx, _ in enumerate(self.volume_data['Q']):
-            data_str = '# Reaction {} \n'.format(reaction_idx)
+            data_str = '# Reaction {} \n'.format(reaction_idx+1)
             data_str += '# ' + ''.join(get_formula_from_stoich(self.volume_data['endstoichs'][reaction_idx])) + '\n'
             data_str += '# {:>10}\t{:>14} \t{:>14}\n'.format('Q (mAh/g)', 'Volume (A^3)', 'Volume ratio with bulk')
             for idx, _ in enumerate(self.volume_data['electrode_volume'][reaction_idx]):
@@ -639,7 +639,7 @@ class QueryConvexHull:
         # iterate over possible delithiated phases
         for reaction_ind, endpoint in enumerate(endpoints):
             print(30 * '-')
-            print('Reaction {}, {}:'.format(reaction_ind, get_formula_from_stoich(endstoichs[reaction_ind])))
+            print('Reaction {}, {}:'.format(reaction_ind+1, get_formula_from_stoich(endstoichs[reaction_ind])))
             try:
                 reactions, capacities, voltages, average_voltage, volumes = self._construct_electrode(
                     convex_hull, endpoint, endstoichs[reaction_ind], hull_cursor
@@ -832,7 +832,7 @@ class QueryConvexHull:
             ' ---> '.join(
                 [' + '.join(
                     ["{}{}".format(
-                        str(round(chem[0], 3)) + ' ' if abs(chem[0]) - 1 > EPS else '',
+                        str(round(chem[0], 3)) + ' ' if abs(chem[0] - 1) > EPS else '',
                         chem[1])
                      for chem in region])
                  for region in reactions])
