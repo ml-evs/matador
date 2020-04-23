@@ -182,15 +182,15 @@ class FingerprintFactory:
         else:
             pool = mp.Pool(processes=self.nprocs)
             fprint_cursor = []
+            # for large cursors, set chunk to at most 16
+            # for smaller cursors, tend to use chunksize 1 for improved load balancing
+            chunksize = min(max(1, int(0.25 * len(compute_list) / self.nprocs)), 16)
             results = pool.map_async(functools.partial(_calc_fprint_pool_wrapper,
                                                        key=self.default_key),
                                      compute_list,
                                      callback=fprint_cursor.extend,
                                      error_callback=print,
-                                     # set chunksize to 1 as Fingerprints will often be O(N^2)
-                                     # in the number of atoms: alternatively sort by N at
-                                     # the start
-                                     chunksize=1)
+                                     chunksize=chunksize)
             pool.close()
             width = len(str(len(required_inds)))
             total = len(required_inds)
