@@ -66,38 +66,40 @@ def recursive_set(data, keys, value):
 
 
 def display_results(cursor,
-                    energy_key='enthalpy_per_atom', args=None, argstr=None, additions=None, deletions=None, no_sort=False,
-                    hull=False, markdown=False, latex=False, colour=True, return_str=False, **kwargs):
-    """ Print query results in a cryan-like fashion, optionally
-    in a markdown format.
+                    energy_key='enthalpy_per_atom', summary=False, args=None, argstr=None, additions=None, deletions=None, sort=True,
+                    hull=False, markdown=False, latex=False, colour=True, return_str=False, use_source=True, details=False,
+                    per_atom=False, eform=False, source=False, **kwargs):
+    """ Print query results in a table, with many options for customisability.
 
     Parameters:
         cursor (list of dict): list of matador documents
 
     Keyword arguments:
+        summary (bool): print a summary per stoichiometry, that uses the lowest
+            energy phase (requires `sort=True`).
         argstr (str): string to store matador initialisation command
+        eform (bool): prepend energy key with "formation_".
+        sort (bool): sort input cursor by the value of energy key.
+        return_str (bool): return string instead of printing.
+        details (bool): print extra details as an extra line per structure.
+        per_atom (bool): print quantities per atom, rather than per fu.
+        source (bool): print all source files associated with the structure.
+        use_source (bool): use the source instead of the text id when displaying a structure.
+        hull (bool): whether or not to print hull-style (True) or query-style
+        energy_key (str or list): key (or recursive key) to print as energy (per atom)
+        markdown (bool): whether or not to write a markdown file containing results
+        latex (bool): whether or not to create a LaTeX table
+        colour (bool): colour on-hull structures
         additions (list): list of string text_ids to be coloured green with a (+)
             or, list of indices referring to those structures in the cursor.
         deletions (list): list of string text_ids to be coloured red with a (-)
             or, list of indices referring to those structures in the cursor.
-        hull (bool): whether or not to print hull-style (True) or query-style
-        markdown (bool): whether or not to write a markdown file containing results
-        latex (bool): whether or not to create a LaTeX table
-        energy_key (str or list): key (or recursive key) to print as energy (per atom)
-        colour (bool): colour on-hull structures
-        return_str (bool): return string instead of printing.
+        kwargs (dict): any extra args are ignored.
 
     Returns:
         str or None: markdown or latex string, if markdown or latex is True, else None.
 
     """
-    if args is None:
-        args = dict()
-
-    args.update(kwargs)
-
-    use_source = args.get('use_source')
-    details = args.get('details')
 
     add_index_mode = False
     del_index_mode = False
@@ -165,19 +167,19 @@ def display_results(cursor,
     header_string += "{:^10}".format('Pressure')
     units_string += "{:^10}".format('(GPa)')
 
-    if args.get('per_atom'):
+    if per_atom:
         header_string += "{:^11}".format('Volume/atom')
     else:
         header_string += "{:^11}".format('Volume/fu')
     units_string += "{:^11}".format('(Ang^3)')
 
-    if args.get('eform'):
+    if eform:
         header_string += "{:^18}".format('Formation energy')
         units_string += "{:^18}".format('(eV/atom)')
     elif hull:
         header_string += "{:^13}".format('Hull dist.')
         units_string += "{:^13}".format('(meV/atom)')
-    elif args.get('per_atom'):
+    elif per_atom:
         header_string += "{:^18}".format(' '.join(energy_key.replace('_per_atom', '').split('_')).title())
         units_string += "{:^18}".format('(eV/atom)')
     else:
@@ -189,11 +191,11 @@ def display_results(cursor,
     header_string += "{:^8}".format('# fu')
     header_string += "{:^8}".format('Prov.')
 
-    if args.get('summary'):
+    if summary:
         header_string += '{:^12}'.format('Occurrences')
 
     # ensure cursor is sorted by enthalpy
-    if not no_sort:
+    if sort:
         cursor = sorted(cursor, key=lambda doc: recursive_get(doc, energy_key), reverse=False)
 
     if latex:
@@ -258,7 +260,7 @@ def display_results(cursor,
         else:
             struct_string[-1] += "{:^9}".format('xxx')
         try:
-            if args.get('per_atom') and 'cell_volume' in doc and 'num_atoms' in doc:
+            if per_atom and 'cell_volume' in doc and 'num_atoms' in doc:
                 struct_string[-1] += "{:>11.1f}".format(doc['cell_volume'] / doc['num_atoms'])
             elif 'cell_volume' in doc and 'num_fu' in doc:
                 struct_string[-1] += "{:>11.1f}".format(doc['cell_volume'] / doc['num_fu'])
@@ -267,7 +269,7 @@ def display_results(cursor,
         except Exception:
             struct_string[-1] += "{:^11}".format('xxx')
         try:
-            if hull and args.get('eform'):
+            if hull and eform:
                 struct_string[-1] += "{:>13.3f}".format(
                     doc['formation_' + energy_key]
                 )
@@ -275,7 +277,7 @@ def display_results(cursor,
                 struct_string[-1] += "{:>13.1f}".format(
                     1000 * doc['hull_distance']
                 )
-            elif args.get('per_atom'):
+            elif per_atom:
                 struct_string[-1] += "{:>18.5f}".format(recursive_get(doc, energy_key) - gs_enthalpy)
             else:
                 struct_string[-1] += ("{:>18.5f}"
@@ -317,7 +319,7 @@ def display_results(cursor,
             latex_struct_string[-1] += "{:^30} \\\\".format('')
 
         if last_formula != formula_substring:
-            if args.get('per_atom'):
+            if per_atom:
                 gs_enthalpy = recursive_get(doc, energy_key)
             else:
                 gs_enthalpy = recursive_get(doc, energy_key) * doc['num_atoms'] / doc['num_fu']
@@ -326,7 +328,7 @@ def display_results(cursor,
 
         if details:
             detail_string.append(11 * ' ' + u"├╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌ ")
-            if args.get('source'):
+            if source:
                 detail_substring.append(11 * ' ' + u"├╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌ ")
             else:
                 detail_substring.append(11 * ' ' + u"└╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌ ")
@@ -378,7 +380,7 @@ def display_results(cursor,
             detail_string[-1] += ' ' + (len(header_string) - len(detail_string[-1]) - 1) * u"╌"
             detail_substring[-1] += ' ' + (len(header_string) - len(detail_substring[-1]) - 1) * u"╌"
 
-        if args.get('source'):
+        if source:
             if len(doc['source']) == 1:
                 source_string.append(11 * ' ' + u"└──────────────────")
             else:
@@ -409,7 +411,7 @@ def display_results(cursor,
         markdown_string += units_string + '\n'
         markdown_string += len(header_string) * '-' + '\n'
 
-    if args.get('summary'):
+    if summary:
         current_formula = ''
         formula_list = {}
         summary_formula_string = {}
@@ -427,7 +429,7 @@ def display_results(cursor,
                 if details and not markdown:
                     summary_formula_string[current_formula].append(detail_string[ind])
                     summary_formula_string[current_formula].append(detail_substring[ind])
-                if args.get('source') and not markdown:
+                if source and not markdown:
                     summary_formula_string[current_formula].append(source_string[ind])
             formula_list[substring] += 1
         for formula in summary_formula_string:
@@ -444,9 +446,9 @@ def display_results(cursor,
                 if details:
                     total_string += detail_string[ind] + '\n'
                     total_string += detail_substring[ind] + '\n'
-                if args.get('source'):
+                if source:
                     total_string += source_string[ind] + '\n'
-                if details or args.get('source'):
+                if details or source:
                     total_string += len(header_string) * '─' + '\n'
     if markdown:
         markdown_string += '```'
@@ -607,7 +609,8 @@ def filter_unique_structures(cursor, quiet=False, **kwargs):
             display_cursor,
             additions=additions,
             deletions=deletions,
-            no_sort=False,
+            sort=False,
+            use_source=True,
             **kwargs
         )
 

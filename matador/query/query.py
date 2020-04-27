@@ -57,7 +57,7 @@ class DBQuery:
 
         Keyword arguments:
             client (pm.MongoClient): the MongoClient to connect to.
-            collections (dict): dictionary of pymongo Collections.
+            collections (dict of pm.collections.Collection): dictionary of pymongo Collections.
             subcmd (str): either 'query' or 'hull', 'voltage', 'hulldiff'.
                 These will decide whether calcuation accuracies are matched
                 in the final results.
@@ -327,7 +327,7 @@ class DBQuery:
                     if self.top == -1 or self.top is None:
                         self.top = count
                     if self.cursor:
-                        display_results(self.cursor[:self.top], args=self.args)
+                        display_results(self.cursor[:self.top], **self.args)
 
         # if no special query has been made already, begin executing the query
         if not self._empty_query:
@@ -366,7 +366,7 @@ class DBQuery:
                         elif cursor_count > self.top:
                             self._num_to_display = self.top
 
-                        display_results(list(self.cursor)[:self._num_to_display], args=self.args)
+                        display_results(list(self.cursor)[:self._num_to_display], **self.args)
 
                 if self.args.get('delta_E') is not None:
                     self.cursor = self.cursor[:self._num_to_display]
@@ -522,7 +522,7 @@ class DBQuery:
             raise RuntimeError('Could not find a match with {} try widening your search.'.format(self.args.get('id')))
 
         if len(self.cursor) >= 1:
-            display_results(list(self.cursor)[:self.top], args=self.args)
+            display_results(list(self.cursor)[:self.top], **self.args)
 
             if len(self.cursor) > 1:
                 print_warning('Matched multiple structures with same text_id. The first one will be used.')

@@ -116,7 +116,7 @@ class PhaseDiagram:
                                hull=True,
                                colour=False,
                                energy_key=self.formation_key,
-                               no_sort=True,
+                               sort=False,
                                return_str=True)
 
     def get_hull_distances(self, structures, precompute=False, **kwargs):
