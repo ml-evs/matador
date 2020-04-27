@@ -24,10 +24,15 @@ ROOT_DIR = os.getcwd()
 
 try:
     import matplotlib  # noqa
-
     MATPLOTLIB_PRESENT = True
 except ImportError:
     MATPLOTLIB_PRESENT = False
+
+try:
+    import ternary
+    TERNARY_PRESENT = True
+except ImportError:
+    TERNARY_PRESENT = False
 
 try:
     import _tkinter  # noqa
@@ -197,7 +202,6 @@ class HullPlotTests(MatadorUnitTest):
         QueryConvexHull(
             cursor=cursor,
             elements=["K", "P"],
-            subcmd="hull",
             svg=True,
             hull_cutoff=0.0,
             plot_kwargs={"plot_fname": "KP_hull_simple", "svg": True},
@@ -215,7 +219,7 @@ class HullPlotTests(MatadorUnitTest):
             no_plot=False,
             png=True,
             quiet=False,
-            subcmd="voltage",
+            voltage=True,
             labels=True,
             label_cutoff=0.05,
             hull_cutoff=0.1,
@@ -228,7 +232,7 @@ class HullPlotTests(MatadorUnitTest):
     def test_voltage_labels(self):
         expected_files = ["KP_voltage.png"]
         cursor = res2dict(REAL_PATH + "data/hull-KP-KSnP_pub/*.res")[0]
-        hull = QueryConvexHull(cursor=cursor, species="KP", no_plot=True, subcmd="voltage", labels=True)
+        hull = QueryConvexHull(cursor=cursor, species="KP", no_plot=True, voltage=True, labels=True)
 
         label_cursor = []
         plot_voltage_curve(hull, label_cursor=label_cursor, png=True)
@@ -238,6 +242,7 @@ class HullPlotTests(MatadorUnitTest):
         for expected_file in expected_files:
             self.assertTrue(os.path.isfile(expected_file))
 
+    @unittest.skipIf(not TERNARY_PRESENT, "Skipping as python-ternary not found")
     def test_ternary_hull_plot(self):
         """ Test plotting ternary hull. """
         expected_files = ["KSnP_hull.png", "KSnP_voltage.png"]
@@ -253,7 +258,7 @@ class HullPlotTests(MatadorUnitTest):
             no_plot=False,
             png=True,
             quiet=False,
-            subcmd="voltage",
+            voltage=True,
             labels=True,
             label_cutoff=0.05,
             hull_cutoff=0.1,
