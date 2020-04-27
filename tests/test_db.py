@@ -83,10 +83,16 @@ class TestDatabaseImport(unittest.TestCase):
         query = DBQuery(db=DB_NAME, mongo_settings=self.settings)
         self.assertEqual(len(query.cursor), 3)
 
-        query = DBQuery(db=DB_NAME, mongo_settings=self.settings, available_values="root_source")
+        query = DBQuery(
+            db=DB_NAME, mongo_settings=self.settings, available_values="root_source"
+        )
         self.assertEqual(len(query.cursor), 3)
 
-        query = DBQuery(db=DB_NAME, mongo_settings=self.settings, root_src="Na3Zn4-swap-ReOs-OQMD_759599")
+        query = DBQuery(
+            db=DB_NAME,
+            mongo_settings=self.settings,
+            root_src="Na3Zn4-swap-ReOs-OQMD_759599",
+        )
         self.assertEqual(len(query.cursor), 1)
 
         query = DBQuery(db=DB_NAME, mongo_settings=self.settings, id="no chance")

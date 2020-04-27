@@ -26,7 +26,9 @@ class SimilarityFilterTest(unittest.TestCase):
         test_docs[6]["icsd"] = 999999
         test_docs[6]["text_id"] = ["keep", "this"]
 
-        uniq_inds, _, _, _ = get_uniq_cursor(test_docs, **{"dr": 0.1, "gaussian_width": 0.1})
+        uniq_inds, _, _, _ = get_uniq_cursor(
+            test_docs, **{"dr": 0.1, "gaussian_width": 0.1}
+        )
         self.assertEqual(uniq_inds, [6])
 
     def test_k3p_uniq_default(self):
@@ -80,19 +82,29 @@ class SimilarityFilterTest(unittest.TestCase):
         cursor = [res2dict(f)[0] for f in files]
         cursor = sorted(cursor, key=lambda x: x["enthalpy_per_atom"])[0:10]
         uniq_inds, _, _, _ = get_uniq_cursor(
-            cursor, sim_tol=0.08, energy_tol=0.05, projected=True, **{"dr": 0.01, "gaussian_width": 0.1}
+            cursor,
+            sim_tol=0.08,
+            energy_tol=0.05,
+            projected=True,
+            **{"dr": 0.01, "gaussian_width": 0.1}
         )
         filtered_cursor = [cursor[ind] for ind in uniq_inds]
         self.assertEqual(len(uniq_inds), 2)
         self.assertEqual(len(filtered_cursor), 2)
-        self.assertTrue("KP-NaP-OQMD_2817-CollCode14009" in filtered_cursor[0]["source"][0])
+        self.assertTrue(
+            "KP-NaP-OQMD_2817-CollCode14009" in filtered_cursor[0]["source"][0]
+        )
         self.assertTrue("KP-NaP-CollCode421420" in filtered_cursor[1]["source"][0])
 
     def test_uniq_filter_with_hierarchy_2(self):
         cursor, f_ = res2dict(REAL_PATH + "data/hull-LLZO/*LLZO*.res")
         cursor = sorted(cursor, key=lambda x: x["enthalpy_per_atom"])[0:10]
         uniq_inds, _, _, _ = get_uniq_cursor(
-            cursor, sim_tol=0.1, energy_tol=1e10, projected=True, **{"dr": 0.01, "gaussian_width": 0.1}
+            cursor,
+            sim_tol=0.1,
+            energy_tol=1e10,
+            projected=True,
+            **{"dr": 0.01, "gaussian_width": 0.1}
         )
         filtered_cursor = [cursor[ind] for ind in uniq_inds]
         self.assertEqual(len(uniq_inds), 1)
@@ -107,14 +119,20 @@ class SimilarityFilterTest(unittest.TestCase):
         cursor = [res2dict(f)[0] for f in files]
         cursor = sorted(cursor, key=lambda x: x["enthalpy_per_atom"])[0:10]
         uniq_inds, _, _, _ = get_uniq_cursor(
-            cursor, sim_tol=0.1, energy_tol=1e20, projected=True, **{"dr": 0.01, "gaussian_width": 0.1}
+            cursor,
+            sim_tol=0.1,
+            energy_tol=1e20,
+            projected=True,
+            **{"dr": 0.01, "gaussian_width": 0.1}
         )
         filtered_cursor = [cursor[ind] for ind in uniq_inds]
         self.assertEqual(len(uniq_inds), 3)
         self.assertEqual(len(filtered_cursor), 3)
         print([doc["source"] for doc in filtered_cursor])
         self.assertTrue("cubic-LLZO-CollCode999999" in filtered_cursor[0]["source"][0])
-        self.assertTrue("KP-NaP-OQMD_2817-CollCode14009" in filtered_cursor[1]["source"][0])
+        self.assertTrue(
+            "KP-NaP-OQMD_2817-CollCode14009" in filtered_cursor[1]["source"][0]
+        )
         self.assertTrue("KP-NaP-CollCode421420" in filtered_cursor[2]["source"][0])
 
     def test_no_overlap_retains_all_structures(self):
@@ -123,7 +141,12 @@ class SimilarityFilterTest(unittest.TestCase):
         files = glob.glob(REAL_PATH + "data/uniqueness_hierarchy/*.res")
         cursor = [res2dict(f)[0] for f in files]
         uniq_inds, _, _, _ = get_uniq_cursor(
-            cursor, sim_tol=0, energy_tol=1e20, projected=True, debug=True, **{"dr": 0.1, "gaussian_width": 0.1}
+            cursor,
+            sim_tol=0,
+            energy_tol=1e20,
+            projected=True,
+            debug=True,
+            **{"dr": 0.1, "gaussian_width": 0.1}
         )
         filtered_cursor = [cursor[ind] for ind in uniq_inds]
         self.assertEqual(len(filtered_cursor), len(cursor))
@@ -135,7 +158,12 @@ class SimilarityFilterTest(unittest.TestCase):
         files = glob.glob(REAL_PATH + "data/uniqueness_hierarchy/*.res")
         cursor = [Crystal(res2dict(f)[0]) for f in files]
         uniq_inds, _, _, _ = get_uniq_cursor(
-            cursor, sim_tol=0, energy_tol=1e20, projected=True, debug=True, **{"dr": 0.1, "gaussian_width": 0.1}
+            cursor,
+            sim_tol=0,
+            energy_tol=1e20,
+            projected=True,
+            debug=True,
+            **{"dr": 0.1, "gaussian_width": 0.1}
         )
         filtered_cursor = [cursor[ind] for ind in uniq_inds]
         self.assertEqual(len(filtered_cursor), len(cursor))
@@ -144,17 +172,20 @@ class SimilarityFilterTest(unittest.TestCase):
         from matador.crystal import Crystal
         from matador.utils.cursor_utils import filter_unique_structures
         import glob
+
         files = glob.glob(REAL_PATH + "data/uniqueness_hierarchy/*.res")
         cursor = [Crystal(res2dict(f)[0]) for f in files]
         filtered_cursor = filter_unique_structures(cursor, energy_tol=0)
         self.assertEqual(len(filtered_cursor), len(cursor))
 
-        cursor = sorted([res2dict(f)[0] for f in files], key=lambda doc: doc['enthalpy_per_atom'])[0:10]
+        cursor = sorted(
+            [res2dict(f)[0] for f in files], key=lambda doc: doc["enthalpy_per_atom"]
+        )[0:10]
         for ind, doc in enumerate(cursor):
-            doc['enthalpy_per_atom'] = float(-ind)
+            doc["enthalpy_per_atom"] = float(-ind)
 
-        cursor[8]['enthalpy_per_atom'] = -5.0
-        cursor[9]['enthalpy_per_atom'] = -5.0001
+        cursor[8]["enthalpy_per_atom"] = -5.0
+        cursor[9]["enthalpy_per_atom"] = -5.0001
 
         filtered_cursor = filter_unique_structures(cursor, energy_tol=0.003)
         self.assertEqual(len(filtered_cursor), 8)

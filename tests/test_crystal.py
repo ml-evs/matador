@@ -101,14 +101,16 @@ class CrystalTest(unittest.TestCase):
 
     def test_convert_positions(self):
         doc = res2dict(REAL_PATH + "data/structures/Li7Sn-Fmmm.res")[0]
-        crystal = res2dict(REAL_PATH + "data/structures/Li7Sn-Fmmm.res", as_model=True)[0]
+        crystal = res2dict(REAL_PATH + "data/structures/Li7Sn-Fmmm.res", as_model=True)[
+            0
+        ]
 
-        doc['positions_abs'] = frac2cart(doc['lattice_cart'], doc['positions_frac'])
+        doc["positions_abs"] = frac2cart(doc["lattice_cart"], doc["positions_frac"])
 
-        np.testing.assert_array_equal(doc['positions_abs'], crystal.positions_abs)
+        np.testing.assert_array_equal(doc["positions_abs"], crystal.positions_abs)
         print(crystal.positions_abs)
         for site in crystal:
-            print(site, site.get_coords('cartesian'))
+            print(site, site.get_coords("cartesian"))
 
     def test_minimal_init(self):
         doc = Crystal(
@@ -207,7 +209,7 @@ class CrystalTest(unittest.TestCase):
         doc, s = magres2dict(REAL_PATH + "data/NaP_QE6.magres")
         crystal = Crystal(doc)
         for atom in crystal:
-            print(atom, atom.site_data['magres_shift'])
+            print(atom, atom.site_data["magres_shift"])
 
     @unittest.skipIf(not imported_vornet, "Voronoi code not found in this distribution")
     def testCoordination(self):

@@ -14,7 +14,13 @@ class QueryParseTest(unittest.TestCase):
         query = DBQuery(**kwargs)
         test_dict = {
             "$and": [
-                {"$and": [{"elems": {"$in": ["K"]}}, {"elems": {"$in": ["P"]}}, {"stoichiometry": {"$size": 2}}]},
+                {
+                    "$and": [
+                        {"elems": {"$in": ["K"]}},
+                        {"elems": {"$in": ["P"]}},
+                        {"stoichiometry": {"$size": 2}},
+                    ]
+                },
                 {"$or": [{"quality": {"$gt": 0}}, {"quality": {"$exists": False}}]},
             ]
         }
@@ -56,7 +62,12 @@ class QueryParseTest(unittest.TestCase):
         query = DBQuery(**kwargs)
         test_dict = {
             "$and": [
-                {"$and": [{"stoichiometry": {"$in": [["K", 3]]}}, {"stoichiometry": {"$in": [["P", 1]]}}]},
+                {
+                    "$and": [
+                        {"stoichiometry": {"$in": [["K", 3]]}},
+                        {"stoichiometry": {"$in": [["P", 1]]}},
+                    ]
+                },
                 {"$or": [{"quality": {"$gt": 0}}, {"quality": {"$exists": False}}]},
             ]
         }
@@ -66,13 +77,22 @@ class QueryParseTest(unittest.TestCase):
         query = DBQuery(**kwargs)
         test_dict = {
             "$and": [
-                {"$and": [{"stoichiometry": {"$in": [["K", 3]]}}, {"stoichiometry": {"$in": [["P", 1]]}}]},
+                {
+                    "$and": [
+                        {"stoichiometry": {"$in": [["K", 3]]}},
+                        {"stoichiometry": {"$in": [["P", 1]]}},
+                    ]
+                },
                 {"$or": [{"quality": {"$gt": 0}}, {"quality": {"$exists": False}}]},
             ]
         }
         self.assertDictEqual(test_dict, query.query_dict)
 
-        kwargs = {"field": ["xc_functional", "cut_off_energy"], "filter": [["PBE"], ["301.2312", 400.0]], "testing": True}
+        kwargs = {
+            "field": ["xc_functional", "cut_off_energy"],
+            "filter": [["PBE"], ["301.2312", 400.0]],
+            "testing": True,
+        }
         query = DBQuery(**kwargs)
         test_dict = {
             "$and": [
@@ -119,7 +139,12 @@ class QueryParseTest(unittest.TestCase):
         query = DBQuery(**kwargs)
         test_dict = {
             "$and": [
-                {"$and": [{"stoichiometry": {"$in": [["K", 3]]}}, {"stoichiometry": {"$in": [["P", 1]]}}]},
+                {
+                    "$and": [
+                        {"stoichiometry": {"$in": [["K", 3]]}},
+                        {"stoichiometry": {"$in": [["P", 1]]}},
+                    ]
+                },
                 {"stoichiometry": {"$size": 3}},
                 {"space_group": "Fd-3m"},
                 {"num_fu": {"$gte": 4}},
@@ -281,19 +306,39 @@ class QueryParseTest(unittest.TestCase):
 
         arg = "[VII][Fe,Ru,Os][I][V][VIII][ASDASD]"
         elements = parse_element_string(arg)
-        self.assertEqual(elements, ["[VII]", "[Fe,Ru,Os]", "[I]", "[V]", "[VIII]", "[ASDASD]"])
+        self.assertEqual(
+            elements, ["[VII]", "[Fe,Ru,Os]", "[I]", "[V]", "[VIII]", "[ASDASD]"]
+        )
 
         arg = "{VII}[Fe,Ru,Os][I]{V}[VIII][ASDASD]"
         elements = parse_element_string(arg)
-        self.assertEqual(elements, ["{VII}", "[Fe,Ru,Os]", "[I]", "{V}", "[VIII]", "[ASDASD]"])
+        self.assertEqual(
+            elements, ["{VII}", "[Fe,Ru,Os]", "[I]", "{V}", "[VIII]", "[ASDASD]"]
+        )
 
         arg = "{VII}[Fe,Ru,Os][I][V][VIII][ASDASD]"
         elements = parse_element_string(arg)
-        self.assertEqual(elements, ["{VII}", "[Fe,Ru,Os]", "[I]", "[V]", "[VIII]", "[ASDASD]"])
+        self.assertEqual(
+            elements, ["{VII}", "[Fe,Ru,Os]", "[I]", "[V]", "[VIII]", "[ASDASD]"]
+        )
 
         arg = "[VII]5[Fe,Ru,Os]2[I][V]6[VIII]2[ASDASD]"
         elements = parse_element_string(arg, stoich=True)
-        self.assertEqual(elements, ["[VII]", "5", "[Fe,Ru,Os]", "2", "[I]", "[V]", "6", "[VIII]", "2", "[ASDASD]"])
+        self.assertEqual(
+            elements,
+            [
+                "[VII]",
+                "5",
+                "[Fe,Ru,Os]",
+                "2",
+                "[I]",
+                "[V]",
+                "6",
+                "[VIII]",
+                "2",
+                "[ASDASD]",
+            ],
+        )
 
         raised = False
         arg = "{VII}[Fe,Ru,Os}[I][V][VIII][ASDASD]"
@@ -330,18 +375,56 @@ class QueryParseTest(unittest.TestCase):
         self.assertDictEqual(test_dict, query.query_dict)
 
     def test_intersection(self):
-        kwargs = {"composition": ["LiFeBe"], "ignore_warnings": True, "intersection": True, "testing": True}
+        kwargs = {
+            "composition": ["LiFeBe"],
+            "ignore_warnings": True,
+            "intersection": True,
+            "testing": True,
+        }
         query = DBQuery(**kwargs)
         test_dict = {
             "$and": [
                 {
                     "$or": [
-                        {"$and": [{"stoichiometry": {"$size": 1}}, {"elems": {"$in": ["Li"]}}]},
-                        {"$and": [{"stoichiometry": {"$size": 1}}, {"elems": {"$in": ["Fe"]}}]},
-                        {"$and": [{"stoichiometry": {"$size": 1}}, {"elems": {"$in": ["Be"]}}]},
-                        {"$and": [{"stoichiometry": {"$size": 2}}, {"elems": {"$in": ["Li"]}}, {"elems": {"$in": ["Fe"]}}]},
-                        {"$and": [{"stoichiometry": {"$size": 2}}, {"elems": {"$in": ["Li"]}}, {"elems": {"$in": ["Be"]}}]},
-                        {"$and": [{"stoichiometry": {"$size": 2}}, {"elems": {"$in": ["Fe"]}}, {"elems": {"$in": ["Be"]}}]},
+                        {
+                            "$and": [
+                                {"stoichiometry": {"$size": 1}},
+                                {"elems": {"$in": ["Li"]}},
+                            ]
+                        },
+                        {
+                            "$and": [
+                                {"stoichiometry": {"$size": 1}},
+                                {"elems": {"$in": ["Fe"]}},
+                            ]
+                        },
+                        {
+                            "$and": [
+                                {"stoichiometry": {"$size": 1}},
+                                {"elems": {"$in": ["Be"]}},
+                            ]
+                        },
+                        {
+                            "$and": [
+                                {"stoichiometry": {"$size": 2}},
+                                {"elems": {"$in": ["Li"]}},
+                                {"elems": {"$in": ["Fe"]}},
+                            ]
+                        },
+                        {
+                            "$and": [
+                                {"stoichiometry": {"$size": 2}},
+                                {"elems": {"$in": ["Li"]}},
+                                {"elems": {"$in": ["Be"]}},
+                            ]
+                        },
+                        {
+                            "$and": [
+                                {"stoichiometry": {"$size": 2}},
+                                {"elems": {"$in": ["Fe"]}},
+                                {"elems": {"$in": ["Be"]}},
+                            ]
+                        },
                         {
                             "$and": [
                                 {"stoichiometry": {"$size": 3}},
@@ -383,13 +466,23 @@ class QueryParseTest(unittest.TestCase):
         self.assertDictEqual(test_dict, query.query_dict)
 
     def test_double_macro_composition(self):
-        kwargs = {"composition": ["[Fe,Ru,Os][I]Be"], "ignore_warnings": True, "testing": True}
+        kwargs = {
+            "composition": ["[Fe,Ru,Os][I]Be"],
+            "ignore_warnings": True,
+            "testing": True,
+        }
         query = DBQuery(**kwargs)
         test_dict = {
             "$and": [
                 {
                     "$and": [
-                        {"$or": [{"elems": {"$in": ["Fe"]}}, {"elems": {"$in": ["Ru"]}}, {"elems": {"$in": ["Os"]}}]},
+                        {
+                            "$or": [
+                                {"elems": {"$in": ["Fe"]}},
+                                {"elems": {"$in": ["Ru"]}},
+                                {"elems": {"$in": ["Os"]}},
+                            ]
+                        },
                         {
                             "$or": [
                                 {"elems": {"$in": ["Li"]}},
@@ -409,14 +502,24 @@ class QueryParseTest(unittest.TestCase):
         self.assertDictEqual(test_dict, query.query_dict)
 
     def test_double_end_macro_composition(self):
-        kwargs = {"composition": ["Be[Fe,Ru,Os][I]"], "ignore_warnings": True, "testing": True}
+        kwargs = {
+            "composition": ["Be[Fe,Ru,Os][I]"],
+            "ignore_warnings": True,
+            "testing": True,
+        }
         query = DBQuery(**kwargs)
         test_dict = {
             "$and": [
                 {
                     "$and": [
                         {"elems": {"$in": ["Be"]}},
-                        {"$or": [{"elems": {"$in": ["Fe"]}}, {"elems": {"$in": ["Ru"]}}, {"elems": {"$in": ["Os"]}}]},
+                        {
+                            "$or": [
+                                {"elems": {"$in": ["Fe"]}},
+                                {"elems": {"$in": ["Ru"]}},
+                                {"elems": {"$in": ["Os"]}},
+                            ]
+                        },
                         {
                             "$or": [
                                 {"elems": {"$in": ["Li"]}},
@@ -435,7 +538,11 @@ class QueryParseTest(unittest.TestCase):
         self.assertDictEqual(test_dict, query.query_dict)
 
     def test_triple_macro_composition(self):
-        kwargs = {"composition": ["[VII][Fe,Ru,Os][I]"], "ignore_warnings": True, "testing": True}
+        kwargs = {
+            "composition": ["[VII][Fe,Ru,Os][I]"],
+            "ignore_warnings": True,
+            "testing": True,
+        }
         query = DBQuery(**kwargs)
         test_dict = {
             "$and": [
@@ -450,7 +557,13 @@ class QueryParseTest(unittest.TestCase):
                                 {"elems": {"$in": ["At"]}},
                             ]
                         },
-                        {"$or": [{"elems": {"$in": ["Fe"]}}, {"elems": {"$in": ["Ru"]}}, {"elems": {"$in": ["Os"]}}]},
+                        {
+                            "$or": [
+                                {"elems": {"$in": ["Fe"]}},
+                                {"elems": {"$in": ["Ru"]}},
+                                {"elems": {"$in": ["Os"]}},
+                            ]
+                        },
                         {
                             "$or": [
                                 {"elems": {"$in": ["Li"]}},
@@ -471,14 +584,30 @@ class QueryParseTest(unittest.TestCase):
         self.assertDictEqual(test_dict, query.query_dict)
 
     def test_double_list_composition(self):
-        kwargs = {"composition": ["[Si,Ge,Sn][Fe,Ru,Os]"], "ignore_warnings": True, "testing": True}
+        kwargs = {
+            "composition": ["[Si,Ge,Sn][Fe,Ru,Os]"],
+            "ignore_warnings": True,
+            "testing": True,
+        }
         query = DBQuery(**kwargs)
         test_dict = {
             "$and": [
                 {
                     "$and": [
-                        {"$or": [{"elems": {"$in": ["Si"]}}, {"elems": {"$in": ["Ge"]}}, {"elems": {"$in": ["Sn"]}}]},
-                        {"$or": [{"elems": {"$in": ["Fe"]}}, {"elems": {"$in": ["Ru"]}}, {"elems": {"$in": ["Os"]}}]},
+                        {
+                            "$or": [
+                                {"elems": {"$in": ["Si"]}},
+                                {"elems": {"$in": ["Ge"]}},
+                                {"elems": {"$in": ["Sn"]}},
+                            ]
+                        },
+                        {
+                            "$or": [
+                                {"elems": {"$in": ["Fe"]}},
+                                {"elems": {"$in": ["Ru"]}},
+                                {"elems": {"$in": ["Os"]}},
+                            ]
+                        },
                         {"stoichiometry": {"$size": 2}},
                     ]
                 }
@@ -488,15 +617,37 @@ class QueryParseTest(unittest.TestCase):
         self.assertDictEqual(test_dict, query.query_dict)
 
     def test_triple_list_composition(self):
-        kwargs = {"composition": ["[Li,Na,K][Fe,Ru,Os][F,P,S]"], "ignore_warnings": True, "testing": True}
+        kwargs = {
+            "composition": ["[Li,Na,K][Fe,Ru,Os][F,P,S]"],
+            "ignore_warnings": True,
+            "testing": True,
+        }
         query = DBQuery(**kwargs)
         test_dict = {
             "$and": [
                 {
                     "$and": [
-                        {"$or": [{"elems": {"$in": ["Li"]}}, {"elems": {"$in": ["Na"]}}, {"elems": {"$in": ["K"]}}]},
-                        {"$or": [{"elems": {"$in": ["Fe"]}}, {"elems": {"$in": ["Ru"]}}, {"elems": {"$in": ["Os"]}}]},
-                        {"$or": [{"elems": {"$in": ["F"]}}, {"elems": {"$in": ["P"]}}, {"elems": {"$in": ["S"]}}]},
+                        {
+                            "$or": [
+                                {"elems": {"$in": ["Li"]}},
+                                {"elems": {"$in": ["Na"]}},
+                                {"elems": {"$in": ["K"]}},
+                            ]
+                        },
+                        {
+                            "$or": [
+                                {"elems": {"$in": ["Fe"]}},
+                                {"elems": {"$in": ["Ru"]}},
+                                {"elems": {"$in": ["Os"]}},
+                            ]
+                        },
+                        {
+                            "$or": [
+                                {"elems": {"$in": ["F"]}},
+                                {"elems": {"$in": ["P"]}},
+                                {"elems": {"$in": ["S"]}},
+                            ]
+                        },
                         {"stoichiometry": {"$size": 3}},
                     ]
                 }
@@ -512,7 +663,12 @@ class QueryParseTest(unittest.TestCase):
             "$and": [
                 {
                     "$and": [
-                        {"$or": [{"$and": [{"elems": {"$in": ["Li"]}}]}, {"$and": [{"elems": {"$in": ["Na"]}}]}]},
+                        {
+                            "$or": [
+                                {"$and": [{"elems": {"$in": ["Li"]}}]},
+                                {"$and": [{"elems": {"$in": ["Na"]}}]},
+                            ]
+                        },
                         {"stoichiometry": {"$size": 1}},
                     ]
                 }
@@ -521,7 +677,11 @@ class QueryParseTest(unittest.TestCase):
         self.assertDictEqual(test_dict, query.query_dict)
 
     def test_double_set_composition(self):
-        kwargs = {"composition": ["{Li,Na}{Be,Fe}"], "ignore_warnings": True, "testing": True}
+        kwargs = {
+            "composition": ["{Li,Na}{Be,Fe}"],
+            "ignore_warnings": True,
+            "testing": True,
+        }
         query = DBQuery(**kwargs)
         test_dict = {
             "$and": [
@@ -529,10 +689,30 @@ class QueryParseTest(unittest.TestCase):
                     "$and": [
                         {
                             "$or": [
-                                {"$and": [{"elems": {"$in": ["Li"]}}, {"elems": {"$in": ["Be"]}}]},
-                                {"$and": [{"elems": {"$in": ["Li"]}}, {"elems": {"$in": ["Fe"]}}]},
-                                {"$and": [{"elems": {"$in": ["Na"]}}, {"elems": {"$in": ["Be"]}}]},
-                                {"$and": [{"elems": {"$in": ["Na"]}}, {"elems": {"$in": ["Fe"]}}]},
+                                {
+                                    "$and": [
+                                        {"elems": {"$in": ["Li"]}},
+                                        {"elems": {"$in": ["Be"]}},
+                                    ]
+                                },
+                                {
+                                    "$and": [
+                                        {"elems": {"$in": ["Li"]}},
+                                        {"elems": {"$in": ["Fe"]}},
+                                    ]
+                                },
+                                {
+                                    "$and": [
+                                        {"elems": {"$in": ["Na"]}},
+                                        {"elems": {"$in": ["Be"]}},
+                                    ]
+                                },
+                                {
+                                    "$and": [
+                                        {"elems": {"$in": ["Na"]}},
+                                        {"elems": {"$in": ["Fe"]}},
+                                    ]
+                                },
                             ]
                         },
                         {"stoichiometry": {"$size": 2}},
@@ -543,7 +723,11 @@ class QueryParseTest(unittest.TestCase):
         self.assertDictEqual(test_dict, query.query_dict)
 
     def test_ternary_set_composition(self):
-        kwargs = {"composition": ["LiRu{Ru,S}"], "ignore_warnings": True, "testing": True}
+        kwargs = {
+            "composition": ["LiRu{Ru,S}"],
+            "ignore_warnings": True,
+            "testing": True,
+        }
         query = DBQuery(**kwargs)
         test_dict = {
             "$and": [
@@ -551,7 +735,13 @@ class QueryParseTest(unittest.TestCase):
                     "$and": [
                         {
                             "$or": [
-                                {"$and": [{"elems": {"$in": ["Li"]}}, {"elems": {"$in": ["Ru"]}}, {"elems": {"$in": ["S"]}}]}
+                                {
+                                    "$and": [
+                                        {"elems": {"$in": ["Li"]}},
+                                        {"elems": {"$in": ["Ru"]}},
+                                        {"elems": {"$in": ["S"]}},
+                                    ]
+                                }
                             ]
                         },
                         {"stoichiometry": {"$size": 3}},
@@ -562,7 +752,11 @@ class QueryParseTest(unittest.TestCase):
         self.assertDictEqual(test_dict, query.query_dict)
 
     def test_solo_set_composition(self):
-        kwargs = {"composition": ["{Li}Ru{Ru,S}"], "ignore_warnings": True, "testing": True}
+        kwargs = {
+            "composition": ["{Li}Ru{Ru,S}"],
+            "ignore_warnings": True,
+            "testing": True,
+        }
         query = DBQuery(**kwargs)
         test_dict = {
             "$and": [
@@ -570,7 +764,13 @@ class QueryParseTest(unittest.TestCase):
                     "$and": [
                         {
                             "$or": [
-                                {"$and": [{"elems": {"$in": ["Li"]}}, {"elems": {"$in": ["Ru"]}}, {"elems": {"$in": ["S"]}}]}
+                                {
+                                    "$and": [
+                                        {"elems": {"$in": ["Li"]}},
+                                        {"elems": {"$in": ["Ru"]}},
+                                        {"elems": {"$in": ["S"]}},
+                                    ]
+                                }
                             ]
                         },
                         {"stoichiometry": {"$size": 3}},
@@ -581,7 +781,11 @@ class QueryParseTest(unittest.TestCase):
         self.assertDictEqual(test_dict, query.query_dict)
 
     def test_triple_set_composition(self):
-        kwargs = {"composition": ["{Li,Na}{Ru,Os}{Ru,S}"], "ignore_warnings": True, "testing": True}
+        kwargs = {
+            "composition": ["{Li,Na}{Ru,Os}{Ru,S}"],
+            "ignore_warnings": True,
+            "testing": True,
+        }
         query = DBQuery(**kwargs)
         test_dict = {
             "$and": [
@@ -589,12 +793,48 @@ class QueryParseTest(unittest.TestCase):
                     "$and": [
                         {
                             "$or": [
-                                {"$and": [{"elems": {"$in": ["Li"]}}, {"elems": {"$in": ["Ru"]}}, {"elems": {"$in": ["S"]}}]},
-                                {"$and": [{"elems": {"$in": ["Li"]}}, {"elems": {"$in": ["Os"]}}, {"elems": {"$in": ["Ru"]}}]},
-                                {"$and": [{"elems": {"$in": ["Li"]}}, {"elems": {"$in": ["Os"]}}, {"elems": {"$in": ["S"]}}]},
-                                {"$and": [{"elems": {"$in": ["Na"]}}, {"elems": {"$in": ["Ru"]}}, {"elems": {"$in": ["S"]}}]},
-                                {"$and": [{"elems": {"$in": ["Na"]}}, {"elems": {"$in": ["Os"]}}, {"elems": {"$in": ["Ru"]}}]},
-                                {"$and": [{"elems": {"$in": ["Na"]}}, {"elems": {"$in": ["Os"]}}, {"elems": {"$in": ["S"]}}]},
+                                {
+                                    "$and": [
+                                        {"elems": {"$in": ["Li"]}},
+                                        {"elems": {"$in": ["Ru"]}},
+                                        {"elems": {"$in": ["S"]}},
+                                    ]
+                                },
+                                {
+                                    "$and": [
+                                        {"elems": {"$in": ["Li"]}},
+                                        {"elems": {"$in": ["Os"]}},
+                                        {"elems": {"$in": ["Ru"]}},
+                                    ]
+                                },
+                                {
+                                    "$and": [
+                                        {"elems": {"$in": ["Li"]}},
+                                        {"elems": {"$in": ["Os"]}},
+                                        {"elems": {"$in": ["S"]}},
+                                    ]
+                                },
+                                {
+                                    "$and": [
+                                        {"elems": {"$in": ["Na"]}},
+                                        {"elems": {"$in": ["Ru"]}},
+                                        {"elems": {"$in": ["S"]}},
+                                    ]
+                                },
+                                {
+                                    "$and": [
+                                        {"elems": {"$in": ["Na"]}},
+                                        {"elems": {"$in": ["Os"]}},
+                                        {"elems": {"$in": ["Ru"]}},
+                                    ]
+                                },
+                                {
+                                    "$and": [
+                                        {"elems": {"$in": ["Na"]}},
+                                        {"elems": {"$in": ["Os"]}},
+                                        {"elems": {"$in": ["S"]}},
+                                    ]
+                                },
                             ]
                         },
                         {"stoichiometry": {"$size": 3}},
@@ -605,12 +845,20 @@ class QueryParseTest(unittest.TestCase):
         self.assertDictEqual(test_dict, query.query_dict)
 
     def test_illegal_character(self):
-        kwargs = {"composition": ["{Li,Na,K}.{Fe,Ru,Os>}{F,P,S}"], "ignore_warnings": True, "testing": True}
+        kwargs = {
+            "composition": ["{Li,Na,K}.{Fe,Ru,Os>}{F,P,S}"],
+            "ignore_warnings": True,
+            "testing": True,
+        }
         with self.assertRaises(RuntimeError):
             DBQuery(**kwargs)
 
     def test_triple_macro_stoich(self):
-        kwargs = {"formula": ["[VII]2[Fe,Ru,Os]3[I]"], "ignore_warnings": True, "testing": True}
+        kwargs = {
+            "formula": ["[VII]2[Fe,Ru,Os]3[I]"],
+            "ignore_warnings": True,
+            "testing": True,
+        }
         query = DBQuery(**kwargs)
         test_dict = {
             "$and": [
@@ -651,7 +899,11 @@ class QueryParseTest(unittest.TestCase):
         print(query.query_dict)
         self.assertDictEqual(test_dict, query.query_dict)
 
-        kwargs = {"formula": ["[Ag,Cd,In]2[Fe,Ru,Os]3[I]"], "ignore_warnings": True, "testing": True}
+        kwargs = {
+            "formula": ["[Ag,Cd,In]2[Fe,Ru,Os]3[I]"],
+            "ignore_warnings": True,
+            "testing": True,
+        }
         query = DBQuery(**kwargs)
         test_dict = {
             "$and": [
@@ -701,7 +953,13 @@ class QueryParseTest(unittest.TestCase):
         time_str += (24 - len(time_str)) * "0"
         test_dict = {
             "$and": [
-                {"$and": [{"elems": {"$in": ["K"]}}, {"elems": {"$in": ["P"]}}, {"stoichiometry": {"$size": 2}}]},
+                {
+                    "$and": [
+                        {"elems": {"$in": ["K"]}},
+                        {"elems": {"$in": ["P"]}},
+                        {"stoichiometry": {"$size": 2}},
+                    ]
+                },
                 {"$or": [{"quality": {"$gt": 0}}, {"quality": {"$exists": False}}]},
                 {"_id": {"$lte": ObjectId(time_str)}},
             ]
@@ -718,7 +976,13 @@ class QueryParseTest(unittest.TestCase):
         time_str += (24 - len(time_str)) * "0"
         test_dict = {
             "$and": [
-                {"$and": [{"elems": {"$in": ["K"]}}, {"elems": {"$in": ["P"]}}, {"stoichiometry": {"$size": 2}}]},
+                {
+                    "$and": [
+                        {"elems": {"$in": ["K"]}},
+                        {"elems": {"$in": ["P"]}},
+                        {"stoichiometry": {"$size": 2}},
+                    ]
+                },
                 {"$or": [{"quality": {"$gt": 0}}, {"quality": {"$exists": False}}]},
                 {"_id": {"$lte": ObjectId(time_str)}},
             ]
@@ -733,7 +997,13 @@ class QueryParseTest(unittest.TestCase):
         time_str += (24 - len(time_str)) * "0"
         test_dict = {
             "$and": [
-                {"$and": [{"elems": {"$in": ["K"]}}, {"elems": {"$in": ["P"]}}, {"stoichiometry": {"$size": 2}}]},
+                {
+                    "$and": [
+                        {"elems": {"$in": ["K"]}},
+                        {"elems": {"$in": ["P"]}},
+                        {"stoichiometry": {"$size": 2}},
+                    ]
+                },
                 {"$or": [{"quality": {"$gt": 0}}, {"quality": {"$exists": False}}]},
                 {"_id": {"$lte": ObjectId(time_str)}},
             ]
@@ -745,7 +1015,10 @@ class QueryParseTest(unittest.TestCase):
         query = DBQuery(**kwargs)
 
         test_dict = {
-            "$and": [{"text_id": ["testing", "testing"]}, {"$or": [{"quality": {"$gt": 0}}, {"quality": {"$exists": False}}]}]
+            "$and": [
+                {"text_id": ["testing", "testing"]},
+                {"$or": [{"quality": {"$gt": 0}}, {"quality": {"$exists": False}}]},
+            ]
         }
 
         print(test_dict)

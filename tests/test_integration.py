@@ -26,7 +26,7 @@ DB_NAME = "ci_test"
 ROOT_DIR = os.getcwd()
 DEBUG = False
 MONGO_CLIENT = mongomock.MongoClient()
-OUTPUT_DIR = ROOT_DIR + '/integration_test_results'
+OUTPUT_DIR = ROOT_DIR + "/integration_test_results"
 
 
 @mongomock.patch(servers=("mongo_test.com:27017",))
@@ -35,6 +35,7 @@ class IntegrationTest(unittest.TestCase):
 
     def tearDown(self):
         import shutil
+
         self.settings.reset()
         os.chdir(ROOT_DIR)
         shutil.rmtree(OUTPUT_DIR)
@@ -57,30 +58,41 @@ class IntegrationTest(unittest.TestCase):
         """ Test import and query. """
         print("IMPORT CASTEP 1")
         query = import_castep()
-        self.assertEqual(len(query.cursor), 3, msg="Failed to import structures correctly")
+        self.assertEqual(
+            len(query.cursor), 3, msg="Failed to import structures correctly"
+        )
 
         # run again and hopefully nothing will change, i.e. no duplication
         print("IMPORT CASTEP 2")
         query = import_castep()
-        self.assertEqual(len(query.cursor), 3, msg="Failed to import structures correctly")
+        self.assertEqual(
+            len(query.cursor), 3, msg="Failed to import structures correctly"
+        )
 
         print("IMPORT CASTEP 3")
         query = import_castep(extra_flags="--recent_only")
-        self.assertEqual(len(query.cursor), 3, msg="Failed to import structures correctly")
+        self.assertEqual(
+            len(query.cursor), 3, msg="Failed to import structures correctly"
+        )
 
         print("IMPORT RES")
         query_1, query_2 = import_res()
         self.assertEqual(len(query_1.cursor), 7, msg="Failed to import res files")
         self.assertEqual(len(query_2.cursor), 4, msg="Failed to import res files")
         self.assertEqual(
-            query_2.cursor[0]["species_pot"]["K"], "2|1.5|9|10|11|30U:40:31(qc=6)", msg="Failed to scrape OTF with weird name"
+            query_2.cursor[0]["species_pot"]["K"],
+            "2|1.5|9|10|11|30U:40:31(qc=6)",
+            msg="Failed to scrape OTF with weird name",
         )
         self.assertEqual(
             query_2.cursor[0]["species_pot"]["Sn"],
             "2|2|2|1.6|9.6|10.8|11.7|50U=-0.395U=+0.25:51U=-0.14U=+0.25",
             msg="Failed to scrape OTF with linebreak",
         )
-        self.assertFalse(any(["Sb" in doc["species_pot"] for doc in query_2.cursor]), msg="pspots over-scraped!")
+        self.assertFalse(
+            any(["Sb" in doc["species_pot"] for doc in query_2.cursor]),
+            msg="pspots over-scraped!",
+        )
 
         print("SWAP")
         output_folder_exists, successes, elem_successes = swaps()
@@ -90,8 +102,12 @@ class IntegrationTest(unittest.TestCase):
 
         print("CHANGES")
         query_1, query_2, changes_count = changes()
-        self.assertEqual(len(query_1.cursor), 3, msg="matador changes did not remove files")
-        self.assertEqual(len(query_2.cursor), 0, msg="matador changes did not remove files")
+        self.assertEqual(
+            len(query_1.cursor), 3, msg="matador changes did not remove files"
+        )
+        self.assertEqual(
+            len(query_2.cursor), 0, msg="matador changes did not remove files"
+        )
         # unclear that mongomock can handle this; just check the queries instead
         # self.assertEqual(changes_count, 1, msg='matador changes did not changelog')
 
@@ -193,7 +209,9 @@ class IntegrationTest(unittest.TestCase):
         cursor = refine().cursor
         self.assertTrue(all([doc["doi"] == ["10/12345"] for doc in cursor]))
         self.assertTrue(all([doc["tags"] == ["integration_test"] for doc in cursor]))
-        self.assertTrue(all([doc["root_source"] == get_root_source(doc) for doc in cursor]))
+        self.assertTrue(
+            all([doc["root_source"] == get_root_source(doc) for doc in cursor])
+        )
         self.assertTrue(all([isinstance(doc["_raw"], list) for doc in cursor]))
 
 
@@ -237,7 +255,9 @@ def import_res():
     matador.cli.cli.main(no_quickstart=True)
 
     query_1 = DBQuery(db=DB_NAME, config=CONFIG_FNAME, details=True, source=True)
-    query_2 = DBQuery(db=DB_NAME, composition="KSnP", config=CONFIG_FNAME, details=True, source=True)
+    query_2 = DBQuery(
+        db=DB_NAME, composition="KSnP", config=CONFIG_FNAME, details=True, source=True
+    )
 
     files_to_delete = glob.glob("*spatula*")
     for f in files_to_delete:
@@ -262,7 +282,13 @@ def pseudoternary_hull():
     matador.cli.cli.main(no_quickstart=True)
 
     query = DBQuery(
-        db=DB_NAME, subcmd='hull', composition="La2O3:Li2O:ZrO2", config=CONFIG_FNAME, details=True, source=True, no_plot=True
+        db=DB_NAME,
+        subcmd="hull",
+        composition="La2O3:Li2O:ZrO2",
+        config=CONFIG_FNAME,
+        details=True,
+        source=True,
+        no_plot=True,
     )
     hull = QueryConvexHull(query=query)
 
@@ -285,7 +311,12 @@ def pseudoternary_hull_no_query():
     matador.cli.cli.main(no_quickstart=True)
 
     hull = QueryConvexHull(
-        db=DB_NAME, composition="La2O3:Li2O:ZrO2", config=CONFIG_FNAME, details=True, source=True, no_plot=True
+        db=DB_NAME,
+        composition="La2O3:Li2O:ZrO2",
+        config=CONFIG_FNAME,
+        details=True,
+        source=True,
+        no_plot=True,
     )
 
     os.chdir(OUTPUT_DIR)
@@ -303,7 +334,19 @@ def stats():
 
 def swaps():
     """ Run swaps, returning data to be checked. """
-    sys.argv = ["matador", "swaps", "--db", DB_NAME, "--res", "--cell", "-c", "NaPZn", "-int", "-sw", "NaLi:PSi:ZnSn"]
+    sys.argv = [
+        "matador",
+        "swaps",
+        "--db",
+        DB_NAME,
+        "--res",
+        "--cell",
+        "-c",
+        "NaPZn",
+        "-int",
+        "-sw",
+        "NaLi:PSi:ZnSn",
+    ]
     if CONFIG_FNAME is not None:
         sys.argv += ["--config", CONFIG_FNAME]
     matador.cli.cli.main()
@@ -361,32 +404,90 @@ def changes():
 
 def refine():
     """ Test various matador refine tasks. """
-    sys.argv = ["matador", "refine", "--db", DB_NAME, "--task", "sym", "--mode", "overwrite"]
+    sys.argv = [
+        "matador",
+        "refine",
+        "--db",
+        DB_NAME,
+        "--task",
+        "sym",
+        "--mode",
+        "overwrite",
+    ]
     if CONFIG_FNAME is not None:
         sys.argv += ["--config", CONFIG_FNAME]
     matador.cli.cli.main(no_quickstart=True)
 
-    sys.argv = ["matador", "refine", "--db", DB_NAME, "--task", "source", "--mode", "set"]
+    sys.argv = [
+        "matador",
+        "refine",
+        "--db",
+        DB_NAME,
+        "--task",
+        "source",
+        "--mode",
+        "set",
+    ]
     if CONFIG_FNAME is not None:
         sys.argv += ["--config", CONFIG_FNAME]
     matador.cli.cli.main(no_quickstart=True)
 
-    sys.argv = ["matador", "refine", "--db", DB_NAME, "--task", "doi", "--mode", "set", "--new_doi", "10/12345"]
+    sys.argv = [
+        "matador",
+        "refine",
+        "--db",
+        DB_NAME,
+        "--task",
+        "doi",
+        "--mode",
+        "set",
+        "--new_doi",
+        "10/12345",
+    ]
     if CONFIG_FNAME is not None:
         sys.argv += ["--config", CONFIG_FNAME]
     matador.cli.cli.main(no_quickstart=True)
 
-    sys.argv = ["matador", "refine", "--db", DB_NAME, "--task", "tag", "--mode", "overwrite", "--new_tag", "integration_test"]
+    sys.argv = [
+        "matador",
+        "refine",
+        "--db",
+        DB_NAME,
+        "--task",
+        "tag",
+        "--mode",
+        "overwrite",
+        "--new_tag",
+        "integration_test",
+    ]
     if CONFIG_FNAME is not None:
         sys.argv += ["--config", CONFIG_FNAME]
     matador.cli.cli.main(no_quickstart=True)
 
-    sys.argv = ["matador", "refine", "--db", DB_NAME, "--task", "pspot", "--mode", "overwrite"]
+    sys.argv = [
+        "matador",
+        "refine",
+        "--db",
+        DB_NAME,
+        "--task",
+        "pspot",
+        "--mode",
+        "overwrite",
+    ]
     if CONFIG_FNAME is not None:
         sys.argv += ["--config", CONFIG_FNAME]
     matador.cli.cli.main(no_quickstart=True)
 
-    sys.argv = ["matador", "refine", "--db", DB_NAME, "--task", "raw", "--mode", "overwrite"]
+    sys.argv = [
+        "matador",
+        "refine",
+        "--db",
+        DB_NAME,
+        "--task",
+        "raw",
+        "--mode",
+        "overwrite",
+    ]
     if CONFIG_FNAME is not None:
         sys.argv += ["--config", CONFIG_FNAME]
     matador.cli.cli.main(no_quickstart=True)
@@ -400,7 +501,16 @@ def export():
     """ Test exporting to some random file types. Don't worry too much about
     the contents of the files yet, just that they exist with non-zero size.
     """
-    sys.argv = ["matador", "query", "--db", DB_NAME, "--xsf", "--pdb", "--latex", "--json"]
+    sys.argv = [
+        "matador",
+        "query",
+        "--db",
+        DB_NAME,
+        "--xsf",
+        "--pdb",
+        "--latex",
+        "--json",
+    ]
 
     if CONFIG_FNAME is not None:
         sys.argv += ["--config", CONFIG_FNAME]

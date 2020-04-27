@@ -24,12 +24,14 @@ ROOT_DIR = os.getcwd()
 
 try:
     import matplotlib  # noqa
+
     MATPLOTLIB_PRESENT = True
 except ImportError:
     MATPLOTLIB_PRESENT = False
 
 try:
-    import ternary
+    import ternary # noqa
+
     TERNARY_PRESENT = True
 except ImportError:
     TERNARY_PRESENT = False
@@ -87,7 +89,15 @@ class SpectralPlotTests(unittest.TestCase):
         expected_file = "K3P-OQMD_4786-CollCode25550_spectral.png"
         if os.path.isfile(expected_file):
             os.remove(expected_file)
-        sys.argv = ["dispersion", "K3P-OQMD_4786-CollCode25550", "--png", "--dos_only", "--figsize", "10", "10"]
+        sys.argv = [
+            "dispersion",
+            "K3P-OQMD_4786-CollCode25550",
+            "--png",
+            "--dos_only",
+            "--figsize",
+            "10",
+            "10",
+        ]
         errored = False
         try:
             matador.cli.dispersion.main()
@@ -137,7 +147,16 @@ class SpectralPlotTests(unittest.TestCase):
     def test_x11_no_fail(self):
         """ Test combined spectral plots. """
         os.chdir(REAL_PATH + "/data/dispersion")
-        sys.argv = ["dispersion", "K3P-OQMD_4786-CollCode25550", "--dos_only", "--cmap", "viridis", "--figsize", "10", "10"]
+        sys.argv = [
+            "dispersion",
+            "K3P-OQMD_4786-CollCode25550",
+            "--dos_only",
+            "--cmap",
+            "viridis",
+            "--figsize",
+            "10",
+            "10",
+        ]
         errored = False
         try:
             matador.cli.dispersion.main()
@@ -154,7 +173,17 @@ class SpectralPlotTests(unittest.TestCase):
         expected_file = "K3P_spectral.png"
         if os.path.isfile(expected_file):
             os.remove(expected_file)
-        sys.argv = ["dispersion", "K3P", "--png", "-ph", "--band_colour", "k", "--figsize", "10", "10"]
+        sys.argv = [
+            "dispersion",
+            "K3P",
+            "--png",
+            "-ph",
+            "--band_colour",
+            "k",
+            "--figsize",
+            "10",
+            "10",
+        ]
         errored = False
         try:
             matador.cli.dispersion.main()
@@ -232,11 +261,18 @@ class HullPlotTests(MatadorUnitTest):
     def test_voltage_labels(self):
         expected_files = ["KP_voltage.png"]
         cursor = res2dict(REAL_PATH + "data/hull-KP-KSnP_pub/*.res")[0]
-        hull = QueryConvexHull(cursor=cursor, species="KP", no_plot=True, voltage=True, labels=True)
+        hull = QueryConvexHull(
+            cursor=cursor, species="KP", no_plot=True, voltage=True, labels=True
+        )
 
         label_cursor = []
         plot_voltage_curve(hull, label_cursor=label_cursor, png=True)
-        labels = [get_formula_from_stoich(doc["stoichiometry"], elements=hull.elements, tex=False) for doc in label_cursor]
+        labels = [
+            get_formula_from_stoich(
+                doc["stoichiometry"], elements=hull.elements, tex=False
+            )
+            for doc in label_cursor
+        ]
 
         self.assertEqual(labels, ["KP7", "K3P7", "K2P3", "KP", "K5P4"])
         for expected_file in expected_files:
@@ -250,7 +286,11 @@ class HullPlotTests(MatadorUnitTest):
             if os.path.isfile(expected_file):
                 os.remove(expected_file)
         res_list = glob(REAL_PATH + "data/hull-KPSn-KP/*.res")
-        self.assertEqual(len(res_list), 87, "Could not find test res files, please check installation...")
+        self.assertEqual(
+            len(res_list),
+            87,
+            "Could not find test res files, please check installation...",
+        )
         cursor = [res2dict(res)[0] for res in res_list]
         QueryConvexHull(
             cursor=cursor,
@@ -281,7 +321,12 @@ class HullPlotTests(MatadorUnitTest):
         self.assertEqual(len(s), 0)
 
         beef_hull = EnsembleHull(
-            cursor, "_beef", elements=["K", "P"], num_samples=10, energy_key="total_energy_per_atom", parameter_key="thetas"
+            cursor,
+            "_beef",
+            elements=["K", "P"],
+            num_samples=10,
+            energy_key="total_energy_per_atom",
+            parameter_key="thetas",
         )
 
         beef_hull.plot_hull(svg=True)
@@ -294,18 +339,22 @@ class FingerprintPlotTests(MatadorUnitTest):
     """ Test ability to plot PDF and PXRDs. """
 
     def test_pdf_plot(self):
-        structure = res2dict(REAL_PATH + "data/res_files/KPSn-OQMD_123456.res", as_model=True)[0]
+        structure = res2dict(
+            REAL_PATH + "data/res_files/KPSn-OQMD_123456.res", as_model=True
+        )[0]
         plot_pdf(structure, png=True)
-        self.assertTrue(os.path.isfile('K7PSn_pdf.png'))
-        plot_pdf([structure, structure], filename='test_pdf', rmax=5, png=True)
-        self.assertTrue(os.path.isfile('test_pdf.png'))
+        self.assertTrue(os.path.isfile("K7PSn_pdf.png"))
+        plot_pdf([structure, structure], filename="test_pdf", rmax=5, png=True)
+        self.assertTrue(os.path.isfile("test_pdf.png"))
 
     def test_pxrd_plot(self):
-        structure = res2dict(REAL_PATH + "data/res_files/KPSn-OQMD_123456.res", as_model=True)[0]
+        structure = res2dict(
+            REAL_PATH + "data/res_files/KPSn-OQMD_123456.res", as_model=True
+        )[0]
         plot_pxrd(structure, png=True)
-        self.assertTrue(os.path.isfile('K7PSn_pxrd.png'))
-        plot_pdf([structure, structure], filename='test_pxrd', png=True)
-        self.assertTrue(os.path.isfile('test_pxrd.png'))
+        self.assertTrue(os.path.isfile("K7PSn_pxrd.png"))
+        plot_pdf([structure, structure], filename="test_pxrd", png=True)
+        self.assertTrue(os.path.isfile("test_pxrd.png"))
 
 
 @unittest.skipIf(not MATPLOTLIB_PRESENT, "Skipping plotting tests.")
@@ -329,12 +378,20 @@ class ConvergencePlotTest(unittest.TestCase):
 
         kpt_files = get_convergence_files("completed_kpts")
         cutoff_files = get_convergence_files("completed_cutoff")
-        kpt_data = get_convergence_data(kpt_files, conv_parameter="kpoints_mp_spacing", species=["Li"])
-        cutoff_data = get_convergence_data(cutoff_files, conv_parameter="cut_off_energy", species=["Li"])
+        kpt_data = get_convergence_data(
+            kpt_files, conv_parameter="kpoints_mp_spacing", species=["Li"]
+        )
+        cutoff_data = get_convergence_data(
+            cutoff_files, conv_parameter="cut_off_energy", species=["Li"]
+        )
         data = combine_convergence_data(kpt_data, cutoff_data)
-        self.assertEqual(data["Li-bcc"]["kpoints_mp_spacing"]["kpoints_mp_spacing"], [0.1, 0.07])
+        self.assertEqual(
+            data["Li-bcc"]["kpoints_mp_spacing"]["kpoints_mp_spacing"], [0.1, 0.07]
+        )
         self.assertEqual(data["Li-bcc"]["cut_off_energy"]["cut_off_energy"], [300, 400])
-        values, parameters = get_convergence_values(data["Li-bcc"], "cut_off_energy", "formation_energy_per_atom", log=True)
+        values, parameters = get_convergence_values(
+            data["Li-bcc"], "cut_off_energy", "formation_energy_per_atom", log=True
+        )
         self.assertEqual(parameters.tolist(), [300.0, 400.0])
         self.assertAlmostEqual(values.tolist()[0], 0.7291198427497395, places=6)
         self.assertEqual(values.tolist()[1], -np.inf)

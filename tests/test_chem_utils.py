@@ -4,8 +4,15 @@ import unittest
 import os
 import numpy as np
 from matador.utils.chem_utils import get_concentration
-from matador.utils.chem_utils import get_generic_grav_capacity, get_binary_volumetric_capacity
-from matador.utils.chem_utils import get_stoich, get_formula_from_stoich, get_stoich_from_formula
+from matador.utils.chem_utils import (
+    get_generic_grav_capacity,
+    get_binary_volumetric_capacity,
+)
+from matador.utils.chem_utils import (
+    get_stoich,
+    get_formula_from_stoich,
+    get_stoich_from_formula,
+)
 from matador.utils.chem_utils import get_ratios_from_stoichiometry, get_root_source
 from matador.utils.chem_utils import get_formation_energy
 from matador.utils.chem_utils import get_padded_composition
@@ -118,7 +125,9 @@ class ChemUtilsTest(unittest.TestCase):
         self.assertEqual(form, get_formula_from_stoich(stoich))
         stoich = [["Li", 1], ["P", 9]]
         form = "LiP$_\\mathrm{9}$"
-        self.assertEqual(form, get_formula_from_stoich(stoich, tex=True, latex_sub_style="\\mathrm"))
+        self.assertEqual(
+            form, get_formula_from_stoich(stoich, tex=True, latex_sub_style="\\mathrm")
+        )
         stoich = [["Li", 1], ["P", 9]]
         form = "P9Li"
         self.assertEqual(form, get_formula_from_stoich(stoich, elements=["P", "Li"]))
@@ -162,7 +171,9 @@ class ChemUtilsTest(unittest.TestCase):
                 "enthalpy_per_atom": -200,
                 "num_fu": 3,
                 "num_atoms": 3,
-                "temperature": {"free_energy_per_atom": {"300": -200, "400": -210, "450": -300}},
+                "temperature": {
+                    "free_energy_per_atom": {"300": -200, "400": -210, "450": -300}
+                },
                 "atom_types": ["P", "P", "P"],
             }
         )
@@ -197,13 +208,25 @@ class ChemUtilsTest(unittest.TestCase):
         self.assertEqual(ef[0], -600 / 4)
         self.assertEqual(ef[1], -1100 / 4)
 
-        ef_300 = get_formation_energy(chempots, cursor[0], energy_key=["temperature", "free_energy_per_atom", "300"])
+        ef_300 = get_formation_energy(
+            chempots,
+            cursor[0],
+            energy_key=["temperature", "free_energy_per_atom", "300"],
+        )
         self.assertEqual(ef_300, -150)
-        ef_400 = get_formation_energy(chempots, cursor[0], energy_key=["temperature", "free_energy_per_atom", "400"])
+        ef_400 = get_formation_energy(
+            chempots,
+            cursor[0],
+            energy_key=["temperature", "free_energy_per_atom", "400"],
+        )
         self.assertEqual(ef_400, -150)
 
         with self.assertRaises(KeyError):
-            get_formation_energy(chempots, cursor[0], energy_key=["temperature", "free_energy_per_atom", "450"])
+            get_formation_energy(
+                chempots,
+                cursor[0],
+                energy_key=["temperature", "free_energy_per_atom", "450"],
+            )
 
     def test_formation_energy_nonbinary(self):
         from matador.utils.chem_utils import get_formation_energy
@@ -246,7 +269,19 @@ class ChemUtilsTest(unittest.TestCase):
                 "enthalpy_per_atom": -1700 / 11,
                 "num_fu": 1,
                 "num_atoms": 11,
-                "atom_types": ["La", "La", "Li", "Li", "Li", "Li", "O", "O", "O", "O", "O"],
+                "atom_types": [
+                    "La",
+                    "La",
+                    "Li",
+                    "Li",
+                    "Li",
+                    "Li",
+                    "O",
+                    "O",
+                    "O",
+                    "O",
+                    "O",
+                ],
             }
         )
         cursor.append(
@@ -256,21 +291,35 @@ class ChemUtilsTest(unittest.TestCase):
                 "enthalpy_per_atom": -1711 / 11,
                 "num_fu": 1,
                 "num_atoms": 11,
-                "atom_types": ["La", "La", "Li", "Li", "Li", "Li", "O", "O", "O", "O", "O"],
+                "atom_types": [
+                    "La",
+                    "La",
+                    "Li",
+                    "Li",
+                    "Li",
+                    "Li",
+                    "O",
+                    "O",
+                    "O",
+                    "O",
+                    "O",
+                ],
             }
         )
         cursor.append(
             {
                 "stoichiometry": [["Li", 7], ["La", 3], ["Zr", 2], ["O", 12]],
                 "enthalpy": -3.5 * 3 * 200 - 1.5 * 5 * 100 - 2 * 3 * -150,
-                "enthalpy_per_atom": (-3.5 * 3 * 200 - 1.5 * 5 * 100 - 2 * 3 * 150) / 24,
+                "enthalpy_per_atom": (-3.5 * 3 * 200 - 1.5 * 5 * 100 - 2 * 3 * 150)
+                / 24,
             }
         )
         cursor.append(
             {
                 "stoichiometry": [["Li", 7], ["La", 3], ["Zr", 2], ["O", 12]],
                 "enthalpy": -3.5 * 3 * 200 - 1.5 * 5 * 100 - 2 * 3 * 150 - 48,
-                "enthalpy_per_atom": (-3.5 * 3 * 200 - 1.5 * 5 * 100 - 2 * 3 * 150 - 48) / 24,
+                "enthalpy_per_atom": (-3.5 * 3 * 200 - 1.5 * 5 * 100 - 2 * 3 * 150 - 48)
+                / 24,
             }
         )
 
@@ -293,7 +342,9 @@ class ChemUtilsTest(unittest.TestCase):
 
         stoich = [["Li", 7], ["La", 3], ["Zr", 2], ["O", 12]]
         chempots = [[["Li", 2], ["O", 1]], [["Zr", 1], ["O", 2]], [["La", 2], ["O", 3]]]
-        np.testing.assert_array_almost_equal(get_number_of_chempots(stoich, chempots, precision=None), [3.5, 2, 1.5])
+        np.testing.assert_array_almost_equal(
+            get_number_of_chempots(stoich, chempots, precision=None), [3.5, 2, 1.5]
+        )
 
         stoich = [["Li", 8], ["Zr", 3], ["O", 10]]
         chempots = [[["Li", 2], ["O", 1]], [["Zr", 1], ["O", 2]], [["La", 2], ["O", 3]]]
@@ -358,7 +409,14 @@ class ChemUtilsTest(unittest.TestCase):
         self.assertEqual(ratios, get_ratios_from_stoichiometry(stoich))
 
         stoich = [["K", 8], ["Sn", 1], ["P", 4]]
-        ratios = {"KSn": 8, "KP": 2, "SnP": 0.25, "SnK": round(1.0 / 8, 3), "PK": 0.5, "PSn": 4}
+        ratios = {
+            "KSn": 8,
+            "KP": 2,
+            "SnP": 0.25,
+            "SnK": round(1.0 / 8, 3),
+            "PK": 0.5,
+            "PSn": 4,
+        }
         self.assertEqual(ratios, get_ratios_from_stoichiometry(stoich))
 
     def test_root_source(self):
@@ -370,11 +428,20 @@ class ChemUtilsTest(unittest.TestCase):
         src = "KP-1234-abcd"
         self.assertEqual(src, get_root_source(source))
 
-        source = ["KP.cell", "KP.param", "abcd-123.fdasf/efgf/KP-0.02.-1234-abcd.castep", "KP-0.02.-1234-abcd.res"]
+        source = [
+            "KP.cell",
+            "KP.param",
+            "abcd-123.fdasf/efgf/KP-0.02.-1234-abcd.castep",
+            "KP-0.02.-1234-abcd.res",
+        ]
         src = "KP-0.02.-1234-abcd"
         self.assertEqual(src, get_root_source(source))
 
-        source = ["KP.cell", "KP.param", "abcd-123.fdasf/efgf/KP-0.02.-1234-abcd.history"]
+        source = [
+            "KP.cell",
+            "KP.param",
+            "abcd-123.fdasf/efgf/KP-0.02.-1234-abcd.history",
+        ]
         src = "KP-0.02.-1234-abcd"
         self.assertEqual(src, get_root_source(source))
 
@@ -390,7 +457,12 @@ class ChemUtilsTest(unittest.TestCase):
         src = "OQMD-12345"
         self.assertEqual(src, get_root_source(source))
 
-        source = ["KP.cell", "KP.param", "abcd-123.fdasf/efgf/KP-0.02.-1234-abcd.castep", "KP-1234-abcde.res"]
+        source = [
+            "KP.cell",
+            "KP.param",
+            "abcd-123.fdasf/efgf/KP-0.02.-1234-abcd.castep",
+            "KP-1234-abcde.res",
+        ]
         with self.assertRaises(RuntimeError):
             src = get_root_source(source)
 

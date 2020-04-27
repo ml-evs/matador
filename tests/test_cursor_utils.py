@@ -24,7 +24,9 @@ class CursorUtilTest(unittest.TestCase):
         sources.append(["/my/ICSD-CollCode678321/stupid/long/path/KSnP-asdf123.castep"])
         answers.append("AIRSS")
 
-        sources.append(["KSnP-asdf123.res", "KSnP-ICSD-CollCode123123.cell", "OQMD_11111.param"])
+        sources.append(
+            ["KSnP-asdf123.res", "KSnP-ICSD-CollCode123123.cell", "OQMD_11111.param"]
+        )
         answers.append("AIRSS")
 
         sources.append(["Na-Collo.res"])
@@ -42,17 +44,23 @@ class CursorUtilTest(unittest.TestCase):
         sources.append(["/u/fs1/swaps+known/LiP-KSnP-GA-abcdef-5x101.res"])
         answers.append("SWAPS")
 
-        sources.append(["/u/fs1/swaps+known/LiP-CollCode10101-swap-KSnP-GA-abcdef-5x101.res"])
+        sources.append(
+            ["/u/fs1/swaps+known/LiP-CollCode10101-swap-KSnP-GA-abcdef-5x101.res"]
+        )
         answers.append("SWAPS")
 
         sources.append(["Ag2Bi2I8-MP-35909_300eV.castep"])
         answers.append("MP")
 
-        sources.append(["AgBiI4-spinel-Config5-DOI-10.17638__datacat.liverpool.ac.uk__240.castep"])
+        sources.append(
+            ["AgBiI4-spinel-Config5-DOI-10.17638__datacat.liverpool.ac.uk__240.castep"]
+        )
         answers.append("DOI")
 
         for source, answer in zip(sources, answers):
-            self.assertEqual(get_guess_doc_provenance(source), answer, msg="failed {}".format(source))
+            self.assertEqual(
+                get_guess_doc_provenance(source), answer, msg="failed {}".format(source)
+            )
 
     def test_filter_cursor(self):
         from matador.utils.cursor_utils import filter_cursor
@@ -79,7 +87,11 @@ class CursorUtilTest(unittest.TestCase):
         nested_dict = {
             "source": ["blah", "foo"],
             "lattice_cart": [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
-            "_beef": {"total_energy": [1, 2, 3, 4], "thetas": [[1, 2, 3], [4, 5, 6], [7, 8, 9]], "foo": {"blah": "bloop"}},
+            "_beef": {
+                "total_energy": [1, 2, 3, 4],
+                "thetas": [[1, 2, 3], [4, 5, 6], [7, 8, 9]],
+                "foo": {"blah": "bloop"},
+            },
         }
         self.assertEqual(recursive_get(nested_dict, ["_beef", "thetas", -1]), [7, 8, 9])
         self.assertEqual(recursive_get(nested_dict, ["_beef", "total_energy", 2]), 3)
@@ -92,24 +104,13 @@ class CursorUtilTest(unittest.TestCase):
         self.assertEqual(recursive_get(nested_dict, ["_beef", "total_energy", 2]), 3)
         nested_dict["_beef"]["foo"]["blah"] = (1, 2)
         self.assertEqual(recursive_get(nested_dict, ["_beef", "foo", "blah"]), (1, 2))
-        errored = False
-        try:
+
+        with self.assertRaises(IndexError):
             recursive_get(nested_dict, ["_beef", "thetas", 4])
-        except IndexError:
-            errored = True
-        self.assertTrue(errored)
-        errored = False
-        try:
+        with self.assertRaises(KeyError):
             recursive_get(nested_dict, ["_beef", "thetaz", 4])
-        except KeyError:
-            errored = True
-        self.assertTrue(errored)
-        errored = False
-        try:
+        with self.assertRaises(KeyError):
             recursive_get(nested_dict, ["_beef", "foo", "blahp"])
-        except KeyError:
-            errored = True
-        self.assertTrue(errored)
 
 
 if __name__ == "__main__":
