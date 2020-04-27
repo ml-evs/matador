@@ -151,14 +151,20 @@ def query2files(cursor, dirname=None, **kwargs):
 
     hull = kwargs.get('subcmd') in ['hull', 'voltage']
     md_path = path.split('/')[0] + '/' + path.split('/')[0] + '.md'
-    print('Writing markdown file', md_path + '...')
-    md_string = display_results(cursor, args=kwargs, argstr=argstr, markdown=True, hull=hull)
+    md_kwargs = {}
+    md_kwargs.update(kwargs)
+    md_kwargs.update({'markdown': True, 'latex': False, 'argstr': argstr, 'hull': hull})
+    md_string = display_results(cursor, **md_kwargs)
     with open(md_path, 'w') as f:
         f.write(md_string)
+
     if tex:
         tex_path = path.split('/')[0] + '/' + path.split('/')[0] + '.tex'
         print('Writing LaTeX file', tex_path + '...')
-        tex_string = display_results(cursor, args=kwargs, argstr=argstr, latex=True, hull=hull)
+        tex_kwargs = {}
+        tex_kwargs.update(kwargs)
+        tex_kwargs.update({'latex': True, 'markdown': False, 'argstr': argstr, 'hull': hull})
+        tex_string = display_results(cursor, **tex_kwargs)
         with open(tex_path, 'w') as f:
             f.write(tex_string)
 
