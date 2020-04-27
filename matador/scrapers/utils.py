@@ -33,7 +33,7 @@ def scraper_function(function):
     from functools import wraps
 
     @wraps(function)
-    def wrapped_scraper_function(*args, **kwargs):
+    def wrapped_scraper_function(*args, verbosity=1, fail_fast=False, **kwargs):
         """ Wrap and return the scraper function, handling the
         multiplicity of file names.
 
@@ -61,7 +61,7 @@ def scraper_function(function):
             # we can get away with this as each
             # scraper function only has one arg
             try:
-                result, success = function(_seed, **kwargs)
+                result, success = function(_seed, verbosity=verbosity, **kwargs)
             # UnicodeDecodeErrors require 5 arguments, so handle these separately
             except (FileNotFoundError, UnicodeError) as oops:
                 raise oops
@@ -69,17 +69,22 @@ def scraper_function(function):
                 success = False
                 result = type(oops)('{}: {}\n'.format(_seed, oops))
 
-                if kwargs.get('verbosity', 0) > 2:
+                if verbosity >= 1:
                     msg = '{}: {} {}'.format(_seed, type(oops), oops)
                     print(msg)
-                if kwargs.get('verbosity', 0) > 3:
+                if verbosity >= 2:
                     tb.print_exc()
+
+                if fail_fast:
+                    raise oops
 
             if len(seed) == 1:
                 if success and kwargs.get('as_model'):
                     orm = _as_model(result, function)
                     if orm is not None:
                         result = orm
+                if not success and verbosity >= 1:
+                    print("Failed to scrape file {}".format(seed))
 
                 return result, success
 
@@ -91,6 +96,9 @@ def scraper_function(function):
                     cursor.append(orm)
                 if not kwargs.get('as_model') or orm is None:
                     cursor.append(result)
+
+        if verbosity >= 1:
+            print("Successfully scraped {} out of {} files.".format(len(cursor), len(cursor) + len(failures)))
 
         return cursor, failures
 

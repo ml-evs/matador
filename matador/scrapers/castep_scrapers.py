@@ -879,8 +879,6 @@ def phonon2dict(seed, **kwargs):
         # read whole file into RAM, typically <~ 1 MB
         flines = f.readlines()
 
-    verbosity = kwargs.get('verbosity', 0)
-
     ph = dict()
 
     if 'phonon_dos' in seed:
@@ -980,9 +978,6 @@ def phonon2dict(seed, **kwargs):
     ph['eigenvalues_q'] *= INVERSE_CM_TO_EV
     ph['softest_mode_freq'] = np.min(ph['eigenvalues_q'])
     ph['eigs_q'] = ph['eigenvalues_q']
-
-    if verbosity > 0:
-        print('{} sucessfully scraped with {} q-points.'.format(seed, ph['num_kpoints']))
 
     return ph, True
 
