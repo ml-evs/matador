@@ -16,7 +16,7 @@ DEBUG = False
 MONGO_CLIENT = mongomock.MongoClient()
 
 
-@mongomock.patch(servers=(("mongo_test.com", 99999),))
+@mongomock.patch(servers=(("mongo_test.com:27017"),))
 class TestDatabaseImport(unittest.TestCase):
     """ Tests the Spatula class. """
 
@@ -28,7 +28,7 @@ class TestDatabaseImport(unittest.TestCase):
         SETTINGS["mongo"]["default_collection"] = DB_NAME
         SETTINGS["mongo"]["default_collection_file_path"] = "/data/"
         SETTINGS["mongo"]["host"] = "mongo_test.com"
-        SETTINGS["mongo"]["port"] = 99999
+        SETTINGS["mongo"]["port"] = 27017
         self.settings = SETTINGS
 
     def tearDown(self):
