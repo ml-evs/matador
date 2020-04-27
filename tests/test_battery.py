@@ -53,7 +53,7 @@ class VoltageTest(unittest.TestCase):
             ) as f:
                 hull_cursor.append(json.load(f))
         bare_hull = QueryConvexHull(
-            cursor=hull_cursor, species=["Li", "As"], subcmd="voltage", no_plot=True
+            cursor=hull_cursor, species=["Li", "As"], voltage=True, no_plot=True
         )
         self.assertTrue(len(bare_hull.voltage_data["voltages"]) == 1)
         np.testing.assert_array_almost_equal(
@@ -87,7 +87,7 @@ class VoltageTest(unittest.TestCase):
                 flines = [line.replace("Li", "Mg") for line in flines]
                 hull_cursor.append(json.loads("\n".join(flines)))
         bare_hull = QueryConvexHull(
-            cursor=hull_cursor, species=["Mg", "As"], subcmd="voltage", no_plot=True
+            cursor=hull_cursor, species=["Mg", "As"], voltage=True, no_plot=True
         )
 
         self.assertTrue(len(bare_hull.voltage_data["voltages"]) == 1)
@@ -115,7 +115,7 @@ class VoltageTest(unittest.TestCase):
         res_list = glob(REAL_PATH + "data/hull-LiP-mdm_chem_mater/*.res")
         cursor = [res2dict(res)[0] for res in res_list]
         hull = QueryConvexHull(
-            cursor=cursor, elements=["Li", "P"], no_plot=True, subcmd="voltage"
+            cursor=cursor, elements=["Li", "P"], no_plot=True, voltage=True
         )
         self.assertEqual(
             len(hull.voltage_data["voltages"]), len(hull.voltage_data["Q"])
@@ -149,7 +149,7 @@ class VoltageTest(unittest.TestCase):
             elements=["Li", "Sn", "S"],
             no_plot=True,
             pathways=True,
-            subcmd="voltage",
+            voltage=True,
             debug=True,
         )
         pin = np.array(
@@ -246,7 +246,7 @@ class VoltageTest(unittest.TestCase):
             elements=["K", "Sn", "P"],
             no_plot=True,
             pathways=True,
-            subcmd="voltage",
+            voltage=True,
         )
         self.assertEqual(
             len(hull.voltage_data["voltages"]), len(hull.voltage_data["Q"])
@@ -295,7 +295,7 @@ class VoltageTest(unittest.TestCase):
             elements=["K", "Sn", "P"],
             no_plot=True,
             pathways=True,
-            subcmd="voltage",
+            voltage=True,
         )
         self.assertEqual(
             len(hull.voltage_data["voltages"]), len(hull.voltage_data["Q"])
@@ -344,7 +344,7 @@ class VoltageTest(unittest.TestCase):
             elements=["K", "Sn", "P"],
             no_plot=True,
             pathways=True,
-            subcmd="voltage",
+            voltage=True,
         )
         self.assertEqual(
             len(hull.voltage_data["voltages"]), len(hull.voltage_data["Q"])
@@ -362,7 +362,7 @@ class VoltageTest(unittest.TestCase):
         # load old hull then rejig it to go through a ternary phase
         cursor = res2dict(REAL_PATH + "data/hull-LiSiP/*.res")[0]
         hull = QueryConvexHull(
-            cursor=cursor, species="LiSiP", no_plot=True, subcmd="voltage"
+            cursor=cursor, species="LiSiP", no_plot=True, voltage=True
         )
         self.assertEqual(
             len(hull.voltage_data["voltages"]), len(hull.voltage_data["Q"])
@@ -404,7 +404,7 @@ class VoltageTest(unittest.TestCase):
         """
         cursor = res2dict(REAL_PATH + "data/voltage_data/voltage-NaSnP/*.res")[0]
         hull = QueryConvexHull(
-            cursor=cursor, species="NaSnP", no_plot=True, subcmd="voltage", volume=True
+            cursor=cursor, species="NaSnP", no_plot=True, voltage=True, volume=True
         )
         self.assertEqual(len(hull.voltage_data["voltages"]), 2)
         self.assertEqual(len(hull.voltage_data["Q"]), 2)
@@ -420,7 +420,7 @@ class VoltageTest(unittest.TestCase):
             REAL_PATH + "data/voltage_data/voltage-NaSnP/*.res", as_model=True
         )[0]
         hull = QueryConvexHull(
-            cursor=cursor, species="NaSnP", no_plot=True, subcmd="voltage", volume=True
+            cursor=cursor, species="NaSnP", no_plot=True, voltage=True, volume=True
         )
         self.assertEqual(len(hull.voltage_data["voltages"]), 2)
         self.assertEqual(len(hull.voltage_data["Q"]), 2)
@@ -438,7 +438,7 @@ class VoltageTest(unittest.TestCase):
         )
         cursor = [res2dict(res)[0] for res in res_list]
         hull = QueryConvexHull(
-            cursor=cursor, elements=["Na", "Fe", "P"], no_plot=True, subcmd="voltage"
+            cursor=cursor, elements=["Na", "Fe", "P"], no_plot=True, voltage=True
         )
         self.assertEqual(len(hull.voltage_data["voltages"][0]), 8)
         self.assertEqual(len(hull.voltage_data["voltages"][1]), 5)
@@ -513,7 +513,7 @@ class VolumeTest(unittest.TestCase):
             )
 
         hull = QueryConvexHull(
-            cursor=cursor, elements=["K", "Sn", "P"], no_plot=True, subcmd="voltage"
+            cursor=cursor, elements=["K", "Sn", "P"], no_plot=True, voltage=True
         )
 
         np.testing.assert_array_almost_equal(
@@ -568,7 +568,7 @@ class VolumeTest(unittest.TestCase):
             )
 
         hull = QueryConvexHull(
-            cursor=cursor, elements=["K", "Sn", "P"], no_plot=True, subcmd="voltage"
+            cursor=cursor, elements=["K", "Sn", "P"], no_plot=True, voltage=True
         )
 
         np.testing.assert_array_almost_equal(
@@ -581,7 +581,7 @@ class VolumeTest(unittest.TestCase):
     def test_realistic_ternary(self):
         cursor, f = res2dict(REAL_PATH + "/data/voltage_data/voltage-LiCoP-oqmd/*.res")
         hull = QueryConvexHull(
-            cursor=cursor, species="LiCoP", subcmd="voltage", volume=True, no_plot=True
+            cursor=cursor, species="LiCoP", voltage=True, volume=True, no_plot=True
         )
 
         for key in hull.volume_data:

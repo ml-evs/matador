@@ -35,7 +35,7 @@ class EnsembleHull(QueryConvexHull):
 
     """
     def __init__(self, cursor, data_key, energy_key='enthalpy_per_atom', chempot_energy_key=None,
-                 num_samples=None, parameter_key=None, species=None, subcmd='hull', verbosity=None, **kwargs):
+                 num_samples=None, parameter_key=None, species=None, voltage=False, verbosity=None, **kwargs):
         """ Initialise EnsembleHull from a cursor, with other keywords
         following QueryConvexHull.
 
@@ -54,7 +54,7 @@ class EnsembleHull(QueryConvexHull):
             num_samples (int): use up to this many samples in creating the hull.
             species (list[str]): list of elements/chempots to use, in
                 the desired order.
-            subcmd (str): either 'hull' or 'voltage'.
+            voltage (bool): whether or not to compute voltage curves.
             plot_kwargs (dict): arguments to pass to plot_hull function.
             kwargs (dict): other arguments to pass to QueryConvexHull.
 
@@ -68,7 +68,7 @@ class EnsembleHull(QueryConvexHull):
         super().__init__(cursor=cursor,
                          energy_key=self.chempot_energy_key,
                          species=species,
-                         subcmd=subcmd,
+                         voltage=voltage,
                          no_plot=True,
                          lazy=False,
                          **kwargs)
