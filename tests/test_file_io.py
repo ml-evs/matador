@@ -643,6 +643,12 @@ class ScraperMiscTest(MatadorUnitTest):
         self.assertEqual(len(cursor), 1)
         self.assertEqual(len(failures), 1)
 
+        res_fname = []
+        res_fname += [REAL_PATH + "data/LiPZn-r57des.res"]
+        res_fname += [REAL_PATH + "data/LiPZn-r57des_bodged.res"]
+        with self.assertRaises(Exception):
+            cursor, failures = res2dict(res_fname, db=True, fail_fast=True)
+
     def test_phonon_scraper(self):
         phonon_fname = REAL_PATH + "data/phonon_dispersion/K3P.phonon"
         self.assertTrue(
@@ -1423,7 +1429,3 @@ class ExportTest(MatadorUnitTest):
                 np.testing.assert_almost_equal(doc["lattice_abc"], doc_exported["lattice_abc"])
             elif key == "lattice_cart":
                 np.testing.assert_almost_equal(doc["lattice_cart"], doc_exported["lattice_cart"])
-
-
-if __name__ == "__main__":
-    unittest.main(buffer=True, verbosity=2)
