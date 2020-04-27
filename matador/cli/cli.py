@@ -74,26 +74,6 @@ class MatadorCommandLine:
 
                 self.cursor = self.refiner.cursor
 
-            if self.args['subcmd'] == 'pdffit':
-                self.query = DBQuery(self.client, self.collections, **self.args)
-                self.cursor = list(self.query.cursor)
-                if self.args.get('hull_cutoff') is not None:
-                    self.hull = QueryConvexHull(self.query, **self.args)
-                    self.cursor = self.hull.hull_cursor
-                    self.top = len(self.cursor)
-                if self.args.get('top') is not None:
-                    self.top = self.args.get('top')
-                if not self.cursor[:self.top]:
-                    print_notify('Performing PDF fit for ' + str(len(self.cursor[:self.top])) + ' structures.')
-                    from matador.plugins.pdffit.pdffit import PDFFitter
-                    self.pdffit = PDFFitter(self.cursor[:self.top], **self.args)
-                    try:
-                        self.pdffit.spawn()
-                    except (KeyboardInterrupt, RuntimeError, SystemExit) as oops:
-                        raise oops('Exiting top-level...')
-                else:
-                    raise SystemExit('No structure match query.')
-
             if self.args['subcmd'] == 'hull' or self.args['subcmd'] == 'voltage':
                 self.query = DBQuery(self.client, self.collections, **self.args)
                 self.hull = QueryConvexHull(self.query, **self.args)
@@ -493,15 +473,6 @@ def main(no_quickstart=False):
                                  'e.g. `--compare 1y2m5d3h` will compare the present hull with that of 1 year, 2 '
                                  'months, 5 days and 3 hours ago, and `--compare 3d 2d` will compare three days ago '
                                  'to two days ago.')
-    pdffit_flags = argparse.ArgumentParser(add_help=False)
-    pdffit_flags.add_argument('-file', '--file', type=str, help='experimental input file to fit structures to.')
-    pdffit_flags.add_argument('-min', '--xmin', type=float,
-                              help='minimum value to compute the PDF (DEFAULT: 1 Angstrom)')
-    pdffit_flags.add_argument('-max', '--xmax', type=float,
-                              help='maximum value to compute the PDF (DEFAULT: 50 Angstrom')
-    pdffit_flags.add_argument('-dx', '--dx', type=float, help='spacing to compute PDF at')
-    pdffit_flags.add_argument('-2', '--two_phase', type=float, help='fit two phases to experimental PDF')
-    pdffit_flags.add_argument('-np', '--num_processes', type=int, help='number of concurrent fits to perform.')
 
     refine_flags = argparse.ArgumentParser(add_help=False)
     refine_flags.add_argument('-task', '--task', type=str,
@@ -531,12 +502,6 @@ def main(no_quickstart=False):
     subparsers.add_parser('import',
                           help='import new structures in folder into database',
                           parents=[global_flags, import_flags])
-
-    # matador pdffit
-    subparsers.add_parser('pdffit',
-                          help='provide experimental .gr file and fit to calculated PDF of structures in query',
-                          parents=[global_flags, query_flags, material_flags,
-                                   structure_flags, pdffit_flags])
 
     # matador hull
     subparsers.add_parser('hull',
@@ -586,11 +551,6 @@ def main(no_quickstart=False):
         raise SystemExit('--field requires --filter.')
     if vars_args.get('subcmd') == 'hull' and vars_args.get('composition') is None:
         raise SystemExit('hull requires --composition')
-    if vars_args.get('subcmd') == 'pdffit':
-        if vars_args.get('file') is None:
-            raise SystemExit('pdffit requires specified --file, exiting...')
-        if not os.path.isfile(vars_args.get('file')):
-            raise SystemExit('specified --file does not exist, exiting...')
     if vars_args.get('calc_match') and vars_args.get('id') is None:
         raise SystemExit('calc_match requires specification of a text_id with -i, exiting...')
     if vars_args.get('profile'):
