@@ -16,7 +16,7 @@ from matador import __version__
 EPS = 1e-12
 
 
-def recursive_get(data, keys, top=True):
+def recursive_get(data, keys, _top=True):
     """ Recursively slice a nested dictionary by a
     list of keys.
 
@@ -36,9 +36,9 @@ def recursive_get(data, keys, top=True):
     if isinstance(keys, (list, tuple)) and len(keys) == 1:
         return data[keys[0]]
     try:
-        return recursive_get(data[keys[0]], keys[1:], top=False)
+        return recursive_get(data[keys[0]], keys[1:], _top=False)
     except (KeyError, IndexError) as exc:
-        if top:
+        if _top:
             raise type(exc)('Recursive keys {} missing'.format(keys))
         raise exc
 
@@ -66,8 +66,10 @@ def recursive_set(data, keys, value):
 
 
 def display_results(cursor,
-                    energy_key='enthalpy_per_atom', summary=False, args=None, argstr=None, additions=None, deletions=None, sort=True,
-                    hull=False, markdown=False, latex=False, colour=True, return_str=False, use_source=True, details=False,
+                    energy_key='enthalpy_per_atom', summary=False,
+                    args=None, argstr=None, additions=None, deletions=None,
+                    sort=True, hull=False, markdown=False, latex=False, colour=True,
+                    return_str=False, use_source=True, details=False,
                     per_atom=False, eform=False, source=False, **kwargs):
     """ Print query results in a table, with many options for customisability.
 
@@ -196,7 +198,13 @@ def display_results(cursor,
 
     # ensure cursor is sorted by enthalpy
     if sort:
-        cursor = sorted(cursor, key=lambda doc: recursive_get(doc, energy_key), reverse=False)
+        sorted_inds = sorted(list(enumerate(cursor)),
+                             key=lambda element: recursive_get(element[1], energy_key))
+        cursor = [cursor[ind[0]] for ind in sorted_inds]
+        if additions is not None and add_index_mode:
+            additions = [sorted_inds[ind][0] for ind in additions]
+        if deletions is not None and del_index_mode:
+            deletions = [sorted_inds[ind][0] for ind in deletions]
 
     if latex:
         latex_sub_style = r'\text'
@@ -609,7 +617,7 @@ def filter_unique_structures(cursor, quiet=False, **kwargs):
             display_cursor,
             additions=additions,
             deletions=deletions,
-            sort=False,
+            sort=True,
             use_source=True,
             **kwargs
         )
