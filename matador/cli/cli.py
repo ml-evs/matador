@@ -30,38 +30,40 @@ class MatadorCommandLine:
         file_exts = ['cell', 'res', 'pdb', 'markdown', 'latex', 'param', 'xsf']
         self.export = any([self.args.get(ext) for ext in file_exts])
 
-        if self.args['subcmd'] != 'import':
+        self.subcommand = self.args.pop("subcmd")
+
+        if self.subcommand != 'import':
             self.settings = load_custom_settings(config_fname=self.args.get('config'),
                                                  debug=self.args.get('debug'),
                                                  no_quickstart=self.args.get('no_quickstart'))
             result = make_connection_to_collection(self.args.get('db'),
-                                                   check_collection=(self.args['subcmd'] != "stats"),
+                                                   check_collection=(self.subcommand != "stats"),
                                                    mongo_settings=self.settings)
             self.client, self.db, self.collections = result
 
-        if self.args['subcmd'] == 'stats':
+        if self.subcommand == 'stats':
             self.stats()
 
         try:
-            if self.args['subcmd'] == 'import':
+            if self.subcommand == 'import':
                 from matador.db import Spatula
                 self.importer = Spatula(self.args)
 
-            if self.args['subcmd'] == 'query':
+            if self.subcommand == 'query':
                 self.query = DBQuery(self.client, self.collections, **self.args)
                 self.cursor = self.query.cursor
 
-            if self.args['subcmd'] == 'swaps':
+            if self.subcommand == 'swaps':
                 from matador.swaps import AtomicSwapper
                 self.query = DBQuery(self.client, self.collections, **self.args)
                 if self.args.get('hull_cutoff') is not None:
-                    self.hull = QueryConvexHull(self.query, **self.args)
+                    self.hull = QueryConvexHull(query=self.query, **self.args)
                     self.swapper = AtomicSwapper(self.hull.hull_cursor, **self.args)
                 else:
                     self.swapper = AtomicSwapper(self.query.cursor, **self.args)
                 self.cursor = self.swapper.cursor
 
-            if self.args['subcmd'] == 'refine':
+            if self.subcommand == 'refine':
                 from matador.db import Refiner
                 self.query = DBQuery(self.client, self.collections, **self.args)
                 if self.args.get('hull_cutoff') is not None:
@@ -97,7 +99,7 @@ class MatadorCommandLine:
                 self.hull = QueryConvexHull(self.query, **self.args)
                 self.cursor = self.hull.hull_cursor
 
-            if self.args['subcmd'] == 'changes':
+            if self.subcommand == 'changes':
                 from matador.db import DatabaseChanges
                 if len(self.collections) != 1:
                     raise SystemExit('Cannot view changes of more than one collection at once.')
@@ -114,7 +116,7 @@ class MatadorCommandLine:
                                 mongo_settings=self.settings,
                                 override=kwargs.get('no_quickstart'))
 
-            if self.args['subcmd'] == 'hulldiff':
+            if self.subcommand == 'hulldiff':
                 from matador.hull.hull_diff import diff_hulls
                 if self.args.get('compare') is None:
                     raise SystemExit('Please specify which hulls to query with --compare.')
@@ -303,13 +305,13 @@ def main(no_quickstart=False):
         .format(__version__.strip()))
     parser.add_argument('--version', action='version', version='matador version ' + __version__ + '.')
 
-    # define subparsers for subcommands
-    subparsers = parser.add_subparsers(title='subcommands', description='valid sub-commands', dest='subcmd')
+    # define subparsers for self.subcommands
+    subparsers = parser.add_subparsers(title='self.subcommands', description='valid sub-commands', dest='subcmd')
 
     # define parent parser for global arguments
     global_flags = argparse.ArgumentParser(add_help=False)
 
-    # common arguments to all subcommands
+    # common arguments to all self.subcommands
     global_flags.add_argument('--db', nargs='+', help='choose which collection to query')
     global_flags.add_argument('--debug', action='store_true', help='enable debug printing throughout code.')
     global_flags.add_argument('-conf', '--config', type=str,
