@@ -243,7 +243,7 @@ def pseudoternary_hull():
     matador.cli.cli.main(no_quickstart=True)
 
     query = DBQuery(
-        db=DB_NAME, composition="La2O3:Li2O:ZrO2", config=CONFIG_FNAME, details=True, source=True, subcmd="hull", no_plot=True
+        db=DB_NAME, composition="La2O3:Li2O:ZrO2", config=CONFIG_FNAME, details=True, source=True, no_plot=True
     )
     hull = QueryConvexHull(query=query)
 
