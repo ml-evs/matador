@@ -52,7 +52,7 @@ class QueryConvexHull:
 
     """
 
-    def __init__(self, query=None, cursor=None, elements=None, species=None, subcmd='hull',
+    def __init__(self, query=None, cursor=None, elements=None, species=None, voltage=False, volume=False, subcmd=None,
                  plot_kwargs=None, lazy=False, energy_key='enthalpy_per_atom', **kwargs):
         """ Initialise the class from either a DBQuery or a cursor (list
         of matador dicts) and construct the appropriate phase diagram.
@@ -61,8 +61,9 @@ class QueryConvexHull:
             query (matador.query.DBQuery): object containing structures,
             cursor (list(dict)): alternatively specify list of matador documents.
             species (list(str)): list of elements/chempots to use, used to provide a useful order,
+            voltage (bool): whether or nto to compute voltages relative for insertion of first entry in species,
+            volume (bool): whether or not to compute volume expansion relative to first entry in species,
             energy_key (str): key under which the desired energy *per atom* is stored.
-            subcmd (str): either 'hull' or 'voltage',
             lazy (bool): if True, do not create hull until `self.create_hull()` is called
             chempots (list(float)): list of chemical potential values to use.
             elements (list(str)): deprecated form `species`.
@@ -75,18 +76,32 @@ class QueryConvexHull:
             self.args.update(query.args)
         self.args.update(kwargs)
 
-        self.devel = True
-        if self.args.get('subcmd') is None:
-            self.args['subcmd'] = subcmd
+        if subcmd is not None:
+            warnings.warn("subcmd will soon be deprecated, please pass the equivalent flag as a kwarg (e.g. voltage=True)")
+            if subcmd == 'voltage':
+                voltage = True
+        self.args['subcmd'] = subcmd
+
         if plot_kwargs is None:
             plot_kwargs = {}
         if plot_kwargs.get('show') is None:
             plot_kwargs['show'] = True
         self.args['plot_kwargs'] = plot_kwargs
 
-        self._query = query
         self.from_cursor = False
         self.plot_params = False
+
+        self.compute_voltages = voltage
+        self.compute_volumes = volume
+
+        if query is None and cursor is None:
+            # if no query or cursor passed, push all kwargs to new query
+            from matador.query import DBQuery
+            query = DBQuery(
+                subcmd='hull', intersection=True, **kwargs
+            )
+
+        self._query = query
 
         if self._query is not None:
             self.cursor = list(deepcopy(query.cursor))
@@ -110,6 +125,8 @@ class QueryConvexHull:
         self.volume_data = defaultdict(list)
         self.elements = []
         self.num_elements = 0
+        self.species = self._get_species(species, elements)
+        self._dimension = len(self.species)
 
         # tracker for whether per_b fields have been setup
         self._per_b_done = False
@@ -129,17 +146,11 @@ class QueryConvexHull:
         if self.cursor is None:
             raise RuntimeError('Failed to find structures to create hull!')
 
-        self._set_species(species, elements)
-
         self._non_elemental = False
         assert isinstance(self.species, list)
         for _species in self.species:
             if len(parse_element_string(_species, stoich=True)) > 1:
                 self._non_elemental = True
-
-        self._dimension = len(self.species)
-        if self._dimension > 2 and self._query is not None and not self._query.args.get('intersection'):
-            raise SystemExit('Please query with -int/--intersection when creating ternary+ hulls.')
 
         if not lazy:
             self.create_hull()
@@ -149,7 +160,7 @@ class QueryConvexHull:
         post-processing specified by initial arguments.
 
         """
-        if self.args.get('uniq') and self.args['subcmd'] != 'swaps':
+        if self.args.get('uniq'):
             from matador.utils.cursor_utils import filter_unique_structures
             if self.args.get('uniq') is True:
                 sim_tol = 0.1
@@ -178,16 +189,17 @@ class QueryConvexHull:
         if not self.args.get('no_plot'):
             from matador import plotting
 
-        if self.args['subcmd'] == 'voltage':
+        if self.compute_voltages:
+            print("Constructing electrode system with active ion: {}".format(self.species[0]))
             self.voltage_curve([doc for doc in self.hull_cursor if doc['hull_distance'] <= 1e-9])
             self.volume_curve()
             if not self.args.get('no_plot'):
                 plotting.plot_voltage_curve(self)
-                if self.args.get('volume'):
+                if self.compute_volumes:
                     plotting.plot_volume_curve(self)
                 self.plot_hull(**self.args['plot_kwargs'], debug=self.args.get('debug'))
 
-        if self.args['subcmd'] == 'hull' and not self.args.get('no_plot'):
+        if not self.args.get('no_plot'):
             self.plot_hull(**self.args['plot_kwargs'], debug=self.args.get('debug'))
 
     def __repr__(self):
@@ -686,7 +698,7 @@ class QueryConvexHull:
         self.volume_data['hull_distances'].append(hull_distances[non_nans].flatten())
         self.volume_data['endstoichs'].append(stable_stoichs[non_nans].flatten()[0])
 
-    def _set_species(self, species=None, elements=None):
+    def _get_species(self, species=None, elements=None):
         """ Try to determine species for phase diagram from arguments or
         passed data. Sets the `self.species` attribute.
 
@@ -730,7 +742,7 @@ class QueryConvexHull:
                     tmp_species.extend([item for item in re.split(r'([A-Z][a-z]*)', spec) if item])
             species = tmp_species
 
-        self.species = species
+        return species
 
     def _construct_electrode(self, hull, endpoint, endstoich, hull_cursor):
 
