@@ -101,6 +101,7 @@ class QueryConvexHull:
         if query is None and cursor is None:
             # if no query or cursor passed, push all kwargs to new query
             from matador.query import DBQuery
+            kwargs.pop('intersection')
             query = DBQuery(
                 subcmd='hull',
                 intersection=True,
@@ -202,9 +203,9 @@ class QueryConvexHull:
             self.voltage_curve([doc for doc in self.hull_cursor if doc['hull_distance'] <= 1e-9])
             self.volume_curve()
             if not self.args.get('no_plot'):
-                plotting.plot_voltage_curve(self)
+                plotting.plot_voltage_curve(self, **self.args['plot_kwargs'])
                 if self.compute_volumes:
-                    plotting.plot_volume_curve(self)
+                    plotting.plot_volume_curve(self, **self.args['plot_kwargs'])
                 self.plot_hull(**self.args['plot_kwargs'], debug=self.args.get('debug'))
 
         if not self.args.get('no_plot'):
