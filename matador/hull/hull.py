@@ -53,7 +53,7 @@ class QueryConvexHull:
     """
 
     def __init__(self, query=None, cursor=None, elements=None, species=None, voltage=False, volume=False, subcmd=None,
-                 plot_kwargs=None, lazy=False, energy_key='enthalpy_per_atom', **kwargs):
+                 plot_kwargs=None, lazy=False, energy_key='enthalpy_per_atom', client=None, collections=None, db=None, **kwargs):
         """ Initialise the class from either a DBQuery or a cursor (list
         of matador dicts) and construct the appropriate phase diagram.
 
@@ -69,6 +69,9 @@ class QueryConvexHull:
             elements (list(str)): deprecated form `species`.
             kwargs (dict): mostly CLI arguments, see matador hull --help for full options.
             plot_kwargs (dict): arguments to pass to plot_hull function
+            client (pymongo.MongoClient): optional client to pass to DBQuery.
+            collections (dict of pymongo.collections.Collection): optional dict of collections to pass to DBQuery.
+            db (str): db name to connect to in DBQuery.
 
         """
         self.args = dict()
@@ -98,7 +101,11 @@ class QueryConvexHull:
             # if no query or cursor passed, push all kwargs to new query
             from matador.query import DBQuery
             query = DBQuery(
-                subcmd='hull', intersection=True, **kwargs
+                subcmd='hull',
+                intersection=True,
+                client=client,
+                collections=collections,
+                **kwargs
             )
 
         self._query = query
