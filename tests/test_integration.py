@@ -26,6 +26,7 @@ DB_NAME = "ci_test"
 ROOT_DIR = os.getcwd()
 DEBUG = False
 MONGO_CLIENT = mongomock.MongoClient()
+OUTPUT_DIR = ROOT_DIR + '/integration_test_results'
 
 
 @mongomock.patch(servers=("mongo_test.com:27017",))
@@ -33,7 +34,10 @@ class IntegrationTest(unittest.TestCase):
     """ Test functionality acting on local database. """
 
     def tearDown(self):
+        import shutil
         self.settings.reset()
+        os.chdir(ROOT_DIR)
+        shutil.rmtree(OUTPUT_DIR)
 
     def setUp(self):
         from matador.config import load_custom_settings, SETTINGS
@@ -46,8 +50,8 @@ class IntegrationTest(unittest.TestCase):
         SETTINGS["mongo"]["port"] = 27017
         self.settings = SETTINGS
 
-        for _file in glob.glob("*spatula*"):
-            os.remove(_file)
+        os.makedirs(OUTPUT_DIR, exist_ok=False)
+        os.chdir(OUTPUT_DIR)
 
     def test_integration(self):
         """ Test import and query. """
@@ -142,6 +146,21 @@ class IntegrationTest(unittest.TestCase):
                 os.remove(_file)
             os.removedirs(expected_dir)
 
+        print("PSEUDOTERNARY HULL 2")
+        hull = pseudoternary_hull_no_query()
+        self.assertTrue(query.args.get("intersection"))
+        self.assertTrue(query._non_elemental)
+        self.assertTrue(query._create_hull)
+        self.assertEqual(len(query.cursor), 7)
+        self.assertEqual(len(hull.cursor), 7)
+        self.assertEqual(len(hull.hull_cursor), 5)
+
+        expected_dir = "query-LaLiZrO-ci_test"
+        if os.path.isdir(expected_dir):
+            for _file in glob.glob(expected_dir + "/*"):
+                os.remove(_file)
+            os.removedirs(expected_dir)
+
         print("UNIQ")
         uniq()
         expected_files = [expected_dir + "/cubic-LLZO-CollCode999999.res"]
@@ -197,7 +216,7 @@ def import_castep(extra_flags=None):
     files_to_delete = glob.glob("*spatula*")
     for f in files_to_delete:
         os.remove(f)
-    os.chdir(REAL_PATH)
+    os.chdir(OUTPUT_DIR)
 
     return query
 
@@ -224,7 +243,7 @@ def import_res():
     for f in files_to_delete:
         os.remove(f)
 
-    os.chdir(REAL_PATH)
+    os.chdir(OUTPUT_DIR)
 
     return query_1, query_2
 
@@ -243,13 +262,35 @@ def pseudoternary_hull():
     matador.cli.cli.main(no_quickstart=True)
 
     query = DBQuery(
-        db=DB_NAME, composition="La2O3:Li2O:ZrO2", config=CONFIG_FNAME, details=True, source=True, no_plot=True
+        db=DB_NAME, subcmd='hull', composition="La2O3:Li2O:ZrO2", config=CONFIG_FNAME, details=True, source=True, no_plot=True
     )
     hull = QueryConvexHull(query=query)
 
-    os.chdir(REAL_PATH)
+    os.chdir(OUTPUT_DIR)
 
     return query, hull
+
+
+def pseudoternary_hull_no_query():
+    """ Import some other res files ready to make a hull. """
+    os.chdir(REAL_PATH + "/data/hull-LLZO")
+    sys.argv = ["matador", "import", "--force", "--db", DB_NAME]
+
+    if CONFIG_FNAME is not None:
+        sys.argv += ["--config", CONFIG_FNAME]
+
+    if DEBUG:
+        sys.argv += ["--debug"]
+
+    matador.cli.cli.main(no_quickstart=True)
+
+    hull = QueryConvexHull(
+        db=DB_NAME, composition="La2O3:Li2O:ZrO2", config=CONFIG_FNAME, details=True, source=True, no_plot=True
+    )
+
+    os.chdir(OUTPUT_DIR)
+
+    return hull
 
 
 def stats():
@@ -295,13 +336,7 @@ def swaps():
             else:
                 elem_successes.append(False)
 
-            os.remove(files + ".cell")
-            os.remove(files + ".res")
-
-        os.remove("swaps-NaPZn-ci_test-NaLi:PSi:ZnSn.md")
-
-        os.chdir(REAL_PATH)
-        os.rmdir(expected_dir)
+    os.chdir(OUTPUT_DIR)
 
     return output_folder_exists, successes, elem_successes
 
@@ -365,7 +400,7 @@ def export():
     """ Test exporting to some random file types. Don't worry too much about
     the contents of the files yet, just that they exist with non-zero size.
     """
-    sys.argv = ["matador", "query", "--db", DB_NAME, "--xsf", "--pdb", "--markdown", "--latex", "--json"]
+    sys.argv = ["matador", "query", "--db", DB_NAME, "--xsf", "--pdb", "--latex", "--json"]
 
     if CONFIG_FNAME is not None:
         sys.argv += ["--config", CONFIG_FNAME]
@@ -405,7 +440,3 @@ def drop(collname):
 
     matador.cli.cli.main(no_quickstart=True)
     print("Dropped ci_test!")
-
-
-if __name__ == "__main__":
-    unittest.main()

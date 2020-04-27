@@ -75,7 +75,10 @@ class MatadorCommandLine:
                 self.cursor = self.refiner.cursor
 
             if self.subcommand == 'hull' or self.subcommand == 'voltage':
-                self.hull = QueryConvexHull(**self.args, voltage=self.subcommand == 'voltage')
+                self.hull = QueryConvexHull(**self.args,
+                                            voltage=self.subcommand == 'voltage',
+                                            client=self.client,
+                                            collections=self.collections)
                 self.cursor = self.hull.hull_cursor
 
             if self.subcommand == 'changes':
@@ -107,7 +110,7 @@ class MatadorCommandLine:
                     self.cursor = [doc for doc in self.cursor if len(doc['stoichiometry']) == self.args.get('write_n')]
                 if not self.cursor:
                     print_failure('No structures left to export.')
-                query2files(self.cursor, **self.args, argstr=self.argstr, hash_dupe=True)
+                query2files(self.cursor, **self.args, argstr=self.argstr, subcmd=self.subcommand, hash_dupe=True)
 
             if self.args.get('view'):
                 from matador.utils.viz_utils import viz
@@ -131,7 +134,7 @@ class MatadorCommandLine:
                 for doc in self.cursor[:self.top]:
                     viz(doc)
 
-            if self.args.get('subcmd') != 'import':
+            if self.subcommand != 'import':
                 self.client.close()
 
         except (RuntimeError, SystemExit, KeyboardInterrupt) as oops:
@@ -273,7 +276,6 @@ def main(no_quickstart=False):
 
     """
     import argparse
-    import os
     from sys import argv
     from matador import __version__
 
