@@ -2,10 +2,20 @@
 import unittest
 import os
 import numpy as np
-from matador.utils.cell_utils import abc2cart, cart2abc, cart2volume, create_simple_supercell
+from matador.utils.cell_utils import (
+    abc2cart,
+    cart2abc,
+    cart2volume,
+    create_simple_supercell,
+)
 from matador.utils.cell_utils import cart2frac, frac2cart
 from matador.utils.cell_utils import doc2spg, cart2abcstar, real2recip
-from matador.scrapers.castep_scrapers import castep2dict, res2dict, cell2dict, bands2dict
+from matador.scrapers.castep_scrapers import (
+    castep2dict,
+    res2dict,
+    cell2dict,
+    bands2dict,
+)
 from matador.fingerprints.pdf import PDF, PDFOverlap
 from matador.export import doc2cell
 from matador.crystal import Crystal
@@ -33,10 +43,16 @@ class CellUtilTest(unittest.TestCase):
         test_doc, s = castep2dict(castep_fname, db=True, verbosity=VERBOSITY)
         try:
             self.assertTrue(
-                np.allclose(test_doc["lattice_abc"], cart2abc(test_doc["lattice_cart"])), msg="Conversion cart2abc failed."
+                np.allclose(
+                    test_doc["lattice_abc"], cart2abc(test_doc["lattice_cart"])
+                ),
+                msg="Conversion cart2abc failed.",
             )
             self.assertTrue(
-                np.allclose(cart2abc(test_doc["lattice_cart"]), cart2abc(abc2cart(test_doc["lattice_abc"]))),
+                np.allclose(
+                    cart2abc(test_doc["lattice_cart"]),
+                    cart2abc(abc2cart(test_doc["lattice_abc"])),
+                ),
                 msg="Conversion abc2cart failed.",
             )
             self.assertAlmostEqual(
@@ -45,15 +61,25 @@ class CellUtilTest(unittest.TestCase):
                 msg="Failed to calculate volume from lattice vectors.",
                 places=5,
             )
-            self.assertIsInstance(test_doc["lattice_abc"], list, msg="Failed abc numpy cast to list")
-            self.assertIsInstance(test_doc["lattice_cart"], list, msg="Failed cartesian numpy cast to list")
+            self.assertIsInstance(
+                test_doc["lattice_abc"], list, msg="Failed abc numpy cast to list"
+            )
+            self.assertIsInstance(
+                test_doc["lattice_cart"],
+                list,
+                msg="Failed cartesian numpy cast to list",
+            )
             cart_pos = frac2cart(test_doc["lattice_cart"], test_doc["positions_frac"])
             back2frac = cart2frac(test_doc["lattice_cart"], cart_pos)
             np.testing.assert_array_almost_equal(back2frac, test_doc["positions_frac"])
         except AssertionError:
             print("cart:", test_doc["lattice_cart"], abc2cart(test_doc["lattice_abc"]))
             print("abc:", test_doc["lattice_abc"], cart2abc(test_doc["lattice_cart"]))
-            print("volume:", test_doc["cell_volume"], cart2volume(test_doc["lattice_cart"]))
+            print(
+                "volume:",
+                test_doc["cell_volume"],
+                cart2volume(test_doc["lattice_cart"]),
+            )
             raise AssertionError
 
     def test_cart2abc_star(self):
@@ -62,7 +88,10 @@ class CellUtilTest(unittest.TestCase):
         test_doc, success = castep2dict(castep_fname, db=True, verbosity=VERBOSITY)
         self.assertTrue(success)
         self.assertTrue(
-            np.allclose(real2recip(test_doc["lattice_cart"]), 2 * np.pi * np.asarray(cart2abcstar(test_doc["lattice_cart"]))),
+            np.allclose(
+                real2recip(test_doc["lattice_cart"]),
+                2 * np.pi * np.asarray(cart2abcstar(test_doc["lattice_cart"])),
+            ),
             msg="Conversion cart2abc failed.",
         )
 
@@ -77,7 +106,9 @@ class CellUtilTest(unittest.TestCase):
 
         lattice_cart = [[2, 0, 0], [0, 2, 0], [0, 0, 2]]
         positions_frac = [[1, 1, 1], [0.5, 0.5, 0.5]]
-        self.assertEqual(frac2cart(lattice_cart, positions_frac), [[2, 2, 2], [1, 1, 1]])
+        self.assertEqual(
+            frac2cart(lattice_cart, positions_frac), [[2, 2, 2], [1, 1, 1]]
+        )
 
     def test_cart2frac(self):
         lattice_cart = [[2, 0, 0], [0, 2, 0], [0, 0, 2]]
@@ -90,7 +121,9 @@ class CellUtilTest(unittest.TestCase):
 
         lattice_cart = [[2, 0, 0], [0, 2, 0], [0, 0, 2]]
         positions_abs = [[2, 2, 2], [1, 1, 1]]
-        self.assertEqual(cart2frac(lattice_cart, positions_abs), [[1, 1, 1], [0.5, 0.5, 0.5]])
+        self.assertEqual(
+            cart2frac(lattice_cart, positions_abs), [[1, 1, 1], [0.5, 0.5, 0.5]]
+        )
 
     def test_conversion_transitivity(self):
         """ Test that cart2frac(frac2cart(A)) == A. """
@@ -99,7 +132,9 @@ class CellUtilTest(unittest.TestCase):
         lattice_cart = test_doc["lattice_cart"]
         positions_frac = test_doc["positions_frac"]
         np.testing.assert_almost_equal(
-            cart2frac(lattice_cart, frac2cart(lattice_cart, positions_frac)), positions_frac, decimal=10
+            cart2frac(lattice_cart, frac2cart(lattice_cart, positions_frac)),
+            positions_frac,
+            decimal=10,
         )
 
     def test_random_noise(self):
@@ -113,32 +148,66 @@ class CellUtilTest(unittest.TestCase):
 
         init_positions_frac = test_doc["positions_frac"]
         test_doc = add_noise(test_doc, amplitude=0)
-        np.testing.assert_almost_equal(init_positions_frac, test_doc["positions_frac"], decimal=10)
+        np.testing.assert_almost_equal(
+            init_positions_frac, test_doc["positions_frac"], decimal=10
+        )
 
         test_doc = add_noise(test_doc, amplitude=0.1)
-        np.testing.assert_almost_equal(init_positions_frac, test_doc["positions_frac"], decimal=1)
-        diff = np.sqrt(np.sum((np.asarray(init_positions_frac) - np.asarray(test_doc["positions_frac"])) ** 2, axis=-1))
+        np.testing.assert_almost_equal(
+            init_positions_frac, test_doc["positions_frac"], decimal=1
+        )
+        diff = np.sqrt(
+            np.sum(
+                (
+                    np.asarray(init_positions_frac)
+                    - np.asarray(test_doc["positions_frac"])
+                )
+                ** 2,
+                axis=-1,
+            )
+        )
         self.assertTrue(np.max(diff) <= 0.1)
         self.assertTrue(np.max(diff) >= 0)
 
     def test_recip2real(self):
-        real_lattice = [[5.5902240, 0, 0], [3.7563195, 4.1401290, 0], [-2.9800295, -1.3200288, 8.5321695]]
+        real_lattice = [
+            [5.5902240, 0, 0],
+            [3.7563195, 4.1401290, 0],
+            [-2.9800295, -1.3200288, 8.5321695],
+        ]
         recip_lattice = real2recip(real_lattice)
         np.testing.assert_array_almost_equal(
             np.asarray(recip_lattice),
-            np.asarray([[1.1239595, -1.0197632, 0.2347956], [0.0, 1.5176303, 0.2347956], [0, 0, 0.7364112]]),
+            np.asarray(
+                [
+                    [1.1239595, -1.0197632, 0.2347956],
+                    [0.0, 1.5176303, 0.2347956],
+                    [0, 0, 0.7364112],
+                ]
+            ),
         )
 
-        real_lattice = [[6.0235150, 0, 0], [0.0, 5.6096010, 0], [-5.0202472, 0, 10.0218337]]
+        real_lattice = [
+            [6.0235150, 0, 0],
+            [0.0, 5.6096010, 0],
+            [-5.0202472, 0, 10.0218337],
+        ]
         recip_lattice = real2recip(real_lattice)
         np.testing.assert_array_almost_equal(
-            np.asarray(recip_lattice), np.asarray([[1.0431094, 0, 0.5225256], [0, 1.1200770, 0], [0, 0, 0.6269494]])
+            np.asarray(recip_lattice),
+            np.asarray(
+                [[1.0431094, 0, 0.5225256], [0, 1.1200770, 0], [0, 0, 0.6269494]]
+            ),
         )
 
     def test_calc_mp_spacing(self):
         from matador.utils.cell_utils import calc_mp_spacing
 
-        real_lattice = [[6.0235150, 0, 0], [0.0, 5.6096010, 0], [-5.0202472, 0, 10.0218337]]
+        real_lattice = [
+            [6.0235150, 0, 0],
+            [0.0, 5.6096010, 0],
+            [-5.0202472, 0, 10.0218337],
+        ]
         mp_grid = [4, 4, 2]
         spacing = calc_mp_spacing(real_lattice, mp_grid, prec=3)
         self.assertEqual(spacing, 0.05)
@@ -150,12 +219,20 @@ class CellUtilTest(unittest.TestCase):
     def test_calc_mp_grid(self):
         from matador.utils.cell_utils import calc_mp_grid
 
-        real_lattice = [[6.0235150, 0, 0], [0.0, 5.6096010, 0], [-5.0202472, 0, 10.0218337]]
+        real_lattice = [
+            [6.0235150, 0, 0],
+            [0.0, 5.6096010, 0],
+            [-5.0202472, 0, 10.0218337],
+        ]
         spacing = 0.05
         self.assertEqual(calc_mp_grid(real_lattice, spacing), [4, 4, 2])
 
     def test_shift_grid(self):
-        from matador.utils.cell_utils import calc_mp_grid, shift_to_include_gamma, abc2cart
+        from matador.utils.cell_utils import (
+            calc_mp_grid,
+            shift_to_include_gamma,
+            abc2cart,
+        )
 
         lattice_abc = [[5.57068, 10.222092, 10.222039], [90.0, 90.0, 90.0]]
         lattice_cart = abc2cart(lattice_abc)
@@ -198,14 +275,22 @@ class SymmetriesAndSupercellsTest(unittest.TestCase):
             standardize = bool(_iter % 2)
             symmetric = bool(_iter % 2)
 
-            supercell = create_simple_supercell(test_doc, tuple(extension), standardize=standardize, symmetric=symmetric)
+            supercell = create_simple_supercell(
+                test_doc, tuple(extension), standardize=standardize, symmetric=symmetric
+            )
             self.assertEqual(supercell["num_atoms"], num_images * test_doc["num_atoms"])
-            self.assertAlmostEqual(supercell["cell_volume"], num_images * test_doc["cell_volume"], places=3)
-            self.assertEqual(len(supercell["positions_frac"]), num_images * len(test_doc["positions_frac"]))
+            self.assertAlmostEqual(
+                supercell["cell_volume"], num_images * test_doc["cell_volume"], places=3
+            )
+            self.assertEqual(
+                len(supercell["positions_frac"]),
+                num_images * len(test_doc["positions_frac"]),
+            )
             for i in range(3):
                 if not standardize:
                     np.testing.assert_array_equal(
-                        np.asarray(supercell["lattice_cart"][i]), extension[i] * np.asarray(test_doc["lattice_cart"][i])
+                        np.asarray(supercell["lattice_cart"][i]),
+                        extension[i] * np.asarray(test_doc["lattice_cart"][i]),
                     )
             self.assertLess(pdf_sim_dist(test_doc, supercell), 1e-3)
             _iter += 1
@@ -214,11 +299,15 @@ class SymmetriesAndSupercellsTest(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             supercell = create_simple_supercell(test_doc, (1, 1, 1))
 
-    @unittest.skipIf(not IMPORTED_SEEKPATH, "Seekpath package not found in this distribution")
+    @unittest.skipIf(
+        not IMPORTED_SEEKPATH, "Seekpath package not found in this distribution"
+    )
     def test_kpt_path(self):
 
         cell, s = castep2dict(REAL_PATH + "data/Na3Zn4-swap-ReOs-OQMD_759599.castep")
-        std_cell, path, seekpath_results = get_seekpath_kpoint_path(cell, spacing=0.01, debug=False)
+        std_cell, path, seekpath_results = get_seekpath_kpoint_path(
+            cell, spacing=0.01, debug=False
+        )
         self.assertEqual(539, len(path))
 
         self.assertLess(pdf_sim_dist(cell, std_cell), 0.05)
@@ -233,7 +322,9 @@ class SymmetriesAndSupercellsTest(unittest.TestCase):
             doc, s = res2dict(fname, db=False)
             doc["cell_volume"] = cart2volume(doc["lattice_cart"])
 
-            std_doc, path, seekpath_results = get_seekpath_kpoint_path(doc, spacing=spacing, debug=False)
+            std_doc, path, seekpath_results = get_seekpath_kpoint_path(
+                doc, spacing=spacing, debug=False
+            )
             seekpath_results_path = get_path(doc2spg(doc))
 
             rel_path = seekpath_results["explicit_kpoints_rel"]
@@ -245,13 +336,21 @@ class SymmetriesAndSupercellsTest(unittest.TestCase):
             np.testing.assert_array_almost_equal(path, rel_path)
             for ind, kpt in enumerate(cart_kpts[:-1]):
                 diffs[ind] = np.sqrt(np.sum((kpt - cart_kpts[ind + 1]) ** 2))
-            self.assertLess(len(np.where(diffs > 1.1 * spacing)[0]), len(seekpath_results["explicit_segments"]))
+            self.assertLess(
+                len(np.where(diffs > 1.1 * spacing)[0]),
+                len(seekpath_results["explicit_segments"]),
+            )
 
             if "flrys4-1x109" in fname:
                 bs, s = bands2dict(fname.replace(".res", ".bands"))
                 np.testing.assert_array_almost_equal(bs["kpoint_path"], rel_path)
-                np.testing.assert_array_almost_equal(bs["lattice_cart"], std_doc["lattice_cart"])
-            self.assertLess(len(np.where(diffs > 1.1 * spacing)[0]), len(seekpath_results["explicit_segments"]))
+                np.testing.assert_array_almost_equal(
+                    bs["lattice_cart"], std_doc["lattice_cart"]
+                )
+            self.assertLess(
+                len(np.where(diffs > 1.1 * spacing)[0]),
+                len(seekpath_results["explicit_segments"]),
+            )
 
             cell_path = fname.replace(".res", ".cell")
             doc2cell(std_doc, cell_path)
@@ -260,7 +359,8 @@ class SymmetriesAndSupercellsTest(unittest.TestCase):
             remove(cell_path)
             seekpath_new_results = get_path(doc2spg(new_doc))
             self.assertEqual(
-                seekpath_new_results["bravais_lattice_extended"], seekpath_results_path["bravais_lattice_extended"]
+                seekpath_new_results["bravais_lattice_extended"],
+                seekpath_results_path["bravais_lattice_extended"],
             )
 
             dist = pdf_sim_dist(doc, std_doc)
@@ -285,7 +385,9 @@ class SymmetriesAndSupercellsTest(unittest.TestCase):
             dist = pdf_sim_dist(doc, std_doc)
             self.assertLess(dist, 0.01)
 
-        doc = Crystal(castep2dict(REAL_PATH + "data/Na3Zn4-swap-ReOs-OQMD_759599.castep")[0])
+        doc = Crystal(
+            castep2dict(REAL_PATH + "data/Na3Zn4-swap-ReOs-OQMD_759599.castep")[0]
+        )
         std_doc = standardize_doc_cell(doc)
         dist = pdf_sim_dist(doc, std_doc)
         self.assertLess(dist, 0.01)

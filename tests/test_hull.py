@@ -51,7 +51,9 @@ class HullTest(unittest.TestCase):
 
     def test_hull_with_crystal_models(self):
         """ Loading hull structures from files. """
-        cursor, failures = res2dict(REAL_PATH + "data/hull-KPSn-KP/*.res", as_model=True)
+        cursor, failures = res2dict(
+            REAL_PATH + "data/hull-KPSn-KP/*.res", as_model=True
+        )
         self.assertEqual(
             len(cursor),
             87,
@@ -340,6 +342,7 @@ class HullTest(unittest.TestCase):
         fake_query._create_hull = True
         fake_query.args = dict()
         fake_query.args["intersection"] = True
+        fake_query.args["subcmd"] = "hull"
         fake_query.args["composition"] = ["La2O3:ZrO2:Li2O"]
         hull = QueryConvexHull(
             query=fake_query,
@@ -418,6 +421,7 @@ class HullTest(unittest.TestCase):
         fake_query._create_hull = True
         fake_query.args = dict()
         fake_query.args["intersection"] = False
+        fake_query.args["subcmd"] = "hull"
         fake_query.args["composition"] = ["KP"]
         hull = QueryConvexHull(
             query=fake_query, chempots=[-791.456765, -219.58161025], no_plot=True

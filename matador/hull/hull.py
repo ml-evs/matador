@@ -53,7 +53,8 @@ class QueryConvexHull:
     """
 
     def __init__(self, query=None, cursor=None, elements=None, species=None, voltage=False, volume=False, subcmd=None,
-                 plot_kwargs=None, lazy=False, energy_key='enthalpy_per_atom', client=None, collections=None, db=None, **kwargs):
+                 plot_kwargs=None, lazy=False, energy_key='enthalpy_per_atom', client=None, collections=None, db=None,
+                 **kwargs):
         """ Initialise the class from either a DBQuery or a cursor (list
         of matador dicts) and construct the appropriate phase diagram.
 

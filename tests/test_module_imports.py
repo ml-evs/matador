@@ -33,7 +33,12 @@ class ImportTest(unittest.TestCase):
         self.assertTrue(Crystal)
 
     def test_db(self):
-        from matador.db import make_connection_to_collection, Spatula, DatabaseChanges, Refiner
+        from matador.db import (
+            make_connection_to_collection,
+            Spatula,
+            DatabaseChanges,
+            Refiner,
+        )
 
         self.assertTrue(make_connection_to_collection)
         self.assertTrue(Spatula)
@@ -72,10 +77,28 @@ class ImportTest(unittest.TestCase):
             get_uniq_cursor,
         )
 
-        self.assertTrue(all([PDF, PDFOverlap, CombinedProjectedPDF, PXRD, Fingerprint, FingerprintFactory, get_uniq_cursor]))
+        self.assertTrue(
+            all(
+                [
+                    PDF,
+                    PDFOverlap,
+                    CombinedProjectedPDF,
+                    PXRD,
+                    Fingerprint,
+                    FingerprintFactory,
+                    get_uniq_cursor,
+                ]
+            )
+        )
 
     def test_hull(self):
-        from matador.hull import QueryConvexHull, EnsembleHull, PhaseDiagram, HullDiff, diff_hulls
+        from matador.hull import (
+            QueryConvexHull,
+            EnsembleHull,
+            PhaseDiagram,
+            HullDiff,
+            diff_hulls,
+        )
 
         self.assertTrue(QueryConvexHull)
         self.assertTrue(EnsembleHull)

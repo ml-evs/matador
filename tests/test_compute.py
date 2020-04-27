@@ -12,11 +12,22 @@ import time
 import warnings
 import multiprocessing as mp
 
-from matador.utils.errors import CalculationError, MaxMemoryEstimateExceeded, CriticalError, WalltimeError, InputError
+from matador.utils.errors import (
+    CalculationError,
+    MaxMemoryEstimateExceeded,
+    CriticalError,
+    WalltimeError,
+    InputError,
+)
 from matador.compute import ComputeTask, BatchRun, reset_job_folder
 from matador.compute.slurm import SlurmQueueManager
 from matador.compute.pbs import PBSQueueManager
-from matador.scrapers.castep_scrapers import cell2dict, param2dict, res2dict, castep2dict
+from matador.scrapers.castep_scrapers import (
+    cell2dict,
+    param2dict,
+    res2dict,
+    castep2dict,
+)
 from .utils import REAL_PATH, MatadorUnitTest, detect_program
 
 HOSTNAME = os.uname()[1]
@@ -42,9 +53,13 @@ class ComputeTest(MatadorUnitTest):
 
     def test_missing_exec(self):
         """ Ensure failure if exec misses. """
-        cell_dict, s = cell2dict(REAL_PATH + "/data/LiAs_tests/LiAs.cell", verbosity=VERBOSITY, db=False)
+        cell_dict, s = cell2dict(
+            REAL_PATH + "/data/LiAs_tests/LiAs.cell", verbosity=VERBOSITY, db=False
+        )
         assert s
-        param_dict, s = param2dict(REAL_PATH + "/data/LiAs_tests/LiAs.param", verbosity=VERBOSITY, db=False)
+        param_dict, s = param2dict(
+            REAL_PATH + "/data/LiAs_tests/LiAs.param", verbosity=VERBOSITY, db=False
+        )
         assert s
 
         node = None
@@ -78,9 +93,15 @@ class ComputeTest(MatadorUnitTest):
 
         """
         seed = REAL_PATH + "data/symmetry_failure/Sb.res"
-        cell_dict, s = cell2dict(REAL_PATH + "/data/symmetry_failure/KSb.cell", verbosity=VERBOSITY, db=False)
+        cell_dict, s = cell2dict(
+            REAL_PATH + "/data/symmetry_failure/KSb.cell", verbosity=VERBOSITY, db=False
+        )
         assert s
-        param_dict, s = param2dict(REAL_PATH + "/data/symmetry_failure/KSb.param", verbosity=VERBOSITY, db=False)
+        param_dict, s = param2dict(
+            REAL_PATH + "/data/symmetry_failure/KSb.param",
+            verbosity=VERBOSITY,
+            db=False,
+        )
         assert s
         executable = REAL_PATH + "data/missing_file_test/monkey_patch_sleep.sh"
         node = None
@@ -113,9 +134,15 @@ class ComputeTest(MatadorUnitTest):
         with open("Sb.castep", "w") as f:
             f.write("I am a CASTEP file, for sure.")
 
-        cell_dict, s = cell2dict(REAL_PATH + "/data/symmetry_failure/KSb.cell", verbosity=VERBOSITY, db=False)
+        cell_dict, s = cell2dict(
+            REAL_PATH + "/data/symmetry_failure/KSb.cell", verbosity=VERBOSITY, db=False
+        )
         assert s
-        param_dict, s = param2dict(REAL_PATH + "/data/symmetry_failure/KSb.param", verbosity=VERBOSITY, db=False)
+        param_dict, s = param2dict(
+            REAL_PATH + "/data/symmetry_failure/KSb.param",
+            verbosity=VERBOSITY,
+            db=False,
+        )
         assert s
         executable = REAL_PATH + "data/missing_file_test/monkey_patch_sleep.sh"
         node = None
@@ -145,9 +172,15 @@ class ComputeTest(MatadorUnitTest):
 
         """
         seed = REAL_PATH + "data/symmetry_failure/Sb.res"
-        cell_dict, s = cell2dict(REAL_PATH + "/data/symmetry_failure/KSb.cell", verbosity=VERBOSITY, db=False)
+        cell_dict, s = cell2dict(
+            REAL_PATH + "/data/symmetry_failure/KSb.cell", verbosity=VERBOSITY, db=False
+        )
         assert s
-        param_dict, s = param2dict(REAL_PATH + "/data/symmetry_failure/KSb.param", verbosity=VERBOSITY, db=False)
+        param_dict, s = param2dict(
+            REAL_PATH + "/data/symmetry_failure/KSb.param",
+            verbosity=VERBOSITY,
+            db=False,
+        )
         assert s
         ncores = 1
         executable = REAL_PATH + "data/symmetry_failure/monkey_patch_move.sh"
@@ -181,15 +214,26 @@ class ComputeTest(MatadorUnitTest):
         self.assertTrue("snap_to_symmetry" not in relaxer.calc_doc)
         self.assertTrue("symmetry_tol" not in relaxer.calc_doc)
 
-    @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), "castep or mpirun executable not found in PATH")
+    @unittest.skipIf(
+        (not CASTEP_PRESENT or not MPI_PRESENT),
+        "castep or mpirun executable not found in PATH",
+    )
     def test_relax_to_queue(self):
         """ Mimic GA and test Queue relaxations. """
 
-        newborn, s = res2dict(REAL_PATH + "/data/structures/LiAs_testcase.res", verbosity=VERBOSITY, db=False)
+        newborn, s = res2dict(
+            REAL_PATH + "/data/structures/LiAs_testcase.res",
+            verbosity=VERBOSITY,
+            db=False,
+        )
         assert s
-        cell_dict, s = cell2dict(REAL_PATH + "/data/LiAs_tests/LiAs.cell", verbosity=VERBOSITY, db=False)
+        cell_dict, s = cell2dict(
+            REAL_PATH + "/data/LiAs_tests/LiAs.cell", verbosity=VERBOSITY, db=False
+        )
         assert s
-        param_dict, s = param2dict(REAL_PATH + "/data/LiAs_tests/LiAs.param", verbosity=VERBOSITY, db=False)
+        param_dict, s = param2dict(
+            REAL_PATH + "/data/LiAs_tests/LiAs.param", verbosity=VERBOSITY, db=False
+        )
         assert s
 
         node = None
@@ -239,15 +283,22 @@ class ComputeTest(MatadorUnitTest):
         self.assertTrue(success, "couldn't parse output file!")
         self.assertTrue(all([match_dict[key] for key in match_dict]))
 
-    @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), "castep or mpirun executable not found in PATH")
+    @unittest.skipIf(
+        (not CASTEP_PRESENT or not MPI_PRESENT),
+        "castep or mpirun executable not found in PATH",
+    )
     def test_relax_to_file(self):
         """ Relax structure from file to file. """
         seed = "_Li.res"
         shutil.copy(REAL_PATH + "data/structures/Li.res", "_Li.res")
 
-        cell_dict, s = cell2dict(REAL_PATH + "/data/LiAs_tests/LiAs.cell", verbosity=VERBOSITY, db=False)
+        cell_dict, s = cell2dict(
+            REAL_PATH + "/data/LiAs_tests/LiAs.cell", verbosity=VERBOSITY, db=False
+        )
         assert s
-        param_dict, s = param2dict(REAL_PATH + "/data/LiAs_tests/LiAs.param", verbosity=VERBOSITY, db=False)
+        param_dict, s = param2dict(
+            REAL_PATH + "/data/LiAs_tests/LiAs.param", verbosity=VERBOSITY, db=False
+        )
         assert s
         executable = "castep"
         node = None
@@ -273,19 +324,32 @@ class ComputeTest(MatadorUnitTest):
         print("Process completed!")
 
         completed_exists = isfile("completed/_Li.res")
-        base_files_exist = [isfile("_Li.res"), isfile("_Li.res.lock"), isfile("_Li.castep")]
+        base_files_exist = [
+            isfile("_Li.res"),
+            isfile("_Li.res.lock"),
+            isfile("_Li.castep"),
+        ]
         self.assertTrue(completed_exists, "couldn't find output file!")
         self.assertFalse(any(base_files_exist), "couldn't clean input files")
 
-    @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), "castep or mpirun executable not found in PATH")
+    @unittest.skipIf(
+        (not CASTEP_PRESENT or not MPI_PRESENT),
+        "castep or mpirun executable not found in PATH",
+    )
     def test_failed_relaxation(self):
         """ Set a relaxation up to fail. """
         seed = "_LiAs_testcase.res"
-        shutil.copy(REAL_PATH + "data/structures/LiAs_testcase_bad.res", "_LiAs_testcase.res")
+        shutil.copy(
+            REAL_PATH + "data/structures/LiAs_testcase_bad.res", "_LiAs_testcase.res"
+        )
 
-        cell_dict, s = cell2dict(REAL_PATH + "/data/LiAs_tests/LiAs.cell", verbosity=VERBOSITY, db=False)
+        cell_dict, s = cell2dict(
+            REAL_PATH + "/data/LiAs_tests/LiAs.cell", verbosity=VERBOSITY, db=False
+        )
         assert s
-        param_dict, s = param2dict(REAL_PATH + "/data/LiAs_tests/LiAs.param", verbosity=VERBOSITY, db=False)
+        param_dict, s = param2dict(
+            REAL_PATH + "/data/LiAs_tests/LiAs.param", verbosity=VERBOSITY, db=False
+        )
         assert s
         param_dict["geom_max_iter"] = 3
         executable = "castep"
@@ -324,12 +388,28 @@ class ComputeTest(MatadorUnitTest):
     def test_dont_restart_completed_calc(self):
         """ Set a relaxation up to fail. """
 
-        shutil.copy(REAL_PATH + "data/no_steps_left_todo/cache/NaP_intermediates_stopped_early.res", ".")
-        shutil.copy(REAL_PATH + "data/no_steps_left_todo/cache/NaP_intermediates_stopped_early.castep", ".")
+        shutil.copy(
+            REAL_PATH
+            + "data/no_steps_left_todo/cache/NaP_intermediates_stopped_early.res",
+            ".",
+        )
+        shutil.copy(
+            REAL_PATH
+            + "data/no_steps_left_todo/cache/NaP_intermediates_stopped_early.castep",
+            ".",
+        )
 
-        cell_dict, s = cell2dict(REAL_PATH + "data/no_steps_left_todo/NaP.cell", verbosity=VERBOSITY, db=False)
+        cell_dict, s = cell2dict(
+            REAL_PATH + "data/no_steps_left_todo/NaP.cell",
+            verbosity=VERBOSITY,
+            db=False,
+        )
         self.assertTrue(s)
-        param_dict, s = param2dict(REAL_PATH + "data/no_steps_left_todo/NaP.param", verbosity=VERBOSITY, db=False)
+        param_dict, s = param2dict(
+            REAL_PATH + "data/no_steps_left_todo/NaP.param",
+            verbosity=VERBOSITY,
+            db=False,
+        )
         self.assertTrue(s)
         executable = "castep"
         node = None
@@ -363,17 +443,26 @@ class ComputeTest(MatadorUnitTest):
         self.assertTrue(bad_exists)
         self.assertTrue(good_exists)
 
-    @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), "castep or mpirun executable not found in PATH")
+    @unittest.skipIf(
+        (not CASTEP_PRESENT or not MPI_PRESENT),
+        "castep or mpirun executable not found in PATH",
+    )
     def test_memcheck(self):
         """ Test the memory checker will not proceed with huge jobs. """
 
-        shutil.copy(REAL_PATH + "data/structures/LiAs_testcase.res", "_LiAs_testcase.res")
+        shutil.copy(
+            REAL_PATH + "data/structures/LiAs_testcase.res", "_LiAs_testcase.res"
+        )
         shutil.copy(REAL_PATH + "data/pspots/Li_00PBE.usp", ".")
         shutil.copy(REAL_PATH + "data/pspots/As_00PBE.usp", ".")
 
-        cell_dict, s = cell2dict(REAL_PATH + "data/LiAs_tests/LiAs.cell", verbosity=VERBOSITY, db=False)
+        cell_dict, s = cell2dict(
+            REAL_PATH + "data/LiAs_tests/LiAs.cell", verbosity=VERBOSITY, db=False
+        )
         self.assertTrue(s)
-        param_dict, s = param2dict(REAL_PATH + "data/LiAs_tests/LiAs.param", verbosity=VERBOSITY, db=False)
+        param_dict, s = param2dict(
+            REAL_PATH + "data/LiAs_tests/LiAs.param", verbosity=VERBOSITY, db=False
+        )
         self.assertTrue(s)
 
         with self.assertRaises(MaxMemoryEstimateExceeded):
@@ -395,14 +484,21 @@ class ComputeTest(MatadorUnitTest):
         folders_that_should_exist = ["logs"]
         folders_that_should_not_exist = ["bad_castep", "input", "completed"]
 
-        correct_files = all([not isfile(_file) for _file in files_that_should_not_exist])
+        correct_files = all(
+            [not isfile(_file) for _file in files_that_should_not_exist]
+        )
         correct_folders = all([isdir(folder) for folder in folders_that_should_exist])
-        correct_folders *= all([not isdir(folder) for folder in folders_that_should_not_exist])
+        correct_folders *= all(
+            [not isdir(folder) for folder in folders_that_should_not_exist]
+        )
 
         self.assertTrue(correct_folders)
         self.assertTrue(correct_files)
 
-    @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), "castep or mpirun executable not found in PATH")
+    @unittest.skipIf(
+        (not CASTEP_PRESENT or not MPI_PRESENT),
+        "castep or mpirun executable not found in PATH",
+    )
     @unittest.skipIf(not RUN_SLOW_TESTS, "this is a slow test, skipping")
     def test_batch_relax(self):
         """ Batch relax structures from file to file. """
@@ -414,7 +510,14 @@ class ComputeTest(MatadorUnitTest):
         shutil.copy(REAL_PATH + "data/pspots/Li_00PBE.usp", ".")
         shutil.copy(REAL_PATH + "data/pspots/C_00PBE.usp", ".")
 
-        runner = BatchRun(seed=["LiC"], debug=False, no_reopt=True, verbosity=VERBOSITY, ncores=NCORES, executable=EXECUTABLE)
+        runner = BatchRun(
+            seed=["LiC"],
+            debug=False,
+            no_reopt=True,
+            verbosity=VERBOSITY,
+            ncores=NCORES,
+            executable=EXECUTABLE,
+        )
         runner.spawn(join=False)
 
         completed_exists = isfile("completed/_LiC.res")
@@ -451,7 +554,13 @@ class ComputeTest(MatadorUnitTest):
         old_env = copy.deepcopy(os.environ)
         os.environ.update(slurm_env)
 
-        runner = BatchRun(seed=["LiC"], debug=False, ncores=NCORES, verbosity=VERBOSITY, executable=EXECUTABLE)
+        runner = BatchRun(
+            seed=["LiC"],
+            debug=False,
+            ncores=NCORES,
+            verbosity=VERBOSITY,
+            executable=EXECUTABLE,
+        )
 
         self.assertEqual(runner.args["ncores"], NCORES)
         self.assertEqual(type(runner.queue_mgr), SlurmQueueManager)
@@ -461,7 +570,13 @@ class ComputeTest(MatadorUnitTest):
         self.assertEqual(runner.queue_mgr.env["SLURM_RANDOM_STRING"], "hello")
         self.assertTrue("blah" not in runner.queue_mgr.env)
 
-        runner = BatchRun(seed=["LiC"], debug=False, ncores=None, verbosity=VERBOSITY, executable=EXECUTABLE)
+        runner = BatchRun(
+            seed=["LiC"],
+            debug=False,
+            ncores=None,
+            verbosity=VERBOSITY,
+            executable=EXECUTABLE,
+        )
 
         self.assertEqual(runner.args["ncores"], 120)
         self.assertEqual(type(runner.queue_mgr), SlurmQueueManager)
@@ -472,7 +587,13 @@ class ComputeTest(MatadorUnitTest):
         os.environ = copy.deepcopy(old_env)
         os.environ.update(pbs_env)
 
-        runner = BatchRun(seed=["LiC"], debug=False, ncores=None, verbosity=VERBOSITY, executable=EXECUTABLE)
+        runner = BatchRun(
+            seed=["LiC"],
+            debug=False,
+            ncores=None,
+            verbosity=VERBOSITY,
+            executable=EXECUTABLE,
+        )
 
         print(runner.queue_mgr)
 
@@ -484,19 +605,32 @@ class ComputeTest(MatadorUnitTest):
 
         os.environ.update(slurm_env)
         with self.assertRaises(RuntimeError):
-            runner = BatchRun(seed=["LiC"], debug=False, ncores=None, verbosity=VERBOSITY, executable=EXECUTABLE)
+            runner = BatchRun(
+                seed=["LiC"],
+                debug=False,
+                ncores=None,
+                verbosity=VERBOSITY,
+                executable=EXECUTABLE,
+            )
 
         os.environ = copy.deepcopy(old_env)
 
-    @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), "castep or mpirun executable not found in PATH")
+    @unittest.skipIf(
+        (not CASTEP_PRESENT or not MPI_PRESENT),
+        "castep or mpirun executable not found in PATH",
+    )
     def test_scf(self):
         """ Perform SCF on structure from file. """
         seed = "_LiC.res"
         shutil.copy(REAL_PATH + "data/structures/LiC.res", "_LiC.res")
 
-        cell_dict, s = cell2dict(REAL_PATH + "/data/LiC_tests/LiC_scf.cell", verbosity=VERBOSITY, db=False)
+        cell_dict, s = cell2dict(
+            REAL_PATH + "/data/LiC_tests/LiC_scf.cell", verbosity=VERBOSITY, db=False
+        )
         assert s
-        param_dict, s = param2dict(REAL_PATH + "/data/LiC_tests/LiC_scf.param", verbosity=VERBOSITY, db=False)
+        param_dict, s = param2dict(
+            REAL_PATH + "/data/LiC_tests/LiC_scf.param", verbosity=VERBOSITY, db=False
+        )
         assert s
         executable = "castep"
         node = None
@@ -519,13 +653,24 @@ class ComputeTest(MatadorUnitTest):
             start=True,
         )
 
-        completed_exists = [isfile("completed/_LiC.res"), isfile("completed/_LiC.castep"), isfile("completed/_LiC-out.cell")]
-        base_file_exists = [isfile("_LiC.res"), isfile("_LiC.castep"), isfile("_LiC.res.lock")]
+        completed_exists = [
+            isfile("completed/_LiC.res"),
+            isfile("completed/_LiC.castep"),
+            isfile("completed/_LiC-out.cell"),
+        ]
+        base_file_exists = [
+            isfile("_LiC.res"),
+            isfile("_LiC.castep"),
+            isfile("_LiC.res.lock"),
+        ]
 
         self.assertFalse(any(base_file_exists), "failed to clean up files!")
         self.assertTrue(all(completed_exists), "couldn't find output files!")
 
-    @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), "castep or mpirun executable not found in PATH")
+    @unittest.skipIf(
+        (not CASTEP_PRESENT or not MPI_PRESENT),
+        "castep or mpirun executable not found in PATH",
+    )
     def test_convergence_runner(self):
         """ Check that convergence tests run to completion. """
         shutil.copy(REAL_PATH + "data/structures/Li.res", "_LiAs_testcase.res")
@@ -565,8 +710,14 @@ class ComputeTest(MatadorUnitTest):
         ]
         do_bad_files_exist = [isfile(_file) for _file in files_that_should_not_exist]
 
-        results = ["completed_cutoff/_LiAs_testcase_{}eV.castep".format(cutoff) for cutoff in [300, 400]]
-        results += ["completed_kpts/_LiAs_testcase_{}A.castep".format(kpts) for kpts in [0.08, 0.07]]
+        results = [
+            "completed_cutoff/_LiAs_testcase_{}eV.castep".format(cutoff)
+            for cutoff in [300, 400]
+        ]
+        results += [
+            "completed_kpts/_LiAs_testcase_{}A.castep".format(kpts)
+            for kpts in [0.08, 0.07]
+        ]
         files_exist = [isfile(_file) for _file in results]
 
         self.assertTrue(all(dirs_exist))
@@ -574,7 +725,10 @@ class ComputeTest(MatadorUnitTest):
         self.assertTrue(all(files_exist))
         self.assertFalse(any(do_bad_files_exist))
 
-    @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), "castep or mpirun executable not found in PATH")
+    @unittest.skipIf(
+        (not CASTEP_PRESENT or not MPI_PRESENT),
+        "castep or mpirun executable not found in PATH",
+    )
     def test_batch_failed_scf(self):
         """ Check that SCF failures don't kill everything... """
 
@@ -586,7 +740,12 @@ class ComputeTest(MatadorUnitTest):
         shutil.copy(REAL_PATH + "data/fail_scf/LiC_scf.param", ".")
 
         runner = BatchRun(
-            seed=["LiC_scf"], debug=False, no_reopt=True, verbosity=VERBOSITY, ncores=NCORES, executable=EXECUTABLE
+            seed=["LiC_scf"],
+            debug=False,
+            no_reopt=True,
+            verbosity=VERBOSITY,
+            ncores=NCORES,
+            executable=EXECUTABLE,
         )
         runner.spawn()
 
@@ -594,7 +753,9 @@ class ComputeTest(MatadorUnitTest):
         bad_castep_folder_exists = isdir("bad_castep")
 
         seeds = ["_Li.res", "_LiC.res"]
-        output_files_exist = all([isfile("bad_castep/{}".format(seed)) for seed in seeds])
+        output_files_exist = all(
+            [isfile("bad_castep/{}".format(seed)) for seed in seeds]
+        )
 
         cruft = glob.glob("_Li*")
         cruft_doesnt_exist = bool(len(cruft))
@@ -631,7 +792,10 @@ class ComputeTest(MatadorUnitTest):
         with self.assertRaises(CriticalError):
             runner.spawn()
 
-    @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), "castep or mpirun executable not found in PATH")
+    @unittest.skipIf(
+        (not CASTEP_PRESENT or not MPI_PRESENT),
+        "castep or mpirun executable not found in PATH",
+    )
     def test_batch_max_walltime_threaded(self):
         """ Check that WallTimeErrors do kill everything... """
 
@@ -659,7 +823,9 @@ class ComputeTest(MatadorUnitTest):
         castep_exists = isfile("LiAs_testcase.castep")
         bad_castep_exists = isfile("LiAs_testcase_bad.castep")
         res_exists = isfile("LiAs_testcase.res") and isfile("LiAs_testcase_bad.res")
-        lock_exists = isfile("LiAs_testcase.res.lock") or isfile("LiAs_testcase_bad.res.lock")
+        lock_exists = isfile("LiAs_testcase.res.lock") or isfile(
+            "LiAs_testcase_bad.res.lock"
+        )
         compute_dir_exist = isdir(HOSTNAME)
 
         self.assertTrue(castep_exists, "Could not find castep file!")
@@ -679,12 +845,23 @@ class ComputeTest(MatadorUnitTest):
         for _file in files:
             shutil.copy(_file, ".")
 
-        runner = BatchRun(seed="*.res", debug=False, mode="generic", verbosity=4, ncores=1, executable=executable)
+        runner = BatchRun(
+            seed="*.res",
+            debug=False,
+            mode="generic",
+            verbosity=4,
+            ncores=1,
+            executable=executable,
+        )
 
         runner.spawn(join=True)
 
-        completed_files_exist = all([isfile("completed/" + _file.split("/")[-1]) for _file in files])
-        txt_files_exist = all([isfile(_file) for _file in ["jobs.txt", "finished_cleanly.txt"]])
+        completed_files_exist = all(
+            [isfile("completed/" + _file.split("/")[-1]) for _file in files]
+        )
+        txt_files_exist = all(
+            [isfile(_file) for _file in ["jobs.txt", "finished_cleanly.txt"]]
+        )
         dirs = ["completed", "input", "logs"]
         dirs_exist = all([isdir(_dir) for _dir in dirs])
 
@@ -696,7 +873,9 @@ class ComputeTest(MatadorUnitTest):
                 log_lines.append(len(f.readlines()))
 
         self.assertEqual(num_logs, len(files), msg="Not enough log files!")
-        self.assertTrue(all(lines > 5 for lines in log_lines), msg="Log files were too short!")
+        self.assertTrue(
+            all(lines > 5 for lines in log_lines), msg="Log files were too short!"
+        )
         self.assertTrue(completed_files_exist)
         self.assertTrue(dirs_exist)
         self.assertTrue(txt_files_exist)
@@ -714,13 +893,21 @@ class ComputeTest(MatadorUnitTest):
             shutil.copy(_file, ".")
 
         runner = BatchRun(
-            seed="*.res", debug=False, mode="generic", verbosity=4, ncores=1, nprocesses=2, executable=executable
+            seed="*.res",
+            debug=False,
+            mode="generic",
+            verbosity=4,
+            ncores=1,
+            nprocesses=2,
+            executable=executable,
         )
 
         runner.spawn(join=True)
 
         completed_files_exist = isfile("completed/" + _file.split("/")[-1])
-        txt_files_exist = all([isfile(_file) for _file in ["jobs.txt", "finished_cleanly.txt"]])
+        txt_files_exist = all(
+            [isfile(_file) for _file in ["jobs.txt", "finished_cleanly.txt"]]
+        )
         dirs = ["completed", "input", "logs"]
         dirs_exist = all([isdir(_dir) for _dir in dirs])
 
@@ -737,7 +924,9 @@ class ComputeTest(MatadorUnitTest):
         self.assertEqual(num_logs, len(files), msg="Not enough log files!")
         for f in files:
             self.assertTrue(os.path.isfile("input/{}".format(f.split("/")[-1])))
-        self.assertTrue(all(lines > 5 for lines in log_lines), msg="Log files were too short!")
+        self.assertTrue(
+            all(lines > 5 for lines in log_lines), msg="Log files were too short!"
+        )
         self.assertEqual(jobs_len, len(files))
         self.assertTrue(dirs_exist)
         self.assertTrue(completed_files_exist)
@@ -749,7 +938,13 @@ class ComputeTest(MatadorUnitTest):
             shutil.copy(file, ".")
 
         runner = BatchRun(
-            seed=["LiAs"], debug=False, no_reopt=True, verbosity=VERBOSITY, ncores=2, nprocesses=2, executable=EXECUTABLE
+            seed=["LiAs"],
+            debug=False,
+            no_reopt=True,
+            verbosity=VERBOSITY,
+            ncores=2,
+            nprocesses=2,
+            executable=EXECUTABLE,
         )
         start = time.time()
         runner.spawn()
@@ -765,7 +960,13 @@ class ComputeTest(MatadorUnitTest):
         failed_safely = False
         try:
             runner = BatchRun(
-                seed=["LiAs"], debug=False, no_reopt=True, verbosity=VERBOSITY, ncores=2, nprocesses=2, executable=EXECUTABLE
+                seed=["LiAs"],
+                debug=False,
+                no_reopt=True,
+                verbosity=VERBOSITY,
+                ncores=2,
+                nprocesses=2,
+                executable=EXECUTABLE,
             )
             runner.spawn()
         except InputError:
@@ -782,7 +983,13 @@ class ComputeTest(MatadorUnitTest):
         errors = [False for test in tests]
         for ind, test in enumerate(tests):
             try:
-                runner = BatchRun(seed=["LiC_" + test], debug=False, no_reopt=True, verbosity=VERBOSITY, executable=EXECUTABLE)
+                runner = BatchRun(
+                    seed=["LiC_" + test],
+                    debug=False,
+                    no_reopt=True,
+                    verbosity=VERBOSITY,
+                    executable=EXECUTABLE,
+                )
                 runner.spawn()
             except InputError:
                 errors[ind] = True
@@ -796,7 +1003,10 @@ class BenchmarkCastep(MatadorUnitTest):
 
     """
 
-    @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), "castep or mpirun executable not found in PATH")
+    @unittest.skipIf(
+        (not CASTEP_PRESENT or not MPI_PRESENT),
+        "castep or mpirun executable not found in PATH",
+    )
     def test_benchmark_dual_core_scf(self):
         """ Test the time taken to perform a set number of SCF steps
         on 2 cores. CASTEP prints no total timing data for single core jobs.
@@ -807,9 +1017,17 @@ class BenchmarkCastep(MatadorUnitTest):
         seed = "_LiC.res"
         shutil.copy(REAL_PATH + "data/structures/LiC.res", "_LiC.res")
 
-        cell_dict, s = cell2dict(REAL_PATH + "/data/benchmark/LiC_scf/LiC_scf.cell", verbosity=VERBOSITY, db=False)
+        cell_dict, s = cell2dict(
+            REAL_PATH + "/data/benchmark/LiC_scf/LiC_scf.cell",
+            verbosity=VERBOSITY,
+            db=False,
+        )
         self.assertTrue(s)
-        param_dict, s = param2dict(REAL_PATH + "/data/benchmark/LiC_scf/LiC_scf.param", verbosity=VERBOSITY, db=False)
+        param_dict, s = param2dict(
+            REAL_PATH + "/data/benchmark/LiC_scf/LiC_scf.param",
+            verbosity=VERBOSITY,
+            db=False,
+        )
         self.assertTrue(s)
 
         shutil.copy(REAL_PATH + "data/pspots/Li_00PBE.usp", ".")
@@ -827,20 +1045,29 @@ class BenchmarkCastep(MatadorUnitTest):
                 start=True,
             )
 
-        outputs_exist = [isfile("bad_castep/_LiC.res"), isfile("bad_castep/_LiC.castep")]
+        outputs_exist = [
+            isfile("bad_castep/_LiC.res"),
+            isfile("bad_castep/_LiC.castep"),
+        ]
 
         results, s = castep2dict("bad_castep/_LiC.castep", db=False)
         makedirs(REAL_PATH + "/data/benchmark/results", exist_ok=True)
         shutil.copy(
             "bad_castep/_LiC.castep",
-            REAL_PATH + "/data/benchmark/results/_LiC_2core_castep{}.castep".format(results.get("castep_version", "xxx")),
+            REAL_PATH
+            + "/data/benchmark/results/_LiC_2core_castep{}.castep".format(
+                results.get("castep_version", "xxx")
+            ),
         )
 
         self.assertTrue(all(outputs_exist), "couldn't find output files!")
         self.assertTrue(s, "couldn't read output files!")
         self.assertLess(results["_time_estimated"], 8)
 
-    @unittest.skipIf((not CASTEP_PRESENT or not MPI_PRESENT), "castep or mpirun executable not found in PATH")
+    @unittest.skipIf(
+        (not CASTEP_PRESENT or not MPI_PRESENT),
+        "castep or mpirun executable not found in PATH",
+    )
     def test_benchmark_manycore_scf(self):
         """ Test the time taken to perform a set number of SCF steps
         on many cores.
@@ -851,9 +1078,17 @@ class BenchmarkCastep(MatadorUnitTest):
         seed = "_LiC.res"
         shutil.copy(REAL_PATH + "data/structures/LiC.res", "_LiC.res")
 
-        cell_dict, s = cell2dict(REAL_PATH + "/data/benchmark/LiC_scf/LiC_scf.cell", verbosity=VERBOSITY, db=False)
+        cell_dict, s = cell2dict(
+            REAL_PATH + "/data/benchmark/LiC_scf/LiC_scf.cell",
+            verbosity=VERBOSITY,
+            db=False,
+        )
         self.assertTrue(s)
-        param_dict, s = param2dict(REAL_PATH + "/data/benchmark/LiC_scf/LiC_scf.param", verbosity=VERBOSITY, db=False)
+        param_dict, s = param2dict(
+            REAL_PATH + "/data/benchmark/LiC_scf/LiC_scf.param",
+            verbosity=VERBOSITY,
+            db=False,
+        )
         self.assertTrue(s)
 
         shutil.copy(REAL_PATH + "data/pspots/Li_00PBE.usp", ".")
@@ -871,7 +1106,10 @@ class BenchmarkCastep(MatadorUnitTest):
                 start=True,
             )
 
-        outputs_exist = [isfile("bad_castep/_LiC.res"), isfile("bad_castep/_LiC.castep")]
+        outputs_exist = [
+            isfile("bad_castep/_LiC.res"),
+            isfile("bad_castep/_LiC.castep"),
+        ]
 
         results, s = castep2dict("bad_castep/_LiC.castep", db=False)
         makedirs(REAL_PATH + "/data/benchmark/results", exist_ok=True)
@@ -879,7 +1117,8 @@ class BenchmarkCastep(MatadorUnitTest):
             "bad_castep/_LiC.castep",
             REAL_PATH
             + "/data/benchmark/results/_LiC_{}core_castep{}.castep".format(
-                results.get("num_mpi_processes", 0), results.get("castep_version", "xxx")
+                results.get("num_mpi_processes", 0),
+                results.get("castep_version", "xxx"),
             ),
         )
 

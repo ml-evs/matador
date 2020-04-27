@@ -13,7 +13,9 @@ ROOT_DIR = os.getcwd()
 def detect_program(executable):
     try:
         with open("/dev/null", "w") as devnull:
-            out, errs = sp.Popen([executable, "--version"], stdout=devnull, stderr=devnull).communicate()
+            out, errs = sp.Popen(
+                [executable, "--version"], stdout=devnull, stderr=devnull
+            ).communicate()
         if errs:
             raise RuntimeError
         return True

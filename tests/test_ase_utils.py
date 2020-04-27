@@ -19,11 +19,15 @@ class AseUtilTest(unittest.TestCase):
 
     def setUp(self):
         # construct ASE atoms object manually
-        self.ase_atoms = ase.build.bulk("SiO", crystalstructure="rocksalt", a=12, cubic=True)
+        self.ase_atoms = ase.build.bulk(
+            "SiO", crystalstructure="rocksalt", a=12, cubic=True
+        )
 
     def test_ase2dict(self):
         doc = ase2dict(self.ase_atoms)
-        self.assertEqual(doc["atom_types"], sorted(["Si", "O", "Si", "O", "Si", "O", "Si", "O"]))
+        self.assertEqual(
+            doc["atom_types"], sorted(["Si", "O", "Si", "O", "Si", "O", "Si", "O"])
+        )
         self.assertListEqual(doc["lattice_cart"][0], [12, 0, 0])
         self.assertListEqual(doc["lattice_cart"][1], [0, 12, 0])
         self.assertListEqual(doc["lattice_cart"][2], [0, 0, 12])

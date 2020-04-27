@@ -75,19 +75,27 @@ class SwapTest(unittest.TestCase):
         for new_doc in swapped_docs:
             self.assertTrue("As" not in new_doc["atom_types"])
             if "P" in new_doc["atom_types"]:
-                self.assertTrue(x not in new_doc["atom_types"] for x in ["Sb", "Zn", "Cu"])
+                self.assertTrue(
+                    x not in new_doc["atom_types"] for x in ["Sb", "Zn", "Cu"]
+                )
                 self.assertEqual(new_doc["atom_types"], ["Li", "Li", "P", "P"])
                 P_found = True
             if "Sb" in new_doc["atom_types"]:
-                self.assertTrue(x not in new_doc["atom_types"] for x in ["P", "Zn", "Cu"])
+                self.assertTrue(
+                    x not in new_doc["atom_types"] for x in ["P", "Zn", "Cu"]
+                )
                 self.assertEqual(new_doc["atom_types"], ["Li", "Li", "Sb", "Sb"])
                 Sb_found = True
             if "Zn" in new_doc["atom_types"]:
-                self.assertTrue(x not in new_doc["atom_types"] for x in ["P", "Sb", "Cu"])
+                self.assertTrue(
+                    x not in new_doc["atom_types"] for x in ["P", "Sb", "Cu"]
+                )
                 self.assertEqual(new_doc["atom_types"], ["Li", "Li", "Zn", "Zn"])
                 Zn_found = True
             if "Cu" in new_doc["atom_types"]:
-                self.assertTrue(x not in new_doc["atom_types"] for x in ["P", "Sb", "Zn"])
+                self.assertTrue(
+                    x not in new_doc["atom_types"] for x in ["P", "Sb", "Zn"]
+                )
                 self.assertEqual(new_doc["atom_types"], ["Li", "Li", "Cu", "Cu"])
                 Cu_found = True
         self.assertTrue(P_found)
@@ -129,7 +137,9 @@ class SwapTest(unittest.TestCase):
         # set up test data for real swap
         doc = dict()
         doc["atom_types"] = ["P", "Sb", "As", "As", "Bi"]
-        self.assertEqual(bare_swap.swap_pairs, [[["N", "P", "As", "Sb", "Bi"], ["Tc", "Mo"]]])
+        self.assertEqual(
+            bare_swap.swap_pairs, [[["N", "P", "As", "Sb", "Bi"], ["Tc", "Mo"]]]
+        )
         swapped_docs, num_swapped = bare_swap.atomic_swaps(doc)
         self.assertEqual(num_swapped, 2)
         self.assertEqual(swapped_docs[0]["atom_types"], ["Tc", "Tc", "Tc", "Tc", "Tc"])
@@ -143,7 +153,9 @@ class SwapTest(unittest.TestCase):
         bare_swap.swap_args = swap_args["swap"]
         # try to parse swaps
         bare_swap.parse_swaps()
-        self.assertEqual(bare_swap.swap_pairs, [[["Li", "Na"], ["K"]], [["Ru", "Rh"], ["La"]]])
+        self.assertEqual(
+            bare_swap.swap_pairs, [[["Li", "Na"], ["K"]], [["Ru", "Rh"], ["La"]]]
+        )
         # set up test data for real swap
         doc = dict()
         doc["atom_types"] = ["Li", "Na", "Ru", "Rh"]
@@ -159,7 +171,10 @@ class SwapTest(unittest.TestCase):
         bare_swap.swap_args = swap_args["swap"]
         # try to parse swaps
         bare_swap.parse_swaps()
-        self.assertEqual(bare_swap.swap_pairs, [[["Li", "Na"], ["K"]], [["V", "I"], ["Li", "Na", "K", "Rb", "Cs", "Fr"]]])
+        self.assertEqual(
+            bare_swap.swap_pairs,
+            [[["Li", "Na"], ["K"]], [["V", "I"], ["Li", "Na", "K", "Rb", "Cs", "Fr"]]],
+        )
         # set up test data for real swap
         doc = dict()
         doc["atom_types"] = ["Li", "Na", "V", "I"]
