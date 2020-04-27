@@ -27,7 +27,7 @@ def plot_voltage_curve(hull, ax=None, show=False, curve_label=None, line_kwargs=
 
     """
     import matplotlib.pyplot as plt
-    hull.colours = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])
+
     if ax is None:
         if hull.savefig or any([kwargs.get(ext) for ext in SAVE_EXTS]):
             fig = plt.figure(facecolor=None, figsize=(4, 3.5))
@@ -58,7 +58,7 @@ def plot_voltage_curve(hull, ax=None, show=False, curve_label=None, line_kwargs=
             stoich_label = None
         label = stoich_label if dft_label is None else dft_label
         if line_kwargs is None:
-            _line_kwargs = {'c': list(plt.rcParams['axes.prop_cycle'].by_key()['color'])[ind+1]}
+            _line_kwargs = {'c': list(plt.rcParams['axes.prop_cycle'].by_key()['color'])[ind+2]}
         else:
             _line_kwargs = line_kwargs
         _add_voltage_curve(capacities, voltages, ax_volt, label=label, **_line_kwargs)
@@ -117,8 +117,10 @@ def _add_voltage_curve(capacities, voltages, ax_volt, label=None, **kwargs):
         alpha (float): transparency of line
 
     """
-    line_kwargs = {'lw': 2,
-                   'alpha': 1}
+    line_kwargs = {
+        'lw': 2,
+        'alpha': 1,
+    }
     line_kwargs.update(kwargs)
 
     for i in range(1, len(voltages) - 1):
@@ -143,8 +145,6 @@ def plot_volume_curve(hull, ax=None, show=True, legend=False, **kwargs):
     """
     import matplotlib.pyplot as plt
 
-    hull.colours = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])
-
     if ax is None:
         if hull.savefig or any([kwargs.get(ext) for ext in SAVE_EXTS]):
             fig = plt.figure(facecolor=None, figsize=(4, 3.5))
@@ -155,6 +155,7 @@ def plot_volume_curve(hull, ax=None, show=True, legend=False, **kwargs):
         ax = ax
 
     for j in range(len(hull.volume_data['electrode_volume'])):
+        c = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])[j+2]
         stable_hull_dist = hull.volume_data['hull_distances'][j]
         if len(stable_hull_dist) != len(hull.volume_data['Q'][j]):
             raise RuntimeError("This plot does not support --hull_cutoff.")
@@ -162,8 +163,13 @@ def plot_volume_curve(hull, ax=None, show=True, legend=False, **kwargs):
         ax.plot(
             [q for ind, q in enumerate(hull.volume_data['Q'][j][:-1]) if stable_hull_dist[ind] == 0],
             [v for ind, v in enumerate(hull.volume_data['volume_ratio_with_bulk'][j]) if stable_hull_dist[ind] == 0],
-            marker='o', markeredgewidth=1.5, markeredgecolor='w',
-            zorder=100,
+            marker='o', markeredgewidth=1.5, markeredgecolor='k', c=c, zorder=1000, lw=0,
+        )
+
+        ax.plot(
+            [q for ind, q in enumerate(hull.volume_data['Q'][j][:-1]) if stable_hull_dist[ind] == 0],
+            [v for ind, v in enumerate(hull.volume_data['volume_ratio_with_bulk'][j]) if stable_hull_dist[ind] == 0],
+            lw=2, c=c,
             label=("Volume expansion from bulk {}"
                    .format(get_formula_from_stoich(hull.volume_data['endstoichs'][j], tex=True)))
         )

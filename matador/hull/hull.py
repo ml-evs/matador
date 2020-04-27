@@ -88,8 +88,6 @@ class QueryConvexHull:
 
         if plot_kwargs is None:
             plot_kwargs = {}
-        if plot_kwargs.get('show') is None:
-            plot_kwargs['show'] = True
         self.args['plot_kwargs'] = plot_kwargs
 
         self.from_cursor = False
@@ -203,12 +201,12 @@ class QueryConvexHull:
             self.voltage_curve([doc for doc in self.hull_cursor if doc['hull_distance'] <= 1e-9])
             self.volume_curve()
             if not self.args.get('no_plot'):
-                plotting.plot_voltage_curve(self, **self.args['plot_kwargs'])
+                plotting.plot_voltage_curve(self, **self.args['plot_kwargs'], show=False)
                 if self.compute_volumes:
-                    plotting.plot_volume_curve(self, **self.args['plot_kwargs'])
-                self.plot_hull(**self.args['plot_kwargs'], debug=self.args.get('debug'))
+                    plotting.plot_volume_curve(self, **self.args['plot_kwargs'], show=False)
+                self.plot_hull(**self.args['plot_kwargs'], debug=self.args.get('debug'), show=True)
 
-        if not self.args.get('no_plot'):
+        elif not self.args.get('no_plot'):
             self.plot_hull(**self.args['plot_kwargs'], debug=self.args.get('debug'))
 
     def __repr__(self):
