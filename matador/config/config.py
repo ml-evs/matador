@@ -224,6 +224,17 @@ def load_custom_settings(config_fname=None, quiet=False, debug=False, no_quickst
 
 
 def set_settings(settings, override=True):
+    """ Updates the global settings with the dictionary
+    provided.
+
+    Parameters:
+        settings (dict): the key-value pairs to use.
+
+    Keyword arguments:
+        override (bool): whether or not to override
+            previous settings, or just update.
+
+    """
 
     if SETTINGS.set and not override:
         return
