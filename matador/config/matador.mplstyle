@@ -16,7 +16,6 @@ figure.titlesize              : large
 legend.fontsize               : small
 text.color                    : .15
 text.usetex                   : False 
-text.latex.unicode            : False
 text.latex.preamble           : \usepackage{sfmath}\usepackage{helvet}\usepackage{amsmath}
 text.latex.preview            : False
 text.hinting                  : auto
@@ -46,7 +45,6 @@ figure.frameon                : True
 figure.autolayout             : False
 savefig.facecolor             : w
 savefig.edgecolor             : w
-savefig.frameon               : True
 savefig.dpi                   : 400
 savefig.bbox                  : tight
 savefig.pad_inches            : 0.1
