@@ -74,9 +74,8 @@ class MatadorCommandLine:
 
                 self.cursor = self.refiner.cursor
 
-            if self.args['subcmd'] == 'hull' or self.args['subcmd'] == 'voltage':
-                self.query = DBQuery(self.client, self.collections, **self.args)
-                self.hull = QueryConvexHull(self.query, **self.args)
+            if self.subcommand == 'hull' or self.subcommand == 'voltage':
+                self.hull = QueryConvexHull(**self.args, voltage=self.subcommand == 'voltage')
                 self.cursor = self.hull.hull_cursor
 
             if self.subcommand == 'changes':
