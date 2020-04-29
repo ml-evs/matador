@@ -6,6 +6,7 @@ construction and manipulation of convex hulls.
 
 """
 
+import warnings
 
 import numpy as np
 
@@ -23,15 +24,13 @@ def vertices2plane(points):
 
     i*x + j*y + k*z + d = 0.
 
-    Input:
+    Parameters:
+        points (list of np.ndarray): list of 3 3D numpy arrays containing
+            the points comprising the vertex.
 
-        points = [np.array([x1, y1, z1]), ...,  np.array([x3, y3, z3])].
-
-    Returns a function which will return the vertical distance between
-    the point and the plane:
-
-        h = height_above_plane(structure)
-
+    Returns:
+        callable: a function which will return the vertical distance between
+            the point and the plane:
 
     """
     v12 = points[1] - points[0]
@@ -51,9 +50,7 @@ def vertices2plane(points):
         y = structure[1]
         z = structure[2]
         if np.abs(normal[2]) < EPS:
-            print('Something fishy with height above plane, returning 0...')
-            print(x, y, z)
-            print(normal)
+            warnings.warn("Normal of plane {normal} is ill-defined. Returning 0 for height above plane.")
             return 0
         z_plane = -((x*normal[0] + y*normal[1] + d) / normal[2])
         height = z - z_plane
@@ -66,14 +63,13 @@ def vertices2line(points):
     """ Perform a simple linear interpolation on
     two points.
 
-    Input:
-
-        [[x1, E1], [x2, E2]]
+    Parameters:
+        points (list of np.ndarray): list of two 2D numpy arrays.
+            of form [[x1, E1], [x2, E2]].
 
     Returns:
-
-        m = (E2 - E1) / (x2 - x1),
-        c = ((E2 - E1) - m * (x1 + x2)) / 2
+        (float, float): a tuple containing the gradient and
+            intercept of the line intersecting the two points.
 
     """
     energy_pair = [points[0][1], points[1][1]]
@@ -135,6 +131,14 @@ def barycentric2cart(structures):
 
     where l3 = 1 - l2 - l1 are the barycentric coordinates of the point
     in the triangle defined by the chemical potentials.
+
+    Parameters:
+        structures (list of np.ndarray): list of 3D numpy arrays containing
+            input points.
+
+    Returns:
+        list of np.ndarray: list of numpy arrays containing converted
+            coordinates.
 
     """
     structures = np.asarray(structures)
