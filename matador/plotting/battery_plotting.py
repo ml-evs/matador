@@ -30,7 +30,7 @@ def plot_voltage_curve(hull, ax=None, show=False, curve_label=None, line_kwargs=
 
     if ax is None:
         if hull.savefig or any([kwargs.get(ext) for ext in SAVE_EXTS]):
-            fig = plt.figure(facecolor=None, figsize=(4, 3.5))
+            fig = plt.figure(facecolor=None, figsize=(8, 6))
         else:
             fig = plt.figure(facecolor=None)
 
@@ -46,7 +46,8 @@ def plot_voltage_curve(hull, ax=None, show=False, curve_label=None, line_kwargs=
         else:
             ax_volt.plot(expt_data[:, 0], expt_data[:, 1], c='k', lw=2, ls='-', label='Experiment')
 
-        dft_label = 'DFT (this work)'
+        if len(hull.voltage_data['endstoichs']) == 1:
+            dft_label = 'DFT (this work)'
 
     if curve_label is not None:
         dft_label = curve_label
@@ -147,7 +148,7 @@ def plot_volume_curve(hull, ax=None, show=True, legend=False, **kwargs):
 
     if ax is None:
         if hull.savefig or any([kwargs.get(ext) for ext in SAVE_EXTS]):
-            fig = plt.figure(facecolor=None, figsize=(4, 3.5))
+            fig = plt.figure(facecolor=None, figsize=(8, 6))
         else:
             fig = plt.figure(facecolor=None)
         ax = fig.add_subplot(111)
