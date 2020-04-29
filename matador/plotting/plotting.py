@@ -31,7 +31,7 @@ def set_style(style=None):
 
 def plotting_function(function):
     """ Wrapper for plotting functions to safely fail on X-forwarding
-    errors.
+    errors and handle the plot style context manager.
     """
 
     from functools import wraps
@@ -51,7 +51,7 @@ def plotting_function(function):
                 if arg.savefig:
                     import matplotlib
                     # don't warn as backend might have been set externally by e.g. Jupyter
-                    matplotlib.use('Agg', warn=False)
+                    matplotlib.use('Agg', force=False)
                     saving = True
                     break
         except AttributeError:
@@ -59,7 +59,7 @@ def plotting_function(function):
         if not saving:
             if any(kwargs.get(ext) for ext in SAVE_EXTS):
                 import matplotlib
-                matplotlib.use('Agg', warn=False)
+                matplotlib.use('Agg', force=False)
                 saving = True
 
         settings = load_custom_settings(kwargs.get('config_fname'), quiet=True, no_quickstart=True)
