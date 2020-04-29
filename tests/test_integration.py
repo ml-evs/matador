@@ -164,9 +164,9 @@ class IntegrationTest(unittest.TestCase):
 
         print("PSEUDOTERNARY HULL 2")
         hull = pseudoternary_hull_no_query()
-        self.assertTrue(query.args.get("intersection"))
-        self.assertTrue(query._non_elemental)
-        self.assertTrue(query._create_hull)
+        self.assertTrue(hull._query.args.get("intersection"))
+        self.assertTrue(hull._query._non_elemental)
+        self.assertTrue(hull._query._create_hull)
         self.assertEqual(len(query.cursor), 7)
         self.assertEqual(len(hull.cursor), 7)
         self.assertEqual(len(hull.hull_cursor), 5)
@@ -299,17 +299,6 @@ def pseudoternary_hull():
 
 def pseudoternary_hull_no_query():
     """ Import some other res files ready to make a hull. """
-    os.chdir(REAL_PATH + "/data/hull-LLZO")
-    sys.argv = ["matador", "import", "--force", "--db", DB_NAME]
-
-    if CONFIG_FNAME is not None:
-        sys.argv += ["--config", CONFIG_FNAME]
-
-    if DEBUG:
-        sys.argv += ["--debug"]
-
-    matador.cli.cli.main(no_quickstart=True)
-
     hull = QueryConvexHull(
         db=DB_NAME,
         composition="La2O3:Li2O:ZrO2",
