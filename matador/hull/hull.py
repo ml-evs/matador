@@ -99,7 +99,7 @@ class QueryConvexHull:
         if query is None and cursor is None:
             # if no query or cursor passed, push all kwargs to new query
             from matador.query import DBQuery
-            kwargs.pop('intersection')
+            kwargs.pop('intersection', None)
             query = DBQuery(
                 subcmd='hull',
                 intersection=True,
