@@ -88,7 +88,7 @@ class DataContainer(ABC):
     def __setitem__(self, key: str, item):
         if key not in self._data or self._data[key] is None:
             self._data[key] = item
-        else:
+        elif self._data[key] != item:
             raise AttributeError('Cannot assign value {} to existing key {} with value {}'
                                  .format(item, key, self._data[key]))
 
