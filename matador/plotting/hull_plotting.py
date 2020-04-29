@@ -376,6 +376,7 @@ def plot_temperature_hull(
 
     """
     import matplotlib.pyplot as plt
+    from matplotlib.colors import rgb2hex
     data_key = hull.data_key
 
     if ax is None:
@@ -383,7 +384,9 @@ def plot_temperature_hull(
         ax = fig.add_subplot(111)
 
     n_hulls = len(hull.phase_diagrams)
-    colours = plt.cm.get_cmap(cmap)(np.linspace(*cmap_limits, n_hulls))
+    colours = [rgb2hex(col) for col in
+        plt.cm.get_cmap(cmap)(np.linspace(*cmap_limits, n_hulls)).tolist()]
+
 
     min_ef = 0
     alpha = alpha_scale
@@ -412,7 +415,7 @@ def plot_temperature_hull(
     hull_cursor = [doc for doc in hull.cursor if doc[data_key]['hull_distance'][ind] <= 0.0 + EPS]
     ax.plot([doc['concentration'][0] for doc in hull_cursor],
             [doc[data_key][formation_energy_key][ind] for doc in hull_cursor],
-            marker='o', alpha=1, c=colours[ind], lw=2*lw_scale,
+            marker='o', c=colours[ind], lw=2*lw_scale,
             markeredgewidth=1.5, markeredgecolor='k',
             ls='--', zorder=1e5, label='Static + ZPE')
 
