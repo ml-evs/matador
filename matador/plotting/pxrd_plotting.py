@@ -17,7 +17,7 @@ __all__ = ['plot_pxrd']
 
 
 @plotting_function
-def plot_pxrd(pxrds, two_theta_range=(10, 70), labels=None, figsize=None, text_offset=0.1, filename=None, **kwargs):
+def plot_pxrd(pxrds, two_theta_range=(8, 72), labels=None, figsize=None, text_offset=0.1, filename=None, **kwargs):
     """ Plot PXRD or PXRDs.
 
     Parameters:
@@ -40,7 +40,7 @@ def plot_pxrd(pxrds, two_theta_range=(10, 70), labels=None, figsize=None, text_o
         labels = [labels]
 
     if figsize is None:
-        height = len(pxrds) * max(0.5, 5/len(pxrds))
+        height = len(pxrds) * max(0.5, 4/len(pxrds))
         figsize = (8, height)
 
     fig, ax = plt.subplots(figsize=figsize)
@@ -63,7 +63,7 @@ def plot_pxrd(pxrds, two_theta_range=(10, 70), labels=None, figsize=None, text_o
                 horizontalalignment='right')
 
     ax.set_yticks([])
-    ax.set_ylim(0 - len(pxrds)*0.01, len(pxrds))
+    ax.set_ylim(-0.2, len(pxrds)+0.1)
     ax.set_xlim(*two_theta_range)
     ax.set_ylabel('Relative intensity')
     ax.set_xlabel('$2\\theta$ (degrees)')

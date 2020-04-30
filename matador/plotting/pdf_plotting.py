@@ -21,7 +21,7 @@ __all__ = ['plot_pdf', 'plot_projected_pdf', 'plot_diff_overlap', 'plot_projecte
 @plotting_function
 def plot_pdf(pdfs,
              labels=None, r_min=None, r_max=None,
-             offset=1.1, text_offset=(0.0, 0.0),
+             offset=1.2, text_offset=(0.0, 0.0),
              legend=False, annotate=True, figsize=None,
              filename=None,
              **kwargs):
@@ -56,7 +56,7 @@ def plot_pdf(pdfs,
         labels = [labels]
 
     if figsize is None:
-        height = len(pdfs) * max(0.5, 5 / len(pdfs))
+        height = len(pdfs) * max(0.5, 4 / len(pdfs))
         figsize = (8, height)
 
     fig = plt.figure(figsize=figsize)
@@ -83,7 +83,7 @@ def plot_pdf(pdfs,
 
     ax1.set_ylabel('Pair distribution function, $g(r)$')
     ax1.get_yaxis().set_ticks([])
-    ax1.set_xlim(r_min, r_max)
+    ax1.set_xlim(r_min, r_max+0.5)
 
     for ind, pdf in enumerate(pdfs):
 
@@ -95,7 +95,7 @@ def plot_pdf(pdfs,
         if labels:
             label = labels[ind]
         else:
-            label = get_space_group_label_latex(pdf.spg) + '-' + get_formula_from_stoich(pdf.stoichiometry)
+            label = get_space_group_label_latex(pdf.spg) + '-' + get_formula_from_stoich(pdf.stoichiometry, tex=True)
 
         ax1.plot(pdf.r_space, pdf.gr + abs_offset * ind, label=label)
         if text_offset is not None:
@@ -104,6 +104,8 @@ def plot_pdf(pdfs,
             text_y = abs_offset*ind + text_offset[1]*gr_max
         if label is not None and annotate:
             ax1.text(text_x, text_y, label)
+
+    ax1.set_ylim(-gr_max * 0.2, offset * gr_max * len(pdfs))
 
     ax1.set_xlabel('$r$ ($\\AA$)')
 
