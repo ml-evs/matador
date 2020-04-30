@@ -395,7 +395,8 @@ class Crystal(DataContainer):
 
         """
         from matador.fingerprints.pxrd import PXRD
-        self._data['pxrd'] = PXRD(self._data, **kwargs)
+        if 'pxrd' not in self._data:
+            self._data['pxrd'] = PXRD(self._data, **kwargs)
         return self._data['pxrd']
 
     @property
