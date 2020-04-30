@@ -6,7 +6,6 @@ displaying, extracting and refining results from a Mongo cursor/list.
 
 """
 
-
 from time import strftime
 
 import numpy as np
@@ -73,6 +72,8 @@ def display_results(cursor,
                     per_atom=False, eform=False, source=False, **kwargs):
     """ Print query results in a table, with many options for customisability.
 
+    TODO: this function has gotten out of control and should be rewritten.
+
     Parameters:
         cursor (list of dict): list of matador documents
 
@@ -120,13 +121,15 @@ def display_results(cursor,
     if markdown and latex:
         raise RuntimeError('Cannot specify both latex and markdown output at once.')
 
-    struct_string = []
-    detail_string = []
-    detail_substring = []
-    source_string = []
-    formula_string = []
+    # lists in which to accumulate the table
+    struct_strings = []
+    detail_strings = []
+    detail_substrings = []
+    source_strings = []
+    formulae = []
+
+    # tracking the last formula
     last_formula = ''
-    units_string = ''
 
     if not cursor:
         raise RuntimeError('No structures found in cursor.')
@@ -147,54 +150,14 @@ def display_results(cursor,
             "provenance & "
             "description \\\\ \n\n"
         )
-        latex_struct_string = []
-
-    header_string = ''
-    if additions is not None or deletions is not None:
-        header_string += '   '
-    if not markdown:
-        if use_source:
-            header_string += "{:^40}".format('Source')
-            units_string += "{:^40}".format('')
-        else:
-            header_string += "{:^28}".format('ID')
-            units_string += "{:^28}".format('')
-
-        header_string += "{:^5}".format('!?!')
-        units_string += "{:^5}".format('')
+        latex_struct_strings = []
+        latex_sub_style = r'\mathrm'
     else:
-        header_string += '```\n'
-        header_string += "{:^40}".format('Root')
-        units_string += "{:^40}".format('')
-    header_string += "{:^10}".format('Pressure')
-    units_string += "{:^10}".format('(GPa)')
+        latex_sub_style = ''
 
-    if per_atom:
-        header_string += "{:^11}".format('Volume/atom')
-    else:
-        header_string += "{:^11}".format('Volume/fu')
-    units_string += "{:^11}".format('(Ang^3)')
-
-    if eform:
-        header_string += "{:^18}".format('Formation energy')
-        units_string += "{:^18}".format('(eV/atom)')
-    elif hull:
-        header_string += "{:^13}".format('Hull dist.')
-        units_string += "{:^13}".format('(meV/atom)')
-    elif per_atom:
-        header_string += "{:^18}".format(' '.join(energy_key.replace('_per_atom', '').split('_')).title())
-        units_string += "{:^18}".format('(eV/atom)')
-    else:
-        header_string += "{:^18}".format(' '.join(energy_key.replace('_per_atom', '').split('_')).title())
-        units_string += "{:^18}".format('(eV/fu)')
-
-    header_string += "{:^13}".format('Space group')
-    header_string += "{:^15}".format('Formula')
-    header_string += "{:^8}".format('# fu')
-    header_string += "{:^8}".format('Prov.')
-
-    if summary:
-        header_string += '{:^12}'.format('Occurrences')
+    header_string, units_string = _construct_header_string(
+        markdown, use_source, per_atom, eform, hull, summary, energy_key
+    )
 
     # ensure cursor is sorted by enthalpy
     if sort:
@@ -206,16 +169,10 @@ def display_results(cursor,
         if deletions is not None and del_index_mode:
             deletions = [sorted_inds[ind][0] for ind in deletions]
 
-    if latex:
-        latex_sub_style = r'\text'
-    else:
-        latex_sub_style = ''
-
+    # loop over structures and create pretty output
     for ind, doc in enumerate(cursor):
-        postfix = ''
-        prefix = ''
-        formula_substring = ''
 
+        # use the formula to see if we need to update gs_enthalpy for this formula
         formula_substring = get_formula_from_stoich(doc['stoichiometry'],
                                                     tex=latex,
                                                     latex_sub_style=latex_sub_style)
@@ -224,107 +181,26 @@ def display_results(cursor,
             formula_substring += '+CNT'
         if last_formula != formula_substring:
             gs_enthalpy = 0.0
-        formula_string.append(formula_substring)
-        if not markdown:
-            if use_source:
-                src = get_root_source(doc['source'])
-                max_len = 34
-                struct_string.append(
-                    "  {:<38.{max_len}}".format(src if len(src) < max_len else src[:max_len-4]+'[..]', max_len=max_len))
-            else:
-                struct_string.append("  {:^26.22}".format(' '.join(doc.get('text_id', ['xxx', 'yyy']))))
-            if hull and np.abs(doc.get('hull_distance')) <= 0.0 + 1e-12:
-                if colour:
-                    prefix = '\033[92m\033[1m'
-                    postfix = '\033[0m'
-                struct_string[-1] = '*' + struct_string[-1][1:]
+        formulae.append(formula_substring)
 
-            if additions is not None:
-                if (add_index_mode and ind in additions) or doc.get('text_id', '_') in additions:
-                    struct_string[-1] = '+' + struct_string[-1][1:]
-                    if colour:
-                        prefix = '\033[92m\033[1m'
-                        postfix = '\033[0m'
-            if deletions is not None:
-                if (del_index_mode and ind in deletions) or doc.get('text_id', '_') in deletions:
-                    struct_string[-1] = '-' + struct_string[-1][1:]
-                    if colour:
-                        prefix = '\033[91m\033[1m'
-                        postfix = '\033[0m'
-            try:
-                if doc.get('prototype'):
-                    struct_string[-1] += "{:^5}".format('*p*')
-                elif doc.get('quality', 5) == 0:
-                    struct_string[-1] += "{:^5}".format('!!!')
-                else:
-                    struct_string[-1] += "{:^5}".format((5 - doc.get('quality', 5)) * '?')
-            except KeyError:
-                struct_string[-1] += "{:^5}".format(' ')
-        else:
-            struct_string.append("{:40}".format(get_root_source(doc['source'])))
-
-        if 'pressure' in doc and doc['pressure'] != 'xxx':
-            struct_string[-1] += "{: >9.2f}".format(doc['pressure'])
-        else:
-            struct_string[-1] += "{:^9}".format('xxx')
-        try:
-            if per_atom and 'cell_volume' in doc and 'num_atoms' in doc:
-                struct_string[-1] += "{:>11.1f}".format(doc['cell_volume'] / doc['num_atoms'])
-            elif 'cell_volume' in doc and 'num_fu' in doc:
-                struct_string[-1] += "{:>11.1f}".format(doc['cell_volume'] / doc['num_fu'])
-            else:
-                struct_string[-1] += "{:^11}".format('xxx')
-        except Exception:
-            struct_string[-1] += "{:^11}".format('xxx')
-        try:
-            if hull and eform:
-                struct_string[-1] += "{:>13.3f}".format(
-                    doc['formation_' + energy_key]
-                )
-            elif hull:
-                struct_string[-1] += "{:>13.1f}".format(
-                    1000 * doc['hull_distance']
-                )
-            elif per_atom:
-                struct_string[-1] += "{:>18.5f}".format(recursive_get(doc, energy_key) - gs_enthalpy)
-            else:
-                struct_string[-1] += ("{:>18.5f}"
-                                      .format(recursive_get(doc, energy_key) * doc['num_atoms'] / doc['num_fu'] - gs_enthalpy))
-        except KeyError:
-            struct_string[-1] += "{:^18}".format('xxx')
+        struct_strings.append(
+            _construct_structure_string(
+                doc, ind, formula_substring, gs_enthalpy, use_source, colour, hull, additions,
+                deletions, add_index_mode, del_index_mode, energy_key, per_atom, eform, markdown, latex
+            )
+        )
 
         if latex:
-            from matador.utils.cell_utils import get_space_group_label_latex
-            struct_string[-1] += "{:^13}".format(get_space_group_label_latex(doc.get('space_group', 'xxx')))
-        else:
-            struct_string[-1] += "{:^13}".format(doc.get('space_group', 'xxx'))
-
-        struct_string[-1] += "{:^15}".format(formula_substring)
-
-        if 'num_fu' in doc:
-            struct_string[-1] += "{:^8}".format(int(doc['num_fu']))
-        else:
-            struct_string[-1] += "{:^8}".format('xxx')
-
-        if 'source' in doc:
-            prov = get_guess_doc_provenance(doc['source'], doc.get('icsd'))
-            struct_string[-1] += "{:^8}".format(prov)
-        else:
-            struct_string[-1] += "{:^8}".format('xxx')
-
-        struct_string[-1] = prefix + struct_string[-1] + postfix
-
-        if latex:
-            latex_struct_string.append("{:^30} {:^10} & ".format(formula_substring, '$\\star$'
-                                                                 if doc.get('hull_distance', 0.1) == 0 else ''))
-            latex_struct_string[-1] += ("{:^20.0f} & ".format(doc.get('hull_distance') * 1000)
-                                        if doc.get('hull_distance', 0) > 0 else '{:^20} &'.format('-'))
-            latex_struct_string[-1] += "{:^20} & ".format(doc.get('space_group', 'xxx'))
+            latex_struct_strings.append("{:^30} {:^10} & ".format(formula_substring, '$\\star$'
+                                                                  if doc.get('hull_distance') == 0 else ''))
+            latex_struct_strings[-1] += ("{:^20.0f} & ".format(doc.get('hull_distance') * 1000)
+                                         if doc.get('hull_distance', 0) > 0 else '{:^20} &'.format('-'))
+            latex_struct_strings[-1] += "{:^20} & ".format(doc.get('space_group', 'xxx'))
             prov = get_guess_doc_provenance(doc['source'], doc.get('icsd'))
             if doc.get('icsd'):
                 prov += ' {}'.format(doc['icsd'])
-            latex_struct_string[-1] += "{:^30} & ".format(prov)
-            latex_struct_string[-1] += "{:^30} \\\\".format('')
+            latex_struct_strings[-1] += "{:^30} & ".format(prov)
+            latex_struct_strings[-1] += "{:^30} \\\\".format('')
 
         if last_formula != formula_substring:
             if per_atom:
@@ -335,83 +211,18 @@ def display_results(cursor,
         last_formula = formula_substring
 
         if details:
-            detail_string.append(11 * ' ' + u"├╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌ ")
-            if source:
-                detail_substring.append(11 * ' ' + u"├╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌ ")
-            else:
-                detail_substring.append(11 * ' ' + u"└╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌ ")
-            if 'spin_polarized' in doc:
-                if doc['spin_polarized']:
-                    detail_string[-1] += 'S-'
-            if 'sedc_scheme' in doc:
-                detail_string[-1] += doc['sedc_scheme'].upper() + '+'
-            if 'xc_functional' in doc:
-                detail_string[-1] += doc['xc_functional']
-            else:
-                detail_string[-1] += 'xc-functional unknown!'
-            if 'cut_off_energy' in doc:
-                detail_string[-1] += ', ' + "{:4.2f}".format(doc['cut_off_energy']) + ' eV'
-            else:
-                detail_string[-1] += 'cutoff unknown'
-            if 'external_pressure' in doc:
-                detail_string[-1] += (', ' + "{:4.2f}".format(doc['external_pressure'][0][0]) + ' GPa')
-            if 'kpoints_mp_spacing' in doc:
-                detail_string[-1] += ', ~' + str(doc['kpoints_mp_spacing']) + ' 1/A'
-            if 'geom_force_tol' in doc:
-                detail_string[-1] += ', {:.2f} eV/A, '.format(doc['geom_force_tol'])
-            if 'species_pot' in doc:
-                try:
-                    for species in doc['species_pot']:
-                        detail_substring[-1] += '{}: {}, '.format(species, doc['species_pot'][species])
-                except KeyError:
-                    pass
-            if 'icsd' in doc:
-                detail_substring[-1] += 'ICSD-CollCode {}, '.format(doc['icsd'])
-            if 'tags' in doc:
-                try:
-                    if isinstance(doc['tags'], list):
-                        for tag in doc['tags']:
-                            detail_substring[-1] += tag + ', '
-                except KeyError:
-                    pass
-            if 'user' in doc:
-                detail_substring[-1] += doc['user']
-            if 'encapsulated' in doc:
-                try:
-                    detail_string[-1] += (
-                        ', (n,m)=(' + str(doc['cnt_chiral'][0]) + ',' + str(doc['cnt_chiral'][1]) + ')'
-                    )
-                    detail_string[-1] += ', r=' + "{:4.2f}".format(doc['cnt_radius']) + ' A'
-                    detail_string[-1] += ', z=' + "{:4.2f}".format(doc['cnt_length']) + ' A'
-                except KeyError:
-                    pass
-            detail_string[-1] += ' ' + (len(header_string) - len(detail_string[-1]) - 1) * u"╌"
-            detail_substring[-1] += ' ' + (len(header_string) - len(detail_substring[-1]) - 1) * u"╌"
+            detail_string, detail_substring = _construct_detail_strings(doc, padding_length=len(header_string), source=source)
+            detail_strings.append(detail_string)
+            detail_substrings.append(detail_substring)
 
         if source:
-            if len(doc['source']) == 1:
-                source_string.append(11 * ' ' + u"└──────────────────")
-            else:
-                source_string.append(11 * ' ' + u"└───────────────┬──")
-            for num, file in enumerate(doc['source']):
-                if len(doc['source']) == 1:
-                    source_string[-1] += ''
-                elif num == len(doc['source']) - 1:
-                    source_string[-1] += (len(u"└────────────── ") + 11) * ' ' + u'└──'
-                elif num != 0:
-                    source_string[-1] += (len(u"└────────────── ") + 11) * ' ' + u'├──'
-                # source_string[-1] += ' ' + file.split('structure_repository')[-1]
-                source_string[-1] += ' ' + file
-                if num != len(doc['source']) - 1:
-                    source_string[-1] += '\n'
+            source_strings.append(_construct_source_string(doc['source']))
 
     total_string = ''
-
-    if not markdown and not latex:
-        total_string += len(header_string) * '─' + '\n'
-        total_string += header_string + '\n'
-        total_string += units_string + '\n'
-        total_string += len(header_string) * '─' + '\n'
+    total_string += len(header_string) * '─' + '\n'
+    total_string += header_string + '\n'
+    total_string += units_string + '\n'
+    total_string += len(header_string) * '─' + '\n'
 
     if markdown:
         markdown_string += len(header_string) * '-' + '\n'
@@ -419,51 +230,44 @@ def display_results(cursor,
         markdown_string += units_string + '\n'
         markdown_string += len(header_string) * '-' + '\n'
 
+    summary_inds = []
+    # filter for lowest energy phase per stoichiometry
     if summary:
         current_formula = ''
         formula_list = {}
-        summary_formula_string = {}
-        for ind, substring in enumerate(formula_string):
+        for ind, substring in enumerate(formulae):
             if substring != current_formula and substring not in formula_list:
                 current_formula = substring
                 formula_list[substring] = 0
-                if markdown:
-                    markdown_string += struct_string[ind] + '\n'
-                elif latex:
-                    latex_string += latex_struct_string[ind]
-                else:
-                    summary_formula_string[current_formula] = []
-                    summary_formula_string[current_formula].append('{}'.format(struct_string[ind]))
-                if details and not markdown:
-                    summary_formula_string[current_formula].append(detail_string[ind])
-                    summary_formula_string[current_formula].append(detail_substring[ind])
-                if source and not markdown:
-                    summary_formula_string[current_formula].append(source_string[ind])
+                summary_inds.append(ind)
             formula_list[substring] += 1
-        for formula in summary_formula_string:
-            summary_formula_string[formula][0] += '{:^12}'.format(formula_list[formula])
-            total_string += '\n'.join(summary_formula_string[formula]) + '\n'
     else:
-        for ind, substring in enumerate(struct_string):
-            if markdown:
-                markdown_string += struct_string[ind] + '\n'
-            elif latex:
-                latex_string += latex_struct_string[ind] + '\n'
-            else:
-                total_string += substring + '\n'
-                if details:
-                    total_string += detail_string[ind] + '\n'
-                    total_string += detail_substring[ind] + '\n'
+        summary_inds = range(len(struct_strings))
+
+    # construct final string containing table
+    if markdown:
+        markdown_string += '\n'.join(struct_strings[ind] for ind in summary_inds)
+    elif latex:
+        latex_string += '\n'.join(latex_struct_strings[ind] for ind in summary_inds)
+    else:
+        for ind in summary_inds:
+            total_string += struct_strings[ind] + '\n'
+            if details:
+                total_string += detail_strings[ind] + '\n'
+                total_string += detail_substrings[ind] + '\n'
                 if source:
-                    total_string += source_string[ind] + '\n'
+                    total_string += source_strings[ind] + '\n'
                 if details or source:
                     total_string += len(header_string) * '─' + '\n'
+
     if markdown:
         markdown_string += '```'
         return markdown_string
+
     if latex:
         latex_string += '\\end{tabular}'
         return latex_string
+
     if return_str:
         return total_string
 
@@ -697,8 +501,6 @@ def filter_cursor_by_chempots(species, cursor):
         try:
             cursor[ind]['num_chempots'] = get_number_of_chempots(doc, chempot_stoichiometries)
         except RuntimeError:
-            import traceback
-            traceback.print_exc()
             inds_to_remove.add(ind)
         else:
             cursor[ind]['concentration'] = (cursor[ind]['num_chempots'][:-1] /
@@ -710,3 +512,283 @@ def filter_cursor_by_chempots(species, cursor):
                     cursor[ind]['concentration'][idx] = 1.0
 
     return [doc for ind, doc in enumerate(cursor) if ind not in inds_to_remove]
+
+
+def _construct_structure_string(
+        doc, ind, formula_substring, gs_enthalpy, use_source, colour, hull, additions, deletions,
+        add_index_mode, del_index_mode, energy_key, per_atom, eform, markdown, latex
+):
+    """ Construct the pretty output for an individual structure.
+
+    Options passed from `matador.utils.cursor_utils.display_results.`
+
+    Returns:
+        str: the pretty output.
+
+    """
+
+    # start with two spaces, replaced by the prefix from hull/add/del
+    this_struct_string = '  '
+    prefix = ''
+    suffix = ''
+    # apply appropriate prefices and suffices to structure
+    if hull and np.abs(doc.get('hull_distance')) <= 0.0 + 1e-12:
+        if colour:
+            prefix = '\033[92m'
+            suffix = '\033[0m'
+        this_struct_string = '* '
+
+    if additions is not None:
+        if (add_index_mode and ind in additions) or doc.get('text_id', '_') in additions:
+            this_struct_string = '+ '
+            if colour:
+                prefix = '\033[92m'
+                suffix = '\033[0m'
+    if deletions is not None:
+        if (del_index_mode and ind in deletions) or doc.get('text_id', '_') in deletions:
+            this_struct_string = '- '
+            if colour:
+                prefix = '\033[91m'
+                suffix = '\033[0m'
+
+    # display the canonical name for the structure
+    if use_source:
+        src = get_root_source(doc['source'])
+        max_len = 34
+        this_struct_string += "{:<36.{max_len}}".format(
+            src if len(src) <= max_len else src[:max_len-4]+'[..]', max_len=max_len
+        )
+    else:
+        this_struct_string += "{:^24.22}".format(' '.join(doc.get('text_id', ['xxx', 'yyy'])))
+
+    # again, if we're not outputting to markdown, then flag warnings in the quality column
+    try:
+        if doc.get('prototype'):
+            this_struct_string += "{:^5}".format('*p*')
+        elif doc.get('quality', 5) == 0:
+            this_struct_string += "{:^5}".format('!!!')
+        else:
+            this_struct_string += "{:^5}".format((5 - doc.get('quality', 5)) * '?')
+    except KeyError:
+        this_struct_string += "{:^5}".format(' ')
+
+    # loop over header names and print the appropriate values
+    if 'pressure' in doc and doc['pressure'] != 'xxx':
+        this_struct_string += "{: >9.2f} ".format(doc['pressure'])
+    else:
+        this_struct_string += "{:^9} ".format('xxx')
+
+    try:
+        if per_atom and 'cell_volume' in doc and 'num_atoms' in doc:
+            this_struct_string += "{:>12.1f}  ".format(doc['cell_volume'] / doc['num_atoms'])
+        elif 'cell_volume' in doc and 'num_fu' in doc:
+            this_struct_string += "{:>12.1f}  ".format(doc['cell_volume'] / doc['num_fu'])
+        else:
+            this_struct_string += "{:^12}  ".format('xxx')
+    except Exception:
+        this_struct_string += "{:^10} ".format('xxx')
+
+    try:
+        if hull and eform:
+            this_struct_string += "{:>12.3f}      ".format(
+                doc['formation_' + energy_key]
+            )
+        elif hull:
+            this_struct_string += "{:>12.1f}      ".format(
+                1000 * doc['hull_distance']
+            )
+        elif per_atom:
+            this_struct_string += "{:>16.4f}  ".format(recursive_get(doc, energy_key) - gs_enthalpy)
+        else:
+            this_struct_string += "{:>16.4f}  ".format(
+                recursive_get(doc, energy_key) * doc['num_atoms'] / doc['num_fu'] - gs_enthalpy
+            )
+    except KeyError:
+        this_struct_string += "{:^18}".format('xxx')
+
+    if latex:
+        from matador.utils.cell_utils import get_space_group_label_latex
+        this_struct_string += " {:^13} ".format(get_space_group_label_latex(doc.get('space_group', 'xxx')))
+    else:
+        this_struct_string += " {:^13} ".format(doc.get('space_group', 'xxx'))
+
+    # now we add the formula column
+    this_struct_string += " {:^13} ".format(formula_substring)
+
+    if 'num_fu' in doc:
+        this_struct_string += " {:^6} ".format(int(doc['num_fu']))
+    else:
+        this_struct_string += " {:^6} ".format('xxx')
+
+    if 'source' in doc:
+        prov = get_guess_doc_provenance(doc['source'], doc.get('icsd'))
+        this_struct_string += "{:^8}".format(prov)
+    else:
+        this_struct_string += "{:^8}".format('xxx')
+
+    this_struct_string = prefix + this_struct_string + suffix
+
+    return this_struct_string
+
+
+def _construct_source_string(sources):
+    """ From a list of sources, return a fancy string output
+    displaying them as a list.
+
+    """
+    num_sources = len(sources)
+    if num_sources == 1:
+        this_source_string = 11 * ' ' + u"└──────────────────"
+    else:
+        this_source_string = 11 * ' ' + u"└───────────────┬──"
+
+    for num, _file in enumerate(sources):
+        if num_sources == 1:
+            this_source_string += ''
+        elif num == num_sources - 1:
+            this_source_string += (len(u"└────────────── ") + 11) * ' ' + u'└──'
+        elif num != 0:
+            this_source_string += (len(u"└────────────── ") + 11) * ' ' + u'├──'
+
+        this_source_string += ' ' + _file
+        if num != num_sources - 1:
+            this_source_string += '\n'
+
+    return this_source_string
+
+
+def _construct_detail_strings(doc, padding_length=0, source=False):
+    """ From a document, return a fancy string output
+    displaying the desired field names and details of
+    the structure.
+
+    Parameters:
+        doc (dict): matador document to print.
+
+    Keyword arguments:
+        source (bool): whether to allow adjust output so it
+            can be interleaved with the source pretty output.
+        padding_length (int): how much to pad the detail string
+            output.
+
+    Returns:
+        (str, str): containing pretty output over two lines.
+
+    """
+    detail_string = 11 * ' ' + u"├╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌ "
+    if source:
+        detail_substring = 11 * ' ' + u"├╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌ "
+    else:
+        detail_substring = 11 * ' ' + u"└╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌ "
+
+    if 'spin_polarized' in doc:
+        if doc['spin_polarized']:
+            detail_string += 'S-'
+
+    if 'sedc_scheme' in doc:
+        detail_string += doc['sedc_scheme'].upper() + '+'
+
+    if 'xc_functional' in doc:
+        detail_string += doc['xc_functional']
+    else:
+        detail_string += 'xc-functional unknown!'
+
+    if 'cut_off_energy' in doc:
+        detail_string += ", {:4.2f} eV".format(doc['cut_off_energy'])
+    else:
+        detail_string += 'cutoff unknown'
+
+    if 'external_pressure' in doc:
+        detail_string += ", {:4.2f} GPa".format(
+            sum(doc['external_pressure'][i][i] for i in range(3)) / 3
+        )
+
+    if 'kpoints_mp_spacing' in doc:
+        detail_string += ", ~{:0.3f} 1/A".format(doc['kpoints_mp_spacing'])
+
+    if 'geom_force_tol' in doc:
+        detail_string += ', {:.2f} eV/A, '.format(doc['geom_force_tol'])
+
+    if 'species_pot' in doc:
+        for species in doc['species_pot']:
+            detail_substring += '{}: {}, '.format(species, doc['species_pot'][species])
+
+    if 'icsd' in doc:
+        detail_substring += 'ICSD-CollCode {}, '.format(doc['icsd'])
+
+    if 'tags' in doc:
+        if isinstance(doc['tags'], list):
+            detail_substring += ', '.join(doc['tags'])
+
+    if 'user' in doc:
+        detail_substring += doc['user']
+
+    if 'encapsulated' in doc and all(key in doc for key in ['cnt_chiral', 'cnt_radius', 'cnt_length']):
+        detail_string += (
+            ', (n,m)=(' + str(doc['cnt_chiral'][0]) + ',' + str(doc['cnt_chiral'][1]) + ')'
+        )
+        detail_string += ", r={:4.2f} A".format(doc['cnt_radius'])
+        detail_string += ", z={:4.2f} A".format(doc['cnt_length'])
+
+    detail_string += ' ' + (padding_length - len(detail_string) - 1) * u"╌"
+    detail_substring += ' ' + (padding_length - len(detail_substring) - 1) * u"╌"
+
+    return detail_string, detail_substring
+
+
+def _construct_header_string(markdown, use_source, per_atom, eform, hull, summary, energy_key):
+    """ Construct the header of the table, from the passed options.
+    For arguments, see docstring for `matador.utils.cursor_utils.display_results`.
+
+    Returns:
+        (str, str): the header and units string.
+
+    """
+    header_string = ''
+    units_string = ''
+    if not markdown:
+        if use_source:
+            header_string += "{:^38}".format('Source')
+            units_string += "{:^38}".format('')
+        else:
+            header_string += "{:^28}".format('ID')
+            units_string += "{:^28}".format('')
+
+        header_string += "{:^5}".format('!?!')
+        units_string += "{:^5}".format('')
+    else:
+        header_string += '```\n'
+        header_string += "{:^43}".format('Root')
+        units_string += "{:^43}".format('')
+
+    header_string += "{:^10}".format('Pressure')
+    units_string += "{:^10}".format('(GPa)')
+
+    header_string += "{:^14}".format('Cell volume')
+    if per_atom:
+        units_string += "{:^14}".format('(A^3/atom)')
+    else:
+        units_string += "{:^14}".format('(A^3/fu)')
+
+    if eform:
+        header_string += "{:^18}".format('Formation energy')
+        units_string += "{:^18}".format('(eV/atom)')
+    elif hull:
+        header_string += "{:^18}".format('Hull dist.')
+        units_string += "{:^18}".format('(meV/atom)')
+    elif per_atom:
+        header_string += "{:^18}".format(' '.join(energy_key.replace('_per_atom', '').split('_')).title())
+        units_string += "{:^18}".format('(eV/atom)')
+    else:
+        header_string += "{:^18}".format(' '.join(energy_key.replace('_per_atom', '').split('_')).title())
+        units_string += "{:^18}".format('(eV/fu)')
+
+    header_string += "{:^15}".format('Space group')
+    header_string += " {:^13} ".format('Formula')
+    header_string += "{:^8}".format('# fu')
+    header_string += "{:^8}".format('Prov.')
+
+    if summary:
+        header_string += '{:^12}'.format('Occurrences')
+
+    return header_string, units_string
