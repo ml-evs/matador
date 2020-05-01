@@ -1,4 +1,5 @@
-Element  a1	b1	a2	b2	a3	b3	a4	b4	c
+# Scattering factors from RASPA2, unfortunately undocumented (https://github.com/numat/RASPA2/blob/master/src/scattering_factors.c)
+# Element  a1	b1	a2	b2	a3	b3	a4	b4	c
  H 	 0.489918 	 20.6593 	 0.262003 	 7.74039 	 0.196767 	 49.5519 	 0.049879 	 2.20159 	 0.001305 
  H1- 	 0.897661 	 53.1368 	 0.565616 	 15.187 	 0.415815 	 186.576 	 0.116973 	 3.56709 	 0.002389 
  He 	 0.8734 	 9.1037 	 0.6309 	 3.3568 	 0.3112 	 22.9276 	 0.178 	 0.9821 	 0.0064 
