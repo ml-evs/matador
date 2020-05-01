@@ -17,7 +17,7 @@ __all__ = ['plot_pxrd']
 
 
 @plotting_function
-def plot_pxrd(pxrds, two_theta_range=(8, 72), labels=None, figsize=None, text_offset=0.1, filename=None, **kwargs):
+def plot_pxrd(pxrds, two_theta_range=(8, 72), ax=None, labels=None, figsize=None, text_offset=0.1, filename=None, **kwargs):
     """ Plot PXRD or PXRDs.
 
     Parameters:
@@ -25,10 +25,14 @@ def plot_pxrd(pxrds, two_theta_range=(8, 72), labels=None, figsize=None, text_of
             or list of PXRDs to plot.
 
     Keyword arguments:
-        labels (list of str): list of labels to plot alongside pattern.
         two_theta_range (tuple): plotting limits for 2theta
+        labels (list of str): list of labels to plot alongside pattern.
         figsize (tuple): specify a figure size, the default
             scales with the number of PXRDs to be plotted.
+        ax (matplotlib.Axis): optional axis object to plot on.
+        text_offset (float): amount by which to offset the labels.
+        filename (str): optional filename for saving.
+
 
     """
 
@@ -43,7 +47,8 @@ def plot_pxrd(pxrds, two_theta_range=(8, 72), labels=None, figsize=None, text_of
         height = len(pxrds) * max(0.5, 4/len(pxrds))
         figsize = (8, height)
 
-    fig, ax = plt.subplots(figsize=figsize)
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
 
     for ind, pxrd in enumerate(pxrds):
         if isinstance(pxrd, Crystal):
