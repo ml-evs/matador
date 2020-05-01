@@ -17,7 +17,7 @@ __all__ = ['plot_pxrd']
 
 
 @plotting_function
-def plot_pxrd(pxrds, two_theta_range=(8, 72), ax=None, labels=None, figsize=None, text_offset=0.1, filename=None, **kwargs):
+def plot_pxrd(pxrds, two_theta_range=(8, 72), rug=False, rug_height=0.05, offset=None, ax=None, labels=None, figsize=None, text_offset=0.1, filename=None, **kwargs):
     """ Plot PXRD or PXRDs.
 
     Parameters:
@@ -26,6 +26,10 @@ def plot_pxrd(pxrds, two_theta_range=(8, 72), ax=None, labels=None, figsize=None
 
     Keyword arguments:
         two_theta_range (tuple): plotting limits for 2theta
+        rug (bool): whether to provide a rug plot of all peaks.
+        rug_height (float): size of rug ticks.
+        offset (float): extra space added between patterns (as fraction
+            of max intensity). Default 0.1.
         labels (list of str): list of labels to plot alongside pattern.
         figsize (tuple): specify a figure size, the default
             scales with the number of PXRDs to be plotted.
@@ -50,22 +54,37 @@ def plot_pxrd(pxrds, two_theta_range=(8, 72), ax=None, labels=None, figsize=None
     if ax is None:
         fig, ax = plt.subplots(figsize=figsize)
 
+    if offset is None and rug:
+        offset = 0.2
+    elif offset is None:
+        offset = 0.1
+
+    colour_cycle = ax._get_lines.prop_cycler
+
     for ind, pxrd in enumerate(pxrds):
         if isinstance(pxrd, Crystal):
             pxrd = pxrd.pxrd
         elif isinstance(pxrd, dict) and 'pxrd' in pxrd:
             pxrd = pxrd['pxrd']
 
+        c = next(colour_cycle).get('color')
+
         if labels:
             label = labels[ind]
         else:
             label = get_space_group_label_latex(pxrd.spg) + '-' + pxrd.formula
 
-        ax.plot(pxrd.two_thetas, 0.9*pxrd.spectrum + ind)
+        ax.plot(pxrd.two_thetas, (1 - offset) * pxrd.pattern + ind, c=c)
 
         ax.text(0.95, ind+text_offset, label,
                 transform=ax.get_yaxis_transform(),
                 horizontalalignment='right')
+
+        if rug:
+            import numpy as np
+            peaks = np.unique(pxrd.peak_positions)
+            for peak in np.unique(pxrd.peak_positions):
+                ax.plot([peak, peak], [ind-rug_height-0.01, ind-0.01], c=c, alpha=0.5)
 
     ax.set_yticks([])
     ax.set_ylim(-0.2, len(pxrds)+0.1)
