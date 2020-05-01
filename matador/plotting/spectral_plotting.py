@@ -61,6 +61,7 @@ def plot_spectral(seeds, **kwargs):
             they lie above or below the Fermi level. If passed 'random', colour bands randomly from
             the cmap. Otherwise, override all colour options with matplotlib-interpretable colour
             (e.g. hexcode or html colour name) to use for all bands (DEFAULT: 'occ').
+        filename (str): filename for figure saving.
         cmap (str): matplotlib colourmap name to use for the bands
         n_colours (int): number of colours to use from cmap (DEFAULT: 4).
         unstacked_pdos (bool): whether to plot projected DOS as stack or overlapping.
@@ -85,7 +86,7 @@ def plot_spectral(seeds, **kwargs):
                      'colour_by_seed': False, 'external_efermi': None,
                      'labels': None, 'cmap': None, 'band_colour': 'occ',
                      'n_colours': 4, 'spin_only': None, 'figsize': None,
-                     'pdis_interpolation_factor': 2, 'pdis_point_scale': 25,
+                     'pdis_interpolation_factor': 2, 'pdis_point_scale': 25, 'filename': None,
                      'unstacked_pdos': False, 'preserve_kspace_distance': False,
                      'band_reorder': None, 'title': None, 'show': True,
                      'verbosity': 0, 'highlight_bands': None, 'pdos_hide_tot': True}
@@ -196,7 +197,9 @@ def plot_spectral(seeds, **kwargs):
     if any([kwargs.get('pdf'), kwargs.get('svg'), kwargs.get('png')]):
         if not bbox_extra_artists:
             bbox_extra_artists = None
-        filename = seeds[0].split('/')[-1].replace('.bands', '').replace('.phonon', '') + '_spectral'
+        filename = kwargs.get('filename')
+        if filename is None:
+            filename = seeds[0].split('/')[-1].replace('.bands', '').replace('.phonon', '') + '_spectral'
         if kwargs.get('pdf'):
             plt.savefig('{}.pdf'.format(filename),
                         bbox_inches='tight', transparent=True, bbox_extra_artists=bbox_extra_artists)
