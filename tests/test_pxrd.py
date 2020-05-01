@@ -16,7 +16,7 @@ class PDFCalculatorTest(unittest.TestCase):
     def test_simple_pxrd(self):
         doc, success = res2dict(REAL_PATH + "data/structures/Li.res")
         doc["pxrd-Cu"] = PXRD(
-            doc, two_theta_resolution=0.0001, gaussian_width=0, plot=False
+            doc, two_theta_resolution=0.0001, gaussian_width=0.001, plot=False, wavelength=1.5406,
         )
         peaks = doc["pxrd-Cu"].peak_positions
         # peaks grabbed from Materials Project for Cu K-alpha
@@ -33,21 +33,22 @@ class PDFCalculatorTest(unittest.TestCase):
             136.034,
         ]
         for peak in Li_peaks:
-            # dodgy test for now: check every peak is present to within 2 degrees
+            # dodgy test for now: check every peak is present to within 1 degrees
             self.assertTrue(
-                len(peaks[np.abs(peaks - peak) < 2]) > 2,
+                len(peaks[np.abs(peaks - peak) < 1]) > 2,
                 msg="Missing peak at {}".format(peak),
             )
         # peaks grabbed from Materials Project for Ag K-alpha
         doc["pxrd-Ag"] = PXRD(
-            doc, two_theta_resolution=0.0001, gaussian_width=0, wavelength=0.56
+            doc, two_theta_resolution=0.0001, gaussian_width=0.001, wavelength=0.56
         )
         peaks = doc["pxrd-Ag"].peak_positions
         Li_peaks = [12.912, 14.92, 21.161, 24.868, 25.992, 30.102, 32.876]
+        print(np.sort(peaks))
         for peak in Li_peaks:
             # dodgy test for now: check every peak is present to within 1 degree
             self.assertTrue(
-                len(peaks[np.abs(peaks - peak) < 2]) > 2,
+                len(peaks[np.abs(peaks - peak) < 1]) > 2,
                 msg="Missing peak at {}".format(peak),
             )
 
