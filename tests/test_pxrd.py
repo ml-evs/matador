@@ -35,21 +35,15 @@ class PXRDCalculatorTest(unittest.TestCase):
 
     def test_simple_pxrd(self):
         """ Test Li PXRD vs GSAS. """
-        pxrd = _match_peaks(
+        _ = _match_peaks(
             REAL_PATH + "data/structures/Li.res",
             REAL_PATH + "data/pxrd_files/Li_reflections_Cu.txt",
         )
-        self.assertAlmostEqual(
-            pxrd.two_thetas[np.argmax(pxrd.pattern)], 30.969, places=2
-        )
         pxrd_args = {"wavelength": 0.559363}
-        pxrd = _match_peaks(
+        _ = _match_peaks(
             REAL_PATH + "data/structures/Li.res",
             REAL_PATH + "data/pxrd_files/Li_reflections_Ag.txt",
             **pxrd_args
-        )
-        self.assertAlmostEqual(
-            pxrd.two_thetas[np.argmax(pxrd.pattern)], 30.969, places=2
         )
 
     def test_CuP2_vs_GSAS(self):
