@@ -258,7 +258,7 @@ class VibrationalDOS(DensityOfStates):
 
         """
         min_energy = np.min(eigs)
-        if min_energy < -0.1:
+        if min_energy < -0.5:
             warnings.warn(
                 'Imaginary frequency phonons found in this structure, ZPE '
                 'calculation will be unreliable, using 0 eV as lower limit of integration.'
