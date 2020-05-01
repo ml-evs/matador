@@ -24,6 +24,7 @@ ROOT_DIR = os.getcwd()
 
 try:
     import matplotlib  # noqa
+    matplotlib.use("Agg")
 
     MATPLOTLIB_PRESENT = True
 except ImportError:
