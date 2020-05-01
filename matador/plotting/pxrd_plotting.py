@@ -17,7 +17,10 @@ __all__ = ['plot_pxrd']
 
 
 @plotting_function
-def plot_pxrd(pxrds, two_theta_range=(8, 72), rug=False, rug_height=0.05, offset=None, ax=None, labels=None, figsize=None, text_offset=0.1, filename=None, **kwargs):
+def plot_pxrd(
+    pxrds, two_theta_range=(8, 72), rug=False, rug_height=0.05, offset=None,
+    ax=None, labels=None, figsize=None, text_offset=0.1, filename=None, **kwargs
+):
     """ Plot PXRD or PXRDs.
 
     Parameters:
@@ -83,7 +86,7 @@ def plot_pxrd(pxrds, two_theta_range=(8, 72), rug=False, rug_height=0.05, offset
         if rug:
             import numpy as np
             peaks = np.unique(pxrd.peak_positions)
-            for peak in np.unique(pxrd.peak_positions):
+            for peak in peaks:
                 ax.plot([peak, peak], [ind-rug_height-0.01, ind-0.01], c=c, alpha=0.5)
 
     ax.set_yticks([])

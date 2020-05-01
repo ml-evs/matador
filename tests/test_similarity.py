@@ -194,7 +194,6 @@ class SimilarityFilterTest(unittest.TestCase):
 
 
 class TestBroadening(unittest.TestCase):
-
     def test_broadening_agreement(self):
 
         hist = np.zeros((1000))
@@ -203,13 +202,10 @@ class TestBroadening(unittest.TestCase):
         x = np.linspace(0, 10, 1000)
         dists = [x[100]] * 10 + [x[800]] * 20
 
-        for btype in ['gaussian', 'lorentzian']:
+        for btype in ["gaussian", "lorentzian"]:
             gr1 = Fingerprint._broadening_distance_dominated(hist, x, 1, btype)
             gr2 = Fingerprint._broadening_unrolled(hist, x, 1, btype)
             gr3 = Fingerprint._broadening_space_dominated(dists, x, 1, btype)
 
             np.testing.assert_almost_equal(gr1, gr2, decimal=10)
             np.testing.assert_almost_equal(gr2, gr3, decimal=10)
-
-if __name__ == "__main__":
-    unittest.main()
