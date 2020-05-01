@@ -766,9 +766,9 @@ def _construct_header_string(markdown, use_source, per_atom, eform, hull, summar
 
     header_string += "{:^14}".format('Cell volume')
     if per_atom:
-        units_string += "{:^14}".format('(A^3/atom)')
+        units_string += "{:^14}".format('(Å³/atom)')
     else:
-        units_string += "{:^14}".format('(A^3/fu)')
+        units_string += "{:^14}".format('(Å³/fu)')
 
     if eform:
         header_string += "{:^18}".format('Formation energy')
