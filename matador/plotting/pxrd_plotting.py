@@ -18,7 +18,7 @@ __all__ = ['plot_pxrd']
 
 @plotting_function
 def plot_pxrd(
-    pxrds, two_theta_range=(8, 72), rug=False, rug_height=0.05, offset=None,
+    pxrds, two_theta_range=(8, 72), rug=False, rug_height=0.05, rug_offset=0.04, offset=None,
     ax=None, labels=None, figsize=None, text_offset=0.1, filename=None, **kwargs
 ):
     """ Plot PXRD or PXRDs.
@@ -31,6 +31,7 @@ def plot_pxrd(
         two_theta_range (tuple): plotting limits for 2theta
         rug (bool): whether to provide a rug plot of all peaks.
         rug_height (float): size of rug ticks.
+        rug_offset (float): offset of rug ticks.
         offset (float): extra space added between patterns (as fraction
             of max intensity). Default 0.1.
         labels (list of str): list of labels to plot alongside pattern.
@@ -87,7 +88,7 @@ def plot_pxrd(
             import numpy as np
             peaks = np.unique(pxrd.peak_positions)
             for peak in peaks:
-                ax.plot([peak, peak], [ind-rug_height-0.01, ind-0.01], c=c, alpha=0.5)
+                ax.plot([peak, peak], [ind-rug_height-rug_offset, ind-rug_offset], c=c, alpha=0.5)
 
     ax.set_yticks([])
     ax.set_ylim(-0.2, len(pxrds)+0.1)
