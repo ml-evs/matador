@@ -384,9 +384,10 @@ def plot_temperature_hull(
         ax = fig.add_subplot(111)
 
     n_hulls = len(hull.phase_diagrams)
-    colours = [rgb2hex(col) for col in
-        plt.cm.get_cmap(cmap)(np.linspace(*cmap_limits, n_hulls)).tolist()]
-
+    colours = [
+        rgb2hex(col) for col in
+        plt.cm.get_cmap(cmap)(np.linspace(*cmap_limits, n_hulls)).tolist()
+    ]
 
     min_ef = 0
     alpha = alpha_scale
