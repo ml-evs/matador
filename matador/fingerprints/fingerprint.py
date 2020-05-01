@@ -8,6 +8,8 @@ X-ray diffraction (PXRD) spectra.
 
 """
 
+# TODO: wrap these broadening methods with heuristics to decide which to use
+
 import abc
 import multiprocessing as mp
 import os
@@ -35,19 +37,18 @@ class Fingerprint(abc.ABC):
     def calculate(self):
         pass
 
-    # TODO: wrap these broadening methods with heuristics to decide which to use
-    # TODO: Lorentzian broadening as an option
     @staticmethod
     @numba.njit
-    def _broadening_space_dominated(distances, r_space, gaussian_width):
-        """ Add Gaussian broadening to the PDF by convolving distances with
+    def _broadening_space_dominated(distances, r_space, width, broadening_type):
+        """ Add broadening to the PDF by convolving distances with
         the radial space and summing. More memory-efficient if len(r_space)
         is less than len(distances).
 
         Parameters:
             distances (numpy.ndarray): array of pair-wise distances.
             r_space (numpy.ndarray): radial grid
-            gaussian_width (float): amount of gaussian broadening.
+            width (float): amount of broadening.
+            broadening_type (str): 'gaussian' or 'lorentzian'.
 
         Returns:
             gr (numpy.ndarray): the unnormalised PDF.
@@ -55,20 +56,24 @@ class Fingerprint(abc.ABC):
         """
         new_space = (np.reshape(r_space, (1, len(r_space))) -
                      np.reshape(distances, (1, len(distances))).T)
-        gr = np.sum(np.exp(-(new_space / gaussian_width)**2), axis=0)
-        return gr
+        if broadening_type == 'lorentzian':
+            width /= 2
+            return np.sum(1 / (1 + (new_space / width)**2), axis=0)
+
+        return np.sum(np.exp(-(new_space / width)**2), axis=0)
 
     @staticmethod
     @numba.njit
-    def _broadening_distance_dominated(hist, r_space, gaussian_width):
-        """ Add Gaussian broadening to the PDF by convolving the distance histogram with
+    def _broadening_distance_dominated(hist, r_space, width, broadening_type):
+        """ Add broadening to the PDF by convolving the distance histogram with
         the radial space and summing. Potentially more memory-efficient than the alternative
         implementation if len(distances) > len(r_space).
 
         Parameters:
             hist (numpy.ndarray): histogram of pairwise frequencies.
             r_space (numpy.ndarray): radial grid
-            gaussian_width (float): amount of gaussian broadening.
+            width (float): amount of gaussian broadening.
+            broadening_type (str): 'gaussian' or 'lorentzian'.
 
         Returns:
             gr (numpy.ndarray): the unnormalised PDF.
@@ -76,33 +81,49 @@ class Fingerprint(abc.ABC):
         """
         new_space = (np.reshape(r_space, (1, len(r_space))) -
                      np.reshape(r_space, (1, len(r_space))).T)
-        gr = np.sum(hist * np.exp(-(new_space / gaussian_width)**2), axis=1)
-        return gr
+
+        if broadening_type == 'lorentzian':
+            width /= 2
+            return np.sum(hist / (1 + (new_space / width)**2), axis=1)
+
+        return np.sum(hist * np.exp(-(new_space / width)**2), axis=1)
 
     @staticmethod
-    @numba.njit
-    def _broadening_unrolled(hist, r_space, gaussian_width):
-        """ Add Gaussian broadening to the PDF by convolving the distance histogram with
+    # @numba.njit
+    def _broadening_unrolled(hist, r_space, width, broadening_type):
+        """ Add broadening to the PDF by convolving the distance histogram with
         the radial space and summing. Unrolled loop to save memory.
 
 
         Parameters:
             hist (numpy.ndarray): histogram of pairwise frequencies.
             r_space (numpy.ndarray): radial grid
-            gaussian_width (float): amount of gaussian broadening.
+            width (float): amount of gaussian broadening.
+            broadening_type (str): 'gaussian' or 'lorentzian'.
 
         Returns:
             gr (numpy.ndarray): the unnormalised PDF.
 
         """
         gr = np.zeros_like(r_space)
-        for ind, _ in enumerate(hist):
-            if hist[ind] != 0:
-                gr += hist[ind] * np.exp(-((r_space-r_space[ind]) / gaussian_width)**2)
+        print(broadening_type)
+
+        if broadening_type == 'lorentzian':
+            width /= 2
+            print('aaah')
+            for ind, _ in enumerate(hist):
+                if hist[ind] != 0:
+                    gr += hist[ind] / (1 + ((r_space - r_space[ind]) / width)**2)
+
+        else:
+            for ind, _ in enumerate(hist):
+                if hist[ind] != 0:
+                    gr += hist[ind] * np.exp(-((r_space-r_space[ind]) / width)**2)
+
         return gr
 
 
-class FingerprintFactory:
+class FingerprintFactory(abc.ABC):
     """ This class computes Fingerprint objects from a list of structures,
     using multiprocessing to perform calculations concurrently. The computed
     fingerprints are stored in each structure's dictionary under the
@@ -142,9 +163,9 @@ class FingerprintFactory:
                   .format(len(cursor) - len(required_inds), len(cursor)))
 
         if self.fingerprint is None or self.default_key is None:
-            # TODO: is this the right way of doing this?
             raise NotImplementedError('Do not create FingerprintFactory directly, '
                                       'use the appropriate sub-class!')
+
         # create list of empty (lazy) PDF objects
         if 'lazy' in fprint_args:
             del fprint_args['lazy']
