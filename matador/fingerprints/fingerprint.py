@@ -38,8 +38,8 @@ class Fingerprint(abc.ABC):
         pass
 
     @staticmethod
-    @numba.njit
-    def _broadening_space_dominated(distances, r_space, width, broadening_type):
+    # @numba.njit
+    def _broadening_space_dominated(distances, r_space, width, broadening_type='gaussian'):
         """ Add broadening to the PDF by convolving distances with
         the radial space and summing. More memory-efficient if len(r_space)
         is less than len(distances).
@@ -64,7 +64,7 @@ class Fingerprint(abc.ABC):
 
     @staticmethod
     @numba.njit
-    def _broadening_distance_dominated(hist, r_space, width, broadening_type):
+    def _broadening_distance_dominated(hist, r_space, width, broadening_type='gaussian'):
         """ Add broadening to the PDF by convolving the distance histogram with
         the radial space and summing. Potentially more memory-efficient than the alternative
         implementation if len(distances) > len(r_space).
@@ -89,8 +89,8 @@ class Fingerprint(abc.ABC):
         return np.sum(hist * np.exp(-(new_space / width)**2), axis=1)
 
     @staticmethod
-    # @numba.njit
-    def _broadening_unrolled(hist, r_space, width, broadening_type):
+    @numba.njit
+    def _broadening_unrolled(hist, r_space, width, broadening_type='gaussian'):
         """ Add broadening to the PDF by convolving the distance histogram with
         the radial space and summing. Unrolled loop to save memory.
 
@@ -106,11 +106,9 @@ class Fingerprint(abc.ABC):
 
         """
         gr = np.zeros_like(r_space)
-        print(broadening_type)
 
         if broadening_type == 'lorentzian':
             width /= 2
-            print('aaah')
             for ind, _ in enumerate(hist):
                 if hist[ind] != 0:
                     gr += hist[ind] / (1 + ((r_space - r_space[ind]) / width)**2)

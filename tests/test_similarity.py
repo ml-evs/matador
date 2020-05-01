@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 import unittest
 from os.path import realpath
+import numpy as np
 from matador.fingerprints.similarity import get_uniq_cursor
+from matador.fingerprints import Fingerprint
 from matador.scrapers.castep_scrapers import res2dict
 
 REAL_PATH = "/".join(realpath(__file__).split("/")[:-1]) + "/"
@@ -190,6 +192,24 @@ class SimilarityFilterTest(unittest.TestCase):
         filtered_cursor = filter_unique_structures(cursor, energy_tol=0.003)
         self.assertEqual(len(filtered_cursor), 8)
 
+
+class TestBroadening(unittest.TestCase):
+
+    def test_broadening_agreement(self):
+
+        hist = np.zeros((1000))
+        hist[100] = 10
+        hist[800] = 20
+        x = np.linspace(0, 10, 1000)
+        dists = [x[100]] * 10 + [x[800]] * 20
+
+        for btype in ['gaussian', 'lorentzian']:
+            gr1 = Fingerprint._broadening_distance_dominated(hist, x, 1, btype)
+            gr2 = Fingerprint._broadening_unrolled(hist, x, 1, btype)
+            gr3 = Fingerprint._broadening_space_dominated(dists, x, 1, btype)
+
+            np.testing.assert_almost_equal(gr1, gr2, decimal=10)
+            np.testing.assert_almost_equal(gr2, gr3, decimal=10)
 
 if __name__ == "__main__":
     unittest.main()
