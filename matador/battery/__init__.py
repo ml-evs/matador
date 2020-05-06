@@ -6,9 +6,9 @@ relevant electrode properties from phase diagrams.
 
 """
 
-__all__ = ['Electrode']
+__all__ = ['Electrode', 'VoltageProfile']
 __author__ = 'Matthew Evans'
 __maintainer__ = 'Matthew Evans'
 
 
-from .electrode import Electrode
+from .electrode import Electrode, VoltageProfile

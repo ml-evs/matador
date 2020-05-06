@@ -7,6 +7,9 @@ relevant electrode properties from phase diagrams.
 """
 
 import numpy as np
+from typing import List, Tuple, Optional
+
+from matador.utils.chem_utils import get_formula_from_stoich
 
 EPS = 1e-12
 
@@ -152,3 +155,55 @@ class Electrode:
                     endstoichs.append(stoichs[ind])
 
         return endpoints, endstoichs
+
+
+class VoltageProfile:
+    """ Container class for data associated with a voltage profile. """
+    def __init__(
+        self,
+        starting_stoichiometry: Tuple[Tuple[str, float], ...],
+        reactions: Optional[List[Tuple[float, str]]],
+        capacities: List[float],
+        average_voltage: float,
+        voltages: List[float],
+        active_ion: str,
+    ):
+        """ Initialise the voltage profile with the given data. """
+        self.starting_stoichiometry = starting_stoichiometry
+        self.starting_formula = get_formula_from_stoich(starting_stoichiometry)
+        self.capacities = capacities
+        self.average_voltage = average_voltage
+        self.voltages = voltages
+        self.reactions = reactions
+        self.active_ion = active_ion
+
+    def voltage_summary(self, csv=False):
+        """ Prints a voltage data summary.
+
+        Keyword arguments:
+            csv (bool/str): whether or not to write a CSV file containing the data.
+                If this contains a string use this as the filename.
+
+        """
+
+        data_str = '# {} into {}\n'.format(self.active_ion, self.starting_formula)
+        data_str += "# Average voltage: {:4.2f} V\n".format(self.average_voltage)
+        data_str += '# {:^10} \t{:^10}\n'.format('Q (mAh/g)', 'Voltage (V)')
+
+        for idx, _ in enumerate(self.voltages):
+            data_str += '{:>10.2f} \t{:>10.8f}'.format(self.capacities[idx], self.voltages[idx])
+            if idx != len(self.voltages) - 1:
+                data_str += '\n'
+
+        if csv:
+            if isinstance(csv, str):
+                fname = csv
+            else:
+                fname = '{}_voltages.csv'.format(self.starting_formula)
+            with open(fname, 'w') as f:
+                f.write(data_str)
+
+        return 'Voltage data:\n\n{}'.format(data_str)
+
+    def __repr__(self):
+        self.voltage_summary(csv=False)

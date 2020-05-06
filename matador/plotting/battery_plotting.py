@@ -6,82 +6,106 @@ such as voltages and volume expansions.
 
 """
 
+from typing import List, Optional, Dict, Union
+
 import numpy as np
 from matador.utils.chem_utils import get_formula_from_stoich
 from matador.plotting.plotting import plotting_function, SAVE_EXTS
 from matador.plotting.hull_plotting import _get_hull_labels
+from matador.battery import VoltageProfile
+
 
 __all__ = ['plot_voltage_curve', 'plot_volume_curve']
 
 
 @plotting_function
-def plot_voltage_curve(hull, ax=None, show=False, curve_label=None, line_kwargs=None, **kwargs):
+def plot_voltage_curve(
+    profiles: Union[List[VoltageProfile], VoltageProfile],
+    ax=None,
+    show: bool = False,
+    savefig: Optional[str] = None,
+    curve_labels: Optional[Union[str, List[str]]] = None,
+    line_kwargs: Optional[Union[Dict, List[Dict]]] = None,
+    expt: Optional[str] = None,
+    expt_label: Optional[str] = None
+):
     """ Plot voltage curve calculated for phase diagram.
 
     Parameters:
-        hull (matador.hull.QueryConvexHull): matador hull object.
+        profiles (list/VoltageProfile): list of/single voltage profile(s).
 
     Keyword arguments:
         ax (matplotlib.axes.Axes): an existing axis on which to plot.
         show (bool): whether to show plot in an X window.
+        savefig (str): filename to use to save the plot.
+        curve_labels (list): optional list of labels for the curves in
+            the profiles list.
+        line_kwargs (list or dict): parameters to pass to the curve plotter,
+            if a list then the line kwargs will be passed to each line individually.
+        expt (str): string to a filename of a csv Q, V to add to the plot.
+        expt_label (str): label for any experimental profile passed to the plot.
 
     """
     import matplotlib.pyplot as plt
 
     if ax is None:
-        if hull.savefig or any([kwargs.get(ext) for ext in SAVE_EXTS]):
-            fig = plt.figure(facecolor=None, figsize=(8, 6))
-        else:
-            fig = plt.figure(facecolor=None)
-
+        fig = plt.figure(figsize=(8, 6))
         ax_volt = fig.add_subplot(111)
     else:
         ax_volt = ax
 
+    if not isinstance(profiles, list):
+        profiles = [profiles]
+    if curve_labels is not None and not isinstance(curve_labels, list):
+        curve_labels = [curve_labels]
+    if line_kwargs is not None and not isinstance(line_kwargs, list):
+        line_kwargs = [line_kwargs]
+
+    if curve_labels is not None and len(curve_labels) != len(profiles):
+        raise RuntimeError(
+            "Wrong number of labels passed for number of profiles: {} vs {}"
+            .format(len(curve_labels), len(profiles))
+        )
+
+    if line_kwargs is not None and len(line_kwargs) != len(profiles):
+        raise RuntimeError(
+            "Wrong number of line kwargs passed for number of profiles: {} vs {}"
+            .format(len(line_kwargs), len(profiles))
+        )
+
     dft_label = None
-    if hull.args.get('expt') is not None:
-        expt_data = np.loadtxt(hull.args.get('expt'), delimiter=',')
-        if hull.args.get('expt_label'):
-            ax_volt.plot(expt_data[:, 0], expt_data[:, 1], c='k', lw=2, ls='-', label=hull.args.get('expt_label'))
+    if expt is not None:
+        expt_data = np.loadtxt(expt, delimiter=',')
+        if expt_label:
+            ax_volt.plot(expt_data[:, 0], expt_data[:, 1], c='k', lw=2, ls='-', label=expt_label)
         else:
             ax_volt.plot(expt_data[:, 0], expt_data[:, 1], c='k', lw=2, ls='-', label='Experiment')
 
-        if len(hull.voltage_data['endstoichs']) == 1:
+        if len(profiles) == 1:
             dft_label = 'DFT (this work)'
 
-    if curve_label is not None:
-        dft_label = curve_label
-
-    for ind, (capacities, voltages) in enumerate(zip(hull.voltage_data['Q'], hull.voltage_data['voltages'])):
-        if dft_label is None and len(hull.voltage_data['voltages']) > 1:
-            stoich_label = get_formula_from_stoich(hull.voltage_data['endstoichs'][ind], tex=True)
+    for ind, profile in enumerate(profiles):
+        if dft_label is None and curve_labels is None:
+            stoich_label = get_formula_from_stoich(profile.starting_stoichiometry, tex=True)
         else:
             stoich_label = None
+
         label = stoich_label if dft_label is None else dft_label
-        if line_kwargs is None:
-            _line_kwargs = {'c': list(plt.rcParams['axes.prop_cycle'].by_key()['color'])[ind+2]}
-        else:
-            _line_kwargs = line_kwargs
-        _add_voltage_curve(capacities, voltages, ax_volt, label=label, **_line_kwargs)
+        if curve_labels is not None and len(curve_labels) > ind:
+            label = curve_labels[ind]
 
-    if hull.args.get('labels') or hull.args.get('label_cutoff') is not None:
-        label_cursor = _get_hull_labels(hull, num_species=2)
-        # for testing purposes only
-        if 'label_cursor' in kwargs:
-            kwargs['label_cursor'].extend(label_cursor)
-        for i, doc in enumerate(label_cursor):
-            ax_volt.annotate(get_formula_from_stoich(doc['stoichiometry'],
-                                                     elements=hull.elements, tex=True),
-                             xy=(hull.voltage_data['Q'][0][i+1]+0.02*max(hull.voltage_data['Q'][0]),
-                                 hull.voltage_data['voltages'][0][i+1]+0.02*max(hull.voltage_data['voltages'][0])),
-                             textcoords='data',
-                             ha='center',
-                             zorder=9999)
+        _line_kwargs = {'c': list(plt.rcParams['axes.prop_cycle'].by_key()['color'])[ind+2]}
+        if line_kwargs is not None:
+            _line_kwargs.update(line_kwargs[ind])
 
-    if hull.args.get('expt') or len(hull.voltage_data['voltages']) != 1:
-        ax_volt.legend(loc=1)
-    ax_volt.set_ylabel('Voltage (V) vs {}$^+/${}'.format(hull.elements[0], hull.elements[0]))
+        _add_voltage_curve(profile.capacities, profile.voltages, ax_volt, label=label, **_line_kwargs)
+
+    if expt or len(profiles) > 1:
+        ax_volt.legend()
+
+    ax_volt.set_ylabel('Voltage (V) vs {ion}$^+/${ion}'.format(ion=profile.active_ion))
     ax_volt.set_xlabel('Gravimetric cap. (mAh/g)')
+
     _, end = ax_volt.get_ylim()
     from matplotlib.ticker import MultipleLocator
     ax_volt.yaxis.set_major_locator(MultipleLocator(0.2))
@@ -91,12 +115,10 @@ def plot_voltage_curve(hull, ax=None, show=False, curve_label=None, line_kwargs=
     ax_volt.grid(False)
     plt.tight_layout(pad=0.0, h_pad=1.0, w_pad=0.2)
 
-    if hull.savefig or any([kwargs.get(ext) for ext in SAVE_EXTS]):
-        fname = ''.join(hull.elements) + '_voltage'
-        for ext in SAVE_EXTS:
-            if hull.args.get(ext) or kwargs.get(ext):
-                plt.savefig('{}.{}'.format(fname, ext), transparent=True)
-                print('Wrote {}.{}'.format(fname, ext))
+    if savefig:
+        plt.savefig(savefig)
+        print('Wrote {}'.format(savefig))
+
     elif show:
         plt.show()
 
