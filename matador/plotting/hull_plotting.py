@@ -475,7 +475,8 @@ def plot_temperature_hull(
 
 @plotting_function
 def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=None,
-                      label_cutoff=None, label_corners=True, expecting_cbar=True, labels=None, plot_fname=None, **kwargs):
+                      label_cutoff=None, label_corners=True, expecting_cbar=True, labels=None, plot_fname=None,
+                      efmap=None, sampmap=None, capmap=None, **kwargs):
     """ Plot calculated ternary hull as a 2D projection.
 
     Parameters:
@@ -493,6 +494,9 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
         label_corners (bool): whether or not to put axis labels on corners or edges.
         png/pdf/svg (bool): whether or not to write the plot to a file.
         plot_fname (str): filename to write plot to.
+        efmap (bool): plot heatmap of formation energy,
+        sampmap (bool): plot heatmap showing sampling density,
+        capmap (bool): plot heatmap showing gravimetric capacity.
 
     Returns:
         matplotlib.axes.Axes: matplotlib axis with plot.
@@ -509,6 +513,13 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
     plt.rcParams['xtick.minor.size'] = 0
     plt.rcParams['ytick.minor.size'] = 0
 
+    if efmap is None:
+        efmap = hull.args.get('efmap')
+    if sampmap is None:
+        sampmap = hull.args.get('sampmap')
+    if capmap is None:
+        capmap = hull.args.get('capmap')
+
     if labels is None:
         labels = hull.args.get('labels')
     if label_cutoff is None:
@@ -524,9 +535,9 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
         hull_cutoff = hull.hull_cutoff
 
     print('Plotting ternary hull...')
-    if hull.args.get('capmap') or hull.args.get('efmap'):
+    if capmap or efmap:
         scale = 100
-    elif hull.args.get('sampmap'):
+    elif sampmap:
         scale = 20
     else:
         scale = 1
@@ -536,7 +547,7 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
         fig, ax = ternary.figure(scale=scale, ax=axis)
     else:
         fig, ax = ternary.figure(scale=scale)
-    if hull.args.get('capmap') or hull.args.get('efmap') or hull.args.get('sampmap'):
+    if capmap or efmap or sampmap:
         fig.set_size_inches(8, 5)
     elif not expecting_cbar:
         fig.set_size_inches(5, 5)
@@ -644,7 +655,7 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
             )
 
     # add colourmaps
-    if hull.args.get('capmap'):
+    if capmap:
         capacities = dict()
         from ternary.helpers import simplex_iterator
         for (i, j, k) in simplex_iterator(scale):
@@ -653,7 +664,7 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
             ], hull.species)
         ax.heatmap(capacities, style="hexagonal", cbarlabel='Gravimetric capacity (mAh/g)',
                    vmin=0, vmax=3000, cmap=pastel_cmap)
-    elif hull.args.get('efmap'):
+    elif efmap:
         energies = dict()
         fake_structures = []
         from ternary.helpers import simplex_iterator
@@ -665,12 +676,12 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
         for (i, j, k) in simplex_iterator(scale):
             energies[(i, j, k)] = -1 * plane_energies[ind]
             ind += 1
-        if isinstance(hull.args.get('efmap'), str):
-            efmap = hull.args.get('efmap')
+        if isinstance(efmap, str):
+            efmap = efmap
         else:
             efmap = 'BuPu_r'
         ax.heatmap(energies, style="hexagonal", cbarlabel='Formation energy (eV/atom)', vmax=0, cmap=efmap)
-    elif hull.args.get('sampmap'):
+    elif sampmap:
         sampling = dict()
         from ternary.helpers import simplex_iterator
         eps = 1.0 / float(scale)
