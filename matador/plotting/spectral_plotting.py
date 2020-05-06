@@ -762,18 +762,19 @@ def _add_path_labels(seed, dispersion, ax_dispersion, path, seed_ind, kwargs):
         if isinstance(dispersion, Dispersion):
             try:
                 spg_structure = doc2spg(dispersion)
-            except (KeyError, RuntimeError) as exc:
-                print("Unable to cast Dispersion object to spglib format: {}".format(exc))
+            except (KeyError, RuntimeError):
+                pass
 
-        elif not spg_structure:
+        if not spg_structure:
             res = False
             cell = False
-            if os.path.isfile(seed + '.res'):
-                res = True
-            elif os.path.isfile(seed + '.cell'):
-                cell = True
-            else:
-                print('Failed to find {}.cell or {}.res, will not be able to generate labels.'.format(seed, seed))
+            if isinstance(seed, str):
+                if os.path.isfile(seed + '.res'):
+                    res = True
+                elif os.path.isfile(seed + '.cell'):
+                    cell = True
+                else:
+                    print('Failed to find {}.cell or {}.res, will not be able to generate labels.'.format(seed, seed))
 
             success = False
             if cell:
