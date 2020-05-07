@@ -16,7 +16,6 @@ from matador.hull import QueryConvexHull
 from matador.plotting.battery_plotting import plot_voltage_curve
 from matador.plotting.pdf_plotting import plot_pdf
 from matador.plotting.pxrd_plotting import plot_pxrd
-from matador.utils.chem_utils import get_formula_from_stoich
 from .utils import MatadorUnitTest
 
 REAL_PATH = "/".join(os.path.realpath(__file__).split("/")[:-1]) + "/"
@@ -266,16 +265,7 @@ class HullPlotTests(MatadorUnitTest):
             cursor=cursor, species="KP", no_plot=True, voltage=True, labels=True
         )
 
-        label_cursor = []
-        plot_voltage_curve(hull, label_cursor=label_cursor, png=True)
-        labels = [
-            get_formula_from_stoich(
-                doc["stoichiometry"], elements=hull.elements, tex=False
-            )
-            for doc in label_cursor
-        ]
-
-        self.assertEqual(labels, ["KP7", "K3P7", "K2P3", "KP", "K5P4"])
+        plot_voltage_curve(hull.voltage_data, labels=True, savefig=expected_files[0])
         for expected_file in expected_files:
             self.assertTrue(os.path.isfile(expected_file))
 
