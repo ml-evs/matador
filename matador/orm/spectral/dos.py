@@ -19,6 +19,8 @@ from matador.utils.chem_utils import KELVIN_TO_EV, INVERSE_CM_TO_EV
 from .dispersion import Dispersion
 
 EPS = 1e-6
+MIN_PHONON_FREQ = -0.01
+FREQ_CUTOFF = 1e-12
 
 
 class DensityOfStates(Dispersion, DataContainer):
@@ -186,37 +188,6 @@ class VibrationalDOS(DensityOfStates):
     gaussian_width = 10 * INVERSE_CM_TO_EV
 
     @property
-    def zero_point_energy_from_dos(self):
-        """ Computes the zero-point energy for the vibrational DOS,
-        using
-
-        .. math::
-
-            E_{zp} = \\frac{1}{2}\\int F(\\omega)\\hbar\\omega\\,\\mathrm{d}\\omega.
-
-        where .. math:: F(\\omega)
-        is the vibrational density of states.
-
-        """
-        raise NotImplementedError('Function is now defunct.')
-        warnings.warn(
-            'Imaginary frequency phonons found in this structure, ZP energy '
-            'calculation will be unreliable',
-            Warning
-        )
-
-        def integrand(omega):
-            return self.vdos_function(omega) * omega
-
-        result = scipy.integrate.quad(
-            integrand,
-            self.sample_energies[0],
-            self.sample_energies[-1]
-        )
-
-        return 0.5 * result[0]
-
-    @property
     def debye_temperature(self):
         """ Returns the Debye temperature in K. """
         return self.debye_freq / KELVIN_TO_EV
@@ -258,10 +229,11 @@ class VibrationalDOS(DensityOfStates):
 
         """
         min_energy = np.min(eigs)
-        if min_energy < -0.5:
+        if min_energy < MIN_PHONON_FREQ:
             warnings.warn(
-                'Imaginary frequency phonons found in this structure, ZPE '
+                'Imaginary frequency phonons found in this structure {:.1f}, ZPE '
                 'calculation will be unreliable, using 0 eV as lower limit of integration.'
+                .format(min_energy)
             )
 
         if kpoint_weights is not None:
@@ -312,15 +284,15 @@ class VibrationalDOS(DensityOfStates):
         free_energy = np.zeros_like(temperatures, dtype=np.float64)
 
         min_energy = np.min(self._data['eigs_q'][0])
-        freq_cutoff = 1e-12
-        if min_energy < freq_cutoff:
+        if min_energy < MIN_PHONON_FREQ:
             warnings.warn(
-                'Imaginary frequency phonons found in this structure, free energy '
+                'Imaginary frequency phonons found in this structure {:.1f}, free energy '
                 'calculation will be unreliable, using {} eV as lower limit of integration.'
-                .format(freq_cutoff))
+                .format(min_energy, FREQ_CUTOFF)
+            )
 
         for ind, temperature in enumerate(temperatures):
-            free_energy[ind] = self.compute_free_energy(temperature, freq_cutoff=freq_cutoff)
+            free_energy[ind] = self.compute_free_energy(temperature)
 
         if len(temperatures) == 1:
             return free_energy[0]
@@ -328,7 +300,7 @@ class VibrationalDOS(DensityOfStates):
         return temperatures, free_energy
 
     @functools.lru_cache(100)
-    def compute_free_energy(self, temperature, freq_cutoff=1e-12):
+    def compute_free_energy(self, temperature):
         """ Compute the vibrational free energy at the given temperature, using
         lru_cache to avoid doing much extra work. Uses minimum temperature cutoff
         of 1e-9, below which it returns just the ZPE (unless T < 0 K).
@@ -352,7 +324,7 @@ class VibrationalDOS(DensityOfStates):
         for mode_ind in range(self.num_modes):
             for qpt_ind in range(self.num_qpoints):
                 freq = self._data['eigs_q'][0][mode_ind][qpt_ind]
-                if freq > freq_cutoff and freq / kT < 32:
+                if freq > FREQ_CUTOFF and freq / kT < 32:
                     contrib = kT * np.log(1 - np.exp(-freq/kT))
                     if 'kpoint_weights' in self._data:
                         contrib *= self.kpoint_weights[qpt_ind]
@@ -386,14 +358,14 @@ class VibrationalDOS(DensityOfStates):
 
         min_energy = self.sample_energies[0]
         max_energy = self.sample_energies[-1]
-        if min_energy < 0:
-            min_energy = 1e-3
+        if min_energy < 0.01:
             warnings.warn(
-                'Imaginary frequency phonons found in this structure, free energy '
+                'Imaginary frequency phonons found in this structure {:.1f}, free energy '
                 'calculation will be unreliable, using {} eV as lower limit of integration.'
-                .format(min_energy),
+                .format(min_energy, FREQ_CUTOFF),
                 Warning
             )
+            min_energy = FREQ_CUTOFF
 
         for ind, temperature in enumerate(temperatures):
 
