@@ -207,7 +207,7 @@ def plot_volume_curve(hull, ax=None, show=True, legend=False, **kwargs):
             [q for ind, q in enumerate(hull.volume_data['Q'][j][:-1]) if stable_hull_dist[ind] == 0],
             [v for ind, v in enumerate(hull.volume_data['volume_ratio_with_bulk'][j]) if stable_hull_dist[ind] == 0],
             lw=2, c=c,
-            label=("Volume expansion from bulk {}"
+            label=("{}"
                    .format(get_formula_from_stoich(hull.volume_data['endstoichs'][j], tex=True)))
         )
 
