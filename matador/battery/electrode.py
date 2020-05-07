@@ -197,7 +197,6 @@ class VoltageProfile:
         self.reactions = reactions
         self.active_ion = active_ion
 
-
     def voltage_summary(self, csv=False):
         """ Prints a voltage data summary.
 

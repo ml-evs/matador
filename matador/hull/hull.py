@@ -691,7 +691,6 @@ class QueryConvexHull:
                 self.volume_data['volume_ratio_with_bulk'].append(np.asarray(volumes) / volumes[0])
                 self.volume_data['hull_distances'].append(np.zeros_like(capacities))
 
-
     def _calculate_binary_volume_curve(self):
         """ Take stable compositions and volume and calculate volume
         expansion per "B" in AB binary.
