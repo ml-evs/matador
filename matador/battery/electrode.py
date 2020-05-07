@@ -7,7 +7,7 @@ relevant electrode properties from phase diagrams.
 """
 
 import numpy as np
-from typing import List, Tuple, Optional
+from typing import List, Tuple
 
 from matador.utils.chem_utils import get_formula_from_stoich
 
@@ -158,17 +158,37 @@ class Electrode:
 
 
 class VoltageProfile:
-    """ Container class for data associated with a voltage profile. """
+    """ Container class for data associated with a voltage profile.
+
+    Attributes:
+        starting_stoichiometry: the initial stoichiometry of the electrode.
+        capacities: list of gravimetric capacities in mAh/g.
+        voltage: list of voltages at each capacity step.
+        average_voltage: the average voltage across the full cycle.
+        reactions: a list of (coefficient, formula) tuples showing the
+            progression of the balanced reaction, e.g.
+            `[((1, "PSn")), ((1, "LiP"), (1, "LiSn"))]`
+        active_ion: species label of the active ion.
+
+    """
     def __init__(
         self,
         starting_stoichiometry: Tuple[Tuple[str, float], ...],
-        reactions: Optional[List[Tuple[float, str]]],
         capacities: List[float],
-        average_voltage: float,
         voltages: List[float],
+        average_voltage: float,
         active_ion: str,
+        reactions: List[Tuple[Tuple[float, str], ...]],
     ):
         """ Initialise the voltage profile with the given data. """
+
+        n_steps = len(voltages)
+        if any(_len != n_steps for _len in [len(capacities), len(reactions)+1]):
+            raise RuntimeError(
+                "Invalid size of initial arrays, capacities and voltages must have same length."
+                "reactions array must have length 1 smaller than voltages"
+            )
+
         self.starting_stoichiometry = starting_stoichiometry
         self.starting_formula = get_formula_from_stoich(starting_stoichiometry)
         self.capacities = capacities
@@ -176,6 +196,7 @@ class VoltageProfile:
         self.voltages = voltages
         self.reactions = reactions
         self.active_ion = active_ion
+
 
     def voltage_summary(self, csv=False):
         """ Prints a voltage data summary.

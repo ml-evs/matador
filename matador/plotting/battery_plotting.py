@@ -11,7 +11,6 @@ from typing import List, Optional, Dict, Union
 import numpy as np
 from matador.utils.chem_utils import get_formula_from_stoich
 from matador.plotting.plotting import plotting_function, SAVE_EXTS
-from matador.plotting.hull_plotting import _get_hull_labels
 from matador.battery import VoltageProfile
 
 
@@ -23,6 +22,7 @@ def plot_voltage_curve(
     profiles: Union[List[VoltageProfile], VoltageProfile],
     ax=None,
     show: bool = False,
+    labels: bool = False,
     savefig: Optional[str] = None,
     curve_labels: Optional[Union[str, List[str]]] = None,
     line_kwargs: Optional[Union[Dict, List[Dict]]] = None,
@@ -50,9 +50,7 @@ def plot_voltage_curve(
 
     if ax is None:
         fig = plt.figure(figsize=(8, 6))
-        ax_volt = fig.add_subplot(111)
-    else:
-        ax_volt = ax
+        ax = fig.add_subplot(111)
 
     if not isinstance(profiles, list):
         profiles = [profiles]
@@ -77,9 +75,9 @@ def plot_voltage_curve(
     if expt is not None:
         expt_data = np.loadtxt(expt, delimiter=',')
         if expt_label:
-            ax_volt.plot(expt_data[:, 0], expt_data[:, 1], c='k', lw=2, ls='-', label=expt_label)
+            ax.plot(expt_data[:, 0], expt_data[:, 1], c='k', lw=2, ls='-', label=expt_label)
         else:
-            ax_volt.plot(expt_data[:, 0], expt_data[:, 1], c='k', lw=2, ls='-', label='Experiment')
+            ax.plot(expt_data[:, 0], expt_data[:, 1], c='k', lw=2, ls='-', label='Experiment')
 
         if len(profiles) == 1:
             dft_label = 'DFT (this work)'
@@ -90,29 +88,45 @@ def plot_voltage_curve(
         else:
             stoich_label = None
 
-        label = stoich_label if dft_label is None else dft_label
+        _label = stoich_label if dft_label is None else dft_label
         if curve_labels is not None and len(curve_labels) > ind:
-            label = curve_labels[ind]
+            _label = curve_labels[ind]
 
         _line_kwargs = {'c': list(plt.rcParams['axes.prop_cycle'].by_key()['color'])[ind+2]}
         if line_kwargs is not None:
             _line_kwargs.update(line_kwargs[ind])
 
-        _add_voltage_curve(profile.capacities, profile.voltages, ax_volt, label=label, **_line_kwargs)
+        _add_voltage_curve(profile.capacities, profile.voltages, ax, label=_label, **_line_kwargs)
+
+    if labels:
+        if len(profiles) > 1:
+            print("Only labelling first voltage profile.")
+        for ind, reaction in enumerate(profiles[0].reactions):
+            _labels = []
+            for phase in reaction:
+                if phase[0] is None or phase[0] == 1.0:
+                    _label = ""
+                else:
+                    _label = "{:.1f} ".format(phase[0])
+                _label += "{}".format(phase[1])
+                _labels.append(_label)
+            _label = '+'.join(_labels)
+            _position = (profiles[0].capacities[ind], profiles[0].voltages[ind] + max(profiles[0].voltages)*0.01)
+            ax.annotate(_label, xy=_position, textcoords="data", ha="center", zorder=9999)
 
     if expt or len(profiles) > 1:
-        ax_volt.legend()
+        ax.legend()
 
-    ax_volt.set_ylabel('Voltage (V) vs {ion}$^+/${ion}'.format(ion=profile.active_ion))
-    ax_volt.set_xlabel('Gravimetric cap. (mAh/g)')
+    ax.set_ylabel('Voltage (V) vs {ion}$^+/${ion}'.format(ion=profile.active_ion))
+    ax.set_xlabel('Gravimetric cap. (mAh/g)')
 
-    _, end = ax_volt.get_ylim()
+    _, end = ax.get_ylim()
     from matplotlib.ticker import MultipleLocator
-    ax_volt.yaxis.set_major_locator(MultipleLocator(0.2))
-    ax_volt.set_ylim(0, 1.1 * end)
-    _, end = ax_volt.get_xlim()
-    ax_volt.set_xlim(0, 1.1 * end)
-    ax_volt.grid(False)
+    ax.yaxis.set_major_locator(MultipleLocator(0.2))
+    ax.set_ylim(0, 1.1 * end)
+    _, end = ax.get_xlim()
+    ax.set_xlim(0, 1.1 * end)
+    ax.grid(False)
     plt.tight_layout(pad=0.0, h_pad=1.0, w_pad=0.2)
 
     if savefig:
@@ -122,16 +136,16 @@ def plot_voltage_curve(
     elif show:
         plt.show()
 
-    return ax_volt
+    return ax
 
 
-def _add_voltage_curve(capacities, voltages, ax_volt, label=None, **kwargs):
+def _add_voltage_curve(capacities, voltages, ax, label=None, **kwargs):
     """ Add the voltage curves stored under hull['voltage_data'] to the plot.
 
     Parameters:
         capacities (list): list or numpy array of capacities.
         voltages (list): list or numpy array of voltages.
-        ax_volt (matplotlib.axes.Axes): an existing axis object on which to plot.
+        ax (matplotlib.axes.Axes): an existing axis object on which to plot.
 
     Keyword arguments:
         **kwargs (dict): to pass to matplotlib, using abbreviated names (e.g. 'c' not 'color')
@@ -148,11 +162,11 @@ def _add_voltage_curve(capacities, voltages, ax_volt, label=None, **kwargs):
 
     for i in range(1, len(voltages) - 1):
         if i == 1 and label is not None:
-            ax_volt.plot([capacities[i - 1], capacities[i]], [voltages[i], voltages[i]], label=label, **line_kwargs)
+            ax.plot([capacities[i - 1], capacities[i]], [voltages[i], voltages[i]], label=label, **line_kwargs)
         else:
-            ax_volt.plot([capacities[i - 1], capacities[i]], [voltages[i], voltages[i]], **line_kwargs)
+            ax.plot([capacities[i - 1], capacities[i]], [voltages[i], voltages[i]], **line_kwargs)
         if i != len(voltages) - 2:
-            ax_volt.plot([capacities[i], capacities[i]], [voltages[i], voltages[i + 1]], **line_kwargs)
+            ax.plot([capacities[i], capacities[i]], [voltages[i], voltages[i + 1]], **line_kwargs)
 
 
 @plotting_function
