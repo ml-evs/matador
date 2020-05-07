@@ -550,12 +550,15 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
         fig, ax = ternary.figure(scale=scale, ax=axis)
     else:
         fig, ax = ternary.figure(scale=scale)
+
+    # maintain aspect ratio of triangle
+    _user_height = plt.rcParams.get("figure.figsize", (8, 6))[0]
     if capmap or efmap or sampmap:
-        fig.set_size_inches(8, 5)
+        fig.set_size_inches(_user_height, 5/8 * _user_height)
     elif not expecting_cbar:
-        fig.set_size_inches(5, 5)
+        fig.set_size_inches(_user_height, _user_height)
     else:
-        fig.set_size_inches(6.67, 5)
+        fig.set_size_inches(_user_height, 5/6.67 * _user_height)
 
     ax.boundary(linewidth=2.0, zorder=99)
     ax.clear_matplotlib_ticks()
