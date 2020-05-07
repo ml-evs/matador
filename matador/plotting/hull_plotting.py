@@ -476,7 +476,7 @@ def plot_temperature_hull(
 @plotting_function
 def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=None,
                       label_cutoff=None, label_corners=True, expecting_cbar=True, labels=None, plot_fname=None,
-                      efmap=None, sampmap=None, capmap=None, **kwargs):
+                      efmap=None, sampmap=None, capmap=None, pathways=False, **kwargs):
     """ Plot calculated ternary hull as a 2D projection.
 
     Parameters:
@@ -497,6 +497,7 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
         efmap (bool): plot heatmap of formation energy,
         sampmap (bool): plot heatmap showing sampling density,
         capmap (bool): plot heatmap showing gravimetric capacity.
+        pathways (bool): plot the pathway from the starting electrode to active ion.
 
     Returns:
         matplotlib.axes.Axes: matplotlib axis with plot.
@@ -519,6 +520,8 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
         sampmap = hull.args.get('sampmap')
     if capmap is None:
         capmap = hull.args.get('capmap')
+    if pathways is None:
+        pathways = hull.args.get('pathways')
 
     if labels is None:
         labels = hull.args.get('labels')
@@ -622,7 +625,7 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
         plane = np.asarray(plane)
         ax.plot(scale * plane, c=hull.colours[0], lw=1.5, alpha=1, zorder=98)
 
-    if hull.args.get('pathways'):
+    if pathways:
         for phase in stable:
             if phase[0] == 0 and phase[1] != 0 and phase[2] != 0:
                 ax.plot([scale * phase, [scale, 0, 0]], c='r', alpha=0.2, lw=6, zorder=99)
