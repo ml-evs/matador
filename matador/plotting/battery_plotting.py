@@ -49,7 +49,7 @@ def plot_voltage_curve(
     import matplotlib.pyplot as plt
 
     if ax is None:
-        fig = plt.figure(figsize=(8, 6))
+        fig = plt.figure()
         ax = fig.add_subplot(111)
 
     if not isinstance(profiles, list):
@@ -184,9 +184,9 @@ def plot_volume_curve(hull, ax=None, show=True, legend=False, **kwargs):
 
     if ax is None:
         if hull.savefig or any([kwargs.get(ext) for ext in SAVE_EXTS]):
-            fig = plt.figure(facecolor=None, figsize=(8, 6))
+            fig = plt.figure()
         else:
-            fig = plt.figure(facecolor=None)
+            fig = plt.figure()
         ax = fig.add_subplot(111)
     else:
         ax = ax

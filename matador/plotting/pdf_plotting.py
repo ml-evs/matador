@@ -56,8 +56,9 @@ def plot_pdf(pdfs,
         labels = [labels]
 
     if figsize is None:
-        height = len(pdfs) * max(0.5, 4 / len(pdfs))
-        figsize = (8, height)
+        _user_default_figsize = plt.rcParams.get('figure.figsize', (8, 6))
+        height = len(pdfs) * max(0.5, _user_default_figsize[1] / 2 / len(pdfs))
+        figsize = (_user_default_figsize[0], height)
 
     fig = plt.figure(figsize=figsize)
     ax1 = fig.add_subplot(111)
@@ -144,7 +145,7 @@ def plot_projected_pdf(pdf, keys=None, other_pdfs=None, vlines=None):
 
     """
     import matplotlib.pyplot as plt
-    fig = plt.figure(figsize=(10, 6))
+    fig = plt.figure()
     ax1 = fig.add_subplot(111)
     if keys is None:
         keys = [key for key in pdf.elem_gr]
@@ -186,7 +187,7 @@ def plot_diff_overlap(pdf_overlap):
     import matplotlib.gridspec as gridspec
     import numpy as np
 
-    plt.figure(figsize=(8, 6))
+    plt.figure()
     gs = gridspec.GridSpec(2, 1, height_ratios=[2, 1])
     gs.update(hspace=0)
 
@@ -223,7 +224,7 @@ def plot_projected_diff_overlap(pdf_overlap):
     import numpy as np
     import matplotlib.gridspec as gridspec
 
-    plt.figure(figsize=(8, 6))
+    plt.figure()
     gs = gridspec.GridSpec(2, 1, height_ratios=[2, 1])
     gs.update(hspace=0)
 

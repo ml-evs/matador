@@ -104,8 +104,8 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
     import matplotlib.colors as colours
 
     if ax is None:
-        fig = plt.figure(facecolor=None, figsize=(8, 6))
-        ax = fig.add_subplot(111, facecolor=None)
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
 
     if not hasattr(hull, 'colours'):
         hull.colours = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])
@@ -302,7 +302,7 @@ def plot_ensemble_hull(hull, data_key,
     import matplotlib.pyplot as plt
 
     if ax is None:
-        fig = plt.figure(figsize=(8, 6))
+        fig = plt.figure()
         ax = fig.add_subplot(111)
 
     n_hulls = len(hull.phase_diagrams)
@@ -380,7 +380,7 @@ def plot_temperature_hull(
     data_key = hull.data_key
 
     if ax is None:
-        fig = plt.figure(figsize=(8, 6))
+        fig = plt.figure()
         ax = fig.add_subplot(111)
 
     n_hulls = len(hull.phase_diagrams)
