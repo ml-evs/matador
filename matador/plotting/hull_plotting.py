@@ -729,6 +729,9 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
             del label_coords[closest_label]
 
     plt.tight_layout(w_pad=0.2)
+    # important for retaining labels if exporting to PDF
+    # see https://github.com/marcharper/python-ternary/issues/36
+    ax._redraw_labels() # noqa
 
     if hull.savefig:
         fname = plot_fname or ''.join(hull.species) + '_hull'
