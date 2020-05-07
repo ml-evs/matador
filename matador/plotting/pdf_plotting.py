@@ -57,7 +57,7 @@ def plot_pdf(pdfs,
 
     if figsize is None:
         _user_default_figsize = plt.rcParams.get('figure.figsize', (8, 6))
-        height = len(pdfs) * max(0.5, _user_default_figsize[1] / 2 / len(pdfs))
+        height = len(pdfs) * max(0.5, _user_default_figsize[1] / 1.5 / len(pdfs))
         figsize = (_user_default_figsize[0], height)
 
     fig = plt.figure(figsize=figsize)

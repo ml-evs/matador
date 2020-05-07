@@ -53,7 +53,7 @@ def plot_pxrd(
 
     if figsize is None:
         _user_default_figsize = plt.rcParams.get('figure.figsize', (8, 6))
-        height = len(pxrds) * max(0.5, _user_default_figsize[1] / 2 / len(pxrds))
+        height = len(pxrds) * max(0.5, _user_default_figsize[1] / 1.5 / len(pxrds))
         figsize = (_user_default_figsize[0], height)
 
     if ax is None:
