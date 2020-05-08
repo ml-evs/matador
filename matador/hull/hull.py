@@ -689,6 +689,7 @@ class QueryConvexHull:
                 self.volume_data['electrode_volume'].append(volumes)
                 self.volume_data['endstoichs'].append(endstoichs[reaction_ind])
                 self.volume_data['volume_ratio_with_bulk'].append(np.asarray(volumes) / volumes[0])
+                self.volume_data['volume_expansion_percentage'].append(((np.asarray(volumes) / volumes[0]) - 1) * 100)
                 self.volume_data['hull_distances'].append(np.zeros_like(capacities))
 
     def _calculate_binary_volume_curve(self):
@@ -711,6 +712,7 @@ class QueryConvexHull:
         self.volume_data['Q'].append(stable_cap[non_nans].flatten())
         self.volume_data['electrode_volume'].append(stable_vol[non_nans].flatten())
         self.volume_data['volume_ratio_with_bulk'].append((stable_vol[non_nans] / stable_vol[0]).flatten())
+        self.volume_data['volume_expansion_percentage'].append(((stable_vol[non_nans] / stable_vol[0]) - 1) * 100)
         self.volume_data['hull_distances'].append(hull_distances[non_nans].flatten())
         self.volume_data['endstoichs'].append(stable_stoichs[non_nans].flatten()[0])
 

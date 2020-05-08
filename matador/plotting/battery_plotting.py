@@ -170,14 +170,17 @@ def _add_voltage_curve(capacities, voltages, ax, label=None, **kwargs):
 
 
 @plotting_function
-def plot_volume_curve(hull, ax=None, show=True, legend=False, **kwargs):
+def plot_volume_curve(hull, ax=None, show=True, legend=False, as_percentages=False, **kwargs):
     """ Plot volume curve calculated for phase diagram.
 
     Parameters:
         hull (matador.hull.QueryConvexHull): matador hull object.
 
     Keyword arguments:
+        ax (matplotlib.axes.Axes): an existing axis on which to plot.
         show (bool): whether or not to display plot in X-window.
+        legend (bool): whether to add the legend.
+        as_percentages (bool): whether to show the expansion as a percentage.
 
     """
     import matplotlib.pyplot as plt
@@ -191,6 +194,11 @@ def plot_volume_curve(hull, ax=None, show=True, legend=False, **kwargs):
     else:
         ax = ax
 
+    if as_percentages:
+        volume_key = 'volume_expansion_percentage'
+    else:
+        volume_key = 'volume_ratio_with_bulk'
+
     for j in range(len(hull.volume_data['electrode_volume'])):
         c = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])[j+2]
         stable_hull_dist = hull.volume_data['hull_distances'][j]
@@ -199,20 +207,24 @@ def plot_volume_curve(hull, ax=None, show=True, legend=False, **kwargs):
 
         ax.plot(
             [q for ind, q in enumerate(hull.volume_data['Q'][j][:-1]) if stable_hull_dist[ind] == 0],
-            [v for ind, v in enumerate(hull.volume_data['volume_ratio_with_bulk'][j]) if stable_hull_dist[ind] == 0],
+            [v for ind, v in enumerate(hull.volume_data[volume_key][j]) if stable_hull_dist[ind] == 0],
             marker='o', markeredgewidth=1.5, markeredgecolor='k', c=c, zorder=1000, lw=0,
         )
 
         ax.plot(
             [q for ind, q in enumerate(hull.volume_data['Q'][j][:-1]) if stable_hull_dist[ind] == 0],
-            [v for ind, v in enumerate(hull.volume_data['volume_ratio_with_bulk'][j]) if stable_hull_dist[ind] == 0],
+            [v for ind, v in enumerate(hull.volume_data[volume_key][j]) if stable_hull_dist[ind] == 0],
             lw=2, c=c,
             label=("{}"
                    .format(get_formula_from_stoich(hull.volume_data['endstoichs'][j], tex=True)))
         )
 
     ax.set_xlabel("Gravimetric capacity (mAh/g)")
-    ax.set_ylabel('Volume ratio with starting electrode')
+    if as_percentages:
+        ax.set_ylabel('Volume expansion (%)')
+    else:
+        ax.set_ylabel('Volume ratio with starting electrode')
+
     if legend or len(hull.volume_data['Q']) > 1:
         ax.legend()
     fname = '{}_volume'.format(''.join(hull.elements))
