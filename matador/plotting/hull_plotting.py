@@ -474,7 +474,7 @@ def plot_temperature_hull(
 
 
 @plotting_function
-def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=None,
+def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=None, fig_height=None,
                       label_cutoff=None, label_corners=True, expecting_cbar=True, labels=None, plot_fname=None,
                       efmap=None, sampmap=None, capmap=None, pathways=False, **kwargs):
     """ Plot calculated ternary hull as a 2D projection.
@@ -544,7 +544,6 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
         scale = 20
     else:
         scale = 1
-    fontsize = plt.rcParams['font.size']
 
     if axis is not None:
         fig, ax = ternary.figure(scale=scale, ax=axis)
@@ -552,7 +551,10 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
         fig, ax = ternary.figure(scale=scale)
 
     # maintain aspect ratio of triangle
-    _user_height = plt.rcParams.get("figure.figsize", (8, 6))[0]
+    if fig_height is None:
+        _user_height = plt.rcParams.get("figure.figsize", (8, 6))[0]
+    else:
+        _user_height = fig_height
     if capmap or efmap or sampmap:
         fig.set_size_inches(_user_height, 5/8 * _user_height)
     elif not expecting_cbar:
@@ -572,16 +574,16 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
     if label_corners:
         # remove 0 and 1 ticks when labelling corners
         ticks = ticks[1:-1]
-        ax.left_corner_label(chempot_labels[2], fontsize=fontsize + 4)
-        ax.right_corner_label(chempot_labels[0], fontsize=fontsize + 4)
-        ax.top_corner_label(chempot_labels[1], fontsize=fontsize + 4, offset=0.16)
+        ax.left_corner_label(chempot_labels[2], fontsize='large')
+        ax.right_corner_label(chempot_labels[0], fontsize='large')
+        ax.top_corner_label(chempot_labels[1], fontsize='large', offset=0.16)
     else:
-        ax.left_axis_label(chempot_labels[2], fontsize=fontsize + 2, offset=0.12)
-        ax.right_axis_label(chempot_labels[1], fontsize=fontsize + 2, offset=0.12)
-        ax.bottom_axis_label(chempot_labels[0], fontsize=fontsize + 2, offset=0.08)
-        ax.set_title('-'.join(['{}'.format(label) for label in chempot_labels]), fontsize=fontsize + 2, y=1.02)
+        ax.left_axis_label(chempot_labels[2], fontsize='large', offset=0.12)
+        ax.right_axis_label(chempot_labels[1], fontsize='large', offset=0.12)
+        ax.bottom_axis_label(chempot_labels[0], fontsize='large', offset=0.08)
+        ax.set_title('-'.join(['{}'.format(label) for label in chempot_labels]), fontsize='large', y=1.02)
 
-    ax.ticks(axis='lbr', linewidth=1, offset=0.02, fontsize=fontsize-2,
+    ax.ticks(axis='lbr', linewidth=1, offset=0.025, fontsize='small',
              locations=(scale * np.asarray(ticks)).tolist(),
              ticks=ticks, tick_formats='%.1f')
 
