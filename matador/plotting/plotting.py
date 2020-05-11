@@ -41,11 +41,10 @@ def plotting_function(function):
     @wraps(function)
     def wrapped_plot_function(*args, **kwargs):
         """ Wrap and return the plotting function. """
-        from tkinter import TclError
-        result = None
-        # if we're going to be saving a figure, switch to Agg to avoid X-forwarding
         saving = False
+        result = None
 
+        # if we're going to be saving a figure, switch to Agg to avoid X-forwarding
         try:
             for arg in args:
                 if arg.savefig:
@@ -80,7 +79,10 @@ def plotting_function(function):
             set_style(style)
             result = function(*args, **kwargs)
 
-        except TclError as exc:
+        except Exception as exc:
+            if 'TclError' not in type(exc).__name__:
+                raise exc
+
             print_failure('Caught exception: {}'.format(type(exc).__name__))
             print_warning('Error message was: {}'.format(exc))
             print_warning('This is probably an X-forwarding error')

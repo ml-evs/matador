@@ -1,6 +1,3 @@
-default_language_version:
-  python: python3.6
-
 repos:
     - repo: https://gitlab.com/PyCQA/flake8
       rev: master 

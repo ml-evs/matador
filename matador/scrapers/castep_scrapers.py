@@ -1246,7 +1246,9 @@ def _castep_scrape_final_parameters(flines, castep):
             castep['sedc_apply'] = True
             castep['sedc_scheme'] = flines[line_no + 1].split(':')[1].split()[0]
         elif 'space_group' not in castep and 'Space group of crystal' in line:
-            castep['space_group'] = line.split(':')[-1].split(',')[0].strip().replace(" ", "")
+            space_group = line.split(':')[-1].split(',')[0].strip().replace(" ", "")
+            if space_group:
+                castep['space_group'] = space_group
         elif 'nelectrons' not in castep and 'number of  electrons' in line:
             castep['nelectrons'] = f90_float_parse(line.split(':')[-1])
         elif 'nelectrons' not in castep and 'number of bands' in line:

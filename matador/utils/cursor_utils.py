@@ -389,6 +389,8 @@ def get_guess_doc_provenance(sources, icsd=None):
                 prov = 'SM'
             elif '-doi-' in fname:
                 prov = 'DOI'
+            elif '-config_enum' in fname:
+                prov = 'ENUM'
 
     return prov
 

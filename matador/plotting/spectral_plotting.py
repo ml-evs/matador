@@ -768,12 +768,13 @@ def _add_path_labels(seed, dispersion, ax_dispersion, path, seed_ind, kwargs):
         if not spg_structure:
             res = False
             cell = False
-            if os.path.isfile(seed + '.res'):
-                res = True
-            elif os.path.isfile(seed + '.cell'):
-                cell = True
-            else:
-                print('Failed to find {}.cell or {}.res, will not be able to generate labels.'.format(seed, seed))
+            if isinstance(seed, str):
+                if os.path.isfile(seed + '.res'):
+                    res = True
+                elif os.path.isfile(seed + '.cell'):
+                    cell = True
+                else:
+                    print('Failed to find {}.cell or {}.res, will not be able to generate labels.'.format(seed, seed))
 
             success = False
             if cell:

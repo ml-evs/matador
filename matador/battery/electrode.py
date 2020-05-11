@@ -7,6 +7,9 @@ relevant electrode properties from phase diagrams.
 """
 
 import numpy as np
+from typing import List, Tuple
+
+from matador.utils.chem_utils import get_formula_from_stoich
 
 EPS = 1e-12
 
@@ -152,3 +155,75 @@ class Electrode:
                     endstoichs.append(stoichs[ind])
 
         return endpoints, endstoichs
+
+
+class VoltageProfile:
+    """ Container class for data associated with a voltage profile.
+
+    Attributes:
+        starting_stoichiometry: the initial stoichiometry of the electrode.
+        capacities: list of gravimetric capacities in mAh/g.
+        voltage: list of voltages at each capacity step.
+        average_voltage: the average voltage across the full cycle.
+        reactions: a list of (coefficient, formula) tuples showing the
+            progression of the balanced reaction, e.g.
+            `[((1, "PSn")), ((1, "LiP"), (1, "LiSn"))]`
+        active_ion: species label of the active ion.
+
+    """
+    def __init__(
+        self,
+        starting_stoichiometry: Tuple[Tuple[str, float], ...],
+        capacities: List[float],
+        voltages: List[float],
+        average_voltage: float,
+        active_ion: str,
+        reactions: List[Tuple[Tuple[float, str], ...]],
+    ):
+        """ Initialise the voltage profile with the given data. """
+
+        n_steps = len(voltages)
+        if any(_len != n_steps for _len in [len(capacities), len(reactions)+1]):
+            raise RuntimeError(
+                "Invalid size of initial arrays, capacities and voltages must have same length."
+                "reactions array must have length 1 smaller than voltages"
+            )
+
+        self.starting_stoichiometry = starting_stoichiometry
+        self.starting_formula = get_formula_from_stoich(starting_stoichiometry)
+        self.capacities = capacities
+        self.average_voltage = average_voltage
+        self.voltages = voltages
+        self.reactions = reactions
+        self.active_ion = active_ion
+
+    def voltage_summary(self, csv=False):
+        """ Prints a voltage data summary.
+
+        Keyword arguments:
+            csv (bool/str): whether or not to write a CSV file containing the data.
+                If this contains a string use this as the filename.
+
+        """
+
+        data_str = '# {} into {}\n'.format(self.active_ion, self.starting_formula)
+        data_str += "# Average voltage: {:4.2f} V\n".format(self.average_voltage)
+        data_str += '# {:^10} \t{:^10}\n'.format('Q (mAh/g)', 'Voltage (V)')
+
+        for idx, _ in enumerate(self.voltages):
+            data_str += '{:>10.2f} \t{:>10.8f}'.format(self.capacities[idx], self.voltages[idx])
+            if idx != len(self.voltages) - 1:
+                data_str += '\n'
+
+        if csv:
+            if isinstance(csv, str):
+                fname = csv
+            else:
+                fname = '{}_voltages.csv'.format(self.starting_formula)
+            with open(fname, 'w') as f:
+                f.write(data_str)
+
+        return 'Voltage data:\n\n{}'.format(data_str)
+
+    def __repr__(self):
+        self.voltage_summary(csv=False)

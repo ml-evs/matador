@@ -8,6 +8,7 @@ queries.
 
 
 from copy import deepcopy
+from typing import List
 from collections import defaultdict
 import re
 import warnings
@@ -23,7 +24,7 @@ from matador.utils.chem_utils import get_formation_energy
 from matador.utils.cursor_utils import set_cursor_from_array, get_array_from_cursor
 from matador.utils.cursor_utils import display_results, recursive_get
 from matador.utils.cursor_utils import filter_cursor_by_chempots
-from matador.battery import Electrode
+from matador.battery import Electrode, VoltageProfile
 from matador.hull.phase_diagram import PhaseDiagram
 
 # general small number used when comparing energies to zero
@@ -45,8 +46,8 @@ class QueryConvexHull:
         species (list): list of chemical potential symbols.
         num_elements (int): number of elements present in the chemical potentials.
         elements (list): the elements present in the convex hull.
-        voltage_data (dict): if voltage_curve() has been called, then
-            this is a dictionary containing Q, x, V and reaction pathways.
+        voltage_data (list): if voltage_curve() has been called, then
+            this is a lsit of VoltageProfile objects containing Q, x, V and reaction pathways.
         volume_data (dict): if volume_curve() has been called, then
             this is a dictionary containing x and volumes per B (in AxBy).
 
@@ -128,7 +129,7 @@ class QueryConvexHull:
         self.phase_diagram = None
         self.hull_dist = None
         self.species = None
-        self.voltage_data = defaultdict(list)
+        self.voltage_data: List[VoltageProfile] = []
         self.volume_data = defaultdict(list)
         self.elements = []
         self.num_elements = 0
@@ -193,21 +194,21 @@ class QueryConvexHull:
 
         display_results(self.hull_cursor, args=self.args, hull=True, energy_key=self.energy_key)
 
-        if not self.args.get('no_plot'):
-            from matador import plotting
-
         if self.compute_voltages:
             print("Constructing electrode system with active ion: {}".format(self.species[0]))
             self.voltage_curve([doc for doc in self.hull_cursor if doc['hull_distance'] <= 1e-9])
-            self.volume_curve()
-            if not self.args.get('no_plot'):
-                plotting.plot_voltage_curve(self, **self.args['plot_kwargs'], show=False)
-                if self.compute_volumes:
-                    plotting.plot_volume_curve(self, **self.args['plot_kwargs'], show=False)
-                self.plot_hull(**self.args['plot_kwargs'], debug=self.args.get('debug'), show=True)
 
-        elif not self.args.get('no_plot'):
-            self.plot_hull(**self.args['plot_kwargs'], debug=self.args.get('debug'))
+        if self.compute_volumes:
+            self.volume_curve()
+
+        if not self.args.get('no_plot'):
+            if self.compute_voltages and self.voltage_data:
+                print('plotting voltage')
+                self.plot_voltage_curve(show=False)
+            if self.compute_volumes and self.volume_data:
+                self.plot_volume_curve(show=False)
+
+            self.plot_hull(**self.args['plot_kwargs'], debug=self.args.get('debug'), show=True)
 
     def __repr__(self):
         return display_results(self.hull_cursor, args=self.args, hull=True, energy_key=self.energy_key, return_str=True)
@@ -216,6 +217,13 @@ class QueryConvexHull:
     def savefig(self):
         """ True if any figure type argument was passed. """
         return any([self.args.get('pdf'), self.args.get('png'), self.args.get('svg')])
+
+    @property
+    def savefig_ext(self):
+        """ Returns the figure extension to save with. """
+        for ext in ['pdf', 'png', 'svg']:
+            if self.args.get(ext):
+                return ext
 
     def plot_hull(self, **kwargs):
         """ Hull plot helper function. """
@@ -227,6 +235,31 @@ class QueryConvexHull:
         else:
             print_notify('Unable to plot phase diagram of dimension {}.'.format(self._dimension))
         return ax
+
+    def plot_voltage_curve(self, **kwargs):
+        """ Voltage plot helper function. """
+        from matador import plotting
+        savefig = None
+        if self.savefig:
+            savefig = '{}_voltage.{}'.format(''.join(self.elements), self.savefig_ext)
+
+        plotting.plot_voltage_curve(
+            self.voltage_data,
+            expt=self.args.get('expt'),
+            savefig=savefig,
+            labels=self.args.get('labels'),
+            expt_label=self.args.get('expt_label'),
+            **kwargs
+        )
+
+    def plot_volume_curve(self, **kwargs):
+        """ Volume plot helper function. """
+        from matador import plotting
+        plotting.plot_volume_curve(
+            self,
+            **self.args['plot_kwargs'],
+            show=False
+        )
 
     def fake_chempots(self, custom_elem=None):
         """ Spoof documents for command-line chemical potentials.
@@ -491,46 +524,8 @@ class QueryConvexHull:
 
         self._scale_voltages(self.species[0])
 
-        self.print_voltage_summary()
-
-    def print_voltage_summary(self):
-        """ Prints a voltage data summary.
-
-        If self.args['csv'] is True, save the summary to a file.
-
-        """
-
-        data_str = ''
-        for ind, path in enumerate(self.voltage_data['Q']):
-            if ind != 0:
-                data_str += '\n'
-            if self._dimension == 3:
-                data_str += '# ' + get_formula_from_stoich(self.voltage_data['endstoichs'][ind]) + '\n'
-            else:
-                data_str += '# ' + ''.join(self.species) + '\n'
-            data_str += "# Average voltage: {:4.2f} V\n".format(self.voltage_data['average_voltage'][ind])
-            # only print concentration if it is well defined (i.e. binary hull)
-            if self._dimension == 2:
-                data_str += '# {:^10} \t{:^10} \t{:^10}\n'.format('x', 'Q (mAh/g)', 'Voltage (V)')
-            else:
-                data_str += '# {:^10} \t{:^10}\n'.format('Q (mAh/g)', 'Voltage (V)')
-            for idx, _ in enumerate(path):
-                if self._dimension == 2:
-                    data_str += '{:>10.4f} \t{:>10.4f} \t{:>10.4f}'.format(self.voltage_data['x'][ind][idx],
-                                                                           self.voltage_data['Q'][ind][idx],
-                                                                           self.voltage_data['voltages'][ind][idx])
-                else:
-                    data_str += '{:>10.2f} \t{:>10.8f}'.format(self.voltage_data['Q'][ind][idx],
-                                                               self.voltage_data['voltages'][ind][idx])
-                if idx != len(path) - 1:
-                    data_str += '\n'
-
-        if self.args.get('csv'):
-            with open(''.join(self.species) + '_voltage.csv', 'w') as f:
-                f.write(data_str)
-
-        print('\nVoltage data:')
-        print('\n' + data_str)
+        for profile in self.voltage_data:
+            print(profile.voltage_summary(csv=self.args.get('csv', False)))
 
     def volume_curve(self):
         """ Take stable compositions and volume and calculate
@@ -588,22 +583,33 @@ class QueryConvexHull:
 
         """
         mu_enthalpy = get_array_from_cursor(self.chempot_cursor, self.energy_key)
-        x = get_num_intercalated(hull_cursor)
-        # sort for voltage calculation
-        capacities = get_array_from_cursor(hull_cursor, 'gravimetric_capacity')
-        capacities = capacities[np.argsort(x)]
-        stable_enthalpy_per_b = get_array_from_cursor(hull_cursor,
-                                                      self._extensive_energy_key + '_per_b')[np.argsort(x)]
-
+        # take a copy of the cursor so it can be reordered
+        _hull_cursor = deepcopy(hull_cursor)
+        x = get_num_intercalated(_hull_cursor)
+        _x_order = np.argsort(x)
+        capacities = np.asarray([
+            get_generic_grav_capacity(
+                get_padded_composition(doc['stoichiometry'], self.elements),
+                self.elements)
+            for doc in _hull_cursor
+        ])
+        set_cursor_from_array(_hull_cursor, x, 'conc_of_active_ion')
+        set_cursor_from_array(_hull_cursor, capacities, 'gravimetric_capacity')
+        _hull_cursor = sorted(_hull_cursor, key=lambda doc: doc['conc_of_active_ion'])
+        capacities = capacities[_x_order]
         x = np.sort(x)
+        stable_enthalpy_per_b = get_array_from_cursor(_hull_cursor,
+                                                      self._extensive_energy_key + '_per_b')
+
         x, uniq_idxs = np.unique(x, return_index=True)
         stable_enthalpy_per_b = stable_enthalpy_per_b[uniq_idxs]
         capacities = capacities[uniq_idxs]
-        V = []
-        for i, _ in enumerate(x):
-            V.append(
-                -(stable_enthalpy_per_b[i] - stable_enthalpy_per_b[i-1]) / (x[i] - x[i-1]) + mu_enthalpy[0])
+
+        V = np.zeros_like(x)
+        V[1:] = - np.diff(stable_enthalpy_per_b) / np.diff(x) + mu_enthalpy[0]
         V[0] = V[1]
+
+        reactions = [((None, get_formula_from_stoich(doc['stoichiometry'])),) for doc in _hull_cursor[1:]]
 
         # make V, Q and x available for plotting, stripping NaNs to re-add later
         # in the edge case of duplicate chemical potentials
@@ -618,11 +624,15 @@ class QueryConvexHull:
         V.append(0.0)
 
         average_voltage = Electrode.calculate_average_voltage(capacities, V)
-
-        self.voltage_data['voltages'] = [V]
-        self.voltage_data['Q'] = [capacities]
-        self.voltage_data['x'] = [x]
-        self.voltage_data['average_voltage'] = [average_voltage]
+        profile = VoltageProfile(
+            voltages=V,
+            capacities=capacities,
+            average_voltage=average_voltage,
+            starting_stoichiometry=[[self.species[1], 1.0]],
+            reactions=reactions,
+            active_ion=self.species[0]
+        )
+        self.voltage_data.append(profile)
 
     def _calculate_ternary_voltage_curve(self, hull_cursor):
         """ Calculate tenary voltage curve, setting self.voltage_data.
@@ -659,28 +669,28 @@ class QueryConvexHull:
         for reaction_ind, endpoint in enumerate(endpoints):
             print(30 * '-')
             print('Reaction {}, {}:'.format(reaction_ind+1, get_formula_from_stoich(endstoichs[reaction_ind])))
-            try:
-                reactions, capacities, voltages, average_voltage, volumes = self._construct_electrode(
-                    convex_hull, endpoint, endstoichs[reaction_ind], hull_cursor
-                )
+            reactions, capacities, voltages, average_voltage, volumes = self._construct_electrode(
+                convex_hull, endpoint, endstoichs[reaction_ind], hull_cursor
+            )
 
-                # set voltage data for external use
-                self.voltage_data['x'].append(capacities)
-                self.voltage_data['Q'].append(capacities)
-                self.voltage_data['voltages'].append(voltages)
-                self.voltage_data['reactions'].append(reactions)
-                self.voltage_data['endstoichs'].append(endstoichs[reaction_ind])
-                self.voltage_data['average_voltage'].append(average_voltage)
-                if not self._non_elemental:
-                    self.volume_data['x'].append(capacities)
-                    self.volume_data['Q'].append(capacities)
-                    self.volume_data['electrode_volume'].append(volumes)
-                    self.volume_data['endstoichs'].append(endstoichs[reaction_ind])
-                    self.volume_data['volume_ratio_with_bulk'].append(np.asarray(volumes) / volumes[0])
-                    self.volume_data['hull_distances'].append(np.zeros_like(capacities))
+            profile = VoltageProfile(
+                starting_stoichiometry=endstoichs[reaction_ind],
+                reactions=reactions,
+                capacities=capacities,
+                voltages=voltages,
+                average_voltage=average_voltage,
+                active_ion=self.species[0]
+            )
+            self.voltage_data.append(profile)
 
-            except RuntimeError as exc:
-                print(exc)
+            if not self._non_elemental:
+                self.volume_data['x'].append(capacities)
+                self.volume_data['Q'].append(capacities)
+                self.volume_data['electrode_volume'].append(volumes)
+                self.volume_data['endstoichs'].append(endstoichs[reaction_ind])
+                self.volume_data['volume_ratio_with_bulk'].append(np.asarray(volumes) / volumes[0])
+                self.volume_data['volume_expansion_percentage'].append(((np.asarray(volumes) / volumes[0]) - 1) * 100)
+                self.volume_data['hull_distances'].append(np.zeros_like(capacities))
 
     def _calculate_binary_volume_curve(self):
         """ Take stable compositions and volume and calculate volume
@@ -702,6 +712,7 @@ class QueryConvexHull:
         self.volume_data['Q'].append(stable_cap[non_nans].flatten())
         self.volume_data['electrode_volume'].append(stable_vol[non_nans].flatten())
         self.volume_data['volume_ratio_with_bulk'].append((stable_vol[non_nans] / stable_vol[0]).flatten())
+        self.volume_data['volume_expansion_percentage'].append(((stable_vol[non_nans] / stable_vol[0]) - 1) * 100)
         self.volume_data['hull_distances'].append(hull_distances[non_nans].flatten())
         self.volume_data['endstoichs'].append(stable_stoichs[non_nans].flatten()[0])
 
@@ -1031,7 +1042,7 @@ class QueryConvexHull:
             return
 
         if valence_factor != 1:
-            for ind, start_point in enumerate(self.voltage_data['voltages']):
-                for j in range(len(self.voltage_data['voltages'][ind])):
-                    self.voltage_data['voltages'][ind][j] *= valence_factor
-            self.voltage_data['average_voltage'][ind] *= valence_factor
+            for ind, start_point in enumerate(self.voltage_data):
+                for j in range(len(self.voltage_data[ind].voltages)):
+                    self.voltage_data[ind].voltages[j] *= valence_factor
+            self.voltage_data[ind].average_voltage *= valence_factor

@@ -203,7 +203,9 @@ class ElectronicDispersion(Dispersion):
         'num_bands',
         'num_electrons',
         'eigs_s_k',
-        'kpoint_path'
+        'kpoint_path',
+        'lattice_cart',
+        'fermi_energy',
     ]
 
     def __init__(self, *args, **kwargs):
@@ -404,6 +406,27 @@ class ElectronicDispersion(Dispersion):
         # use smallest spin channel gap data for standard non-spin data access
         for key in spin_keys:
             self._data[key.replace('spin_', '')] = self._data[key][spin_gap_index]
+
+    def new_from_trimmed_path(self, k_start_ind=0, k_end_ind=None):
+        """ Returns a new ElectronicDispersion object with the kpoint
+        path trimmed by the provided indices.
+
+        """
+        _new_data_dict = {}
+        if k_end_ind is None:
+            k_end_ind = len(self.kpoint_path)
+
+        _new_data_dict['kpoint_path'] = self.kpoint_path[k_start_ind:k_end_ind]
+        _new_data_dict['eigs_s_k'] = self.eigs[:, :, k_start_ind:k_end_ind]
+        _new_data_dict['num_bands'] = self.num_bands
+        _new_data_dict['num_electrons'] = self.num_electrons
+        _new_data_dict['num_spins'] = self.num_spins
+        _new_data_dict['num_kpoints'] = len(_new_data_dict['kpoint_path'])
+        _new_data_dict['lattice_cart'] = self.lattice_cart
+        _new_data_dict['fermi_energy'] = self.fermi_energy
+        _new_data_dict['spin_fermi_energy'] = self.spin_fermi_energy
+
+        return ElectronicDispersion(**_new_data_dict)
 
 
 class VibrationalDispersion(Dispersion):

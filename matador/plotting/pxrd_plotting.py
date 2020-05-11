@@ -52,8 +52,9 @@ def plot_pxrd(
         labels = [labels]
 
     if figsize is None:
-        height = len(pxrds) * max(0.5, 4/len(pxrds))
-        figsize = (8, height)
+        _user_default_figsize = plt.rcParams.get('figure.figsize', (8, 6))
+        height = len(pxrds) * max(0.5, _user_default_figsize[1] / 1.5 / len(pxrds))
+        figsize = (_user_default_figsize[0], height)
 
     if ax is None:
         fig, ax = plt.subplots(figsize=figsize)

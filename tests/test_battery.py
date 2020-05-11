@@ -44,7 +44,6 @@ class VoltageTest(unittest.TestCase):
     def test_binary_voltage(self):
         """ Test simple binary voltage curve. """
         hull_cursor = []
-        test_x = np.loadtxt(REAL_PATH + "data/voltage_data/LiAs_x.dat")
         test_Q = np.loadtxt(REAL_PATH + "data/voltage_data/LiAs_Q.dat")
         test_V = np.loadtxt(REAL_PATH + "data/voltage_data/LiAs_V.dat")
         for i in range(5):
@@ -52,30 +51,24 @@ class VoltageTest(unittest.TestCase):
                 REAL_PATH + "data/voltage_data/hull_data" + str(i) + ".json"
             ) as f:
                 hull_cursor.append(json.load(f))
-        bare_hull = QueryConvexHull(
+        hull = QueryConvexHull(
             cursor=hull_cursor, species=["Li", "As"], voltage=True, no_plot=True
         )
-        self.assertTrue(len(bare_hull.voltage_data["voltages"]) == 1)
+        self.assertTrue(len(hull.voltage_data) == 1)
         np.testing.assert_array_almost_equal(
-            bare_hull.voltage_data["voltages"][0], test_V, decimal=5, verbose=True
+            hull.voltage_data[0].voltages, test_V, decimal=5, verbose=True
         )
         np.testing.assert_array_almost_equal(
-            bare_hull.voltage_data["x"][0], test_x, decimal=5
-        )
-        np.testing.assert_array_almost_equal(
-            bare_hull.voltage_data["Q"][0], test_Q, decimal=5
+            hull.voltage_data[0].capacities, test_Q, decimal=5
         )
         self.assertAlmostEqual(
-            bare_hull.voltage_data["average_voltage"][0], 0.949184, places=3
+            hull.voltage_data[0].average_voltage, 0.949184, places=3
         )
-        for ind in range(len(bare_hull.voltage_data["voltages"])):
-            self.assertTrue(np.isnan(bare_hull.voltage_data["Q"][ind][-1]))
-            self.assertTrue(bare_hull.voltage_data["voltages"][ind][-1] == 0)
+        self._check_voltages_match_capacities(hull.voltage_data)
 
     def test_multivalent_binary_voltage(self):
         """ Test simple binary voltage curve. """
         hull_cursor = []
-        test_x = np.loadtxt(REAL_PATH + "data/voltage_data/LiAs_x.dat")
         test_Q = np.loadtxt(REAL_PATH + "data/voltage_data/LiAs_Q.dat")
         test_V = np.loadtxt(REAL_PATH + "data/voltage_data/LiAs_V.dat")
         for i in range(5):
@@ -86,26 +79,21 @@ class VoltageTest(unittest.TestCase):
                 # replace all Li with Mg
                 flines = [line.replace("Li", "Mg") for line in flines]
                 hull_cursor.append(json.loads("\n".join(flines)))
-        bare_hull = QueryConvexHull(
+        hull = QueryConvexHull(
             cursor=hull_cursor, species=["Mg", "As"], voltage=True, no_plot=True
         )
 
-        self.assertTrue(len(bare_hull.voltage_data["voltages"]) == 1)
+        self.assertEqual(len(hull.voltage_data), 1)
         np.testing.assert_array_almost_equal(
-            bare_hull.voltage_data["voltages"][0], 2 * test_V, decimal=5, verbose=True
+            hull.voltage_data[0].voltages, 2 * test_V, decimal=5, verbose=True
         )
         np.testing.assert_array_almost_equal(
-            bare_hull.voltage_data["x"][0], test_x, decimal=5
-        )
-        np.testing.assert_array_almost_equal(
-            bare_hull.voltage_data["Q"][0], test_Q, decimal=5
+            hull.voltage_data[0].capacities, test_Q, decimal=5
         )
         self.assertAlmostEqual(
-            bare_hull.voltage_data["average_voltage"][0], 2 * 0.949184, places=3
+            hull.voltage_data[0].average_voltage, 2 * 0.949184, places=3
         )
-        for ind in range(len(bare_hull.voltage_data["voltages"])):
-            self.assertTrue(np.isnan(bare_hull.voltage_data["Q"][ind][-1]))
-            self.assertTrue(bare_hull.voltage_data["voltages"][ind][-1] == 0)
+        self._check_voltages_match_capacities(hull.voltage_data)
 
     def test_binary_voltage_mayo(self):
         """ Test binary voltages from cursor for Mayo et al,
@@ -117,27 +105,24 @@ class VoltageTest(unittest.TestCase):
         hull = QueryConvexHull(
             cursor=cursor, elements=["Li", "P"], no_plot=True, voltage=True
         )
-        self.assertEqual(
-            len(hull.voltage_data["voltages"]), len(hull.voltage_data["Q"])
-        )
-        self.assertEqual(
-            len(hull.voltage_data["voltages"]), len(hull.voltage_data["Q"])
-        )
+        for profile in hull.voltage_data:
+            self.assertEqual(
+                len(profile.voltages), len(profile.capacities)
+            )
         LiP_voltage_curve = np.loadtxt(
             REAL_PATH + "data/LiP_voltage.csv", delimiter=","
         )
-        self.assertTrue(len(hull.voltage_data["voltages"]) == 1)
+        self.assertTrue(len(hull.voltage_data) == 1)
         np.testing.assert_allclose(
-            hull.voltage_data["voltages"][0],
+            hull.voltage_data[0].voltages,
             LiP_voltage_curve[:, 1],
             verbose=True,
             rtol=1e-4,
         )
         np.testing.assert_allclose(
-            hull.voltage_data["Q"][0], LiP_voltage_curve[:, 0], verbose=True, rtol=1e-4
+            hull.voltage_data[0].capacities, LiP_voltage_curve[:, 0], verbose=True, rtol=1e-4
         )
-        self.assertTrue(np.isnan(hull.voltage_data["Q"][0][-1]))
-        self.assertEqual(0.0, hull.voltage_data["voltages"][0][-1])
+        self._check_voltages_match_capacities(hull.voltage_data)
 
     def test_ternary_voltage(self):
         """ Test ternary voltages from cursor. """
@@ -198,21 +183,15 @@ class VoltageTest(unittest.TestCase):
 
         points = np.delete(points, 2, axis=1)
 
-        self.assertEqual(len(hull.voltage_data["Q"]), len(Q_data))
-        for i in range(len(hull.voltage_data["voltages"])):
+        self.assertEqual(len(hull.voltage_data), len(Q_data))
+        for i in range(len(hull.voltage_data)):
             np.testing.assert_array_almost_equal(
-                hull.voltage_data["voltages"][i], voltage_data[i], decimal=3
+                hull.voltage_data[i].voltages, voltage_data[i], decimal=3
             )
             np.testing.assert_array_almost_equal(
-                hull.voltage_data["Q"][i], Q_data[i], decimal=0
+                hull.voltage_data[i].capacities, Q_data[i], decimal=0
             )
-        for ind in range(len(hull.voltage_data["voltages"])):
-            self.assertEqual(
-                len(hull.voltage_data["Q"][ind]),
-                len(hull.voltage_data["voltages"][ind]),
-            )
-            self.assertTrue(np.isnan(hull.voltage_data["Q"][ind][-1]))
-            self.assertTrue(hull.voltage_data["voltages"][ind][-1] == 0)
+        self._check_voltages_match_capacities(hull.voltage_data)
 
     def test_ternary_voltage_with_one_two_phase_region(self):
         """ Test ternary voltages with awkward two-phase region. """
@@ -248,21 +227,12 @@ class VoltageTest(unittest.TestCase):
             pathways=True,
             voltage=True,
         )
-        self.assertEqual(
-            len(hull.voltage_data["voltages"]), len(hull.voltage_data["Q"])
-        )
         np.testing.assert_array_almost_equal(
-            np.asarray(hull.voltage_data["voltages"]),
-            np.asarray([[1.0229, 1.0229, 0.2676, 0.000]]),
+            np.asarray(hull.voltage_data[0].voltages),
+            np.asarray([1.0229, 1.0229, 0.2676, 0.000]),
             decimal=3,
         )
-        for ind in range(len(hull.voltage_data["voltages"])):
-            self.assertEqual(
-                len(hull.voltage_data["Q"][ind]),
-                len(hull.voltage_data["voltages"][ind]),
-            )
-            self.assertTrue(np.isnan(hull.voltage_data["Q"][ind][-1]))
-            self.assertTrue(hull.voltage_data["voltages"][ind][-1] == 0)
+        self._check_voltages_match_capacities(hull.voltage_data)
 
     def test_ternary_voltage_with_two_two_phase_regions(self):
         """ Test ternary voltages with two awkward two-phase regions. """
@@ -297,25 +267,16 @@ class VoltageTest(unittest.TestCase):
             pathways=True,
             voltage=True,
         )
-        self.assertEqual(
-            len(hull.voltage_data["voltages"]), len(hull.voltage_data["Q"])
-        )
         np.testing.assert_array_almost_equal(
-            np.asarray(hull.voltage_data["voltages"][0]),
+            np.asarray(hull.voltage_data[0].voltages),
             np.asarray([1.1845, 1.1845, 0.8612, 0.2676, 0.000]),
             decimal=3,
         )
-        self.assertAlmostEqual(hull.voltage_data["Q"][0][-2], 425.7847612, places=5)
+        self.assertAlmostEqual(hull.voltage_data[0].capacities[-2], 425.7847612, places=5)
         self.assertAlmostEqual(
-            hull.voltage_data["average_voltage"][0], 0.58523, places=4
+            hull.voltage_data[0].average_voltage, 0.58523, places=4
         )
-        for ind in range(len(hull.voltage_data["voltages"])):
-            self.assertEqual(
-                len(hull.voltage_data["Q"][ind]),
-                len(hull.voltage_data["voltages"][ind]),
-            )
-            self.assertTrue(np.isnan(hull.voltage_data["Q"][ind][-1]))
-            self.assertTrue(hull.voltage_data["voltages"][ind][-1] == 0)
+        self._check_voltages_match_capacities(hull.voltage_data)
 
     def test_ternary_voltage_with_exclusively_two_phase_regions(self):
         """ Test ternary voltages exclusively awkward two-phase regions. """
@@ -346,16 +307,8 @@ class VoltageTest(unittest.TestCase):
             pathways=True,
             voltage=True,
         )
-        self.assertEqual(
-            len(hull.voltage_data["voltages"]), len(hull.voltage_data["Q"])
-        )
-        self.assertEqual(len(hull.voltage_data["voltages"]), 1)
-        for ind in range(len(hull.voltage_data["voltages"])):
-            self.assertEqual(
-                len(hull.voltage_data["Q"][ind]),
-                len(hull.voltage_data["voltages"][ind]),
-            )
-            self.assertTrue(np.isnan(hull.voltage_data["Q"][ind][-1]))
+        self.assertEqual(len(hull.voltage_data), 1)
+        self._check_voltages_match_capacities(hull.voltage_data)
 
     def test_ternary_voltage_with_single_phase_region(self):
         """ Test ternary voltages with single-phase regions. """
@@ -364,11 +317,8 @@ class VoltageTest(unittest.TestCase):
         hull = QueryConvexHull(
             cursor=cursor, species="LiSiP", no_plot=True, voltage=True
         )
-        self.assertEqual(
-            len(hull.voltage_data["voltages"]), len(hull.voltage_data["Q"])
-        )
         np.testing.assert_array_almost_equal(
-            np.asarray(hull.voltage_data["voltages"][0]),
+            np.asarray(hull.voltage_data[0].voltages),
             np.asarray(
                 [
                     1.1683,
@@ -387,15 +337,9 @@ class VoltageTest(unittest.TestCase):
             ),
             decimal=3,
         )
-        self.assertEqual(len(hull.voltage_data["Q"][0]), 12)
-        self.assertEqual(len(hull.voltage_data["Q"][1]), 11)
-        for ind in range(len(hull.voltage_data["voltages"])):
-            self.assertEqual(
-                len(hull.voltage_data["voltages"][ind]),
-                len(hull.voltage_data["Q"][ind]),
-            )
-            self.assertTrue(np.isnan(hull.voltage_data["Q"][ind][-1]))
-            self.assertTrue(hull.voltage_data["voltages"][ind][-1] == 0)
+        self.assertEqual(len(hull.voltage_data[0].capacities), 12)
+        self.assertEqual(len(hull.voltage_data[1].capacities), 11)
+        self._check_voltages_match_capacities(hull.voltage_data)
 
     def test_ternary_voltage_problematic(self):
         """ Test for NaSnP voltages which triggered a bug in the capacity
@@ -406,10 +350,10 @@ class VoltageTest(unittest.TestCase):
         hull = QueryConvexHull(
             cursor=cursor, species="NaSnP", no_plot=True, voltage=True, volume=True
         )
-        self.assertEqual(len(hull.voltage_data["voltages"]), 2)
-        self.assertEqual(len(hull.voltage_data["Q"]), 2)
-        self.assertEqual(len(hull.voltage_data["Q"][0]), 13)
-        self.assertEqual(len(hull.voltage_data["Q"][1]), 12)
+        self._check_voltages_match_capacities(hull.voltage_data)
+        self.assertEqual(len(hull.voltage_data), 2)
+        self.assertEqual(len(hull.voltage_data[0].capacities), 13)
+        self.assertEqual(len(hull.voltage_data[1].capacities), 12)
 
     def test_ternary_voltage_problematic_with_crystal_models(self):
         """ Test for NaSnP voltages which triggered a bug in the capacity
@@ -422,10 +366,10 @@ class VoltageTest(unittest.TestCase):
         hull = QueryConvexHull(
             cursor=cursor, species="NaSnP", no_plot=True, voltage=True, volume=True
         )
-        self.assertEqual(len(hull.voltage_data["voltages"]), 2)
-        self.assertEqual(len(hull.voltage_data["Q"]), 2)
-        self.assertEqual(len(hull.voltage_data["Q"][0]), 13)
-        self.assertEqual(len(hull.voltage_data["Q"][1]), 12)
+        self._check_voltages_match_capacities(hull.voltage_data)
+        self.assertEqual(len(hull.voltage_data), 2)
+        self.assertEqual(len(hull.voltage_data[0].capacities), 13)
+        self.assertEqual(len(hull.voltage_data[1].capacities), 12)
 
     def test_angelas_awkward_voltage(self):
         """ Test a particular example of Angela's awkward ternary voltages. """
@@ -440,17 +384,19 @@ class VoltageTest(unittest.TestCase):
         hull = QueryConvexHull(
             cursor=cursor, elements=["Na", "Fe", "P"], no_plot=True, voltage=True
         )
-        self.assertEqual(len(hull.voltage_data["voltages"][0]), 8)
-        self.assertEqual(len(hull.voltage_data["voltages"][1]), 5)
-        self.assertEqual(len(hull.voltage_data["voltages"][2]), 3)
+        self.assertEqual(len(hull.voltage_data[0].voltages), 8)
+        self.assertEqual(len(hull.voltage_data[1].voltages), 5)
+        self.assertEqual(len(hull.voltage_data[2].voltages), 3)
 
-        for ind in range(len(hull.voltage_data["voltages"])):
+        self._check_voltages_match_capacities(hull.voltage_data)
+
+    def _check_voltages_match_capacities(self, voltage_data):
+        for profile in voltage_data:
             self.assertEqual(
-                len(hull.voltage_data["voltages"][ind]),
-                len(hull.voltage_data["Q"][ind]),
+                len(profile.voltages), len(profile.capacities)
             )
-            self.assertTrue(np.isnan(hull.voltage_data["Q"][ind][-1]))
-            self.assertTrue(hull.voltage_data["voltages"][ind][-1] == 0)
+            self.assertTrue(np.isnan(profile.capacities[-1]))
+            self.assertEqual(profile.voltages[-1], 0.0)
 
 
 class VolumeTest(unittest.TestCase):
@@ -629,12 +575,12 @@ class VolumeTest(unittest.TestCase):
             for j, react in enumerate(expected_reactions[i]):
                 for k, elem in enumerate(react):
                     self.assertEqual(
-                        hull.voltage_data["reactions"][i][j][k][1], elem[1]
+                        hull.voltage_data[i].reactions[j][k][1], elem[1]
                     )
                     self.assertAlmostEqual(
-                        hull.voltage_data["reactions"][i][j][k][0],
+                        hull.voltage_data[i].reactions[j][k][0],
                         elem[0],
                         msg="\nReaction ({}, {}, {}) did not match: {} vs {}".format(
-                            i, j, k, hull.voltage_data["reactions"][i][j][k], elem
+                            i, j, k, hull.voltage_data[i].reactions[j][k], elem
                         ),
                     )
