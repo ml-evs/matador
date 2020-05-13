@@ -656,7 +656,8 @@ class DBQuery:
 
         for ind, _ in enumerate(stoich):
             elem = stoich[ind][0]
-            fraction = stoich[ind][1]
+            fraction = int(stoich[ind][1])
+
             if '[' in elem or ']' in elem:
                 types_dict = dict()
                 types_dict['$or'] = list()
@@ -688,7 +689,7 @@ class DBQuery:
 
     @staticmethod
     def _query_ratio(ratios):
-        """ Query DB for ratio of two elements.
+        """ Query DB for ratio of two elements. Ratios must be integers.
 
         Parameters:
             ratios (list): e.g.  ratios = [['MoS', 2], ['LiS', 1]]
@@ -696,7 +697,7 @@ class DBQuery:
         """
         query_dict = dict()
         for pair in ratios:
-            query_dict['ratios.' + pair[0]] = pair[1]
+            query_dict['ratios.' + pair[0]] = int(pair[1])
         return query_dict
 
     def _query_composition(self, custom_elem=None, partial_formula=None, elem_field='elems'):
@@ -925,13 +926,14 @@ class DBQuery:
         else:
             icsd = self.args.get('icsd')
         query_dict = dict()
-        query_dict['icsd'] = dict()
         if isinstance(icsd[0], bool):
+            query_dict['icsd'] = dict()
             query_dict['icsd']['$exists'] = icsd[0]
         elif icsd[0] == 0:
+            query_dict['icsd'] = dict()
             query_dict['icsd']['$exists'] = True
         else:
-            query_dict['icsd']['$eq'] = str(icsd[0])
+            query_dict['$or'] = [{'icsd': {'$eq': str(icsd[0])}}, {'icsd': {'$eq': icsd[0]}}]
         return query_dict
 
     def _query_source(self):
