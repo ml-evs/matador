@@ -99,25 +99,36 @@ class DBQuery:
             f = open(devnull, 'w')
             sys.stdout = f
 
-        # connect to db or use passed client
-        if client:
-            self._client = client
-            self._db = client.crystals
-        if collections is not False:
-            _collections = collections
+        # if testing keyword is used, all database operations are ignored
+        if not self.args.get('testing'):
 
-        if (not collections or not client) and not self.args.get('testing'):
-            if mongo_settings:
-                self.mongo_settings = mongo_settings
+            # connect to db or use passed client
+            if client:
+                self._client = client
+                self._db = client.crystals
+            if collections is not False:
+                _collections = collections
+
+            if (not collections or not client):
+                # use passed settings or load from config file
+                if mongo_settings:
+                    self.mongo_settings = mongo_settings
+                else:
+                    self.mongo_settings = load_custom_settings(
+                        config_fname=self.args.get('config'), debug=self.args.get('debug')
+                    )
+
+                result = make_connection_to_collection(
+                    self.args.get('db'), mongo_settings=self.mongo_settings
+                )
+                self._client, self._db, _collections = result
+
+            if len(_collections) > 1:
+                raise NotImplementedError("Querying multiple collections is no longer supported.")
             else:
-                self.mongo_settings = load_custom_settings(config_fname=self.args.get('config'), debug=self.args.get('debug'))
-            result = make_connection_to_collection(self.args.get('db'), mongo_settings=self.mongo_settings)
-            self._client, self._db, _collections = result
-
-        if len(_collections) > 1:
-            raise NotImplementedError("Querying multiple collections is no longer supported.")
-        else:
-            self._collection = _collections.items()[0][1]
+                for collection in _collections:
+                    self._collection = _collections[collection]
+                    break
 
         # define some periodic table macros
         self._periodic_table = get_periodic_table()
