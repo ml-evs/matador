@@ -708,7 +708,7 @@ def _construct_detail_strings(doc, padding_length=0, source=False):
 
     if 'external_pressure' in doc:
         detail_string += ", {:4.2f} GPa".format(
-            sum(doc['external_pressure'][i][i] for i in range(3)) / 3
+            sum(doc['external_pressure'][i][0] for i in range(3)) / 3
         )
 
     if 'kpoints_mp_spacing' in doc:
