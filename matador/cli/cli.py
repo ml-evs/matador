@@ -253,7 +253,9 @@ class MatadorCommandLine:
                 from ascii_graph import Pyasciigraph
                 from ascii_graph.colors import Gre, Blu, Red
                 from ascii_graph.colordata import hcolor
-
+            except ImportError:
+                print("ascii_graph dependency not found, not creating histogram.")
+            else:
                 graph = Pyasciigraph(line_length=80, multivalue=False)
                 thresholds = {int(stats_dict['count'] / 40): Gre,
                               int(stats_dict['count'] / 10): Blu,
@@ -263,7 +265,6 @@ class MatadorCommandLine:
                     print(line)
                 print('\n')
 
-            except ImportError:
                 for comp in comp_list:
                     print(comp)
 
