@@ -32,8 +32,8 @@ class QueryParseTest(unittest.TestCase):
             "$and": [
                 {
                     "$and": [
-                        {"stoichiometry": {"$in": [["K", 3.0]]}},
-                        {"stoichiometry": {"$in": [["P", 4.0]]}},
+                        {"stoichiometry": {"$in": [["K", 3]]}},
+                        {"stoichiometry": {"$in": [["P", 4]]}},
                         {"stoichiometry": {"$size": 2}},
                     ]
                 },
@@ -48,8 +48,8 @@ class QueryParseTest(unittest.TestCase):
             "$and": [
                 {
                     "$and": [
-                        {"stoichiometry": {"$in": [["K", 1.0]]}},
-                        {"stoichiometry": {"$in": [["P", 2.0]]}},
+                        {"stoichiometry": {"$in": [["K", 1]]}},
+                        {"stoichiometry": {"$in": [["P", 2]]}},
                         {"stoichiometry": {"$size": 2}},
                     ]
                 },
@@ -150,7 +150,7 @@ class QueryParseTest(unittest.TestCase):
                 {"num_fu": {"$gte": 4}},
                 {"$and": [{"tags": {"$in": ["foo"]}}, {"tags": {"$in": ["Bar"]}}]},
                 {"doi": {"$in": ["1001/4001"]}},
-                {"icsd": {"$eq": 100020}},
+                {"$or": [{'icsd': {"$eq": "100020"}}, {'icsd': {'$eq': 100020}}]},
                 {"cut_off_energy": {"$eq": 300}},
                 {"spin_polarized": True},
                 {"$or": [{"quality": {"$gt": 0}}, {"quality": {"$exists": False}}]},
@@ -866,28 +866,28 @@ class QueryParseTest(unittest.TestCase):
                     "$and": [
                         {
                             "$or": [
-                                {"stoichiometry": {"$in": [["F", 2.0]]}},
-                                {"stoichiometry": {"$in": [["Cl", 2.0]]}},
-                                {"stoichiometry": {"$in": [["Br", 2.0]]}},
-                                {"stoichiometry": {"$in": [["I", 2.0]]}},
-                                {"stoichiometry": {"$in": [["At", 2.0]]}},
+                                {"stoichiometry": {"$in": [["F", 2]]}},
+                                {"stoichiometry": {"$in": [["Cl", 2]]}},
+                                {"stoichiometry": {"$in": [["Br", 2]]}},
+                                {"stoichiometry": {"$in": [["I", 2]]}},
+                                {"stoichiometry": {"$in": [["At", 2]]}},
                             ]
                         },
                         {
                             "$or": [
-                                {"stoichiometry": {"$in": [["Fe", 3.0]]}},
-                                {"stoichiometry": {"$in": [["Ru", 3.0]]}},
-                                {"stoichiometry": {"$in": [["Os", 3.0]]}},
+                                {"stoichiometry": {"$in": [["Fe", 3]]}},
+                                {"stoichiometry": {"$in": [["Ru", 3]]}},
+                                {"stoichiometry": {"$in": [["Os", 3]]}},
                             ]
                         },
                         {
                             "$or": [
-                                {"stoichiometry": {"$in": [["Li", 1.0]]}},
-                                {"stoichiometry": {"$in": [["Na", 1.0]]}},
-                                {"stoichiometry": {"$in": [["K", 1.0]]}},
-                                {"stoichiometry": {"$in": [["Rb", 1.0]]}},
-                                {"stoichiometry": {"$in": [["Cs", 1.0]]}},
-                                {"stoichiometry": {"$in": [["Fr", 1.0]]}},
+                                {"stoichiometry": {"$in": [["Li", 1]]}},
+                                {"stoichiometry": {"$in": [["Na", 1]]}},
+                                {"stoichiometry": {"$in": [["K", 1]]}},
+                                {"stoichiometry": {"$in": [["Rb", 1]]}},
+                                {"stoichiometry": {"$in": [["Cs", 1]]}},
+                                {"stoichiometry": {"$in": [["Fr", 1]]}},
                             ]
                         },
                         {"stoichiometry": {"$size": 3}},
@@ -911,26 +911,26 @@ class QueryParseTest(unittest.TestCase):
                     "$and": [
                         {
                             "$or": [
-                                {"stoichiometry": {"$in": [["Ag", 2.0]]}},
-                                {"stoichiometry": {"$in": [["Cd", 2.0]]}},
-                                {"stoichiometry": {"$in": [["In", 2.0]]}},
+                                {"stoichiometry": {"$in": [["Ag", 2]]}},
+                                {"stoichiometry": {"$in": [["Cd", 2]]}},
+                                {"stoichiometry": {"$in": [["In", 2]]}},
                             ]
                         },
                         {
                             "$or": [
-                                {"stoichiometry": {"$in": [["Fe", 3.0]]}},
-                                {"stoichiometry": {"$in": [["Ru", 3.0]]}},
-                                {"stoichiometry": {"$in": [["Os", 3.0]]}},
+                                {"stoichiometry": {"$in": [["Fe", 3]]}},
+                                {"stoichiometry": {"$in": [["Ru", 3]]}},
+                                {"stoichiometry": {"$in": [["Os", 3]]}},
                             ]
                         },
                         {
                             "$or": [
-                                {"stoichiometry": {"$in": [["Li", 1.0]]}},
-                                {"stoichiometry": {"$in": [["Na", 1.0]]}},
-                                {"stoichiometry": {"$in": [["K", 1.0]]}},
-                                {"stoichiometry": {"$in": [["Rb", 1.0]]}},
-                                {"stoichiometry": {"$in": [["Cs", 1.0]]}},
-                                {"stoichiometry": {"$in": [["Fr", 1.0]]}},
+                                {"stoichiometry": {"$in": [["Li", 1]]}},
+                                {"stoichiometry": {"$in": [["Na", 1]]}},
+                                {"stoichiometry": {"$in": [["K", 1]]}},
+                                {"stoichiometry": {"$in": [["Rb", 1]]}},
+                                {"stoichiometry": {"$in": [["Cs", 1]]}},
+                                {"stoichiometry": {"$in": [["Fr", 1]]}},
                             ]
                         },
                         {"stoichiometry": {"$size": 3}},
