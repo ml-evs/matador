@@ -54,16 +54,13 @@ def get_uniq_cursor(cursor, sim_tol=0.1, energy_tol=1e-2,
     if isinstance(sim_tol, bool):
         sim_tol = 0.1
 
+    if not cursor:
+        raise RuntimeError("No structures provided to compare.")
+
     fingerprint_list = []
     if not enforce_same_stoich:
         energy_tol = 1e20
     print('Calculating fingerprints...')
-    if debug:
-        import time
-        start = time.time()
-    if debug:
-        completed = time.time() - start
-        print('{} of {} structures completed in {:0.1f} s'.format(fingerprint, len(cursor), completed))
 
     fingerprint_list = [None for doc in cursor]
     required_inds = set()
