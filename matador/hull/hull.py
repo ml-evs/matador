@@ -706,7 +706,8 @@ class QueryConvexHull:
         stable_vol = get_array_from_cursor(self.hull_cursor, 'cell_volume_per_b')[unique_comp_inds]
         stable_cap = get_array_from_cursor(self.hull_cursor, 'gravimetric_capacity')[unique_comp_inds]
         hull_distances = get_array_from_cursor(self.hull_cursor, 'hull_distance')[unique_comp_inds]
-        stable_x = stable_comp / (1 - stable_comp)
+        with np.errstate(divide='ignore'):
+            stable_x = stable_comp / (1 - stable_comp)
         non_nans = np.argwhere(np.isfinite(stable_x))
         self.volume_data['x'].append(stable_x[non_nans].flatten())
         self.volume_data['Q'].append(stable_cap[non_nans].flatten())

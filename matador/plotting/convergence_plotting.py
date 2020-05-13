@@ -327,7 +327,8 @@ def get_convergence_values(data, parameter, field, reference='last', log=False):
         values = np.abs(values)
 
     if log:
-        values = np.log10(values)
+        with np.errstate(divide='ignore'):
+            values = np.log10(values)
 
     return values, parameters
 
