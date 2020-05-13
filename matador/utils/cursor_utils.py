@@ -9,6 +9,7 @@ displaying, extracting and refining results from a Mongo cursor/list.
 from time import strftime
 
 import numpy as np
+import pymongo as pm
 from matador.utils.chem_utils import get_formula_from_stoich, get_root_source, get_stoich_from_formula
 from matador import __version__
 
@@ -75,7 +76,7 @@ def display_results(cursor,
     TODO: this function has gotten out of control and should be rewritten.
 
     Parameters:
-        cursor (list of dict): list of matador documents
+        cursor (list of dict or pm.cursor.Cursor): list of matador documents
 
     Keyword arguments:
         summary (bool): print a summary per stoichiometry, that uses the lowest
@@ -159,8 +160,13 @@ def display_results(cursor,
         markdown, use_source, per_atom, eform, hull, summary, energy_key
     )
 
+    if summary and isinstance(cursor, pm.cursor.Cursor):
+        raise RuntimeError("Unable to provide summary when displaying cursor object.")
+
     # ensure cursor is sorted by enthalpy
-    if sort:
+    if sort and isinstance(cursor, pm.cursor.Cursor):
+        print("Unable to check sorting of cursor, assuming it is already sorted.")
+    elif sort:
         sorted_inds = sorted(list(enumerate(cursor)),
                              key=lambda element: recursive_get(element[1], energy_key))
         cursor = [cursor[ind[0]] for ind in sorted_inds]
@@ -255,10 +261,10 @@ def display_results(cursor,
             if details:
                 total_string += detail_strings[ind] + '\n'
                 total_string += detail_substrings[ind] + '\n'
-                if source:
-                    total_string += source_strings[ind] + '\n'
-                if details or source:
-                    total_string += len(header_string) * '─' + '\n'
+            if source:
+                total_string += source_strings[ind] + '\n'
+            if details or source:
+                total_string += len(header_string) * '─' + '\n'
 
     if markdown:
         markdown_string += '```'
@@ -753,8 +759,8 @@ def _construct_header_string(markdown, use_source, per_atom, eform, hull, summar
             header_string += "{:^38}".format('Source')
             units_string += "{:^38}".format('')
         else:
-            header_string += "{:^28}".format('ID')
-            units_string += "{:^28}".format('')
+            header_string += "{:^26}".format('ID')
+            units_string += "{:^26}".format('')
 
         header_string += "{:^5}".format('!?!')
         units_string += "{:^5}".format('')
