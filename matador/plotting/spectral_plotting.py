@@ -734,8 +734,7 @@ def _get_lineprops(dispersion, spin_fermi_energy, nb, ns, branch, branch_ind, se
 
 def _add_path_labels(seed, dispersion, ax_dispersion, path, seed_ind, kwargs):
     """ Scrape k-point path labels from cell file and seekpath, then add them to the plot. """
-    from matador.utils.cell_utils import doc2spg
-    from seekpath import get_path
+    from matador.utils.cell_utils import doc2spg, get_seekpath_kpoint_path
     xticks = []
     xticklabels = []
     shear_planes = []
@@ -792,7 +791,7 @@ def _add_path_labels(seed, dispersion, ax_dispersion, path, seed_ind, kwargs):
                     print('Failed to scrape {}.cell/.res, will not be able to generate labels.'.format(seed))
 
         if spg_structure:
-            seekpath_results = get_path(spg_structure)
+            _, _, seekpath_results = get_seekpath_kpoint_path(spg_structure, standardize=False, explicit=False)
             path_labels = seekpath_results['point_coords']
 
     for branch_ind, branch in enumerate(dispersion.kpoint_branches):

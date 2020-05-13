@@ -358,7 +358,9 @@ def calc_mp_spacing(real_lat, mp_grid, prec=3):
     return round(max_spacing + 0.5*10**exponent, prec)
 
 
-def get_seekpath_kpoint_path(doc, spacing=0.01, threshold=1e-7, debug=False, symmetry_tol=None):
+def get_seekpath_kpoint_path(
+    doc, standardize=True, explicit=True, spacing=0.01, threshold=1e-7, debug=False, symmetry_tol=None
+):
     """ Return the conventional kpoint path of the relevant crystal system
     according to the definitions by "HKPOT" in
     Comp. Mat. Sci. 128, 2017:
@@ -366,7 +368,7 @@ def get_seekpath_kpoint_path(doc, spacing=0.01, threshold=1e-7, debug=False, sym
     http://dx.doi.org/10.1016/j.commatsci.2016.10.015
 
     Parameters:
-        doc (dict): matador doc to find kpoint path for.
+        doc (dict/tuple): matador doc or spglib tuple to find kpoint path for.
 
     Keyword arguments:
         spacing (float): desired kpoint spacing
@@ -379,18 +381,34 @@ def get_seekpath_kpoint_path(doc, spacing=0.01, threshold=1e-7, debug=False, sym
         dict: full dictionary of all seekpath results
 
     """
-    from seekpath import get_explicit_k_path
+    try:
+        from seekpath import get_explicit_k_path, get_path
+    except ImportError:
+        raise ImportError("SeeK-Path dependency missing, please install it with `pip install seekpath`.")
+
     if symmetry_tol is None:
         symmetry_tol = 1e-5
-    spg_doc = standardize_doc_cell(doc, symprec=symmetry_tol)
-    spg_structure = doc2spg(spg_doc)
-    seekpath_results = get_explicit_k_path(spg_structure,
-                                           reference_distance=spacing,
-                                           with_time_reversal=True,
-                                           symprec=symmetry_tol,
-                                           threshold=threshold)
 
-    kpt_path = seekpath_results['explicit_kpoints_rel']
+    if isinstance(doc, tuple):
+        spg_structure = doc
+    else:
+        if standardize:
+            spg_structure = doc2spg(standardize_doc_cell(doc, symprec=symmetry_tol))
+        else:
+            spg_structure = doc2spg(doc)
+
+    if explicit:
+        seekpath_results = get_explicit_k_path(spg_structure,
+                                               reference_distance=spacing,
+                                               with_time_reversal=True,
+                                               symprec=symmetry_tol,
+                                               threshold=threshold)
+
+        kpt_path = seekpath_results['explicit_kpoints_rel']
+    else:
+        seekpath_results = get_path(spg_structure)
+        kpt_path = []
+
     primitive_doc = dict()
     primitive_doc['lattice_cart'] = seekpath_results['primitive_lattice']
     primitive_doc['positions_frac'] = seekpath_results['primitive_positions']
@@ -405,6 +423,7 @@ def get_seekpath_kpoint_path(doc, spacing=0.01, threshold=1e-7, debug=False, sym
         print('New lattice:\n', np.asarray(primitive_doc['lattice_cart']))
         print('Contains {} atoms'.format(primitive_doc['num_atoms']))
         print('k-point path contains {} points.'.format(len(kpt_path)))
+
     if 'site_occupancy' in doc:
         if min(doc['site_occupancy']) < 1 - EPS:
             print('Ignoring any site occupancy found in this cell.')
