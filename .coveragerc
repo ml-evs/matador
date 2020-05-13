@@ -1,12 +1,12 @@
 [report]
 # Regexes for lines to exclude from consideration
 ignore_errors = True
-omit = 
+omit =
     *matador/workflows*
     *matador/plugins*
     *matador/cli/run3.py
-    *matador/crystal/network.py
-exclude_lines = 
+    *matador/config/quickstart.py
+exclude_lines =
     pragma: no cover
     if verbosity
     if self.verbosity
