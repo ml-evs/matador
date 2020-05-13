@@ -1,5 +1,5 @@
 mongo:
-    host: localhost 
+    host: localhost
     port: 27017
     db: crystals
     default_collection: repo
@@ -12,3 +12,4 @@ plotting:
 run3:
     castep_executable: castep
     optados_executable: optados
+    scratch_prefix: .
