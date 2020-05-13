@@ -1,5 +1,5 @@
 pytest~=3.10
 pytest-cov
 coverage
-codecov
-mongomock==3.16
+codecov>=2.0
+mongomock>=3.16

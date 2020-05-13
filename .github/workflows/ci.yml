@@ -15,7 +15,7 @@ jobs:
       max-parallel: 2
       matrix:
         python-version: [3.6]
-        
+
     steps:
     - uses: actions/checkout@v1
     - name: Set up Python ${{ matrix.python-version }}
@@ -41,7 +41,7 @@ jobs:
     strategy:
       matrix:
         python-version: [3.6]
-        
+
     steps:
     - uses: actions/checkout@v1
     - name: Set up Python ${{ matrix.python-version }}
@@ -52,8 +52,7 @@ jobs:
       run: |
         cp tests/data/matador_pipelines_conf.yml $HOME/.matadorrc
         python -m pip install --upgrade pip
-        pip install -e .[test,plotting,crystal]
-        pip install ase
+        pip install -e .[test,plotting,crystal,optional]
     - name: Test with pytest
       run: |
         py.test -rs --cov-config .coveragerc --cov=./matador/ --cov-report=xml
