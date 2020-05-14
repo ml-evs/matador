@@ -71,7 +71,6 @@ def load_custom_settings(
         for fname in trial_user_fnames:
             if os.path.isfile(fname):
                 config_fname = str(fname)
-                print("Using config from {}".format(config_fname))
                 break
         else:
             # otherwise offer to create one, or use default
@@ -79,7 +78,7 @@ def load_custom_settings(
                 config_fname = quickstart_settings()
             if config_fname is None:
                 # otherwise load default
-                print("Loading perhaps unsuitable defaults instead.")
+                print("No config provided: loading perhaps unsuitable defaults instead.")
                 config_fname = Path(__file__).parent.joinpath("matadorrc.yml"),
 
         if not quiet:
