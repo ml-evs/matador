@@ -4,6 +4,7 @@
 import json
 import os
 import glob
+import itertools
 import numpy as np
 
 from matador.scrapers import castep2dict, res2dict, cell2dict
@@ -2121,33 +2122,36 @@ class ExportTest(MatadorUnitTest):
 
     def test_query2files(self):
         """ Test that MP/ICSD/OQMD structures get written correctly. """
-        import glob
-        import json
-
         json_files = glob.glob(REAL_PATH + "data/json_query_files/*.json")
         cursor = []
         for f in json_files:
             with open(f, "r") as _f:
                 cursor.append(json.load(_f))
-        query2files(cursor, res=True, cell=True, cif=True)
+        query2files(cursor, res=True, cell=True)
         self.assertTrue(os.path.isdir("query"))
-        res_files = glob.glob("query/*.res")
-        cell_files = glob.glob("query/*.cell")
-        self.assertEqual(len(res_files), 3)
-        self.assertEqual(len(cell_files), 3)
+        self.assertEqual(len(glob.glob("query/*.res")), 3)
+        self.assertEqual(len(glob.glob("query/*.cell")), 3)
         fnames = [
             "CuSr-MP_1025402-CollCode629305",
             "H-MP_632250",
             "BaS3Te-OQMD_1606-CollCode8",
         ]
         exts = ["cell", "res"]
-        print(glob.glob("query/*"))
-        for name in fnames:
-            for ext in exts:
-                self.assertTrue(
-                    os.path.isfile("query/{}.{}".format(name, ext)),
-                    msg="Missing {}.{}".format(name, ext),
-                )
+        for name, ext in itertools.product(fnames, exts):
+            self.assertTrue(
+                os.path.isfile("query/{}.{}".format(name, ext)),
+                msg="Missing {}.{}".format(name, ext),
+            )
+
+    def test_large_writes(self):
+        """ Fake some large queries and make sure they are not written. """
+        fake_cursor = 100*[{'dummy': 'data'}]
+        with self.assertRaises(RuntimeError):
+            query2files(fake_cursor, res=True, max_files=99)
+        with self.assertRaises(RuntimeError):
+            query2files(fake_cursor, res=True, cell=True, max_files=199)
+        with self.assertRaises(RuntimeError):
+            query2files(fake_cursor, res=True, cell=True, pdb=True, max_files=299)
 
     def compare_json_with_res(self, json_fname, test_fname):
         with open(json_fname, "r") as f:

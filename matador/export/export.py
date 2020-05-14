@@ -20,7 +20,12 @@ from .utils import file_writer_function, generate_relevant_path, generate_hash
 EPS = 1e-8
 
 
-def query2files(cursor, dirname=None, **kwargs):
+def query2files(
+    cursor, dirname=None, max_files=10000, top=None, prefix=None,
+    cell=None, param=None, res=None, pdb=None, json=None, xsf=None, md=False, tex=False,
+    subcmd=None,
+    **kwargs
+):
     """ Many-to-many convenience function for many structures being written to
     many file types.
 
@@ -30,28 +35,19 @@ def query2files(cursor, dirname=None, **kwargs):
     Keyword arguments:
         dirname (str): the folder to save the results into. Will be created if non-existent.
             Will have integer appended to it if already existing.
+        max_files (int): if the number of files to be written exceeds this number, then raise RuntimeError.
         **kwargs (dict): dictionary of {filetype: bool(whether to write)}. Accepted file types
             are cell, param, res, pdb, json, xsf, markdown and latex.
 
     """
-    cell = kwargs.get('cell')
-    top = kwargs.get('top')
-    param = kwargs.get('param')
-    res = kwargs.get('res')
-    pdb = kwargs.get('pdb')
-    json = kwargs.get('json')
-    xsf = kwargs.get('xsf')
-    tex = kwargs.get('latex')
-    argstr = kwargs.get('argstr')
-    multiple_files = cell or param or res or pdb or xsf
-    prefix = (kwargs.get('prefix') + '-') if kwargs.get('prefix') is not None else ''
-    pressure = kwargs.get('write_pressure')
+    multiple_files = any((cell, param, res, pdb, xsf))
+    prefix = prefix + '-' if prefix is not None else ''
 
     if isinstance(cursor, AtomicSwapper):
         cursor = cursor.cursor
-        kwargs['subcmd'] = "swaps"
+        subcmd = "swaps"
 
-    if kwargs.get('subcmd') in ['polish', 'swaps']:
+    if subcmd in ['polish', 'swaps']:
         info = False
         hash_dupe = False
     else:
@@ -65,24 +61,20 @@ def query2files(cursor, dirname=None, **kwargs):
 
     if top is not None:
         if top < num:
-            cursor = cursor[:top]
             num = top
+
+    num_files = num * sum(1 for ext in [cell, param, res, pdb, xsf] if ext)
+
     if multiple_files:
         print('Intending to write', num, 'structures to file...')
-        if len(cursor) > 10000:
-            write = input('This operation will write ' + str(len(cursor)) + ' structures' +
-                          ' are you sure you want to do this? [y/n] ')
-            if write.lower() == 'y':
-                print('Writing them all.')
-                write = True
-            else:
-                write = False
-                return
-        else:
-            write = True
+        if num_files > max_files:
+            raise RuntimeError(
+                "Not writing {} files as it exceeds argument `max_files` limit of {}"
+                .format(num_files, max_files)
+            )
 
     if dirname is None:
-        dirname = generate_relevant_path(kwargs)
+        dirname = generate_relevant_path(subcmd=subcmd, **kwargs)
 
     _dir = False
     dir_counter = 0
@@ -98,18 +90,18 @@ def query2files(cursor, dirname=None, **kwargs):
         else:
             dir_counter += 1
 
-    for _, doc in enumerate(cursor):
-        name = prefix
-        path = directory + '/'
-        # write either cell, res or both
+    for _, doc in enumerate(cursor[:num]):
+        # generate an appropriate filename for the structure
         root_source = get_root_source(doc)
+
         if '_swapped_stoichiometry' in doc:
             formula = get_formula_from_stoich(doc['_swapped_stoichiometry'])
         else:
             formula = get_formula_from_stoich(doc['stoichiometry'])
 
-        if kwargs.get('subcmd') == 'swaps':
+        if subcmd == 'swaps':
             root_source = root_source.replace('-swap-', '-')
+
         name = root_source
 
         if 'OQMD ' in root_source:
@@ -131,15 +123,16 @@ def query2files(cursor, dirname=None, **kwargs):
                 name += '-PF-{}'.format(pf_id)
 
         # if swaps, prepend new composition
-        if kwargs.get('subcmd') == 'swaps':
+        if subcmd == 'swaps':
             new_formula = get_formula_from_stoich(get_stoich(doc['atom_types']))
             name = '{}-swap-{}'.format(new_formula, name)
 
-        path += name
+        path = "{directory}/{prefix}{name}".format(directory=directory, prefix=prefix, name=name)
+
         if param:
             doc2param(doc, path, hash_dupe=hash_dupe)
         if cell:
-            doc2cell(doc, path, pressure, hash_dupe=hash_dupe)
+            doc2cell(doc, path, hash_dupe=hash_dupe)
         if res:
             doc2res(doc, path, info=info, hash_dupe=hash_dupe)
         if json:
