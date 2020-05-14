@@ -120,7 +120,7 @@ def display_results(cursor,
         assert max(deletions) <= len(cursor) and min(deletions) >= 0
 
     if markdown and latex:
-        raise RuntimeError('Cannot specify both latex and markdown output at once.')
+        latex = False
 
     # lists in which to accumulate the table
     struct_strings = []
