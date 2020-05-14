@@ -40,8 +40,13 @@ class DBQuery:
             dictionary contains the parameters used to match to other structures
         repo (pymongo.collection.Collection): the pymongo collection that is being queried.
         top (int): number of structures to print/export set by self.args.get('top') (DEFAULT: 10).
+        cursor_min_limit (int): if a query returns more structures than this, do not implicitly convert to a list.
 
     """
+
+    # below this number of documents,
+    # all queries will return a list rather than a pymongo Cursor
+    cursor_min_limit = 1000
 
     def __init__(
         self,
@@ -91,6 +96,7 @@ class DBQuery:
         self._gs_enthalpy = None
         self._non_elemental = None
         self._chempots = None
+        self._num_to_display = None
 
         if debug:
             print(self.args)
@@ -121,6 +127,8 @@ class DBQuery:
                 result = make_connection_to_collection(
                     self.args.get('db'), mongo_settings=self.mongo_settings
                 )
+                # ideally this would be rewritten to use a context manager to ensure
+                # that connections are _always_ cleaned up
                 self._client, self._db, _collections = result
 
             if len(_collections) > 1:
@@ -159,11 +167,15 @@ class DBQuery:
                 if self.args.get('uniq'):
                     from matador.utils.cursor_utils import filter_unique_structures
                     print_notify('Filtering for unique structures...')
+
+                    if isinstance(self.cursor, pm.cursor.Cursor):
+                        raise RuntimeError("Unable to filter pymongo cursor for uniqueness directly.")
+
                     if self.args.get('top') is not None:
-                        top = self.top
+                        top = self.args['top']
                     else:
                         top = len(self.cursor)
-                    # filter for uniqueness
+
                     self.cursor = filter_unique_structures(
                         self.cursor[:top],
                         debug=self.args.get('debug'),
@@ -175,6 +187,7 @@ class DBQuery:
                 print('Querying available values...')
                 self._query_available_values(self.args.get('available_values'), self.cursor)
 
+            # if no client was passed, then we need to close the one we made
             if not client and not self.args.get('testing'):
                 self._client.close()
 
@@ -336,20 +349,23 @@ class DBQuery:
             self.query_dict['$and'].append(self._query_time(self.args.get('since') or False))
             self._empty_query = False
 
-    def _perform_empty_query(self):
+    def _perform_empty_query(self, as_list=False):
         """ No parameters were asked for, so just return a cursor
         that contains the entire collection currently stored as
         :attr:`repo`.
 
         Returns:
-            :obj:`pymongo.Cursor`: the results of the query.
+            list or :obj:`pymongo.cursor.Cursor`: the results of the query.
 
 
         """
+        num_documents = self.repo.count_documents({})
         cursor = self.repo.find().sort('enthalpy_per_atom', pm.ASCENDING)
-        num_documents = self.cursor.count_documents({})
         if self.debug:
             print('Empty query, showing all...')
+
+        if num_documents < self.cursor_min_limit or as_list:
+            return list(cursor), num_documents
 
         return cursor, num_documents
 
@@ -375,46 +391,56 @@ class DBQuery:
                 self.cursor = filter_cursor_by_chempots(self._chempots, self.cursor)
 
         print('{} results found for query in {}.'.format(cursor_count, self.repo.name))
+        self._num_to_display = cursor_count
         if self.args.get('subcmd') != 'swaps' and not self._create_hull:
-            self.filter_results(cursor_count)
-        self._display_results()
+            self._set_filter_display_results(cursor_count)
 
-    def _display_results(self):
-        display_results(self.cursor[:self._num_to_display], args=self.args)
+        # if a summary has been requested, cursor must be converted to list
+        if (self._create_hull or self.args.get('subcmd') == 'swaps' or self.args.get('summary')) \
+                and not isinstance(self.cursor, list):
+            self.cursor = list(self.cursor)
+
+        if self.args.get('subcmd') != 'swaps' and not self._create_hull:
+            if self._num_to_display >= 1 or self._num_to_display is None:
+                if self._num_to_display == cursor_count:
+                    display_results(self.cursor, **self.args)
+                else:
+                    display_results(self.cursor[:self._num_to_display], **self.args)
+
+        if isinstance(self.cursor, pm.cursor.Cursor):
+            self.cursor.rewind()
 
     def _set_filter_display_results(self, cursor_count):
         """ Filter and display the results based on the command line parameters. """
+        # by default, show the top structures only
+        # if delta_E requested, count how many exist below that energy
         if self.args.get('delta_E') is not None:
-            if any(doc['stoichiometry'] != self.cursor[0]['stoichiometry'] for doc in self.cursor):
+            if isinstance(self.cursor, pm.cursor.Cursor) and len(self.cursor.distinct('stoichiometry')) > 1:
                 print('Multiple stoichiometries in cursor, unable to filter by energy with --delta_E.')
             else:
-                self.cursor.rewind()
+                self.cursor = list(self.cursor)
                 gs_enthalpy = self.cursor[0]['enthalpy_per_atom']
                 for ind, doc in enumerate(self.cursor[1:]):
                     if abs(doc['enthalpy_per_atom'] - gs_enthalpy) > self.args.get('delta_E'):
                         self._num_to_display = ind + 1
                         break
-                self.cursor.rewind()
-        elif self.top == -1 or self.top is None:
+
+        elif self.top == -1 or self.top is None or cursor_count <= self.top:
             self._num_to_display = cursor_count
             self.top = cursor_count
         elif cursor_count > self.top:
             self._num_to_display = self.top
 
-        # if delta_E was requested, remove any structures above the threshold
-        if self.args.get('delta_E') is not None:
-            self.cursor = self.cursor[:self._num_to_display]
-
-    def _find_and_sort(self, query_filter=None, as_list=True, **kwargs):
+    def _find_and_sort(self, query_filter=None, as_list=False, **kwargs):
         """ Query `self.repo` using Pymongo arguments/kwargs. Sorts based
         on enthalpy_per_atom and optionally returns list of Crystals.
 
         Keyword arguments:
             query_filter (dict): the query to use. If None, perform a blank query.
-            as_list (bool): whether to return a list of a pm.Cursor object.
+            as_list (bool): whether to return a list of a pm.cursor.Cursor object.
 
         Returns:
-            list/pm.Cursor: the results of the query.
+            list/pm.cursor.Cursor: the results of the query.
             int: the number of results in the query.
 
         """
@@ -426,7 +452,7 @@ class DBQuery:
 
         if self.args.get('as_crystal'):
             return [Crystal(doc) for doc in cursor], count
-        if as_list:
+        if count < self.cursor_min_limit or as_list:
             return list(cursor), count
 
         return cursor, count
@@ -487,7 +513,7 @@ class DBQuery:
                             self.query_dict['$and'].append(self._query_quality())
                         test_query_dict.append(self.query_dict)
                         test_cursors.append(
-                            self._find_and_sort(SON(test_query_dict[-1]))[0]
+                            list(self._find_and_sort(SON(test_query_dict[-1]))[0])
                         )
                         if self._non_elemental:
                             test_cursors[-1] = filter_cursor_by_chempots(self._chempots, test_cursors[-1])
@@ -658,7 +684,7 @@ class DBQuery:
         if partial_formula is None:
             partial_formula = self.args.get('partial_formula')
         if ':' in stoich[0]:
-            sys.exit('Formula cannot contain ":", you probably meant to query composition.')
+            raise RuntimeError('Formula cannot contain ":", you probably meant to query composition.')
 
         stoich = get_stoich_from_formula(stoich[0], sort=False)
 

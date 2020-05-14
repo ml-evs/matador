@@ -112,6 +112,7 @@ class QueryConvexHull:
         self._query = query
 
         if self._query is not None:
+            # this isn't strictly necessary but it maintains the sanctity of the query results
             self.cursor = list(deepcopy(query.cursor))
             self.args['use_source'] = False
             if self._query.args['subcmd'] not in ['hull', 'voltage', 'hulldiff']:
