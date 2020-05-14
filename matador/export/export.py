@@ -9,6 +9,7 @@ import os
 from traceback import print_exc
 
 import numpy as np
+import pymongo as pm
 
 from matador.utils.cell_utils import cart2abcstar, frac2cart, cart2abc
 from matador.utils.cell_utils import abc2cart, calc_mp_grid
@@ -22,8 +23,8 @@ EPS = 1e-8
 
 def query2files(
     cursor, dirname=None, max_files=10000, top=None, prefix=None,
-    cell=None, param=None, res=None, pdb=None, json=None, xsf=None, md=False, tex=False,
-    subcmd=None,
+    cell=None, param=None, res=None, pdb=None, json=None, xsf=None, markdown=True, latex=False,
+    subcmd=None, argstr=None,
     **kwargs
 ):
     """ Many-to-many convenience function for many structures being written to
@@ -142,8 +143,10 @@ def query2files(
         if xsf:
             doc2xsf(doc, path)
 
-    hull = kwargs.get('subcmd') in ['hull', 'voltage']
-    md_path = path.split('/')[0] + '/' + path.split('/')[0] + '.md'
+    hull = subcmd in ['hull', 'voltage']
+    if isinstance(cursor, pm.cursor.Cursor):
+        cursor.rewind()
+    md_path = "{directory}/{directory}.md".format(directory=directory)
     md_kwargs = {}
     md_kwargs.update(kwargs)
     md_kwargs.update({'markdown': True, 'latex': False, 'argstr': argstr, 'hull': hull})
@@ -151,8 +154,10 @@ def query2files(
     with open(md_path, 'w') as f:
         f.write(md_string)
 
-    if tex:
-        tex_path = path.split('/')[0] + '/' + path.split('/')[0] + '.tex'
+    if latex:
+        if isinstance(cursor, pm.cursor.Cursor):
+            cursor.rewind()
+        tex_path = "{directory}/{directory}.tex".format(directory=directory)
         print('Writing LaTeX file', tex_path + '...')
         tex_kwargs = {}
         tex_kwargs.update(kwargs)

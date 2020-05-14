@@ -70,7 +70,7 @@ def generate_relevant_path(**args):
     if args.get('subcmd') is not None:
         dirname += args.get('subcmd') + '-'
     else:
-        dirname = 'query-'
+        dirname = 'query'
     if args.get('composition') is not None:
         for comp in args['composition']:
             dirname += comp
