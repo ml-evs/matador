@@ -64,13 +64,13 @@ def generate_hash(hash_len=6):
     return _hash
 
 
-def generate_relevant_path(args):
+def generate_relevant_path(**args):
     """ Generates a suitable path name based on query. """
     dirname = ''
     if args.get('subcmd') is not None:
         dirname += args.get('subcmd') + '-'
     else:
-        dirname = 'query'
+        dirname = 'query-'
     if args.get('composition') is not None:
         for comp in args['composition']:
             dirname += comp
