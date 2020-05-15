@@ -1,18 +1,11 @@
 # coding: utf-8
 # Distributed under the terms of the MIT License.
 
-
-import subprocess as sp
 import os
-from setuptools import setup, find_packages
+from setuptools import setup
 from glob import glob
 
-try:
-    __version__ = sp.check_output(['git', 'describe', '--tags']).decode('utf-8').strip()
-    __version__ += '+' + (sp.check_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD'])
-                          .decode('utf-8').strip())
-except sp.CalledProcessError:
-    __version__ = '0.9a1'
+from matador import __version__
 
 with open('requirements/requirements.txt', 'r') as f:
     requirements = [line.strip() for line in f.readlines()]
@@ -29,18 +22,21 @@ for _file in req_files:
             extra_requirements[subreq] = [line.strip() for line in f.readlines()]
             extra_requirements['all'] += extra_requirements[subreq]
 
+with open("README.rst", "r") as f:
+    long_description = f.read()
 
-setup(name='matador',
+
+setup(name='matador-db',
       version=__version__,
-      summary='MATerial and Atomic Database Of Refined structures.',
-      description_file='README.rst',
+      description='MATerial and Atomic Databases Of Refined structures.',
+      long_description=long_description,
       url='https://github.com/ml-evs/matador',
       author='Matthew Evans',
       author_email='matador@ml-evs.science',
       maintainer='Matthew Evans',
       maintainer_email='matador@ml-evs.science',
       license='MIT',
-      packages=find_packages(),
+      packages=['matador'],
       python_requires='>=3.6',
       install_requires=requirements,
       scripts=[script for script in glob('scripts/*') if os.path.isfile(script)],

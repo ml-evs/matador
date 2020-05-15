@@ -1,12 +1,13 @@
 Changelog
 =========
 
-New in development version (rolling) (0.9a)
--------------------------------------------
+New in release (0.9) [15/05/2020]
+---------------------------------
 
-- Much improved code structure and many additional classes that wrap the raw calculation dictionaries for e.g. :class:`matador.crystal.Crystal` and spectral classes. 
+- PyPI release! Can now install with ``pip install matador-db`` (unfortunately ``matador`` was taken, but they are sufficiently orthogonal that the package name ``matador`` is retained here.
+- Much improved code structure and many additional classes that wrap the raw calculation dictionaries for e.g. :class:`matador.crystal.Crystal` and spectral classes.
 - New module :mod:`matador.orm` containing useful models for data handling.
- 
+
   - :class:`matador.orm.orm.DataContainer` as a base class that allows for easy
     access to underlying dictionaries.
   - :mod:`matador.orm.spectral` module that contains many useful classes for
@@ -21,9 +22,9 @@ New in development version (rolling) (0.9a)
   - Finite temperature hulls based on :class:`matador.hull.EnsembleHull` with
     :class:`matador.hull.TemperatureDependentHull`.
 
-- Refactored old PDF `similarity` module into new module :mod:`matador.fingerprints`. 
+- Refactored old PDF `similarity` module into new module :mod:`matador.fingerprints`.
 
-  - Added new fingerprint class, :class:`matador.fingerprints.PXRD`, with associated plots (thanks for James Darby for some initial code).
+  - Added new fingerprint class, :class:`matador.fingerprints.PXRD`, with associated plots (thanks for James Darby for some initial code). Defaults calibrated with GSAS-II.
   - :class:`matador.fingerprints.PDF` sped up by an order of magnitude using `numba`.
 
 - :class:`matador.workflows.castep.CastepSpectralWorkflow` extended to include latest projected dispersion curve developments from OptaDOS, with associated projected dispersion plots (see tutorial).
@@ -41,9 +42,10 @@ New in development version (rolling) (0.9a)
 
   - :ref:`MongoDB setup<mongo>`
   - :ref:`Spectral calculations with run3<run3_spectral>`
+  - Example notebooks
 
 
-New in current release (0.8b) [03/08/2018]
+New in release (0.8b) [03/08/2018]
 ------------------------------------------
 
 - Wholesale changes, complete refactoring of most of the code.
