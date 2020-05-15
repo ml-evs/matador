@@ -8,12 +8,15 @@ diagrams generally.
 
 
 import numpy as np
-from matador.utils.chem_utils import get_concentration
 from matador.utils.chem_utils import get_stoich_from_formula, get_formula_from_stoich
-from matador.plotting.plotting import plotting_function, get_linear_cmap
+from matador.plotting.plotting import plotting_function, get_linear_cmap, SAVE_EXTS
+
+EPS = 1e-12
+
+__all__ = ['plot_2d_hull', 'plot_ternary_hull', 'plot_ensemble_hull', 'plot_temperature_hull']
 
 
-def get_hull_labels(hull, label_cutoff=None, num_species=None, exclude_edges=True):
+def _get_hull_labels(hull, label_cutoff=None, num_species=None, exclude_edges=True):
     """ Return list of structures to labels on phase diagram.
 
     Parameters:
@@ -35,12 +38,12 @@ def get_hull_labels(hull, label_cutoff=None, num_species=None, exclude_edges=Tru
     if isinstance(label_cutoff, list) and len(label_cutoff) == 2:
         label_cutoff = sorted(label_cutoff)
         # first, only apply upper limit as we need to filter by stoich aftewards
-        label_cursor = [doc for doc in hull.hull_cursor if doc['hull_distance'] <= label_cutoff[1]]
+        label_cursor = [doc for doc in hull.cursor if doc['hull_distance'] <= label_cutoff[1]]
     else:
         if isinstance(label_cutoff, list):
             assert len(label_cutoff) == 1, 'Incorrect number of label_cutoff values passed, should be 1 or 2.'
             label_cutoff = label_cutoff[0]
-        label_cursor = [doc for doc in hull.hull_cursor if doc['hull_distance'] <= label_cutoff + eps]
+        label_cursor = [doc for doc in hull.cursor if doc['hull_distance'] <= label_cutoff + eps]
 
     num_labels = len({get_formula_from_stoich(doc['stoichiometry']) for doc in label_cursor})
     if num_labels < len(label_cursor):
@@ -60,13 +63,16 @@ def get_hull_labels(hull, label_cutoff=None, num_species=None, exclude_edges=Tru
         label_cursor = [doc for doc in label_cursor if (all(doc['concentration']) > 0 and
                                                         sum(doc['concentration']) <= 1 - 1e-6)]
 
+    label_cursor = sorted(label_cursor, key=lambda doc: doc['concentration'])
+
     return label_cursor
 
 
 @plotting_function
-def plot_2d_hull(hull, ax=None, show=False, plot_points=True,
+def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
                  plot_hull_points=True, labels=None, label_cutoff=None, colour_by_source=False,
-                 sources=None, source_labels=None, title=True,
+                 sources=None, hull_label=None, source_labels=None, title=True, plot_fname=None, show_cbar=True,
+                 label_offset=(1.15, 0.05), eform_limits=None, legend_kwargs=None,
                  **kwargs):
     """ Plot calculated hull, returning ax and fig objects for further editing.
 
@@ -87,6 +93,8 @@ def plot_2d_hull(hull, ax=None, show=False, plot_points=True,
         sources (list): list of possible provenances to colour when colour_by_source
             is True (others will be grey)
         title (str/bool): whether to include a plot title.
+        png/pdf/svg (bool): whether or not to write the plot to a file.
+        plot_fname (str): filename to write plot to, without file extension.
 
     Returns:
         matplotlib.axes.Axes: matplotlib axis with plot.
@@ -96,10 +104,11 @@ def plot_2d_hull(hull, ax=None, show=False, plot_points=True,
     import matplotlib.colors as colours
 
     if ax is None:
-        fig = plt.figure(facecolor=None, figsize=(8, 6))
+        fig = plt.figure()
         ax = fig.add_subplot(111)
 
-    hull.colours = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])
+    if not hasattr(hull, 'colours'):
+        hull.colours = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])
     hull.default_cmap_list = get_linear_cmap(hull.colours[1:4], list_only=True)
     hull.default_cmap = get_linear_cmap(hull.colours[1:4], list_only=False)
 
@@ -110,17 +119,24 @@ def plot_2d_hull(hull, ax=None, show=False, plot_points=True,
 
     scale = 1
     scatter = []
-    chempot_labels = [get_formula_from_stoich(get_stoich_from_formula(species, sort=False), tex=True) for species in hull.species]
-    tie_line = hull.structure_slice[hull.convex_hull.vertices]
+    chempot_labels = [get_formula_from_stoich(get_stoich_from_formula(species, sort=False), tex=True)
+                      for species in hull.species]
+    tie_line = hull.convex_hull.points[hull.convex_hull.vertices]
 
     # plot hull structures
-    if plot_hull_points and '_beef' not in hull.cursor[0]:
+    if plot_hull_points:
         ax.scatter(tie_line[:, 0], tie_line[:, 1],
                    c=hull.colours[1],
                    marker='o', zorder=99999, edgecolor='k',
                    s=scale*40, lw=1.5)
-    ax.plot(np.sort(tie_line[:, 0]), tie_line[np.argsort(tie_line[:, 0]), 1],
-            c=hull.colours[0], zorder=1)
+        if plot_tie_line:
+            ax.plot(np.sort(tie_line[:, 0]), tie_line[np.argsort(tie_line[:, 0]), 1],
+                    c=hull.colours[0], zorder=1, label=hull_label,
+                    marker='o', markerfacecolor=hull.colours[0],
+                    markeredgecolor='k', markeredgewidth=1.5, markersize=np.sqrt(scale*40))
+    if plot_tie_line:
+        ax.plot(np.sort(tie_line[:, 0]), tie_line[np.argsort(tie_line[:, 0]), 1],
+                c=hull.colours[0], zorder=1, label=hull_label, markersize=0)
 
     if hull.hull_cutoff > 0:
         ax.plot(np.sort(tie_line[:, 0]), tie_line[np.argsort(tie_line[:, 0]), 1] + hull.hull_cutoff,
@@ -128,47 +144,39 @@ def plot_2d_hull(hull, ax=None, show=False, plot_points=True,
 
     # annotate hull structures
     if labels or label_cutoff is not None:
-        label_cursor = get_hull_labels(hull, num_species=2, label_cutoff=label_cutoff)
+        label_cursor = _get_hull_labels(hull, num_species=2, label_cutoff=label_cutoff)
+        already_labelled = []
         for ind, doc in enumerate(label_cursor):
-            arrowprops = dict(arrowstyle="-|>", lw=2, alpha=1, zorder=1, shrinkA=2, shrinkB=4)
-            min_comp = tie_line[np.argmin(tie_line[:, 1]), 0]
-            e_f = label_cursor[ind]['formation_' + str(hull.energy_key)]
-            conc = label_cursor[ind]['concentration'][0]
-            if conc < min_comp:
-                position = (0.8 * conc, 1.15 * (e_f - 0.05))
-            elif label_cursor[ind]['concentration'][0] == min_comp:
-                position = (conc, 1.15 * (e_f - 0.05))
-            else:
-                position = (min(1.1 * conc + 0.15, 0.95), 1.15 * (e_f - 0.05))
-            print(doc['stoichiometry'], hull.species)
-            ax.annotate(get_formula_from_stoich(doc['stoichiometry'],
-                                                latex_sub_style=r'\mathregular',
-                                                tex=True,
-                                                sort=False),
-                        xy=(conc, e_f),
-                        xytext=position,
-                        textcoords='data',
-                        ha='right',
-                        va='bottom',
-                        arrowprops=arrowprops,
-                        zorder=1)
+            formula = get_formula_from_stoich(doc['stoichiometry'], sort=True)
+            if formula not in already_labelled:
+                arrowprops = dict(arrowstyle="-|>", lw=2, alpha=1, zorder=1, shrinkA=2, shrinkB=4)
+                min_comp = tie_line[np.argmin(tie_line[:, 1]), 0]
+                e_f = label_cursor[ind]['formation_' + str(hull.energy_key)]
+                conc = label_cursor[ind]['concentration'][0]
+                if conc < min_comp:
+                    position = (0.8 * conc, label_offset[0] * (e_f - label_offset[1]))
+                elif label_cursor[ind]['concentration'][0] == min_comp:
+                    position = (conc, label_offset[0] * (e_f - label_offset[1]))
+                else:
+                    position = (min(1.1 * conc + 0.15, 0.95), label_offset[0] * (e_f - label_offset[1]))
+                ax.annotate(get_formula_from_stoich(doc['stoichiometry'],
+                                                    latex_sub_style=r'\mathregular',
+                                                    tex=True,
+                                                    elements=hull.species,
+                                                    sort=False),
+                            xy=(conc, e_f),
+                            xytext=position,
+                            textcoords='data',
+                            ha='right',
+                            va='bottom',
+                            arrowprops=arrowprops,
+                            zorder=1)
+                already_labelled.append(formula)
 
     # points for off hull structures; we either colour by source or by energy
     if plot_points and not colour_by_source:
 
-        if '_beef' in hull.cursor[0]:
-            cmap = hull.default_cmap
-            if plot_points:
-                scatter = ax.scatter(hull.structures[np.argsort(hull.hull_dist), 0][::-1],
-                                     hull.structures[np.argsort(hull.hull_dist), -1][::-1],
-                                     s=scale*40,
-                                     c=np.asarray([doc['_beef']['std_dev'] for doc in hull.cursor])[np.argsort(hull.hull_dist)],
-                                     cmap=cmap,
-                                     zorder=10000)
-                cbar = plt.colorbar(scatter, aspect=30, pad=0.02)
-                cbar.set_label('Standard deviation (BEEF) (eV/atom)')
-
-        elif hull.hull_cutoff == 0:
+        if hull.hull_cutoff == 0:
             # if no specified hull cutoff, ignore labels and colour by hull distance
             cmap = hull.default_cmap
             if plot_points:
@@ -179,14 +187,15 @@ def plot_2d_hull(hull, ax=None, show=False, plot_points=True,
                                      zorder=10000,
                                      cmap=cmap, norm=colours.LogNorm(0.02, 2))
 
-                cbar = plt.colorbar(scatter, aspect=30, pad=0.02,
-                                    ticks=[0, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28])
-                cbar.ax.tick_params(length=0)
-                cbar.ax.set_yticklabels([0, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28])
-                cbar.ax.yaxis.set_ticks_position('right')
-                cbar.ax.set_frame_on(False)
-                cbar.outline.set_visible(False)
-                cbar.set_label('Distance from hull (eV/atom)')
+                if show_cbar:
+                    cbar = plt.colorbar(scatter, aspect=30, pad=0.02,
+                                        ticks=[0, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28])
+                    cbar.ax.tick_params(length=0)
+                    cbar.ax.set_yticklabels([0, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28])
+                    cbar.ax.yaxis.set_ticks_position('right')
+                    cbar.ax.set_frame_on(False)
+                    cbar.outline.set_visible(False)
+                    cbar.set_label('Distance from hull (eV/atom)')
 
         elif hull.hull_cutoff != 0:
             # if specified hull cutoff colour those below
@@ -205,244 +214,269 @@ def plot_2d_hull(hull, ax=None, show=False, plot_points=True,
                            edgecolor='k', zorder=10)
 
     elif colour_by_source:
-        from matador.utils.cursor_utils import get_guess_doc_provenance
-        if sources is None:
-            sources = ['AIRSS', 'GA', 'OQMD', 'SWAPS', 'ICSD']
-        if source_labels is None:
-            source_labels = sources
-        else:
-            assert len(source_labels) == len(sources)
+        _scatter_plot_by_source(
+            hull, ax, scale, kwargs,
+            sources=sources, source_labels=source_labels,
+            plot_hull_points=plot_hull_points, legend_kwargs=legend_kwargs)
 
-        colour_choices = {source: hull.colours[ind + 1] for ind, source in enumerate(sources)}
-        colours = []
-        concs = []
-        energies = []
-        zorders = []
-        for doc in hull.cursor:
-            source = get_guess_doc_provenance(doc['source'])
-            if source not in sources:
-                # use grey for undesired sources
-                colours.append(hull.colours[-2])
-                if 'Other' not in sources:
-                    sources.append('Other')
-                    labels.append('Other')
-                    colour_choices['Other'] = hull.colours[-2]
-            else:
-                colours.append(colour_choices[source])
-            zorders.append(sources.index(source))
-            concs.append(doc['concentration'])
-            energies.append(doc['formation_{}'.format(hull.energy_key)])
-
-        alpha = kwargs.get('alpha')
-        if alpha is None:
-            alpha = 0.2
-
-        for ind, conc in enumerate(concs):
-            if hull.cursor[ind]['hull_distance'] <= 0 + 1e-9 and not plot_hull_points:
-                ax.scatter(conc, energies[ind],
-                           c=colours[ind], alpha=alpha, s=scale*40,
-                           zorder=zorders[ind]+1e5, lw=1.5)
-            else:
-                ax.scatter(conc, energies[ind],
-                           c=colours[ind], alpha=alpha, s=scale*20,
-                           zorder=zorders[ind]+100)
-
-        for ind, source in enumerate(sources):
-            ax.scatter(1e10, 1e10, c=colour_choices[source], label=source_labels[ind], alpha=alpha, lw=1)
-
-        legend = ax.legend(loc=9, facecolor='w', frameon=True, fancybox=False, shadow=False)
-        legend.set_zorder(1e20)
-
-    eform_limits = (np.min(hull.structures[:, 1]), np.max(hull.structures[:, 1]))
-    lims = (-0.1 if eform_limits[0] >= 0 else 1.4*eform_limits[0],
-            eform_limits[1] if eform_limits[0] >= 0 else 0.1)
+    if eform_limits is None:
+        eform_limits = (np.min(hull.structures[:, 1]), np.max(hull.structures[:, 1]))
+        lims = (-0.1 if eform_limits[0] >= 0 else 1.4*eform_limits[0],
+                eform_limits[1] if eform_limits[0] >= 0 else 0.1)
+    else:
+        lims = sorted(eform_limits)
     ax.set_ylim(lims)
 
     if isinstance(title, bool) and title:
         if hull._non_elemental:
-            ax.set_title(r'{d[0]}$_\mathrm{{x}}$({d[1]})$_\mathrm{{1-x}}$'.format(d=chempot_labels))
+            ax.set_title(r'({d[0]})$_\mathrm{{x}}$({d[1]})$_\mathrm{{1-x}}$'.format(d=chempot_labels))
         else:
             ax.set_title(r'{d[0]}$_\mathrm{{x}}${d[1]}$_\mathrm{{1-x}}$'.format(d=chempot_labels))
-    elif title:
+    elif isinstance(title, str) and title != '':
         ax.set_title(title)
 
     plt.locator_params(nbins=3)
     if hull._non_elemental:
-        ax.set_xlabel(r'x in {d[0]}$_\mathrm{{x}}(${d[1]}$)_\mathrm{{1-x}}$'.format(d=chempot_labels))
+        ax.set_xlabel(r'x in ({d[0]})$_\mathrm{{x}}$({d[1]})$_\mathrm{{1-x}}$'.format(d=chempot_labels))
     else:
         ax.set_xlabel(r'x in {d[0]}$_\mathrm{{x}}${d[1]}$_\mathrm{{1-x}}$'.format(d=chempot_labels))
 
     ax.grid(False)
     ax.set_xlim(-0.05, 1.05)
-    ax.set_xticks([0, 0.25, 0.33, 0.5, 0.66, 0.75, 1])
+    ax.set_xticks([0, 0.25, 0.5, 0.75, 1])
     ax.set_xticklabels(ax.get_xticks())
     ax.set_ylabel('Formation energy (eV/atom)')
 
-    if hull.savefig:
-        fname = ''.join(hull.species) + '_hull'
-        exts = ['pdf', 'svg', 'png']
-        for ext in exts:
-            if hull.args.get(ext):
+    if hull.savefig or any([kwargs.get(ext) for ext in SAVE_EXTS]):
+        import os
+        fname = plot_fname or ''.join(hull.species) + '_hull'
+        for ext in SAVE_EXTS:
+            if hull.args.get(ext) or kwargs.get(ext):
+                fname_tmp = fname
+                ind = 0
+                while os.path.isfile('{}.{}'.format(fname_tmp, ext)):
+                    ind += 1
+                    fname_tmp = fname + str(ind)
+
+                fname = fname_tmp
                 plt.savefig('{}.{}'.format(fname, ext),
-                            dpi=500, bbox_inches='tight', transparent=True)
+                            bbox_inches='tight', transparent=True)
                 print('Wrote {}.{}'.format(fname, ext))
-    elif show:
+
+    if show:
         plt.show()
 
     return ax
 
 
 @plotting_function
-def plot_binary_beef_hull(hull, ax=None, plot_points=True, plot_hulls=True, voltages=False, **kwargs):
-    """ Plot and generate an ensemble of hulls with associated
-    Bayesian Error Estimate functionals (BEEF). If axis not requested,
+def plot_ensemble_hull(hull, data_key,
+                       ax=None,
+                       formation_energy_key='formation_enthalpy_per_atom',
+                       plot_points=False,
+                       plot_hull_points=True,
+                       alpha_scale=0.25,
+                       plot_hulls=True,
+                       voltages=False,
+                       show=True,
+                       plot_fname=None,
+                       **kwargs):
+    """ Plot and generate an ensemble of hulls. If axis not requested,
     a histogram of frequency of a particular concentration appearing on
     the convex hull is also generated as a second axis.
 
     Parameters:
         hull (QueryConvexHull): hull object created with a cursor that
-            contains the ``_beef`` key for all entries in hull.cursor.
+            contains the data key for all entries in hull.cursor.
+        data_key (str): the key under which ensemble data is stored.
 
     Keyword arguments:
         ax (matplotlib.axes.Axes): matplotlib axis object on which to plot.
+        formation_energy_key (str): the key under which formation energies have been stored.
+        alpha_scale (float): value by which to scale transparency of hulls.
         plot_points (bool): whether to plot the hull points for each hull in the ensemble.
         plot_hulls (bool): whether to plot the hull tie-lines for each hull in the ensemble.
         voltages (bool): compute average voltage and heatmaps.
 
     """
     import matplotlib.pyplot as plt
-    from copy import deepcopy
-    from collections import defaultdict
-    from matador.hull import QueryConvexHull
-    from matador.plotting.battery_plotting import add_voltage_curve
 
     if ax is None:
-        fig = plt.figure(figsize=(7, 10))
+        fig = plt.figure()
         ax = fig.add_subplot(111)
 
-    fig2 = plt.figure()
-    ax_volt = fig2.add_subplot(111)
-
-    subcmd = 'voltage' if voltages else 'hull'
-
-    ax_hist = ax.twinx()
-    for doc in hull.cursor:
-        doc['_formula'] = get_formula_from_stoich(doc['stoichiometry'],
-                                                  elements=hull.species, tex=False)
-    hull_concs = defaultdict(int)
-
-    plot_2d_hull(hull, ax=ax, plot_points=False, plot_hull_points=True)
-    orig_hull_concs = []
-    for doc in hull.hull_cursor[1:-1]:
-        orig_hull_concs.append(doc['concentration'][0])
-
-    beef_cursor = deepcopy(hull.cursor)
-    n_beef = len(beef_cursor[0]['_beef']['thetas'])
-    if kwargs.get('n_beef') is not None:
-        n_beef = min([n_beef, kwargs.get('n_beef')])
-
-    # parameters for voltage heat map
-    max_voltage = 1.5*max(hull.voltage_data['voltages'][0])
-    min_voltage = 0
-    max_q = 1.5*max(hull.voltage_data['Q'][0])
-    min_q = 0
-    grid_scale = kwargs.get('grid_scale', 1000)
-    voltage_heatmap = np.zeros((grid_scale, grid_scale), dtype=np.int)
-    q_grid, v_grid = np.meshgrid(np.linspace(min_q, max_q, num=grid_scale), np.linspace(min_voltage, max_voltage, num=grid_scale))
-
-    print('Calculating voltage heat map from {} to {} V'.format(min_voltage, max_voltage))
-
-    # collect minimum formation energy for ylimits
+    n_hulls = len(hull.phase_diagrams)
+    plot_2d_hull(hull, ax=ax, plot_points=False, plot_hull_points=True, show=False, **kwargs)
     min_ef = 0
-
-    for beef_ind in range(n_beef):
-        for ind, doc in enumerate(beef_cursor):
-            beef_cursor[ind]['total_energy_per_atom'] = hull.cursor[ind]['_beef']['total_energy_per_atom'][beef_ind]
-            beef_cursor[ind]['total_energy'] = hull.cursor[ind]['_beef']['total_energy_per_atom'][beef_ind] * doc['num_atoms']
-
-        beef_hull = QueryConvexHull(subcmd=subcmd, cursor=beef_cursor, elements=hull.species, no_plot=True, quiet=True, energy_key='total_energy')
-        min_ef = np.min([doc['formation_total_energy_per_atom'] for doc in beef_hull.hull_cursor] + [min_ef])
+    colours_list = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])
+    alpha = min([1, max([1/(alpha_scale*n_hulls), 0.01])])
+    for ind, _ in enumerate(hull.phase_diagrams):
+        hull_cursor = [doc for doc in hull.cursor if doc[data_key]['hull_distance'][ind] <= 0.0 + EPS]
+        min_ef = np.min([doc[data_key][formation_energy_key][ind] for doc in hull_cursor] + [min_ef])
         if plot_hulls:
-            ax.plot([doc['concentration'][0] for doc in beef_hull.hull_cursor],
-                    [doc['formation_total_energy_per_atom'] for doc in beef_hull.hull_cursor],
-                    alpha=min([1, max([1/(0.25*n_beef), 0.01])]), c='k', lw=0.5, zorder=0)
+            ax.plot([doc['concentration'][0] for doc in hull_cursor],
+                    [doc[data_key][formation_energy_key][ind] for doc in hull_cursor],
+                    alpha=alpha, c='k', lw=0.5, zorder=0)
+        if plot_hull_points:
+            ax.scatter([doc['concentration'][0] for doc in hull_cursor],
+                       [doc[data_key][formation_energy_key][ind] for doc in hull_cursor],
+                       alpha=alpha, marker='o', c=colours_list[1], lw=0, zorder=0)
         if plot_points:
-            ax.scatter([doc['concentration'][0] for doc in beef_hull.hull_cursor],
-                       [doc['formation_total_energy_per_atom'] for doc in beef_hull.hull_cursor],
-                       alpha=min([1, max([1/(0.25*n_beef), 0.01])]), c=hull.colours[1], s=10, zorder=10, lw=0)
+            ax.scatter([doc['concentration'][0] for doc in hull.cursor],
+                       [doc[data_key][formation_energy_key][ind] for doc in hull.cursor],
+                       alpha=alpha, marker='o', c='k', s=5, lw=0, zorder=0)
 
-        previous_qindex = 0
-        V = beef_hull.voltage_data['voltages'][0]
-        Q = beef_hull.voltage_data['Q'][0]
-        for step, (qs, vs) in enumerate(zip(Q, V)):
-            if step == len(V) - 1 or np.isnan(qs) or np.isnan(vs):
-                continue
-            v_index = max([0, min([int((vs-min_voltage)/(max_voltage-min_voltage) * grid_scale), grid_scale-1])])
-            q_index = max([0, min([int((qs-min_q)/(max_q-min_q)*grid_scale), grid_scale-1])])
-            voltage_heatmap[v_index, previous_qindex:q_index+1] += 1
-            if kwargs.get('hist_vertical'):
-                if not np.isnan(V[step+1]):
-                    next_vindex = max([0, min([int(V[step+1]/(max_voltage-min_voltage) * grid_scale), grid_scale-1])])
-                    voltage_heatmap[next_vindex+1:v_index, q_index] += 1
-            previous_qindex = q_index
+    ax.set_ylim(1.1*min_ef)
 
-        for doc in beef_hull.hull_cursor[1:-1]:
-            hull_concs[doc['_formula']] += 1
-
-    ax.set_ylim(min_ef)
-
-    ax_volt.pcolor(q_grid, v_grid, voltage_heatmap, cmap='viridis')#, norm=mpl.colors.LogNorm(vmin=1, vmax=np.max(voltage_heatmap)))
-
-    voltage_curve = calculate_average_voltage_from_heatmap(voltage_heatmap, v_grid, q_grid)
-    ax_volt.plot(q_grid[0, :], voltage_curve, c='white', zorder=1e20, lw=3, ls='--')
-    c = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])[1]
-    add_voltage_curve(hull.voltage_data['Q'][0], hull.voltage_data['voltages'][0], ax_volt, lw=5, ls='--', c=c)
-
-    concs = []
-    freqs = []
-    for key in hull_concs:
-        concs.append(get_concentration(get_stoich_from_formula(key), elements=hull.species)[0])
-        freqs.append(hull_concs[key])
-
-    max_freq = 0
-    for ind, conc in enumerate(concs):
-        if conc in orig_hull_concs:
-            ax_hist.plot([conc, conc], [0, freqs[ind]], lw=3, alpha=0.5, c=hull.colours[1])
+    if hull.savefig or any(kwargs.get(ext) for ext in SAVE_EXTS):
+        if plot_fname is not None:
+            fname = plot_fname
         else:
-            ax_hist.plot([conc, conc], [0, freqs[ind]], lw=3, alpha=0.5, c=hull.colours[0])
-
-    max_freq = max(freqs)
-    ax_hist.set_ylim(0, 10*max_freq)
-    ax_hist.set_ylabel('Frequency')
-    ax_hist.set_xlabel('Concentration')
-    return voltage_heatmap
-
-
-def calculate_average_voltage_from_heatmap(voltage_heatmap, v_grid, q_grid):
-    """ For a histogram of voltages computed on grids v_grid and q_grid,
-    compute the average voltage curve.
-
-    Parameters:
-        voltage_heatmap (numpy.ndarray): NxN square array containing
-            frequencies of Q vs V.
-        v_grid (numpy.ndarray): NxN array containing the voltage value
-            at each point of the heatmap
-        q_grid (numpy.ndarray): NxN array containing the capacity value
-            at each point of the heatmap.
-
-    """
-    voltage_curve = np.zeros((len(voltage_heatmap)))
-    for q in range(len(voltage_heatmap)):
-        v_indices = np.where(voltage_heatmap[:, q] > 0)
-        voltages = [v_grid[index] for index in v_indices]
-        voltage_curve[q] = np.mean(voltages)
-
-    return voltage_curve
+            fname = ''.join(hull.species) + data_key + '_hull'
+        for ext in SAVE_EXTS:
+            if hull.args.get(ext) or kwargs.get(ext):
+                plt.savefig('{}.{}'.format(fname, ext),
+                            bbox_inches='tight', transparent=True)
+                print('Wrote {}.{}'.format(fname, ext))
 
 
 @plotting_function
-def plot_ternary_hull(hull, axis=None, show=False, plot_points=True, hull_cutoff=None,
-                      label_cutoff=None, expecting_cbar=True, labels=None, **kwargs):
+def plot_temperature_hull(
+    hull,
+    cmap='plasma',
+    cmap_limits=(0.2, 0.8),
+    ax=None,
+    formation_energy_key='formation_free_energy_per_atom',
+    plot_points=False,
+    show_cbar=True,
+    plot_hull_points=True,
+    alpha_scale=1,
+    lw_scale=1,
+    plot_hulls=True,
+    voltages=False,
+    show=True,
+    plot_fname=None,
+    **kwargs
+):
+    """ Plot and generate an ensemble of hulls. If axis not requested,
+    a histogram of frequency of a particular concentration appearing on
+    the convex hull is also generated as a second axis.
+
+    Parameters:
+        hull (QueryConvexHull): hull object created with a cursor that
+            contains the data key for all entries in hull.cursor.
+
+    Keyword arguments:
+        ax (matplotlib.axes.Axes): matplotlib axis object on which to plot.
+        formation_energy_key (str): the key under which formation energies have been stored.
+        alpha_scale (float): value by which to scale transparency of hulls.
+        plot_points (bool): whether to plot the hull points for each hull in the ensemble.
+        plot_hulls (bool): whether to plot the hull tie-lines for each hull in the ensemble.
+        voltages (bool): compute average voltage and heatmaps.
+
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import rgb2hex
+    data_key = hull.data_key
+
+    if ax is None:
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+
+    n_hulls = len(hull.phase_diagrams)
+    colours = [
+        rgb2hex(col) for col in
+        plt.cm.get_cmap(cmap)(np.linspace(*cmap_limits, n_hulls)).tolist()
+    ]
+
+    min_ef = 0
+    alpha = alpha_scale
+
+    # hack the energy key so that labels work
+    _cached_key = hull.energy_key
+    hull.energy_key = hull.chempot_energy_key
+    max_temperature = max(hull.temperatures)
+    # set up initial plot without plotting tie line
+    ax = plot_2d_hull(
+        hull, ax=ax,
+        plot_tie_line=False,
+        plot_points=False,
+        plot_hull_points=False,
+        show=False,
+        **kwargs
+    )
+    hull.energy_key = _cached_key
+
+    ax.plot([doc['concentration'][0] for doc in hull.hull_cursor],
+            [doc['formation_' + hull.chempot_energy_key] for doc in hull.hull_cursor],
+            marker='o',
+            alpha=1, c='k', lw=2*lw_scale, ls='--', label='Static', zorder=1e5)
+
+    ind = 0
+    hull_cursor = [doc for doc in hull.cursor if doc[data_key]['hull_distance'][ind] <= 0.0 + EPS]
+    ax.plot([doc['concentration'][0] for doc in hull_cursor],
+            [doc[data_key][formation_energy_key][ind] for doc in hull_cursor],
+            marker='o', c=colours[ind], lw=2*lw_scale,
+            markeredgewidth=1.5, markeredgecolor='k',
+            ls='--', zorder=1e5, label='Static + ZPE')
+
+    # plot remaining temperatures
+    for ind, _ in enumerate(hull.temperatures[1:]):
+        hull_cursor = [doc for doc in hull.cursor if doc[data_key]['hull_distance'][ind] <= 0.0 + EPS]
+        min_ef = np.min([doc[data_key][formation_energy_key][ind] for doc in hull_cursor] + [min_ef])
+        colour_ind = int(n_hulls * hull.temperatures[ind] / max_temperature)
+        if plot_hulls:
+            ax.plot([doc['concentration'][0] for doc in hull_cursor],
+                    [doc[data_key][formation_energy_key][ind] for doc in hull_cursor],
+                    alpha=alpha, c=colours[colour_ind], lw=1*lw_scale, zorder=0)
+        if plot_hull_points:
+            ax.scatter([doc['concentration'][0] for doc in hull_cursor],
+                       [doc[data_key][formation_energy_key][ind] for doc in hull_cursor],
+                       alpha=1, marker='o', c=colours[colour_ind], lw=0.5,
+                       edgecolor='k', label="Structures on hull" if ind == n_hulls - 2 else None,
+                       zorder=1e4)
+        if plot_points:
+            ax.scatter([doc['concentration'][0] for doc in hull.cursor],
+                       [doc[data_key][formation_energy_key][ind] for doc in hull.cursor],
+                       label="Structures above hull" if ind == n_hulls - 2 else None,
+                       alpha=1, marker='o', edgecolor='w', c=colours[colour_ind], lw=0.5, zorder=1e-3)
+
+    ax.set_ylim(1.1*min_ef)
+
+    if show_cbar:
+        import matplotlib.colors
+        mappable = plt.cm.ScalarMappable(
+            cmap=matplotlib.colors.LinearSegmentedColormap.from_list('cut', colours),
+            norm=plt.Normalize(vmin=0, vmax=np.max(hull.temperatures))
+        )
+        mappable._A = hull.temperatures
+        cbar = plt.colorbar(mappable, alpha=alpha)
+        cbar.ax.tick_params(length=0)
+        cbar.ax.yaxis.set_ticks_position('right')
+        cbar.ax.set_frame_on(False)
+        cbar.outline.set_visible(False)
+        cbar.set_label('Temperature (K)')
+
+    if hull.savefig or any(kwargs.get(ext) for ext in SAVE_EXTS):
+        if plot_fname is not None:
+            fname = plot_fname
+        else:
+            fname = ''.join(hull.species) + data_key + '_hull'
+        for ext in SAVE_EXTS:
+            if hull.args.get(ext) or kwargs.get(ext):
+                plt.savefig('{}.{}'.format(fname, ext),
+                            bbox_inches='tight', transparent=True)
+                print('Wrote {}.{}'.format(fname, ext))
+
+    ax.legend()
+
+    return ax
+
+
+@plotting_function
+def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=None, fig_height=None,
+                      label_cutoff=None, label_corners=True, expecting_cbar=True, labels=None, plot_fname=None,
+                      efmap=None, sampmap=None, capmap=None, pathways=False, **kwargs):
     """ Plot calculated ternary hull as a 2D projection.
 
     Parameters:
@@ -457,6 +491,13 @@ def plot_ternary_hull(hull, axis=None, show=False, plot_points=True, hull_cutoff
         expecting_cbar (bool): whether or not to space out the plot to preserve
             aspect ratio if a colourbar is present.
         labels (bool): whether or not to label on-hull structures
+        label_corners (bool): whether or not to put axis labels on corners or edges.
+        png/pdf/svg (bool): whether or not to write the plot to a file.
+        plot_fname (str): filename to write plot to.
+        efmap (bool): plot heatmap of formation energy,
+        sampmap (bool): plot heatmap showing sampling density,
+        capmap (bool): plot heatmap showing gravimetric capacity.
+        pathways (bool): plot the pathway from the starting electrode to active ion.
 
     Returns:
         matplotlib.axes.Axes: matplotlib axis with plot.
@@ -473,6 +514,15 @@ def plot_ternary_hull(hull, axis=None, show=False, plot_points=True, hull_cutoff
     plt.rcParams['xtick.minor.size'] = 0
     plt.rcParams['ytick.minor.size'] = 0
 
+    if efmap is None:
+        efmap = hull.args.get('efmap')
+    if sampmap is None:
+        sampmap = hull.args.get('sampmap')
+    if capmap is None:
+        capmap = hull.args.get('capmap')
+    if pathways is None:
+        pathways = hull.args.get('pathways')
+
     if labels is None:
         labels = hull.args.get('labels')
     if label_cutoff is None:
@@ -488,38 +538,54 @@ def plot_ternary_hull(hull, axis=None, show=False, plot_points=True, hull_cutoff
         hull_cutoff = hull.hull_cutoff
 
     print('Plotting ternary hull...')
-    if hull.args.get('capmap') or hull.args.get('efmap'):
+    if capmap or efmap:
         scale = 100
-    elif hull.args.get('sampmap'):
+    elif sampmap:
         scale = 20
     else:
         scale = 1
-    fontsize = plt.rcParams['font.size']
 
     if axis is not None:
         fig, ax = ternary.figure(scale=scale, ax=axis)
     else:
         fig, ax = ternary.figure(scale=scale)
-    if hull.args.get('capmap') or hull.args.get('efmap') or hull.args.get('sampmap'):
-        fig.set_size_inches(8, 5)
-    elif not expecting_cbar:
-        fig.set_size_inches(5, 5)
+
+    # maintain aspect ratio of triangle
+    if fig_height is None:
+        _user_height = plt.rcParams.get("figure.figsize", (8, 6))[0]
     else:
-        fig.set_size_inches(6.67, 5)
+        _user_height = fig_height
+    if capmap or efmap or sampmap:
+        fig.set_size_inches(_user_height, 5/8 * _user_height)
+    elif not expecting_cbar:
+        fig.set_size_inches(_user_height, _user_height)
+    else:
+        fig.set_size_inches(_user_height, 5/6.67 * _user_height)
 
     ax.boundary(linewidth=2.0, zorder=99)
     ax.clear_matplotlib_ticks()
 
-    chempot_labels = [get_formula_from_stoich(get_stoich_from_formula(species, sort=False), sort=False, tex=True) for species in hull.species]
+    chempot_labels = [get_formula_from_stoich(
+        get_stoich_from_formula(species, sort=False), sort=False, tex=True) for species in hull.species
+    ]
 
     ax.gridlines(color='black', multiple=scale * 0.1, linewidth=0.5)
     ticks = [float(val) for val in np.linspace(0, 1, 6)]
-    ax.ticks(axis='lbr', linewidth=1, offset=0.02, fontsize=fontsize-2, locations=ticks,
+    if label_corners:
+        # remove 0 and 1 ticks when labelling corners
+        ticks = ticks[1:-1]
+        ax.left_corner_label(chempot_labels[2], fontsize='large')
+        ax.right_corner_label(chempot_labels[0], fontsize='large')
+        ax.top_corner_label(chempot_labels[1], fontsize='large', offset=0.16)
+    else:
+        ax.left_axis_label(chempot_labels[2], fontsize='large', offset=0.12)
+        ax.right_axis_label(chempot_labels[1], fontsize='large', offset=0.12)
+        ax.bottom_axis_label(chempot_labels[0], fontsize='large', offset=0.08)
+        ax.set_title('-'.join(['{}'.format(label) for label in chempot_labels]), fontsize='large', y=1.02)
+
+    ax.ticks(axis='lbr', linewidth=1, offset=0.025, fontsize='small',
+             locations=(scale * np.asarray(ticks)).tolist(),
              ticks=ticks, tick_formats='%.1f')
-    ax.set_title('-'.join(['({})'.format(label) for label in chempot_labels]), fontsize=fontsize + 2, y=1.02)
-    ax.left_axis_label(chempot_labels[2], fontsize=fontsize + 2)
-    ax.right_axis_label(chempot_labels[1], fontsize=fontsize + 2)
-    ax.bottom_axis_label(chempot_labels[0], fontsize=fontsize + 2)
 
     concs = np.zeros((len(hull.structures), 3))
     concs[:, :-1] = hull.structures[:, :-1]
@@ -527,7 +593,7 @@ def plot_ternary_hull(hull, axis=None, show=False, plot_points=True, hull_cutoff
         # set third triangular coordinate
         concs[i, -1] = 1 - concs[i, 0] - concs[i, 1]
 
-    stable = np.asarray([concs[ind] for ind in hull.convex_hull.vertices])
+    stable = concs[np.where(hull.hull_dist <= 0 + EPS)]
 
     # sort by hull distances so things are plotting the right order
     concs = concs[np.argsort(hull.hull_dist)].tolist()
@@ -564,7 +630,7 @@ def plot_ternary_hull(hull, axis=None, show=False, plot_points=True, hull_cutoff
         plane = np.asarray(plane)
         ax.plot(scale * plane, c=hull.colours[0], lw=1.5, alpha=1, zorder=98)
 
-    if hull.args.get('pathways'):
+    if pathways:
         for phase in stable:
             if phase[0] == 0 and phase[1] != 0 and phase[2] != 0:
                 ax.plot([scale * phase, [scale, 0, 0]], c='r', alpha=0.2, lw=6, zorder=99)
@@ -597,7 +663,7 @@ def plot_ternary_hull(hull, axis=None, show=False, plot_points=True, hull_cutoff
             )
 
     # add colourmaps
-    if hull.args.get('capmap'):
+    if capmap:
         capacities = dict()
         from ternary.helpers import simplex_iterator
         for (i, j, k) in simplex_iterator(scale):
@@ -606,7 +672,7 @@ def plot_ternary_hull(hull, axis=None, show=False, plot_points=True, hull_cutoff
             ], hull.species)
         ax.heatmap(capacities, style="hexagonal", cbarlabel='Gravimetric capacity (mAh/g)',
                    vmin=0, vmax=3000, cmap=pastel_cmap)
-    elif hull.args.get('efmap'):
+    elif efmap:
         energies = dict()
         fake_structures = []
         from ternary.helpers import simplex_iterator
@@ -618,8 +684,12 @@ def plot_ternary_hull(hull, axis=None, show=False, plot_points=True, hull_cutoff
         for (i, j, k) in simplex_iterator(scale):
             energies[(i, j, k)] = -1 * plane_energies[ind]
             ind += 1
-        ax.heatmap(energies, style="hexagonal", cbarlabel='Formation energy (eV/atom)', vmax=0, cmap='bone')
-    elif hull.args.get('sampmap'):
+        if isinstance(efmap, str):
+            efmap = efmap
+        else:
+            efmap = 'BuPu_r'
+        ax.heatmap(energies, style="hexagonal", cbarlabel='Formation energy (eV/atom)', vmax=0, cmap=efmap)
+    elif sampmap:
         sampling = dict()
         from ternary.helpers import simplex_iterator
         eps = 1.0 / float(scale)
@@ -634,7 +704,7 @@ def plot_ternary_hull(hull, axis=None, show=False, plot_points=True, hull_cutoff
 
     # add labels
     if labels:
-        label_cursor = get_hull_labels(hull, label_cutoff=label_cutoff)
+        label_cursor = _get_hull_labels(hull, label_cutoff=label_cutoff)
         if len(label_cursor) == 1:
             label_coords = [[0.25, 0.5]]
         else:
@@ -643,7 +713,9 @@ def plot_ternary_hull(hull, axis=None, show=False, plot_points=True, hull_cutoff
         from matador.utils.hull_utils import barycentric2cart
         for ind, doc in enumerate(label_cursor):
             conc = np.asarray(doc['concentration'] + [1 - sum(doc['concentration'])])
-            formula = get_formula_from_stoich(doc['stoichiometry'], tex=True, latex_sub_style=r'\mathregular')
+            formula = get_formula_from_stoich(
+                doc['stoichiometry'], sort=False, tex=True, latex_sub_style=r'\mathregular', elements=hull.species
+            )
             arrowprops = dict(arrowstyle="-|>", color='k', lw=2, alpha=0.5, zorder=1, shrinkA=2, shrinkB=4)
             cart = barycentric2cart([doc['concentration'] + [0]])[0][:2]
             min_dist = 1e20
@@ -662,15 +734,87 @@ def plot_ternary_hull(hull, axis=None, show=False, plot_points=True, hull_cutoff
             del label_coords[closest_label]
 
     plt.tight_layout(w_pad=0.2)
+    # important for retaining labels if exporting to PDF
+    # see https://github.com/marcharper/python-ternary/issues/36
+    ax._redraw_labels() # noqa
 
     if hull.savefig:
-        if hull.args.get('png'):
-            plt.savefig(''.join(hull.species) + '_hull.png', dpi=400, transparent=True, bbox_inches='tight')
-        if hull.args.get('svg'):
-            plt.savefig(''.join(hull.species) + '_hull.svg', dpi=400, transparent=True, bbox_inches='tight')
-        if hull.args.get('pdf'):
-            plt.savefig(''.join(hull.species) + '_hull.pdf', dpi=400, transparent=True, bbox_inches='tight')
+        fname = plot_fname or ''.join(hull.species) + '_hull'
+        for ext in SAVE_EXTS:
+            if hull.args.get(ext) or kwargs.get(ext):
+                plt.savefig('{}.{}'.format(fname, ext),
+                            bbox_inches='tight', transparent=True)
+                print('Wrote {}.{}'.format(fname, ext))
     elif show:
-        ax.show()
+        print('Showing plot...')
+        plt.show()
+
+    return ax
+
+
+def _scatter_plot_by_source(hull, ax, scale, kwargs,
+                            sources=None, source_labels=None, plot_hull_points=True, legend_kwargs=None):
+    """ Add scatter points to the hull depending on the guessed
+    provenance of a structure.
+
+    """
+    from matador.utils.cursor_utils import get_guess_doc_provenance
+    if sources is None:
+        sources = ['AIRSS', 'GA', 'OQMD', 'SWAPS', 'ICSD', 'DOI', 'SM', 'MP', 'PF', 'Other']
+    if source_labels is None:
+        source_labels = sources
+    else:
+        assert len(source_labels) == len(sources)
+
+    # hack: double length of hull colours
+    hull.colours.extend(hull.colours)
+
+    colour_choices = {source: hull.colours[ind + 1] for ind, source in enumerate(sources)}
+    colours = []
+    concs = []
+    energies = []
+    zorders = []
+    for doc in hull.cursor:
+        source = get_guess_doc_provenance(doc['source'])
+        if source not in sources:
+            # use grey for undesired sources
+            colours.append(hull.colours[-2])
+            source = 'Other'
+            if 'Other' not in sources:
+                sources.append('Other')
+                source_labels.append('Other')
+                colour_choices['Other'] = hull.colours[-2]
+        else:
+            colours.append(source)
+        zorders.append(sources.index(source))
+        concs.append(doc['concentration'])
+        energies.append(doc['formation_{}'.format(hull.energy_key)])
+
+    sources_present = set(colours)
+    sources_present = [source for source in sources if source in sources_present]
+    colour_choices = {source: hull.colours[ind + 1] for ind, source in enumerate(sources_present)}
+    colours = [colour_choices[src] for src in colours]
+    alpha = kwargs.get('alpha')
+    if alpha is None:
+        alpha = 0.2
+
+    for ind, conc in enumerate(concs):
+        if hull.cursor[ind]['hull_distance'] <= 0 + 1e-9 and not plot_hull_points:
+            ax.scatter(conc, energies[ind],
+                       c=colours[ind], alpha=1, s=scale*40, edgecolor='k',
+                       zorder=zorders[ind]+1e5, lw=1.5)
+        else:
+            ax.scatter(conc, energies[ind],
+                       c=colours[ind], alpha=alpha, s=scale*20,
+                       zorder=zorders[ind]+100)
+
+    for ind, source in enumerate(sources_present):
+        ax.scatter(1e10, 1e10, c=colour_choices[source], label=source_labels[ind], alpha=alpha, lw=1)
+
+    if legend_kwargs is not None:
+        legend = ax.legend(**legend_kwargs)
+    else:
+        legend = ax.legend(ncol=2)
+    legend.set_zorder(1e20)
 
     return ax

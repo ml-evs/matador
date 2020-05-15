@@ -12,7 +12,7 @@ Example 1.1: Using run3 locally
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-In this example, we will suppose that you want to perform a geometry optimisation on several different polymorphs of TiO<sub>2</sub> from the ICSD. The files for this example can be found in ``examples/run3_tutorial``, `here <https://bitbucket.org/ml-evs/matador/src/examples/run3_tutorial>`_.
+In this example, we will suppose that you want to perform a geometry optimisation on several different polymorphs of TiO\ :sub:`2` from the ICSD. The files for this example can be found in ``examples/run3_tutorial``, `here <https://github.com/ml-evs/matador/blob/develop/examples/run3_tutorial>`_.
 
 Setting up the files
 ^^^^^^^^^^^^^^^^^^^^
@@ -135,7 +135,7 @@ These calculations are performed in exactly the same was as above, except a ``<s
 Example 1.2: High-throughput geometry optimisations with CASTEP on a supercomputer
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Each HPC facility has its own quirks, so in this example we will try to be as explicit as possible. The set up of the job is exactly the same as in `example 1 <ex1_>`__, but we now must add run3 to our job submission script. The following examples are for the SLURM system on the BlueBear machine at the University of Birmingham and PBS on ARCHER (Tier-1), but run3 has also been tested on CSD3 (Tier-2), HPC Midlands-Plus (Tier-2), Thomas (Tier-2) and several local group-scale clusters.
+Each HPC facility has its own quirks, so in this example we will try to be as explicit as possible. The set up of the job is exactly the same as in `example 1 <ex1_>`__, but we now must add run3 to our job submission script. The following examples are for the SLURM queuing system on the BlueBear machine at the University of Birmingham and PBS on ARCHER (Tier-1), but run3 has also been tested on CSD3 (Tier-2), HPC Midlands-Plus (Tier-2), Thomas (Tier-2) and several local group-scale clusters.
 
 Example 1.2.1: SLURM on BlueBear
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -161,15 +161,16 @@ In this job, we will submit a run3 job that performs CASTEP calculations across 
     module load mpi/impi/2017.1.132-iccifort-2017.1.132
     unset I_MPI_PMI_LIBRARY
     
-    ###### RUN3 COMMANDS (assuming installation guide followed at https://matador-db.readthedocs.io/en/latest/install.html) ######
+    # RUN3 COMMANDS
+    # (assuming installation guide followed at
+    #  https://matador-db.readthedocs.io/en/latest/install.html)
 
-    source activate matador run3 -nc 48 --intel -v 4 --executable castep.mpi --ignore_jobs_file TiO2
+    source activate matador
+    run3 -nc 48 -v 4 --executable castep.mpi --ignore_jobs_file TiO2
 
 Let's unpick a few of the flags used to call run3 here:
 
 * ``-nc/--ncores``: the number of cores to use per structure, per calculation. It is often worth specifying this if more than one node is being used, as the correctness of run3's core counter is queue/machine-specific.
-* ``--intel``: use Intel-style ``mpirun`` calls. Again, run3 should be able to detect this, but worth specifying.
-* ``--executable``: by default run3 will try to call an executable called simply ``castep``. On many machines, CASTEP is installed as ``castep.mpi``.
 * ``-v 4``: sets the verbosity in the log file to the highest level.
 * ``--ignore_jobs_file``: by default run3 will for both ``<structure>.lock`` files and entries in ``jobs.txt`` before running a new structure. It is often worth disabling the ``jobs.txt`` check if it is not expected that all structures complete in one job submission (see below).
   
@@ -221,6 +222,6 @@ Instructions are almost identical to the above, but the array job script looks a
 
     run3 --archer -v 4 -nc 48 KSnP
 
-Notice here we have specified ``--archer`` instead of ``--intel``: again, run3 should be able to detect that ``mpirun`` is missing and thus try ``aprun``, but it can be worth specifying just in case. With PBS, the whole array can be submitted with just::
+Notice here we have specified ``--archer``: again, run3 should be able to detect that ``mpirun`` is missing and thus try ``aprun``, but it can be worth specifying just in case. With PBS, the whole array can be submitted with just::
 
     $ qsub run3.job

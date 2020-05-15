@@ -1,0 +1,7 @@
+task                          : bulk_modulus
+cut_off_energy                : 300.0 eV
+write_bib                     : False
+xc_functional                 : LDA
+geom_force_tol                : 0.05
+finite_basis_corr             : 0
+write_checkpoint              : none

@@ -1,0 +1,34 @@
+START COMMENT
+ 261 COARSE
+ 294 MEDIUM
+ 318 FINE
+ 509 EXTREME
+ 
+   ============================================================                
+   | Pseudopotential Report - Date of generation 17-11-2017   |                
+   ------------------------------------------------------------                
+   | Element: Sn Ionic charge:  4.00 Level of theory: PBE     |                
+   | Atomic Solver: Koelling-Harmon                           |                
+   |                                                          |                
+   |               Reference Electronic Structure             |                
+   |         Orbital         Occupation         Energy        |                
+   |            5s              2.000           -0.388        |                
+   |            5p              2.000           -0.136        |                
+   |                                                          |                
+   |                 Pseudopotential Definition               |                
+   |        Beta     l      e      Rc     scheme   norm       |                
+   |          1      0   -0.395   2.006     qc      0         |                
+   |          2      0    0.250   2.006     qc      0         |                
+   |          3      1   -0.140   2.006     qc      0         |                
+   |          4      1    0.250   2.006     qc      0         |                
+   |         loc     2    0.000   2.006     pn      0         |                
+   |                                                          |                
+   | Augmentation charge Rinner = 1.602                       |                
+   | Partial core correction Rc = 1.602                       |                
+   ------------------------------------------------------------                
+   | "2|2|2|1.6|9.6|10.8|11.7|50U=-0.395U=+0.25:51U=-0.14U=   |                
+   |  +0.25"                                                  |                
+   ------------------------------------------------------------                
+   |      Author: Chris J. Pickard, Cambridge University      |                
+   ============================================================                
+ 

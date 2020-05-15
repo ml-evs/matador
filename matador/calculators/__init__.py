@@ -12,7 +12,6 @@ __author__ = 'Matthew Evans'
 __maintainer__ = 'Matthew Evans'
 
 
-from matador.calculators.calculator import Calculator
 from matador.calculators.castep import CastepCalculator
 # from matador.calculators.quantum_espresso import QuantumEspressoCalculator
 # from matador.calculators.ase import ASECalculator

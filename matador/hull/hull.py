@@ -7,30 +7,30 @@ queries.
 """
 
 
-from traceback import print_exc
-from bisect import bisect_left
 from copy import deepcopy
-import sys
-import os
+from typing import List
+from collections import defaultdict
 import re
+import warnings
 
-from scipy.spatial import ConvexHull
-from scipy.spatial.qhull import QhullError
 from bson.son import SON
 import pymongo as pm
 import numpy as np
 
 from matador.utils.print_utils import print_notify, print_warning
-from matador.utils.hull_utils import barycentric2cart, vertices2plane, vertices2line, FakeHull
 from matador.utils.chem_utils import parse_element_string, get_padded_composition, get_num_intercalated
 from matador.utils.chem_utils import get_generic_grav_capacity, get_formula_from_stoich, get_stoich_from_formula
 from matador.utils.chem_utils import get_formation_energy
 from matador.utils.cursor_utils import set_cursor_from_array, get_array_from_cursor
-from matador.utils.cursor_utils import display_results
-from matador.export import generate_hash
+from matador.utils.cursor_utils import display_results, recursive_get
 from matador.utils.cursor_utils import filter_cursor_by_chempots
+from matador.battery import Electrode, VoltageProfile
+from matador.hull.phase_diagram import PhaseDiagram
 
-EPS = 1e-12
+# general small number used when comparing energies to zero
+EPS = 1e-8
+# small number used for checking boundaries
+BOUNDARY_EPS = 1e-12
 
 
 class QueryConvexHull:
@@ -42,33 +42,38 @@ class QueryConvexHull:
         hull_cursor (list): list of all documents within hull_cutoff.
         chempot_cursor (list): list of chemical potential documents.
         structures (numpy.ndarray): all structures used to create hull.
-        structure_slice (numpy.ndarray): array of concentrations and
-            formation energies for each structure with E_F <= 0. The indices
-            in hull correspond to entries of this array.
         hull_dist (np.ndarray): array of distances from hull for each structure.
         species (list): list of chemical potential symbols.
         num_elements (int): number of elements present in the chemical potentials.
         elements (list): the elements present in the convex hull.
-        voltage_data (dict): if voltage_curve() has been called, then
-            this is a dictionary containing Q, x, V and reaction pathways.
+        voltage_data (list): if voltage_curve() has been called, then
+            this is a lsit of VoltageProfile objects containing Q, x, V and reaction pathways.
         volume_data (dict): if volume_curve() has been called, then
             this is a dictionary containing x and volumes per B (in AxBy).
 
     """
 
-    def __init__(self, query=None, cursor=None, elements=None, species=None, subcmd='hull', quiet=False,
-                 plot_kwargs=None, **kwargs):
+    def __init__(self, query=None, cursor=None, elements=None, species=None, voltage=False, volume=False, subcmd=None,
+                 plot_kwargs=None, lazy=False, energy_key='enthalpy_per_atom', client=None, collections=None, db=None,
+                 **kwargs):
         """ Initialise the class from either a DBQuery or a cursor (list
         of matador dicts) and construct the appropriate phase diagram.
 
         Keyword arguments:
             query (matador.query.DBQuery): object containing structures,
-            cursor (list(dict)): alternatively specify list of matador docs.
+            cursor (list(dict)): alternatively specify list of matador documents.
             species (list(str)): list of elements/chempots to use, used to provide a useful order,
-            elements (list(str)): deprecated form of the above.
-            subcmd (str): either 'hull' or 'voltage',
+            voltage (bool): whether or nto to compute voltages relative for insertion of first entry in species,
+            volume (bool): whether or not to compute volume expansion relative to first entry in species,
+            energy_key (str): key under which the desired energy *per atom* is stored.
+            lazy (bool): if True, do not create hull until `self.create_hull()` is called
+            chempots (list(float)): list of chemical potential values to use.
+            elements (list(str)): deprecated form `species`.
             kwargs (dict): mostly CLI arguments, see matador hull --help for full options.
             plot_kwargs (dict): arguments to pass to plot_hull function
+            client (pymongo.MongoClient): optional client to pass to DBQuery.
+            collections (dict of pymongo.collections.Collection): optional dict of collections to pass to DBQuery.
+            db (str): db name to connect to in DBQuery.
 
         """
         self.args = dict()
@@ -76,62 +81,72 @@ class QueryConvexHull:
             self.args.update(query.args)
         self.args.update(kwargs)
 
-        self.devel = True
-        if self.args.get('subcmd') is None:
-            self.args['subcmd'] = subcmd
+        if subcmd is not None:
+            warnings.warn("subcmd will soon be deprecated, please pass the equivalent flag as a kwarg (e.g. voltage=True)")
+            if subcmd == 'voltage':
+                voltage = True
+        self.args['subcmd'] = subcmd
+
         if plot_kwargs is None:
             plot_kwargs = {}
-        if plot_kwargs.get('show') is None:
-            plot_kwargs['show'] = True
-        self._query = query
+        self.args['plot_kwargs'] = plot_kwargs
+
         self.from_cursor = False
         self.plot_params = False
 
+        self.compute_voltages = voltage
+        self.compute_volumes = volume
+
+        if query is None and cursor is None:
+            # if no query or cursor passed, push all kwargs to new query
+            from matador.query import DBQuery
+            kwargs.pop('intersection', None)
+            query = DBQuery(
+                subcmd='hull',
+                intersection=True,
+                client=client,
+                collections=collections,
+                **kwargs
+            )
+
+        self._query = query
+
         if self._query is not None:
+            # this isn't strictly necessary but it maintains the sanctity of the query results
             self.cursor = list(deepcopy(query.cursor))
-            use_source = False
+            self.args['use_source'] = False
             if self._query.args['subcmd'] not in ['hull', 'voltage', 'hulldiff']:
                 print_warning('Query was not prepared with subcmd=hull, so cannot guarantee consistent formation energies.')
         else:
-            self.cursor = list(deepcopy(cursor))
+            self.cursor = list(cursor)
             self.from_cursor = True
-            use_source = True
+            self.args['use_source'] = True
 
         # set up attributes for later
+        self.structures = None
+        self.convex_hull = None
         self.chempot_cursor = None
         self.hull_cursor = None
-        self.structure_slice = None
+        self.phase_diagram = None
         self.hull_dist = None
         self.species = None
-        self.voltage_data = {}
-        self.volume_data = {}
+        self.voltage_data: List[VoltageProfile] = []
+        self.volume_data = defaultdict(list)
         self.elements = []
         self.num_elements = 0
+        self.species = self._get_species(species, elements)
+        self._dimension = len(self.species)
 
-        # set some hull options
-        if quiet:
-            cached_stdout = sys.stdout
-            f = open(os.devnull, 'w')
-            sys.stdout = f
+        # tracker for whether per_b fields have been setup
+        self._per_b_done = False
 
-        if self.args.get('energy_key') is not None:
-            # consider if temperature present and looking for thermo_* keys
-            if self.args.get('temperature') is not None:
-                if self.args.get('energy_key').startswith('thermo_'):
-                    prefix = ''
-                else:
-                    prefix = 'thermo_'
-            else:
-                prefix = ''
+        self.energy_key = energy_key
+        if not self.energy_key.endswith('_per_atom'):
+            warnings.warn('Appending per_atom to energy_key {}'.format(self.energy_key))
+            self.energy_key += '_per_atom'
 
-            if self.args.get('energy_key').endswith('_per_atom'):
-                self.energy_key = prefix + self.args.get('energy_key')
-            else:
-                self.energy_key = prefix + self.args.get('energy_key') + '_per_atom'
-        else:
-            self.energy_key = 'enthalpy_per_atom'
+        self._extensive_energy_key = self.energy_key.split('_per_atom')[0]
 
-        self.temperature = self.args.get('temperature')
         if self.args.get('hull_cutoff') is not None:
             self.hull_cutoff = float(self.args['hull_cutoff'])
         else:
@@ -140,49 +155,35 @@ class QueryConvexHull:
         if self.cursor is None:
             raise RuntimeError('Failed to find structures to create hull!')
 
-        if species is None:
-            species = elements
-
         self._non_elemental = False
-        if species is None:
-            # handles element list passed by query: should only ever be a list of one entry
-            if elements is None:
-                if isinstance(self.args.get('composition'), list):
-                    species = self.args.get('composition')[0]
-                else:
-                    species = self.args.get('composition')
-                if ':' in species:
-                    species = species.split(':')
-            else:
-                species = elements
-
-        # handles when species is e.g. ['LiCo2:Sn2S']
-        if isinstance(species, str):
-            if ':' in species:
-                species = species.split(':')
-            else:
-                species = [spec for spec in re.split(r'([A-Z][a-z]*)', species) if spec]
-
-        # edge case where user passes e.g. ['KP'], when they mean ['K', 'P'].
-        if isinstance(species, list) and len(species) == 1:
-            tmp_species = []
-            for spec in species:
-                if ':' in spec:
-                    tmp_species.append(spec.split(':'))
-                else:
-                    tmp_species.extend([item for item in re.split(r'([A-Z][a-z]*)', spec) if item])
-            species = tmp_species
-
-        self.species = species
-
         assert isinstance(self.species, list)
         for _species in self.species:
             if len(parse_element_string(_species, stoich=True)) > 1:
                 self._non_elemental = True
 
-        self._dimension = len(self.species)
-        if self._dimension > 2 and self._query is not None and not self._query.args.get('intersection'):
-            raise SystemExit('Please query with -int/--intersection when creating ternary+ hulls.')
+        if not lazy:
+            self.create_hull()
+
+    def create_hull(self):
+        """ Begin the hull creation routines and perform the
+        post-processing specified by initial arguments.
+
+        """
+        if self.args.get('uniq'):
+            from matador.utils.cursor_utils import filter_unique_structures
+            if self.args.get('uniq') is True:
+                sim_tol = 0.1
+            else:
+                sim_tol = self.args.get('uniq')
+            print_notify('Filtering for unique structures...')
+            self.cursor = filter_unique_structures(
+                self.cursor,
+                args=self.args,
+                quiet=True,
+                sim_tol=sim_tol,
+                hull=True,
+                energy_key=self.energy_key
+            )
 
         self.construct_phase_diagram()
 
@@ -192,46 +193,38 @@ class QueryConvexHull:
             print_notify('{} structures found within {} eV of the hull, including chemical potentials.'
                          .format(len(self.hull_cursor), self.hull_cutoff))
 
-        display_results(self.hull_cursor, self.args, hull=True, use_source=use_source)
+        display_results(self.hull_cursor, hull=True, energy_key=self.energy_key, **self.args)
+
+        if self.compute_voltages:
+            print("Constructing electrode system with active ion: {}".format(self.species[0]))
+            self.voltage_curve([doc for doc in self.hull_cursor if doc['hull_distance'] <= 1e-9])
+
+        if self.compute_volumes:
+            self.volume_curve()
 
         if not self.args.get('no_plot'):
-            from matador import plotting
+            if self.compute_voltages and self.voltage_data:
+                print('plotting voltage')
+                self.plot_voltage_curve(show=False)
+            if self.compute_volumes and self.volume_data:
+                self.plot_volume_curve(show=False)
 
-        if self.args['subcmd'] == 'voltage':
-            self.voltage_curve([doc for doc in self.hull_cursor if doc['hull_distance'] <= 1e-9])
-            if not self.args.get('no_plot'):
-                plotting.plot_voltage_curve(self)
-                self.plot_hull(**plot_kwargs, debug=self.args.get('debug'))
+            self.plot_hull(**self.args['plot_kwargs'], debug=self.args.get('debug'), show=True)
 
-        if self.args.get('volume'):
-            self.volume_curve()
-            if not self.args.get('no_plot'):
-                plotting.plot_volume_curve(self)
-
-        if self.args['subcmd'] == 'hull' and not self.args.get('no_plot'):
-            self.plot_hull(**plot_kwargs, debug=self.args.get('debug'))
-
-        if self.args.get('uniq') and self.args['subcmd'] != 'swaps':
-            from matador.similarity.similarity import get_uniq_cursor
-            if self.args.get('uniq') is True:
-                sim_tol = 0.1
-            else:
-                sim_tol = self.args.get('uniq')
-            print_notify('Filtering for unique structures...')
-            unique_set, _, _, _ = get_uniq_cursor(self.hull_cursor, debug=self.args.get('debug'), sim_tol=sim_tol)
-            old_cursor_len = len(self.hull_cursor)
-            self.hull_cursor = [self.hull_cursor[ind] for ind in unique_set]
-            display_results(self.hull_cursor, hull=True, args=self.args)
-            print('Filtered {} down to {}'.format(old_cursor_len, len(unique_set)))
-
-        if quiet:
-            f.close()
-            sys.stdout = cached_stdout
+    def __repr__(self):
+        return display_results(self.hull_cursor, args=self.args, hull=True, energy_key=self.energy_key, return_str=True)
 
     @property
     def savefig(self):
         """ True if any figure type argument was passed. """
         return any([self.args.get('pdf'), self.args.get('png'), self.args.get('svg')])
+
+    @property
+    def savefig_ext(self):
+        """ Returns the figure extension to save with. """
+        for ext in ['pdf', 'png', 'svg']:
+            if self.args.get(ext):
+                return ext
 
     def plot_hull(self, **kwargs):
         """ Hull plot helper function. """
@@ -244,6 +237,31 @@ class QueryConvexHull:
             print_notify('Unable to plot phase diagram of dimension {}.'.format(self._dimension))
         return ax
 
+    def plot_voltage_curve(self, **kwargs):
+        """ Voltage plot helper function. """
+        from matador import plotting
+        savefig = None
+        if self.savefig:
+            savefig = '{}_voltage.{}'.format(''.join(self.elements), self.savefig_ext)
+
+        plotting.plot_voltage_curve(
+            self.voltage_data,
+            expt=self.args.get('expt'),
+            savefig=savefig,
+            labels=self.args.get('labels'),
+            expt_label=self.args.get('expt_label'),
+            **kwargs
+        )
+
+    def plot_volume_curve(self, **kwargs):
+        """ Volume plot helper function. """
+        from matador import plotting
+        plotting.plot_volume_curve(
+            self,
+            **self.args['plot_kwargs'],
+            show=False
+        )
+
     def fake_chempots(self, custom_elem=None):
         """ Spoof documents for command-line chemical potentials.
 
@@ -252,23 +270,27 @@ class QueryConvexHull:
 
         """
         self.chempot_cursor = []
+        print('Generating fake chempots...')
 
         if custom_elem is None:
             custom_elem = self.species
 
         if len(custom_elem) != len(self.species):
-            raise RuntimeError('Wrong number of compounds/chemical potentials specified: {} vs {}'.format(custom_elem, self.args.get('chempots')))
+            raise RuntimeError('Wrong number of compounds/chemical potentials specified: {} vs {}'
+                               .format(custom_elem, self.args.get('chempots')))
         for i, _ in enumerate(self.args.get('chempots')):
             self.chempot_cursor.append(dict())
             self.chempot_cursor[i]['stoichiometry'] = get_stoich_from_formula(custom_elem[i])
-            self.chempot_cursor[i]['enthalpy_per_atom'] = -1*abs(self.args.get('chempots')[i])
-            self.chempot_cursor[i]['enthalpy'] = self.chempot_cursor[i]['enthalpy_per_atom'] * sum(elem[1] for elem in self.chempot_cursor[i]['stoichiometry'])
+            self.chempot_cursor[i][self.energy_key] = -1*abs(self.args.get('chempots')[i])
+            self.chempot_cursor[i][self._extensive_energy_key] = self.chempot_cursor[i][self.energy_key] * \
+                sum(elem[1] for elem in self.chempot_cursor[i]['stoichiometry'])
             self.chempot_cursor[i]['num_fu'] = 1
+            self.chempot_cursor[i]['num_atoms'] = 1
             self.chempot_cursor[i]['text_id'] = ['command', 'line']
-            self.chempot_cursor[i]['_id'] = generate_hash(hash_len=10)
+            self.chempot_cursor[i]['_id'] = None
             self.chempot_cursor[i]['source'] = ['command_line']
             self.chempot_cursor[i]['space_group'] = 'xxx'
-            self.chempot_cursor[i]['enthalpy_per_b'] = self.chempot_cursor[i]['enthalpy_per_atom']
+            self.chempot_cursor[i][self._extensive_energy_key + '_per_b'] = self.chempot_cursor[i][self.energy_key]
             self.chempot_cursor[i]['num_a'] = 0
             self.chempot_cursor[i]['cell_volume'] = 1
             self.chempot_cursor[i]['concentration'] = [1 if i == ind else 0 for ind in range(self._dimension-1)]
@@ -276,7 +298,7 @@ class QueryConvexHull:
         notify = 'Custom chempots:'
         for chempot in self.chempot_cursor:
             notify += '{:3} = {} eV/fu, '.format(get_formula_from_stoich(chempot['stoichiometry'], sort=False),
-                                                 chempot['enthalpy'])
+                                                 chempot[self._extensive_energy_key])
 
         if self.args.get('debug'):
             for match in self.chempot_cursor:
@@ -285,263 +307,61 @@ class QueryConvexHull:
         print(notify)
         print(len(notify) * '─')
 
-    def get_hull_distances(self, structures, precompute=False):
-        """ Returns array of distances to pre-computed binary or ternary
-        hull, from array containing concentrations and energies.
-
-        Parameters:
-            structures (numpy.ndarray): N x n array of concentrations and
-                enthalpies for N structures, with up to 2 columns of
-                concentrations and the last column containing the
-                structure's formation enthalpy.
-
-        Keyword arguments:
-            precompute (bool): whether or not to bootstrap hull
-                distances from previously computed values at the same
-                stoichiometry.
-
-        Returns:
-            numpy.ndarray: N-dim array storing distances to
-                the hull for N structures,
-
-        """
-
-        if precompute:
-            # dict with formula keys, containing tuple of pre-computed enthalpy/atom and hull distance
-            cached_formula_dists = dict()
-            cache_hits = 0
-            cache_misses = 0
-
-        if isinstance(structures, list):
-            structures = np.asarray(structures)
-
-        # if only chem pots on hull, dist = energy
-        if len(self.structure_slice) == self._dimension:
-            hull_dist = np.ones((len(structures)))
-            hull_dist = structures[:, -1]
-
-        # if binary hull, do binary search
-        elif self._dimension == 2:
-            tie_line_comp = self.structure_slice[self.convex_hull.vertices, 0]
-            tie_line_energy = self.structure_slice[self.convex_hull.vertices, -1]
-            tie_line_comp = np.asarray(tie_line_comp)
-            tie_line_energy = tie_line_energy[np.argsort(tie_line_comp)]
-            tie_line_comp = tie_line_comp[np.argsort(tie_line_comp)]
-
-            hull_dist = np.ones((len(structures)))
-            if precompute:
-                for ind, _ in enumerate(structures):
-                    formula = get_formula_from_stoich(self.cursor[ind]['stoichiometry'], sort=True, tex=False)
-                    if formula in cached_formula_dists:
-                        hull_dist[ind] = (structures[ind, -1] - cached_formula_dists[formula][0] +
-                                          cached_formula_dists[formula][1])
-                        cache_hits += 1
-                    else:
-                        i = bisect_left(tie_line_comp, structures[ind, 0])
-                        gradient, intercept = vertices2line([[tie_line_comp[i-1], tie_line_energy[i-1]],
-                                                             [tie_line_comp[i], tie_line_energy[i]]])
-                        # calculate hull_dist
-                        hull_dist[ind] = structures[ind, -1] - (gradient * structures[ind, 0] + intercept)
-                        cached_formula_dists[formula] = (structures[ind, -1], hull_dist[ind])
-                        cache_misses += 1
-            else:
-                for ind, _ in enumerate(structures):
-                    i = bisect_left(tie_line_comp, structures[ind, 0])
-                    gradient, intercept = vertices2line([[tie_line_comp[i-1], tie_line_energy[i-1]],
-                                                         [tie_line_comp[i], tie_line_energy[i]]])
-                    # calculate hull_dist
-                    hull_dist[ind] = structures[ind, -1] - (gradient * structures[ind, 0] + intercept)
-
-        # if ternary, use barycentric coords
-        elif self._dimension == 3:
-            # for each plane, convert each point into barycentric coordinates
-            # for that plane and test for negative values
-            self.convex_hull.planes = [[self.structure_slice[vertex] for vertex in simplex]
-                                       for simplex in self.convex_hull.simplices]
-            structures_finished = [False] * len(structures)
-            hull_dist = np.ones((len(structures) + 1))
-            planes_R_inv = []
-            planes_height_fn = []
-            for ind, plane in enumerate(self.convex_hull.planes):
-                R = barycentric2cart(plane).T
-                R[-1, :] = 1
-                # if projection of triangle in 2D is a line, do binary search
-                if np.linalg.det(R) == 0:
-                    planes_R_inv.append(None)
-                    planes_height_fn.append(None)
-                else:
-                    planes_R_inv.append(np.linalg.inv(R))
-                    planes_height_fn.append(vertices2plane(plane))
-            for idx, structure in enumerate(structures):
-                for ind, plane in enumerate(self.convex_hull.planes):
-                    if structures_finished[idx] or planes_R_inv[ind] is None:
-                        continue
-                    if precompute and get_formula_from_stoich(self.cursor[idx]['stoichiometry'], sort=True,
-                                                              tex=False) in cached_formula_dists:
-                        formula = get_formula_from_stoich(self.cursor[idx]['stoichiometry'], sort=True, tex=False)
-                        if formula in cached_formula_dists:
-                            cache_hits += 1
-                            hull_dist[idx] = (structures[idx, -1] - cached_formula_dists[formula][0] +
-                                              cached_formula_dists[formula][1])
-                            structures_finished[idx] = True
-                    else:
-                        barycentric_structure = barycentric2cart(structure.reshape(1, 3)).T
-                        barycentric_structure[-1, :] = 1
-                        plane_barycentric_structure = np.matrix(planes_R_inv[ind]) * np.matrix(barycentric_structure)
-                        if (plane_barycentric_structure >= 0 - 1e-12).all():
-                            structures_finished[idx] = True
-                            hull_dist[idx] = planes_height_fn[ind](structure)
-                            if precompute:
-                                cached_formula_dists[
-                                    get_formula_from_stoich(self.cursor[idx]['stoichiometry'], sort=True,
-                                                            tex=False)] = (structure[-1], hull_dist[idx])
-                                cache_misses += 1
-
-            for idx, dist in enumerate(hull_dist):
-                if np.abs(dist) < EPS:
-                    hull_dist[idx] = 0
-
-            failed_structures = []
-            for ind, structure in enumerate(structures_finished):
-                if not structure:
-                    failed_structures.append(ind)
-            if failed_structures:
-                raise RuntimeError('There were issues calculating the hull distance for {} structures.'.format(len(failed_structures)))
-
-            hull_dist = hull_dist[:-1]
-
-        # otherwise, set to zero until proper N-d distance can be implemented
-        else:
-            raise NotImplementedError
-            # self.hull.planes = [[self.structure_slice[vertex] for vertex in simplex]
-                                # for simplex in self.hull.simplices]
-            # for idx, structure in enumerate(structures):
-                # if precompute and get_formula_from_stoich(self.cursor[idx]['stoichiometry'],
-                                                          # tex=False) in cached_formula_dists:
-                    # formula = get_formula_from_stoich(self.cursor[idx]['stoichiometry'], tex=False)
-                    # if formula in cached_formula_dists:
-                        # cache_hits += 1
-                        # hull_dist[idx] = (structures[idx, -1] - cached_formula_dists[formula][0] +
-                                          # cached_formula_dists[formula][1])
-                    # structures_finished[idx] = True
-                # else:
-                    # if point_in_polygon(structure[:-1], plane):
-                        # hull_dist[idx] = 0
-                        # continue
-
-            # loop over compositions
-                # loop over planes
-                    # check if point is interior to plane
-                        # if so, compute "height" above plane, using equation of hyperplane from scipy
-
-        return hull_dist
-
-    def point_in_polygon(self):
-        """ Use "ray-tracing" or winding number approach
-        to compute whether a point lies inside a polygon.
-        """
-        raise NotImplementedError
-
     def construct_phase_diagram(self):
         """ Create a phase diagram with arbitrary chemical potentials.
 
         Expects self.cursor to be populated with structures and chemical potential
         labels to be set under self.species.
 
-        TODO: optimise cursor filtering for simple cases.
-
         """
         self.set_chempots()
         self.cursor = filter_cursor_by_chempots(self.species, self.cursor)
 
         formation_key = 'formation_{}'.format(self.energy_key)
+        extensive_formation_key = 'formation_{}'.format(self._extensive_energy_key)
         for ind, doc in enumerate(self.cursor):
             self.cursor[ind][formation_key] = get_formation_energy(self.chempot_cursor, doc,
-                                                                   energy_key=self.energy_key,
-                                                                   temperature=self.temperature)
+                                                                   energy_key=self.energy_key)
+            self.cursor[ind][extensive_formation_key] = doc[formation_key] * doc['num_atoms']
 
-        structures = np.hstack((
-            get_array_from_cursor(self.cursor, 'concentration').reshape(len(self.cursor), self._dimension-1),
-            get_array_from_cursor(self.cursor, formation_key).reshape(len(self.cursor), 1)))
+        if self._non_elemental and self.args.get('subcmd') in ['voltage', 'volume']:
+            raise NotImplementedError('Pseudo-binary/pseudo-ternary voltages not yet implemented.')
 
-        if not self._non_elemental:
-            self._setup_per_b_fields()
-        elif self.args.get('subcmd') in ['voltage', 'volume']:
-            raise NotImplementedError('Pseudo-binary/ternary voltages not yet implemented.')
-
-        if self._dimension == 3:
-            # add a point "above" the hull
-            # for simple removal of extraneous vertices (e.g. top of 2D hull)
-            dummy_point = [0.333, 0.333, 1e5]
-            # if ternary, use all structures, not just those with negative eform for compatibility reasons
-            self.structure_slice = np.vstack((structures, dummy_point))
-        else:
-            # filter out those with positive formation energy, to reduce expense computing hull
-            self.structure_slice = structures[np.where(structures[:, -1] <= 0 + EPS)]
-
-        # if we only have the chempots (or worse) with negative formation energy, don't even make the hull
-        if len(self.structure_slice) <= self._dimension:
-            if len(self.structure_slice) < self._dimension:
-                raise RuntimeError('No chemical potentials on hull... either mysterious use of custom chempots, or worry!')
-            self.convex_hull = FakeHull()
-        else:
-            try:
-                self.convex_hull = ConvexHull(self.structure_slice)
-            except QhullError:
-                print('Error with QHull, plotting formation energies only...')
-                print('To view errors, use --debug')
-                if self.args.get('debug'):
-                    print_exc()
-                self.convex_hull = FakeHull()
-
-        # remove vertices that have positive formation energy
-        filtered_vertices = [vertex for vertex in self.convex_hull.vertices if self.structure_slice[vertex, -1] <= 0 + EPS]
-        temp_simplices = self.convex_hull.simplices
-        bad_simplices = []
-        for ind, simplex in enumerate(temp_simplices):
-            for vertex in simplex:
-                if vertex not in filtered_vertices:
-                    bad_simplices.append(ind)
-                    break
-        filtered_simplices = [simplex for ind, simplex in enumerate(temp_simplices) if ind not in bad_simplices]
-        del self.convex_hull
-        self.convex_hull = FakeHull()
-        self.convex_hull.vertices = list(filtered_vertices)
-        self.convex_hull.simplices = list(filtered_simplices)
-
-        self.hull_dist = self.get_hull_distances(structures, precompute=True)
-        set_cursor_from_array(self.cursor, self.hull_dist, 'hull_distance')
+        self.phase_diagram = PhaseDiagram(self.cursor, formation_key, self._dimension)
+        # aliases for data stored in phase diagram
+        self.structures = self.phase_diagram.structures
+        self.hull_dist = self.phase_diagram.hull_dist
+        self.convex_hull = self.phase_diagram.convex_hull
 
         # ensure hull cursor is sorted by enthalpy_per_atom,
         # then by concentration, as it will be by default if from database
         hull_cursor = [self.cursor[idx] for idx in np.where(self.hull_dist <= self.hull_cutoff + EPS)[0]]
-        if self.temperature is not None:
-            hull_cursor = sorted(hull_cursor, key=lambda doc: doc[self.energy_key][self.temperature])
-        else:
-            hull_cursor = sorted(hull_cursor, key=lambda doc: doc[self.energy_key])
-        hull_cursor = sorted(hull_cursor, key=lambda k: k['concentration'])
+        # TODO: check why this fails when the opposite way around
+        hull_cursor = sorted(hull_cursor, key=lambda doc: (doc['concentration'], recursive_get(doc, self.energy_key)))
 
+        # by default hull cursor includes all structures within hull_cutoff
         # if summary requested and we're in hulldiff mode, filter hull_cursor for lowest per stoich
         if self.args.get('summary') and self.args['subcmd'] == 'hulldiff':
-            self.hull_cursor = []
+            tmp_hull_cursor = []
             compositions = set()
             for ind, member in enumerate(hull_cursor):
                 formula = get_formula_from_stoich(member['stoichiometry'], sort=True)
                 if formula not in compositions:
                     compositions.add(formula)
-                    self.hull_cursor.append(member)
-        # otherwise, hull cursor includes all structures within hull_cutoff
-        else:
-            self.hull_cursor = hull_cursor
+                    tmp_hull_cursor.append(member)
 
-        self.structures = structures
+            hull_cursor = tmp_hull_cursor
 
-    def set_chempots(self):
+        self.hull_cursor = hull_cursor
+
+    def set_chempots(self, energy_key=None):
         """ Search for chemical potentials that match the structures in
         the query cursor and add them to the cursor. Also set the concentration
-        of chemical potentials in cursor, if not already set.
+        of chemical potentials in :attr:`cursor`, if not already set.
 
         """
+        if energy_key is None:
+            energy_key = self.energy_key
         query = self._query
         query_dict = dict()
         species_stoich = [sorted(get_stoich_from_formula(spec, sort=False)) for spec in self.species]
@@ -552,8 +372,7 @@ class QueryConvexHull:
 
         elif self.from_cursor:
             chempot_cursor = sorted([doc for doc in self.cursor if doc['stoichiometry'] in species_stoich],
-                                    key=lambda k: (k[self.energy_key] if self.temperature is None
-                                                   else k[self.energy_key][self.temperature]))
+                                    key=lambda doc: recursive_get(doc, energy_key))
 
             for species in species_stoich:
                 for doc in chempot_cursor:
@@ -562,11 +381,8 @@ class QueryConvexHull:
                         break
 
             if len(self.chempot_cursor) != len(self.species):
-                raise RuntimeError('Found {} of {} required chemical potentials'.format(len(self.chempot_cursor), len(self.species)))
-
-            for ind, doc in enumerate(self.chempot_cursor):
-                self.chempot_cursor[ind]['enthalpy_per_b'] = doc[self.energy_key]
-                self.chempot_cursor[ind]['cell_volume_per_b'] = float('inf') if ind == 0 else 0.0
+                raise RuntimeError('Found {} of {} required chemical potentials'
+                                   .format(len(self.chempot_cursor), len(self.species)))
 
             if self.args.get('debug'):
                 print([mu['stoichiometry'] for mu in self.chempot_cursor])
@@ -581,18 +397,18 @@ class QueryConvexHull:
                 query_dict['$and'] = deepcopy(list(query.calc_dict['$and']))
 
                 if not self.args.get('ignore_warnings'):
-                    query_dict['$and'].append(query._query_quality())
+                    query_dict['$and'].append(query.query_quality())
 
                 if len(species_stoich[ind]) == 1:
-                    query_dict['$and'].append(query._query_composition(custom_elem=[elem]))
+                    query_dict['$and'].append(query.query_composition(custom_elem=[elem]))
                 else:
-                    query_dict['$and'].append(query._query_stoichiometry(custom_stoich=[elem]))
+                    query_dict['$and'].append(query.query_stoichiometry(custom_stoich=[elem]))
 
                 # if oqmd, only query composition, not parameters
                 if query.args.get('tags') is not None:
-                    query_dict['$and'].append(query._query_tags())
+                    query_dict['$and'].append(query.query_tags())
 
-                mu_cursor = query.repo.find(SON(query_dict)).sort(self.energy_key, pm.ASCENDING)
+                mu_cursor = query.repo.find(SON(query_dict)).sort(energy_key, pm.ASCENDING)
                 if mu_cursor.count() == 0:
                     print_notify('Failed... searching without spin polarization field...')
                     scanned = False
@@ -604,7 +420,7 @@ class QueryConvexHull:
                                     break
                             if idx == len(query_dict['$and']) - 1:
                                 scanned = True
-                    mu_cursor = query.repo.find(SON(query_dict)).sort(self.energy_key, pm.ASCENDING)
+                    mu_cursor = query.repo.find(SON(query_dict)).sort(energy_key, pm.ASCENDING)
 
                 if mu_cursor.count() == 0:
                     raise RuntimeError('No chemical potentials found for {}...'.format(elem))
@@ -618,7 +434,7 @@ class QueryConvexHull:
                     raise RuntimeError('No possible chem pots available for {}.'.format(elem))
 
             for i, mu in enumerate(self.chempot_cursor):
-                self.chempot_cursor[i]['enthalpy_per_b'] = mu[self.energy_key]
+                self.chempot_cursor[i][self._extensive_energy_key + '_per_b'] = mu[energy_key]
                 self.chempot_cursor[i]['num_a'] = 0
 
             self.chempot_cursor[0]['num_a'] = float('inf')
@@ -626,10 +442,10 @@ class QueryConvexHull:
         # don't check for IDs if we're loading from cursor
         if not self.from_cursor:
             ids = [doc['_id'] for doc in self.cursor]
-            if self.chempot_cursor[0]['_id'] not in ids:
+            if self.chempot_cursor[0]['_id'] is None or self.chempot_cursor[0]['_id'] not in ids:
                 self.cursor.insert(0, self.chempot_cursor[0])
             for match in self.chempot_cursor[1:]:
-                if match['_id'] not in ids:
+                if match['_id'] is None or match['_id'] not in ids:
                     self.cursor.append(match)
 
         # add faked chempots to overall cursor
@@ -663,6 +479,8 @@ class QueryConvexHull:
 
     def _setup_per_b_fields(self):
         """ Calculate the enthalpy and volume per "B" in A_x B. """
+        if self._per_b_done:
+            return
         for ind, doc in enumerate(self.cursor):
             nums_b = len(self.species[1:]) * [0]
             for elem in doc['stoichiometry']:
@@ -673,310 +491,207 @@ class QueryConvexHull:
             num_b = sum(nums_b)
             num_fu = doc['num_fu']
             if num_b == 0:
-                self.cursor[ind]['enthalpy_per_b'] = 12345e5
+                self.cursor[ind][self._extensive_energy_key + '_per_b'] = 12345e5
                 self.cursor[ind]['cell_volume_per_b'] = 12345e5
             else:
-                if self.energy_key == 'enthalpy_per_atom':
-                    self.cursor[ind]['enthalpy_per_b'] = doc['enthalpy'] / (num_b * num_fu)
-                else:
+                self.cursor[ind][self._extensive_energy_key + '_per_b'] = doc[self._extensive_energy_key] / (num_b * num_fu)
+                if 'cell_volume' in doc:
+                    self.cursor[ind]['cell_volume_per_b'] = doc['cell_volume'] / (num_b * num_fu)
 
-                    if self.temperature is not None:
-                        key = self.energy_key.split("_per_atom")[0]
-                        self.cursor[ind]['enthalpy_per_b'] = doc[key][self.temperature] / (num_b * num_fu)
-                    else:
-                        self.cursor[ind]['enthalpy_per_b'] = doc[self.energy_key.split("_per_atom")[0]] / (num_b * num_fu)
-
-                self.cursor[ind]['cell_volume_per_b'] = doc['cell_volume'] / (num_b * num_fu)
-
-        Q = np.zeros((len(self.cursor)))
+        capacities = np.zeros((len(self.cursor)))
         for i, doc in enumerate(self.cursor):
             concs = self.cursor[i]['concentration']
             concs = get_padded_composition(doc['stoichiometry'], self.elements)
-            Q[i] = get_generic_grav_capacity(concs, self.elements)
-        set_cursor_from_array(self.cursor, Q, 'gravimetric_capacity')
+            capacities[i] = get_generic_grav_capacity(concs, self.elements)
+        set_cursor_from_array(self.cursor, capacities, 'gravimetric_capacity')
+        self._per_b_done = True
 
-    def voltage_curve(self, hull_cursor, quiet=False):
+    def voltage_curve(self, hull_cursor):
         """ Take a computed convex hull and calculate voltages for either binary or ternary
         systems. Sets the self.voltage_data attribute with various fields.
 
         Parameters:
             hull_cursor (list(dict)): list of structures to include in the voltage curve.
 
-        Keyword arguments:
-            quiet (bool): if False, print voltage data
-
         """
+        if not self._non_elemental:
+            self._setup_per_b_fields()
         if self._dimension == 2:
-            self._calculate_binary_voltage_curve(hull_cursor, quiet=quiet)
+            self._calculate_binary_voltage_curve(hull_cursor)
         elif self._dimension == 3:
-            self._calculate_ternary_voltage_curve(hull_cursor, quiet=quiet)
+            self._calculate_ternary_voltage_curve(hull_cursor)
         else:
             raise RuntimeError('Unable to calculate voltage curve for hull of dimension {}'.format(self._dimension))
 
-        data_str = ''
-        for ind, path in enumerate(self.voltage_data['Q']):
-            if ind != 0:
-                data_str += '\n'
-            if self._dimension == 3:
-                data_str += '# ' + get_formula_from_stoich(self.voltage_data['endstoichs'][ind]) + '\n'
-            else:
-                data_str += '# ' + ''.join(self.species) + '\n'
-            data_str += '# {:^10},\t{:^10},\t{:^10}\n'.format('x', 'Q (mAh/g)', 'Voltage (V)')
-            for idx, _ in enumerate(path):
-                data_str += '{:>10.2f},\t{:>10.2f},\t{:>10.4f}'.format(self.voltage_data['x'][ind][idx],
-                                                                       self.voltage_data['Q'][ind][idx],
-                                                                       self.voltage_data['voltages'][ind][idx])
-                if idx != len(path) - 1:
-                    data_str += '\n'
-        if self.args.get('csv'):
-            with open(''.join(self.species) + '_voltage.csv', 'w') as f:
-                f.write(data_str)
-        if not quiet:
-            print('\nVoltage data:')
-            print('\n' + data_str)
+        self._scale_voltages(self.species[0])
 
-    def volume_curve(self, quiet=False):
+        for profile in self.voltage_data:
+            print(profile.voltage_summary(csv=self.args.get('csv', False)))
+
+    def volume_curve(self):
         """ Take stable compositions and volume and calculate
         volume expansion per "B" in AB binary.
 
-        Keyword arguments:
-            quiet (bool): if False, print voltage data
-
         """
 
+        if not self._non_elemental and not self._per_b_done:
+            self._setup_per_b_fields()
         if self._dimension == 2:
             self._calculate_binary_volume_curve()
+        elif self._dimension == 3:
+            # dimension 3 is implemented inside the voltage curve call.
+            pass
         else:
-            raise NotImplementedError('Volume curves have only been implemented for binary phase diagrams.')
+            raise NotImplementedError(
+                "Volume curves have only been implemented for binary and ternary phase diagrams."
+            )
 
-        data_str = ''
-        data_str += '# ' + ''.join(self.species) + '\n'
-        data_str += '# {:>10},\t{:>10}\n'.format('x in {d[0]}x{d[1]}'.format(d=self.species),
-                                                 'Volume per {} (Ang^3)'.format(self.species[1]))
-        for idx, _ in enumerate(self.volume_data['x']):
-            data_str += '{:>10.2f},\t{:>10.4f}'.format(self.volume_data['x'][idx],
-                                                       self.volume_data['vol_per_y'][idx])
-            if idx != len(self.volume_data['x']) - 1:
-                data_str += '\n'
-        if self.args.get('csv'):
-            with open(''.join(self.species) + '_volume.csv', 'w') as f:
-                f.write(data_str)
-        if not quiet:
+        self.print_volume_summary()
+
+    def print_volume_summary(self):
+        """ Prints a volume data summary.
+
+        If self.args['csv'] is True, save the summary to a file.
+
+        """
+        for reaction_idx, _ in enumerate(self.volume_data['Q']):
+            data_str = '# Reaction {} \n'.format(reaction_idx+1)
+            data_str += '# ' + ''.join(get_formula_from_stoich(self.volume_data['endstoichs'][reaction_idx])) + '\n'
+            data_str += '# {:>10}\t{:>14} \t{:>14}\n'.format('Q (mAh/g)', 'Volume (A^3)', 'Volume ratio with bulk')
+            for idx, _ in enumerate(self.volume_data['electrode_volume'][reaction_idx]):
+                data_str += ('{:>10.2f} \t{:14.2f} \t{:14.2f}'
+                             .format(self.volume_data['Q'][reaction_idx][idx],
+                                     self.volume_data['electrode_volume'][reaction_idx][idx],
+                                     self.volume_data['volume_ratio_with_bulk'][reaction_idx][idx]))
+                if idx != len(self.volume_data['Q'][reaction_idx]) - 1:
+                    data_str += '\n'
+            if self.args.get('csv'):
+                with open(''.join(self.species) + '_volume.csv', 'w') as f:
+                    f.write(data_str)
             print('\nVolume data:')
             print('\n' + data_str)
 
-    def _calculate_binary_voltage_curve(self, hull_cursor, quiet=False):
+    def get_hull_distances(self, *args, **kwargs):
+        """ Wrapper to PhaseDiagram.get_hull_distances. """
+        return self.phase_diagram.get_hull_distances(*args, **kwargs)
+
+    def _calculate_binary_voltage_curve(self, hull_cursor):
         """ Generate binary voltage curve, setting the self.voltage_data
         dictionary.
 
         Parameters:
             hull_cursor (list(dict)): list of structures to include in the voltage curve.
 
-        Keyword arguments:
-            quiet (bool): if False, print voltage data
-
         """
-
-        if not quiet:
-            print('Generating voltage curve...')
-        if self.temperature is not None and self.energy_key is not None:
-            mu_enthalpy = []
-            for doc in self.chempot_cursor:
-                mu_enthalpy.append(doc[self.energy_key][self.temperature])
-            mu_enthalpy = np.asarray(mu_enthalpy)
-            if len(mu_enthalpy) != len(self.chempot_cursor):
-                raise RuntimeError('Some keys were missing.')
-        elif self.energy_key is not None:
-            mu_enthalpy = get_array_from_cursor(self.chempot_cursor, self.energy_key)
-        else:
-            mu_enthalpy = get_array_from_cursor(self.chempot_cursor, 'enthalpy_per_atom')
-        x = get_num_intercalated(hull_cursor)
-        # sort for voltage calculation
-        Q = get_array_from_cursor(hull_cursor, 'gravimetric_capacity')
-        Q = Q[np.argsort(x)]
-        stable_enthalpy_per_b = get_array_from_cursor(hull_cursor, 'enthalpy_per_b')[np.argsort(x)]
+        mu_enthalpy = get_array_from_cursor(self.chempot_cursor, self.energy_key)
+        # take a copy of the cursor so it can be reordered
+        _hull_cursor = deepcopy(hull_cursor)
+        x = get_num_intercalated(_hull_cursor)
+        _x_order = np.argsort(x)
+        capacities = np.asarray([
+            get_generic_grav_capacity(
+                get_padded_composition(doc['stoichiometry'], self.elements),
+                self.elements)
+            for doc in _hull_cursor
+        ])
+        set_cursor_from_array(_hull_cursor, x, 'conc_of_active_ion')
+        set_cursor_from_array(_hull_cursor, capacities, 'gravimetric_capacity')
+        _hull_cursor = sorted(_hull_cursor, key=lambda doc: doc['conc_of_active_ion'])
+        capacities = capacities[_x_order]
         x = np.sort(x)
+        stable_enthalpy_per_b = get_array_from_cursor(_hull_cursor,
+                                                      self._extensive_energy_key + '_per_b')
+
         x, uniq_idxs = np.unique(x, return_index=True)
         stable_enthalpy_per_b = stable_enthalpy_per_b[uniq_idxs]
-        Q = Q[uniq_idxs]
-        V = []
-        for i, _ in enumerate(x):
-            V.append(
-                -(stable_enthalpy_per_b[i] - stable_enthalpy_per_b[i-1]) / (x[i] - x[i-1]) + mu_enthalpy[0])
-        V[0] = V[1]
-        V[-1] = 0
-        # make V, Q and x available for plotting
-        self.voltage_data['voltages'] = []
-        self.voltage_data['voltages'].append(V)
-        self.voltage_data['Q'] = []
-        self.voltage_data['Q'].append(Q)
-        self.voltage_data['x'] = []
-        self.voltage_data['x'].append(x)
+        capacities = capacities[uniq_idxs]
 
-    def _calculate_ternary_voltage_curve(self, hull_cursor, quiet=False):
+        V = np.zeros_like(x)
+        V[1:] = - np.diff(stable_enthalpy_per_b) / np.diff(x) + mu_enthalpy[0]
+        V[0] = V[1]
+
+        reactions = [((None, get_formula_from_stoich(doc['stoichiometry'])),) for doc in _hull_cursor[1:]]
+
+        # make V, Q and x available for plotting, stripping NaNs to re-add later
+        # in the edge case of duplicate chemical potentials
+        capacities, unique_caps = np.unique(capacities, return_index=True)
+        non_nan = np.argwhere(np.isfinite(capacities))
+        V = (np.asarray(V)[unique_caps])[non_nan].flatten().tolist()
+        x = (np.asarray(x)[unique_caps])[non_nan].flatten().tolist()
+        capacities = capacities[non_nan].flatten().tolist()
+
+        x.append(np.nan)
+        capacities.append(np.nan)
+        V.append(0.0)
+
+        average_voltage = Electrode.calculate_average_voltage(capacities, V)
+        profile = VoltageProfile(
+            voltages=V,
+            capacities=capacities,
+            average_voltage=average_voltage,
+            starting_stoichiometry=[[self.species[1], 1.0]],
+            reactions=reactions,
+            active_ion=self.species[0]
+        )
+        self.voltage_data.append(profile)
+
+    def _calculate_ternary_voltage_curve(self, hull_cursor):
         """ Calculate tenary voltage curve, setting self.voltage_data.
         First pass written by James Darby, jpd47@cam.ac.uk.
 
         Parameters:
             hull_cursor (list(dict)): list of structures to include in the voltage curve.
 
-        Keyword arguments:
-            quiet (bool): if False, print voltage data
-
         """
+
+        # construct working array of concentrations and energies
+        stoichs = get_array_from_cursor(hull_cursor, 'stoichiometry')
+
+        # do another convex hull on just the known hull points, to allow access to useful indices
+        import scipy.spatial
+
+        # construct working array of concentrations and energies
         points = np.hstack((
             get_array_from_cursor(hull_cursor, 'concentration'),
-            get_array_from_cursor(hull_cursor, 'enthalpy_per_atom').reshape(len(hull_cursor), 1)))
+            get_array_from_cursor(hull_cursor, self.energy_key).reshape(len(hull_cursor), 1)
+        ))
         stoichs = get_array_from_cursor(hull_cursor, 'stoichiometry')
-        mu_enthalpy = get_array_from_cursor(self.chempot_cursor, 'enthalpy_per_atom')
-        enthalpy_active_ion = mu_enthalpy[0]
+
         # do another convex hull on just the known hull points, to allow access to useful indices
-        hull = ConvexHull(points)
+        convex_hull = scipy.spatial.ConvexHull(points)
 
-        endpoints = []
-        endstoichs = []
-        for ind, point in enumerate(points):
-            if point[0] == 0 and point[1] != 0 and point[1] != 1:
-                if not any([point.tolist() == test_point.tolist() for test_point in endpoints]):
-                    endpoints.append(point)
-                    endstoichs.append(stoichs[ind])
-        if not quiet:
-            print('{} starting point(s) found.'.format(len(endstoichs)))
-            for endstoich in endstoichs:
-                print(get_formula_from_stoich(endstoich), end=' ')
-            print('\n')
+        endpoints, endstoichs = Electrode._find_starting_materials(convex_hull.points, stoichs)
+        print('{} starting point(s) found.'.format(len(endstoichs)))
+        for endstoich in endstoichs:
+            print(get_formula_from_stoich(endstoich), end=' ')
+        print('\n')
 
-        # iterate over possible endpoints of delithiation
-        _reactions = []
-        _voltages = []
-        _Q = []
+        # iterate over possible delithiated phases
         for reaction_ind, endpoint in enumerate(endpoints):
-            ratio = endpoint[1] / (1 - endpoint[0] - endpoint[1])
-            if not quiet:
-                print(30 * '-')
-                print('Reaction {}, {}:'.format(reaction_ind, get_formula_from_stoich(endstoichs[reaction_ind])))
-            y0 = endpoint[1] / (1 - endpoint[0])
-            simp_in = 0
-            intersections = []
-            crossover = []
-            # put starting point into crossover just in case it is not detected
-            sum_conc = sum([int(species[1]) for species in endstoichs[reaction_ind]])
-            conc = [int(species[1]) / sum_conc for species in endstoichs[reaction_ind]]
-            if len(conc) == 2:
-                conc.insert(0, 0.0)
-            crossover.append(conc)
-            for simplex in hull.simplices:
-                tints = []
-                for i in range(3):
-                    j = (i + 1) % 3
-                    e = points[simplex[i], 0]
-                    f = points[simplex[i], 1]
-                    g = points[simplex[j], 0] - points[simplex[i], 0]
-                    h = points[simplex[j], 1] - points[simplex[i], 1]
+            print(30 * '-')
+            print('Reaction {}, {}:'.format(reaction_ind+1, get_formula_from_stoich(endstoichs[reaction_ind])))
+            reactions, capacities, voltages, average_voltage, volumes = self._construct_electrode(
+                convex_hull, endpoint, endstoichs[reaction_ind], hull_cursor
+            )
 
-                    x1 = e
-                    y1 = f
-                    z1 = 1 - x1 - y1
-                    x2 = points[simplex[j], 0]
-                    y2 = points[simplex[j], 1]
-                    z2 = 1 - x2 - y2
+            profile = VoltageProfile(
+                starting_stoichiometry=endstoichs[reaction_ind],
+                reactions=reactions,
+                capacities=capacities,
+                voltages=voltages,
+                average_voltage=average_voltage,
+                active_ion=self.species[0]
+            )
+            self.voltage_data.append(profile)
 
-                    if np.abs(h + g * y0) > EPS:
-                        tin = (e * h + g * y0 - f * g) / (h + g * y0)
-                        s2 = (y0 - e * y0 - f) / (h + g * y0)
-                        if tin >= 0 and tin <= 1 and s2 >= 0 and s2 <= 1:
-                            tints = np.append(tints, tin)
-                            a = 1
-                            # x1-x2 never == 0 on points we care about
-                            if np.abs(x1 - x2) > EPS:
-                                b = (y1 - y2) / (x1 - x2)
-                                c = (z1 - z2) / (x1 - x2)
-                                x_cross = tin
-                                y_cross = b * (tin - x1) / a + y1
-                                z_cross = c * (tin - x1) / a + z1
-                                # only append unique points
-                                if (len(crossover) == 0 or not np.any([np.isclose([x_cross, y_cross, z_cross], val)
-                                                                       for val in crossover])):
-                                    if y1 != 0 and y2 != 0 and round(float(z1 / y1), 5) == round(float(
-                                            z2 / y2), 5) and round(float(z1 / y1), 5) == round(ratio, 5):
-                                        pass
-                                    else:
-                                        crossover.append([x_cross, y_cross, z_cross])
-                if len(tints) != 0:
-                    temp = [simp_in, np.amin(tints), np.amax(tints)]
-                    # condition removes the big triangle and the points which only graze the line of interest
-                    if all([temp[2] > EPS, temp[1] < 1, temp[2] - temp[1] > EPS, temp[2] - temp[1] < 1,
-                            temp[1] != temp[2]]):
-                        intersections = np.append(intersections, temp)
-                simp_in += 1
-
-            # if tie line runs from fully de-lithiated to pure lithium (for example), then print and skip
-            if not quiet:
-                if len(intersections) == 0:
-                    print_notify('No intermediate structures found for starting point {}.'.format(get_formula_from_stoich(endstoichs[reaction_ind])))
-                    continue
-
-            intersections = np.asarray(intersections)
-            intersections = intersections.reshape(-1, 3)
-            intersections = intersections[intersections[:, 1].argsort()]
-            ends_of_rows = []
-            min_values = []
-            rows_to_keep = []
-            # remove row corresponding to largest triangle, i.e. chempots only, and near duplicates (i.e. points with multiple tie-lines)
-            for ind, row in enumerate(intersections):
-                if not (row[1:].tolist() == [0, 1] or row[1:].tolist() in ends_of_rows or
-                        np.any(np.isclose(row.tolist()[1], [val for val in min_values]))):
-                    rows_to_keep.append(ind)
-                    ends_of_rows.append(row[1:].tolist())
-                    min_values.append(row.tolist()[1])
-            intersections = intersections[rows_to_keep]
-
-            voltages = []
-            crossover = sorted(crossover)
-            Q = sorted([get_generic_grav_capacity(point, self.species) for point in crossover])
-            reactions = []
-            reaction = [get_formula_from_stoich(endstoichs[reaction_ind])]
-            reactions.append(reaction)
-            for ind, face in enumerate(intersections):
-                simplex_index = int(face[0])
-                reaction = []
-                reaction = [get_formula_from_stoich(hull_cursor[idx]['stoichiometry'])
-                            for idx in hull.simplices[simplex_index]
-                            if get_formula_from_stoich(hull_cursor[idx]['stoichiometry']) not in reaction]
-                reactions.append(reaction)
-                if not quiet:
-                    print('{d[0]} + {d[1]} + {d[2]}'.format(d=reaction))
-                Evec = points[hull.simplices[simplex_index], 2]
-                Comp = points[hull.simplices[simplex_index], :]
-                Comp[:, 2] = 1 - Comp[:, 0] - Comp[:, 1]
-
-                Comp = Comp.T
-                Compinv = np.linalg.inv(Comp)
-
-                X = [1, 0, 0]
-
-                V = -(Compinv.dot(X)).dot(Evec)
-                V = V + enthalpy_active_ion
-                # double up on first voltage
-                if ind == 0:
-                    voltages.append(V)
-                if not quiet:
-                    if ind != len(intersections) - 1:
-                        print(5 * (ind + 1) * ' ' + ' ---> ', end='')
-                voltages.append(V)
-
-            _reactions.append(reactions)
-            _Q.append(Q)
-            _voltages.append(voltages)
-            if not quiet:
-                print('\n')
-        assert len(_Q) == len(_voltages)
-
-        self.voltage_data['x'] = _Q
-        self.voltage_data['Q'] = _Q
-        self.voltage_data['voltages'] = _voltages
-        self.voltage_data['reactions'] = _reactions
-        self.voltage_data['endstoichs'] = endstoichs
+            if not self._non_elemental:
+                self.volume_data['x'].append(capacities)
+                self.volume_data['Q'].append(capacities)
+                self.volume_data['electrode_volume'].append(volumes)
+                self.volume_data['endstoichs'].append(endstoichs[reaction_ind])
+                self.volume_data['volume_ratio_with_bulk'].append(np.asarray(volumes) / volumes[0])
+                self.volume_data['volume_expansion_percentage'].append(((np.asarray(volumes) / volumes[0]) - 1) * 100)
+                self.volume_data['hull_distances'].append(np.zeros_like(capacities))
 
     def _calculate_binary_volume_curve(self):
         """ Take stable compositions and volume and calculate volume
@@ -984,12 +699,352 @@ class QueryConvexHull:
 
         """
         stable_comp = get_array_from_cursor(self.hull_cursor, 'concentration')
+        stable_comp, unique_comp_inds = np.unique(stable_comp, return_index=True)
         for doc in self.hull_cursor:
             if 'cell_volume_per_b' not in doc:
-                print(doc)
-        stable_vol = get_array_from_cursor(self.hull_cursor, 'cell_volume_per_b')
-        self.volume_data['x'] = np.asarray([comp / (1 - comp) for comp in stable_comp[:-1]]).flatten()
-        self.volume_data['vol_per_y'] = np.asarray([vol for vol in stable_vol[:-1]])
-        self.volume_data['bulk_volume'] = self.volume_data['vol_per_y'][0]
-        self.volume_data['bulk_species'] = self.species[-1]
-        self.volume_data['volume_ratio_with_bulk'] = self.volume_data['vol_per_y'] / self.volume_data['bulk_volume']
+                raise RuntimeError("Document missing key `cell_volume_per_b`: {}".format(doc))
+        stable_stoichs = get_array_from_cursor(self.hull_cursor, 'stoichiometry')[unique_comp_inds]
+        stable_vol = get_array_from_cursor(self.hull_cursor, 'cell_volume_per_b')[unique_comp_inds]
+        stable_cap = get_array_from_cursor(self.hull_cursor, 'gravimetric_capacity')[unique_comp_inds]
+        hull_distances = get_array_from_cursor(self.hull_cursor, 'hull_distance')[unique_comp_inds]
+        with np.errstate(divide='ignore'):
+            stable_x = stable_comp / (1 - stable_comp)
+        non_nans = np.argwhere(np.isfinite(stable_x))
+        self.volume_data['x'].append(stable_x[non_nans].flatten())
+        self.volume_data['Q'].append(stable_cap[non_nans].flatten())
+        self.volume_data['electrode_volume'].append(stable_vol[non_nans].flatten())
+        self.volume_data['volume_ratio_with_bulk'].append((stable_vol[non_nans] / stable_vol[0]).flatten())
+        self.volume_data['volume_expansion_percentage'].append(((stable_vol[non_nans] / stable_vol[0]) - 1) * 100)
+        self.volume_data['hull_distances'].append(hull_distances[non_nans].flatten())
+        self.volume_data['endstoichs'].append(stable_stoichs[non_nans].flatten()[0])
+
+    def _get_species(self, species=None, elements=None):
+        """ Try to determine species for phase diagram from arguments or
+        passed data. Sets the `self.species` attribute.
+
+        Keyword arguments:
+            species (str/list): the species kwarg passed to __init__.
+            elements (str/list): the elements kwarg passed to __init__.
+
+        """
+        # try to determine species for phase diagram, from arguments and data
+        species = species or elements
+        if species is None:
+            # handles element list passed by query: should only ever be a list of one entry
+            if self.args.get('composition') is not None:
+                if isinstance(self.args.get('composition'), list):
+                    species = self.args.get('composition')[0]
+                else:
+                    species = self.args.get('composition')
+                if ':' in species:
+                    species = species.split(':')
+        if species is None:
+            if self.from_cursor:
+                species = list({atom for doc in self.cursor for atom in doc['atom_types']})
+            else:
+                raise RuntimeError("Unable to determine species in hull, please specify with "
+                                   "e.g. `elements=['Li', 'P']")
+
+        # handles when species is e.g. ['LiCo2:Sn2S']
+        if isinstance(species, str):
+            if ':' in species:
+                species = species.split(':')
+            else:
+                species = [spec for spec in re.split(r'([A-Z][a-z]*)', species) if spec]
+
+        # edge case where user passes e.g. ['KP'], when they mean ['K', 'P'].
+        if isinstance(species, list) and len(species) == 1:
+            tmp_species = []
+            for spec in species:
+                if ':' in spec:
+                    tmp_species.append(spec.split(':'))
+                else:
+                    tmp_species.extend([item for item in re.split(r'([A-Z][a-z]*)', spec) if item])
+            species = tmp_species
+
+        return species
+
+    def _construct_electrode(self, hull, endpoint, endstoich, hull_cursor):
+
+        intersections, crossover = self._find_hull_pathway_intersections(
+            endpoint, endstoich, hull
+        )
+        return self._compute_voltages_from_intersections(
+            intersections, hull, crossover, endstoich, hull_cursor
+        )
+
+    def _compute_voltages_from_intersections(
+            self, intersections, hull, crossover, endstoich, hull_cursor
+    ):
+        """ Traverse the composition pathway and its intersections with hull facets
+        and compute the voltage and volume drops along the way, for a ternary system
+        with N 3-phase regions.
+
+        Parameters:
+            intersections (np.ndarray): Nx3 array containing the list of face indices
+                crossed by the path.
+            hull (scipy.spatial.ConvexHull): the temporary hull object that is referred
+                to by any indices.
+            crossover (np.ndarray): (N+1)x3 array containing the coordinates at which
+                the composition pathway crosses the hull faces.
+            endstoich (list): a matador stoichiometry that defines the end of the pathway.
+            hull_cursor (list): the actual structures used to create the hull.
+
+        """
+        if len(crossover) != len(intersections) + 1:
+            raise RuntimeError("Incompatible number of crossovers ({}) and intersections ({})."
+                               .format(np.shape(crossover), np.shape(intersections)))
+
+        # set up output arrays
+        voltages = np.empty(len(intersections) + 1)
+        volumes = np.empty(len(intersections))
+        reactions = []
+
+        # set up some useful arrays for later
+        points = hull.points
+        mu_enthalpy = get_array_from_cursor(self.chempot_cursor, self.energy_key)
+        if not self._non_elemental:
+            input_volumes = get_array_from_cursor(hull_cursor, 'cell_volume') / get_array_from_cursor(hull_cursor, 'num_atoms')
+        capacities = [get_generic_grav_capacity(point, self.species) for point in crossover]
+
+        # initial composition of one formula unit of the starting material
+        initial_comp = get_padded_composition(endstoich, self.species)
+
+        # loop over intersected faces and compute the voltage and volume at the
+        # crossover with that face
+        for ind, face in enumerate(intersections):
+
+            simplex_index = int(face[0])
+
+            final_stoichs = [hull_cursor[idx]['stoichiometry'] for idx in hull.simplices[simplex_index]]
+            atoms_per_fu = [sum([elem[1] for elem in stoich]) for stoich in final_stoichs]
+
+            energy_vec = points[hull.simplices[simplex_index], 2]
+            comp = points[hull.simplices[simplex_index], :]
+            comp[:, 2] = 1 - comp[:, 0] - comp[:, 1]
+
+            # normalize the crossover composition to one formula unit of the starting electrode
+            norm = np.asarray(crossover[ind][1:]) / np.asarray(initial_comp[1:])
+            ratios_of_phases = np.linalg.solve(comp.T, crossover[ind] / norm[0])
+
+            # remove small numerical noise
+            ratios_of_phases[np.where(ratios_of_phases < EPS)] = 0
+
+            # create a list containing the sections of the balanced reaction for printing
+            balanced_reaction = []
+            for i, ratio in enumerate(ratios_of_phases):
+                if ratio < EPS:
+                    continue
+                else:
+                    formula = get_formula_from_stoich(final_stoichs[i])
+                    balanced_reaction.append((ratio / atoms_per_fu[i], formula))
+            reactions.append(balanced_reaction)
+
+            # compute the voltage as the difference between the projection of the gradient down to pure active ion,
+            # and the reference chemical potential
+            comp_inv = np.linalg.inv(comp.T)
+            V = -(comp_inv.dot([1, 0, 0])).dot(energy_vec)
+            V = V + mu_enthalpy[0]
+
+            # compute the volume of the final electrode
+            if not self._non_elemental:
+                if ind <= len(intersections) - 1:
+                    volume_vec = input_volumes[hull.simplices[simplex_index]]
+                    volumes[ind] = np.dot(ratios_of_phases, volume_vec)
+
+            # double up on first voltage
+            if ind == 0:
+                voltages[0] = V
+            voltages[ind+1] = V
+
+        average_voltage = Electrode.calculate_average_voltage(capacities, voltages)
+
+        # print the reaction over a few lines, remove 1s and rounded ratios
+        print(
+            ' ---> '.join(
+                [' + '.join(
+                    ["{}{}".format(
+                        str(round(chem[0], 3)) + ' ' if abs(chem[0] - 1) > EPS else '',
+                        chem[1])
+                     for chem in region])
+                 for region in reactions])
+        )
+
+        return reactions, capacities, voltages, average_voltage, volumes
+
+    def _find_hull_pathway_intersections(self, endpoint, endstoich, hull):
+        """ This function traverses a ternary phase diagram on a path from `endpoint`
+        towards [1, 0, 0], i.e. a pure phase of the active ion. The aim is to find
+        all of the faces and intersections along this pathway, making sure to only
+        add unique intersections, and making appropriate (symmetry-breaking) choices
+        of which face to use. We proceed as follows:
+
+            1. Filter out any vertices that contain only binary phases, or that contain
+                only the chemical potentials.
+            2. Loop over all faces of the convex hull and test if the pathway touches/intersects
+                that face. If it does, ascertain where the intersection occurs, and whether
+                it is at one, two or none of the vertices of the face. Create an array of unique
+                intersections for this face and save them for later.
+            3. Loop over the zeros found between for each face. If the pathway only grazes a single
+                point on this face, ignore it. If one of the edges is parallel to the pathway,
+                make sure to include this face and the faces either side of it.
+
+        Parameters:
+            endpoint (np.ndarray): array containing composition (2D) and energy of
+                start point.
+
+        """
+        import scipy.spatial.distance
+        import itertools
+
+        endpoint = endpoint[:-1]
+        compositions = np.zeros_like(hull.points)
+        compositions[:, 0] = hull.points[:, 0]
+        compositions[:, 1] = hull.points[:, 1]
+        compositions[:, 2] = 1 - hull.points[:, 0] - hull.points[:, 1]
+
+        # define the composition pathway through ternary space
+        gradient = endpoint[1] / (endpoint[0] - 1)
+        # has to intersect [1, 0] so c = y0 - m*x0 = -m
+        y0 = -gradient
+
+        # filter the vertices we're going to consider
+        skip_inds = set()
+        for simp_ind, simplex in enumerate(hull.simplices):
+            vertices = np.asarray([compositions[i] for i in simplex])
+            # skip all simplices that contain only binary phases
+            for i in range(3):
+                if np.max(vertices[:, i]) < BOUNDARY_EPS:
+                    skip_inds.add(simp_ind)
+                    continue
+            # skip the outer triangle formed by the chemical potentials
+            if all(np.max(vertices, axis=-1) > 1 - BOUNDARY_EPS):
+                skip_inds.add(simp_ind)
+                continue
+
+        two_phase_crossover = []
+        three_phase_crossover = []
+
+        for simp_ind, simplex in enumerate(hull.simplices):
+            if simp_ind in skip_inds:
+                continue
+            vertices = np.asarray([compositions[i] for i in simplex])
+
+            # put each vertex of triangle into line equation and test their signs
+            test = vertices[:, 0] * gradient + y0 - vertices[:, 1]
+            test[np.abs(test) < BOUNDARY_EPS] = 0.0
+            test = np.sign(test)
+
+            # if there are two different signs in the test array, then the line intersects/grazes this face triangle
+            if len(np.unique(test)) > 1:
+                # now find intersection points and split them into one, two and three-phase crossover regions
+                zeros = [val for zero in np.where(test == 0) for val in zero.tolist()]
+                num_zeros = len(zeros)
+                zero_points = []
+                # skip_vertex = None
+                for zero in zeros:
+                    zero_pos = compositions[simplex[zero]]
+                    if num_zeros == 2:
+                        zero_points.append(zero_pos)
+                        two_phase_crossover.append((zero_pos, simp_ind))
+
+                # if we have already found both crossovers, skip to next face
+                if num_zeros == 2:
+                    continue
+
+                # now find the non-trivial intersections
+                for i, j in itertools.combinations(simplex, r=2):
+                    # if skip_vertex in [i, j]:
+                    #     continue
+
+                    A = compositions[i]
+                    B = compositions[j]
+                    C = endpoint
+                    D = [1, 0]
+
+                    def coeffs(X, Y):
+                        # find line equation for edge AB
+                        # a x + b y = c
+                        return (Y[1] - X[1], X[0] - Y[0])
+
+                    a1, b1 = coeffs(A, B)
+                    c1 = a1 * A[0] + b1 * A[1]
+
+                    a2, b2 = coeffs(C, D)
+                    c2 = a2 * C[0] + b2 * C[1]
+                    det = a1 * b2 - a2 * b1
+                    if det == 0:
+                        continue
+
+                    x = (b2 * c1 - b1 * c2) / det
+                    y = (a1 * c2 - a2 * c1) / det
+                    intersection_point = np.asarray([x, y, 1-x-y])
+
+                    # now have to test whether that intersection point is inside the triangle
+                    # which we can do by testing that is inside the rectangle spanned by AB
+                    x_bound = sorted([A[0], B[0]])
+                    y_bound = sorted([A[1], B[1]])
+                    if (
+                        x_bound[0] - BOUNDARY_EPS/2 <= intersection_point[0] <= x_bound[1] + BOUNDARY_EPS/2 and
+                        y_bound[0] - BOUNDARY_EPS/2 <= intersection_point[1] <= y_bound[1] + BOUNDARY_EPS/2
+                    ):
+                        # three_phase_crossover.append((intersection_point, simp_ind))
+                        zero_points.append(intersection_point)
+
+                unique_zeros = []
+                for zero in zero_points:
+                    if (len(unique_zeros) >= 1 and
+                            np.any(scipy.spatial.distance.cdist(unique_zeros, zero.reshape(1, 3)) < BOUNDARY_EPS)):
+                        pass
+                    else:
+                        unique_zeros.append(zero)
+
+                num_zeros = len(unique_zeros)
+                if num_zeros == 1:
+                    # we never need to use faces which just touch the triangle
+                    continue
+                elif num_zeros == 2:
+                    three_phase_crossover.append((unique_zeros[0], simp_ind))
+                    three_phase_crossover.append((unique_zeros[1], simp_ind))
+
+        # loop over points and only add the unique ones to the crossover array
+        # if a point exists as a two-phase region, then always add that simplex
+        crossover = [[1, 0, 0]]
+        simplices = {}
+        zeros = sorted(two_phase_crossover + three_phase_crossover, key=lambda x: x[0][0])
+        # for multiplicity, zeros in enumerate([one_phase_crossover, two_phase_crossover, three_phase_crossover]):
+        for zero, simp_ind in zeros:
+            if len(crossover) >= 1 and np.any(scipy.spatial.distance.cdist(crossover, zero.reshape(1, 3)) < BOUNDARY_EPS):
+                pass
+            else:
+                if simp_ind not in simplices:
+                    crossover.append(zero)
+                    # if multiplicity > 0:
+                    simplices[simp_ind] = zero[0]
+
+        intersections = sorted(simplices.items(), key=lambda x: x[1])
+
+        if len(intersections) == 0:
+            raise RuntimeError(
+                'No intermediate structures found for starting point {}.'
+                .format(get_formula_from_stoich(endstoich))
+            )
+
+        return intersections, sorted(crossover, key=lambda x: x[0])
+
+    def _scale_voltages(self, species):
+        """ Rescale voltages to account for the valence of the active ion,
+        as stored in the Electrode class.
+
+        """
+        valence_factor = Electrode.valence_data.get(species, None)
+
+        if valence_factor is None:
+            warnings.warn("Unable to find valence of species {}, treating it as 1.".format(species))
+            return
+
+        if valence_factor != 1:
+            for ind, start_point in enumerate(self.voltage_data):
+                for j in range(len(self.voltage_data[ind].voltages)):
+                    self.voltage_data[ind].voltages[j] *= valence_factor
+            self.voltage_data[ind].average_voltage *= valence_factor

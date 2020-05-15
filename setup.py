@@ -1,17 +1,11 @@
 # coding: utf-8
 # Distributed under the terms of the MIT License.
 
-
-import subprocess as sp
-from setuptools import setup, find_packages
+import os
+from setuptools import setup
 from glob import glob
 
-try:
-    __version__ = sp.check_output(['git', 'describe', '--tags']).decode('utf-8').strip()
-    __version__ += '+' + (sp.check_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD'])
-                          .decode('utf-8').strip())
-except sp.CalledProcessError:
-    __version__ = '0.9a1'
+from matador import __version__
 
 with open('requirements/requirements.txt', 'r') as f:
     requirements = [line.strip() for line in f.readlines()]
@@ -20,29 +14,46 @@ with open('requirements/pip_requirements.txt', 'r') as f:
     requirements += [line.strip() for line in f.readlines()]
 
 extra_requirements = dict(all=[])
-for subreq in ['docs', 'test', 'plotting', 'viz', 'crystal', 'optional']:
-    with open('requirements/{}_requirements.txt'.format(subreq), 'r') as f:
-        extra_requirements[subreq] = [line.strip() for line in f.readlines()]
-        extra_requirements['all'] += extra_requirements[subreq]
+req_files = glob('requirements/*.txt')
+for _file in req_files:
+    if _file != 'requirements/requirements.txt':
+        with open(_file, 'r') as f:
+            subreq = _file.split('/')[-1].split('_')[0]
+            extra_requirements[subreq] = [line.strip() for line in f.readlines()]
+            extra_requirements['all'] += extra_requirements[subreq]
+
+with open("README.rst", "r") as f:
+    long_description = f.read()
 
 
-setup(name='matador',
+setup(name='matador-db',
       version=__version__,
-      summary='MATerial and Atomic Database Of Refined structures.',
-      description_file='README.rst',
-      url='https://bitbucket.org/ml-evs/matador',
+      description='MATerial and Atomic Databases Of Refined structures.',
+      long_description=long_description,
+      url='https://github.com/ml-evs/matador',
       author='Matthew Evans',
-      author_email='matthew@ml-evs.science',
+      author_email='matador@ml-evs.science',
       maintainer='Matthew Evans',
-      maintainer_email='matthew@ml-evs.science',
+      maintainer_email='matador@ml-evs.science',
       license='MIT',
-      packages=find_packages(),
+      packages=['matador'],
       python_requires='>=3.6',
       install_requires=requirements,
-      scripts=glob('bin/*') + glob('scripts/*'),
+      scripts=[script for script in glob('scripts/*') if os.path.isfile(script)],
       test_suite='matador.tests',
       include_package_data=True,
       extras_require=extra_requirements,
+      classifiers=[
+          "Development Status :: 4 - Beta",
+          "Intended Audience :: Science/Research",
+          "License :: OSI Approved :: MIT License",
+          "Programming Language :: Python :: 3",
+          "Programming Language :: Python :: 3.6",
+          "Programming Language :: Python :: 3.7",
+          "Topic :: Scientific/Engineering",
+          "Topic :: Scientific/Engineering :: Chemistry",
+          "Topic :: Scientific/Engineering :: Physics"
+      ],
       entry_points={'console_scripts': ['matador = matador.cli.cli:main',
                                         'dispersion = matador.cli.dispersion:main',
                                         'run3 = matador.cli.run3:main']},

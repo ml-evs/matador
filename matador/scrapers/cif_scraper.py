@@ -9,6 +9,7 @@
 import numpy as np
 from matador.scrapers.utils import scraper_function
 from matador.utils.cell_utils import get_spacegroup_spg
+from matador.utils.cell_utils import abc2cart, cart2volume, frac2cart
 
 EPS = 1e-13
 
@@ -66,7 +67,6 @@ def cif2dict(seed, **kwargs):
                                     cif_dict['_cell_angle_beta'],
                                     cif_dict['_cell_angle_gamma']]))]
 
-    from matador.utils.cell_utils import abc2cart, cart2volume
     doc['lattice_cart'] = abc2cart(doc['lattice_abc'])
     doc['cell_volume'] = cart2volume(doc['lattice_cart'])
     doc['stoichiometry'] = _cif_disordered_stoichiometry(doc)
@@ -183,8 +183,12 @@ def _cif_parse_raw(flines):
                             raw = raw[:start] + [' '.join(raw[start:end+1]).replace('\'', '')] + raw[end+1:]
                     data.extend(raw)
                     jnd += 1
-                for index, datum in enumerate(data):
-                    cif_dict[keys[index]].append(datum)
+                try:
+                    for index, datum in enumerate(data):
+                        cif_dict[keys[index]].append(datum)
+                except Exception:
+                    print('Failed to scrape one of {}'.format(keys))
+                    pass
 
         ind += jnd
 
@@ -203,6 +207,9 @@ def _cif_set_unreduced_sites(doc):
 
     """
     from matador.utils.cell_utils import wrap_frac_coords
+    from matador.utils.cell_utils import calc_pairwise_distances_pbc
+    from matador.fingerprints.pdf import PDF
+    from collections import defaultdict
     species_sites = dict()
     species_occ = dict()
     for ind, site in enumerate(doc['positions_frac']):
@@ -231,23 +238,58 @@ def _cif_set_unreduced_sites(doc):
     unreduced_sites = []
     unreduced_occupancies = []
     unreduced_species = []
+
+    # this loop assumes that no symmetry operation can map 2 unlike sites upon one another
     for species in species_sites:
-        unreduced_sites_spec, indices = np.unique(species_sites[species],
+        unreduced_sites_spec, indices = np.unique(np.around(species_sites[species], decimals=5),
                                                   return_index=True, axis=0)
         unreduced_occupancies_spec = np.asarray(species_occ[species])[indices].tolist()
         unreduced_occupancies.extend(unreduced_occupancies_spec)
         unreduced_sites.extend(unreduced_sites_spec.tolist())
         unreduced_species.extend(len(unreduced_sites_spec) * [species])
 
+    images = PDF._get_image_trans_vectors_auto(doc['lattice_cart'], 0.1, 0.01, max_num_images=2)
+    poscarts = frac2cart(doc['lattice_cart'], unreduced_sites)
+    distances = calc_pairwise_distances_pbc(
+        poscarts,
+        images,
+        doc['lattice_cart'],
+        0.1,
+        compress=False,
+        per_image=True
+    )
+
+    dupe_dict = defaultdict(list)
+    dupe_set = set()
+    for img in distances:
+        for i in range(len(poscarts)):
+            for j in range(len(poscarts)):
+                if i == j:
+                    continue
+                if not img.mask[i, j]:
+                    if i not in dupe_set and unreduced_occupancies[i] == 1:
+                        dupe_dict[i].append(j)
+                        dupe_set.add(j)
+
     doc['positions_frac'] = unreduced_sites
     doc['site_occupancy'] = unreduced_occupancies
     doc['atom_types'] = unreduced_species
+
+    doc['site_occupancy'] = [
+        doc['site_occupancy'][ind] for ind, atom in enumerate(doc['positions_frac']) if ind not in dupe_set
+    ]
+    doc['atom_types'] = [doc['atom_types'][ind] for ind, atom in enumerate(doc['positions_frac']) if ind not in dupe_set]
+    doc['positions_frac'] = [atom for ind, atom in enumerate(doc['positions_frac']) if ind not in dupe_set]
+
     tmp = sum(doc['site_occupancy'])
     if abs(tmp - round(tmp, 0)) < EPS:
         tmp = round(tmp, 0)
     doc['num_atoms'] = tmp
-    assert len(doc['site_occupancy']) == len(doc['positions_frac']), 'Size mismatch between positions and occs, {} vs {}'.format(len(doc['site_occupancy']), len(doc['positions_frac']))
-    assert len(doc['positions_frac']) == len(doc['atom_types']), 'Size mismatch between positions and types'
+    if len(doc['site_occupancy']) != len(doc['positions_frac']):
+        raise RuntimeError('Size mismatch between positions and occs, {} vs {}'
+                           .format(len(doc['site_occupancy']), len(doc['positions_frac'])))
+    if len(doc['positions_frac']) != len(doc['atom_types']):
+        raise RuntimeError('Size mismatch between positions and types')
 
 
 def _cif_line_contains_data(line):

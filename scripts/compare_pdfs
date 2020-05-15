@@ -2,7 +2,8 @@
 """ Quick script to compute overlap and plot PDFs from CLI. """
 import argparse
 from matador.scrapers.castep_scrapers import res2dict
-from matador.similarity.pdf_similarity import PDF, PDFOverlap, CombinedProjectedPDF
+from matador.fingerprints.pdf import PDF, PDFOverlap, CombinedProjectedPDF
+from matador.fingerprints.similarity import get_uniq_cursor
 import matplotlib.pyplot as plt
 
 
@@ -27,7 +28,6 @@ def compare_pdfs(**kwargs):
             strucs.append(struc)
 
     if kwargs.get('uniq'):
-        from matador.similarity.similarity import get_uniq_cursor
         from matador.export import doc2res
         import os
         print('Creating PDF cursor...')

@@ -2,66 +2,47 @@
 matador
 =======
 
-|Bitbucket Pipelines| |Develop Pipelines| |Coverage Status| |Documentation Status| |MIT License|
+|GH Actions| |Coverage Status| |Documentation Status| |MIT License|
 
-matador is an aggregator, manipulator and runner of first-principles
-calculations, written with a bent towards battery electrode materials. 
-The source can be found on `Bitbucket <https://bitbucket.org/ml-evs/matador>`_.
+matador is an aggregator, manipulator and runner of first-principles calculations, written with a bent towards battery electrode materials.
+The source can be found on `GitHub <https://github.com/ml-evs/matador>`_ and online documentation is hosted on `ReadTheDocs <https://docs.matador.science>`_.
 
-Written by `Matthew Evans <https://www.ml-evs.github.io>`_ (2016-). 
+Example Jupyter notebooks and tutorials can be found `online <https://docs.matador.science/en/latest/examples_index.html>`_ or in the ``examples/`` folder of the matador source code.
+
+Written & maintained by `Matthew Evans <https://ml-evs.science>`_ (2016-).
 
 
 .. image:: docs/src/img/lipzn.png
    :name: LiPZn
    :align: center
 
-Core functionality
--------------------
+Installation
+------------
 
-The core functionality can be summarised by the various sub-commands of the
-command-line interface. The API has many more features that can be explored
-in the examples and API documentation.
-
-
-1. The scraping of CASTEP/Quantum Espresso output files into flexible
-   Python dictionaries with a sensible schema via ``matador import``.
-2. The transferal of the scraped dictionaries into a MongoDB database.
-3. Powerful CLI querying of the database, with a focus on energy storage
-   applications using ``matador query``.
-4. Calculation and presentation of binary and ternary phase diagrams
-   with ``matador hull``.
-5. 0K voltage curves for binary and ternary systems, as well as arbitrary intercalation electrodes, using
-   ``matador voltage``.
-6. Atomic species swapping and polishing from previous calculations using 
-   ``matador swaps``.
-7. Automated high-throughput geometry optimisations, electronic and vibrational properties, 
-   plus convergence tests, using CASTEP or Quantum Espresso, with the ``run3`` entrypoint.
-   Tested on several supercomputers.
-8. Refinement of structural and chemical data, and symmetries powered by ``spglib``, via
-   ``matador refine``.
+In the simplest case, ``pip install matador-db`` is sufficient to get up and running, preferably in a fresh virtual environment. More detailed instructions can be found in the `Installation instructions <https://docs.matador.science/en/latest/install.html>`_.
 
 Usage
 ------
 
-For basic command-line usage, please explore the help system for each sub-command. Common workflows can be found under ``examples/`` and :ref:`tutorials_index`.
+For basic command-line usage, please explore the help system for each sub-command. Common workflows can be found inside ``examples/`` and in the `online docs <http://docs.matador.science/en/latest/examples_index.html>`_.
 
-The full Python API documentation can be found under :ref:`modules`.
+Please consult the full `Python API documentation <http://docs.matador.science/en/latest/modules.html>`_ for programmatic usage.
 
 .. code-block:: text
 
     usage: matador [-h] [--version]
                    {stats,query,import,hull,voltage,changes,hulldiff,swaps,refine}
                    ...
-    
+
     MATerial and Atomic Database Of Refined structures.
-    
+
     optional arguments:
       -h, --help            show this help message and exit
       --version             show program's version number and exit
-    
+
     subcommands:
       valid sub-commands
-    
+
       {stats,query,import,hull,voltage,changes,hulldiff,swaps,refine}
         stats               print some stats about the database.
         query               query and extract structures from the database
@@ -77,18 +58,30 @@ The full Python API documentation can be found under :ref:`modules`.
         refine              update structures in the database according to
                             specified --task
 
-License
---------
+Core functionality
+-------------------
 
-matador is available under the `MIT License <https://bitbucket.org/ml-evs/matador/src/master/LICENSE>`_.
+The core functionality can be summarised by the various sub-commands of the
+command-line interface above. The API has many more features that can be explored
+in the examples and API documentation.
 
-.. |Bitbucket Pipelines| image:: https://img.shields.io/bitbucket/pipelines/ml-evs/matador/master.svg?label=master
-   :target: https://bitbucket.org/ml-evs/matador/addon/pipelines/home#!/results/branch/master/page/1
-.. |Develop Pipelines| image:: https://img.shields.io/bitbucket/pipelines/ml-evs/matador/develop.svg?label=develop
-   :target: https://bitbucket.org/ml-evs/matador/addon/pipelines/home#!/results/branch/develop/page/1
+- Scraping of CASTEP (and Quantum Espresso) input/output files into flexible
+Python dictionaries/models.
+- The creation and curation of MongoDB collections of geometry optimisation,
+calculations, with a powerful querying CLI/API.
+- Customisable, publication-ready plots for all models, e.g. phase diagrams, PDF, PXRD,
+voltage profiles, electronic/vibrational bandstructures etc.
+- Automated high-throughput geometry optimisations, electronic and vibrational properties
+using CASTEP (and Quantum Espresso) with ``run3``. Tested on several supercomputers.
+- Creation of phase diagrams and electrochemical voltage profiles from the
+results of DFT calculations.
+
+
+.. |GH Actions| image:: https://img.shields.io/github/workflow/status/ml-evs/matador/Run%20tests/develop?label=develop&logo=github
+   :target: https://github.com/ml-evs/matador/actions?query=branch%3Adevelop
 .. |MIT License| image:: https://img.shields.io/badge/license-MIT-blue.svg
-   :target: https://bitbucket.org/ml-evs/matador/src/master/LICENSE
-.. |Coverage Status| image:: https://codecov.io/bb/ml-evs/matador/branch/master/graph/badge.svg
-  :target: https://codecov.io/bb/ml-evs/matador
+   :target: https://github.com/ml-evs/matador/blob/master/LICENSE
+.. |Coverage Status| image:: https://img.shields.io/codecov/c/gh/ml-evs/matador/develop?logo=codecov
+  :target: https://codecov.io/gh/ml-evs/matador
 .. |Documentation Status| image:: https://readthedocs.org/projects/matador-db/badge/?version=latest
    :target: https://matador-db.readthedocs.io/en/latest/?badge=latest

@@ -11,11 +11,12 @@ from collections import defaultdict
 import os
 import glob
 import gzip
+import warnings
 import pwd
 import numpy as np
-from matador.utils.cell_utils import abc2cart, calc_mp_spacing, cart2volume, wrap_frac_coords, cart2abc, frac2cart, cart2frac, real2recip
-from matador.utils.chem_utils import get_stoich
-from matador.scrapers.utils import DFTError, CalculationError, scraper_function, f90_float_parse
+from matador.utils.cell_utils import abc2cart, calc_mp_spacing, cart2volume, wrap_frac_coords, cart2abc, cart2frac
+from matador.utils.chem_utils import get_stoich, INVERSE_CM_TO_EV
+from matador.scrapers.utils import DFTError, ComputationError, scraper_function, f90_float_parse
 
 
 @scraper_function
@@ -45,7 +46,11 @@ def res2dict(seed, db=True, **kwargs):
     res['source'] = []
     res['source'].append(seed + '.res')
     # grab file owner username
-    res['user'] = pwd.getpwuid(os.stat(seed + '.res').st_uid).pw_name
+    try:
+        res['user'] = pwd.getpwuid(os.stat(seed + '.res').st_uid).pw_name
+    except Exception:
+        pass
+
     get_seed_metadata(res, seed)
     # alias special lines in res file
     titl = ''
@@ -63,7 +68,7 @@ def res2dict(seed, db=True, **kwargs):
             remark = line.split()
     if cell == '':
         raise RuntimeError('missing CELL info')
-    elif titl == '' and db:
+    if titl == '' and db:
         raise RuntimeError('missing TITL')
     if db:
         res['pressure'] = f90_float_parse(titl[2])
@@ -198,6 +203,9 @@ def cell2dict(seed, db=False, lattice=True, positions=True, **kwargs):
             cell['cell_constraints'] = []
             for j in range(2):
                 cell['cell_constraints'].append(list(map(int, flines[line_no + j + 1].split())))
+            if (any(len(cell['cell_constraints'][i]) != 3 for i in range(2))
+                    or len(cell['cell_constraints']) != 2):
+                raise RuntimeError('Invalid cell constraints block.')
         elif '%block hubbard_u' in line.lower():
             cell['hubbard_u'] = defaultdict(list)
             i = 0
@@ -215,12 +223,24 @@ def cell2dict(seed, db=False, lattice=True, positions=True, **kwargs):
                     cell['hubbard_u'][atom][orbital] = shift
                     i += 1
         elif '%block external_pressure' in line.lower():
-            cell['external_pressure'] = []
+            cell['external_pressure'] = np.zeros((3, 3))
             i = 1
-            while 'endblock' not in flines[line_no + i].lower():
-                if not flines[line_no + i].strip()[0].isalpha():
+            j = 0
+            while 'endblock' not in flines[line_no+i].lower():
+                if not flines[line_no+i].strip()[0].isalpha():
                     flines[line_no+i] = flines[line_no+i].replace(',', '')
-                    cell['external_pressure'].append(list(map(f90_float_parse, flines[line_no+i].split())))
+                    vals = list(map(f90_float_parse, flines[line_no+i].split()))
+                    if len(vals) != (3-j):
+                        raise RuntimeError('External pressure should be specified as upper triangular matrix.')
+                    cell['external_pressure'][j] = np.asarray(j*[0.0] + vals).reshape(3)
+                    j += 1
+                i += 1
+            cell['external_pressure'] = cell['external_pressure'].tolist()
+        elif '%block ionic_constraints' in line.lower():
+            cell['ionic_constraints'] = []
+            i = 1
+            while 'endblock' not in flines[line_no+i].lower():
+                cell['ionic_constraints'].append(flines[line_no+i].strip())
                 i += 1
         # parse kpoints
         elif 'kpoints_mp_spacing' in line.lower() or 'kpoint_mp_spacing' in line.lower():
@@ -237,6 +257,8 @@ def cell2dict(seed, db=False, lattice=True, positions=True, **kwargs):
         elif 'kpoints_mp_grid' in line.lower() or 'kpoint_mp_grid' in line.lower():
             if 'spectral_kpoints_mp_grid' in line.lower() or 'spectral_kpoint_mp_grid' in line.lower():
                 cell['spectral_kpoints_mp_grid'] = list(map(int, line.split()[-3:]))
+            # these two keywords do not have a corresponding "kpoints" alias (instead of kpoint)
+            # so must remain unpluralised (see below for other phonon keyword exceptions)
             elif 'phonon_kpoints_mp_grid' in line.lower() or 'phonon_kpoint_mp_grid' in line.lower():
                 cell['phonon_kpoint_mp_grid'] = list(map(int, line.split()[-3:]))
             elif 'phonon_fine_kpoints_mp_grid' in line.lower() or 'phonon_fine_kpoint_mp_grid' in line.lower():
@@ -353,7 +375,13 @@ def cell2dict(seed, db=False, lattice=True, positions=True, **kwargs):
                         raise RuntimeError('Atomic init spins do not match positions')
 
             elif 'fix_com' in line.lower():
-                cell['fix_com'] = line.split()[-1]
+                cell['fix_com'] = bool(line.split()[-1])
+            elif 'fix_all_ions' in line.lower():
+                cell['fix_all_ions'] = bool(line.split()[-1])
+            elif 'fix_all_cell' in line.lower():
+                cell['fix_all_cell'] = bool(line.split()[-1])
+            elif 'fix_vol' in line.lower():
+                cell['fix_vol'] = bool(line.split()[-1])
             elif 'symmetry_generate' in line.lower():
                 cell['symmetry_generate'] = True
             elif 'symmetry_tol' in line.lower():
@@ -375,7 +403,7 @@ def cell2dict(seed, db=False, lattice=True, positions=True, **kwargs):
                     cell['kpoints_path_spacing'] = f90_float_parse(line.split()[-1])
 
     if 'external_pressure' not in cell or not cell['external_pressure']:
-        cell['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0], [0.0]]
+        cell['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
 
     if lattice:
         if 'lattice_cart' not in cell and 'lattice_abc' in cell:
@@ -488,7 +516,8 @@ def param2dict(seed, db=True, **kwargs):
                             if temp_cut_off[1] == 'ev':
                                 param['cut_off_energy'] = f90_float_parse(temp_cut_off[0])
                             elif db:
-                                raise RuntimeError('cut_off_energy units must be eV or blank in db mode, not {}'.format(temp_cut_off[1]))
+                                raise RuntimeError('cut_off_energy units must be eV or blank in db mode, not {}'
+                                                   .format(temp_cut_off[1]))
                             else:
                                 param['cut_off_energy'] = '{} {}'.format(temp_cut_off[0], temp_cut_off[1])
                         else:
@@ -555,13 +584,20 @@ def castep2dict(seed, db=True, intermediates=False, **kwargs):
         with gzip.open(seed, 'r') as f:
             flines = [line.decode('utf-8') for line in f.readlines()]
     else:
-        with open(seed, 'r') as f:
-            flines = f.readlines()
+        try:
+            with open(seed, 'r', encoding='utf-8') as f:
+                flines = f.readlines()
+        except Exception:
+            with open(seed, 'r', encoding='latin1') as f:
+                flines = f.readlines()
     # set source tag to castep file
     castep['source'] = []
     castep['source'].append(seed)
     # grab file owner
-    castep['user'] = pwd.getpwuid(os.stat(seed).st_uid).pw_name
+    try:
+        castep['user'] = pwd.getpwuid(os.stat(seed).st_uid).pw_name
+    except Exception:
+        pass
     get_seed_metadata(castep, seed.replace('.' + ftype, ''))
     # wrangle castep file for parameters in 3 passes:
     # once forwards to get number and types of atoms
@@ -576,12 +612,17 @@ def castep2dict(seed, db=True, intermediates=False, **kwargs):
     if not db and 'thermo' in castep['task'].lower():
         _castep_scrape_thermo_data(flines, castep)
 
-    # only scrape snapshots/number of intermediates if requested,
-    # or if not in db mode
-    if intermediates or not db:
+    if not db and 'thermo' in castep['task'].lower() or 'phonon' in castep['task'].lower():
+        _castep_scrape_phonon_frequencies(flines, castep)
+
+    # only scrape snapshots/number of intermediates if requested
+    try:
         snapshots, castep['geom_iter'] = _castep_scrape_all_snapshots(flines)
         if intermediates:
             castep['intermediates'] = snapshots
+    except RuntimeError as exc:
+        if intermediates:
+            raise RuntimeError('Failed to scrape intermediates: {}'.format(exc))
 
     _castep_scrape_metadata(flines, castep)
 
@@ -591,8 +632,11 @@ def castep2dict(seed, db=True, intermediates=False, **kwargs):
     # scrape any BEEF post-processing
     _castep_scrape_beef(flines, castep)
 
+    # scrape any AJM group-specific devel codes
+    _castep_scrape_devel_code(flines, castep)
+
     if 'positions_frac' not in castep or not castep['positions_frac']:
-        raise CalculationError('Could not find positions')
+        raise ComputationError('Could not find positions')
 
     # unfortunately CASTEP does not write forces when there is only one atom
     if 'forces' not in castep and castep['num_atoms'] == 1 and 'geometry' in castep['task']:
@@ -622,16 +666,12 @@ def castep2dict(seed, db=True, intermediates=False, **kwargs):
 
 
 @scraper_function
-def bands2dict(seed, summary=False, gap=False, external_efermi=None, **kwargs):
-    """ Parse a CASTEP bands file into a dictionary.
+def bands2dict(seed, **kwargs):
+    """ Parse a CASTEP bands file into a dictionary, which can be used as input to
+    an :obj:`matador.orm.spectral.ElectronicDispersion` object.
 
     Parameters:
         seed (str/list): filename of list of filenames to be scraped.
-
-    Keyword arguments:
-        summary (bool): print info about bandgap.
-        gap (bool): re-compute bandgap info.
-        external_efermi (f90_float_parse): override the Fermi energy with this value (eV)
 
     Returns:
         (tuple): containing either dict/str containing data or error, and a bool stating
@@ -640,8 +680,6 @@ def bands2dict(seed, summary=False, gap=False, external_efermi=None, **kwargs):
     """
     from matador.utils.chem_utils import HARTREE_TO_EV, BOHR_TO_ANGSTROM
 
-    verbosity = kwargs.get('verbosity', 0)
-
     bs = dict()
     with open(seed, 'r') as f:
         # read whole file into RAM, typically ~ 1 MB
@@ -649,27 +687,23 @@ def bands2dict(seed, summary=False, gap=False, external_efermi=None, **kwargs):
     header = flines[:9]
     data = flines[9:]
 
-    seed = seed.replace('.bands', '')
-    bs['source'] = [seed + '.bands']
+    bs['source'] = [seed]
 
     bs['num_kpoints'] = int(header[0].split()[-1])
     bs['num_spins'] = int(header[1].split()[-1])
     bs['num_electrons'] = f90_float_parse(header[2].split()[-1])
     bs['num_bands'] = int(header[3].split()[-1])
-    if external_efermi is None:
-        bs['fermi_energy_Ha'] = f90_float_parse(header[4].split()[-1])
-        bs['fermi_energy'] = bs['fermi_energy_Ha'] * HARTREE_TO_EV
-    else:
-        bs['fermi_energy'] = external_efermi
+
+    bs['spin_fermi_energy_Ha'] = [f90_float_parse(val) for val in header[4].split()[-bs['num_spins']:]]
+    bs['spin_fermi_energy'] = [HARTREE_TO_EV * val for val in bs['spin_fermi_energy_Ha']]
+    bs['fermi_energy'] = np.mean(bs['spin_fermi_energy'])
+
     bs['lattice_cart'] = []
     for i in range(3):
         bs['lattice_cart'].append([BOHR_TO_ANGSTROM * f90_float_parse(elem) for elem in header[6 + i].split()])
     bs['kpoint_path'] = np.zeros((bs['num_kpoints'], 3))
     bs['kpoint_weights'] = np.zeros((bs['num_kpoints']))
     bs['eigenvalues_k_s'] = np.empty((bs['num_spins'], bs['num_bands'], bs['num_kpoints']))
-
-    if verbosity > 2:
-        print('Found {}'.format(bs['num_kpoints']))
 
     for nk in range(bs['num_kpoints']):
         kpt_ind = nk * (bs['num_spins'] * bs['num_bands'] + bs['num_spins'] + 1)
@@ -682,111 +716,9 @@ def bands2dict(seed, summary=False, gap=False, external_efermi=None, **kwargs):
                 line_number = kpt_ind + 2 + ns + (ns * bs['num_bands']) + nb
                 bs['eigenvalues_k_s'][ns][nb][int(data[kpt_ind].split()[1]) - 1] = (
                     f90_float_parse(data[line_number].strip()))
+
     bs['eigenvalues_k_s'] *= HARTREE_TO_EV
-    bs['eigenvalues_k_s'] -= bs['fermi_energy']
-
-    # create list containing kpoint indices of discontinuous branches through k-space
-    bs['kpoints_cartesian'] = np.asarray(frac2cart(real2recip(bs['lattice_cart']), bs['kpoint_path']))
-    bs['kpoint_branches'], bs['kpoint_path_spacing'] = get_kpt_branches(bs['kpoints_cartesian'])
-
-    if not sum([len(branch) for branch in bs['kpoint_branches']]) == bs['num_kpoints']:
-        raise RuntimeError('Error parsing kpoints: number of kpoints does not match number in branches')
-
-    if gap and bs['num_spins'] == 1:
-        vbm = -1e10
-        cbm = 1e10
-        cbm_pos = []
-        vbm_pos = []
-        eps = 1e-6
-        if bs['num_spins'] == 1:
-            # calculate indirect gap
-            for _, branch in enumerate(bs['kpoint_branches']):
-                for nb in range(bs['num_bands']):
-                    band = bs['eigenvalues_k_s'][0][nb][branch]
-                    band_branch_min = np.min(band)
-                    band_branch_max = np.max(band)
-                    band_branch_argmin = np.where(band <= band_branch_min + eps)[0]
-                    band_branch_argmax = np.where(band >= band_branch_max - eps)[0]
-                    if vbm + eps < band_branch_max < 0:
-                        vbm = band_branch_max
-                        vbm_pos = [branch[max_ind] for max_ind in band_branch_argmax]
-                    elif vbm - eps <= band_branch_max < 0:
-                        vbm = band_branch_max
-                        vbm_pos.extend([branch[val] for val in band_branch_argmax])
-                    if cbm - eps > band_branch_min > 0:
-                        cbm = band_branch_min
-                        cbm_pos = [branch[min_ind] for min_ind in band_branch_argmin]
-                    elif cbm + eps >= band_branch_min > 0:
-                        cbm = band_branch_min
-                        cbm_pos.extend([branch[val] for val in band_branch_argmin])
-                    if band_branch_min < 0 < band_branch_max:
-                        vbm = 0
-                        cbm = 0
-                        vbm_pos = [0]
-                        cbm_pos = [0]
-                        break
-
-            smallest_diff = 1e10
-            for _cbm_pos in cbm_pos:
-                for _vbm_pos in vbm_pos:
-                    if abs(_vbm_pos - _cbm_pos) < smallest_diff:
-                        tmp_cbm_pos = _cbm_pos
-                        tmp_vbm_pos = _vbm_pos
-                        smallest_diff = abs(_vbm_pos - _cbm_pos)
-            cbm_pos = tmp_cbm_pos
-            vbm_pos = tmp_vbm_pos
-            bs['valence_band_min'] = vbm
-            bs['conduction_band_max'] = cbm
-            bs['band_gap'] = cbm - vbm
-            bs['band_gap_path'] = [bs['kpoint_path'][cbm_pos], bs['kpoint_path'][vbm_pos]]
-            bs['band_gap_path_inds'] = [cbm_pos, vbm_pos]
-            bs['gap_momentum'] = np.sqrt(np.sum((bs['kpoints_cartesian'][cbm_pos] - bs['kpoints_cartesian'][vbm_pos])**2))
-
-            # calculate direct gap
-            direct_gaps = np.zeros((len(bs['kpoint_path'])))
-            direct_cbms = np.zeros((len(bs['kpoint_path'])))
-            direct_vbms = np.zeros((len(bs['kpoint_path'])))
-            for ind, _ in enumerate(bs['kpoint_path']):
-                direct_cbm = 1e10
-                direct_vbm = -1e10
-                for nb in range(bs['num_bands']):
-                    band_eig = bs['eigenvalues_k_s'][0][nb][ind]
-                    if direct_vbm <= band_eig < 0:
-                        direct_vbm = band_eig
-                    if direct_cbm >= band_eig > 0:
-                        direct_cbm = band_eig
-                direct_gaps[ind] = direct_cbm - direct_vbm
-                direct_cbms[ind] = direct_cbm
-                direct_vbms[ind] = direct_vbm
-            bs['direct_gap'] = np.min(direct_gaps)
-            bs['direct_conduction_band_max'] = direct_cbms[np.argmin(direct_gaps)]
-            bs['direct_valence_band_min'] = direct_vbms[np.argmin(direct_gaps)]
-            bs['direct_gap'] = np.min(direct_gaps)
-            bs['direct_gap_path'] = 2 * [bs['kpoint_path'][np.argmin(direct_gaps)]]
-            bs['direct_gap_path_inds'] = 2 * [np.argmin(direct_gaps)]
-
-        if np.abs(bs['direct_gap'] - bs['band_gap']) < 1e-5:
-            bs['valence_band_min'] = direct_vbm
-            bs['conduction_band_max'] = direct_cbm
-            bs['band_gap_path_inds'] = bs['direct_gap_path_inds']
-            cbm_pos = bs['direct_gap_path_inds'][0]
-            vbm_pos = bs['direct_gap_path_inds'][1]
-            bs['band_gap_path'] = bs['direct_gap_path']
-            bs['gap_momentum'] = np.sqrt(np.sum((bs['kpoints_cartesian'][cbm_pos] - bs['kpoints_cartesian'][vbm_pos])**2))
-
-        if summary:
-            print('Read bs for {}.'.format(seed))
-            if bs['band_gap'] == 0:
-                print('The structure is metallic.')
-            elif bs['band_gap_path_inds'][0] == bs['band_gap_path_inds'][1]:
-                print('Band gap is direct with size {:5.5f} eV'.format(bs['band_gap']), end=' ')
-                print('and lies at {}'.format(bs['direct_gap_path'][0]))
-            else:
-                print('Band gap is indirect with size {:5.5f} eV'.format(bs['band_gap']), end=' ')
-                print('between {} and {}'.format(bs['kpoint_path'][cbm_pos], bs['kpoint_path'][vbm_pos]), end=' ')
-                print('corresponding to a wavenumber of {:5.5f} eV/A'.format(bs['gap_momentum']))
-                print('The smallest direct gap has size {:5.5f} eV'.format(bs['direct_gap']), end=' ')
-                print('and lies at {}'.format(bs['direct_gap_path'][0]))
+    bs['eigs_s_k'] = bs['eigenvalues_k_s']
 
     return bs, True
 
@@ -872,34 +804,8 @@ def optados2dict(seed, **kwargs):
         optados['energies'] = data[:, 0]
 
     if is_pdos or is_pdis:
-        projectors = []
-        # get pdos labels
-        for ind, line in enumerate(header):
-            if 'Projector:' in line:
-                # skip current line and column headings
-                j = 2
-                elements = []
-                ang_mom_channels = []
-                while ind + j + 1 < len(header) and 'Projector:' not in header[ind + j + 1]:
-                    elements.append(header[ind + j].split()[1])
-                    ang_mom_channels.append(header[ind + j].split()[3])
-                    j += 1
-                projector_label = []
-                if len(set(elements)) == 1:
-                    projector_label.append(elements[0])
-                else:
-                    projector_label.append(None)
-
-                if len(set(ang_mom_channels)) == 1:
-                    projector_label.append(ang_mom_channels[0])
-                else:
-                    projector_label.append(None)
-
-                projector_label = tuple(projector_label)
-                projectors.append(projector_label)
-
-        optados['num_projectors'] = len(projectors)
-        optados['projectors'] = projectors
+        optados['projectors'] = _optados_get_projector_labels(header)
+        optados['num_projectors'] = len(optados['projectors'])
 
     if dos_unit_label is not None:
         optados['dos_unit_label'] = dos_unit_label
@@ -908,14 +814,18 @@ def optados2dict(seed, **kwargs):
         # get pdos values
         optados['pdos'] = dict()
         optados['sum_pdos'] = np.zeros_like(data[:, 0])
-        for i, projector in enumerate(projectors):
-            optados['pdos'][projector] = data[:, i + 1]
+        for i, projector in enumerate(optados['projectors']):
+            # optados spin-down projectors are negative, unfortunately
+            if 'down' in projector:
+                optados['pdos'][projector] = -data[:, i + 1]
+            else:
+                optados['pdos'][projector] = data[:, i + 1]
             optados['sum_pdos'] += data[:, i + 1]
 
     elif is_spin_dos:
         optados['spin_dos'] = dict()
         optados['spin_dos']['up'] = data[:, 1]
-        optados['spin_dos']['down'] = data[:, 2]
+        optados['spin_dos']['down'] = -data[:, 2]
         optados['dos'] = np.abs(optados['spin_dos']['up']) + np.abs(optados['spin_dos']['down'])
 
     elif is_pdis:
@@ -944,6 +854,8 @@ def optados2dict(seed, **kwargs):
             optados['eigenvalues'].append(eigs)
             optados['pdis'].append(pdis)
 
+        optados['pdis'] = np.asarray(optados['pdis'])
+
     else:
         optados['dos'] = data[:, 1]
 
@@ -967,20 +879,27 @@ def phonon2dict(seed, **kwargs):
         # read whole file into RAM, typically <~ 1 MB
         flines = f.readlines()
 
-    verbosity = kwargs.get('verbosity', 0)
-
     ph = dict()
-    seed = seed.replace('.phonon', '')
-    ph['source'] = [seed + '.phonon']
+
+    if 'phonon_dos' in seed:
+        seed = seed.replace('.phonon_dos', '')
+        ph['source'] = [seed + '.phonon_dos']
+    else:
+        seed = seed.replace('.phonon', '')
+        ph['source'] = [seed + '.phonon']
+
+    dos_present = False
+    data_start = 0
 
     for line_no, line in enumerate(flines):
         line = line.lower()
         if 'number of ions' in line:
             ph['num_atoms'] = int(line.split()[-1])
         elif 'number of branches' in line:
-            ph['num_branches'] = int(line.split()[-1])
+            ph['num_modes'] = int(line.split()[-1])
+            ph['num_branches'] = ph['num_modes']
         elif 'number of wavevectors' in line:
-            ph['num_qpoints'] = int(line.split()[-1])
+            ph['num_kpoints'] = int(line.split()[-1])
         elif 'frequencies in' in line:
             ph['freq_unit'] = line.split()[-1]
         elif 'unit cell vectors' in line:
@@ -998,52 +917,80 @@ def phonon2dict(seed, **kwargs):
                 ph['atom_masses'].append(f90_float_parse(flines[line_no + i].split()[-1]))
                 i += 1
         elif 'end header' in line:
-            data = flines[line_no + 1:]
+            data_start = line_no + 1
+        elif 'begin dos' in line:
+            dos_present = True
+            projector_labels = flines[line_no].split()[5:]
+            projector_labels = [(label, None) for label in projector_labels]
+            begin_dos = line_no + 1
+
+        elif 'q-pt' in line:
+            last_qpt_ind = int(line.split()[1])
+
+    if dos_present:
+        # extra header line with GRADIENTS written when dos is present
+        data_start += 1
+        # no eigenvectors written when dos is present
+        line_offset = ph['num_modes'] + 1
+    else:
+        line_offset = ph['num_modes'] * (ph['num_atoms'] + 1) + 3
+
+    data = flines[data_start:]
 
     ph['phonon_kpoint_list'] = []
-    ph['eigenvalues_q'] = np.zeros((1, ph['num_branches'], ph['num_qpoints']))
-    line_offset = ph['num_branches'] * (ph['num_atoms'] + 1) + 3
-    for qind in range(ph['num_qpoints']):
+    if 'num_kpoints' not in ph:
+        ph['num_kpoints'] = last_qpt_ind
+    ph['eigenvalues_q'] = np.zeros((1, ph['num_modes'], ph['num_kpoints']))
+    raman_intensity = np.zeros_like(ph['eigenvalues_q'])
+    infrared_intensity = np.zeros_like(ph['eigenvalues_q'])
+    raman = False
+    ir = False
+    for qind in range(ph['num_kpoints']):
         ph['phonon_kpoint_list'].append([f90_float_parse(elem) for elem in data[qind * line_offset].split()[2:]])
-        for i in range(1, ph['num_branches'] + 1):
-            ph['eigenvalues_q'][0][i - 1][qind] = f90_float_parse(data[qind * line_offset + i].split()[-1])
+        for i in range(1, ph['num_modes'] + 1):
+            line_split = data[qind * line_offset + i].split()
+            ph['eigenvalues_q'][0][i - 1][qind] = f90_float_parse(line_split[1])
+            if len(line_split) > 2:
+                infrared_intensity[0][i - 1][qind] = f90_float_parse(line_split[2])
+                ir = True
+            if len(line_split) > 3:
+                raman_intensity[0][i - 1][qind] = f90_float_parse(line_split[3])
+                raman = True
 
-    ph['qpoint_path'] = np.asarray([qpt[0:3] for qpt in ph['phonon_kpoint_list']])
-    ph['qpoint_weights'] = [qpt[3] for qpt in ph['phonon_kpoint_list']]
+    if ir:
+        ph['infrared_intensity'] = infrared_intensity
+    if raman:
+        ph['raman_intensity'] = raman_intensity
+
+    if dos_present:
+        # remove header and "END"
+        flines = flines[begin_dos:-1]
+        raw_data = np.genfromtxt(flines)
+        ph['energies'] = raw_data[:, 0] * INVERSE_CM_TO_EV
+        ph['dos'] = raw_data[:, 1]
+        ph['pdos'] = dict()
+
+        for i, label in enumerate(projector_labels):
+            ph['pdos'][label] = raw_data[:, i + 2]
+
+    ph['kpoint_path'] = np.asarray([qpt[0:3] for qpt in ph['phonon_kpoint_list']])
+    ph['kpoint_weights'] = [qpt[3] for qpt in ph['phonon_kpoint_list']]
+    ph['eigenvalues_q'] *= INVERSE_CM_TO_EV
     ph['softest_mode_freq'] = np.min(ph['eigenvalues_q'])
-
-    cart_kpts = np.asarray(frac2cart(real2recip(ph['lattice_cart']), ph['qpoint_path']))
-    ph['cart_qpoints'] = cart_kpts
-    kpts_diff = np.zeros((len(cart_kpts) - 1))
-    kpts_diff_set = set()
-    for i in range(len(cart_kpts) - 1):
-        kpts_diff[i] = np.sqrt(np.sum((cart_kpts[i] - cart_kpts[i + 1])**2))
-        kpts_diff_set.add(kpts_diff[i])
-    ph['qpoint_path_spacing'] = np.median(kpts_diff)
-
-    # create list containing qpoint indices of discontinuous branches through k-space
-    ph['qpoint_branches'] = []
-    current_branch = []
-    for ind, point in enumerate(cart_kpts):
-        if ind == 0:
-            current_branch.append(ind)
-        elif ind == len(cart_kpts) - 1:
-            ph['qpoint_branches'].append(current_branch)
-            continue
-
-        if np.sqrt(np.sum((point - cart_kpts[ind + 1])**2)) < 10 * ph['qpoint_path_spacing']:
-            current_branch.append(ind + 1)
-        else:
-            ph['qpoint_branches'].append(current_branch)
-            current_branch = [ind + 1]
-
-    if not sum([len(branch) for branch in ph['qpoint_branches']]) == ph['num_qpoints']:
-        raise RuntimeError('Error parsing qpoints: number of qpoints does not match number in branches')
-
-    if verbosity > 0:
-        print('{} sucessfully scraped with {} q-points.'.format(seed, ph['num_qpoints']))
+    ph['eigs_q'] = ph['eigenvalues_q']
 
     return ph, True
+
+
+@scraper_function
+def phonon_dos2dict(*args, **kwargs):
+    """ Wrapper for old phonon DOS scraper, which has since been merged
+    with `phonon2dict`. Note that this function still has a different
+    effect to `phonon2dict` when `as_model` is used as the results will
+    be cast into a :class:`VibrationalDOS` object.
+
+    """
+    return phonon2dict(*args, no_wrap=True, **kwargs)
 
 
 def usp2dict(seed, **kwargs):
@@ -1100,15 +1047,15 @@ def _castep_scrape_thermo_data(flines, castep):
     """
     for line_no, line in enumerate(flines):
         if 'Number of temperature values' in line:
-            castep['num_temp_vals'] = int(line.split(':')[-1].strip())
+            castep['thermo_num_temp_vals'] = int(line.split(':')[-1].strip())
         elif 'Initial temperature' in line:
-            castep['temp_init'] = f90_float_parse(line.split(':')[1].strip().split(' ')[0])
+            castep['thermo_temp_init'] = f90_float_parse(line.split(':')[1].strip().split(' ')[0])
         elif 'Final temperature' in line:
-            castep['temp_final'] = f90_float_parse(line.split(':')[1].strip().split(' ')[0])
+            castep['thermo_temp_final'] = f90_float_parse(line.split(':')[1].strip().split(' ')[0])
         elif 'Spacing between temperature values' in line:
-            castep['temp_spacing'] = f90_float_parse(line.split(':')[1].strip().split(' ')[0])
+            castep['thermo_temp_spacing'] = f90_float_parse(line.split(':')[1].strip().split(' ')[0])
         elif 'Zero-point energy' in line:
-            castep['zero_point_E'] = f90_float_parse(line.split("=")[1].strip().split(' ')[0])
+            castep['thermo_zero_point_energy'] = f90_float_parse(line.split("=")[1].strip().split(' ')[0])
         elif 'T(K)' and 'E(eV)' in line:
             castep['thermo_temps'] = []  # temperatures calculation was done at
             castep['thermo_enthalpy'] = {}  # enthalpy E(eV)
@@ -1127,6 +1074,51 @@ def _castep_scrape_thermo_data(flines, castep):
                     castep['thermo_entropy'][f90_float_parse(temp_line[0])] = f90_float_parse(temp_line[3])
                     castep['thermo_heat_cap'][f90_float_parse(temp_line[0])] = f90_float_parse(temp_line[4])
                 i += 1
+
+
+def _castep_scrape_phonon_frequencies(flines, castep):
+    """ Iterate through flines to scrape the phonon frequencies
+    from this CASTEP calculation. Will only scrape the *final* set
+    of frequencies in the CASTEP file, ignoring any others.
+
+    """
+    phonons = {}
+
+    phonons['phonon_fine_kpoint_list'] = []
+    phonons['phonon_fine_kpoint_weights'] = []
+    phonons['eigs_q'] = []
+
+    # first find the last block of frequencies
+    for line_no, line in enumerate(flines):
+        if "Performing frequency calculation at " in line:
+            start_line_no = line_no + 2
+
+    q_pt_ind = 0
+    for line_no, line in enumerate(flines[start_line_no:]):
+        if '============' in line:
+            break
+        if 'q-pt=' in line:
+            q_pt = [f90_float_parse(val) for val in line.split('(')[-1].split(')')[0].split()]
+            phonons['phonon_fine_kpoint_list'].append(q_pt)
+            phonons['phonon_fine_kpoint_weights'].append(f90_float_parse(line.split()[-2]))
+            phonons['eigs_q'].append([])
+
+            for _, freq_line in enumerate(flines[start_line_no:][line_no+6:]):
+                if '.........................' in freq_line:
+                    break
+                phonons['eigs_q'][q_pt_ind].append(f90_float_parse(freq_line.split()[2]))
+            q_pt_ind += 1
+
+    phonons['num_modes'] = len(phonons['eigs_q'][0])
+    phonons['eigs_q'] = np.asarray(phonons['eigs_q']).T
+    phonons['eigs_q'] = INVERSE_CM_TO_EV * phonons['eigs_q'].reshape(1, *np.shape(phonons['eigs_q']))
+    phonons['kpoint_path'] = phonons['phonon_fine_kpoint_list']
+    phonons['kpoint_weights'] = phonons['phonon_fine_kpoint_weights']
+    phonons['num_kpoints'] = len(phonons['phonon_fine_kpoint_list'])
+    phonons['num_qpoints'] = len(phonons['phonon_fine_kpoint_list'])
+
+    for key in phonons:
+        castep[key] = phonons[key]
 
 
 def _castep_scrape_atoms(flines, castep):
@@ -1152,6 +1144,21 @@ def _castep_scrape_atoms(flines, castep):
                     temp_line = flines[line_no + i].split()[0:3]
                     castep['lattice_cart'].append(list(map(f90_float_parse, temp_line)))
                 i += 1
+        if 'Lattice parameters' in line:
+            castep['lattice_abc'] = []
+            i = 1
+            castep['lattice_abc'].append(
+                list(map(f90_float_parse,
+                         [flines[line_no+i].split('=')[1].strip().split(' ')[0],
+                          flines[line_no+i+1].split('=')[1].strip().split(' ')[0],
+                          flines[line_no+i+2].split('=')[1].strip().split(' ')[0]])))
+            castep['lattice_abc'].append(
+                list(map(f90_float_parse,
+                         [flines[line_no+i].split('=')[-1].strip(),
+                          flines[line_no+i+1].split('=')[-1].strip(),
+                          flines[line_no+i+2].split('=')[-1].strip()])))
+        if 'Current cell volume' in line:
+            castep['cell_volume'] = f90_float_parse(line.split('=')[1].split()[0].strip())
         if 'atom types' not in castep and 'Cell Contents' in line:
             castep['atom_types'] = []
             castep['positions_frac'] = []
@@ -1177,7 +1184,7 @@ def _castep_scrape_atoms(flines, castep):
             castep['num_fu'] = castep['num_atoms'] / sum([elem[1] for elem in castep['stoichiometry']])
             break
     else:
-        raise CalculationError('Unable to find atoms in CASTEP file.')
+        raise ComputationError('Unable to find atoms in CASTEP file.')
 
 
 def _castep_scrape_final_parameters(flines, castep):
@@ -1213,6 +1220,15 @@ def _castep_scrape_final_parameters(flines, castep):
                 castep['xc_functional'] = 'HSE03'
             elif 'hybrid HSE06' in xc_string:
                 castep['xc_functional'] = 'HSE06'
+            elif 'RSCAN' in xc_string:
+                castep['xc_functional'] = 'RSCAN'
+            elif 'Screened Hartree-Fock' in xc_string:
+                castep['xc_functional'] = 'SHF-LDA'
+            else:
+                castep['xc_functional'] = xc_string.split(':')[-1]
+                warnings.warn('Unrecognised functional {xc}: scraping as {xc}.'
+                              'This may lead to incompatible param files.'
+                              .format(xc=castep['xc_functional']))
         elif 'cut_off_energy' not in castep and 'plane wave basis set' in line:
             castep['cut_off_energy'] = f90_float_parse(line.split(':')[-1].split()[0])
         elif 'finite_basis_corr' not in castep and 'finite basis set correction  ' in line:
@@ -1230,13 +1246,32 @@ def _castep_scrape_final_parameters(flines, castep):
             castep['sedc_apply'] = True
             castep['sedc_scheme'] = flines[line_no + 1].split(':')[1].split()[0]
         elif 'space_group' not in castep and 'Space group of crystal' in line:
-            castep['space_group'] = line.split(':')[-1].split(',')[0].strip().replace(" ", "")
+            space_group = line.split(':')[-1].split(',')[0].strip().replace(" ", "")
+            if space_group:
+                castep['space_group'] = space_group
+        elif 'nelectrons' not in castep and 'number of  electrons' in line:
+            castep['nelectrons'] = f90_float_parse(line.split(':')[-1])
+        elif 'nelectrons' not in castep and 'number of bands' in line:
+            castep['nbands'] = int(line.split(':')[-1])
+        elif 'Cell constraints are' in line and 'cell_constraints' not in castep:
+            castep['cell_constraints'] = [int(val) for val in line.split(':')[-1].split()]
+            if castep['cell_constraints'] == [1, 2, 3, 4, 5, 6]:
+                del castep['cell_constraints']
+            elif all(val == 0 for val in castep['cell_constraints']):
+                castep['fix_all_cell'] = True
+                del castep['cell_constraints']
+            if 'cell_constraints' in castep:
+                if len(castep['cell_constraints']) != 6:
+                    raise RuntimeError('Unable to read cell constraints block.')
+                castep['cell_constraints'] = [castep['cell_constraints'][0:3], castep['cell_constraints'][3:]]
         elif 'external_pressure' not in castep and 'External pressure/stress' in line:
             try:
                 castep['external_pressure'] = []
-                castep['external_pressure'].append(list(map(f90_float_parse, flines[line_no + 1].split())))
-                castep['external_pressure'].append(list(map(f90_float_parse, flines[line_no + 2].split())))
-                castep['external_pressure'].append(list(map(f90_float_parse, flines[line_no + 3].split())))
+                for i in range(3):
+                    parsed_line = list(map(f90_float_parse, flines[line_no + i + 1].split()))
+                    if len(parsed_line) != 3:
+                        parsed_line = i * [0.0] + parsed_line
+                    castep['external_pressure'].append(parsed_line)
             except ValueError:
                 castep['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
         elif 'spin_polarized' not in castep and 'treating system as spin-polarized' in line:
@@ -1295,7 +1330,7 @@ def _castep_scrape_final_parameters(flines, castep):
                 i += 1
     # write zero pressure if not found in file
     if 'external_pressure' not in castep:
-        castep['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0], [0.0]]
+        castep['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
     if 'spin_polarized' not in castep:
         castep['spin_polarized'] = False
 
@@ -1322,148 +1357,136 @@ def _castep_scrape_final_structure(flines, castep, db=True):
 
     final_flines = flines[finish_line + 1:]
     for line_no, line in enumerate(final_flines):
-        try:
-            if 'Real Lattice' in line:
-                castep['lattice_cart'] = []
-                i = 1
-                while True:
-                    if not final_flines[line_no + i].strip():
+        if 'Real Lattice' in line:
+            castep['lattice_cart'] = []
+            i = 1
+            while i < 4:
+                if not final_flines[line_no + i].strip():
+                    break
+                else:
+                    temp_line = final_flines[line_no + i].split()[0:3]
+                    castep['lattice_cart'].append(list(map(f90_float_parse, temp_line)))
+                i += 1
+        if 'Lattice parameters' in line:
+            castep['lattice_abc'] = []
+            i = 1
+            castep['lattice_abc'].append(
+                list(map(f90_float_parse,
+                         [final_flines[line_no+i].split('=')[1].strip().split(' ')[0],
+                          final_flines[line_no+i+1].split('=')[1].strip().split(' ')[0],
+                          final_flines[line_no+i+2].split('=')[1].strip().split(' ')[0]])))
+            castep['lattice_abc'].append(
+                list(map(f90_float_parse,
+                         [final_flines[line_no+i].split('=')[-1].strip(),
+                          final_flines[line_no+i+1].split('=')[-1].strip(),
+                          final_flines[line_no+i+2].split('=')[-1].strip()])))
+        elif 'Current cell volume' in line:
+            castep['cell_volume'] = f90_float_parse(line.split('=')[1].split()[0].strip())
+        elif 'Cell Contents' in line:
+            castep['positions_frac'] = []
+            i = 1
+            atoms = False
+            while True:
+                if atoms:
+                    if 'xxxxxxxxx' in final_flines[line_no + i]:
+                        atoms = False
                         break
                     else:
-                        temp_line = final_flines[line_no + i].split()[0:3]
-                        castep['lattice_cart'].append(list(map(f90_float_parse, temp_line)))
-                    i += 1
-            elif 'Lattice parameters' in line:
-                castep['lattice_abc'] = []
-                i = 1
-                castep['lattice_abc'].append(
-                    list(map(f90_float_parse,
-                             [final_flines[line_no+i].split('=')[1].strip().split(' ')[0],
-                              final_flines[line_no+i+1].split('=')[1].strip().split(' ')[0],
-                              final_flines[line_no+i+2].split('=')[1].strip().split(' ')[0]])))
-                castep['lattice_abc'].append(
-                    list(map(f90_float_parse,
-                             [final_flines[line_no+i].split('=')[-1].strip(),
-                              final_flines[line_no+i+1].split('=')[-1].strip(),
-                              final_flines[line_no+i+2].split('=')[-1].strip()])))
-            elif 'Current cell volume' in line:
-                castep['cell_volume'] = f90_float_parse(line.split('=')[1].split()[0].strip())
-            elif 'Cell Contents' in line:
-                castep['positions_frac'] = []
-                i = 1
-                atoms = False
-                while True:
-                    if atoms:
-                        if 'xxxxxxxxx' in final_flines[line_no + i]:
-                            atoms = False
-                            break
-                        else:
-                            temp_frac = final_flines[line_no + i].split()[3:6]
-                            castep['positions_frac'].append(list(map(f90_float_parse, temp_frac)))
-                    if 'x------' in final_flines[line_no + i]:
-                        atoms = True
-                    i += 1
-            # don't check if final_energy exists, as this will update for each GO step
-            elif 'Final energy, E' in line:
-                castep['total_energy'] = f90_float_parse(line.split('=')[1].split()[0])
-                castep['total_energy_per_atom'] = castep['total_energy'] / castep['num_atoms']
-            elif 'Final free energy' in line:
-                castep['free_energy'] = f90_float_parse(line.split('=')[1].split()[0])
-                castep['free_energy_per_atom'] = castep['free_energy'] / castep['num_atoms']
-            elif '0K energy' in line:
-                castep['0K_energy'] = f90_float_parse(line.split('=')[1].split()[0])
-                castep['0K_energy_per_atom'] = castep['0K_energy'] / castep['num_atoms']
-            elif ' Forces **' in line:
-                castep['forces'] = []
-                i = 1
-                max_force = 0
-                forces = False
-                while True:
-                    if forces:
-                        if '*' in final_flines[line_no + i].split()[1]:
-                            forces = False
-                            break
-                        else:
-                            force_on_atom = 0
-                            castep['forces'].append([])
-                            for j in range(3):
-                                temp = final_flines[line_no + i].replace('(cons\'d)', '')
-                                force_on_atom += f90_float_parse(temp.split()[3 + j])**2
-                                castep['forces'][-1].append(f90_float_parse(temp.split()[3 + j]))
-                            if force_on_atom > max_force:
-                                max_force = force_on_atom
-                    elif 'x' in final_flines[line_no + i]:
-                        i += 1  # skip next blank line
-                        forces = True
-                    i += 1
-                castep['max_force_on_atom'] = pow(max_force, 0.5)
-            elif 'Stress Tensor' in line:
-                i = 1
-                while i < 20:
-                    if 'Cartesian components' in final_flines[line_no + i]:
-                        castep['stress'] = []
+                        temp_frac = final_flines[line_no + i].split()[3:6]
+                        castep['positions_frac'].append(list(map(f90_float_parse, temp_frac)))
+                if 'x------' in final_flines[line_no + i]:
+                    atoms = True
+                i += 1
+        # don't check if final_energy exists, as this will update for each GO step
+        elif 'Final energy =' in line or 'Final energy, E' in line:
+            castep['total_energy'] = f90_float_parse(line.split('=')[1].split()[0])
+            castep['total_energy_per_atom'] = castep['total_energy'] / castep['num_atoms']
+        elif 'Final free energy' in line:
+            castep['smeared_free_energy'] = f90_float_parse(line.split('=')[1].split()[0])
+            castep['smeared_free_energy_per_atom'] = castep['smeared_free_energy'] / castep['num_atoms']
+        elif '0K energy' in line:
+            castep['0K_energy'] = f90_float_parse(line.split('=')[1].split()[0])
+            castep['0K_energy_per_atom'] = castep['0K_energy'] / castep['num_atoms']
+        elif ' Forces **' in line:
+            castep['forces'] = []
+            i = 1
+            forces = False
+            while True:
+                if forces:
+                    if '*' in final_flines[line_no + i].split()[1]:
+                        forces = False
+                        break
+                    else:
+                        castep['forces'].append([])
                         for j in range(3):
-                            castep['stress'].append(list(map(f90_float_parse, (final_flines[line_no + i + j + 4].split()[2:5]))))
-                    elif 'Pressure' in final_flines[line_no + i]:
-                        try:
-                            castep['pressure'] = f90_float_parse(final_flines[line_no + i].split()[-2])
-                        except ValueError:
-                            pass
-                        break
-                    i += 1
-            elif 'Integrated Spin Density' in line:
-                castep['integrated_spin_density'] = f90_float_parse(line.split()[-2])
-            elif 'Integrated |Spin Density|' in line:
-                castep['integrated_mod_spin_density'] = f90_float_parse(line.split()[-2])
-            elif 'Atomic Populations (Mulliken)' in line:
-                # population format seems to change every CASTEP version...
-                if float(castep.get('castep_version', 0.0)) >= 16:
-                    if castep['spin_polarized']:
-                        castep['mulliken_spins'] = []
-                        castep['mulliken_net_spin'] = 0.0
-                        castep['mulliken_abs_spin'] = 0.0
-                    castep['mulliken_charges'] = []
+                            temp = final_flines[line_no + i].replace('(cons\'d)', '')
+                            castep['forces'][-1].append(f90_float_parse(temp.split()[3 + j]))
+                elif 'x' in final_flines[line_no + i]:
+                    i += 1  # skip next blank line
+                    forces = True
+                i += 1
+            castep['max_force_on_atom'] = np.max(np.linalg.norm(castep['forces'], axis=-1))
+        elif 'Stress Tensor' in line:
+            i = 1
+            while i < 20:
+                if 'Cartesian components' in final_flines[line_no + i]:
+                    castep['stress'] = []
+                    for j in range(3):
+                        castep['stress'].append(list(map(f90_float_parse, (final_flines[line_no + i + j + 4].split()[2:5]))))
+                elif 'Pressure' in final_flines[line_no + i]:
+                    try:
+                        castep['pressure'] = f90_float_parse(final_flines[line_no + i].split()[-2])
+                    except ValueError:
+                        pass
+                    break
+                i += 1
+        elif 'Integrated Spin Density' in line:
+            castep['integrated_spin_density'] = f90_float_parse(line.split()[-2])
+        elif 'Integrated |Spin Density|' in line:
+            castep['integrated_mod_spin_density'] = f90_float_parse(line.split()[-2])
+        elif 'Atomic Populations (Mulliken)' in line:
+            # population format seems to change every CASTEP version...
+            if float(castep.get('castep_version', 0.0)) >= 18:
+                if castep['spin_polarized']:
                     castep['mulliken_spins'] = []
-                    i = 0
-                    ind = 0
-                    while ind < len(castep['atom_types']):
-                        if castep['spin_polarized']:
-                            castep['mulliken_charges'].append(f90_float_parse(final_flines[line_no + i + 4].split()[-2]))
-                            castep['mulliken_spins'].append(f90_float_parse(final_flines[line_no + i + 4].split()[-1]))
-                            castep['mulliken_net_spin'] += castep['mulliken_spins'][-1]
-                            castep['mulliken_abs_spin'] += abs(castep['mulliken_spins'][-1])
-                            i += 2
-                        else:
-                            castep['mulliken_charges'].append(f90_float_parse(final_flines[line_no + i + 4].split()[-1]))
-                            i += 1
-                        ind += 1
-            elif 'Final Enthalpy' in line:
-                castep['enthalpy'] = f90_float_parse(line.split('=')[-1].split()[0])
-                castep['enthalpy_per_atom'] = (f90_float_parse(line.split('=')[-1].split()[0]) / castep['num_atoms'])
-            elif 'Final bulk modulus' in line:
-                try:
-                    castep['bulk_modulus'] = f90_float_parse(line.split('=')[-1].split()[0])
-                except ValueError:
-                    # the above will fail if bulk modulus was not printed (i.e. if it was unchanged)
-                    pass
+                    castep['mulliken_net_spin'] = 0.0
+                    castep['mulliken_abs_spin'] = 0.0
+                castep['mulliken_charges'] = []
+                castep['mulliken_spins'] = []
+                i = 0
+                ind = 0
+                while ind < len(castep['atom_types']):
+                    if castep['spin_polarized']:
+                        castep['mulliken_charges'].append(f90_float_parse(final_flines[line_no + i + 4].split()[-2]))
+                        castep['mulliken_spins'].append(f90_float_parse(final_flines[line_no + i + 4].split()[-1]))
+                        castep['mulliken_net_spin'] += castep['mulliken_spins'][-1]
+                        castep['mulliken_abs_spin'] += abs(castep['mulliken_spins'][-1])
+                        i += 2
+                    else:
+                        castep['mulliken_charges'].append(f90_float_parse(final_flines[line_no + i + 4].split()[-1]))
+                        i += 1
+                    ind += 1
+        elif 'Final Enthalpy' in line:
+            castep['enthalpy'] = f90_float_parse(line.split('=')[-1].split()[0])
+            castep['enthalpy_per_atom'] = (f90_float_parse(line.split('=')[-1].split()[0]) / castep['num_atoms'])
+        elif 'Final bulk modulus' in line:
+            try:
+                castep['bulk_modulus'] = f90_float_parse(line.split('=')[-1].split()[0])
+            except ValueError:
+                # the above will fail if bulk modulus was not printed (i.e. if it was unchanged)
+                pass
 
-            elif 'Chemical Shielding and Electric Field Gradient Tensors'.lower() in line.lower():
-                i = 5
-                castep['chemical_shifts'] = []
-                while True:
-                    # break when the line containing just '=' is reached
-                    if len(flines[line_no + i].split()) == 1:
-                        break
-                    castep['chemical_shifts'].append(flines[line_no + i].split()[3])
-                    i += 1
-                if len(castep['chemical_shifts']) != len(castep['atom_types']):
-                    raise RuntimeError('Found fewer chemical shifts than atoms (or vice versa)!')
-
-        except DFTError as exc:
-            raise exc
-        except Exception as oops:
-            msg = 'Error on line {}, contents: {}, error: {}'.format(line_no, line, oops)
-            raise RuntimeError(msg)
+        elif 'Chemical Shielding and Electric Field Gradient Tensors'.lower() in line.lower():
+            i = 5
+            castep['chemical_shifts'] = []
+            while True:
+                # break when the line containing just '=' is reached
+                if len(flines[line_no + i].split()) == 1:
+                    break
+                castep['chemical_shifts'].append(flines[line_no + i].split()[3])
+                i += 1
+            if len(castep['chemical_shifts']) != len(castep['atom_types']):
+                raise RuntimeError('Found fewer chemical shifts than atoms (or vice versa)!')
 
     # calculate kpoint spacing if not found
     if 'kpoints_mp_grid' in castep and 'kpoints_mp_spacing' not in castep and 'lattice_cart' in castep:
@@ -1484,29 +1507,61 @@ def _castep_scrape_metadata(flines, castep):
     """
     from time import strptime
     # computing metadata, i.e. parallelism, time, memory, version
+    if 'total_time_secs' not in castep:
+        castep['total_time_secs'] = 0
+    if 'total_time_hrs' not in castep:
+        castep['total_time_hrs'] = 0
+
     for ind, line in enumerate(flines):
         if 'Release CASTEP version' in line:
             castep['castep_version'] = line.replace('|', '').split()[-1]
-        try:
-            if 'Run started:' in line:
+        if 'Run started:' in line:
+            try:
                 year = line.split()[5]
                 month = str(strptime(line.split()[4], '%b').tm_mon)
                 day = line.split()[3]
                 castep['date'] = day + '-' + month + '-' + year
-            elif 'compiled for' in line.lower():
+            except (IndexError, ValueError):
+                castep['date'] = 'unknown'
+        elif 'compiled for' in line.lower():
+            try:
                 castep['_compiler_architecture'] = line.split()[2]
-            elif 'from code version' in line.lower():
+            except IndexError:
+                castep['_compiler_architecture'] = 'unknown'
+        elif 'from code version' in line.lower():
+            try:
                 castep['_castep_commit'] = ' '.join(flines[ind:ind+2]).split()[3]
-            elif 'Total time' in line and 'matrix elements' not in line:
-                castep['total_time_hrs'] = f90_float_parse(line.split()[-2]) / 3600
-            elif 'Peak Memory Use' in line:
+            except (IndexError, ValueError):
+                castep['_castep_commit'] = 'unknown'
+        elif 'Total time' in line and 'matrix elements' not in line:
+            try:
+                time = f90_float_parse(line.split()[-2])
+                castep['total_time_secs'] += time
+                castep['total_time_hrs'] += time / 3600
+            except (IndexError, ValueError):
+                castep['final_calculation_time_secs'] = 0
+        elif 'Calculation only took' in line:
+            castep['_time_estimated'] = f90_float_parse(line.split()[4])
+        elif 'Peak Memory Use' in line:
+            try:
                 castep['peak_mem_MB'] = int(f90_float_parse(line.split()[-2]) / 1024)
-            elif 'total storage required per process' in line:
-                castep['estimated_mem_MB'] = f90_float_parse(line.split()[-5])
+            except (IndexError, ValueError):
+                castep['peak_mem_MB'] = -1
+        elif 'total storage required per process' in line:
+            try:
+                castep['estimated_mem_per_process_MB'] = f90_float_parse(line.split()[-5])
+            except (IndexError, ValueError):
+                castep['estimated_mem_per_process_MB'] = 0
+        elif 'Calculation parallelised over' in line:
+            try:
+                castep['num_mpi_processes'] = int(f90_float_parse(line.split()[3]))
+            except Exception:
+                castep['num_mpi_processes'] = 1
+        elif 'Calculation not parall' in line:
+            castep['num_mpi_processes'] = 1
 
-        # if any of these error, don't worry too much (at all)
-        except (IndexError, ValueError):
-            pass
+        if 'num_mpi_processes' in castep and 'estimated_mem_per_process_MB' in castep:
+            castep['estimated_mem_MB'] = castep['estimated_mem_per_process_MB'] * castep['num_mpi_processes']
 
 
 def _castep_find_final_structure(flines):
@@ -1523,20 +1578,25 @@ def _castep_find_final_structure(flines):
     finish_line = 0
     success_string = 'Geometry optimization completed successfully'
     failure_string = 'Geometry optimization failed to converge after'
+    annoying_string = 'WARNING - there is nothing to optimise - skipping relaxation'
     # look for final "success/failure" string in file for geometry optimisation
     for line_no, line in enumerate(reversed(flines)):
         if success_string in line:
             finish_line = len(flines) - line_no
             optimised = True
             break
-        elif failure_string in line:
+        if annoying_string in line:
+            finish_line = len(flines) - line_no
+            optimised = True
+            break
+        if failure_string in line:
             finish_line = len(flines) - line_no
             optimised = False
             break
 
     # now wind back to get final total energies and non-symmetrised forces
     for count, line in enumerate(reversed(flines[:finish_line])):
-        if 'Final energy, E' in line:
+        if 'Final energy, E' in line or 'Final energy =' in line:
             finish_line -= count + 2
             break
 
@@ -1570,7 +1630,7 @@ def _castep_scrape_all_snapshots(flines):
                         snapshot['positions_frac'] = intermediates[-1]['positions_frac']
                         snapshot['atom_types'] = intermediates[-1]['atom_types']
                         snapshot['num_atoms'] = len(snapshot['positions_frac'])
-                    snapshot['free_energy_per_atom'] = snapshot['free_energy'] / snapshot['num_atoms']
+                    snapshot['smeared_free_energy_per_atom'] = snapshot['smeared_free_energy'] / snapshot['num_atoms']
                     snapshot['total_energy_per_atom'] = snapshot['total_energy'] / snapshot['num_atoms']
                     snapshot['0K_energy_per_atom'] = snapshot['0K_energy'] / snapshot['num_atoms']
                     # handle single atom forces edge-case
@@ -1635,10 +1695,10 @@ def _castep_scrape_all_snapshots(flines):
                 snapshot['stoichiometry'] = get_stoich(snapshot['atom_types'])
 
             # don't check if final_energy exists, as this will update for each GO step
-            elif 'Final energy, E' in line:
+            elif 'Final energy, E' in line or 'Final energy =' in line:
                 snapshot['total_energy'] = f90_float_parse(line.split('=')[1].split()[0])
             elif 'Final free energy' in line:
-                snapshot['free_energy'] = f90_float_parse(line.split('=')[1].split()[0])
+                snapshot['smeared_free_energy'] = f90_float_parse(line.split('=')[1].split()[0])
             elif '0K energy' in line:
                 snapshot['0K_energy'] = f90_float_parse(line.split('=')[1].split()[0])
             elif ' Forces **' in line:
@@ -1707,11 +1767,8 @@ def _castep_scrape_beef(flines, castep):
     else:
         return
 
-    castep['_beef'] = {'thetas': [], 'xc_energy': [], 'total_energy': [], 'total_energy_per_atom': [], 'xc_energy_per_atom': []}
-
-    for line_no, line in enumerate(flines[beef_start:]):
-        if 'Self-consistent xc-energy' in line:
-            castep['_beef']['total_energy_sans_xc'] = castep['total_energy'] + HARTREE_TO_EV*f90_float_parse(line.strip().split()[-2])
+    castep['_beef'] = {'thetas': [], 'xc_energy': [], 'total_energy': [],
+                       'total_energy_per_atom': [], 'xc_energy_per_atom': []}
 
     for line_no, line in enumerate(flines[beef_start:]):
         if '<-- BEEF' in line:
@@ -1721,53 +1778,108 @@ def _castep_scrape_beef(flines, castep):
             castep['_beef']['xc_energy_per_atom'].append(castep['_beef']['xc_energy'][-1] / castep['num_atoms'])
             castep['_beef']['total_energy_per_atom'].append(castep['_beef']['total_energy'][-1] / castep['num_atoms'])
         if 'BEEF completed' in line:
-            beef_end = line_no
             break
     else:
-        print('Warning, end of BEEF estimate not found.')
-        return
+        raise RuntimeError('End of BEEF estimate not found.')
 
-    for _, line in enumerate(flines[beef_end:]):
-        if 'Mean total energy' in line:
-            castep['_beef']['mean_total_energy'] = HARTREE_TO_EV*f90_float_parse(line.strip().split()[-2])
-        if 'Standard deviation' in line:
-            castep['_beef']['std_dev'] = HARTREE_TO_EV*f90_float_parse(line.strip().split()[-2]) / castep['num_atoms']
+    castep['_beef']['mean_total_energy'] = np.mean(castep['_beef']['total_energy'])
+    castep['_beef']['mean_total_energy_per_atom'] = np.mean(castep['_beef']['total_energy']) / castep['num_atoms']
+    castep['_beef']['std_dev_total_energy'] = np.std(castep['_beef']['total_energy'])
+    castep['_beef']['std_dev_total_energy_per_atom'] = np.std(castep['_beef']['total_energy']) / castep['num_atoms']
 
 
-def get_kpt_branches(cart_kpts):
-    """ Separate a kpoint path into discontinuous branches, returning
-    the indices of the branches and the estimated kpoint spacing.
+def _castep_scrape_devel_code(flines, castep):
+    """ Scrape the contents of the developer code block and
+    extract any information about nanotube encapsulation.
+    Searches for then scrapes the last occurence of "Developer
+    Code". If nanotube information is found, the `encapsulated`
+    flag is set to True.
 
     Parameters:
-        cart_kpts (list or np.ndarray): list of kpoints in Cartesian coordinates.
-
-    Returns:
-        (tuple):
-            - list: list of lists containing branches of continous kpoint indices,
-            - float: estimated kpoint spacing.
+        flines (list): CASTEP output flines to scrape.
+        castep (dict): dictionary to update with BEEF output.
 
     """
-    kpt_branches = []
-    kpts_diff = np.zeros((len(cart_kpts) - 1))
-    kpts_diff_set = set()
-    for i in range(len(cart_kpts) - 1):
-        kpts_diff[i] = np.sqrt(np.sum((cart_kpts[i] - cart_kpts[i + 1])**2))
-        kpts_diff_set.add(kpts_diff[i])
-    kpt_spacing = np.median(kpts_diff)
-    current_branch = []
-    for ind, point in enumerate(cart_kpts):
-        if ind == 0:
-            current_branch.append(ind)
-        elif ind == len(cart_kpts) - 1:
-            kpt_branches.append(current_branch)
-            continue
+    last_devel_code = len(flines)
+    for line_no, line in enumerate(flines):
+        if line.startswith(' *') and '**** Developer Code ****' in line:
+            last_devel_code = line_no
 
-        if np.sqrt(np.sum((point - cart_kpts[ind + 1])**2)) < 3 * kpt_spacing:
-            current_branch.append(ind + 1)
-        else:
-            kpt_branches.append(current_branch)
-            current_branch = [ind + 1]
-    return kpt_branches, kpt_spacing
+    castep['devel_code'] = []
+    for line_no, line in enumerate(flines[last_devel_code+1:]):
+        # look for end of block
+        if '*************' in line.strip():
+            break
+
+        line = line.strip()
+        if line:
+            castep['devel_code'].append(line)
+
+    devel_code = '\n'.join(castep['devel_code'])
+    if 'gaussian_cylinder' in devel_code.lower():
+        castep['encapsulated'] = True
+        for line in castep['devel_code']:
+            if 'radius' in line.lower():
+                castep['cnt_radius'] = float(line.strip().split()[-1])
+
+    # store as string rather than list
+    castep['devel_code'] = devel_code
+
+
+def _optados_get_projector_labels(header):
+    """ Get OptaDOS projector labels from a pdos.dat or pdis.dat file,
+    returning None-padded labels as `('species', 'ang_mom', 'spin channel')`,
+    e.g. ('Li', 's', None) or ('Cr', None, 'up').
+
+    Parameters:
+        header (str): the file header containing projector labels.
+
+    Returns:
+        list(tuple(str, str, str)): projector labels formatted as above.
+
+    """
+    projectors = []
+    for ind, line in enumerate(header):
+        separators = ['Projector:', 'Column:']
+        if any(sep in line for sep in separators):
+            is_spin_pdos = 'Spin' in header[ind+1]
+            # skip current line and column headings
+            j = 2
+            elements = []
+            ang_mom_channels = []
+            spin_channels = []
+            # loop over file finding projector header blocks
+            while ind + j + 1 < len(header) and not any(keyword in header[ind+j+1] for keyword in separators):
+                elements.append(header[ind + j].split()[1])
+                ang_mom_channels.append(header[ind + j].split()[3])
+                if is_spin_pdos:
+                    spin_channels.append(header[ind + j].split()[4].lower())
+                j += 1
+
+            projector_label = []
+
+            # check that this projector contains exactly 1 species
+            if len(set(elements)) == 1:
+                projector_label.append(elements[0])
+            else:
+                projector_label.append(None)
+
+            # check that this projector has exactly 1 ang mom channel
+            if len(set(ang_mom_channels)) == 1:
+                projector_label.append(ang_mom_channels[0])
+            else:
+                projector_label.append(None)
+
+            # check that this projector has exactly 1 spin channel
+            if len(set(spin_channels)) == 1:
+                projector_label.append(spin_channels[0])
+            else:
+                projector_label.append(None)
+
+            projector_label = tuple(projector_label)
+            projectors.append(projector_label)
+
+    return projectors
 
 
 def get_seed_metadata(doc, seed):
@@ -1786,7 +1898,13 @@ def get_seed_metadata(doc, seed):
         doc['icsd'] = int(seed.split('CollCode')[-1].split('-')[0].split('_')[0].split('.')[0])
     elif '-ICSD-' in seed:
         doc['icsd'] = int(seed.split('-ICSD-')[-1].split('-')[0].split('_')[0].split('.')[0])
+    if '-OQMD-' in seed:
+        doc['oqmd_id'] = int(seed.split('-OQMD-')[-1].split('-')[0].split('_')[0].split('.')[0])
+    elif '-OQMD_' in seed:
+        doc['oqmd_id'] = int(seed.split('-OQMD_')[-1].split('-')[0].split('_')[0].split('.')[0])
     if '-MP-' in seed:
-        doc['mp-id'] = int(seed.split('-MP-')[-1].split('-')[0].split('_')[0].split('.')[0])
+        doc['mp_id'] = int(seed.split('-MP-')[-1].split('-')[0].split('_')[0].split('.')[0])
+    elif '-MP_' in seed:
+        doc['mp_id'] = int(seed.split('-MP_')[-1].split('-')[0].split('_')[0].split('.')[0])
     if '-DOI-' in seed:
         doc['doi'] = seed.split('-DOI-')[-1].split('-')[0].replace('__', '/')

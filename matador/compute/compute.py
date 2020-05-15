@@ -6,7 +6,6 @@ calculations on a single structure.
 
 """
 
-
 import os
 import sys
 import shutil
@@ -14,17 +13,25 @@ import subprocess as sp
 import glob
 import time
 import logging
+import traceback as tb
 from copy import deepcopy
 from math import ceil
 from psutil import virtual_memory
 
+from matador import __version__
 from matador.scrapers.castep_scrapers import cell2dict
 from matador.scrapers.castep_scrapers import res2dict, castep2dict
 from matador.calculators import CastepCalculator
+from matador.crystal import Crystal
 from matador.export import doc2cell, doc2param, doc2res
-from matador.compute.errors import CriticalError, WalltimeError, InputError, CalculationError, MaxMemoryEstimateExceeded
+from matador.utils.errors import CriticalError, WalltimeError, InputError, CalculationError, MaxMemoryEstimateExceeded
+from matador.utils.chem_utils import get_root_source
+import matador.utils.print_utils
 
 MATADOR_CUSTOM_TASKS = ['bulk_modulus', 'projected_bandstructure', 'pdispersion', 'all']
+
+LOG = logging.getLogger('run3')
+LOG.setLevel(logging.DEBUG)
 
 
 class ComputeTask:
@@ -50,13 +57,13 @@ class ComputeTask:
 
         Parameters:
             res (str/dict): filename or input structure dict
-            param_dict (dict): dictionary of CASTEP parameters
-            cell_dict (dict): dictionary of CASTEP cell options
             ncores (int): number of cores *per node* for mpirun call
             nnodes (int): number of nodes for mpirun call (if None, use 1)
             node (str): node name to run on (if None, run on localhost)
 
         Keyword arguments:
+            param_dict (dict): dictionary of CASTEP parameters
+            cell_dict (dict): dictionary of CASTEP cell options
             executable (str): name of binary to execute (DEFAULT: 'castep').
                 Special string $seed will be parsed as the seedname,
                 e.g. executable = 'pw6.x -i $seed.in > $seed.out' (requires mode='generic').
@@ -77,10 +84,11 @@ class ComputeTask:
                 to use for SCF convergence test
             kpts_1D (bool): treat z-direction as special and create
                 kpt_grid [1 1 n_kz] (DEFAULT: False)
+            noise (bool): add noise to the positions (DEFAULT: False)
+            squeeze (bool/float): add an external pressure to the first steps (DEFAULT: False)
             archer (bool): force use of aprun over mpirun (DEFAULT: False)
             slurm (bool): force use of srun over mpirun (DEFAULT: False)
             intel (bool): force use of Intel mpirun-style calls (DEFAULT: False)
-            profile (bool): use cProfile to profile runtime (DEFAULT: False)
             redirect (str): file to redirect stdout to (DEFAULT: /dev/null unless debug).
             exec_test (bool): test executable with `<exec> --version`
                 before progressing (DEFAULT: True)
@@ -111,53 +119,50 @@ class ComputeTask:
         """
         # set defaults and update class with desired values
         prop_defaults = {'paths': None, 'param_dict': None, 'cell_dict': None, 'mode': 'castep', 'executable': 'castep',
-                         'memcheck': False, 'rough': 4, 'rough_iter': 2, 'fine_iter': 20, 'spin': None,
+                         'memcheck': False, 'rough': 4, 'rough_iter': 2, 'fine_iter': 20, 'spin': None, 'squeeze': False,
                          'output_queue': None, 'redirect': None, 'reopt': False, 'compute_dir': None, 'noise': False,
                          'custom_params': False, 'archer': False, 'maxmem': None, 'killcheck': True, 'kpts_1D': False,
-                         'conv_cutoff': False, 'conv_kpt': False, 'profile': False, 'slurm': False, 'intel': False,
+                         'conv_cutoff': False, 'conv_kpt': False, 'slurm': False, 'intel': False,
                          'exec_test': True, 'timings': (None, None), 'start': True, 'verbosity': 1, 'polltime': 30,
-                         'optados_executable': 'optados', 'run3_settings': None}
+                         'optados_executable': 'optados', 'run3_settings': dict(), 'workflow_kwargs': dict()}
 
         self.paths = None
         self.output_queue = None
         self.final_result = None
+        self.executable = None
 
         self._process = None
         self._first_run = True
         self._geom_max_iter_list = None
+        self._squeeze_list = None
         self._max_iter = None
         self._num_rough_iter = None
+        self._target_spacing = None
+        self._target_pressure = None
         self._num_retries = 0
         self._max_num_retries = 2
         self.maxmem = None
         self.cell_dict = None
         self.param_dict = None
+        self.res_dict = None
+        self.calc_doc = None
 
         # save all keyword arguments as attributes
         self.__dict__.update(prop_defaults)
-        self.__dict__.update(kwargs)
-
-        if self.profile:
-            import cProfile
-            import pstats
-            from sys import version_info
-            from matador import __version__
-            profile = cProfile.Profile()
-            profile.enable()
+        for arg in kwargs:
+            if arg in prop_defaults:
+                self.__dict__.update({arg: kwargs[arg]})
 
         if self.maxmem is None and self.memcheck:
             self.maxmem = float(virtual_memory().available) / 1024**2
 
         # scrape and save seed name
-        self.res = res
-        if isinstance(self.res, str):
-            self.seed = self.res
+        if isinstance(res, str):
+            self.seed = res
+            self.seed = self.seed.split('/')[-1].replace('.res', '')
         else:
-            assert isinstance(self.res['source'], list)
-            assert len(self.res['source']) == 1
-            self.seed = self.res['source'][0]
-
-        self.seed = self.seed.split('/')[-1].replace('.res', '')
+            self.seed = get_root_source(res)
+        self._input_res = res
 
         # set up logging; by default, write DEBUG level into a file called logs/$seed.log
         # and write desired verbosity to stdout (default WARN).
@@ -173,37 +178,33 @@ class ComputeTask:
         if not os.path.isdir('logs'):
             os.mkdir('logs')
 
-        logging.basicConfig(level=logging.DEBUG)
-        logging.getLogger().handlers = []
+        LOG.handlers = []
 
-        stdout_handler = logging.StreamHandler(sys.stdout)
-        stdout_handler.setLevel(loglevel)
-        stdout_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)8s: %(message)s'))
-        logging.getLogger().addHandler(stdout_handler)
+        if self.verbosity > 1:
+            stdout_handler = logging.StreamHandler(sys.stdout)
+            stdout_handler.setLevel(loglevel)
+            stdout_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s | %(levelname)8s: %(message)s'))
+            LOG.addHandler(stdout_handler)
 
         logname = os.path.abspath('logs/{}.log'.format(self.seed))
         file_handler = logging.FileHandler(logname, mode='a')
-        file_handler.setLevel(loglevel)
-        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)8s: %(message)s'))
-        logging.getLogger().addHandler(file_handler)
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s | %(levelname)8s: %(message)s'))
+        LOG.addHandler(file_handler)
 
-        splash_screen = r""" Run started for seed {}.
-
+        splash_screen = r"""
                            _____
           _ __ _   _ _ __ |___ /
          | '__| | | | '_ \  |_ \
          | |  | |_| | | | |___) |
          |_|   \__,_|_| |_|____/
 
+        """
 
-        """.format(self.seed)
-
-        # at every other verbosity level, logging also writes to stdout
-        if self.verbosity == 1:
-            print(splash_screen)
-
-        logging.info(splash_screen)
-        logging.info('Initialising FullRelaxer object for {seed}'.format(seed=self.seed))
+        LOG.info(splash_screen)
+        LOG.info('matador version: {}'.format(__version__))
+        LOG.info('Host info: {}.'.format('-'.join(os.uname())))
+        LOG.info('Run started for seed {}'.format(self.seed))
 
         # set up compute parameters
         self.ncores = ncores
@@ -220,65 +221,101 @@ class ComputeTask:
             self.max_walltime = self.timings[0]
             self.start_time = self.timings[1]
 
-        logging.debug('Starting at {start}, max walltime allowed is {walltime}'.format(
-            start=self.start_time, walltime=self.max_walltime))
+        if self.max_walltime is not None:
+            LOG.debug('Starting at {start}, max walltime allowed is {walltime}'.format(
+                start=self.start_time, walltime=self.max_walltime))
+            LOG.debug('{} s remaining.'.format(self.max_walltime - (time.time() - self.start_time)))
 
         self._redirect_filename = None
 
         if self.paths is None:
             self.paths = {}
             self.paths['completed_dir'] = 'completed'
+            self.paths['failed_dir'] = 'bad_castep'
+            self.paths['memory_fname'] = 'memory_exceeded.txt'
+            self.paths['jobs_fname'] = 'jobs.txt'
+            self.paths['completed_fname'] = 'finished_cleanly.txt'
+            self.paths['failures_fname'] = 'failures.txt'
+
+        elif 'completed_dir' not in self.paths:
+            raise RuntimeError('Invalid paths: {}'.format(self.paths))
+
+        self.set_input_structure(res)
+
+        if self.start:
+            self.begin()
         else:
-            assert 'completed_dir' in self.paths
+            LOG.info('Waiting for `begin()` method to be called...')
 
-        # actually run the calculations, catching only CalculationErrors
-        try:
-            # run through CASTEP specific features
-            if self.mode == 'castep':
-                calculation_parameters = {**self.cell_dict, **self.param_dict}
-                self.calculator = CastepCalculator(calculation_parameters)
-                self.success = self.run_castep(res)
-            # otherwise run generic script
-            else:
-                self.success = self.run_generic(res)
-
-        # errors that matter only for the current structure
-        except CalculationError as exc:
-            logging.error('Process raised {} with message {}.'.format(type(exc), exc))
-            self.success = False
-            self._finalise_result()
-            raise exc
-        # errors that need to be passed upwards to kill future jobs
-        except RuntimeError as exc:
-            logging.error('Process raised {} with message {}.'.format(type(exc), exc))
-            raise exc
-        except MaxMemoryEstimateExceeded as exc:
-            logging.error(exc)
-            raise exc
-        except Exception as exc:
-            logging.error('Caught unexpected error {}: {}'.format(type(exc), exc))
-            raise exc
-
-        if self.profile:
-            profile.disable()
-            fname = 'relaxer-{}-{}-{}.{}.{}'.format(__version__, os.hostname()[1], version_info.major,
-                                                    version_info.minor, version_info.micro)
-            profile.dump_stats(fname + '.prof')
-            with open(fname + '.pstats', 'w') as fp:
-                stats = pstats.Stats(profile, stream=fp).sort_stats('cumulative')
-                stats.print_stats()
-
-        if self.success:
-            logging.info('FullRelaxer finished successfully for {seed}'.format(seed=self.seed))
-        else:
-            logging.info('FullRelaxer failed cleanly for {seed}'.format(seed=self.seed))
-
-    def run_castep(self, res):
-        """ Set up and run CASTEP calculation.
+    def set_input_structure(self, res):
+        """ Set the input structure to the given dictionary, or read it from
+        the given file.
 
         Parameters:
-            res (str/dict): either the filename or a dict
-                containing the structure.
+            res (str/dict): either the scraped structure or the filename of a res file.
+
+        """
+
+        # read in initial structure and skip if failed
+        if isinstance(res, str):
+            self.res_dict, success = res2dict(res, db=False, verbosity=self.verbosity)
+            if not success:
+                msg = 'Unable to parse initial res file, error: {res_dict}'.format(res_dict=self.res_dict)
+                raise CalculationError(msg)
+
+        elif isinstance(res, dict):
+            # check res is a valid crystal
+            try:
+                Crystal(res)
+            except Exception as exc:
+                msg = 'Unable to convert res to Crystal: {}'.format(exc)
+                LOG.error(msg)
+                LOG.error('Traceback:\n{}'.format(tb.format_exc()))
+                raise CalculationError(msg)
+
+            self.res_dict = res
+
+    def begin(self):
+        """ Run the prepared ComputeTask. Catches CalculationError objects
+        and cleans up, passing all other errors upwards.
+
+        """
+
+        try:
+            try:
+                # run through CASTEP specific features
+                if self.mode == 'castep':
+                    calculation_parameters = {**self.cell_dict, **self.param_dict}
+                    self.calculator = CastepCalculator(calculation_parameters)
+                    self.success = self.run_castep()
+                # otherwise run generic script
+                else:
+                    self.success = self.run_generic()
+
+            except CalculationError as exc:
+                self.success = False
+                self._finalise_result()
+                raise exc
+
+        except Exception as exc:
+            LOG.error('Process raised {} with message {}.'.format(type(exc), exc))
+            if isinstance(exc, CalculationError):
+                LOG.error('Full traceback:\n{}'.format(tb.format_exc()))
+            for handler in LOG.handlers[:]:
+                handler.close()
+            raise exc
+
+        if self.success:
+            LOG.info('FullRelaxer finished successfully for {seed}'.format(seed=self.seed))
+        else:
+            LOG.info('FullRelaxer failed cleanly for {seed}'.format(seed=self.seed))
+        for handler in LOG.handlers[:]:
+            handler.close()
+
+    def run_castep(self):
+        """ Set up and run CASTEP calculation on the prepared structure,
+        `self.res_dict`, using the parameters in `self.cell_dict` and
+        `self.param_dict`.
 
         Raises:
             WalltimeError: if max_walltime is exceeded.
@@ -293,8 +330,6 @@ class ComputeTask:
                 unless every calculation fails.
 
         """
-        logging.info('Calling CASTEP on {seed}'.format(seed=self.seed))
-
         success = False
 
         if self.exec_test:
@@ -302,89 +337,81 @@ class ComputeTask:
 
         # pre-processing
         if self.kpts_1D:
-            logging.debug('1D kpoint grid requested.')
+            LOG.debug('1D kpoint grid requested.')
             if 'kpoints_mp_spacing' not in self.cell_dict:
                 raise CriticalError('kpoints_mp_spacing not found, but kpts_1D requested...')
             self._target_spacing = deepcopy(self.cell_dict['kpoints_mp_spacing'])
 
-        # read in initial structure and skip if failed
-        if isinstance(res, str):
-            self.res_dict, success = res2dict(res, db=False)
-            if not success:
-                msg = 'Unable to parse initial res file, error: {res_dict}'.format(res_dict=self.res_dict)
-                logging.error(msg)
-                raise CalculationError(msg)
-        elif isinstance(res, dict):
-            self.res_dict = res
+        if self.squeeze:
+            self._target_pressure = deepcopy(self.cell_dict['external_pressure'])
 
         if self.noise:
             from matador.utils.cell_utils import add_noise
-            logging.info('Adding noise to the positions in the cell')
+            LOG.info('Adding noise to the positions in the cell')
             self.res_dict = add_noise(self.res_dict, amplitude=0.1)
 
-        calc_doc = deepcopy(self.res_dict)
+        self.calc_doc = deepcopy(self.res_dict)
 
         # update global doc with cell and param dicts for folder, and verify
         bad_keys = ['atom_types', 'positions_frac', 'positions_abs', 'lattice_cart', 'lattice_abc']
         self.cell_dict = {key: self.cell_dict[key] for key in self.cell_dict if key not in bad_keys}
-        calc_doc.update(self.cell_dict)
-        calc_doc.update(self.param_dict)
-        self.calculator.verify_calculation_parameters(calc_doc, self.res_dict)
+        self.calc_doc.update(self.cell_dict)
+        self.calc_doc.update(self.param_dict)
+        self.calculator.verify_calculation_parameters(self.calc_doc, self.res_dict)
 
-        # this is now a dict containing the exact calculation we are going to run
-        self.calc_doc = calc_doc
+        try:
+            LOG.info('Struture: {}'.format(Crystal(self.calc_doc)))
+        except Exception as exc:
+            LOG.warning('Unable to convert structure to Crystal... {}'.format(exc))
 
         # now verify the structure itself
         self.calculator.verify_simulation_cell(self.res_dict)
 
         # do memcheck, if desired, and only continue if enough memory is free
         if self.memcheck:
-            memory_usage_estimate = self.calculator.do_memcheck()
-            memory_usage_estimate = self.do_memcheck(calc_doc, self.seed)
+            memory_usage_estimate = self.do_memcheck(self.calc_doc, self.seed)
             mem_string = ('Memory estimate / Available memory (MB): {:8.0f} / {:8.0f}'
                           .format(memory_usage_estimate, self.maxmem))
-            logging.info(mem_string)
+            LOG.info(mem_string)
 
             if memory_usage_estimate > 0.9 * self.maxmem:
                 msg = 'Structure {} failed memcheck, skipping... '.format(self.seed) + mem_string
+                with open(self.paths['memory_fname'], 'a') as f:
+                    f.write("{} {:.2f}GB/{:.2f}GB\n".format(self.seed, memory_usage_estimate / 1024, self.maxmem / 1024))
+
                 raise MaxMemoryEstimateExceeded(msg)
 
         try:
-            if self.start:
-                # TODO: refactor this into calculator
-                # run convergence tests
-                if any([self.conv_cutoff_bool, self.conv_kpt_bool]):
-                    success = self.run_convergence_tests(calc_doc)
+            # run convergence tests
+            if any([self.conv_cutoff_bool, self.conv_kpt_bool]):
+                success = self.run_convergence_tests(self.calc_doc)
 
-                # perform relaxation
-                elif calc_doc['task'].upper() in ['GEOMETRYOPTIMISATION', 'GEOMETRYOPTIMIZATION']:
-                    success = self.relax()
+            # perform relaxation
+            elif self.calc_doc['task'].upper() in ['GEOMETRYOPTIMISATION', 'GEOMETRYOPTIMIZATION']:
+                success = self.relax()
 
-                elif calc_doc['task'].upper() in ['PHONON', 'THERMODYNAMICS']:
-                    from matador.workflows.castep import castep_full_phonon
-                    success = castep_full_phonon(self, calc_doc, self.seed)
+            elif self.calc_doc['task'].upper() in ['PHONON', 'THERMODYNAMICS']:
+                from matador.workflows.castep import castep_full_phonon
+                success = castep_full_phonon(self, self.calc_doc, self.seed, **self.workflow_kwargs)
 
-                elif calc_doc['task'].upper() in ['SPECTRAL']:
-                    from matador.workflows.castep import castep_full_spectral
-                    success = castep_full_spectral(self, calc_doc, self.seed)
+            elif self.calc_doc['task'].upper() in ['SPECTRAL']:
+                from matador.workflows.castep import castep_full_spectral
+                success = castep_full_spectral(self, self.calc_doc, self.seed, **self.workflow_kwargs)
 
-                elif calc_doc['task'].upper() in ['BULK_MODULUS']:
-                    from matador.workflows.castep import castep_elastic
-                    success = castep_elastic(self, calc_doc, self.seed)
+            elif self.calc_doc['task'].upper() in ['BULK_MODULUS']:
+                from matador.workflows.castep import castep_elastic
+                success = castep_elastic(self, self.calc_doc, self.seed, **self.workflow_kwargs)
 
-                # run in SCF mode, i.e. just call CASTEP on the seeds
-                else:
-                    success = self.scf(calc_doc, self.seed, keep=True)
+            # run in SCF mode, i.e. just call CASTEP on the seeds
+            else:
+                success = self.scf(self.calc_doc, self.seed, keep=True)
 
-                if self.compute_dir is not None:
-                    logging.debug('Cleaning up after relaxation.')
-                    # always cd back to root folder
-                    os.chdir(self.root_folder)
-                    self.remove_compute_dir_if_finished(self.compute_dir)
-                self._first_run = False
+            if self.compute_dir is not None:
+                os.chdir(self.root_folder)
+                self.remove_compute_dir_if_finished(self.compute_dir)
+            self._first_run = False
 
         except Exception as err:
-            logging.debug('Cleaning up after catching error {}.'.format(err))
             if self.compute_dir is not None:
                 # always cd back to root folder
                 os.chdir(self.root_folder)
@@ -393,13 +420,10 @@ class ComputeTask:
 
         return success
 
-    def run_generic(self, seed, intermediate=False, mv_bad_on_failure=True):
+    def run_generic(self, intermediate=False, mv_bad_on_failure=True):
         """ Run a generic mpi program on the given seed. Files from
         completed runs are moved to "completed" (unless intermediate
         is True) and failed runs to "bad_castep".
-
-        Parameters:
-            seed (str): filename of structure
 
         Keyword arguments:
             intermediate (bool): whether we want to run more calculations
@@ -412,43 +436,62 @@ class ComputeTask:
             bool: True if calculations progressed without error.
 
         """
-        logging.info('Calling executable {exe} MPI program on {seed}'.format(exe=self.executable, seed=self.seed))
+        LOG.info('Calling executable {exe} MPI program on {seed}'.format(exe=self.executable, seed=self.seed))
         try:
-            self.seed = seed
-            if '.' in self.seed:
-                self.seed = self.seed.split('.')[-2]
-                self.input_ext = self.seed.split('.')[-1]
+            seed = self._input_res
+            if '.' in seed:
+                seed = seed.split('.')[-2]
+                input_ext = seed.split('.')[-1]
             else:
-                self.input_ext = ''
-            assert isinstance(self.seed, str)
-            self.cp_to_input(seed, ext=self.input_ext, glob_files=True)
+                input_ext = ''
+
+            assert isinstance(seed, str)
+            self.cp_to_input(seed, ext=input_ext, glob_files=True)
+
+            self._setup_compute_dir(self.seed, self.compute_dir, generic=True)
+            if self.compute_dir is not None:
+                os.chdir(self.compute_dir)
+
             self._process = self.run_command(seed)
             out, errs = self._process.communicate()
+            out = out.decode('utf-8')
+            errs = errs.decode('utf-8')
             if self._process.returncode != 0 or errs:
                 message = 'Process returned error code {}'.format(self._process.returncode)
-                message += '\nstdout: {}'.format(out.decode('utf-8'))
-                message += '\nstderr: {}'.format(errs.decode('utf-8'))
+                message += '\nstdout: {}'.format(out)
+                message += '\nstderr: {}'.format(errs)
                 raise CalculationError(message)
 
             if not intermediate:
-                logging.info('Writing results of generic call to res file and tidying up.')
+                LOG.info('Writing results of generic call to res file and tidying up.')
                 self.mv_to_completed(seed, keep=True, completed_dir=self.paths['completed_dir'])
 
-            logging.info('Executable {exe} finished cleanly.'.format(exe=self.executable))
+            LOG.info('Executable {exe} finished cleanly.'.format(exe=self.executable))
             self._first_run = False
+
+            if self.compute_dir is not None:
+                os.chdir(self.root_folder)
+
             return True
 
         except Exception as err:
             self._first_run = False
-            logging.error('Caught error inside run_generic: {error}.'.format(error=err))
+            LOG.error('Caught error inside run_generic: {error}.'.format(error=err))
             if mv_bad_on_failure:
                 self.mv_to_bad(seed)
+            if self.compute_dir is not None:
+                os.chdir(self.root_folder)
             raise err
 
-    def relax(self):
+    def relax(self, intermediate=False):
         """ Set up a structural relaxation that is restarted intermittently
         in order to re-mesh the kpoint grid. Completed calculations are moved
         to the "completed" folder, and failures to "bad_castep".
+
+        Keyword arguments:
+            intermediate (bool): whether we want to run more calculations
+                on the output of this, i.e. whether to move to completed
+                or not.
 
         Returns:
             bool: True iff structure was optimised, False otherwise.
@@ -459,171 +502,223 @@ class ComputeTask:
             WalltimeError: if walltime was reached, and jobs need to stop.
 
         """
-        logging.info('Attempting to relax {}'.format(self.seed))
-
         try:
-            self._setup_relaxation()
-            seed = self.seed
-            rerun = False
-            # iterate over geom iter blocks
-            for ind, num_iter in enumerate(self._geom_max_iter_list):
-
-                # preprocess last step that did not finish geom opt
-                if self.reopt and rerun:
-                    # if we're now reoptimising after a success in last step
-                    # use the fine iter value
-                    num_iter = self.fine_iter
-                    logging.info('Last step was successful, performing one last relaxation...')
-
-                # update the geom_max_iter to use with either the number in iter_list, or the overriden value
-                self.calc_doc['geom_max_iter'] = num_iter
-
-                # delete any existing files and write new ones
-                self._update_input_files(self.seed, self.calc_doc)
-
-                # run CASTEP
-                self._process = self.run_command(seed)
-                proc_clock = time.time()
-
-                if self.max_walltime is not None and self.start_time is None:
-                    msg = 'Somehow initial start time was not found'
-                    logging.critical(msg)
-                    raise CriticalError(msg)
-
-                logging.info('Polling process every {} s'.format(self.polltime))
-
-                while self._process.poll() is None:
-                    proc_elapsed = time.time() - proc_clock
-                    if proc_elapsed > 2*self.polltime:
-                        # if no CASTEP file made within 2*polltime (e.g. 60 seconds), then raise error
-                        # or if the file has not been written to in the last 60 seconds
-                        if not os.path.isfile(seed + '.castep'):
-                            msg = ('CASTEP file was not created, please check your executable: {}.'
-                                   .format(self.executable))
-                            logging.critical(msg)
-                            raise CalculationError(msg)
-                        elif os.path.getmtime(seed + '.castep') - proc_clock < 0:
-                            msg = ('CASTEP file present, but too old to be made by this process. Please check your executable: {}.'
-                                   .format(self.executable))
-                            logging.critical(msg)
-                            raise CalculationError(msg)
-
-                    if self.max_walltime is not None:
-                        run_elapsed = time.time() - self.start_time
-                        # leave 1 minute to clean up
-                        if run_elapsed > abs(self.max_walltime - 3*self.polltime):
-                            msg = 'About to run out of time on seed {}, killing early...'.format(self.seed)
-                            logging.info(msg)
-                            raise WalltimeError(msg)
-
-                    time.sleep(self.polltime)
-
-                self._process.communicate()
-
-                opti_dict, success = castep2dict(seed + '.castep', db=False, verbosity=self.verbosity)
-                logging.debug('Process returned {}'.format(self._process.returncode))
-
-                # check for errors and try to correct for them
-                errors_present, errors, remedy = self._catch_castep_errors()
-                skip_postprocess = remedy is not None
-
-                if errors_present:
-                    msg = 'Failed to optimise {} as CASTEP crashed with error:'.format(seed)
-                    msg += errors
-                    logging.warning(msg)
-                    if isinstance(opti_dict, dict):
-                        self._update_output_files(opti_dict)
-                    if remedy is not None and self._num_retries <= self._max_num_retries:
-                        logging.warning('Attempting to recover using {}'.format(remedy))
-                    else:
-                        raise CalculationError(msg)
-
-                if not success and remedy is None and isinstance(opti_dict, Exception):
-                    msg = 'Failed to parse CASTEP file... {}'.format(opti_dict)
-                    logging.warning(msg)
-                    raise CalculationError(msg)
-                elif isinstance(opti_dict, Exception) and remedy is not None:
-                    opti_dict = {'optimised': False}
-
-                logging.debug('Intermediate calculation completed successfully: num_iter = {} '.format(num_iter))
-
-                # scrub keys that need to be rescraped
-                keys_to_remove = ['kpoints_mp_spacing', 'kpoints_mp_grid', 'species_pot', 'sedc_apply', 'sedc_scheme']
-                for key in keys_to_remove:
-                    if key in opti_dict:
-                        del opti_dict[key]
-
-                if not skip_postprocess:
-                    # now post-process the last step
-                    # did we try to rerun, and are now no longer optimised?
-                    # then reset, and go again...
-                    if self.reopt and rerun and not opti_dict['optimised']:
-                        rerun = False
-                        self._update_output_files(opti_dict)
-
-                    # are we optimised, but haven't yet rerun?
-                    # then set prepare to do one more full relaxation
-                    if self.reopt and not rerun and opti_dict['optimised']:
-                        rerun = True
-                        self._update_output_files(opti_dict)
-
-                    # or did the relaxation complete successfuly, including rerun?
-                    elif (not self.reopt or rerun) and opti_dict['optimised']:
-                        logging.info('Successfully relaxed {}'.format(seed))
-                        self._update_output_files(opti_dict)
-                        break
-
-                    # reached maximum number of steps
-                    elif ind == len(self._geom_max_iter_list) - 1:
-                        msg = 'Failed to optimise {} after {} steps'.format(seed, sum(self._geom_max_iter_list))
-                        logging.info(msg)
-                        raise CalculationError(msg)
-
-                    # if we weren't successful, then preprocess the next step
-
-                    # set atomic_init_spins with value from CASTEP file, if it exists
-                    if 'mulliken_spins' in opti_dict:
-                        self.calc_doc['atomic_init_spins'] = opti_dict['mulliken_spins']
-
-                    # if writing out cell, use it for higher precision lattice_cart
-                    if self.calc_doc.get('write_cell_structure') and os.path.isfile('{}-out.cell'.format(seed)):
-                        cell_dict, success = cell2dict('{}-out.cell'.format(seed),
-                                                       verbosity=self.verbosity,
-                                                       db=False, positions=True, lattice=True)
-                        if success:
-                            opti_dict['lattice_cart'] = list(cell_dict['lattice_cart'])
-
-                    logging.debug('N = {iters:03d} | |F| = {d[max_force_on_atom]:5.5f} eV/A | '
-                                  'S = {d[pressure]:5.5f} GPa | H = {d[enthalpy_per_atom]:5.5f} eV/atom'
-                                  .format(d=opti_dict, iters=sum(self._geom_max_iter_list[:ind+1])))
-
-                # if there were errors that can be remedied, now is the time to do it
-                # this will normally involve changing a parameter to avoid future failures
-                self.calc_doc.update(opti_dict)
-
-                if remedy is not None:
-                    logging.info('Trying to remedy error...')
-                    remedy(self.calc_doc)
-                    self._num_retries += 1
-
-            return self._finalise_result()
+            result = self._relax(intermediate=intermediate)
+            if self.compute_dir is not None:
+                os.chdir(self.root_folder)
+            return result
 
         # catch WalltimeErrors and reset the job folder ready for continuation
         except WalltimeError as err:
-            logging.error('WalltimeError thrown; calling times_up')
+            LOG.error('WalltimeError thrown; calling times_up')
             self.times_up(self._process)
+            if self.compute_dir is not None:
+                os.chdir(self.root_folder)
             raise err
 
         # All other errors mean something bad has happened, so we should clean up this job
         # more jobs will run unless this exception is either CriticalError or KeyboardInterrupt
         except Exception as err:
-            logging.error('Error caught: terminating job for {}. Error = {}'.format(self.seed, err))
+            LOG.error('{} caught: terminating job for {}.'.format(type(err), self.seed))
             try:
                 self._process.terminate()
             except AttributeError:
                 pass
-            self._finalise_result()
+            self._finalise_result(intermediate)
+            if self.compute_dir is not None:
+                os.chdir(self.root_folder)
             raise err
+
+    def _relax(self, intermediate=False):
+        """ Set up a structural relaxation that is restarted intermittently
+        in order to re-mesh the kpoint grid. Completed calculations are moved
+        to the "completed" folder, and failures to "bad_castep".
+
+        Keyword arguments:
+            intermediate (bool): whether we want to run more calculations
+                on the output of this, i.e. whether to move to completed
+                or not.
+
+        Returns:
+            bool: True iff structure was optimised, False otherwise.
+
+        Raises:
+            CalculationError: if structure-level error occured.
+            CriticalError: if fatal global error occured.
+            WalltimeError: if walltime was reached, and jobs need to stop.
+
+        """
+        self._setup_relaxation()
+        seed = self.seed
+        rerun = False
+        # iterate over geom iter blocks
+        for ind, num_iter in enumerate(self._geom_max_iter_list):
+
+            # preprocess last step that did not finish geom opt
+            if self.reopt and rerun:
+                # if we're now reoptimising after a success in last step
+                # use the fine iter value
+                num_iter = self.fine_iter
+                LOG.info('Last step was successful, performing one last relaxation...')
+
+            # update the geom_max_iter to use with either the number in iter_list, or the overriden value
+            self.calc_doc['geom_max_iter'] = num_iter
+
+            # delete any existing files and write new ones
+            if self.squeeze:
+                squeeze = int(self._squeeze_list[ind]) * float(self.squeeze)
+            else:
+                squeeze = None
+            self._update_input_files(self.seed, self.calc_doc, squeeze=squeeze)
+
+            # run CASTEP
+            self._process = self.run_command(seed)
+            proc_clock = time.time()
+
+            if self.max_walltime is not None and self.start_time is None:
+                msg = 'Somehow initial start time was not found'
+                LOG.critical(msg)
+                raise CriticalError(msg)
+
+            LOG.info('Polling process every {} s'.format(self.polltime))
+
+            checked_castep_exists = False
+            i = 0
+            while self._process.poll() is None:
+                if i % max(int(self.polltime), 1) == 0:
+                    proc_elapsed = time.time() - proc_clock
+                    if not checked_castep_exists and proc_elapsed > 3*self.polltime:
+                        # if no CASTEP file made within 3 poll times, or if this process
+                        # hasn't written to it, then raise error
+                        if not os.path.isfile(seed + '.castep'):
+                            msg = ('CASTEP file was not created, please check your executable: {}.'
+                                   .format(self.executable))
+                            LOG.critical(msg)
+                            raise CalculationError(msg)
+                        if os.path.getmtime(seed + '.castep') - proc_clock < 0:
+                            msg = ('CASTEP file present, but too old to be made by this process. '
+                                   'Please check your executable: {}.'
+                                   .format(self.executable))
+                            LOG.critical(msg)
+                            raise CalculationError(msg)
+                        checked_castep_exists = True
+
+                    if self.max_walltime is not None:
+                        print(self.max_walltime, self.polltime)
+                        run_elapsed = time.time() - self.start_time
+                        # leave 1 minute to clean up
+                        if run_elapsed > abs(self.max_walltime - 5*self.polltime):
+                            msg = 'About to run out of time on seed {}, killing early...'.format(self.seed)
+                            LOG.info(msg)
+                            raise WalltimeError(msg)
+
+                i += 1
+                time.sleep(1)
+
+            self._process.communicate()
+
+            opti_dict, success = castep2dict(seed + '.castep', db=False, verbosity=self.verbosity)
+            LOG.debug('Process returned {}'.format(self._process.returncode))
+
+            # check for errors and try to correct for them
+            errors_present, errors, remedy = self._catch_castep_errors()
+            skip_postprocess = remedy is not None
+
+            if errors_present:
+                msg = 'Failed to optimise {} as CASTEP crashed with error:'.format(seed)
+                msg += errors
+                LOG.warning(msg)
+                if isinstance(opti_dict, dict):
+                    self._update_output_files(seed, opti_dict)
+                if remedy is not None and self._num_retries <= self._max_num_retries:
+                    LOG.warning('Attempting to recover using {}'.format(remedy))
+                else:
+                    raise CalculationError(msg)
+
+            if not success and remedy is None and isinstance(opti_dict, Exception):
+                msg = 'Failed to parse CASTEP file... {}'.format(opti_dict)
+                LOG.warning(msg)
+                raise CalculationError(msg)
+            if isinstance(opti_dict, Exception) and remedy is not None:
+                opti_dict = {'optimised': False}
+
+            LOG.info('Intermediate calculation completed successfully: total relaxation steps now = {} '
+                     .format(opti_dict.get('geom_iter')))
+
+            # scrub keys that need to be rescraped
+            keys_to_remove = ['kpoints_mp_spacing', 'kpoints_mp_grid', 'species_pot',
+                              'sedc_apply', 'sedc_scheme', 'cell_constraints']
+            for key in keys_to_remove:
+                if key in opti_dict:
+                    del opti_dict[key]
+
+            if not skip_postprocess:
+                # now post-process the last step
+                # did we try to rerun, and are now no longer optimised?
+                # then reset, and go again...
+                if self.reopt and rerun and not opti_dict['optimised']:
+                    rerun = False
+                    self._update_output_files(seed, opti_dict)
+
+                # are we optimised, but haven't yet rerun?
+                # then set prepare to do one more full relaxation
+                if self.reopt and not rerun and opti_dict['optimised']:
+                    rerun = True
+
+                    # disable squeezing if we've already reached optimisation
+                    if self.squeeze:
+                        for jnd in range(ind, len(self._squeeze_list)):
+                            self._squeeze_list[jnd] = False
+                    self._update_output_files(seed, opti_dict)
+
+                # or did the relaxation complete successfuly, including rerun?
+                elif (not self.reopt or rerun) and opti_dict['optimised']:
+                    LOG.info('Successfully relaxed {}'.format(seed))
+                    self._update_output_files(seed, opti_dict)
+                    break
+
+                # reached maximum number of steps
+                elif ind == len(self._geom_max_iter_list) - 1:
+                    msg = 'Failed to optimise {} after {} steps'.format(seed, sum(self._geom_max_iter_list))
+                    LOG.info(msg)
+                    raise CalculationError(msg)
+
+                # if we weren't successful, then preprocess the next step
+
+                # set atomic_init_spins with value from CASTEP file, if it exists
+                if 'mulliken_spins' in opti_dict:
+                    self.calc_doc['atomic_init_spins'] = opti_dict['mulliken_spins']
+
+                # CASTEP prints cell constraints in castep file when running with symmetry
+                # its useful to disable these and use either the initial constraints, or none
+                if 'cell_constraints' in self.cell_dict:
+                    self.calc_doc['cell_constraints'] = self.cell_dict['cell_constraints']
+
+                # if writing out cell, use it for higher precision lattice_cart
+                if self.calc_doc.get('write_cell_structure') and os.path.isfile('{}-out.cell'.format(seed)):
+                    cell_dict, success = cell2dict('{}-out.cell'.format(seed),
+                                                   verbosity=self.verbosity,
+                                                   db=False, positions=True, lattice=True)
+                    if success:
+                        opti_dict['lattice_cart'] = list(cell_dict['lattice_cart'])
+
+                LOG.info('N = {iters:03d} | |F| = {d[max_force_on_atom]:5.5f} eV/A | '
+                         'S = {pressure:5.5f} GPa | H = {enthalpy_per_atom:5.5f} eV/atom'
+                         .format(d=opti_dict,
+                                 pressure=opti_dict.get('pressure', 0.0),
+                                 enthalpy_per_atom=opti_dict.get('enthalpy_per_atom', 0.0),
+                                 iters=opti_dict.get('geom_iter', 0)))
+
+            # if there were errors that can be remedied, now is the time to do it
+            # this will normally involve changing a parameter to avoid future failures
+            self.calc_doc.update(opti_dict)
+
+            if remedy is not None:
+                LOG.info('Trying to remedy error with {}'.format(remedy))
+                remedy(self.calc_doc)
+                self._num_retries += 1
+
+        return self._finalise_result(intermediate=intermediate)
 
     def scf(self, calc_doc, seed, keep=True, intermediate=False):
         """ Perform a single-shot calculation with CASTEP.
@@ -645,45 +740,53 @@ class ComputeTask:
             bool: True iff SCF completed successfully, False otherwise.
 
         """
-        logging.info('Performing single-shot CASTEP run on {}'.format(seed))
+        LOG.info('Performing single-shot CASTEP run on {}, with task: {}'.format(seed, calc_doc['task']))
         try:
             self.cp_to_input(seed)
+            self._setup_compute_dir(self.seed, self.compute_dir, custom_params=self.custom_params)
+            if self.compute_dir is not None:
+                os.chdir(self.compute_dir)
 
             self._update_input_files(seed, calc_doc)
+            doc2res(calc_doc, self.seed, info=False, hash_dupe=False, overwrite=True)
 
             # run CASTEP
             self._process = self.run_command(seed)
             self._process.communicate()
 
             # scrape dict but ignore the results
-            results_dict, success = castep2dict(seed + '.castep', db=False)
+            results_dict, success = castep2dict(seed + '.castep', db=False, verbosity=self.verbosity)
 
             # check for errors and try to correct for them
             errors_present, errors, _ = self._catch_castep_errors()
             if errors_present:
                 msg = 'CASTEP run on {} failed with errors: {}'.format(seed, errors)
-                logging.error(msg)
                 raise CalculationError(msg)
 
             if not success:
                 msg = 'Error scraping CASTEP file {}: {}'.format(seed, results_dict)
-                logging.error(msg)
                 raise CalculationError(msg)
 
+            self._update_output_files(seed)
+
             if not intermediate:
-                logging.info('Writing results of singleshot CASTEP run to res file and tidying up.')
+                LOG.info('Writing results of singleshot CASTEP run to res file and tidying up.')
                 doc2res(results_dict, seed, hash_dupe=False, overwrite=True)
                 self.mv_to_completed(seed, keep=keep, completed_dir=self.paths['completed_dir'])
-                if not keep:
-                    self.tidy_up(seed)
+                self.tidy_up(seed)
+
+            if self.compute_dir is not None:
+                os.chdir(self.root_folder)
 
             return success
 
         except Exception as err:
-            logging.error('Caught error: {}'.format(err))
+            LOG.error('{} caught: terminating job for {}.'.format(type(err), self.seed))
             self.mv_to_bad(seed)
             if not keep:
                 self.tidy_up(seed)
+            if self.compute_dir is not None:
+                os.chdir(self.root_folder)
             raise err
 
     @staticmethod
@@ -724,14 +827,14 @@ class ComputeTask:
                 and list containing the kpoints.
 
         """
-        logging.info('Getting seekpath cell and kpoint path.')
+        LOG.info('Getting seekpath cell and kpoint path.')
         from matador.utils.cell_utils import get_seekpath_kpoint_path
-        from matador.crystal import Crystal
-        logging.debug('Old lattice: {}'.format(Crystal(calc_doc)))
+        LOG.debug('Old lattice: {}'.format(Crystal(calc_doc)))
         prim_doc, kpt_path, _ = get_seekpath_kpoint_path(calc_doc,
                                                          spacing=spacing,
+                                                         symmetry_tol=calc_doc.get('symmetry_tol'),
                                                          debug=debug)
-        logging.debug('New lattice: {}'.format(Crystal(calc_doc)))
+        LOG.debug('New lattice: {}'.format(Crystal(calc_doc)))
         return prim_doc, kpt_path
 
     def run_convergence_tests(self, calc_doc):
@@ -745,33 +848,31 @@ class ComputeTask:
             bool: True unless every single calculation failed.
 
         """
-        logging.info('Performing convergence tests...')
+        LOG.info('Performing convergence tests...')
         from matador.utils.cell_utils import get_best_mp_offset_for_cell
         successes = []
         cached_cutoff = calc_doc['cut_off_energy']
         if self.conv_cutoff_bool:
             # run series of singlepoints for various cutoffs
-            logging.info('Running cutoff convergence...')
+            LOG.info('Running cutoff convergence...')
             for cutoff in self.conv_cutoff:
-                logging.info('{} eV... '.format(cutoff))
+                LOG.info('{} eV... '.format(cutoff))
                 calc_doc.update({'cut_off_energy': cutoff})
                 self.paths['completed_dir'] = 'completed_cutoff'
                 seed = self.seed + '_' + str(cutoff) + 'eV'
-                self._update_input_files(seed, calc_doc)
                 success = self.scf(calc_doc, seed, keep=False)
                 successes.append(success)
         if self.conv_kpt_bool:
             # run series of singlepoints for various cutoffs
-            logging.info('Running kpt convergence tests...')
+            LOG.info('Running kpt convergence tests...')
             calc_doc['cut_off_energy'] = cached_cutoff
             for kpt in self.conv_kpt:
-                logging.info('{} 1/A... '.format(kpt))
+                LOG.info('{} 1/A... '.format(kpt))
                 calc_doc.update({'kpoints_mp_spacing': kpt})
                 calc_doc['kpoints_mp_offset'] = get_best_mp_offset_for_cell(calc_doc)
-                logging.debug('Using offset {}'.format(calc_doc['kpoints_mp_offset']))
+                LOG.debug('Using offset {}'.format(calc_doc['kpoints_mp_offset']))
                 self.paths['completed_dir'] = 'completed_kpts'
                 seed = self.seed + '_' + str(kpt) + 'A'
-                self._update_input_files(seed, calc_doc)
                 success = self.scf(calc_doc, seed, keep=False)
                 successes.append(success)
         return any(successes)
@@ -811,7 +912,7 @@ class ComputeTask:
         else:
             self._redirect_filename = None
 
-        logging.debug('Executable string parsed as {}'.format(command))
+        LOG.debug('Executable string parsed as {}'.format(command))
 
         return command
 
@@ -822,25 +923,29 @@ class ComputeTask:
             CriticalError: if executable not found.
 
         """
-        logging.info('Testing executable {executable}.'.format(executable=self.executable))
+        LOG.info('Testing executable "{executable}".'.format(executable=self.executable))
+
         try:
-            proc = self.run_command('--version', exec_test=True)
+            proc = self.run_command('--version')
+
         except FileNotFoundError:
-            logging.critical('Unable to call mpirun/aprun/srun, currently selected: {}'.format(self.mpi_library))
+            LOG.critical('Unable to call mpirun/aprun/srun, currently selected: {}'.format(self.mpi_library))
             message = 'Please check initialistion of FullRelaxer object/CLI args.'
-            logging.debug('Raising CriticalError with message: {message}'.format(message=message))
+            LOG.debug('Raising CriticalError with message: {message}'.format(message=message))
             raise CriticalError(message)
 
         out, errs = proc.communicate()
-        if 'CASTEP version' not in out.decode('utf-8'):
+        out = out.decode('utf-8')
+        errs = errs.decode('utf-8')
+        if 'CASTEP version' not in out:
             # this is an OpenMPI error that occurs when hyperthreading is enabled
             # best way to handle is to half the number of procs available
-            if 'not enough slots' in errs.decode('utf-8'):
+            if 'not enough slots' in errs:
                 err_string = ('MPI library tried to use too many cores and failed, '
                               'rescaling core count and re-running with {} cores...'.format(int(self.ncores/2)))
-                logging.warning(err_string)
-                logging.warning('stdout: {stdout}'.format(stdout=out.decode('utf-8')))
-                logging.warning('sterr: {stderr}'.format(stderr=errs.decode('utf-8')))
+                LOG.warning(err_string)
+                LOG.warning('stdout: {stdout}'.format(stdout=out))
+                LOG.warning('sterr: {stderr}'.format(stderr=errs))
                 if self.ncores >= 2:
                     self.ncores = int(self.ncores/2)
                 else:
@@ -848,41 +953,73 @@ class ComputeTask:
                 self.test_exec()
 
             else:
-                err_string = 'Executable {} failed testing. Is it on your PATH?'.format(self.executable)
-                logging.critical(err_string)
-                logging.critical('stdout: {stdout}'.format(stdout=out.decode('utf-8')))
-                logging.critical('sterr: {stderr}'.format(stderr=errs.decode('utf-8')))
-                logging.debug('Raising CriticalError.')
+                err_string = 'Executable `{}` failed testing: does it support --version flag?'.format(self.executable)
+                LOG.critical(err_string)
+                LOG.critical('stdout: {stdout}'.format(stdout=out))
+                LOG.critical('sterr: {stderr}'.format(stderr=errs))
+                LOG.debug('Raising CriticalError.')
                 raise CriticalError(err_string)
 
         if errs:
-            logging.info('Executable {} passed test, but stderr contains the following:'.format(self.executable))
-            logging.info(errs.decode('utf-8'))
+            LOG.info('Executable {} passed test, but stderr contains the following:'.format(self.executable))
+            LOG.info(errs)
+
+        try:
+            version_string = out.split('\n')
+            for line in version_string:
+                if 'CASTEP version' in line:
+                    version = line.strip().split(' ')[-1]
+                    version = float(version)
+
+            LOG.info('CASTEP version: {}'.format(version))
+            if version < 18:
+                LOG.warning('Using CASTEP version {}: '
+                            'some features may not work, consider updating to at least CASTEP 18'.format(version))
+        except Exception:
+            LOG.warning('Unable to detect CASTEP version: '
+                        'some features may not work unless you are using at least version 18.')
 
     @property
     def mpi_library(self):
         """ Property to store/compute desired MPI library. """
         if self._mpi_library is None:
             self._mpi_library = self.set_mpi_library()
-            logging.info('Detected {mpi} MPI.'.format(mpi=self._mpi_library))
         return self._mpi_library
 
     def set_mpi_library(self):
         """ Combines command-line MPI arguments into string and calls
         MPI library detection is no args are present.
         """
+        guessed_version = self.detect_mpi()
+        LOG.info('Detected {} MPI.'.format(guessed_version))
         if sum([self.archer, self.intel, self.slurm]) > 1:
             message = 'Conflicting command-line arguments for MPI library have been supplied, exiting.'
-            logging.critical(message)
+            LOG.critical(message)
             raise CriticalError(message)
-        elif self.archer:
+
+        if self.archer:
+            if guessed_version != 'archer':
+                message = ('Detected {} MPI, but user asked to use aprun... please check your environment.'
+                           .format(self._mpi_library))
+                LOG.critical(message)
+                raise CriticalError(message)
             return 'archer'
-        elif self.intel:
+
+        if self.intel:
+            if guessed_version != 'intel':
+                message = ('Detected {} MPI, but user asked to use Intel MPI... please check your environment.'
+                           .format(self._mpi_library))
+                LOG.critical(message)
+                raise CriticalError(message)
             return 'intel'
-        elif self.slurm:
+
+        if self.slurm:
+            if guessed_version != 'slurm':
+                message = 'Detected {} MPI, but user asked to use srun... continuing with srun.'.format(self._mpi_library)
+                LOG.warning(message)
             return 'slurm'
-        else:
-            return self.detect_mpi()
+
+        return guessed_version
 
     @staticmethod
     def detect_mpi():
@@ -897,12 +1034,12 @@ class ComputeTask:
             try:
                 mpi_version_string = str(sp.check_output('mpirun --version', shell=True))
             except sp.CalledProcessError:
-                logging.info('Failed to find mpirun, checking aprun...')
+                LOG.info('Failed to find mpirun, checking aprun...')
                 mpi_version_string = str(sp.check_output('aprun --version', shell=True))
         except Exception as exc:
             msg = 'Failed to find mpirun or aprun.'
-            logging.critical(msg)
-            logging.debug('Error message: {exc}'.format(exc=exc))
+            LOG.critical(msg)
+            LOG.debug('Error message: {exc}'.format(exc=exc))
             raise CriticalError(msg)
         if 'Intel' in mpi_version_string:
             mpi_version = 'intel'
@@ -911,11 +1048,11 @@ class ComputeTask:
         elif 'Open MPI' in mpi_version_string:
             mpi_version = 'default'
         else:
-            logging.debug('Could not detect MPI library so using default (OpenMPI), version string was: {response}'
-                          .format(response=mpi_version_string))
+            LOG.debug('Could not detect MPI library so using default (OpenMPI), version string was: {response}'
+                      .format(response=mpi_version_string))
             mpi_version = 'default'
 
-        logging.info('Using {version} MPI library.'.format(version=mpi_version))
+        LOG.info('Using {version} MPI library.'.format(version=mpi_version))
         return mpi_version
 
     def do_memcheck(self, calc_doc, seed):
@@ -930,7 +1067,7 @@ class ComputeTask:
                 `self.maxmem`, if set
 
         """
-        logging.info('Performing memory check for {seed}'.format(seed=seed))
+        LOG.info('Performing memory check for {seed}'.format(seed=seed))
         memcheck_seed = seed + '_memcheck'
 
         memcheck_doc = deepcopy(calc_doc)
@@ -939,15 +1076,17 @@ class ComputeTask:
             memcheck_doc['task'] = 'singlepoint'
 
         doc2param(memcheck_doc, memcheck_seed, hash_dupe=False)
-        doc2cell(memcheck_doc, memcheck_seed, hash_dupe=False, copy_pspots=False)
+        doc2cell(memcheck_doc, memcheck_seed, hash_dupe=False)
 
-        logging.debug('Running CASTEP dryrun.')
-        process = sp.Popen(['nice', '-n', '15', self.executable, '-d', memcheck_seed])
+        LOG.debug('Running CASTEP dryrun.')
+        self.executable += ' --dryrun'
+        process = self.run_command(memcheck_seed)
         process.communicate()
+        self.executable = self.executable.replace(' --dryrun', '')
 
-        results, success = castep2dict(memcheck_seed + '.castep', db=False)
+        results, success = castep2dict(memcheck_seed + '.castep', db=False, verbosity=self.verbosity)
+
         for _file in glob.glob(memcheck_seed + '*'):
-
             if _file.endswith('.res'):
                 continue
             else:
@@ -957,18 +1096,20 @@ class ComputeTask:
             msg = 'CASTEP dryrun failed with output {results}'.format(results=results)
             raise MaxMemoryEstimateExceeded(msg)
 
-        return results['estimated_mem_MB']
+        estimate = results['estimated_mem_per_process_MB']
+        if self.ncores is not None:
+            estimate *= self.ncores
+        if self.nnodes is not None:
+            estimate *= self.nnodes
 
-    def run_command(self, seed, exec_test=False):
+        return estimate
+
+    def run_command(self, seed):
         """ Calls executable on seed with desired number of cores.
 
         Parameters:
             seed (str): seedname to pass append to CASTEP command,
                 e.g. <seed> or --version.
-
-        Keyword arguments:
-            exec_test (bool): run executable in test mode, with output
-                piped to stdout.
 
         Returns:
             subprocess.Popen: process to run.
@@ -976,20 +1117,21 @@ class ComputeTask:
         """
         command = self.parse_executable(seed)
         if self.nnodes is None or self.nnodes == 1:
-            if self.ncores == 1 and self.node is None:
-                command = ['nice', '-n', '15'] + command
-            elif self.mpi_library == 'archer':
-                command = ['aprun', '-n', str(self.ncores)] + command
-            elif self.mpi_library == 'slurm':
-                command = ['srun', '--exclusive', '-N', '1', '-n', str(self.ncores)] + command
-            elif self.mpi_library == 'intel':
-                command = ['mpirun', '-n', str(self.ncores), '-ppn', str(self.ncores)] + command
+            if self.node is None:
+                if self.ncores == 1 and self.node is None:
+                    command = ['nice', '-n', '15'] + command
+                elif self.mpi_library == 'archer':
+                    command = ['aprun', '-n', str(self.ncores)] + command
+                elif self.mpi_library == 'slurm':
+                    command = ['srun'] + command
+                elif self.mpi_library in ['intel', 'default']:
+                    command = ['mpirun', '-n', str(self.ncores)] + command
+                else:
+                    command = ['mpirun', '-n', str(self.ncores)] + command
             elif self.node is not None:
                 cwd = os.getcwd()
                 command = ['ssh', '{}'.format(self.node), 'cd', '{};'.format(cwd), 'mpirun', '-n',
                            str(self.ncores)] + command
-            else:
-                command = ['nice', '-n', '15', 'mpirun', '-n', str(self.ncores)] + command
         else:
             if self.mpi_library == 'archer':
                 command = [
@@ -998,30 +1140,30 @@ class ComputeTask:
                     str(self.ncores), '-S', '12', '-d', '1'
                 ] + command
             elif self.mpi_library == 'slurm':
-                command = ['srun', '--exclusive', '-N',
-                           str(self.nnodes), '-n',
-                           str(self.ncores * self.nnodes)] + command
+                command = ['srun'] + command
             elif self.mpi_library == 'intel':
                 command = ['mpirun', '-n', str(self.ncores * self.nnodes), '-ppn', str(self.ncores)] + command
             else:
                 command = ['mpirun', '-n', str(self.ncores * self.nnodes), '-npernode', str(self.ncores)] + command
 
+        if self.ncores > 1 and 'run' not in ' '.join(command):
+            raise RuntimeError('Issue running command {} in parallel, this is probably a matador bug!'.format(command))
+
         stdout = sp.PIPE
         stderr = sp.PIPE
 
         if self._redirect_filename is not None:
-            logging.info('Redirecting output to {redirect}'.format(redirect=self._redirect_filename))
+            LOG.info('Redirecting output to {redirect}'.format(redirect=self._redirect_filename))
             redirect_file = open(self._redirect_filename, 'w')
             stdout = redirect_file
 
+        LOG.info('Running {}'.format(command))
         process = sp.Popen(command, shell=False, stdout=stdout, stderr=stderr)
         try:
             redirect_file.close()
         except Exception:
             pass
 
-        if not exec_test:
-            logging.debug('Running {}'.format(command))
         return process
 
     def _catch_castep_errors(self):
@@ -1056,12 +1198,15 @@ class ComputeTask:
 
                 for line in flines:
                     if 'Work-around was successful, continuing with calculation.' in line:
-                        logging.info('Found LAPACK issue that was circumvented, removing error file.')
+                        LOG.info('Found LAPACK issue that was circumvented, removing error file.')
                         os.remove(globbed)
                         break
                     elif 'ERROR in cell constraints: attempt to fix' in line:
-                        logging.info('Trying to remedy CASTEP symmetry error...')
                         remedy = self._remedy_castep_symmetry_error
+                        break
+                    elif 'Symmetry matrix not integer' in line:
+                        remedy = self._remedy_symmetry_matrix_not_integer
+                        break
                 else:
                     error_str += ' '.join(flines)
                     error_str += '\n'
@@ -1078,12 +1223,19 @@ class ComputeTask:
             opti_dict (dict): the dictionary of parameters to change.
 
         """
+        LOG.info('Trying to remedy CASTEP symmetry error...')
         if 'symmetry_generate' in opti_dict:
             del opti_dict['symmetry_generate']
         if 'symmetry_tol' in opti_dict:
             del opti_dict['symmetry_tol']
         if 'snap_to_symmetry' in opti_dict:
             del opti_dict['snap_to_symmetry']
+
+    def _remedy_symmetry_matrix_not_integer(self, opti_dict):
+        LOG.info('Trying to remedy symmetry matrix not integer bug: symmetry tol now = {}'
+                 .format(opti_dict['symmetry_tol']))
+        if 'symmetry_tol' in opti_dict:
+            opti_dict['symmetry_tol'] /= 10
 
     def mv_to_bad(self, seed):
         """ Move all files associated with "seed" to bad_castep, from both
@@ -1094,28 +1246,28 @@ class ComputeTask:
 
         """
         try:
-            bad_dir = self.root_folder + '/bad_castep'
-            logging.info('Moving files to bad_castep: {bad}.'.format(bad=bad_dir))
+            bad_dir = self.root_folder + '/' + self.paths["failed_dir"]
             if not os.path.exists(bad_dir):
                 os.makedirs(bad_dir, exist_ok=True)
             seed_files = glob.glob(seed + '.*') + glob.glob(seed + '-out.cell*')
             if seed_files:
-                logging.debug('Files to move: {seed}'.format(seed=seed_files))
+                LOG.info('Moving files to bad_castep: {bad}.'.format(bad=bad_dir))
+                LOG.debug('Files to move: {seed}'.format(seed=seed_files))
                 for _file in seed_files:
                     try:
                         shutil.copy2(_file, bad_dir)
                         os.remove(_file)
                     except Exception as exc:
-                        logging.warning('Error moving files to bad: {error}'.format(error=exc))
+                        LOG.warning('Error moving files to bad: {error}'.format(error=exc))
             # check root folder for any matching files and remove them
             fname = '{}/{}'.format(self.root_folder, seed)
             for ext in ['.res', '.res.lock', '.castep', '-out.cell']:
                 if os.path.isfile('{}{}'.format(fname, ext)):
                     os.remove('{}{}'.format(fname, ext))
         except Exception as exc:
-            logging.warning('Error moving files to bad: {error}'.format(error=exc))
+            LOG.warning('Error moving files to bad: {error}'.format(error=exc))
 
-    def mv_to_completed(self, seed, completed_dir='completed', keep=False):
+    def mv_to_completed(self, seed, completed_dir='completed', keep=False, skip_existing=False):
         """ Move all associated files to completed, removing any
         remaining files in the root_folder and compute_dir.
 
@@ -1125,20 +1277,30 @@ class ComputeTask:
         Keyword arguments:
             completed_dir (str): folder for completed jobs.
             keep (bool): whether to also move intermediate files.
+            skip_existing (bool): if True, skip files that already exist,
+                otherwise throw an error.
 
         """
         completed_dir = self.root_folder + '/' + completed_dir
-        logging.info('Moving files to completed: {completed}.'.format(completed=completed_dir))
+        LOG.info('Moving files to completed: {completed}'.format(completed=completed_dir))
+
+        if seed.endswith('.res'):
+            seed = str(seed.replace('.res', ''))
+
         if not os.path.exists(completed_dir):
             os.makedirs(completed_dir, exist_ok=True)
+
         for _file in glob.glob(seed + '*_bak') + glob.glob(seed + '*.lock'):
             os.remove(_file)
         if keep:
             seed_files = glob.glob(seed + '.*') + glob.glob(seed + '-out.cell*')
             if seed_files:
-                logging.debug('Files to move: {files}.'.format(files=seed_files))
+                LOG.debug('Files to move: {files}.'.format(files=seed_files))
                 for _file in seed_files:
-                    shutil.move(_file, completed_dir)
+                    if skip_existing and os.path.isfile(completed_dir + '/' + _file):
+                        LOG.warning('File already found {}...'.format(_file))
+                    else:
+                        shutil.move(_file, completed_dir)
         else:
             # move castep/param/res/out_cell files to completed
             file_exts = ['.castep']
@@ -1154,11 +1316,11 @@ class ComputeTask:
                 try:
                     shutil.move('{}{}'.format(seed, ext), completed_dir)
                 except Exception as exc:
-                    logging.warning('Error moving files to completed: {error}'.format(error=exc))
+                    LOG.warning('Error moving files to completed: {error}'.format(error=exc))
 
         # delete whatever is left
-        wildcard_fnames = glob.glob('{}/{}.*'.format(self.root_folder, seed))
-        wildcard_fnames += glob.glob('{}/{}-out.*'.format(self.root_folder, seed))
+        wildcard_fnames = glob.glob(seed + '.*')
+        wildcard_fnames += glob.glob(seed + '-out.*')
         for fname in wildcard_fnames:
             os.remove(fname)
 
@@ -1176,19 +1338,19 @@ class ComputeTask:
         if not self._first_run:
             return
         input_dir = self.root_folder + '/input'
-        logging.debug('Copying file to input_dir: {input}'.format(input=input_dir))
+        LOG.debug('Copying file to input_dir: {input}'.format(input=input_dir))
         if not os.path.exists(input_dir):
             os.makedirs(input_dir, exist_ok=True)
         if glob_files:
-            files = glob.glob('{}*'.format(seed))
-            logging.debug('Files to copy: {files}'.format(files=files))
+            files = glob.glob('{}.*'.format(seed))
+            LOG.debug('Files to copy: {files}'.format(files=files))
             for f in files:
                 if f.endswith('.lock'):
                     continue
-                if not os.path.isfile(f):
+                if not os.path.isfile(input_dir + '/' + f):
                     shutil.copy2('{}'.format(f), input_dir)
         else:
-            logging.debug('File to copy: {file}'.format(file='{}.{}'.format(seed, ext)))
+            LOG.debug('File to copy: {file}'.format(file='{}.{}'.format(seed, ext)))
             if os.path.isfile('{}.{}'.format(seed, ext)):
                 if not os.path.isfile('{}/{}.{}'.format(input_dir, seed, ext)):
                     shutil.copy2('{}.{}'.format(seed, ext), input_dir)
@@ -1204,59 +1366,40 @@ class ComputeTask:
 
         """
 
-        logging.info('Preparing to relax {seed}'.format(seed=self.seed))
-        if self.compute_dir is not None:
-            logging.info('Using compute_dir: {compute}'.format(compute=self.compute_dir))
-            if not os.path.isdir(self.compute_dir):
-                os.makedirs(self.compute_dir)
-            # if compute_dir isn't simply inside this folder, make a symlink that is
-            if '/' in self.compute_dir:
-                link_name = self.compute_dir.split('/')[-1]
-                if not os.path.isfile(link_name) and not os.path.isdir(link_name):
-                    if os.path.islink(link_name):
-                        os.remove(link_name)
-                    os.symlink(self.compute_dir, link_name)
-
-            # copy pspots and any intermediate calcs to compute_dir
-            logging.info('Copying pspots into compute_dir')
-            pspots = glob.glob('*.usp')
-            for pspot in pspots:
-                shutil.copy2(pspot, self.compute_dir)
-
-            if self.custom_params:
-                shutil.copy2(self.seed + '.param', self.compute_dir)
+        LOG.info('Preparing to relax {seed}'.format(seed=self.seed))
+        self._setup_compute_dir(self.seed, self.compute_dir, custom_params=self.custom_params)
 
         # update res file with intermediate calculation if castep file is newer than res
         if os.path.isfile(self.seed + '.castep') and os.path.isfile(self.seed + '.res'):
-            logging.info('Trying to update res file with result from intermediate CASTEP file found in root_dir')
+            LOG.info('Trying to update res file with result from intermediate CASTEP file found in root_dir')
             if self.compute_dir is not None:
                 shutil.copy2(self.seed + '.castep', self.compute_dir)
-            castep_dict, success = castep2dict(self.seed + '.castep', db=False)
+            castep_dict, success = castep2dict(self.seed + '.castep', db=False, verbosity=self.verbosity)
             if success:
-                self.res_dict['geom_iter'] = castep_dict.get('geom_iter')
+                self.res_dict['geom_iter'] = castep_dict.get('geom_iter', 0)
 
             if os.path.getmtime(self.seed + '.res') < os.path.getmtime(self.seed + '.castep'):
-                logging.info('CASTEP file was updated more recently than res file, using intermediate structure...')
+                LOG.info('CASTEP file was updated more recently than res file, using intermediate structure...')
                 self.res_dict.update(castep_dict)
 
         if self.compute_dir is not None:
             os.chdir(self.compute_dir)
 
         # copy initial res file to seed
-        logging.info('Writing fresh res file to start calculation from.')
+        LOG.info('Writing fresh res file to start calculation from.')
         doc2res(self.res_dict, self.seed, info=False, hash_dupe=False, overwrite=True)
         self.cp_to_input(self.seed)
 
         # set up geom opt iteration options based on input/scraped parameters
         self._max_iter = self.calc_doc['geom_max_iter']
-        if 'geom_iter' in self.res_dict:
+        if self.res_dict.get('geom_iter'):
             self._max_iter -= self.res_dict['geom_iter']
         else:
             self.res_dict['geom_iter'] = 0
 
         if self.res_dict['geom_iter'] > self.calc_doc['geom_max_iter']:
             msg = '{} iterations already performed on structure, exiting...'.format(self.res_dict['geom_iter'])
-            logging.critical(msg)
+            LOG.critical(msg)
             raise CalculationError(msg)
 
         # number of steps in fine and rough calcs respectively
@@ -1269,6 +1412,10 @@ class ComputeTask:
                 rough_iter = 3
         self._geom_max_iter_list = (num_rough_iter * [rough_iter])
         self._max_iter -= num_rough_iter * rough_iter
+        if self.squeeze:
+            self._squeeze_list = [True for val in self._geom_max_iter_list]
+        else:
+            self._squeeze_list = [False for val in self._geom_max_iter_list]
 
         num_fine_iter = ceil(int(self._max_iter) / fine_iter)
         if self._max_iter > 0:
@@ -1276,45 +1423,64 @@ class ComputeTask:
                 fine_iter = self._max_iter
                 num_fine_iter = 1
             self._geom_max_iter_list.extend(num_fine_iter * [fine_iter])
+            self._squeeze_list.extend(num_fine_iter * [False])
 
-        logging.info('Geometry optimisation iteration scheme set to {}'.format(self._geom_max_iter_list))
+        LOG.info('Geometry optimisation iteration scheme set to {}'.format(self._geom_max_iter_list))
+        if self.squeeze:
+            LOG.info('Squeeze scheme set to {}'.format(self._geom_max_iter_list))
 
         if not self._geom_max_iter_list:
             msg = 'Could not divide up relaxation; consider increasing geom_max_iter'
-            logging.critical(msg)
+            LOG.critical(msg)
             raise CriticalError(msg)
 
-    def _update_input_files(self, seed, calc_doc):
+    def _update_input_files(self, seed, calc_doc, squeeze=None):
         """ Update the cell and param files for the next relaxation.
 
         Parameters:
             seed (str): the seedname to update.
             calc_doc (dict): the calculation dictionary to write to file.
 
-        """
+        Keyword arguments:
+            squeeze (float): external pressure to add this step
 
+        """
         if seed is None:
             seed = self.seed
+
+        this_calc_doc = deepcopy(calc_doc)
+
         # update cell
         if os.path.isfile(seed + '.cell'):
             os.remove(seed + '.cell')
+        if squeeze is not None:
+            if squeeze:
+                LOG.info('Applying pressure of {} GPa to this calculation'.format(squeeze))
+                this_calc_doc['external_pressure'] = [[squeeze, 0, 0], [0, squeeze, 0], [0, 0, squeeze]]
+            else:
+                LOG.info('Pressure reset to {}'.format(self._target_pressure))
+                this_calc_doc['external_pressure'] = self._target_pressure
+
         if self.kpts_1D:
-            n_kz = ceil(1 / (calc_doc['lattice_abc'][0][2] * self._target_spacing))
+            n_kz = ceil(1 / (this_calc_doc['lattice_abc'][0][2] * self._target_spacing))
             if n_kz % 2 == 1:
                 n_kz += 1
-            calc_doc['kpoints_mp_grid'] = [1, 1, n_kz]
+            this_calc_doc['kpoints_mp_grid'] = [1, 1, n_kz]
             if 'kpoints_mp_spacing' in calc_doc:
                 del calc_doc['kpoints_mp_spacing']
-        doc2cell(calc_doc, seed, hash_dupe=False, copy_pspots=False, spin=self.spin)
+        doc2cell(this_calc_doc, seed, hash_dupe=False, spin=self.spin)
 
         # update param
         if not self.custom_params:
             if os.path.isfile(seed + '.param'):
                 os.remove(seed + '.param')
-            doc2param(calc_doc, seed, hash_dupe=False, spin=self.spin)
+            doc2param(this_calc_doc, seed, hash_dupe=False, spin=self.spin)
 
-    @staticmethod
-    def tidy_up(seed):
+        LOG.debug('Calculation dictionary: {}'
+                  .format(matador.utils.print_utils.dumps(this_calc_doc,
+                                                          indent=None)))
+
+    def tidy_up(self, seed):
         """ Delete all created files before quitting.
 
         Parameters:
@@ -1322,62 +1488,77 @@ class ComputeTask:
 
         """
         files = glob.glob(seed + '.*')
+        if self.compute_dir is not None:
+            files += glob.glob(self.root_folder + '/' + seed + '.*')
         if files:
-            logging.info('Tidying up remaining files: {files}'.format(files=files))
+            LOG.info('Tidying up remaining files: {files}'.format(files=files))
             for f in files:
-                if not (f.endswith('.res') or f.endswith('.castep')):
+                # if we're working in a compute dir, then delete any remaining files in base dir
+                # otherwise, only delete things that we dont care about, i.e. non-res/castep in
+                # case they were not correctly moved to completed/bad_castep by the other routines
+                if self.compute_dir is not None or (not (f.endswith('.res') or f.endswith('.castep'))):
                     os.remove(f)
 
-    def _update_output_files(self, opti_dict):
+    def _update_output_files(self, seed, opti_dict=None):
         """ Copy new data to output files and update
          the results dict.
 
-        Parameter:
+        Keyword arguments:
             opti_dict (dict): intermediate calculation results.
 
         """
-        logging.info('Updating .res and .castep files in root_dir with new results')
-        if os.path.isfile(self.seed + '.res'):
-            os.rename('{}.res'.format(self.seed), '{}.res_bak'.format(self.seed))
-        try:
-            doc2res(opti_dict, self.seed, hash_dupe=False)
-        except CalculationError:
-            doc2res(opti_dict, self.seed, hash_dupe=False, info=False)
-        if os.path.isfile(self.seed + '.res_bak'):
-            os.remove(self.seed + '.res_bak')
+        LOG.info('Updating .res and .castep files in root_dir with new results')
+        if opti_dict is not None:
+            if os.path.isfile(seed + '.res'):
+                os.rename('{}.res'.format(seed), '{}.res_bak'.format(seed))
+            try:
+                doc2res(opti_dict, seed, hash_dupe=False)
+            except CalculationError:
+                doc2res(opti_dict, seed, hash_dupe=False, info=False)
+            if os.path.isfile(seed + '.res_bak'):
+                os.remove(seed + '.res_bak')
+            self.res_dict.update(opti_dict)
 
         if self.compute_dir is not None:
-            shutil.copy2(self.seed + '.res', self.root_folder)
-            if os.path.isfile(self.seed + '.castep'):
-                shutil.copy2(self.seed + '.castep', self.root_folder)
-        self.res_dict.update(opti_dict)
+            if os.path.isfile(seed + '.res'):
+                shutil.copy2(seed + '.res', self.root_folder)
+            if os.path.isfile(seed + '.castep'):
+                shutil.copy2(seed + '.castep', self.root_folder)
 
-    def _finalise_result(self):
+    def _finalise_result(self, intermediate=False):
         """ Push to queue if necessary and return status.
+
+        Keyword arguments:
+            intermediate (bool): whether we want to run more calculations
+                on the output of this, i.e. whether to move to completed
+                or not.
 
         Returns:
             bool: True is relaxation was successful, False otherwise.
 
         """
-        logging.info('Finalising calculation...')
+        LOG.info('Finalising calculation...')
         try:
             success = self.res_dict.get('optimised', False)
         except AttributeError:
             success = False
 
-        logging.info('Was calculation successful? {success}'.format(success=success))
+        LOG.info('Was calculation successful? {success}'.format(success=success))
         if self.output_queue is not None:
-            logging.info('Pushing results to output queue')
+            LOG.info('Pushing results to output queue')
             self.output_queue.put(self.res_dict)
         if success:
-            self.mv_to_completed(self.seed, completed_dir=self.paths['completed_dir'])
+            if not intermediate:
+                self.mv_to_completed(self.seed, completed_dir=self.paths['completed_dir'])
         else:
             self.mv_to_bad(self.seed)
 
         if success:
             self.final_result = self.res_dict
-        # clean up rest of files
-        self.tidy_up(self.seed)
+
+        if not intermediate:
+            # clean up rest of files
+            self.tidy_up(self.seed)
 
         return success
 
@@ -1389,15 +1570,15 @@ class ComputeTask:
             subprocess.Popen: running process to be killed.
 
         """
-        logging.info('Ending process early for seed: {seed}'.format(seed=self.seed))
+        LOG.info('Ending process early for seed: {seed}'.format(seed=self.seed))
         process.terminate()
-        logging.info('Ended process early for seed: {seed}'.format(seed=self.seed))
+        LOG.info('Ended process early for seed: {seed}'.format(seed=self.seed))
         if self.compute_dir is not None:
-            logging.info('Cleaning up compute_dir: {dir}'.format(dir=self.compute_dir))
+            LOG.info('Cleaning up compute_dir: {dir}'.format(dir=self.compute_dir))
             for f in glob.glob('{}.*'.format(self.seed)):
                 shutil.copy2(f, self.root_folder)
                 os.remove(f)
-        logging.info('Removing lock file so calculation can be continued.')
+        LOG.info('Removing lock file so calculation can be continued.')
         if os.path.isfile('{}/{}{}'.format(self.root_folder, self.seed, '.res.lock')):
             os.remove('{}/{}{}'.format(self.root_folder, self.seed, '.res.lock'))
 
@@ -1414,21 +1595,21 @@ class ComputeTask:
                 were found, otherwise False.
 
         """
-        logging.info('Checking if compute_dir still contains calculations...')
+        LOG.info('Checking if compute_dir still contains calculations...')
         if not os.path.isdir(compute_dir):
             return False
 
         files = glob.glob(compute_dir + '/*')
-        logging.debug('Found {files} in {dir}'.format(files=files, dir=compute_dir))
+        LOG.debug('Found {files} in {dir}'.format(files=files, dir=compute_dir))
 
         for fname in files:
             if fname.endswith('.res') or fname.endswith('.castep'):
-                logging.debug('Not removing {dir} as it still contains calculation {fname}'.format(
+                LOG.debug('Not removing {dir} as it still contains calculation {fname}'.format(
                     dir=compute_dir, fname=fname))
                 return False
 
         # remove files in directory, then delete directory
-        logging.debug('Deleting files {files} from {dir}'.format(files=files, dir=compute_dir))
+        LOG.debug('Deleting files {files} from {dir}'.format(files=files, dir=compute_dir))
         for fname in files:
             if os.path.isfile(fname):
                 try:
@@ -1437,13 +1618,67 @@ class ComputeTask:
                     pass
 
         if os.path.isdir(compute_dir):
-            logging.debug('Deleting directory {dir}'.format(dir=compute_dir))
-            os.rmdir(compute_dir)
+            LOG.debug('Deleting directory {dir}'.format(dir=compute_dir))
+            try:
+                os.rmdir(compute_dir)
+            except OSError:
+                LOG.debug('Unable to delete directory {} as it still contains files.'.format(compute_dir))
 
-        if os.path.islink(compute_dir.split('/')[-1]):
-            os.remove(compute_dir.split('/')[-1])
+        if os.path.islink(compute_dir.split('/')[-1] + '_link'):
+            os.remove(compute_dir.split('/')[-1] + '_link')
 
         return True
+
+    def _setup_compute_dir(self, seed, compute_dir, custom_params=False, generic=False):
+        """ Create the desired directory if it doens't exist,
+        and try to link to it in the current folder.
+
+        Parameters:
+            seed (str): name of seed.
+            compute_dir (str): name of directory to make.
+
+        Keyword arguments:
+            custom_params (bool): whether to try to copy custom
+                param files into this directory.
+
+        """
+        if compute_dir is None:
+            return
+
+        LOG.info('Using compute_dir: {}'.format(compute_dir))
+        if not os.path.isdir(compute_dir):
+            try:
+                os.makedirs(compute_dir)
+            except PermissionError as exc:
+                raise CriticalError('Invalid compute dir requested: {} {}'.format(compute_dir, exc))
+        # if compute_dir isn't simply inside this folder, make a symlink that is
+        if compute_dir.startswith('/'):
+            link_name = compute_dir.split('/')[-1] + '_link'
+            if not os.path.exists(link_name):
+                os.symlink(compute_dir, link_name)
+
+        if generic:
+            # if generic, copy all seed files to compute dir
+            for f in glob.glob(seed + '*'):
+                shutil.copy2(f, compute_dir)
+
+        # copy pspots and any intermediate calcs to compute_dir
+        LOG.info('Copying pspots into compute_dir')
+        if self.cell_dict is not None:
+            for pspot in self.cell_dict.get('species_pot', {}).values():
+                if os.path.isfile(pspot):
+                    try:
+                        shutil.copy2(pspot, compute_dir)
+                    except shutil.SameFileError:
+                        pass
+
+        if custom_params:
+            shutil.copy2(seed + '.param', compute_dir)
+
+        # if a checkfile exists, copy it to the new dir
+        # so that it can be restarted from
+        if os.path.isfile(seed + '.check'):
+            shutil.copy2(seed + '.check', compute_dir)
 
 
 class FullRelaxer(ComputeTask):

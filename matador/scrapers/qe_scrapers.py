@@ -17,7 +17,7 @@ from matador.scrapers.utils import scraper_function
 
 
 @scraper_function
-def pwout2dict(seed):
+def pwout2dict(seed, **kwargs):
     """ Extract available information from pw.x .out file.
 
     Parameters:

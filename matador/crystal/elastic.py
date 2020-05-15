@@ -6,6 +6,7 @@ of state to ab initio data, primarily to calculate bulk moduli.
 
 """
 
+import re
 
 import numpy as np
 from matador.utils.chem_utils import eV_PER_ANGSTROM_CUBED_TO_GPa
@@ -51,29 +52,43 @@ def get_equation_of_state(seed, plot=False):
 
     types_of_fit = EquationOfState.__subclasses__()
 
-    if plot:
-        import matplotlib.pyplot as plt
-        _, ax = plt.subplots(1)
-        ax.plot(volumes, energies, marker='o')
-
     results['eos'] = []
+    results['summary'] = []
+    probes_all = []
+    curves = []
+    labels = []
 
     for eos_type in types_of_fit:
         eos = eos_type(E_0, V_0)
         eos.fit(volumes, energies)
-        print(eos_type.__name__)
-        print('fitting parameters = {d[0]:.6f}, {d[1]:.6f}'.format(d=eos.fit_parameters))
-        print('rrrmsd = {:10.10f} %'.format(eos.rrmsd))
-        print('bulk modulus = {d[0]:.6f} +/- {d[1]:.6f} GPa'.format(d=(eos.bulk_modulus, eos.bulk_modulus_err)))
+
+        results['summary'].append(eos_type.__name__ + '\n')
+        results['summary'].append('fitting parameters = {d[0]:.6f}, {d[1]:.6f}\n'.format(d=eos.fit_parameters))
+        results['summary'].append('rrrmsd = {:10.10f} %\n'.format(eos.rrmsd))
+        results['summary'].append('bulk modulus = {d[0]:.6f} +/- {d[1]:.6f} GPa\n'
+                                  .format(d=(eos.bulk_modulus, eos.bulk_modulus_err)))
+        results['summary'].append(80*'-' + '\n')
         probes = np.linspace(min(volumes), max(volumes), num=100)
         fitted_curve = eos.evaluate(probes, *eos.popt)
         results['eos'].append(eos)
-        if plot:
-            ax.plot(probes, fitted_curve, label=eos_type.__name__)
+        probes_all.append(probes)
+        curves.append(fitted_curve)
+        name = eos_type.__name__.replace('EOS', '')
+        label = '-'.join(re.findall('[A-Z][^A-Z]*', name))
+        labels.append(label)
 
     if plot:
+        import matplotlib.pyplot as plt
+        _, ax = plt.subplots(1, figsize=(8, 6))
+        ax.set_ylabel('Total energy (eV)')
+        ax.set_xlabel('Cell volume ($\\AA^3$)')
+        ls = ['--', '-.', ':']
+        for ind, probe in enumerate(probes_all):
+            ax.plot(probes_all[ind], curves[ind], label=labels[ind], ls=ls[ind])
+        ax.plot(volumes, energies, marker='o', label='DFT data')
+
         ax.legend(loc=0)
-        plt.show()
+        plt.savefig(seed + '.png')
 
     return results
 
@@ -96,7 +111,7 @@ class EquationOfState:
     def __init__(self, E_0, V_0):
         """ Set up EOS ready for fit.
 
-        Keyword arguments:
+        Parameters:
             E_0 (float): equilibrium energy.
             V_0 (float): equilibrium volume.
 

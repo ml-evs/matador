@@ -19,13 +19,15 @@ multiple steps (only when necessary):
 """
 
 
-import logging
 import os
 import copy
-from matador.workflows import Workflow
+import logging
+from matador.workflows.workflows import Workflow
+
+LOG = logging.getLogger('run3')
 
 
-def castep_full_phonon(relaxer, calc_doc, seed):
+def castep_full_phonon(relaxer, calc_doc, seed, **kwargs):
     """ Perform a "full" phonon calculation on a system, i.e.
     first perform a relaxation in a standardised unit cell,
     then compute the dynamical matrix, then finally interpolate
@@ -45,7 +47,7 @@ def castep_full_phonon(relaxer, calc_doc, seed):
         bool: True if Workflow completed successfully, or False otherwise.
 
     """
-    workflow = CastepPhononWorkflow(relaxer, calc_doc, seed)
+    workflow = CastepPhononWorkflow(relaxer, calc_doc, seed, **kwargs)
     return workflow.success
 
 
@@ -70,42 +72,62 @@ class CastepPhononWorkflow(Workflow):
 
         """
         # default todo
-        todo = {'relax': True, 'dynmat': True, 'dos': False, 'dispersion': False, 'thermodynamics': False}
+        todo = {'relax': True, 'dynmat': True, 'vdos': False, 'dispersion': False, 'thermodynamics': False}
         # definition of steps and names
         steps = {'relax': castep_phonon_prerelax,
                  'dynmat': castep_phonon_dynmat,
-                 'dos': castep_phonon_dos,
+                 'vdos': castep_phonon_dos,
                  'dispersion': castep_phonon_dispersion,
                  'thermodynamics': castep_phonon_thermodynamics}
 
+        exts = {
+            'relax':
+                {'input': ['.cell', '.param'], 'output': ['.castep', '-out.cell', '.*err']},
+            'dynmat':
+                {'input': ['.cell', '.param'], 'output': ['.castep', '.*err']},
+            'vdos':
+                {'input': ['.cell', '.param'], 'output': ['.castep', '.phonon', '.phonon_dos', '.*err']},
+            'dispersion':
+                {'input': ['.cell', '.param'], 'output': ['.castep', '.phonon', '.*err']},
+            'thermodynamics':
+                {'input': ['.cell', '.param'], 'output': ['.castep', '.*err']}
+        }
+
         if self.calc_doc.get('task').lower() in ['phonon', 'thermodynamics']:
-            if (('phonon_fine_kpoint_path' not in self.calc_doc and 'phonon_fine_kpoint_list' not in self.calc_doc) and
-                    'phonon_fine_kpoint_path_spacing' in self.calc_doc):
+            if ('phonon_fine_kpoint_path' in self.calc_doc or 'phonon_fine_kpoint_list' in self.calc_doc
+                    or 'phonon_fine_kpoint_path_spacing' in self.calc_doc):
                 todo['dispersion'] = True
             if 'phonon_fine_kpoint_mp_spacing' in self.calc_doc:
-                todo['dos'] = True
+                todo['vdos'] = True
             if self.calc_doc['task'].lower() == 'thermodynamics':
                 todo['thermodynamics'] = True
 
         # prepare to do pre-relax if there's no check file
         if os.path.isfile(self.seed + '.check'):
             todo['relax'] = False
-            logging.info('Restarting from {}.check, so not performing re-relaxation'.format(self.seed))
+            LOG.info('Restarting from {}.check, so not performing re-relaxation'.format(self.seed))
 
         for key in todo:
             if todo[key]:
-                self.add_step(steps[key], key)
+                self.add_step(steps[key], key,
+                              input_exts=exts[key].get('input'),
+                              output_exts=exts[key].get('output'))
 
         # always standardise the cell so that any phonon calculation can have
-        # post-processing performed after the fact
-        from matador.utils.cell_utils import cart2abc
-        prim_doc, kpt_path = self.relaxer.get_seekpath_compliant_input(
-            self.calc_doc, self.calc_doc.get('phonon_fine_kpoint_path_spacing', 0.02))
-        self.calc_doc.update(prim_doc)
-        self.calc_doc['lattice_abc'] = cart2abc(self.calc_doc['lattice_cart'])
+        # post-processing performed after the fact, unless a path has been provided
+        if 'phonon_fine_kpoint_list' not in self.calc_doc and 'phonon_fine_kpoint_path' not in self.calc_doc:
+            from matador.utils.cell_utils import cart2abc
+            prim_doc, kpt_path = self.relaxer.get_seekpath_compliant_input(
+                self.calc_doc, self.calc_doc.get('phonon_fine_kpoint_path_spacing', 0.02))
+            self.calc_doc.update(prim_doc)
+            self.calc_doc['lattice_abc'] = cart2abc(self.calc_doc['lattice_cart'])
+            if todo['dispersion']:
+                self.calc_doc['phonon_fine_kpoint_list'] = kpt_path
 
-        if todo['dispersion']:
-            self.calc_doc['phonon_fine_kpoint_list'] = kpt_path
+        elif todo['dispersion'] and 'phonon_fine_kpoint_path' in self.calc_doc:
+            self._user_defined_kpt_path = True
+            LOG.warning('Using user-defined k-point path for all structures.')
+            self.calc_doc['phonon_fine_kpoint_spacing'] = self.calc_doc.get('phonon_fine_kpoint_path_spacing', 0.05)
 
         # always shift phonon grid to include Gamma
         if 'phonon_kpoint_mp_spacing' in self.calc_doc:
@@ -114,9 +136,9 @@ class CastepPhononWorkflow(Workflow):
             offset = shift_to_include_gamma(grid)
             if offset != [0, 0, 0]:
                 self.calc_doc['phonon_kpoint_mp_offset'] = offset
-                logging.debug('Set phonon MP grid offset to {}'.format(offset))
+                LOG.debug('Set phonon MP grid offset to {}'.format(offset))
 
-        logging.info('Preprocessing completed: run3 phonon options {}'.format(todo))
+        LOG.info('Preprocessing completed: run3 phonon options {}'.format(todo))
 
 
 def castep_phonon_prerelax(relaxer, calc_doc, seed):
@@ -130,11 +152,11 @@ def castep_phonon_prerelax(relaxer, calc_doc, seed):
         seed (str): root filename of structure.
 
     """
-    logging.info('Performing CASTEP phonon pre-relax...')
+    LOG.info('Performing CASTEP phonon pre-relax...')
     relax_doc = copy.deepcopy(calc_doc)
     relax_doc['write_checkpoint'] = 'ALL'
     if 'geom_max_iter' not in relax_doc:
-        relax_doc['geom_max_iter'] = 20
+        relax_doc['geom_max_iter'] = 100
     relax_doc['task'] = 'geometryoptimisation'
 
     required = []
@@ -144,8 +166,9 @@ def castep_phonon_prerelax(relaxer, calc_doc, seed):
                  'phonon_fine_kpoint_path_spacing']
 
     relaxer.validate_calc_doc(relax_doc, required, forbidden)
+    relaxer.calc_doc = relax_doc
 
-    return relaxer.scf(relax_doc, seed, keep=True, intermediate=True)
+    relaxer.relax(intermediate=True)
 
 
 def castep_phonon_dynmat(relaxer, calc_doc, seed):
@@ -157,11 +180,10 @@ def castep_phonon_dynmat(relaxer, calc_doc, seed):
         seed (str): root filename of structure.
 
     """
-    logging.info('Performing CASTEP dynmat calculation...')
-    relax_doc = copy.deepcopy(calc_doc)
-    relax_doc['write_checkpoint'] = 'ALL'
-    relax_doc['continuation'] = 'default'
-    relax_doc['task'] = 'phonon'
+    LOG.info('Performing CASTEP dynmat calculation...')
+    dynmat_doc = copy.deepcopy(calc_doc)
+    dynmat_doc['write_checkpoint'] = 'ALL'
+    dynmat_doc['task'] = 'phonon'
 
     required = []
     forbidden = ['phonon_fine_kpoint_list',
@@ -169,8 +191,8 @@ def castep_phonon_dynmat(relaxer, calc_doc, seed):
                  'phonon_fine_kpoint_mp_spacing',
                  'phonon_fine_kpoint_path_spacing']
 
-    relaxer.validate_calc_doc(relax_doc, required, forbidden)
-    return relaxer.scf(relax_doc, seed, keep=True, intermediate=True)
+    relaxer.validate_calc_doc(dynmat_doc, required, forbidden)
+    return relaxer.scf(dynmat_doc, seed, keep=True, intermediate=True)
 
 
 def castep_phonon_dos(relaxer, calc_doc, seed):
@@ -183,10 +205,11 @@ def castep_phonon_dos(relaxer, calc_doc, seed):
         seed (str): root filename of structure.
 
     """
-    logging.info('Performing CASTEP phonon DOS calculation...')
+    LOG.info('Performing CASTEP phonon DOS calculation...')
     dos_doc = copy.deepcopy(calc_doc)
     dos_doc['task'] = 'phonon'
     dos_doc['phonon_calculate_dos'] = True
+    dos_doc['continuation'] = 'default'
 
     required = ['phonon_fine_kpoint_mp_spacing']
     forbidden = ['phonon_fine_kpoint_list',
@@ -208,15 +231,14 @@ def castep_phonon_dispersion(relaxer, calc_doc, seed):
         seed (str): root filename of structure.
 
     """
-    logging.info('Performing CASTEP phonon dispersion calculation...')
+    LOG.info('Performing CASTEP phonon dispersion calculation...')
     disp_doc = copy.deepcopy(calc_doc)
     disp_doc['task'] = 'phonon'
     disp_doc['phonon_calculate_dos'] = False
+    disp_doc['continuation'] = 'default'
 
-    required = ['phonon_fine_kpoint_list']
-    forbidden = ['phonon_fine_kpoint_mp_spacing',
-                 'phonon_fine_kpoint_path',
-                 'phonon_fine_kpoint_path_spacing']
+    required = []
+    forbidden = ['phonon_fine_kpoint_mp_spacing']
 
     relaxer.validate_calc_doc(disp_doc, required, forbidden)
 
@@ -233,7 +255,7 @@ def castep_phonon_thermodynamics(relaxer, calc_doc, seed):
         seed (str): root filename of structure.
 
     """
-    logging.info('Performing CASTEP thermodynamics calculation...')
+    LOG.info('Performing CASTEP thermodynamics calculation...')
     thermo_doc = copy.deepcopy(calc_doc)
     thermo_doc['continuation'] = 'default'
     thermo_doc['task'] = 'thermodynamics'

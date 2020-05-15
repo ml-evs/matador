@@ -1,6 +1,7 @@
 numpy>=1.14
 scipy>=1.0
-psutil
-pyyaml
+psutil>=5.0
+pyyaml>=5.3
 pymongo>=3.7
-numba
+numba>=0.4
+tqdm>=4

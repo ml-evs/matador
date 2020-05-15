@@ -9,22 +9,132 @@ manipulation and analysis of the lattice.
 
 from copy import deepcopy
 from matador.utils import cell_utils
-from matador.similarity.pdf_similarity import PDF
+from matador.orm.orm import DataContainer
 from matador.crystal.crystal_site import Site
 from matador.utils.chem_utils import get_concentration
+from matador.utils.cell_utils import real2recip
 
 
-class Crystal:
+class UnitCell:
+    """ This class describes a 3D periodic unit cell by its
+    Cartesian lattice vectors or lattice parameters, in Å.
+
+    """
+
+    _lattice_abc = None
+    _lattice_cart = None
+    _volume = None
+
+    def __init__(self, lattice):
+        """ Initialise the cell from either Cartesian lattice vectors
+        [[x1, y1, z1], [x2, y2, z2], [x3, y3, z3]], or lattice
+        parameters [[a, b, c], [alpha, beta, gamma]].
+
+        Parameters:
+            lattice (:obj:`list` or numpy.ndarray): either Cartesian
+                lattice vectors or lattice parameters, stored as lists
+                or a numpy arrays.
+
+        """
+
+        self._volume = None
+        if len(lattice) == 3:
+            if any(len(vec) != 3 for vec in lattice):
+                raise RuntimeError('Unable to cast {} into lattice_cart'.format(lattice))
+            self.lattice_cart = lattice
+        elif len(lattice) == 2:
+            if any(len(vec) != 3 for vec in lattice):
+                raise RuntimeError('Unable to cast {} into lattice_abc'.format(lattice))
+            self.lattice_abc = lattice
+        else:
+            raise RuntimeError("Unable to create UnitCell from lattice {}".format(lattice))
+
+    @property
+    def lattice_cart(self):
+        """ The Cartesian lattice vectors as a tuple. """
+        return self._lattice_cart
+
+    @lattice_cart.setter
+    def lattice_cart(self, new_lattice):
+        self._lattice_cart = tuple(tuple(vec) for vec in new_lattice)
+        self._lattice_abc = tuple(tuple(elem) for elem in cell_utils.cart2abc(self._lattice_cart))
+        self._volume = None
+
+    @property
+    def lattice_abc(self):
+        """ Lattice parameters as a tuple. """
+        return self._lattice_abc
+
+    @lattice_abc.setter
+    def lattice_abc(self, new_lattice):
+        self._lattice_abc = tuple(tuple(vec) for vec in new_lattice)
+        self._lattice_cart = tuple(tuple(vec) for vec in cell_utils.abc2cart(self._lattice_abc))
+        self._volume = None
+
+    @property
+    def lengths(self):
+        """ Lattice vector lengths. """
+        return self._lattice_abc[0]
+
+    @lengths.setter
+    def lengths(self, new_lengths):
+        if len(new_lengths) != 3:
+            raise RuntimeError('Expected list of 3 floats for cell vector lengths, received {}'
+                               .format(new_lengths))
+        self.lattice_abc = [new_lengths, self._lattice_abc[1]]
+
+    @property
+    def recip_lattice_cart(self):
+        return real2recip(self.lattice_cart)
+
+    @property
+    def angles(self):
+        """ Lattice vector angles. """
+        return self._lattice_abc[1]
+
+    @angles.setter
+    def angles(self, new_angles):
+        if len(new_angles) != 3:
+            raise RuntimeError('Expected list of 3 floats for cell vector angles, received {}'
+                               .format(new_angles))
+        self.lattice_abc = [self._lattice_abc[0], new_angles]
+
+    @property
+    def volume(self):
+        """ The cell volume in Å³. """
+        if not self._volume:
+            self._volume = cell_utils.cart2volume(self._lattice_cart)
+        return self._volume
+
+
+class Crystal(DataContainer):
     """ Class that wraps the MongoDB document, providing useful
     interfaces for cell manipulation and validation.
+
+    Attributes:
+        elems (:obj:`list` of :obj:`str`): list of present elements in the crystal,
+            sorted in alphabetical order.
+        cell (:obj:`UnitCell`): the unit cell constructed from lattice vectors.
+
     """
+
+    @staticmethod
+    def _validate_doc(doc):
+        if not any(key in doc for key in ['lattice_cart', 'lattice_abc']):
+            raise RuntimeError('No lattice information found, cannot create Crystal.')
+        if 'atom_types' not in doc:
+            raise RuntimeError('No species information found `"atom_types"`, cannot create Crystal.')
+        if not any(key in doc for key in ['positions_frac', 'positions_abs']):
+            raise RuntimeError('No position information found `"positions_frac"/"positions_abs"`, cannot create Crystal.')
 
     def __init__(self, doc, voronoi=False, network_kwargs=None):
         """ Initialise Crystal object from matador document with Site list
         and any additional abstractions, e.g. voronoi or CrystalGraph.
 
         Parameters:
-            doc (dict): matador document containing structural information
+            doc (dict): document containing structural information, minimal requirement
+                is for `atom_types`, one of `lattice_abc` or `lattice_cart`, and one of
+                `positions_frac` or `positions_abs` to be present.
 
         Keyword Arguments:
            voronoi (bool): whether to compute Voronoi substructure for each site
@@ -32,13 +142,19 @@ class Crystal:
 
         """
 
-        self._doc = deepcopy(doc)
-        self.elems = sorted(list(set(self._doc['atom_types'])))
-        self.sites = []
-        self._construct_sites(voronoi=voronoi)
+        self._validate_doc(doc)
+        if isinstance(doc, Crystal):
+            doc = deepcopy(doc._data)
 
-        if not any(key in self._doc for key in ['lattice_cart', 'lattice_abc']):
-            raise RuntimeError('No lattice information found, cannot create Crystal.')
+        super().__init__(doc)
+
+        self.elems = sorted(list(set(self._data['atom_types'])))
+        self.sites = []
+
+        # use lattice_cart to construct cell if present, otherwise abc
+        self.cell = UnitCell(doc.get('lattice_cart', doc.get('lattice_abc')))
+
+        self._construct_sites(voronoi=voronoi)
 
         if network_kwargs is not None:
             self._network_kwargs = network_kwargs
@@ -53,60 +169,43 @@ class Crystal:
         self._bonding_stats = None
 
         # assume default value for symprec
-        if 'space_group' in self._doc:
-            self._space_group = {0.01: self._doc['space_group']}
+        if 'space_group' in self._data:
+            self._space_group = {0.01: self._data['space_group']}
         else:
             self._space_group = {}
 
-        # set root source to structure filename
-        from matador.utils.chem_utils import get_root_source
-        try:
-            self.root_source = get_root_source(self._doc['source'])
-        except RuntimeError:
-            self.root_source = 'xxx'
-
     def __getitem__(self, key):
-        # if array-style access, e.g. crystal[3], return 3rd site object
+        """ If integer key is requested, return index into site array. """
         if isinstance(key, int):
             return self.sites[key]
-
-        # otherwise, if dict-style access, try to return key from doc/__dict__
-        return self._doc[key]
-
-    def __setitem__(self, key, item):
-        self._doc[key] = item
-
-    def __contains__(self, key):
-        if key in self._doc:
-            return True
-        return False
+        return super().__getitem__(key)
 
     def __str__(self):
         repr_string = "{root_source}: {formula}\n".format(root_source=self.root_source, formula=self.formula)
         repr_string += "{num_atoms:<3} atoms. {space_group:<8}\n".format(num_atoms=self.num_atoms,
                                                                          space_group=self.space_group)
 
-        if 'formation_enthalpy_per_atom' in self._doc:
-            repr_string += ("Formation enthalpy = {:6.6f} eV/atom\n".format(self._doc['formation_enthalpy_per_atom']))
+        if 'formation_enthalpy_per_atom' in self._data:
+            repr_string += ("Formation enthalpy = {:6.6f} eV/atom\n".format(self._data['formation_enthalpy_per_atom']))
 
         repr_string += (
             "(a, b, c) = {lattice[0][0]:4.4f} Å, {lattice[0][1]:4.4f} Å, {lattice[0][2]:4.4f} Å\n"
             "(α, β, γ) = {lattice[1][0]:4.4f}° {lattice[1][1]:4.4f}° {lattice[1][2]:4.4f}°\n"
-            .format(lattice=self.lattice_abc))
+            .format(lattice=self.cell.lattice_abc))
 
         return repr_string
 
-    def get(self, key):
-        """ Overload dictionary.get() method.
+    def set_positions(self, new_positions, fractional=True):
+        if len(new_positions) != self.num_atoms:
+            raise RuntimeError('Cannot change size of positions array!')
+        if fractional:
+            self._data['positions_frac'] = new_positions
+            self._data.pop('positions_abs', None)
+        else:
+            self._data['positions_abs'] = new_positions
+            self._data.pop('positions_frac', None)
 
-        Parameters:
-            key (str): key to try and obtain.
-
-        Returns:
-            doc[key] if it exists, else None.
-
-        """
-        return self._doc.get(key)
+        self._construct_sites()
 
     def _construct_sites(self, voronoi=False):
         """ Constructs the list of Site objects stored in self.sites.
@@ -116,35 +215,36 @@ class Crystal:
                 of each site.
 
         """
+        self.sites = []
         for ind, species in enumerate(self.atom_types):
-            position = self._doc['positions_frac'][ind]
+            position = self.positions_frac[ind]
             site_data = {}
-            if 'site_occupancy' in self._doc:
-                if len(self._doc['site_occupancy']) == len(self._doc['atom_types']):
-                    site_data['site_occupancy'] = self._doc['site_occupancy'][ind]
-            if 'chemical_shifts' in self._doc:
-                if len(self._doc['chemical_shifts']) == len(self._doc['atom_types']):
-                    site_data['magres_shift'] = self._doc['chemical_shifts'][ind]
-            if 'magnetic_shielding_tensor' in self._doc:
-                if len(self._doc['magnetic_shielding_tensor']) == len(self._doc['atom_types']):
-                    site_data['magres_shielding'] = self._doc['magnetic_shielding_tensor'][ind]
-            if 'chemical_shift_anisos' in self._doc:
-                site_data['magres_aniso'] = self._doc['chemical_shift_anisos'][ind]
-            if 'chemical_shift_asymmetries' in self._doc:
-                site_data['magres_asymm'] = self._doc['chemical_shift_asymmetries'][ind]
-            if 'atomic_spins' in self._doc:
-                site_data['spin'] = self._doc['atomic_spins'][ind]
-            if 'voronoi_substructure' in self._doc:
-                site_data['voronoi_substructure'] = self._doc['voronoi_substructure'][ind]
+            if 'site_occupancy' in self._data:
+                if len(self._data['site_occupancy']) == len(self._data['atom_types']):
+                    site_data['site_occupancy'] = self._data['site_occupancy'][ind]
+            if 'chemical_shifts' in self._data:
+                if len(self._data['chemical_shifts']) == len(self._data['atom_types']):
+                    site_data['magres_shift'] = self._data['chemical_shifts'][ind]
+            if 'magnetic_shielding_tensor' in self._data:
+                if len(self._data['magnetic_shielding_tensor']) == len(self._data['atom_types']):
+                    site_data['magres_shielding'] = self._data['magnetic_shielding_tensor'][ind]
+            if 'chemical_shift_anisos' in self._data:
+                site_data['magres_aniso'] = self._data['chemical_shift_anisos'][ind]
+            if 'chemical_shift_asymmetries' in self._data:
+                site_data['magres_asymm'] = self._data['chemical_shift_asymmetries'][ind]
+            if 'atomic_spins' in self._data:
+                site_data['spin'] = self._data['atomic_spins'][ind]
+            if 'voronoi_substructure' in self._data:
+                site_data['voronoi_substructure'] = self._data['voronoi_substructure'][ind]
             elif voronoi:
                 site_data['voronoi_substructure'] = self.voronoi_substructure[ind]
 
-            self.sites.append(Site(species, position, self.lattice_cart, **site_data))
+            self.sites.append(Site(species, position, self.cell.lattice_cart, **site_data))
 
     @property
     def atom_types(self):
         """ Return list of atom types. """
-        return self._doc['atom_types']
+        return self._data['atom_types']
 
     @property
     def num_atoms(self):
@@ -152,17 +252,25 @@ class Crystal:
         return len(self.sites)
 
     @property
+    def num_elements(self):
+        """ Return number of species in the structure. """
+        return len(self.elems)
+
+    @property
     def positions_frac(self):
         """ Return list of fractional positions. """
-        return self._doc['positions_frac']
+        from matador.utils.cell_utils import cart2frac
+        if 'positions_frac' not in self._data:
+            self._data['positions_frac'] = cart2frac(self.cell.lattice_cart, self.positions_abs)
+        return self._data['positions_frac']
 
     @property
     def positions_abs(self):
         """ Return list of absolute Cartesian positions. """
         from matador.utils.cell_utils import frac2cart
-        if 'positions_abs' not in self._doc:
-            self._doc['positions_abs'] = frac2cart(self.lattice_cart, self.positions_frac)
-        return self._doc['positions_abs']
+        if 'positions_abs' not in self._data:
+            self._data['positions_abs'] = frac2cart(self.cell.lattice_cart, self.positions_frac)
+        return self._data['positions_abs']
 
     @property
     def stoichiometry(self):
@@ -172,44 +280,48 @@ class Crystal:
         by element symbol).
 
         """
-        if 'stoichiometry' not in self._doc:
+        if 'stoichiometry' not in self._data:
             from matador.utils.chem_utils import get_stoich
-            self._doc['stoichiometry'] = get_stoich(self.atom_types)
-        return self._doc['stoichiometry']
+            self._data['stoichiometry'] = get_stoich(self.atom_types)
+        return self._data['stoichiometry']
 
     @property
     def concentration(self):
         """ Return concentration of each species in stoichiometry. """
-        if 'concentration' not in self._doc:
-            self._doc['concentration'] = get_concentration(self.stoichiometry, [elem[0] for elem in self.stoichiometry])
-        return self._doc['concentration']
+        if 'concentration' not in self._data:
+            self._data['concentration'] = get_concentration(
+                self.stoichiometry,
+                [elem[0] for elem in self.stoichiometry],
+                include_end=True
+            )
+        return self._data['concentration']
 
     @property
     def formula(self):
         """ Returns chemical formula of structure. """
         from matador.utils.chem_utils import get_formula_from_stoich
-        return get_formula_from_stoich(self._doc['stoichiometry'], tex=False)
+        return get_formula_from_stoich(self.stoichiometry, tex=False)
 
     @property
-    def lattice_cart(self):
-        """ Returns Cartesian lattice vectors. """
-        if 'lattice_cart' not in self._doc:
-            self._doc['lattice_cart'] = cell_utils.abc2cart(self._doc['lattice_abc'])
-        return self._doc['lattice_cart']
-
-    @property
-    def lattice_abc(self):
-        """ Returns lattice parameters. """
-        if 'lattice_abc' not in self._doc:
-            self._doc['lattice_abc'] = cell_utils.cart2abc(self['lattice_cart'])
-        return self._doc['lattice_abc']
+    def formula_tex(self):
+        """ Returns chemical formula of structure in LaTeX format. """
+        from matador.utils.chem_utils import get_formula_from_stoich
+        return get_formula_from_stoich(self.stoichiometry, tex=True)
 
     @property
     def cell_volume(self):
         """ Returns cell volume in Å³. """
-        if 'cell_volume' not in self.__dict__ or 'cell_volume' not in self._doc:
-            self._doc['cell_volume'] = cell_utils.cart2volume(self._doc['lattice_cart'])
-        return self._doc['cell_volume']
+        return self.cell.volume
+
+    @property
+    def lattice_cart(self):
+        """ The Cartesian lattice vectors as a tuple. """
+        return self.cell.lattice_cart
+
+    @property
+    def lattice_abc(self):
+        """ Lattice parameters as a tuple. """
+        return self.cell.lattice_abc
 
     @property
     def bond_lengths(self):
@@ -231,21 +343,21 @@ class Crystal:
         substructure of crystal.
 
         """
-        if 'voronoi_substructure' not in self._doc:
+        if 'voronoi_substructure' not in self._data:
             from matador.plugins.voronoi_interface.voronoi_interface import get_voronoi_substructure
-            self._doc['voronoi_substructure'] = get_voronoi_substructure(self._doc)
-        return self._doc['voronoi_substructure']
+            self._data['voronoi_substructure'] = get_voronoi_substructure(self._data)
+        return self._data['voronoi_substructure']
 
     @property
     def space_group(self):
         """ Return the space group symbol at the last-used symprec. """
-        return self.get_space_group(symprec=self._doc.get('symprec', 0.01))
+        return self.get_space_group(symprec=self._data.get('symprec', 0.01))
 
     def get_space_group(self, symprec=0.01):
         """ Return the space group of the structure at the desired
         symprec. Stores the space group in a dictionary
         `self._space_group` under symprec keys. Updates
-        `self._doc['space_group']` and `self._doc['symprec']` with the
+        `self._data['space_group']` and `self._data['symprec']` with the
         last value calculated.
 
         Keyword arguments:
@@ -253,20 +365,39 @@ class Crystal:
 
         """
         if symprec not in self._space_group:
-            self._doc['space_group'] = cell_utils.get_spacegroup_spg(self._doc, symprec=symprec)
-            self._doc['symprec'] = symprec
-            self._space_group[symprec] = self._doc['space_group']
+            self._data['space_group'] = cell_utils.get_spacegroup_spg(self._data, symprec=symprec)
+            self._data['symprec'] = symprec
+            self._space_group[symprec] = self._data['space_group']
         return self._space_group[symprec]
 
     @property
-    def pdf(self, **kwargs):
+    def pdf(self):
         """ Returns a PDF object (pair distribution function) for the
-        structure, calculated with default PDF settings, unless kwargs
-        are passed.
+        structure, calculated with default PDF settings.
 
         """
-        self._doc['pdf'] = PDF(self._doc, **kwargs)
-        return self._doc['pdf']
+        from matador.fingerprints.pdf import PDF
+        if 'pdf' not in self._data:
+            self._data['pdf'] = PDF(self._data, label=self.formula_tex)
+        return self._data['pdf']
+
+    @pdf.setter
+    def pdf(self, pdf):
+        """ Set the PDF to the given PDF object (or None). """
+        from matador.fingerprints.pdf import PDF
+        if isinstance(pdf, PDF) or pdf is None:
+            self._data['pdf'] = pdf
+
+    @property
+    def pxrd(self, **kwargs):
+        """ Returns a PXRD object (powder xray diffraction) containing
+        the XRD pattern for the structure.
+
+        """
+        from matador.fingerprints.pxrd import PXRD
+        if 'pxrd' not in self._data:
+            self._data['pxrd'] = PXRD(self._data, **kwargs)
+        return self._data['pxrd']
 
     @property
     def coordination_stats(self):
@@ -288,6 +419,24 @@ class Crystal:
             self._coordination_stats = coordination_stats
 
         return self._coordination_stats
+
+    @property
+    def ase_atoms(self):
+        """ Returns an ASE Atoms representation of
+        the crystal.
+
+        """
+        from matador.utils.ase_utils import doc2ase
+        return doc2ase(self, add_keys_to_info=False)
+
+    @property
+    def pmg_structure(self):
+        """ Returns the pymatgen structure representation of
+        the crystal.
+
+        """
+        from matador.utils.pmg_utils import doc2pmg
+        return doc2pmg(self)
 
     @property
     def coordination_lists(self):
@@ -315,9 +464,9 @@ class Crystal:
     @property
     def unique_sites(self):
         """ Return unique sites using Voronoi decomposition. """
-        from matador.similarity.voronoi_similarity import get_unique_sites
-        get_unique_sites(self._doc)
-        return self._doc['similar_sites']
+        from matador.plugins.voronoi_interface.voronoi_similarity import get_unique_sites
+        get_unique_sites(self._data)
+        return self._data['similar_sites']
 
     @property
     def network(self):
@@ -367,8 +516,14 @@ class Crystal:
 
                 bond_length = data[2]['dist']
                 is_image = bool(data[2]['image'])
-                bonding_dict[atom_1]['bonds'].append({'species': site_2.species, 'index': atom_2, 'length': bond_length, 'is_image': is_image, 'position': site_2.coords})
-                bonding_dict[atom_2]['bonds'].append({'species': site_1.species, 'index': atom_1, 'length': bond_length, 'is_image': is_image, 'position': site_1.coords})
+                bonding_dict[atom_1]['bonds'].append(
+                    {'species': site_2.species, 'index': atom_2, 'length': bond_length,
+                     'is_image': is_image, 'position': site_2.coords}
+                )
+                bonding_dict[atom_2]['bonds'].append(
+                    {'species': site_1.species, 'index': atom_1, 'length': bond_length,
+                     'is_image': is_image, 'position': site_1.coords}
+                )
 
             for key in bonding_dict:
                 bonding_dict[key]['bonds'] = sorted(bonding_dict[key]['bonds'], key=lambda x: x['index'])

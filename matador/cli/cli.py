@@ -24,44 +24,46 @@ class MatadorCommandLine:
         # read args
         self.kwargs = kwargs
         self.args = vars(args[0])
-        self.args['override'] = self.kwargs.get('override')
+        self.args['no_quickstart'] = self.kwargs.get('no_quickstart')
         self.argstr = kwargs.get('argstr')
 
         file_exts = ['cell', 'res', 'pdb', 'markdown', 'latex', 'param', 'xsf']
         self.export = any([self.args.get(ext) for ext in file_exts])
 
-        if self.args['subcmd'] != 'import':
+        self.subcommand = self.args.pop("subcmd")
+
+        if self.subcommand != 'import':
             self.settings = load_custom_settings(config_fname=self.args.get('config'),
                                                  debug=self.args.get('debug'),
-                                                 override=self.args.get('override'))
+                                                 no_quickstart=self.args.get('no_quickstart'))
             result = make_connection_to_collection(self.args.get('db'),
-                                                   check_collection=True,
+                                                   check_collection=(self.subcommand != "stats"),
                                                    mongo_settings=self.settings)
             self.client, self.db, self.collections = result
 
-        if self.args['subcmd'] == 'stats':
+        if self.subcommand == 'stats':
             self.stats()
 
         try:
-            if self.args['subcmd'] == 'import':
+            if self.subcommand == 'import':
                 from matador.db import Spatula
                 self.importer = Spatula(self.args)
 
-            if self.args['subcmd'] == 'query':
+            if self.subcommand == 'query':
                 self.query = DBQuery(self.client, self.collections, **self.args)
                 self.cursor = self.query.cursor
 
-            if self.args['subcmd'] == 'swaps':
+            if self.subcommand == 'swaps':
                 from matador.swaps import AtomicSwapper
                 self.query = DBQuery(self.client, self.collections, **self.args)
                 if self.args.get('hull_cutoff') is not None:
-                    self.hull = QueryConvexHull(self.query, **self.args)
+                    self.hull = QueryConvexHull(query=self.query, **self.args)
                     self.swapper = AtomicSwapper(self.hull.hull_cursor, **self.args)
                 else:
                     self.swapper = AtomicSwapper(self.query.cursor, **self.args)
                 self.cursor = self.swapper.cursor
 
-            if self.args['subcmd'] == 'refine':
+            if self.subcommand == 'refine':
                 from matador.db import Refiner
                 self.query = DBQuery(self.client, self.collections, **self.args)
                 if self.args.get('hull_cutoff') is not None:
@@ -72,32 +74,14 @@ class MatadorCommandLine:
 
                 self.cursor = self.refiner.cursor
 
-            if self.args['subcmd'] == 'pdffit':
-                self.query = DBQuery(self.client, self.collections, **self.args)
-                self.cursor = list(self.query.cursor)
-                if self.args.get('hull_cutoff') is not None:
-                    self.hull = QueryConvexHull(self.query, **self.args)
-                    self.cursor = self.hull.hull_cursor
-                    self.top = len(self.cursor)
-                if self.args.get('top') is not None:
-                    self.top = self.args.get('top')
-                if not self.cursor[:self.top]:
-                    print_notify('Performing PDF fit for ' + str(len(self.cursor[:self.top])) + ' structures.')
-                    from matador.plugins.pdffit.pdffit import PDFFitter
-                    self.pdffit = PDFFitter(self.cursor[:self.top], **self.args)
-                    try:
-                        self.pdffit.spawn()
-                    except (KeyboardInterrupt, RuntimeError, SystemExit) as oops:
-                        raise oops('Exiting top-level...')
-                else:
-                    raise SystemExit('No structure match query.')
-
-            if self.args['subcmd'] == 'hull' or self.args['subcmd'] == 'voltage':
-                self.query = DBQuery(self.client, self.collections, **self.args)
-                self.hull = QueryConvexHull(self.query, **self.args)
+            if self.subcommand == 'hull' or self.subcommand == 'voltage':
+                self.hull = QueryConvexHull(**self.args,
+                                            voltage=self.subcommand == 'voltage',
+                                            client=self.client,
+                                            collections=self.collections)
                 self.cursor = self.hull.hull_cursor
 
-            if self.args['subcmd'] == 'changes':
+            if self.subcommand == 'changes':
                 from matador.db import DatabaseChanges
                 if len(self.collections) != 1:
                     raise SystemExit('Cannot view changes of more than one collection at once.')
@@ -112,9 +96,9 @@ class MatadorCommandLine:
                                 changeset_ind=changeset,
                                 action=action,
                                 mongo_settings=self.settings,
-                                override=self.args.get('override'))
+                                override=kwargs.get('no_quickstart'))
 
-            if self.args['subcmd'] == 'hulldiff':
+            if self.subcommand == 'hulldiff':
                 from matador.hull.hull_diff import diff_hulls
                 if self.args.get('compare') is None:
                     raise SystemExit('Please specify which hulls to query with --compare.')
@@ -126,7 +110,7 @@ class MatadorCommandLine:
                     self.cursor = [doc for doc in self.cursor if len(doc['stoichiometry']) == self.args.get('write_n')]
                 if not self.cursor:
                     print_failure('No structures left to export.')
-                query2files(self.cursor, **self.args, argstr=self.argstr)
+                query2files(self.cursor, **self.args, argstr=self.argstr, subcmd=self.subcommand, hash_dupe=True)
 
             if self.args.get('view'):
                 from matador.utils.viz_utils import viz
@@ -150,7 +134,7 @@ class MatadorCommandLine:
                 for doc in self.cursor[:self.top]:
                     viz(doc)
 
-            if self.args.get('subcmd') != 'import':
+            if self.subcommand != 'import':
                 self.client.close()
 
         except (RuntimeError, SystemExit, KeyboardInterrupt) as oops:
@@ -175,9 +159,9 @@ class MatadorCommandLine:
     def stats(self):
         """ Print some useful stats about the database. """
         if self.args.get('list'):
-            print_notify(str(len(self.db.collection_names())) + ' collections found in database:\n')
+            print_notify(str(len(self.db.list_collection_names())) + ' collections found in database:\n')
             collstats_list = []
-            for name in self.db.collection_names():
+            for name in self.db.list_collection_names():
                 collstats_list.append(self.db.command('collstats', name))
                 collstats_list[-1]['name'] = name
             collstats_list = sorted(collstats_list, key=lambda k: k['count'], reverse=True)
@@ -194,30 +178,31 @@ class MatadorCommandLine:
                 raise SystemExit('I will only delete one collection at a time...')
             if target is None:
                 raise SystemExit('Please specify a collection to delete.')
-            elif target not in self.db.collection_names():
+            if target not in self.db.list_collection_names():
                 raise SystemExit('No collection named {} was found'.format(target))
+
+            from getpass import getuser
+            user = getuser()
+            if user not in target:
+                raise SystemExit('I cannot delete a collection that\'s name does not start with '
+                                 'your username, {}'.format(user))
+            stats = self.db.command('collstats', target)
+
+            if self.args.get('no_quickstart'):
+                answer = 'y'
             else:
-                from getpass import getuser
-                user = getuser()
-                if user not in target:
-                    raise SystemExit('I cannot delete a collection that\'s name does not start with '
-                                     'your username, {}'.format(user))
-                stats = self.db.command('collstats', target)
-                if self.args.get('override'):
-                    answer = 'y'
-                else:
-                    answer = input('Are you sure you want to delete collection {} containing {} '
-                                   'structures? [y/n]\n'.format(target, stats['count']))
-                if answer.lower() == 'y':
-                    if target == 'repo':
-                        raise SystemExit('I\'m sorry Dave, I\'m afraid I can\'t do that...')
-                    else:
-                        print('Deleting collection {}...'.format(target))
-                        self.db[target].drop()
-                        print('and its changelog...')
-                        self.db['__changelog_{}'.format(target)].drop()
-                else:
-                    raise SystemExit('Nevermind then!')
+                answer = input('Are you sure you want to delete collection {} containing {} '
+                               'structures? [y/n]\n'.format(target, stats['count']))
+            if answer.lower() == 'y':
+                if target == 'repo':
+                    raise SystemExit('I\'m sorry Dave, I\'m afraid I can\'t do that...')
+                print('Deleting collection {}...'.format(target))
+                self.db[target].drop()
+                print('and its changelog...')
+                self.db['__changelog_{}'.format(target)].drop()
+            else:
+                raise SystemExit('Nevermind then!')
+
         else:
             comp_list = dict()
             stats_dict = dict()
@@ -232,13 +217,12 @@ class MatadorCommandLine:
                 stats_dict['storageSize'] += db_stats_dict['storageSize']
                 stats_dict['totalIndexSize'] += db_stats_dict['totalIndexSize']
             print(("The collection(s) queried in {} contain {} structures at {:.1f} kB each "
-                   "totalling {} when padding and indices are included.")
+                   "totalling {:.1f} MB with a further {:.1f} MB of indexes.")
                   .format(self.db.name,
                           stats_dict['count'],
-                          stats_dict['avgObjSize'] /
-                          (1024 * len(self.collections)),
-                          (stats_dict['totalIndexSize'] + stats_dict['storageSize']) /
-                          (1024**2)))
+                          stats_dict['avgObjSize'] / (1024),
+                          stats_dict['storageSize'] / (1024**2),
+                          stats_dict['totalIndexSize'] / (1024**2)))
             for collname in self.collections:
                 cursor = self.collections[collname].find()
                 for doc in cursor:
@@ -269,7 +253,9 @@ class MatadorCommandLine:
                 from ascii_graph import Pyasciigraph
                 from ascii_graph.colors import Gre, Blu, Red
                 from ascii_graph.colordata import hcolor
-
+            except ImportError:
+                print("ascii_graph dependency not found, not creating histogram.")
+            else:
                 graph = Pyasciigraph(line_length=80, multivalue=False)
                 thresholds = {int(stats_dict['count'] / 40): Gre,
                               int(stats_dict['count'] / 10): Blu,
@@ -279,20 +265,18 @@ class MatadorCommandLine:
                     print(line)
                 print('\n')
 
-            except ImportError:
                 for comp in comp_list:
                     print(comp)
 
 
-def main(override=False):
+def main(no_quickstart=False):
     """ Parse all user args and construct a MatadorCommandLine object.
 
     Keyword arguments:
-        override: override all stdin with sensible defaults.
+        no_quickstart: no_quickstart all stdin with sensible defaults.
 
     """
     import argparse
-    import os
     from sys import argv
     from matador import __version__
 
@@ -303,13 +287,13 @@ def main(override=False):
         .format(__version__.strip()))
     parser.add_argument('--version', action='version', version='matador version ' + __version__ + '.')
 
-    # define subparsers for subcommands
-    subparsers = parser.add_subparsers(title='subcommands', description='valid sub-commands', dest='subcmd')
+    # define subparsers for self.subcommands
+    subparsers = parser.add_subparsers(title='self.subcommands', description='valid sub-commands', dest='subcmd')
 
     # define parent parser for global arguments
     global_flags = argparse.ArgumentParser(add_help=False)
 
-    # common arguments to all subcommands
+    # common arguments to all self.subcommands
     global_flags.add_argument('--db', nargs='+', help='choose which collection to query')
     global_flags.add_argument('--debug', action='store_true', help='enable debug printing throughout code.')
     global_flags.add_argument('-conf', '--config', type=str,
@@ -368,6 +352,10 @@ def main(override=False):
                                  help='specify the min. and optionally max. planewave cutoff.')
     structure_flags.add_argument('-geom', '--geom_force_tol', type=float, nargs='+',
                                  help='force tolerance in eV/Å to query for calc matches.')
+    structure_flags.add_argument('-grid', '--grid_scale', type=float, nargs='+',
+                                 help='grid scale to query for calc matches.')
+    structure_flags.add_argument('-finegrid', '--fine_grid_scale', type=float, nargs='+',
+                                 help='fine grid scale to query for calc matches.')
     structure_flags.add_argument('--sedc', type=str, help='specify the dispersion correction scheme, e.g. TS or null.')
     structure_flags.add_argument('-xc', '--xc_functional', type=str,
                                  help='specify an xc-functional to query (case-insensitive).')
@@ -416,11 +404,13 @@ def main(override=False):
     import_flags = argparse.ArgumentParser(add_help=False)
     import_flags.add_argument('-d', '--dryrun', action='store_true',
                               help='run the importer without connecting to the database')
-    import_flags.add_argument('-v', '--verbosity', action='count', help='enable verbose output')
+    import_flags.add_argument('-v', '--verbosity', type=int, help='enable verbose output', default=0)
     import_flags.add_argument('-f', '--force', action='store_true', help='override main database protection')
     import_flags.add_argument('-t', '--tags', nargs='+', type=str, help='set user tags, e.g. nanotube, project name')
+    import_flags.add_argument('--recent_only', action='store_true', help='sort files by creation date (st_ctime) and '
+                              'stop importing after a duplicate is found in the database.')
     import_flags.add_argument('-s', '--scan', action='store_true',
-                              help='only scan the database for new structures, do not dictify')
+                              help='only scan the database for new structures, do not import new structures')
     import_flags.add_argument('-p', '--prototype', action='store_true',
                               help='create a database of prototype structures that contain no DFT calculations')
 
@@ -447,9 +437,11 @@ def main(override=False):
     query_flags.add_argument('-d', '--details', action='store_true',
                              help='show as much detail about calculation as possible')
     query_flags.add_argument('-pa', '--per_atom', action='store_true', help='show quantities per atom not per fu.')
+    query_flags.add_argument('-ef', '--eform', action='store_true', help='print formation energy not hull distance.')
     query_flags.add_argument('-dt', '--time', type=int, help='query only structures added before this time in days')
     query_flags.add_argument('-avail', '--available_values', type=str, help='list all values of field in query results')
-    query_flags.add_argument('--use_source', action='store_true', help='show the source rather than database ID')
+    query_flags.add_argument('--use_source', default=False, action='store_true',
+                             help='show the source rather than database ID')
     query_flags.add_argument('--since', action='store_true',
                              help='query only structures added after time specified by --time in days')
     query_flags.add_argument('--source', action='store_true',
@@ -484,18 +476,11 @@ def main(override=False):
                                  'e.g. `--compare 1y2m5d3h` will compare the present hull with that of 1 year, 2 '
                                  'months, 5 days and 3 hours ago, and `--compare 3d 2d` will compare three days ago '
                                  'to two days ago.')
-    pdffit_flags = argparse.ArgumentParser(add_help=False)
-    pdffit_flags.add_argument('-file', '--file', type=str, help='experimental input file to fit structures to.')
-    pdffit_flags.add_argument('-min', '--xmin', type=float,
-                              help='minimum value to compute the PDF (DEFAULT: 1 Angstrom)')
-    pdffit_flags.add_argument('-max', '--xmax', type=float,
-                              help='maximum value to compute the PDF (DEFAULT: 50 Angstrom')
-    pdffit_flags.add_argument('-dx', '--dx', type=float, help='spacing to compute PDF at')
-    pdffit_flags.add_argument('-2', '--two_phase', type=float, help='fit two phases to experimental PDF')
-    pdffit_flags.add_argument('-np', '--num_processes', type=int, help='number of concurrent fits to perform.')
 
     refine_flags = argparse.ArgumentParser(add_help=False)
-    refine_flags.add_argument('-task', '--task', type=str, help='refine subtask to perform: options are spg or sub')
+    refine_flags.add_argument('-task', '--task', type=str,
+                              help=('refine subtask to perform: options are spg, elem_set, tag, doi, source, '
+                                    'pspot or raw or sub'))
     refine_flags.add_argument('-mode', '--mode', type=str,
                               help='mode of refinement: options are display, set and overwrite')
     refine_flags.add_argument('-symprec', '--symprec', type=float, help='spglib symmetry precision for refinement')
@@ -520,12 +505,6 @@ def main(override=False):
     subparsers.add_parser('import',
                           help='import new structures in folder into database',
                           parents=[global_flags, import_flags])
-
-    # matador pdffit
-    subparsers.add_parser('pdffit',
-                          help='provide experimental .gr file and fit to calculated PDF of structures in query',
-                          parents=[global_flags, query_flags, material_flags,
-                                   structure_flags, pdffit_flags])
 
     # matador hull
     subparsers.add_parser('hull',
@@ -575,11 +554,6 @@ def main(override=False):
         raise SystemExit('--field requires --filter.')
     if vars_args.get('subcmd') == 'hull' and vars_args.get('composition') is None:
         raise SystemExit('hull requires --composition')
-    if vars_args.get('subcmd') == 'pdffit':
-        if vars_args.get('file') is None:
-            raise SystemExit('pdffit requires specified --file, exiting...')
-        if not os.path.isfile(vars_args.get('file')):
-            raise SystemExit('specified --file does not exist, exiting...')
     if vars_args.get('calc_match') and vars_args.get('id') is None:
         raise SystemExit('calc_match requires specification of a text_id with -i, exiting...')
     if vars_args.get('profile'):
@@ -589,7 +563,7 @@ def main(override=False):
         profiler = cProfile.Profile()
         profiler.enable()
 
-    MatadorCommandLine(parsed_args, argstr=argv[1:], override=override)
+    MatadorCommandLine(parsed_args, argstr=argv[1:], no_quickstart=no_quickstart)
 
     if vars_args.get('profile'):
         profiler.disable()

@@ -79,10 +79,10 @@ class DatabaseChanges:
                                                                   allow_changelog=False,
                                                                   override=override)
                 collection_to_delete_from = [collections[key] for key in collections][0]
-                result = collection_to_delete_from.remove({'_id': {'$in': self.change['id_list']}})
-                print('Deleted {}/{} successfully.'.format(result['n'], self.change['count']))
+                result = collection_to_delete_from.delete_many({'_id': {'$in': self.change['id_list']}})
+                print('Deleted {}/{} successfully.'.format(result.deleted_count, self.change['count']))
                 print('Tidying up changelog database...')
-                self.repo.remove({'_id': self.change['_id']})
+                self.repo.delete_one({'_id': self.change['_id']})
                 if not self.repo.find_one():
                     print('No structures left remaining, deleting database...')
                     collection_to_delete_from.drop()

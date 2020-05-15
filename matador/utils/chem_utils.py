@@ -8,26 +8,16 @@ constants, with a focus on battery materials.
 
 
 import copy
+import warnings
+
 import numpy as np
-from scipy.constants import physical_constants
+from matador.data.constants import * # noqa
 
-FARADAY_CONSTANT_Cpermol = physical_constants['Faraday constant'][0]
-HARTREE_TO_EV = physical_constants['Hartree energy in eV'][0]
-Cperg_to_mAhperg = 2.778e-1
-C_TO_mAh = Cperg_to_mAhperg
-BOHR_TO_ANGSTROM = physical_constants['Bohr radius'][0] * 1e10
-RY_TO_EV = physical_constants['Rydberg constant times hc in eV'][0]
-KBAR_TO_GPA = 0.1
-eV_PER_ANGSTROM_CUBED_TO_GPa = 160.21776
-AVOGADROS_NUMBER = physical_constants['Avogadro constant'][0]
-ANGSTROM_CUBED_TO_CENTIMETRE_CUBED = 1e-24
-ELECTRON_CHARGE = physical_constants['elementary charge'][0]
-KELVIN_TO_EV = physical_constants['kelvin-electron volt relationship'][0]
-
-EPS = 1e-12
+EPS = 1e-8
 
 
 def get_iupac_ordering():
+    """ Stub for implementing IUPAC chemical ordering in formulae. """
     raise NotImplementedError
 
 
@@ -185,7 +175,7 @@ def get_binary_volumetric_capacity(initial_doc, final_doc):
 
     num_ions_per_initial_fu = num_ion / num_B
     volume_per_fu_cm3 = initial_doc['cell_volume'] * ANGSTROM_CUBED_TO_CENTIMETRE_CUBED / initial_doc['num_fu']
-    return ((num_ions_per_initial_fu / volume_per_fu_cm3) * (ELECTRON_CHARGE * Cperg_to_mAhperg))
+    return (num_ions_per_initial_fu / volume_per_fu_cm3) * (ELECTRON_CHARGE * Cperg_to_mAhperg)
 
 
 def get_atoms_per_fu(doc):
@@ -195,32 +185,45 @@ def get_atoms_per_fu(doc):
         doc (list/dict): structure to evaluate OR matador-style stoichiometry.
 
     """
-    if isinstance(doc, dict):
+    if 'stoichiometry' in doc:
         return sum([elem[1] for elem in doc['stoichiometry']])
-    else:
-        return sum([elem[1] for elem in doc])
+    return sum([elem[1] for elem in doc])
 
 
-def get_formation_energy(chempots, doc, energy_key='enthalpy_per_atom', temperature=None):
+def get_formation_energy(chempots, doc, energy_key='enthalpy_per_atom'):
     """ From given chemical potentials, calculate the simplest
     formation energy per atom of the desired document.
 
+    Note:
+        recursive_get(doc, energy_key) MUST return an energy per atom for
+        the target doc and the chemical potentials.
+
     Parameters:
-        chempots (list of dict): list of chempot structures.
+        chempots (list of dict): list of chempot structures, must be unique.
         doc (dict): structure to evaluate.
 
     Keyword arguments:
-        energy_key (str): name of energy field to use to calculate formation energy.
-        temperature (float): if not None, use doc[energy_key][temperature] to calculate formation energy.
+        energy_key (str or list): name of energy field to use to calculate
+            formation energy. Can use a list of keys/subkeys/indices to
+            query nested dicts with `matador.utils.cursor_utils.recursive_get`.
 
     Returns:
         float: formation energy per atom.
 
     """
-    if temperature is not None:
-        formation = doc[energy_key][temperature]
-    else:
-        formation = doc[energy_key]
+    from matador.utils.cursor_utils import recursive_get
+
+    # warn user if per_atom energy is not found
+    if isinstance(energy_key, (list, tuple)) and not any(['per_atom' in str(key) for key in energy_key]) \
+            or (isinstance(energy_key, str) and 'per_atom' not in energy_key):
+        warnings.warn('Requested energy key {} in get_formation_energy may'
+                      ' not be per atom, if so results will be incorrect.'.format(energy_key))
+
+    try:
+        formation = recursive_get(doc, energy_key)
+    except KeyError as exc:
+        print('Doc {} missing key {}'.format(doc['source'], energy_key))
+        raise exc
 
     # see if num chempots has been set and try to reuse it
     if 'num_chempots' in doc:
@@ -231,22 +234,31 @@ def get_formation_energy(chempots, doc, energy_key='enthalpy_per_atom', temperat
     num_atoms_per_fu = get_atoms_per_fu(doc)
     for ind, mu in enumerate(chempots):
         num_atoms_per_mu = get_atoms_per_fu(mu)
-        if temperature is not None:
-            formation -= mu[energy_key][temperature] * num_chempots[ind] * num_atoms_per_mu / num_atoms_per_fu
-        else:
-            formation -= mu[energy_key] * num_chempots[ind] * num_atoms_per_mu / num_atoms_per_fu
+        try:
+            mu_energy = recursive_get(mu, energy_key)
+        except KeyError as exc:
+            raise exc('Chemical potential {} missing key {}'.format(mu['source'], energy_key))
+
+        formation -= mu_energy * num_chempots[ind] * num_atoms_per_mu / num_atoms_per_fu
+
     return formation
 
 
-def get_number_of_chempots(stoich, chempot_stoichs):
+def get_number_of_chempots(stoich, chempot_stoichs, precision=5):
     """ Return the required number of each (arbitrary) chemical potentials
-    to construct one formula unit of the input stoichiometry.
+    to construct one formula unit of the input stoichiometry. Uses least-squares
+    as implemented by `numpy.linalg.lstsq` and rounds the output precision based
+    on the `precision` kwarg.
 
     Parameters:
         stoich (list/dict): matador-style stoichiometry,
             e.g. [['Li', 3], ['P', 1]], or the full document.
         chempot_stoichs (list/dict): list of stoichiometries of the input
             chemical potentials, or the full documents.
+
+    Keyword arguments:
+        precision (int/None): number of decimal places to round answer to. None
+            maintains the precision from `numpy.linalg.lstsq`.
 
     Returns:
         list: number of each chemical potential required to create
@@ -257,22 +269,25 @@ def get_number_of_chempots(stoich, chempot_stoichs):
             with the given chemical potentials.
 
     """
-    import scipy.linalg
 
-    if isinstance(stoich, dict):
+    # need to support dict, list and Crystal inputs
+    try:
         stoich = stoich['stoichiometry']
-    if isinstance(chempot_stoichs[0], dict):
+    except (TypeError, ValueError):
+        pass
+    try:
         chempot_stoichs = [mu['stoichiometry'] for mu in chempot_stoichs]
+    except (TypeError, ValueError):
+        pass
 
     # find all elements present in the chemical potentials
     elements = set()
     for mu in chempot_stoichs:
-        for elem, num in mu:
+        for elem, _ in mu:
             elements.add(elem)
     elements = sorted(list(elements))
 
     chempot_matrix = np.asarray([get_padded_composition(mu, elements) for mu in chempot_stoichs])
-    num_extraneous_equations = max(np.shape(chempot_matrix)) - min(np.shape(chempot_matrix))
 
     try:
         solution = np.asarray(get_padded_composition(stoich, elements))
@@ -280,16 +295,28 @@ def get_number_of_chempots(stoich, chempot_stoichs):
         raise RuntimeError('Stoichiometry {} could not be created from chemical potentials {}: missing chempot'
                            .format(stoich, chempot_stoichs))
 
-    if num_extraneous_equations == 0:
-        num_chempots = scipy.linalg.solve(chempot_matrix.T, solution)
-    else:
-        num_chempots = scipy.linalg.solve(chempot_matrix[:, :-num_extraneous_equations].T, solution[:-num_extraneous_equations])
-        # check equations are consistent
-        for i in range(1, num_extraneous_equations+1):
-            verify = sum(num_chempots * chempot_matrix[:, -i])
-            if np.abs(verify - solution[-i]) > EPS:
-                raise RuntimeError('Stoichiometry {} could not be created from chemical potentials {}: stoichiometry inconsistent with chempots'
-                                   .format(stoich, chempot_stoichs))
+    try:
+        num_chempots, residuals, _, _ = np.linalg.lstsq(chempot_matrix.T, solution, rcond=None)
+    except np.linalg.LinAlgError:
+        raise RuntimeError('Stoichiometry {} could not be created from chemical potentials {}: numpy LinAlg error'
+                           .format(stoich, chempot_stoichs))
+
+    # check if lstsq actually found a "solution"
+    if np.abs(np.sum(residuals)) > EPS:
+        raise RuntimeError('Stoichiometry {} could not be created from chemical potentials {}'
+                           .format(stoich, chempot_stoichs))
+
+    # round output array based on user-specified precision
+    if precision is not None:
+        num_chempots[np.where(np.abs(num_chempots) < EPS)] = 0.0
+        for i, val in enumerate(num_chempots):
+            if np.abs(val - round(val, precision)) < EPS:
+                num_chempots[i] = round(val, precision)
+
+    # check for sensible numbers in output
+    if np.min(np.sign(num_chempots)) == -1:
+        raise RuntimeError('Stoichiometry {} could not be created from chemical potentials {}'
+                           .format(stoich, chempot_stoichs))
 
     return num_chempots.tolist()
 
@@ -417,8 +444,8 @@ def get_stoich_from_formula(formula: str, sort=True):
     stoich = [[elements[ind], fraction[ind]] for ind, _ in enumerate(elements)]
     if sort:
         return sorted(stoich)
-    else:
-        return stoich
+
+    return stoich
 
 
 def parse_element_string(elements_str, stoich=False):
@@ -538,16 +565,20 @@ def get_root_source(source):
             'KP_specific_structure.res'] then root = 'KP_specific_structure'.
 
     """
-    if isinstance(source, dict):
+    try:
         sources = copy.deepcopy(source['source'])
-    else:
+    except (KeyError, TypeError):
         sources = copy.deepcopy(source)
+
     src_list = set()
     for src in sources:
-        if src.endswith('.res') or src.endswith('.castep') or src.endswith('.history') or src.endswith('.history.gz'):
+        if any([src.endswith(ext) for ext in
+               ['.res', '.castep', '.history', '.history.gz', '.phonon', '.phonon_dos', '.bands']]):
             src_list.add('.'.join(src.split('/')[-1].split('.')[0:-1]))
         elif 'OQMD' in src.upper():
-            src_list.add('_'.join(src.split()))
+            src_list.add(src)
+        elif 'MP-' in src.upper():
+            src_list.add(src)
         elif len(sources) == 1:
             src_list.add(src)
         elif src == 'command_line':

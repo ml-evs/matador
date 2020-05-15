@@ -1,15 +1,37 @@
 # coding: utf-8
 # Distributed under the terms of the MIT License.
 
-""" This submodule implements some useful auxiliary routines
-for use in the other plotting functions.
+""" This submodule implements some useful auxiliary routines for use in
+the other plotting functions, and some generic routines for plotting
+simple (x, y) line data (e.g. pair distribution functions), or lists of
+(x, y) data against some third parameter (e.g. powder x-ray spectrum vs
+voltage).
 
 """
+
+SAVE_EXTS = ['pdf', 'png', 'svg']
+MATADOR_STYLE = '/'.join(__file__.split('/')[:-1]) + '/../config/matador.mplstyle'
+
+
+def set_style(style=None):
+    """ Set the matplotlib style for all future plots, manually. This
+    will conflict with the context manager used by the `plotting_function`
+    wrapper.
+
+    """
+    import matplotlib.pyplot as plt
+    if style is None or style == 'matador':
+        style = MATADOR_STYLE
+    if not isinstance(style, list):
+        style = [style]
+    # apply multiple compound styles, if present
+    for styles in style:
+        plt.style.use(styles)
 
 
 def plotting_function(function):
     """ Wrapper for plotting functions to safely fail on X-forwarding
-    errors.
+    errors and handle the plot style context manager.
     """
 
     from functools import wraps
@@ -19,38 +41,48 @@ def plotting_function(function):
     @wraps(function)
     def wrapped_plot_function(*args, **kwargs):
         """ Wrap and return the plotting function. """
-        from tkinter import TclError
-        result = None
-        # if we're going to be saving a figure, switch to Agg to avoid X-forwarding
         saving = False
+        result = None
 
+        # if we're going to be saving a figure, switch to Agg to avoid X-forwarding
         try:
             for arg in args:
                 if arg.savefig:
                     import matplotlib
-                    matplotlib.use('Agg')
+                    # don't warn as backend might have been set externally by e.g. Jupyter
+                    matplotlib.use('Agg', force=False)
                     saving = True
                     break
         except AttributeError:
             pass
         if not saving:
-            if any([kwargs.get('pdf'), kwargs.get('svg'), kwargs.get('png')]):
+            if any(kwargs.get(ext) for ext in SAVE_EXTS):
                 import matplotlib
-                matplotlib.use('Agg')
+                matplotlib.use('Agg', force=False)
                 saving = True
 
-        settings = load_custom_settings(kwargs.get('config_fname'), quiet=True, override=kwargs.get('override'))
+        settings = load_custom_settings(kwargs.get('config_fname'), quiet=True, no_quickstart=True)
         try:
-            import matplotlib.pyplot as plt
             style = settings.get('plotting', {}).get('default_style')
-            if style is None or style == 'matador':
-                style = '/'.join(__file__.split('/')[:-1]) + '/../config/matador.mplstyle'
-            plt.style.use(style)
-            if kwargs.get('debug'):
-                print('Using style {}'.format(style))
-                print(plt.rcParams)
+            if kwargs.get('style'):
+                style = kwargs['style']
+            if style is not None and not isinstance(style, list):
+                style = [style]
+            if style is None:
+                style = ['matador']
+            if 'matador' in style:
+                for ind, styles in enumerate(style):
+                    if styles == 'matador':
+                        style[ind] = MATADOR_STYLE
+
+            # now actually call the function
+            set_style(style)
             result = function(*args, **kwargs)
-        except TclError as exc:
+
+        except Exception as exc:
+            if 'TclError' not in type(exc).__name__:
+                raise exc
+
             print_failure('Caught exception: {}'.format(type(exc).__name__))
             print_warning('Error message was: {}'.format(exc))
             print_warning('This is probably an X-forwarding error')
@@ -101,3 +133,79 @@ def get_linear_cmap(colours, num_colours=100, list_only=False):
         return linear_cmap
 
     return LinearSegmentedColormap.from_list('linear_cmap', linear_cmap, N=num_colours)
+
+
+class XYvsZPlot:
+    """ This class wraps plotting (x, y) lines against a third
+    variable.
+
+    """
+    def __init__(self, xys, zs, y_scale=1.0, **kwargs):
+        """ Construct plot from data.
+
+        Parameters:
+            xys (:obj:`list` of :obj:`list` or numpy.ndarray): list or
+                array of data to be plotted. For N lines of M samples,
+                this can be provided as an (N, M, 2) or (2, M, N) array,
+                or corresponding list/sublist format.
+            zs (:obj:`list`): third parameter to plot lines against. The
+                y-values are rescaled relative to the maximum across all
+                lines so that no lines overlap (this can be overridden
+                using offset_factor keyword).
+
+        Keyword arguments:
+            y_scale (float): controls the scale factor between the
+                arbitrary y-scale and the z-scale.
+
+        """
+
+        import numpy as np
+
+        self.plot_kwargs = kwargs
+
+        _xys = np.asarray(xys)
+        shape = np.shape(_xys)
+        if shape[0] != 2 and shape[-1] != 2:
+            raise RuntimeError('Data of shape {} is not compatible with XYvsZPlot.'
+                               .format(shape))
+        if shape[0] == 2:
+            _xys = _xys.T
+
+        self._xs = _xys[:, :, 0]
+        self._ys = _xys[:, :, 1]
+        self._zs = np.asarray(zs).flatten()
+
+        if len(self._zs) != np.shape(self._xs)[0]:
+            raise RuntimeError('x/y and z data do not match in shape!')
+
+        self._y_scale = y_scale
+
+        self.plot(**self.plot_kwargs)
+
+    @property
+    def y_scale(self):
+        return self._y_scale
+
+    @y_scale.setter
+    def y_scale(self, value):
+        """ Reset the y_scale and replot. """
+        self._y_scale = value
+        self.plot(**self.plot_kwargs)
+
+    def get_plot(self):
+        return self.fig, self.ax
+
+    @plotting_function
+    def plot(self, *args, **kwargs):
+        """ Actually plot the data and optionally save it. """
+
+        import matplotlib.pyplot as plt
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        for i in range(len(self._xs)):
+            ax.plot(self._xs[i, :], self._y_scale * self._ys[i, :] + self._zs[i])
+
+        self.fig = fig
+        self.ax = ax
+        plt.show()

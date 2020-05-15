@@ -1,0 +1,9 @@
+kpoint_mp_grid: 1 1 1
+spectral_kpoint_mp_spacing: 0.1
+spectral_kpoint_path_spacing: 0.1
+
+%block species_pot
+Si Si_00.usp
+%endblock species_pot
+
+symmetry_generate

@@ -1,0 +1,16 @@
+task             : phonon 
+phonon_method    : finitedisplacement
+phonon_fine_method : supercell 
+cut_off_energy   : 300 eV
+spin_polarized: false
+xc_functional    : PBE 
+fix_occupancy    : false
+max_scf_cycles   : 50
+finite_basis_corr : 0
+grid_scale       : 2
+opt_strategy     : speed
+num_dump_cycles  : 0
+nextra_bands     : 6
+popn_write : none 
+write_checkpoint: all
+write_bib : false

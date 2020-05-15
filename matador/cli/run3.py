@@ -6,10 +6,10 @@ such that there are no clashes.
 """
 import os
 import argparse
-from traceback import print_exc
 from matador import __version__
 from matador.utils.print_utils import print_notify
-from matador.compute import BatchRun, InputError
+from matador.utils.errors import InputError
+from matador.compute import BatchRun
 
 
 def main():
@@ -50,8 +50,13 @@ def main():
                         help='do not run geometry optimisation again after first success')
     parser.add_argument('--redirect', type=str,
                         help='filename to redirect output to, can use $seed macro')
+    parser.add_argument('--mode', type=str, default='castep',
+                        help='either castep or generic')
     parser.add_argument('--noise', action='store_true',
-                        help='add 0.1 A of random noise to positions on every cell, useful for converging forces (DEFAULT: off)')
+                        help=('add 0.1 A of random noise to positions on every cell, '
+                              'useful for converging forces (DEFAULT: off)'))
+    parser.add_argument('--squeeze', action='store_true',
+                        help='add external pressure to the rough steps of geom opts')
     parser.add_argument('--ignore_jobs_file', action='store_true',
                         help='whether to use the jobs.txt file to avoid clashes')
     parser.add_argument('-d', '--debug', action='store_true', default=False,
@@ -83,7 +88,8 @@ def main():
     parser.add_argument('--kpts_1D', action='store_true', default=False,
                         help='recalculate a 1D kpoint mesh of spacing specified in template cell')
     parser.add_argument('--spin', type=int, nargs='?', const=5, default=None,
-                        help='if not specified in .cell file, break spin symmetry on first atom using the spin specified by the user [DEFAULT: 5]')
+                        help=('if not specified in .cell file, break spin symmetry on first atom using the spin specified by '
+                              'the user [DEFAULT: 5]'))
     parser.add_argument('--rough', type=int, default=4,
                         help='choose how many <rough_iter> geometry optimizations \
                               to perform, decrease if lattice is nearly correct. [DEFAULT: 4].')

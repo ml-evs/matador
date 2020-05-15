@@ -16,7 +16,6 @@ figure.titlesize              : large
 legend.fontsize               : small
 text.color                    : .15
 text.usetex                   : False 
-text.latex.unicode            : False
 text.latex.preamble           : \usepackage{sfmath}\usepackage{helvet}\usepackage{amsmath}
 text.latex.preview            : False
 text.hinting                  : auto
@@ -46,7 +45,6 @@ figure.frameon                : True
 figure.autolayout             : False
 savefig.facecolor             : w
 savefig.edgecolor             : w
-savefig.frameon               : True
 savefig.dpi                   : 400
 savefig.bbox                  : tight
 savefig.pad_inches            : 0.1
@@ -68,18 +66,6 @@ axes.spines.top               : True
 axes.grid                     : False 
 axes.grid.which               : major
 axes.grid.axis                : both
-
-legend.fancybox               : False
-legend.loc                    : best
-legend.numpoints              : 1
-legend.scatterpoints          : 1
-legend.markerscale            : 1.0
-legend.shadow                 : False
-legend.frameon                : True
-legend.framealpha             : 0.8
-legend.borderpad              : 0.4
-legend.facecolor              : inherit
-legend.edgecolor              : 0.8
 
 xtick.labelsize               : small
 ytick.labelsize               : small

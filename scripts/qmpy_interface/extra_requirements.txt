@@ -1,0 +1,4 @@
+qmpy
+pymongo
+tqdm
+numpy

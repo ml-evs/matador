@@ -1,0 +1,14 @@
+###########################################################
+#       OptaDOS example file -- AJ Morris 18/V/11
+###########################################################
+
+TASK              : pdispersion
+
+# Decompose into angular momentum channels
+# (also try species_ang, species, sites)
+PDISPERSION : angular
+PDOS: angular
+BROADENING : adaptive
+ADAPTIVE_SMEARING: 0.4
+DOS_SPACING: 0.1
+set_efermi_zero : true

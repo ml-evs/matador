@@ -2,7 +2,7 @@
 # Distributed under the terms of the MIT license.
 
 """ This file implements the BatchRun class for chaining
-FullRelaxer instances across several structures with
+ComputeTask instances across several structures with
 high-throughput.
 
 """
@@ -13,21 +13,26 @@ import multiprocessing as mp
 import os
 import glob
 import time
+import random
 from matador.utils.print_utils import print_failure, print_warning
-from matador.compute.queue import get_queue_env, get_queue_walltime, get_queue_manager
+from matador.compute.queueing import get_queue_manager
 from matador.scrapers.castep_scrapers import cell2dict, param2dict
-from matador.compute.compute import FullRelaxer
-from matador.compute.errors import InputError, CalculationError, MaxMemoryEstimateExceeded
+from matador.compute.compute import ComputeTask
+from matador.utils.errors import (
+    InputError, CalculationError,
+    MaxMemoryEstimateExceeded, NodeCollisionError
+)
 
 
 class BatchRun:
     """ A class that implements the running of multiple generic jobs on
     a series of files without collisions with other nodes using the
-    FullRelaxer class. Jobs that have started are listed in jobs.txt,
-    failed jobs are moved to bad_castep, completed jobs are moved to
-    completed and listed in finished_cleanly.txt.
+    ComputeTask class. Jobs that have been started are listed in
+    `jobs.txt`, failed jobs are moved to `bad_castep/`, completed jobs
+    are moved to `completed/`.
 
-    Based on run.pl, run2.pl and PyAIRSS class CastepRunner.
+    Interface initially inspired by on run.pl, run2.pl and PyAIRSS class
+    CastepRunner.
 
     """
 
@@ -52,9 +57,9 @@ class BatchRun:
             Exhaustive list found in argparse parser inside `matador/cli/run3.py`.
 
         """
-        # parse args, then co-opt them for passing directly into FullRelaxer
+        # parse args, then co-opt them for passing directly into ComputeTask
         prop_defaults = {'ncores': None, 'nprocesses': 1, 'nnodes': 1,
-                         'executable': 'castep', 'no_reopt': False,
+                         'executable': 'castep', 'no_reopt': False, 'mode': None,
                          'redirect': None, 'debug': False, 'custom_params': False,
                          'verbosity': 0, 'archer': False, 'slurm': False,
                          'intel': False, 'conv_cutoff': False, 'conv_kpt': False,
@@ -66,10 +71,11 @@ class BatchRun:
         self.args.update(prop_defaults)
         self.args.update(kwargs)
         self.debug = self.args.get('debug')
+
         self.seed = seed
         # if only one seed, check if it is a file, and if so treat
         # this run as a generic run, not a CASTEP cell/param run
-        if len(self.seed) == 1:
+        if len(self.seed) == 1 and isinstance(self.seed, list):
             if '*' in self.seed[0]:
                 self.seed = glob.glob(self.seed[0])
             elif not os.path.isfile(self.seed[0]):
@@ -78,11 +84,17 @@ class BatchRun:
         self.compute_dir = os.uname()[1]
         if self.args.get('scratch_prefix') not in [None, '.']:
             self.compute_dir = '{}/{}'.format(self.args['scratch_prefix'], self.compute_dir).replace('//', '/')
+        elif self.args.get('scratch_prefix') == '.':
+            self.compute_dir = None
 
-        if isinstance(self.seed, str):
-            self.mode = 'castep'
+        if self.args.get('mode') is not None:
+            self.mode = self.args.get('mode')
         else:
-            self.mode = 'generic'
+            if isinstance(self.seed, str):
+                self.mode = 'castep'
+            else:
+                self.mode = 'generic'
+        del self.args['mode']
 
         if self.args.get('no_reopt'):
             self.args['reopt'] = False
@@ -94,31 +106,18 @@ class BatchRun:
         del self.args['nprocesses']
         self.limit = self.args.get('limit')
         del self.args['limit']
+        self.maxmem = self.args.get('maxmem')
+        del self.args['maxmem']
+        self.max_walltime = self.args.get('max_walltime')
 
         # detect and scrape queue settings
-        self._queue_env = None
-        self._queue_walltime = None
-        self._queue_available_tasks = None
-        queue_mgr = get_queue_manager()
-        if queue_mgr is not None:
-            self._queue_env = get_queue_env(token=queue_mgr)
-            if queue_mgr == 'slurm':
-                self._queue_available_tasks = int(self._queue_env.get('SLURM_NTASKS', 0))
-            elif queue_mgr == 'pbs':
-                # PBS docs are unclear whether this is actually available
-                self._queue_available_tasks = int(self._queue_env.get('PBS_TASKNUM', 0))
-                self._queue_available_tasks = None
+        self.queue_mgr = get_queue_manager()
 
-            if self._queue_env is not None:
-                self._queue_walltime = get_queue_walltime(self._queue_env, queue_mgr)
-
-        # handle user-specified walltime and queue walltimes
-        if self.args.get('max_walltime') is not None:
-            self.max_walltime = self.args.get('max_walltime')
-        elif self._queue_walltime is not None:
-            self.max_walltime = self._queue_walltime
-        else:
-            self.max_walltime = None
+        if self.queue_mgr is not None:
+            if self.maxmem is None:
+                self.maxmem = self.queue_mgr.max_memory
+            if self.max_walltime is None:
+                self.max_walltime = self.queue_mgr.walltime
 
         self.start_time = None
         if self.max_walltime is not None:
@@ -127,16 +126,18 @@ class BatchRun:
         # assign number of cores
         self.all_cores = mp.cpu_count()
         if self.args.get('ncores') is None:
-            if self._queue_available_tasks is None:
+            if self.queue_mgr is None:
                 self.args['ncores'] = int(self.all_cores / self.nprocesses)
             else:
-                self.args['ncores'] = int(self._queue_available_tasks / self.nprocesses)
+                self.args['ncores'] = int(self.queue_mgr.ntasks / self.nprocesses)
 
         if self.args['nnodes'] < 1 or self.args['ncores'] < 1 or self.nprocesses < 1:
             raise InputError('Invalid number of cores, nodes or processes.')
         if self.all_cores < self.nprocesses:
-            raise InputError('Requesting more processes than available cores.')
+            raise InputError('Requesting more processes than available cores: {} vs {}'
+                             .format(self.all_cores, self.nprocesses))
 
+        # scrape input cell/param/other files
         if self.mode == 'castep':
             self.castep_setup()
         else:
@@ -173,18 +174,24 @@ class BatchRun:
         """ Spawn processes to perform calculations.
 
         Keyword arguments:
-            join (bool): whether or not to attach to FullRelaxer
+            join (bool): whether or not to attach to ComputeTask
                 process. Useful for testing.
 
         """
-        from random import sample
         procs = []
         error_queue = mp.Queue()
         for proc_id in range(self.nprocesses):
-            procs.append(mp.Process(target=self.perform_new_calculations,
-                                    args=(sample(self.file_lists['res'],
-                                                 len(self.file_lists['res']))
-                                          if self.mode == 'castep' else self.seed, error_queue, proc_id)))
+            procs.append(
+                mp.Process(
+                    target=self.perform_new_calculations,
+                    args=(
+                        random.sample(self.file_lists['res'],
+                                      len(self.file_lists['res'])),
+                        error_queue,
+                        proc_id
+                    )
+                )
+            )
         for proc in procs:
             proc.start()
             if join:
@@ -234,6 +241,17 @@ class BatchRun:
             res_list = [res_list]
         for res in res_list:
             try:
+                if not os.path.isfile(res):
+                    continue
+                # probe once then sleep for a random amount up to 5 seconds
+                # before checking again for a lock file, just to protect
+                # against collisions in large array jobs on slower parallel file systems
+                _ = os.path.isfile('{}.lock'.format(res))
+                time.sleep(2 * random.random())
+                # wait some additional time if this is a slurm array job
+                if self.queue_mgr is not None:
+                    extra_wait = self.queue_mgr.array_id % 10 if self.queue_mgr.array_id else 0
+                    time.sleep(extra_wait)
                 locked = os.path.isfile('{}.lock'.format(res))
                 if not self.args.get('ignore_jobs_file'):
                     listed = self._check_jobs_file(res)
@@ -246,13 +264,14 @@ class BatchRun:
                         error_queue.put((proc_id, job_count, res))
                         return
 
-                    # write lock file
-                    if not os.path.isfile('{}.lock'.format(res)):
-                        with open(res + '.lock', 'a') as job_file:
-                            pass
-                    else:
-                        print('Another node wrote this file when I wanted to, skipping...')
-                        continue
+                    # check 3 more times if a lock exists with random up to 1 second
+                    # waits each time
+                    for _ in range(3):
+                        time.sleep(random.random())
+                        if os.path.isfile('{}.lock'.format(res)):
+                            raise NodeCollisionError('Another node wrote this file when I wanted to, skipping...')
+                    with open(res + '.lock', 'a') as job_file:
+                        pass
 
                     # write to jobs file
                     with open(self.paths['jobs_fname'], 'a') as job_file:
@@ -260,11 +279,11 @@ class BatchRun:
 
                     # create full relaxer object for creation and running of job
                     job_count += 1
-                    relaxer = FullRelaxer(node=None, res=res,
+                    relaxer = ComputeTask(node=None, res=res,
                                           param_dict=self.param_dict,
                                           cell_dict=self.cell_dict,
                                           mode=self.mode, paths=self.paths, compute_dir=self.compute_dir,
-                                          timings=(self.max_walltime, self.start_time),
+                                          timings=(self.max_walltime, self.start_time), maxmem=self.maxmem,
                                           **self.args)
                     # if memory check failed, let other nodes have a go
                     if not relaxer.enough_memory:
@@ -287,14 +306,15 @@ class BatchRun:
                         with open(self.paths['failures_fname'], 'a') as job_file:
                             job_file.write(res + '\n')
 
-            # ignore individual calculation errors
-            except CalculationError as err:
-                continue
-
             # catch memory errors and reset so another node can try
-            except MaxMemoryEstimateExceeded as err:
+            except MaxMemoryEstimateExceeded:
                 reset_single_seed(res)
                 continue
+
+            # ignore any other individual calculation errors or node collisions that were caught here
+            except CalculationError:
+                continue
+
             # reset txt/lock for an input error, but throw it to prevent other calcs
             except InputError as err:
                 reset_single_seed(res)
@@ -304,7 +324,7 @@ class BatchRun:
             except RuntimeError as err:
                 error_queue.put((proc_id, err, res))
                 return
-            # finally catch any other generic error, normally caused by me
+            # finally catch any other generic error in e.g. the above code, normally caused by me
             except Exception as err:
                 error_queue.put((proc_id, err, res))
                 return
@@ -316,15 +336,19 @@ class BatchRun:
         self.cell_dict = None
         self.param_dict = None
 
+        # scan directory for files to run
+        self.file_lists = defaultdict(list)
+        self.file_lists['res'] = glob.glob('*.res')
+
     def castep_setup(self):
         """ Set up CASTEP jobs from res files, and $seed.cell/param. """
         # read cell/param files
         exts = ['cell', 'param']
         for ext in exts:
             if not os.path.isfile('{}.{}'.format(self.seed, ext)):
-                raise InputError('Failed to find {} file, {}.{}'.format(ext, self.seed, ext))
+                raise InputError('Failed to find {ext} file, {seed}.{ext}'.format(ext=ext, seed=self.seed))
         self.cell_dict, cell_success = cell2dict(self.seed + '.cell',
-                                                 db=False, lattice=False, positions=False)
+                                                 db=False, lattice=False, positions=True)
         if not cell_success:
             print(self.cell_dict)
             raise InputError('Failed to parse cell file')
@@ -335,10 +359,12 @@ class BatchRun:
 
         # scan directory for files to run
         self.file_lists = defaultdict(list)
-        self.file_lists['res'] = [file.name for file in os.scandir() if file.name.endswith('.res')]
-        if self.seed in (file.replace('.res', '') for file in self.file_lists['res']):
-            error = ("Found .res file with same name as seed: {}.res. This will wreak havoc on your calculations!".format(self.seed) +
-                     "Please rename either your seed.cell/seed.param files, or rename the offending .res")
+        self.file_lists['res'] = glob.glob('*.res')
+        if any(self.seed == file.replace('.res', '') for file in self.file_lists['res']):
+            error = ("Found .res file with same name as seed: {}.res. This will wreak havoc on your calculations!\n"
+                     .format(self.seed)
+                     + "Please rename either your seed.cell/seed.param files, or rename the offending {}.res"
+                     .format(self.seed))
             raise InputError(error)
 
         if not self.file_lists['res']:
@@ -348,15 +374,15 @@ class BatchRun:
             )
             raise InputError(error)
 
-        if (len(self.file_lists['res']) < self.nprocesses and
-                (not self.args.get('conv_cutoff') and not self.args.get('conv_kpt'))):
+        if (len(self.file_lists['res']) < self.nprocesses
+                and not any([self.args.get('conv_cutoff'), self.args.get('conv_kpt')])):
             raise InputError('Requested more processes than there are jobs to run!')
 
         # do some prelim checks of parameters
         if self.param_dict['task'].upper() in ['GEOMETRYOPTIMISATION', 'GEOMETRYOPTIMIZATION']:
             if 'geom_max_iter' not in self.param_dict:
                 raise InputError('geom_max_iter is unset, please fix this.')
-            elif int(self.param_dict['geom_max_iter']) <= 0:
+            if int(self.param_dict['geom_max_iter']) <= 0:
                 raise InputError('geom_max_iter is only {}!'.format(self.param_dict['geom_max_iter']))
 
         # parse convergence args and set them up
@@ -417,7 +443,6 @@ class BundledErrors(Exception):
     """ Raise this after collecting all exceptions from
     processes.
     """
-    pass
 
 
 def reset_job_folder(debug=False):
@@ -425,7 +450,7 @@ def reset_job_folder(debug=False):
     ready for job restart.
 
     Note:
-        This should be not called by a FullRelaxer instance, in case
+        This should be not called by a ComputeTask instance, in case
         other instances are running.
 
     Returns:
@@ -456,8 +481,7 @@ def reset_job_folder(debug=False):
                 if line in res_list:
                     print('Excluding {}'.format(line))
                     continue
-                else:
-                    f.write(line)
+                f.write(line)
             f.truncate()
             flines = f.readlines()
             if debug:
@@ -482,8 +506,7 @@ def reset_single_seed(seed):
                 line = line.strip()
                 if seed in line:
                     continue
-                else:
-                    f.write(line)
+                f.write(line)
             f.truncate()
             flines = f.readlines()
     if os.path.isfile(seed + '.lock'):

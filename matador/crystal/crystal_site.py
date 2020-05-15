@@ -7,14 +7,15 @@ atomic sites.
 """
 
 import numpy as np
-from matador.utils.cell_utils import cart2frac, frac2cart
+import copy
+from matador.utils.cell_utils import cart2frac, frac2cart, wrap_frac_coords
 
 
 class Site:
-    def __init__(self, species, position, lattice_cart,
+    def __init__(self, species: str, position: list, lattice_cart,
                  position_unit='fractional', **site_data):
 
-        self.lattice = lattice_cart
+        self.lattice = copy.deepcopy(lattice_cart)
         self.set_position(position, position_unit)
         self.species = species
         self.site_data = {}
@@ -27,20 +28,16 @@ class Site:
         self.site_data.update(site_data)
 
     def __str__(self):
-        site_str = '{species:<3} {pos[0]:4.4f} {pos[1]:4.4f} {pos[2]:4.4f}'.format(species=self.species, pos=self.coords)
+        site_str = '{species} {pos[0]:4.4f} {pos[1]:4.4f} {pos[2]:4.4f}'.format(species=self.species, pos=self.coords)
         for key in self.site_data:
             site_str += '\n{} = {}'.format(key, self.site_data[key])
         return site_str
 
-    def __getattr__(self, key):
-        if key in self.__dict__:
-            return self.key
-        if key in self.site_data:
-            return self.site_data[key]
-        if key == '__deepcopy__':
-            return self.__deepcopy__(memo)
-        else:
-            raise AttributeError
+    def __repr__(self):
+        site_str = '{species} {pos[0]:4.4f} {pos[1]:4.4f} {pos[2]:4.4f}'.format(species=self.species, pos=self.coords)
+        for key in self.site_data:
+            site_str += '\n{} = {}'.format(key, self.site_data[key])
+        return site_str
 
     def __deepcopy__(self, memo):
         from copy import deepcopy
@@ -49,14 +46,22 @@ class Site:
         return Site(species, position, lattice, position_unit='fractional', **site_data)
 
     def set_position(self, position, units):
+        if len(position) != 3 or not all(isinstance(p, (float, int)) for p in position):
+            raise RuntimeError('CrystalSite position has wrong shape: {}'.format(position))
         if '_coords' not in self.__dict__:
             self._coords = dict()
         if units == 'fractional':
-            self._coords['fractional'] = position
+            self._coords['fractional'] = wrap_frac_coords(
+                [float(pos) for pos in position],
+                remove=False
+            )
             self._coords['cartesian'] = frac2cart(self.lattice, self.coords)
         elif units == 'cartesian':
-            self._coords['cartesian'] = position
-            self._coords['fractional'] = cart2frac(self.lattice, self.coords(units='cartesian'))
+            self._coords['cartesian'] = [float(pos) for pos in position]
+            self._coords['fractional'] = wrap_frac_coords(
+                cart2frac(self.lattice, self.coords(units='cartesian')),
+                remove=False
+            )
         else:
             raise RuntimeError('Unit system {} not understood, expecting `fractional`/`cartesian`'.format(units))
 
@@ -93,4 +98,6 @@ class Site:
         return np.asarray(self.get_coords(units='cartesian')) - np.asarray(other_site.get_coords(units='cartesian'))
 
     def distance_between_sites(self, other_site):
-        return np.linalg.norm(self.displacement_between_sites(other_site))
+        return np.linalg.norm(
+            self.displacement_between_sites(other_site)
+        )

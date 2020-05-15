@@ -6,7 +6,7 @@
 Example 2: Spectral calculations with CASTEP and run3
 -----------------------------------------------------
 
-In this example, we will go from a crystal structure to a dispersion and DOS plot using run3, CASTEP and `OptaDOS <https://bitbucket.org/ajm255/optados>`_. For this use case, run3 uses the `SeeKPath library <https://github.com/giovannipizzi/seekpath>`_ to generate standardised band paths through reciprocal space to automatically compute a useful bandstructure for all crystal types.
+In this example, we will go from a crystal structure to a dispersion and DOS plot using run3, CASTEP and `OptaDOS <https://github.com/optados-developers/optados>`_. For this use case, run3 uses the `SeeK-path library <https://github.com/giovannipizzi/seekpath>`_ to generate standardised band paths through reciprocal space to automatically compute a useful bandstructure for all crystal types.
 
 Spectral calculations follow a similar setup to geometry optimisations: run3 expects to find a folder containing .res files with lattice/atomic position data, and one .cell and one .param file specifying the CASTEP options. Standard run3 rules apply: if a ``<seed>.res.lock`` file is found, or if the .res file is listed in ``jobs.txt``, the structure will be skipped. Such a folder can be found in ``examples/bandstructure+dos/simple`` which contains some LiCoO\ :sub:`2` polymorphs. The Jupyter
 notebook ``simple_spectral.ipynb`` will also show you exactly how to run a standard BS/DOS calculation and plot the results with the API. The files in ``examples/bandstructure+dos/projected`` will show you how to use matador and OptaDOS to get projected densities of states and bandstructures. Here, we shall run through some more simple cases first.
@@ -93,7 +93,7 @@ Again, simply running ``run3 LiCoO2`` will do the trick. Eventually, a .bands_do
 
 
 Example 2.3: Putting it all together
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 To run a DOS and bandstructure on the same structure, simply include both ``spectral_kpoints_mp_spacing`` and ``spectral_kpoints_path_spacing`` in your .cell file. Your ``spectral_task`` keyword in the param file will be ignored. This exact example can be found in ``examples/bandstructure+dos/simple``, with an example Jupyter notebook showing how to make plots with the API directly, rather than the dispersion script.
 
@@ -104,15 +104,15 @@ After calling run3 again, the ``completed/`` folder in this case should contain 
    :align: center
 
 Example 2.4: Using OptaDOS for post-processing: projected DOS and bandstructures
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The final piece of the puzzle is `OptaDOS <http://www.tcm.phy.cam.ac.uk/~ajm255/optados/>`_, a package for broadening and projecting densities of states (amongst other things) that comes with CASTEP. By default, run3 will turn on the required CASTEP settings (namely ``pdos_calculate_weights``) required by OptaDOS. In order for OptaDOS to be run automatically by run3, an extra .odi file must be added into our input deck, containing the details of the desired OptaDOS calculation.
+The final piece of the puzzle is `OptaDOS <https://github.com/optados-developers/optados>`_, a package for broadening and projecting densities of states (amongst other things) that comes with CASTEP. By default, run3 will turn on the required CASTEP settings (namely ``pdos_calculate_weights``) required by OptaDOS. In order for OptaDOS to be run automatically by run3, an extra .odi file must be added into our input deck, containing the details of the desired OptaDOS calculation.
 
 .. note::
    This example assumes that the OptaDOS binary is called ``optados`` and resides in your PATH, likewise ``orbitals2bands``.
 
 .. note::
-   The projected dispersion curve feature is quite new to OptaDOS and thus is temperamental. Depending on when you are reading this, it may require you to have compiled OptaDOS from the development branch on `BitBucket <http://bitbucket.org/ajm255/optados>`_.
+   The projected dispersion curve feature is quite new to OptaDOS and thus is temperamental. Depending on when you are reading this, it may require you to have compiled OptaDOS from the development branch on GitHub.
 
 run3 will try to perform three types of calculation: a simple DOS smearing, a projected density of states (with projectors specified by the ``pdos`` keyword), and a projected bandstructure (with projectors specified by the ``pdispersion`` keyword). If ``pdos``/``pdispersion`` is not found in the .odi, this corresponding task will be skipped. Likewise, if ``broadening`` is not found in the .odi, the standard DOS broadening will not be performed.::
 

@@ -30,7 +30,7 @@ def make_connection_to_collection(coll_names, check_collection=False, allow_chan
     """
 
     if mongo_settings is None:
-        settings = load_custom_settings(override=override)
+        settings = load_custom_settings(no_quickstart=override)
     else:
         settings = mongo_settings
 
@@ -47,7 +47,7 @@ def make_connection_to_collection(coll_names, check_collection=False, allow_chan
         connectTimeoutMS=10000)  # give up trying to connect to new database after 2 seconds
 
     try:
-        database_names = client.database_names()
+        database_names = client.list_database_names()
         if not quiet:
             print('Success!')
     except pm.errors.ServerSelectionTimeoutError as exc:
@@ -68,13 +68,17 @@ def make_connection_to_collection(coll_names, check_collection=False, allow_chan
             print('Creating database {}'.format(settings['mongo']['db']))
 
     db = client[settings['mongo']['db']]
-    possible_collections = [name for name in db.collection_names() if not name.startswith('__')]
+    possible_collections = [name for name in db.list_collection_names() if not name.startswith('__')]
     collections = dict()
     # allow lists of collections for backwards-compat, though normally
     # we only want to connect to one at a time
     if coll_names is not None:
         if not isinstance(coll_names, list):
             coll_names = [coll_names]
+
+        if len(coll_names) > 1:
+            raise NotImplementedError("Querying multiple collections is no longer supported.")
+
         for collection in coll_names:
 
             if not allow_changelog:
@@ -87,14 +91,14 @@ def make_connection_to_collection(coll_names, check_collection=False, allow_chan
                         client.close()
                         raise SystemExit('Collection {} not found!'.format(collection))
                     else:
-                        print('Collection not found, did you mean one of these?')
+                        print('Collection {} not found, did you mean one of these?'.format(collection))
                         for ind, value in enumerate(options[:10]):
                             print('({}):\t{}'.format(ind, value))
                         if check_collection:
                             try:
                                 choice = int(input('Please enter your choice: '))
                                 collection = options[choice]
-                            except:
+                            except Exception:
                                 raise SystemExit('Invalid choice. Exiting...')
                         elif import_mode:
                             if override:
@@ -106,7 +110,7 @@ def make_connection_to_collection(coll_names, check_collection=False, allow_chan
                                 try:
                                     choice = int(input('Then please enter your choice from above: '))
                                     collection = options[choice]
-                                except:
+                                except Exception:
                                     raise SystemExit('Invalid choice. Exiting...')
 
             collections[collection] = db[collection]

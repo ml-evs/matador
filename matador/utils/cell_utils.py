@@ -135,7 +135,8 @@ def wrap_frac_coords(positions, remove=False):
     """ Wrap the given fractional coordinates back into the cell.
 
     Parameters:
-        positions (list): list of fractional position vectors.
+        positions (list): list of fractional position vectors, or
+            a single position.
 
     Keyword arguments:
         remove (bool): if True, removes points exterior to the cell.
@@ -146,9 +147,13 @@ def wrap_frac_coords(positions, remove=False):
     """
     from copy import deepcopy
     wrapped = deepcopy(positions)
+    single = False
+    if len(wrapped) == 3 and isinstance(wrapped[0], float):
+        wrapped = [wrapped]
+        single = True
     if remove:
         to_remove = len(wrapped)*[False]
-    for ind, pos in enumerate(positions):
+    for ind, pos in enumerate(wrapped):
         for k in range(3):
             if pos[k] >= 1 or pos[k] < 0:
                 if remove:
@@ -158,6 +163,9 @@ def wrap_frac_coords(positions, remove=False):
                     wrapped[ind][k] %= 1
     if remove:
         wrapped = [wrapped[ind] for ind, res in enumerate(to_remove) if not res]
+    if single:
+        return wrapped[0]
+
     return wrapped
 
 
@@ -226,12 +234,11 @@ def real2recip(real_lat):
     """
     real_lat = np.asarray(real_lat)
     recip_lat = np.zeros((3, 3))
-    recip_lat[0] = (2*np.pi)*np.cross(real_lat[1], real_lat[2]) / \
-        (np.dot(real_lat[0], np.cross(real_lat[1], real_lat[2])))
-    recip_lat[1] = (2*np.pi)*np.cross(real_lat[2], real_lat[0]) / \
-        (np.dot(real_lat[1], np.cross(real_lat[2], real_lat[0])))
-    recip_lat[2] = (2*np.pi)*np.cross(real_lat[0], real_lat[1]) / \
-        (np.dot(real_lat[2], np.cross(real_lat[0], real_lat[1])))
+    volume = np.dot(real_lat[0], np.cross(real_lat[1], real_lat[2]))
+    recip_lat[0] = (2*np.pi)*np.cross(real_lat[1], real_lat[2])
+    recip_lat[1] = (2*np.pi)*np.cross(real_lat[2], real_lat[0])
+    recip_lat[2] = (2*np.pi)*np.cross(real_lat[0], real_lat[1])
+    recip_lat /= volume
     return recip_lat.tolist()
 
 
@@ -351,7 +358,9 @@ def calc_mp_spacing(real_lat, mp_grid, prec=3):
     return round(max_spacing + 0.5*10**exponent, prec)
 
 
-def get_seekpath_kpoint_path(doc, spacing=0.01, threshold=1e-7, debug=False):
+def get_seekpath_kpoint_path(
+    doc, standardize=True, explicit=True, spacing=0.01, threshold=1e-7, debug=False, symmetry_tol=None
+):
     """ Return the conventional kpoint path of the relevant crystal system
     according to the definitions by "HKPOT" in
     Comp. Mat. Sci. 128, 2017:
@@ -359,11 +368,12 @@ def get_seekpath_kpoint_path(doc, spacing=0.01, threshold=1e-7, debug=False):
     http://dx.doi.org/10.1016/j.commatsci.2016.10.015
 
     Parameters:
-        doc (dict): matador doc to find kpoint path for.
+        doc (dict/tuple): matador doc or spglib tuple to find kpoint path for.
 
     Keyword arguments:
         spacing (float): desired kpoint spacing
         threshold (float): internal seekpath threshold
+        symmetry_tol (float): spglib symmetry tolerance
 
     Returns:
         dict: standardized version of input doc
@@ -371,14 +381,34 @@ def get_seekpath_kpoint_path(doc, spacing=0.01, threshold=1e-7, debug=False):
         dict: full dictionary of all seekpath results
 
     """
-    from seekpath import get_explicit_k_path
-    spg_structure = doc2spg(doc)
-    seekpath_results = get_explicit_k_path(spg_structure,
-                                           reference_distance=spacing,
-                                           with_time_reversal=True,
-                                           threshold=threshold)
+    try:
+        from seekpath import get_explicit_k_path, get_path
+    except ImportError:
+        raise ImportError("SeeK-Path dependency missing, please install it with `pip install seekpath`.")
 
-    kpt_path = seekpath_results['explicit_kpoints_rel']
+    if symmetry_tol is None:
+        symmetry_tol = 1e-5
+
+    if isinstance(doc, tuple):
+        spg_structure = doc
+    else:
+        if standardize:
+            spg_structure = doc2spg(standardize_doc_cell(doc, symprec=symmetry_tol))
+        else:
+            spg_structure = doc2spg(doc)
+
+    if explicit:
+        seekpath_results = get_explicit_k_path(spg_structure,
+                                               reference_distance=spacing,
+                                               with_time_reversal=True,
+                                               symprec=symmetry_tol,
+                                               threshold=threshold)
+
+        kpt_path = seekpath_results['explicit_kpoints_rel']
+    else:
+        seekpath_results = get_path(spg_structure)
+        kpt_path = []
+
     primitive_doc = dict()
     primitive_doc['lattice_cart'] = seekpath_results['primitive_lattice']
     primitive_doc['positions_frac'] = seekpath_results['primitive_positions']
@@ -393,6 +423,11 @@ def get_seekpath_kpoint_path(doc, spacing=0.01, threshold=1e-7, debug=False):
         print('New lattice:\n', np.asarray(primitive_doc['lattice_cart']))
         print('Contains {} atoms'.format(primitive_doc['num_atoms']))
         print('k-point path contains {} points.'.format(len(kpt_path)))
+
+    if 'site_occupancy' in doc:
+        if min(doc['site_occupancy']) < 1 - EPS:
+            print('Ignoring any site occupancy found in this cell.')
+        primitive_doc['site_occupancy'] = [1 for atom in primitive_doc['atom_types']]
 
     return primitive_doc, kpt_path, seekpath_results
 
@@ -420,7 +455,43 @@ def doc2spg(doc):
     return cell
 
 
-def standardize_doc_cell(doc, primitive=True, symprec=1e-5):
+def get_space_group_label_latex(label):
+    """ Return the LaTeX format of the passed space group label. Takes
+    any string, leaves the first character upright, italicses the rest,
+    handles subscripts and bars over numbers.
+
+    Parameters:
+        label (str): a given space group in "standard" plain text format,
+        e.g. P-63m.
+
+    Returns:
+        str: the best attempt to convert the label to LaTeX.
+
+    """
+    latex_label = '$'
+    if not isinstance(label, str):
+        raise RuntimeError("Space group label must be a string, not {}".format(label))
+
+    skip = False
+    for ind, char in enumerate(label):
+        if skip:
+            skip = False
+            continue
+
+        if char == '-':
+            # add the next char inside the bar
+            latex_label += "\\bar{" + label[ind+1] + "}"
+            skip = True
+
+        else:
+            latex_label += char
+
+    latex_label += "$"
+
+    return latex_label
+
+
+def standardize_doc_cell(doc, primitive=True, symprec=1e-2):
     """ Return standardized cell data from matador doc.
 
     Parameters:
@@ -435,18 +506,26 @@ def standardize_doc_cell(doc, primitive=True, symprec=1e-5):
 
     """
     import spglib as spg
+    from matador.crystal import Crystal
     from matador.utils.chem_utils import get_atomic_symbol
     from copy import deepcopy
 
     spg_cell = doc2spg(doc)
     spg_standardized = spg.standardize_cell(spg_cell, to_primitive=primitive, symprec=symprec)
-    std_doc = deepcopy(doc)
+    if not isinstance(doc, Crystal):
+        std_doc = deepcopy(doc)
+    else:
+        std_doc = deepcopy(doc._data)
     std_doc['lattice_cart'] = [list(vec) for vec in spg_standardized[0]]
     std_doc['lattice_abc'] = cart2abc(std_doc['lattice_cart'])
     std_doc['positions_frac'] = [list(atom) for atom in spg_standardized[1]]
     std_doc['atom_types'] = [get_atomic_symbol(atom) for atom in spg_standardized[2]]
     std_doc['site_occupancy'] = len(std_doc['positions_frac']) * [1]
     std_doc['cell_volume'] = cart2volume(std_doc['lattice_cart'])
+    std_doc['space_group'] = get_spacegroup_spg(std_doc, symprec=symprec)
+    # if the original document was a crystal, return a new one
+    if isinstance(doc, Crystal):
+        std_doc = Crystal(std_doc)
 
     return std_doc
 
@@ -503,7 +582,8 @@ def add_noise(doc, amplitude=0.1):
 
 
 def calc_pairwise_distances_pbc(poscart, images, lattice, rmax,
-                                poscart_b=None, compress=False, debug=False):
+                                poscart_b=None, compress=False, debug=False,
+                                filter_zero=False, per_image=False):
     """ Calculate PBC distances with SciPy's cdist, given the
     image cell vectors.
 
@@ -521,10 +601,15 @@ def calc_pairwise_distances_pbc(poscart, images, lattice, rmax,
         debug (bool): print timing data and how many distances were masked.
         compress (bool): whether or not to compressed the output array,
             useful when e.g. creating PDFs but not when atom ID is important.
+        filter_zero (bool): whether or not to filter out the "self-interaction"
+            zero distances.
+        per_image (bool): return a list of distances per image, as opposed to
+            one large flat. This preserves atom IDs for use elsewhere.
 
     Returns:
         distances (numpy.ndarray): pairwise 2-D d_ij masked array with values
-            or stripped 1-D array containing just the distances.
+            or stripped 1-D array containing just the distances, or a list of
+            numpy arrays if per_image is True.
 
     """
     from scipy.spatial.distance import cdist
@@ -533,27 +618,38 @@ def calc_pairwise_distances_pbc(poscart, images, lattice, rmax,
         start = time.time()
     _lattice = np.asarray(lattice)
     _poscart = np.asarray(poscart)
+    image_distances = []
     if poscart_b is None:
         _poscart_b = _poscart
     else:
         _poscart_b = np.asarray(poscart_b)
 
-    distances = np.empty((len(_poscart)*len(images)*len(_poscart_b)))
     num_pairs = len(_poscart) * len(_poscart_b)
 
-    for image_ind, prod in enumerate(images):
-        distances[image_ind*num_pairs:(image_ind+1)*num_pairs] = cdist(_poscart, _poscart_b + prod @ _lattice).flatten()
+    if per_image:
+        for image_ind, prod in enumerate(images):
+            distances = cdist(_poscart, _poscart_b + prod @ _lattice)
+            distances = np.ma.masked_where(distances > rmax, distances, copy=False)
+            image_distances.append(distances)
 
-    # mask by rmax/0 and remove masked values
-    distances = np.ma.masked_where(distances > rmax, distances, copy=False)
-    distances = np.ma.masked_where(distances < EPS, distances, copy=False)
+        distances = image_distances
 
-    if debug:
-        print('Calculated: {}, Used: {}, Ignored: {}'.format(len(distances),
-                                                             np.ma.count(distances),
-                                                             np.ma.count_masked(distances)))
-    if compress:
-        distances = distances.compressed()
+    else:
+        array_size = (len(_poscart) * len(images) * len(_poscart_b))
+        distances = np.empty(array_size)
+        for image_ind, prod in enumerate(images):
+            distances[image_ind*num_pairs:(image_ind+1)*num_pairs] = cdist(_poscart, _poscart_b + prod @ _lattice).flatten()
+
+        distances = np.ma.masked_where(distances > rmax, distances, copy=False)
+        if filter_zero:
+            distances = np.ma.masked_where(distances < EPS, distances, copy=False)
+
+        if debug:
+            print('Calculated: {}, Used: {}, Ignored: {}'.format(len(distances),
+                                                                 np.ma.count(distances),
+                                                                 np.ma.count_masked(distances)))
+        if compress:
+            distances = distances.compressed()
 
     if debug:
         end = time.time()

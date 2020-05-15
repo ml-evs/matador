@@ -11,6 +11,16 @@ import os
 import numpy as np
 from matador.utils.viz_utils import get_element_colours
 from matador.plotting.plotting import plotting_function
+from matador.scrapers import optados2dict, phonon2dict, bands2dict, phonon_dos2dict
+from matador.scrapers import cell2dict, res2dict
+from matador.orm.spectral import (
+    ElectronicDispersion, ElectronicDOS,
+    VibrationalDispersion, VibrationalDOS,
+    Dispersion, DensityOfStates
+)
+from matador.utils.chem_utils import INVERSE_CM_TO_EV
+
+__all__ = ['plot_spectral']
 
 
 @plotting_function
@@ -37,21 +47,24 @@ def plot_spectral(seeds, **kwargs):
     Keyword Arguments:
         plot_bandstructure (bool): whether to plot bandstructure, if available
         plot_dos (bool): whether to plot density of states, if available
+        plot_pdos (bool): whether or not to plot projected DOS, if available
         plot_pdis (bool): whether to plot projected dispersion, if available
         dos (str): separate seed name for pDOS/DOS data
         phonons (bool): whether to plot phonon or electronic data
         labels (list): list of strings for legend labels for multiple bandstructures
         gap (bool): whether to draw on the band gap
         colour_by_seed (bool): plot with a separate colour per bandstructure
-        external_efermi (float): replace scraped Fermi energy with this value (eV)
+        external_efermi (float or list): replace scraped Fermi energy with this value (eV) (can be
+            specified per spin channel).
         highlight_bands (list): list of integer indices, colour the bands with these indices in red
         band_colour (str): if passed "occ", bands will be coloured using cmap depending on whether
             they lie above or below the Fermi level. If passed 'random', colour bands randomly from
             the cmap. Otherwise, override all colour options with matplotlib-interpretable colour
             (e.g. hexcode or html colour name) to use for all bands (DEFAULT: 'occ').
+        filename (str): filename for figure saving.
         cmap (str): matplotlib colourmap name to use for the bands
         n_colours (int): number of colours to use from cmap (DEFAULT: 4).
-        no_stacked_pdos (bool): whether to plot projected DOS as stack or overlapping.
+        unstacked_pdos (bool): whether to plot projected DOS as stack or overlapping.
         spin_only (str): either 'up' or 'down' to only plot one spin channel.
         preserve_kspace_distance (bool): whether to preserve distances in reciprocal space when
             linearising the kpoint path. If False, bandstructures of different lattice parameters
@@ -68,14 +81,14 @@ def plot_spectral(seeds, **kwargs):
     import matplotlib.pyplot as plt
     from cycler import cycler
     # set defaults and update class with desired values
-    prop_defaults = {'plot_bandstructure': True, 'plot_dos': True, 'plot_pdis': True,
+    prop_defaults = {'plot_bandstructure': True, 'plot_dos': True, 'plot_pdos': True, 'plot_pdis': True,
                      'phonons': False, 'gap': False,
                      'colour_by_seed': False, 'external_efermi': None,
                      'labels': None, 'cmap': None, 'band_colour': 'occ',
                      'n_colours': 4, 'spin_only': None, 'figsize': None,
-                     'pdis_interpolation_factor': 2, 'pdis_point_scale': 25,
-                     'no_stacked_pdos': False, 'preserve_kspace_distance': False,
-                     'band_reorder': None, 'title': None,
+                     'pdis_interpolation_factor': 2, 'pdis_point_scale': 25, 'filename': None,
+                     'unstacked_pdos': False, 'preserve_kspace_distance': False,
+                     'band_reorder': None, 'title': None, 'show': True,
                      'verbosity': 0, 'highlight_bands': None, 'pdos_hide_tot': True}
     for key in kwargs:
         if kwargs[key] is not None:
@@ -102,8 +115,10 @@ def plot_spectral(seeds, **kwargs):
         seeds = [seeds]
 
     if len(seeds) > 1:
-        raise DeprecationWarning('Multiple seeds is a pain to make look good, '
-                                 'if you want this feature, let me know.')
+        if kwargs['plot_pdis'] or kwargs['plot_dos']:
+            kwargs['plot_pdos'] = False
+            kwargs['plot_pdis'] = False
+            print('Disabling projections as mutiple seeds requested.')
 
     if kwargs.get('plot_window') is not None:
         if isinstance(kwargs.get('plot_window'), list):
@@ -115,10 +130,16 @@ def plot_spectral(seeds, **kwargs):
     else:
         kwargs['plot_window'] = None
 
-    if kwargs['plot_dos']:
-        # check an optados file exists
-        exts = ['pdos.dat', 'adaptive.dat', 'fixed.dat', 'linear.dat', 'jdos.dat', 'phonon_dos', 'bands_dos']
-        kwargs['plot_dos'] = any([any([os.path.isfile('{}.{}'.format(seed, ext)) for ext in exts]) for seed in seeds])
+    if all(isinstance(seed, str) for seed in seeds):
+
+        if kwargs['plot_dos']:
+            # check an optados file exists
+            exts = ['pdos.dat', 'adaptive.dat', 'fixed.dat', 'linear.dat', 'jdos.dat', 'phonon_dos', 'bands_dos']
+            kwargs['plot_dos'] = any([any([os.path.isfile('{}.{}'.format(seed, ext)) for ext in exts]) for seed in seeds])
+
+        if kwargs['plot_pdos']:
+            exts = ['pdos.dat', 'phonon_dos']
+            kwargs['plot_pdos'] = any([any([os.path.isfile('{}.{}'.format(seed, ext)) for ext in exts]) for seed in seeds])
 
     figsize = kwargs['figsize']
     if kwargs['plot_bandstructure'] and not kwargs['plot_dos']:
@@ -137,7 +158,7 @@ def plot_spectral(seeds, **kwargs):
         ax_grid[2].axis('off')
     elif not kwargs['plot_bandstructure'] and kwargs['plot_dos']:
         if figsize is None:
-            figsize = (6, 3)
+            figsize = (9, 4)
         fig, ax_dos = plt.subplots(1, figsize=figsize)
 
     kwargs['valence'] = kwargs['colours'][0]
@@ -149,17 +170,19 @@ def plot_spectral(seeds, **kwargs):
         kwargs['ls'] = ['-'] * len(seeds)
         kwargs['colour_by_seed'] = True
         if kwargs.get('labels') is None:
-            kwargs['labels'] = [seed.split('/')[-1].split('.')[0] for seed in seeds]
-    else:
-        kwargs['ls'] = []
-        kwargs['colour_by_seed'] = False
-        for i in range(len(seeds)):
-            if i % 3 == 0:
-                kwargs['ls'].append('-')
-            elif i % 3 == 1:
-                kwargs['ls'].append('--')
-            elif i % 3 == 2:
-                kwargs['ls'].append('-.')
+            try:
+                kwargs['labels'] = [seed.split('/')[-1].split('.')[0] for seed in seeds]
+            except AttributeError:
+                kwargs['labels'] = [seed.root_source for seed in seeds]
+
+    kwargs['ls'] = []
+    for i in range(len(seeds)):
+        if i % 3 == 0:
+            kwargs['ls'].append('-')
+        elif i % 3 == 1:
+            kwargs['ls'].append('--')
+        elif i % 3 == 2:
+            kwargs['ls'].append('-.')
 
     bbox_extra_artists = []
     if kwargs['plot_bandstructure']:
@@ -174,7 +197,9 @@ def plot_spectral(seeds, **kwargs):
     if any([kwargs.get('pdf'), kwargs.get('svg'), kwargs.get('png')]):
         if not bbox_extra_artists:
             bbox_extra_artists = None
-        filename = seeds[0].split('/')[-1].replace('.bands', '').replace('.phonon', '') + '_spectral'
+        filename = kwargs.get('filename')
+        if filename is None:
+            filename = seeds[0].split('/')[-1].replace('.bands', '').replace('.phonon', '') + '_spectral'
         if kwargs.get('pdf'):
             plt.savefig('{}.pdf'.format(filename),
                         bbox_inches='tight', transparent=True, bbox_extra_artists=bbox_extra_artists)
@@ -187,8 +212,9 @@ def plot_spectral(seeds, **kwargs):
 
     else:
         plt.tight_layout()
-        print('Displaying plot...')
-        plt.show()
+        if kwargs['show']:
+            print('Displaying plot...')
+            plt.show()
 
 
 def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
@@ -205,83 +231,103 @@ def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
         matplotlib.Axes: the axis that was plotted on.
 
     """
-    from matador.scrapers.castep_scrapers import bands2dict, phonon2dict
     from cycler import cycler
     import matplotlib.pyplot as plt
     plotted_pdis = False
     for seed_ind, seed in enumerate(seeds):
-        seed = seed.replace('.bands', '').replace('.phonon', '')
-        if os.path.isfile('{}.phonon'.format(seed)):
-            dispersion, s = phonon2dict(seed + '.phonon', verbosity=kwargs.get('verbosity'))
-            if not s:
-                raise RuntimeError(dispersion)
-            branch_key = 'qpoint_branches'
-            num_key = 'num_qpoints'
-            path_key = 'qpoint_path'
-            eig_key = 'eigenvalues_q'
-            band_key = 'num_branches'
-            dispersion['num_spins'] = 1
-            spin_key = 'num_spins'
-            if kwargs['plot_window'] is None:
-                kwargs['plot_window'] = [min(-10, np.min(dispersion[eig_key])-10), np.max(dispersion[eig_key])]
 
-            path = _linearise_path(dispersion, path_key, branch_key, num_key, kwargs)
+        if isinstance(seed, dict):
+            if kwargs.get('phonons'):
+                dispersion = VibrationalDispersion(seed)
+            else:
+                dispersion = ElectronicDispersion(seed)
 
-        elif os.path.isfile('{}.bands'.format(seed)):
-            dispersion, s = bands2dict(seed + '.bands',
-                                       summary=True,
-                                       gap=kwargs.get('gap'),
-                                       external_efermi=kwargs.get('external_efermi'),
-                                       verbosity=kwargs.get('verbosity'))
-            if not s:
-                raise RuntimeError(dispersion)
-            branch_key = 'kpoint_branches'
-            num_key = 'num_kpoints'
-            path_key = 'kpoint_path'
-            eig_key = 'eigenvalues_k_s'
-            band_key = 'num_bands'
-            spin_key = 'num_spins'
-
-            if kwargs['plot_window'] is None:
-                kwargs['plot_window'] = [-10, 10]
-
-            path = _linearise_path(dispersion, path_key, branch_key, num_key, kwargs)
-
-            if os.path.isfile('{}.pdis.dat'.format(seed)) and len(seeds) == 1 and kwargs['plot_pdis']:
-                ax_dispersion = projected_bandstructure_plot(seed, ax_dispersion, path, dispersion,
-                                                             bbox_extra_artists,
-                                                             point_scale=kwargs.get('pdis_point_scale', 25),
-                                                             interpolation_factor=kwargs.get('pdis_interpolation_factor', 2))
-                kwargs['band_colour'] = 'grey'
-                plotted_pdis = True
+        elif isinstance(seed, Dispersion):
+            dispersion = seed
 
         else:
-            raise RuntimeError('{}.bands/.phonon not found.'.format(seed))
+            seed = seed.replace('.bands', '').replace('.phonon', '')
+            if os.path.isfile('{}.phonon'.format(seed)):
+                dispersion, s = phonon2dict(seed + '.phonon', verbosity=kwargs.get('verbosity'))
+                if not s:
+                    raise RuntimeError(dispersion)
 
+                dispersion = VibrationalDispersion(dispersion)
+
+            elif os.path.isfile('{}.bands'.format(seed)):
+                dispersion, s = bands2dict(seed + '.bands',
+                                           verbosity=kwargs.get('verbosity'))
+                if not s:
+                    raise RuntimeError(dispersion)
+
+                if os.path.isfile('{}.pdis.dat'.format(seed)) and kwargs['plot_pdis']:
+                    pdis_data, s = optados2dict('{}.pdis.dat'.format(seed))
+                    if not s:
+                        raise RuntimeError(pdis_data)
+                else:
+                    pdis_data = None
+
+                dispersion = ElectronicDispersion(dispersion, projection_data=pdis_data)
+
+            else:
+                raise RuntimeError('{}.bands/.phonon not found.'.format(seed))
+
+        eigs = dispersion.eigs
+        if kwargs['phonons']:
+            # convert from internal eV frequencies to cm^-1
+            eigs = dispersion.eigs / INVERSE_CM_TO_EV
+
+        if kwargs['plot_window'] is None:
+            if kwargs['phonons']:
+                kwargs['plot_window'] = [min(-10, np.min(eigs) - 10), np.max(eigs)]
+            else:
+                kwargs['plot_window'] = [-10, 10]
+
+        path = dispersion.linearise_path(preserve_kspace_distance=kwargs['preserve_kspace_distance'])
+
+        # try to match bands if requested
         if kwargs['band_reorder'] or (kwargs['band_reorder'] is None and kwargs['phonons']):
             print('Reordering bands based on local gradients...')
-            dispersion[eig_key] = match_bands(dispersion[eig_key], dispersion[branch_key])
+            dispersion.reorder_bands()
+
+        if dispersion.projectors and len(seeds) == 1 and kwargs['plot_pdis'] and not kwargs['phonons']:
+            ax_dispersion = projected_bandstructure_plot(dispersion, ax_dispersion, path,
+                                                         bbox_extra_artists,
+                                                         **kwargs)
+            kwargs['band_colour'] = 'grey'
+            plotted_pdis = True
 
         # loop over branches and plot
         if not plotted_pdis:
-            for branch_ind, branch in enumerate(dispersion[branch_key]):
+            if kwargs.get('external_efermi') is None:
+                spin_fermi_energy = dispersion.spin_fermi_energy
+            else:
+                spin_fermi_energy = kwargs.get('external_efermi')
+            if len(spin_fermi_energy) == 1 and dispersion.num_spins != 1:
+                spin_fermi_energy = [spin_fermi_energy] * dispersion.num_spins
+
+            for branch_ind, branch in enumerate(dispersion.kpoint_branches):
+
                 # seem to have to reset colours here for some reason
                 plt.rcParams['axes.prop_cycle'] = cycler('color', kwargs['colours'])
-                for ns in range(dispersion[spin_key]):
+
+                for ns in range(dispersion.num_spins):
+
                     if ns == 1 and kwargs.get('spin_only') == 'up':
                         continue
                     elif ns == 0 and kwargs.get('spin_only') == 'down':
                         continue
-                    for nb in range(dispersion[band_key]):
-                        colour, alpha, label = _get_lineprops(dispersion, eig_key, spin_key, nb, ns, branch, branch_ind, seed_ind, kwargs)
+
+                    for nb in range(dispersion.num_bands):
+                        colour, alpha, label = _get_lineprops(
+                            dispersion, spin_fermi_energy, nb, ns, branch, branch_ind, seed_ind, kwargs)
 
                         ax_dispersion.plot(path[(np.asarray(branch)-branch_ind).tolist()],
-                                           dispersion[eig_key][ns][nb][branch], c=colour,
-                                           ls=kwargs['ls'][seed_ind], alpha=alpha, label=label)
+                                           eigs[ns][nb][branch] - spin_fermi_energy[ns],
+                                           c=colour, ls=kwargs['ls'][seed_ind], alpha=alpha, label=label)
 
     if len(seeds) > 1:
-        disp_legend = ax_dispersion.legend(loc='upper center',
-                                           frameon=True, fancybox=False, shadow=False, framealpha=1)
+        disp_legend = ax_dispersion.legend(loc='upper center')
         bbox_extra_artists.append(disp_legend)
 
     ax_dispersion.axhline(0, ls='--', lw=1, c='grey')
@@ -292,7 +338,7 @@ def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
         ylabel = r'Energy (eV)'
     ax_dispersion.set_ylabel(ylabel)
     ax_dispersion.set_xlim(0, 1)
-    _add_path_labels(seed, dispersion, ax_dispersion, path, path_key, branch_key, seed_ind, kwargs)
+    _add_path_labels(seeds[-1], dispersion, ax_dispersion, path, 0, kwargs)
 
     return ax_dispersion
 
@@ -311,67 +357,15 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
         matplotlib.Axes: the axis that was plotted on.
 
     """
-    from matador.scrapers import optados2dict, phonon2dict, bands2dict
     for seed_ind, seed in enumerate(seeds):
-        seed = seed.replace('.bands', '').replace('.phonon', '')
-        if kwargs['plot_dos']:
-            if not kwargs['phonons']:
-                if kwargs.get('dos') is None:
-                    # look for dat files, and just use the first
-                    exts = ['adaptive.dat', 'fixed.dat', 'linear.dat', 'bands_dos']
-                    for ext in exts:
-                        if os.path.isfile('{}.{}'.format(seed, ext)):
-                            dos_seed = '{}.{}'.format(seed, ext)
-                            break
-                    else:
-                        raise SystemExit('No total DOS files found.')
-                else:
-                    dos_seed = kwargs.get('dos')
+        # load electronic data
+        if not kwargs['phonons']:
+            dos_data = _load_electronic_dos(seed, kwargs)
 
-                if dos_seed.endswith('.bands_dos'):
-                    # if bands_dos exists, do some manual broadening
-                    dos_data, s = bands2dict(dos_seed)
-                    raw_weights = []
-                    space_size = 1000
-                    gaussian_width = kwargs.get('gaussian_width')
-                    if gaussian_width is None:
-                        gaussian_width = 0.1
+            if kwargs['plot_window'] is None:
+                kwargs['plot_window'] = [-10, 10]
 
-                    raw_eigenvalues = []
-                    for kind, qpt in enumerate(dos_data['eigenvalues_k_s']):
-                        weight = dos_data['kpoint_weights'][kind]
-                        for eig in qpt:
-                            raw_weights.append(weight)
-                            raw_eigenvalues.append(eig)
-                    raw_eigenvalues = np.asarray(raw_eigenvalues)
-                    hist, energies = np.histogram(raw_eigenvalues, bins=space_size)
-                    # shift bin edges to bin centres
-                    energies -= energies[1] - energies[0]
-                    energies = energies[:-1]
-                    new_energies = np.reshape(energies, (1, len(energies)))
-                    new_energies = new_energies - np.reshape(energies, (1, len(energies))).T
-                    dos = np.sum(hist * np.exp(-(new_energies)**2 / gaussian_width), axis=1)
-                    dos = np.divide(dos, np.sqrt(2 * np.pi * gaussian_width**2))
-                    dos_data['dos'] = dos
-                    dos_data['energies'] = energies
-                else:
-                    dos_data, s = optados2dict(dos_seed, verbosity=0)
-
-                if not s:
-                    raise RuntimeError(dos_data)
-
-                energies = dos_data['energies']
-                dos = dos_data['dos']
-
-                if kwargs['plot_window'] is None:
-                    kwargs['plot_window'] = [-10, 10]
-
-                if 'spin_dos' in dos_data:
-                    max_density = max(np.max(np.abs(dos_data['spin_dos']['down'][np.where(energies > kwargs['plot_window'][0])])),
-                                      np.max(np.abs(dos_data['spin_dos']['up'][np.where(energies > kwargs['plot_window'][0])])))
-                else:
-                    max_density = np.max(dos[np.where(np.logical_and(energies < kwargs['plot_window'][1], energies > kwargs['plot_window'][0]))])
-
+            if kwargs['plot_pdos']:
                 pdos_seed = '{}.pdos.dat'.format(seed)
                 pdos_data = {}
                 if os.path.isfile(pdos_seed):
@@ -379,196 +373,211 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                     if not s:
                         raise RuntimeError(pdos_data)
                     dos_data['pdos'] = pdos_data
-            else:
-                if not os.path.isfile(seed + '.phonon_dos'):
-                    phonon_data, s = phonon2dict(seed + '.phonon')
-                    if not s:
-                        raise RuntimeError(phonon_data)
-                    else:
-                        if kwargs['plot_window'] is None:
-                            kwargs['plot_window'] = [min(-10, np.min(phonon_data['eigenvalues_q']) - 10), np.max(phonon_data['eigenvalues_q'])]
-                        space_size = 1000
-                        gaussian_width = kwargs.get('gaussian_width', 100)
-                        raw_weights = []
-                        raw_eigenvalues = []
-                        for qind, qpt in enumerate(phonon_data['eigenvalues_q']):
-                            weight = phonon_data['qpoint_weights'][qind]
-                            for eig in qpt:
-                                raw_weights.append(weight)
-                                raw_eigenvalues.append(eig)
-                        hist, energies = np.histogram(raw_eigenvalues, weights=raw_weights, bins=space_size)
-                        # shift bin edges to bin centres
-                        energies -= energies[1] - energies[0]
-                        energies = energies[:-1]
-                        new_energies = np.reshape(energies, (1, len(energies)))
-                        new_energies -= np.reshape(energies, (1, len(energies))).T
-                        dos = np.sum(hist * np.exp(-(new_energies)**2 / gaussian_width), axis=1)
-                        dos = np.divide(dos, np.sqrt(2 * np.pi * gaussian_width**2))
-                        max_density = np.max(dos)
-                        phonon_data['freq_unit'] = phonon_data['freq_unit'].replace('-1', '$^{-1}$')
-                        ax_dos.axvline(phonon_data['softest_mode_freq'], ls='--', c='r',
-                                       label=(r'$\omega_\mathrm{{min}} = {:5.3f}$ {}'
-                                              .format(phonon_data['softest_mode_freq'],
-                                                      phonon_data['freq_unit'])))
-                else:
-                    with open(seed + '.phonon_dos', 'r') as f:
-                        flines = f.readlines()
-                    for ind, line in enumerate(flines):
-                        if 'begin dos' in line.lower():
-                            projector_labels = line.split()[5:]
-                            projector_labels = [(label, None) for label in projector_labels]
-                            begin = ind + 1
-                            break
-                    data_flines = flines[begin:-1]
-                    with open(seed + '.phonon_dos_tmp', 'w') as f:
-                        for line in data_flines:
-                            f.write(line + '\n')
-                    raw_data = np.loadtxt(seed + '.phonon_dos_tmp')
-                    energies = raw_data[:, 0]
-                    dos = raw_data[:, 1]
-                    dos_data = {}
-                    dos_data['dos'] = dos
-                    max_density = np.max(dos)
-                    dos_data['energies'] = energies
-                    if kwargs['plot_window'] is None:
-                        kwargs['plot_window'] = [np.min(energies[np.where(dos > 1e-3)]) - 10, np.max(energies[np.where(dos > 1e-3)])]
-                    dos_data['pdos'] = dict()
-                    for i, label in enumerate(projector_labels):
-                        dos_data['pdos'][label] = raw_data[:, i + 2]
-                    pdos = dos_data['pdos']
-                    pdos_data = dos_data
-                    from os import remove
-                    remove(seed + '.phonon_dos_tmp')
+        else:
+            dos_data = _load_phonon_dos(seed, kwargs)
+            max_density = np.max(dos_data['dos'])
+            if kwargs['plot_pdos']:
+                pdos_data = dos_data
 
-            if kwargs['phonons']:
-                ylabel = 'Phonon DOS'
-                xlabel = 'Wavenumber (cm$^{{-1}}$)'
-            else:
-                if 'dos_unit_label' in dos_data:
-                    ylabel = dos_data['dos_unit_label'].replace('A^3', 'Å$^{3}$')
-                else:
-                    if kwargs['plot_bandstructure']:
-                        ylabel = 'DOS'
-                    else:
-                        ylabel = 'DOS (eV$^{{-1}}$Å$^{{-3}}$)'
-                xlabel = 'Energy (eV)'
+        energies = np.copy(dos_data['energies'])
+        # change unit of phonon energies and set plot window
+        if kwargs['phonons']:
+            energies /= INVERSE_CM_TO_EV
+            if kwargs['plot_window'] is None:
+                kwargs['plot_window'] = [np.min(energies[np.where(dos_data['dos'] > 1e-3)]) - 10,
+                                         np.max(energies[np.where(dos_data['dos'] > 1e-3)])]
 
+        if 'spin_dos' in dos_data:
+            max_density = max(np.max(np.abs(dos_data['spin_dos']['down'][np.where(energies > kwargs['plot_window'][0])])),
+                              np.max(np.abs(dos_data['spin_dos']['up'][np.where(energies > kwargs['plot_window'][0])])))
+        else:
+            max_density = np.max(dos_data['dos'][np.where(np.logical_and(energies < kwargs['plot_window'][1],
+                                                                         energies > kwargs['plot_window'][0]))])
+
+        dos = dos_data['dos']
+
+        # plotting pdos depends on these other factors too
+        plotting_pdos = (kwargs['plot_pdos'] and len(seeds) == 1
+                         and not (kwargs['phonons'] and len(dos_data.get('pdos', [])) <= 1))
+
+        if kwargs['phonons']:
+            ylabel = 'Phonon DOS'
+            xlabel = 'Wavenumber (cm$^{{-1}}$)'
+        else:
+            if 'dos_unit_label' in dos_data:
+                ylabel = dos_data['dos_unit_label'].replace('A^3', 'Å$^{3}$')
+            else:
+                if kwargs['plot_bandstructure']:
+                    ylabel = 'DOS'
+                else:
+                    ylabel = 'DOS (eV$^{{-1}}$Å$^{{-3}}$)'
+            xlabel = 'Energy (eV)'
+
+        if kwargs['plot_bandstructure']:
+            ax_dos.set_xlabel(ylabel)
+            ax_dos.axhline(0, c='grey', ls='--', lw=1)
+            if 'spin_dos' in dos_data:
+                ax_dos.set_xlim(-max_density*1.2, max_density * 1.2)
+            else:
+                ax_dos.set_xlim(0, max_density * 1.2)
+            ax_dos.set_ylim(kwargs['plot_window'])
+            ax_dos.axvline(0, c='grey', lw=1)
+            ax_dos.xaxis.set_ticks_position('none')
+
+            if 'spin_dos' not in dos_data:
+                ax_dos.plot(dos, energies, ls=kwargs['ls'][seed_ind],
+                            color='grey', zorder=1e10, label='Total DOS')
+                if not kwargs['plot_pdos']:
+                    ax_dos.fill_betweenx(energies[np.where(energies > 0)], 0, dos[np.where(energies > 0)],
+                                         alpha=0.2, color=kwargs['conduction'])
+                    ax_dos.fill_betweenx(energies[np.where(energies <= 0)], 0, dos[np.where(energies <= 0)],
+                                         alpha=0.2, color=kwargs['valence'])
+        else:
+            ax_dos.set_xlabel(xlabel)
+            ax_dos.set_ylabel(ylabel)
+            ax_dos.axvline(0, c='grey', lw=1, ls='--')
+            if 'spin_dos' in dos_data:
+                ax_dos.set_ylim(-max_density*1.2, max_density * 1.2)
+            else:
+                ax_dos.set_ylim(0, max_density * 1.2)
+            ax_dos.set_xlim(kwargs['plot_window'])
+            ax_dos.axhline(0, c='grey', lw=1)
+
+            if 'spin_dos' not in dos_data:
+                ax_dos.plot(energies, dos, ls=kwargs['ls'][seed_ind], alpha=1,
+                            c='grey', zorder=1e10, label='Total DOS')
+                if not plotting_pdos:
+                    ax_dos.fill_between(energies[np.where(energies > 0)], 0, dos[np.where(energies > 0)],
+                                        alpha=0.2, color=kwargs['conduction'])
+                    ax_dos.fill_between(energies[np.where(energies <= 0)], 0, dos[np.where(energies <= 0)],
+                                        alpha=0.2, color=kwargs['valence'])
+
+        if 'spin_dos' in dos_data and not kwargs['pdos_hide_tot']:
             if kwargs['plot_bandstructure']:
-                ax_dos.set_xlabel(ylabel)
-                ax_dos.axhline(0, c='grey', ls='--', lw=1)
-                if 'spin_dos' in dos_data:
-                    ax_dos.set_xlim(-max_density*1.2, max_density * 1.2)
-                else:
-                    ax_dos.set_xlim(0, max_density * 1.2)
-                ax_dos.set_ylim(kwargs['plot_window'])
-                ax_dos.axvline(0, c='grey', lw=1)
-                ax_dos.xaxis.set_ticks_position('none')
+                if kwargs.get('spin_only') in [None, 'up']:
+                    if not plotting_pdos:
+                        ax_dos.fill_betweenx(energies, 0, dos_data['spin_dos']['up'], alpha=0.2, color='r')
+                    ax_dos.plot(dos_data['spin_dos']['up'], energies,
+                                ls=kwargs['ls'][seed_ind], color='r', zorder=1e10, label='$\\uparrow$')
+                if kwargs.get('spin_only') in [None, 'down']:
+                    if not plotting_pdos:
+                        ax_dos.fill_betweenx(energies, 0, -dos_data['spin_dos']['down'], alpha=0.2, color='b')
+                    ax_dos.plot(-dos_data['spin_dos']['down'], energies,
+                                ls=kwargs['ls'][seed_ind], color='b', zorder=1e10, label='$\\downarrow$')
+            else:
+                if kwargs.get('spin_only') in [None, 'up']:
+                    ax_dos.plot(energies, dos_data['spin_dos']['up'],
+                                ls=kwargs['ls'][seed_ind], color='r', zorder=1e10, label='$\\uparrow$')
+                    if not plotting_pdos:
+                        ax_dos.fill_between(energies, 0, dos_data['spin_dos']['up'], alpha=0.2, color='r')
+                if kwargs.get('spin_only') in [None, 'down']:
+                    ax_dos.plot(energies, -dos_data['spin_dos']['down'],
+                                ls=kwargs['ls'][seed_ind], color='b', zorder=1e10, label='$\\downarrow$')
+                    if not plotting_pdos:
+                        ax_dos.fill_between(energies, 0, -dos_data['spin_dos']['down'], alpha=0.2, color='b')
 
-                if 'spin_dos' not in dos_data:
-                    ax_dos.plot(dos, energies, ls=kwargs['ls'][seed_ind],
-                                color='grey', zorder=1e10, label='Total DOS')
-                    if 'pdos' not in dos_data:
-                        ax_dos.fill_betweenx(energies[np.where(energies > 0)], 0, dos[np.where(energies > 0)], alpha=0.2, color=kwargs['conduction'])
-                        ax_dos.fill_betweenx(energies[np.where(energies <= 0)], 0, dos[np.where(energies <= 0)], alpha=0.2, color=kwargs['valence'])
+        if plotting_pdos:
+
+            pdos = pdos_data['pdos']
+
+            stacks = dict()
+            projector_labels, dos_colours = _get_projector_info([projector for projector in pdos])
+            unique_labels = set()
+            for ind, projector in enumerate(pdos):
+
+                # don't break PDOS label down by spin
+                if projector_labels[ind] in unique_labels:
+                    projector_labels[ind] = ''
+                else:
+                    unique_labels.add(projector_labels[ind])
+
+                # split stacked pdos by spin channel
+                stack_key = None
+                if len(projector) > 2:
+                    stack_key = projector[2]
+
+                if stack_key not in stacks:
+                    stacks[stack_key] = np.zeros_like(pdos[projector])
+
+                stack = stacks[stack_key]
+                if kwargs['unstacked_pdos']:
+                    stack = 0
+                else:
+                    stack = stacks[stack_key]
+
+                if not kwargs['unstacked_pdos']:
+                    alpha = 0.8
+                else:
+                    alpha = 0.7
+
+                # mask negative contributions with 0
+                pdos[projector] = np.ma.masked_where(pdos[projector] < 0, pdos[projector], copy=True)
+                np.ma.set_fill_value(pdos[projector], 0)
+                pdos[projector] = np.ma.filled(pdos[projector])
+
+                # flip sign of down spin energies for spin polarised plot
+                if 'down' in projector:
+                    pdos[projector] *= -1
+
+                if not np.max(np.abs(pdos[projector])) < 1e-8:
+                    if kwargs['plot_bandstructure']:
+                        label = None
+                        if not kwargs['unstacked_pdos']:
+                            ax_dos.fill_betweenx(energies, stack, stack+pdos[projector],
+                                                 alpha=alpha, label=projector_labels[ind],
+                                                 color=dos_colours[ind])
+                        else:
+                            label = projector_labels[ind]
+                        ax_dos.plot(stack + pdos[projector], energies,
+                                    alpha=1, color=dos_colours[ind], label=label)
+                    else:
+                        label = None
+                        if not kwargs['unstacked_pdos']:
+                            ax_dos.fill_between(energies, stack, stack+pdos[projector],
+                                                alpha=alpha, label=projector_labels[ind],
+                                                color=dos_colours[ind])
+                        else:
+                            label = projector_labels[ind]
+                        ax_dos.plot(energies, stack + pdos[projector],
+                                    alpha=1, color=dos_colours[ind], label=label)
+
+                    stacks[stack_key] += pdos[projector]
+
+            if not kwargs['pdos_hide_tot'] and kwargs['unstacked_pdos']:
+                for stack_key in stacks:
+                    if stack_key is None:
+                        label = 'Sum pDOS'
+                    else:
+                        label = 'Sum pDOS: spin-{}'.format(stack_key)
+                    if kwargs['plot_bandstructure']:
+                        ax_dos.plot(stacks[stack_key], energies,
+                                    ls='--', alpha=1, color='black', zorder=1e9, label=label)
+                    else:
+                        ax_dos.plot(energies, stacks[stack_key],
+                                    ls='--', alpha=1, color='black', zorder=1e9, label=label)
+
+        if len(seeds) == 1 and (plotting_pdos or 'spin_dos' in dos_data):
+            if kwargs['plot_bandstructure']:
+                dos_legend = ax_dos.legend(bbox_to_anchor=(1, 1))
 
             else:
-                ax_dos.set_xlabel(xlabel)
-                ax_dos.set_ylabel(ylabel)
-                ax_dos.axvline(0, c='grey', lw=1, ls='--')
-                if 'spin_dos' in dos_data:
-                    ax_dos.set_ylim(-max_density*1.2, max_density * 1.2)
-                else:
-                    ax_dos.set_ylim(0, max_density * 1.2)
-                ax_dos.set_xlim(kwargs['plot_window'])
-                ax_dos.axhline(0, c='grey', lw=1)
+                dos_legend = ax_dos.legend(bbox_to_anchor=(1, 0.5), loc='center left')
 
-                if 'spin_dos' not in dos_data:
-                    ax_dos.plot(energies, dos, ls=kwargs['ls'][seed_ind], alpha=1,
-                                c='grey', zorder=1e10, label='Total DOS')
-                    if 'pdos' not in dos_data:
-                        ax_dos.fill_between(energies[np.where(energies > 0)], 0, dos[np.where(energies > 0)], alpha=0.2, color=kwargs['conduction'])
-                        ax_dos.fill_between(energies[np.where(energies <= 0)], 0, dos[np.where(energies <= 0)], alpha=0.2, color=kwargs['valence'])
-
-            if 'pdos' in pdos_data and len(seeds) == 1:
-                pdos = pdos_data['pdos']
-                energies = pdos_data['energies']
-                projector_labels, dos_colours = _get_projector_info([projector for projector in pdos])
-                for ind, projector in enumerate(pdos):
-                    if ind == 0:
-                        stack = np.zeros_like(pdos[projector])
-
-                    if not kwargs['no_stacked_pdos']:
-                        alpha = 0.8
-                    else:
-                        alpha = 0.7
-
-                    # mask negative contributions with 0
-                    pdos[projector] = np.ma.masked_where(pdos[projector] < 0, pdos[projector], copy=True)
-                    np.ma.set_fill_value(pdos[projector], 0)
-                    pdos[projector] = np.ma.filled(pdos[projector])
-
-                    if not np.max(pdos[projector]) < 1e-8:
-
-                        if kwargs['plot_bandstructure']:
-                            if not kwargs['no_stacked_pdos']:
-                                ax_dos.fill_betweenx(energies, stack, stack+pdos[projector],
-                                                     alpha=alpha, label=projector_labels[ind],
-                                                     color=dos_colours[ind])
-                        else:
-                            if not kwargs['no_stacked_pdos']:
-                                ax_dos.fill_between(energies, stack, stack+pdos[projector],
-                                                    alpha=alpha, label=projector_labels[ind],
-                                                    color=dos_colours[ind])
-
-                        if not kwargs['no_stacked_pdos']:
-                            stack += pdos[projector]
-
-                if not kwargs['pdos_hide_tot'] and not kwargs['no_stacked_pdos']:
-                    if kwargs['plot_bandstructure']:
-                        ax_dos.plot(stack, energies,
-                                    ls='--', alpha=1, color='black', zorder=1e10, label='Sum pDOS')
-                    else:
-                        ax_dos.plot(energies, stack,
-                                    ls='--', alpha=1, color='black', zorder=1e10, label='Sum pDOS')
-
-            elif 'spin_dos' in dos_data:
-                if kwargs['plot_bandstructure']:
-                    if kwargs.get('spin_only') in [None, 'down']:
-                        print('Plotting only spin down channel...')
-                        ax_dos.fill_betweenx(energies, 0, dos_data['spin_dos']['down'], alpha=0.2, color='b')
-                        ax_dos.plot(dos_data['spin_dos']['down'], energies, ls=kwargs['ls'][seed_ind], color='b', zorder=1e10, label='spin-down channel')
-                    if kwargs.get('spin_only') in [None, 'up']:
-                        print('Plotting only spin up channel...')
-                        ax_dos.fill_betweenx(energies, 0, dos_data['spin_dos']['up'], alpha=0.2, color='r')
-                        ax_dos.plot(dos_data['spin_dos']['up'], energies, ls=kwargs['ls'][seed_ind], color='r', zorder=1e10, label='spin-up channel')
-                else:
-                    if kwargs.get('spin_only') in [None, 'down']:
-                        print('Plotting only spin down channel...')
-                        ax_dos.plot(energies, dos_data['spin_dos']['down'], ls=kwargs['ls'][seed_ind], color='b', zorder=1e10, label='spin-down channel')
-                        ax_dos.fill_between(energies, 0, dos_data['spin_dos']['down'], alpha=0.2, color='b')
-                    if kwargs.get('spin_only') in [None, 'up']:
-                        print('Plotting only spin up channel...')
-                        ax_dos.plot(energies, dos_data['spin_dos']['up'], ls=kwargs['ls'][seed_ind], color='r', zorder=1e10, label='spin-up channel')
-                        ax_dos.fill_between(energies, 0, dos_data['spin_dos']['up'], alpha=0.2, color='r')
-
-            if len(seeds) == 1:
-                if kwargs['plot_bandstructure']:
-                    dos_legend = ax_dos.legend(bbox_to_anchor=(1, 1),
-                                               frameon=True, fancybox=False, shadow=False)
-                else:
-                    dos_legend = ax_dos.legend(frameon=True, fancybox=False, shadow=False)
-                bbox_extra_artists.append(dos_legend)
+            bbox_extra_artists.append(dos_legend)
 
     return ax_dos
 
 
-def projected_bandstructure_plot(seed, ax, path, dispersion, bbox_extra_artists, interpolation_factor=2, point_scale=25, **kwargs):
+def projected_bandstructure_plot(
+    dispersion, ax, path, bbox_extra_artists, pdis_interpolation_factor=2, pdis_point_scale=25, **kwargs
+):
     """ Plot projected bandstructure with weightings from OptaDOS pdis.dat file.
 
     Parameters:
+        dispersion (matador.orm.spectral.ElectronicDispersion): scraped
+            data for bandstructure and pdis.
         seed (str): seed name for files to scrape.
         ax (matplotlib.pyplot.Axes): axis to plot on.
-        dispersion (dict): scraped bandstructure info without weights.
         bbox_extra_artists (list): list to append any legends too.
 
     Keyword arguments:
@@ -579,42 +588,36 @@ def projected_bandstructure_plot(seed, ax, path, dispersion, bbox_extra_artists,
         matplotlib.pyplot.Axes: the axis that was plotted on.
 
     """
-    from matador.scrapers.castep_scrapers import optados2dict, get_kpt_branches
-    from matador.utils.cell_utils import frac2cart, real2recip
-    seed = seed.replace('.pdis.dat', '')
-    dos_data, s = optados2dict(seed + '.pdis.dat', verbosity=0)
-    if not s:
-        raise RuntimeError(dos_data)
 
-    pdis = np.asarray(dos_data['pdis'])
+    pdis = dispersion.projector_weights
+    projectors = dispersion.projectors
+
     pdis[pdis < 0] = 0
     pdis[pdis > 1] = 1
 
-    projectors = dos_data['projectors']
     keep_inds = []
     for ind, _ in enumerate(projectors):
         if np.max(pdis[:, :, ind]) > 1e-8:
             keep_inds.append(ind)
 
-    lattice_cart = dispersion['lattice_cart']
-    eigs = np.asarray(dos_data['eigenvalues'])
-
     projector_labels, dos_colours = _get_projector_info(projectors)
 
-    for ind, projector in enumerate(projectors):
+    fermi_energy = kwargs.get('external_efermi') or dispersion.fermi_energy
+
+    _ordered_scatter(path, dispersion.eigs_s_k[0].T - fermi_energy, pdis, dispersion.kpoint_branches,
+                     interpolation_factor=pdis_interpolation_factor, point_scale=pdis_point_scale,
+                     ax=ax, colours=dos_colours)
+
+    # if not kwargs['plot_pdos']:
+    for ind, _ in enumerate(projectors):
         if ind in keep_inds:
             ax.scatter(1e20, 0, facecolor=dos_colours[ind],
                        label=projector_labels[ind], lw=0)
 
-    dos_data['kpoints_cartesian'] = np.asarray(frac2cart(real2recip(lattice_cart), dos_data['kpoints']))
-    dos_data['kpoint_branches'], dos_data['kpoint_path_spacing'] = get_kpt_branches(dos_data['kpoints_cartesian'])
-    _ordered_scatter(path, eigs, pdis, dos_data['kpoint_branches'],
-                     interpolation_factor=interpolation_factor, point_scale=point_scale,
-                     ax=ax, colours=dos_colours)
-
-    legend = ax.legend(loc=1, frameon=True, fancybox=False, shadow=False)
+    legend = ax.legend(loc=1)
     legend.set_zorder(1e20)
     bbox_extra_artists.append(legend)
+
     return ax
 
 
@@ -624,7 +627,7 @@ def _ordered_scatter(path, eigs, pdis, branches, ax=None, colours=None, interpol
     Parameters:
         path (np.ndarray): linearised [0, 1] kpoint path array.
         eigs (np.ndarray): (num_kpoints x num_bands) array containing eigenvalues
-        pdis (np.ndarray): (num_kpoints x num_bands x num_projecttors) array containing
+        pdis (np.ndarray): (num_kpoints x num_bands x num_projectors) array containing
             projector weights.
         branches (list): list of branch indices, e.g. for two branches [[0,1,2], [3, 4]].
 
@@ -644,10 +647,8 @@ def _ordered_scatter(path, eigs, pdis, branches, ax=None, colours=None, interpol
     for nb in range(len(eigs[0])):
         for branch_ind, branch in enumerate(branches):
             k = path[(np.asarray(branch) - branch_ind).tolist()]
-            e = eigs[branch, nb]
             projections = pdis[branch, nb]
-
-            ek_fn = interp1d(k, e)
+            ek_fn = interp1d(k, eigs[branch, nb])
             k_interp = np.linspace(np.min(k), np.max(k), num=int(interpolation_factor*len(k)))
             ek_interp = ek_fn(k_interp)
             projections = projections.T
@@ -687,101 +688,24 @@ def _ordered_scatter(path, eigs, pdis, branches, ax=None, colours=None, interpol
     ax.scatter(flat_pts_k, flat_pts_e, edgecolor=flat_colours, s=flat_sizes, lw=0, marker='o', facecolor=flat_colours)
 
 
-def match_bands(dispersion, branches):
-    """ Recursively reorder eigenvalues such that bands join up correctly,
-    based on local gradients.
-
-    Parameters:
-        dispersion (numpy.ndarray): array containing eigenvalues as a
-            function of q/k
-        branches (:obj:`list` of :obj:`int`): list containing branches of
-            k/q-point path
-
-    Returns:
-        numpy.ndarray: reordered branches.
-
-    """
-    from copy import deepcopy
-
-    for channel_ind, channel in enumerate(dispersion):
-        eigs = channel
-        for branch_ind, branch in enumerate(branches):
-            eigs_branch = eigs[:, branch]
-            converged = False
-            counter = 0
-            i_cached = 0
-            while not converged and counter < len(branch):
-                counter += 1
-                for i in range(i_cached+1, len(branch) - 1):
-                    guess = (2 * eigs_branch[:, i] - eigs_branch[:, i-1])
-                    argsort_guess = np.argsort(guess)
-                    if np.any(np.argsort(guess) != np.argsort(eigs_branch[:, i+1])):
-                        tmp_copy = deepcopy(eigs)
-                        for ind, mode in enumerate(np.argsort(eigs_branch[:, i]).tolist()):
-                            eigs_branch[mode, i+1:] = tmp_copy[:, branch][argsort_guess[ind], i+1:]
-                        for other_branch in branches[branch_ind:]:
-                            eigs_other_branch = eigs[:, other_branch]
-                            for ind, mode in enumerate(np.argsort(eigs_branch[:, i]).tolist()):
-                                eigs_other_branch[mode] = tmp_copy[:, other_branch][argsort_guess[ind]]
-                            eigs[:, other_branch] = eigs_other_branch
-                        eigs[:, branch] = eigs_branch
-                        i_cached = i
-                        break
-
-                    if i == len(branch) - 2:
-                        converged = True
-
-        dispersion[channel_ind] = eigs.reshape(1, len(eigs), len(eigs[0]))
-
-    return dispersion
-
-
-def _linearise_path(dispersion, path_key, branch_key, num_key, kwargs):
-    """ For a given k-point path, normalise the spacing between points, mapping
-    it onto [0, 1].
-
-    Note:
-        If kwargs['preserve_kspace-distance'], point separation will be determined
-        by their actual separation in reciprocal space, otherwise they will be
-        equally spaced.
-
-    Returns:
-        np.ndarray: 3xN array containing k-points mapped onto [0, 1].
-
-    """
-    path = [0]
-    for branch in dispersion[branch_key]:
-        for ind, kpt in enumerate(dispersion[path_key][branch]):
-            if ind != len(branch) - 1:
-                if kwargs['preserve_kspace_distance']:
-                    diff = np.sqrt(np.sum((kpt - dispersion[path_key][branch[ind + 1]])**2))
-                else:
-                    diff = 1.
-                path.append(path[-1] + diff)
-    path = np.asarray(path)
-    path /= np.max(path)
-    assert len(path) == int(dispersion[num_key]) - len(dispersion[branch_key]) + 1
-
-    return path
-
-
-def _get_lineprops(dispersion, eig_key, spin_key, nb, ns, branch, branch_ind, seed_ind, kwargs):
+def _get_lineprops(dispersion, spin_fermi_energy, nb, ns, branch, branch_ind, seed_ind, kwargs):
     """ Get the properties of the line to plot. """
     colour = None
     alpha = 1
     label = None
-    if not kwargs['phonons']:
-        if dispersion[spin_key] == 2:
+    if isinstance(dispersion, ElectronicDispersion):
+        if dispersion.num_spins == 2:
             if ns == 0:
                 colour = 'red'
-                alpha = 0.3
+                alpha = 0.8
             else:
                 colour = 'blue'
-                alpha = 0.3
+                alpha = 0.8
         else:
             if kwargs.get('band_colour') == 'occ':
-                band_min = np.min(dispersion[eig_key][ns][nb][branch])
-                band_max = np.max(dispersion[eig_key][ns][nb][branch])
+                band_min = np.min(dispersion.eigs[ns][nb][branch]) - spin_fermi_energy[ns]
+                band_max = np.max(dispersion.eigs[ns][nb][branch]) - spin_fermi_energy[ns]
+
                 if band_max < 0:
                     colour = kwargs.get('valence')
                 elif band_min > 0:
@@ -801,17 +725,16 @@ def _get_lineprops(dispersion, eig_key, spin_key, nb, ns, branch, branch_ind, se
             colour = 'red'
         else:
             alpha = 0.5
+
     if branch_ind == 0 and ns == 0 and nb == 0 and kwargs.get('labels') is not None:
         label = kwargs.get('labels')[seed_ind]
 
     return colour, alpha, label
 
 
-def _add_path_labels(seed, dispersion, ax_dispersion, path, path_key, branch_key, seed_ind, kwargs):
+def _add_path_labels(seed, dispersion, ax_dispersion, path, seed_ind, kwargs):
     """ Scrape k-point path labels from cell file and seekpath, then add them to the plot. """
-    from matador.scrapers import cell2dict, res2dict
-    from matador.utils.cell_utils import doc2spg
-    from seekpath import get_path
+    from matador.utils.cell_utils import doc2spg, get_seekpath_kpoint_path
     xticks = []
     xticklabels = []
     shear_planes = []
@@ -819,7 +742,7 @@ def _add_path_labels(seed, dispersion, ax_dispersion, path, path_key, branch_key
     path_labels = dict()
 
     # first, try to grab them from the cell file
-    if os.path.isfile(seed + '.cell'):
+    if isinstance(seed, str) and os.path.isfile(seed + '.cell'):
         doc, success = cell2dict(seed + '.cell',
                                  db=False, verbosity=kwargs.get('verbosity', 0),
                                  lattice=True, positions=True)
@@ -832,20 +755,25 @@ def _add_path_labels(seed, dispersion, ax_dispersion, path, path_key, branch_key
                 path_labels[label] = point
             print('Detected path labels from cell file')
 
-    if len(path_labels) == 0:
+    if not path_labels:
         # try to get dispersion path labels from spglib/seekpath
         spg_structure = None
-        if kwargs['phonons']:
-            spg_structure = doc2spg(dispersion)
-        else:
+        if isinstance(dispersion, Dispersion):
+            try:
+                spg_structure = doc2spg(dispersion)
+            except (KeyError, RuntimeError):
+                pass
+
+        if not spg_structure:
             res = False
             cell = False
-            if os.path.isfile(seed + '.res'):
-                res = True
-            elif os.path.isfile(seed + '.cell'):
-                cell = True
-            else:
-                print('Failed to find {}.cell or {}.res, will not be able to generate labels.'.format(seed, seed))
+            if isinstance(seed, str):
+                if os.path.isfile(seed + '.res'):
+                    res = True
+                elif os.path.isfile(seed + '.cell'):
+                    cell = True
+                else:
+                    print('Failed to find {}.cell or {}.res, will not be able to generate labels.'.format(seed, seed))
 
             success = False
             if cell:
@@ -863,12 +791,12 @@ def _add_path_labels(seed, dispersion, ax_dispersion, path, path_key, branch_key
                     print('Failed to scrape {}.cell/.res, will not be able to generate labels.'.format(seed))
 
         if spg_structure:
-            seekpath_results = get_path(spg_structure)
+            _, _, seekpath_results = get_seekpath_kpoint_path(spg_structure, standardize=False, explicit=False)
             path_labels = seekpath_results['point_coords']
 
-    for branch_ind, branch in enumerate(dispersion[branch_key]):
+    for branch_ind, branch in enumerate(dispersion.kpoint_branches):
         for sub_ind, ind in enumerate(branch):
-            kpt = dispersion[path_key][ind]
+            kpt = dispersion.kpoint_path[ind]
             for label, point in path_labels.items():
                 if np.allclose(point, kpt):
                     if ind - branch_ind not in labelled:
@@ -877,9 +805,9 @@ def _add_path_labels(seed, dispersion, ax_dispersion, path, path_key, branch_key
                         label = label.replace('DELTA', r'\Delta')
                         label = label.replace('LAMBDA', r'\Lambda')
                         if sub_ind == len(branch) - 1:
-                            if branch_ind < len(dispersion[branch_key]) - 1:
-                                _tmp = dispersion[path_key]
-                                next_point = _tmp[dispersion[branch_key][branch_ind + 1][0]]
+                            if branch_ind < len(dispersion.kpoint_branches) - 1:
+                                _tmp = dispersion.kpoint_path
+                                next_point = _tmp[dispersion.kpoint_branches[branch_ind + 1][0]]
                                 for new_label, new_point in path_labels.items():
                                     new_label = new_label.replace('GAMMA', r'\Gamma')
                                     new_label = new_label.replace('SIGMA', r'\Sigma')
@@ -897,33 +825,36 @@ def _add_path_labels(seed, dispersion, ax_dispersion, path, path_key, branch_key
                         xticks.append(path[ind - branch_ind])
                         break
 
-    if not kwargs['phonons'] and kwargs['gap'] and dispersion['band_gap'] > 0:
-        vbm_pos = dispersion['band_gap_path_inds'][1]
-        vbm = dispersion['valence_band_min']
-        cbm_pos = dispersion['band_gap_path_inds'][0]
-        cbm = dispersion['conduction_band_max']
-        if vbm_pos != cbm_pos:
+    if isinstance(dispersion, ElectronicDispersion) and kwargs['gap']:
+        if dispersion.num_spins != 1:
+            raise NotImplementedError('Band gap summary not implemented for multiple spin channels.')
+        if dispersion.band_gap > 0:
+            vbm_pos = dispersion['band_gap_path_inds'][1]
+            vbm = dispersion['valence_band_min'] - dispersion.fermi_energy
+            cbm_pos = dispersion['band_gap_path_inds'][0]
+            cbm = dispersion['conduction_band_max'] - dispersion.fermi_energy
+            if vbm_pos != cbm_pos:
+                vbm_offset = sum([vbm_pos > ind for ind in shear_planes])
+                cbm_offset = sum([cbm_pos > ind for ind in shear_planes])
+                ax_dispersion.plot([path[vbm_pos - vbm_offset], path[cbm_pos - cbm_offset]], [vbm, cbm],
+                                   ls=kwargs['ls'][seed_ind],
+                                   c='blue',
+                                   label='indirect gap {:3.3f} eV'.format(cbm - vbm))
+
+            vbm_pos = dispersion['direct_gap_path_inds'][1]
+            vbm = dispersion['direct_valence_band_min'] - dispersion.fermi_energy
+            cbm_pos = dispersion['direct_gap_path_inds'][0]
+            cbm = dispersion['direct_conduction_band_max'] - dispersion.fermi_energy
             vbm_offset = sum([vbm_pos > ind for ind in shear_planes])
             cbm_offset = sum([cbm_pos > ind for ind in shear_planes])
             ax_dispersion.plot([path[vbm_pos - vbm_offset], path[cbm_pos - cbm_offset]], [vbm, cbm],
                                ls=kwargs['ls'][seed_ind],
-                               c='blue',
-                               label='indirect gap {:3.3f} eV'.format(cbm - vbm))
-
-        vbm_pos = dispersion['direct_gap_path_inds'][1]
-        vbm = dispersion['direct_valence_band_min']
-        cbm_pos = dispersion['direct_gap_path_inds'][0]
-        cbm = dispersion['direct_conduction_band_max']
-        vbm_offset = sum([vbm_pos > ind for ind in shear_planes])
-        cbm_offset = sum([cbm_pos > ind for ind in shear_planes])
-        ax_dispersion.plot([path[vbm_pos - vbm_offset], path[cbm_pos - cbm_offset]], [vbm, cbm],
-                           ls=kwargs['ls'][seed_ind],
-                           c='red',
-                           label='direct gap {:3.3f} eV'.format(cbm - vbm))
-        ax_dispersion.legend(loc='upper center',
-                             bbox_to_anchor=(0.5, 1.1),
-                             fancybox=True, shadow=True,
-                             ncol=2, handlelength=1)
+                               c='red',
+                               label='direct gap {:3.3f} eV'.format(cbm - vbm))
+            ax_dispersion.legend(loc='upper center',
+                                 bbox_to_anchor=(0.5, 1.1),
+                                 fancybox=True, shadow=True,
+                                 ncol=2, handlelength=1)
 
     if seed_ind == 0:
         ax_dispersion.set_xticks(xticks)
@@ -932,8 +863,7 @@ def _add_path_labels(seed, dispersion, ax_dispersion, path, path_key, branch_key
 
 
 def _get_projector_info(projectors):
-    """ Grab appropriate colours and labels from
-    a list of projectors.
+    """ Grab appropriate colours and labels from a list of projectors.
 
     Parameters:
         projectors (list): list containing (element_str, l_channel) tuples.
@@ -949,19 +879,47 @@ def _get_projector_info(projectors):
     projector_labels = []
     dos_colours = []
     for ind, projector in enumerate(projectors):
-        if projector[0] is None:
-            projector_label = '${}$-character'.format(projector[1])
-        elif projector[1] is None:
-            projector_label = projector[0]
+
+        # pad out projectors for e.g. phonon case
+        species = projector[0]
+        if len(projector) > 1:
+            ang_mom = projector[1]
         else:
-            projector_label = '{p[0]} (${p[1]}$)'.format(p=projector)
+            ang_mom = None
+        if len(projector) > 2:
+            spin = projector[2]
+        else:
+            spin = None
+
+        # (species, None, None)
+        if species is not None and ang_mom is None and spin is None:
+            projector_label = species
+        # (None, ang mom, None)
+        if species is None and ang_mom is not None and spin is None:
+            projector_label = '${}$'.format(ang_mom)
+        # (None, None, spin)
+        elif species is None and ang_mom is None and spin is not None:
+            projector_label = ''
+        # (species, ang_mom, None/spin)
+        elif species is not None and ang_mom is not None:
+            projector_label = '{} (${}$)'.format(species, ang_mom)
+        # (species, None, None/spin)
+        elif species is not None and ang_mom is None:
+            projector_label = '{}'.format(species)
+        # (None, ang_mom, None/spin)
+        elif species is None and ang_mom is not None:
+            projector_label = '${}$'.format(ang_mom)
+        # (species, ang_mom, None/spin)
+        else:
+            projector_label = '{} (${}$)'.format(species, ang_mom)
+
         projector_labels.append(projector_label)
 
         # if species-projected only, then use VESTA colours
-        if projector[0] is not None and projector[1] is None:
+        if species is not None and ang_mom is None:
             dos_colours.append(element_colours.get(projector[0]))
         # if species_ang-projected, then use VESTA colours but lightened
-        elif projector[0] is not None and projector[1] is not None:
+        elif species is not None and ang_mom is not None:
             from copy import deepcopy
             dos_colour = deepcopy(element_colours.get(projector[0]))
             multi = ['s', 'p', 'd', 'f'].index(projector[1]) - 1
@@ -973,3 +931,86 @@ def _get_projector_info(projectors):
             dos_colours.append(list(plt.rcParams['axes.prop_cycle'].by_key()['color'])[ind])
 
     return projector_labels, dos_colours
+
+
+def _load_electronic_dos(seed, kwargs):
+    """ Try to obtain electronic DOS data, either from files, or as
+    a dictionary.
+
+    Parameters:
+        seed (str/dict): either a filename or dictionary containing dos
+            data.
+        kwargs (dict): plotting kwargs.
+
+    Returns:
+        ElectronicDOS object containing scraped data.
+
+    """
+    if isinstance(seed, dict):
+        return ElectronicDOS(seed)
+
+    if isinstance(seed, ElectronicDOS):
+        return seed
+
+    seed = seed.replace('.bands', '')
+    if kwargs.get('dos') is None:
+        # look for dat files, and just use the first
+        exts = ['adaptive.dat', 'fixed.dat', 'linear.dat', 'bands_dos']
+        for ext in exts:
+            if os.path.isfile('{}.{}'.format(seed, ext)):
+                dos_seed = '{}.{}'.format(seed, ext)
+                break
+        else:
+            raise SystemExit('No total DOS files found.')
+    else:
+        dos_seed = kwargs.get('dos')
+
+    # If bands_dos exists, do some manual broadening:
+    # .bands_dos is a file written by run3 when doing a
+    # full spectral calculation, it is simply the .bands
+    # file output from a DOS calculation
+    if dos_seed.endswith('.bands_dos'):
+        dos_data, s = bands2dict(dos_seed)
+        gaussian_width = kwargs.get('gaussian_width', 0.1)
+        dos_data['dos'], dos_data['energies'] = DensityOfStates.bands_as_dos(
+            dos_data, gaussian_width=gaussian_width
+        )
+
+        if isinstance(dos_data['dos'], dict):
+            dos_data['spin_dos'] = dos_data['dos']
+            del dos_data['dos']
+
+    else:
+        dos_data, s = optados2dict(dos_seed, verbosity=0)
+
+    if not s:
+        raise RuntimeError(dos_data)
+
+    return ElectronicDOS(dos_data)
+
+
+def _load_phonon_dos(seed, kwargs):
+    """ Try to obtain phonon DOS data, either from files, or as
+    a dictionary.
+
+    Parameters:
+        seed (str/dict): either a filename or dictionary containing dos
+            data.
+        kwargs (dict): plotting kwargs.
+
+    Returns:
+        VibrationalDOS object containing scraped data.
+
+    """
+
+    if isinstance(seed, dict):
+        return VibrationalDOS(seed)
+    if isinstance(seed, DensityOfStates):
+        return seed
+
+    # otherwise, just read the phonon_dos file
+    dos_data, s = phonon_dos2dict(seed + '.phonon_dos')
+    if not s:
+        raise RuntimeError(dos_data)
+
+    return VibrationalDOS(dos_data)

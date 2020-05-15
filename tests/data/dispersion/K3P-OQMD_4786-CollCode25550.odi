@@ -1,0 +1,6 @@
+task: pdispersion
+pdispersion: species_ang
+set_efermi_zero: True
+dos_spacing: 0.01
+dos_per_volume: True
+adaptive_smearing: 1

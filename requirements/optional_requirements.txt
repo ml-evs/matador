@@ -1,2 +1,3 @@
-tqdm
+pymatgen>=2019.10.4
+ase>=3.18
 ascii_graph>=1.2

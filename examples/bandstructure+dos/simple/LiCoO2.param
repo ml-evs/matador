@@ -1,3 +1,4 @@
 task: spectral
 xc_functional: PBE
-cut_off_energy: 300 eV
+cut_off_energy: 500 eV
+spin_polarized: false

@@ -12,9 +12,4 @@ __all__ = ['__version__']
 __author__ = 'Matthew Evans'
 __maintainer__ = 'Matthew Evans'
 
-
-from pkg_resources import require
-try:
-    __version__ = require('matador')[0].version
-except Exception:
-    __version__ = 'xxx'
+__version__ = "0.9.0"

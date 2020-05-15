@@ -6,8 +6,12 @@ of chaining up different calculations at high-throughput.
 
 """
 
-import logging
 import abc
+import os
+import logging
+from matador.utils.print_utils import dumps
+
+LOG = logging.getLogger('run3')
 
 
 class Workflow:
@@ -48,20 +52,26 @@ class Workflow:
         self.calc_doc = calc_doc
         self.seed = seed
         self.label = self.__class__.__name__
+        self.compute_dir = relaxer.compute_dir
         self.success = None
         self.steps = []
+        self.clean_after_step = []
+        self.workflow_params = workflow_kwargs
 
-        logging.info('Performing Workflow of type {} on {}'.format(self.label, self.seed))
+        LOG.info('Performing Workflow of type {} on {}'.format(self.label, self.seed))
 
         self.preprocess()
         try:
             self.run_steps()
         except RuntimeError as exc:
-            logging.critical('Workflow failed: calling postprocess()')
-            self.postprocess()
+            LOG.critical('Workflow failed: calling postprocess()')
+            self._clean_up()
             raise exc
 
-        self.postprocess()
+        if self.success:
+            self.postprocess()
+
+        self._clean_up()
 
     @abc.abstractmethod
     def preprocess(self):
@@ -72,49 +82,81 @@ class Workflow:
         raise NotImplementedError('Please implement a preprocess method.')
 
     def postprocess(self):
-        """ This function is run upon successful completion of all steps
-        of the workflow and is responsible for cleaning up files and any
-        other post-processing.
+        """ This OPTIONAL function is run upon successful completion of all steps
+        of the workflow and can be overloaded by the subclass to perform
+        any postprocessing steps. This occurs *before* cleaning up the
+        directory (i.e. moving to completed/bad_castep).
 
         """
-        if self.success:
-            logging.info('Writing results of Workflow {} run to res file and tidying up.'.format(self.label))
-            self.relaxer.mv_to_completed(self.seed, keep=True)
-        else:
-            logging.info('Writing results of failed Workflow {} run to res file and tidying up.'.format(self.label))
-            self.relaxer.mv_to_bad(self.seed)
 
-    def add_step(self, function, name, input_exts=None, output_exts=None, **func_kwargs):
+    def _clean_up(self, success=None):
+        """ This method moves files to `completed/` or `bad_castep/` depending on the status
+        of the workflow. It will use the current seed of the relaxer, so this function can be
+        called at intermediate steps if this seed changes.
+
+        """
+        cwd = os.getcwd()
+        if success is None:
+            success = self.success
+
+        if self.compute_dir:
+            os.chdir(self.compute_dir)
+            if success:
+                LOG.info('Writing results from compute dir of Workflow {} run to completed folder and tidying up.'
+                         .format(self.label))
+                self.relaxer.mv_to_completed(self.relaxer.seed, keep=True, skip_existing=False)
+            else:
+                LOG.info('Writing results from compute dir of failed Workflow {} run to bad_castep folder and tidying up.'
+                         .format(self.label))
+                self.relaxer.mv_to_bad(self.relaxer.seed)
+            os.chdir(cwd)
+
+        if success:
+            LOG.info('Writing results of Workflow {} run to completed folder and tidying up.'.format(self.label))
+            self.relaxer.mv_to_completed(self.relaxer.seed, keep=True, skip_existing=True)
+        else:
+            LOG.info('Writing results of failed Workflow {} run to bad_castep folder and tidying up.'.format(self.label))
+            self.relaxer.mv_to_bad(self.relaxer.seed)
+
+    def add_step(self, function, name, input_exts=None, output_exts=None, clean_after=False, **func_kwargs):
         """ Add a step to the workflow.
 
         Parameters:
             function (Function): the function to run in the step; must
                 accept arguments of (self.relaxer, self.calc_doc, self.seed).
             name (str): the desired name for the step (human-readable).
+
+        Keyword arguments:
+            clean_after (bool): whether or not to clean up after this step is called
             func_kwargs (dict): any arguments to pass to function when called.
 
         """
         self.steps.append(WorkflowStep(function, name,
-                                       input_exts, output_exts,
+                                       self.compute_dir, input_exts, output_exts,
                                        **func_kwargs))
+        self.clean_after_step.append(clean_after)
 
     def run_steps(self):
         """ Loop over steps and run them. """
         try:
             if not self.steps:
                 msg = 'No steps added to Workflow!'
-                logging.error(msg)
+                LOG.error(msg)
                 raise RuntimeError(msg)
 
-            for step in self.steps:
-                step.run_step(self.relaxer, self.calc_doc, self.seed)
+            for ind, step in enumerate(self.steps):
+                LOG.info("Running step {step.name}: {step.function}".format(step=step))
+                LOG.debug("Current state: " + dumps(self.calc_doc, indent=None))
+                success = step.run_step(self.relaxer, self.calc_doc, self.seed)
+                if self.clean_after_step[ind]:
+                    self._clean_up(success=success)
 
             self.success = True
 
         except RuntimeError:
             self.success = False
             msg = '{} workflow exiting...'.format(self.label)
-            logging.error(msg)
+            LOG.error(msg)
             raise RuntimeError(msg)
 
 
@@ -126,21 +168,26 @@ class WorkflowStep:
     Attributes:
         function (function): the function to call.
         name (str): the human-readable name of the step.
+        compute_dir (str): the folder that relaxer will perform the calculation in.
         func_kwargs (dict): any extra kwargs to pass to the function.
         input_exts (list): list of input file extensions to cache after running.
         output_exts (list): list of output file extensions to cache after running.
 
     """
-    def __init__(self, function, name, input_exts=None, output_exts=None, **func_kwargs):
+
+    success = False
+
+    def __init__(self, function, name, compute_dir=None, input_exts=None, output_exts=None, **func_kwargs):
         """ Construct a WorkflowStep from a function. """
-        logging.debug('Constructing WorkflowStep: {}'.format(name))
+        LOG.debug('Constructing WorkflowStep: {}'.format(name))
         self.function = function
         self.name = name
+        self.compute_dir = compute_dir
         self.func_kwargs = func_kwargs
         self.input_exts = input_exts
         self.output_exts = output_exts
 
-    def _cache_files(self, seed, exts, mode):
+    def _cache_files(self, seed, exts, mode, directory=None):
         """ Copy any files <seed>.<ext> for ext in exts to
         <seed>.<ext>_<label>.
 
@@ -151,23 +198,22 @@ class WorkflowStep:
 
         """
         import shutil
-        import os
         import glob
+
         for ext in exts:
             if '*' in ext:
                 srcs = glob.glob('{}{}'.format(seed, ext))
             else:
                 srcs = ['{}{}'.format(seed, ext)]
-            print(ext, srcs)
             for src in srcs:
                 dst = src + '_{}'.format(self.name)
                 if os.path.isfile(src):
                     shutil.copy2(src, dst, follow_symlinks=True)
-                    logging.info('Backed up {} file {} to {}.'.format(mode, src, dst))
+                    LOG.info('Backed up {} file {} to {}.'.format(mode, src, dst))
                 else:
                     if mode == 'in':
                         error = 'Failed to cache input file {} for step {}.'.format(src, self.name)
-                        logging.warning(error)
+                        LOG.warning(error)
 
     def _cache_inputs(self, seed):
         """ Save any input files for the WorkflowStep with appropriate suffix
@@ -200,11 +246,15 @@ class WorkflowStep:
         """ Wrapper for calling both _cache_inputs and _cache_outputs, without
         throwing any errors.
         """
-        # try:
+        cwd = os.getcwd()
+        if self.compute_dir is not None:
+            os.chdir(self.compute_dir)
+
         self._cache_inputs(seed)
         self._cache_outputs(seed)
-        # except Exception:
-            # pass
+
+        if self.compute_dir is not None:
+            os.chdir(cwd)
 
     def run_step(self, relaxer, calc_doc, seed):
         """ Run the workflow step.
@@ -220,24 +270,24 @@ class WorkflowStep:
 
         """
         try:
-            logging.info('WorkflowStep {} starting...'.format(self.name))
-            success = self.function(relaxer, calc_doc, seed, **self.func_kwargs)
+            LOG.info('WorkflowStep {} starting...'.format(self.name))
+            self.success = self.function(relaxer, calc_doc, seed, **self.func_kwargs)
         except RuntimeError as exc:
             msg = 'WorkflowStep {} failed with error {}.'.format(self.name, exc)
-            logging.error(msg)
-            success = False
+            LOG.error(msg)
+            self.success = False
             self.cache_files(seed)
             raise exc
 
-        if success is None:
-            logging.info('WorkflowStep {} skipped, did you provide all the input files?'.format(self.name))
-            return success
+        if self.success is None:
+            LOG.info('WorkflowStep {} skipped, did you provide all the input files?'.format(self.name))
+            return self.success
 
-        if success:
-            logging.info('WorkflowStep {} completed successfully.'.format(self.name))
+        if self.success:
+            LOG.info('WorkflowStep {} completed successfully.'.format(self.name))
         else:
-            logging.warning('WorkflowStep {} was unsuccessful.'.format(self.name))
+            LOG.warning('WorkflowStep {} was unsuccessful.'.format(self.name))
 
         self.cache_files(seed)
 
-        return success
+        return self.success

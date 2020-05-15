@@ -15,15 +15,17 @@ spectral calculations with CASTEP in multiple steps:
 """
 
 
-import logging
 import os
 import copy
 import glob
+import logging
 from matador.workflows import Workflow
 from matador.scrapers import arbitrary2dict
 
+LOG = logging.getLogger('run3')
 
-def castep_full_spectral(relaxer, calc_doc, seed):
+
+def castep_full_spectral(relaxer, calc_doc, seed, **kwargs):
     """ Perform a "full" spectral calculation on a system, i.e. first
     perform an SCF then interpolate to different kpoint paths/grids to
     form DOS and dispersions. Optionally use OptaDOS for post-processing
@@ -76,21 +78,35 @@ class CastepSpectralWorkflow(Workflow):
                  'dispersion': castep_spectral_dispersion,
                  'pdis': optados_pdispersion}
 
-        exts = {'scf':
-                {'input': ['.cell', '.param'], 'output': ['.castep', '.*err', '-out.cell']},
-                'dos':
-                {'input': ['.cell', '.param'], 'output': ['.castep', '.bands', '.pdos_bin', '.dome_bin', '.*err', '-out.cell']},
-                'dispersion':
-                {'input': ['.cell', '.param'], 'output': ['.castep', '.bands', '.pdos_bin', '.dome_bin', '.*err', '-out.cell']},
-                'pdis':
-                {'input': ['.odi', '.pdos_bin'], 'output': ['.odo', '.*err']},
-                'pdos':
-                {'input': ['.odi', '.pdos_bin', '.dome_bin'], 'output': ['.odo', '.*err']},
-                'broadening':
-                {'input': ['.odi', '.pdos_bin', '.dome_bin'], 'output': ['.odo', '.*err']}}
+        exts = {
+            'scf': {
+                'input': ['.cell', '.param'],
+                'output': ['.castep', '.*err', '-out.cell']
+            },
+            'dos': {
+                'input': ['.cell', '.param'],
+                'output': ['.castep', '.bands', '.pdos_bin', '.dome_bin', '.*err', '-out.cell']
+            },
+            'dispersion': {
+                'input': ['.cell', '.param'],
+                'output': ['.castep', '.bands', '.pdos_bin', '.dome_bin', '.*err', '-out.cell']
+            },
+            'pdis': {
+                'input': ['.odi', '.pdos_bin'],
+                'output': ['.odo', '.*err']
+            },
+            'pdos': {
+                'input': ['.odi', '.pdos_bin', '.dome_bin'],
+                'output': ['.odo', '.*err']
+            },
+            'broadening': {
+                'input': ['.odi', '.pdos_bin', '.dome_bin'],
+                'output': ['.odo', '.*err']
+            }
+        }
 
         if os.path.isfile(self.seed + '.check'):
-            logging.info('Found {}.check, so skipping initial SCF.'.format(self.seed))
+            LOG.info('Found {}.check, so skipping initial SCF.'.format(self.seed))
             todo['scf'] = False
 
         if (
@@ -110,9 +126,11 @@ class CastepSpectralWorkflow(Workflow):
         odi_fname = _get_optados_fname(self.seed)
         if odi_fname is not None:
             odi_dict, _ = arbitrary2dict(odi_fname)
-            todo['pdis'] = 'pdispersion' in odi_dict
-            todo['broadening'] = 'broadening' in odi_dict
-            todo['pdos'] = 'pdos' in odi_dict
+            if todo['dispersion']:
+                todo['pdis'] = 'pdispersion' in odi_dict
+            if todo['dos']:
+                todo['broadening'] = 'broadening' in odi_dict
+                todo['pdos'] = 'pdos' in odi_dict
 
         for key in todo:
             if todo[key]:
@@ -135,14 +153,14 @@ class CastepSpectralWorkflow(Workflow):
         if 'spectral_kpoints_list' not in self.calc_doc and 'spectral_kpoints_path' not in self.calc_doc:
             from matador.utils.cell_utils import cart2abc
             prim_doc, kpt_path = self.relaxer.get_seekpath_compliant_input(
-                self.calc_doc, self.calc_doc['spectral_kpoints_path_spacing'])
+                self.calc_doc, self.calc_doc.get('spectral_kpoints_path_spacing', 0.05))
             self.calc_doc.update(prim_doc)
             self.calc_doc['lattice_abc'] = cart2abc(self.calc_doc['lattice_cart'])
             if todo['dispersion']:
                 self.calc_doc['spectral_kpoints_list'] = kpt_path
         elif todo['dispersion'] and 'spectral_kpoints_path' in self.calc_doc:
             self._user_defined_kpt_path = True
-            logging.warning('Using user-defined k-point path for all structures.')
+            LOG.warning('Using user-defined k-point path for all structures.')
             self.calc_doc['spectral_kpoints_path_spacing'] = self.calc_doc.get('spectral_kpoints_path_spacing', 0.05)
 
         if todo['dos']:
@@ -151,7 +169,7 @@ class CastepSpectralWorkflow(Workflow):
         # always use continuation
         self.calc_doc['continuation'] = 'default'
 
-        logging.info('Preprocessing completed: run3 spectral options {}'.format(todo))
+        LOG.info('Preprocessing completed: run3 spectral options {}'.format(todo))
 
 
 def castep_spectral_scf(relaxer, calc_doc, seed):
@@ -163,7 +181,7 @@ def castep_spectral_scf(relaxer, calc_doc, seed):
         seed (str): root filename of structure.
 
     """
-    logging.info('Performing CASTEP spectral SCF...')
+    LOG.info('Performing CASTEP spectral SCF...')
     scf_doc = copy.deepcopy(calc_doc)
     scf_doc['write_checkpoint'] = 'ALL'
     scf_doc['task'] = 'singlepoint'
@@ -193,7 +211,7 @@ def castep_spectral_dos(relaxer, calc_doc, seed):
         seed (str): root filename of structure.
 
     """
-    logging.info('Performing CASTEP spectral DOS calculation...')
+    LOG.info('Performing CASTEP spectral DOS calculation...')
 
     dos_doc = copy.deepcopy(calc_doc)
     dos_doc['task'] = 'spectral'
@@ -224,7 +242,7 @@ def castep_spectral_dispersion(relaxer, calc_doc, seed):
         seed (str): root filename of structure.
 
     """
-    logging.info('Performing CASTEP spectral dispersion calculation...')
+    LOG.info('Performing CASTEP spectral dispersion calculation...')
     disp_doc = copy.deepcopy(calc_doc)
     disp_doc['task'] = 'spectral'
     disp_doc['spectral_task'] = 'bandstructure'
@@ -242,18 +260,18 @@ def castep_spectral_dispersion(relaxer, calc_doc, seed):
     success = relaxer.scf(disp_doc, seed, keep=True, intermediate=True)
 
     if disp_doc.get('write_orbitals'):
-        logging.info('Planning to call orbitals2bands...')
+        LOG.info('Planning to call orbitals2bands...')
 
         _cache_executable = copy.deepcopy(relaxer.executable)
         _cache_core = copy.deepcopy(relaxer.ncores)
         relaxer.ncores = 1
         relaxer.executable = 'orbitals2bands'
         try:
-            success = relaxer.run_generic(seed, intermediate=True, mv_bad_on_failure=False)
+            success = relaxer.run_generic(intermediate=True, mv_bad_on_failure=False)
         except Exception as exc:
             relaxer.executable = _cache_executable
             relaxer.ncores = _cache_core
-            logging.warning('Failed to call orbitals2bands, with error: {}'.format(exc))
+            LOG.warning('Failed to call orbitals2bands, with error: {}'.format(exc))
 
         relaxer.ncores = _cache_core
         relaxer.executable = _cache_executable
@@ -279,7 +297,7 @@ def optados_pdos(relaxer, _, seed):
         if 'pdispersion' in odi_dict:
             del odi_dict['pdispersion']
 
-        logging.info('Performing OptaDOS pDOS calculation with parameters from {}'.format(odi_fname))
+        LOG.info('Performing OptaDOS pDOS calculation with parameters from {}'.format(odi_fname))
         success = _run_optados(relaxer, odi_dict, seed, suffix='dos')
         return success
 
@@ -306,7 +324,7 @@ def optados_dos_broadening(relaxer, _, seed):
         if 'pdispersion' in odi_dict:
             del odi_dict['pdispersion']
 
-        logging.info('Performing OptaDOS DOS broadening with parameters from {}'.format(odi_fname))
+        LOG.info('Performing OptaDOS DOS broadening with parameters from {}'.format(odi_fname))
         return _run_optados(relaxer, odi_dict, seed, suffix='dos')
 
     return None
@@ -329,7 +347,7 @@ def optados_pdispersion(relaxer, _, seed):
         if 'pdos' in odi_dict:
             del odi_dict['pdos']
 
-        logging.info('Performing OptaDOS pDIS calculation with parameters from {}'.format(odi_fname))
+        LOG.info('Performing OptaDOS pDIS calculation with parameters from {}'.format(odi_fname))
         return _run_optados(relaxer, odi_dict, seed, suffix='dispersion')
 
     return None
@@ -351,7 +369,11 @@ def _run_optados(relaxer, odi_dict, seed, suffix=None):
     """
 
     from matador.export import doc2arbitrary
-    doc2arbitrary(odi_dict, seed + '.odi', overwrite=True)
+    odi_path = '{}.odi'.format(seed)
+    if relaxer.compute_dir is not None:
+        odi_path = relaxer.compute_dir + '/' + odi_path
+    doc2arbitrary(odi_dict, odi_path, overwrite=True)
+
     if suffix is not None:
         _get_correct_files_for_optados(seed, suffix=suffix)
 
@@ -364,9 +386,9 @@ def _run_optados(relaxer, odi_dict, seed, suffix=None):
     success = False
 
     try:
-        success = relaxer.run_generic(seed, intermediate=True, mv_bad_on_failure=False)
+        success = relaxer.run_generic(intermediate=True, mv_bad_on_failure=False)
     except Exception as exc:
-        logging.warning('Failed to call optados with error: {}'.format(exc))
+        LOG.warning('Failed to call optados with error: {}'.format(exc))
 
     relaxer.ncores = _cache_core
     relaxer.nnodes = _cache_nodes
@@ -416,6 +438,9 @@ def _get_correct_files_for_optados(seed, suffix=None):
 
     """
     import shutil
+    LOG.debug('Getting files for OptaDOS: {} {}'.format(seed, suffix))
+    if suffix is None:
+        return
     files_to_cache = ['.pdos_bin', '.dome_bin', '-out.cell', '.bands', '.cell', '.param']
     for ext in files_to_cache:
         old_file = '{}{}_{}'.format(seed, ext, suffix)
@@ -426,6 +451,7 @@ def _get_correct_files_for_optados(seed, suffix=None):
                 shutil.copy2(current_file, backup_file)
             os.remove(current_file)
         if os.path.isfile(old_file):
+            LOG.debug('Copying {} to {}'.format(old_file, current_file))
             shutil.copy2(old_file, current_file)
             if suffix == 'bak':
                 os.remove(old_file)

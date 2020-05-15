@@ -1,0 +1,34 @@
+START COMMENT
+ 245 COARSE
+ 272 MEDIUM
+ 299 FINE
+ 479 EXTREME
+ 
+   ============================================================                
+   | Pseudopotential Report - Date of generation 17-11-2017   |                
+   ------------------------------------------------------------                
+   | Element: K Ionic charge:  9.00 Level of theory: PBE      |                
+   | Atomic Solver: Koelling-Harmon                           |                
+   |                                                          |                
+   |               Reference Electronic Structure             |                
+   |         Orbital         Occupation         Energy        |                
+   |            3s              2.000           -1.299        |                
+   |            3p              6.000           -0.691        |                
+   |            4s              1.000           -0.085        |                
+   |                                                          |                
+   |                 Pseudopotential Definition               |                
+   |        Beta     l      e      Rc     scheme   norm       |                
+   |          1      0   -1.299   1.500     qc      0         |                
+   |          2      0   -0.085   1.500     qc      0         |                
+   |          3      0    0.250   1.500     qc      0         |                
+   |          4      1   -0.691   1.500     qc      0         |                
+   |          5      1    0.250   1.500     qc      0         |                
+   |         loc     2    0.000   1.500     pn      0         |                
+   |                                                          |                
+   | Augmentation charge Rinner = 1.048                       |                
+   | Partial core correction Rc = 1.048                       |                
+   ------------------------------------------------------------                
+   | "2|1.5|9|10|11|30U:40:31(qc=6)"                          |                
+   ------------------------------------------------------------                
+   |      Author: Chris J. Pickard, Cambridge University      |                
+   ============================================================                

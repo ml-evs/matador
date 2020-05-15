@@ -7,8 +7,8 @@ with the compute module.
 """
 
 import os
-from matador.calculators import Calculator
-from matador.compute.errors import InputError, CalculationError
+from matador.calculators.calculator import Calculator
+from matador.utils.errors import InputError, CalculationError
 
 VALID_PSPOT_LIBS = ['C7', 'C8', 'C9', 'C17', 'C18', 'MS', 'HARD',
                     'QC5', 'NCP', 'NCP18', 'NCP17', 'NCP9']
@@ -26,13 +26,14 @@ class CastepCalculator(Calculator):
                 if elem[0] not in calculation_parameters['species_pot']:
                     msg = 'Unable to find pseudopotential specification for species {}'.format(elem[0])
                     errors.append(msg)
-                if ('|' not in calculation_parameters['species_pot'][elem[0]] and
-                        not os.path.isfile(os.path.expanduser(calculation_parameters['species_pot'][elem[0]])) and
-                        calculation_parameters['species_pot'][elem[0]] not in VALID_PSPOT_LIBS):
-                    msg = 'Unable to find pseudopotential file/string/library: {}'.format(calculation_parameters['species_pot'][elem[0]])
+                elif ('|' not in calculation_parameters['species_pot'][elem[0]] and
+                      not os.path.isfile(os.path.expanduser(calculation_parameters['species_pot'][elem[0]])) and
+                      calculation_parameters['species_pot'][elem[0]] not in VALID_PSPOT_LIBS):
+                    msg = ('Unable to find pseudopotential file/string/library: {}'
+                           .format(calculation_parameters['species_pot'][elem[0]]))
                     errors.append(msg)
 
-        if 'cut_off_energy' not in calculation_parameters:
+        if 'cut_off_energy' not in calculation_parameters and 'basis_precision' not in calculation_parameters:
             msg = 'Unable to find cut_off_energy field in param file'
             errors.append(msg)
         if 'xc_functional' not in calculation_parameters:

@@ -1,6 +1,6 @@
 codecov:
   notify:
-    require_ci_to_pass: yes
+    require_ci_to_pass: no
 
 coverage:
   precision: 2
@@ -11,4 +11,4 @@ coverage:
     project: yes
     patch: yes
     changes: no
-    threshold: 0.5
+    threshold: 1

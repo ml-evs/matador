@@ -25,7 +25,7 @@ def main():
     parser.add_argument('--svg', action='store_true',
                         help='save svg rather than showing plot in X')
     parser.add_argument('--labels', type=str, nargs='*',
-                        help='list of legend labels')
+                        help='list of legend labels, comma separated')
     parser.add_argument('--dos_only', action='store_true', help='only plot DOS')
     parser.add_argument('--bs_only', action='store_true', help='only plot dispersion')
     parser.add_argument('--preserve_kspace_distance', action='store_true',
@@ -40,8 +40,10 @@ def main():
                         help='multiple by which to interpolate pDIS bands (DEFAULT: 2)')
     parser.add_argument('-scale', '--pdis_point_scale', type=float,
                         help='point scale in pDIS plots (DEFAULT: 25)')
-    parser.add_argument('--no_stacked_pdos', action='store_true',
+    parser.add_argument('--unstacked_pdos', action='store_true',
                         help='plot PDOS as overlap rather than stack')
+    parser.add_argument('--no_pdis', action='store_true',
+                        help='do not try to plot PDIS, even if its available')
     parser.add_argument('--no_band_reorder', action='store_true',
                         help='don\'t reorder bands based on local gradients')
     parser.add_argument('--band_reorder', action='store_true',
@@ -55,8 +57,13 @@ def main():
                         help='plot position and size of band gap')
     parser.add_argument('-ph', '--phonons', action='store_true', default=False,
                         help='plot phonon calculation, rather than electronic')
+    parser.add_argument('-ir', '--infrared', action='store_true', default=False,
+                        help='plot infrared spectrum from file')
+    parser.add_argument('-ir_ss', '--infrared_step_size', type=float, nargs='?', default=1.0,
+                        help='step size in cm^{-1} on x-axis for IR plots; must be > 0, default is 1')
     parser.add_argument('-gw', '--gaussian_width', type=float,
-                        help='smearing width for DOS from .bands_dos (default: 0.1 eV) or .phonon_dos files (default: 10 1/cm)')
+                        help=('smearing width for DOS from .bands_dos (default: 0.1 eV) or '
+                              '.phonon_dos files (default: 10 1/cm)'))
     parser.add_argument('--highlight_bands', nargs='+', type=int,
                         help='specify band numbres to highlight in plot')
     parser.add_argument('-v', '--verbosity', type=int, default=0,
@@ -66,22 +73,35 @@ def main():
     parser.add_argument('-pw', '--plot_window', nargs='+', type=float,
                         help='energy window [x, y] or [-x, x] to plot either side of E_F (eV)\
                              (DEFAULT: 5 eV)')
-    parser.add_argument('seed', type=str,
+    parser.add_argument('seed', type=str, nargs='+',
                         help='seedname or related filename (e.g. bands or dos file)')
     kwargs = vars(parser.parse_args())
     if 'gap' in kwargs:
         gap = kwargs['gap']
         del kwargs['gap']
 
-    seed = kwargs.get('seed')
+    seeds = kwargs.get('seed')
     exts_to_strip = ['bands', 'linear.dat', 'adaptive.dat', 'pdis.dat',
                      'bands_dos', 'pdos.dat', 'phonon', 'phonon_dos']
-    for ext in exts_to_strip:
-        seed = seed.replace('.' + ext, '')
+
+    for ind, seed in enumerate(seeds):
+        for ext in exts_to_strip:
+            seeds[ind] = seeds[ind].replace('.' + ext, '')
 
     verbosity = kwargs.get('verbosity')
     phonons = kwargs.get('phonons')
-    labels = kwargs.get('labels')
+    ir = kwargs.get('infrared')
+    if kwargs.get('labels'):
+        labels = ' '.join(kwargs.get('labels')).split(',')
+    else:
+        labels = None
+
+    if kwargs['no_pdis']:
+        plot_pdis = False
+    else:
+        plot_pdis = True
+    del kwargs['no_pdis']
+
     cmap = kwargs.get('cmap')
     band_colour = kwargs.get('band_colour')
     if band_colour is None:
@@ -93,7 +113,7 @@ def main():
     else:
         band_reorder = None
 
-    from matador.plotting import plot_spectral
+    from matador.plotting import plot_spectral, plot_ir_spectrum
 
     del kwargs['seed']
     del kwargs['verbosity']
@@ -103,28 +123,32 @@ def main():
     del kwargs['band_reorder']
     del kwargs['no_band_reorder']
 
-    from matador.utils.print_utils import print_failure
+    bandstructure = False
+    for seed in seeds:
+        if not phonons and not ir:
+            bs_seed = seed + '.bands'
+            bandstructure = isfile(bs_seed)
+            dos_seeds = glob.glob(seed + '*.dat')
+            if isfile(seed + '.bands_dos'):
+                dos_seeds.append(seed + '.bands_dos')
+            dos = any([isfile(dos_seed) for dos_seed in dos_seeds])
 
-    if not phonons:
-        bs_seed = seed + '.bands'
-        bandstructure = isfile(bs_seed)
-        dos_seeds = glob.glob(seed + '*.dat')
-        if isfile(seed + '.bands_dos'):
-            dos_seeds.append(seed + '.bands_dos')
-        dos = any([isfile(dos_seed) for dos_seed in dos_seeds])
+        elif phonons and not ir:
+            phonon_seed = seed + '.phonon'
+            bandstructure = isfile(phonon_seed)
+            dos_seed = seed + '.phonon_dos'
+            dos = isfile(dos_seed)
 
-    elif phonons:
-        phonon_seed = seed + '.phonon'
-        bandstructure = isfile(phonon_seed)
-        dos_seed = seed + '.phonon_dos'
-        dos = isfile(dos_seed)
+        elif ir:
+            if len(seeds) > 1:
+                exit('Multiple seeds not supported for IR plot.')
+            ir_seed = seed + '.phonon'
 
-    cell_seed = seed + '.cell'
-    cell = isfile(cell_seed)
-
-    if not dos and not bandstructure:
-        print_failure('Could not find files for specified seed {}.'.format(seed))
-        exit()
+    if bandstructure:
+        cell_seed = seed + '.cell'
+        cell = isfile(cell_seed)
+    else:
+        cell = False
 
     if kwargs.get('dos_only') and dos:
         bandstructure = False
@@ -132,17 +156,31 @@ def main():
     if kwargs.get('bs_only') and bandstructure:
         dos = False
 
-    plot_spectral(seed,
-                  plot_bandstructure=bandstructure,
-                  plot_dos=dos,
-                  cell=cell,
-                  gap=gap,
-                  verbosity=verbosity,
-                  labels=labels,
-                  cmap=cmap,
-                  band_reorder=band_reorder,
-                  band_colour=band_colour,
-                  **kwargs)
+    if not ir:
+        return plot_spectral(
+            seeds,
+            plot_bandstructure=bandstructure,
+            plot_dos=dos,
+            plot_pdis=plot_pdis,
+            cell=cell,
+            gap=gap,
+            verbosity=verbosity,
+            labels=labels,
+            cmap=cmap,
+            band_reorder=band_reorder,
+            band_colour=band_colour,
+            **kwargs
+        )
+
+    if ir:
+        return plot_ir_spectrum(
+            ir_seed,
+            bin_width=kwargs['infrared_step_size'],
+            **kwargs
+        )
+
+    exit("Issue plotting {}: did you specify -ph/-ir appropriately?"
+         .format(seeds))
 
 
 if __name__ == '__main__':
