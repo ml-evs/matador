@@ -2,17 +2,11 @@
 # Distributed under the terms of the MIT License.
 
 
-import subprocess as sp
 import os
 from setuptools import setup, find_packages
 from glob import glob
 
-try:
-    __version__ = sp.check_output(['git', 'describe', '--tags']).decode('utf-8').strip()
-    __version__ += '+' + (sp.check_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD'])
-                          .decode('utf-8').strip())
-except sp.CalledProcessError:
-    __version__ = '0.9a1'
+from matador import __version__
 
 with open('requirements/requirements.txt', 'r') as f:
     requirements = [line.strip() for line in f.readlines()]
