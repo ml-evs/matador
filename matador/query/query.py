@@ -7,14 +7,14 @@ user inputs, displaying results and calling other functionality.
 """
 
 
-from os import devnull
 import sys
+import random
+from os import devnull
 from itertools import combinations
 from traceback import print_exc
 
 import pymongo as pm
 import numpy as np
-from bson.son import SON
 from bson.json_util import dumps
 from bson.objectid import ObjectId
 
@@ -396,8 +396,7 @@ class DBQuery:
             self._set_filter_display_results(cursor_count)
 
         # if a summary has been requested, cursor must be converted to list
-        if (self._create_hull or self.args.get('subcmd') == 'swaps' or self.args.get('summary')) \
-                and not isinstance(self.cursor, list):
+        if self.args.get('summary'):
             self.cursor = list(self.cursor)
 
         if self.args.get('subcmd') != 'swaps' and not self._create_hull:
@@ -475,85 +474,81 @@ class DBQuery:
 
             test_cursors = []
             test_cursor_count = []
-            test_query_dict = []
+            text_ids = []
             calc_dicts = []
             cutoff = []
-            sample = 2
-            rand_sample = 5 if self.args.get('biggest') else 3
-            i = 0
-            count = len(self.cursor)
+
+            num_sample = 2
+            num_rand_sample = 5 if self.args.get('biggest') else 3
+
+            if isinstance(self.cursor, pm.cursor.Cursor):
+                count = self.cursor.count()
+            else:
+                count = len(self.cursor)
+
             if count <= 0:
                 raise SystemExit('No structures found for hull.')
 
-            while i < sample + rand_sample:
-                # start with sample/2 lowest enthalpy structures
-                if i < int(sample) and not self.args.get('intersection'):
-                    ind = i
-                # then do some random samples
-                else:
-                    ind = np.random.randint(rand_sample if rand_sample < count - 1 else 0, count - 1)
+            # generate some random indices to match to, make sure they are in order
+            # so can be accessed without cursor rewinds
+            sampling_indices = list(range(num_sample)) + sorted(random.sample(range(2, count), num_rand_sample))
 
+            for ind in sampling_indices:
                 doc = self.cursor[ind]
+                text_ids.append(doc['text_id'])
+                try:
+                    self.query_dict = self._query_calc(doc)
+                    cutoff.append(doc['cut_off_energy'])
+                    calc_dicts.append(dict())
+                    calc_dicts[-1]['$and'] = list(self.query_dict['$and'])
+                    self.query_dict['$and'].append(self._query_composition())
+                    if not self.args.get('ignore_warnings'):
+                        self.query_dict['$and'].append(self._query_quality())
 
-                id_cursor, id_count = self._find_and_sort({'text_id': doc['text_id']})
-                if id_count > 1:
-                    print_warning(
-                        'WARNING: matched multiple structures with text_id ' + id_cursor[0]['text_id'][0] + ' ' +
-                        id_cursor[0]['text_id'][1] + '.' + ' Skipping this set...')
-                    rand_sample += 1
-                else:
-                    self.query_dict = dict()
-                    try:
-                        self.query_dict = self._query_calc(id_cursor[0])
-                        cutoff.append(id_cursor[0]['cut_off_energy'])
-                        calc_dicts.append(dict())
-                        calc_dicts[-1]['$and'] = list(self.query_dict['$and'])
-                        self.query_dict['$and'].append(self._query_composition())
-                        if not self.args.get('ignore_warnings'):
-                            self.query_dict['$and'].append(self._query_quality())
-                        test_query_dict.append(self.query_dict)
-                        test_cursors.append(
-                            list(self._find_and_sort(SON(test_query_dict[-1]))[0])
-                        )
-                        if self._non_elemental:
-                            test_cursors[-1] = filter_cursor_by_chempots(self._chempots, test_cursors[-1])
-                        test_cursor_count.append(len(test_cursors[-1]))
-                        print("{:^24}: matched {} structures."
-                              .format(' '.join(doc['text_id']), test_cursor_count[-1]),
-                              end='\t-> ')
-                        print('{spin}{sedc}{functional} {cutoff} eV, {geom_force_tol} eV/A, {kpoints} 1/A.'
-                              .format(spin="S-" if doc.get('spin_polarized') else '',
-                                      sedc="+" + doc.get('sedc') + "+" if doc.get('sedc') else "",
-                                      functional=doc["xc_functional"],
-                                      cutoff=doc["cut_off_energy"],
-                                      geom_force_tol=doc.get('geom_force_tol', 'xxx'),
-                                      kpoints=doc.get('kpoints_mp_spacing', 'xxx')))
+                    probe_cursor, probe_count = self._find_and_sort(self.query_dict)
 
-                        if test_cursor_count[-1] == count:
-                            print('Matched all structures...')
-                            break
-                        if test_cursor_count[-1] > 2 * int(count / 3):
-                            print('Matched at least 2/3 of total number, composing hull...')
-                            break
-                    except (KeyboardInterrupt, SystemExit) as oops:
-                        raise oops
-                    except Exception:
-                        print_exc()
-                        print_warning('Error with {}'.format(' '.join(id_cursor[0]['text_id'])))
-                        rand_sample += 1
-                i += 1
+                    if self._non_elemental:
+                        probe_cursor = filter_cursor_by_chempots(self._chempots, probe_cursor)
+                        probe_count = len(probe_cursor)
+
+                    test_cursors.append(probe_cursor)
+                    test_cursor_count.append(probe_count)
+
+                    print("{:^24}: matched {} structures."
+                          .format(' '.join(doc['text_id']), probe_count),
+                          end='\t-> ')
+                    print('{spin}{sedc}{functional} {cutoff} eV, {geom_force_tol} eV/A, {kpoints} 1/A.'
+                          .format(spin="S-" if doc.get('spin_polarized') else '',
+                                  sedc="+" + doc.get('sedc') + "+" if doc.get('sedc') else "",
+                                  functional=doc["xc_functional"],
+                                  cutoff=doc["cut_off_energy"],
+                                  geom_force_tol=doc.get('geom_force_tol', 'xxx'),
+                                  kpoints=doc.get('kpoints_mp_spacing', 'xxx')))
+
+                    if test_cursor_count[-1] == count:
+                        print('Matched all structures...')
+                        break
+                    if test_cursor_count[-1] > 2 * int(count / 3):
+                        print('Matched at least 2/3 of total number, composing hull...')
+                        break
+
+                except Exception:
+                    print_exc()
+                    print_warning('Error with {}'.format(' '.join(doc['text_id'])))
 
             if self.args.get('biggest'):
                 choice = np.argmax(np.asarray(test_cursor_count))
             else:
                 # by default, find highest cutoff hull as first proxy for quality
                 choice = np.argmax(np.asarray(cutoff))
+
+            text_id = text_ids[choice]
             self.cursor = test_cursors[choice]
-            if not self.cursor:
+            self.calc_dict = calc_dicts[choice]
+            if not test_cursor_count[choice]:
                 raise RuntimeError('No structures found that match chemical potentials.')
 
-            print_success('Composing hull from set containing {}'.format(' '.join(self.cursor[0]['text_id'])))
-            self.calc_dict = calc_dicts[choice]
+            print_success('Composing hull from set containing {}'.format(' '.join(text_id)))
 
     def perform_id_query(self):
         """ Query the `text_id` field for the ID provided in the args for a calc_match

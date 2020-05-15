@@ -193,7 +193,7 @@ class QueryConvexHull:
             print_notify('{} structures found within {} eV of the hull, including chemical potentials.'
                          .format(len(self.hull_cursor), self.hull_cutoff))
 
-        display_results(self.hull_cursor, args=self.args, hull=True, energy_key=self.energy_key)
+        display_results(self.hull_cursor, hull=True, energy_key=self.energy_key, **self.args)
 
         if self.compute_voltages:
             print("Constructing electrode system with active ion: {}".format(self.species[0]))

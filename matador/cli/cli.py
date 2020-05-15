@@ -440,7 +440,8 @@ def main(no_quickstart=False):
     query_flags.add_argument('-ef', '--eform', action='store_true', help='print formation energy not hull distance.')
     query_flags.add_argument('-dt', '--time', type=int, help='query only structures added before this time in days')
     query_flags.add_argument('-avail', '--available_values', type=str, help='list all values of field in query results')
-    query_flags.add_argument('--use_source', action='store_true', help='show the source rather than database ID')
+    query_flags.add_argument('--use_source', default=False, action='store_true',
+                             help='show the source rather than database ID')
     query_flags.add_argument('--since', action='store_true',
                              help='query only structures added after time specified by --time in days')
     query_flags.add_argument('--source', action='store_true',
