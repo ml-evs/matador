@@ -2,7 +2,7 @@
 matador
 =======
 
-|GH Actions| |Coverage Status| |Documentation Status| |MIT License|
+|PyPI Version| |GH Actions| |Coverage Status| |Documentation Status| |MIT License|
 
 matador is an aggregator, manipulator and runner of first-principles calculations, written with a bent towards battery electrode materials.
 The source can be found on `GitHub <https://github.com/ml-evs/matador>`_ and online documentation is hosted on `ReadTheDocs <https://docs.matador.science>`_.
@@ -72,6 +72,7 @@ in the examples and API documentation.
 - Creation of phase diagrams and electrochemical voltage profiles from the results of DFT calculations.
 
 
+.. |PyPI Version| image:: https://img.shields.io/pypi/v/matador-db?label=PyPI&logo=pypi
 .. |GH Actions| image:: https://img.shields.io/github/workflow/status/ml-evs/matador/Run%20tests/develop?label=develop&logo=github
    :target: https://github.com/ml-evs/matador/actions?query=branch%3Adevelop
 .. |MIT License| image:: https://img.shields.io/badge/license-MIT-blue.svg
