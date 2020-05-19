@@ -494,6 +494,9 @@ class ComputeTask:
         try:
             return self._relax(intermediate=intermediate)
 
+        except WalltimeError as err:
+            raise err
+
         except Exception as err:
             self._finalise_result(intermediate)
             raise err
@@ -685,44 +688,10 @@ class ComputeTask:
         """
         LOG.info('Performing single-shot CASTEP run on {}, with task: {}'.format(seed, calc_doc['task']))
         try:
-            self.cp_to_input(seed)
-            self._setup_compute_dir(self.seed, self.compute_dir, custom_params=self.custom_params)
-            if self.compute_dir is not None:
-                os.chdir(self.compute_dir)
+            self._singleshot(calc_doc, seed, keep=keep, intermediate=intermediate)
 
-            self._update_input_files(seed, calc_doc)
-            doc2res(calc_doc, self.seed, info=False, hash_dupe=False, overwrite=True)
-
-            # run CASTEP
-            _process = self.run_command(seed)
-            output_filename = "{}.{}".format(seed, 'castep')
-            self._handle_process(
-                _process, expected_fname=output_filename, check_walltime=True
-            )
-
-            # check for errors and report them
-            errors_present, errors, _ = self._catch_castep_errors(_process)
-            if errors_present:
-                raise CalculationError(
-                    'CASTEP run on {} failed with errors: {}'.format(seed, errors)
-                )
-
-            # scrape dict but ignore the results
-            results_dict, success = castep2dict(output_filename, db=False, verbosity=self.verbosity)
-            if not success:
-                raise CalculationError(
-                    'Error scraping CASTEP file {}: {}'.format(seed, results_dict)
-                )
-
-            self._update_castep_output_files(seed)
-
-            if not intermediate:
-                LOG.info('Writing results of singleshot CASTEP run to res file and tidying up.')
-                doc2res(results_dict, seed, hash_dupe=False, overwrite=True)
-                self.mv_to_completed(seed, keep=keep, completed_dir=self.paths['completed_dir'])
-                self.tidy_up(seed)
-
-            return success
+        except WalltimeError as err:
+            raise err
 
         except Exception as err:
             self.mv_to_bad(seed)
@@ -733,6 +702,67 @@ class ComputeTask:
         finally:
             if self.compute_dir is not None:
                 os.chdir(self.root_folder)
+
+    def _singleshot(self, calc_doc, seed, keep=True, intermediate=False):
+        """ Perform a singleshot calculation with CASTEP. Singleshot runs do not
+        attempt to remedy any errors raised.
+
+        Files from completed runs are moved to `completed`, if not
+        in intermediate mode, and failed runs to `bad_castep`.
+
+        Parameters:
+            calc_doc (dict): dictionary containing parameters and structure
+            seed (str): structure filename
+
+        Keyword arguments:
+            intermediate (bool): whether we want to run more calculations
+                on the output of this, i.e. whether to move to completed
+                or not.
+            keep (bool): whether to keep intermediate files e.g. .bands
+
+        Returns:
+            bool: True iff SCF completed successfully, False otherwise.
+
+        """
+
+        self.cp_to_input(seed)
+        self._setup_compute_dir(seed, self.compute_dir, custom_params=self.custom_params)
+        if self.compute_dir is not None:
+            os.chdir(self.compute_dir)
+
+        self._update_input_files(seed, calc_doc)
+        doc2res(calc_doc, self.seed, info=False, hash_dupe=False, overwrite=True)
+
+        # run CASTEP
+        _process = self.run_command(seed)
+        output_filename = "{}.{}".format(seed, 'castep')
+        self._handle_process(
+            _process, expected_fname=output_filename, check_walltime=True
+        )
+
+        # check for errors and report them
+        errors_present, errors, _ = self._catch_castep_errors(_process)
+        if errors_present:
+            raise CalculationError(
+                'CASTEP run on {} failed with errors: {}'.format(seed, errors)
+            )
+
+        # scrape dict but ignore the results
+        results_dict, success = castep2dict(output_filename, db=False, verbosity=self.verbosity)
+        if not success:
+            raise CalculationError(
+                'Error scraping CASTEP file {}: {}'.format(seed, results_dict)
+            )
+
+        self._update_castep_output_files(seed)
+
+        if not intermediate:
+            LOG.info('Writing results of singleshot CASTEP run to res file and tidying up.')
+            doc2res(results_dict, seed, hash_dupe=False, overwrite=True)
+            self.mv_to_completed(seed, keep=keep, completed_dir=self.paths['completed_dir'])
+            self.tidy_up(seed)
+
+        return success
 
     @staticmethod
     def validate_calc_doc(calc_doc, required, forbidden):
