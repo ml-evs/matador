@@ -1,7 +1,7 @@
 # coding: utf-8
 # Distributed under the terms of the MIT license.
 
-""" This file implements the FullRelaxer class for handling
+""" This file implements the :class:`ComputeTask` class for handling
 calculations on a single structure.
 
 """
@@ -32,6 +32,8 @@ MATADOR_CUSTOM_TASKS = ['bulk_modulus', 'projected_bandstructure', 'pdispersion'
 
 LOG = logging.getLogger('run3')
 LOG.setLevel(logging.DEBUG)
+
+__all__ = ["ComputeTask"]
 
 
 class ComputeTask:
@@ -240,14 +242,14 @@ class ComputeTask:
         elif 'completed_dir' not in self.paths:
             raise RuntimeError('Invalid paths: {}'.format(self.paths))
 
-        self.set_input_structure(res)
+        self._set_input_structure(res)
 
         if self.start:
             self.begin()
         else:
             LOG.info('Waiting for `begin()` method to be called...')
 
-    def set_input_structure(self, res):
+    def _set_input_structure(self, res):
         """ Set the input structure to the given dictionary, or read it from
         the given file.
 
@@ -306,9 +308,9 @@ class ComputeTask:
             raise exc
 
         if self.success:
-            LOG.info('FullRelaxer finished successfully for {seed}'.format(seed=self.seed))
+            LOG.info('ComputeTask finished successfully for {seed}'.format(seed=self.seed))
         else:
-            LOG.info('FullRelaxer failed cleanly for {seed}'.format(seed=self.seed))
+            LOG.info('ComputeTask failed cleanly for {seed}'.format(seed=self.seed))
         for handler in LOG.handlers[:]:
             handler.close()
 
@@ -388,7 +390,7 @@ class ComputeTask:
 
             # perform relaxation
             elif self.calc_doc['task'].upper() in ['GEOMETRYOPTIMISATION', 'GEOMETRYOPTIMIZATION']:
-                success = self.relax()
+                success = self.run_castep_relaxation()
 
             elif self.calc_doc['task'].upper() in ['PHONON', 'THERMODYNAMICS']:
                 from matador.workflows.castep import castep_full_phonon
@@ -402,9 +404,9 @@ class ComputeTask:
                 from matador.workflows.castep import castep_elastic
                 success = castep_elastic(self, self.calc_doc, self.seed, **self.workflow_kwargs)
 
-            # run in SCF mode, i.e. just call CASTEP on the seeds
+            # run in singleshot mode, i.e. just call CASTEP on the seeds
             else:
-                success = self.scf(self.calc_doc, self.seed, keep=True)
+                success = self.run_castep_singleshot(self.calc_doc, self.seed, keep=True)
 
             if self.compute_dir is not None:
                 os.chdir(self.root_folder)
@@ -469,21 +471,20 @@ class ComputeTask:
             LOG.info('Executable {exe} finished cleanly.'.format(exe=self.executable))
             self._first_run = False
 
+            return True
+
+        finally:
             if self.compute_dir is not None:
                 os.chdir(self.root_folder)
-
-            return True
 
         except Exception as err:
             self._first_run = False
             LOG.error('Caught error inside run_generic: {error}.'.format(error=err))
             if mv_bad_on_failure:
                 self.mv_to_bad(seed)
-            if self.compute_dir is not None:
-                os.chdir(self.root_folder)
             raise err
 
-    def relax(self, intermediate=False):
+    def run_castep_relaxation(self, intermediate=False):
         """ Set up a structural relaxation that is restarted intermittently
         in order to re-mesh the kpoint grid. Completed calculations are moved
         to the "completed" folder, and failures to "bad_castep".
@@ -629,7 +630,7 @@ class ComputeTask:
                 msg += errors
                 LOG.warning(msg)
                 if isinstance(opti_dict, dict):
-                    self._update_output_files(seed, opti_dict)
+                    self._update_castep_output_files(seed, opti_dict)
                 if remedy is not None and self._num_retries <= self._max_num_retries:
                     LOG.warning('Attempting to recover using {}'.format(remedy))
                 else:
@@ -658,7 +659,7 @@ class ComputeTask:
                 # then reset, and go again...
                 if self.reopt and rerun and not opti_dict['optimised']:
                     rerun = False
-                    self._update_output_files(seed, opti_dict)
+                    self._update_castep_output_files(seed, opti_dict)
 
                 # are we optimised, but haven't yet rerun?
                 # then set prepare to do one more full relaxation
@@ -669,12 +670,12 @@ class ComputeTask:
                     if self.squeeze:
                         for jnd in range(ind, len(self._squeeze_list)):
                             self._squeeze_list[jnd] = False
-                    self._update_output_files(seed, opti_dict)
+                    self._update_castep_output_files(seed, opti_dict)
 
                 # or did the relaxation complete successfuly, including rerun?
                 elif (not self.reopt or rerun) and opti_dict['optimised']:
                     LOG.info('Successfully relaxed {}'.format(seed))
-                    self._update_output_files(seed, opti_dict)
+                    self._update_castep_output_files(seed, opti_dict)
                     break
 
                 # reached maximum number of steps
@@ -720,7 +721,7 @@ class ComputeTask:
 
         return self._finalise_result(intermediate=intermediate)
 
-    def scf(self, calc_doc, seed, keep=True, intermediate=False):
+    def run_castep_singleshot(self, calc_doc, seed, keep=True, intermediate=False):
         """ Perform a single-shot calculation with CASTEP.
 
         Files from completed runs are moved to `completed`, if not
@@ -767,7 +768,7 @@ class ComputeTask:
                 msg = 'Error scraping CASTEP file {}: {}'.format(seed, results_dict)
                 raise CalculationError(msg)
 
-            self._update_output_files(seed)
+            self._update_castep_output_files(seed)
 
             if not intermediate:
                 LOG.info('Writing results of singleshot CASTEP run to res file and tidying up.')
@@ -839,7 +840,7 @@ class ComputeTask:
 
     def run_convergence_tests(self, calc_doc):
         """ Run kpoint and cutoff_energy convergence tests based on
-        options passed to FullRelaxer.
+        options passed to ComputeTask.
 
         Parameters:
             calc_doc (dict): the structure to converge.
@@ -860,7 +861,7 @@ class ComputeTask:
                 calc_doc.update({'cut_off_energy': cutoff})
                 self.paths['completed_dir'] = 'completed_cutoff'
                 seed = self.seed + '_' + str(cutoff) + 'eV'
-                success = self.scf(calc_doc, seed, keep=False)
+                success = self.run_castep_singleshot(calc_doc, seed, keep=False)
                 successes.append(success)
         if self.conv_kpt_bool:
             # run series of singlepoints for various cutoffs
@@ -873,7 +874,7 @@ class ComputeTask:
                 LOG.debug('Using offset {}'.format(calc_doc['kpoints_mp_offset']))
                 self.paths['completed_dir'] = 'completed_kpts'
                 seed = self.seed + '_' + str(kpt) + 'A'
-                success = self.scf(calc_doc, seed, keep=False)
+                success = self.run_castep_singleshot(calc_doc, seed, keep=False)
                 successes.append(success)
         return any(successes)
 
@@ -930,7 +931,7 @@ class ComputeTask:
 
         except FileNotFoundError:
             LOG.critical('Unable to call mpirun/aprun/srun, currently selected: {}'.format(self.mpi_library))
-            message = 'Please check initialistion of FullRelaxer object/CLI args.'
+            message = 'Please check initialistion of ComputeTask object/CLI args.'
             LOG.debug('Raising CriticalError with message: {message}'.format(message=message))
             raise CriticalError(message)
 
@@ -1499,14 +1500,14 @@ class ComputeTask:
                 if self.compute_dir is not None or (not (f.endswith('.res') or f.endswith('.castep'))):
                     os.remove(f)
 
-    def _update_output_files(self, seed, opti_dict=None):
-        """ Copy new data to output files and update
+    def _update_castep_output_files(self, seed, opti_dict=None):
+        """ Copy new data to root CASTEP output files and update
          the results dict.
 
         Keyword arguments:
             opti_dict (dict): intermediate calculation results.
 
-        """
+       """
         LOG.info('Updating .res and .castep files in root_dir with new results')
         if opti_dict is not None:
             if os.path.isfile(seed + '.res'):
@@ -1680,10 +1681,19 @@ class ComputeTask:
         if os.path.isfile(seed + '.check'):
             shutil.copy2(seed + '.check', compute_dir)
 
+    def scf(self, *args, **kwargs):
+        """ Alias for backwards-compatibility. """
+        warnings.warn(
+            '`scf` method name is deprecated, please use run_castep_singleshot to avoid future issues.',
+            DeprecationWarning
+        )
+        return self.run_castep_singleshot(*args, **kwargs)
 
-class FullRelaxer(ComputeTask):
-    """ Alias of ComputeTask class for backwards compatiblity. """
-    def __init__(self, *args, **kwargs):
+    def relax(self, *args, **kwargs):
+        """ Alias for backwards-compatibility. """
         import warnings
-        warnings.warn('FullRelaxer name is deprecated, please use ComputeTask to avoid future issues.', DeprecationWarning)
-        super().__init__(*args, **kwargs)
+        warnings.warn(
+            '`relax` method name is deprecated, please use run_castep_relaxation to avoid future issues.',
+            DeprecationWarning
+        )
+        return self.run_castep_relaxation(*args, **kwargs)

@@ -17,13 +17,13 @@ LOG = logging.getLogger('run3')
 class Workflow:
     """ Workflow objects are bundles of calculations defined as
     :obj:`WorkflowStep` objects. Each :obj:`WorkflowStep` takes three arguments:
-    the :obj:`matador.compute.FullRelaxer` object used to run the calculations, the calculation
+    the :obj:`matador.compute.ComputeTask` object used to run the calculations, the calculation
     parameters (which can be modified by each step), the seed name.
     Any subclass of Workflow must implement `preprocess` and `postprocess`
     methods (even if they just return True).
 
     Attributes:
-        relaxer (:obj:`matador.compute.FullRelaxer`): the object that will be running the computation.
+        relaxer (:obj:`matador.compute.ComputeTask`): the object that will be running the computation.
         calc_doc (dict): the interim dictionary of structural and
             calculation parameters.
         seed (str): the root seed for the calculation.
@@ -35,11 +35,11 @@ class Workflow:
 
     """
     def __init__(self, relaxer, calc_doc, seed, **workflow_kwargs):
-        """ Initialise the Workflow object from a :obj:`matador.compute.FullRelaxer`, calculation
+        """ Initialise the Workflow object from a :obj:`matador.compute.ComputeTask`, calculation
         parameters and the seed name.
 
         Parameters:
-            relaxer (:obj:`matador.compute.FullRelaxer`): the object that will be running the computation.
+            relaxer (:obj:`matador.compute.ComputeTask`): the object that will be running the computation.
             calc_doc (dict): dictionary of structure and calculation
                 parameters.
             seed (str): root seed for the calculation.
@@ -260,7 +260,7 @@ class WorkflowStep:
         """ Run the workflow step.
 
         Parameters:
-            relaxer (:obj:`matador.compute.FullRelaxer`): the object that will be running the computation.
+            relaxer (:obj:`matador.compute.ComputeTask`): the object that will be running the computation.
             calc_doc (dict): dictionary of structure and calculation
                 parameters.
             seed (str): root seed for the calculation.

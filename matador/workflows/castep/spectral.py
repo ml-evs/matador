@@ -32,7 +32,7 @@ def castep_full_spectral(relaxer, calc_doc, seed, **kwargs):
     of DOS.
 
     Parameters:
-        relaxer (:obj:`matador.compute.FullRelaxer`): the object that will be calling CASTEP.
+        relaxer (:obj:`matador.compute.ComputeTask`): the object that will be calling CASTEP.
         calc_doc (dict): dictionary of structure and calculation
             parameters.
         seed (str): root seed for the calculation.
@@ -55,7 +55,7 @@ class CastepSpectralWorkflow(Workflow):
     of DOS.
 
     Attributes:
-        relaxer (:obj:`matador.compute.FullRelaxer`): the object that calls CASTEP.
+        relaxer (:obj:`matador.compute.ComputeTask`): the object that calls CASTEP.
         calc_doc (dict): the interim dictionary of structural and
             calculation parameters.
         seed (str): the root seed for the calculation.
@@ -176,7 +176,7 @@ def castep_spectral_scf(relaxer, calc_doc, seed):
     """ Run a singleshot SCF calculation.
 
     Parameters:
-        relaxer (:obj:`matador.compute.FullRelaxer`): the object that will be calling CASTEP.
+        relaxer (:obj:`matador.compute.ComputeTask`): the object that will be calling CASTEP.
         calc_doc (dict): the structure to run on.
         seed (str): root filename of structure.
 
@@ -198,7 +198,7 @@ def castep_spectral_scf(relaxer, calc_doc, seed):
 
     relaxer.validate_calc_doc(scf_doc, required, forbidden)
 
-    return relaxer.scf(scf_doc, seed, keep=True, intermediate=True)
+    return relaxer.run_castep_singleshot(scf_doc, seed, keep=True, intermediate=True)
 
 
 def castep_spectral_dos(relaxer, calc_doc, seed):
@@ -206,7 +206,7 @@ def castep_spectral_dos(relaxer, calc_doc, seed):
     .odi file is found, run OptaDOS on the resulting DOS.
 
     Parameters:
-        relaxer (:obj:`matador.compute.FullRelaxer`): the object that will be calling CASTEP.
+        relaxer (:obj:`matador.compute.ComputeTask`): the object that will be calling CASTEP.
         calc_doc (dict): the structure to run on.
         seed (str): root filename of structure.
 
@@ -227,7 +227,7 @@ def castep_spectral_dos(relaxer, calc_doc, seed):
                  'spectral_kpoints_path_spacing']
 
     relaxer.validate_calc_doc(dos_doc, required, forbidden)
-    success = relaxer.scf(dos_doc, seed, keep=True, intermediate=True)
+    success = relaxer.run_castep_singleshot(dos_doc, seed, keep=True, intermediate=True)
 
     return success
 
@@ -237,7 +237,7 @@ def castep_spectral_dispersion(relaxer, calc_doc, seed):
     optionally running orbitals2bands and OptaDOS projected dispersion.
 
     Parameters:
-        relaxer (:obj:`matador.compute.FullRelaxer`): the object that will be calling CASTEP.
+        relaxer (:obj:`matador.compute.ComputeTask`): the object that will be calling CASTEP.
         calc_doc (dict): the structure to run on.
         seed (str): root filename of structure.
 
@@ -257,7 +257,7 @@ def castep_spectral_dispersion(relaxer, calc_doc, seed):
     forbidden = ['spectral_kpoints_mp_spacing']
 
     relaxer.validate_calc_doc(disp_doc, required, forbidden)
-    success = relaxer.scf(disp_doc, seed, keep=True, intermediate=True)
+    success = relaxer.run_castep_singleshot(disp_doc, seed, keep=True, intermediate=True)
 
     if disp_doc.get('write_orbitals'):
         LOG.info('Planning to call orbitals2bands...')
@@ -283,7 +283,7 @@ def optados_pdos(relaxer, _, seed):
     """ Run an OptaDOS projected-DOS.
 
     Parameters:
-        relaxer (:obj:`matador.compute.FullRelaxer`): the object that will be calling OptaDOS.
+        relaxer (:obj:`matador.compute.ComputeTask`): the object that will be calling OptaDOS.
         _ : second parameter is required but ignored.
         seed (str): root filename of structure.
 
@@ -308,7 +308,7 @@ def optados_dos_broadening(relaxer, _, seed):
     """ Run an OptaDOS total DOS broadening.
 
     Parameters:
-        relaxer (:obj:`matador.compute.FullRelaxer`): the object that will be calling OptaDOS.
+        relaxer (:obj:`matador.compute.ComputeTask`): the object that will be calling OptaDOS.
         _ : second parameter is required but ignored.
         seed (str): root filename of structure.
 
@@ -334,7 +334,7 @@ def optados_pdispersion(relaxer, _, seed):
     """ Runs an OptaDOS projected dispersion calculation.
 
     Parameters:
-        relaxer (:obj:`matador.compute.FullRelaxer`): the object that will be calling OptaDOS.
+        relaxer (:obj:`matador.compute.ComputeTask`): the object that will be calling OptaDOS.
         _ : second parameter is required but ignored.
         seed (str): root filename of structure.
 
@@ -358,7 +358,7 @@ def _run_optados(relaxer, odi_dict, seed, suffix=None):
     the number of cores and the executable to call, then restoring them after.
 
     Parameters:
-        relaxer (:obj:`matador.compute.FullRelaxer`): the object that will be calling OptaDOS.
+        relaxer (:obj:`matador.compute.ComputeTask`): the object that will be calling OptaDOS.
         odi_dict (dict): the OptaDOS parameters to write to file.
         seed (str): root filename of structure.
 
