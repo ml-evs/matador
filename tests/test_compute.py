@@ -671,6 +671,53 @@ class ComputeTest(MatadorUnitTest):
         (not CASTEP_PRESENT or not MPI_PRESENT),
         "castep or mpirun executable not found in PATH",
     )
+    def test_scf_max_walltime(self):
+        """ Perform SCF on structure from file. """
+        seed = "_LiC.res"
+        shutil.copy(REAL_PATH + "data/structures/LiC.res", "_LiC.res")
+
+        cell_dict, s = cell2dict(
+            REAL_PATH + "/data/LiC_tests/LiC_scf.cell", verbosity=VERBOSITY, db=False
+        )
+        assert s
+        param_dict, s = param2dict(
+            REAL_PATH + "/data/LiC_tests/LiC_scf.param", verbosity=VERBOSITY, db=False
+        )
+        assert s
+        executable = "castep"
+        node = None
+
+        shutil.copy(REAL_PATH + "data/pspots/Li_00PBE.usp", ".")
+        shutil.copy(REAL_PATH + "data/pspots/C_00PBE.usp", ".")
+
+        with self.assertRaises(WalltimeError):
+            ComputeTask(
+                ncores=NCORES,
+                nnodes=None,
+                node=node,
+                res=seed,
+                param_dict=param_dict,
+                cell_dict=cell_dict,
+                verbosity=VERBOSITY,
+                timings=(5, time.time()),
+                polltime=2,
+                executable=executable,
+                compute_dir="/tmp/compute_test",
+                start=True,
+            )
+
+        base_file_exists = [
+            isfile("_LiC.res"),
+            isfile("_LiC.castep"),
+        ]
+
+        self.assertFalse(isfile("_LiC.res.lock"), "failed to clean up lock")
+        self.assertTrue(all(base_file_exists), "failed to keep valid files!")
+
+    @unittest.skipIf(
+        (not CASTEP_PRESENT or not MPI_PRESENT),
+        "castep or mpirun executable not found in PATH",
+    )
     def test_convergence_runner(self):
         """ Check that convergence tests run to completion. """
         shutil.copy(REAL_PATH + "data/structures/Li.res", "_LiAs_testcase.res")
@@ -815,7 +862,7 @@ class ComputeTest(MatadorUnitTest):
             nprocesses=2,
             executable=EXECUTABLE,
             max_walltime=15,
-            polltime=0.5,
+            polltime=10,
         )
         with self.assertRaises(WalltimeError):
             runner.spawn()
