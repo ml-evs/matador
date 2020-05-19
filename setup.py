@@ -2,7 +2,7 @@
 # Distributed under the terms of the MIT License.
 
 import os
-from setuptools import setup
+from setuptools import setup, find_packages
 from glob import glob
 
 from matador import __version__
@@ -36,7 +36,7 @@ setup(name='matador-db',
       maintainer='Matthew Evans',
       maintainer_email='matador@ml-evs.science',
       license='MIT',
-      packages=['matador'],
+      packages=find_packages(),
       python_requires='>=3.6',
       install_requires=requirements,
       scripts=[script for script in glob('scripts/*') if os.path.isfile(script)],
