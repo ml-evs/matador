@@ -4,10 +4,10 @@
 
 import unittest
 import os
-import multiprocessing as mp
 import shutil
 import glob
 
+import psutil
 import numpy as np
 
 from .utils import MatadorUnitTest, REAL_PATH, detect_program
@@ -25,7 +25,7 @@ CASTEP_PRESENT = detect_program(EXECUTABLE)
 MPI_PRESENT = detect_program("mpirun")
 
 if CASTEP_PRESENT and MPI_PRESENT:
-    NCORES = mp.cpu_count() - 2
+    NCORES = max(psutil.cpu_count(logical=False) - 2, 1)
 else:
     NCORES = 1
 

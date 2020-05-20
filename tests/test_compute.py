@@ -12,6 +12,8 @@ import time
 import warnings
 import multiprocessing as mp
 
+import psutil
+
 from matador.utils.errors import (
     CalculationError,
     MaxMemoryEstimateExceeded,
@@ -40,7 +42,7 @@ CASTEP_PRESENT = detect_program(EXECUTABLE)
 MPI_PRESENT = detect_program("mpirun")
 
 if CASTEP_PRESENT and MPI_PRESENT:
-    NCORES = max(mp.cpu_count() - 2, 1)
+    NCORES = max(psutil.cpu_count(logical=False) - 2, 1)
 else:
     NCORES = 1
 
