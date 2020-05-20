@@ -14,6 +14,7 @@ import os
 import glob
 import time
 import random
+import psutil
 from matador.utils.print_utils import print_failure, print_warning
 from matador.compute.queueing import get_queue_manager
 from matador.scrapers.castep_scrapers import cell2dict, param2dict
@@ -124,7 +125,7 @@ class BatchRun:
             self.start_time = time.time()
 
         # assign number of cores
-        self.all_cores = mp.cpu_count()
+        self.all_cores = psutil.cpu_count(logical=False)
         if self.args.get('ncores') is None:
             if self.queue_mgr is None:
                 self.args['ncores'] = int(self.all_cores / self.nprocesses)
