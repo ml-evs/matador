@@ -88,7 +88,7 @@ def plot_spectral(seeds, **kwargs):
                      'n_colours': 4, 'spin_only': None, 'figsize': None,
                      'pdis_interpolation_factor': 2, 'pdis_point_scale': 25, 'filename': None,
                      'unstacked_pdos': False, 'preserve_kspace_distance': False,
-                     'band_reorder': None, 'title': None, 'show': True,
+                     'band_reorder': False, 'title': None, 'show': True,
                      'verbosity': 0, 'highlight_bands': None, 'pdos_hide_tot': True}
     for key in kwargs:
         if kwargs[key] is not None:
@@ -272,10 +272,10 @@ def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
             else:
                 raise RuntimeError('{}.bands/.phonon not found.'.format(seed))
 
-        eigs = dispersion.eigs
+        eigs = np.array(dispersion.eigs, copy=True)
         if kwargs['phonons']:
             # convert from internal eV frequencies to cm^-1
-            eigs = dispersion.eigs / INVERSE_CM_TO_EV
+            eigs /= INVERSE_CM_TO_EV
 
         if kwargs['plot_window'] is None:
             if kwargs['phonons']:
@@ -283,16 +283,16 @@ def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
             else:
                 kwargs['plot_window'] = [-10, 10]
 
-        path = dispersion.linearise_path(preserve_kspace_distance=kwargs['preserve_kspace_distance'])
-
         # try to match bands if requested
-        if kwargs['band_reorder'] or (kwargs['band_reorder'] is None and kwargs['phonons']):
+        if kwargs['band_reorder']:
             print('Reordering bands based on local gradients...')
-            dispersion.reorder_bands()
+            eigs = Dispersion.get_band_reordering(eigs, dispersion.kpoint_branches)
+
+        path = dispersion.linearise_path(preserve_kspace_distance=kwargs['preserve_kspace_distance'])
 
         if dispersion.projectors and len(seeds) == 1 and kwargs['plot_pdis'] and not kwargs['phonons']:
             ax_dispersion = projected_bandstructure_plot(dispersion, ax_dispersion, path,
-                                                         bbox_extra_artists,
+                                                         bbox_extra_artists, eigs=eigs,
                                                          **kwargs)
             kwargs['band_colour'] = 'grey'
             plotted_pdis = True
@@ -307,12 +307,10 @@ def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
                 spin_fermi_energy = [spin_fermi_energy] * dispersion.num_spins
 
             for branch_ind, branch in enumerate(dispersion.kpoint_branches):
-
                 # seem to have to reset colours here for some reason
                 plt.rcParams['axes.prop_cycle'] = cycler('color', kwargs['colours'])
 
                 for ns in range(dispersion.num_spins):
-
                     if ns == 1 and kwargs.get('spin_only') == 'up':
                         continue
                     elif ns == 0 and kwargs.get('spin_only') == 'down':
@@ -320,7 +318,7 @@ def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
 
                     for nb in range(dispersion.num_bands):
                         colour, alpha, label = _get_lineprops(
-                            dispersion, spin_fermi_energy, nb, ns, branch, branch_ind, seed_ind, kwargs)
+                            dispersion, spin_fermi_energy, nb, ns, branch, branch_ind, seed_ind, kwargs, eigs=eigs)
 
                         ax_dispersion.plot(path[(np.asarray(branch)-branch_ind).tolist()],
                                            eigs[ns][nb][branch] - spin_fermi_energy[ns],
@@ -569,7 +567,7 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
 
 
 def projected_bandstructure_plot(
-    dispersion, ax, path, bbox_extra_artists, pdis_interpolation_factor=2, pdis_point_scale=25, **kwargs
+    dispersion, ax, path, bbox_extra_artists, eigs=None, pdis_interpolation_factor=2, pdis_point_scale=25, **kwargs
 ):
     """ Plot projected bandstructure with weightings from OptaDOS pdis.dat file.
 
@@ -581,6 +579,8 @@ def projected_bandstructure_plot(
         bbox_extra_artists (list): list to append any legends too.
 
     Keyword arguments:
+        eigs (np.ndarray): eigenvalues for the associated Dispesion object,
+            passed separately to allow for reordering.
         interpolation_factor (float): amount by which to interpolate bands.
         point_scale (float): rescale points by this amount
 
@@ -591,6 +591,8 @@ def projected_bandstructure_plot(
 
     pdis = dispersion.projector_weights
     projectors = dispersion.projectors
+    if eigs is None:
+        eigs = dispersion.eigs_s_k
 
     pdis[pdis < 0] = 0
     pdis[pdis > 1] = 1
@@ -604,7 +606,7 @@ def projected_bandstructure_plot(
 
     fermi_energy = kwargs.get('external_efermi') or dispersion.fermi_energy
 
-    _ordered_scatter(path, dispersion.eigs_s_k[0].T - fermi_energy, pdis, dispersion.kpoint_branches,
+    _ordered_scatter(path, eigs[0].T - fermi_energy, pdis, dispersion.kpoint_branches,
                      interpolation_factor=pdis_interpolation_factor, point_scale=pdis_point_scale,
                      ax=ax, colours=dos_colours)
 
@@ -688,12 +690,15 @@ def _ordered_scatter(path, eigs, pdis, branches, ax=None, colours=None, interpol
     ax.scatter(flat_pts_k, flat_pts_e, edgecolor=flat_colours, s=flat_sizes, lw=0, marker='o', facecolor=flat_colours)
 
 
-def _get_lineprops(dispersion, spin_fermi_energy, nb, ns, branch, branch_ind, seed_ind, kwargs):
+def _get_lineprops(dispersion, spin_fermi_energy, nb, ns, branch, branch_ind, seed_ind, kwargs, eigs=None):
     """ Get the properties of the line to plot. """
     colour = None
     alpha = 1
     label = None
+
     if isinstance(dispersion, ElectronicDispersion):
+        if eigs is None:
+            eigs = dispersion.eigs
         if dispersion.num_spins == 2:
             if ns == 0:
                 colour = 'red'
@@ -703,8 +708,8 @@ def _get_lineprops(dispersion, spin_fermi_energy, nb, ns, branch, branch_ind, se
                 alpha = 0.8
         else:
             if kwargs.get('band_colour') == 'occ':
-                band_min = np.min(dispersion.eigs[ns][nb][branch]) - spin_fermi_energy[ns]
-                band_max = np.max(dispersion.eigs[ns][nb][branch]) - spin_fermi_energy[ns]
+                band_min = np.min(eigs[ns][nb][branch]) - spin_fermi_energy[ns]
+                band_max = np.max(eigs[ns][nb][branch]) - spin_fermi_energy[ns]
 
                 if band_max < 0:
                     colour = kwargs.get('valence')
