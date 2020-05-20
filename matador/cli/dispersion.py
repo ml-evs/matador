@@ -44,8 +44,6 @@ def main():
                         help='plot PDOS as overlap rather than stack')
     parser.add_argument('--no_pdis', action='store_true',
                         help='do not try to plot PDIS, even if its available')
-    parser.add_argument('--no_band_reorder', action='store_true',
-                        help='don\'t reorder bands based on local gradients')
     parser.add_argument('--band_reorder', action='store_true',
                         help='try to reorder bands based on local gradients')
     parser.add_argument('--pdos_hide_tot', action='store_true',
@@ -103,15 +101,8 @@ def main():
     del kwargs['no_pdis']
 
     cmap = kwargs.get('cmap')
-    band_colour = kwargs.get('band_colour')
-    if band_colour is None:
-        band_colour = 'occ'
-    if kwargs['no_band_reorder']:
-        band_reorder = False
-    elif kwargs['band_reorder']:
-        band_reorder = True
-    else:
-        band_reorder = None
+    band_colour = kwargs.get('band_colour', 'occ')
+    band_reorder = kwargs.get('band_reorder', False)
 
     from matador.plotting import plot_spectral, plot_ir_spectrum
 
@@ -121,9 +112,10 @@ def main():
     del kwargs['cmap']
     del kwargs['band_colour']
     del kwargs['band_reorder']
-    del kwargs['no_band_reorder']
 
     bandstructure = False
+    dos = False
+
     for seed in seeds:
         if not phonons and not ir:
             bs_seed = seed + '.bands'
@@ -155,6 +147,9 @@ def main():
 
     if kwargs.get('bs_only') and bandstructure:
         dos = False
+
+    if not any([bandstructure, dos, ir]):
+        raise SystemExit("Unable to find files for seedname {}".format(seed))
 
     if not ir:
         return plot_spectral(

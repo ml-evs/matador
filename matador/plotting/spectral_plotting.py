@@ -57,12 +57,15 @@ def plot_spectral(seeds, **kwargs):
         external_efermi (float or list): replace scraped Fermi energy with this value (eV) (can be
             specified per spin channel).
         highlight_bands (list): list of integer indices, colour the bands with these indices in red
-        band_colour (str): if passed "occ", bands will be coloured using cmap depending on whether
-            they lie above or below the Fermi level. If passed 'random', colour bands randomly from
-            the cmap. Otherwise, override all colour options with matplotlib-interpretable colour
-            (e.g. hexcode or html colour name) to use for all bands (DEFAULT: 'occ').
+        band_colour (str): if passed "occ", bands will be coloured using
+            cmap depending on whether they lie above or below the Fermi
+            level. Otherwise, override all colour options with
+            matplotlib-interpretable colour (e.g. hexcode or html colour
+            name) to use for all bands (DEFAULT: 'occ').
+        band_alpha (float): transparency of plotted bands.
         filename (str): filename for figure saving.
         cmap (str): matplotlib colourmap name to use for the bands
+        cmap_limits (tuple): fraction of cmap to use (DEFAULT: (0.2, 0.8)).
         n_colours (int): number of colours to use from cmap (DEFAULT: 4).
         unstacked_pdos (bool): whether to plot projected DOS as stack or overlapping.
         spin_only (str): either 'up' or 'down' to only plot one spin channel.
@@ -84,7 +87,7 @@ def plot_spectral(seeds, **kwargs):
     prop_defaults = {'plot_bandstructure': True, 'plot_dos': True, 'plot_pdos': True, 'plot_pdis': True,
                      'phonons': False, 'gap': False,
                      'colour_by_seed': False, 'external_efermi': None,
-                     'labels': None, 'cmap': None, 'band_colour': 'occ',
+                     'labels': None, 'cmap': None, 'cmap_limits': (0.2, 0.8), 'band_colour': 'occ',
                      'n_colours': 4, 'spin_only': None, 'figsize': None,
                      'pdis_interpolation_factor': 2, 'pdis_point_scale': 25, 'filename': None,
                      'unstacked_pdos': False, 'preserve_kspace_distance': False,
@@ -101,14 +104,23 @@ def plot_spectral(seeds, **kwargs):
     else:
         if isinstance(kwargs['cmap'], str):
             print('Adjusting colour palette... to {}'.format(kwargs.get('cmap')))
-            kwargs['colours'] = plt.cm.get_cmap(kwargs.get('cmap')).colors
-            plt.rcParams['axes.prop_cycle'] = cycler('color', kwargs['colours'])
+            try:
+                kwargs['colours'] = plt.cm.get_cmap(kwargs.get('cmap')).colors
+                plt.rcParams['axes.prop_cycle'] = cycler('color', kwargs['colours'])
+            except AttributeError:
+                kwargs['colours'] = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])
+            kwargs['_mpl_cmap'] = plt.get_cmap(kwargs.get('cmap'))
         elif isinstance(kwargs['cmap'], list):
             print('Reading list of colours {}...'.format(kwargs.get('cmap')))
             kwargs['colours'] = kwargs['cmap']
             plt.rcParams['axes.prop_cycle'] = cycler('color', kwargs['colours'])
 
-    if (kwargs.get('phonons') and kwargs['band_colour'] == 'occ') or kwargs['band_colour'] == 'random':
+    if (kwargs.get('phonons') and kwargs['band_colour'] == 'occ' and kwargs.get('cmap') is None):
+        kwargs['band_colour'] = 'grey'
+        if kwargs.get('band_alpha') is None:
+            kwargs['band_alpha'] = 0.8
+
+    elif kwargs['band_colour'] in [None, 'random']:
         kwargs['band_colour'] = None
 
     if not isinstance(seeds, list):
@@ -160,6 +172,8 @@ def plot_spectral(seeds, **kwargs):
         if figsize is None:
             figsize = (9, 4)
         fig, ax_dos = plt.subplots(1, figsize=figsize)
+    else:
+        raise RuntimeError("No plots requested, please set either plot_dos or plot_bandstructure to True!")
 
     kwargs['valence'] = kwargs['colours'][0]
     kwargs['conduction'] = kwargs['colours'][-1]
@@ -306,8 +320,14 @@ def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
             if len(spin_fermi_energy) == 1 and dispersion.num_spins != 1:
                 spin_fermi_energy = [spin_fermi_energy] * dispersion.num_spins
 
+            if kwargs.get('cmap') is not None:
+                cmap_limits = kwargs.get('cmap_limits', (0.2, 0.8))
+                kwargs['_mpl_cmap'] = plt.cm.get_cmap(kwargs.get('cmap'))(
+                    np.linspace(*cmap_limits, num=dispersion.num_bands)
+                )
+
+            # loop over branches and plot
             for branch_ind, branch in enumerate(dispersion.kpoint_branches):
-                # seem to have to reset colours here for some reason
                 plt.rcParams['axes.prop_cycle'] = cycler('color', kwargs['colours'])
 
                 for ns in range(dispersion.num_spins):
@@ -333,7 +353,7 @@ def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
     if kwargs['phonons']:
         ylabel = 'Wavenumber (cm$^{-1}$)'
     else:
-        ylabel = r'Energy (eV)'
+        ylabel = 'Energy (eV)'
     ax_dispersion.set_ylabel(ylabel)
     ax_dispersion.set_xlim(0, 1)
     _add_path_labels(seeds[-1], dispersion, ax_dispersion, path, 0, kwargs)
@@ -725,6 +745,12 @@ def _get_lineprops(dispersion, spin_fermi_energy, nb, ns, branch, branch_ind, se
         if kwargs.get('band_colour') != 'occ':
             colour = kwargs.get('band_colour')
 
+    if kwargs.get('_mpl_cmap') is not None:
+        colour = kwargs['_mpl_cmap'][nb]
+
+    if kwargs.get('band_alpha') is not None:
+        alpha = kwargs['band_alpha']
+
     if kwargs.get('highlight_bands') is not None:
         if nb in kwargs.get('highlight_bands'):
             colour = 'red'
@@ -966,7 +992,7 @@ def _load_electronic_dos(seed, kwargs):
                 dos_seed = '{}.{}'.format(seed, ext)
                 break
         else:
-            raise SystemExit('No total DOS files found.')
+            raise RuntimeError('No total DOS files found.')
     else:
         dos_seed = kwargs.get('dos')
 
