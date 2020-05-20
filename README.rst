@@ -73,11 +73,11 @@ in the examples and API documentation.
 
 
 .. |PyPI Version| image:: https://img.shields.io/pypi/v/matador-db?label=PyPI&logo=pypi
-.. |GH Actions| image:: https://img.shields.io/github/workflow/status/ml-evs/matador/Run%20tests/develop?label=develop&logo=github
-   :target: https://github.com/ml-evs/matador/actions?query=branch%3Adevelop
+.. |GH Actions| image:: https://img.shields.io/github/workflow/status/ml-evs/matador/Run%20tests/master?label=master&logo=github
+   :target: https://github.com/ml-evs/matador/actions?query=branch%3Amaster
 .. |MIT License| image:: https://img.shields.io/badge/license-MIT-blue.svg
    :target: https://github.com/ml-evs/matador/blob/master/LICENSE
-.. |Coverage Status| image:: https://img.shields.io/codecov/c/gh/ml-evs/matador/develop?logo=codecov
+.. |Coverage Status| image:: https://img.shields.io/codecov/c/gh/ml-evs/matador/master?logo=codecov
   :target: https://codecov.io/gh/ml-evs/matador
 .. |Documentation Status| image:: https://readthedocs.org/projects/matador-db/badge/?version=latest
    :target: https://matador-db.readthedocs.io/en/latest/?badge=latest
