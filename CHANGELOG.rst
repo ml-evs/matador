@@ -1,6 +1,15 @@
 Changelog
 =========
 
+New in release (0.9.1) [20/05/2020]
+-----------------------------------
+
+- Fixed issue with local pip installs after 0.9 release
+- Fixed issue with multinode MPI tasks by switching to ``proc.communicate()`` after an initial polling stage (#37)
+- Fixed issue where bands would be reordered multiple times in spectral plots (#40)
+- Tweaked spectral plot defaults (#40)
+- Replaced ``multiprocessing.cpu_count()`` calls with `psutil.cpu_count(logical=False)`` to avoid double-counting hyperthreaded cores
+
 New in release (0.9) [15/05/2020]
 ---------------------------------
 
