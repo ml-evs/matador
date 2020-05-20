@@ -93,6 +93,11 @@ class Dispersion(Spectral):
         return path
 
     def reorder_bands(self):
+        """ Reorder the bands of this Dispersion object directly. """
+        self._data['eigs_s_k'] = self.get_band_reordering(self.eigs, self.kpoint_branches)
+
+    @staticmethod
+    def get_band_reordering(eigs, kpoint_branches):
         """ Recursively reorder eigenvalues such that bands join up correctly,
         based on local gradients.
 
@@ -106,12 +111,14 @@ class Dispersion(Spectral):
             numpy.ndarray: reordered branches.
 
         """
-        from copy import deepcopy
 
-        for channel_ind, channel in enumerate(self.eigs):
+        sorted_eigs = np.array(eigs, copy=True)
+        num_bands = np.shape(sorted_eigs)[1]
+
+        for channel_ind, channel in enumerate(eigs):
             eigs = channel
-            for branch_ind, branch in enumerate(self.kpoint_branches):
-                eigs_branch = eigs[:, branch]
+            for branch_ind, branch in enumerate(kpoint_branches):
+                eigs_branch = channel[:, branch]
                 converged = False
                 counter = 0
                 i_cached = 0
@@ -121,21 +128,23 @@ class Dispersion(Spectral):
                         guess = (2 * eigs_branch[:, i] - eigs_branch[:, i-1])
                         argsort_guess = np.argsort(guess)
                         if np.any(np.argsort(guess) != np.argsort(eigs_branch[:, i+1])):
-                            tmp_copy = deepcopy(eigs)
+                            tmp_copy = np.array(channel, copy=True)
                             for ind, mode in enumerate(np.argsort(eigs_branch[:, i]).tolist()):
                                 eigs_branch[mode, i+1:] = tmp_copy[:, branch][argsort_guess[ind], i+1:]
-                            for other_branch in self.kpoint_branches[branch_ind:]:
-                                eigs_other_branch = eigs[:, other_branch]
-                                for ind, mode in enumerate(np.argsort(eigs_branch[:, i]).tolist()):
+                            for other_branch in kpoint_branches[branch_ind:]:
+                                eigs_other_branch = channel[:, other_branch]
+                                for ind, mode in enumerate(np.argsort(channel[:, i]).tolist()):
                                     eigs_other_branch[mode] = tmp_copy[:, other_branch][argsort_guess[ind]]
-                            eigs[:, other_branch] = eigs_other_branch
-                            eigs[:, branch] = eigs_branch
+                            channel[:, other_branch] = eigs_other_branch
+                            channel[:, branch] = eigs_branch
                             i_cached = i
                             break
                     else:
                         converged = True
 
-            self.eigs[channel_ind] = eigs.reshape(1, self.num_bands, len(eigs[0]))
+            sorted_eigs[channel_ind] = channel.reshape(1, num_bands, len(channel[0]))
+
+        return sorted_eigs
 
     def plot_dispersion(self, **kwargs):
         """ Make a plot of the band structure, with projections, if found. """
