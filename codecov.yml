@@ -8,7 +8,9 @@ coverage:
   range: "50...80"
 
   status:
-    project: yes
-    patch: yes
-    changes: no
-    threshold: 1
+    project:
+        threshold: 0.05
+    patch:
+        threshold: 100
+    changes:
+        threshold: 50
