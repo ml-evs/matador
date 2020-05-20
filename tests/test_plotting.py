@@ -124,6 +124,7 @@ class SpectralPlotTests(unittest.TestCase):
             "--cmap",
             "viridis",
             "--png",
+            "--band_reorder",
             "--labels",
             "PBE, LDA",
             "--figsize",
