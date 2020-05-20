@@ -20,6 +20,7 @@ class TemperatureDependentHull(EnsembleHull):
     """
 
     data_key = "temperature"
+    parameter_key = "temperatures"
     energy_key = "free_energy_per_atom"
 
     def __init__(self, cursor, energy_key='enthalpy_per_atom', temperatures=None, **kwargs):
@@ -43,10 +44,11 @@ class TemperatureDependentHull(EnsembleHull):
 
         super().__init__(
             cursor=_cursor,
+            hull=None,
             data_key=self.data_key,
             energy_key=self.energy_key,
             chempot_energy_key=energy_key,
-            parameter_key="temperatures",
+            parameter_key=self.parameter_key,
             **kwargs
         )
 
