@@ -12,4 +12,4 @@ __all__ = ['__version__']
 __author__ = 'Matthew Evans'
 __maintainer__ = 'Matthew Evans'
 
-__version__ = "0.9.0"
+__version__ = "0.9.1"

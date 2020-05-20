@@ -22,7 +22,7 @@ def castep_elastic(relaxer, calc_doc, seed, **kwargs):
     Currently only calculation of the bulk modulus is implemented.
 
     Parameters:
-        relaxer (:obj:`FullRelaxer`): the object that will be calling CASTEP.
+        relaxer (:obj:`ComputeTask`): the object that will be calling CASTEP.
         calc_doc (dict): dictionary of structure and calculation
             parameters.
         seed (str): root seed for the calculation.
@@ -45,7 +45,7 @@ class CastepElasticWorkflow(Workflow):
     of DOS.
 
     Attributes:
-        relaxer (:obj:`FullRelaxer`): the object that calls CASTEP.
+        relaxer (:obj:`ComputeTask`): the object that calls CASTEP.
         calc_doc (dict): the interim dictionary of structural and
             calculation parameters.
         seed (str): the root seed for the calculation.
@@ -90,7 +90,7 @@ def castep_rescaled_volume_scf(relaxer, calc_doc, seed, rescale=1):
     """ Run a singleshot SCF calculation.
 
     Parameters:
-        relaxer (:obj:`FullRelaxer`): the object that will be calling CASTEP.
+        relaxer (:obj:`ComputeTask`): the object that will be calling CASTEP.
         calc_doc (dict): the structure to run on.
         seed (str): root filename of structure.
 
@@ -108,14 +108,14 @@ def castep_rescaled_volume_scf(relaxer, calc_doc, seed, rescale=1):
     bulk_mod_seed = seed + '.bulk_mod'
     relaxer.seed = bulk_mod_seed
 
-    return relaxer.scf(scf_doc, bulk_mod_seed, keep=True, intermediate=True)
+    return relaxer.run_castep_singleshot(scf_doc, bulk_mod_seed, keep=True, intermediate=True)
 
 
 def castep_elastic_prerelax(relaxer, calc_doc, seed):
     """ Run a geometry optimisation before re-scaling volumes SCF-style calculation.
 
     Parameters:
-        relaxer (:obj:`FullRelaxer`): the object that will be calling CASTEP.
+        relaxer (:obj:`ComputeTask`): the object that will be calling CASTEP.
         calc_doc (dict): the structure to run on.
         seed (str): root filename of structure.
 
@@ -131,4 +131,4 @@ def castep_elastic_prerelax(relaxer, calc_doc, seed):
     relaxer.validate_calc_doc(relax_doc, required, forbidden)
     relaxer.calc_doc = relax_doc
 
-    return relaxer.relax(intermediate=True)
+    return relaxer.run_castep_relaxation(intermediate=True)

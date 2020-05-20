@@ -1,7 +1,7 @@
 # coding: utf-8
 # Distributed under the terms of the MIT license.
 
-""" This file implements the FullRelaxer class for handling
+""" This file implements the :class:`ComputeTask` class for handling
 calculations on a single structure.
 
 """
@@ -32,6 +32,8 @@ MATADOR_CUSTOM_TASKS = ['bulk_modulus', 'projected_bandstructure', 'pdispersion'
 
 LOG = logging.getLogger('run3')
 LOG.setLevel(logging.DEBUG)
+
+__all__ = ["ComputeTask"]
 
 
 class ComputeTask:
@@ -123,7 +125,7 @@ class ComputeTask:
                          'output_queue': None, 'redirect': None, 'reopt': False, 'compute_dir': None, 'noise': False,
                          'custom_params': False, 'archer': False, 'maxmem': None, 'killcheck': True, 'kpts_1D': False,
                          'conv_cutoff': False, 'conv_kpt': False, 'slurm': False, 'intel': False,
-                         'exec_test': True, 'timings': (None, None), 'start': True, 'verbosity': 1, 'polltime': 30,
+                         'exec_test': True, 'timings': (None, None), 'start': True, 'verbosity': 1, 'polltime': 60,
                          'optados_executable': 'optados', 'run3_settings': dict(), 'workflow_kwargs': dict()}
 
         self.paths = None
@@ -131,7 +133,6 @@ class ComputeTask:
         self.final_result = None
         self.executable = None
 
-        self._process = None
         self._first_run = True
         self._geom_max_iter_list = None
         self._squeeze_list = None
@@ -240,14 +241,14 @@ class ComputeTask:
         elif 'completed_dir' not in self.paths:
             raise RuntimeError('Invalid paths: {}'.format(self.paths))
 
-        self.set_input_structure(res)
+        self._set_input_structure(res)
 
         if self.start:
             self.begin()
         else:
             LOG.info('Waiting for `begin()` method to be called...')
 
-    def set_input_structure(self, res):
+    def _set_input_structure(self, res):
         """ Set the input structure to the given dictionary, or read it from
         the given file.
 
@@ -306,9 +307,9 @@ class ComputeTask:
             raise exc
 
         if self.success:
-            LOG.info('FullRelaxer finished successfully for {seed}'.format(seed=self.seed))
+            LOG.info('ComputeTask finished successfully for {seed}'.format(seed=self.seed))
         else:
-            LOG.info('FullRelaxer failed cleanly for {seed}'.format(seed=self.seed))
+            LOG.info('ComputeTask failed cleanly for {seed}'.format(seed=self.seed))
         for handler in LOG.handlers[:]:
             handler.close()
 
@@ -388,7 +389,7 @@ class ComputeTask:
 
             # perform relaxation
             elif self.calc_doc['task'].upper() in ['GEOMETRYOPTIMISATION', 'GEOMETRYOPTIMIZATION']:
-                success = self.relax()
+                success = self.run_castep_relaxation()
 
             elif self.calc_doc['task'].upper() in ['PHONON', 'THERMODYNAMICS']:
                 from matador.workflows.castep import castep_full_phonon
@@ -402,23 +403,19 @@ class ComputeTask:
                 from matador.workflows.castep import castep_elastic
                 success = castep_elastic(self, self.calc_doc, self.seed, **self.workflow_kwargs)
 
-            # run in SCF mode, i.e. just call CASTEP on the seeds
+            # run in singleshot mode, i.e. just call CASTEP on the seeds
             else:
-                success = self.scf(self.calc_doc, self.seed, keep=True)
+                success = self.run_castep_singleshot(self.calc_doc, self.seed, keep=True)
 
-            if self.compute_dir is not None:
-                os.chdir(self.root_folder)
-                self.remove_compute_dir_if_finished(self.compute_dir)
             self._first_run = False
 
-        except Exception as err:
+            return success
+
+        finally:
+            # always cd back to root folder, in case we have ended up on the wrong place
             if self.compute_dir is not None:
-                # always cd back to root folder
                 os.chdir(self.root_folder)
                 self.remove_compute_dir_if_finished(self.compute_dir)
-            raise err
-
-        return success
 
     def run_generic(self, intermediate=False, mv_bad_on_failure=True):
         """ Run a generic mpi program on the given seed. Files from
@@ -452,15 +449,8 @@ class ComputeTask:
             if self.compute_dir is not None:
                 os.chdir(self.compute_dir)
 
-            self._process = self.run_command(seed)
-            out, errs = self._process.communicate()
-            out = out.decode('utf-8')
-            errs = errs.decode('utf-8')
-            if self._process.returncode != 0 or errs:
-                message = 'Process returned error code {}'.format(self._process.returncode)
-                message += '\nstdout: {}'.format(out)
-                message += '\nstderr: {}'.format(errs)
-                raise CalculationError(message)
+            _process = self.run_command(seed)
+            self._handle_process(_process, check_walltime=True)
 
             if not intermediate:
                 LOG.info('Writing results of generic call to res file and tidying up.')
@@ -469,9 +459,6 @@ class ComputeTask:
             LOG.info('Executable {exe} finished cleanly.'.format(exe=self.executable))
             self._first_run = False
 
-            if self.compute_dir is not None:
-                os.chdir(self.root_folder)
-
             return True
 
         except Exception as err:
@@ -479,11 +466,13 @@ class ComputeTask:
             LOG.error('Caught error inside run_generic: {error}.'.format(error=err))
             if mv_bad_on_failure:
                 self.mv_to_bad(seed)
-            if self.compute_dir is not None:
-                os.chdir(self.root_folder)
             raise err
 
-    def relax(self, intermediate=False):
+        finally:
+            if self.compute_dir is not None:
+                os.chdir(self.root_folder)
+
+    def run_castep_relaxation(self, intermediate=False):
         """ Set up a structural relaxation that is restarted intermittently
         in order to re-mesh the kpoint grid. Completed calculations are moved
         to the "completed" folder, and failures to "bad_castep".
@@ -503,31 +492,18 @@ class ComputeTask:
 
         """
         try:
-            result = self._relax(intermediate=intermediate)
-            if self.compute_dir is not None:
-                os.chdir(self.root_folder)
-            return result
+            return self._relax(intermediate=intermediate)
 
-        # catch WalltimeErrors and reset the job folder ready for continuation
         except WalltimeError as err:
-            LOG.error('WalltimeError thrown; calling times_up')
-            self.times_up(self._process)
-            if self.compute_dir is not None:
-                os.chdir(self.root_folder)
             raise err
 
-        # All other errors mean something bad has happened, so we should clean up this job
-        # more jobs will run unless this exception is either CriticalError or KeyboardInterrupt
         except Exception as err:
-            LOG.error('{} caught: terminating job for {}.'.format(type(err), self.seed))
-            try:
-                self._process.terminate()
-            except AttributeError:
-                pass
             self._finalise_result(intermediate)
+            raise err
+
+        finally:
             if self.compute_dir is not None:
                 os.chdir(self.root_folder)
-            raise err
 
     def _relax(self, intermediate=False):
         """ Set up a structural relaxation that is restarted intermittently
@@ -571,65 +547,34 @@ class ComputeTask:
                 squeeze = None
             self._update_input_files(self.seed, self.calc_doc, squeeze=squeeze)
 
-            # run CASTEP
-            self._process = self.run_command(seed)
-            proc_clock = time.time()
-
             if self.max_walltime is not None and self.start_time is None:
                 msg = 'Somehow initial start time was not found'
                 LOG.critical(msg)
                 raise CriticalError(msg)
 
-            LOG.info('Polling process every {} s'.format(self.polltime))
+            # run CASTEP
+            _process = self.run_command(seed)
 
-            checked_castep_exists = False
-            i = 0
-            while self._process.poll() is None:
-                if i % max(int(self.polltime), 1) == 0:
-                    proc_elapsed = time.time() - proc_clock
-                    if not checked_castep_exists and proc_elapsed > 3*self.polltime:
-                        # if no CASTEP file made within 3 poll times, or if this process
-                        # hasn't written to it, then raise error
-                        if not os.path.isfile(seed + '.castep'):
-                            msg = ('CASTEP file was not created, please check your executable: {}.'
-                                   .format(self.executable))
-                            LOG.critical(msg)
-                            raise CalculationError(msg)
-                        if os.path.getmtime(seed + '.castep') - proc_clock < 0:
-                            msg = ('CASTEP file present, but too old to be made by this process. '
-                                   'Please check your executable: {}.'
-                                   .format(self.executable))
-                            LOG.critical(msg)
-                            raise CalculationError(msg)
-                        checked_castep_exists = True
+            # will throw errors if the process fails
+            output_filename = "{}.{}".format(seed, 'castep')
 
-                    if self.max_walltime is not None:
-                        print(self.max_walltime, self.polltime)
-                        run_elapsed = time.time() - self.start_time
-                        # leave 1 minute to clean up
-                        if run_elapsed > abs(self.max_walltime - 5*self.polltime):
-                            msg = 'About to run out of time on seed {}, killing early...'.format(self.seed)
-                            LOG.info(msg)
-                            raise WalltimeError(msg)
-
-                i += 1
-                time.sleep(1)
-
-            self._process.communicate()
-
-            opti_dict, success = castep2dict(seed + '.castep', db=False, verbosity=self.verbosity)
-            LOG.debug('Process returned {}'.format(self._process.returncode))
+            self._handle_process(
+                _process, expected_fname=output_filename, check_walltime=True
+            )
 
             # check for errors and try to correct for them
-            errors_present, errors, remedy = self._catch_castep_errors()
+            errors_present, errors, remedy = self._catch_castep_errors(_process)
             skip_postprocess = remedy is not None
+
+            # try to read the CASTEP file
+            opti_dict, success = castep2dict(output_filename, db=False, verbosity=self.verbosity)
 
             if errors_present:
                 msg = 'Failed to optimise {} as CASTEP crashed with error:'.format(seed)
                 msg += errors
                 LOG.warning(msg)
                 if isinstance(opti_dict, dict):
-                    self._update_output_files(seed, opti_dict)
+                    self._update_castep_output_files(seed, opti_dict)
                 if remedy is not None and self._num_retries <= self._max_num_retries:
                     LOG.warning('Attempting to recover using {}'.format(remedy))
                 else:
@@ -658,7 +603,7 @@ class ComputeTask:
                 # then reset, and go again...
                 if self.reopt and rerun and not opti_dict['optimised']:
                     rerun = False
-                    self._update_output_files(seed, opti_dict)
+                    self._update_castep_output_files(seed, opti_dict)
 
                 # are we optimised, but haven't yet rerun?
                 # then set prepare to do one more full relaxation
@@ -669,12 +614,12 @@ class ComputeTask:
                     if self.squeeze:
                         for jnd in range(ind, len(self._squeeze_list)):
                             self._squeeze_list[jnd] = False
-                    self._update_output_files(seed, opti_dict)
+                    self._update_castep_output_files(seed, opti_dict)
 
                 # or did the relaxation complete successfuly, including rerun?
                 elif (not self.reopt or rerun) and opti_dict['optimised']:
                     LOG.info('Successfully relaxed {}'.format(seed))
-                    self._update_output_files(seed, opti_dict)
+                    self._update_castep_output_files(seed, opti_dict)
                     break
 
                 # reached maximum number of steps
@@ -720,8 +665,9 @@ class ComputeTask:
 
         return self._finalise_result(intermediate=intermediate)
 
-    def scf(self, calc_doc, seed, keep=True, intermediate=False):
-        """ Perform a single-shot calculation with CASTEP.
+    def run_castep_singleshot(self, calc_doc, seed, keep=True, intermediate=False):
+        """ Perform a singleshot calculation with CASTEP. Singleshot runs do not
+        attempt to remedy any errors raised.
 
         Files from completed runs are moved to `completed`, if not
         in intermediate mode, and failed runs to `bad_castep`.
@@ -742,52 +688,81 @@ class ComputeTask:
         """
         LOG.info('Performing single-shot CASTEP run on {}, with task: {}'.format(seed, calc_doc['task']))
         try:
-            self.cp_to_input(seed)
-            self._setup_compute_dir(self.seed, self.compute_dir, custom_params=self.custom_params)
-            if self.compute_dir is not None:
-                os.chdir(self.compute_dir)
+            self._singleshot(calc_doc, seed, keep=keep, intermediate=intermediate)
 
-            self._update_input_files(seed, calc_doc)
-            doc2res(calc_doc, self.seed, info=False, hash_dupe=False, overwrite=True)
-
-            # run CASTEP
-            self._process = self.run_command(seed)
-            self._process.communicate()
-
-            # scrape dict but ignore the results
-            results_dict, success = castep2dict(seed + '.castep', db=False, verbosity=self.verbosity)
-
-            # check for errors and try to correct for them
-            errors_present, errors, _ = self._catch_castep_errors()
-            if errors_present:
-                msg = 'CASTEP run on {} failed with errors: {}'.format(seed, errors)
-                raise CalculationError(msg)
-
-            if not success:
-                msg = 'Error scraping CASTEP file {}: {}'.format(seed, results_dict)
-                raise CalculationError(msg)
-
-            self._update_output_files(seed)
-
-            if not intermediate:
-                LOG.info('Writing results of singleshot CASTEP run to res file and tidying up.')
-                doc2res(results_dict, seed, hash_dupe=False, overwrite=True)
-                self.mv_to_completed(seed, keep=keep, completed_dir=self.paths['completed_dir'])
-                self.tidy_up(seed)
-
-            if self.compute_dir is not None:
-                os.chdir(self.root_folder)
-
-            return success
+        except WalltimeError as err:
+            raise err
 
         except Exception as err:
-            LOG.error('{} caught: terminating job for {}.'.format(type(err), self.seed))
             self.mv_to_bad(seed)
             if not keep:
                 self.tidy_up(seed)
+            raise err
+
+        finally:
             if self.compute_dir is not None:
                 os.chdir(self.root_folder)
-            raise err
+
+    def _singleshot(self, calc_doc, seed, keep=True, intermediate=False):
+        """ Perform a singleshot calculation with CASTEP. Singleshot runs do not
+        attempt to remedy any errors raised.
+
+        Files from completed runs are moved to `completed`, if not
+        in intermediate mode, and failed runs to `bad_castep`.
+
+        Parameters:
+            calc_doc (dict): dictionary containing parameters and structure
+            seed (str): structure filename
+
+        Keyword arguments:
+            intermediate (bool): whether we want to run more calculations
+                on the output of this, i.e. whether to move to completed
+                or not.
+            keep (bool): whether to keep intermediate files e.g. .bands
+
+        Returns:
+            bool: True iff SCF completed successfully, False otherwise.
+
+        """
+
+        self.cp_to_input(seed)
+        self._setup_compute_dir(seed, self.compute_dir, custom_params=self.custom_params)
+        if self.compute_dir is not None:
+            os.chdir(self.compute_dir)
+
+        self._update_input_files(seed, calc_doc)
+        doc2res(calc_doc, self.seed, info=False, hash_dupe=False, overwrite=True)
+
+        # run CASTEP
+        _process = self.run_command(seed)
+        output_filename = "{}.{}".format(seed, 'castep')
+        self._handle_process(
+            _process, expected_fname=output_filename, check_walltime=True
+        )
+
+        # check for errors and report them
+        errors_present, errors, _ = self._catch_castep_errors(_process)
+        if errors_present:
+            raise CalculationError(
+                'CASTEP run on {} failed with errors: {}'.format(seed, errors)
+            )
+
+        # scrape dict but ignore the results
+        results_dict, success = castep2dict(output_filename, db=False, verbosity=self.verbosity)
+        if not success:
+            raise CalculationError(
+                'Error scraping CASTEP file {}: {}'.format(seed, results_dict)
+            )
+
+        self._update_castep_output_files(seed)
+
+        if not intermediate:
+            LOG.info('Writing results of singleshot CASTEP run to res file and tidying up.')
+            doc2res(results_dict, seed, hash_dupe=False, overwrite=True)
+            self.mv_to_completed(seed, keep=keep, completed_dir=self.paths['completed_dir'])
+            self.tidy_up(seed)
+
+        return success
 
     @staticmethod
     def validate_calc_doc(calc_doc, required, forbidden):
@@ -839,7 +814,7 @@ class ComputeTask:
 
     def run_convergence_tests(self, calc_doc):
         """ Run kpoint and cutoff_energy convergence tests based on
-        options passed to FullRelaxer.
+        options passed to ComputeTask.
 
         Parameters:
             calc_doc (dict): the structure to converge.
@@ -860,7 +835,7 @@ class ComputeTask:
                 calc_doc.update({'cut_off_energy': cutoff})
                 self.paths['completed_dir'] = 'completed_cutoff'
                 seed = self.seed + '_' + str(cutoff) + 'eV'
-                success = self.scf(calc_doc, seed, keep=False)
+                success = self.run_castep_singleshot(calc_doc, seed, keep=False)
                 successes.append(success)
         if self.conv_kpt_bool:
             # run series of singlepoints for various cutoffs
@@ -873,7 +848,7 @@ class ComputeTask:
                 LOG.debug('Using offset {}'.format(calc_doc['kpoints_mp_offset']))
                 self.paths['completed_dir'] = 'completed_kpts'
                 seed = self.seed + '_' + str(kpt) + 'A'
-                success = self.scf(calc_doc, seed, keep=False)
+                success = self.run_castep_singleshot(calc_doc, seed, keep=False)
                 successes.append(success)
         return any(successes)
 
@@ -930,7 +905,7 @@ class ComputeTask:
 
         except FileNotFoundError:
             LOG.critical('Unable to call mpirun/aprun/srun, currently selected: {}'.format(self.mpi_library))
-            message = 'Please check initialistion of FullRelaxer object/CLI args.'
+            message = 'Please check initialistion of ComputeTask object/CLI args.'
             LOG.debug('Raising CriticalError with message: {message}'.format(message=message))
             raise CriticalError(message)
 
@@ -1166,7 +1141,100 @@ class ComputeTask:
 
         return process
 
-    def _catch_castep_errors(self):
+    def _handle_process(self, process, check_walltime=False, expected_fname=None):
+        """ Poll, wait, communicate with running process, with optional
+        checks on walltime and file creation.
+
+        Parameters:
+            process (subprocess.Popen): process object to handle.
+
+        Keyword arguments:
+            check_walltime (bool): timeout the process 2 x :attr:`polltime` before
+                the allotted walltime, and clean up any files.
+            expected_fname (str): the filename to check for, assuming filename
+
+        Raises:
+            CalculationError: if calculation reports its own failure through
+                stderr or non-zero return code, or if expected_fname check fails.
+            WalltimeError: if the calculation has not completed before the end
+                of the allotted walltime.
+
+        Returns:
+            (str, str): any output to stdout/stderr.
+
+        """
+
+        proc_clock = time.time()
+
+        def _check_file_has_been_written(fname, proc_start):
+            """ Check if the file at `fname` has been written to by the current process.
+            Assumes a 1 second lee-way in the IO, in case the process wrote to the file
+            just before starting the timer.
+
+            Parameters:
+                fname (str): the filename to check.
+                proc_start (int): Unix time in seconds at which the process started.
+
+            Raises:
+                CalculationError: if the file does not exist, or if it is too old.
+
+            """
+
+            if not os.path.isfile(fname):
+                msg = ('File {} was not created after {} s, please check your executable: {}.'
+                       .format(fname, self.polltime, self.executable))
+                LOG.critical(msg)
+                raise CalculationError(msg)
+            if os.path.getmtime(fname) - proc_clock < -1:
+                msg = ('File {} present, but too old to be made by this process. '
+                       'Please check your executable: {}.'
+                       .format(fname, self.executable))
+                LOG.critical(msg)
+                raise CalculationError(msg)
+
+        if expected_fname is not None:
+            LOG.info("Watching for file write to {} after {} s".format(expected_fname, self.polltime))
+            while process.poll() is None:
+                proc_elapsed = time.time() - proc_clock
+                if proc_elapsed > self.polltime:
+                    _check_file_has_been_written(expected_fname, proc_clock)
+                    break
+                time.sleep(1)
+
+        timeout = None
+        if check_walltime and self.max_walltime is not None:
+            LOG.info("Will not let process walltime exceed {} seconds".format(self.max_walltime))
+            proc_elapsed = time.time() - proc_clock
+            timeout = max(self.max_walltime - 2 * self.polltime - proc_elapsed, 1)
+
+        try:
+            out, errs = process.communicate(timeout=timeout)
+
+            out = out.decode("utf-8")
+            errs = errs.decode("utf-8")
+            if process.returncode != 0 or errs:
+                # as there are several reasons why the process can return != 0, handle
+                # them in turn for each case, rather than raising an error here
+                LOG.warning('Process returned error code {}'.format(process.returncode))
+                LOG.warning('\nstdout: {}'.format(out))
+                LOG.warning('\nstderr: {}'.format(errs))
+
+        except sp.TimeoutExpired:
+            LOG.error("Process reached maximum walltime, cleaning up...")
+            self._times_up(process)
+            raise WalltimeError("Cleaned up process after reaching maximum walltime")
+
+        except Exception as err:
+            LOG.error('Unexpected Exception {} caught: terminating job for {}.'.format(type(err).__name__, self.seed))
+            raise err
+
+        finally:
+            LOG.error("Explicitly terminating process.")
+            process.terminate()
+
+        return out, errs
+
+    def _catch_castep_errors(self, process):
         """ Look for CASTEP error files and fallover appropriately. If
         the magic string 'Work-around was succesful' is found in error,
         no errors will be reported and the file will be deleted,
@@ -1184,8 +1252,8 @@ class ComputeTask:
         errors_present = False
         remedy = None
 
-        if self._process.returncode != 0:
-            msg = 'CASTEP returned non-zero error code {}.'.format(self._process.returncode)
+        if process.returncode != 0:
+            msg = 'CASTEP returned non-zero error code {}.'.format(process.returncode)
             error_str += msg + '\n'
             errors_present = True
 
@@ -1499,14 +1567,14 @@ class ComputeTask:
                 if self.compute_dir is not None or (not (f.endswith('.res') or f.endswith('.castep'))):
                     os.remove(f)
 
-    def _update_output_files(self, seed, opti_dict=None):
-        """ Copy new data to output files and update
+    def _update_castep_output_files(self, seed, opti_dict=None):
+        """ Copy new data to root CASTEP output files and update
          the results dict.
 
         Keyword arguments:
             opti_dict (dict): intermediate calculation results.
 
-        """
+       """
         LOG.info('Updating .res and .castep files in root_dir with new results')
         if opti_dict is not None:
             if os.path.isfile(seed + '.res'):
@@ -1562,7 +1630,7 @@ class ComputeTask:
 
         return success
 
-    def times_up(self, process):
+    def _times_up(self, process):
         """ If walltime has nearly expired, run this function
         to kill the process and unlock it for restarted calculations.
 
@@ -1570,9 +1638,6 @@ class ComputeTask:
             subprocess.Popen: running process to be killed.
 
         """
-        LOG.info('Ending process early for seed: {seed}'.format(seed=self.seed))
-        process.terminate()
-        LOG.info('Ended process early for seed: {seed}'.format(seed=self.seed))
         if self.compute_dir is not None:
             LOG.info('Cleaning up compute_dir: {dir}'.format(dir=self.compute_dir))
             for f in glob.glob('{}.*'.format(self.seed)):
@@ -1680,10 +1745,20 @@ class ComputeTask:
         if os.path.isfile(seed + '.check'):
             shutil.copy2(seed + '.check', compute_dir)
 
-
-class FullRelaxer(ComputeTask):
-    """ Alias of ComputeTask class for backwards compatiblity. """
-    def __init__(self, *args, **kwargs):
+    def scf(self, *args, **kwargs):
+        """ Alias for backwards-compatibility. """
         import warnings
-        warnings.warn('FullRelaxer name is deprecated, please use ComputeTask to avoid future issues.', DeprecationWarning)
-        super().__init__(*args, **kwargs)
+        warnings.warn(
+            '`scf` method name is deprecated, please use run_castep_singleshot to avoid future issues.',
+            DeprecationWarning
+        )
+        return self.run_castep_singleshot(*args, **kwargs)
+
+    def relax(self, *args, **kwargs):
+        """ Alias for backwards-compatibility. """
+        import warnings
+        warnings.warn(
+            '`relax` method name is deprecated, please use run_castep_relaxation to avoid future issues.',
+            DeprecationWarning
+        )
+        return self.run_castep_relaxation(*args, **kwargs)
