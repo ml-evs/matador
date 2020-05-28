@@ -8,6 +8,7 @@ children.
 """
 
 import copy
+import math
 from abc import ABC
 
 
@@ -88,7 +89,13 @@ class DataContainer(ABC):
     def __setitem__(self, key: str, item):
         if key not in self._data or self._data[key] is None:
             self._data[key] = item
+            return
         elif self._data[key] != item:
+            try:
+                if (math.isnan(item) and math.isnan(self._data[key])):
+                    return
+            except TypeError:
+                pass
             raise AttributeError('Cannot assign value {} to existing key {} with value {}'
                                  .format(item, key, self._data[key]))
 

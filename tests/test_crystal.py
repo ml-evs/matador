@@ -82,6 +82,27 @@ class CrystalTest(unittest.TestCase):
         with self.assertRaises(AttributeError):
             crystal["positions_frac"] = [[0, 1, 2]]
 
+        # check we can set fields to the same value
+        crystal["new_field"] = [1, 2, 3]
+        crystal["new_field"] = [1, 2, 3]
+
+        crystal["new_field_2"] = np.nan
+        crystal["new_field_2"] = np.nan
+
+        crystal["new_field_3"] = [1, 2, 4]
+        with self.assertRaises(AttributeError):
+            crystal["new_field_3"] = [1, 2, 5]
+
+        crystal["new_field_4"] = [1, 2, np.nan]
+        crystal["new_field_4"] = [1, 2, np.nan]
+
+        crystal["new_field_5"] = [1, np.nan, 2]
+        with self.assertRaises(AttributeError):
+            crystal["new_field_5"] = [1, 2, np.nan]
+
+        crystal["new_field_6"] = np.linspace(0, 1, 1000).tolist()
+        crystal["new_field_6"] = np.array(crystal["new_field_6"], copy=True).tolist()
+
     def test_set_positions(self):
         doc, s = castep2dict(REAL_PATH + "data/Na3Zn4-swap-ReOs-OQMD_759599.castep")
         doc = Crystal(doc)
