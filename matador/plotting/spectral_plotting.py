@@ -8,6 +8,7 @@ bandstructures for electronic and vibrational calculations.
 
 
 import os
+import copy
 import numpy as np
 from matador.utils.viz_utils import get_element_colours
 from matador.plotting.plotting import plotting_function
@@ -641,17 +642,22 @@ def projected_bandstructure_plot(
                 .format(projectors_to_plot, dispersion.projectors)
             )
 
-        pdis = np.zeros((dispersion.num_kpoints, dispersion.num_bands, len(projectors_to_plot)))
-        jnd = 0
+        _projectors_to_plot = []
+        _projector_inds = []
         for ind, projector in enumerate(dispersion.projectors):
             if projector in projectors_to_plot:
-                pdis[:, :, jnd] = dispersion.projector_weights[:, :, ind]
-                jnd += 1
-        projectors = projectors_to_plot
+                _projectors_to_plot.append(projector)
+                _projector_inds.append(ind)
+
+        pdis = np.zeros((dispersion.num_kpoints, dispersion.num_bands, len(_projectors_to_plot)))
+        for jnd, ind in enumerate(_projector_inds):
+            pdis[:, :, jnd] = dispersion.projector_weights[:, :, ind]
+
+        projectors = _projectors_to_plot
 
     else:
         pdis = np.array(dispersion.projector_weights, copy=True)
-        projectors = np.array(dispersion.projectors, copy=True)
+        projectors = copy.deepcopy(dispersion.projectors)
 
     pdis[pdis < 0] = 0
     pdis[pdis > 1] = 1
@@ -989,8 +995,7 @@ def _get_projector_info(projectors):
             dos_colours.append(element_colours.get(projector[0]))
         # if species_ang-projected, then use VESTA colours but lightened
         elif species is not None and ang_mom is not None:
-            from copy import deepcopy
-            dos_colour = deepcopy(element_colours.get(projector[0]))
+            dos_colour = copy.deepcopy(element_colours.get(projector[0]))
             multi = ['s', 'p', 'd', 'f'].index(projector[1]) - 1
             for jind, _ in enumerate(dos_colour):
                 dos_colour[jind] = max(min(dos_colour[jind]+multi*0.2, 1), 0)
