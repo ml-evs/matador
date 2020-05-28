@@ -167,13 +167,14 @@ def display_results(cursor,
     if sort and isinstance(cursor, pm.cursor.Cursor):
         print("Unable to check sorting of cursor, assuming it is already sorted.")
     elif sort:
-        sorted_inds = sorted(list(enumerate(cursor)),
+        sorted_inds = sorted(enumerate(cursor),
                              key=lambda element: recursive_get(element[1], energy_key))
-        cursor = [cursor[ind[0]] for ind in sorted_inds]
+        cursor = [ind[1] for ind in sorted_inds]
+        sorted_inds = [ind[0] for ind in sorted_inds]
         if additions is not None and add_index_mode:
-            additions = [sorted_inds[ind][0] for ind in additions]
+            additions = [sorted_inds.index(ind) for ind in additions]
         if deletions is not None and del_index_mode:
-            deletions = [sorted_inds[ind][0] for ind in deletions]
+            deletions = [sorted_inds.index(ind) for ind in deletions]
 
     # loop over structures and create pretty output
     for ind, doc in enumerate(cursor):
