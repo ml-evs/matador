@@ -1107,6 +1107,7 @@ def _parse_projectors_list(projectors):
             element = projector
             for orbital in orbitals:
                 _projectors.append((element, orbital, None))
+            _projectors.append((element, None, None))
         else:
             element = projector.split(":")[0]
             orbital = projector.split(":")[1]
