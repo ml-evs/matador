@@ -224,16 +224,16 @@ class SpectralPlotTests(unittest.TestCase):
         from matador.plotting.spectral_plotting import _parse_projectors_list
         self.assertEqual(
             _parse_projectors_list("K"),
-            [("K", "s", None), ("K", "p", None), ("K", "d", None), ("K", "f", None)]
+            [("K", "s", None), ("K", "p", None), ("K", "d", None), ("K", "f", None), ("K", None, None)]
         )
         self.assertEqual(
             _parse_projectors_list("K,P"),
-            [("K", "s", None), ("K", "p", None), ("K", "d", None), ("K", "f", None),
-             ("P", "s", None), ("P", "p", None), ("P", "d", None), ("P", "f", None)]
+            [("K", "s", None), ("K", "p", None), ("K", "d", None), ("K", "f", None), ("K", None, None),
+             ("P", "s", None), ("P", "p", None), ("P", "d", None), ("P", "f", None), ("P", None, None)]
         )
         self.assertEqual(
             _parse_projectors_list("K,P:s"),
-            [("K", "s", None), ("K", "p", None), ("K", "d", None), ("K", "f", None),
+            [("K", "s", None), ("K", "p", None), ("K", "d", None), ("K", "f", None), ("K", None, None),
              ("P", "s", None)]
         )
         self.assertEqual(
