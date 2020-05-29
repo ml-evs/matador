@@ -55,8 +55,15 @@ def cif2dict(seed, **kwargs):
                                  cif_dict['_atom_site_fract_y'],
                                  cif_dict['_atom_site_fract_z'])]
 
-    doc['site_occupancy'] = [float(x.split('(')[0]) for x in cif_dict['_atom_site_occupancy']]
-    doc['site_multiplicity'] = [float(x.split('(')[0]) for x in cif_dict['_atom_site_symmetry_multiplicity']]
+    if '_atom_site_occupancy' in cif_dict:
+        doc['site_occupancy'] = [float(x.split('(')[0]) for x in cif_dict['_atom_site_occupancy']]
+    else:
+        doc['site_occupancy'] = [1.0 for _ in doc['positions_frac']]
+
+    if '_atom_site_symmetry_multiplicity' in cif_dict:
+        doc['site_multiplicity'] = [float(x.split('(')[0]) for x in cif_dict['_atom_site_symmetry_multiplicity']]
+    else:
+        doc['site_multiplicity'] = [1.0 for _ in doc['positions_frac']]
 
     doc['lattice_abc'] = [list(map(_cif_parse_float_with_errors,
                                    [cif_dict['_cell_length_a'],
@@ -76,7 +83,7 @@ def cif2dict(seed, **kwargs):
         _cif_set_unreduced_sites(doc)
 
     try:
-        doc['space_group'] = get_spacegroup_spg(doc)
+        doc['space_group'] = get_spacegroup_spg(doc, check_occ=False)
     except RuntimeError:
         pass
 
