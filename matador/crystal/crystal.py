@@ -372,7 +372,7 @@ class Crystal(DataContainer):
 
         """
         if symprec not in self._space_group:
-            self._data['space_group'] = cell_utils.get_spacegroup_spg(self._data, symprec=symprec)
+            self._data['space_group'] = cell_utils.get_spacegroup_spg(self._data, symprec=symprec, check_occ=False)
             self._data['symprec'] = symprec
             self._space_group[symprec] = self._data['space_group']
         return self._space_group[symprec]
