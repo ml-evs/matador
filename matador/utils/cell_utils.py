@@ -432,11 +432,15 @@ def get_seekpath_kpoint_path(
     return primitive_doc, kpt_path, seekpath_results
 
 
-def doc2spg(doc):
+def doc2spg(doc, check_occ=True):
     """ Return an spglib input tuple from a matador doc.
 
     Parameters:
         doc (dict or :class:`Crystal`): matador document or Crystal object.
+
+    Keyword arguments:
+        check_occ (bool): check for partial occupancy and raise an error if
+            present.
 
     Returns:
         tuple: spglib-style tuple of lattice, positions and types.
@@ -449,7 +453,7 @@ def doc2spg(doc):
         cell = (doc['lattice_cart'],
                 doc['positions_frac'],
                 [get_atomic_number(elem) for elem in doc['atom_types']])
-        if np.min(doc.get('site_occupancy', [1.0])) < 1.0:
+        if check_occ and np.min(doc.get('site_occupancy', [1.0])) < 1.0:
             raise RuntimeError("spglib does not support partial occupancy.")
 
     except KeyError:
@@ -533,7 +537,7 @@ def standardize_doc_cell(doc, primitive=True, symprec=1e-2):
     return std_doc
 
 
-def get_spacegroup_spg(doc, symprec=0.01):
+def get_spacegroup_spg(doc, symprec=0.01, check_occ=True):
     """ Return spglib spacegroup for a cell.
 
     Parameters:
@@ -547,7 +551,7 @@ def get_spacegroup_spg(doc, symprec=0.01):
 
     """
     import spglib as spg
-    spg_cell = doc2spg(doc)
+    spg_cell = doc2spg(doc, check_occ=check_occ)
     space_group = spg.get_spacegroup(spg_cell, symprec=symprec)
     if space_group is None:
         raise RuntimeError('Spglib was unable to calculate space group.')
