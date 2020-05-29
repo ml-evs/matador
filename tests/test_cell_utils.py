@@ -370,6 +370,7 @@ class SymmetriesAndSupercellsTest(unittest.TestCase):
 
     def test_spg_standardize(self):
         from matador.utils.cell_utils import standardize_doc_cell
+        from matador.scrapers import cif2dict
         import glob
 
         doc, s = castep2dict(REAL_PATH + "data/Na3Zn4-swap-ReOs-OQMD_759599.castep")
@@ -391,6 +392,10 @@ class SymmetriesAndSupercellsTest(unittest.TestCase):
         std_doc = standardize_doc_cell(doc)
         dist = pdf_sim_dist(doc, std_doc)
         self.assertLess(dist, 0.01)
+
+        doc = Crystal(cif2dict(REAL_PATH + "data/cif_files/AgBiI.cif")[0])
+        with self.assertRaises(RuntimeError):
+            std_doc = standardize_doc_cell(doc)
 
 
 def pdf_sim_dist(doc_test, doc_supercell):

@@ -449,6 +449,9 @@ def doc2spg(doc):
         cell = (doc['lattice_cart'],
                 doc['positions_frac'],
                 [get_atomic_number(elem) for elem in doc['atom_types']])
+        if np.min(doc.get('site_occupancy', [1.0])) < 1.0:
+            raise RuntimeError("spglib does not support partial occupancy.")
+
     except KeyError:
         raise RuntimeError('doc2spg failed, matador document was missing data!')
 
