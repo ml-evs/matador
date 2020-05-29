@@ -273,6 +273,13 @@ class Crystal(DataContainer):
         return self._data['positions_abs']
 
     @property
+    def site_occupancies(self):
+        """ Return a list of site occupancies. """
+        if 'site_occupancies' not in self._data:
+            self._data['site_occupancies'] = [site.occupancy for site in self]
+        return self._data['site_occupancies']
+
+    @property
     def stoichiometry(self):
         """ Return stoichiometry in matador format: a list of
         two-member lists containing element symbol and number

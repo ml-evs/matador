@@ -18,6 +18,7 @@ class Site:
         self.lattice = copy.deepcopy(lattice_cart)
         self.set_position(position, position_unit)
         self.species = species
+        self._occupancy = None
         self.site_data = {}
 
         if site_data.get('voronoi_substructure') is not None:
@@ -74,6 +75,12 @@ class Site:
             raise RuntimeError('Unit system {} not understood, expecting `fractional`/`cartesian`'.format(units))
         else:
             return self._coords[units]
+
+    @property
+    def occupancy(self):
+        if self._occupancy is None:
+            self._occupancy = self.site_data.get("site_occupancy", 1.0)
+        return self._occupancy
 
     @property
     def coordination(self):
