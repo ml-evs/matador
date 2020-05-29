@@ -47,7 +47,7 @@ class PXRD(Fingerprint):
         """ Set up the PXRD, and compute it, if lazy is False.
 
         Parameters:
-            doc (dict): matador document to compute PXRD for.
+            doc (dict/Crystal): matador document to compute PXRD for.
 
         Keyword arguments:
             lorentzian_width (float): width of Lorentzians for broadening (DEFAULT: 0.03)
@@ -81,7 +81,12 @@ class PXRD(Fingerprint):
         if self.two_theta_bounds[0] < THETA_TOL:
             self.two_theta_bounds[0] = THETA_TOL
 
-        self.doc = Crystal(standardize_doc_cell(doc, primitive=True))
+        if np.min(doc.get('site_occupancy', [1.0])) < 1.0:
+            print("System has partial occupancy, not refining with spglib.")
+            self.doc = Crystal(doc)
+        else:
+            self.doc = Crystal(standardize_doc_cell(doc, primitive=True))
+
         self.formula = get_formula_from_stoich(self.doc['stoichiometry'], tex=True)
         self.spg = self.doc['space_group']
 
@@ -113,6 +118,7 @@ class PXRD(Fingerprint):
         lattice_abc = np.asarray(self.doc.lattice_abc)
         lattice_cart = np.asarray(self.doc.lattice_cart)
         positions_abs = np.asarray(self.doc.positions_abs)
+        site_occupancies = np.asarray(self.doc.site_occupancies)
 
         # find allowed reciprocal lattice points within limiting sphere
         min_r, max_r = [2 / self.wavelength * np.sin(np.pi / 180 * t / 2) for t in self.two_theta_bounds]
@@ -147,10 +153,10 @@ class PXRD(Fingerprint):
         for ind, q_vector in enumerate(qs):
             # accumulate atomic scattering factors
             atomic_factor = {}
-            for species in set(self.doc['atom_types']):
+            for species in set(self.doc.atom_types):
                 atomic_factor[species] = self.atomic_scattering_factor(q_mags[ind], species)
-            factors = np.array([atomic_factor[species] for species in self.doc['atom_types']])
-            F_s = np.sum(np.exp(1j * positions_abs @ q_vector) * factors)
+            factors = np.array([atomic_factor[species] for species in self.doc.atom_types])
+            F_s = np.sum(np.exp(1j * positions_abs @ q_vector) * factors * site_occupancies)
             S_q[ind] = np.abs(F_s)**2
 
         # apply Lorentz correction for polarisation and finite size effects
