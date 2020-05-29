@@ -1,2 +1,0 @@
-matplotlib>=3.0
-python-ternary>=1.0.6
