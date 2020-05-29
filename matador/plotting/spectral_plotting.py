@@ -8,6 +8,7 @@ bandstructures for electronic and vibrational calculations.
 
 
 import os
+import copy
 import numpy as np
 from matador.utils.viz_utils import get_element_colours
 from matador.plotting.plotting import plotting_function
@@ -56,7 +57,8 @@ def plot_spectral(seeds, **kwargs):
         colour_by_seed (bool): plot with a separate colour per bandstructure
         external_efermi (float or list): replace scraped Fermi energy with this value (eV) (can be
             specified per spin channel).
-        highlight_bands (list): list of integer indices, colour the bands with these indices in red
+        highlight_bands (list): list of integer indices, colour the bands
+            with these indices in red
         band_colour (str): if passed "occ", bands will be coloured using
             cmap depending on whether they lie above or below the Fermi
             level. Otherwise, override all colour options with
@@ -75,6 +77,9 @@ def plot_spectral(seeds, **kwargs):
             appear rarefied or compressed in particular regions.
         pdis_interpolation_factor (float): multiple by which to interpolate pDIS bands
         pdis_point_scale (float): size of points in pDIS (DEFAULT: 50).
+        projectors_to_plot (str): comma-separted list of projectors to
+            plot in the PDIS or PDOS, provided as element:orbital, e.g.
+            "K:s,K:p,P" will plot s and p orbitals for K, and all orbitals for P.
         band_reorder (bool): try to reorder bands based on local gradients (DEFAULT: True for phonons, otherwise False).
         title (str): optional plot title
         pdos_hide_tot (bool): whether or not to plot the total DOS on a PDOS plot; this is to hide
@@ -88,15 +93,18 @@ def plot_spectral(seeds, **kwargs):
                      'phonons': False, 'gap': False,
                      'colour_by_seed': False, 'external_efermi': None,
                      'labels': None, 'cmap': None, 'cmap_limits': (0.2, 0.8), 'band_colour': 'occ',
-                     'n_colours': 4, 'spin_only': None, 'figsize': None,
-                     'pdis_interpolation_factor': 2, 'pdis_point_scale': 25, 'filename': None,
+                     'n_colours': 4, 'spin_only': None, 'figsize': None, 'filename': None,
+                     'pdis_interpolation_factor': 2, 'pdis_point_scale': 25, 'projectors_to_plot': None,
                      'unstacked_pdos': False, 'preserve_kspace_distance': False,
                      'band_reorder': False, 'title': None, 'show': True,
                      'verbosity': 0, 'highlight_bands': None, 'pdos_hide_tot': True}
+
     for key in kwargs:
         if kwargs[key] is not None:
             prop_defaults[key] = kwargs[key]
     kwargs = prop_defaults
+
+    kwargs['projectors_to_plot'] = _parse_projectors_list(kwargs['projectors_to_plot'])
 
     if kwargs.get('cmap') is None:
         kwargs['colours'] = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])
@@ -496,10 +504,16 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
 
         if plotting_pdos:
 
-            pdos = pdos_data['pdos']
+            if kwargs.get('projectors_to_plot') is not None:
+                pdos = dict()
+                for projector in pdos_data['pdos']:
+                    if projector in kwargs.get("projectors_to_plot"):
+                        pdos[projector] = pdos_data['pdos'][projector]
+            else:
+                pdos = pdos_data['pdos']
 
             stacks = dict()
-            projector_labels, dos_colours = _get_projector_info([projector for projector in pdos])
+            projector_labels, dos_colours = _get_projector_info(list(pdos.keys()))
             unique_labels = set()
             for ind, projector in enumerate(pdos):
 
@@ -587,7 +601,15 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
 
 
 def projected_bandstructure_plot(
-    dispersion, ax, path, bbox_extra_artists, eigs=None, pdis_interpolation_factor=2, pdis_point_scale=25, **kwargs
+    dispersion,
+    ax,
+    path,
+    bbox_extra_artists,
+    eigs=None,
+    pdis_interpolation_factor=2,
+    pdis_point_scale=25,
+    projectors_to_plot=None,
+    **kwargs
 ):
     """ Plot projected bandstructure with weightings from OptaDOS pdis.dat file.
 
@@ -603,16 +625,39 @@ def projected_bandstructure_plot(
             passed separately to allow for reordering.
         interpolation_factor (float): amount by which to interpolate bands.
         point_scale (float): rescale points by this amount
+        projectors_to_plot (list(tuple)): list of projectors to plot.
 
     Returns:
         matplotlib.pyplot.Axes: the axis that was plotted on.
 
     """
 
-    pdis = dispersion.projector_weights
-    projectors = dispersion.projectors
     if eigs is None:
         eigs = dispersion.eigs_s_k
+
+    if projectors_to_plot is not None:
+        if not any(projector in dispersion.projectors for projector in projectors_to_plot):
+            raise RuntimeError(
+                "None of the desired projectors {} could be found in {}"
+                .format(projectors_to_plot, dispersion.projectors)
+            )
+
+        _projectors_to_plot = []
+        _projector_inds = []
+        for ind, projector in enumerate(dispersion.projectors):
+            if projector in projectors_to_plot:
+                _projectors_to_plot.append(projector)
+                _projector_inds.append(ind)
+
+        pdis = np.zeros((dispersion.num_kpoints, dispersion.num_bands, len(_projectors_to_plot)))
+        for jnd, ind in enumerate(_projector_inds):
+            pdis[:, :, jnd] = dispersion.projector_weights[:, :, ind]
+
+        projectors = _projectors_to_plot
+
+    else:
+        pdis = np.array(dispersion.projector_weights, copy=True)
+        projectors = copy.deepcopy(dispersion.projectors)
 
     pdis[pdis < 0] = 0
     pdis[pdis > 1] = 1
@@ -630,7 +675,6 @@ def projected_bandstructure_plot(
                      interpolation_factor=pdis_interpolation_factor, point_scale=pdis_point_scale,
                      ax=ax, colours=dos_colours)
 
-    # if not kwargs['plot_pdos']:
     for ind, _ in enumerate(projectors):
         if ind in keep_inds:
             ax.scatter(1e20, 0, facecolor=dos_colours[ind],
@@ -951,8 +995,7 @@ def _get_projector_info(projectors):
             dos_colours.append(element_colours.get(projector[0]))
         # if species_ang-projected, then use VESTA colours but lightened
         elif species is not None and ang_mom is not None:
-            from copy import deepcopy
-            dos_colour = deepcopy(element_colours.get(projector[0]))
+            dos_colour = copy.deepcopy(element_colours.get(projector[0]))
             multi = ['s', 'p', 'd', 'f'].index(projector[1]) - 1
             for jind, _ in enumerate(dos_colour):
                 dos_colour[jind] = max(min(dos_colour[jind]+multi*0.2, 1), 0)
@@ -1045,3 +1088,34 @@ def _load_phonon_dos(seed, kwargs):
         raise RuntimeError(dos_data)
 
     return VibrationalDOS(dos_data)
+
+
+def _parse_projectors_list(projectors):
+    """ Convert CLI args into the appropriate projector, ignoring
+    spin channels.
+
+    Parameters:
+        projectors (str): a string of comma-separated element:orbital
+            pairs. If the colon is omitted, all oribtals will be used.
+
+    Returns:
+        list(tuple): list of projectors in format [(element, orbital, spin)].
+
+    """
+    if projectors is None:
+        return None
+    _projectors = []
+    orbitals = ['s', 'p', 'd', 'f']
+
+    for projector in projectors.split(','):
+        if ":" not in projector:
+            element = projector
+            for orbital in orbitals:
+                _projectors.append((element, orbital, None))
+            _projectors.append((element, None, None))
+        else:
+            element = projector.split(":")[0]
+            orbital = projector.split(":")[1]
+            _projectors.append((element, orbital, None))
+
+    return _projectors

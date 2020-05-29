@@ -40,6 +40,9 @@ def main():
                         help='multiple by which to interpolate pDIS bands (DEFAULT: 2)')
     parser.add_argument('-scale', '--pdis_point_scale', type=float,
                         help='point scale in pDIS plots (DEFAULT: 25)')
+    parser.add_argument('-p', '--projectors_to_plot', type=str,
+                        help=("a list of projectors to plot, in the format element:orbital, "
+                              "e.g. -p K:s,P:p. If the orbital is omitted, all orbitals will be used for that element."))
     parser.add_argument('--unstacked_pdos', action='store_true',
                         help='plot PDOS as overlap rather than stack')
     parser.add_argument('--no_pdis', action='store_true',
