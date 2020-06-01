@@ -16,7 +16,7 @@ with open('requirements/pip_requirements.txt', 'r') as f:
 extra_requirements = dict(all=[])
 req_files = glob('requirements/*.txt')
 for _file in req_files:
-    if _file != 'requirements/requirements.txt':
+    if _file not in ['requirements/requirements.txt', 'requirements/pip_requirements.txt']:
         with open(_file, 'r') as f:
             subreq = _file.split('/')[-1].split('_')[0]
             extra_requirements[subreq] = [line.strip() for line in f.readlines()]
