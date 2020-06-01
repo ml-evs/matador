@@ -19,51 +19,23 @@ Written & maintained by `Matthew Evans <https://ml-evs.science>`_ (2016-).
 Installation
 ------------
 
-In the simplest case, ``pip install matador-db`` is sufficient to get up and running, preferably in a fresh virtual environment. More detailed instructions can be found in the `Installation instructions <https://docs.matador.science/en/latest/install.html>`_.
+In the simplest case (e.g. you already have Python 3.6+ set up), ``pip install matador-db`` is sufficient to get up and running, preferably in a fresh virtual environment. More detailed instructions can be found in the `Installation instructions <https://docs.matador.science/en/latest/install.html>`_.
+
+Upgrading to the latest version should be as simple as ``pip install -U matador-db``.
 
 Usage
 ------
 
-For basic command-line usage, please explore the help system for each sub-command. Common workflows can be found inside ``examples/`` and in the `online docs <http://docs.matador.science/en/latest/examples_index.html>`_.
+``matador`` is primarily a Python *library* that can be used inside Python scripts/modules to create a custom workflow. There are, however, several command-line scripts bundled with ``matador`` itself. All of these scripts are listed under `CLI Usage <https://docs.matador.science/en/latest/cli.html>`_.
+
+For basic command-line usage, please explore the help system for command. Common workflows can be found inside ``examples/`` and in the `online docs <http://docs.matador.science/en/latest/examples_index.html>`_.
 
 Please consult the full `Python API documentation <http://docs.matador.science/en/latest/modules.html>`_ for programmatic usage.
-
-.. code-block:: text
-
-    usage: matador [-h] [--version]
-                   {stats,query,import,hull,voltage,changes,hulldiff,swaps,refine}
-                   ...
-
-    MATerial and Atomic Database Of Refined structures.
-
-    optional arguments:
-      -h, --help            show this help message and exit
-      --version             show program's version number and exit
-
-    subcommands:
-      valid sub-commands
-
-      {stats,query,import,hull,voltage,changes,hulldiff,swaps,refine}
-        stats               print some stats about the database.
-        query               query and extract structures from the database
-        import              import new structures in folder into database
-        hull                create a convex hull from query results (currently
-                            limited to binaries and ternaries)
-        voltage             plot a voltage curve from query results (currently
-                            limited to binaries and ternaries)
-        changes             view database changelog or undo additions to database
-                            (NB: not deletions!)
-        hulldiff            diff two convex hulls with the --compare flag.
-        swaps               perform atomic swaps on query results
-        refine              update structures in the database according to
-                            specified --task
 
 Core functionality
 -------------------
 
-The core functionality can be summarised by the various sub-commands of the
-command-line interface above. The API has many more features that can be explored
-in the examples and API documentation.
+The API has many features that can be explored in the examples and API documentation. As a summary, ``matador`` can be used for:
 
 - Scraping of CASTEP (and Quantum Espresso) input/output files into flexible Python dictionaries/models.
 - The creation and curation of MongoDB collections of geometry optimisation, calculations, with a powerful querying CLI/API.
