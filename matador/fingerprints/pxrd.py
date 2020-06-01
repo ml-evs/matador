@@ -7,6 +7,7 @@ of a crystal.
 """
 
 import itertools
+import os
 from typing import Tuple
 
 import numpy as np
@@ -232,6 +233,63 @@ class PXRD(Fingerprint):
         """ Wrapper function to plot the PXRD pattern. """
         from matador.plotting.pxrd_plotting import plot_pxrd
         plot_pxrd(self, **kwargs)
+
+    def save_pattern(pxrd, fname):
+        """ Write a file to `fname` that contains the xy coordinates of
+        the PXRD pattern.
+
+        """
+
+        if os.path.isfile(fname):
+            raise RuntimeError(f"Requested filename {fname} already exists!")
+
+        from matador import __version__
+        header = f""" PXRD pattern computed with matador {__version__}.
+Input file:
+{pxrd.doc.source[0]}
+
+Structure:
+{pxrd.doc}
+
+Settings:
+wavelength = {pxrd.wavelength} Å
+theta_m = {pxrd.theta_m} degrees
+lorentzian_width = {pxrd.lorentzian_width} degrees
+
+2θ (degrees),\t\t\tRelative intensity"""
+
+        np.savetxt(fname, np.vstack([pxrd.two_thetas, pxrd.pattern]).T, header=header, fmt='%.14e', delimiter='\t')
+
+    def save_peaks(pxrd, fname):
+        """ Write a file to `fname` that contains the peak list. """
+
+        if os.path.isfile(fname):
+            raise RuntimeError(f"Requested filename {fname} already exists!")
+
+        from matador import __version__
+        header = f""" PXRD peaks computed with matador {__version__}.
+Input file:
+{pxrd.doc.source[0]}
+
+Structure:
+{pxrd.doc}
+
+Settings:
+wavelength = {pxrd.wavelength} Å
+theta_m = {pxrd.theta_m} degrees
+lorentzian_width = {pxrd.lorentzian_width} degrees
+
+<hkl>,\t\tPeak position (degrees)"""
+
+        np.savetxt(
+            fname,
+            np.vstack(
+                [pxrd.hkls[:, 0], pxrd.hkls[:, 1], pxrd.hkls[:, 2], pxrd.peak_positions]
+            ).T,
+            header=header,
+            fmt=['% d', '% d', '% d', '%.14e'],
+            delimiter='\t'
+        )
 
 
 class PXRDFactory(FingerprintFactory):
