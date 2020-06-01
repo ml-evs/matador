@@ -2,6 +2,7 @@ recursive-include matador/config *
 recursive-include docs *
 recursive-include matador/tests/data *
 recursive-include matador/data *
+recursive-include requirements/ *
 include README.rst
 include CHANGELOG.rst
 include INSTALL.rst
