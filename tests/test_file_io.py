@@ -1954,7 +1954,7 @@ class CifTests(MatadorUnitTest):
         self.assertEqual(cif['space_group'], "P2_12_12_1")
         self.assertAlmostEqual(cif['cell_volume'], 11309.1, places=1)
         self.assertEqual(cif['num_atoms'], 1156)
-
+        self.assertEqual(len(cif['positions_frac']), 1156)
 
 
 class ExportTest(MatadorUnitTest):

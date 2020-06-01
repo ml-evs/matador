@@ -6,6 +6,8 @@
 
 """
 
+import functools
+from pathlib import Path
 import numpy as np
 from matador.scrapers.utils import scraper_function
 from matador.utils.cell_utils import get_spacegroup_spg
@@ -39,9 +41,16 @@ def cif2dict(seed, **kwargs):
     cif_dict = _cif_parse_raw(flines)
 
     doc['_cif'] = cif_dict
+    doc['source'] = [str(Path(seed).resolve())]
 
     doc['atom_types'] = []
-    for atom in cif_dict['_atom_site_label']:
+    atom_labels = cif_dict.get("_atom_site_type_symbol", False)
+    if not atom_labels:
+        atom_labels = cif_dict.get("_atom_site_label", False)
+    if not atom_labels:
+        raise RuntimeError(f"Unable to find atom types in cif file {seed}.")
+
+    for atom in atom_labels:
         symbol = ''
         for character in atom:
             if not character.isalpha():
@@ -216,28 +225,40 @@ def _cif_set_unreduced_sites(doc):
     from matador.utils.cell_utils import wrap_frac_coords
     from matador.utils.cell_utils import calc_pairwise_distances_pbc
     from matador.fingerprints.pdf import PDF
-    from collections import defaultdict
+
     species_sites = dict()
     species_occ = dict()
+
+    symmetry_ops = []
+    symmetry_functions = []
+
+    def _apply_sym_op(x=None, y=None, z=None, symmetry=None):
+        """ Returns the site after the applied symmetry operation, in string representation. """
+        # cannot use a listcomp here due to interplay with functools
+        return [eval(symmetry[0]), eval(symmetry[1]), eval(symmetry[2])]
+
+    for symmetry in doc['_cif']['_symmetry_equiv_pos_as_xyz']:
+        symmetry = tuple(elem.strip() for elem in symmetry.strip('\'').split(','))
+        # check the element before doing an eval, as it is so unsafe
+        allowed_chars = ['x', 'y', 'z', '.', '/', '+', '-',
+                         '0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
+        for element in symmetry:
+            for character in element:
+                if character not in allowed_chars:
+                    raise RuntimeError('You are trying to do something naughty with the symmetry element {}'
+                                       .format(element))
+        symmetry_ops.append(symmetry)
+        symmetry_functions.append(functools.partial(_apply_sym_op, symmetry=symmetry))
+
     for ind, site in enumerate(doc['positions_frac']):
         species = doc['atom_types'][ind]
         occupancy = doc['site_occupancy'][ind]
         if doc['atom_types'][ind] not in species_sites:
             species_sites[species] = []
             species_occ[species] = []
-        for symmetry in doc['_cif']['_symmetry_equiv_pos_as_xyz']:
-            symmetry = [elem.strip() for elem in symmetry.strip('\'').split(',')]
+        for symmetry in symmetry_functions:
             x, y, z = site
-            new_site = []
-            # check the element before doing an eval, as it is so unsafe
-            allowed_chars = ['x', 'y', 'z', '.', '/', '+', '-',
-                             '0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
-            for element in symmetry:
-                for character in element:
-                    if character not in allowed_chars:
-                        raise RuntimeError('You are trying to do something naughty with the symmetry element {}'
-                                           .format(element))
-                new_site.append(eval(element))
+            new_site = symmetry(x=x, y=y, z=z)
             new_site = wrap_frac_coords([new_site])[0]
             species_sites[species].append(new_site)
             species_occ[species].append(occupancy)
@@ -248,50 +269,59 @@ def _cif_set_unreduced_sites(doc):
 
     # this loop assumes that no symmetry operation can map 2 unlike sites upon one another
     for species in species_sites:
-        unreduced_sites_spec, indices = np.unique(np.around(species_sites[species], decimals=5),
-                                                  return_index=True, axis=0)
-        unreduced_occupancies_spec = np.asarray(species_occ[species])[indices].tolist()
-        unreduced_occupancies.extend(unreduced_occupancies_spec)
-        unreduced_sites.extend(unreduced_sites_spec.tolist())
-        unreduced_species.extend(len(unreduced_sites_spec) * [species])
+        unreduced_sites.extend(species_sites[species])
+        unreduced_occupancies.extend(species_occ[species])
+        unreduced_species.extend(len(species_sites[species]) * [species])
 
-    images = PDF._get_image_trans_vectors_auto(doc['lattice_cart'], 0.1, 0.01, max_num_images=2)
+    # check that the symmetry procedure has not generated overlapping atoms
+    # this can happen for certain symmetries/cells if positions are not
+    # reported to sufficient precision
+    images = PDF._get_image_trans_vectors_auto(
+        doc['lattice_cart'],
+        0.1, 0.01, max_num_images=1,
+    )
+
     poscarts = frac2cart(doc['lattice_cart'], unreduced_sites)
     distances = calc_pairwise_distances_pbc(
         poscarts,
         images,
         doc['lattice_cart'],
-        0.1,
+        0.01,
         compress=False,
+        filter_zero=False,
         per_image=True
     )
 
-    dupe_dict = defaultdict(list)
     dupe_set = set()
     for img in distances:
-        for i in range(len(poscarts)):
-            for j in range(len(poscarts)):
-                if i == j:
-                    continue
-                if not img.mask[i, j]:
-                    if i not in dupe_set and unreduced_occupancies[i] == 1:
-                        dupe_dict[i].append(j)
-                        dupe_set.add(j)
+        i_s, j_s = np.where(~img.mask)
+        for i, j in zip(i_s, j_s):
+            if i == j:
+                continue
+            else:
+                # sites can overlap if they have partial occupancy
+                if i not in dupe_set and unreduced_species[i] == unreduced_species[j]:
+                    dupe_set.add(j)
 
     doc['positions_frac'] = unreduced_sites
     doc['site_occupancy'] = unreduced_occupancies
     doc['atom_types'] = unreduced_species
 
     doc['site_occupancy'] = [
-        doc['site_occupancy'][ind] for ind, atom in enumerate(doc['positions_frac']) if ind not in dupe_set
+        atom for ind, atom in enumerate(unreduced_occupancies) if ind not in dupe_set
     ]
-    doc['atom_types'] = [doc['atom_types'][ind] for ind, atom in enumerate(doc['positions_frac']) if ind not in dupe_set]
-    doc['positions_frac'] = [atom for ind, atom in enumerate(doc['positions_frac']) if ind not in dupe_set]
+    doc['atom_types'] = [
+        atom for ind, atom in enumerate(unreduced_species) if ind not in dupe_set
+    ]
+    doc['positions_frac'] = [
+        atom for ind, atom in enumerate(unreduced_sites) if ind not in dupe_set
+    ]
 
-    tmp = sum(doc['site_occupancy'])
-    if abs(tmp - round(tmp, 0)) < EPS:
-        tmp = round(tmp, 0)
-    doc['num_atoms'] = tmp
+    _num_atoms = np.sum(doc['site_occupancy'])
+    if abs(_num_atoms - round(_num_atoms, 0)) < EPS:
+        _num_atoms = int(round(_num_atoms, 0))
+    doc['num_atoms'] = _num_atoms
+
     if len(doc['site_occupancy']) != len(doc['positions_frac']):
         raise RuntimeError('Size mismatch between positions and occs, {} vs {}'
                            .format(len(doc['site_occupancy']), len(doc['positions_frac'])))
