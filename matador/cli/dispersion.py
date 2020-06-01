@@ -10,14 +10,18 @@ then a combined BS/DOS plot will be created.
 from os.path import isfile
 import argparse
 import glob
+from matador import __version__, script_epilog
 
 
 def main():
     """ Parse args and run the script. """
     parser = argparse.ArgumentParser(
         prog='dispersion',
-        description='simple plotting script for bandstructures/DOS based on matador')
-    parser = argparse.ArgumentParser(add_help=True)
+        epilog=script_epilog,
+        description='simple plotting script for bandstructures/DOS based on matador',
+        add_help=True)
+
+    parser.add_argument('--version', action='version', version='matador version ' + __version__ + '.')
     parser.add_argument('--pdf', action='store_true',
                         help='save pdf rather than showing plot in X')
     parser.add_argument('--png', action='store_true',

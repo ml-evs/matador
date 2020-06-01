@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 """ A file containing small db utlities, like
 dropping collections.
 """
@@ -21,6 +21,7 @@ def dbstats():
     for name in db.collection_names():
         print(json.dumps(db.command('collstats', name), indent=2))
 
+
 if __name__ == '__main__':
 
     client = pm.MongoClient()
@@ -33,7 +34,7 @@ if __name__ == '__main__':
     if args.drop is not None:
         try:
             db[str(args.drop)].dropIndexes()
-        except:
+        except Exception:
             pass
         db[str(args.drop)].drop()
         print('Collection', str(args.drop), 'dropped.')

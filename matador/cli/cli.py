@@ -278,13 +278,13 @@ def main(no_quickstart=False):
     """
     import argparse
     from sys import argv
-    from matador import __version__
+    from matador import __version__, script_epilog
 
     parser = argparse.ArgumentParser(
         prog='matador',
         description='MATerial and Atomistic Database Of Refined structures.',
-        epilog='Written and maintained by Matthew Evans (me388@cam.ac.uk) 2016-2017, version {}.'
-        .format(__version__.strip()))
+        epilog=script_epilog
+    )
     parser.add_argument('--version', action='version', version='matador version ' + __version__ + '.')
 
     # define subparsers for self.subcommands
