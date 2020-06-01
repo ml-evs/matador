@@ -11,6 +11,7 @@ Main entry points
 -----------------
 
 ``matador`` has 3 main CLI entry points that are added to your ``$PATH`` on installation:
+
 - ``matador``: used to interact with databases.
 - ``run3``: used to run calculations at high-throughput on the local machine.
 - ``dispersion``: used to plot electronic or vibrational properties from local files containing the output of the relevant calculations.
