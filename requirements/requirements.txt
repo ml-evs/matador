@@ -6,4 +6,3 @@ pymongo>=3.7
 numba>=0.4
 tqdm>=4
 matplotlib>=3.0
-python-ternary>=1.0.6
