@@ -51,5 +51,5 @@ The API has many features that can be explored in the examples and API documenta
    :target: https://github.com/ml-evs/matador/blob/master/LICENSE
 .. |Coverage Status| image:: https://img.shields.io/codecov/c/gh/ml-evs/matador/master?logo=codecov
   :target: https://codecov.io/gh/ml-evs/matador
-.. |Documentation Status| image:: https://readthedocs.org/projects/matador-db/badge/?version=latest
-   :target: https://matador-db.readthedocs.io/en/latest/?badge=latest
+.. |Documentation Status| image:: https://readthedocs.org/projects/matador-db/badge/?version=stable
+   :target: https://matador-db.readthedocs.io/en/stable/?badge=stable
