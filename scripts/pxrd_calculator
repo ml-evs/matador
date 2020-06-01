@@ -4,6 +4,7 @@ import argparse
 import time
 from traceback import print_exc
 import matplotlib.pyplot as plt
+from matador import script_epilog
 from matador.scrapers import cif2dict
 from matador.plotting.pxrd_plotting import plot_pxrd
 from matador.crystal import Crystal
@@ -68,7 +69,10 @@ def compute_pxrd(**kwargs):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description="Compute, plot and export PXRD patterns from CIF file inputs.",
+        epilog=script_epilog
+    )
     parser.add_argument('-l', '--wavelength', type=float, default=1.5406)
     parser.add_argument('-bw', '--broadening_width', type=float, default=0.03)
     parser.add_argument('-tm', '--theta_m', type=float, default=0.0)

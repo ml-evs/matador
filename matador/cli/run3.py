@@ -6,7 +6,7 @@ such that there are no clashes.
 """
 import os
 import argparse
-from matador import __version__
+from matador import __version__, script_epilog
 from matador.utils.print_utils import print_notify
 from matador.utils.errors import InputError
 from matador.compute import BatchRun
@@ -26,10 +26,9 @@ def main():
                      "bad_castep" and initial res files will go into "input". Running jobs will \
                      be listed in jobs.txt and those that completed cleanly will be listed \
                      in finished_cleanly.txt.',
-        epilog='Written by Matthew Evans (2016), based primarily on run.pl and run2.pl \
-                by Chris Pickard and Andrew Morris and PyAIRSS CastepRunner by Jamie Wynn.')
-    parser.add_argument('--version', action='version', version='run3 operating from matador version ' +
-                        __version__ + '.')
+        epilog=script_epilog
+    )
+    parser.add_argument('--version', action='version', version='matador version ' + __version__ + '.')
     parser.add_argument('seed', type=str, nargs='+',
                         help='cell and param seed to use as template for CASTEP calculations OR list of files\
                               to apply run executable on')
