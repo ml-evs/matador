@@ -7,6 +7,7 @@ of a crystal.
 """
 
 import itertools
+from typing import Tuple
 
 import numpy as np
 
@@ -43,7 +44,21 @@ class PXRD(Fingerprint):
             corresponding to sample points of self.pattern.
 
     """
-    def __init__(self, doc, lazy=False, plot=False, *args, **kwargs):
+    def __init__(
+        self,
+        doc,
+        wavelength: float = 1.5406,
+        lorentzian_width: float = 0.03,
+        two_theta_resolution: float = 0.01,
+        two_theta_bounds: Tuple[float, float] = (0, 90),
+        theta_m: float = 0.0,
+        scattering_factors: str = "RASPA",
+        lazy=False,
+        plot=False,
+        progress=False,
+        *args,
+        **kwargs
+    ):
         """ Set up the PXRD, and compute it, if lazy is False.
 
         Parameters:
@@ -53,6 +68,7 @@ class PXRD(Fingerprint):
             lorentzian_width (float): width of Lorentzians for broadening (DEFAULT: 0.03)
             wavelength (float): incident X-ray wavelength
                 (DEFAULT: CuKa, 1.5406).
+            theta_m (float): the monochromator angle in degrees (DEFAULT: 0)
             two_theta_resolution (float): resolution of grid 2θ
                 used for plotting.
             two_theta_bounds (tuple of float): values between which
@@ -63,20 +79,13 @@ class PXRD(Fingerprint):
             plot (bool): whether to display PXRD as a plot.
 
         """
-        prop_defaults = {
-            'wavelength': 1.5406,
-            'lorentzian_width': 0.03,
-            'two_theta_resolution': 0.01,
-            'two_theta_bounds': [0, 90],
-            'scattering_factors': "RASPA",
-        }
-
-        options = dict(prop_defaults)
-        options.update(kwargs)
-        self.wavelength = options['wavelength']
-        self.lorentzian_width = options['lorentzian_width']
-        self.two_theta_resolution = options['two_theta_resolution']
-        self.two_theta_bounds = list(options['two_theta_bounds'])
+        self.wavelength = wavelength
+        self.lorentzian_width = lorentzian_width
+        self.two_theta_resolution = two_theta_resolution
+        self.two_theta_bounds = list(two_theta_bounds)
+        self.theta_m = theta_m
+        self.scattering_factors = scattering_factors
+        self.progress = progress
 
         if self.two_theta_bounds[0] < THETA_TOL:
             self.two_theta_bounds[0] = THETA_TOL
@@ -91,19 +100,18 @@ class PXRD(Fingerprint):
         self.spg = self.doc['space_group']
 
         species = list(set(self.doc['atom_types']))
-        self.options = options
 
         # this could be cached across PXRD objects but is much faster than the XRD calculation itself
-        if options.get('scattering_factors') == "GSAS":
+        if self.scattering_factors == "GSAS":
             from matador.data import GSAS_ATOMIC_SCATTERING_COEFFS
             self.atomic_scattering_coeffs = {spec: GSAS_ATOMIC_SCATTERING_COEFFS[spec] for spec in species}
-        elif options.get('scattering_factors') == "RASPA":
+        elif self.scattering_factors == "RASPA":
             from matador.data import RASPA_ATOMIC_SCATTERING_COEFFS
             self.atomic_scattering_coeffs = {spec: RASPA_ATOMIC_SCATTERING_COEFFS[spec] for spec in species}
         else:
             raise RuntimeError(
                 "No set of scattering factors matched: {}. Please use 'GSAS' or 'RASPA'."
-                .format(options.get('scattering_factors'))
+                .format(self.scattering_factors)
             )
 
         if not lazy:
@@ -150,7 +158,14 @@ class PXRD(Fingerprint):
         # compute structure factor S(q) as sum of atomic scattering factors
         S_q = np.zeros_like(taus)
 
-        for ind, q_vector in enumerate(qs):
+        if self.progress:
+            import tqdm
+            bar = tqdm.tqdm
+        else:
+            def bar(x):
+                return x
+
+        for ind, q_vector in bar(enumerate(qs)):
             # accumulate atomic scattering factors
             atomic_factor = {}
             for species in set(self.doc.atom_types):
@@ -160,7 +175,7 @@ class PXRD(Fingerprint):
             S_q[ind] = np.abs(F_s)**2
 
         # apply Lorentz correction for polarisation and finite size effects
-        S_q *= 2 * (1 + np.cos(taus) ** 2) / (np.sin(taus) * np.sin(0.5 * taus))
+        S_q *= 2 * (1 + np.cos(taus) ** 2 * np.cos(2 * self.theta_m) ** 2) / (np.sin(taus) * np.sin(0.5 * taus))
 
         # thermal correction assuming no Debye-Waller factor
         S_q *= np.exp(-np.sin(taus)**2 / self.wavelength**2)**2
