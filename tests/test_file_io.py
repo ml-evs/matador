@@ -1939,6 +1939,23 @@ class CifTests(MatadorUnitTest):
         self.assertEqual(sum(test_dict["site_occupancy"]), test_dict["num_atoms"])
         self.assertEqual(len(test_dict["positions_frac"]), test_dict["num_atoms"])
 
+    def test_big_cif(self):
+        cif_fname = REAL_PATH + "data/cif_files/1000001.cif"
+        self.assertTrue(
+            os.path.isfile(cif_fname),
+            msg="Failed to open test case {} - please check installation.".format(
+                cif_fname
+            ),
+        )
+
+        cif, s = cif2dict(cif_fname)
+        self.assertTrue(s)
+        self.assertEqual(cif['stoichiometry'], [["C", 107], ["H", 142], ["N", 14], ["O", 26]])
+        self.assertEqual(cif['space_group'], "P2_12_12_1")
+        self.assertAlmostEqual(cif['cell_volume'], 11309.1, places=1)
+        self.assertEqual(cif['num_atoms'], 1156)
+
+
 
 class ExportTest(MatadorUnitTest):
     """ Test file export functions. """
