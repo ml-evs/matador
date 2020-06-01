@@ -38,6 +38,7 @@ def file_writer_function(function):
                     path = '{}-{}.{}'.format(path.replace(ext, ''), generate_hash(), ext)
                 else:
                     print('File name {} already exists! Skipping!'.format(path))
+                    return False
 
             with open(path, 'w') as f:
                 for line in flines:
