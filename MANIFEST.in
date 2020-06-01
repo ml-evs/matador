@@ -1,8 +1,9 @@
 recursive-include matador/config *
 recursive-include docs *
-recursive-include matador/tests/data *
-recursive-include matador/data *
+recursive-include matador/data/atomic_scattering *.dat
 recursive-include requirements/ *
+include matador/data/nouns
+include matador/data/words
 include README.rst
 include CHANGELOG.rst
 include INSTALL.rst

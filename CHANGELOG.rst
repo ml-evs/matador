@@ -1,6 +1,19 @@
 Changelog
 =========
 
+New in release (0.9.2) [01/06/2020]
+-----------------------------------
+
+- Optimised CIF reader considerably (#50)
+- Updated PXRD calculator to allow for partial occupancy, monochromated beam angles and text export, and added ``pxrd_calculator`` script for convenience when handling CIF files.
+- Added ability to choose which projectors are plotted with dispersion (#47)
+- Various minor fixes and updates:
+
+    - Updates to docs for CLI and configuration.
+    - Allow nan-values to be reset inside :class:`matador.crystal.Crystal`.
+    - Fixed display ordering of fingerprint-filtered cursors.
+
+
 New in release (0.9.1) [20/05/2020]
 -----------------------------------
 
