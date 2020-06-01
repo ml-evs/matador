@@ -395,12 +395,33 @@ class Crystal(DataContainer):
         if isinstance(pdf, PDF) or pdf is None:
             self._data['pdf'] = pdf
 
+    def calculate_pdf(self, **kwargs):
+        """ Calculate and set the PDF with the passed parameters. """
+        from matador.fingerprints.pdf import PDF
+        if 'pdf' not in self._data:
+            self._data['pdf'] = PDF(self._data, label=self.formula_tex, **kwargs)
+        return self._data['pdf']
+
     @property
-    def pxrd(self, **kwargs):
+    def pxrd(self):
         """ Returns a PXRD object (powder xray diffraction) containing
         the XRD pattern for the structure.
 
         """
+        from matador.fingerprints.pxrd import PXRD
+        if 'pxrd' not in self._data:
+            self._data['pxrd'] = PXRD(self._data)
+        return self._data['pxrd']
+
+    @pxrd.setter
+    def pxrd(self, pxrd):
+        """ Set the PXRD to the given PXRD object (or None). """
+        from matador.fingerprints.pxrd import PXRD
+        if isinstance(pxrd, PXRD) or pxrd is None:
+            self._data['pxrd'] = pxrd
+
+    def calculate_pxrd(self, **kwargs):
+        """ Compute and set PXRD with the passed parameters. """
         from matador.fingerprints.pxrd import PXRD
         if 'pxrd' not in self._data:
             self._data['pxrd'] = PXRD(self._data, **kwargs)
