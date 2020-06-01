@@ -10,7 +10,7 @@ and convolving pair distribution functions.
 from itertools import combinations_with_replacement
 import itertools
 import copy
-from math import ceil
+from math import ceil, copysign
 import time
 
 import numpy as np
@@ -310,6 +310,11 @@ class PDF(Fingerprint):
 
         unit_vector_lengths = np.sqrt(np.sum(_lattice**2, axis=1))
         limits = [int((dr + rmax + max_trans) / length) for length in unit_vector_lengths]
+
+        for ind, limit in enumerate(limits):
+            if abs(limit) > max_num_images:
+                limits[ind] = int(copysign(max_num_images, limit))
+
         products = itertools.product(*(range(-lim, lim+1) for lim in limits))
         for prod in products:
             trans = prod @ _lattice
