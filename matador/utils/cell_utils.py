@@ -450,16 +450,23 @@ def doc2spg(doc, check_occ=True):
     try:
         if 'lattice_cart' not in doc:
             doc['lattice_cart'] = abc2cart(doc['lattice_abc'])
+    except KeyError:
+        raise RuntimeError("doc2spg failed: unable to find lattice in document.")
+
+    required_keys = ("lattice_cart", "positions_frac", "atom_types")
+    if all(key in doc for key in required_keys):
+        if 'lattice_cart' not in doc:
+            doc['lattice_cart'] = abc2cart(doc['lattice_abc'])
         cell = (doc['lattice_cart'],
                 doc['positions_frac'],
                 [get_atomic_number(elem) for elem in doc['atom_types']])
         if check_occ and np.min(doc.get('site_occupancy', [1.0])) < 1.0:
             raise RuntimeError("spglib does not support partial occupancy.")
 
-    except KeyError:
-        raise RuntimeError('doc2spg failed, matador document was missing data!')
+        return cell
 
-    return cell
+    else:
+        raise RuntimeError(f"Unable to use doc2spg, one of {required_keys} was missing.")
 
 
 def get_space_group_label_latex(label):

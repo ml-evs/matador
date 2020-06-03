@@ -829,7 +829,7 @@ def optados2dict(seed, **kwargs):
         optados['dos'] = np.abs(optados['spin_dos']['up']) + np.abs(optados['spin_dos']['down'])
 
     elif is_pdis:
-        optados['pdis'] = []
+        optados['projector_weights'] = []
         optados['kpoints'] = []
         optados['eigenvalues'] = []
         # get kpoints and count number of bands
@@ -852,9 +852,9 @@ def optados2dict(seed, **kwargs):
                 eigs.append(f90_float_parse(flines[nk*(optados['num_bands']+1) + nb + 1].split()[0]))
                 pdis.append([f90_float_parse(val) for val in flines[nk*(optados['num_bands']+1) + 1 + nb].split()[1:]])
             optados['eigenvalues'].append(eigs)
-            optados['pdis'].append(pdis)
+            optados['projector_weights'].append(pdis)
 
-        optados['pdis'] = np.asarray(optados['pdis'])
+        optados['projector_weights'] = np.asarray(optados['projector_weights'])
 
     else:
         optados['dos'] = data[:, 1]

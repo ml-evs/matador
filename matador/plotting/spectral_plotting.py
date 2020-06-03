@@ -82,7 +82,7 @@ def plot_spectral(seeds, **kwargs):
             "K:s,K:p,P" will plot s and p orbitals for K, and all orbitals for P.
         band_reorder (bool): try to reorder bands based on local gradients (DEFAULT: True for phonons, otherwise False).
         title (str): optional plot title
-        pdos_hide_tot (bool): whether or not to plot the total DOS on a PDOS plot; this is to hide
+        pdos_hide_sum (bool): whether or not to plot the total DOS on a PDOS plot; this is to hide
             regions where the PDOS is negative (leading to total DOS lower than stacked PDOS) (DEFAULT: False).
 
     """
@@ -97,7 +97,7 @@ def plot_spectral(seeds, **kwargs):
                      'pdis_interpolation_factor': 2, 'pdis_point_scale': 25, 'projectors_to_plot': None,
                      'unstacked_pdos': False, 'preserve_kspace_distance': False,
                      'band_reorder': False, 'title': None, 'show': True,
-                     'verbosity': 0, 'highlight_bands': None, 'pdos_hide_tot': True}
+                     'verbosity': 0, 'highlight_bands': None, 'pdos_hide_sum': True}
 
     for key in kwargs:
         if kwargs[key] is not None:
@@ -392,13 +392,15 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                 kwargs['plot_window'] = [-10, 10]
 
             if kwargs['plot_pdos']:
-                pdos_seed = '{}.pdos.dat'.format(seed)
-                pdos_data = {}
-                if os.path.isfile(pdos_seed):
-                    pdos_data, s = optados2dict(pdos_seed, verbosity=0)
-                    if not s:
-                        raise RuntimeError(pdos_data)
-                    dos_data['pdos'] = pdos_data
+                if 'pdos' in dos_data:
+                    pdos_data = dos_data
+                else:
+                    pdos_seed = '{}.pdos.dat'.format(seed)
+                    if os.path.isfile(pdos_seed):
+                        pdos_data, s = optados2dict(pdos_seed, verbosity=0)
+                        if not s:
+                            raise RuntimeError(pdos_data)
+                        dos_data['pdos'] = pdos_data
         else:
             dos_data = _load_phonon_dos(seed, kwargs)
             max_density = np.max(dos_data['dos'])
@@ -478,7 +480,7 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                     ax_dos.fill_between(energies[np.where(energies <= 0)], 0, dos[np.where(energies <= 0)],
                                         alpha=0.2, color=kwargs['valence'])
 
-        if 'spin_dos' in dos_data and not kwargs['pdos_hide_tot']:
+        if 'spin_dos' in dos_data and not kwargs['pdos_hide_sum']:
             if kwargs['plot_bandstructure']:
                 if kwargs.get('spin_only') in [None, 'up']:
                     if not plotting_pdos:
@@ -575,7 +577,7 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
 
                     stacks[stack_key] += pdos[projector]
 
-            if not kwargs['pdos_hide_tot'] and kwargs['unstacked_pdos']:
+            if not kwargs['pdos_hide_sum'] and kwargs['unstacked_pdos']:
                 for stack_key in stacks:
                     if stack_key is None:
                         label = 'Sum pDOS'
@@ -821,14 +823,17 @@ def _add_path_labels(seed, dispersion, ax_dispersion, path, seed_ind, kwargs):
         doc, success = cell2dict(seed + '.cell',
                                  db=False, verbosity=kwargs.get('verbosity', 0),
                                  lattice=True, positions=True)
-        if kwargs['phonons']:
-            key = 'phonon_fine_kpoint_path'
-        else:
-            key = 'spectral_kpoints_path'
-        if key in doc and key + '_labels' in doc:
-            for label, point in zip(doc[key + '_labels'], doc[key]):
-                path_labels[label] = point
-            print('Detected path labels from cell file')
+    else:
+        doc = seed
+
+    if kwargs['phonons']:
+        key = 'phonon_fine_kpoint_path'
+    else:
+        key = 'spectral_kpoints_path'
+    if key in doc and key + '_labels' in doc:
+        for label, point in zip(doc.get(key + '_labels', []), doc.get(key, None)):
+            path_labels[label] = point
+        print('Detected path labels from cell file')
 
     if not path_labels:
         # try to get dispersion path labels from spglib/seekpath
@@ -836,8 +841,8 @@ def _add_path_labels(seed, dispersion, ax_dispersion, path, seed_ind, kwargs):
         if isinstance(dispersion, Dispersion):
             try:
                 spg_structure = doc2spg(dispersion)
-            except (KeyError, RuntimeError):
-                pass
+            except (KeyError, RuntimeError) as exc:
+                print(f"Unable to create spglib structure from input data: skipping path labels: {exc}.")
 
         if not spg_structure:
             res = False
@@ -1001,8 +1006,8 @@ def _get_projector_info(projectors):
                 dos_colour[jind] = max(min(dos_colour[jind]+multi*0.2, 1), 0)
             dos_colours.append(dos_colour)
         # otherwise if just ang-projected, use colour_cycle
-        else:
-            dos_colours.append(list(plt.rcParams['axes.prop_cycle'].by_key()['color'])[ind])
+        if dos_colours[-1] is None:
+            dos_colours[-1] = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])[ind]
 
     return projector_labels, dos_colours
 

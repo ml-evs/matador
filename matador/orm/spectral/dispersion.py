@@ -149,12 +149,16 @@ class Dispersion(Spectral):
     def plot_dispersion(self, **kwargs):
         """ Make a plot of the band structure, with projections, if found. """
         from matador.plotting.spectral_plotting import plot_spectral
+        _kwargs = {
+            "plot_dos": False,
+            "plot_bandstructure": True,
+            "plot_pdis": "projector_weights" in self,
+            "phonons": "Vibrational" in self.__class__.__name__
+        }
+        _kwargs.update(kwargs)
         plot_spectral(
             self,
-            phonons='Vibrational' in self.__class__.__name__,
-            plot_dos=False,
-            plot_bandstructure=True,
-            **kwargs
+            **_kwargs
         )
 
     def _reshaped_eigs(self, eigs, shape):
@@ -223,21 +227,22 @@ class ElectronicDispersion(Dispersion):
 
         if kwargs.get('projection_data') is not None:
             projection_data = kwargs.get('projection_data')
+            self._data['projectors'] = projection_data['projectors']
+            self._data['projector_weights'] = projection_data['projector_weights']
+
+        else:
+            self._data['projectors'] = self._data.get("projectors")
+            self._data['projector_weights'] = self._data.get("projector_weights")
+
+        if self._data.get("projectors") is not None:
             if self.num_spins != 1:
                 raise NotImplementedError('Projected dispersion not implemented'
                                           ' for multiple spin channels')
             # only want to take projectors and projector_weights from this data
-            if self.num_kpoints != len(projection_data['kpoints']):
-                raise RuntimeError('k-point mismatch between bandstructure '
-                                   'and projection data.')
-
-            self._data['projectors'] = projection_data['projectors']
-            self._data['projector_weights'] = projection_data['pdis']
-            assert np.shape(projection_data['pdis']) == (self.num_kpoints, self.num_bands, self.num_projectors)
-
-        else:
-            self._data['projectors'] = None
-            self._data['projector_weights'] = None
+            proj_shape = np.shape(self._data["projector_weights"])
+            expected_shape = (self.num_kpoints, self.num_bands, self.num_projectors)
+            if proj_shape != expected_shape:
+                raise RuntimeError(f"Incompatible shape of projector weights: {proj_shape}, was expecting {expected_shape}")
 
         shape = (self.num_spins, self.num_bands, self.num_kpoints)
         if np.shape(self._data['eigs_s_k']) != shape:

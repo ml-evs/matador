@@ -46,7 +46,7 @@ class DensityOfStates(Dispersion, DataContainer):
             data = kwargs
         # as we can also construct a DOS from arbitarary kpoint/energy data,
         # check that we've been passed this first
-        if isinstance(data, Dispersion) or ('dos' not in data and 'spin_dos' not in data):
+        if isinstance(data, Dispersion) or (isinstance(data, dict) and ('dos' not in data and 'spin_dos' not in data)):
             data = self._from_dispersion(data)
         elif isinstance(data, DensityOfStates):
             data = copy.deepcopy(DensityOfStates._data)
@@ -97,12 +97,16 @@ class DensityOfStates(Dispersion, DataContainer):
     def plot_dos(self, **kwargs):
         """ Plot the density of states. """
         from matador.plotting.spectral_plotting import plot_spectral
+        _kwargs = {
+            "plot_dos": True,
+            "plot_pdos": "pdos" in self,
+            "plot_bandstructure": False,
+            "phonons": "Vibrational" in self.__class__.__name__
+        }
+        _kwargs.update(kwargs)
         plot_spectral(
             self,
-            phonons='Vibrational' in self.__class__.__name__,
-            plot_dos=True,
-            plot_bandstructure=False,
-            **kwargs
+            **_kwargs
         )
 
     @staticmethod
