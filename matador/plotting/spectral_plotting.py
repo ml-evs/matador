@@ -823,7 +823,7 @@ def _add_path_labels(seed, dispersion, ax_dispersion, path, seed_ind, kwargs):
         doc, success = cell2dict(seed + '.cell',
                                  db=False, verbosity=kwargs.get('verbosity', 0),
                                  lattice=True, positions=True)
-    elif isinstance(seed, Dispersion) or isinstance(seed, dict):
+    else:
         doc = seed
 
     if kwargs['phonons']:
@@ -831,7 +831,7 @@ def _add_path_labels(seed, dispersion, ax_dispersion, path, seed_ind, kwargs):
     else:
         key = 'spectral_kpoints_path'
     if key in doc and key + '_labels' in doc:
-        for label, point in zip(doc[key + '_labels'], doc[key]):
+        for label, point in zip(doc.get(key + '_labels', []), doc.get(key, None)):
             path_labels[label] = point
         print('Detected path labels from cell file')
 
