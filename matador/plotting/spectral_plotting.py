@@ -82,7 +82,7 @@ def plot_spectral(seeds, **kwargs):
             "K:s,K:p,P" will plot s and p orbitals for K, and all orbitals for P.
         band_reorder (bool): try to reorder bands based on local gradients (DEFAULT: True for phonons, otherwise False).
         title (str): optional plot title
-        pdos_hide_tot (bool): whether or not to plot the total DOS on a PDOS plot; this is to hide
+        pdos_hide_sum (bool): whether or not to plot the total DOS on a PDOS plot; this is to hide
             regions where the PDOS is negative (leading to total DOS lower than stacked PDOS) (DEFAULT: False).
 
     """
@@ -97,7 +97,7 @@ def plot_spectral(seeds, **kwargs):
                      'pdis_interpolation_factor': 2, 'pdis_point_scale': 25, 'projectors_to_plot': None,
                      'unstacked_pdos': False, 'preserve_kspace_distance': False,
                      'band_reorder': False, 'title': None, 'show': True,
-                     'verbosity': 0, 'highlight_bands': None, 'pdos_hide_tot': True}
+                     'verbosity': 0, 'highlight_bands': None, 'pdos_hide_sum': True}
 
     for key in kwargs:
         if kwargs[key] is not None:
@@ -480,7 +480,7 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                     ax_dos.fill_between(energies[np.where(energies <= 0)], 0, dos[np.where(energies <= 0)],
                                         alpha=0.2, color=kwargs['valence'])
 
-        if 'spin_dos' in dos_data and not kwargs['pdos_hide_tot']:
+        if 'spin_dos' in dos_data and not kwargs['pdos_hide_sum']:
             if kwargs['plot_bandstructure']:
                 if kwargs.get('spin_only') in [None, 'up']:
                     if not plotting_pdos:
@@ -577,7 +577,7 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
 
                     stacks[stack_key] += pdos[projector]
 
-            if not kwargs['pdos_hide_tot'] and kwargs['unstacked_pdos']:
+            if not kwargs['pdos_hide_sum'] and kwargs['unstacked_pdos']:
                 for stack_key in stacks:
                     if stack_key is None:
                         label = 'Sum pDOS'

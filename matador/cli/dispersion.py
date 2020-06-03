@@ -53,8 +53,8 @@ def main():
                         help='do not try to plot PDIS, even if its available')
     parser.add_argument('--band_reorder', action='store_true',
                         help='try to reorder bands based on local gradients')
-    parser.add_argument('--pdos_hide_tot', action='store_true',
-                        help='plot PDOS without total DOS, i.e. if PDOS is negative in parts')
+    parser.add_argument('--pdos_hide_sum', action='store_true',
+                        help='plot PDOS without sum pDOS')
     parser.add_argument('--band_colour', type=str,
                         help='override all other colour options with a matploblib-interpretable colour string, '
                              'or choose one of "occ" or "random".')
