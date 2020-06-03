@@ -392,13 +392,15 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                 kwargs['plot_window'] = [-10, 10]
 
             if kwargs['plot_pdos']:
-                pdos_seed = '{}.pdos.dat'.format(seed)
-                pdos_data = {}
-                if os.path.isfile(pdos_seed):
-                    pdos_data, s = optados2dict(pdos_seed, verbosity=0)
-                    if not s:
-                        raise RuntimeError(pdos_data)
-                    dos_data['pdos'] = pdos_data
+                if 'pdos' in dos_data:
+                    pdos_data = dos_data
+                else:
+                    pdos_seed = '{}.pdos.dat'.format(seed)
+                    if os.path.isfile(pdos_seed):
+                        pdos_data, s = optados2dict(pdos_seed, verbosity=0)
+                        if not s:
+                            raise RuntimeError(pdos_data)
+                        dos_data['pdos'] = pdos_data
         else:
             dos_data = _load_phonon_dos(seed, kwargs)
             max_density = np.max(dos_data['dos'])
@@ -821,14 +823,17 @@ def _add_path_labels(seed, dispersion, ax_dispersion, path, seed_ind, kwargs):
         doc, success = cell2dict(seed + '.cell',
                                  db=False, verbosity=kwargs.get('verbosity', 0),
                                  lattice=True, positions=True)
-        if kwargs['phonons']:
-            key = 'phonon_fine_kpoint_path'
-        else:
-            key = 'spectral_kpoints_path'
-        if key in doc and key + '_labels' in doc:
-            for label, point in zip(doc[key + '_labels'], doc[key]):
-                path_labels[label] = point
-            print('Detected path labels from cell file')
+    elif isinstance(seed, Dispersion) or isinstance(seed, dict):
+        doc = seed
+
+    if kwargs['phonons']:
+        key = 'phonon_fine_kpoint_path'
+    else:
+        key = 'spectral_kpoints_path'
+    if key in doc and key + '_labels' in doc:
+        for label, point in zip(doc[key + '_labels'], doc[key]):
+            path_labels[label] = point
+        print('Detected path labels from cell file')
 
     if not path_labels:
         # try to get dispersion path labels from spglib/seekpath
@@ -836,8 +841,8 @@ def _add_path_labels(seed, dispersion, ax_dispersion, path, seed_ind, kwargs):
         if isinstance(dispersion, Dispersion):
             try:
                 spg_structure = doc2spg(dispersion)
-            except (KeyError, RuntimeError):
-                pass
+            except (KeyError, RuntimeError) as exc:
+                print(f"Unable to create spglib structure from input data: skipping path labels: {exc}.")
 
         if not spg_structure:
             res = False
@@ -1001,8 +1006,8 @@ def _get_projector_info(projectors):
                 dos_colour[jind] = max(min(dos_colour[jind]+multi*0.2, 1), 0)
             dos_colours.append(dos_colour)
         # otherwise if just ang-projected, use colour_cycle
-        else:
-            dos_colours.append(list(plt.rcParams['axes.prop_cycle'].by_key()['color'])[ind])
+        if dos_colours[-1] is None:
+            dos_colours[-1] = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])[ind]
 
     return projector_labels, dos_colours
 
