@@ -83,7 +83,10 @@ class PXRD(Fingerprint):
         self.wavelength = wavelength
         self.lorentzian_width = lorentzian_width
         self.two_theta_resolution = two_theta_resolution
-        self.two_theta_bounds = list(two_theta_bounds)
+        if two_theta_bounds is not None:
+            self.two_theta_bounds = list(two_theta_bounds)
+        else:
+            self.two_theta_bounds = [0, 90]
         self.theta_m = theta_m
         self.scattering_factors = scattering_factors
         self.progress = progress

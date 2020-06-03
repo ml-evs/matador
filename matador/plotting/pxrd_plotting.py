@@ -18,7 +18,7 @@ __all__ = ['plot_pxrd']
 
 @plotting_function
 def plot_pxrd(
-    pxrds, two_theta_range=(8, 72), rug=False, rug_height=0.05, rug_offset=0.04, offset=None,
+    pxrds, two_theta_range=None, rug=False, rug_height=0.05, rug_offset=0.04, offset=None,
     ax=None, labels=None, figsize=None, text_offset=0.1, filename=None, **kwargs
 ):
     """ Plot PXRD or PXRDs.
@@ -91,9 +91,14 @@ def plot_pxrd(
             for peak in peaks:
                 ax.plot([peak, peak], [ind-rug_height-rug_offset, ind-rug_offset], c=c, alpha=0.5)
 
-    ax.set_yticks([])
+    if len(pxrds) > 1:
+        ax.set_yticks([])
+    else:
+        import numpy as np
+        ax.set_yticks(np.linspace(0, 1, 5, endpoint=True))
     ax.set_ylim(-0.2, len(pxrds)+0.1)
-    ax.set_xlim(*two_theta_range)
+    if two_theta_range is not None:
+        ax.set_xlim(*two_theta_range)
     ax.set_ylabel('Relative intensity')
     ax.set_xlabel('$2\\theta$ (degrees)')
 
