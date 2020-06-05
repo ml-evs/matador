@@ -356,6 +356,9 @@ class ComputeTask:
         # update global doc with cell and param dicts for folder, and verify
         bad_keys = ['atom_types', 'positions_frac', 'positions_abs', 'lattice_cart', 'lattice_abc']
         self.cell_dict = {key: self.cell_dict[key] for key in self.cell_dict if key not in bad_keys}
+        if "write_cell_structure" not in self.cell_dict:
+            self.cell_dict["write_cell_structure"] = True
+
         self.calc_doc.update(self.cell_dict)
         self.calc_doc.update(self.param_dict)
         self.calculator.verify_calculation_parameters(self.calc_doc, self.res_dict)
@@ -639,13 +642,16 @@ class ComputeTask:
                 if 'cell_constraints' in self.cell_dict:
                     self.calc_doc['cell_constraints'] = self.cell_dict['cell_constraints']
 
-                # if writing out cell, use it for higher precision lattice_cart
+                # if writing out cell, use it for higher precision positions and lattice_cart
                 if self.calc_doc.get('write_cell_structure') and os.path.isfile('{}-out.cell'.format(seed)):
                     cell_dict, success = cell2dict('{}-out.cell'.format(seed),
                                                    verbosity=self.verbosity,
                                                    db=False, positions=True, lattice=True)
                     if success:
                         opti_dict['lattice_cart'] = list(cell_dict['lattice_cart'])
+                        if 'positions_frac' in cell_dict and 'atom_types' in cell_dict:
+                            opti_dict['positions_frac'] = list(cell_dict['positions_frac'])
+                            opti_dict['atom_types'] = list(cell_dict['atom_types'])
 
                 LOG.info('N = {iters:03d} | |F| = {d[max_force_on_atom]:5.5f} eV/A | '
                          'S = {pressure:5.5f} GPa | H = {enthalpy_per_atom:5.5f} eV/atom'
