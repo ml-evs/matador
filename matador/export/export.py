@@ -322,7 +322,7 @@ def doc2cell(doc, path, overwrite=False, hash_dupe=False, spin=False):
             except IndexError:
                 pass
 
-            flines.append("{0:8s} {1[0]: 15f} {1[1]: 15f} {1[2]: 15f} {2:}".format(
+            flines.append("{0:8s} {1[0]: 20.15f} {1[1]: 20.15f} {1[2]: 20.15f} {2:}".format(
                 atom[0], atom[1], postfix))
 
         flines.append('%ENDBLOCK {}'.format(title))
@@ -788,7 +788,7 @@ def doc2res(doc, path, overwrite=False, hash_dupe=False, info=True, spoof_titl=F
         j += 1
 
     for atom in zip(atom_types, atom_labels, positions_frac, occupancies):
-        flines.append("{0:8s}{1:3d}{2[0]: 15f} {2[1]: 15f} {2[2]: 15f}  {3: 15f}".format(
+        flines.append("{0:8s}{1:3d}{2[0]: 20.15f} {2[1]: 20.15f} {2[2]: 20.15f}  {3: 20.15f}".format(
             atom[0], atom[1], atom[2], atom[3]))
     flines.append('END')
     # very important newline for compatibliy with cryan
