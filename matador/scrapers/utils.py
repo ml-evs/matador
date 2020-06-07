@@ -20,6 +20,7 @@ MODEL_REGISTRY = {
     "bands2dict": ElectronicDispersion,
     "castep2dict": Crystal,
     "res2dict": Crystal,
+    "cif2dict": Crystal,
 }
 
 

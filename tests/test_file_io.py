@@ -1950,11 +1950,81 @@ class CifTests(MatadorUnitTest):
 
         cif, s = cif2dict(cif_fname)
         self.assertTrue(s)
-        self.assertEqual(cif['stoichiometry'], [["C", 107], ["H", 142], ["N", 14], ["O", 26]])
-        self.assertEqual(cif['space_group'], "P2_12_12_1")
-        self.assertAlmostEqual(cif['cell_volume'], 11309.1, places=1)
-        self.assertEqual(cif['num_atoms'], 1156)
-        self.assertEqual(len(cif['positions_frac']), 1156)
+        self.assertEqual(
+            cif["stoichiometry"], [["C", 107], ["H", 142], ["N", 14], ["O", 26]]
+        )
+        self.assertEqual(cif["space_group"], "P2_12_12_1")
+        self.assertAlmostEqual(cif["cell_volume"], 11309.1, places=1)
+        self.assertEqual(cif["num_atoms"], 1156)
+        self.assertEqual(len(cif["positions_frac"]), 1156)
+
+    def test_tricky_cif_loops(self):
+        from matador.scrapers.cif_scraper import _cif_parse_loop
+
+        data_block = """'C   ' 0.0170 0.0090 2.3100 20.8439 1.0200 10.2075 1.5886 0.5687 0.8650 51.6512
+0.2156 International_Tables_Vol_IV_Table_2.2B
+'H   ' 0.0000 0.0000 0.4930 10.5109 0.3229 26.1257 0.1402 3.1424 0.0408 57.7997
+0.0030 International_Tables_Vol_IV_Table_2.2B
+'N   ' 0.0290 0.0180 12.2126 0.0057 3.1322 9.8933 2.0125 28.9975 1.1663 0.5826
+-11.5290 International_Tables_Vol_IV_Table_2.2B
+'O   ' 0.0470 0.0320 3.0485 13.2771 2.2868 5.7011 1.5463 0.3239 0.8670 32.9089
+0.2508 International_Tables_Vol_IV_Table_2.2B
+"""
+
+        keys = [
+            "_atom_type_symbol",
+            "_atom_type_scat_dispersion_real",
+            "_atom_type_scat_dispersion_imag",
+            "_atom_type_scat_Cromer_Mann_a1",
+            "_atom_type_scat_Cromer_Mann_b1",
+            "_atom_type_scat_Cromer_Mann_a2",
+            "_atom_type_scat_Cromer_Mann_b2",
+            "_atom_type_scat_Cromer_Mann_a3",
+            "_atom_type_scat_Cromer_Mann_b3",
+            "_atom_type_scat_Cromer_Mann_a4",
+            "_atom_type_scat_Cromer_Mann_b4",
+            "_atom_type_scat_Cromer_Mann_c",
+            "_atom_type_scat_source",
+        ]
+
+        loop_dict = _cif_parse_loop(keys, data_block)
+        self.assertListEqual(
+            loop_dict["_atom_type_symbol"],
+            ["C", "H", "N", "O"]
+        )
+        self.assertListEqual(
+            loop_dict["_atom_type_scat_source"],
+            4*["International_Tables_Vol_IV_Table_2.2B"]
+        )
+
+        data_block = """
+ 'Bi' 'Bi' -4.1077 10.2566
+ 'International Tables Vol C Tables 4.2.6.8 and 6.1.1.4'
+ 'C' 'C' 0.0033 0.0016 'International Tables Vol C Tables 4.2.6.8 and 6.1.1.4'
+ 'Co' 'Co' 0.3494 0.9721 'International Tables Vol C Tables 4.2.6.8 and 6.1.1.4'
+ 'N' 'N' 0.0061 0.0033 'International Tables Vol C Tables 4.2.6.8 and 6.1.1.4'
+ 'O' 'O' 0.0106 0.0060 'International Tables Vol C Tables 4.2.6.8 and 6.1.1.4'
+ 'S' 'S' 0.1246 0.1234 'International Tables Vol C Tables 4.2.6.8 and 6.1.1.4'
+ """
+        keys = ["_atom_type_symbol", "_atom_type_description", "_atom_type_scat_dispersion_real",
+                "_atom_type_scat_dispersion_imag", "_atom_type_scat_source"]
+
+        loop_dict = _cif_parse_loop(keys, data_block)
+
+        self.assertListEqual(
+            loop_dict["_atom_type_symbol"],
+            ["Bi", "C", "Co", "N", "O", "S"]
+        )
+
+        self.assertListEqual(
+            loop_dict["_atom_type_description"],
+            ["Bi", "C", "Co", "N", "O", "S"]
+        )
+
+        self.assertListEqual(
+            loop_dict["_atom_type_scat_source"],
+            6*["International Tables Vol C Tables 4.2.6.8 and 6.1.1.4"]
+        )
 
 
 class ExportTest(MatadorUnitTest):
@@ -2162,7 +2232,7 @@ class ExportTest(MatadorUnitTest):
 
     def test_large_writes(self):
         """ Fake some large queries and make sure they are not written. """
-        fake_cursor = 100*[{'dummy': 'data'}]
+        fake_cursor = 100 * [{"dummy": "data"}]
         with self.assertRaises(RuntimeError):
             query2files(fake_cursor, res=True, max_files=99)
         with self.assertRaises(RuntimeError):

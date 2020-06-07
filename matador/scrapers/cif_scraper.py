@@ -153,8 +153,6 @@ def _cif_parse_raw(flines):
     ind = 0
     cif_dict = dict()
     cif_dict['loops'] = list()
-    for line in flines:
-        line = line.strip()
     while ind < len(flines):
         jnd = 1
         line = flines[ind].strip()
@@ -179,36 +177,70 @@ def _cif_parse_raw(flines):
             for key in keys:
                 cif_dict[key] = []
             cif_dict['loops'].append(keys)
-            while ind + jnd < len(flines) and _cif_line_contains_data(flines[ind+jnd]):
-                data = []
+            while ind + jnd < len(flines) and _cif_line_contains_data(flines[ind+jnd].strip()):
+                data = ''
                 # loop over line and next lines
-                while len(data) < len(keys) and ind + jnd < len(flines) and _cif_line_contains_data(flines[ind+jnd]):
-                    # parse '' blocks out of strings
-                    raw = flines[ind+jnd].split()
-                    valid = False
-                    while not valid:
-                        valid = True
-                        for i, entry in enumerate(raw):
-                            if entry.startswith('\''):
-                                start = i
-                                valid = False
-                            elif entry.endswith('\''):
-                                end = i
-                                valid = False
-                        if not valid:
-                            raw = raw[:start] + [' '.join(raw[start:end+1]).replace('\'', '')] + raw[end+1:]
-                    data.extend(raw)
+                while ind + jnd < len(flines) and _cif_line_contains_data(flines[ind+jnd]):
+                    data += flines[ind+jnd]
                     jnd += 1
-                try:
-                    for index, datum in enumerate(data):
-                        cif_dict[keys[index]].append(datum)
-                except Exception:
-                    print('Failed to scrape one of {}'.format(keys))
-                    pass
+
+            loop_dict = _cif_parse_loop(keys, data)
+            cif_dict.update(loop_dict)
 
         ind += jnd
 
     return cif_dict
+
+
+def _cif_parse_loop(keys, data_block):
+    """ A hacky way to parse CIF data loops that can be split by quotes
+    or spaces. There must be a better way...
+
+    Parameters:
+        keys (list of str): list of keys for the loop.
+        data_block (str): raw string of the entire data block.
+
+    Returns:
+        Dict[str, str]: a dictionary with keys from ``keys``, containing the
+            data split by quotes and spaces. All data is left as
+            strings for further processing.
+
+    """
+
+    from collections import deque, defaultdict
+
+    dq = deque(data_block)
+    data_list = []
+    entry = None
+    in_quotes = False
+    while dq:
+        char = dq.popleft()
+        if not char.strip() and entry is None:
+            continue
+        elif (not char.strip() or char in [" ", ";"]) and entry is not None and not in_quotes:
+            data_list.append(entry.strip())
+            entry = None
+        elif not char.strip() and entry is not None and in_quotes:
+            entry += " "
+        elif char == "'" and entry and entry is not None:
+            in_quotes = False
+            data_list.append(entry.strip())
+            entry = None
+        elif char == "'" and entry is None:
+            entry = ''
+            in_quotes = True
+        else:
+            if entry is None:
+                entry = char
+            else:
+                entry += char
+
+    loop_dict = defaultdict(list)
+    for ind, entry in enumerate(data_list):
+        ind = ind % len(keys)
+        loop_dict[keys[ind]].append(entry)
+
+    return loop_dict
 
 
 def _cif_set_unreduced_sites(doc):
