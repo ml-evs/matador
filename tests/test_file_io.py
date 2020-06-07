@@ -2026,6 +2026,23 @@ class CifTests(MatadorUnitTest):
             6*["International Tables Vol C Tables 4.2.6.8 and 6.1.1.4"]
         )
 
+    def test_another_big_cif(self):
+        cif_fname = REAL_PATH + "data/cif_files/2.cif"
+        self.assertTrue(
+            os.path.isfile(cif_fname),
+            msg="Failed to open test case {} - please check installation.".format(
+                cif_fname
+            ),
+        )
+
+        cif, s = cif2dict(cif_fname)
+
+        self.assertTrue(s)
+        self.assertEqual(cif["space_group"], "P-1")
+        self.assertAlmostEqual(cif["cell_volume"], 3464.52, places=1)
+        self.assertEqual(cif["num_atoms"], 161)
+        self.assertEqual(len(cif["positions_frac"]), 161)
+
 
 class ExportTest(MatadorUnitTest):
     """ Test file export functions. """
