@@ -88,6 +88,8 @@ def cif2dict(seed, **kwargs):
     doc['stoichiometry'] = _cif_disordered_stoichiometry(doc)
     doc['num_atoms'] = len(doc['positions_frac'])
 
+    if '_space_group_symop_operation_xyz' in doc['_cif'] and '_symmetry_equiv_pos_as_xyz' not in doc['_cif']:
+        doc["_cif"]["_symmetry_equiv_pos_as_xyz"] = doc["_cif"]["_space_group_symop_operation_xyz"]
     if '_symmetry_equiv_pos_as_xyz' in doc['_cif']:
         _cif_set_unreduced_sites(doc)
 
