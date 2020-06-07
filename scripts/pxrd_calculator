@@ -89,19 +89,31 @@ if __name__ == '__main__':
         description="Compute, plot and export PXRD patterns from CIF file inputs.",
         epilog=script_epilog
     )
-    parser.add_argument('-l', '--wavelength', type=float, default=1.5406)
-    parser.add_argument('-bw', '--broadening_width', type=float, default=0.03)
-    parser.add_argument('-tm', '--theta_m', type=float, default=0.0)
-    parser.add_argument('--plot', action='store_true', help='show a plot of the PXRD patterns')
-    parser.add_argument('--savefig', type=str, help='save a plot to this file, e.g. "pxrd.pdf"')
-    parser.add_argument('-t', '--two_theta_range', nargs=2, type=float)
-    parser.add_argument('--spg_labels', action='store_true', help='label with spacegroup-formula instead of filename')
+    parser.add_argument('-l', '--wavelength', type=float, default=1.5406,
+                        help='the incident X-ray wavelength in Angstrom (DEFAULT: 1.506, i.e. CuKa)')
+    parser.add_argument('-bw', '--broadening_width', type=float, default=0.03,
+                        help='the width of broadening to apply to each peak')
+    parser.add_argument('-tm', '--theta_m', type=float, default=0.0,
+                        help='the monochromator angle n degrees (DEFAULT: 0 degrees)')
+    parser.add_argument('--plot', action='store_true',
+                        help='show a plot of the PXRD patterns')
+    parser.add_argument('--savefig', type=str,
+                        help='save a plot to this file, e.g. "pxrd.pdf"')
+    parser.add_argument('-t', '--two_theta_range', nargs=2, type=float,
+                        help="the two theta range to use for plotting/calculating the pattern (DEFAULT: 10 80)")
+    parser.add_argument('--spg_labels', action='store_true',
+                        help='label with computed spacegroup-formula instead of filename')
     parser.add_argument('--save_res', action='store_true',
                         help='save a res file with a closer interpretation of the structure used')
-    parser.add_argument('--save_patterns', action='store_true', help='save a .dat file with the xy pattern for each structure')
-    parser.add_argument('--save_peaks', action='store_true', help='save a .txt file per structure with a list of peaks')
-    parser.add_argument('--rugplot', action='store_true')
-    parser.add_argument('seeds', nargs='+', type=str, help='list of structures to compute')
+    parser.add_argument('--save_patterns', action='store_true',
+                        help='save a .dat file with the xy pattern for each structure')
+    parser.add_argument('--save_peaks', action='store_true',
+                        help='save a .txt file per structure with a list of peaks')
+    parser.add_argument('--rugplot', action='store_true',
+                        help="additionally plot peak positions as a rug plot")
+    parser.add_argument('seeds', nargs='+', type=str,
+                        help='list of structures to compute')
+
     parsed_kwargs = vars(parser.parse_args())
     compute_pxrd(**parsed_kwargs)
     print('Done!')
