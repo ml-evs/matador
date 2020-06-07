@@ -1,6 +1,13 @@
 Changelog
 =========
 
+New in release (0.9.3) [07/06/2020]
+-----------------------------------
+
+- Fixes for the CIF reader: now works with awkward linebreaks and alternative symmetry operation specifications (#61).
+- Added several new flags to ``pxrd_calculator`` script (#60 and 61).
+- Usability fixes for ``spectral_plotting`` in the case of projected dispersion curves (#59).
+
 New in release (0.9.2) [01/06/2020]
 -----------------------------------
 
