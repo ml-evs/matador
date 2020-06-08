@@ -125,7 +125,7 @@ class BatchRun:
             self.start_time = time.time()
 
         # assign number of cores
-        self.all_cores = psutil.cpu_count(logical=False)
+        self.all_cores = psutil.cpu_count(logical=True)
         if self.args.get('ncores') is None:
             if self.queue_mgr is None:
                 self.args['ncores'] = int(self.all_cores / self.nprocesses)
