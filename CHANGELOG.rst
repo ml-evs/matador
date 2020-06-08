@@ -1,6 +1,13 @@
 Changelog
 =========
 
+Hotfix (0.9.3.1) [08/06/2020]
+-----------------------------
+
+- Fixed flag help strings for ``pxrd_calculator`` (#65)
+- Changed default PDF broadening for 3x speedup (#65)
+- Reverted ``cpu_count`` to use version that works correctly in most cases, by chance (#66).
+
 New in release (0.9.3) [07/06/2020]
 -----------------------------------
 
