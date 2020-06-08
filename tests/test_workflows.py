@@ -25,7 +25,7 @@ CASTEP_PRESENT = detect_program(EXECUTABLE)
 MPI_PRESENT = detect_program("mpirun")
 
 if CASTEP_PRESENT and MPI_PRESENT:
-    NCORES = max(psutil.cpu_count(logical=False) - 2, 1)
+    NCORES = max(psutil.cpu_count(logical=True) - 2, 1)
 else:
     NCORES = 1
 

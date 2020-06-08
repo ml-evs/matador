@@ -46,7 +46,7 @@ class Hive:
     def run_command(self, node):
         """ Parse command and run on particular node. """
         cwd = getcwd()
-        compute_command = self.command.replace('$ALL_CORES', str(psutil.cpu_count(logical=False)))
+        compute_command = self.command.replace('$ALL_CORES', str(psutil.cpu_count(logical=True)))
         print_notify('Executing {} on {}{}...'.format(compute_command, self.prefix, node))
         process = sp.Popen(['ssh', '{}{}'.format(self.prefix, node),
                             'cd', '{};'.format(cwd),
