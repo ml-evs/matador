@@ -261,19 +261,7 @@ class PDF(Fingerprint):
         else:
             # otherwise do normal smearing
             hist = self._dist_hist(distances, self.r_space, self.dr)
-            if self.kwargs.get('low_mem'):
-                if self.kwargs.get('debug'):
-                    print('Using low memory mode...')
-                gr = self._broadening_unrolled(hist, self.r_space, gaussian_width)
-            else:
-                try:
-                    gr = self._broadening_distance_dominated(hist, self.r_space, gaussian_width)
-                except MemoryError:
-                    # if run out of memory, use low memory mode
-                    if self.kwargs.get('debug'):
-                        print('Ran out of memory, using low memory mode...')
-                    self.kwargs['low_mem'] = True
-                    gr = self._broadening_unrolled(hist, self.r_space, gaussian_width)
+            gr = self._broadening_unrolled(hist, self.r_space, gaussian_width)
 
         gr = self._normalize_gr(gr, self.r_space, self.dr, self._num_atoms, self.number_density)
 
