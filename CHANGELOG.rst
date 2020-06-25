@@ -1,11 +1,18 @@
 Changelog
 =========
 
+New in release (0.9.5) [25/06/2020]
+-----------------------------------
+- This release is mostly to trigger Zenodo archiving.
+- Updated README and tests for recent Python versions.
+
+
 New in release (0.9.4) [08/06/2020]
 -----------------------------------
 - Fixed flag help strings for ``pxrd_calculator`` (#65)
 - Changed default PDF broadening for 3x speedup (#65)
 - Reverted ``cpu_count`` to use version that works correctly in most cases, by chance (#66).
+
 
 New in release (0.9.3) [07/06/2020]
 -----------------------------------
@@ -13,6 +20,7 @@ New in release (0.9.3) [07/06/2020]
 - Fixes for the CIF reader: now works with awkward linebreaks and alternative symmetry operation specifications (#61).
 - Added several new flags to ``pxrd_calculator`` script (#60 and 61).
 - Usability fixes for ``spectral_plotting`` in the case of projected dispersion curves (#59).
+
 
 New in release (0.9.2) [01/06/2020]
 -----------------------------------
@@ -35,6 +43,7 @@ New in release (0.9.1) [20/05/2020]
 - Fixed issue where bands would be reordered multiple times in spectral plots (#40)
 - Tweaked spectral plot defaults (#40)
 - Replaced ``multiprocessing.cpu_count()`` calls with ``psutil.cpu_count(logical=False)`` to avoid double-counting hyperthreaded cores
+
 
 New in release (0.9) [15/05/2020]
 ---------------------------------

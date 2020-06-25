@@ -2,7 +2,7 @@
 matador
 =======
 
-|PyPI Version| |GH Actions| |Coverage Status| |Documentation Status| |MIT License|
+|PyPI Version| |Zenodo| |GH Actions| |Coverage Status| |Documentation Status| |MIT License|
 
 matador is an aggregator, manipulator and runner of first-principles calculations, written with a bent towards battery electrode materials.
 The source can be found on `GitHub <https://github.com/ml-evs/matador>`_ and online documentation is hosted on `ReadTheDocs <https://docs.matador.science>`_.
@@ -65,3 +65,5 @@ If you think this list is outdated, incorrect or simply incomplete, then please 
   :target: https://codecov.io/gh/ml-evs/matador
 .. |Documentation Status| image:: https://readthedocs.org/projects/matador-db/badge/?version=stable
    :target: https://matador-db.readthedocs.io/en/stable/?badge=stable
+.. |Zenodo| image:: https://zenodo.org/badge/DOI/10.5281/zenodo.3908573.svg
+   :target: https://doi.org/10.5281/zenodo.3908573
