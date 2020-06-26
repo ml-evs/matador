@@ -8,7 +8,7 @@ Tutorials and example notebooks
 Real use-cases
 --------------
 
-- `Harper et al, Research Data Accompanying "Computational Discovery of Novel Copper Phosphide Conversion Anode for Lithium-Ion Batteries" <https://github.com/harpaf13/data.copper-phosphides>`_.
+- `Harper et al, Research Data Accompanying "Computational Discovery of Novel Copper Phosphide Conversion Anode for Lithium-Ion Batteries" <https://github.com/harpaf13/data.copper-phosphides>`_. |CuP Binder|
 
 Example Jupyter notebooks
 -------------------------
@@ -29,3 +29,6 @@ Tutorials
 
     tutorials/run3
     tutorials/mongo
+
+.. |CuP Binder| image:: https://mybinder.org/badge_logo.svg
+   :target: https://mybinder.org/v2/gh/harpaf13/data.copper-phosphides/master?filepath=CuP_results.ipynb
