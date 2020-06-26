@@ -197,7 +197,7 @@ class QueryConvexHull:
 
         if self.compute_voltages:
             print("Constructing electrode system with active ion: {}".format(self.species[0]))
-            self.voltage_curve([doc for doc in self.hull_cursor if doc['hull_distance'] <= 1e-9])
+            self.voltage_curve()
 
         if self.compute_volumes:
             self.volume_curve()
@@ -244,13 +244,14 @@ class QueryConvexHull:
         if self.savefig:
             savefig = '{}_voltage.{}'.format(''.join(self.elements), self.savefig_ext)
 
+        keys = ['expt', 'labels', 'expt_label']
+        plot_args = {key: self.args.get(key) for key in keys}
+        plot_args["savefig"] = savefig
+        plot_args.update(kwargs)
+
         plotting.plot_voltage_curve(
             self.voltage_data,
-            expt=self.args.get('expt'),
-            savefig=savefig,
-            labels=self.args.get('labels'),
-            expt_label=self.args.get('expt_label'),
-            **kwargs
+            **plot_args
         )
 
     def plot_volume_curve(self, **kwargs):
@@ -506,7 +507,7 @@ class QueryConvexHull:
         set_cursor_from_array(self.cursor, capacities, 'gravimetric_capacity')
         self._per_b_done = True
 
-    def voltage_curve(self, hull_cursor):
+    def voltage_curve(self, cursor=None):
         """ Take a computed convex hull and calculate voltages for either binary or ternary
         systems. Sets the self.voltage_data attribute with various fields.
 
@@ -514,6 +515,10 @@ class QueryConvexHull:
             hull_cursor (list(dict)): list of structures to include in the voltage curve.
 
         """
+        hull_cursor = cursor
+        if hull_cursor is None:
+            hull_cursor = [doc for doc in self.hull_cursor if doc.get("hull_distance", 1e20) < 1e-9]
+
         if not self._non_elemental:
             self._setup_per_b_fields()
         if self._dimension == 2:
