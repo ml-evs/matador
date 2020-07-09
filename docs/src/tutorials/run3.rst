@@ -1,4 +1,4 @@
-.. index:: run3 
+.. index:: run3
 
 .. highlight:: bash
 
@@ -16,3 +16,4 @@ run3 is the main entrypoint for performing high-throughput calculations with the
     run3_spectral
     run3_phonon
     run3_elastic
+    run3_qe
