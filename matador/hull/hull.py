@@ -204,7 +204,6 @@ class QueryConvexHull:
 
         if not self.args.get('no_plot'):
             if self.compute_voltages and self.voltage_data:
-                print('plotting voltage')
                 self.plot_voltage_curve(show=False)
             if self.compute_volumes and self.volume_data:
                 self.plot_volume_curve(show=False)
