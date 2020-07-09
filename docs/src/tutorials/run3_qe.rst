@@ -1,5 +1,11 @@
-run3 for geometry optimisations with Quantum Espresso
-=====================================================
+.. index:: run3_qe
+
+.. highlight:: bash
+
+.. _run3_elastic:
+
+Example 5: Geometry optimisations with Quantum Espresso and run3
+================================================================
 
 This tutorial uses the files found in ``examples/run3_quantum_espresso/vc-relax`` to relax
 a folder of res files in a similar way to the CASTEP tutorial. Quantum Espresso (QE) uses a single
