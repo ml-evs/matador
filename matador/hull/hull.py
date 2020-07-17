@@ -47,7 +47,7 @@ class QueryConvexHull:
         num_elements (int): number of elements present in the chemical potentials.
         elements (list): the elements present in the convex hull.
         voltage_data (list): if voltage_curve() has been called, then
-            this is a lsit of VoltageProfile objects containing Q, x, V and reaction pathways.
+            this is a list of VoltageProfile objects containing Q, x, V and reaction pathways.
         volume_data (dict): if volume_curve() has been called, then
             this is a dictionary containing x and volumes per B (in AxBy).
 
