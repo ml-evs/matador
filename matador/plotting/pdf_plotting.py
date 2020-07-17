@@ -73,7 +73,7 @@ def plot_pdf(pdfs,
         gr_max = max(np.max(pdf['pdf'].gr) for pdf in pdfs)
         _r_max = min(np.max(pdf['pdf'].r_space) for pdf in pdfs)
     else:
-        gr_max = max(np.max(pdf) for pdf in pdfs)
+        gr_max = max(np.max(pdf.gr) for pdf in pdfs)
         _r_max = min(np.max(pdf.r_space) for pdf in pdfs)
     abs_offset = offset * gr_max
 

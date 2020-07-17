@@ -74,7 +74,8 @@ def compare_pdfs(**kwargs):
         combo.plot_projected_pdf()
 
     elif kwargs.get('plot'):
-        strucs[0]['pdf'].plot_pdf(other_pdfs=[doc['pdf'] for doc in strucs[1:]])
+        from matador.plotting.pdf_plotting import plot_pdf
+        plot_pdf([doc['pdf'] for doc in strucs])
 
     plt.show()
 
