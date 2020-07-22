@@ -57,7 +57,7 @@ def plot_voltage_curve(
     if curve_labels is not None and not isinstance(curve_labels, list):
         curve_labels = [curve_labels]
     if line_kwargs is not None and not isinstance(line_kwargs, list):
-        line_kwargs = [line_kwargs]
+        line_kwargs = len(profiles) * [line_kwargs]
 
     if curve_labels is not None and len(curve_labels) != len(profiles):
         raise RuntimeError(
