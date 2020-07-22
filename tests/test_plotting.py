@@ -406,22 +406,23 @@ class MagresPlotTests(MatadorUnitTest):
             savefig="magres_P.pdf",
             line_kwargs={"c": "green"},
         )
-        self.assertTrue(os.path.isfile("magres.pdf"))
+        self.assertTrue(os.path.isfile("magres_P.pdf"))
         plot_magres(
             magres,
             species="Li",
             magres_key="chemical_shielding_aniso",
-            savefig="magres_Li.pdf",
+            savefig="magres_Li.png",
             xlabel="Chemical shielding anisotropy",
             signal_labels=["NaP", "LiP"],
             line_kwargs=[{"lw": 3}, {"ls": "--"}],
         )
+        self.assertTrue(os.path.isfile("magres_Li.png"))
 
         with self.assertRaises(RuntimeError):
-            plot_magres(magres, species=None, savefig="magres.pdf")
+            plot_magres(magres, species=None)
 
         with self.assertRaises(RuntimeError):
-            plot_magres(magres, species="K", savefig="magres.pdf")
+            plot_magres(magres, species="K")
 
 
 @unittest.skipIf(not MATPLOTLIB_PRESENT, "Skipping plotting tests.")
