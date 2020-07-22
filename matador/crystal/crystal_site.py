@@ -58,13 +58,10 @@ class Site(DataContainer):
     def __str__(self):
         site_str = '{species} {pos[0]:4.4f} {pos[1]:4.4f} {pos[2]:4.4f}'.format(species=self.species, pos=self.coords)
         for key in self.site_data:
-            site_str += '\n{} = {}'.format(key, self.site_data[key])
-        return site_str
-
-    def __repr__(self):
-        site_str = '{species} {pos[0]:4.4f} {pos[1]:4.4f} {pos[2]:4.4f}'.format(species=self.species, pos=self.coords)
-        for key in self.site_data:
-            site_str += '\n{} = {}'.format(key, self.site_data[key])
+            try:
+                site_str += '\n{} = {:4.4f}'.format(key, float(self.site_data[key]))
+            except ValueError:
+                site_str += '\n{} = {}'.format(key, self.site_data[key])
         return site_str
 
     def __deepcopy__(self, memo):

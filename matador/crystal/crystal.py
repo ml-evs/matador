@@ -195,6 +195,11 @@ class Crystal(DataContainer):
 
         return repr_string
 
+    def print_sites(self):
+        for site in self:
+            print(site)
+        print('---')
+
     def set_positions(self, new_positions, fractional=True):
         if len(new_positions) != self.num_atoms:
             raise RuntimeError('Cannot change size of positions array!')
