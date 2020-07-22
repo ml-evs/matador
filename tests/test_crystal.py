@@ -227,14 +227,14 @@ class CrystalTest(unittest.TestCase):
         self.assertEqual(crystal.get_space_group(symprec=0.0000001), "Pm")
 
     def testFromMagres(self):
-        doc, s = magres2dict(REAL_PATH + "data/NaP_QE6.magres")
+        doc, s = magres2dict(REAL_PATH + "data/magres_files/NaP_QE6.magres")
         crystal = Crystal(doc)
         for atom in crystal:
-            print(atom, atom.site_data["magres_shift"])
+            print(atom, atom["chemical_shielding_iso"], atom["chemical_shielding_asymmetry"])
 
     @unittest.skipIf(not imported_vornet, "Voronoi code not found in this distribution")
     def testCoordination(self):
-        doc, s = magres2dict(REAL_PATH + "data/NaP_QE6.magres")
+        doc, s = magres2dict(REAL_PATH + "data/magres_files/NaP_QE6.magres")
         crystal = Crystal(doc, voronoi=True)
         for atom in crystal:
             print(atom, atom.coordination)
@@ -243,19 +243,19 @@ class CrystalTest(unittest.TestCase):
 
     @unittest.skipIf(not imported_vornet, "Voronoi code not found in this distribution")
     def testVoronoi(self):
-        doc, s = magres2dict(REAL_PATH + "data/NaP_QE6.magres")
+        doc, s = magres2dict(REAL_PATH + "data/magres_files/NaP_QE6.magres")
         crystal = Crystal(doc)
         print(crystal.unique_sites)
 
     @unittest.skipIf(not imported_networkx, "NetworkX missing")
     def testBondLengths(self):
-        doc, s = magres2dict(REAL_PATH + "data/NaP_QE6.magres")
+        doc, s = magres2dict(REAL_PATH + "data/magres_files/NaP_QE6.magres")
         crystal = Crystal(doc)
         print(crystal.bond_lengths)
 
     @unittest.skipIf(not imported_networkx, "NetworkX missing")
     def testBondStats(self):
-        doc, s = magres2dict(REAL_PATH + "data/NaP_QE6.magres")
+        doc, s = magres2dict(REAL_PATH + "data/magres_files/NaP_QE6.magres")
         crystal = Crystal(doc)
         print(crystal.bonding_stats)
 

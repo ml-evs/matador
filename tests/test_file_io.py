@@ -1489,18 +1489,19 @@ class ScraperMiscTest(MatadorUnitTest):
         self.assertTrue(isinstance(bs, ElectronicDispersion))
 
     def test_qe_magres(self):
-        magres_fname = REAL_PATH + "data/NaP_QE6.magres"
-        magres_dict, s = magres2dict(magres_fname)
+        magres_fname = REAL_PATH + "data/magres_files/NaP_QE6.magres"
+        magres_dict, s = magres2dict(magres_fname, as_model=True)
         self.assertTrue(s)
         self.assertEqual(len(magres_dict["atom_types"]), 4)
-        self.assertTrue(
-            magres_dict["lattice_cart"][0] == [-2.503686, 2.503686, 3.540961]
-        )
-        self.assertTrue(
-            magres_dict["lattice_cart"][1] == [2.503686, -2.503686, 3.540961]
-        )
-        self.assertTrue(
-            magres_dict["lattice_cart"][2] == [2.503686, 2.503686, -3.540961]
+        np.testing.assert_array_equal(
+            magres_dict["lattice_cart"],
+            np.array(
+                [
+                    [-2.503686, 2.503686, 3.540961],
+                    [2.503686, -2.503686, 3.540961],
+                    [2.503686, 2.503686, -3.540961],
+                ]
+            ),
         )
 
         np.testing.assert_almost_equal(
@@ -1520,7 +1521,7 @@ class ScraperMiscTest(MatadorUnitTest):
         self.assertEqual(magres_dict["calculator"], "QE-GIPAW")
 
     def test_castep_magres(self):
-        magres_fname = REAL_PATH + "data/LiP_CASTEP18.magres"
+        magres_fname = REAL_PATH + "data/magres_files/LiP_CASTEP18.magres"
         magres_crystal, s = magres2dict(magres_fname, as_model=True)
         self.assertTrue(s)
         self.assertEqual(len(magres_crystal["atom_types"]), 20)
@@ -1613,6 +1614,20 @@ class ScraperMiscTest(MatadorUnitTest):
             ],
             decimal=2,
         )
+
+        for ind, atom in enumerate(magres_crystal):
+            self.assertEqual(
+                atom["chemical_shielding_iso"],
+                magres_crystal["chemical_shielding_isos"][ind],
+            )
+            self.assertEqual(
+                atom["chemical_shielding_aniso"],
+                magres_crystal["chemical_shielding_anisos"][ind],
+            )
+            self.assertEqual(
+                atom["chemical_shielding_asymmetry"],
+                magres_crystal["chemical_shielding_asymmetries"][ind],
+            )
 
         self.assertEqual(magres_crystal["calculator"], "CASTEP")
         self.assertEqual(magres_crystal["calculator_version"], "18.1")
