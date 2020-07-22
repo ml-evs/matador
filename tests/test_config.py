@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+import copy
 import unittest
 import os
 import shutil
@@ -92,3 +92,16 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual(settings.settings, DEFAULT_SETTINGS)
 
         settings.reset()
+
+    def testSetDefaultSettings(self):
+        """ Test default config. """
+        set_settings(DEFAULT_SETTINGS)
+        from matador.config import SETTINGS
+
+        new_settings = copy.deepcopy(DUMMY_SETTINGS)
+        new_settings["mongo"].pop("host")
+
+        set_settings(new_settings)
+        self.assertEqual(SETTINGS.settings["mongo"]["host"], DEFAULT_SETTINGS["mongo"]["host"])
+
+        SETTINGS.reset()

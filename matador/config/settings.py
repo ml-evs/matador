@@ -13,6 +13,7 @@ class Settings:
             self.set = True
 
     def __getitem__(self, key):
+        # print("__getitem__", key)
         return self.settings[key]
 
     def get(self, key, default=None):
@@ -23,6 +24,9 @@ class Settings:
             self.settings[key].update(val)
         else:
             self.settings[key] = val
+
+    def __iter__(self):
+        return iter(self.settings)
 
     def __repr__(self):
         return str(self.settings)
