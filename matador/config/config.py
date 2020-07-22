@@ -139,12 +139,10 @@ def set_settings(settings, override=True):
     if SETTINGS.set and not override:
         return
 
-    keys = list(SETTINGS.settings.keys())
-    for key in keys:
-        if key not in settings:
-            SETTINGS.settings.pop(key)
-
     for key in settings:
-        SETTINGS[key] = settings[key]
+        if key not in SETTINGS:
+            SETTINGS[key] = {}
+        for _key in settings[key]:
+            SETTINGS[key][_key] = settings[key][_key]
 
     SETTINGS.set = True

@@ -50,7 +50,7 @@ def vertices2plane(points):
         y = structure[1]
         z = structure[2]
         if np.abs(normal[2]) < EPS:
-            warnings.warn("Normal of plane {normal} is ill-defined. Returning 0 for height above plane.")
+            warnings.warn(f"Normal of plane {normal} is ill-defined. Returning 0 for height above plane.")
             return 0
         z_plane = -((x*normal[0] + y*normal[1] + d) / normal[2])
         height = z - z_plane

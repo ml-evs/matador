@@ -8,15 +8,24 @@ although only PDF has been implemented so far.
 
 import copy
 from collections import defaultdict
+from typing import List, Dict, Tuple
 import numpy as np
 from matador.fingerprints.pdf import PDF, PDFFactory
+from matador.fingerprints.fingerprint import Fingerprint
 from matador.utils.cursor_utils import get_guess_doc_provenance
 
 
-def get_uniq_cursor(cursor, sim_tol=0.1, energy_tol=1e-2,
-                    enforce_same_stoich=True, fingerprint=PDF,
-                    hierarchy_order=None, hierarchy_values=None,
-                    debug=False, **fingerprint_calc_args):
+def get_uniq_cursor(
+    cursor,
+    sim_tol=0.1,
+    energy_tol=1e-2,
+    enforce_same_stoich=True,
+    fingerprint=PDF,
+    hierarchy_order=None,
+    hierarchy_values=None,
+    debug=False,
+    **fingerprint_calc_args
+) -> Tuple[List[int], Dict[int, int], List[Fingerprint], np.ndarray]:
     """ Uses fingerprint to filter cursor into unique structures to some
     tolerance sim_tol, additionally returning a dict of duplicates and the
     correlation matrix.
@@ -44,10 +53,10 @@ def get_uniq_cursor(cursor, sim_tol=0.1, energy_tol=1e-2,
         fingerprint_calc_args (dict): kwargs to pass to fingerprint
 
     Returns:
-        distinct_set (list): ordered list indices of unique documents
-        dupe_dict (dict): a dict with keys from distinct_set, listing duplicates
-        fingerprint_list (list): a list of <Fingerprint> objects
-        sim_mat (np.ndarray): the correlation matrix of pair similarity distances
+        ordered list of indices of unique documents,
+        a dict with keys from distinct_set,
+        a list of Fingerprint objects,
+        and the sparse correlation matrix of pairwise similarity distances
 
     """
 
