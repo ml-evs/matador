@@ -54,6 +54,13 @@ def plot_magres(
     """
     import matplotlib.pyplot as plt
 
+    if not isinstance(magres, list):
+        magres = [magres]
+    if signal_labels is not None and not isinstance(signal_labels, list):
+        signal_labels = [signal_labels]
+    if line_kwargs is not None and not isinstance(line_kwargs, list):
+        line_kwargs = len(magres) * [line_kwargs]
+
     if figsize is None:
         _user_default_figsize = plt.rcParams.get('figure.figsize', (8, 6))
         height = len(magres) * max(0.5, _user_default_figsize[1] / 1.5 / len(magres))
@@ -65,13 +72,6 @@ def plot_magres(
 
     if species is None:
         raise RuntimeError("You must provide a species label for plotting.")
-
-    if not isinstance(magres, list):
-        magres = [magres]
-    if signal_labels is not None and not isinstance(signal_labels, list):
-        signal_labels = [signal_labels]
-    if line_kwargs is not None and not isinstance(line_kwargs, list):
-        line_kwargs = len(magres) * [line_kwargs]
 
     if signal_labels is not None and len(signal_labels) != len(magres):
         raise RuntimeError(
