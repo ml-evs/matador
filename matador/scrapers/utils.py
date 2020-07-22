@@ -21,6 +21,7 @@ MODEL_REGISTRY = {
     "castep2dict": Crystal,
     "res2dict": Crystal,
     "cif2dict": Crystal,
+    "magres2dict": Crystal,
 }
 
 
@@ -106,17 +107,20 @@ def scraper_function(function):
     return wrapped_scraper_function
 
 
-def _as_model(doc, function, debug=False):
+def _as_model(doc, function, debug=True):
     """ Convert the document to the appropriate orm model. """
     model = MODEL_REGISTRY.get(function.__name__)
     orm = None
     if model is not None:
         try:
             orm = model(doc)
-        except Exception:
+        except Exception as exc:
+            if debug:
+                tb.print_exc()
             print('Unable to convert scraped dict to model {}'.format(model.__name__))
+            raise exc
     else:
-        print('as_model keyword not supported for {}, not converting'.format(function.__name__))
+        print('`as_model` keyword not supported for {}, not converting'.format(function.__name__))
 
     return orm
 

@@ -79,29 +79,29 @@ def magres2dict(seed, **kwargs):
                         magres['susceptibility_tensor'].append([float(val) for val in sus[3*j:3*(j+1)]])
                 elif 'ms' in flines[line_no+i]:
                     ms = flines[line_no+i].split()[3:]
-                    magres['magnetic_shielding_tensor'].append([])
+                    magres['magnetic_shielding_tensors'].append([])
                     for j in range(3):
-                        magres['magnetic_shielding_tensor'][-1].append([float(val) for val in ms[3*j:3*(j+1)]])
-                    magres['chemical_shifts'].append(0)
-                    magres['chemical_shift_anisos'].append(0)
-                    magres['chemical_shift_asymmetries'].append(0)
+                        magres['magnetic_shielding_tensors'][-1].append([float(val) for val in ms[3*j:3*(j+1)]])
+                    magres['chemical_shielding_isos'].append(0)
+                    magres['chemical_shielding_anisos'].append(0)
+                    magres['chemical_shielding_asymmetries'].append(0)
                     for j in range(3):
-                        magres['chemical_shifts'][-1] += magres['magnetic_shielding_tensor'][-1][j][j] / 3
+                        magres['chemical_shielding_isos'][-1] += magres['magnetic_shielding_tensors'][-1][j][j] / 3
 
                     # find eigenvalues of symmetric part of shielding and order them to calc anisotropy eta
                     symmetric_shielding = (
                         0.5 *
-                        (magres['magnetic_shielding_tensor'][-1] + np.asarray(magres['magnetic_shielding_tensor'][-1]).T)
+                        (magres['magnetic_shielding_tensors'][-1] + np.asarray(magres['magnetic_shielding_tensors'][-1]).T)
                     )
                     eig_vals, eig_vecs = np.linalg.eig(symmetric_shielding)
                     eig_vals, eig_vecs = zip(*sorted(zip(eig_vals, eig_vecs),
-                                                     key=lambda eig: abs(eig[0] - magres['chemical_shifts'][-1])))
+                                                     key=lambda eig: abs(eig[0] - magres['chemical_shielding_isos'][-1])))
                     # Haeberlen convention: |s_zz - s_iso| >= |s_xx - s_iso| >= |s_yy - s_iso|
                     s_yy, s_xx, s_zz = eig_vals
-                    s_iso = magres['chemical_shifts'][-1]
+                    s_iso = magres['chemical_shielding_isos'][-1]
                     # convert from reduced anistropy to CSA
-                    magres['chemical_shift_anisos'][-1] = s_zz - (s_xx + s_yy)/2.0
-                    magres['chemical_shift_asymmetries'][-1] = (s_yy - s_xx) / (s_zz - s_iso)
+                    magres['chemical_shielding_anisos'][-1] = s_zz - (s_xx + s_yy)/2.0
+                    magres['chemical_shielding_asymmetries'][-1] = (s_yy - s_xx) / (s_zz - s_iso)
                 i += 1
 
     for line_no, line in enumerate(flines):
