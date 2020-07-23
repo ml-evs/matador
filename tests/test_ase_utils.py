@@ -10,7 +10,10 @@ try:
 except ImportError:
     ASE_IMPORTED = False
 
+import numpy as np
+
 from matador.utils.ase_utils import ase2dict
+from .utils import REAL_PATH
 
 
 @unittest.skipIf(not ASE_IMPORTED, "ASE not found")
@@ -22,6 +25,7 @@ class AseUtilTest(unittest.TestCase):
         self.ase_atoms = ase.build.bulk(
             "SiO", crystalstructure="rocksalt", a=12, cubic=True
         )
+        self.ase_atoms.info = {"test_info": "dictionary"}
 
     def test_ase2dict(self):
         doc = ase2dict(self.ase_atoms)
@@ -44,10 +48,28 @@ class AseUtilTest(unittest.TestCase):
         self.assertListEqual(doc["stoichiometry"][1], ["Si", 1.0])
         self.assertListEqual(sorted(list(doc["elems"])), ["O", "Si"])
         self.assertEqual(doc["space_group"], "Fm-3m")
+        self.assertDictEqual(doc["ase_info"], self.ase_atoms.info)
 
     def test_doc2ase(self):
-        pass
+        from matador.scrapers import castep2dict
 
+        doc, s = castep2dict(
+            REAL_PATH + "data/castep_files/KP-castep17.castep", as_model=True
+        )
 
-if __name__ == "__main__":
-    unittest.main()
+        ase_atoms = doc.ase_atoms
+        np.testing.assert_array_almost_equal(
+            ase_atoms.cell.array, doc.lattice_cart, decimal=16
+        )
+
+        np.testing.assert_array_almost_equal(
+            doc.positions_frac, ase_atoms.get_scaled_positions(), decimal=12
+        )
+
+        for ind, site in enumerate(doc):
+            np.testing.assert_array_almost_equal(
+                site.get_coords("cartesian"), ase_atoms[ind].position, decimal=12
+            )
+            self.assertEqual(site.species, ase_atoms[ind].symbol)
+
+        self.assertDictEqual(ase_atoms.info["matador"], doc._data)
