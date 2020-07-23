@@ -353,7 +353,7 @@ class PDF(Fingerprint):
         from matador.plotting.pdf_plotting import plot_projected_pdf
         plot_projected_pdf(self, **kwargs)
 
-    def plot_pdf(self, **kwargs):
+    def plot(self, **kwargs):
         """ Plot PDFs.
 
         Keyword arguments:
