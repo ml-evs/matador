@@ -9,11 +9,15 @@ the pymatgen, via ASE.
 import pickle
 import os
 import getpass
+import copy
+from typing import Union
 
 from pymatgen.io.ase import AseAtomsAdaptor
 from pymatgen import MPRester
+
 from matador.utils.ase_utils import ase2dict, doc2ase
 from matador.utils.cell_utils import calc_mp_spacing
+from matador.crystal import Crystal
 
 REQ_PROPERTIES = [
     'formula',
@@ -73,13 +77,23 @@ def get_chemsys(elements, dumpfile=None):
     return cursor, count
 
 
-def doc2pmg(doc):
-    """ Converts matador document to a pymatgen structure,
+def doc2pmg(doc: Union[dict, Crystal]):
+    """ Converts matador document/Crystal to a pymatgen structure,
     via ASE.
 
     """
     ase_atoms = doc2ase(doc)
-    return AseAtomsAdaptor.get_structure(ase_atoms)
+    pmg_structure = AseAtomsAdaptor.get_structure(ase_atoms)
+    pmg_structure.info = {}
+    if isinstance(doc, Crystal):
+        pmg_structure.info["matador"] = copy.deepcopy(doc._data)
+    else:
+        pmg_structure.info["matador"] = copy.deepcopy(doc._data)
+
+    if "_id" in pmg_structure.info:
+        pmg_structure.info["matador"]["_id"] = str(pmg_structure.info["_id"])
+
+    return pmg_structure
 
 
 def mp2dict(response):
