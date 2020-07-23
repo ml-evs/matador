@@ -466,6 +466,14 @@ class ChemUtilsTest(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             src = get_root_source(source)
 
+        source = ["not a file name"]
+        src = "not a file name"
+        self.assertEqual(src, get_root_source(source))
+
+        source = "not even a list"
+        src = "not even a list"
+        self.assertEqual(src, get_root_source(source))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -558,7 +558,7 @@ def get_root_source(source):
     """ Get the main file source from a doc's source list.
 
     Parameters:
-        source (list/dict): contents of doc['source'] or the doc itself.
+        source (str/list/dict): contents of doc['source'] or the doc itself.
 
     Returns:
         str: "root" filename, e.g. if source = ['KP.cell', 'KP.param',
@@ -569,6 +569,9 @@ def get_root_source(source):
         sources = copy.deepcopy(source['source'])
     except (KeyError, TypeError):
         sources = copy.deepcopy(source)
+
+    if isinstance(source, str):
+        return source
 
     src_list = set()
     for src in sources:
