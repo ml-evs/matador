@@ -1489,18 +1489,19 @@ class ScraperMiscTest(MatadorUnitTest):
         self.assertTrue(isinstance(bs, ElectronicDispersion))
 
     def test_qe_magres(self):
-        magres_fname = REAL_PATH + "data/NaP_QE6.magres"
-        magres_dict, s = magres2dict(magres_fname)
+        magres_fname = REAL_PATH + "data/magres_files/NaP_QE6.magres"
+        magres_dict, s = magres2dict(magres_fname, as_model=True)
         self.assertTrue(s)
         self.assertEqual(len(magres_dict["atom_types"]), 4)
-        self.assertTrue(
-            magres_dict["lattice_cart"][0] == [-2.503686, 2.503686, 3.540961]
-        )
-        self.assertTrue(
-            magres_dict["lattice_cart"][1] == [2.503686, -2.503686, 3.540961]
-        )
-        self.assertTrue(
-            magres_dict["lattice_cart"][2] == [2.503686, 2.503686, -3.540961]
+        np.testing.assert_array_equal(
+            magres_dict["lattice_cart"],
+            np.array(
+                [
+                    [-2.503686, 2.503686, 3.540961],
+                    [2.503686, -2.503686, 3.540961],
+                    [2.503686, 2.503686, -3.540961],
+                ]
+            ),
         )
 
         np.testing.assert_almost_equal(
@@ -1512,31 +1513,31 @@ class ScraperMiscTest(MatadorUnitTest):
             ],
         )
         np.testing.assert_almost_equal(
-            magres_dict["chemical_shifts"], [518.15, 467.61, 467.61, 275.34], decimal=2
+            magres_dict["chemical_shielding_isos"],
+            [518.15, 467.61, 467.61, 275.34],
+            decimal=2,
         )
 
         self.assertEqual(magres_dict["calculator"], "QE-GIPAW")
 
     def test_castep_magres(self):
-        magres_fname = REAL_PATH + "data/LiP_CASTEP18.magres"
-        magres_dict, s = magres2dict(magres_fname)
+        magres_fname = REAL_PATH + "data/magres_files/LiP_CASTEP18.magres"
+        magres_crystal, s = magres2dict(magres_fname, as_model=True)
         self.assertTrue(s)
-        self.assertEqual(len(magres_dict["atom_types"]), 20)
-        self.assertTrue(
-            magres_dict["lattice_cart"][0]
-            == [4.1332870000000002, 0.0000000000000000, 0.0000000000000000]
-        )
-        self.assertTrue(
-            magres_dict["lattice_cart"][1]
-            == [-8.9905292805212659e-4, 6.0637949333506347, 0.0000000000000000]
-        )
-        self.assertTrue(
-            magres_dict["lattice_cart"][2]
-            == [2.0677013018922552, 3.3924745014331725e-1, 12.368724395669441]
+        self.assertEqual(len(magres_crystal["atom_types"]), 20)
+        np.testing.assert_array_equal(
+            magres_crystal.lattice_cart,
+            np.array(
+                [
+                    [4.1332870000000002, 0.0000000000000000, 0.0000000000000000],
+                    [-8.9905292805212659e-4, 6.0637949333506347, 0.0000000000000000],
+                    [2.0677013018922552, 3.3924745014331725e-1, 12.368724395669441],
+                ],
+            ),
         )
 
         np.testing.assert_almost_equal(
-            magres_dict["chemical_shifts"],
+            magres_crystal["chemical_shielding_isos"],
             [
                 83.7,
                 84.3,
@@ -1562,7 +1563,7 @@ class ScraperMiscTest(MatadorUnitTest):
             decimal=1,
         )
         np.testing.assert_almost_equal(
-            magres_dict["chemical_shift_anisos"],
+            magres_crystal["chemical_shielding_anisos"],
             [
                 9.4,
                 4.4,
@@ -1588,7 +1589,7 @@ class ScraperMiscTest(MatadorUnitTest):
             decimal=1,
         )
         np.testing.assert_almost_equal(
-            magres_dict["chemical_shift_asymmetries"],
+            magres_crystal["chemical_shielding_asymmetries"],
             [
                 0.33,
                 0.76,
@@ -1614,8 +1615,22 @@ class ScraperMiscTest(MatadorUnitTest):
             decimal=2,
         )
 
-        self.assertEqual(magres_dict["calculator"], "CASTEP")
-        self.assertEqual(magres_dict["calculator_version"], "18.1")
+        for ind, atom in enumerate(magres_crystal):
+            self.assertEqual(
+                atom["chemical_shielding_iso"],
+                magres_crystal["chemical_shielding_isos"][ind],
+            )
+            self.assertEqual(
+                atom["chemical_shielding_aniso"],
+                magres_crystal["chemical_shielding_anisos"][ind],
+            )
+            self.assertEqual(
+                atom["chemical_shielding_asymmetry"],
+                magres_crystal["chemical_shielding_asymmetries"][ind],
+            )
+
+        self.assertEqual(magres_crystal["calculator"], "CASTEP")
+        self.assertEqual(magres_crystal["calculator_version"], "18.1")
 
     def test_pwscfout(self):
         pwout_fname = REAL_PATH + "data/NaP.out"
@@ -1988,13 +2003,10 @@ class CifTests(MatadorUnitTest):
         ]
 
         loop_dict = _cif_parse_loop(keys, data_block)
-        self.assertListEqual(
-            loop_dict["_atom_type_symbol"],
-            ["C", "H", "N", "O"]
-        )
+        self.assertListEqual(loop_dict["_atom_type_symbol"], ["C", "H", "N", "O"])
         self.assertListEqual(
             loop_dict["_atom_type_scat_source"],
-            4*["International_Tables_Vol_IV_Table_2.2B"]
+            4 * ["International_Tables_Vol_IV_Table_2.2B"],
         )
 
         data_block = """
@@ -2006,24 +2018,27 @@ class CifTests(MatadorUnitTest):
  'O' 'O' 0.0106 0.0060 'International Tables Vol C Tables 4.2.6.8 and 6.1.1.4'
  'S' 'S' 0.1246 0.1234 'International Tables Vol C Tables 4.2.6.8 and 6.1.1.4'
  """
-        keys = ["_atom_type_symbol", "_atom_type_description", "_atom_type_scat_dispersion_real",
-                "_atom_type_scat_dispersion_imag", "_atom_type_scat_source"]
+        keys = [
+            "_atom_type_symbol",
+            "_atom_type_description",
+            "_atom_type_scat_dispersion_real",
+            "_atom_type_scat_dispersion_imag",
+            "_atom_type_scat_source",
+        ]
 
         loop_dict = _cif_parse_loop(keys, data_block)
 
         self.assertListEqual(
-            loop_dict["_atom_type_symbol"],
-            ["Bi", "C", "Co", "N", "O", "S"]
+            loop_dict["_atom_type_symbol"], ["Bi", "C", "Co", "N", "O", "S"]
         )
 
         self.assertListEqual(
-            loop_dict["_atom_type_description"],
-            ["Bi", "C", "Co", "N", "O", "S"]
+            loop_dict["_atom_type_description"], ["Bi", "C", "Co", "N", "O", "S"]
         )
 
         self.assertListEqual(
             loop_dict["_atom_type_scat_source"],
-            6*["International Tables Vol C Tables 4.2.6.8 and 6.1.1.4"]
+            6 * ["International Tables Vol C Tables 4.2.6.8 and 6.1.1.4"],
         )
 
     def test_another_big_cif(self):

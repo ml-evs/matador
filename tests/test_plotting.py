@@ -11,11 +11,12 @@ import sys
 from glob import glob
 import numpy as np
 import matador.cli.dispersion
-from matador.scrapers import res2dict
+from matador.scrapers import res2dict, magres2dict
 from matador.hull import QueryConvexHull
 from matador.plotting.battery_plotting import plot_voltage_curve
 from matador.plotting.pdf_plotting import plot_pdf
 from matador.plotting.pxrd_plotting import plot_pxrd
+from matador.plotting.magres_plotting import plot_magres
 from .utils import MatadorUnitTest
 
 REAL_PATH = "/".join(os.path.realpath(__file__).split("/")[:-1]) + "/"
@@ -23,6 +24,7 @@ ROOT_DIR = os.getcwd()
 
 try:
     import matplotlib  # noqa
+
     matplotlib.use("Agg")
 
     MATPLOTLIB_PRESENT = True
@@ -30,7 +32,7 @@ except ImportError:
     MATPLOTLIB_PRESENT = False
 
 try:
-    import ternary # noqa
+    import ternary  # noqa
 
     TERNARY_PRESENT = True
 except ImportError:
@@ -222,23 +224,45 @@ class SpectralPlotTests(unittest.TestCase):
 
     def test_projector_scraping(self):
         from matador.plotting.spectral_plotting import _parse_projectors_list
+
         self.assertEqual(
             _parse_projectors_list("K"),
-            [("K", "s", None), ("K", "p", None), ("K", "d", None), ("K", "f", None), ("K", None, None)]
+            [
+                ("K", "s", None),
+                ("K", "p", None),
+                ("K", "d", None),
+                ("K", "f", None),
+                ("K", None, None),
+            ],
         )
         self.assertEqual(
             _parse_projectors_list("K,P"),
-            [("K", "s", None), ("K", "p", None), ("K", "d", None), ("K", "f", None), ("K", None, None),
-             ("P", "s", None), ("P", "p", None), ("P", "d", None), ("P", "f", None), ("P", None, None)]
+            [
+                ("K", "s", None),
+                ("K", "p", None),
+                ("K", "d", None),
+                ("K", "f", None),
+                ("K", None, None),
+                ("P", "s", None),
+                ("P", "p", None),
+                ("P", "d", None),
+                ("P", "f", None),
+                ("P", None, None),
+            ],
         )
         self.assertEqual(
             _parse_projectors_list("K,P:s"),
-            [("K", "s", None), ("K", "p", None), ("K", "d", None), ("K", "f", None), ("K", None, None),
-             ("P", "s", None)]
+            [
+                ("K", "s", None),
+                ("K", "p", None),
+                ("K", "d", None),
+                ("K", "f", None),
+                ("K", None, None),
+                ("P", "s", None),
+            ],
         )
         self.assertEqual(
-            _parse_projectors_list("123:x,P:s"),
-            [("123", "x", None), ("P", "s", None)]
+            _parse_projectors_list("123:x,P:s"), [("123", "x", None), ("P", "s", None)]
         )
 
 
@@ -368,6 +392,37 @@ class FingerprintPlotTests(MatadorUnitTest):
         self.assertTrue(os.path.isfile("K7PSn_pxrd.png"))
         plot_pdf([structure, structure], filename="test_pxrd", png=True)
         self.assertTrue(os.path.isfile("test_pxrd.png"))
+
+
+@unittest.skipIf(not MATPLOTLIB_PRESENT, "Skipping plotting tests.")
+class MagresPlotTests(MatadorUnitTest):
+    """ Test ability to plot magres data. """
+
+    def test_magres_plot(self):
+        magres, f = magres2dict(REAL_PATH + "data/magres_files/*.magres", as_model=True)
+        plot_magres(
+            magres,
+            species="P",
+            savefig="magres_P.pdf",
+            line_kwargs={"c": "green"},
+        )
+        self.assertTrue(os.path.isfile("magres_P.pdf"))
+        plot_magres(
+            magres,
+            species="Li",
+            magres_key="chemical_shielding_aniso",
+            savefig="magres_Li.png",
+            xlabel="Chemical shielding anisotropy",
+            signal_labels=["NaP", "LiP"],
+            line_kwargs=[{"lw": 3}, {"ls": "--"}],
+        )
+        self.assertTrue(os.path.isfile("magres_Li.png"))
+
+        with self.assertRaises(RuntimeError):
+            plot_magres(magres, species=None)
+
+        with self.assertRaises(RuntimeError):
+            plot_magres(magres, species="K")
 
 
 @unittest.skipIf(not MATPLOTLIB_PRESENT, "Skipping plotting tests.")

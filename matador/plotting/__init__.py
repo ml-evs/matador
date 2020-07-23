@@ -20,6 +20,7 @@ __all__ = ['plot_spectral', 'plot_voltage_curve',
            'get_linear_cmap', 'plot_free_energy', 'plot_cutoff_kpt_grid',
            'plot_ensemble_hull', 'plot_temperature_hull',
            'plot_pdf', 'plot_projected_pdf', 'plot_diff_overlap',
+           'plot_magres',
            'plot_projected_diff_overlap', 'plot_pxrd', 'set_style']
 __author__ = 'Matthew Evans'
 __maintainer__ = 'Matthew Evans'
@@ -33,3 +34,4 @@ from matador.plotting.temperature_plotting import plot_free_energy
 from matador.plotting.pdf_plotting import plot_pdf, plot_projected_pdf, plot_diff_overlap, plot_projected_diff_overlap
 from matador.plotting.pxrd_plotting import plot_pxrd
 from matador.plotting.ir_plotting import plot_ir_spectrum
+from matador.plotting.magres_plotting import plot_magres

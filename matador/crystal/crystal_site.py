@@ -7,37 +7,61 @@ atomic sites.
 """
 
 import numpy as np
-import copy
 from matador.utils.cell_utils import cart2frac, frac2cart, wrap_frac_coords
+from matador.orm.orm import DataContainer
 
 
-class Site:
+class Site(DataContainer):
+
     def __init__(self, species: str, position: list, lattice_cart,
                  position_unit='fractional', **site_data):
 
-        self.lattice = copy.deepcopy(lattice_cart)
-        self.set_position(position, position_unit)
-        self.species = species
-        self._occupancy = None
-        self.site_data = {}
-
         if site_data.get('voronoi_substructure') is not None:
             assert self.species == site_data['voronoi_substructure'][0]
-            self.site_data['voronoi_substructure'] = site_data['voronoi_substructure'][1]
-            del site_data['voronoi_substructure']
+            site_data['voronoi_substructure'] = site_data['voronoi_substructure'][1]
 
+        super().__init__(
+            species=species,
+            position=position,
+            lattice_cart=lattice_cart,
+            **site_data
+        )
+
+        self.set_position(position, position_unit)
+        self._occupancy = None
+
+        self.site_data = {}
         self.site_data.update(site_data)
+
+    def __getitem__(self, key):
+        """ Add extra look-up in `self.site_data` to
+        :class:`DataContainer`'s `__getitem__`.
+
+        Parameters:
+            key (str): name of key or attribute to get.
+
+        Raises:
+            AttributeError: if key or attribute can't be found.
+
+        """
+        try:
+            super().__getitem__(key)
+        except (AttributeError, KeyError):
+            pass
+
+        try:
+            return self.site_data[key]
+        except KeyError:
+            raise KeyError('Site has no data/site_data or implementation for requested key: "{}"'
+                           .format(key))
 
     def __str__(self):
         site_str = '{species} {pos[0]:4.4f} {pos[1]:4.4f} {pos[2]:4.4f}'.format(species=self.species, pos=self.coords)
         for key in self.site_data:
-            site_str += '\n{} = {}'.format(key, self.site_data[key])
-        return site_str
-
-    def __repr__(self):
-        site_str = '{species} {pos[0]:4.4f} {pos[1]:4.4f} {pos[2]:4.4f}'.format(species=self.species, pos=self.coords)
-        for key in self.site_data:
-            site_str += '\n{} = {}'.format(key, self.site_data[key])
+            try:
+                site_str += '\n{} = {:4.4f}'.format(key, float(self.site_data[key]))
+            except ValueError:
+                site_str += '\n{} = {}'.format(key, self.site_data[key])
         return site_str
 
     def __deepcopy__(self, memo):
@@ -70,6 +94,18 @@ class Site:
     def coords(self):
         return self._coords['fractional']
 
+    @property
+    def species(self):
+        return self._data['species']
+
+    @species.setter
+    def species(self, value):
+        self._data['species'] = value
+
+    @property
+    def lattice(self):
+        return self._data['lattice_cart']
+
     def get_coords(self, units='fractional'):
         if units not in ['fractional', 'cartesian']:
             raise RuntimeError('Unit system {} not understood, expecting `fractional`/`cartesian`'.format(units))
@@ -78,9 +114,9 @@ class Site:
 
     @property
     def occupancy(self):
-        if self._occupancy is None:
-            self._occupancy = self.site_data.get("site_occupancy", 1.0)
-        return self._occupancy
+        if "site_occupancy" not in self._data:
+            self._data["site_occupancy"] = 1.0
+        return self._data["site_occupancy"]
 
     @property
     def coordination(self):
