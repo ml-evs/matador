@@ -15,15 +15,19 @@ from matador.crystal import Crystal
 __all__ = ['ase2dict', 'doc2ase']
 
 
-def ase2dict(atoms) -> dict:
-    """ Return a simple matador-style dictionary from
-    an ase.Atoms object.
+def ase2dict(atoms, as_model=False) -> Union[dict, Crystal]:
+    """ Return a matador document (dictionary or :obj:`Crystal`)
+    from an `ase.Atoms` object.
 
     Parameters:
         atoms (ase.Atoms): input structure.
 
+    Keyword arguments:
+        as_model (bool): if `True`, return a
+            Crystal instead of a dictionary.
+
     Returns:
-        dict: matador output.
+        Union[dict, Crystal]: matador output.
 
     """
     from matador.utils.cell_utils import cart2abc
@@ -49,6 +53,9 @@ def ase2dict(atoms) -> dict:
 
     if atoms.info:
         doc["ase_info"] = copy.deepcopy(atoms.info)
+
+    if as_model:
+        doc = Crystal(doc)
 
     return doc
 

@@ -195,6 +195,13 @@ class Crystal(DataContainer):
 
         return repr_string
 
+    def update(self, data):
+        """ Update the underlying `self._data` dictionary
+        with the passed data.
+
+        """
+        self._data.update(data)
+
     def print_sites(self):
         for site in self:
             print(site)
@@ -470,6 +477,16 @@ class Crystal(DataContainer):
         """
         from matador.utils.pmg_utils import doc2pmg
         return doc2pmg(self)
+
+    @classmethod
+    def from_ase(cls, atoms):
+        from matador.utils.ase_utils import ase2dict
+        return ase2dict(atoms, as_model=True)
+
+    @classmethod
+    def from_pmg(cls, pmg):
+        from matador.utils.pmg_utils import pmg2dict
+        return pmg2dict(pmg, as_model=True)
 
     @property
     def coordination_lists(self):

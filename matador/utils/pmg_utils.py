@@ -13,7 +13,7 @@ import copy
 from typing import Union
 
 from pymatgen.io.ase import AseAtomsAdaptor
-from pymatgen import MPRester
+from pymatgen import MPRester, Structure
 
 from matador.utils.ase_utils import ase2dict, doc2ase
 from matador.utils.cell_utils import calc_mp_spacing
@@ -94,6 +94,23 @@ def doc2pmg(doc: Union[dict, Crystal]):
         pmg_structure.info["matador"]["_id"] = str(pmg_structure.info["_id"])
 
     return pmg_structure
+
+
+def pmg2dict(pmg: Structure, as_model=False) -> Union[dict, Crystal]:
+    """ Converts a pymatgen.Structure to a matador document/Crystal.
+
+    Parameters:
+        pmg (pymatgen.Structure): the structure to convert.
+
+    Keyword arguments:
+        as_model (bool): if True, return a Crystal instead of a dict.
+
+    Returns:
+        Union[dict, Crystal]: the converted structure.
+
+    """
+    from matador.utils.ase_utils import ase2dict
+    return ase2dict(AseAtomsAdaptor.get_atoms(pmg), as_model=as_model)
 
 
 def mp2dict(response):
