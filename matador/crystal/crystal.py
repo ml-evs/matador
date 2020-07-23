@@ -460,7 +460,7 @@ class Crystal(DataContainer):
 
         """
         from matador.utils.ase_utils import doc2ase
-        return doc2ase(self, add_keys_to_info=False)
+        return doc2ase(self, add_keys_to_info=True)
 
     @property
     def pmg_structure(self):

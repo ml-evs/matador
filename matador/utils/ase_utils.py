@@ -4,18 +4,18 @@
 """ This file implements some light wrappers to
 the Atomic Simulation Environment (ASE).
 
-TODO: Use Crystal class to automate filling.
-
 """
+
 import copy
-import matador.crystal
+from typing import Union
 from matador.utils.chem_utils import get_stoich
 from matador.utils.cell_utils import get_spacegroup_spg
+from matador.crystal import Crystal
 
 __all__ = ['ase2dict', 'doc2ase']
 
 
-def ase2dict(atoms):
+def ase2dict(atoms) -> dict:
     """ Return a simple matador-style dictionary from
     an ase.Atoms object.
 
@@ -47,14 +47,17 @@ def ase2dict(atoms):
     doc['num_fu'] = doc['num_atoms'] / int(sum(doc['stoichiometry'][i][1] for i in range(len(doc['stoichiometry']))))
     doc['space_group'] = get_spacegroup_spg(doc, symprec=0.001)
 
+    if atoms.info:
+        doc["ase_info"] = copy.deepcopy(atoms.info)
+
     return doc
 
 
-def doc2ase(doc, add_keys_to_info=True):
+def doc2ase(doc: Union[dict, Crystal], add_keys_to_info=True):
     """ Convert matador document to simple ASE object.
 
     Parameters:
-        doc (dict/:obj:`matador.crystal.Crystal`): matador document  or
+        doc (dict/:obj:`Crystal`): matador document or
             `Crystal` containing the structure.
 
     Keyword arguments:
@@ -70,7 +73,7 @@ def doc2ase(doc, add_keys_to_info=True):
                   pbc=True)
 
     if add_keys_to_info:
-        if isinstance(doc, matador.crystal.Crystal):
+        if isinstance(doc, Crystal):
             atoms.info['matador'] = doc._data
         else:
             atoms.info['matador'] = copy.deepcopy(doc)
