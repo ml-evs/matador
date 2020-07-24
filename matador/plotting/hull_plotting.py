@@ -476,7 +476,7 @@ def plot_temperature_hull(
 @plotting_function
 def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=None, fig_height=None,
                       label_cutoff=None, label_corners=True, expecting_cbar=True, labels=None, plot_fname=None,
-                      efmap=None, sampmap=None, capmap=None, pathways=False, **kwargs):
+                      hull_dist_unit="meV", efmap=None, sampmap=None, capmap=None, pathways=False, **kwargs):
     """ Plot calculated ternary hull as a 2D projection.
 
     Parameters:
@@ -492,6 +492,7 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
             aspect ratio if a colourbar is present.
         labels (bool): whether or not to label on-hull structures
         label_corners (bool): whether or not to put axis labels on corners or edges.
+        hull_dist_unit (str): either "eV" or "meV",
         png/pdf/svg (bool): whether or not to write the plot to a file.
         plot_fname (str): filename to write plot to.
         efmap (bool): plot heatmap of formation energy,
@@ -615,6 +616,11 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
     min_cut = 0.0
     max_cut = 0.2
 
+    if hull_dist_unit.lower() == "mev":
+        hull_dist *= 1000
+        min_cut *= 1000
+        max_cut *= 1000
+
     hull.colours = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])
     hull.default_cmap_list = get_linear_cmap(hull.colours[1:4], list_only=True)
     hull.default_cmap = get_linear_cmap(hull.colours[1:4], list_only=False)
@@ -640,16 +646,17 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
         colours_list = []
         colour_metric = hull_dist
         for i, _ in enumerate(colour_metric):
-            if colour_metric[i] >= max_cut:
+            if hull_dist[i] >= max_cut:
                 colours_list.append(n_colours - 1)
-            elif colour_metric[i] <= min_cut:
+            elif hull_dist[i] <= min_cut:
                 colours_list.append(0)
             else:
-                colours_list.append(int((n_colours - 1) * (colour_metric[i] / max_cut)))
+                colours_list.append(int((n_colours - 1) * (hull_dist[i] / max_cut)))
         colours_list = np.asarray(colours_list)
         ax.scatter(scale*stable, marker='o', color=hull.colours[1], edgecolors='black', zorder=9999999,
                    s=150, lw=1.5)
-        ax.scatter(scale*concs, colormap=cmap, colorbar=True, cbarlabel='Distance from hull (eV/atom)',
+        ax.scatter(scale*concs, colormap=cmap, colorbar=True,
+                   cbarlabel='Distance from hull ({}eV/atom)'.format("m" if hull_dist_unit.lower() == "mev" else ""),
                    c=colour_metric, vmax=max_cut, vmin=min_cut, zorder=1000, s=40, alpha=0)
         for i, _ in enumerate(concs):
             ax.scatter(
