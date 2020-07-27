@@ -35,11 +35,11 @@ class TemperatureDependentHull(EnsembleHull):
         for ind, doc in enumerate(cursor):
             if not isinstance(doc, VibrationalDOS):
                 _doc = VibrationalDOS(doc)
-                temps, vib_free_energies = _doc.vibrational_free_energy(temperatures=temperatures)
+                temps, vib_free_energies = _doc.vibrational_free_energy(temperatures=self.temperatures)
                 _cursor[ind][self.data_key] = {}
-                _cursor[ind][self.data_key][self.energy_key] = np.ones_like(temperatures) * _cursor[ind][energy_key]
+                _cursor[ind][self.data_key][self.energy_key] = np.ones_like(self.temperatures) * _cursor[ind][energy_key]
                 _cursor[ind][self.data_key][self.energy_key] += vib_free_energies
-                _cursor[ind][self.data_key]["temperatures"] = temperatures
+                _cursor[ind][self.data_key]["temperatures"] = self.temperatures
 
         super().__init__(
             cursor=_cursor,

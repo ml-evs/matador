@@ -351,9 +351,6 @@ class HullPlotTests(MatadorUnitTest):
         from matador.scrapers import castep2dict
 
         expected_file = "KP_beef_hull.svg"
-        if os.path.isfile(expected_file):
-            os.remove(expected_file)
-
         cursor, s = castep2dict(REAL_PATH + "data/beef_files/*.castep", db=False)
         self.assertEqual(len(s), 0)
 
@@ -368,7 +365,15 @@ class HullPlotTests(MatadorUnitTest):
 
         beef_hull.plot_hull(svg=True)
         self.assertTrue(os.path.isfile(expected_file))
-        os.remove(expected_file)
+
+    def test_td_hull_plot(self):
+        from matador.hull.hull_temperature import TemperatureDependentHull
+        from matador.scrapers import castep2dict
+
+        cursor, s = castep2dict(REAL_PATH + "data/castep_phonon_files/*.castep", db=False)
+        td_hull = TemperatureDependentHull(cursor=cursor, energy_key="total_energy_per_atom")
+        td_hull.plot_hull(plot_fname="td_hull", png=True)
+        self.assertTrue(os.path.isfile("td_hull.png"))
 
 
 @unittest.skipIf(not MATPLOTLIB_PRESENT, "Skipping plotting tests.")

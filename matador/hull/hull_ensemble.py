@@ -103,10 +103,17 @@ class EnsembleHull(QueryConvexHull):
 
         if self.parameter_key is None:
             parameter_iterable = recursive_get(self.chempot_cursor[0], self._energy_keys)
+            _keys = self._energy_keys
         else:
             parameter_iterable = recursive_get(self.chempot_cursor[0], self._parameter_keys)
+            _keys = self.parameter_key
 
-        print('Found {} entries under data key: {}.'.format(len(parameter_iterable), self.data_key))
+        if parameter_iterable is None:
+            raise RuntimeError(
+                f"Could not find any data for keys {_keys} in {self.chempot_cursor[0]}."
+            )
+
+        print(f"Found {len(parameter_iterable)} entries under data key: {self.data_key}.")
 
         # allocate formation energy and hull distance arrays
         for ind, doc in enumerate(self.cursor):
@@ -116,7 +123,7 @@ class EnsembleHull(QueryConvexHull):
         n_hulls = len(parameter_iterable)
         if num_samples is not None:
             parameter_iterable = parameter_iterable[:num_samples]
-            print('Using {} out of {} possible phase diagrams.'.format(num_samples, n_hulls))
+            print(f"Using {num_samples} out of {n_hulls} possible phase diagrams.")
         else:
             num_samples = n_hulls
 
