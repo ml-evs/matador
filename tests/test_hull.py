@@ -475,3 +475,17 @@ class EnsembleHullTest(unittest.TestCase):
         self.assertEqual(len(beef_hull.phase_diagrams), 5000)
         self.assertEqual(len(beef_hull.cursor[0]["_beef"]["hull_distance"]), 5000)
         self.assertEqual(len(beef_hull.cursor[1]["_beef"]["hull_distance"]), 5000)
+
+
+class TemperatureDependentHullTest(unittest.TestCase):
+    """ Tests for the TemperatureDependentHull class. """
+
+    def test_td_hull(self):
+        from matador.hull.hull_temperature import TemperatureDependentHull
+        from matador.scrapers import castep2dict
+
+        cursor, s = castep2dict(REAL_PATH + "data/castep_phonon_files/*.castep", db=False)
+
+        td_hull = TemperatureDependentHull(cursor=cursor, energy_key="total_energy_per_atom")
+
+        self.assertEqual(len(td_hull.phase_diagrams), 21)
