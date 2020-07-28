@@ -1,3 +1,6 @@
+# coding: utf-8
+# Distributed under the terms of the MIT License.
+
 import numpy as np
 from matador.utils.cell_utils import real2recip, frac2cart
 from matador.orm.orm import DataContainer

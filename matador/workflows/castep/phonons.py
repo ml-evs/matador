@@ -8,12 +8,12 @@ multiple steps (only when necessary):
     1. Try to pre-relax structure (skipped if check file
            is already present).
     2. Calculate dynamical matrix.
-    3. If `phonon_fine_kpoint_mp_spacing` keyword is found,
+    3. If ``phonon_fine_kpoint_mp_spacing`` keyword is found,
        interpolate dynamical matrix to form phonon DOS.
-    4. If `phonon_fine_kpoint_path_spacing` key word is found,
+    4. If ``phonon_fine_kpoint_path_spacing`` key word is found,
        interpolate dynamical matrix to form phonon dispersion
        on the path given by seekpath.
-    5. If `task=thermodynamics`, perform a CASTEP thermodynamics
+    5. If ``task=thermodynamics``, perform a CASTEP thermodynamics
        calculation for the temperature-dependence of the free energy.
 
 """
