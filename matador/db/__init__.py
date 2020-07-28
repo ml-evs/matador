@@ -12,7 +12,7 @@ __all__ = ['Spatula', 'DatabaseChanges', 'Refiner', 'make_connection_to_collecti
 __author__ = 'Matthew Evans'
 __maintainer__ = 'Matthew Evans'
 
-from matador.db.connect import make_connection_to_collection
-from matador.db.importer import Spatula
-from matador.db.changes import DatabaseChanges
-from matador.db.refine import Refiner
+from .connect import make_connection_to_collection
+from .importer import Spatula
+from .changes import DatabaseChanges
+from .refine import Refiner

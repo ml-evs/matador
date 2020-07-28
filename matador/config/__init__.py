@@ -8,4 +8,4 @@ __all__ = ['load_custom_settings', 'set_settings', 'SETTINGS']
 __author__ = 'Matthew Evans'
 __maintainer__ = 'Matthew Evans'
 
-from matador.config.config import load_custom_settings, SETTINGS, set_settings
+from .config import load_custom_settings, SETTINGS, set_settings

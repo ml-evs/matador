@@ -13,4 +13,4 @@ __author__ = 'Matthew Evans'
 __maintainer__ = 'Matthew Evans'
 
 
-from matador.query.query import DBQuery
+from .query import DBQuery

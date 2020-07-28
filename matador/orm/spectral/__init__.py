@@ -1,3 +1,6 @@
+# coding: utf-8
+# Distributed under the terms of the MIT License.
+
 """ This submodule implements some useful classes for manipulating
 DOS and dispersion data.
 

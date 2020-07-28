@@ -19,4 +19,4 @@ __author__ = 'Matthew Evans'
 __maintainer__ = 'Matthew Evans'
 
 
-from matador.workflows.workflows import Workflow, WorkflowStep
+from .workflows import Workflow, WorkflowStep
