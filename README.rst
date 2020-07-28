@@ -46,7 +46,7 @@ The API has many features that can be explored in the examples and API documenta
 - High-throughput geometry optimisations, electronic and vibrational properties using CASTEP (and Quantum Espresso) with ``run3``. Tested on several supercomputers. ``run3`` is designed primarily for simple workflows and offers little in the way of tools for creating complex workflows; if this is your use case, then check out some of the other codes listed below.
 - Creation of phase diagrams and electrochemical voltage profiles from the results of DFT calculations.
 
-This functionality is achieved by interfacing with much of the standard scientific Python stack (`NumPy <https://numpy.org>`_, `SciPy <https://scipy.org>`_, `matplotlib <https://matplotlib.org>`_), some more materials-specific packages (`spglib <https://github.com/atztogo/spglib/>`_, `SeeK-path <https://github.com/giovannipizzi/seekpath>`_, `periodictable <https://github.com/pkienzle/periodictable>`_) and other general packages (`pymongo <https://github.com/mongodb/mongo-python-driver>`_, `python-ternary <https://github.com/marcharper/python-ternary>`_, `numba <https://numba.org`_).
+This functionality is achieved by interfacing with much of the standard scientific Python stack (`NumPy <https://numpy.org>`_, `SciPy <https://scipy.org>`_, `matplotlib <https://matplotlib.org>`_), some more materials-specific packages (`spglib <https://github.com/atztogo/spglib/>`_, `SeeK-path <https://github.com/giovannipizzi/seekpath>`_, `periodictable <https://github.com/pkienzle/periodictable>`_) and other general packages (`pymongo <https://github.com/mongodb/mongo-python-driver>`_, `python-ternary <https://github.com/marcharper/python-ternary>`_, `numba <https://numba.org>`_).
 
 Similar packages
 ----------------
@@ -65,7 +65,7 @@ Citing matador
 
 If you use matador in your work, we kindly ask that you cite the source code archive on Zenodo:
 
-> Matthew Evans, ml-evs/matador (2020), Zenodo. http://doi.org/10.5281/zenodo.3908574
+    Matthew Evans, ml-evs/matador (2020), Zenodo. http://doi.org/10.5281/zenodo.3908574
 
 
 .. |PyPI Version| image:: https://img.shields.io/pypi/v/matador-db?label=PyPI&logo=pypi
