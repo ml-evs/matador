@@ -41,7 +41,7 @@ Core functionality
 The API has many features that can be explored in the examples and API documentation. As a summary, ``matador`` can be used for:
 
 - Scraping of CASTEP (and Quantum Espresso) input/output files into flexible Python dictionaries/models.
-- The creation and curation of MongoDB collections of geometry optimisation, calculations, with a powerful querying CLI/API.
+- The creation and curation of MongoDB collections of geometry optimisation calculations, with a powerful querying CLI/API.
 - Customisable, publication-ready plots for all models, e.g. phase diagrams, PDF, PXRD, voltage profiles, electronic/vibrational bandstructures etc.
 - High-throughput geometry optimisations, electronic and vibrational properties using CASTEP (and Quantum Espresso) with ``run3``. Tested on several supercomputers. ``run3`` is designed primarily for simple workflows and offers little in the way of tools for creating complex workflows; if this is your use case, then check out some of the other codes listed below.
 - Creation of phase diagrams and electrochemical voltage profiles from the results of DFT calculations.
