@@ -1,8 +1,8 @@
 # coding: utf-8
 # Distributed under the terms of the MIT License.
 
-""" This module implements the Electrode class used for calculating
-relevant electrode properties from phase diagrams.
+""" This module implements the Electrode class, which contains methods
+used for calculating electrode properties from phase diagrams.
 
 """
 
@@ -21,10 +21,10 @@ class Electrode:
     Note:
         The units for relevant quantities are as follows:
 
-            gravimetric capacity --> mAh/g
-            volumetric capacity  --> mAh/cm^3
-            gravimetric energy density --> Wh/kg
-            volumetric energy density --> Wh/l
+        - gravimetric capacity --> mAh/g
+        - volumetric capacity  --> mAh/cm^3
+        - gravimetric energy density --> Wh/kg
+        - volumetric energy density --> Wh/l
 
     Attributes:
         kind (str): either 'anode' or 'cathode'. Effects conventions
@@ -40,8 +40,10 @@ class Electrode:
     valence_data = {'Li': 1, 'Na': 1, 'K': 1,
                     'Mg': 2, 'Ca': 2}
 
+    """ This comment contains some stubs for functionality that has not yet been implemented.
+
     def __init__(self, active_ion, base_material, phases, kind='anode', valence=None):
-        """ Initialise Electrode material for the given ion from a convex hull.
+        \"\"\" Initialise Electrode material for the given ion from a convex hull.
 
         Parameters:
             active_ion (str): label of species to use as active ion.
@@ -57,7 +59,7 @@ class Electrode:
             valence (int): the valence of the active ion, if not included
                 this will be looked up for common ions.
 
-        """
+        \"\"\"
 
         if kind not in self._kinds:
             raise TypeError('Electrode kind must be one of {}'.format(self._kinds))
@@ -74,6 +76,7 @@ class Electrode:
 
         # TODO: detect different materials inside convex hull
         # or directly compute if just a list of phases
+
 
     @property
     def gravimetric_capacities(self):
@@ -126,6 +129,8 @@ class Electrode:
     @property
     def pxrd_vs_capacity(self):
         pass
+
+    """
 
     @classmethod
     def calculate_average_voltage(cls, capacities, voltages):
