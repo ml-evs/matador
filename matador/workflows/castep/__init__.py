@@ -13,6 +13,6 @@ __author__ = 'Matthew Evans'
 __maintainer__ = 'Matthew Evans'
 
 
-from .castep.phonons import castep_full_phonon
-from .castep.spectral import castep_full_spectral
-from .castep.elastic import castep_elastic
+from .phonons import castep_full_phonon
+from .spectral import castep_full_spectral
+from .elastic import castep_elastic
