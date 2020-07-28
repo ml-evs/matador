@@ -23,7 +23,8 @@ class EnsembleHull(QueryConvexHull):
          },
         }
 
-    Hull data will be stored as arrays per document under `doc[data_key]['hull_distance']`
+    Hull data will be stored as arrays per document under
+    ``doc[data_key]['hull_distance']``
     and ``doc[data_key]['formation_' + energy_key]``.
 
     Inherits the attributes of matador.hull.QueryConvexHull, with many set to

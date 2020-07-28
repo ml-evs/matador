@@ -862,12 +862,12 @@ class ComputeTask:
         """ Turn executable string into list with arguments to be executed.
 
         Example:
-            With `self.executable='castep17'` and `seed='test'`, `['castep17', 'test']`
+            With ``self.executable='castep17'`` and ``seed='test'``, ``['castep17', 'test']``
             will be returned.
 
         Example:
-            With `self.executable='pw6.x -i $seed.in > $seed.out'` and `seed='test'`,
-            `['pw6.x', '-i', 'test.in', '>' 'test.out']` will be returned.
+            With ``self.executable='pw6.x -i $seed.in > $seed.out'`` and ``seed='test'``,
+            ``['pw6.x', '-i', 'test.in', '>' 'test.out']`` will be returned.
 
         Parameters:
             seed (str): filename to replace $seed with in command.

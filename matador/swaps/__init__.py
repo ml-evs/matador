@@ -13,4 +13,4 @@ __author__ = 'Matthew Evans'
 __maintainer__ = 'Matthew Evans'
 
 
-from matador.swaps.swaps import AtomicSwapper
+from .swaps import AtomicSwapper

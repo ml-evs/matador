@@ -29,8 +29,8 @@ class BatchRun:
     """ A class that implements the running of multiple generic jobs on
     a series of files without collisions with other nodes using the
     ComputeTask class. Jobs that have been started are listed in
-    `jobs.txt`, failed jobs are moved to `bad_castep/`, completed jobs
-    are moved to `completed/`.
+    ``jobs.txt``, failed jobs are moved to ``bad_castep/``, completed jobs
+    are moved to ``completed/``.
 
     Interface initially inspired by on run.pl, run2.pl and PyAIRSS class
     CastepRunner.
@@ -49,9 +49,9 @@ class BatchRun:
         Parameters:
             seed (:obj:`list` of :obj:`str`): single entry of param/cell
                 file seed for CASTEP geometry optimisations of res
-                files, or a list of filenames of $seed to run arbitrary
-                executables on. e.g. ['LiAs'] if LiAs.cell and LiAs.param
-                exist in cwd full of res files, e.g.2. ['LiAs_1', 'LiAs_2']
+                files, or a list of filenames of ``$seed`` to run arbitrary
+                executables on. e.g. ``['LiAs']`` if LiAs.cell and LiAs.param
+                exist in cwd full of res files, e.g.2. ``['LiAs_1', 'LiAs_2']``
                 if LiAs_1.in/LiAs_2.in exist, and executable = 'pw6.x < $seed.in'.
 
         Keyword arguments:

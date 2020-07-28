@@ -24,6 +24,6 @@ __author__ = 'Matthew Evans'
 __maintainer__ = 'Matthew Evans'
 
 
-from matador.export.export import doc2param, doc2cell, doc2pdb
-from matador.export.export import doc2pwscf, doc2res, doc2xsf, doc2arbitrary
-from matador.export.export import query2files
+from .export import doc2param, doc2cell, doc2pdb
+from .export import doc2pwscf, doc2res, doc2xsf, doc2arbitrary
+from .export import query2files

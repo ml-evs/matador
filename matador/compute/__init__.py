@@ -23,5 +23,5 @@ __author__ = 'Matthew Evans'
 __maintainer__ = 'Matthew Evans'
 
 
-from matador.compute.compute import ComputeTask
-from matador.compute.batch import BatchRun, reset_job_folder
+from .compute import ComputeTask
+from .batch import BatchRun, reset_job_folder

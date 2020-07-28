@@ -13,6 +13,6 @@ __author__ = 'Matthew Evans'
 __maintainer__ = 'Matthew Evans'
 
 
-from matador.workflows.castep.phonons import castep_full_phonon
-from matador.workflows.castep.spectral import castep_full_spectral
-from matador.workflows.castep.elastic import castep_elastic
+from .castep.phonons import castep_full_phonon
+from .castep.spectral import castep_full_spectral
+from .castep.elastic import castep_elastic

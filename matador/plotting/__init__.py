@@ -25,13 +25,13 @@ __all__ = ['plot_spectral', 'plot_voltage_curve',
 __author__ = 'Matthew Evans'
 __maintainer__ = 'Matthew Evans'
 
-from matador.plotting.plotting import get_linear_cmap, set_style
-from matador.plotting.spectral_plotting import plot_spectral
-from matador.plotting.convergence_plotting import plot_cutoff_kpt_grid
-from matador.plotting.battery_plotting import plot_voltage_curve, plot_volume_curve
-from matador.plotting.hull_plotting import plot_2d_hull, plot_ternary_hull, plot_temperature_hull, plot_ensemble_hull
-from matador.plotting.temperature_plotting import plot_free_energy
-from matador.plotting.pdf_plotting import plot_pdf, plot_projected_pdf, plot_diff_overlap, plot_projected_diff_overlap
-from matador.plotting.pxrd_plotting import plot_pxrd
-from matador.plotting.ir_plotting import plot_ir_spectrum
-from matador.plotting.magres_plotting import plot_magres
+from .plotting import get_linear_cmap, set_style
+from .spectral_plotting import plot_spectral
+from .convergence_plotting import plot_cutoff_kpt_grid
+from .battery_plotting import plot_voltage_curve, plot_volume_curve
+from .hull_plotting import plot_2d_hull, plot_ternary_hull, plot_temperature_hull, plot_ensemble_hull
+from .temperature_plotting import plot_free_energy
+from .pdf_plotting import plot_pdf, plot_projected_pdf, plot_diff_overlap, plot_projected_diff_overlap
+from .pxrd_plotting import plot_pxrd
+from .ir_plotting import plot_ir_spectrum
+from .magres_plotting import plot_magres

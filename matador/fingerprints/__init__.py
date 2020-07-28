@@ -16,7 +16,7 @@ __author__ = 'Matthew Evans'
 __maintainer__ = 'Matthew Evans'
 
 
-from matador.fingerprints.similarity import get_uniq_cursor
-from matador.fingerprints.fingerprint import Fingerprint, FingerprintFactory
-from matador.fingerprints.pdf import PDF, PDFOverlap, CombinedProjectedPDF
-from matador.fingerprints.pxrd import PXRD
+from .similarity import get_uniq_cursor
+from .fingerprint import Fingerprint, FingerprintFactory
+from .pdf import PDF, PDFOverlap, CombinedProjectedPDF
+from .pxrd import PXRD

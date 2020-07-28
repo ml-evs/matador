@@ -14,4 +14,4 @@ __author__ = 'Matthew Evans'
 __maintainer__ = 'Matthew Evans'
 
 
-from matador.crystal.crystal import Crystal
+from .crystal import Crystal
