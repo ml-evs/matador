@@ -40,7 +40,7 @@ setup(name='matador-db',
       python_requires='>=3.6',
       install_requires=requirements,
       scripts=[script for script in glob('scripts/*') if os.path.isfile(script)],
-      test_suite='matador.tests',
+      test_suite='tests',
       include_package_data=True,
       extras_require=extra_requirements,
       classifiers=[
