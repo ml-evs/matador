@@ -1,6 +1,12 @@
 Changelog
 =========
 
+New in release (0.9.6) [28/07/2020]
+-----------------------------------
+- Improvements to ASE and pymatgen interoperability (#80)
+- Fixed bug in :class:`matador.hull.TemperatureDependentHull` which would crash when not provided a list of temperatures (#82).
+- Added plotting functions for magres data, and improved its handling inside :class:`matador.crystal.Crystal` (#79).
+
 New in release (0.9.5) [25/06/2020]
 -----------------------------------
 - This release is mostly to trigger Zenodo archiving.
