@@ -1,6 +1,12 @@
 Changelog
 =========
 
+New in release (0.9.7) [29/07/2020]
+-----------------------------------
+- Bug fixes to problems introduced in 0.9.6.
+- Cosmetic fixes to logging and misleading status reports in workflows.
+
+
 New in release (0.9.6) [28/07/2020]
 -----------------------------------
 - Improvements to ASE and pymatgen interoperability (#80)
