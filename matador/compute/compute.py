@@ -361,6 +361,13 @@ class ComputeTask:
 
         self.calc_doc.update(self.cell_dict)
         self.calc_doc.update(self.param_dict)
+
+        # combine source field from all inputs
+        self.calc_doc['source'] = (
+            self.res_dict.get("source", []) +
+            self.cell_dict.get("source", []) +
+            self.param_dict.get("source", [])
+        )
         self.calculator.verify_calculation_parameters(self.calc_doc, self.res_dict)
 
         try:
@@ -694,7 +701,7 @@ class ComputeTask:
         """
         LOG.info('Performing single-shot CASTEP run on {}, with task: {}'.format(seed, calc_doc['task']))
         try:
-            self._singleshot(calc_doc, seed, keep=keep, intermediate=intermediate)
+            return self._singleshot(calc_doc, seed, keep=keep, intermediate=intermediate)
 
         except WalltimeError as err:
             raise err
