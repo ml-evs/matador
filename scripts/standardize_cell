@@ -26,7 +26,7 @@ def standardize_cell(symtol=0.01, **kwargs):
             if not kwargs.get('cell'):
                 doc2res(spg_doc, seed + '_std.res', info=False)
             else:
-                doc2cell(spg_doc, seed + '_std.cell', copy_pspots=False)
+                doc2cell(spg_doc, seed + '_std.cell')
         else:
             print('Standardization failed for {}'.format(seed))
 
