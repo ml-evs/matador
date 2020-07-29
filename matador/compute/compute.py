@@ -1228,15 +1228,13 @@ class ComputeTask:
         except sp.TimeoutExpired:
             LOG.error("Process reached maximum walltime, cleaning up...")
             self._times_up(process)
+            process.terminate()
             raise WalltimeError("Cleaned up process after reaching maximum walltime")
 
         except Exception as err:
             LOG.error('Unexpected Exception {} caught: terminating job for {}.'.format(type(err).__name__, self.seed))
-            raise err
-
-        finally:
-            LOG.error("Explicitly terminating process.")
             process.terminate()
+            raise err
 
         return out, errs
 
