@@ -246,34 +246,12 @@ class PhaseDiagram:
 
         # otherwise, set to zero until proper N-d distance can be implemented
         else:
-            raise NotImplementedError
-            # self.hull.planes = [[self._structure_slice[vertex] for vertex in simplex]
-            #                     for simplex in self.hull.simplices]
-            # for idx, structure in enumerate(structures):
-            #     if precompute and get_formula_from_stoich(self.cursor[idx]['stoichiometry'],
-            #                                               tex=False) in cached_formula_dists:
-            #         formula = get_formula_from_stoich(self.cursor[idx]['stoichiometry'], tex=False)
-            #         if formula in cached_formula_dists:
-            #             cache_hits += 1
-            #             hull_dist[idx] = (structures[idx, -1] - cached_formula_dists[formula][0] +
-            #                               cached_formula_dists[formula][1])
-            #         structures_finished[idx] = True
-            #     else:
-            #         if point_in_polygon(structure[:-1], plane):
-            #             hull_dist[idx] = 0
-            #             continue
+            raise NotImplementedError(
+                "Unable to compute {dimension}-dimensional hull distances (yet) "
+                "consider breaking your phase diagram into a pseudo-ternary or pseudo-binary system."
+            )
 
-            # loop over compositions
-            #   loop over planes
-            #       check if point is interior to plane
-            #           if so, compute "height" above plane, using equation of hyperplane from scipy
         if np.isnan(hull_dist).any():
-            raise RuntimeError("Some hull distances failed")
+            raise RuntimeError(f"Some hull distances failed, found NaNs at {np.isnan(hull_dist, where=True)}")
 
         return hull_dist
-
-    def point_in_polygon(self):
-        """ Use "ray-tracing" or winding number approach
-        to compute whether a point lies inside a polygon.
-        """
-        raise NotImplementedError
