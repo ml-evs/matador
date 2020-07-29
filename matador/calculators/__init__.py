@@ -7,11 +7,9 @@ calculators within the compute module class.
 """
 
 
-__all__ = ['Calculator', 'CastepCalculator']  # , 'QuantumEspressoCalculator', 'ASECalculator']
+__all__ = ['CastepCalculator']
 __author__ = 'Matthew Evans'
 __maintainer__ = 'Matthew Evans'
 
 
 from .castep import CastepCalculator
-# from matador.calculators.quantum_espresso import QuantumEspressoCalculator
-# from matador.calculators.ase import ASECalculator

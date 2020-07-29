@@ -52,7 +52,6 @@ class Calculator:
             errors.append(msg)
 
         # TODO: check overlapping atoms
-
         if errors:
             raise CalculationError('. '.join(errors))
 
@@ -63,5 +62,3 @@ class Calculator:
             int: estimated memory usage in MB. 0 if method not implemented.
 
         """
-        # TODO: reimplement
-        return 0

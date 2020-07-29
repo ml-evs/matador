@@ -361,6 +361,13 @@ class ComputeTask:
 
         self.calc_doc.update(self.cell_dict)
         self.calc_doc.update(self.param_dict)
+
+        # combine source field from all inputs
+        self.calc_doc['source'] = (
+            self.res_dict.get("source", []) +
+            self.cell_dict.get("source", []) +
+            self.param_dict.get("source", [])
+        )
         self.calculator.verify_calculation_parameters(self.calc_doc, self.res_dict)
 
         try:
@@ -694,7 +701,7 @@ class ComputeTask:
         """
         LOG.info('Performing single-shot CASTEP run on {}, with task: {}'.format(seed, calc_doc['task']))
         try:
-            self._singleshot(calc_doc, seed, keep=keep, intermediate=intermediate)
+            return self._singleshot(calc_doc, seed, keep=keep, intermediate=intermediate)
 
         except WalltimeError as err:
             raise err
@@ -1228,15 +1235,13 @@ class ComputeTask:
         except sp.TimeoutExpired:
             LOG.error("Process reached maximum walltime, cleaning up...")
             self._times_up(process)
+            process.terminate()
             raise WalltimeError("Cleaned up process after reaching maximum walltime")
 
         except Exception as err:
             LOG.error('Unexpected Exception {} caught: terminating job for {}.'.format(type(err).__name__, self.seed))
-            raise err
-
-        finally:
-            LOG.error("Explicitly terminating process.")
             process.terminate()
+            raise err
 
         return out, errs
 
