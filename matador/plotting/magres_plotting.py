@@ -137,7 +137,13 @@ def plot_magres(
 
             hist, bins = np.histogram(shifts, bins=s_space)
 
-            signal = Fingerprint._broadening_unrolled(hist, s_space, broadening_width, broadening_type="lorentzian")
+            if broadening_width > 0:
+                signal = Fingerprint._broadening_unrolled(hist, s_space, broadening_width, broadening_type="lorentzian")
+            else:
+                signal = np.array(hist, dtype=np.float64)
+                bin_centres = s_space[:-1] + (s_space[1] - s_space[0]) / 2
+                s_space = bin_centres
+
             signal /= np.max(signal)
 
         ax.plot(s_space, signal + (ind * 1.1), **_line_kwargs)
@@ -148,10 +154,18 @@ def plot_magres(
                     horizontalalignment='right')
 
     if xlabel is None:
+        unit = set(doc.get("magres_units", {}).get("ms", "ppm") for doc in magres)
+        if len(unit) > 1:
+            raise RuntimeError(f"Multiple incompatible units found for chemical shift: {unit}")
+        unit = list(unit)[0]
         if magres_key == "chemical_shielding_iso":
-            xlabel = species + ": Isotropic chemical shielding $\\sigma_\\mathrm{iso}$ (ms)"
-        if magres_key == "chemical_shift_iso":
-            xlabel = species + ": Isotropic chemical shift $\\delta_\\mathrm{iso}$ (ms)"
+            xlabel = f"{species}: Isotropic chemical shielding $\\sigma_\\mathrm{{iso}}$ ({unit})"
+        elif magres_key == "chemical_shift_iso":
+            xlabel = f"{species}: Isotropic chemical shift $\\sigma_\\mathrm{{iso}}$ ({unit})"
+        elif magres_key == "chemical_shift_aniso":
+            xlabel = f"{species}: Anisotropic chemical shift $\\sigma_\\mathrm{{iso}}$ ({unit})"
+        elif magres_key == "chemical_shift_asymmetry":
+            xlabel = f"{species}: Chemial shift asymmetry, $\\eta$"
 
     ax.set_xlabel(xlabel)
     ax.set_ylabel("Intensity (arb. units)")
