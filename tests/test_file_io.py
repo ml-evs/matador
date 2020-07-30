@@ -1568,7 +1568,7 @@ class ScraperMiscTest(MatadorUnitTest):
             decimal=1,
         )
         np.testing.assert_almost_equal(
-            magres_crystal["chemical_shift_anisoss"],
+            magres_crystal["chemical_shift_anisos"],
             [
                 9.4,
                 4.4,
@@ -1594,7 +1594,7 @@ class ScraperMiscTest(MatadorUnitTest):
             decimal=1,
         )
         np.testing.assert_almost_equal(
-            magres_crystal["chemical_shift_asymmmetries"],
+            magres_crystal["chemical_shift_asymmetries"],
             [
                 0.33,
                 0.76,
@@ -1626,12 +1626,12 @@ class ScraperMiscTest(MatadorUnitTest):
                 magres_crystal["chemical_shielding_isos"][ind],
             )
             self.assertEqual(
-                atom["chemical_shift_anisos"],
-                magres_crystal["chemical_shift_anisoss"][ind],
+                atom["chemical_shift_aniso"],
+                magres_crystal["chemical_shift_anisos"][ind],
             )
             self.assertEqual(
-                atom["chemical_shift_asymmmetry"],
-                magres_crystal["chemical_shift_asymmmetries"][ind],
+                atom["chemical_shift_asymmetry"],
+                magres_crystal["chemical_shift_asymmetries"][ind],
             )
 
         self.assertEqual(magres_crystal["calculator"], "CASTEP")
@@ -1640,7 +1640,6 @@ class ScraperMiscTest(MatadorUnitTest):
         self.assertEqual(magres_crystal["magres_units"]["ms"], "ppm")
         self.assertEqual(magres_crystal["magres_units"]["lattice"], "Angstrom")
         self.assertEqual(magres_crystal["magres_units"]["atom"], "Angstrom")
-        self.assertEqual(magres_crystal["magres_units"]["sus"], "10^-6.cm^3.mol^-1")
 
     def test_pwscfout(self):
         pwout_fname = REAL_PATH + "data/NaP.out"
