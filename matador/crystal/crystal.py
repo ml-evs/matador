@@ -240,10 +240,10 @@ class Crystal(DataContainer):
             if 'magnetic_shielding_tensor' in self._data:
                 if len(self._data['magnetic_shielding_tensors']) == len(self._data['atom_types']):
                     site_data['magnetic_shielding_tensor'] = self._data['magnetic_shielding_tensors'][ind]
-            if 'chemical_shielding_anisos' in self._data:
-                site_data['chemical_shielding_aniso'] = self._data['chemical_shielding_anisos'][ind]
-            if 'chemical_shielding_asymmetries' in self._data:
-                site_data['chemical_shielding_asymmetry'] = self._data['chemical_shielding_asymmetries'][ind]
+            if 'chemical_shift_anisos' in self._data:
+                site_data['chemical_shift_aniso'] = self._data['chemical_shift_anisos'][ind]
+            if 'chemical_shift_asymmetries' in self._data:
+                site_data['chemical_shift_asymmetry'] = self._data['chemical_shift_asymmetries'][ind]
             if 'atomic_spins' in self._data:
                 site_data['spin'] = self._data['atomic_spins'][ind]
             if 'voronoi_substructure' in self._data:

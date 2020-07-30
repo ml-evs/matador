@@ -37,16 +37,20 @@ def magres2dict(seed, **kwargs):
         if kwargs.get('debug'):
             print(seed + '.magres has no owner.')
 
+    magres['magres_units'] = dict()
     for line_no, line in enumerate(flines):
         line = line.lower().strip()
         if line in ['<atoms>', '[atoms]']:
             i = 1
             while flines[line_no+i].strip().lower() not in ['</atoms>', '[/atoms]']:
-                if i > 1e5:
-                    raise RuntimeError
-                if 'units' in flines[line_no+i]:
+                split_line = flines[line_no+i].split()
+                if not split_line:
                     i += 1
                     continue
+                if i > len(flines):
+                    raise RuntimeError("Something went wrong in reader loop")
+                if split_line[0] == 'units':
+                    magres['magres_units'][split_line[1]] = split_line[2]
                 elif 'lattice' in flines[line_no+i]:
                     lattice = flines[line_no+i].split()[1:]
                     for j in range(3):
@@ -68,11 +72,14 @@ def magres2dict(seed, **kwargs):
         if line in ['<magres>', '[magres]']:
             i = 1
             while flines[line_no+i].strip().lower() not in ['</magres>', '[/magres]']:
-                if i > 1e5:
-                    raise RuntimeError
-                if 'units' in flines[line_no+i]:
+                split_line = flines[line_no+i].split()
+                if not split_line:
                     i += 1
                     continue
+                if i > len(flines):
+                    raise RuntimeError("Something went wrong in reader loop")
+                if split_line[0] == 'units':
+                    magres['magres_units'][split_line[1]] = split_line[2]
                 elif 'sus' in flines[line_no+i]:
                     sus = flines[line_no+i].split()[1:]
                     for j in range(3):
@@ -83,8 +90,8 @@ def magres2dict(seed, **kwargs):
                     for j in range(3):
                         magres['magnetic_shielding_tensors'][-1].append([float(val) for val in ms[3*j:3*(j+1)]])
                     magres['chemical_shielding_isos'].append(0)
-                    magres['chemical_shielding_anisos'].append(0)
-                    magres['chemical_shielding_asymmetries'].append(0)
+                    magres['chemical_shift_anisos'].append(0)
+                    magres['chemical_shift_asymmetries'].append(0)
                     for j in range(3):
                         magres['chemical_shielding_isos'][-1] += magres['magnetic_shielding_tensors'][-1][j][j] / 3
 
@@ -100,8 +107,8 @@ def magres2dict(seed, **kwargs):
                     s_yy, s_xx, s_zz = eig_vals
                     s_iso = magres['chemical_shielding_isos'][-1]
                     # convert from reduced anistropy to CSA
-                    magres['chemical_shielding_anisos'][-1] = s_zz - (s_xx + s_yy)/2.0
-                    magres['chemical_shielding_asymmetries'][-1] = (s_yy - s_xx) / (s_zz - s_iso)
+                    magres['chemical_shift_anisos'][-1] = s_zz - (s_xx + s_yy)/2.0
+                    magres['chemical_shift_asymmetries'][-1] = (s_yy - s_xx) / (s_zz - s_iso)
                 i += 1
 
     for line_no, line in enumerate(flines):
@@ -109,8 +116,8 @@ def magres2dict(seed, **kwargs):
         if line in ['<calculation>', '[calculation]']:
             i = 1
             while flines[line_no+i].strip().lower() not in ['</calculation>', '[/calculation]']:
-                if i > 1e5:
-                    raise RuntimeError
+                if i > len(flines):
+                    raise RuntimeError("Something went wrong in reader loop")
                 # space important as it excludes other calc_code_x variables
                 if 'calc_code ' in flines[line_no+i]:
                     magres['calculator'] = flines[line_no+i].split()[1]

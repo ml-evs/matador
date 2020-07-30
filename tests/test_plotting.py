@@ -415,9 +415,9 @@ class MagresPlotTests(MatadorUnitTest):
         plot_magres(
             magres,
             species="Li",
-            magres_key="chemical_shielding_aniso",
+            broadening_width=0,
+            magres_key="chemical_shift_aniso",
             savefig="magres_Li.png",
-            xlabel="Chemical shielding anisotropy",
             signal_labels=["NaP", "LiP"],
             line_kwargs=[{"lw": 3}, {"ls": "--"}],
         )
