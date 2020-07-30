@@ -1,5 +1,6 @@
-pytest~=3.10
-pytest-cov
-coverage
+pytest~=5.4
+nbval>=0.9
+pytest-cov>=2.9
+coverage>=4.4
 codecov>=2.0
 mongomock>=3.16
