@@ -230,7 +230,7 @@ class CrystalTest(unittest.TestCase):
         doc, s = magres2dict(REAL_PATH + "data/magres_files/NaP_QE6.magres")
         crystal = Crystal(doc)
         for atom in crystal:
-            print(atom, atom["chemical_shielding_iso"], atom["chemical_shielding_asymmetry"])
+            print(atom, atom["chemical_shielding_iso"], atom["chemical_shift_asymmetry"])
 
     @unittest.skipIf(not imported_vornet, "Voronoi code not found in this distribution")
     def testCoordination(self):
