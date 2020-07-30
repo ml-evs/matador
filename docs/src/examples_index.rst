@@ -18,6 +18,7 @@ Example Jupyter notebooks
     notebooks/hull
     notebooks/matador_plot_styles
     notebooks/voltage_from_res_files
+    notebooks/simple_spectral
     notebooks/projected_spectral
     notebooks/phonon_results
     notebooks/pxrd_plotting
