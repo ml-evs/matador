@@ -1,3 +1,5 @@
+.. _changelog:
+
 Changelog
 =========
 
@@ -6,7 +8,7 @@ Changes since last release [06/08/2020]
 - Improvements to PDIS functionality (#94).
 
     - Rasterized scatter points for more efficient exporting and fewer graphical artifacts
-    - Made underlying :function:`matador.plotting.spectral_plotting.dos_plot` and :function:`matador.plotting.spectral_plotting.dispersion_plot` more API friendly, and added example notebook.
+    - Made underlying :func:`matador.plotting.spectral_plotting.dos_plot` and :func:`matador.plotting.spectral_plotting.dispersion_plot` more API friendly, and added example notebook.
     - Fixed bug in cell scraping for old ``BS_*`` style keywords.
 
 - Improvements to magres functionality, including scraping of units (#90)
@@ -64,7 +66,7 @@ New in release (0.9.1) [20/05/2020]
 -----------------------------------
 
 - Fixed issue with local pip installs after 0.9 release
-- Fixed issue with multinode MPI tasks by switching to ``proc.communicate()`` after an initial polling stage (#37)
+- Fixed issue with multi-node MPI tasks by switching to ``proc.communicate()`` after an initial polling stage (#37)
 - Fixed issue where bands would be reordered multiple times in spectral plots (#40)
 - Tweaked spectral plot defaults (#40)
 - Replaced ``multiprocessing.cpu_count()`` calls with ``psutil.cpu_count(logical=False)`` to avoid double-counting hyperthreaded cores
@@ -115,7 +117,7 @@ New in release (0.9) [15/05/2020]
 
 
 New in release (0.8b) [03/08/2018]
-------------------------------------------
+----------------------------------
 
 - Wholesale changes, complete refactoring of most of the code.
 - Released open source under the MIT license!
