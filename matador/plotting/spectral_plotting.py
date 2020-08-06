@@ -23,7 +23,7 @@ from matador.utils.chem_utils import INVERSE_CM_TO_EV
 
 __all__ = ['plot_spectral']
 
-PROJECTOR_MIN = 1e-3
+PROJECTOR_MIN = 1e-5
 SPIN_UP_COLOUR = "firebrick"
 SPIN_DOWN_COLOUR = "dodgerblue"
 
@@ -788,13 +788,15 @@ def _ordered_scatter(path, eigs, pdis, branches, ax=None, colours=None, interpol
             else:
                 plot_colours = [None for i in range(len(projections[0]))]
             for i, _ in enumerate(projections):
-                # zeros mess up zorder, so add small shift then subtract
-                # before calculating real sizes
-                projections[projections <= 1e-9] = 1e-9
-                sizes = np.cumsum(projections[i])
-                zorders = 1000*(-nb + 1-sizes)
-                projections[projections <= 1e-9] = 0
-                sizes = np.cumsum(projections[i])
+                # use masked arrays to exclude the small projections
+                sizes = np.ma.masked_where(
+                    projections[i] <= PROJECTOR_MIN,
+                    np.cumsum(projections[i])
+                )
+                # zorders should be large and negative in order to pass rasterization condition on axis
+                zorders = 1000*(-100 * nb - branch_ind + 1-sizes) - 1e7
+
+                # this loop is slow, but will still be orders of magnitude faster than the matplotlib rendering
                 for j in range(len(projections[i])):
                     flat_pts_k.append(pts[i, 0, 0])
                     flat_pts_e.append(pts[i, 0, 1])
@@ -802,7 +804,9 @@ def _ordered_scatter(path, eigs, pdis, branches, ax=None, colours=None, interpol
                     flat_sizes.append(point_scale*(size)**2)
                     flat_colours.append(plot_colours[j])
                     flat_zorders.append(zorders[j])
-            ax.plot(pts[:, 0, 0], pts[:, 0, 1], lw=0.5, alpha=0.5, c='grey', zorder=0)
+
+            # plot all bands in light grey as a skeleton
+            ax.plot(pts[:, 0, 0], pts[:, 0, 1], lw=1, alpha=0.5, c='grey', zorder=0)
 
     flat_zorders = np.asarray(flat_zorders)
     flat_pts_k = np.asarray(flat_pts_k)[np.argsort(flat_zorders)]
@@ -810,7 +814,7 @@ def _ordered_scatter(path, eigs, pdis, branches, ax=None, colours=None, interpol
     flat_sizes = np.asarray(flat_sizes)[np.argsort(flat_zorders)]
     flat_colours = np.asarray(flat_colours)[np.argsort(flat_zorders)]
 
-    ax.scatter(flat_pts_k, flat_pts_e, edgecolor=flat_colours, s=flat_sizes, lw=0, marker='o', facecolor=flat_colours)
+    ax.scatter(flat_pts_k, flat_pts_e, s=flat_sizes, c=flat_colours, marker='o')
 
 
 def _get_lineprops(dispersion, spin_fermi_energy, nb, ns, branch, branch_ind, seed_ind, kwargs, eigs=None):
@@ -1074,9 +1078,7 @@ def _get_projector_info(projectors, colours_override=None):
             try:
                 dos_colour = colours_override[ind]
             except IndexError:
-                print(
-                    f"Insufficient number of override colours provided for projector ({ind+1} vs {len(colours_override)}), "
-                    "reverting to default.")
+                pass
 
         dos_colours.append(dos_colour)
 
