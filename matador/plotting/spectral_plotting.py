@@ -68,7 +68,6 @@ def plot_spectral(seeds, **kwargs):
         filename (str): filename for figure saving.
         cmap (str): matplotlib colourmap name to use for the bands
         cmap_limits (tuple): fraction of cmap to use (DEFAULT: (0.2, 0.8)).
-        n_colours (int): number of colours to use from cmap (DEFAULT: 4).
         unstacked_pdos (bool): whether to plot projected DOS as stack or overlapping.
         spin_only (str): either 'up' or 'down' to only plot one spin channel.
         preserve_kspace_distance (bool): whether to preserve distances in reciprocal space when
@@ -93,8 +92,9 @@ def plot_spectral(seeds, **kwargs):
                      'phonons': False, 'gap': False,
                      'colour_by_seed': False, 'external_efermi': None,
                      'labels': None, 'cmap': None, 'cmap_limits': (0.2, 0.8), 'band_colour': 'occ',
-                     'n_colours': 4, 'spin_only': None, 'figsize': None, 'filename': None,
+                     'spin_only': None, 'figsize': None, 'filename': None,
                      'pdis_interpolation_factor': 2, 'pdis_point_scale': 25, 'projectors_to_plot': None,
+                     'projector_colours': None,
                      'unstacked_pdos': False, 'preserve_kspace_distance': False,
                      'band_reorder': False, 'title': None, 'show': True,
                      'verbosity': 0, 'highlight_bands': None, 'pdos_hide_sum': True}
@@ -521,7 +521,9 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists):
                 pdos = pdos_data['pdos']
 
             stacks = dict()
-            projector_labels, dos_colours = _get_projector_info(list(pdos.keys()))
+            projector_labels, dos_colours = _get_projector_info(
+                list(pdos.keys()), colours_override=kwargs.get("projector_colours")
+            )
             unique_labels = set()
             for ind, projector in enumerate(pdos):
 
@@ -675,7 +677,7 @@ def projected_bandstructure_plot(
         if np.max(pdis[:, :, ind]) > 1e-8:
             keep_inds.append(ind)
 
-    projector_labels, dos_colours = _get_projector_info(projectors)
+    projector_labels, dos_colours = _get_projector_info(projectors, colours_override=kwargs.get("projector_colours"))
 
     fermi_energy = kwargs.get('external_efermi') or dispersion.fermi_energy
 
@@ -951,7 +953,7 @@ def _add_path_labels(seed, dispersion, ax_dispersion, path, seed_ind, kwargs):
         ax_dispersion.grid(False)
 
 
-def _get_projector_info(projectors):
+def _get_projector_info(projectors, colours_override=None):
     """ Grab appropriate colours and labels from a list of projectors.
 
     Parameters:
@@ -1020,6 +1022,15 @@ def _get_projector_info(projectors):
         # otherwise if just ang-projected, use colour_cycle
         if dos_colour is None:
             dos_colour = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])[ind]
+
+        if colours_override:
+            try:
+                dos_colour = colours_override[ind]
+            except IndexError:
+                print(
+                    f"Insufficient number of override colours provided for projector ({ind+1} vs {len(colours_override)}), "
+                    "reverting to default.")
+
         dos_colours.append(dos_colour)
 
     return projector_labels, dos_colours
