@@ -311,6 +311,8 @@ def dispersion_plot(seeds, ax_dispersion, kwargs, bbox_extra_artists):
 
         # try to match bands if requested
         if kwargs['band_reorder']:
+            if kwargs['plot_pdis']:
+                raise RuntimeError("PDIS not currently compatible with post-hoc band reordering.")
             print('Reordering bands based on local gradients...')
             eigs = Dispersion.get_band_reordering(eigs, dispersion.kpoint_branches)
 
