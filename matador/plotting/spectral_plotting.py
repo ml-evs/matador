@@ -964,6 +964,9 @@ def _get_projector_info(projectors):
     element_colours = get_element_colours()
     projector_labels = []
     dos_colours = []
+
+    all_species = set(proj[0] for proj in projectors)
+
     for ind, projector in enumerate(projectors):
 
         # pad out projectors for e.g. phonon case
@@ -1001,19 +1004,20 @@ def _get_projector_info(projectors):
 
         projector_labels.append(projector_label)
 
+        dos_colour = None
         # if species-projected only, then use VESTA colours
         if species is not None and ang_mom is None:
-            dos_colours.append(element_colours.get(projector[0]))
+            dos_colour = element_colours.get(projector[0])
         # if species_ang-projected, then use VESTA colours but lightened
-        elif species is not None and ang_mom is not None:
+        elif len(all_species) > 1 and species is not None and ang_mom is not None:
             dos_colour = copy.deepcopy(element_colours.get(projector[0]))
             multi = ['s', 'p', 'd', 'f'].index(projector[1]) - 1
             for jind, _ in enumerate(dos_colour):
                 dos_colour[jind] = max(min(dos_colour[jind]+multi*0.2, 1), 0)
-            dos_colours.append(dos_colour)
         # otherwise if just ang-projected, use colour_cycle
-        if dos_colours[-1] is None:
-            dos_colours[-1] = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])[ind]
+        if dos_colour is None:
+            dos_colour = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])[ind]
+        dos_colours.append(dos_colour)
 
     return projector_labels, dos_colours
 
@@ -1107,7 +1111,7 @@ def _parse_projectors_list(projectors):
 
     Parameters:
         projectors (str): a string of comma-separated element:orbital
-            pairs. If the colon is omitted, all oribtals will be used.
+            pairs. If the colon is omitted, all orbitals will be used.
 
     Returns:
         list(tuple): list of projectors in format [(element, orbital, spin)].
