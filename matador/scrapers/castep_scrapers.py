@@ -187,6 +187,10 @@ def cell2dict(seed, db=False, lattice=True, positions=True, **kwargs):
             cell['species_pot'] = dict()
             i = 1
             while 'endblock' not in flines[line_no + i].lower():
+                # handle blank lines in species pot
+                if not flines[line_no + i].split():
+                    i += 1
+                    continue
                 if db:
                     species = flines[line_no+i].split()[0]
                     pspot_string = flines[line_no+i].split()[1].split('/')[-1]
@@ -199,6 +203,8 @@ def cell2dict(seed, db=False, lattice=True, positions=True, **kwargs):
                     else:
                         cell['species_pot'][flines[line_no + i].split()[0]] = flines[line_no + i].split()[1]
                 i += 1
+            if not cell['species_pot']:
+                cell.pop('species_pot')
         elif '%block cell_constraints' in line.lower():
             cell['cell_constraints'] = []
             for j in range(2):
