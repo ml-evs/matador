@@ -142,11 +142,15 @@ def plot_spectral(seeds, **kwargs):
 
     if kwargs.get('plot_window') is not None:
         if isinstance(kwargs.get('plot_window'), list):
-            if len(kwargs.get('plot_window')) != 2:
-                exit('plot_window must have length 2 or be a single number')
-            kwargs['plot_window'] = sorted(kwargs.get('plot_window'))
+            if len(kwargs.get('plot_window')) == 1:
+                kwargs['plot_window'] = (-kwargs['plot_window'][0], kwargs['plot_window'][0])
+            elif len(kwargs.get("plot_window")) != 2:
+                raise RuntimeError(f"`plot_window` must have length 2 or be a single number, not {kwargs['plot_window']}")
         else:
-            kwargs['plot_window'] = (-kwargs.get('plot_window'), kwargs.get('plot_window'))
+            kwargs['plot_window'] = (-kwargs['plot_window'], kwargs['plot_window'])
+
+        kwargs['plot_window'] = sorted(kwargs.get('plot_window'))
+
     else:
         kwargs['plot_window'] = None
 
