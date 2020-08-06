@@ -170,19 +170,15 @@ def plot_spectral(seeds, **kwargs):
             kwargs['plot_pdos'] = any([any([os.path.isfile('{}.{}'.format(seed, ext)) for ext in exts]) for seed in seeds])
 
     figsize = kwargs['figsize']
-    # need to rasterize pdis plots, which we'll force to have negative zorders
-    rasterized = kwargs.get('plot_pdis', False)
-    subplot_kw = {"rasterized": rasterized}
-    if rasterized:
-        subplot_kw["rasterization_zorder"] = -1e3
+
     if kwargs['plot_bandstructure'] and not kwargs['plot_dos']:
         if figsize is None:
             figsize = (7, 6)
-        fig, ax_dispersion = plt.subplots(figsize=figsize, subplot_kw=subplot_kw)
+        fig, ax_dispersion = plt.subplots(figsize=figsize)
     elif kwargs['plot_bandstructure'] and kwargs['plot_dos']:
         if figsize is None:
             figsize = (10, 6)
-        fig, ax_grid = plt.subplots(1, 3, figsize=figsize, sharey=True, subplot_kw=subplot_kw,
+        fig, ax_grid = plt.subplots(1, 3, figsize=figsize, sharey=True,
                                     gridspec_kw={'width_ratios': [4, 2, 1],
                                                  'wspace': 0.1,
                                                  'left': 0.15})
@@ -192,7 +188,7 @@ def plot_spectral(seeds, **kwargs):
     elif not kwargs['plot_bandstructure'] and kwargs['plot_dos']:
         if figsize is None:
             figsize = (9, 4)
-        fig, ax_dos = plt.subplots(1, figsize=figsize, subplot_kw=subplot_kw)
+        fig, ax_dos = plt.subplots(1, figsize=figsize)
     else:
         raise RuntimeError("No plots requested, please set either plot_dos or plot_bandstructure to True!")
 
