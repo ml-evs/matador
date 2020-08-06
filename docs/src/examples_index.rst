@@ -20,6 +20,7 @@ Example Jupyter notebooks
     notebooks/voltage_from_res_files
     notebooks/simple_spectral
     notebooks/projected_spectral
+    notebooks/projected_spectral_as_subplots
     notebooks/phonon_results
     notebooks/pxrd_plotting
     notebooks/magres_plotting

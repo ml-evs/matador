@@ -1,6 +1,19 @@
 Changelog
 =========
 
+Changes since last release [06/08/2020]
+---------------------------------------
+- Improvements to PDIS functionality (#94).
+
+    - Rasterized scatter points for more efficient exporting and fewer graphical artifacts
+    - Made underlying :function:`matador.plotting.spectral_plotting.dos_plot` and :function:`matador.plotting.spectral_plotting.dispersion_plot` more API friendly, and added example notebook.
+    - Fixed bug in cell scraping for old ``BS_*`` style keywords.
+
+- Improvements to magres functionality, including scraping of units (#90)
+- Example notebooks that do not external data/databases are now run as part of CI (#91).
+
+
+
 New in release (0.9.7) [29/07/2020]
 -----------------------------------
 - Bug fixes to problems introduced in 0.9.6.
