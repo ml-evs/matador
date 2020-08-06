@@ -36,8 +36,6 @@ def main():
                         help='when linearising kpoint path, ensure distance in reciprocal space is conserved')
     parser.add_argument('--cmap', type=str,
                         help='matplotlib colourmap name to use')
-    parser.add_argument('--n_colours', type=int,
-                        help='number of colours to use from colourmap (DEFAULT: 6)')
     parser.add_argument('--spin_only', type=str,
                         help='either "up" or "down" to only plot one channel')
     parser.add_argument('-interp', '--pdis_interpolation_factor', type=float,
@@ -56,8 +54,11 @@ def main():
     parser.add_argument('--pdos_hide_sum', action='store_true',
                         help='plot PDOS without sum pDOS')
     parser.add_argument('--band_colour', type=str,
-                        help='override all other colour options with a matploblib-interpretable colour string, '
+                        help='override all other colour options with a matplotlib-interpretable colour string, '
                              'or choose one of "occ" or "random".')
+    parser.add_argument('--projector_colours', type=str, nargs="+",
+                        help='override all projector colour options with a list of matplotlib-interpretable colours, '
+                             'e.g. --projector_colours red blue #ff00ff')
     parser.add_argument('-g', '--gap', action='store_true',
                         help='plot position and size of band gap')
     parser.add_argument('-ph', '--phonons', action='store_true', default=False,

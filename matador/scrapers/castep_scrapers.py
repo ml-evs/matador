@@ -187,6 +187,10 @@ def cell2dict(seed, db=False, lattice=True, positions=True, **kwargs):
             cell['species_pot'] = dict()
             i = 1
             while 'endblock' not in flines[line_no + i].lower():
+                # handle blank lines in species pot
+                if not flines[line_no + i].split():
+                    i += 1
+                    continue
                 if db:
                     species = flines[line_no+i].split()[0]
                     pspot_string = flines[line_no+i].split()[1].split('/')[-1]
@@ -199,6 +203,8 @@ def cell2dict(seed, db=False, lattice=True, positions=True, **kwargs):
                     else:
                         cell['species_pot'][flines[line_no + i].split()[0]] = flines[line_no + i].split()[1]
                 i += 1
+            if not cell['species_pot']:
+                cell.pop('species_pot')
         elif '%block cell_constraints' in line.lower():
             cell['cell_constraints'] = []
             for j in range(2):
@@ -246,6 +252,8 @@ def cell2dict(seed, db=False, lattice=True, positions=True, **kwargs):
         elif 'kpoints_mp_spacing' in line.lower() or 'kpoint_mp_spacing' in line.lower():
             if 'spectral_kpoints_mp_spacing' in line.lower() or 'spectral_kpoint_mp_spacing' in line.lower():
                 cell['spectral_kpoints_mp_spacing'] = f90_float_parse(line.split()[-1])
+            elif 'bs_kpoints_mp_spacing' in line.lower() or 'bs_kpoint_mp_spacing' in line.lower():
+                cell['spectral_kpoints_mp_spacing'] = f90_float_parse(line.split()[-1])
             elif 'supercell_kpoints_mp_spacing' in line.lower() or 'supercell_kpoint_mp_spacing' in line.lower():
                 cell['supercell_kpoints_mp_spacing'] = f90_float_parse(line.split()[-1])
             elif 'phonon_kpoints_mp_spacing' in line.lower() or 'phonon_kpoint_mp_spacing' in line.lower():
@@ -256,6 +264,8 @@ def cell2dict(seed, db=False, lattice=True, positions=True, **kwargs):
                 cell['kpoints_mp_spacing'] = f90_float_parse(line.split()[-1])
         elif 'kpoints_mp_grid' in line.lower() or 'kpoint_mp_grid' in line.lower():
             if 'spectral_kpoints_mp_grid' in line.lower() or 'spectral_kpoint_mp_grid' in line.lower():
+                cell['spectral_kpoints_mp_grid'] = list(map(int, line.split()[-3:]))
+            if 'bs_kpoints_mp_grid' in line.lower() or 'bs_kpoint_mp_grid' in line.lower():
                 cell['spectral_kpoints_mp_grid'] = list(map(int, line.split()[-3:]))
             # these two keywords do not have a corresponding "kpoints" alias (instead of kpoint)
             # so must remain unpluralised (see below for other phonon keyword exceptions)
@@ -268,6 +278,8 @@ def cell2dict(seed, db=False, lattice=True, positions=True, **kwargs):
         elif 'kpoints_mp_offset' in line.lower() or 'kpoint_mp_offset' in line.lower():
             if 'spectral_kpoints_mp_offset' in line.lower() or 'spectral_kpoint_mp_offset' in line.lower():
                 cell['spectral_kpoints_mp_offset'] = list(map(f90_float_parse, line.split()[-3:]))
+            if 'bs_kpoints_mp_offset' in line.lower() or 'bs_kpoint_mp_offset' in line.lower():
+                cell['spectral_kpoints_mp_offset'] = list(map(f90_float_parse, line.split()[-3:]))
             elif 'phonon_kpoints_mp_offset' in line.lower() or 'phonon_kpoint_mp_offset' in line.lower():
                 # this is a special case where phonon_kpointS_mp_offset doesn't exist
                 cell['phonon_kpoint_mp_offset'] = list(map(f90_float_parse, line.split()[-3:]))
@@ -276,12 +288,12 @@ def cell2dict(seed, db=False, lattice=True, positions=True, **kwargs):
             else:
                 cell['kpoints_mp_offset'] = list(map(f90_float_parse, line.split()[-3:]))
         elif '%block' in line.lower() and ('_kpoints_path' in line.lower() or '_kpoint_path' in line.lower()):
-            if 'spectral' in line.lower():
+            if 'spectral_' in line.lower() or "bs_" in line.lower():
                 key = 'spectral_kpoints_path'
-            elif 'phonon_fine' in line.lower():
+            elif 'phonon_fine_' in line.lower():
                 key = 'phonon_fine_kpoint_path'
             else:
-                raise RuntimeError('Found unknown kpoint path block.')
+                raise RuntimeError(f'Found unknown kpoint path key in line: {line}.')
             i = 1
             labels = []
             found_labels = False
@@ -300,7 +312,11 @@ def cell2dict(seed, db=False, lattice=True, positions=True, **kwargs):
                 i += 1
             if found_labels:
                 cell[key + '_labels'] = labels
-        elif '%block spectral_kpoints_list' in line.lower() or '%block spectral_kpoint_list' in line.lower():
+        elif any(
+            block in line.lower()
+            for block in
+            ['%block spectral_kpoints_list', '%block spectral_kpoint_list', '%block bs_kpoint_list', '%block bs_kpoints_list']
+        ):
             i = 1
             cell['spectral_kpoints_list'] = []
             while '%endblock' not in flines[line_no + i].lower():
@@ -396,6 +412,8 @@ def cell2dict(seed, db=False, lattice=True, positions=True, **kwargs):
                 cell['cell_noise'] = f90_float_parse(line.split()[-1])
             elif 'kpoints_path' in line.lower() or 'kpoint_path' in line.lower() and '%block' not in line.lower():
                 if 'spectral_kpoints_path_spacing' in line.lower() or 'spectral_kpoint_path_spacing' in line.lower():
+                    cell['spectral_kpoints_path_spacing'] = f90_float_parse(line.split()[-1])
+                if 'bs_kpoints_path_spacing' in line.lower() or 'bs_kpoint_path_spacing' in line.lower():
                     cell['spectral_kpoints_path_spacing'] = f90_float_parse(line.split()[-1])
                 elif 'phonon_fine_kpoints_path_spacing' in line.lower() or 'phonon_fine_kpoint_path_spacing' in line.lower():
                     cell['phonon_fine_kpoint_path_spacing'] = f90_float_parse(line.split()[-1])

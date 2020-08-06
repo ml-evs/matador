@@ -28,7 +28,6 @@ mathtext.bf                   : sans:bold
 mathtext.sf                   : sans
 mathtext.fontset              : stixsans
 mathtext.default              : regular
-mathtext.fallback             : cm
 
 patch.edgecolor        : k
 
