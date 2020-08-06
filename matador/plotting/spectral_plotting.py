@@ -829,6 +829,9 @@ def _add_path_labels(seed, dispersion, ax_dispersion, path, seed_ind, kwargs):
         doc, success = cell2dict(seed + '.cell',
                                  db=False, verbosity=kwargs.get('verbosity', 0),
                                  lattice=True, positions=True)
+        if not success:
+            print(f"Unable to scrape {seed}.cell: {doc}")
+            doc = {}
     else:
         doc = seed
 
