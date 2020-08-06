@@ -794,7 +794,7 @@ def _ordered_scatter(path, eigs, pdis, branches, ax=None, colours=None, interpol
                     np.cumsum(projections[i])
                 )
                 # zorders should be large and negative in order to pass rasterization condition on axis
-                zorders = 1000*(-100 * nb - branch_ind + 1-sizes) - 1e7
+                zorders = 1000*(-100 * nb - sizes) - 1e7
 
                 # this loop is slow, but will still be orders of magnitude faster than the matplotlib rendering
                 for j in range(len(projections[i])):
@@ -814,7 +814,14 @@ def _ordered_scatter(path, eigs, pdis, branches, ax=None, colours=None, interpol
     flat_sizes = np.asarray(flat_sizes)[np.argsort(flat_zorders)]
     flat_colours = np.asarray(flat_colours)[np.argsort(flat_zorders)]
 
-    ax.scatter(flat_pts_k, flat_pts_e, s=flat_sizes, c=flat_colours, marker='o')
+    ax.scatter(
+        flat_pts_k,
+        flat_pts_e,
+        s=flat_sizes,
+        c=flat_colours,
+        marker='o',
+        rasterized=True
+    )
 
 
 def _get_lineprops(dispersion, spin_fermi_energy, nb, ns, branch, branch_ind, seed_ind, kwargs, eigs=None):
