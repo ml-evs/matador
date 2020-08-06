@@ -10,7 +10,7 @@ import numpy as np
 from matador.orm.spectral.spectral import Spectral
 from matador.utils.chem_utils import INVERSE_CM_TO_EV, KELVIN_TO_EV
 
-EPS = 1e-6
+EPS = 1e-4
 
 
 class Dispersion(Spectral):
@@ -353,7 +353,7 @@ class ElectronicDispersion(Dispersion):
                     elif cbm + EPS >= band[argmin] > 0:
                         cbm = band[argmin]
                         cbm_pos.extend([branch[argmin]])
-                    if band[argmin] < 0 < band[argmax]:
+                    if band[argmin] + EPS/2 < 0 < band[argmax] - EPS/2:
                         vbm = 0
                         cbm = 0
                         vbm_pos = [0]
@@ -387,9 +387,9 @@ class ElectronicDispersion(Dispersion):
                 direct_vbm = -1e10
                 for nb in range(self.num_bands):
                     band_eig = self.eigs_s_k[ispin][nb][ind] - self.spin_fermi_energy[ispin]
-                    if direct_vbm <= band_eig < 0:
+                    if direct_vbm <= band_eig < EPS:
                         direct_vbm = band_eig
-                    if direct_cbm >= band_eig > 0:
+                    if direct_cbm >= band_eig > EPS:
                         direct_cbm = band_eig
                 direct_gaps[ind] = direct_cbm - direct_vbm
                 direct_cbms[ind] = direct_cbm
