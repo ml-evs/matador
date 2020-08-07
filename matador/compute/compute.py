@@ -409,6 +409,10 @@ class ComputeTask:
                 from matador.workflows.castep import castep_full_spectral
                 success = castep_full_spectral(self, self.calc_doc, self.seed, **self.workflow_kwargs)
 
+            elif self.calc_doc['task'].upper() in ['MAGRES']:
+                from matador.workflows.castep import castep_full_magres
+                success = castep_full_magres(self, self.calc_doc, self.seed, **self.workflow_kwargs)
+
             elif self.calc_doc['task'].upper() in ['BULK_MODULUS']:
                 from matador.workflows.castep import castep_elastic
                 success = castep_elastic(self, self.calc_doc, self.seed, **self.workflow_kwargs)

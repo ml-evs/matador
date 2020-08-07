@@ -1,4 +1,4 @@
-kpoint_mp_spacing: 0.07
+kpoint_mp_grid: 2 2 2
 
 %block species_pot
 Si Si_00PBE.usp
