@@ -1,0 +1,7 @@
+kpoint_mp_spacing: 0.07
+
+%block species_pot
+Si Si_00PBE.usp
+%endblock species_pot
+
+symmetry_generate
