@@ -924,6 +924,7 @@ def phonon2dict(seed, **kwargs):
             ph['lattice_cart'] = []
             for i in range(3):
                 ph['lattice_cart'].append([f90_float_parse(elem) for elem in flines[line_no + i + 1].split()])
+            ph['lattice_abc'] = cart2abc(ph['lattice_cart'])
         elif 'fractional co-ordinates' in line:
             ph['positions_frac'] = []
             ph['atom_types'] = []
