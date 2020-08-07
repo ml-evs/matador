@@ -13,7 +13,7 @@ import logging
 import numpy as np
 from matador.workflows import Workflow
 from matador.crystal.elastic import get_equation_of_state
-from matador.workflows.castep.commom import castep_prerelax
+from matador.workflows.castep.common import castep_prerelax
 
 LOG = logging.getLogger('run3')
 

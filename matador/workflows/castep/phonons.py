@@ -155,7 +155,7 @@ def castep_phonon_prerelax(computer, calc_doc, seed):
     from matador.workflows.castep.common import castep_prerelax
 
     LOG.info('Performing CASTEP phonon pre-relax...')
-    required = []
+    required = ["write_checkpoint"]
     forbidden = ['phonon_fine_kpoint_list',
                  'phonon_fine_kpoint_path',
                  'phonon_fine_kpoint_mp_spacing',
@@ -183,8 +183,9 @@ def castep_phonon_dynmat(computer, calc_doc, seed):
     dynmat_doc = copy.deepcopy(calc_doc)
     dynmat_doc['write_checkpoint'] = 'ALL'
     dynmat_doc['task'] = 'phonon'
+    dynmat_doc['continuation'] = 'default'
 
-    required = []
+    required = ["continuation", "write_checkpoint"]
     forbidden = ['phonon_fine_kpoint_list',
                  'phonon_fine_kpoint_path',
                  'phonon_fine_kpoint_mp_spacing',

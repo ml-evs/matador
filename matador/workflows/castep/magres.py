@@ -21,8 +21,10 @@ from matador.workflows.castep.common import castep_prerelax, castep_scf
 
 LOG = logging.getLogger('run3')
 
+__all__ = ("castep_full_magres")
 
-def castep_full_phonon(computer, calc_doc, seed, **kwargs):
+
+def castep_full_magres(computer, calc_doc, seed, **kwargs):
     """ Perform a "full" magres calculation on a system, i.e.
     first perform a relaxation, then do a high quality SCF
     and compute NMR properties in the same step.
@@ -68,7 +70,11 @@ class CastepMagresWorkflow(Workflow):
         # default todo
         todo = {'relax': True, 'scf': True, 'magres': True}
         # definition of steps and names
-        steps = {'relax': castep_prerelax, 'magres': castep_magres_scf}
+        steps = {
+            'relax': castep_prerelax,
+            'scf': castep_magres_scf,
+            'magres': castep_magres
+        }
 
         exts = {
             'relax':
@@ -103,8 +109,14 @@ def castep_magres_scf(computer, calc_doc, seed):
         bool: whether or not the SCF was successful.
 
     """
+    calc_doc["write_checkpoint"] = "ALL"
+    calc_doc["continuation"] = "default"
 
-    return castep_scf(computer, calc_doc, seed, elec_energy_tol=1e-12)
+    required = ["write_checkpoint", "continuation"]
+
+    return castep_scf(
+        computer, calc_doc, seed, elec_energy_tol=1e-12, required_keys=required
+    )
 
 
 def castep_magres(computer, calc_doc, seed):
@@ -120,7 +132,9 @@ def castep_magres(computer, calc_doc, seed):
     LOG.info('Performing CASTEP phonon dispersion calculation...')
     magres_doc = copy.deepcopy(calc_doc)
     magres_doc['task'] = 'magres'
-    magres_doc['magres_task'] = 'nmr'
+    magres_doc['magres_task'] = calc_doc.get("magres_task", "NMR")
+    if magres_doc["magres_task"].upper() == "NMR" and "species_gamma" not in magres_doc:
+        magres_doc["magres_task"] = "shielding"
     magres_doc['continuation'] = 'default'
 
     required = []

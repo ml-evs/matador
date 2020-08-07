@@ -115,7 +115,7 @@ def _parse_write_checkpoint(write_checkpoint):
             write_checkpoint = "NONE"
         else:
             write_checkpoint = "ALL"
-    if write_checkpoint not in ("NONE", "MINIMAL", "ALL", "BOTH", "FULL"):
+    if write_checkpoint.upper() not in ("NONE", "MINIMAL", "ALL", "BOTH", "FULL"):
         LOG.warning(
             f"Invalid value of `write_checkpoint` provided: {write_checkpoint}, using 'ALL'"
         )
