@@ -21,7 +21,7 @@ from matador.orm.spectral import (
 )
 from matador.utils.chem_utils import INVERSE_CM_TO_EV
 
-__all__ = ['plot_spectral']
+__all__ = ['plot_spectral', 'dos_plot', 'dispersion_plot']
 
 PROJECTOR_MIN = 1e-5
 SPIN_UP_COLOUR = "firebrick"
