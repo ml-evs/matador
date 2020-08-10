@@ -53,7 +53,7 @@ class ElasticWorkflowTest(MatadorUnitTest):
         )
 
         self.assertFalse(os.path.isfile("completed/Si2.bib"))
-        self.assertFalse(os.path.isfile("completed/Si2.check"))
+        self.assertTrue(os.path.isfile("completed/Si2.check"))
 
         self.assertTrue(os.path.isfile("completed/Si2.bulk_mod.results"))
         self.assertTrue(os.path.isfile("completed/Si2.bulk_mod.res"))
@@ -67,11 +67,11 @@ class ElasticWorkflowTest(MatadorUnitTest):
             if "bulk modulus" in line:
                 B.append(float(line.split()[3]))
 
-        # check all computed bulk mods are between 91-93
+        # check all computed bulk mods are between 88-92
         self.assertEqual(len(B), 3)
-        self.assertTrue(all(abs(b - 92) < 1) for b in B)
+        self.assertTrue(all(abs(b - 90) < 2) for b in B)
 
-        self.assertFalse(os.path.isfile("completed/Si2.bulk_mod.png"))
+        self.assertFalse(os.path.isfile("completed/Si2.bulk_mod.pdf"))
 
         self.assertTrue(os.path.isfile("completed/Si2.res"))
         self.assertTrue(os.path.isfile("completed/Si2.geom"))
@@ -114,17 +114,12 @@ class PhononWorkflowTest(MatadorUnitTest):
         phon, s = phonon2dict("completed/Si2.phonon")
         a = 2.7355124
         np.testing.assert_array_almost_equal(
-            phon["lattice_cart"],
-            np.array([[0, a, a], [a, 0, a], [a, a, 0]]),
-            decimal=3,
-
+            phon["lattice_cart"], np.array([[0, a, a], [a, 0, a], [a, a, 0]]), decimal=3
         )
 
         a = 3.869
         np.testing.assert_array_almost_equal(
-            phon["lattice_abc"],
-            np.array([[a, a, a], [60, 60, 60]]),
-            decimal=3
+            phon["lattice_abc"], np.array([[a, a, a], [60, 60, 60]]), decimal=3
         )
         self.assertTrue(s, msg="Failed to read phonon file")
         self.assertGreater(np.min(phon["eigenvalues_q"]), -0.05)
@@ -165,15 +160,11 @@ class MagresWorkflowTest(MatadorUnitTest):
 
         a = 3.866895
         np.testing.assert_array_almost_equal(
-            magres["lattice_abc"],
-            np.array([[a, a, a], [60, 60, 60]]),
-            decimal=3
+            magres["lattice_abc"], np.array([[a, a, a], [60, 60, 60]]), decimal=3
         )
 
         np.testing.assert_array_almost_equal(
-            magres["chemical_shielding_isos"],
-            np.array([129.577, 129.577]),
-            decimal=2,
+            magres["chemical_shielding_isos"], np.array([129.577, 129.577]), decimal=2
         )
 
         self.assertTrue(os.path.isfile("completed/Si2.cell"))
