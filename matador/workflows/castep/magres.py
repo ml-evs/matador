@@ -16,6 +16,7 @@ multiple steps (only when necessary):
 import os
 import copy
 import logging
+from functools import partial
 from matador.workflows.workflows import Workflow
 from matador.workflows.castep.common import castep_prerelax, castep_scf
 
@@ -24,7 +25,7 @@ LOG = logging.getLogger('run3')
 __all__ = ("castep_full_magres")
 
 
-def castep_full_magres(computer, calc_doc, seed, **kwargs):
+def castep_full_magres(computer, calc_doc, seed, final_elec_energy_tol=1e-12, **kwargs):
     """ Perform a "full" magres calculation on a system, i.e.
     first perform a relaxation, then do a high quality SCF
     and compute NMR properties in the same step.
@@ -44,7 +45,14 @@ def castep_full_magres(computer, calc_doc, seed, **kwargs):
         bool: True if Workflow completed successfully, or False otherwise.
 
     """
-    workflow = CastepMagresWorkflow(computer, calc_doc, seed, **kwargs)
+    workflow = CastepMagresWorkflow(
+        computer,
+        calc_doc,
+        seed,
+        final_elec_energy_tol=final_elec_energy_tol,
+        **kwargs
+    )
+
     return workflow.success
 
 
@@ -60,6 +68,8 @@ class CastepMagresWorkflow(Workflow):
         seed (str): the root seed for the calculation.
         success (bool): the status of the Workflow: only set to True after
             post-processing method completes.
+        final_elec_energy_tol (float): the electronic energy tolerance to use
+            in the high-quality SCF calculation.
 
     """
     def preprocess(self):
@@ -67,13 +77,15 @@ class CastepMagresWorkflow(Workflow):
         and set the appropriate CASTEP parameters.
 
         """
+
+        self.final_elec_energy_tol = self.workflow_params.get("elec_energy_tol", 1e-12)
         # default todo
         todo = {'relax': True, 'scf': True, 'magres': True}
         # definition of steps and names
         steps = {
             'relax': castep_prerelax,
-            'scf': castep_magres_scf,
-            'magres': castep_magres
+            'scf': partial(castep_magres_scf, elec_energy_tol=self.final_elec_energy_tol),
+            'magres': partial(castep_magres, elec_energy_tol=self.final_elec_energy_tol)
         }
 
         exts = {
@@ -97,7 +109,7 @@ class CastepMagresWorkflow(Workflow):
                               output_exts=exts[key].get('output'))
 
 
-def castep_magres_scf(computer, calc_doc, seed):
+def castep_magres_scf(computer, calc_doc, seed, elec_energy_tol=1e-12):
     """ Run a singleshot SCF calculation with a high elec_energy_tol.
 
     Parameters:
@@ -115,11 +127,11 @@ def castep_magres_scf(computer, calc_doc, seed):
     required = ["write_checkpoint", "continuation"]
 
     return castep_scf(
-        computer, calc_doc, seed, elec_energy_tol=1e-12, required_keys=required
+        computer, calc_doc, seed, elec_energy_tol=elec_energy_tol, required_keys=required
     )
 
 
-def castep_magres(computer, calc_doc, seed):
+def castep_magres(computer, calc_doc, seed, elec_energy_tol=1e-12):
     """ Runs a NMR properties calculation on top of a completed
     SCF calculation.
 
@@ -136,6 +148,8 @@ def castep_magres(computer, calc_doc, seed):
     if magres_doc["magres_task"].upper() == "NMR" and "species_gamma" not in magres_doc:
         magres_doc["magres_task"] = "shielding"
     magres_doc['continuation'] = 'default'
+    # this is just to suppress a warning that elec_energy_tol has changed
+    magres_doc["elec_energy_tol"] = elec_energy_tol
 
     required = []
     forbidden = []

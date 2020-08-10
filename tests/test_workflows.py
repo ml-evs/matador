@@ -147,6 +147,7 @@ class MagresWorkflowTest(MatadorUnitTest):
             param_dict=param_dict,
             verbosity=VERBOSITY,
             compute_dir="tmpier_tst",
+            workflow_kwargs={"final_elec_energy_tol": 1e-9},
         )
 
         self.assertTrue(os.path.isfile("completed/Si2.check"))
@@ -154,6 +155,20 @@ class MagresWorkflowTest(MatadorUnitTest):
         self.assertTrue(os.path.isfile("completed/Si2.bands"))
         self.assertTrue(os.path.isfile("completed/Si2.castep"))
         self.assertTrue(os.path.isfile("completed/Si2.magres"))
+
+        self.assertTrue(os.path.isfile("completed/Si2.cell_magres"))
+        self.assertTrue(os.path.isfile("completed/Si2.param_magres"))
+
+        self.assertTrue(os.path.isfile("completed/Si2.cell_scf"))
+        self.assertTrue(os.path.isfile("completed/Si2.param_scf"))
+
+        param, s = param2dict("completed/Si2.param_scf")
+        self.assertTrue(s, msg="Failed to read param file")
+        self.assertEqual(param["elec_energy_tol"], 1e-12)
+
+        param, s = param2dict("completed/Si2.param_magres")
+        self.assertEqual(param["elec_energy_tol"], 1e-12)
+        self.assertTrue(s, msg="Failed to read param file")
 
         magres, s = magres2dict("completed/Si2.magres")
         self.assertTrue(s, msg="Failed to read magres file")
