@@ -206,6 +206,14 @@ def plot_spectral(seeds, **kwargs):
             except AttributeError:
                 kwargs['labels'] = [seed.root_source for seed in seeds]
 
+        if len(kwargs.get("labels")) != len(seeds):
+            raise RuntimeError(
+                f"Invalid number of labels provided for {len(seeds)} seeds: {kwargs.get('labels')}. "
+                "Multiple labels should be comma separated."
+            )
+
+        kwargs["labels"] = [label.strip() for label in kwargs["labels"]]
+
     kwargs['ls'] = []
     for i in range(len(seeds)):
         if i % 3 == 0:
@@ -643,14 +651,20 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists=None):
                         ax_dos.plot(pdos_energies, stacks[stack_key],
                                     ls='--', alpha=1, color='black', zorder=1e9, label=label)
 
-        if len(seeds) == 1 and (plotting_pdos or 'spin_dos' in dos_data):
-            if kwargs.get('plot_bandstructure'):
-                dos_legend = ax_dos.legend(bbox_to_anchor=(1, 1))
+    if len(seeds) == 1 and (plotting_pdos or 'spin_dos' in dos_data):
+        if kwargs.get('plot_bandstructure'):
+            dos_legend = ax_dos.legend(bbox_to_anchor=(1, 1))
 
-            else:
-                dos_legend = ax_dos.legend(bbox_to_anchor=(1, 0.5), loc='center left')
+        else:
+            dos_legend = ax_dos.legend(bbox_to_anchor=(1, 0.5), loc='center left')
 
-            bbox_extra_artists.append(dos_legend)
+        bbox_extra_artists.append(dos_legend)
+
+    elif len(seeds) > 1 and not plotting_pdos:
+        if kwargs.get('plot_bandstructure'):
+            dos_legend = ax_dos.legend(bbox_to_anchor=(1, 1))
+        else:
+            dos_legend = ax_dos.legend(loc="upper right")
 
     return ax_dos
 
