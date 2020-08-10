@@ -9,11 +9,13 @@ calculations (i.e. varying volume from equilibrium) have been implemented.
 
 
 import copy
+import os
 import logging
 import numpy as np
 from matador.workflows import Workflow
 from matador.crystal.elastic import get_equation_of_state
 from matador.workflows.castep.common import castep_prerelax
+from matador.scrapers import cell2dict
 
 LOG = logging.getLogger('run3')
 
@@ -72,7 +74,12 @@ class CastepElasticWorkflow(Workflow):
                  .format(self.volume_rescale))
 
         # clean up after geometry step as seed is going to change
-        self.add_step(castep_elastic_prerelax, 'relax', clean_after=True)
+        self.add_step(
+            castep_elastic_prerelax,
+            'relax',
+            clean_after=True,
+            output_exts=["-out.cell"]
+        )
         for volume in self.volume_rescale:
             self.add_step(castep_rescaled_volume_scf, 'rescaled_volume_scf', rescale=volume)
 
@@ -102,9 +109,22 @@ def castep_rescaled_volume_scf(computer, calc_doc, seed, rescale=1):
     assert rescale > 0
     LOG.info('Performing CASTEP SCF on volume rescaled by {:.2f}.'.format(rescale**3))
     scf_doc = copy.deepcopy(calc_doc)
+
+    # get relaxed cell from previous step
+    fname = f"completed/{seed}-out.cell"
+    if not os.path.isfile(fname):
+        raise RuntimeError(f"Could not find relaxed geometry in {fname}.")
+    relaxed_cell, s = cell2dict(fname, positions=True, lattice=True)
+
+    scf_doc["lattice_cart"] = relaxed_cell["lattice_cart"]
+    scf_doc["positions_frac"] = relaxed_cell["positions_frac"]
+
+    LOG.debug("Found equilibrium geometry: {scf_doc['lattice_cart']}")
+
     for i in range(3):
         for k in range(3):
             scf_doc['lattice_cart'][i][k] *= rescale
+
     scf_doc['task'] = 'singlepoint'
     bulk_mod_seed = seed + '.bulk_mod'
     computer.seed = bulk_mod_seed
@@ -122,4 +142,7 @@ def castep_elastic_prerelax(computer, calc_doc, seed):
 
     """
     LOG.info('Performing CASTEP elastic pre-relax...')
-    return castep_prerelax(computer, calc_doc, seed)
+    relax_doc = copy.deepcopy(calc_doc)
+    relax_doc["write_cell_structure"] = True
+
+    return castep_prerelax(computer, relax_doc, seed)
