@@ -58,7 +58,6 @@ def plot_spectral(seeds, **kwargs):
         phonons (bool): whether to plot phonon or electronic data
         labels (list): list of strings for legend labels for multiple bandstructures
         gap (bool): whether to draw on the band gap
-        colour_by_seed (bool): plot with a separate colour per bandstructure
         external_efermi (float or list): replace scraped Fermi energy with this value (eV) (can be
             specified per spin channel).
         highlight_bands (list): list of integer indices, colour the bands
@@ -98,7 +97,7 @@ def plot_spectral(seeds, **kwargs):
                      'labels': None, 'cmap': None, 'cmap_limits': (0.2, 0.8), 'band_colour': 'occ',
                      'spin_only': None, 'figsize': None, 'filename': None,
                      'pdis_interpolation_factor': 2, 'pdis_point_scale': 25, 'projectors_to_plot': None,
-                     'projector_colours': None,
+                     'projector_colours': None, 'colours': None,
                      'unstacked_pdos': False, 'preserve_kspace_distance': False,
                      'band_reorder': False, 'title': None, 'show': True,
                      'verbosity': 0, 'highlight_bands': None, 'pdos_hide_sum': True}
@@ -110,22 +109,22 @@ def plot_spectral(seeds, **kwargs):
 
     kwargs['projectors_to_plot'] = _parse_projectors_list(kwargs['projectors_to_plot'])
 
-    if kwargs.get('cmap') is None:
+    if kwargs["projector_colours"] is not None:
+        kwargs['colours'] = kwargs["projector_colours"]
+
+    if kwargs["colours"] is None:
         kwargs['colours'] = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])
+
+    if kwargs.get('cmap') is None:
         plt.rcParams['axes.prop_cycle'] = cycler('color', kwargs['colours'])
     else:
-        if isinstance(kwargs['cmap'], str):
-            print('Adjusting colour palette... to {}'.format(kwargs.get('cmap')))
-            try:
-                kwargs['colours'] = plt.cm.get_cmap(kwargs.get('cmap')).colors
-                plt.rcParams['axes.prop_cycle'] = cycler('color', kwargs['colours'])
-            except AttributeError:
-                kwargs['colours'] = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])
-            kwargs['_mpl_cmap'] = plt.get_cmap(kwargs.get('cmap'))
-        elif isinstance(kwargs['cmap'], list):
-            print('Reading list of colours {}...'.format(kwargs.get('cmap')))
-            kwargs['colours'] = kwargs['cmap']
+        print('Adjusting colour palette... to {}'.format(kwargs.get('cmap')))
+        try:
+            kwargs['colours'] = plt.cm.get_cmap(kwargs.get('cmap')).colors
             plt.rcParams['axes.prop_cycle'] = cycler('color', kwargs['colours'])
+        except AttributeError:
+            kwargs['colours'] = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])
+        kwargs['_mpl_cmap'] = plt.get_cmap(kwargs.get('cmap'))
 
     if (kwargs.get('phonons') and kwargs['band_colour'] == 'occ' and kwargs.get('cmap') is None):
         kwargs['band_colour'] = 'grey'
@@ -139,6 +138,7 @@ def plot_spectral(seeds, **kwargs):
         seeds = [seeds]
 
     if len(seeds) > 1:
+        kwargs["colour_by_seed"] = True
         if kwargs['plot_pdis'] or kwargs['plot_dos']:
             kwargs['plot_pdos'] = False
             kwargs['plot_pdis'] = False
@@ -196,10 +196,8 @@ def plot_spectral(seeds, **kwargs):
     kwargs['conduction'] = kwargs['colours'][-1]
     kwargs['crossing'] = kwargs['colours'][int(len(kwargs['colours']) / 2)]
 
-    if len(seeds) > 1 or kwargs.get('colour_by_seed'):
-        kwargs['seed_colours'] = kwargs['colours']
+    if len(seeds) > 1:
         kwargs['ls'] = ['-'] * len(seeds)
-        kwargs['colour_by_seed'] = True
         if kwargs.get('labels') is None:
             try:
                 kwargs['labels'] = [seed.split('/')[-1].split('.')[0] for seed in seeds]
@@ -507,13 +505,20 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists=None):
             ax_dos.axhline(0, c='grey', lw=1)
 
             if 'spin_dos' not in dos_data:
+
+                dos_colour = kwargs["colours"][seed_ind]
+                if len(seeds) > 1:
+                    c = None
+                    label = kwargs.get("labels")[seed_ind]
+                else:
+                    c = 'grey'
+                    label = 'Total DOS'
+
                 ax_dos.plot(energies, dos, ls=kwargs.get('ls', len(seeds) * ['-'])[seed_ind], alpha=1,
-                            c='grey', zorder=1e10, label='Total DOS')
+                            c=c, zorder=1e10, label=label)
+
                 if not plotting_pdos:
-                    ax_dos.fill_between(energies[np.where(energies > 0)], 0, dos[np.where(energies > 0)],
-                                        alpha=0.2, color=kwargs.get('conduction'))
-                    ax_dos.fill_between(energies[np.where(energies <= 0)], 0, dos[np.where(energies <= 0)],
-                                        alpha=0.2, color=kwargs.get('valence'))
+                    ax_dos.fill_between(energies, 0, dos, alpha=0.2, color=dos_colour)
 
         if 'spin_dos' in dos_data and not kwargs.get('pdos_hide_sum'):
             if kwargs.get('plot_bandstructure'):
@@ -575,7 +580,7 @@ def dos_plot(seeds, ax_dos, kwargs, bbox_extra_artists=None):
 
             stacks = dict()
             projector_labels, dos_colours = _get_projector_info(
-                list(pdos.keys()), colours_override=kwargs.get("projector_colours")
+                list(pdos.keys()), colours_override=kwargs.get("colours")
             )
             unique_labels = set()
             for ind, projector in enumerate(pdos):
@@ -736,7 +741,7 @@ def projected_bandstructure_plot(
         if np.max(pdis[:, :, ind]) > 1e-8:
             keep_inds.append(ind)
 
-    projector_labels, dos_colours = _get_projector_info(projectors, colours_override=kwargs.get("projector_colours"))
+    projector_labels, dos_colours = _get_projector_info(projectors, colours_override=kwargs.get("colours"))
 
     fermi_energy = kwargs.get('external_efermi') or dispersion.fermi_energy
 
@@ -863,7 +868,7 @@ def _get_lineprops(dispersion, spin_fermi_energy, nb, ns, branch, branch_ind, se
                     colour = kwargs.get('crossing')
 
     if kwargs['colour_by_seed']:
-        colour = kwargs.get('seed_colours')[seed_ind]
+        colour = kwargs.get('colours')[seed_ind]
 
     if kwargs.get('band_colour') is not None:
         if kwargs.get('band_colour') != 'occ':

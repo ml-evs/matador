@@ -59,6 +59,9 @@ def main():
     parser.add_argument('--projector_colours', type=str, nargs="+",
                         help='override all projector colour options with a list of matplotlib-interpretable colours, '
                              'e.g. --projector_colours red blue #ff00ff')
+    parser.add_argument('--colours', type=str, nargs="+",
+                        help='override all colour options with a list of matplotlib-interpretable colours, '
+                             'e.g. --colours red blue #ff00ff')
     parser.add_argument('-g', '--gap', action='store_true',
                         help='plot position and size of band gap')
     parser.add_argument('-ph', '--phonons', action='store_true', default=False,

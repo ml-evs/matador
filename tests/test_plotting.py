@@ -121,7 +121,7 @@ class SpectralPlotTests(unittest.TestCase):
         sys.argv = [
             "dispersion",
             "KPSn",
-            "KPSn_2.bands",
+            "KPSn_2",
             "--dos_only",
             "--cmap",
             "viridis",
@@ -132,6 +132,9 @@ class SpectralPlotTests(unittest.TestCase):
             "--figsize",
             "10",
             "10",
+            "--colours",
+            "green",
+            "red"
         ]
         errored = False
         try:
