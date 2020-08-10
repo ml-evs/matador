@@ -401,13 +401,17 @@ class ComputeTask:
             elif self.calc_doc['task'].upper() in ['GEOMETRYOPTIMISATION', 'GEOMETRYOPTIMIZATION']:
                 success = self.run_castep_relaxation()
 
-            elif self.calc_doc['task'].upper() in ['PHONON', 'THERMODYNAMICS']:
+            elif self.calc_doc['task'].upper() in ['PHONON', 'THERMODYNAMICS', 'PHONON+EFIELD']:
                 from matador.workflows.castep import castep_full_phonon
                 success = castep_full_phonon(self, self.calc_doc, self.seed, **self.workflow_kwargs)
 
             elif self.calc_doc['task'].upper() in ['SPECTRAL']:
                 from matador.workflows.castep import castep_full_spectral
                 success = castep_full_spectral(self, self.calc_doc, self.seed, **self.workflow_kwargs)
+
+            elif self.calc_doc['task'].upper() in ['MAGRES']:
+                from matador.workflows.castep import castep_full_magres
+                success = castep_full_magres(self, self.calc_doc, self.seed, **self.workflow_kwargs)
 
             elif self.calc_doc['task'].upper() in ['BULK_MODULUS']:
                 from matador.workflows.castep import castep_elastic
@@ -791,14 +795,17 @@ class ComputeTask:
             AssertionError: if required key is missing.
 
         """
-        for keyword in forbidden:
-            if keyword in calc_doc:
-                del calc_doc[keyword]
+        if forbidden is not None:
+            for keyword in forbidden:
+                if keyword in calc_doc:
+                    del calc_doc[keyword]
 
         failures = []
-        for keyword in required:
-            if keyword not in calc_doc:
-                failures.append(keyword)
+        if required is not None:
+            for keyword in required:
+                if keyword not in calc_doc:
+                    failures.append(keyword)
+
         if failures:
             raise InputError('The following keywords are required for workflow: {}'.format(', '.join(failures)))
 

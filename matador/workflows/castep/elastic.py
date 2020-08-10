@@ -9,20 +9,23 @@ calculations (i.e. varying volume from equilibrium) have been implemented.
 
 
 import copy
+import os
 import logging
 import numpy as np
 from matador.workflows import Workflow
 from matador.crystal.elastic import get_equation_of_state
+from matador.workflows.castep.common import castep_prerelax
+from matador.scrapers import cell2dict
 
 LOG = logging.getLogger('run3')
 
 
-def castep_elastic(relaxer, calc_doc, seed, **kwargs):
+def castep_elastic(computer, calc_doc, seed, **kwargs):
     """ Perform a calculation of the elastic tensor on a system.
     Currently only calculation of the bulk modulus is implemented.
 
     Parameters:
-        relaxer (:obj:`ComputeTask`): the object that will be calling CASTEP.
+        computer (:obj:`ComputeTask`): the object that will be calling CASTEP.
         calc_doc (dict): dictionary of structure and calculation
             parameters.
         seed (str): root seed for the calculation.
@@ -34,7 +37,7 @@ def castep_elastic(relaxer, calc_doc, seed, **kwargs):
         bool: True if Workflow completed successfully, or False otherwise.
 
     """
-    workflow = CastepElasticWorkflow(relaxer, calc_doc, seed, **kwargs)
+    workflow = CastepElasticWorkflow(computer, calc_doc, seed, **kwargs)
     return workflow.success
 
 
@@ -45,7 +48,7 @@ class CastepElasticWorkflow(Workflow):
     of DOS.
 
     Attributes:
-        relaxer (:obj:`ComputeTask`): the object that calls CASTEP.
+        computer (:obj:`ComputeTask`): the object that calls CASTEP.
         calc_doc (dict): the interim dictionary of structural and
             calculation parameters.
         seed (str): the root seed for the calculation.
@@ -71,7 +74,12 @@ class CastepElasticWorkflow(Workflow):
                  .format(self.volume_rescale))
 
         # clean up after geometry step as seed is going to change
-        self.add_step(castep_elastic_prerelax, 'relax', clean_after=True)
+        self.add_step(
+            castep_elastic_prerelax,
+            'relax',
+            clean_after=True,
+            output_exts=["-out.cell"]
+        )
         for volume in self.volume_rescale:
             self.add_step(castep_rescaled_volume_scf, 'rescaled_volume_scf', rescale=volume)
 
@@ -86,11 +94,11 @@ class CastepElasticWorkflow(Workflow):
                 f.writelines(results['summary'])
 
 
-def castep_rescaled_volume_scf(relaxer, calc_doc, seed, rescale=1):
+def castep_rescaled_volume_scf(computer, calc_doc, seed, rescale=1):
     """ Run a singleshot SCF calculation.
 
     Parameters:
-        relaxer (:obj:`ComputeTask`): the object that will be calling CASTEP.
+        computer (:obj:`ComputeTask`): the object that will be calling CASTEP.
         calc_doc (dict): the structure to run on.
         seed (str): root filename of structure.
 
@@ -101,34 +109,40 @@ def castep_rescaled_volume_scf(relaxer, calc_doc, seed, rescale=1):
     assert rescale > 0
     LOG.info('Performing CASTEP SCF on volume rescaled by {:.2f}.'.format(rescale**3))
     scf_doc = copy.deepcopy(calc_doc)
+
+    # get relaxed cell from previous step
+    fname = f"completed/{seed}-out.cell"
+    if not os.path.isfile(fname):
+        raise RuntimeError(f"Could not find relaxed geometry in {fname}.")
+    relaxed_cell, s = cell2dict(fname, positions=True, lattice=True)
+
+    scf_doc["lattice_cart"] = relaxed_cell["lattice_cart"]
+    scf_doc["positions_frac"] = relaxed_cell["positions_frac"]
+
+    LOG.debug("Found equilibrium geometry: {scf_doc['lattice_cart']}")
+
     for i in range(3):
         for k in range(3):
             scf_doc['lattice_cart'][i][k] *= rescale
+
     scf_doc['task'] = 'singlepoint'
     bulk_mod_seed = seed + '.bulk_mod'
-    relaxer.seed = bulk_mod_seed
+    computer.seed = bulk_mod_seed
 
-    return relaxer.run_castep_singleshot(scf_doc, bulk_mod_seed, keep=True, intermediate=True)
+    return computer.run_castep_singleshot(scf_doc, bulk_mod_seed, keep=True, intermediate=True)
 
 
-def castep_elastic_prerelax(relaxer, calc_doc, seed):
+def castep_elastic_prerelax(computer, calc_doc, seed):
     """ Run a geometry optimisation before re-scaling volumes SCF-style calculation.
 
     Parameters:
-        relaxer (:obj:`ComputeTask`): the object that will be calling CASTEP.
+        computer (:obj:`ComputeTask`): the object that will be calling CASTEP.
         calc_doc (dict): the structure to run on.
         seed (str): root filename of structure.
 
     """
     LOG.info('Performing CASTEP elastic pre-relax...')
     relax_doc = copy.deepcopy(calc_doc)
-    if 'geom_max_iter' not in relax_doc:
-        relax_doc['geom_max_iter'] = 100
-    relax_doc['task'] = 'geometryoptimisation'
+    relax_doc["write_cell_structure"] = True
 
-    required = []
-    forbidden = []
-    relaxer.validate_calc_doc(relax_doc, required, forbidden)
-    relaxer.calc_doc = relax_doc
-
-    return relaxer.run_castep_relaxation(intermediate=True)
+    return castep_prerelax(computer, relax_doc, seed)

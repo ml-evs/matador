@@ -10,22 +10,35 @@ inputs and outputs.
 from collections import defaultdict
 import os
 import glob
-import gzip
 import warnings
 import pwd
 import numpy as np
-from matador.utils.cell_utils import abc2cart, calc_mp_spacing, cart2volume, wrap_frac_coords, cart2abc, cart2frac
+from pathlib import Path
+from matador.utils.cell_utils import (
+    abc2cart,
+    calc_mp_spacing,
+    cart2volume,
+    wrap_frac_coords,
+    cart2abc,
+    cart2frac,
+)
 from matador.utils.chem_utils import get_stoich, INVERSE_CM_TO_EV
-from matador.scrapers.utils import DFTError, ComputationError, scraper_function, f90_float_parse
+from matador.scrapers.utils import (
+    DFTError,
+    ComputationError,
+    scraper_function,
+    f90_float_parse,
+    get_flines_extension_agnostic,
+)
 
 
 @scraper_function
-def res2dict(seed, db=True, **kwargs):
+def res2dict(fname, db=True, **kwargs):
     """ Extract available information from .res file; preferably
     used in conjunction with cell or param file.
 
     Parameters:
-        seed (str or list): filename or list of filenames of res file(s)
+        fname (str or list): filename or list of filenames of res file(s)
             (with or without extension).
 
     Keyword arguments:
@@ -36,22 +49,18 @@ def res2dict(seed, db=True, **kwargs):
             if the scrape was successful.
 
     """
+    flines, fname = get_flines_extension_agnostic(fname, "res")
     res = dict()
-    # read .res file into array
-    if seed.endswith('.res'):
-        seed = seed.replace('.res', '')
-    with open(seed + '.res', 'r') as f:
-        flines = f.readlines()
+
     # add .res to source
-    res['source'] = []
-    res['source'].append(seed + '.res')
+    res['source'] = [fname]
     # grab file owner username
     try:
-        res['user'] = pwd.getpwuid(os.stat(seed + '.res').st_uid).pw_name
+        res['user'] = pwd.getpwuid(os.stat(fname).st_uid).pw_name
     except Exception:
         pass
 
-    get_seed_metadata(res, seed)
+    get_seed_metadata(res, fname)
     # alias special lines in res file
     titl = ''
     cell = ''
@@ -129,12 +138,12 @@ def res2dict(seed, db=True, **kwargs):
 
 
 @scraper_function
-def cell2dict(seed, db=False, lattice=True, positions=True, **kwargs):
+def cell2dict(fname, db=False, lattice=True, positions=True, **kwargs):
     """ Extract available information from .cell file; probably
     to be merged with another dict from a .param or .res file.
 
     Parameters:
-        seed (str/list): filename or list of filenames of cell file(s)
+        fname (str/list): filename or list of filenames of cell file(s)
             to scrape, with or without extension.
 
     Keyword arguments:
@@ -148,13 +157,11 @@ def cell2dict(seed, db=False, lattice=True, positions=True, **kwargs):
 
     """
     cell = dict()
-    if seed.endswith('.cell'):
-        seed = seed.replace('.cell', '')
-    with open(seed + '.cell', 'r') as f:
-        flines = f.readlines()
+    flines, fname = get_flines_extension_agnostic(fname, "cell")
+
     # add cell file to source
-    cell['source'] = []
-    cell['source'].append(seed + '.cell')
+    cell['source'] = [fname]
+
     for line_no, line in enumerate(flines):
         if line.startswith(('#', '!')):
             continue
@@ -439,7 +446,7 @@ def cell2dict(seed, db=False, lattice=True, positions=True, **kwargs):
     if db:
         for species in cell['species_pot']:
             if 'OTF' in cell['species_pot'][species].upper():
-                pspot_seed = '/'.join(seed.split('/')[:-1]) + '/' + cell['species_pot'][species]
+                pspot_seed = '/'.join(fname.split('/')[:-1]) + '/' + cell['species_pot'][species]
                 if os.path.isfile(pspot_seed):
                     cell['species_pot'].update(usp2dict(pspot_seed))
 
@@ -447,12 +454,12 @@ def cell2dict(seed, db=False, lattice=True, positions=True, **kwargs):
 
 
 @scraper_function
-def param2dict(seed, db=True, **kwargs):
+def param2dict(fname, db=True, **kwargs):
     """ Extract available information from .param file; probably
     to be merged with other dicts from other files.
 
     Parameters:
-        seed (str/list): param filename or list of filenames with or
+        fname (str/list): param filename or list of filenames with or
             without file extension
 
     Keyword arguments:
@@ -464,13 +471,9 @@ def param2dict(seed, db=True, **kwargs):
 
     """
     from matador.utils.castep_params import CASTEP_PARAMS
-    param = dict()
-    if seed.endswith('.param'):
-        seed = seed.replace('.param', '')
-    with open(seed + '.param', 'r') as f:
-        flines = f.readlines()
-    param['source'] = []
-    param['source'].append(seed + '.param')
+    flines, fname = get_flines_extension_agnostic(fname, "param")
+    param = {}
+    param['source'] = [fname]
     # exclude some useless info if importing to db
     scrub_list = ['checkpoint', 'write_bib', 'mix_history_length',
                   'fix_occupancy', 'page_wvfns', 'num_dump_cycles',
@@ -567,12 +570,12 @@ def param2dict(seed, db=True, **kwargs):
 
 
 @scraper_function
-def castep2dict(seed, db=True, intermediates=False, **kwargs):
+def castep2dict(fname, db=True, intermediates=False, **kwargs):
     """ From seed filename, create dict of the most relevant
     information about a calculation.
 
     Parameters:
-        seed (str/list): filename or list of filenames of castep file(s)
+        fname (str/list): filename or list of filenames of castep file(s)
 
     Keyword arguments:
         db (bool): whether to error on missing relaxation info
@@ -584,39 +587,19 @@ def castep2dict(seed, db=True, intermediates=False, **kwargs):
             if the scrape was successful.
 
     """
-    if seed.endswith('.history'):
-        seed = seed.replace('.history', '')
-        ftype = 'history'
-    elif seed.endswith('.history.gz'):
-        seed = seed.replace('.history.gz', '')
-        ftype = 'history.gz'
-    else:
-        seed = seed.replace('.castep', '')
-        ftype = 'castep'
-
-    seed = '{}.{}'.format(seed, ftype)
+    flines, fname = get_flines_extension_agnostic(fname, ["castep", "history", "history.gz"])
 
     castep = dict()
-    # read .castep, .history or .history.gz file
-    if ftype == 'history.gz':
-        with gzip.open(seed, 'r') as f:
-            flines = [line.decode('utf-8') for line in f.readlines()]
-    else:
-        try:
-            with open(seed, 'r', encoding='utf-8') as f:
-                flines = f.readlines()
-        except Exception:
-            with open(seed, 'r', encoding='latin1') as f:
-                flines = f.readlines()
     # set source tag to castep file
-    castep['source'] = []
-    castep['source'].append(seed)
+    castep['source'] = [fname]
+
     # grab file owner
     try:
-        castep['user'] = pwd.getpwuid(os.stat(seed).st_uid).pw_name
+        castep['user'] = pwd.getpwuid(os.stat(fname).st_uid).pw_name
     except Exception:
         pass
-    get_seed_metadata(castep, seed.replace('.' + ftype, ''))
+
+    get_seed_metadata(castep, fname)
     # wrangle castep file for parameters in 3 passes:
     # once forwards to get number and types of atoms
     _castep_scrape_atoms(flines, castep)
@@ -664,11 +647,7 @@ def castep2dict(seed, db=True, intermediates=False, **kwargs):
     if db:
         for species in castep['species_pot']:
             if 'OTF' in castep['species_pot'][species].upper():
-                pspot_seed = ''
-                for directory in seed.split('/')[:-1]:
-                    pspot_seed += directory + '/'
-                # glob for all .usp files with format species_*OTF.usp
-                pspot_seed += castep['species_pot'][species]
+                pspot_seed = str(Path(fname).parent.joinpath(castep['species_pot'][species]))
                 for globbed in glob.glob(pspot_seed):
                     if os.path.isfile(globbed):
                         castep['species_pot'].update(usp2dict(globbed))
@@ -684,12 +663,12 @@ def castep2dict(seed, db=True, intermediates=False, **kwargs):
 
 
 @scraper_function
-def bands2dict(seed, **kwargs):
+def bands2dict(fname, **kwargs):
     """ Parse a CASTEP bands file into a dictionary, which can be used as input to
     an :obj:`matador.orm.spectral.ElectronicDispersion` object.
 
     Parameters:
-        seed (str/list): filename of list of filenames to be scraped.
+        fname (str/list): filename of list of filenames to be scraped.
 
     Returns:
         (tuple): containing either dict/str containing data or error, and a bool stating
@@ -699,13 +678,12 @@ def bands2dict(seed, **kwargs):
     from matador.utils.chem_utils import HARTREE_TO_EV, BOHR_TO_ANGSTROM
 
     bs = dict()
-    with open(seed, 'r') as f:
-        # read whole file into RAM, typically ~ 1 MB
-        flines = f.readlines()
+    flines, fname = get_flines_extension_agnostic(fname, "bands")
+
     header = flines[:9]
     data = flines[9:]
 
-    bs['source'] = [seed]
+    bs['source'] = [fname]
 
     bs['num_kpoints'] = int(header[0].split()[-1])
     bs['num_spins'] = int(header[1].split()[-1])
@@ -742,24 +720,26 @@ def bands2dict(seed, **kwargs):
 
 
 @scraper_function
-def arbitrary2dict(seed, **kwargs):
+def arbitrary2dict(fname, **kwargs):
     """ Read arbitrary CASTEP-style input files into
     a dictionary.
 
     Parameters:
-        seed (str/list): filename or list of filenames.
+        fname (str/list): filename or list of filenames.
 
     Returns:
         (tuple): containing either dict/str containing data or error, and a bool stating
             if the scrape was successful.
 
     """
-    with open(seed, 'r') as f:
-        flines = f.readlines()
+
+    flines, fname = get_flines_extension_agnostic(fname, None)
+
     splitters = [':', '=', '\t', ' ']
     comment_delims = ['!', '%', '#', '/*', '*/']
+
     result = {}
-    result['source'] = [seed]
+    result['source'] = [fname]
     for line in flines:
         comment = False
         for delim in comment_delims:
@@ -778,12 +758,12 @@ def arbitrary2dict(seed, **kwargs):
 
 
 @scraper_function
-def optados2dict(seed, **kwargs):
+def optados2dict(fname, **kwargs):
     """ Scrape optados output file (*.*.dat) or (*.pdos.*.dat)
     for DOS, projectors and projected DOS/dispersion.
 
     Parameters:
-        seed (str/list): optados filename or list of filenames.
+        fname (str/list): optados filename or list of filenames.
 
     Returns:
         (tuple): containing either dict/str containing data or error, and a bool stating
@@ -795,8 +775,8 @@ def optados2dict(seed, **kwargs):
     is_pdis = False
     is_spin_dos = False
     dos_unit_label = None
-    with open(seed, 'r') as f:
-        flines = f.readlines()
+
+    flines, fname = get_flines_extension_agnostic(fname, None)
 
     header = []
     header_ind = 0
@@ -818,7 +798,7 @@ def optados2dict(seed, **kwargs):
     flines = flines[header_ind:]
 
     if not is_pdis:
-        data = np.loadtxt(seed, comments='#')
+        data = np.loadtxt(fname, comments='#')
         optados['energies'] = data[:, 0]
 
     if is_pdos or is_pdis:
@@ -881,11 +861,11 @@ def optados2dict(seed, **kwargs):
 
 
 @scraper_function
-def phonon2dict(seed, **kwargs):
+def phonon2dict(fname, **kwargs):
     """ Parse a CASTEP phonon file into a dictionary.
 
     Parameters:
-        seed (str/list): phonon filename or list of filenames.
+        fname (str/list): phonon filename or list of filenames.
 
     Returns:
         (tuple): containing either dict/str containing data or error, and a bool stating
@@ -893,18 +873,10 @@ def phonon2dict(seed, **kwargs):
 
     """
 
-    with open(seed, 'r') as f:
-        # read whole file into RAM, typically <~ 1 MB
-        flines = f.readlines()
+    flines, fname = get_flines_extension_agnostic(fname, ["phonon", "phonon_dos"])
 
     ph = dict()
-
-    if 'phonon_dos' in seed:
-        seed = seed.replace('.phonon_dos', '')
-        ph['source'] = [seed + '.phonon_dos']
-    else:
-        seed = seed.replace('.phonon', '')
-        ph['source'] = [seed + '.phonon']
+    ph['source'] = [fname]
 
     dos_present = False
     data_start = 0
@@ -924,6 +896,7 @@ def phonon2dict(seed, **kwargs):
             ph['lattice_cart'] = []
             for i in range(3):
                 ph['lattice_cart'].append([f90_float_parse(elem) for elem in flines[line_no + i + 1].split()])
+            ph['lattice_abc'] = cart2abc(ph['lattice_cart'])
         elif 'fractional co-ordinates' in line:
             ph['positions_frac'] = []
             ph['atom_types'] = []
@@ -1011,19 +984,19 @@ def phonon_dos2dict(*args, **kwargs):
     return phonon2dict(*args, no_wrap=True, **kwargs)
 
 
-def usp2dict(seed, **kwargs):
+def usp2dict(fname, **kwargs):
     """ Extract pseudopotential string from a CASTEP
     OTF .USP file.
 
     Parameters:
-        seed (str/list): filename of usp file, or list of filenames.
+        fname (str/list): filename of usp file, or list of filenames.
 
     Returns:
         dict: partial species_pot dict from usp file.
 
     """
     species_pot = dict()
-    with open(seed, 'r') as f:
+    with open(fname, 'r') as f:
         flines = f.readlines()
         for line_no, line in enumerate(flines):
             if 'Pseudopotential Report' in line:

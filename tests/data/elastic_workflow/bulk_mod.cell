@@ -1,4 +1,4 @@
-kpoints_mp_spacing: 0.1
+kpoints_mp_spacing: 0.07
 snap_to_symmetry
 symmetry_tol: 0.01
 symmetry_generate

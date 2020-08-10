@@ -1,5 +1,5 @@
-kpoint_mp_grid: 1 1 1
-phonon_kpoint_mp_grid: 1 1 1
+kpoint_mp_grid: 2 2 2
+phonon_kpoint_mp_grid: 2 2 2
 phonon_fine_kpoint_path_spacing: 0.1
 phonon_fine_kpoint_mp_spacing: 0.1
 

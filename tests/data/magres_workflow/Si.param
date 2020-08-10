@@ -1,0 +1,10 @@
+task              : magres
+magres_task       : NMR
+cut_off_energy    : 300 eV
+spin_polarized    : false
+xc_functional     : PBE 
+fix_occupancy     : true 
+max_scf_cycles    : 30
+finite_basis_corr : 0
+opt_strategy      : speed
+num_dump_cycles   : 0

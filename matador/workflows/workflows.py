@@ -23,7 +23,7 @@ class Workflow:
     methods (even if they just return True).
 
     Attributes:
-        relaxer (:obj:`matador.compute.ComputeTask`): the object that will be running the computation.
+        computer (:obj:`matador.compute.ComputeTask`): the object that will be running the computation.
         calc_doc (dict): the interim dictionary of structural and
             calculation parameters.
         seed (str): the root seed for the calculation.
@@ -34,12 +34,12 @@ class Workflow:
             completed.
 
     """
-    def __init__(self, relaxer, calc_doc, seed, **workflow_kwargs):
+    def __init__(self, computer, calc_doc, seed, **workflow_kwargs):
         """ Initialise the Workflow object from a :obj:`matador.compute.ComputeTask`, calculation
         parameters and the seed name.
 
         Parameters:
-            relaxer (:obj:`matador.compute.ComputeTask`): the object that will be running the computation.
+            computer (:obj:`matador.compute.ComputeTask`): the object that will be running the computation.
             calc_doc (dict): dictionary of structure and calculation
                 parameters.
             seed (str): root seed for the calculation.
@@ -48,11 +48,11 @@ class Workflow:
             RuntimeError: if any part of the calculation fails.
 
         """
-        self.relaxer = relaxer
+        self.computer = computer
         self.calc_doc = calc_doc
         self.seed = seed
         self.label = self.__class__.__name__
-        self.compute_dir = relaxer.compute_dir
+        self.compute_dir = computer.compute_dir
         self.success = None
         self.steps = []
         self.clean_after_step = []
@@ -91,7 +91,7 @@ class Workflow:
 
     def _clean_up(self, success=None):
         """ This method moves files to `completed/` or `bad_castep/` depending on the status
-        of the workflow. It will use the current seed of the relaxer, so this function can be
+        of the workflow. It will use the current seed of the computer, so this function can be
         called at intermediate steps if this seed changes.
 
         """
@@ -104,26 +104,26 @@ class Workflow:
             if success:
                 LOG.info('Writing results from compute dir of Workflow {} run to completed folder and tidying up.'
                          .format(self.label))
-                self.relaxer.mv_to_completed(self.relaxer.seed, keep=True, skip_existing=False)
+                self.computer.mv_to_completed(self.computer.seed, keep=True, skip_existing=False)
             else:
                 LOG.info('Writing results from compute dir of failed Workflow {} run to bad_castep folder and tidying up.'
                          .format(self.label))
-                self.relaxer.mv_to_bad(self.relaxer.seed)
+                self.computer.mv_to_bad(self.computer.seed)
             os.chdir(cwd)
 
         if success:
             LOG.info('Writing results of Workflow {} run to completed folder and tidying up.'.format(self.label))
-            self.relaxer.mv_to_completed(self.relaxer.seed, keep=True, skip_existing=True)
+            self.computer.mv_to_completed(self.computer.seed, keep=True, skip_existing=True)
         else:
             LOG.info('Writing results of failed Workflow {} run to bad_castep folder and tidying up.'.format(self.label))
-            self.relaxer.mv_to_bad(self.relaxer.seed)
+            self.computer.mv_to_bad(self.computer.seed)
 
     def add_step(self, function, name, input_exts=None, output_exts=None, clean_after=False, **func_kwargs):
         """ Add a step to the workflow.
 
         Parameters:
             function (Function): the function to run in the step; must
-                accept arguments of (self.relaxer, self.calc_doc, self.seed).
+                accept arguments of (self.computer, self.calc_doc, self.seed).
             name (str): the desired name for the step (human-readable).
 
         Keyword arguments:
@@ -147,7 +147,7 @@ class Workflow:
             for ind, step in enumerate(self.steps):
                 LOG.info("Running step {step.name}: {step.function}".format(step=step))
                 LOG.debug("Current state: " + dumps(self.calc_doc, indent=None))
-                success = step.run_step(self.relaxer, self.calc_doc, self.seed)
+                success = step.run_step(self.computer, self.calc_doc, self.seed)
                 if self.clean_after_step[ind]:
                     self._clean_up(success=success)
 
@@ -163,12 +163,12 @@ class Workflow:
 class WorkflowStep:
     """ An individual step in a Workflow, defined by a Python function
     and a name. The function will be called with arguments
-    (relaxer, calc_doc, seed) with the run_step method.
+    (computer, calc_doc, seed) with the run_step method.
 
     Attributes:
         function (function): the function to call.
         name (str): the human-readable name of the step.
-        compute_dir (str): the folder that relaxer will perform the calculation in.
+        compute_dir (str): the folder that computer will perform the calculation in.
         func_kwargs (dict): any extra kwargs to pass to the function.
         input_exts (list): list of input file extensions to cache after running.
         output_exts (list): list of output file extensions to cache after running.
@@ -256,11 +256,11 @@ class WorkflowStep:
         if self.compute_dir is not None:
             os.chdir(cwd)
 
-    def run_step(self, relaxer, calc_doc, seed):
+    def run_step(self, computer, calc_doc, seed):
         """ Run the workflow step.
 
         Parameters:
-            relaxer (:obj:`matador.compute.ComputeTask`): the object that will be running the computation.
+            computer (:obj:`matador.compute.ComputeTask`): the object that will be running the computation.
             calc_doc (dict): dictionary of structure and calculation
                 parameters.
             seed (str): root seed for the calculation.
@@ -271,7 +271,7 @@ class WorkflowStep:
         """
         try:
             LOG.info('WorkflowStep {} starting...'.format(self.name))
-            self.success = self.function(relaxer, calc_doc, seed, **self.func_kwargs)
+            self.success = self.function(computer, calc_doc, seed, **self.func_kwargs)
         except RuntimeError as exc:
             msg = 'WorkflowStep {} failed with error {}.'.format(self.name, exc)
             LOG.error(msg)

@@ -1,8 +1,8 @@
 # coding: utf-8
 # Distributed under the terms of the MIT License.
 
-""" This module implements the CastepPhononWorkflow,
-which performs phonon calculations with CASTEP in
+""" This module implements the :class:`CastepPhononWorkflow`
+class, which performs phonon calculations with CASTEP in
 multiple steps (only when necessary):
 
     1. Try to pre-relax structure (skipped if check file
@@ -27,15 +27,15 @@ from matador.workflows.workflows import Workflow
 LOG = logging.getLogger('run3')
 
 
-def castep_full_phonon(relaxer, calc_doc, seed, **kwargs):
+def castep_full_phonon(computer, calc_doc, seed, **kwargs):
     """ Perform a "full" phonon calculation on a system, i.e.
     first perform a relaxation in a standardised unit cell,
     then compute the dynamical matrix, then finally interpolate
     that dynamical matrix into dispersion curves and DOS. This function
-    is a wrapper for the CastepPhononWorkflow class.
+    is a wrapper for the :class:`CastepPhononWorkflow` class.
 
     Parameters:
-        relaxer (:obj:`ComputeTask`): the object that will be calling CASTEP.
+        computer (:obj:`matador.compute.ComputeTask`): the object that will be calling CASTEP.
         calc_doc (dict): dictionary of structure and calculation
             parameters.
         seed (str): root seed for the calculation.
@@ -47,7 +47,7 @@ def castep_full_phonon(relaxer, calc_doc, seed, **kwargs):
         bool: True if Workflow completed successfully, or False otherwise.
 
     """
-    workflow = CastepPhononWorkflow(relaxer, calc_doc, seed, **kwargs)
+    workflow = CastepPhononWorkflow(computer, calc_doc, seed, **kwargs)
     return workflow.success
 
 
@@ -58,7 +58,7 @@ class CastepPhononWorkflow(Workflow):
     that dynamical matrix into dispersion curves and DOS.
 
     Attributes:
-        relaxer (:obj:`ComputeTask`): the object that calls CASTEP.
+        computer (:obj:`ComputeTask`): the object that calls CASTEP.
         calc_doc (dict): the interim dictionary of structural and
             calculation parameters.
         seed (str): the root seed for the calculation.
@@ -93,7 +93,7 @@ class CastepPhononWorkflow(Workflow):
                 {'input': ['.cell', '.param'], 'output': ['.castep', '.*err']}
         }
 
-        if self.calc_doc.get('task').lower() in ['phonon', 'thermodynamics']:
+        if self.calc_doc.get('task').lower() in ['phonon', 'thermodynamics', 'phonon+efield']:
             if ('phonon_fine_kpoint_path' in self.calc_doc or 'phonon_fine_kpoint_list' in self.calc_doc
                     or 'phonon_fine_kpoint_path_spacing' in self.calc_doc):
                 todo['dispersion'] = True
@@ -117,7 +117,7 @@ class CastepPhononWorkflow(Workflow):
         # post-processing performed after the fact, unless a path has been provided
         if 'phonon_fine_kpoint_list' not in self.calc_doc and 'phonon_fine_kpoint_path' not in self.calc_doc:
             from matador.utils.cell_utils import cart2abc
-            prim_doc, kpt_path = self.relaxer.get_seekpath_compliant_input(
+            prim_doc, kpt_path = self.computer.get_seekpath_compliant_input(
                 self.calc_doc, self.calc_doc.get('phonon_fine_kpoint_path_spacing', 0.02))
             self.calc_doc.update(prim_doc)
             self.calc_doc['lattice_abc'] = cart2abc(self.calc_doc['lattice_cart'])
@@ -141,41 +141,40 @@ class CastepPhononWorkflow(Workflow):
         LOG.info('Preprocessing completed: run3 phonon options {}'.format(todo))
 
 
-def castep_phonon_prerelax(relaxer, calc_doc, seed):
+def castep_phonon_prerelax(computer, calc_doc, seed):
     """ Run a singleshot geometry optimisation before an SCF-style calculation.
     This is typically used to ensure phonon calculations start successfully.
     The phonon calculation will then be restarted from the .check file produced here.
 
     Parameters:
-        relaxer (:obj:`ComputeTask`): the object that will be calling CASTEP.
+        computer (:obj:`ComputeTask`): the object that will be calling CASTEP.
         calc_doc (dict): the structure to run on.
         seed (str): root filename of structure.
 
     """
-    LOG.info('Performing CASTEP phonon pre-relax...')
-    relax_doc = copy.deepcopy(calc_doc)
-    relax_doc['write_checkpoint'] = 'ALL'
-    if 'geom_max_iter' not in relax_doc:
-        relax_doc['geom_max_iter'] = 100
-    relax_doc['task'] = 'geometryoptimisation'
+    from matador.workflows.castep.common import castep_prerelax
 
-    required = []
+    LOG.info('Performing CASTEP phonon pre-relax...')
+    required = ["write_checkpoint"]
     forbidden = ['phonon_fine_kpoint_list',
                  'phonon_fine_kpoint_path',
                  'phonon_fine_kpoint_mp_spacing',
                  'phonon_fine_kpoint_path_spacing']
 
-    relaxer.validate_calc_doc(relax_doc, required, forbidden)
-    relaxer.calc_doc = relax_doc
+    return castep_prerelax(
+        computer,
+        calc_doc,
+        seed,
+        required_keys=required,
+        forbidden_keys=forbidden
+    )
 
-    relaxer.run_castep_relaxation(intermediate=True)
 
-
-def castep_phonon_dynmat(relaxer, calc_doc, seed):
+def castep_phonon_dynmat(computer, calc_doc, seed):
     """ Runs a singleshot phonon dynmat calculation, with no "fine_method" interpolation.
 
     Parameters:
-        relaxer (:obj:`ComputeTask`): the object that will be calling CASTEP.
+        computer (:obj:`ComputeTask`): the object that will be calling CASTEP.
         calc_doc (dict): the structure to run on.
         seed (str): root filename of structure.
 
@@ -183,24 +182,29 @@ def castep_phonon_dynmat(relaxer, calc_doc, seed):
     LOG.info('Performing CASTEP dynmat calculation...')
     dynmat_doc = copy.deepcopy(calc_doc)
     dynmat_doc['write_checkpoint'] = 'ALL'
-    dynmat_doc['task'] = 'phonon'
+    if calc_doc['task'].lower() == "phonon+efield":
+        dynmat_doc['task'] = "phonon+efield"
+    else:
+        dynmat_doc['task'] = "phonon"
 
-    required = []
+    dynmat_doc['continuation'] = 'default'
+
+    required = ["continuation", "write_checkpoint"]
     forbidden = ['phonon_fine_kpoint_list',
                  'phonon_fine_kpoint_path',
                  'phonon_fine_kpoint_mp_spacing',
                  'phonon_fine_kpoint_path_spacing']
 
-    relaxer.validate_calc_doc(dynmat_doc, required, forbidden)
-    return relaxer.run_castep_singleshot(dynmat_doc, seed, keep=True, intermediate=True)
+    computer.validate_calc_doc(dynmat_doc, required, forbidden)
+    return computer.run_castep_singleshot(dynmat_doc, seed, keep=True, intermediate=True)
 
 
-def castep_phonon_dos(relaxer, calc_doc, seed):
+def castep_phonon_dos(computer, calc_doc, seed):
     """ Runs a DOS interpolation on top of a completed
     phonon calculation.
 
     Parameters:
-        relaxer (:obj:`ComputeTask`): the object that will be calling CASTEP.
+        computer (:obj:`ComputeTask`): the object that will be calling CASTEP.
         calc_doc (dict): the structure to run on.
         seed (str): root filename of structure.
 
@@ -216,17 +220,17 @@ def castep_phonon_dos(relaxer, calc_doc, seed):
                  'phonon_fine_kpoint_path',
                  'phonon_fine_kpoint_path_spacing']
 
-    relaxer.validate_calc_doc(dos_doc, required, forbidden)
+    computer.validate_calc_doc(dos_doc, required, forbidden)
 
-    return relaxer.run_castep_singleshot(dos_doc, seed, keep=True, intermediate=True)
+    return computer.run_castep_singleshot(dos_doc, seed, keep=True, intermediate=True)
 
 
-def castep_phonon_dispersion(relaxer, calc_doc, seed):
+def castep_phonon_dispersion(computer, calc_doc, seed):
     """ Runs a dispersion interpolation on top of a completed
     phonon calculation.
 
     Parameters:
-        relaxer (:obj:`ComputeTask`): the object that will be calling CASTEP.
+        computer (:obj:`ComputeTask`): the object that will be calling CASTEP.
         calc_doc (dict): the structure to run on.
         seed (str): root filename of structure.
 
@@ -240,17 +244,17 @@ def castep_phonon_dispersion(relaxer, calc_doc, seed):
     required = []
     forbidden = ['phonon_fine_kpoint_mp_spacing']
 
-    relaxer.validate_calc_doc(disp_doc, required, forbidden)
+    computer.validate_calc_doc(disp_doc, required, forbidden)
 
-    return relaxer.run_castep_singleshot(disp_doc, seed, keep=True, intermediate=True)
+    return computer.run_castep_singleshot(disp_doc, seed, keep=True, intermediate=True)
 
 
-def castep_phonon_thermodynamics(relaxer, calc_doc, seed):
+def castep_phonon_thermodynamics(computer, calc_doc, seed):
     """ Runs a "thermodynamics" interpolation on top of a completed
     phonon calculation, using the phonon_fine_kpoint_mp_grid.
 
     Parameters:
-        relaxer (:obj:`ComputeTask`): the object that will be calling CASTEP.
+        computer (:obj:`ComputeTask`): the object that will be calling CASTEP.
         calc_doc (dict): the structure to run on.
         seed (str): root filename of structure.
 
@@ -266,6 +270,6 @@ def castep_phonon_thermodynamics(relaxer, calc_doc, seed):
                  'phonon_fine_kpoint_path',
                  'phonon_fine_kpoint_path_spacing']
 
-    relaxer.validate_calc_doc(thermo_doc, required, forbidden)
+    computer.validate_calc_doc(thermo_doc, required, forbidden)
 
-    return relaxer.run_castep_singleshot(thermo_doc, seed, keep=True, intermediate=True)
+    return computer.run_castep_singleshot(thermo_doc, seed, keep=True, intermediate=True)

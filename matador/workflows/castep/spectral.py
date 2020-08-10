@@ -21,18 +21,19 @@ import glob
 import logging
 from matador.workflows import Workflow
 from matador.scrapers import arbitrary2dict
+from matador.workflows.castep.common import castep_scf
 
 LOG = logging.getLogger('run3')
 
 
-def castep_full_spectral(relaxer, calc_doc, seed, **kwargs):
+def castep_full_spectral(computer, calc_doc, seed, **kwargs):
     """ Perform a "full" spectral calculation on a system, i.e. first
     perform an SCF then interpolate to different kpoint paths/grids to
     form DOS and dispersions. Optionally use OptaDOS for post-processing
     of DOS.
 
     Parameters:
-        relaxer (:obj:`matador.compute.ComputeTask`): the object that will be calling CASTEP.
+        computer (:obj:`matador.compute.ComputeTask`): the object that will be calling CASTEP.
         calc_doc (dict): dictionary of structure and calculation
             parameters.
         seed (str): root seed for the calculation.
@@ -44,7 +45,7 @@ def castep_full_spectral(relaxer, calc_doc, seed, **kwargs):
         bool: True if Workflow completed successfully, or False otherwise.
 
     """
-    workflow = CastepSpectralWorkflow(relaxer, calc_doc, seed)
+    workflow = CastepSpectralWorkflow(computer, calc_doc, seed)
     return workflow.success
 
 
@@ -55,7 +56,7 @@ class CastepSpectralWorkflow(Workflow):
     of DOS.
 
     Attributes:
-        relaxer (:obj:`matador.compute.ComputeTask`): the object that calls CASTEP.
+        computer (:obj:`matador.compute.ComputeTask`): the object that calls CASTEP.
         calc_doc (dict): the interim dictionary of structural and
             calculation parameters.
         seed (str): the root seed for the calculation.
@@ -138,21 +139,21 @@ class CastepSpectralWorkflow(Workflow):
                               input_exts=exts[key].get('input'),
                               output_exts=exts[key].get('output'))
 
-        if self.relaxer.run3_settings.get('run3_settings') is not None:
-            settings = self.relaxer.kwargs.get('run3_settings')
-            # check that relaxer.exec was not overriden at cmd-line, then check settings file
-            if settings.get('castep_executable') is not None and self.relaxer.executable == 'castep':
+        if self.computer.run3_settings.get('run3_settings') is not None:
+            settings = self.computer.kwargs.get('run3_settings')
+            # check that computer.exec was not overriden at cmd-line, then check settings file
+            if settings.get('castep_executable') is not None and self.computer.executable == 'castep':
                 self.castep_executable = settings.get('castep_executable', 'castep')
-                self.relaxer.executable = self.castep_executable
+                self.computer.executable = self.castep_executable
             if settings.get('optados_executable') is not None:
                 self.optados_executable = settings.get('optados_executable', 'optados')
-                self.relaxer.optados_executable = self.optados_executable
+                self.computer.optados_executable = self.optados_executable
 
         # if not using a user-requested path, use seekpath and spglib
         # to reduce to primitive and use consistent path
         if 'spectral_kpoints_list' not in self.calc_doc and 'spectral_kpoints_path' not in self.calc_doc:
             from matador.utils.cell_utils import cart2abc
-            prim_doc, kpt_path = self.relaxer.get_seekpath_compliant_input(
+            prim_doc, kpt_path = self.computer.get_seekpath_compliant_input(
                 self.calc_doc, self.calc_doc.get('spectral_kpoints_path_spacing', 0.05))
             self.calc_doc.update(prim_doc)
             self.calc_doc['lattice_abc'] = cart2abc(self.calc_doc['lattice_cart'])
@@ -172,16 +173,17 @@ class CastepSpectralWorkflow(Workflow):
         LOG.info('Preprocessing completed: run3 spectral options {}'.format(todo))
 
 
-def castep_spectral_scf(relaxer, calc_doc, seed):
+def castep_spectral_scf(computer, calc_doc, seed):
     """ Run a singleshot SCF calculation.
 
     Parameters:
-        relaxer (:obj:`matador.compute.ComputeTask`): the object that will be calling CASTEP.
+        computer (:obj:`matador.compute.ComputeTask`): the object that will be calling CASTEP.
         calc_doc (dict): the structure to run on.
         seed (str): root filename of structure.
 
     """
     LOG.info('Performing CASTEP spectral SCF...')
+
     scf_doc = copy.deepcopy(calc_doc)
     scf_doc['write_checkpoint'] = 'ALL'
     scf_doc['task'] = 'singlepoint'
@@ -196,17 +198,15 @@ def castep_spectral_scf(relaxer, calc_doc, seed):
                  'spectral_kpoints_mp_spacing',
                  'spectral_kpoints_path_spacing']
 
-    relaxer.validate_calc_doc(scf_doc, required, forbidden)
-
-    return relaxer.run_castep_singleshot(scf_doc, seed, keep=True, intermediate=True)
+    return castep_scf(computer, scf_doc, seed, required_keys=required, forbidden_keys=forbidden)
 
 
-def castep_spectral_dos(relaxer, calc_doc, seed):
+def castep_spectral_dos(computer, calc_doc, seed):
     """ Runs a DOS interpolation on top of a completed SCF. If a single
     .odi file is found, run OptaDOS on the resulting DOS.
 
     Parameters:
-        relaxer (:obj:`matador.compute.ComputeTask`): the object that will be calling CASTEP.
+        computer (:obj:`matador.compute.ComputeTask`): the object that will be calling CASTEP.
         calc_doc (dict): the structure to run on.
         seed (str): root filename of structure.
 
@@ -226,18 +226,18 @@ def castep_spectral_dos(relaxer, calc_doc, seed):
                  'spectral_kpoints_path',
                  'spectral_kpoints_path_spacing']
 
-    relaxer.validate_calc_doc(dos_doc, required, forbidden)
-    success = relaxer.run_castep_singleshot(dos_doc, seed, keep=True, intermediate=True)
+    computer.validate_calc_doc(dos_doc, required, forbidden)
+    success = computer.run_castep_singleshot(dos_doc, seed, keep=True, intermediate=True)
 
     return success
 
 
-def castep_spectral_dispersion(relaxer, calc_doc, seed):
+def castep_spectral_dispersion(computer, calc_doc, seed):
     """ Runs a dispersion interpolation on top of a completed SCF calculation,
     optionally running orbitals2bands and OptaDOS projected dispersion.
 
     Parameters:
-        relaxer (:obj:`matador.compute.ComputeTask`): the object that will be calling CASTEP.
+        computer (:obj:`matador.compute.ComputeTask`): the object that will be calling CASTEP.
         calc_doc (dict): the structure to run on.
         seed (str): root filename of structure.
 
@@ -256,34 +256,34 @@ def castep_spectral_dispersion(relaxer, calc_doc, seed):
     required = []
     forbidden = ['spectral_kpoints_mp_spacing']
 
-    relaxer.validate_calc_doc(disp_doc, required, forbidden)
-    success = relaxer.run_castep_singleshot(disp_doc, seed, keep=True, intermediate=True)
+    computer.validate_calc_doc(disp_doc, required, forbidden)
+    success = computer.run_castep_singleshot(disp_doc, seed, keep=True, intermediate=True)
 
     if disp_doc.get('write_orbitals'):
         LOG.info('Planning to call orbitals2bands...')
 
-        _cache_executable = copy.deepcopy(relaxer.executable)
-        _cache_core = copy.deepcopy(relaxer.ncores)
-        relaxer.ncores = 1
-        relaxer.executable = 'orbitals2bands'
+        _cache_executable = copy.deepcopy(computer.executable)
+        _cache_core = copy.deepcopy(computer.ncores)
+        computer.ncores = 1
+        computer.executable = 'orbitals2bands'
         try:
-            success = relaxer.run_generic(intermediate=True, mv_bad_on_failure=False)
+            success = computer.run_generic(intermediate=True, mv_bad_on_failure=False)
         except Exception as exc:
-            relaxer.executable = _cache_executable
-            relaxer.ncores = _cache_core
+            computer.executable = _cache_executable
+            computer.ncores = _cache_core
             LOG.warning('Failed to call orbitals2bands, with error: {}'.format(exc))
 
-        relaxer.ncores = _cache_core
-        relaxer.executable = _cache_executable
+        computer.ncores = _cache_core
+        computer.executable = _cache_executable
 
     return success
 
 
-def optados_pdos(relaxer, _, seed):
+def optados_pdos(computer, _, seed):
     """ Run an OptaDOS projected-DOS.
 
     Parameters:
-        relaxer (:obj:`matador.compute.ComputeTask`): the object that will be calling OptaDOS.
+        computer (:obj:`matador.compute.ComputeTask`): the object that will be calling OptaDOS.
         _ : second parameter is required but ignored.
         seed (str): root filename of structure.
 
@@ -298,17 +298,17 @@ def optados_pdos(relaxer, _, seed):
             del odi_dict['pdispersion']
 
         LOG.info('Performing OptaDOS pDOS calculation with parameters from {}'.format(odi_fname))
-        success = _run_optados(relaxer, odi_dict, seed, suffix='dos')
+        success = _run_optados(computer, odi_dict, seed, suffix='dos')
         return success
 
     return None
 
 
-def optados_dos_broadening(relaxer, _, seed):
+def optados_dos_broadening(computer, _, seed):
     """ Run an OptaDOS total DOS broadening.
 
     Parameters:
-        relaxer (:obj:`matador.compute.ComputeTask`): the object that will be calling OptaDOS.
+        computer (:obj:`matador.compute.ComputeTask`): the object that will be calling OptaDOS.
         _ : second parameter is required but ignored.
         seed (str): root filename of structure.
 
@@ -325,16 +325,16 @@ def optados_dos_broadening(relaxer, _, seed):
             del odi_dict['pdispersion']
 
         LOG.info('Performing OptaDOS DOS broadening with parameters from {}'.format(odi_fname))
-        return _run_optados(relaxer, odi_dict, seed, suffix='dos')
+        return _run_optados(computer, odi_dict, seed, suffix='dos')
 
     return None
 
 
-def optados_pdispersion(relaxer, _, seed):
+def optados_pdispersion(computer, _, seed):
     """ Runs an OptaDOS projected dispersion calculation.
 
     Parameters:
-        relaxer (:obj:`matador.compute.ComputeTask`): the object that will be calling OptaDOS.
+        computer (:obj:`matador.compute.ComputeTask`): the object that will be calling OptaDOS.
         _ : second parameter is required but ignored.
         seed (str): root filename of structure.
 
@@ -348,17 +348,17 @@ def optados_pdispersion(relaxer, _, seed):
             del odi_dict['pdos']
 
         LOG.info('Performing OptaDOS pDIS calculation with parameters from {}'.format(odi_fname))
-        return _run_optados(relaxer, odi_dict, seed, suffix='dispersion')
+        return _run_optados(computer, odi_dict, seed, suffix='dispersion')
 
     return None
 
 
-def _run_optados(relaxer, odi_dict, seed, suffix=None):
-    """ Run OptaDOS with given relaxer object, parameters and seed, adjusting
+def _run_optados(computer, odi_dict, seed, suffix=None):
+    """ Run OptaDOS with given computer object, parameters and seed, adjusting
     the number of cores and the executable to call, then restoring them after.
 
     Parameters:
-        relaxer (:obj:`matador.compute.ComputeTask`): the object that will be calling OptaDOS.
+        computer (:obj:`matador.compute.ComputeTask`): the object that will be calling OptaDOS.
         odi_dict (dict): the OptaDOS parameters to write to file.
         seed (str): root filename of structure.
 
@@ -370,29 +370,29 @@ def _run_optados(relaxer, odi_dict, seed, suffix=None):
 
     from matador.export import doc2arbitrary
     odi_path = '{}.odi'.format(seed)
-    if relaxer.compute_dir is not None:
-        odi_path = relaxer.compute_dir + '/' + odi_path
+    if computer.compute_dir is not None:
+        odi_path = computer.compute_dir + '/' + odi_path
     doc2arbitrary(odi_dict, odi_path, overwrite=True)
 
     if suffix is not None:
         _get_correct_files_for_optados(seed, suffix=suffix)
 
-    _cache_executable = copy.deepcopy(relaxer.executable)
-    _cache_core = copy.deepcopy(relaxer.ncores)
-    _cache_nodes = copy.deepcopy(relaxer.nnodes)
-    relaxer.ncores = 1
-    relaxer.nnodes = 1
-    relaxer.executable = relaxer.optados_executable
+    _cache_executable = copy.deepcopy(computer.executable)
+    _cache_core = copy.deepcopy(computer.ncores)
+    _cache_nodes = copy.deepcopy(computer.nnodes)
+    computer.ncores = 1
+    computer.nnodes = 1
+    computer.executable = computer.optados_executable
     success = False
 
     try:
-        success = relaxer.run_generic(intermediate=True, mv_bad_on_failure=False)
+        success = computer.run_generic(intermediate=True, mv_bad_on_failure=False)
     except Exception as exc:
         LOG.warning('Failed to call optados with error: {}'.format(exc))
 
-    relaxer.ncores = _cache_core
-    relaxer.nnodes = _cache_nodes
-    relaxer.executable = _cache_executable
+    computer.ncores = _cache_core
+    computer.nnodes = _cache_nodes
+    computer.executable = _cache_executable
     if suffix is not None:
         _get_correct_files_for_optados(seed, suffix='bak')
 
