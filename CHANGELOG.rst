@@ -3,22 +3,22 @@
 Changelog
 =========
 
-Changes since last release [06/08/2020]
----------------------------------------
+New in release (0.9.8) [10/08/2020]
+-----------------------------------
 - Improvements to PDIS functionality (#94).
 
-    - Rasterized scatter points for more efficient exporting and fewer graphical artifacts
-    - Made underlying :func:`matador.plotting.spectral_plotting.dos_plot` and :func:`matador.plotting.spectral_plotting.dispersion_plot` more API friendly, and added example notebook.
-    - Fixed bug in cell scraping for old ``BS_*`` style keywords.
+  - Rasterized scatter points for more efficient exporting and fewer graphical artifacts
+  - Made underlying :func:`matador.plotting.spectral_plotting.dos_plot` and :func:`matador.plotting.spectral_plotting.dispersion_plot` more API friendly, and added example notebook.
+  - Fixed bug in cell scraping for old ``BS_*`` style keywords.
 
 - Improvements to magres functionality, including scraping of units (#90)
 - Example notebooks that do not need external data/databases are now run as part of CI (#91).
 - New workflow for NMR calculations and refactoring of old workflows (#96).
 
-    - New workflow performs relaxation and high-quality SCF before NMR calculation.
-    - Old workflows refactored and improved to enforce certain required parameters for e.g. checkpointing.
-    - Enabled phonon workflow for CASTEP ``PHONON+EFIELD`` task.
-    - Made file scrapers less dependent on file type.
+  - New workflow performs relaxation and high-quality SCF before NMR calculation.
+  - Old workflows refactored and improved to enforce certain required parameters for e.g. checkpointing.
+  - Enabled phonon workflow for CASTEP ``PHONON+EFIELD`` task.
+  - Made file scrapers less dependent on file type.
 
 - Updated CASTEP parameter list to 20.1 (#97).
 - Tweaked spectral plotting defaults, including ``--colours`` flag to dispersion script (#98).
@@ -65,9 +65,9 @@ New in release (0.9.2) [01/06/2020]
 - Added ability to choose which projectors are plotted with dispersion (#47)
 - Various minor fixes and updates:
 
-    - Updates to docs for CLI and configuration.
-    - Allow nan-values to be reset inside :class:`matador.crystal.Crystal`.
-    - Fixed display ordering of fingerprint-filtered cursors.
+  - Updates to docs for CLI and configuration.
+  - Allow nan-values to be reset inside :class:`matador.crystal.Crystal`.
+  - Fixed display ordering of fingerprint-filtered cursors.
 
 
 New in release (0.9.1) [20/05/2020]
