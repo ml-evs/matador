@@ -49,7 +49,7 @@ class ElasticWorkflowTest(MatadorUnitTest):
             param_dict=param_dict,
             verbosity=VERBOSITY,
             compute_dir="/tmp/scratch_test",
-            workflow_kwargs={"plot": False, "num_volumes": 3},
+            workflow_kwargs={"plot": False, "num_volumes": 5},
         )
 
         self.assertFalse(os.path.isfile("completed/Si2.bib"))
@@ -58,6 +58,19 @@ class ElasticWorkflowTest(MatadorUnitTest):
         self.assertTrue(os.path.isfile("completed/Si2.bulk_mod.results"))
         self.assertTrue(os.path.isfile("completed/Si2.bulk_mod.res"))
         self.assertTrue(os.path.isfile("completed/Si2.bulk_mod.castep"))
+
+        with open("completed/Si2.bulk_mod.results", "r") as f:
+            flines = f.readlines()
+
+        B = []
+        for line in flines:
+            if "bulk modulus" in line:
+                B.append(float(line.split()[3]))
+
+        # check all computed bulk mods are between 91-93
+        self.assertEqual(len(B), 3)
+        self.assertTrue(all(abs(b - 92) < 1) for b in B)
+
         self.assertFalse(os.path.isfile("completed/Si2.bulk_mod.png"))
 
         self.assertTrue(os.path.isfile("completed/Si2.res"))
