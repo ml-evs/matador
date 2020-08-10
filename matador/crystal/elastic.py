@@ -10,6 +10,7 @@ import re
 
 import numpy as np
 from matador.utils.chem_utils import eV_PER_ANGSTROM_CUBED_TO_GPa
+from matador.plotting.plotting import plotting_function
 
 
 def get_equation_of_state(seed, plot=False):
@@ -75,20 +76,14 @@ def get_equation_of_state(seed, plot=False):
         curves.append(fitted_curve)
         name = eos_type.__name__.replace('EOS', '')
         label = '-'.join(re.findall('[A-Z][^A-Z]*', name))
+        label += " {eos.bulk_modulus:3.1f}±{eos.bulk_modulus_err:3.1f} GPa"
         labels.append(label)
 
     if plot:
-        import matplotlib.pyplot as plt
-        _, ax = plt.subplots(1, figsize=(8, 6))
-        ax.set_ylabel('Total energy (eV)')
-        ax.set_xlabel('Cell volume ($\\AA^3$)')
-        ls = ['--', '-.', ':']
-        for ind, probe in enumerate(probes_all):
-            ax.plot(probes_all[ind], curves[ind], label=labels[ind], ls=ls[ind])
-        ax.plot(volumes, energies, marker='o', label='DFT data')
-
-        ax.legend(loc=0)
-        plt.savefig(seed + '.png')
+        try:
+            plot_volume_curve(probes_all, labels, curves, volumes, energies, seed)
+        except Exception:
+            print("There was a problem making the bulk modulus plot.")
 
     return results
 
@@ -242,3 +237,19 @@ class TaitEOS(EquationOfState):
         if self.popt is None:
             raise RuntimeError('No fit performed.')
         return self.popt[0] * eV_PER_ANGSTROM_CUBED_TO_GPa
+
+
+@plotting_function
+def plot_volume_curve(probes_all, labels, curves, volumes, energies, seed):
+    """ Plot all fitted EOS curves for this structure and save as a PDF. """
+    import matplotlib.pyplot as plt
+    _, ax = plt.subplots()
+    ax.set_ylabel('Total energy (eV)')
+    ax.set_xlabel('Cell volume ($\\AA^3$)')
+    ls = 2*['--', '-.', ':']
+    for ind, probe in enumerate(probes_all):
+        ax.plot(probes_all[ind], curves[ind], label=labels[ind], ls=ls[ind])
+    ax.plot(volumes, energies, marker='o', label='DFT data')
+
+    ax.legend(loc=0)
+    plt.savefig(seed + '.pdf')
