@@ -1290,7 +1290,7 @@ class ScraperMiscTest(MatadorUnitTest):
         self.assertTrue(isinstance(od, ElectronicDOS))
 
     def test_optados_pdos_scraper(self):
-        odo_fname = REAL_PATH + "data/optados_files/KP.pdos.adaptive.dat"
+        odo_fname = REAL_PATH + "data/optados_files/KP.pdos.dat"
         failed_open = False
         try:
             f = open(odo_fname, "r")
