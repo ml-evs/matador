@@ -14,28 +14,23 @@ from pwd import getpwuid
 import numpy as np
 from matador.utils.cell_utils import cart2abc, cart2frac
 from matador.utils.chem_utils import get_stoich
-from matador.scrapers.utils import scraper_function
+from matador.scrapers.utils import scraper_function, get_flines_extension_agnostic
 
 
 @scraper_function
-def magres2dict(seed, **kwargs):
+def magres2dict(fname, **kwargs):
     """ Extract available information from .magres file. Assumes units of
     Angstrom and ppm for relevant quantities.
     """
     magres = defaultdict(list)
-    # read .pwout file into array
-    seed = seed.replace('.magres', '')
-    with open(seed + '.magres', 'r') as f:
-        flines = f.readlines()
-    # add .magres to source
-    magres['source'].append(seed+'.magres')
+    flines, fname = get_flines_extension_agnostic(fname, "magres")
+    magres['source'] = [fname]
+
     # grab file owner username
     try:
-        magres['user'] = getpwuid(stat(seed + '.magres').st_uid).pw_name
+        magres['user'] = getpwuid(stat(fname).st_uid).pw_name
     except Exception:
         magres['user'] = 'xxx'
-        if kwargs.get('debug'):
-            print(seed + '.magres has no owner.')
 
     magres['magres_units'] = dict()
     for line_no, line in enumerate(flines):

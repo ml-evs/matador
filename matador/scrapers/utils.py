@@ -7,6 +7,8 @@ like custom errors and a scraper function wrapper.
 
 
 import glob
+import os
+import gzip
 import traceback as tb
 
 from matador.orm.spectral import VibrationalDOS, VibrationalDispersion
@@ -22,7 +24,55 @@ MODEL_REGISTRY = {
     "res2dict": Crystal,
     "cif2dict": Crystal,
     "magres2dict": Crystal,
+    "pwout2dict": Crystal,
 }
+
+
+def get_flines_extension_agnostic(fname, ext):
+    """ Try to open and read the filename provided, if it doesn't exist
+    then try adding the given file extension to it.
+
+    Parameters:
+        fname (str): the filename with or without extension.
+        ext (list of str or str): the extension or list of file extensions to try,
+            or None. Should not contain ".".
+
+    Raises:
+        FileNotFoundError: if the file was not found in either form.
+
+    Returns:
+        (list of str, str): the contents of the file and the filename.
+
+    """
+    if isinstance(ext, str):
+        ext = [ext]
+
+    if ext is not None and not os.path.isfile(fname):
+        for exts in ext:
+            if not fname.endswith(exts):
+                _fname = f"{fname}.{exts}"
+                if os.path.isfile(_fname):
+                    fname = _fname
+                    break
+
+    try:
+        if fname.endswith(".gz"):
+            with gzip.open(fname, 'r') as f:
+                flines = [line.decode('utf-8') for line in f.readlines()]
+        else:
+            try:
+                with open(fname, 'r', encoding='utf-8') as f:
+                    flines = f.readlines()
+            except Exception:
+                with open(fname, 'r', encoding='latin1') as f:
+                    flines = f.readlines()
+
+    except FileNotFoundError as exc:
+        if ext is not None:
+            raise FileNotFoundError(f"Neither {fname} or {fname}.{ext} could be found.")
+        raise exc
+
+    return flines, fname
 
 
 def scraper_function(function):

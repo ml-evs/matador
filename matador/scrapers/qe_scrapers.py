@@ -13,37 +13,28 @@ from math import gcd
 from pwd import getpwuid
 from matador.utils.cell_utils import cart2abc, cart2volume
 from matador.utils.chem_utils import RY_TO_EV, KBAR_TO_GPA
-from matador.scrapers.utils import scraper_function
+from matador.scrapers.utils import scraper_function, get_flines_extension_agnostic
 
 
 @scraper_function
-def pwout2dict(seed, **kwargs):
+def pwout2dict(fname, **kwargs):
     """ Extract available information from pw.x .out file.
 
     Parameters:
-        seed (str/list): filename or list of filenames to scrape as a
+        fname (str/list): filename or list of filenames to scrape as a
             QuantumEspresso pw.x output.
 
     """
-    pwout = defaultdict(list)
-    # read .pwout file into array
-    if seed.endswith('.out'):
-        ext = '.out'
-        seed = seed.replace('.out', '')
-    elif seed.endswith('.in'):
-        ext = '.in'
-        seed = seed.replace('.in', '')
-    else:
-        ext = seed.split('.')[-1]
+    flines, fname = get_flines_extension_agnostic(fname, ["out", "in"])
 
-    with open(seed+ext, 'r') as f:
-        flines = f.readlines()
-    # add .pwout to source
-    pwout['source'].append(seed+ext)
+    pwout = {}
+    pwout['source'] = [fname]
+
     # grab file owner username
-    pwout['user'] = getpwuid(stat(seed+ext).st_uid).pw_name
-    if 'CollCode' in seed:
-        pwout['icsd'] = seed.split('CollCode')[-1]
+    pwout['user'] = getpwuid(stat(fname).st_uid).pw_name
+
+    if 'CollCode' in fname:
+        pwout['icsd'] = fname.split('CollCode')[-1]
     for ind, line in enumerate(reversed(flines)):
         ind = len(flines) - 1 - ind
         if 'cell_parameters' in line.lower() and 'angstrom' in line.lower() and 'lattice_cart' not in pwout:

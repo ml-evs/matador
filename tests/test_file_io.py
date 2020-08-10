@@ -680,12 +680,26 @@ class CastepScraperTests(MatadorUnitTest):
         except FileNotFoundError:
             error = True
 
+    def test_multiple_exts(self):
+        castep_fname = (
+            REAL_PATH + "data/castep_files/Na-edgecase-CollCode10101"
+        )
+        test_dict, s = castep2dict(castep_fname, db=True)
+        self.assertTrue(s, msg="Failed entirely, oh dear!\n{}".format(test_dict))
+
+        castep_fname = (
+            REAL_PATH + "data/castep_files/CuP-thermo-test"
+        )
+        test_dict, s = castep2dict(castep_fname, db=False)
+        self.assertTrue(s, msg="Failed entirely, oh dear!\n{}".format(test_dict))
+
     def test_history(self):
         castep_fname = (
             REAL_PATH + "data/castep_files/Na3Zn4-swap-ReOs-OQMD_759599.history"
         )
         test_dict, s = castep2dict(castep_fname, db=True)
         self.assertTrue(s, msg="Failed entirely, oh dear!\n{}".format(test_dict))
+        self.assertEqual(test_dict["source"][0], castep_fname)
         self.assertEqual(test_dict["pressure"], 0.0763, msg="Failed to read pressure!")
         self.assertEqual(
             test_dict["enthalpy"], -2.15036930e4, msg="Failed to read enthalpy!"

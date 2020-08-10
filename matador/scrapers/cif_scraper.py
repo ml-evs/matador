@@ -9,22 +9,26 @@
 import functools
 from pathlib import Path
 import numpy as np
-from matador.scrapers.utils import scraper_function
-from matador.utils.cell_utils import get_spacegroup_spg
-from matador.utils.cell_utils import abc2cart, cart2volume, frac2cart
+from matador.scrapers.utils import scraper_function, get_flines_extension_agnostic
+from matador.utils.cell_utils import (
+    get_spacegroup_spg,
+    abc2cart,
+    cart2volume,
+    frac2cart,
+)
 
 EPS = 1e-13
 
 
 @scraper_function
-def cif2dict(seed, **kwargs):
+def cif2dict(fname, **kwargs):
     """ Extract available information from  .cif file and store as a
     dictionary. Raw cif data is stored under the `'_cif'` key. Symmetric
     sites are expanded by the symmetry operations and their occupancies
     are tracked.
 
     Parameters:
-        seed (str/list): filename or list of filenames of .cif file(s)
+        fname (str/list): filename or list of filenames of .cif file(s)
             (with or without extension).
 
     Returns:
@@ -34,21 +38,20 @@ def cif2dict(seed, **kwargs):
 
     """
 
-    with open(seed, 'r') as f:
-        flines = f.readlines()
+    flines, fname = get_flines_extension_agnostic(fname, "cif")
 
     doc = dict()
     cif_dict = _cif_parse_raw(flines)
 
     doc['_cif'] = cif_dict
-    doc['source'] = [str(Path(seed).resolve())]
+    doc['source'] = [str(Path(fname).resolve())]
 
     doc['atom_types'] = []
     atom_labels = cif_dict.get("_atom_site_type_symbol", False)
     if not atom_labels:
         atom_labels = cif_dict.get("_atom_site_label", False)
     if not atom_labels:
-        raise RuntimeError(f"Unable to find atom types in cif file {seed}.")
+        raise RuntimeError(f"Unable to find atom types in cif file {fname}.")
 
     for atom in atom_labels:
         symbol = ''
