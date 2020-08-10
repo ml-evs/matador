@@ -10,8 +10,13 @@ Changes since last release [06/08/2020]
     - Fixed bug in cell scraping for old ``BS_*`` style keywords.
 
 - Improvements to magres functionality, including scraping of units (#90)
-- Example notebooks that do not external data/databases are now run as part of CI (#91).
+- Example notebooks that do not need external data/databases are now run as part of CI (#91).
+- New workflow for NMR calculations and refactoring of old workflows (#96).
 
+    - New workflow performs relaxation and high-quality SCF before NMR calculation.
+    - Old workflows refactored and improved to enforce certain required parameters for e.g. checkpointing.
+    - Enabled phonon workflow for CASTEP ``PHONON+EFIELD`` task.
+    - Made file scrapers less dependent on file type.
 
 
 New in release (0.9.7) [29/07/2020]
