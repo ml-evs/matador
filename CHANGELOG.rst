@@ -20,6 +20,8 @@ Changes since last release [06/08/2020]
     - Enabled phonon workflow for CASTEP ``PHONON+EFIELD`` task.
     - Made file scrapers less dependent on file type.
 
+- Updated CASTEP parameter list to 20.1 (#97).
+
 
 New in release (0.9.7) [29/07/2020]
 -----------------------------------
