@@ -3,7 +3,7 @@
 Changelog
 =========
 
-Changes since last release [06/08/2020]
+New in release (0.9.8) [10/08/2020]
 ---------------------------------------
 - Improvements to PDIS functionality (#94).
 
