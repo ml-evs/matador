@@ -1,4 +1,4 @@
-task             : phonon 
+task             : phonon+efield
 phonon_method    : finitedisplacement
 phonon_fine_method : supercell 
 cut_off_energy   : 300 eV

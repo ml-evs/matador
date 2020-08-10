@@ -93,7 +93,7 @@ class CastepPhononWorkflow(Workflow):
                 {'input': ['.cell', '.param'], 'output': ['.castep', '.*err']}
         }
 
-        if self.calc_doc.get('task').lower() in ['phonon', 'thermodynamics']:
+        if self.calc_doc.get('task').lower() in ['phonon', 'thermodynamics', 'phonon+efield']:
             if ('phonon_fine_kpoint_path' in self.calc_doc or 'phonon_fine_kpoint_list' in self.calc_doc
                     or 'phonon_fine_kpoint_path_spacing' in self.calc_doc):
                 todo['dispersion'] = True
@@ -182,7 +182,11 @@ def castep_phonon_dynmat(computer, calc_doc, seed):
     LOG.info('Performing CASTEP dynmat calculation...')
     dynmat_doc = copy.deepcopy(calc_doc)
     dynmat_doc['write_checkpoint'] = 'ALL'
-    dynmat_doc['task'] = 'phonon'
+    if calc_doc['task'].lower() == "phonon+efield":
+        dynmat_doc['task'] = "phonon+efield"
+    else:
+        dynmat_doc['task'] = "phonon"
+
     dynmat_doc['continuation'] = 'default'
 
     required = ["continuation", "write_checkpoint"]

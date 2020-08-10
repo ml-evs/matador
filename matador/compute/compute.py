@@ -401,7 +401,7 @@ class ComputeTask:
             elif self.calc_doc['task'].upper() in ['GEOMETRYOPTIMISATION', 'GEOMETRYOPTIMIZATION']:
                 success = self.run_castep_relaxation()
 
-            elif self.calc_doc['task'].upper() in ['PHONON', 'THERMODYNAMICS']:
+            elif self.calc_doc['task'].upper() in ['PHONON', 'THERMODYNAMICS', 'PHONON+EFIELD']:
                 from matador.workflows.castep import castep_full_phonon
                 success = castep_full_phonon(self, self.calc_doc, self.seed, **self.workflow_kwargs)
 
