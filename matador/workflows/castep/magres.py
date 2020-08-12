@@ -19,6 +19,8 @@ import logging
 from functools import partial
 from matador.workflows.workflows import Workflow
 from matador.workflows.castep.common import castep_prerelax, castep_scf
+from matador.workflows.castep.spectral import castep_spectral_dos, optados_pdos, optados_dos_broadening, _get_optados_fname
+from matador.scrapers import arbitrary2dict
 
 LOG = logging.getLogger('run3')
 
@@ -80,22 +82,50 @@ class CastepMagresWorkflow(Workflow):
 
         self.final_elec_energy_tol = self.workflow_params.get("elec_energy_tol", 1e-12)
         # default todo
-        todo = {'relax': True, 'scf': True, 'magres': True}
+        todo = {'relax': True, 'scf': True, 'dos': True, 'pdos': True, 'broadening': True, 'magres': True}
         # definition of steps and names
         steps = {
             'relax': castep_prerelax,
             'scf': partial(castep_magres_scf, elec_energy_tol=self.final_elec_energy_tol),
+            'dos': castep_spectral_dos,
+            'pdos': optados_pdos,
+            'broadening': optados_dos_broadening,
             'magres': partial(castep_magres, elec_energy_tol=self.final_elec_energy_tol)
         }
 
         exts = {
-            'relax':
-                {'input': ['.cell', '.param'], 'output': ['.castep', '-out.cell', '.*err']},
-            'scf':
-                {'input': ['.cell', '.param'], 'output': ['.castep']},
-            'magres':
-                {'input': ['.cell', '.param'], 'output': ['.castep', '.magres']}
+            'relax': {
+                'input': ['.cell', '.param'],
+                'output': ['.castep', '-out.cell', '.*err']
+            },
+            'scf': {
+                'input': ['.cell', '.param'],
+                'output': ['.castep', '.bands']
+            },
+            'magres': {
+                'input': ['.cell', '.param'],
+                'output': ['.castep', '.magres']
+            },
+            'dos': {
+                'input': ['.cell', '.param'],
+                'output': ['.castep', '.bands', '.pdos_bin', '.dome_bin', '.*err', '-out.cell']
+            },
+            'pdos': {
+                'input': ['.odi', '.pdos_bin', '.dome_bin'],
+                'output': ['.odo', '.*err']
+            },
+            'broadening': {
+                'input': ['.odi', '.pdos_bin', '.dome_bin'],
+                'output': ['.odo', '.*err']
+            }
         }
+
+        odi_fname = _get_optados_fname(self.seed)
+        if odi_fname is not None:
+            odi_dict, _ = arbitrary2dict(odi_fname)
+            if todo['dos']:
+                todo['broadening'] = 'broadening' in odi_dict
+                todo['pdos'] = 'pdos' in odi_dict
 
         # prepare to do pre-relax if there's no check file
         if os.path.isfile(self.seed + '.check'):
