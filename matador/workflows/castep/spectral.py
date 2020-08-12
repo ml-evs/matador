@@ -139,16 +139,6 @@ class CastepSpectralWorkflow(Workflow):
                               input_exts=exts[key].get('input'),
                               output_exts=exts[key].get('output'))
 
-        if self.computer.run3_settings.get('run3_settings') is not None:
-            settings = self.computer.kwargs.get('run3_settings')
-            # check that computer.exec was not overriden at cmd-line, then check settings file
-            if settings.get('castep_executable') is not None and self.computer.executable == 'castep':
-                self.castep_executable = settings.get('castep_executable', 'castep')
-                self.computer.executable = self.castep_executable
-            if settings.get('optados_executable') is not None:
-                self.optados_executable = settings.get('optados_executable', 'optados')
-                self.computer.optados_executable = self.optados_executable
-
         # if not using a user-requested path, use seekpath and spglib
         # to reduce to primitive and use consistent path
         if 'spectral_kpoints_list' not in self.calc_doc and 'spectral_kpoints_path' not in self.calc_doc:
@@ -169,8 +159,6 @@ class CastepSpectralWorkflow(Workflow):
 
         # always use continuation
         self.calc_doc['continuation'] = 'default'
-
-        LOG.info('Preprocessing completed: run3 spectral options {}'.format(todo))
 
 
 def castep_spectral_scf(computer, calc_doc, seed):

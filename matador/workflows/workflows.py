@@ -60,7 +60,19 @@ class Workflow:
 
         LOG.info('Performing Workflow of type {} on {}'.format(self.label, self.seed))
 
+        if self.computer.run3_settings.get('run3_settings') is not None:
+            settings = self.computer.kwargs.get('run3_settings')
+            # check that computer.exec was not overriden at cmd-line, then check settings file
+            if settings.get('castep_executable') is not None and self.computer.executable == 'castep':
+                self.castep_executable = settings.get('castep_executable', 'castep')
+                self.computer.executable = self.castep_executable
+            if settings.get('optados_executable') is not None:
+                self.optados_executable = settings.get('optados_executable', 'optados')
+                self.computer.optados_executable = self.optados_executable
+
         self.preprocess()
+        LOG.info('Preprocessing completed, steps to perform: {}'.format([step.name for step in self.steps]))
+
         try:
             self.run_steps()
         except RuntimeError as exc:
@@ -79,8 +91,8 @@ class Workflow:
         responsible for adding WorkflowStep objects to the Workflow.
 
         """
-        raise NotImplementedError('Please implement a preprocess method.')
 
+    @abc.abstractmethod
     def postprocess(self):
         """ This OPTIONAL function is run upon successful completion of all steps
         of the workflow and can be overloaded by the subclass to perform
