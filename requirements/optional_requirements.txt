@@ -2,3 +2,5 @@ pymatgen>=2022,<2023
 ase~=3.22
 ascii_graph~=1.5
 networkx~=2.6
+statsmodels>=0.11
+seaborn>=0.10
