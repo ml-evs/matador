@@ -86,7 +86,9 @@ def plot_magres(
     _magres = []
 
     if signal_limits is not None:
-        min_shielding, max_shielding = signal_limits
+        min_shielding, max_shielding = sorted(signal_limits)
+        if signal_limits[0] > signal_limits[1]:
+            ax.invert_xaxis()
     else:
         min_shielding, max_shielding = (1e20, -1e20)
 
@@ -176,9 +178,9 @@ def plot_magres(
         if magres_key == "chemical_shielding_iso":
             xlabel = f"{species}: Isotropic chemical shielding $\\sigma_\\mathrm{{iso}}$ ({unit})"
         elif magres_key == "chemical_shift_iso":
-            xlabel = f"{species}: Isotropic chemical shift $\\sigma_\\mathrm{{iso}}$ ({unit})"
+            xlabel = f"{species}: Isotropic chemical shift $\\delta_\\mathrm{{iso}}$ ({unit})"
         elif magres_key == "chemical_shift_aniso":
-            xlabel = f"{species}: Anisotropic chemical shift $\\sigma_\\mathrm{{iso}}$ ({unit})"
+            xlabel = f"{species}: Anisotropic chemical shift $\\Delta_\\mathrm{{iso}}$ ({unit})"
         elif magres_key == "chemical_shift_asymmetry":
             xlabel = f"{species}: Chemial shift asymmetry, $\\eta$"
 

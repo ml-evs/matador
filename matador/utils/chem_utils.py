@@ -578,7 +578,7 @@ def get_root_source(source):
     src_list = set()
     for src in sources:
         if any([src.endswith(ext) for ext in
-               ['.res', '.castep', '.history', '.history.gz', '.phonon', '.phonon_dos', '.bands', '.cif']]):
+               ['.res', '.castep', '.history', '.history.gz', '.phonon', '.phonon_dos', '.bands', '.cif', '.magres']]):
             src_list.add('.'.join(src.split('/')[-1].split('.')[0:-1]))
         elif 'OQMD' in src.upper():
             src_list.add(src)

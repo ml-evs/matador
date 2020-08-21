@@ -133,7 +133,7 @@ class Crystal(DataContainer):
         if not any(key in doc for key in ['positions_frac', 'positions_abs']):
             raise RuntimeError('No position information found `"positions_frac"/"positions_abs"`, cannot create Crystal.')
 
-    def __init__(self, doc, voronoi=False, network_kwargs=None):
+    def __init__(self, doc, mutable=False, voronoi=False, network_kwargs=None):
         """ Initialise Crystal object from matador document with Site list
         and any additional abstractions, e.g. voronoi or CrystalGraph.
 
@@ -152,7 +152,7 @@ class Crystal(DataContainer):
         if isinstance(doc, Crystal):
             doc = deepcopy(doc._data)
 
-        super().__init__(doc)
+        super().__init__(doc, mutable=mutable)
 
         self.elems = sorted(list(set(self._data['atom_types'])))
         self.sites = []
@@ -181,9 +181,17 @@ class Crystal(DataContainer):
             self._space_group = {}
 
     def __getitem__(self, key):
-        """ If integer key is requested, return index into site array. """
+        """ If integer key is requested, return index into site array. If
+        a known site data key is requested, return the live version attached
+        to the sites. Otherwise, go through the DataContainer methods.
+
+        """
         if isinstance(key, int):
             return self.sites[key]
+
+        elif key in Site._crystal_key_map:
+            return [s.get(Site._crystal_key_map[key]) for s in self]
+
         return super().__getitem__(key)
 
     def __str__(self):
