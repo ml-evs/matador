@@ -45,6 +45,7 @@ extensions = [
 templates_path = ["_templates"]
 
 autodoc_member_order = "bysource"
+default_role = "any"
 autoclass_content = "both"
 
 # The suffix(es) of source filenames.
