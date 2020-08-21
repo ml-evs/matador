@@ -10,6 +10,7 @@ children.
 import copy
 import math
 from abc import ABC
+from typing import Dict
 
 
 class DataContainer(ABC):
@@ -21,10 +22,10 @@ class DataContainer(ABC):
 
     required_keys = []
 
-    def __init__(self, data=None, **kwargs):
+    def __init__(self, data: Dict = None, **kwargs):
         """ Initalise copy of raw data. """
         if isinstance(data, dict):
-            self._data = copy.deepcopy(data)
+            self._data = copy.deepcopy(dict(data))
         else:
             self._data = {key: kwargs[key] for key in kwargs}
 
