@@ -103,9 +103,7 @@ class DataContainer(ABC):
                                  .format(item, key, self._data[key]))
 
     def __contains__(self, key):
-        if key in self._data:
-            return True
-        return False
+        return key in self._data
 
     def get(self, *args):
         """ Overload dictionary.get() method.

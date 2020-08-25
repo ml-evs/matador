@@ -46,14 +46,50 @@ class DensityOfStates(Dispersion, DataContainer):
             data = kwargs
         # as we can also construct a DOS from arbitarary kpoint/energy data,
         # check that we've been passed this first
-        if isinstance(data, Dispersion) or (isinstance(data, dict) and ('dos' not in data and 'spin_dos' not in data)):
+        if (isinstance(data, Dispersion)
+                or (isinstance(data, dict) and not any(key in data for key in ["spin_dos", "dos", "pdos"]))):
             data = self._from_dispersion(data)
         elif isinstance(data, DensityOfStates):
             data = copy.deepcopy(DensityOfStates._data)
 
+        # Attempted workaround for old OPTADOS bug where spin-polarized PDOS would
+        # ignore set_efermi_zero. Requires any other DOS data to have been computed
+        # on same grid with OptaDOS, and assumes Fermi level is the same for each spin.
+        # https://github.com/optados-developers/optados/issues/24
+        if "pdos" in data and len(set(proj[2] for proj in data["pdos"]["projectors"])) == 2:
+            # check for energies either side of 0, if none are found, try to shift to other fermi values
+            if (len(data["pdos"]["energies"]) == len(data.get("energies", []))
+                    and (np.max(data["pdos"]["energies"]) < 0 or np.min(data["pdos"]["energies"]) > 0)):
+                correction = np.max(data["pdos"]["energies"]) - np.max(data["energies"])
+                data["pdos"]["energies"] -= correction
+                warnings.warn(
+                    f"""Corrected PDOS energies with difference between total DOS and PDOS grid.
+Guessed Fermi level = {correction:4.3f} eV, assumed constant for both spins.
+In the future, please use an updated version of OptaDOS.
+This correction is to account for the OptaDOS bug #24:
+https://github.com/optados-developers/optados/issues/24
+"""
+                )
+
         # trigger generation of dos key from spin dos
         if 'dos' not in data and 'spin_dos' in data:
             data["dos"] = np.asarray(data["spin_dos"]["up"]) + np.asarray(data["spin_dos"]["down"])
+
+        if 'dos' not in data and 'pdos' in data:
+            data["dos"] = np.sum(data["pdos"]["pdos"][proj] for proj in data["pdos"]["projectors"])
+            data["energies"] = data["pdos"]["energies"]
+            warnings.warn("Total DOS created from sum of projected DOS, which may not be at all reliable.")
+
+        if 'spin_dos' not in data and 'pdos' in data:
+            spin_channels = set(proj[2] for proj in data["pdos"]["projectors"])
+            if len(spin_channels) == 2:
+                data["spin_dos"] = {}
+                for channel in spin_channels:
+                    data["spin_dos"][channel] = np.sum(
+                        data["pdos"]["pdos"][proj] for proj in data["pdos"]["projectors"] if proj[2] == channel
+                    )
+                data["energies"] = data["pdos"]["energies"]
+                warnings.warn("Total spin DOS created from sum of projected DOS, which may not be at all reliable.")
 
         super().__init__(data)
         self._trim_dos()
@@ -79,6 +115,8 @@ class DensityOfStates(Dispersion, DataContainer):
 
         _data['dos'] = dos
         _data['energies'] = energies
+
+        warnings.warn("Loaded DOS from .bands file with naive Gaussian smearing.")
         return _data
 
     @property
