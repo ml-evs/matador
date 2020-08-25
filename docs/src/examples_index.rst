@@ -5,6 +5,8 @@
 Tutorials and example notebooks
 ===============================
 
+Many of these examples can be run interactively at Binder, though some require external data. |Binder|
+
 Real use-cases
 --------------
 
@@ -34,6 +36,9 @@ Tutorials
 
     tutorials/run3
     tutorials/mongo
+
+.. |Binder| image:: https://mybinder.org/badge_logo.svg
+ :target: https://mybinder.org/v2/gh/ml-evs/matador/master?filepath=examples
 
 .. |CuP Binder| image:: https://mybinder.org/badge_logo.svg
    :target: https://mybinder.org/v2/gh/harpaf13/data.copper-phosphides/master?filepath=CuP_results.ipynb
