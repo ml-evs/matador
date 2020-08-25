@@ -184,7 +184,7 @@ class SpectralPlotTests(unittest.TestCase):
             "K3P",
             "--png",
             "-ph",
-            "--band_colour",
+            "--colours grey green blue",
             "k",
             "--figsize",
             "10",

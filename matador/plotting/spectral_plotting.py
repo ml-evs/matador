@@ -105,12 +105,11 @@ def plot_spectral(seeds, **options):
         "plot_pdis": True,
         "phonons": False,
         "gap": False,
-        "colour_by_seed": False,
         "external_efermi": None,
         "labels": None,
         "cmap": None,
         "cmap_limits": (0.2, 0.8),
-        "band_colour": "occ",
+        "band_colour": None,
         "spin_only": None,
         "figsize": None,
         "filename": None,
@@ -147,8 +146,6 @@ def plot_spectral(seeds, **options):
     if options["colours"] is not None:
         options["colour_cycle"] = options["colours"]
 
-    print(options["colours"])
-
     if options.get("cmap") is None:
         plt.rcParams["axes.prop_cycle"] = cycler("color", options["colour_cycle"])
     else:
@@ -162,21 +159,17 @@ def plot_spectral(seeds, **options):
 
     if (
         options.get("phonons")
-        and options["band_colour"] == "occ"
         and options.get("cmap") is None
+        and options.get("colours") is None
     ):
         options["band_colour"] = "grey"
         if options.get("band_alpha") is None:
             options["band_alpha"] = 0.8
 
-    elif options["band_colour"] in [None, "random"]:
-        options["band_colour"] = None
-
     if not isinstance(seeds, list):
         seeds = [seeds]
 
     if len(seeds) > 1:
-        options["colour_by_seed"] = True
         if options["plot_pdis"] or options["plot_dos"]:
             options["plot_pdos"] = False
             options["plot_pdis"] = False
@@ -354,8 +347,6 @@ def dispersion_plot(seeds, ax_dispersion, options, bbox_extra_artists=None):
         matplotlib.Axes: the axis that was plotted on.
 
     """
-    from cycler import cycler
-
     plotted_pdis = False
 
     if not isinstance(seeds, list):
@@ -465,10 +456,6 @@ def dispersion_plot(seeds, ax_dispersion, options, bbox_extra_artists=None):
 
             # loop over branches and plot
             for branch_ind, branch in enumerate(dispersion.kpoint_branches):
-                plt.rcParams["axes.prop_cycle"] = cycler(
-                    "color", options.get("colours")
-                )
-
                 for ns in range(dispersion.num_spins):
                     if ns == 1 and options.get("spin_only") == "up":
                         continue
@@ -1106,7 +1093,7 @@ def _get_lineprops(
     eigs=None,
 ):
     """ Get the properties of the line to plot. """
-    colour = None
+    colour = options.get("colour_cycle")[seed_ind]
     alpha = 1
     label = None
 
@@ -1120,24 +1107,9 @@ def _get_lineprops(
             else:
                 colour = "blue"
                 alpha = 0.8
-        else:
-            if options.get("band_colour") == "occ":
-                band_min = np.min(eigs[ns][nb][branch]) - spin_fermi_energy[ns]
-                band_max = np.max(eigs[ns][nb][branch]) - spin_fermi_energy[ns]
-
-                if band_max < 0:
-                    colour = options.get("valence")
-                elif band_min > 0:
-                    colour = options.get("conduction")
-                elif band_min < 0 < band_max:
-                    colour = options.get("crossing")
-
-    if options["colour_by_seed"]:
-        colour = options.get("colours")[seed_ind]
 
     if options.get("band_colour") is not None:
-        if options.get("band_colour") != "occ":
-            colour = options.get("band_colour")
+        colour = options.get("band_colour")
 
     if options.get("_mpl_cmap") is not None:
         colour = options["_mpl_cmap"][nb]

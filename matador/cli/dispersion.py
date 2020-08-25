@@ -53,9 +53,6 @@ def main():
                         help='try to reorder bands based on local gradients')
     parser.add_argument('--pdos_hide_sum', action='store_true',
                         help='plot PDOS without sum pDOS')
-    parser.add_argument('--band_colour', type=str,
-                        help='override all other colour options with a matplotlib-interpretable colour string, '
-                             'or choose one of "occ" or "random".')
     parser.add_argument('--projector_colours', type=str, nargs="+",
                         help='override all projector colour options with a list of matplotlib-interpretable colours, '
                              'e.g. --projector_colours red blue #ff00ff')
@@ -112,7 +109,6 @@ def main():
     del kwargs['no_pdis']
 
     cmap = kwargs.get('cmap')
-    band_colour = kwargs.get('band_colour', 'occ')
     band_reorder = kwargs.get('band_reorder', False)
 
     from matador.plotting import plot_spectral, plot_ir_spectrum
@@ -121,7 +117,6 @@ def main():
     del kwargs['verbosity']
     del kwargs['labels']
     del kwargs['cmap']
-    del kwargs['band_colour']
     del kwargs['band_reorder']
 
     bandstructure = False
@@ -174,7 +169,6 @@ def main():
             labels=labels,
             cmap=cmap,
             band_reorder=band_reorder,
-            band_colour=band_colour,
             **kwargs
         )
 
