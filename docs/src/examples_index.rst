@@ -14,11 +14,11 @@ Example Jupyter notebooks
 -------------------------
 
 .. toctree::
+    :maxdepth: 1
 
     notebooks/hull
     notebooks/matador_plot_styles
     notebooks/voltage_from_res_files
-    notebooks/simple_spectral
     notebooks/projected_spectral
     notebooks/projected_spectral_as_subplots
     notebooks/phonon_results
