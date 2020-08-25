@@ -88,7 +88,8 @@ if __name__ == "__main__":
                         <seed>' -n 1 16",
     )
     PARSER.add_argument(
-        "sleep",
+        "-s",
+        "--sleep",
         type=int,
         help="sleep for this many seconds in between submissions to nodes (DEFAULT: 1 s)",
     )
@@ -105,7 +106,7 @@ if __name__ == "__main__":
     PARSER.add_argument("-d", "--debug", action="store_true", help="debug output")
     ARGS = PARSER.parse_args()
     RUNNER = Hive(
-        command=ARGS.command, nodes=ARGS.nodes, debug=ARGS.debug, prefix=ARGS.prefix
+        command=ARGS.command, nodes=ARGS.nodes, debug=ARGS.debug, prefix=ARGS.prefix, sleep=ARGS.sleep
     )
     try:
         RUNNER.spawn()
