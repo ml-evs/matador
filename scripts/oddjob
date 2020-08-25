@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # encoding: utf-8
+
 """ Submits the same job across multiple nodes
 on a cluster with a shared filesystem, and no queuing,
 handling killed jobs and crashes.
@@ -8,6 +9,7 @@ handling killed jobs and crashes.
 from traceback import print_exc
 from sys import stdout
 import argparse
+import time
 import multiprocessing as mp
 import subprocess as sp
 from os import getcwd
@@ -23,6 +25,7 @@ class Hive:
         self.command = self.args.get('command')
         self.nodes = self.args.get('nodes')
         self.prefix = self.args.get('prefix')
+        self.sleep = self.args.get("sleep", 1)
         if self.prefix is None:
             self.prefix = 'node'
         if len(set(self.nodes)) < len(list(self.nodes)):
@@ -37,6 +40,8 @@ class Hive:
         try:
             for proc in procs:
                 proc.start()
+                if len(self.nodes) > 1:
+                    time.sleep(self.sleep)
         except(KeyboardInterrupt, SystemExit, RuntimeError):
             print_exc()
             for proc in procs:
@@ -59,11 +64,13 @@ if __name__ == '__main__':
         prog='oddjob',
         description='Run a single script on multiple nodes, numbered node<n>.',
         epilog='Written by Matthew Evans (2017).')
-    PARSER.add_argument('command', type=str,
+    PARSER.add_argument('command', type=str, default=1,
                         help='command to run, with arguments - must be apostrophized. \
                         Use the $ALL_CORES macro to use, unsurprisingly, all the cores \
                         on the node in question. e.g. oddjob \'pyairss -c $ALL_CORES -ha \
                         <seed>\' -n 1 16')
+    PARSER.add_argument("sleep", type=int,
+                        help="sleep for this many seconds in between submissions to nodes (DEFAULT: 1 s)")
     PARSER.add_argument('-n', '--nodes', type=str, nargs='+', required=True,
                         help='list node numbers to run job on with space delimiters, e.g. \
                         -n 3 14 15')
