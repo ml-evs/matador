@@ -301,24 +301,34 @@ def cell2dict(fname, db=False, lattice=True, positions=True, **kwargs):
                 key = 'phonon_fine_kpoint_path'
             else:
                 raise RuntimeError(f'Found unknown kpoint path key in line: {line}.')
-            i = 1
             labels = []
             found_labels = False
             comment_delims = ['!', '%', '#']
             cell[key] = []
-            while '%endblock' not in flines[line_no + i].lower():
+            for line in flines[line_no+1:]:
+                if "%endblock" in line.lower():
+                    break
+
+                # ignore CASTEP BREAK keyword and let dispersion script figure out discontinuities
+                if "BREAK" in line.strip().upper():
+                    continue
+
+                cell[key].append(list(map(f90_float_parse, line.split()[:3])))
+
                 for delim in comment_delims:
-                    if delim in flines[line_no+i]:
-                        labels.append(flines[line_no+i].split(delim)[-1].strip())
+                    if delim in line:
+                        labels.append(line.split(delim)[-1].strip())
                         found_labels = True
                         break
                 else:
                     labels.append(None)
 
-                cell[key].append(list(map(f90_float_parse, flines[line_no + i].split()[:3])))
-                i += 1
+            else:
+                raise RuntimeError(f"Unable to find closing of block {key}, missing %endblock.")
+
             if found_labels:
                 cell[key + '_labels'] = labels
+
         elif any(
             block in line.lower()
             for block in
