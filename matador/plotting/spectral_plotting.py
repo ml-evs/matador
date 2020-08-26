@@ -524,21 +524,17 @@ def dos_plot(seeds, ax_dos, options, bbox_extra_artists=None):
         seeds = [seeds]
 
     for seed_ind, seed in enumerate(seeds):
-        # load electronic data
         if not options.get("phonons"):
             dos_data = _load_electronic_dos(seed, options)
 
             if options.get("plot_window") is None:
                 options["plot_window"] = [-10, 10]
-
-            if options.get("plot_pdos") and "pdos" in dos_data:
-                pdos_data = dos_data["pdos"]
         else:
             dos_data = _load_phonon_dos(seed, options)
             max_density = np.max(dos_data["dos"])
-            # phonon files contain the PDOS by default, so just alias it
-            if options.get("plot_pdos"):
-                pdos_data = dos_data
+
+        if options.get("plot_pdos") and "pdos" in dos_data:
+            pdos_data = dos_data["pdos"]
 
         energies = np.copy(dos_data["energies"])
         # change unit of phonon energies and set plot window
@@ -1365,6 +1361,7 @@ def _get_projector_info(projectors, colours_override=None):
         projector_labels.append(projector_label)
 
         dos_colour = None
+
         # if species-projected only, then use VESTA colours
         if species is not None and ang_mom is None:
             dos_colour = element_colours.get(projector[0])
