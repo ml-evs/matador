@@ -540,6 +540,9 @@ def dos_plot(seeds, ax_dos, options, bbox_extra_artists=None):
         # change unit of phonon energies and set plot window
         if options.get("phonons"):
             energies /= INVERSE_CM_TO_EV
+            if "pdos" in dos_data:
+                dos_data["pdos"]["energies"] /= INVERSE_CM_TO_EV
+
             if options.get("plot_window") is None:
                 options["plot_window"] = [
                     np.min(energies[np.where(dos_data["dos"] > 1e-3)]) - 10,
