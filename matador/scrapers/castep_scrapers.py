@@ -60,7 +60,11 @@ def res2dict(fname, db=True, **kwargs):
     except Exception:
         pass
 
-    get_seed_metadata(res, fname)
+    try:
+        get_seed_metadata(res, fname)
+    except Exception as exc:
+        warnings.warn(f'There was an error scraping provenance from filename {fname}: {exc}')
+
     # alias special lines in res file
     titl = ''
     cell = ''
@@ -609,7 +613,11 @@ def castep2dict(fname, db=True, intermediates=False, **kwargs):
     except Exception:
         pass
 
-    get_seed_metadata(castep, fname)
+    try:
+        get_seed_metadata(castep, fname)
+    except Exception as exc:
+        warnings.warn(f'There was an error scraping provenance from filename {fname}: {exc}')
+
     # wrangle castep file for parameters in 3 passes:
     # once forwards to get number and types of atoms
     _castep_scrape_atoms(flines, castep)
@@ -1897,19 +1905,47 @@ def get_seed_metadata(doc, seed):
         seed (str): the filename that is being scraped (sans file extension).
 
     """
+    errors = []
     if '-CollCode-' in seed:
-        doc['icsd'] = int(seed.split('CollCode-')[-1].split('-')[0].split('_')[0].split('.')[0])
+        try:
+            doc['icsd'] = int(seed.split('CollCode-')[-1].split('-')[0].split('_')[0].split('.')[0])
+        except ValueError as exc:
+            errors.append(exc)
     elif 'CollCode' in seed:
-        doc['icsd'] = int(seed.split('CollCode')[-1].split('-')[0].split('_')[0].split('.')[0])
+        try:
+            doc['icsd'] = int(seed.split('CollCode')[-1].split('-')[0].split('_')[0].split('.')[0])
+        except ValueError as exc:
+            errors.append(exc)
     elif '-ICSD-' in seed:
-        doc['icsd'] = int(seed.split('-ICSD-')[-1].split('-')[0].split('_')[0].split('.')[0])
+        try:
+            doc['icsd'] = int(seed.split('-ICSD-')[-1].split('-')[0].split('_')[0].split('.')[0])
+        except ValueError as exc:
+            errors.append(exc)
     if '-OQMD-' in seed:
-        doc['oqmd_id'] = int(seed.split('-OQMD-')[-1].split('-')[0].split('_')[0].split('.')[0])
+        try:
+            doc['oqmd_id'] = int(seed.split('-OQMD-')[-1].split('-')[0].split('_')[0].split('.')[0])
+        except ValueError as exc:
+            errors.append(exc)
     elif '-OQMD_' in seed:
-        doc['oqmd_id'] = int(seed.split('-OQMD_')[-1].split('-')[0].split('_')[0].split('.')[0])
+        try:
+            doc['oqmd_id'] = int(seed.split('-OQMD_')[-1].split('-')[0].split('_')[0].split('.')[0])
+        except ValueError as exc:
+            errors.append(exc)
     if '-MP-' in seed:
-        doc['mp_id'] = int(seed.split('-MP-')[-1].split('-')[0].split('_')[0].split('.')[0])
+        try:
+            doc['mp_id'] = int(seed.split('-MP-')[-1].split('-')[0].split('_')[0].split('.')[0])
+        except ValueError as exc:
+            errors.append(exc)
     elif '-MP_' in seed:
-        doc['mp_id'] = int(seed.split('-MP_')[-1].split('-')[0].split('_')[0].split('.')[0])
+        try:
+            doc['mp_id'] = int(seed.split('-MP_')[-1].split('-')[0].split('_')[0].split('.')[0])
+        except ValueError as exc:
+            errors.append(exc)
     if '-DOI-' in seed:
-        doc['doi'] = seed.split('-DOI-')[-1].split('-')[0].replace('__', '/')
+        try:
+            doc['doi'] = seed.split('-DOI-')[-1].split('-')[0].replace('__', '/')
+        except ValueError as exc:
+            errors.append(exc)
+
+    if errors:
+        raise ValueError(errors)
