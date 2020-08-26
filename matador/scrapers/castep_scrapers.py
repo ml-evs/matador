@@ -922,7 +922,7 @@ def phonon2dict(fname, **kwargs):
         elif 'begin dos' in line:
             dos_present = True
             projector_labels = flines[line_no].split()[5:]
-            projector_labels = [(label, None) for label in projector_labels]
+            projector_labels = [(label, None, None) for label in projector_labels]
             begin_dos = line_no + 1
 
         elif 'q-pt' in line:
@@ -970,9 +970,13 @@ def phonon2dict(fname, **kwargs):
         ph['energies'] = raw_data[:, 0] * INVERSE_CM_TO_EV
         ph['dos'] = raw_data[:, 1]
         ph['pdos'] = dict()
+        ph['pdos']['pdos'] = dict()
+        ph['pdos']["projectors"] = []
+        ph['pdos']["energies"] = ph["energies"]
 
         for i, label in enumerate(projector_labels):
-            ph['pdos'][label] = raw_data[:, i + 2]
+            ph['pdos']['pdos'][label] = raw_data[:, i + 2]
+            ph['pdos']["projectors"].append(label)
 
     ph['kpoint_path'] = np.asarray([qpt[0:3] for qpt in ph['phonon_kpoint_list']])
     ph['kpoint_weights'] = [qpt[3] for qpt in ph['phonon_kpoint_list']]
