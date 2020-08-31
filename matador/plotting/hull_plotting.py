@@ -71,7 +71,7 @@ def _get_hull_labels(hull, label_cutoff=None, num_species=None, exclude_edges=Tr
 @plotting_function
 def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
                  plot_hull_points=True, labels=None, label_cutoff=None, colour_by_source=False,
-                 sources=None, hull_label=None, source_labels=None, title=True, plot_fname=None, show_cbar=True,
+                 sources=None, hull_label=None, source_labels=None, title=True, plot_fname=None, show_cbar=False,
                  label_offset=(1.15, 0.05), eform_limits=None, legend_kwargs=None,
                  **kwargs):
     """ Plot calculated hull, returning ax and fig objects for further editing.
@@ -95,6 +95,8 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
         title (str/bool): whether to include a plot title.
         png/pdf/svg (bool): whether or not to write the plot to a file.
         plot_fname (str): filename to write plot to, without file extension.
+        eform_limits (tuple): specify the y-axis limits of the plot.
+        legend_kwargs (dict): keyword arguments to pass to `ax.legend(...)`.
 
     Returns:
         matplotlib.axes.Axes: matplotlib axis with plot.
@@ -190,7 +192,7 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
                 if show_cbar:
                     cbar = plt.colorbar(scatter, aspect=30, pad=0.02,
                                         ticks=[0, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28])
-                    cbar.ax.tick_params(length=0)
+                    cbar.ax.tick_params(length=0, width=0)
                     cbar.ax.set_yticklabels([0, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28])
                     cbar.ax.yaxis.set_ticks_position('right')
                     cbar.ax.set_frame_on(False)
@@ -222,7 +224,7 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
     if eform_limits is None:
         eform_limits = (np.min(hull.structures[:, 1]), np.max(hull.structures[:, 1]))
         lims = (-0.1 if eform_limits[0] >= 0 else 1.4*eform_limits[0],
-                eform_limits[1] if eform_limits[0] >= 0 else 0.1)
+                eform_limits[1] if eform_limits[0] >= 0 else 0.5*abs(eform_limits[0]))
     else:
         lims = sorted(eform_limits)
     ax.set_ylim(lims)
@@ -235,7 +237,7 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
     elif isinstance(title, str) and title != '':
         ax.set_title(title)
 
-    plt.locator_params(nbins=3)
+    ax.locator_params(nbins=8)
     if hull._non_elemental:
         ax.set_xlabel(r'x in ({d[0]})$_\mathrm{{x}}$({d[1]})$_\mathrm{{1-x}}$'.format(d=chempot_labels))
     else:
