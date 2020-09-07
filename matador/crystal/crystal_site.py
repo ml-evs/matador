@@ -12,10 +12,32 @@ from matador.orm.orm import DataContainer
 
 
 class Site(DataContainer):
+    """ The Site class contains a description of an individual
+    site within a 3D periodic Crystal.
+
+    """
+    # This dictionary defines the map between fields in :obj:`Crystal`
+    # that correspond to arrays of site properties and between the
+    # relevant keys the :obj:`Site` object
+    _crystal_key_map = {
+        "site_occupancy": "site_occupancy",
+        "chemical_shielding_isos": "chemical_shielding_iso",
+        "chemical_shift_isos": "chemical_shift_iso",
+        "magnetic_shielding_tensors": "magnetic_shielding_tensor",
+        "chemical_shift_anisos": "chemical_shift_aniso",
+        "chemical_shift_asymmetries": "chemical_shift_asymmetry",
+        "quadrupolar_couplings": "quadrupolar_coupling",
+        "quadrupolar_asymmetries": "quadrupolar_asymmetry",
+        "voronoi_substructure": "voronoi_substructure"
+    }
 
     def __init__(self, species: str, position: list, lattice_cart,
                  position_unit='fractional', **site_data):
+        """ Initialise a Site object from its species, position and
+        a reference to the lattice it exists in. Any other keys will be made available
+        as site-level values.
 
+        """
         if site_data.get('voronoi_substructure') is not None:
             assert self.species == site_data['voronoi_substructure'][0]
             site_data['voronoi_substructure'] = site_data['voronoi_substructure'][1]

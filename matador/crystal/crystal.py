@@ -227,31 +227,19 @@ class Crystal(DataContainer):
                 of each site.
 
         """
+
         self.sites = []
         for ind, species in enumerate(self.atom_types):
             position = self.positions_frac[ind]
             site_data = {}
-            if 'site_occupancy' in self._data:
-                if len(self._data['site_occupancy']) == len(self._data['atom_types']):
-                    site_data['site_occupancy'] = self._data['site_occupancy'][ind]
-            if 'chemical_shielding_isos' in self._data:
-                if len(self._data['chemical_shielding_isos']) == len(self._data['atom_types']):
-                    site_data['chemical_shielding_iso'] = self._data['chemical_shielding_isos'][ind]
-            if 'magnetic_shielding_tensor' in self._data:
-                if len(self._data['magnetic_shielding_tensors']) == len(self._data['atom_types']):
-                    site_data['magnetic_shielding_tensor'] = self._data['magnetic_shielding_tensors'][ind]
-            if 'chemical_shift_anisos' in self._data:
-                site_data['chemical_shift_aniso'] = self._data['chemical_shift_anisos'][ind]
-            if 'chemical_shift_asymmetries' in self._data:
-                site_data['chemical_shift_asymmetry'] = self._data['chemical_shift_asymmetries'][ind]
-            if 'atomic_spins' in self._data:
-                site_data['spin'] = self._data['atomic_spins'][ind]
-            if 'voronoi_substructure' in self._data:
-                site_data['voronoi_substructure'] = self._data['voronoi_substructure'][ind]
-            elif voronoi:
-                site_data['voronoi_substructure'] = self.voronoi_substructure[ind]
+            for key in Site._crystal_key_map:
+                if key in self._data and len(self._data[key]) == len(self._data["atom_types"]):
+                    site_data[Site._crystal_key_map[key]] = self._data[key]
 
-            self.sites.append(Site(species, position, self.cell.lattice_cart, **site_data))
+            if voronoi and "voronoi_substructure" not in site_data:
+                site_data["voronoi_substructure"] = self.voronoi_substructure[ind]
+
+            self.sites.append(Site(species, position, self.cell, **site_data))
 
     @property
     def atom_types(self):
