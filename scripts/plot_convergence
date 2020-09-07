@@ -6,48 +6,81 @@ this should read data from a run3 convergence test and plot it.
 from os.path import isdir
 from traceback import print_exc
 from matador.plotting.convergence_plotting import (
-    plot_cutoff_kpt_grid, get_convergence_files,
-    get_convergence_data, combine_convergence_data
+    plot_cutoff_kpt_grid,
+    get_convergence_files,
+    get_convergence_data,
+    combine_convergence_data,
 )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser(prog='plot_convergence')
-    parser.add_argument('--species', type=str, nargs='*', help='list of elements to include in plot')
+
+    parser = argparse.ArgumentParser(prog="plot_convergence")
+    parser.add_argument(
+        "--species", type=str, nargs="*", help="list of elements to include in plot"
+    )
     # parser.add_argument('--log', action='store_true', help='Plot log energies')
     # parser.add_argument('--show_chempots', action='store_true', help='Include chempots in plot')
     # parser.add_argument('--only', type=str, help='Show only convergence of this seedname')
-    parser.add_argument('--max_energy',  type=float, help='Plot up to this energy value in meV/atom')
-    # parser.add_argument('--force-range', '--force_range', type=float, help='Plot up to this force value')
-    # parser.add_argument('--energy-target', '--energy_target', type=float, help='Mark this convergence target on the plot')
-    # parser.add_argument('--force-target', '--force_target', type=float, help='Mark this convergence target on the plot')
+    parser.add_argument("--forces", action="store_true", help="Plot force convergence")
+    parser.add_argument(
+        "--max_energy", type=float, help="Plot up to this energy value in meV/atom"
+    )
+    parser.add_argument(
+        "--max-force", "--max_force", type=float, help="Plot up to this force value"
+    )
+    parser.add_argument(
+        "--energy-target",
+        "--energy_target",
+        type=float,
+        help="Mark this convergence target on the plot",
+    )
+    parser.add_argument(
+        "--force-target",
+        "--force_target",
+        type=float,
+        help="Mark this convergence target on the plot",
+    )
     args = parser.parse_args()
     kwargs = vars(args)
-    if kwargs.get('only') is not None:
-        kwargs['only'] = kwargs['only'].split('.')[0]
+    if kwargs.get("only") is not None:
+        kwargs["only"] = kwargs["only"].split(".")[0]
     try:
         cutoff = True
         kpts = True
-        if not isdir('completed_cutoff'):
+        forces = kwargs.pop("forces", False)
+        if not isdir("completed_cutoff"):
             cutoff = False
             cutoff_data = {}
-            print('Did not find completed_cutoff folder, skipping cutoffs...')
-        if not isdir('completed_kpts'):
+            print("Did not find completed_cutoff folder, skipping cutoffs...")
+        if not isdir("completed_kpts"):
             kpts = False
             kpt_data = {}
-            print('Did not find completed_kpts folder, skipping kpts...')
+            print("Did not find completed_kpts folder, skipping kpts...")
         if not cutoff and not kpts:
-            exit('Could not find any completed_$x folders!')
-        if isdir('completed_cutoff'):
-            print('Parsing cutoffs...')
-            cutoff_structure_files = get_convergence_files('completed_cutoff', only=kwargs.get('only'))
-            cutoff_data = get_convergence_data(cutoff_structure_files, conv_parameter='cut_off_energy', species=kwargs['species'])
+            exit("Could not find any completed_$x folders!")
+        if isdir("completed_cutoff"):
+            print("Parsing cutoffs...")
+            cutoff_structure_files = get_convergence_files(
+                "completed_cutoff", only=kwargs.get("only")
+            )
+            cutoff_data = get_convergence_data(
+                cutoff_structure_files,
+                conv_parameter="cut_off_energy",
+                species=kwargs["species"],
+            )
             cutoff = True
-        if isdir('completed_kpts'):
-            print('Parsing kpts...')
-            kpt_structure_files = get_convergence_files('completed_kpts', only=kwargs.get('only'))
-            kpt_data = get_convergence_data(kpt_structure_files, conv_parameter='kpoints_mp_spacing', species=kwargs['species'])
+        if isdir("completed_kpts"):
+            print("Parsing kpts...")
+            kpt_structure_files = get_convergence_files(
+                "completed_kpts", only=kwargs.get("only")
+            )
+            kpt_data = get_convergence_data(
+                kpt_structure_files,
+                conv_parameter="kpoints_mp_spacing",
+                species=kwargs["species"],
+            )
             kpts = True
         if cutoff and kpts:
             data = combine_convergence_data(kpt_data, cutoff_data)
@@ -56,7 +89,9 @@ if __name__ == '__main__':
         else:
             data = kpt_data
 
-        plot_cutoff_kpt_grid(data, forces=False, show=True, png=True, **kwargs)
+        plot_cutoff_kpt_grid(data, forces=forces, show=True, **kwargs)
     except Exception:
         print_exc()
-        print('This script is rubbish, please contact me388@cam.ac.uk and tell him to fix it.')
+        print(
+            "This script is rubbish, please contact me388@cam.ac.uk and tell him to fix it."
+        )
