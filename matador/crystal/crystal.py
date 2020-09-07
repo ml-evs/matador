@@ -106,10 +106,10 @@ class UnitCell:
             self._volume = cell_utils.cart2volume(self._lattice_cart)
         return self._volume
 
-    def __repr__(self):
+    def __str__(self):
         return (
-            f"{self.lengths[0]:3.1f} {self.lengths[1]:3.1f} {self.lengths[2]:3.1f}\n"
-            f"{self.angles[0]:3.1f} {self.angles[1]:3.1f} {self.angles[2]:3.1f}"
+            f"(a, b, c) = {self.lengths[0]:4.4f} Å, {self.lengths[1]:4.4f} Å, {self.lengths[2]:4.4f} Å\n"
+            f"(α, β, γ) = {self.angles[0]:4.4f}° {self.angles[1]:4.4f}° {self.angles[2]:4.4f}°\n"
         )
 
 
@@ -187,19 +187,19 @@ class Crystal(DataContainer):
         return super().__getitem__(key)
 
     def __str__(self):
-        repr_string = "{root_source}: {formula}\n".format(root_source=self.root_source, formula=self.formula)
-        repr_string += "{num_atoms:<3} atoms. {space_group:<8}\n".format(num_atoms=self.num_atoms,
-                                                                         space_group=self.space_group)
+        repr_string = f"{self.formula}: {self.root_source}\n"
+        repr_string += (len(repr_string)-1) * "=" + "\n"
+        repr_string += f"{self.num_atoms:<3} atoms. {self.space_group}\n"
 
         if 'formation_enthalpy_per_atom' in self._data:
             repr_string += ("Formation enthalpy = {:6.6f} eV/atom\n".format(self._data['formation_enthalpy_per_atom']))
 
-        repr_string += (
-            "(a, b, c) = {lattice[0][0]:4.4f} Å, {lattice[0][1]:4.4f} Å, {lattice[0][2]:4.4f} Å\n"
-            "(α, β, γ) = {lattice[1][0]:4.4f}° {lattice[1][1]:4.4f}° {lattice[1][2]:4.4f}°\n"
-            .format(lattice=self.cell.lattice_abc))
+        repr_string += self.cell.__str__()
 
         return repr_string
+
+    def __repr__(self):
+        return f"<Crystal: {self.formula} {self.root_source}>"
 
     def update(self, data):
         """ Update the underlying `self._data` dictionary
@@ -209,9 +209,10 @@ class Crystal(DataContainer):
         self._data.update(data)
 
     def print_sites(self):
-        for site in self:
-            print(site)
         print('---')
+        for ind, site in enumerate(self):
+            print(f"{ind:3d}", end=" ")
+            print(site)
 
     def set_positions(self, new_positions, fractional=True):
         if len(new_positions) != self.num_atoms:

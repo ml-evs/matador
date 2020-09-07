@@ -86,9 +86,19 @@ class Site(DataContainer):
         site_str = '{species} {pos[0]:4.4f} {pos[1]:4.4f} {pos[2]:4.4f}'.format(species=self.species, pos=self.coords)
         for key in self.site_data:
             try:
-                site_str += '\n{} = {:4.4f}'.format(key, float(self.site_data[key]))
-            except ValueError:
-                site_str += '\n{} = {}'.format(key, self.site_data[key])
+                site_str += '\n{} = {:4.4f}'.format(key, np.asarray(self.site_data[key]))
+            except (ValueError, TypeError):
+                with np.printoptions(precision=2, threshold=6, edgeitems=2):
+                    site_str += (
+                        '\n{} = \n{}'
+                        .format(
+                            key,
+                            "\n".join(f"  {row}" for row in np.asarray(self.site_data[key]).__str__().split("\n"))
+                        )
+                    )
+
+        site_str += "\n---"
+
         return site_str
 
     def __deepcopy__(self, memo):
