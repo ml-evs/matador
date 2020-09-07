@@ -1855,13 +1855,57 @@ class ScraperMiscTest(MatadorUnitTest):
             decimal=2,
         )
 
+        np.testing.assert_almost_equal(
+            magres_crystal["quadrupolar_couplings"],
+            [
+                4.3343,
+                -2.1919,
+                4.1313,
+                4.1313,
+                -2.1926,
+                -2.3873,
+                -2.3873,
+                -1.7451,
+                3.8329,
+                3.8329,
+                3.7332,
+                -1.5063,
+                -1.5063,
+                3.7332,
+                3.8329,
+                3.8329,
+                -1.7451,
+                -2.3873,
+                -2.3873,
+                -2.1926,
+                4.1313,
+                4.1313,
+                -2.1919,
+                4.3343,
+                5.3374,
+                5.3374,
+                8.3891,
+                -5.5409,
+                -7.8892,
+                5.1095,
+                4.8178,
+                4.8178,
+                2.3583,
+                2.3583,
+                4.8178,
+                4.8178,
+                5.1095,
+                -7.8892,
+                -5.5409,
+                8.3891,
+            ],
+            decimal=2,
+        )
         self.assertEqual(magres_crystal["calculator"], "CASTEP")
         self.assertEqual(magres_crystal["calculator_version"], "19.1")
 
         self.assertEqual(magres_crystal["magres_units"]["ms"], "ppm")
         self.assertEqual(magres_crystal["magres_units"]["efg"], "au")
-        self.assertEqual(magres_crystal["magres_units"]["lattice"], "Angstrom")
-        self.assertEqual(magres_crystal["magres_units"]["atom"], "Angstrom")
 
     def test_pwscfout(self):
         pwout_fname = REAL_PATH + "data/NaP.out"

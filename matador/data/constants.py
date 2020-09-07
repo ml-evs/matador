@@ -15,8 +15,12 @@ ANGSTROM_CUBED_TO_CENTIMETRE_CUBED = 1e-24
 ELECTRON_CHARGE = physical_constants['elementary charge'][0]
 KELVIN_TO_EV = physical_constants['kelvin-electron volt relationship'][0]
 INVERSE_CM_TO_EV = physical_constants['inverse meter-electron volt relationship'][0] * 100
-EFG_AU_BARN_TO_MHZ = 1
-ELECTRIC_QUADRUPOLE_MOMENTS = {}
+EFG_AU_TO_SI = physical_constants["atomic unit of electric field gradient"][0]
+BARN_TO_M2 = 1e-28
+PLANCK_CONSTANT = physical_constants["Planck constant"][0]
+
+
+ELECTRIC_QUADRUPOLE_MOMENTS = {"O": -0.0256, "Al": 0.1466}
 
 __all__ = [
     'FARADAY_CONSTANT_Cpermol',

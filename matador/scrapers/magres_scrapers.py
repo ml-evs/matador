@@ -15,7 +15,10 @@ import numpy as np
 from matador.utils.cell_utils import cart2abc, cart2frac
 from matador.utils.chem_utils import get_stoich
 from matador.scrapers.utils import scraper_function, get_flines_extension_agnostic
-from matador.data.constants import EFG_AU_BARN_TO_MHZ, ELECTRIC_QUADRUPOLE_MOMENTS
+from matador.data.constants import (
+    ELECTRIC_QUADRUPOLE_MOMENTS, ELECTRON_CHARGE,
+    PLANCK_CONSTANT, BARN_TO_M2, EFG_AU_TO_SI
+)
 
 
 @scraper_function
@@ -85,13 +88,8 @@ def magres2dict(fname, **kwargs):
                     s_iso = np.trace(ms) / 3
 
                     # find eigenvalues of symmetric part of shielding and order them to calc anisotropy eta
-                    symmetric_shielding = 0.5 * (ms + ms.T)
-                    eig_vals, eig_vecs = np.linalg.eig(symmetric_shielding)
-                    eig_vals, eig_vecs = zip(*sorted(zip(eig_vals, eig_vecs),
-                                                     key=lambda eig: abs(eig[0] - s_iso)))
-
-                    # Haeberlen convention: |s_zz - s_iso| >= |s_xx - s_iso| >= |s_yy - s_iso|
-                    s_yy, s_xx, s_zz = eig_vals
+                    symmetric_shielding = _symmetrise_tensor(ms)
+                    s_yy, s_xx, s_zz = _get_haeberlen_eigs(symmetric_shielding)
                     s_aniso = s_zz - (s_xx + s_yy)/2.0
                     asymm = (s_yy - s_xx) / (s_zz - s_iso)
 
@@ -103,13 +101,16 @@ def magres2dict(fname, **kwargs):
 
                 elif "efg" in split_line:
                     efg = np.array([float(val) for val in split_line[3:]]).reshape(3, 3)
-                    species = split_line[0]
+                    species = split_line[1]
 
-                    eigs, _ = np.linalg.eig(efg)
-                    eigs = sorted(eigs, key=lambda x: abs(x))
-                    vzz, eta = eigs[2], (eigs[0] - eigs[1]) / eigs[2]
+                    eigs = _get_haeberlen_eigs(efg)
+                    v_zz, eta = eigs[2], (eigs[0] - eigs[1]) / eigs[2]
 
-                    C_Q = (vzz * ELECTRIC_QUADRUPOLE_MOMENTS.get(species, 1) * EFG_AU_BARN_TO_MHZ)
+                    # calculate C_Q in MHz
+                    C_Q = (
+                        (ELECTRON_CHARGE * v_zz * ELECTRIC_QUADRUPOLE_MOMENTS[species] * EFG_AU_TO_SI * BARN_TO_M2)
+                        / (PLANCK_CONSTANT * 1e6)
+                    )
 
                     magres["electric_field_gradient"].append(efg)
                     magres["quadrupolar_couplings"].append(C_Q)
@@ -132,3 +133,35 @@ def magres2dict(fname, **kwargs):
                 i += 1
 
     return dict(magres), True
+
+
+def _symmetrise_tensor(t):
+    """ Returns the symmetrised tensor.
+
+    Arguments:
+        t: numpy array containing a NxN square tensor.
+
+    Returns:
+        np.ndarray: NxN numpy array containing the symmetric tensor.
+
+    """
+    return 0.5 * (t + t.T)
+
+
+def _get_haeberlen_eigs(t: np.ndarray):
+    """ Return Haeberlen convention ordered eigenvalues of the passed tensor.
+
+    ``|s_zz - s_iso| >= |s_xx - s_iso| >= |s_yy - s_iso|``
+
+    Arguments:
+        t: numpy array containing a NxN square tensor.
+
+    Returns:
+        np.ndarray: N-d numpy array containing the ordered eigenvalues.
+
+    """
+    eig_vals, eig_vecs = np.linalg.eig(t)
+    eig_vals, eig_vecs = zip(*sorted(zip(eig_vals, eig_vecs),
+                                     key=lambda eig: abs(eig[0] - np.trace(t) / 3)))
+
+    return eig_vals
