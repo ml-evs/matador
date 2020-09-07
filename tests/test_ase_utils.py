@@ -68,7 +68,7 @@ class AseUtilTest(unittest.TestCase):
 
         for ind, site in enumerate(doc):
             np.testing.assert_array_almost_equal(
-                site.get_coords("cartesian"), ase_atoms[ind].position, decimal=12
+                site.coords_cartesian, ase_atoms[ind].position, decimal=12
             )
             self.assertEqual(site.species, ase_atoms[ind].symbol)
 

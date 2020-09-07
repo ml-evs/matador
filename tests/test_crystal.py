@@ -128,10 +128,17 @@ class CrystalTest(unittest.TestCase):
 
         doc["positions_abs"] = frac2cart(doc["lattice_cart"], doc["positions_frac"])
 
-        np.testing.assert_array_equal(doc["positions_abs"], crystal.positions_abs)
-        print(crystal.positions_abs)
-        for site in crystal:
-            print(site, site.get_coords("cartesian"))
+        np.testing.assert_array_almost_equal(doc["positions_abs"], crystal.positions_abs)
+        for ind, site in enumerate(crystal):
+            np.testing.assert_array_almost_equal(doc["positions_abs"][ind], site.coords_cartesian)
+
+        crystal.cell.lengths = np.asarray(crystal.cell.lengths) * 10
+
+        rescaled_pos = frac2cart(np.asarray(doc["lattice_cart"]) * 10, doc["positions_frac"])
+
+        for ind, site in enumerate(crystal):
+            np.testing.assert_array_almost_equal(doc["positions_frac"][ind], site.coords)
+            np.testing.assert_array_almost_equal(rescaled_pos[ind], site.coords_cartesian)
 
     def test_minimal_init(self):
         doc = Crystal(
@@ -180,8 +187,8 @@ class CrystalTest(unittest.TestCase):
         doc, s = castep2dict(REAL_PATH + "data/Na3Zn4-swap-ReOs-OQMD_759599.castep")
         del doc["lattice_cart"]
         crystal = Crystal(doc)
-        print(crystal)
-        self.assertEqual(crystal[0].coords, [0.776467, 0.466319, 0.0])
+        np.testing.assert_array_almost_equal(crystal[0].coords, [0.776467, 0.466319, 0.0])
+
         with self.assertRaises(RuntimeError):
             crystal[0].set_position([0.5, 0.6, 0.7, 0.8], "fractional")
         with self.assertRaises(RuntimeError):
@@ -193,7 +200,7 @@ class CrystalTest(unittest.TestCase):
         atom = Site(
             species="Cl",
             position=[0.2, 0.5, 0.2],
-            lattice_cart=[[10, 0, 0], [0, 10, 0], [0, 0, 10]],
+            lattice=[[10, 0, 0], [0, 10, 0], [0, 0, 10]],
         )
         atom2 = copy.deepcopy(atom)
         atom2.species = "Br"

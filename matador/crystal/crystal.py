@@ -106,6 +106,12 @@ class UnitCell:
             self._volume = cell_utils.cart2volume(self._lattice_cart)
         return self._volume
 
+    def __repr__(self):
+        return (
+            f"{self.lengths[0]:3.1f} {self.lengths[1]:3.1f} {self.lengths[2]:3.1f}\n"
+            f"{self.angles[0]:3.1f} {self.angles[1]:3.1f} {self.angles[2]:3.1f}"
+        )
+
 
 class Crystal(DataContainer):
     """ Class that wraps the MongoDB document, providing useful
@@ -234,7 +240,7 @@ class Crystal(DataContainer):
             site_data = {}
             for key in Site._crystal_key_map:
                 if key in self._data and len(self._data[key]) == len(self._data["atom_types"]):
-                    site_data[Site._crystal_key_map[key]] = self._data[key]
+                    site_data[Site._crystal_key_map[key]] = self._data[key][ind]
 
             if voronoi and "voronoi_substructure" not in site_data:
                 site_data["voronoi_substructure"] = self.voronoi_substructure[ind]

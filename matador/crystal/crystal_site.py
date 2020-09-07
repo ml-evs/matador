@@ -31,7 +31,7 @@ class Site(DataContainer):
         "voronoi_substructure": "voronoi_substructure"
     }
 
-    def __init__(self, species: str, position: list, lattice_cart,
+    def __init__(self, species: str, position: list, lattice,
                  position_unit='fractional', **site_data):
         """ Initialise a Site object from its species, position and
         a reference to the lattice it exists in. Any other keys will be made available
@@ -42,12 +42,17 @@ class Site(DataContainer):
             assert self.species == site_data['voronoi_substructure'][0]
             site_data['voronoi_substructure'] = site_data['voronoi_substructure'][1]
 
+        # DataContainer will take a copy of all data passed to it, but lets keep
+        # lattice as a reference so that it can change externally
+        self._lattice = lattice
+
         super().__init__(
             species=species,
             position=position,
-            lattice_cart=lattice_cart,
             **site_data
         )
+
+        self._data["lattice_cart"] = self._lattice
 
         self.set_position(position, position_unit)
         self._occupancy = None
@@ -88,25 +93,23 @@ class Site(DataContainer):
 
     def __deepcopy__(self, memo):
         from copy import deepcopy
-        species, position, lattice = (deepcopy(x) for x in (self.species, self._coords['fractional'], self.lattice))
+        species, position, lattice = (deepcopy(x) for x in (self.species, self.coords, self.lattice))
         site_data = deepcopy(self.site_data)
         return Site(species, position, lattice, position_unit='fractional', **site_data)
 
     def set_position(self, position, units):
         if len(position) != 3 or not all(isinstance(p, (float, int)) for p in position):
             raise RuntimeError('CrystalSite position has wrong shape: {}'.format(position))
-        if '_coords' not in self.__dict__:
+        if not hasattr(self, '_coords'):
             self._coords = dict()
         if units == 'fractional':
             self._coords['fractional'] = wrap_frac_coords(
                 [float(pos) for pos in position],
                 remove=False
             )
-            self._coords['cartesian'] = frac2cart(self.lattice, self.coords)
         elif units == 'cartesian':
-            self._coords['cartesian'] = [float(pos) for pos in position]
             self._coords['fractional'] = wrap_frac_coords(
-                cart2frac(self.lattice, self.coords(units='cartesian')),
+                cart2frac(self.lattice, self.coords),
                 remove=False
             )
         else:
@@ -114,7 +117,11 @@ class Site(DataContainer):
 
     @property
     def coords(self):
-        return self._coords['fractional']
+        return np.asarray(self._coords['fractional'])
+
+    @property
+    def coords_cartesian(self):
+        return np.asarray(frac2cart(self.lattice, self.coords))
 
     @property
     def species(self):
@@ -126,13 +133,10 @@ class Site(DataContainer):
 
     @property
     def lattice(self):
-        return self._data['lattice_cart']
-
-    def get_coords(self, units='fractional'):
-        if units not in ['fractional', 'cartesian']:
-            raise RuntimeError('Unit system {} not understood, expecting `fractional`/`cartesian`'.format(units))
-        else:
-            return self._coords[units]
+        try:
+            return self._lattice.lattice_cart
+        except AttributeError:
+            return self._lattice
 
     @property
     def occupancy(self):
@@ -160,7 +164,7 @@ class Site(DataContainer):
         return coordination
 
     def displacement_between_sites(self, other_site):
-        return np.asarray(self.get_coords(units='cartesian')) - np.asarray(other_site.get_coords(units='cartesian'))
+        return self.coords_cartesian - other_site.coords_cartesian
 
     def distance_between_sites(self, other_site):
         return np.linalg.norm(
