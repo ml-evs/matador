@@ -27,7 +27,7 @@ LOG = logging.getLogger('run3')
 __all__ = ("castep_full_magres")
 
 
-def castep_full_magres(computer, calc_doc, seed, final_elec_energy_tol=1e-12, **kwargs):
+def castep_full_magres(computer, calc_doc, seed, final_elec_energy_tol=1e-11, **kwargs):
     """ Perform a "full" magres calculation on a system, i.e.
     first perform a relaxation, then do a high quality SCF
     and compute NMR properties in the same step.
@@ -80,7 +80,7 @@ class CastepMagresWorkflow(Workflow):
 
         """
 
-        self.final_elec_energy_tol = self.workflow_params.get("elec_energy_tol", 1e-12)
+        self.final_elec_energy_tol = self.workflow_params.get("final_elec_energy_tol", 1e-11)
         # default todo
         todo = {'relax': True, 'scf': True, 'dos': True, 'pdos': True, 'broadening': True, 'magres': True}
         # definition of steps and names
@@ -139,7 +139,7 @@ class CastepMagresWorkflow(Workflow):
                               output_exts=exts[key].get('output'))
 
 
-def castep_magres_scf(computer, calc_doc, seed, elec_energy_tol=1e-12):
+def castep_magres_scf(computer, calc_doc, seed, elec_energy_tol=1e-11):
     """ Run a singleshot SCF calculation with a high elec_energy_tol.
 
     Parameters:
@@ -161,7 +161,7 @@ def castep_magres_scf(computer, calc_doc, seed, elec_energy_tol=1e-12):
     )
 
 
-def castep_magres(computer, calc_doc, seed, elec_energy_tol=1e-12):
+def castep_magres(computer, calc_doc, seed, elec_energy_tol=1e-11):
     """ Runs a NMR properties calculation on top of a completed
     SCF calculation.
 
