@@ -20,11 +20,14 @@ Written & maintained by `Matthew Evans <https://ml-evs.science>`_ (2016-).
 Installation
 ------------
 
-In the simplest case (e.g. you already have Python 3.6+ set up), ``pip install matador-db`` is sufficient to get up and running, preferably in a fresh virtual environment. More detailed instructions can be found in the `Installation instructions <https://docs.matador.science/en/latest/install.html>`_.
-
-Tests can be run on your local machine with ``python -m unittest discover -v -b`` or simply with ``py.test`` (required pytest to be installed); in order to test CASTEP-running functionality, the tests will look for an MPI-enabled executable named ``castep`` on your ``$PATH``.
+In the simplest case (e.g. you already have Python 3.6+ set up), ``pip install matador-db`` is sufficient to get up and running, preferably in a fresh virtual environment.
 
 Upgrading to the latest version should be as simple as ``pip install -U matador-db``.
+
+For an editable development installation, clone the source code from this repository and run ``pip install -e .`` from the matador folder. Tests can be run on your local machine with ``python -m unittest discover -v -b`` or simply with ``py.test`` after test dependencies have been installed with ``pip install .[test]``. In order to test CASTEP-running functionality, the tests will look for an MPI-enabled executable named ``castep`` on your ``$PATH``.
+
+Further instructions can be found in the `Installation instructions <https://docs.matador.science/en/latest/install.html>`_.
+
 
 Usage
 ------
