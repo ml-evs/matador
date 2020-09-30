@@ -16,9 +16,10 @@ from matador.utils.cell_utils import cart2abc, cart2frac
 from matador.utils.chem_utils import get_stoich
 from matador.scrapers.utils import scraper_function, get_flines_extension_agnostic
 from matador.data.constants import (
-    ELECTRIC_QUADRUPOLE_MOMENTS, ELECTRON_CHARGE,
+    ELECTRON_CHARGE,
     PLANCK_CONSTANT, BARN_TO_M2, EFG_AU_TO_SI
 )
+from matador.data import ELECTRIC_QUADRUPOLE_MOMENTS
 
 
 @scraper_function
@@ -107,8 +108,10 @@ def magres2dict(fname, **kwargs):
                     v_zz, eta = eigs[2], (eigs[0] - eigs[1]) / eigs[2]
 
                     # calculate C_Q in MHz
+                    quadrupole_moment = ELECTRIC_QUADRUPOLE_MOMENTS.get(species, 1.0)
+
                     C_Q = (
-                        (ELECTRON_CHARGE * v_zz * ELECTRIC_QUADRUPOLE_MOMENTS[species] * EFG_AU_TO_SI * BARN_TO_M2)
+                        (ELECTRON_CHARGE * v_zz * quadrupole_moment * EFG_AU_TO_SI * BARN_TO_M2)
                         / (PLANCK_CONSTANT * 1e6)
                     )
 

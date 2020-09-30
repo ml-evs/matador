@@ -20,8 +20,6 @@ BARN_TO_M2 = 1e-28
 PLANCK_CONSTANT = physical_constants["Planck constant"][0]
 
 
-ELECTRIC_QUADRUPOLE_MOMENTS = {"O": -0.0256, "Al": 0.1466}
-
 __all__ = [
     'FARADAY_CONSTANT_Cpermol',
     'HARTREE_TO_EV',
