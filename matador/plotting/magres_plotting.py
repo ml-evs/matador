@@ -84,7 +84,7 @@ def plot_magres(
     max_shielding = -1e20
     for ind, doc in enumerate(magres):
 
-        if isinstance(magres, dict):
+        if isinstance(doc, dict):
             _doc = Crystal(doc)
         else:
             _doc = doc
