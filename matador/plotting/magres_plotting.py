@@ -29,6 +29,7 @@ def plot_magres(
     show: bool = False,
     savefig: Optional[str] = None,
     signal_labels: Optional[Union[str, List[str]]] = None,
+    signal_limits: Tuple[float] = None,
     line_kwargs: Optional[Union[Dict, List[Dict]]] = None,
 ):
     """ Plot voltage curve calculated for phase diagram.
@@ -48,6 +49,8 @@ def plot_magres(
         savefig (str): filename to use to save the plot.
         signal_labels (list): optional list of labels for the curves in
             the magres list.
+        signal_limits (Tuple[float]): values at which to clip the magres signals. Defaults
+            to the maximum and minimum shifts across all passed structures.
         line_kwargs (list or dict): parameters to pass to the curve plotter,
             if a list then the line kwargs will be passed to each line individually.
 
@@ -80,8 +83,12 @@ def plot_magres(
         )
 
     _magres = []
-    min_shielding = 1e20
-    max_shielding = -1e20
+
+    if signal_limits is not None:
+        min_shielding, max_shielding = signal_limits
+    else:
+        min_shielding, max_shielding = (1e20, -1e20)
+
     for ind, doc in enumerate(magres):
 
         if isinstance(doc, dict):
@@ -94,8 +101,9 @@ def plot_magres(
         relevant_sites = [atom for atom in _doc if atom.species == species]
         if relevant_sites:
             shielding = [atom[magres_key] for atom in relevant_sites]
-            min_shielding = min(np.min(shielding), min_shielding)
-            max_shielding = max(np.max(shielding), max_shielding)
+            if signal_limits is None:
+                min_shielding = min(np.min(shielding), min_shielding)
+                max_shielding = max(np.max(shielding), max_shielding)
 
     if min_shielding > 1e19 and max_shielding < -1e19:
         raise RuntimeError(f"No sites of {species} found in any of the passed crystals.")
@@ -106,6 +114,9 @@ def plot_magres(
         max_shielding + _buffer,
         num=1000
     )
+
+    _padded_colours = list(plt.rcParams["axes.prop_cycle"].by_key()["color"])
+    _padded_colours = (1 + (len(magres) // len(_padded_colours))) * _padded_colours
 
     if line_kwargs is not None and len(line_kwargs) != len(magres):
         raise RuntimeError(
@@ -123,7 +134,7 @@ def plot_magres(
         if signal_labels is not None and len(signal_labels) > ind:
             _label = signal_labels[ind]
 
-        _line_kwargs = {'c': list(plt.rcParams['axes.prop_cycle'].by_key()['color'])[ind+2]}
+        _line_kwargs = {'c': _padded_colours[ind]}
         if line_kwargs is not None:
             _line_kwargs.update(line_kwargs[ind])
 
@@ -144,7 +155,10 @@ def plot_magres(
                 bin_centres = s_space[:-1] + (s_space[1] - s_space[0]) / 2
                 s_space = bin_centres
 
-            signal /= np.max(signal)
+            if np.max(signal) > 1e-10:
+                signal /= np.max(signal)
+            else:
+                signal *= 0
 
         ax.plot(s_space, signal + (ind * 1.1), **_line_kwargs)
 
