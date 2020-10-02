@@ -681,15 +681,11 @@ class CastepScraperTests(MatadorUnitTest):
             error = True
 
     def test_multiple_exts(self):
-        castep_fname = (
-            REAL_PATH + "data/castep_files/Na-edgecase-CollCode10101"
-        )
+        castep_fname = REAL_PATH + "data/castep_files/Na-edgecase-CollCode10101"
         test_dict, s = castep2dict(castep_fname, db=True)
         self.assertTrue(s, msg="Failed entirely, oh dear!\n{}".format(test_dict))
 
-        castep_fname = (
-            REAL_PATH + "data/castep_files/CuP-thermo-test"
-        )
+        castep_fname = REAL_PATH + "data/castep_files/CuP-thermo-test"
         test_dict, s = castep2dict(castep_fname, db=False)
         self.assertTrue(s, msg="Failed entirely, oh dear!\n{}".format(test_dict))
 
@@ -1656,6 +1652,260 @@ class ScraperMiscTest(MatadorUnitTest):
         self.assertEqual(magres_crystal["magres_units"]["ms"], "ppm")
         self.assertEqual(magres_crystal["magres_units"]["lattice"], "Angstrom")
         self.assertEqual(magres_crystal["magres_units"]["atom"], "Angstrom")
+
+    def test_castep_magres_efg(self):
+        magres_fname = REAL_PATH + "data/magres_files/Al2O3.magres"
+        magres_crystal, s = magres2dict(magres_fname, as_model=False, verbosity=5)
+        self.assertTrue(s)
+        # self.assertEqual(len(magres_crystal["atom_types"]), 40)
+        # np.testing.assert_array_equal(
+        #     magres_crystal.lattice_cart,
+        #     np.array(
+        #         [
+        #             [4.1332870000000002, 0.0000000000000000, 0.0000000000000000],
+        #             [-8.9905292805212659e-4, 6.0637949333506347, 0.0000000000000000],
+        #             [2.0677013018922552, 3.3924745014331725e-1, 12.368724395669441],
+        #         ],
+        #     ),
+        # )
+
+        np.testing.assert_almost_equal(
+            magres_crystal["chemical_shielding_isos"],
+            [
+                161.853,
+                183.025,
+                172.432,
+                172.432,
+                167.275,
+                156.212,
+                156.212,
+                179.976,
+                182.155,
+                182.155,
+                182.817,
+                189.255,
+                189.255,
+                182.817,
+                182.155,
+                182.155,
+                179.976,
+                156.212,
+                156.212,
+                167.275,
+                172.432,
+                172.432,
+                183.025,
+                161.853,
+                543.580,
+                543.580,
+                487.296,
+                539.563,
+                489.973,
+                541.225,
+                540.768,
+                540.768,
+                483.439,
+                483.439,
+                540.768,
+                540.768,
+                541.225,
+                489.973,
+                539.563,
+                487.296,
+            ],
+            decimal=2,
+        )
+        np.testing.assert_almost_equal(
+            magres_crystal["chemical_shift_anisos"],
+            [
+                -17.8527,
+                11.7056,
+                -10.1521,
+                -10.1521,
+                17.2892,
+                -22.7995,
+                -22.7995,
+                8.9808,
+                10.5535,
+                10.5535,
+                7.8228,
+                13.6391,
+                13.6391,
+                7.8228,
+                10.5535,
+                10.5535,
+                8.9808,
+                -22.7995,
+                -22.7995,
+                17.2892,
+                -10.1521,
+                -10.1521,
+                11.7056,
+                -17.8527,
+                -22.4242,
+                -22.4242,
+                -41.4922,
+                -22.2261,
+                46.6031,
+                -18.5085,
+                -19.0290,
+                -19.0290,
+                -14.2300,
+                -14.2300,
+                -19.0290,
+                -19.0290,
+                -18.5085,
+                46.6031,
+                -22.2261,
+                -41.4922,
+            ],
+            decimal=2,
+        )
+        np.testing.assert_almost_equal(
+            magres_crystal["chemical_shift_asymmetries"],
+            [
+                0.5984,
+                0.3471,
+                0.1803,
+                0.1803,
+                0.2218,
+                0.7010,
+                0.7010,
+                0.2946,
+                0.4797,
+                0.4797,
+                0.7501,
+                0.0757,
+                0.0757,
+                0.7501,
+                0.4797,
+                0.4797,
+                0.2946,
+                0.7010,
+                0.7010,
+                0.2218,
+                0.1803,
+                0.1803,
+                0.3471,
+                0.5984,
+                0.4436,
+                0.4436,
+                0.5404,
+                0.8069,
+                0.1034,
+                0.3005,
+                0.4336,
+                0.4336,
+                0.1165,
+                0.1165,
+                0.4336,
+                0.4336,
+                0.3005,
+                0.1034,
+                0.8069,
+                0.5404,
+            ],
+            decimal=2,
+        )
+
+        np.testing.assert_almost_equal(
+            magres_crystal["quadrupolar_asymmetries"],
+            [
+                0.5745,
+                0.0775,
+                0.5651,
+                0.5651,
+                0.2482,
+                0.4066,
+                0.4066,
+                0.1503,
+                0.4494,
+                0.4494,
+                0.3889,
+                0.0946,
+                0.0946,
+                0.3889,
+                0.4494,
+                0.4494,
+                0.1503,
+                0.4066,
+                0.4066,
+                0.2482,
+                0.5651,
+                0.5651,
+                0.0775,
+                0.5745,
+                0.7239,
+                0.7239,
+                0.1168,
+                0.9321,
+                0.0885,
+                0.6130,
+                0.8278,
+                0.8278,
+                0.0189,
+                0.0189,
+                0.8278,
+                0.8278,
+                0.6130,
+                0.0885,
+                0.9321,
+                0.1168,
+            ],
+            decimal=2,
+        )
+
+        np.testing.assert_almost_equal(
+            magres_crystal["quadrupolar_couplings"],
+            [
+                4.3343,
+                -2.1919,
+                4.1313,
+                4.1313,
+                -2.1926,
+                -2.3873,
+                -2.3873,
+                -1.7451,
+                3.8329,
+                3.8329,
+                3.7332,
+                -1.5063,
+                -1.5063,
+                3.7332,
+                3.8329,
+                3.8329,
+                -1.7451,
+                -2.3873,
+                -2.3873,
+                -2.1926,
+                4.1313,
+                4.1313,
+                -2.1919,
+                4.3343,
+                5.3374,
+                5.3374,
+                8.3891,
+                -5.5409,
+                -7.8892,
+                5.1095,
+                4.8178,
+                4.8178,
+                2.3583,
+                2.3583,
+                4.8178,
+                4.8178,
+                5.1095,
+                -7.8892,
+                -5.5409,
+                8.3891,
+            ],
+            decimal=2,
+        )
+        self.assertEqual(magres_crystal["calculator"], "CASTEP")
+        self.assertEqual(magres_crystal["calculator_version"], "19.1")
+
+        self.assertEqual(magres_crystal["magres_units"]["ms"], "ppm")
+        self.assertEqual(magres_crystal["magres_units"]["efg"], "au")
 
     def test_pwscfout(self):
         pwout_fname = REAL_PATH + "data/NaP.out"

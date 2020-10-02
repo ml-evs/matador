@@ -409,7 +409,7 @@ class MagresPlotTests(MatadorUnitTest):
     """ Test ability to plot magres data. """
 
     def test_magres_plot(self):
-        magres, f = magres2dict(REAL_PATH + "data/magres_files/*.magres", as_model=True)
+        magres, f = magres2dict(REAL_PATH + "data/magres_files/*P*.magres", as_model=True)
         plot_magres(
             magres,
             species="P",

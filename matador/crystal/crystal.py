@@ -106,6 +106,12 @@ class UnitCell:
             self._volume = cell_utils.cart2volume(self._lattice_cart)
         return self._volume
 
+    def __str__(self):
+        return (
+            f"(a, b, c) = {self.lengths[0]:4.4f} Å, {self.lengths[1]:4.4f} Å, {self.lengths[2]:4.4f} Å\n"
+            f"(α, β, γ) = {self.angles[0]:4.4f}° {self.angles[1]:4.4f}° {self.angles[2]:4.4f}°\n"
+        )
+
 
 class Crystal(DataContainer):
     """ Class that wraps the MongoDB document, providing useful
@@ -181,19 +187,19 @@ class Crystal(DataContainer):
         return super().__getitem__(key)
 
     def __str__(self):
-        repr_string = "{root_source}: {formula}\n".format(root_source=self.root_source, formula=self.formula)
-        repr_string += "{num_atoms:<3} atoms. {space_group:<8}\n".format(num_atoms=self.num_atoms,
-                                                                         space_group=self.space_group)
+        repr_string = f"{self.formula}: {self.root_source}\n"
+        repr_string += (len(repr_string)-1) * "=" + "\n"
+        repr_string += f"{self.num_atoms:<3} atoms. {self.space_group}\n"
 
         if 'formation_enthalpy_per_atom' in self._data:
             repr_string += ("Formation enthalpy = {:6.6f} eV/atom\n".format(self._data['formation_enthalpy_per_atom']))
 
-        repr_string += (
-            "(a, b, c) = {lattice[0][0]:4.4f} Å, {lattice[0][1]:4.4f} Å, {lattice[0][2]:4.4f} Å\n"
-            "(α, β, γ) = {lattice[1][0]:4.4f}° {lattice[1][1]:4.4f}° {lattice[1][2]:4.4f}°\n"
-            .format(lattice=self.cell.lattice_abc))
+        repr_string += self.cell.__str__()
 
         return repr_string
+
+    def __repr__(self):
+        return f"<Crystal: {self.formula} {self.root_source}>"
 
     def update(self, data):
         """ Update the underlying `self._data` dictionary
@@ -203,9 +209,10 @@ class Crystal(DataContainer):
         self._data.update(data)
 
     def print_sites(self):
-        for site in self:
-            print(site)
         print('---')
+        for ind, site in enumerate(self):
+            print(f"{ind:3d}", end=" ")
+            print(site)
 
     def set_positions(self, new_positions, fractional=True):
         if len(new_positions) != self.num_atoms:
@@ -227,31 +234,19 @@ class Crystal(DataContainer):
                 of each site.
 
         """
+
         self.sites = []
         for ind, species in enumerate(self.atom_types):
             position = self.positions_frac[ind]
             site_data = {}
-            if 'site_occupancy' in self._data:
-                if len(self._data['site_occupancy']) == len(self._data['atom_types']):
-                    site_data['site_occupancy'] = self._data['site_occupancy'][ind]
-            if 'chemical_shielding_isos' in self._data:
-                if len(self._data['chemical_shielding_isos']) == len(self._data['atom_types']):
-                    site_data['chemical_shielding_iso'] = self._data['chemical_shielding_isos'][ind]
-            if 'magnetic_shielding_tensor' in self._data:
-                if len(self._data['magnetic_shielding_tensors']) == len(self._data['atom_types']):
-                    site_data['magnetic_shielding_tensor'] = self._data['magnetic_shielding_tensors'][ind]
-            if 'chemical_shift_anisos' in self._data:
-                site_data['chemical_shift_aniso'] = self._data['chemical_shift_anisos'][ind]
-            if 'chemical_shift_asymmetries' in self._data:
-                site_data['chemical_shift_asymmetry'] = self._data['chemical_shift_asymmetries'][ind]
-            if 'atomic_spins' in self._data:
-                site_data['spin'] = self._data['atomic_spins'][ind]
-            if 'voronoi_substructure' in self._data:
-                site_data['voronoi_substructure'] = self._data['voronoi_substructure'][ind]
-            elif voronoi:
-                site_data['voronoi_substructure'] = self.voronoi_substructure[ind]
+            for key in Site._crystal_key_map:
+                if key in self._data and len(self._data[key]) == len(self._data["atom_types"]):
+                    site_data[Site._crystal_key_map[key]] = self._data[key][ind]
 
-            self.sites.append(Site(species, position, self.cell.lattice_cart, **site_data))
+            if voronoi and "voronoi_substructure" not in site_data:
+                site_data["voronoi_substructure"] = self.voronoi_substructure[ind]
+
+            self.sites.append(Site(species, position, self.cell, **site_data))
 
     @property
     def atom_types(self):
