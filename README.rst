@@ -2,8 +2,10 @@
 matador
 =======
 
-| |GH Actions| |Coverage Status| |Documentation Status| |MIT License|
-| |PyPI Version| |Binder| |Zenodo|
+| |PyPI Version| |GH Actions| |Binder|
+| |Documentation Status| |MIT License| |Coverage Status|
+| |JOSS| |Zenodo|
+
 
 matador is an aggregator, manipulator and runner of first-principles calculations, written with a bent towards battery electrode materials.
 The source can be found on `GitHub <https://github.com/ml-evs/matador>`_ and online documentation is hosted at `ReadTheDocs <https://docs.matador.science>`_.
@@ -72,15 +74,18 @@ If you use matador in your work, we kindly ask that you cite the source code arc
 
 
 .. |PyPI Version| image:: https://img.shields.io/pypi/v/matador-db?label=PyPI&logo=pypi
+   :target: https://pypi.org/project/matador-db/
 .. |GH Actions| image:: https://img.shields.io/github/workflow/status/ml-evs/matador/Run%20tests/master?label=master&logo=github
    :target: https://github.com/ml-evs/matador/actions?query=branch%3Amaster
 .. |MIT License| image:: https://img.shields.io/badge/license-MIT-blue.svg
    :target: https://github.com/ml-evs/matador/blob/master/LICENSE
 .. |Coverage Status| image:: https://img.shields.io/codecov/c/gh/ml-evs/matador/master?logo=codecov
-  :target: https://codecov.io/gh/ml-evs/matador
+   :target: https://codecov.io/gh/ml-evs/matador
 .. |Documentation Status| image:: https://readthedocs.org/projects/matador-db/badge/?version=stable
    :target: https://matador-db.readthedocs.io/en/stable/?badge=stable
 .. |Zenodo| image:: https://zenodo.org/badge/DOI/10.5281/zenodo.3908573.svg
    :target: https://doi.org/10.5281/zenodo.3908573
 .. |Binder| image:: https://mybinder.org/badge_logo.svg
- :target: https://mybinder.org/v2/gh/ml-evs/matador/master?filepath=examples
+   :target: https://mybinder.org/v2/gh/ml-evs/matador/master?filepath=examples
+.. |JOSS| image:: https://joss.theoj.org/papers/4d0eea9bea4362dec4cb6d62ebccc913/status.svg
+   :target: https://joss.theoj.org/papers/4d0eea9bea4362dec4cb6d62ebccc913
