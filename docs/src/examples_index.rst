@@ -43,6 +43,8 @@ These examples require external data, but can be used as example code.
 Tutorials
 ---------
 
+These tutorials will guide you through common use cases of the command-line tools bundled with ``matador``.
+
 .. toctree::
     :maxdepth: 2
 
