@@ -33,7 +33,7 @@ The properties of materials depend heavily on their atomistic structure; knowled
 
 # Statement of need
 
-The purpose of `matador` is four-fold: 
+The purpose of `matador` is fourfold:
 - to promote the use of local databases and high-throughput workflows to increase the reproducibility of the computational results, 
 - to perform reliable analysis of the stability, structure and properties of materials derived from calculations, 
 - to provide tools to create customisable, publication-quality plots of phase diagrams, spectral properties and electrochemistry,
