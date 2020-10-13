@@ -34,6 +34,7 @@ The properties of materials depend heavily on their atomistic structure; knowled
 # Statement of need
 
 The purpose of `matador` is fourfold:
+
 - to promote the use of local databases and high-throughput workflows to increase the reproducibility of the computational results, 
 - to perform reliable analysis of the stability, structure and properties of materials derived from calculations, 
 - to provide tools to create customisable, publication-quality plots of phase diagrams, spectral properties and electrochemistry,
@@ -41,7 +42,7 @@ The purpose of `matador` is fourfold:
 
 # `matador`
 
-`matador` is a Python 3.6+ library and set of command-line tools for performing and analysing high-throughput DFT calculations using the CASTEP [@castep] and Quantum Espresso [@qe] packages. It is well-tested and fully-documented at [ReadTheDocs](https://matador-db.readthedocs.io), and comes with several tutorials and examples. The package is available on PyPI under the name [`matador-db`](https://pypi.org/project/matador-db). As with many projects, `matador` is built on top of the scientific Python ecosystem of NumPy [@numpy; @numpybook], SciPy [@scipy] and matplotlib [@matplotlib].
+`matador` is a Python 3.6+ library and set of command-line tools for performing and analysing high-throughput DFT calculations using the CASTEP [@castep] and Quantum Espresso [@qe] packages. It is well-tested and fully-documented at [ReadTheDocs](https://matador-db.readthedocs.io), and comes with several tutorials and examples. The package is available on PyPI under the name [`matador-db`](https://pypi.org/project/matador-db). As with many projects, `matador` is built on top of the scientific Python ecosystem of NumPy [@numpy], SciPy [@scipy] and matplotlib [@matplotlib].
 
 `matador` has been developed with high-throughput CSP in mind and has found use in the application of CSP to energy storage materials [@NaP; @CuP]; in this use case, a single compositional phase diagram can consist of tens of thousands of structural relaxation calculations. This package is aimed at users of CASTEP or Quantum Espresso who are comfortable with the command-line, yet maybe lack the Python knowledge required to start from scratch with more sophisticated packages. There are many mature packages that provide overlapping functionality with `matador`, the most widespread of which being the Atomic Simulation Environment (ASE) [@ase] and pymatgen [@pymatgen]. A translation layer to and from the structure representation of both of these packages is provided, such that analysis can be reused and combined. 
 
