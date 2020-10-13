@@ -16,7 +16,9 @@ Example Jupyter notebooks
 Interactive
 ~~~~~~~~~~~
 
-These interactive examples can be run under Binder; some features that required system configuration (e.g. fonts when plotting) may not work correctly. |Binder|
+These interactive examples can be run under Binder; some features that required system configuration (e.g. fonts when plotting) may not work correctly.
+
+|Binder|
 
 .. toctree::
     :maxdepth: 1

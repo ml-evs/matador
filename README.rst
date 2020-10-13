@@ -86,6 +86,6 @@ If you use matador in your work, we kindly ask that you cite the source code arc
 .. |Zenodo| image:: https://zenodo.org/badge/DOI/10.5281/zenodo.3908573.svg
    :target: https://doi.org/10.5281/zenodo.3908573
 .. |Binder| image:: https://mybinder.org/badge_logo.svg
-   :target: https://mybinder.org/v2/gh/ml-evs/matador/master?filepath=examples
+   :target: https://mybinder.org/v2/gh/ml-evs/matador/master?filepath=docs/src/notebooks/interactive
 .. |JOSS| image:: https://joss.theoj.org/papers/4d0eea9bea4362dec4cb6d62ebccc913/status.svg
    :target: https://joss.theoj.org/papers/4d0eea9bea4362dec4cb6d62ebccc913
