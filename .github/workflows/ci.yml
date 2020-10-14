@@ -58,10 +58,10 @@ jobs:
     - name: Test notebook examples
       if: matrix.python-version == 3.8 && github.repository == 'ml-evs/matador'
       run: |
-        py.test -rs -vvv --nbval --current-env --cov-config .coveragerc --cov=./matador/ --cov-append --cov-report=xml examples/magres_plotting/
-        py.test -rs -vvv --nbval --current-env --cov-config .coveragerc --cov=./matador/ --cov-append --cov-report=xml examples/voltage/
-        py.test -rs -vvv --nbval-lax --current-env --cov-config .coveragerc --cov=./matador/ --cov-append --cov-report=xml examples/pymatgen_and_ase_interfaces/
-        py.test -rs -vvv --nbval-lax --current-env --cov-config .coveragerc --cov=./matador/ --cov-append --cov-report=xml examples/plot_styles/
+        py.test -rs -vvv --nbval --current-env --cov-config .coveragerc --cov=./matador/ --cov-append --cov-report=xml examples/interactive/magres_plotting/
+        py.test -rs -vvv --nbval --current-env --cov-config .coveragerc --cov=./matador/ --cov-append --cov-report=xml examples/interactive/voltage/
+        py.test -rs -vvv --nbval-lax --current-env --cov-config .coveragerc --cov=./matador/ --cov-append --cov-report=xml examples/interactive/pymatgen_and_ase_interfaces/
+        py.test -rs -vvv --nbval-lax --current-env --cov-config .coveragerc --cov=./matador/ --cov-append --cov-report=xml examples/interactive/plot_styles/
     - name: Upload coverage to Codecov
       if: matrix.python-version == 3.8 && github.repository == 'ml-evs/matador'
       uses: codecov/codecov-action@v1
