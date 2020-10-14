@@ -23,7 +23,7 @@ DEFAULT_SETTINGS = {
         "port": 27017,
         "default_collection": "repo",
     },
-    "plotting": {"default_style": "matador", "element_colours": "vesta_elements.ini"},
+    "plotting": {"default_style": "matador", "element_colours": Path(__file__).parent.joinpath("vesta_elements.ini")},
     "run3": {
         "scratch_prefix": ".",
         "castep_executable": "castep",
