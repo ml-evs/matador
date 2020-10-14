@@ -1,1 +1,0 @@
-../../docs/src/tutorials/mongo.rst

@@ -54,7 +54,7 @@ These tutorials will guide you through common use cases of the command-line tool
     tutorials/mongo
 
 .. |Binder| image:: https://mybinder.org/badge_logo.svg
- :target: https://mybinder.org/v2/gh/ml-evs/matador/master?filepath=docs/src/notebooks/interactive
+ :target: https://mybinder.org/v2/gh/ml-evs/matador/master?filepath=examples/interactive/
 
 .. |CuP Binder| image:: https://mybinder.org/badge_logo.svg
    :target: https://mybinder.org/v2/gh/harpaf13/data.copper-phosphides/master?filepath=CuP_results.ipynb
