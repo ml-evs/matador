@@ -19,7 +19,7 @@ from matador.data.constants import (
     ELECTRON_CHARGE,
     PLANCK_CONSTANT, BARN_TO_M2, EFG_AU_TO_SI
 )
-from matador.data import ELECTRIC_QUADRUPOLE_MOMENTS
+from matador.data.magres import ELECTRIC_QUADRUPOLE_MOMENTS
 
 
 @scraper_function
