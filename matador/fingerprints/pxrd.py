@@ -107,10 +107,10 @@ class PXRD(Fingerprint):
 
         # this could be cached across PXRD objects but is much faster than the XRD calculation itself
         if self.scattering_factors == "GSAS":
-            from matador.data import GSAS_ATOMIC_SCATTERING_COEFFS
+            from matador.data.atomic_scattering import GSAS_ATOMIC_SCATTERING_COEFFS
             self.atomic_scattering_coeffs = {spec: GSAS_ATOMIC_SCATTERING_COEFFS[spec] for spec in species}
         elif self.scattering_factors == "RASPA":
-            from matador.data import RASPA_ATOMIC_SCATTERING_COEFFS
+            from matador.data.atomic_scattering import RASPA_ATOMIC_SCATTERING_COEFFS
             self.atomic_scattering_coeffs = {spec: RASPA_ATOMIC_SCATTERING_COEFFS[spec] for spec in species}
         else:
             raise RuntimeError(
