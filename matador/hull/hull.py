@@ -689,13 +689,13 @@ class QueryConvexHull:
             self.voltage_data.append(profile)
 
             if not self._non_elemental:
-                self.volume_data['x'].append(capacities)
-                self.volume_data['Q'].append(capacities)
+                self.volume_data['x'].append(capacities[:-1])
+                self.volume_data['Q'].append(capacities[:-1])
                 self.volume_data['electrode_volume'].append(volumes)
                 self.volume_data['endstoichs'].append(endstoichs[reaction_ind])
                 self.volume_data['volume_ratio_with_bulk'].append(np.asarray(volumes) / volumes[0])
                 self.volume_data['volume_expansion_percentage'].append(((np.asarray(volumes) / volumes[0]) - 1) * 100)
-                self.volume_data['hull_distances'].append(np.zeros_like(capacities))
+                self.volume_data['hull_distances'].append(np.zeros_like(self.volume_data["x"][-1]))
 
     def _calculate_binary_volume_curve(self):
         """ Take stable compositions and volume and calculate volume

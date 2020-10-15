@@ -228,7 +228,7 @@ class VoltageProfile:
             with open(fname, 'w') as f:
                 f.write(data_str)
 
-        return 'Voltage data:\n\n{}'.format(data_str)
+        return f"\nVoltage data:\n\n{data_str}"
 
     def __repr__(self):
-        self.voltage_summary(csv=False)
+        return self.voltage_summary(csv=False)
