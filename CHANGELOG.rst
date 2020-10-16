@@ -3,6 +3,16 @@
 Changelog
 =========
 
+New in release (0.9.9) [16/10/2020]
+-----------------------------------
+
+- Added support for CASTEP kpoint path ``BREAK`` directive (#107)
+- Improvements to magres plotting and magres workflow (#112)
+- Added ability to scrape electric field gradient values and compute quadrupolar quantities from NMR calculations (#115)
+- Added ability to run all several examples under Binder (#106, #130).
+- JOSS paper accepted! (#129)
+
+
 New in release (0.9.8) [10/08/2020]
 -----------------------------------
 - Improvements to PDIS functionality (#94).
