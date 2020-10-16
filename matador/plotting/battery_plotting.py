@@ -101,7 +101,7 @@ def plot_voltage_curve(
     if labels:
         if len(profiles) > 1:
             print("Only labelling first voltage profile.")
-        for ind, reaction in enumerate(profiles[0].reactions):
+        for ind, reaction in enumerate(profiles[0].reactions[:-1]):
             _labels = []
             for phase in reaction:
                 if phase[0] is None or phase[0] == 1.0:
@@ -111,7 +111,7 @@ def plot_voltage_curve(
                 _label += "{}".format(phase[1])
                 _labels.append(_label)
             _label = '+'.join(_labels)
-            _position = (profiles[0].capacities[ind], profiles[0].voltages[ind] + max(profiles[0].voltages)*0.01)
+            _position = (profiles[0].capacities[ind+1], profiles[0].voltages[ind+1] + max(profiles[0].voltages)*0.01)
             ax.annotate(_label, xy=_position, textcoords="data", ha="center", zorder=9999)
 
     if expt or len(profiles) > 1:
@@ -206,13 +206,13 @@ def plot_volume_curve(hull, ax=None, show=True, legend=False, as_percentages=Fal
             raise RuntimeError("This plot does not support --hull_cutoff.")
 
         ax.plot(
-            [q for ind, q in enumerate(hull.volume_data['Q'][j][:-1]) if stable_hull_dist[ind] == 0],
+            [q for ind, q in enumerate(hull.volume_data['Q'][j]) if stable_hull_dist[ind] == 0],
             [v for ind, v in enumerate(hull.volume_data[volume_key][j]) if stable_hull_dist[ind] == 0],
             marker='o', markeredgewidth=1.5, markeredgecolor='k', c=c, zorder=1000, lw=0,
         )
 
         ax.plot(
-            [q for ind, q in enumerate(hull.volume_data['Q'][j][:-1]) if stable_hull_dist[ind] == 0],
+            [q for ind, q in enumerate(hull.volume_data['Q'][j]) if stable_hull_dist[ind] == 0],
             [v for ind, v in enumerate(hull.volume_data[volume_key][j]) if stable_hull_dist[ind] == 0],
             lw=2, c=c,
             label=("{}"
