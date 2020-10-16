@@ -68,9 +68,12 @@ If you think this list is outdated, incorrect or simply incomplete, then please 
 Citing matador
 --------------
 
-If you use matador in your work, we kindly ask that you cite the source code archive on Zenodo:
+If you use matador in your work, we kindly ask that you cite
 
-    Matthew Evans, ml-evs/matador (2020), Zenodo. http://doi.org/10.5281/zenodo.3908574
+    Matthew Evans, Andrew Morris, *matador: a Python library for analysing, curating and performing high-throughput density-functional theory calculations* Journal of Open Source Software (2020)
+    `URL <https://joss.theoj.org/papers/4d0eea9bea4362dec4cb6d62ebccc913>`_
+
+Source code archives for all versions above 0.9 can be found at Zenodo `DOI 10.5281/zenodo.3908573 <https://doi.org/10.5281/zenodo.3908573>`_.
 
 
 .. |PyPI Version| image:: https://img.shields.io/pypi/v/matador-db?label=PyPI&logo=pypi
