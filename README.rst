@@ -70,7 +70,7 @@ Citing matador
 
 If you use matador in your work, we kindly ask that you cite
 
-    Matthew Evans, Andrew Morris, *matador: a Python library for analysing, curating and performing high-throughput density-functional theory calculations* Journal of Open Source Software, 5(54), 2563 (2020)
+    Matthew L. Evans, Andrew J. Morris, *matador: a Python library for analysing, curating and performing high-throughput density-functional theory calculations* Journal of Open Source Software, 5(54), 2563 (2020)
     `10.21105/joss.02563 <https://doi.org/10.21105/joss.02563>`_
 
 Source code archives for all versions above 0.9 can be found at Zenodo `DOI 10.5281/zenodo.3908573 <https://doi.org/10.5281/zenodo.3908573>`_.
