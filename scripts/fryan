@@ -9,23 +9,21 @@ def main(**kwargs):
     from matador.scrapers.castep_scrapers import res2dict
     from matador.utils.cursor_utils import display_results
     from matador.utils.chem_utils import get_formula_from_stoich
+    from matador.crystal import Crystal
 
-    import glob
-
-    res_list = glob.glob('*.res')
-    cursor = [res2dict(f) for f in res_list]
+    cursor, failures = res2dict("*.res", info=False)
     to_display = []
+    if failures:
+        print(f"Unable to read files: {failures}")
+
     for doc in cursor:
-        if not doc[1]:
-            raise RuntimeError
-        else:
-            to_display.append(doc[0])
+        if not doc.get("space_group") or kwargs.get("symprec") is not None:
+            doc.pop("space_group")
+        to_display.append(Crystal(doc, symprec=kwargs.get("spg_symprec")))
 
     if kwargs.get('hull'):
-        QueryConvexHull(cursor=[doc[0] for doc in cursor], hull_cutoff=10)
-
+        QueryConvexHull(cursor=cursor, hull_cutoff=10)
     else:
-
         if kwargs.get('formula'):
             to_display = [doc for doc in to_display
                           if get_formula_from_stoich(sorted(doc['stoichiometry'])) == kwargs.get('formula')]
@@ -34,7 +32,7 @@ def main(**kwargs):
         if kwargs.get('top'):
             to_display = to_display[:kwargs.get('top')]
 
-        display_results(to_display, use_source=True)
+        display_results(to_display, use_source=True, summary=kwargs.get("summary"))
 
 
 if __name__ == '__main__':
@@ -43,5 +41,7 @@ if __name__ == '__main__':
     parser.add_argument('-f', '--formula', type=str)
     parser.add_argument('-m', '--hull', action='store_true')
     parser.add_argument('-t', '--top', type=int)
+    parser.add_argument("-spg", "--spg_symprec", type=float, help="spglib tolerance to use when re-computing spacegroups")
+    parser.add_argument("-s", "--summary", action='store_true', help="use matador's output summary")
     parsed_kwargs = vars(parser.parse_args())
     main(**parsed_kwargs)
