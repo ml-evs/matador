@@ -133,7 +133,7 @@ class Crystal(DataContainer):
         if not any(key in doc for key in ['positions_frac', 'positions_abs']):
             raise RuntimeError('No position information found `"positions_frac"/"positions_abs"`, cannot create Crystal.')
 
-    def __init__(self, doc, voronoi=False, network_kwargs=None):
+    def __init__(self, doc, voronoi=False, network_kwargs=None, symprec=None):
         """ Initialise Crystal object from matador document with Site list
         and any additional abstractions, e.g. voronoi or CrystalGraph.
 
@@ -145,12 +145,18 @@ class Crystal(DataContainer):
         Keyword Arguments:
            voronoi (bool): whether to compute Voronoi substructure for each site
            network_kwargs (dict): keywords to pass to the CrystalGraph initialiser
+           symprec (float): custom spglib symetry prediction to use when recomputing
+                space group data. If provided, will trigger recalculation of space group.
 
         """
 
         self._validate_doc(doc)
         if isinstance(doc, Crystal):
             doc = deepcopy(doc._data)
+
+        self._symprec = symprec
+        if symprec is None:
+            self._symprec = 0.01
 
         super().__init__(doc)
 
@@ -175,10 +181,11 @@ class Crystal(DataContainer):
         self._bonding_stats = None
 
         # assume default value for symprec
-        if 'space_group' in self._data:
-            self._space_group = {0.01: self._data['space_group']}
-        else:
-            self._space_group = {}
+        self._space_group = {}
+        if symprec is not None or "space_group" not in self._data:
+            self._space_group[self._symprec] = self.get_space_group(symprec=self._symprec)
+        elif 'space_group' in self._data:
+            self._space_group[0.01] = self._data['space_group']
 
     def __getitem__(self, key):
         """ If integer key is requested, return index into site array. """
