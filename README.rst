@@ -36,7 +36,7 @@ Usage
 
 ``matador`` is primarily a Python *library* that can be used inside Python scripts/modules to create a custom workflow. There are, however, several command-line scripts bundled with ``matador`` itself. All of these scripts are listed under `CLI Usage <https://docs.matador.science/en/latest/cli.html>`_.
 
-For basic command-line usage, please explore the help system for command. Common workflows can be found inside ``examples/`` and in the `online docs <http://docs.matador.science/en/latest/examples_index.html>`_.
+For basic command-line usage, please explore the help system for each command. Common workflows can be found inside ``examples/`` and in the `online docs <http://docs.matador.science/en/latest/examples_index.html>`_.
 
 Please consult the full `Python API documentation <http://docs.matador.science/en/latest/modules.html>`_ for programmatic usage.
 
@@ -70,8 +70,8 @@ Citing matador
 
 If you use matador in your work, we kindly ask that you cite
 
-    Matthew Evans, Andrew Morris, *matador: a Python library for analysing, curating and performing high-throughput density-functional theory calculations* Journal of Open Source Software (2020)
-    `URL <https://joss.theoj.org/papers/4d0eea9bea4362dec4cb6d62ebccc913>`_
+    Matthew Evans, Andrew Morris, *matador: a Python library for analysing, curating and performing high-throughput density-functional theory calculations* Journal of Open Source Software, 5(54), 2563 (2020)
+    `10.21105/joss.02563 <https://doi.org/10.21105/joss.02563>`_
 
 Source code archives for all versions above 0.9 can be found at Zenodo `DOI 10.5281/zenodo.3908573 <https://doi.org/10.5281/zenodo.3908573>`_.
 
