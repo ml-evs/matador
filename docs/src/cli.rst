@@ -42,4 +42,4 @@ These scripts all use ``matador``'s internal file readers/writers to operate on 
 - ``atoms3shx``: use ASE's file reader on any arbitrary file, and output a ``.res`` file.
 - ``castep3shx``, ``castep3cell``: convert a CASTEP output file into ``.res`` or ``.cell`` respectively.
 - ``cell3shx``, ``cif3shx``, ``magres3shx``: convert a CASTEP ``.cell``, ``.cif``, ``.magres`` or Quantum Espresso output file into a ``.res`` file.
-- ``shx3cell``, ``shx3cif``, ``shx3pwscf``: convert a ``.res`` file into either ``.cell`, ``.cif``, or Quantum Espresso ``.in`` input file.
+- ``shx3cell``, ``shx3cif``, ``shx3pwscf``: convert a ``.res`` file into either ``.cell``, ``.cif``, or Quantum Espresso ``.in`` input file.
