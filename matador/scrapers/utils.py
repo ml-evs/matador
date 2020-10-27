@@ -96,9 +96,12 @@ def scraper_function(function):
 
         result = None
         seed = args[0]
+        globbed = False
+
         if isinstance(seed, str):
             if '*' in seed and not kwargs.get('noglob'):
                 seed = sorted(glob.glob(seed))
+                globbed = True
             else:
                 seed = [seed]
 
@@ -130,7 +133,7 @@ def scraper_function(function):
                 if fail_fast:
                     raise oops
 
-            if len(seed) == 1:
+            if not globbed and len(seed) == 1:
                 if success and kwargs.get('as_model'):
                     orm = _as_model(result, function)
                     if orm is not None:
