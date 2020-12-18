@@ -24,7 +24,7 @@ jobs:
     - name: Install dependencies
       run: |
         cp tests/data/matador_pipelines_conf.yml $HOME/.matadorrc
-        python -m pip install --upgrade pip
+        python -m pip install pip==20.2
         pip install flake8
     - name: Check for syntax errors and lint with flake8
       run: |
@@ -50,7 +50,7 @@ jobs:
     - name: Install dependencies
       run: |
         cp tests/data/matador_pipelines_conf.yml $HOME/.matadorrc
-        python -m pip install --upgrade pip
+        python -m pip install pip==20.2
         pip install -e .[test,crystal,optional]
     - name: Test with pytest
       run: |
