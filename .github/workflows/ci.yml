@@ -9,21 +9,19 @@ on:
 jobs:
   lint:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: [3.8]
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v2
+
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v2
       with:
-        python-version: ${{ matrix.python-version }}
+        python-version: 3.8
+
     - name: Install dependencies
       run: |
         cp tests/data/matador_pipelines_conf.yml $HOME/.matadorrc
-        python -m pip install --upgrade pip setuptools
+        python -m pip install --upgrade setuptools
         pip install flake8
     - name: Check for syntax errors and lint with flake8
       run: |
@@ -42,15 +40,15 @@ jobs:
         python-version: [3.6, 3.7, 3.8]
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v2
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
       run: |
         cp tests/data/matador_pipelines_conf.yml $HOME/.matadorrc
-        python -m pip install --upgrade setuptools pip
+        python -m pip install --upgrade setuptools pip wheel
         pip install -e .[test,optional]
     - name: Test with pytest
       run: |
