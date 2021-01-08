@@ -210,7 +210,7 @@ class CellScraperTests(MatadorUnitTest):
         self.assertEqual(test_dict["phonon_supercell_matrix"][2], [0, 0, 9])
         np.testing.assert_array_equal(
             test_dict["external_efield"],
-            np.array([[0.5, 0, 0], [0.123, 0.153, 0], [0.413, 0.123, 0.23]]),
+            np.array([0.5, 0, 0]),
         )
 
     def test_cell_failure(self):
