@@ -253,6 +253,14 @@ def cell2dict(fname, db=False, lattice=True, positions=True, **kwargs):
                     j += 1
                 i += 1
             cell['external_pressure'] = cell['external_pressure'].tolist()
+
+        elif '%block external_efield' in line.lower():
+            cell['external_efield'] = []
+            for i in range(1, 4):
+                cell['external_efield'].append([f90_float_parse(e) for e in flines[line_no+i].split()])
+            if len(cell['external_efield']) != 3 or any(len(vec) != 3 for vec in cell['external_efield']):
+                raise RuntimeError(f"EXTERNAL_EFIELD block has wrong shape, should be 3x3: {cell['external_efield']}")
+
         elif '%block ionic_constraints' in line.lower():
             cell['ionic_constraints'] = []
             i = 1
