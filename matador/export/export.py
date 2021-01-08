@@ -340,6 +340,12 @@ def doc2cell(doc, path, overwrite=False, hash_dupe=False, spin=False):
 
         flines.append('%ENDBLOCK EXTERNAL_PRESSURE')
 
+    if 'external_efield' in doc:
+        flines.append('\n%BLOCK EXTERNAL_EFIELD')
+        for i in range(3):
+            flines.append('{d[0]} {d[1]} {d[2]}'.format(d=doc['external_efield'][i]))
+        flines.append('%ENDBLOCK EXTERNAL_EFIELD')
+
     if 'ionic_constraints' in doc:
         flines.append('\n%BLOCK IONIC_CONSTRAINTS')
         for constraint in doc['ionic_constraints']:
