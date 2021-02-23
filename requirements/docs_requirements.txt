@@ -1,6 +1,6 @@
-sphinx
-sphinx-argparse
-sphinx-rtd-theme
-sphinxcontrib-napoleon
-ipykernel
-nbsphinx
+sphinx~=3.5
+sphinx-argparse~=0.2
+sphinx-rtd-theme~=0.5
+sphinxcontrib-napoleon~=0.7
+ipykernel~=5.5
+nbsphinx~=0.8

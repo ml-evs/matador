@@ -1,8 +1,8 @@
-numpy>=1.14
-scipy>=1.0
-psutil>=5.7.3
-pyyaml>=5.3
-pymongo>=3.7
-numba>=0.4
-tqdm>=4
-matplotlib>=3.0
+numpy~=1.19
+scipy~=1.6
+psutil~=5.8
+pyyaml~=5.4
+pymongo~=3.11
+numba~=0.52;python_version<"3.9"
+tqdm~=4.57
+matplotlib~=3.3
