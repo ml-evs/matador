@@ -11,9 +11,9 @@ from collections import defaultdict
 import os
 import glob
 import warnings
-import pwd
-import numpy as np
 from pathlib import Path
+
+import numpy as np
 from matador.utils.cell_utils import (
     abc2cart,
     calc_mp_spacing,
@@ -56,8 +56,10 @@ def res2dict(fname, db=True, **kwargs):
     res['source'] = [fname]
     # grab file owner username
     try:
+        import pwd
         res['user'] = pwd.getpwuid(os.stat(fname).st_uid).pw_name
     except Exception:
+        res['user'] = 'xxx'
         pass
 
     try:
@@ -615,9 +617,10 @@ def castep2dict(fname, db=True, intermediates=False, **kwargs):
 
     # grab file owner
     try:
+        import pwd
         castep['user'] = pwd.getpwuid(os.stat(fname).st_uid).pw_name
     except Exception:
-        pass
+        castep['user'] = 'xxx'
 
     try:
         get_seed_metadata(castep, fname)

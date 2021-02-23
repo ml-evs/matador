@@ -9,7 +9,6 @@ NMR-related inputs and outputs, e.g. .magres files.
 
 from collections import defaultdict
 from os import stat
-from pwd import getpwuid
 
 import numpy as np
 from matador.utils.cell_utils import cart2abc, cart2frac
@@ -33,6 +32,7 @@ def magres2dict(fname, **kwargs):
 
     # grab file owner username
     try:
+        from pwd import getpwuid
         magres['user'] = getpwuid(stat(fname).st_uid).pw_name
     except Exception:
         magres['user'] = 'xxx'
