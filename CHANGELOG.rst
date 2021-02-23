@@ -3,6 +3,13 @@
 Changelog
 =========
 
+New in release (0.9.10) [23/02/2021]
+------------------------------------
+
+- Windows compatibility changes (#149)
+- Dependency updates (#146, #148, #149)
+
+
 New in release (0.9.9) [16/10/2020]
 -----------------------------------
 
