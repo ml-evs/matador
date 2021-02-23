@@ -254,7 +254,7 @@ def draw_network(structure,
             edge_colours.append('black')
 
     nx.draw_networkx_nodes(network, pos, node_color=colours, edgecolors='black', linewidths=2, node_size=1000, ax=ax)
-    nx.draw_networkx_edges(network, pos, edge_color=edge_colours, linewidths=2, node_size=1000, ax=ax)
+    nx.draw_networkx_edges(network, pos, edge_color=edge_colours, width=2, node_size=1000, ax=ax)
     if edge_labels:
         edge_weight = dict()
         for edge in network.edges(data=True):
