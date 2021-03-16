@@ -201,20 +201,23 @@ def cell2dict(fname, db=False, lattice=True, positions=True, **kwargs):
             i = 1
             while 'endblock' not in flines[line_no + i].lower():
                 # handle blank lines in species pot
-                if not flines[line_no + i].split():
+                split_line = flines[line_no+i].split()
+                if not split_line:
                     i += 1
                     continue
-                if db:
-                    species = flines[line_no+i].split()[0]
-                    pspot_string = flines[line_no+i].split()[1].split('/')[-1]
+                if len(split_line) == 2:
+                    species = split_line[0]
+                    pspot_string = split_line[1].split('/')[-1]
                     cell['species_pot'][species] = pspot_string.replace('()', '').replace('[]', '')
-                else:
-                    pspot_libs = ['C7', 'C8', 'C9', 'C17', 'C18', 'MS', 'HARD',
-                                  'QC5', 'NCP', 'NCP18', 'NCP17', 'NCP9']
-                    if flines[line_no + i].upper().split()[0] in pspot_libs:
-                        cell['species_pot']['library'] = flines[line_no + i].upper().split()[0]
-                    else:
-                        cell['species_pot'][flines[line_no + i].split()[0]] = flines[line_no + i].split()[1]
+                elif db:
+                    raise RuntimeError(
+                        f"Cannot parse `species_pot` block line {flines[line_no+i]} with `db=True`, "
+                        "expected a (species, pspot) pair. "
+                        "Try using `db=False` if specifying a pspot library for all species."
+                    )
+                elif len(split_line) == 1:
+                    cell['species_pot']['library'] = split_line[0].upper()
+
                 i += 1
             if not cell['species_pot']:
                 cell.pop('species_pot')
