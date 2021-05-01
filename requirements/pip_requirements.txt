@@ -1,4 +1,4 @@
-periodictable~=1.5
+periodictable~=1.6
 seekpath~=2.0
 spglib~=1.16
 python-ternary~=1.0
