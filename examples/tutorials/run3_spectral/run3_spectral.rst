@@ -111,7 +111,7 @@ The final piece of the puzzle is `OptaDOS <https://github.com/optados-developers
 .. note::
    This example assumes that the OptaDOS binary is called ``optados`` and resides in your PATH, likewise ``orbitals2bands``. This can altered by setting the ``run3.optados_executable`` setting in your matador config.
 
-.. warning:: By default, OptaDOS will *not* be invoked with `mpirun`.
+.. warning:: By default, OptaDOS will *not* be invoked with ``mpirun`` (i.e., your executable should work for serial runs too). A parallel OptaDOS run can be performed by setting the ``run3.optados_executable`` to e.g. ``mpirun optados.mpi`.
 
 .. warning::
    The projected dispersion curve feature is quite new to OptaDOS and thus is temperamental. Depending on when you are reading this, it may require you to have compiled OptaDOS from the development branch on GitHub.
