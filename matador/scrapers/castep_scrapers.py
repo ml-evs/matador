@@ -1303,9 +1303,10 @@ def _castep_scrape_final_parameters(flines, castep):
             castep['spin_polarized'] = True
         elif 'hubbard_u' not in castep and 'Hubbard U values are eV' in line:
             castep['hubbard_u'] = defaultdict(list)
-            i = 5
+            n_lines_header = 5
+            i = 0
             while i < castep['num_atoms']:
-                line = flines[line_no + i].strip()
+                line = flines[line_no + i + n_lines_header].strip()
                 atom = line.split()[0].replace('|', '')
                 shifts = list(map(f90_float_parse, line.split()[-5:-1]))
                 for ind, shift in enumerate(shifts):
