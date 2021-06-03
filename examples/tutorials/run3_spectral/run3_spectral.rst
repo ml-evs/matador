@@ -14,11 +14,11 @@ notebook ``simple_spectral.ipynb`` will also show you exactly how to run a stand
 run3 will follow some simple rules to decide what kind of spectral calculation you want to run. First, it will check the ``task`` and ``spectral_task`` keywords. The ``task`` keyword needs to be set to ``'spectral'`` to trigger a spectral workflow. If ``spectral_task`` is either ``dos`` or ``bandstructure``, then this calculation type will always be included in the workflow, with default parameters if unset. Otherwise, run3 will check the cell file for the
 ``spectral_kpoints_mp_spacing`` (DOS) and ``spectral_kpoints_path_spacing`` (bandstructure) keywords and will perform either one or both of the corresponding calculation types. The first step will always be to perform an SCF calculation, which is continued from to obtain the DOS or BS (if any check file is found in the folder, run3 will attempt to skip the SCF and restart accordingly).
 
-Both the bandstructure and DOS tasks can be post-processed with OptaDOS; run3 will perform this automatically if it finds a .odi file in alongside the .cell and .param. Similarly, if the ``write_orbitals_file`` keyword is set to True in the param file, ``orbitals2bands`` will be run automatically to reorder the eigenvalues in the .bands file. The output can be plotted using either the ``dispersion`` script bundled with matador, or through the API (see the Jupyter notebook). 
+Both the bandstructure and DOS tasks can be post-processed with OptaDOS; run3 will perform this automatically if it finds a .odi file in alongside the .cell and .param. Similarly, if the ``write_orbitals_file`` keyword is set to True in the param file, ``orbitals2bands`` will be run automatically to reorder the eigenvalues in the .bands file. The output can be plotted using either the ``dispersion`` script bundled with matador, or through the API (see the Jupyter notebook).
 
 Let us now consider some concrete examples.
 
-Example 2.1: Bandstructure calculation with automatic path 
+Example 2.1: Bandstructure calculation with automatic path
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 We can compute just bandstructure by specifying ``spectral_kpoints_path_spacing`` and ``spectral_task = bandstructure`` in the cell and param respectively, e.g. ::
@@ -36,7 +36,7 @@ We can compute just bandstructure by specifying ``spectral_kpoints_path_spacing`
 with .res file ::
 
    $ cat LiCoO2-CollCode29225.res
-   TITL LiCoO2-CollCode29225 
+   TITL LiCoO2-CollCode29225
    CELL 1.0  4.91 4.91 4.91 33.7 33.7 33.7
    LATT -1
    SFAC 	 Co Li O
@@ -48,7 +48,7 @@ with .res file ::
 
 Simply calling ``run3 LiCoO2`` (with ``-v 4`` if you want to see what's going on) will perform three steps:
 
-   1. Analyse the lattice with SeeKPath, perhaps creating a primitive cell or standardising if need be, and generate the standard Brillouin zone path with desired spacing set by ``spectral_kpoints_path_spacing``. 
+   1. Analyse the lattice with SeeKPath, perhaps creating a primitive cell or standardising if need be, and generate the standard Brillouin zone path with desired spacing set by ``spectral_kpoints_path_spacing``.
    2. Perform a self-consistent singlepoint energy calculation to obtain the electron density on the k-point grid specified by ``kpoints_mp_spacing``.
    3. Interpolate the desired bandstructure path, yielding a ``.bands`` file containing the bandstructure.
 
@@ -65,7 +65,7 @@ Note that the path labels are generated from the .cell/.res file in the ``comple
 
 .. tip::
    You can also specify a ``spectral_kpoint_path`` in your .cell file, that will be used for all structures in that
-   folder. This can be useful when comparing the electronic structure of e.g. defected cells. The ``dispersion`` 
+   folder. This can be useful when comparing the electronic structure of e.g. defected cells. The ``dispersion``
    script will try to scrape the labels to use for plotting from the comments at the specification of the kpoint path,
    e.g. ::
 
@@ -77,11 +77,11 @@ Note that the path labels are generated from the .cell/.res file in the ``comple
 Example 2.2: A simple density of states (DOS) calculation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-We shall now calculate the density of states in a similar way to the above, using the matador default for ``spectral_kpoints_mp_spacing``, such that the cell file only contains ``kpoints_mp_spacing: 0.05`` and the param file now has ``spectral_task: DOS``. 
+We shall now calculate the density of states in a similar way to the above, using the matador default for ``spectral_kpoints_mp_spacing``, such that the cell file only contains ``kpoints_mp_spacing: 0.05`` and the param file now has ``spectral_task: DOS``.
 
 .. tip::
    If you are starting from the example above, you will need to move the .res file back into the current folder, delete the .txt files and rename the ``completed/`` folder to e.g. ``completed_bs/``. You might also consider moving the .check file to current folder, so that the calculation will re-use the SCF results.
-   
+
 Again, simply running ``run3 LiCoO2`` will do the trick. Eventually, a .bands_dos file will be produced (any existing .bands files will be backed up and replaced at the end of the run). The dispersion script will recognise this as a density of states, and will apply some naive gaussian smearing that can be controlled with the ``-gw/--gaussian_width`` flag. Running ``dispersion LiCoO2-CollCode29225 --png -gw 0.01`` will produce the following:
 
 .. image:: LiCoO2-CollCode29225_spectral_dos.png
@@ -109,9 +109,11 @@ Example 2.4: Using OptaDOS for post-processing: projected DOS and bandstructures
 The final piece of the puzzle is `OptaDOS <https://github.com/optados-developers/optados>`_, a package for broadening and projecting densities of states (amongst other things) that comes with CASTEP. By default, run3 will turn on the required CASTEP settings (namely ``pdos_calculate_weights``) required by OptaDOS. In order for OptaDOS to be run automatically by run3, an extra .odi file must be added into our input deck, containing the details of the desired OptaDOS calculation.
 
 .. note::
-   This example assumes that the OptaDOS binary is called ``optados`` and resides in your PATH, likewise ``orbitals2bands``.
+   This example assumes that the OptaDOS binary is called ``optados`` and resides in your PATH, likewise ``orbitals2bands``. This can altered by setting the ``run3.optados_executable`` setting in your matador config.
 
-.. note::
+.. warning:: By default, OptaDOS will *not* be invoked with ``mpirun`` (i.e., your executable should work for serial runs too). A parallel OptaDOS run can be performed by setting the ``run3.optados_executable`` to e.g. ``mpirun optados.mpi`.
+
+.. warning::
    The projected dispersion curve feature is quite new to OptaDOS and thus is temperamental. Depending on when you are reading this, it may require you to have compiled OptaDOS from the development branch on GitHub.
 
 run3 will try to perform three types of calculation: a simple DOS smearing, a projected density of states (with projectors specified by the ``pdos`` keyword), and a projected bandstructure (with projectors specified by the ``pdispersion`` keyword). If ``pdos``/``pdispersion`` is not found in the .odi, this corresponding task will be skipped. Likewise, if ``broadening`` is not found in the .odi, the standard DOS broadening will not be performed.::
