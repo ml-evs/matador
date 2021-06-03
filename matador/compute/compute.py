@@ -606,7 +606,7 @@ class ComputeTask:
 
             # scrub keys that need to be rescraped
             keys_to_remove = ['kpoints_mp_spacing', 'kpoints_mp_grid', 'species_pot',
-                              'sedc_apply', 'sedc_scheme', 'cell_constraints']
+                              'sedc_apply', 'sedc_scheme', 'cell_constraints', 'hubbard_u']
             for key in keys_to_remove:
                 if key in opti_dict:
                     del opti_dict[key]
@@ -652,6 +652,10 @@ class ComputeTask:
                 # its useful to disable these and use either the initial constraints, or none
                 if 'cell_constraints' in self.cell_dict:
                     self.calc_doc['cell_constraints'] = self.cell_dict['cell_constraints']
+
+                # The Hubbard U should be constant throughout the run and set from the cell file
+                if 'hubbard_u' in self.cell_dict:
+                    self.calc_doc['hubbard_u'] = self.cell_dict['hubbard_u']
 
                 # if writing out cell, use it for higher precision positions and lattice_cart
                 if self.calc_doc.get('write_cell_structure') and os.path.isfile('{}-out.cell'.format(seed)):

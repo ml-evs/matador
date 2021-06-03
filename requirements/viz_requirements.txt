@@ -1,2 +1,2 @@
 ase~=3.21
-nglview~=2.7
+nglview~=3.0

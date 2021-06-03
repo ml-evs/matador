@@ -284,6 +284,7 @@ def _cif_set_unreduced_sites(doc):
                 if character not in allowed_chars:
                     raise RuntimeError('You are trying to do something naughty with the symmetry element {}'
                                        .format(element))
+
         symmetry_ops.append(symmetry)
         symmetry_functions.append(functools.partial(_apply_sym_op, symmetry=symmetry))
 
@@ -331,7 +332,11 @@ def _cif_set_unreduced_sites(doc):
 
     dupe_set = set()
     for img in distances:
-        i_s, j_s = np.where(~img.mask)
+        try:
+            i_s, j_s = np.where(~img.mask)
+        except ValueError:
+            # ValueError will be raised if there is only one atom as i_s, j_s cannot be unpacked
+            continue
         for i, j in zip(i_s, j_s):
             if i == j:
                 continue
