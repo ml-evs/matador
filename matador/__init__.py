@@ -13,9 +13,9 @@ import sys
 __all__ = ['__version__']
 __author__ = 'Matthew Evans'
 __maintainer__ = 'Matthew Evans'
-__version__ = "0.9.10"
+__version__ = "0.9.11"
 
-script_epilog = f"Written and maintained by Matthew Evans (me388@cam.ac.uk) 2016-2020, version {__version__}."
+script_epilog = f"Written and maintained by Matthew Evans (me388@cam.ac.uk) 2016-2021, version {__version__}."
 
 if sys.version_info.minor == 6:
     # Python 3.6
