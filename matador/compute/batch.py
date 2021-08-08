@@ -221,11 +221,19 @@ class BatchRun:
         except RuntimeError as err:
             result = [proc.join(timeout=2) for proc in procs]
             result = [proc.terminate() for proc in procs if proc.is_alive()]
-            print_failure('Fatal error(s) reported:')
-            print_warning(err)
+            try:
+                # Guard against failures to write to stdout
+                print_failure('Fatal error(s) reported:')
+                print_warning(err)
+            except OSError:
+                pass
             raise err
 
-        print('Nothing left to do.')
+        try:
+            # Guard against failures to write to stdout
+            print('Nothing left to do.')
+        except OSError:
+            pass
 
     def perform_new_calculations(self, res_list, error_queue, proc_id):
         """ Perform all calculations that have not already
@@ -351,12 +359,10 @@ class BatchRun:
         self.cell_dict, cell_success = cell2dict(self.seed + '.cell',
                                                  db=False, lattice=False, positions=True)
         if not cell_success:
-            print(self.cell_dict)
-            raise InputError('Failed to parse cell file')
+            raise InputError(f'Failed to parse cell file: {self.cell_dict}')
         self.param_dict, param_success = param2dict(self.seed + '.param', db=False)
         if not param_success:
-            print(self.param_dict)
-            raise InputError('Failed to parse param file')
+            raise InputError(f'Failed to parse param file: {self.param_dict}')
 
         # scan directory for files to run
         self.file_lists = defaultdict(list)
@@ -459,34 +465,25 @@ def reset_job_folder(debug=False):
 
     """
     res_list = glob.glob('*.res')
-    if debug:
-        print(res_list)
     for f in res_list:
         root = f.replace('.res', '')
         exts_to_rm = ['res.lock', 'kill']
         for ext in exts_to_rm:
             if os.path.isfile('{}.{}'.format(root, ext)):
-                if debug:
-                    print('Deleting {}.{}'.format(root, ext))
                 os.remove('{}.{}'.format(root, ext))
 
     # also remove from jobs file
     if os.path.isfile('jobs.txt'):
         with open('jobs.txt', 'r+') as f:
             flines = f.readlines()
-            if debug:
-                print('Initially {} jobs in jobs.txt'.format(len(flines)))
             f.seek(0)
             for line in flines:
                 line = line.strip()
                 if line in res_list:
-                    print('Excluding {}'.format(line))
                     continue
                 f.write(line)
             f.truncate()
             flines = f.readlines()
-            if debug:
-                print('{} jobs remain in jobs.txt'.format(len(flines)))
 
     return len(res_list)
 
