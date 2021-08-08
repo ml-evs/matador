@@ -300,8 +300,7 @@ class ComputeTask:
 
         except Exception as exc:
             LOG.error('Process raised {} with message {}.'.format(type(exc), exc))
-            if isinstance(exc, CalculationError):
-                LOG.error('Full traceback:\n{}'.format(tb.format_exc()))
+            LOG.error('Full traceback:\n{}'.format(tb.format_exc()))
             for handler in LOG.handlers[:]:
                 handler.close()
             raise exc
