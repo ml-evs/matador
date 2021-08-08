@@ -73,13 +73,15 @@ class CastepElasticWorkflow(Workflow):
         LOG.info('Preprocessing completed: run3 bulk modulus calculation options {}'
                  .format(self.volume_rescale))
 
-        # clean up after geometry step as seed is going to change
-        self.add_step(
-            castep_elastic_prerelax,
-            'relax',
-            clean_after=True,
-            output_exts=["-out.cell"]
-        )
+        # if there is not geom_force_tol parameter set, then don't pre-relax
+        if self.calc_doc.get("geom_force_tol"):
+            self.add_step(
+                castep_elastic_prerelax,
+                'relax',
+                clean_after=True,  # clean up after geometry step as seed is going to change
+                output_exts=["-out.cell"]
+            )
+
         for volume in self.volume_rescale:
             self.add_step(castep_rescaled_volume_scf, 'rescaled_volume_scf', rescale=volume)
 
