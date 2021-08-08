@@ -166,6 +166,7 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
                     position = (conc, label_offset[0] * (e_f - label_offset[1]))
                 else:
                     position = (min(1.1 * conc + 0.15, 0.95), label_offset[0] * (e_f - label_offset[1]))
+                    position = (min(1.05 * conc + 0.15, 0.95), label_offset[0] * (e_f - label_offset[1]))
                 if _specific_label_offset:
                     plain_formula = get_formula_from_stoich(doc['stoichiometry'], tex=False)
                     if plain_formula in _specific_label_offset:
@@ -200,8 +201,9 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
                                      hull.structures[np.argsort(hull.hull_dist), -1][::-1],
                                      s=scale*40,
                                      c=np.sort(hull.hull_dist)[::-1],
-                                     zorder=10000,
-                                     cmap=cmap, norm=colours.LogNorm(0.01, 1))
+                                     zorder=100,
+                                     cmap=cmap, norm=colours.LogNorm(0.01, 1),
+                                     rasterized=True)
 
                 if show_cbar:
                     ticks = [0.01, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64]
@@ -229,7 +231,7 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
                 ax.scatter(hull.structures[1:-1, 0], hull.structures[1:-1, 1],
                            s=scale*30, lw=0,
                            alpha=0.3, c=hull.colours[-2],
-                           edgecolor='k', zorder=10)
+                           edgecolor='k', zorder=10, rasterized=True)
 
     elif colour_by_source:
         _scatter_plot_by_source(
