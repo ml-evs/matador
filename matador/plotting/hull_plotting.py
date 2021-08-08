@@ -7,6 +7,7 @@ diagrams generally.
 """
 
 
+from collections import defaultdict
 import numpy as np
 from matador.utils.chem_utils import get_stoich_from_formula, get_formula_from_stoich
 from matador.plotting.plotting import plotting_function, get_linear_cmap, SAVE_EXTS
@@ -784,55 +785,85 @@ def _scatter_plot_by_source(hull, ax, scale, kwargs,
     from matador.utils.cursor_utils import get_guess_doc_provenance
     if sources is None:
         sources = ['AIRSS', 'GA', 'OQMD', 'SWAPS', 'ICSD', 'DOI', 'SM', 'MP', 'PF', 'Other']
+
     if source_labels is None:
         source_labels = sources
     else:
         assert len(source_labels) == len(sources)
 
+    if "Other" not in sources:
+        sources.append("Other")
+        source_labels.append("Other")
+
     # hack: double length of hull colours
     hull.colours.extend(hull.colours)
 
     colour_choices = {source: hull.colours[ind + 1] for ind, source in enumerate(sources)}
-    colours = []
-    concs = []
-    energies = []
-    zorders = []
+    points_by_source = {source: defaultdict(list) for source in sources}
+    hull_points_by_source = {source: defaultdict(list) for source in sources}
+    sources_present = set()
     for doc in hull.cursor:
         source = get_guess_doc_provenance(doc['source'])
         if source not in sources:
             # use grey for undesired sources
-            colours.append(hull.colours[-2])
             source = 'Other'
-            if 'Other' not in sources:
-                sources.append('Other')
-                source_labels.append('Other')
-                colour_choices['Other'] = hull.colours[-2]
+        if doc["hull_distance"] <= 0 + 1e-9 and not plot_hull_points:
+            hull_points_by_source[source]["concs"].append(doc['concentration'])
+            hull_points_by_source[source]["energies"].append(doc['formation_{}'.format(hull.energy_key)])
         else:
-            colours.append(source)
-        zorders.append(sources.index(source))
-        concs.append(doc['concentration'])
-        energies.append(doc['formation_{}'.format(hull.energy_key)])
+            points_by_source[source]["concs"].append(doc['concentration'])
+            points_by_source[source]["energies"].append(doc['formation_{}'.format(hull.energy_key)])
 
-    sources_present = set(colours)
-    sources_present = [source for source in sources if source in sources_present]
-    colour_choices = {source: hull.colours[ind + 1] for ind, source in enumerate(sources_present)}
-    colours = [colour_choices[src] for src in colours]
+        sources_present.add(source)
+
     alpha = kwargs.get('alpha')
     if alpha is None:
         alpha = 0.2
 
-    for ind, conc in enumerate(concs):
-        if hull.cursor[ind]['hull_distance'] <= 0 + 1e-9 and not plot_hull_points:
-            ax.scatter(conc, energies[ind],
-                       c=colours[ind], alpha=1, s=scale*40, edgecolor='k',
-                       zorder=zorders[ind]+1e5, lw=1.5)
-        else:
-            ax.scatter(conc, energies[ind],
-                       c=colours[ind], alpha=alpha, s=scale*20,
-                       zorder=zorders[ind]+100)
+    legend_sources = {}
 
-    for ind, source in enumerate(sources_present):
-        ax.scatter(1e10, 1e10, c=colour_choices[source], label=source_labels[ind], alpha=alpha, lw=1)
+    for source in sources:
+        if "concs" not in points_by_source[source]:
+            continue
+
+        concs = points_by_source[source]["concs"]
+        energies = points_by_source[source]["energies"]
+        ax.scatter(
+            concs,
+            energies,
+            c=colour_choices[source],
+            alpha=alpha,
+            s=scale*20,
+            lw=0,
+            zorder=100,
+            rasterized=True
+        )
+
+        legend_sources[source] = colour_choices[source]
+
+    if not plot_hull_points:
+        for source in sources:
+            if "concs" not in hull_points_by_source[source]:
+                continue
+
+            concs = hull_points_by_source[source]["concs"]
+            energies = hull_points_by_source[source]["energies"]
+            ax.scatter(
+                concs,
+                energies,
+                facecolor=colour_choices[source],
+                edgecolor="k",
+                alpha=1,
+                s=scale*40,
+                lw=1.5,
+                zorder=1e5,
+            )
+
+            legend_sources[source] = colour_choices[source]
+
+    for ind, source in enumerate(sources):
+        if source in legend_sources:
+            ax.scatter(1e10, 1e10, c=legend_sources[source], label=source_labels[ind], alpha=max(0.5, alpha), lw=1)
 
     if legend_kwargs is not None:
         legend = ax.legend(**legend_kwargs)
