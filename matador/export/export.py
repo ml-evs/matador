@@ -207,7 +207,6 @@ def doc2param(doc, path, overwrite=False, hash_dupe=False, spin=False):
     skip_keywords = ['nbands', 'nelectrons']
     for kw in skip_keywords:
         if kw in doc:
-            print('Skipping keyword {} as it was probably not desired...'.format(kw))
             param_dict.pop(kw)
 
     if spin is not None and not doc.get('spin_polarized'):
