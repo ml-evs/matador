@@ -197,17 +197,19 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
                                      s=scale*40,
                                      c=np.sort(hull.hull_dist)[::-1],
                                      zorder=10000,
-                                     cmap=cmap, norm=colours.LogNorm(0.02, 2))
+                                     cmap=cmap, norm=colours.LogNorm(0.01, 1))
 
                 if show_cbar:
-                    cbar = plt.colorbar(scatter, aspect=30, pad=0.02,
-                                        ticks=[0, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28])
-                    cbar.ax.tick_params(length=0)
-                    cbar.ax.set_yticklabels([0, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28])
-                    cbar.ax.yaxis.set_ticks_position('right')
-                    cbar.ax.set_frame_on(False)
-                    cbar.outline.set_visible(False)
-                    cbar.set_label('Distance from hull (eV/atom)')
+                    ticks = [0.01, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64]
+                    cbar = plt.colorbar(scatter, aspect=30, pad=0.02, ticks=ticks, extend="both")
+                    if hull_dist_unit.lower() == "mev":
+                        ticks = [int(1000 * t) for t in ticks]
+                    cbar.ax.set_yticklabels(ticks)
+                    cbar.ax.tick_params(which="minor", length=0)
+                    unit = "eV/atom"
+                    if hull_dist_unit.lower() == "mev":
+                        unit = "m" + unit
+                    cbar.set_label(f'Distance from hull ({unit})')
 
         elif hull.hull_cutoff != 0:
             # if specified hull cutoff colour those below
@@ -735,7 +737,7 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
             formula = get_formula_from_stoich(
                 doc['stoichiometry'], sort=False, tex=True, latex_sub_style=r'\mathregular', elements=hull.species
             )
-            arrowprops = dict(arrowstyle="-|>", color='k', lw=2, alpha=0.5, zorder=1, shrinkA=2, shrinkB=4)
+            arrowprops = dict(arrowstyle="-|>", facecolor="k", color='k', lw=2, alpha=0.5, zorder=1, shrinkA=2, shrinkB=4)
             cart = barycentric2cart([doc['concentration'] + [0]])[0][:2]
             min_dist = 1e20
             closest_label = 0
