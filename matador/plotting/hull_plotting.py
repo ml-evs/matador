@@ -72,7 +72,8 @@ def _get_hull_labels(hull, label_cutoff=None, num_species=None, exclude_edges=Tr
 def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
                  plot_hull_points=True, labels=None, label_cutoff=None, colour_by_source=False,
                  sources=None, hull_label=None, source_labels=None, title=True, plot_fname=None, show_cbar=True,
-                 label_offset=(1.15, 0.05), eform_limits=None, legend_kwargs=None,
+                 label_offset=(1.15, 0.05), specific_label_offset=None, eform_limits=None, legend_kwargs=None,
+                 hull_dist_unit="meV",
                  **kwargs):
     """ Plot calculated hull, returning ax and fig objects for further editing.
 
@@ -88,6 +89,8 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
             hull.args.
         label_cutoff (float/:obj:`tuple` of :obj:`float`): draw labels less than or
             between these distances form the hull, also read from hull.args.
+        specific_label_offset (dict): A dictionary keyed by chemical formula strings
+            containing 2-length float tuples of label offsets.
         colour_by_source (bool): plot and label points by their sources
         alpha (float): alpha value of points when colour_by_source is True
         sources (list): list of possible provenances to colour when colour_by_source
@@ -159,6 +162,11 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
                     position = (conc, label_offset[0] * (e_f - label_offset[1]))
                 else:
                     position = (min(1.1 * conc + 0.15, 0.95), label_offset[0] * (e_f - label_offset[1]))
+                if specific_label_offset:
+                    plain_formula = get_formula_from_stoich(doc['stoichiometry'], tex=False)
+                    if plain_formula in specific_label_offset:
+                        offset = specific_label_offset.pop(plain_formula)
+                        position = (position[0] + offset[0], position[1] + offset[1])
                 ax.annotate(get_formula_from_stoich(doc['stoichiometry'],
                                                     latex_sub_style=r'\mathregular',
                                                     tex=True,
@@ -172,6 +180,10 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
                             arrowprops=arrowprops,
                             zorder=1)
                 already_labelled.append(formula)
+
+    if specific_label_offset:
+        import warnings
+        warnings.warn(f"Found unused requested offsets: {specific_label_offset}")
 
     # points for off hull structures; we either colour by source or by energy
     if plot_points and not colour_by_source:
