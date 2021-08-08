@@ -32,7 +32,6 @@ def _get_hull_labels(hull, label_cutoff=None, num_species=None, exclude_edges=Tr
         label_cursor (list(dict)): list of matador documents to label.
 
     """
-    eps = 1e-9
     if label_cutoff is None:
         label_cutoff = 0.0
     if isinstance(label_cutoff, list) and len(label_cutoff) == 2:
@@ -43,7 +42,7 @@ def _get_hull_labels(hull, label_cutoff=None, num_species=None, exclude_edges=Tr
         if isinstance(label_cutoff, list):
             assert len(label_cutoff) == 1, 'Incorrect number of label_cutoff values passed, should be 1 or 2.'
             label_cutoff = label_cutoff[0]
-        label_cursor = [doc for doc in hull.cursor if doc['hull_distance'] <= label_cutoff + eps]
+        label_cursor = [doc for doc in hull.cursor if doc['hull_distance'] <= label_cutoff + EPS]
 
     num_labels = len({get_formula_from_stoich(doc['stoichiometry']) for doc in label_cursor})
     if num_labels < len(label_cursor):
@@ -61,7 +60,7 @@ def _get_hull_labels(hull, label_cutoff=None, num_species=None, exclude_edges=Tr
         label_cursor = [doc for doc in label_cursor if len(doc['stoichiometry']) == num_species]
     if exclude_edges:
         label_cursor = [doc for doc in label_cursor if (all(doc['concentration']) > 0 and
-                                                        sum(doc['concentration']) <= 1 - 1e-6)]
+                                                        sum(doc['concentration']) <= 1 - EPS)]
 
     label_cursor = sorted(label_cursor, key=lambda doc: doc['concentration'])
 
@@ -72,7 +71,7 @@ def _get_hull_labels(hull, label_cutoff=None, num_species=None, exclude_edges=Tr
 def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
                  plot_hull_points=True, labels=None, label_cutoff=None, colour_by_source=False,
                  sources=None, hull_label=None, source_labels=None, title=True, plot_fname=None, show_cbar=True,
-                 label_offset=(1.15, 0.05), specific_label_offset=None, eform_limits=None, legend_kwargs=None,
+                 label_offset=(1, 0.1), specific_label_offset=None, eform_limits=None, legend_kwargs=None,
                  hull_dist_unit="meV",
                  **kwargs):
     """ Plot calculated hull, returning ax and fig objects for further editing.
@@ -105,6 +104,11 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
     """
     import matplotlib.pyplot as plt
     import matplotlib.colors as colours
+
+    # cache the specific label offset dict
+    _specific_label_offset = None
+    if specific_label_offset:
+        _specific_label_offset = dict(specific_label_offset)
 
     if ax is None:
         fig = plt.figure()
@@ -152,7 +156,7 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
         for ind, doc in enumerate(label_cursor):
             formula = get_formula_from_stoich(doc['stoichiometry'], sort=True)
             if formula not in already_labelled:
-                arrowprops = dict(arrowstyle="-|>", lw=2, alpha=1, zorder=1, shrinkA=2, shrinkB=4)
+                arrowprops = dict(arrowstyle="-|>", facecolor="k", color="k", lw=2, alpha=1, zorder=1, shrinkA=2, shrinkB=4)
                 min_comp = tie_line[np.argmin(tie_line[:, 1]), 0]
                 e_f = label_cursor[ind]['formation_' + str(hull.energy_key)]
                 conc = label_cursor[ind]['concentration'][0]
@@ -162,10 +166,10 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
                     position = (conc, label_offset[0] * (e_f - label_offset[1]))
                 else:
                     position = (min(1.1 * conc + 0.15, 0.95), label_offset[0] * (e_f - label_offset[1]))
-                if specific_label_offset:
+                if _specific_label_offset:
                     plain_formula = get_formula_from_stoich(doc['stoichiometry'], tex=False)
-                    if plain_formula in specific_label_offset:
-                        offset = specific_label_offset.pop(plain_formula)
+                    if plain_formula in _specific_label_offset:
+                        offset = _specific_label_offset.pop(plain_formula)
                         position = (position[0] + offset[0], position[1] + offset[1])
                 ax.annotate(get_formula_from_stoich(doc['stoichiometry'],
                                                     latex_sub_style=r'\mathregular',
@@ -181,9 +185,9 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
                             zorder=1)
                 already_labelled.append(formula)
 
-    if specific_label_offset:
+    if _specific_label_offset:
         import warnings
-        warnings.warn(f"Found unused requested offsets: {specific_label_offset}")
+        warnings.warn(f"Found unused requested offsets: {_specific_label_offset}")
 
     # points for off hull structures; we either colour by source or by energy
     if plot_points and not colour_by_source:
@@ -235,8 +239,8 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
 
     if eform_limits is None:
         eform_limits = (np.min(hull.structures[:, 1]), np.max(hull.structures[:, 1]))
-        lims = (-0.1 if eform_limits[0] >= 0 else 1.4*eform_limits[0],
-                eform_limits[1] if eform_limits[0] >= 0 else 0.1)
+        lims = (-0.1 if eform_limits[0] >= 0 else 1.25*eform_limits[0],
+                eform_limits[1] if eform_limits[0] >= 0 else 0.05)
     else:
         lims = sorted(eform_limits)
     ax.set_ylim(lims)
@@ -249,16 +253,12 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
     elif isinstance(title, str) and title != '':
         ax.set_title(title)
 
-    plt.locator_params(nbins=3)
     if hull._non_elemental:
         ax.set_xlabel(r'x in ({d[0]})$_\mathrm{{x}}$({d[1]})$_\mathrm{{1-x}}$'.format(d=chempot_labels))
     else:
         ax.set_xlabel(r'x in {d[0]}$_\mathrm{{x}}${d[1]}$_\mathrm{{1-x}}$'.format(d=chempot_labels))
 
-    ax.grid(False)
     ax.set_xlim(-0.05, 1.05)
-    ax.set_xticks([0, 0.25, 0.5, 0.75, 1])
-    ax.set_xticklabels(ax.get_xticks())
     ax.set_ylabel('Formation energy (eV/atom)')
 
     if hull.savefig or any([kwargs.get(ext) for ext in SAVE_EXTS]):
