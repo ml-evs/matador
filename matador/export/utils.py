@@ -3,7 +3,6 @@ for exporting data.
 
 """
 
-from traceback import print_exc
 import os
 import random
 
@@ -34,10 +33,8 @@ def file_writer_function(function):
                 if overwrite:
                     os.remove(path)
                 elif hash_dupe:
-                    print('File name already exists, generating hash...')
                     path = '{}-{}.{}'.format(path.replace(ext, ''), generate_hash(), ext)
                 else:
-                    print('File name {} already exists! Skipping!'.format(path))
                     return False
 
             with open(path, 'w') as f:
@@ -45,7 +42,6 @@ def file_writer_function(function):
                     f.write(line + '\n')
 
         except Exception as exc:
-            print_exc()
             raise type(exc)('Failed to write {}: {}'.format(path, exc))
 
     return wrapped_writer
