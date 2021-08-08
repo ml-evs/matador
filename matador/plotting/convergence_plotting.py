@@ -58,6 +58,9 @@ def plot_cutoff_kpt_grid(
     else:
         ax = axes[0]
 
+    k_label = "Reduced $k$-point spacing (1/Å)"
+    e_label = "Planewave cutoff energy (eV)"
+
     _, lines, labels = plot_field(
         data,
         field="formation_energy_per_atom",
@@ -65,13 +68,13 @@ def plot_cutoff_kpt_grid(
         ax=ax,
         colour_by=colour_by,
         max_y=max_energy,
-        label_x=not forces,
+        label_x=e_label if not forces else False,
         label_y=True,
         reference="last",
     )
 
     if len(labels) < 30 and legend:
-        plt.figlegend(lines, labels, loc="upper center", fontsize=10, ncol=5)
+        plt.figlegend(lines, labels, loc="upper center", ncol=min(len(lines)//2, 8))
 
     if forces:
         ax = axes[0][1]
@@ -85,7 +88,7 @@ def plot_cutoff_kpt_grid(
         ax=ax,
         colour_by=colour_by,
         max_y=max_energy,
-        label_x=not forces,
+        label_x=k_label if not forces else False,
         label_y=False,
         reference="last",
     )
@@ -97,7 +100,7 @@ def plot_cutoff_kpt_grid(
             parameter="cut_off_energy",
             ax=axes[1][0],
             max_y=max_force,
-            label_x=True,
+            label_x=e_label,
             label_y=True,
             reference="last",
         )
@@ -107,7 +110,7 @@ def plot_cutoff_kpt_grid(
             parameter="kpoints_mp_spacing",
             max_y=max_force,
             ax=axes[1][1],
-            label_x=True,
+            label_x=k_label,
             label_y=False,
             reference="last",
         )
@@ -123,7 +126,24 @@ def plot_cutoff_kpt_grid(
                 )
                 print("Wrote {}.{}".format(fname, ext))
 
-    plt.show()
+    if kwargs.get("plot_fname") or any([kwargs.get(ext) for ext in SAVE_EXTS]):
+        import os
+        fname = kwargs.get("plot_fname") or "conv"
+        for ext in SAVE_EXTS:
+            if kwargs.get(ext):
+                fname_tmp = fname
+                ind = 0
+                while os.path.isfile('{}.{}'.format(fname_tmp, ext)):
+                    ind += 1
+                    fname_tmp = fname + str(ind)
+
+                fname = fname_tmp
+                plt.savefig('{}.{}'.format(fname, ext),
+                            bbox_inches='tight', transparent=True)
+                print('Wrote {}.{}'.format(fname, ext))
+
+    if kwargs.get("show"):
+        plt.show()
 
 
 def plot_field(
@@ -168,7 +188,6 @@ def plot_field(
     lines = []
     labels = []
     labelled = []
-    ax.xaxis.grid()
 
     colourmap = {}
     if colour_by == "formula":
@@ -227,16 +246,22 @@ def plot_field(
             lines, labels = ax.get_legend_handles_labels()
 
     if label_x:
-        ax.set_xlabel(parameter.replace("_", " "))
+        if isinstance(label_x, bool):
+            label_x = parameter.replace("_", " ")
+        ax.set_xlabel(label_x)
+
     if label_y:
         if "force" in field.lower():
-            ylabel = "$\\Delta F$ (eV/$\\AA$)"
-        else:
+            ylabel = "$\\Delta F$ (eV/Å)"
+        elif "formation" in field.lower():
             ylabel = "$\\Delta E$ (meV/atom)"
-        ax.set_ylabel(ylabel.format(field.replace("_", " ")))
+        else:
+            ylabel = field.replace("_", " ")
+
+        ax.set_ylabel(ylabel)
 
     if max_y is not None:
-        ax.set_ylim(0, max_y)
+        ax.set_ylim(None, max_y)
 
     return ax, lines, labels
 
@@ -291,10 +316,8 @@ def get_convergence_data(
     if len(form_set) == 1:
         chempot_mode = False
         single = True
-        print("Working in single stoichiometry mode..")
 
     else:
-        print("Searching for chemical potentials")
         chempot_mode = True
         single = False
         chempots_dict = defaultdict(dict)
@@ -319,9 +342,13 @@ def get_convergence_data(
                 scraped_from_filename = None
                 if not single and len(doc["stoichiometry"]) == 1:
                     if conv_parameter == "kpoints_mp_spacing":
-                        scraped_from_filename = float(
-                            doc["source"][0].split("/")[-1].split("_")[-1].split("A")[0]
-                        )
+                        try:
+                            scraped_from_filename = float(
+                                doc["source"][0].split("/")[-1].split("_")[-1].split("A")[0]
+                            )
+                        except ValueError:
+                            print(f"Unable to determine kpoints label from {doc['source'][0]}, skipping...")
+                            continue
 
                     if scraped_from_filename is not None:
                         rounded_field = round(scraped_from_filename, rounding)
@@ -362,9 +389,13 @@ def get_convergence_data(
 
         for doc in structure_files[key]:
             if conv_parameter == "kpoints_mp_spacing":
-                scraped_from_filename = float(
-                    doc["source"][0].split("/")[-1].split("_")[-1].split("A")[0]
-                )
+                try:
+                    scraped_from_filename = float(
+                        doc["source"][0].split("/")[-1].split("_")[-1].split("A")[0]
+                    )
+                except ValueError:
+                    print(f"Unable to determine kpoints label from {doc['source'][0]}, skipping...")
+                    continue
             try:
                 doc["formation_energy_per_atom"] = doc["total_energy_per_atom"]
                 if scraped_from_filename is not None:
