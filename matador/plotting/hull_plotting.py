@@ -90,7 +90,8 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
         label_cutoff (float/:obj:`tuple` of :obj:`float`): draw labels less than or
             between these distances form the hull, also read from hull.args.
         specific_label_offset (dict): A dictionary keyed by chemical formula strings
-            containing 2-length float tuples of label offsets.
+            containing 2-length float tuples of label offsets. A value of `None` for
+            a particular formula will exclude that label from the plot.
         colour_by_source (bool): plot and label points by their sources
         alpha (float): alpha value of points when colour_by_source is True
         sources (list): list of possible provenances to colour when colour_by_source
@@ -157,7 +158,9 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
         for ind, doc in enumerate(label_cursor):
             formula = get_formula_from_stoich(doc['stoichiometry'], sort=True)
             if formula not in already_labelled:
-                arrowprops = dict(arrowstyle="-|>", facecolor="k", color="k", lw=2, alpha=1, zorder=1, shrinkA=2, shrinkB=4)
+                arrowprops = dict(
+                    arrowstyle="-|>", facecolor="k", edgecolor="k", lw=2, alpha=1, zorder=1, shrinkA=2, shrinkB=4
+                )
                 min_comp = tie_line[np.argmin(tie_line[:, 1]), 0]
                 e_f = label_cursor[ind]['formation_' + str(hull.energy_key)]
                 conc = label_cursor[ind]['concentration'][0]
@@ -172,6 +175,8 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
                     plain_formula = get_formula_from_stoich(doc['stoichiometry'], tex=False)
                     if plain_formula in _specific_label_offset:
                         offset = _specific_label_offset.pop(plain_formula)
+                        if offset is None:
+                            continue
                         position = (position[0] + offset[0], position[1] + offset[1])
                 ax.annotate(get_formula_from_stoich(doc['stoichiometry'],
                                                     latex_sub_style=r'\mathregular',
