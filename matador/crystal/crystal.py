@@ -600,3 +600,13 @@ class Crystal(DataContainer):
         """ Draw the CrystalGraph network. """
         from matador.crystal.network import draw_network
         draw_network(self, layout=layout)
+
+    def supercell(self, extension):
+        """Returns a supercell of this crystal with the specified extension."""
+        from matador.utils.cell_utils import create_simple_supercell
+        return create_simple_supercell(self, extension)
+
+    def standardized(self, primitive=False):
+        """Returns a supercell of this crystal with the specified extension."""
+        from matador.utils.cell_utils import standardize_doc_cell
+        return standardize_doc_cell(self, primitive=primitive)

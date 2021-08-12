@@ -690,10 +690,14 @@ def create_simple_supercell(doc, extension, standardize=False, symmetric=False):
     """
     from itertools import product
     from copy import deepcopy
+    from matador.crystal import Crystal
     if not all([elem >= 1 for elem in extension]) or extension == (1, 1, 1):
         raise RuntimeError('Bad/null supercell {} requested...'.format(extension))
 
-    supercell_doc = deepcopy(doc)
+    if isinstance(doc, Crystal):
+        supercell_doc = deepcopy(doc._data)
+    else:
+        supercell_doc = deepcopy(doc)
     # standardize cell with spglib
     if standardize:
         supercell_doc = standardize_doc_cell(supercell_doc)
@@ -733,5 +737,8 @@ def create_simple_supercell(doc, extension, standardize=False, symmetric=False):
 
     assert np.isclose(supercell_doc['cell_volume'],
                       np.prod(extension)*cart2volume(doc['lattice_cart']))
+
+    if isinstance(doc, Crystal):
+        return Crystal(supercell_doc)
 
     return supercell_doc
