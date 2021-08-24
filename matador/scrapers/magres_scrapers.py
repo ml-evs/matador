@@ -36,7 +36,6 @@ def magres2dict(fname, **kwargs):
         magres['user'] = getpwuid(stat(fname).st_uid).pw_name
     except Exception:
         magres['user'] = 'xxx'
-
     magres['magres_units'] = dict()
     for line_no, line in enumerate(flines):
         line = line.lower().strip()
@@ -62,12 +61,11 @@ def magres2dict(fname, **kwargs):
                     magres['positions_abs'].append([float(elem) for elem in atom[-3:]])
                 i += 1
             break
-
     if "atom_types" in magres:
         magres['num_atoms'] = len(magres['atom_types'])
         magres['positions_frac'] = cart2frac(magres['lattice_cart'], magres['positions_abs'])
         magres['stoichiometry'] = get_stoich(magres['atom_types'])
-
+    
     for line_no, line in enumerate(flines):
         line = line.lower().strip()
         if line in ['<magres>', '[magres]']:
@@ -85,7 +83,7 @@ def magres2dict(fname, **kwargs):
                     magres["susceptibility_tensor"] = np.array([float(val) for val in split_line[1:]]).reshape(3, 3)
 
                 elif 'ms' in split_line:
-                    ms = np.array([float(val) for val in split_line[3:]]).reshape(3, 3)
+                    ms = np.array([float(val) for val in split_line[-9:]]).reshape(3, 3)
                     s_iso = np.trace(ms) / 3
 
                     # find eigenvalues of symmetric part of shielding and order them to calc anisotropy eta
@@ -120,7 +118,6 @@ def magres2dict(fname, **kwargs):
                     magres["quadrupolar_asymmetries"].append(eta)
 
                 i += 1
-
     for line_no, line in enumerate(flines):
         line = line.lower().strip()
         if line in ['<calculation>', '[calculation]']:
