@@ -85,7 +85,7 @@ def magres2dict(fname, **kwargs):
                     magres["susceptibility_tensor"] = np.array([float(val) for val in split_line[1:]]).reshape(3, 3)
 
                 elif 'ms' in split_line:
-                    ms = np.array([float(val) for val in split_line[3:]]).reshape(3, 3)
+                    ms = np.array([float(val) for val in split_line[-9:]]).reshape(3, 3)
                     s_iso = np.trace(ms) / 3
 
                     # find eigenvalues of symmetric part of shielding and order them to calc anisotropy eta
