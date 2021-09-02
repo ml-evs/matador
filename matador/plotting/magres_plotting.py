@@ -25,12 +25,15 @@ def plot_magres(
     broadening_width: float = 1,
     text_offset: float = 0.1,
     ax=None,
+    cor_constant: float = 0,
+    cor_gradient: float = 1,
     figsize: Tuple[float] = None,
     show: bool = False,
     savefig: Optional[str] = None,
     signal_labels: Optional[Union[str, List[str]]] = None,
     signal_limits: Tuple[float] = None,
     line_kwargs: Optional[Union[Dict, List[Dict]]] = None,
+    flipxax: bool = False,
 ):
     """ Plot voltage curve calculated for phase diagram.
 
@@ -45,6 +48,8 @@ def plot_magres(
         show (bool): whether to show plot in an X window.
         figsize (Tuple[float]): overrides the default size for the matplotlib figure.
         broadening_width (float): the Lorentzian width to apply to the shifts.
+        cor_constant (float): a linear correction to apply to magres shifts.
+        cor_gradient (float): a gradient correction to apply to magres shifts.
         xlabel (str): a custom label for the x-axis.
         savefig (str): filename to use to save the plot.
         signal_labels (list): optional list of labels for the curves in
@@ -100,7 +105,8 @@ def plot_magres(
 
         relevant_sites = [atom for atom in _doc if atom.species == species]
         if relevant_sites:
-            shielding = [atom[magres_key] for atom in relevant_sites]
+            # cor_gradient and cor_constant are 1 and 0 by default and are effectively ignored
+            shielding = [(atom[magres_key]*cor_gradient + cor_constant) for atom in relevant_sites]
             if signal_limits is None:
                 min_shielding = min(np.min(shielding), min_shielding)
                 max_shielding = max(np.max(shielding), max_shielding)
@@ -144,7 +150,7 @@ def plot_magres(
             signal = np.zeros_like(s_space)
 
         else:
-            shifts = [site[magres_key] for site in relevant_sites]
+            shifts = [(site[magres_key]*cor_gradient + cor_constant) for site in relevant_sites]
 
             hist, bins = np.histogram(shifts, bins=s_space)
 
@@ -190,6 +196,8 @@ def plot_magres(
         ax.set_yticks(np.linspace(0, 1, 5, endpoint=True))
 
     ax.set_ylim(-0.1, 1.1 * len(magres))
+    if flipxax:
+        ax.invert_xaxis()
 
     if savefig:
         plt.savefig(savefig)
