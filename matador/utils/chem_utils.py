@@ -652,7 +652,7 @@ def magres_reference_shifts(
     shielding_key: str = "chemical_shielding_iso",
     shift_key: str = "chemical_shift_iso",
 ):
-    """ Convert chemical shielding to chemical shift.
+    """Set chemical shifts inside a matador document from shieldings and a given reference.
 
     Parameters:
         magres (Dict[str, Any]): A matador document containing the structure and magres shielding data.
