@@ -655,13 +655,13 @@ def magres_reference_shifts(
     """Set chemical shifts inside a matador document from shieldings and a given reference.
 
     Parameters:
-        magres (Dict[str, Any]): A matador document containing the structure and magres shielding data.
-        reference (Dict[str, Tuple[float, float]]): dictionary of conversion values in the form {element: [gradient, constant]}.
+        magres (list): A matador document containing the structure and magres shielding data.
+        eference (Dict[str, Tuple[float, float]]): dictionary of conversion values in the form {element: [gradient, constant]}.
 
     Keyword arguments:
         shielding_key (str): the data key for which the shielding is stored under.
         shift_key (str): the data key for which the shift will be stored under.
-        
+
    Returns:
         The input dictionary with the `chemical_shift_isos` key set to the referenced shifts.
     """
@@ -669,14 +669,10 @@ def magres_reference_shifts(
     shielding_key_plural = shielding_key + "s"
     shift_key_plural = shift_key + "s"
 
-    chemical_shifts = []
+    chemical_shifts = magres.get(shift_key_plural, len(magres["atom_types"]) * [None])
     for ind, species in enumerate(magres["atom_types"]):
-        if species in relevant_species:
+        if species in reference:
             chemical_shift = (magres[shielding_key_plural][ind] * reference[species][0]) + reference[species][1]
-            chemical_shifts.append(chemical_shift)
-        else:
-            chemical_shifts.append(None)
+            chemical_shifts[ind] = chemical_shift
 
     magres[shift_key_plural] = chemical_shifts
-
-    return magres
