@@ -666,7 +666,6 @@ def magres_reference_shifts(
         The input dictionary with the `chemical_shift_isos` key set to the referenced shifts.
     """
 
-    relevant_species = list(reference.keys())
     shielding_key_plural = shielding_key + "s"
     shift_key_plural = shift_key + "s"
 
