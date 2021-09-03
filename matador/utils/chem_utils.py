@@ -9,9 +9,11 @@ constants, with a focus on battery materials.
 
 import copy
 import warnings
+from typing import List, Union
 
 import numpy as np
 from matador.data.constants import * # noqa
+
 
 EPS = 1e-8
 
@@ -643,3 +645,36 @@ def get_formula_from_stoich(stoich, elements=None, tex=False, sort=True, latex_s
                 else:
                     form += elem[0] + str(int(elem[1]))
     return form
+
+def magres_reference_shifts(
+    magres: list,
+    reference: dict,
+    shielding_key: str = "chemical_shielding_iso",
+    shift_key: str = "chemical_shift_iso",
+):
+    """ Convert chemical shielding to chemical shift.
+
+    Parameters:
+        magres (list): list of containing magres data.
+        reference (str): dictionary of conversion values in the form {element: [gradient, constant]}.
+
+    Keyword arguments:
+        shielding_key (str): the data key for which the shielding is stored under.
+        shift_key (str): the data key for which the shift will be stored under.
+    """
+
+    relevant_species = list(reference.keys())
+    shielding_key_plural = ''.join([shielding_key, 's'])
+    shift_key_plural = ''.join([shift_key, 's'])
+
+    chemical_shifts = []
+    for ind, species in enumerate(magres["atom_types"]):
+        if species in relevant_species:
+            chemical_shift = (magres[shielding_key_plural][ind] * reference[species][0]) + reference[species][1]
+            chemical_shifts.append(chemical_shift)
+        else:
+            chemical_shifts.append(None)
+
+    magres[shift_key_plural] = chemical_shifts
+
+    return magres
