@@ -664,8 +664,8 @@ def magres_reference_shifts(
     """
 
     relevant_species = list(reference.keys())
-    shielding_key_plural = ''.join([shielding_key, 's'])
-    shift_key_plural = ''.join([shift_key, 's'])
+    shielding_key_plural = shielding_key + "s"
+    shift_key_plural = shift_key + "s"
 
     chemical_shifts = []
     for ind, species in enumerate(magres["atom_types"]):
