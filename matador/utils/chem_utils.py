@@ -655,7 +655,7 @@ def magres_reference_shifts(
     """ Convert chemical shielding to chemical shift.
 
     Parameters:
-        magres (list): list of containing magres data.
+        magres (Dict[str, Any]): A matador document containing the structure and magres shielding data.
         reference (str): dictionary of conversion values in the form {element: [gradient, constant]}.
 
     Keyword arguments:
