@@ -661,6 +661,9 @@ def magres_reference_shifts(
     Keyword arguments:
         shielding_key (str): the data key for which the shielding is stored under.
         shift_key (str): the data key for which the shift will be stored under.
+        
+   Returns:
+        The input dictionary with the `chemical_shift_isos` key set to the referenced shifts.
     """
 
     relevant_species = list(reference.keys())
