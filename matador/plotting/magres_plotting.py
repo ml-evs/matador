@@ -125,7 +125,7 @@ def plot_magres(
             .format(len(line_kwargs), len(magres))
         )
 
-    for ind, doc in enumerate(magres):
+    for ind, doc in enumerate(_magres):
         if signal_labels is None:
             stoich_label = doc.formula_tex
         else:
@@ -139,9 +139,7 @@ def plot_magres(
         if line_kwargs is not None:
             _line_kwargs.update(line_kwargs[ind])
 
-        _doc = _magres[ind]
-
-        relevant_sites = [site for site in _doc if site.species == species]
+        relevant_sites = [site for site in doc if site.species == species]
         if not relevant_sites:
             print(f"No sites of {species} found in {doc.root_source}, signal will be empty.")
             signal = np.zeros_like(s_space)
