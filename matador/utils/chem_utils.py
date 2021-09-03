@@ -656,7 +656,7 @@ def magres_reference_shifts(
 
     Parameters:
         magres (Dict[str, Any]): A matador document containing the structure and magres shielding data.
-        reference (str): dictionary of conversion values in the form {element: [gradient, constant]}.
+        reference (Dict[str, Tuple[float, float]]): dictionary of conversion values in the form {element: [gradient, constant]}.
 
     Keyword arguments:
         shielding_key (str): the data key for which the shielding is stored under.
