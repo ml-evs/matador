@@ -647,7 +647,7 @@ def get_formula_from_stoich(stoich, elements=None, tex=False, sort=True, latex_s
     return form
 
 def magres_reference_shifts(
-    magres: list,
+    magres: Dict[str, Any],
     reference: dict,
     shielding_key: str = "chemical_shielding_iso",
     shift_key: str = "chemical_shift_iso",
