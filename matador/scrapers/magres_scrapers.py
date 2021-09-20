@@ -101,7 +101,7 @@ def magres2dict(fname, **kwargs):
                     magres["chemical_shift_asymmetries"].append(asymm)
 
                 elif "efg" in split_line:
-                    efg = np.array([float(val) for val in split_line[3:]]).reshape(3, 3)
+                    efg = np.array([float(val) for val in split_line[-9:]]).reshape(3, 3)
                     species = split_line[1]
 
                     eigs = _get_haeberlen_eigs(efg)
