@@ -653,8 +653,8 @@ def magres_reference_shifts(
     """Set chemical shifts inside a matador document from shieldings and a given reference.
 
     Parameters:
-        magres (list): A matador document containing the structure and magres shielding data.
-        reference (Dict[str, Tuple[float, float]]): dictionary of conversion values in the form {element: [gradient, constant]}.
+        magres: A matador document containing the structure and magres shielding data.
+        reference: Reference values in the form `{element: [gradient, constant]}`.
 
    Returns:
         The input dictionary with the `chemical_shift_isos` key set to the referenced shifts.
