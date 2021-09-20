@@ -488,8 +488,8 @@ class ChemUtilsTest(unittest.TestCase):
 
         self.assertEqual(magres, magres_with_shifts)
 
-        
+
 if __name__ == "__main__":
     unittest.main()
 
-    
+
