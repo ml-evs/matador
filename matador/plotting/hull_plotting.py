@@ -812,7 +812,7 @@ def _scatter_plot_by_source(hull, ax, scale, kwargs,
         if source not in sources:
             # use grey for undesired sources
             source = 'Other'
-        if doc["hull_distance"] <= 0 + 1e-9 and not plot_hull_points:
+        if doc["hull_distance"] <= 0 + 2e-3 and not plot_hull_points:
             hull_points_by_source[source]["concs"].append(doc['concentration'])
             hull_points_by_source[source]["energies"].append(doc['formation_{}'.format(hull.energy_key)])
         else:
@@ -846,6 +846,10 @@ def _scatter_plot_by_source(hull, ax, scale, kwargs,
 
         legend_sources[source] = colour_choices[source]
 
+    hull_point_options = dict(
+        edgecolor="k", alpha=1, s=scale*40, lw=1.5, zorder=1e5
+    )
+
     if not plot_hull_points:
         for source in sources:
             if "concs" not in hull_points_by_source[source]:
@@ -857,18 +861,16 @@ def _scatter_plot_by_source(hull, ax, scale, kwargs,
                 concs,
                 energies,
                 facecolor=colour_choices[source],
-                edgecolor="k",
-                alpha=1,
-                s=scale*40,
-                lw=1.5,
-                zorder=1e5,
+                **hull_point_options
             )
 
             legend_sources[source] = colour_choices[source]
 
     for ind, source in enumerate(sources):
         if source in legend_sources:
-            ax.scatter(1e10, 1e10, c=legend_sources[source], label=source_labels[ind], alpha=max(0.5, alpha), lw=1)
+            ax.scatter(
+                1e10, 1e10, facecolor=legend_sources[source], label=source_labels[ind], **hull_point_options
+            )
 
     if legend_kwargs is not None:
         legend = ax.legend(**legend_kwargs)
