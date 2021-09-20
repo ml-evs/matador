@@ -31,7 +31,7 @@ def plot_magres(
     signal_labels: Optional[Union[str, List[str]]] = None,
     signal_limits: Tuple[float] = None,
     line_kwargs: Optional[Union[Dict, List[Dict]]] = None,
-    flipxax: bool = False,
+    invert_xaxis: bool = True,
 ):
     """ Plot magnetic resonance.
 
