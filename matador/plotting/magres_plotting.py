@@ -191,7 +191,7 @@ def plot_magres(
         ax.set_yticks(np.linspace(0, 1, 5, endpoint=True))
 
     ax.set_ylim(-0.1, 1.1 * len(magres))
-    if flipxax:
+    if invert_xaxis:
         ax.invert_xaxis()
 
     if savefig:
