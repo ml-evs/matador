@@ -147,7 +147,7 @@ def fresnel_view(doc, standardize=True, extension=None, show_bonds=True, show_ce
 
     a, b, c = doc.lattice_cart
     middle = np.sum(doc.lattice_cart, axis=-1) / 2
-    scene.camera = fresnel.iamera.Orthographic(
+    scene.camera = fresnel.camera.Orthographic(
         position=1.3 * np.asarray(a) - 1.2 * np.asarray(b) + np.asarray(c),
         look_at=middle,
         up=c,
