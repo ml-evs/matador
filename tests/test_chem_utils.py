@@ -480,13 +480,16 @@ class ChemUtilsTest(unittest.TestCase):
         magres = {"chemical_shielding_isos": [100, 75, -50, -25, 0, 100, 75, -50, -25, 0],
                   "atom_types": ["H", "H", "H", "H", "H", "Li", "Li", "Li", "Li", "Li"]}
 
-        magres_with_shifts = {  "chemical_shielding_isos": [100, 75, -50, -25, 0, 100, 75, -50, -25, 0],
-                                "atom_types": ["H", "H", "H", "H", "H", "Li", "Li", "Li", "Li", "Li"],
-                                "chemical_shift_isos": [-49.0, -36.5, 26.0, 13.5, 1.0, None, None, None, None, None]}
+        magres_with_shifts = {"chemical_shielding_isos": [100, 75, -50, -25, 0, 100, 75, -50, -25, 0],
+                              "atom_types": ["H", "H", "H", "H", "H", "Li", "Li", "Li", "Li", "Li"],
+                              "chemical_shift_isos": [-49.0, -36.5, 26.0, 13.5, 1.0, None, None, None, None, None]}
 
         magres_reference_shifts(magres=magres, reference={'H': [-0.5, 1]})
 
         self.assertEqual(magres, magres_with_shifts)
 
+        
 if __name__ == "__main__":
     unittest.main()
+
+    
