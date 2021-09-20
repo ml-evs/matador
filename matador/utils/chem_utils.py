@@ -9,7 +9,7 @@ constants, with a focus on battery materials.
 
 import copy
 import warnings
-from typing import Dict, Union, Tuple, Any
+from typing import Dict, Tuple, Any
 
 import numpy as np
 from matador.data.constants import * # noqa
