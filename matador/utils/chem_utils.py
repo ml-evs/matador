@@ -646,6 +646,7 @@ def get_formula_from_stoich(stoich, elements=None, tex=False, sort=True, latex_s
                     form += elem[0] + str(int(elem[1]))
     return form
 
+
 def magres_reference_shifts(
     magres: Dict[str, Any],
     reference: Dict[str, Tuple[float, float]],
