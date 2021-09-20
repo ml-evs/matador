@@ -648,7 +648,7 @@ def get_formula_from_stoich(stoich, elements=None, tex=False, sort=True, latex_s
 
 def magres_reference_shifts(
     magres: Dict[str, Any],
-    reference: dict,
+    reference: Dict[str, Tuple[float, float]],
 ):
     """Set chemical shifts inside a matador document from shieldings and a given reference.
 
