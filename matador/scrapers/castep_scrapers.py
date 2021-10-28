@@ -11,9 +11,9 @@ from collections import defaultdict
 import os
 import glob
 import warnings
-import pwd
-import numpy as np
 from pathlib import Path
+
+import numpy as np
 from matador.utils.cell_utils import (
     abc2cart,
     calc_mp_spacing,
@@ -56,8 +56,10 @@ def res2dict(fname, db=True, **kwargs):
     res['source'] = [fname]
     # grab file owner username
     try:
+        import pwd
         res['user'] = pwd.getpwuid(os.stat(fname).st_uid).pw_name
     except Exception:
+        res['user'] = 'xxx'
         pass
 
     try:
@@ -199,20 +201,23 @@ def cell2dict(fname, db=False, lattice=True, positions=True, **kwargs):
             i = 1
             while 'endblock' not in flines[line_no + i].lower():
                 # handle blank lines in species pot
-                if not flines[line_no + i].split():
+                split_line = flines[line_no+i].split()
+                if not split_line:
                     i += 1
                     continue
-                if db:
-                    species = flines[line_no+i].split()[0]
-                    pspot_string = flines[line_no+i].split()[1].split('/')[-1]
+                if len(split_line) == 2:
+                    species = split_line[0]
+                    pspot_string = split_line[1].split('/')[-1]
                     cell['species_pot'][species] = pspot_string.replace('()', '').replace('[]', '')
-                else:
-                    pspot_libs = ['C7', 'C8', 'C9', 'C17', 'C18', 'MS', 'HARD',
-                                  'QC5', 'NCP', 'NCP18', 'NCP17', 'NCP9']
-                    if flines[line_no + i].upper().split()[0] in pspot_libs:
-                        cell['species_pot']['library'] = flines[line_no + i].upper().split()[0]
-                    else:
-                        cell['species_pot'][flines[line_no + i].split()[0]] = flines[line_no + i].split()[1]
+                elif db:
+                    raise RuntimeError(
+                        f"Cannot parse `species_pot` block line {flines[line_no+i]} with `db=True`, "
+                        "expected a (species, pspot) pair. "
+                        "Try using `db=False` if specifying a pspot library for all species."
+                    )
+                elif len(split_line) == 1:
+                    cell['species_pot']['library'] = split_line[0].upper()
+
                 i += 1
             if not cell['species_pot']:
                 cell.pop('species_pot')
@@ -253,6 +258,12 @@ def cell2dict(fname, db=False, lattice=True, positions=True, **kwargs):
                     j += 1
                 i += 1
             cell['external_pressure'] = cell['external_pressure'].tolist()
+
+        elif '%block external_efield' in line.lower():
+            cell['external_efield'] = [f90_float_parse(e) for e in flines[line_no+1].split()]
+            if len(cell['external_efield']) != 3:
+                raise RuntimeError(f"EXTERNAL_EFIELD block has wrong shape, should be 3-D not: {cell['external_efield']}")
+
         elif '%block ionic_constraints' in line.lower():
             cell['ionic_constraints'] = []
             i = 1
@@ -609,9 +620,10 @@ def castep2dict(fname, db=True, intermediates=False, **kwargs):
 
     # grab file owner
     try:
+        import pwd
         castep['user'] = pwd.getpwuid(os.stat(fname).st_uid).pw_name
     except Exception:
-        pass
+        castep['user'] = 'xxx'
 
     try:
         get_seed_metadata(castep, fname)
@@ -1291,9 +1303,10 @@ def _castep_scrape_final_parameters(flines, castep):
             castep['spin_polarized'] = True
         elif 'hubbard_u' not in castep and 'Hubbard U values are eV' in line:
             castep['hubbard_u'] = defaultdict(list)
-            i = 5
+            n_lines_header = 5
+            i = 0
             while i < castep['num_atoms']:
-                line = flines[line_no + i].strip()
+                line = flines[line_no + i + n_lines_header].strip()
                 atom = line.split()[0].replace('|', '')
                 shifts = list(map(f90_float_parse, line.split()[-5:-1]))
                 for ind, shift in enumerate(shifts):

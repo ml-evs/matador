@@ -131,7 +131,7 @@ class FingerprintFactory(abc.ABC):
     Note:
         The number of processes used to concurrency is set by the following
         hierarchy:
-        SLURM_NTASKS -> OMP_NUM_THREADS -> `psutil.cpu_count(logical=True)`.
+        ``$SLURM_NTASKS -> $OMP_NUM_THREADS -> psutil.cpu_count(logical=False)``.
 
     Attributes:
         nprocs (int): number of concurrent processes to be used.
@@ -142,7 +142,7 @@ class FingerprintFactory(abc.ABC):
 
     def __init__(self, cursor, required_inds=None, debug=False, **fprint_args):
         """ Compute PDFs over n processes, where n is set by either
-        SLURM_NTASKS, OMP_NUM_THREADS or physical core count.
+        ``$SLURM_NTASKS``, ``$OMP_NUM_THREADS`` or physical core count.
 
         Parameters:
             cursor (list of dict): list of matador structures
@@ -187,7 +187,7 @@ class FingerprintFactory(abc.ABC):
             self.nprocs = int(os.environ.get('OMP_NUM_THREADS'))
             env = '$OMP_NUM_THREADS'
         else:
-            self.nprocs = psutil.cpu_count(logical=True)
+            self.nprocs = psutil.cpu_count(logical=False)
             env = 'core count'
         print_notify('Running {} jobs on at most {} processes, set by {}.'
                      .format(len(required_inds), self.nprocs, env))

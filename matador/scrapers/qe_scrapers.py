@@ -10,7 +10,6 @@ Quantum Espresso-related inputs and outputs.
 from collections import defaultdict
 from os import stat
 from math import gcd
-from pwd import getpwuid
 from matador.utils.cell_utils import cart2abc, cart2volume
 from matador.utils.chem_utils import RY_TO_EV, KBAR_TO_GPA
 from matador.scrapers.utils import scraper_function, get_flines_extension_agnostic
@@ -30,8 +29,12 @@ def pwout2dict(fname, **kwargs):
     pwout = {}
     pwout['source'] = [fname]
 
-    # grab file owner username
-    pwout['user'] = getpwuid(stat(fname).st_uid).pw_name
+    try:
+        # grab file owner username
+        from pwd import getpwuid
+        pwout['user'] = getpwuid(stat(fname).st_uid).pw_name
+    except Exception:
+        pwout['user'] = 'xxx'
 
     if 'CollCode' in fname:
         pwout['icsd'] = fname.split('CollCode')[-1]

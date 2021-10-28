@@ -9,7 +9,6 @@ NMR-related inputs and outputs, e.g. .magres files.
 
 from collections import defaultdict
 from os import stat
-from pwd import getpwuid
 
 import numpy as np
 from matador.utils.cell_utils import cart2abc, cart2frac
@@ -33,6 +32,7 @@ def magres2dict(fname, **kwargs):
 
     # grab file owner username
     try:
+        from pwd import getpwuid
         magres['user'] = getpwuid(stat(fname).st_uid).pw_name
     except Exception:
         magres['user'] = 'xxx'
@@ -85,7 +85,7 @@ def magres2dict(fname, **kwargs):
                     magres["susceptibility_tensor"] = np.array([float(val) for val in split_line[1:]]).reshape(3, 3)
 
                 elif 'ms' in split_line:
-                    ms = np.array([float(val) for val in split_line[3:]]).reshape(3, 3)
+                    ms = np.array([float(val) for val in split_line[-9:]]).reshape(3, 3)
                     s_iso = np.trace(ms) / 3
 
                     # find eigenvalues of symmetric part of shielding and order them to calc anisotropy eta
@@ -101,7 +101,7 @@ def magres2dict(fname, **kwargs):
                     magres["chemical_shift_asymmetries"].append(asymm)
 
                 elif "efg" in split_line:
-                    efg = np.array([float(val) for val in split_line[3:]]).reshape(3, 3)
+                    efg = np.array([float(val) for val in split_line[-9:]]).reshape(3, 3)
                     species = split_line[1]
 
                     eigs = _get_haeberlen_eigs(efg)

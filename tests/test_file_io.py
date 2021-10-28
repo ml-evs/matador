@@ -160,6 +160,7 @@ class CellScraperTests(MatadorUnitTest):
                 test_dict["phonon_kpoint_mp_grid"]
             ),
         )
+
         self.assertEqual(
             test_dict["phonon_kpoint_mp_offset"],
             [0.25, 0.25, 0.25],
@@ -207,6 +208,9 @@ class CellScraperTests(MatadorUnitTest):
         self.assertEqual(test_dict["phonon_supercell_matrix"][0], [3, 0, 1])
         self.assertEqual(test_dict["phonon_supercell_matrix"][1], [0, 3, 0])
         self.assertEqual(test_dict["phonon_supercell_matrix"][2], [0, 0, 9])
+        np.testing.assert_array_equal(
+            test_dict["external_efield"], np.array([0.5, 0, 0]),
+        )
 
     def test_cell_failure(self):
         cell_fname = REAL_PATH + "data/K5P4-phonon_bodged.cell"
@@ -2110,6 +2114,19 @@ class ScraperMiscTest(MatadorUnitTest):
 
 class CifTests(MatadorUnitTest):
     """ These tests check the cif scraper for correctness. """
+
+    def test_cif_primitive(self):
+        cif_fname = REAL_PATH + "data/cif_files/primitive.cif"
+        self.assertTrue(
+            os.path.isfile(cif_fname),
+            msg="Failed to open test case {} - please check installation.".format(
+                cif_fname
+            ),
+        )
+        test_dict, s = cif2dict(cif_fname, verbosity=VERBOSITY)
+        self.assertTrue(s, "Failed entirely, oh dear! {}".format(test_dict))
+        self.assertEqual(test_dict["num_atoms"], 1)
+        self.assertListEqual(test_dict["atom_types"], ["Si"])
 
     def test_cif_partial_occ(self):
         cif_fname = REAL_PATH + "data/cif_files/AgBiI.cif"

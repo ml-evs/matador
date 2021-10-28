@@ -31,8 +31,9 @@ def plot_magres(
     signal_labels: Optional[Union[str, List[str]]] = None,
     signal_limits: Tuple[float] = None,
     line_kwargs: Optional[Union[Dict, List[Dict]]] = None,
+    invert_xaxis: bool = True,
 ):
-    """ Plot voltage curve calculated for phase diagram.
+    """ Plot magnetic resonance.
 
     Parameters:
         magres (Union[Crystal, List[Crystal]]): list of :class:`Crystal` containing
@@ -124,7 +125,7 @@ def plot_magres(
             .format(len(line_kwargs), len(magres))
         )
 
-    for ind, doc in enumerate(magres):
+    for ind, doc in enumerate(_magres):
         if signal_labels is None:
             stoich_label = doc.formula_tex
         else:
@@ -190,6 +191,8 @@ def plot_magres(
         ax.set_yticks(np.linspace(0, 1, 5, endpoint=True))
 
     ax.set_ylim(-0.1, 1.1 * len(magres))
+    if invert_xaxis:
+        ax.invert_xaxis()
 
     if savefig:
         plt.savefig(savefig)

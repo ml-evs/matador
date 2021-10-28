@@ -3,6 +3,21 @@
 Changelog
 =========
 
+New in release (0.9.11) [03/06/2021]
+------------------------------------
+
+- Minor change: allow specification of arbitrary strings for CASTEP pseudopotential libraries (#156).
+- Bug fix: ``standardize_cell`` script failing to use default symmetry tolerance value (#157).
+- Bug fix: scraping of .cif files with single atoms and no symmetries (#173)
+- Bug fix: scraping of Hubbard U values from .castep files, and associated bugs when performing relaxations with Hubbard U (#180)
+- Dependency updates and Python 3.6 deprecation warning (#158, #181)
+
+New in release (0.9.10) [23/02/2021]
+------------------------------------
+
+- Windows compatibility changes (#149)
+- Dependency updates (#146, #148, #149)
+
 New in release (0.9.9) [16/10/2020]
 -----------------------------------
 
