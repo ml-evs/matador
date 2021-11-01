@@ -84,6 +84,15 @@ https://github.com/optados-developers/optados/issues/24
             spin_channels = set(proj[2] for proj in data["pdos"]["projectors"])
             if len(spin_channels) == 2:
                 data["spin_dos"] = {}
+
+                # mask negative contributions with 0
+                for proj in data["pdos"]["projectors"]:
+                    data["pdos"]["pdos"][proj] = np.ma.masked_where(
+                        data["pdos"]["pdos"][proj] < 0, data["pdos"]["pdos"][proj], copy=True
+                    )
+                    np.ma.set_fill_value(data["pdos"]["pdos"][proj], 0)
+                    data["pdos"]["pdos"][proj] = np.ma.filled(data["pdos"]["pdos"][proj])
+
                 for channel in spin_channels:
                     data["spin_dos"][channel] = np.sum(
                         data["pdos"]["pdos"][proj] for proj in data["pdos"]["projectors"] if proj[2] == channel

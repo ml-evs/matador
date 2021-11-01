@@ -788,13 +788,6 @@ def dos_plot(seeds, ax_dos, options, bbox_extra_artists=None):
                 else:
                     alpha = 0.7
 
-                # mask negative contributions with 0
-                pdos[projector] = np.ma.masked_where(
-                    pdos[projector] < 0, pdos[projector], copy=True
-                )
-                np.ma.set_fill_value(pdos[projector], 0)
-                pdos[projector] = np.ma.filled(pdos[projector])
-
                 # flip sign of down spin energies for spin polarised plot
                 if "down" in projector:
                     pdos[projector] *= -1
