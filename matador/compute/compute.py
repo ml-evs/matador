@@ -1122,7 +1122,7 @@ class ComputeTask:
                 elif self.mpi_library == 'archer':
                     command = ['aprun', '-n', str(self.ncores)] + command
                 elif self.mpi_library == 'slurm':
-                    command = ['srun'] + command
+                    command = ['srun', '--exclusive', '--ntasks', str(self.ncores)] + command
                 elif self.mpi_library in ['intel', 'default']:
                     command = ['mpirun', '-n', str(self.ncores)] + command
                 else:
@@ -1139,7 +1139,8 @@ class ComputeTask:
                     str(self.ncores), '-S', '12', '-d', '1'
                 ] + command
             elif self.mpi_library == 'slurm':
-                command = ['srun'] + command
+                command = ['srun', '--exclusive', '--ntasks', str(self.ncores * self.nnodes), '--ntasks-per-node',
+                           str(self.ncores)] + command
             elif self.mpi_library == 'intel':
                 command = ['mpirun', '-n', str(self.ncores * self.nnodes), '-ppn', str(self.ncores)] + command
             else:
