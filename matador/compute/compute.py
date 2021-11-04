@@ -1736,7 +1736,7 @@ class ComputeTask:
         LOG.info('Using compute_dir: {}'.format(compute_dir))
         if not os.path.isdir(compute_dir):
             try:
-                os.makedirs(compute_dir)
+                os.makedirs(compute_dir, exist_ok=True)
             except PermissionError as exc:
                 raise CriticalError('Invalid compute dir requested: {} {}'.format(compute_dir, exc))
         # if compute_dir isn't simply inside this folder, make a symlink that is
