@@ -208,7 +208,7 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
                                      s=scale*40,
                                      c=np.sort(hull.hull_dist)[::-1],
                                      zorder=100,
-                                     cmap=cmap, norm=colours.LogNorm(0.01, 1),
+                                     cmap=cmap, norm=colours.LogNorm(0.01, 1, clip=True),
                                      rasterized=True)
 
                 if show_cbar:
