@@ -801,3 +801,127 @@ def _construct_header_string(markdown, use_source, per_atom, eform, hull, summar
         header_string += '{:^12}'.format('Occurrences')
 
     return header_string, units_string
+
+
+def index_cursors_by_structure(cursors, structure_labeller=get_root_source):
+    """For a dictionary of lists of structures, reindex the
+    list by the root source of each structure.
+
+    Args:
+        cursors: A dictionary of input cursors. Keys will be used
+            as labels in the output dictionary.
+        structure_labeller: A function called on each structure,
+            the result of which will be that structure's key in
+            the output dictionary.
+
+    Returns:
+        A dictionary with one key per structure, with subkeys
+        corresponding to the elements of the initial cursors,
+        under which structures are stored from each cursor.
+
+    """
+    from collections import defaultdict
+    structure_map = defaultdict(dict)
+    for label in cursors:
+        for s in cursors[label]:
+            structure_map[structure_labeller(s)][label] = s
+
+    return structure_map
+
+
+def _compare_field(bench, other, field):
+    """For a given field, compute absolute and relative differences
+    between the benchmark and other structure.
+
+    Args:
+        bench: The structure to compare against.
+        other: The structure to compare.
+        field: The field to compare (will be accessed recursively if iterable,
+            e.g., `(lattice_abc, 0, 0)`).
+
+    Returns:
+        A dictionary summarising the differences.
+
+    """
+    if isinstance(field, str):
+        field = [field]
+
+    field_label = "_".join(str(_) for _ in field)
+
+    benchmark_field = recursive_get(bench, field)
+    other_field = recursive_get(other, field)
+    summary = {f"abs_{field_label}": benchmark_field - other_field}
+    if abs(benchmark_field) > 1e-10:
+        summary[f"rel_{field_label}"] = summary[f"abs_{field_label}"] / benchmark_field
+
+    return summary
+
+
+def compare_structures(structures, order, fields=None):
+    """Compare structures across various specified or default fields.
+
+    Intended use is to compare crystal structures/energies of the "same"
+    crystal when relaxed with different parameters.
+
+    Args:
+        structures: A dictionary containing the structures to compare. Keys
+            will be used to label the output.
+        order: The order of the input keys to use, the first of which will be
+            treated as the 'benchmark' structure.
+        fields: A list of fields to compare. If None, defaults to comparing
+            the lattice parameters, cell volumes and stabilities (hull distance,
+            formation energy).
+
+    Returns:
+        A dictionary summarising the differences.
+
+    """
+    root_sources = set(get_root_source(structures[s]) for s in (structures))
+    if len(root_sources) != 1:
+        raise RuntimeError(f"Not comparing structures with multiple root sources: {root_sources}")
+
+    if fields is None:
+        fields = [
+            "cell_volume",
+            "formation_enthalpy_per_atom",
+            "hull_distance",
+            ("lattice_abc", 0, 0),
+            ("lattice_abc", 0, 1),
+            ("lattice_abc", 0, 2),
+            ("lattice_abc", 1, 0),
+            ("lattice_abc", 1, 1),
+            ("lattice_abc", 1, 2),
+        ]
+
+    benchmark = structures[order[0]]
+    results = {}
+    for label in order[1:]:
+        summary = {}
+        if label in structures:
+            for field in fields:
+                summary.update(_compare_field(benchmark, structures[label], field))
+            results[label] = summary
+
+    return results
+
+
+def compare_structure_cursor(cursor, order):
+    """Compare the "same" structures across different accuracies.
+
+    Args:
+        cursor: A dict of dicts keyed by structure ID storing data for each
+            structure at different accuracies.
+        order: An ordered list of the subkeys for each structure; the first
+            will be used as the benchmark.
+
+    Returns:
+        A dictionary of dictionaries summarising the differences.
+
+    """
+    structure_comparator = {}
+    for entry in cursor:
+        structures = cursor[entry]
+        if len(structures) > 1:
+            structure_comparator[entry] = compare_structures(structures, order=order)
+
+    return structure_comparator
