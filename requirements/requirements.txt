@@ -2,7 +2,6 @@ numpy~=1.22
 scipy~=1.7
 psutil~=5.9
 pyyaml~=6.0
-pyyaml~=5.4
 pymongo~=3.11
 numba~=0.55
 tqdm~=4.62
