@@ -13,7 +13,8 @@ import copy
 from typing import Union
 
 from pymatgen.io.ase import AseAtomsAdaptor
-from pymatgen import MPRester, Structure
+from pymatgen.ext.matproj import MPRester
+from pymatgen.core import Structure
 
 from matador.utils.ase_utils import ase2dict, doc2ase
 from matador.utils.cell_utils import calc_mp_spacing
