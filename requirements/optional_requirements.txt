@@ -1,4 +1,4 @@
-pymatgen~=2022.2
+pymatgen>=2022,<2023
 ase~=3.22
 ascii_graph~=1.5
 networkx~=2.6
