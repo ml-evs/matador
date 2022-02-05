@@ -57,7 +57,7 @@ setup(name='matador-db',
           "Topic :: Scientific/Engineering :: Chemistry",
           "Topic :: Scientific/Engineering :: Physics"
       ],
-      # entry_points={'console_scripts': ['matador = matador.cli.cli:main',
-      #                                  'dispersion = matador.cli.dispersion:main',
-      #                                  'run3 = matador.cli.run3:main']},
+      entry_points={'console_scripts': ['matador = matador.cli.cli:main',
+                                        'dispersion = matador.cli.dispersion:main',
+                                        'run3 = matador.cli.run3:main']},
       zip_safe=False)
