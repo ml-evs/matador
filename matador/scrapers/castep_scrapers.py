@@ -1629,6 +1629,33 @@ def _castep_find_final_structure(flines):
     return finish_line, optimised
 
 
+def _castep_finalize_snapshot(snapshot: dict, intermediates: list) -> None:
+    """Add per-atom keys to snapshot and append it to the intermediates list.
+
+    Parameters:
+        snapshot: The document containing the current snapshot.
+        intermediates: The list of snapshots so far.
+
+    """
+    # if positions frac or lattice didn't change (and thus weren't printed, use the last value)
+    if 'positions_frac' not in snapshot:
+        snapshot['positions_frac'] = intermediates[-1]['positions_frac']
+        snapshot['atom_types'] = intermediates[-1]['atom_types']
+        snapshot['num_atoms'] = len(snapshot['positions_frac'])
+    if 'lattice_cart' not in snapshot:
+        snapshot['lattice_cart'] = intermediates[-1]['lattice_cart']
+        snapshot['lattice_abc'] = intermediates[-1]['lattice_abc']
+
+    snapshot['smeared_free_energy_per_atom'] = snapshot['smeared_free_energy'] / snapshot['num_atoms']
+    snapshot['0K_energy_per_atom'] = snapshot['0K_energy'] / snapshot['num_atoms']
+    snapshot['total_energy_per_atom'] = snapshot['total_energy'] / snapshot['num_atoms']
+    # handle single atom forces edge-case
+    if snapshot['num_atoms'] == 1:
+        snapshot['forces'] = [[0, 0, 0]]
+
+    intermediates.append(snapshot)
+
+
 def _castep_scrape_all_snapshots(flines):
     """ Scrape all intermediate structures from a CASTEP file, both
     geometry optimisation snapshots, and repeated SCF calculations.
@@ -1647,28 +1674,37 @@ def _castep_scrape_all_snapshots(flines):
     snapshot = dict()
     for line_no, line in enumerate(flines):
         try:
-            # use the "Real Lattice" line as the start of a new snapshot / end of old one
-            if 'Real Lattice' in line:
-                # add the last snapshot only if it isn't a repeat
-                if 'total_energy' in snapshot:
-                    # if positions frac didn't change (and thus weren't printed, use the last value)
-                    if 'positions_frac' not in snapshot:
-                        snapshot['positions_frac'] = intermediates[-1]['positions_frac']
-                        snapshot['atom_types'] = intermediates[-1]['atom_types']
-                        snapshot['num_atoms'] = len(snapshot['positions_frac'])
-                    snapshot['smeared_free_energy_per_atom'] = snapshot['smeared_free_energy'] / snapshot['num_atoms']
-                    snapshot['total_energy_per_atom'] = snapshot['total_energy'] / snapshot['num_atoms']
-                    snapshot['0K_energy_per_atom'] = snapshot['0K_energy'] / snapshot['num_atoms']
-                    # handle single atom forces edge-case
-                    if snapshot['num_atoms'] == 1:
-                        snapshot['forces'] = [[0, 0, 0]]
-                    if not intermediates:
-                        intermediates.append(snapshot)
-                    elif (snapshot['lattice_cart'] != intermediates[-1]['lattice_cart'] and
-                          snapshot['total_energy'] != intermediates[-1]['total_energy']):
-                        intermediates.append(snapshot)
+            if 'Cell Contents' in line or 'Unit Cell' in line:
+                if "total_energy" in snapshot:
+                    _castep_finalize_snapshot(snapshot, intermediates)
+                    snapshot = dict()
 
-                snapshot = dict()
+            if 'Cell Contents' in line:
+                snapshot['positions_frac'] = []
+                snapshot['atom_types'] = []
+                i = 1
+                atoms = False
+                while True:
+                    if atoms:
+                        if 'xxxxxxxxx' in flines[line_no + i]:
+                            atoms = False
+                            break
+                        else:
+                            temp_frac = flines[line_no + i].split()[3:6]
+                            snapshot['positions_frac'].append(list(map(f90_float_parse, temp_frac)))
+                            snapshot['atom_types'].append(flines[line_no + i].split()[1])
+                    if 'x------' in flines[line_no + i]:
+                        atoms = True
+                    i += 1
+                for ind, pos in enumerate(snapshot['positions_frac']):
+                    for k in range(3):
+                        if pos[k] > 1 or pos[k] < 0:
+                            snapshot['positions_frac'][ind][k] %= 1
+
+                snapshot['num_atoms'] = len(snapshot['positions_frac'])
+                snapshot['stoichiometry'] = get_stoich(snapshot['atom_types'])
+
+            elif 'Real Lattice' in line:
                 snapshot['lattice_cart'] = []
                 i = 1
                 while True:
@@ -1695,32 +1731,6 @@ def _castep_scrape_all_snapshots(flines):
 
             elif 'Current cell volume' in line:
                 snapshot['cell_volume'] = f90_float_parse(line.split('=')[1].split()[0].strip())
-            elif 'Cell Contents' in line:
-                snapshot['positions_frac'] = []
-                snapshot['atom_types'] = []
-                i = 1
-                atoms = False
-                while True:
-                    if atoms:
-                        if 'xxxxxxxxx' in flines[line_no + i]:
-                            atoms = False
-                            break
-                        else:
-                            temp_frac = flines[line_no + i].split()[3:6]
-                            snapshot['positions_frac'].append(list(map(f90_float_parse, temp_frac)))
-                            snapshot['atom_types'].append(flines[line_no + i].split()[1])
-                    if 'x------' in flines[line_no + i]:
-                        atoms = True
-                    i += 1
-                for ind, pos in enumerate(snapshot['positions_frac']):
-                    for k in range(3):
-                        if pos[k] > 1 or pos[k] < 0:
-                            snapshot['positions_frac'][ind][k] %= 1
-
-                snapshot['num_atoms'] = len(snapshot['positions_frac'])
-                snapshot['stoichiometry'] = get_stoich(snapshot['atom_types'])
-
-            # don't check if final_energy exists, as this will update for each GO step
             elif 'Final energy, E' in line or 'Final energy =' in line:
                 snapshot['total_energy'] = f90_float_parse(line.split('=')[1].split()[0])
             elif 'Final free energy' in line:
@@ -1770,8 +1780,7 @@ def _castep_scrape_all_snapshots(flines):
                     num_opt_steps += 1
 
         except Exception as exc:
-            msg = 'Error on line {}, contents: {}, error: {}"'.format(line_no, line, exc)
-            raise RuntimeError(msg)
+            raise RuntimeError from exc
 
     return intermediates, num_opt_steps
 
