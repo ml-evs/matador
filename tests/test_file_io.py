@@ -552,8 +552,25 @@ class CastepScraperTests(MatadorUnitTest):
             for key in test_dict:
                 self.assertEqual(test_dict[key], int_dict[key])
 
-            self.assertEqual(len(int_dict["intermediates"]), 45)
-            for i in range(45):
+            self.assertEqual(len(int_dict["intermediates"]), 51)
+
+            energies = [
+                -1304.222889926,
+                -1304.222911722,
+                -1304.222930541,
+                -1304.222928920,
+                -1304.222941837,
+                -1304.222959187,
+                -1304.222958028,
+                -1304.222976388
+            ]
+
+            for i, energy in enumerate(energies):
+                self.assertEqual(int_dict["intermediates"][i]["total_energy"], energy)
+
+            special_case = -8
+
+            for i in range(len(int_dict["intermediates"])):
                 self.assertEqual(int_dict["intermediates"][i]["forces"], [[0, 0, 0]])
                 self.assertEqual(
                     int_dict["intermediates"][i]["positions_frac"], [[0, 0, 0]]
@@ -566,10 +583,10 @@ class CastepScraperTests(MatadorUnitTest):
                 int_dict["intermediates"][-1]["smeared_free_energy"], -1304.233706274
             )
             self.assertEqual(
-                int_dict["intermediates"][-7]["total_energy"], -1304.222982442
+                int_dict["intermediates"][special_case]["total_energy"], -1304.222982442
             )
             self.assertEqual(
-                int_dict["intermediates"][-7]["smeared_free_energy"], -1304.233677344
+                int_dict["intermediates"][special_case]["smeared_free_energy"], -1304.233677344
             )
             self.assertEqual(
                 int_dict["intermediates"][-1]["total_energy_per_atom"], -1304.223019263
@@ -579,10 +596,10 @@ class CastepScraperTests(MatadorUnitTest):
                 -1304.233706274,
             )
             self.assertEqual(
-                int_dict["intermediates"][-7]["total_energy_per_atom"], -1304.222982442
+                int_dict["intermediates"][special_case]["total_energy_per_atom"], -1304.222982442
             )
             self.assertEqual(
-                int_dict["intermediates"][-7]["smeared_free_energy_per_atom"],
+                int_dict["intermediates"][special_case]["smeared_free_energy_per_atom"],
                 -1304.233677344,
             )
             self.assertEqual(int_dict["geom_iter"], 44)
@@ -810,7 +827,7 @@ class CastepScraperTests(MatadorUnitTest):
             test_dict["intermediates"][-1]["smeared_free_energy"], -8546.922614706
         )
         self.assertEqual(test_dict["geom_iter"], 70)
-        self.assertEqual(len(test_dict["intermediates"]), 141)
+        self.assertEqual(len(test_dict["intermediates"]), 148)
         self.assertEqual(test_dict["smeared_free_energy"], -8546.922614706)
         self.assertEqual(final_dict["smeared_free_energy"], -8546.922614706)
 
