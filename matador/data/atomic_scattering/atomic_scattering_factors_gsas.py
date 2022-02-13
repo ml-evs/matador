@@ -18,7 +18,7 @@ def load_atomic_scattering_factors_gsas():
 
     filename = Path(__file__).parent.joinpath("atomic_scattering_factors_gsas.dat")
     return load_scattering_file(
-        filename, a_inds=(1, 2, 3, 4), b_inds=(6, 7, 8, 9), c_ind=5
+        filename, a_inds=(1, 2, 3, 4, 5), b_inds=(7, 8, 9, 10, 11), c_ind=6
     )
 
 
