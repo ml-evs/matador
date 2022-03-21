@@ -7,6 +7,8 @@ manipulation and analysis of the lattice.
 
 """
 
+
+import re
 from copy import deepcopy
 from matador.utils import cell_utils
 from matador.orm.orm import DataContainer
@@ -371,11 +373,20 @@ class Crystal(DataContainer):
         return self._data['voronoi_substructure']
 
     @property
-    def space_group(self):
+    def space_group(self) -> str:
         """ Return the space group symbol at the last-used symprec. """
         return self.get_space_group(symprec=self._data.get('symprec', 0.01))
 
-    def get_space_group(self, symprec=0.01):
+    @property
+    def space_group_tex(self) -> str:
+        """Returns the space group symbol at the last-used symprec, formatted for LaTeX.
+
+        The HM symbol is surrounded by $ and with '-' replaced with overbars for rotoinversion axes,
+        e.g., Fm-3m -> $Fm\\bar{3}m$.
+        """
+        return "${}$".format(re.sub("-(?P<number>[0-9])", "\\\\bar{\\g<number>}", self.space_group))
+
+    def get_space_group(self, symprec=0.01) -> str:
         """ Return the space group of the structure at the desired
         symprec. Stores the space group in a dictionary
         `self._space_group` under symprec keys. Updates
