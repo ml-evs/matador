@@ -1,18 +1,48 @@
 # coding: utf-8
 # Distributed under the terms of the MIT license.
 
-from typing import Dict, List, Optional
-import numpy as np
+from typing import Dict, List, Optional, Tuple
 import warnings
+
+import numpy as np
+import statsmodels.api as sm
 
 from matador.plotting.plotting import plotting_function
 from matador.crystal import Crystal
 
-__all__ = ("MagresReferencer", )
+__all__ = ("MagresReferencer",)
 
 
 class MagresReferencer:
-    """ Class for referencing NMR predictions with experimental data. """
+    """Class for referencing computed NMR chemical shielding tensors
+    with experimental data on chemical shifts, and related plotting.
+
+    Attributes:
+        fit_model: The underlying statsmodel model.
+        fit_results: The results of the statsmodel fit.
+        fit_intercept: The intercept of the fit.
+        fit_gradient: The gradient of the fit.
+        fit_rsquared: The R^2 value of the fit.
+        structures_exp: A dictionary of experimental structures, keyed by label
+        shifts_exp: A dictionary of measured shifts with the same keys as `structures_exp`.
+        species: The species of interest.
+        structures: An optional list of theoretical structures with computed shieldings
+            to be referenced.
+        warn_tolerance: The maximum deviation from the ideal "-1" gradient above which to warn
+            the user during the fit.
+
+    """
+
+    fit_model: sm.regression.linear_model.WLS = None
+    fit_results: sm.regression.linear_model.RegressionResults = None
+    fit_intercept: float
+    fit_gradient: float
+    fit_rsquared: float
+    structures_exp: Dict[str, Crystal]
+    shifts_exp: List[Dict[str, List[float]]]
+    species: str
+    structures: Optional[List[Crystal]]
+    warn_tolerance: float = 0.1
 
     def __init__(
         self,
@@ -52,6 +82,17 @@ class MagresReferencer:
             self.set_shifts_from_fit(self.structures)
 
     def match_exp_structure_shifts(self, structure, shifts):
+        """For a model structure and a set of experimental shifts, match each site in the
+        structure to the closest shift value, allowing for multiplicity.
+
+        Sets the weights to be used for each site based on the number of unique shifts/local
+        environments in the structure.
+
+        Parameters:
+            structure: The model structure for each exp. shift.
+            shifts: An array of measured chemical shifts.
+
+        """
         relevant_sites = [site for site in structure if site.species == self.species]
         calc_shifts = sorted(
             [site["chemical_shielding_iso"] for site in relevant_sites]
@@ -80,16 +121,35 @@ class MagresReferencer:
         return _shifts, _weights, calc_shifts
 
     def set_shifts_from_fit(self, structures):
-        for ind, struc in enumerate(structures):
-            for jnd, site in enumerate(struc):
+        """Set the chemical shifts of the given structures to the predicted values.
+
+        Parameters:
+            structures: A list of structures with computed shieldings.
+
+        """
+        for _, struc in enumerate(structures):
+            for _, site in enumerate(struc):
                 if site.species == self.species:
-                    site["chemical_shift_iso"] = self.predict(site["chemical_shielding_iso"])[0]
+                    site["chemical_shift_iso"] = self.predict(
+                        site["chemical_shielding_iso"]
+                    )[0]
 
     def fit(self):
-        import statsmodels.api as sm
+        """Construct a statsmodels weighted least squares model between experimental
+        shifts and computed shieldings.
 
+        Sets the following attributes:
+            fit_model: The underlying statsmodel model.
+            fit_results: The output of the statsmodel fit.
+            fit_intercept: The intercept of the fit.
+            fit_gradient: The gradient of the fit.
+            fit_rsquared: The R^2 value of the fit.
+
+        """
         _fit_shifts = sm.add_constant(self._calc_shifts)
-        self.fit_model = sm.regression.linear_model.WLS(self._expt_shifts, _fit_shifts, weights=self._fit_weights)
+        self.fit_model = sm.regression.linear_model.WLS(
+            self._expt_shifts, _fit_shifts, weights=self._fit_weights
+        )
         self.fit_results = self.fit_model.fit()
         self.fit_intercept = self.fit_results.params[0]
         self.fit_gradient = self.fit_results.params[1]
@@ -102,11 +162,22 @@ class MagresReferencer:
                 f"outside of tolerated range -1.0 ± {self.warn_tolerance:.2f}"
             )
 
-    def predict(self, shifts):
-        _shifts = np.asarray(shifts)
-        return self.fit_gradient * _shifts + self.fit_intercept, self.fit_results.bse[1] * _shifts + self.fit_results.bse[0]
+    def predict(self, shieldings) -> Tuple[np.array, np.array]:
+        """Compute the predicted chemical shifts (and errors) for given chemical shieldings, based
+        on the linear fit.
+
+        Returns:
+            A tuple of shift values and associated errors.
+
+        """
+        _shieldings = np.asarray(shieldings)
+        return (
+            self.fit_gradient * _shieldings + self.fit_intercept,
+            self.fit_results.bse[1] * _shieldings + self.fit_results.bse[0],
+        )
 
     def print_fit_summary(self):
+        """Print the fitted parameters and their errors."""
         if self._fitted:
             print("Performed WLS fit for: δ_expt = m * σ_calc + c")
             print(f"m = {self.fit_gradient:3.3f} ± {self.fit_results.bse[1]:3.3f}")
@@ -117,15 +188,30 @@ class MagresReferencer:
 
     @plotting_function
     def plot_fit(self, ax=None, padding=100, figsize=None):
+        """Plot the fit of shifts vs shieldings to experimental data.
+
+        Parameters:
+            ax (matplotlib.axes.Axes): Axes to plot on.
+            padding (float): Padding to add to each axis limit.
+            figsize (tuple): Figure size.
+
+        Returns:
+            The axis object used for plotting.
+
+        """
         import matplotlib.pyplot as plt
         import seaborn as sns
 
         if ax is None:
-            fig, ax = plt.subplots(figsize=figsize)
+            _, ax = plt.subplots(figsize=figsize)
 
         ax.grid(False)
-        ax.set_xlim(np.min(self._calc_shifts) - padding, np.max(self._calc_shifts) + padding)
-        ax.set_ylim(np.min(self._expt_shifts) - padding, np.max(self._expt_shifts) + padding)
+        ax.set_xlim(
+            np.min(self._calc_shifts) - padding, np.max(self._calc_shifts) + padding
+        )
+        ax.set_ylim(
+            np.min(self._expt_shifts) - padding, np.max(self._expt_shifts) + padding
+        )
         ax = sns.regplot(
             y=self._expt_shifts,
             x=self._calc_shifts,
@@ -161,14 +247,35 @@ class MagresReferencer:
 
     @plotting_function
     def plot_fit_and_predictions(self, ax=None, padding=100):
+        """Make a plot of the fit and predictions for the experimental chemical shifts.
+
+        Parameters:
+            ax (matplotlib.axes.Axes): Optional axis object to plot on.
+            padding (float): Padding to add to each axis limit.
+
+        """
+
         import matplotlib.pyplot as plt
-        fig, ax = plt.subplots()
+
+        if ax is None:
+            _, ax = plt.subplots()
         self.plot_fit(ax=ax, padding=padding)
 
         for doc in self.structures:
-            _calc_shifts = [site["chemical_shielding_iso"] for site in doc if site.species == self.species]
+            _calc_shifts = [
+                site["chemical_shielding_iso"]
+                for site in doc
+                if site.species == self.species
+            ]
             _predicted_shifts, _predicted_errs = self.predict(_calc_shifts)
-            ax.scatter(_predicted_shifts, _calc_shifts, s=5, c='k')
-            ax.errorbar(_predicted_shifts, _calc_shifts, fmt='None', xerr=_predicted_errs, lw=0.5, c='k')
+            ax.scatter(_predicted_shifts, _calc_shifts, s=5, c="k")
+            ax.errorbar(
+                _predicted_shifts,
+                _calc_shifts,
+                fmt="None",
+                xerr=_predicted_errs,
+                lw=0.5,
+                c="k",
+            )
 
         return ax
