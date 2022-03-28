@@ -7,8 +7,6 @@ manipulation and analysis of the lattice.
 
 """
 
-
-import re
 from copy import deepcopy
 from matador.utils import cell_utils
 from matador.orm.orm import DataContainer
@@ -209,7 +207,7 @@ class Crystal(DataContainer):
         return repr_string
 
     def __repr__(self):
-        return f"<Crystal: {self.formula} {self.root_source}>"
+        return f"<Crystal: {self.formula_unicode} {self.root_source}>"
 
     def update(self, data):
         """ Update the underlying `self._data` dictionary
@@ -333,6 +331,11 @@ class Crystal(DataContainer):
         return get_formula_from_stoich(self.stoichiometry, tex=True)
 
     @property
+    def formula_unicode(self):
+        """Returns a unicode string for the chemical formula."""
+        return self.formula.translate(str.maketrans("0123456789", "₀₁₂₃₄₅₆₇₈₉"))
+
+    @property
     def cell_volume(self):
         """ Returns cell volume in Å³. """
         return self.cell.volume
@@ -384,7 +387,8 @@ class Crystal(DataContainer):
         The HM symbol is surrounded by $ and with '-' replaced with overbars for rotoinversion axes,
         e.g., Fm-3m -> $Fm\\bar{3}m$.
         """
-        return "${}$".format(re.sub("-(?P<number>[0-9])", "\\\\bar{\\g<number>}", self.space_group))
+        from matador.utils.cell_utils import get_space_group_label_latex
+        return get_space_group_label_latex(self.space_group)
 
     def get_space_group(self, symprec=0.01) -> str:
         """ Return the space group of the structure at the desired
@@ -601,10 +605,16 @@ class Crystal(DataContainer):
         from matador.crystal.network import draw_network
         draw_network(self, layout=layout)
 
-    def supercell(self, extension):
+    def supercell(self, extension=None, target=None):
         """Returns a supercell of this crystal with the specified extension."""
-        from matador.utils.cell_utils import create_simple_supercell
-        return create_simple_supercell(self, extension)
+        if extension is not None:
+            from matador.utils.cell_utils import create_simple_supercell
+            return create_simple_supercell(self, extension)
+        elif target is not None:
+            from matador.utils.cell_utils import create_supercell_with_minimum_side_length
+            return create_supercell_with_minimum_side_length(self, target)
+        else:
+            raise RuntimeError("One of `extension` or `target` must be specified.")
 
     def standardized(self, primitive=False):
         """Returns a supercell of this crystal with the specified extension."""
