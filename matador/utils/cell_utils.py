@@ -6,19 +6,27 @@ cell manipulation, symmetry checking and sampling (e.g. grids and paths.)
 
 """
 
+from __future__ import annotations
+from typing import Dict, Any, Union, Tuple, List, TYPE_CHECKING
+
 import numpy as np
 from periodictable import elements
+
+if TYPE_CHECKING:
+    from matador.crystal import Crystal
+
+
 EPS = 1e-12
 
 
-def abc2cart(lattice_abc):
+def abc2cart(lattice_abc: List[List[float]]) -> List[List[float]]:
     """ Converts lattice parameters into Cartesian lattice vectors.
 
     Parameters:
-        lattice_abc (list): [[a, b, c], [alpha, beta, gamma]]
+        lattice_abc: The lattice parameters [[a, b, c], [alpha, beta, gamma]]
 
     Returns:
-        list: Cartesian lattice vectors.
+        Cartesian lattice vectors.
 
     """
     assert len(lattice_abc) == 2
@@ -33,7 +41,6 @@ def abc2cart(lattice_abc):
     gamma = lattice_abc[1][2] * deg2rad
     lattice_cart = []
     lattice_cart.append([a, 0.0, 0.0])
-    # vec(b) = (b np.cos(gamma), b np.sin(gamma), 0)
     bx = b*np.cos(gamma)
     by = b*np.sin(gamma)
     tol = 1e-12
@@ -53,28 +60,28 @@ def abc2cart(lattice_abc):
     return lattice_cart
 
 
-def cart2abcstar(lattice_cart):
-    """ Convert lattice_cart =[[a1,a2,a3],[b1,b2,b3],[c1,c2,c3]]
-    to the reciprocal of the lattice vectors, NOT the reciprocal lattice vectors.
+def cart2abcstar(lattice_cart: List[List[float]]) -> np.ndarray:
+    """ Convert Cartesian lattice vectors to the reciprocal of the lattice vectors,
+    NOT the reciprocal lattice vectors (useful when writing PDB files).
 
     Parameters:
-        lattice_cart (list): Cartesian lattice vectors.
+        lattice_cart: Cartesian lattice vectors.
 
     Returns:
-        list: lattice parameters [[a,b,c],[alpha,beta,gamma]]
+        Reciprocal of the lattice vectors.
 
     """
     return np.asarray(real2recip(lattice_cart)) / (2*np.pi)
 
 
-def cart2volume(lattice_cart):
+def cart2volume(lattice_cart: List[List[float]]) -> float:
     """ Convert lattice_cart to cell volume.
 
     Parameters:
-        lattice_cart (list): Cartesian lattice vectors.
+        lattice_cart: Cartesian lattice vectors.
 
     Returns:
-        float: cell volume in Angstrom^3.
+        Cell volume in the same unit as the lattice vectors (cubed).
 
     """
     lattice_cart = np.asarray(lattice_cart)
@@ -82,14 +89,14 @@ def cart2volume(lattice_cart):
     return vol
 
 
-def cart2abc(lattice_cart):
+def cart2abc(lattice_cart: List[List[float]]) -> List[List[float]]:
     """ Convert Cartesian lattice vectors to lattice parametres.
 
     Parameters:
-        lattice_cart (list): Cartesian lattice vectors.
+        lattice_cart: Cartesian lattice vectors.
 
     Returns:
-        list: lattice parameters [[a,b,c],[alpha,beta,gamma]].
+        The lattice parameters :math:`[(a, b, c), (\\alpha, \\beta, \\gamma)]`.
 
     """
     vecs = lattice_cart
@@ -108,15 +115,15 @@ def cart2abc(lattice_cart):
     return lattice_abc
 
 
-def frac2cart(lattice_cart, positions_frac):
+def frac2cart(lattice_cart: List[List[float]], positions_frac: List[List[float]]) -> List[List[float]]:
     """ Convert positions_frac block into positions_abs.
 
     Parameters:
-        lattice_cart (list): Cartesian lattice vectors.
-        positions_frac (list): list of fractional position vectors.
+        lattice_cart: Cartesian lattice vectors.
+        positions_frac: List of fractional position vectors.
 
     Returns:
-        list: list of absolute position vectors.
+        List of absolute position vectors.
 
     """
     _positions_frac = np.asarray(positions_frac)
@@ -131,18 +138,21 @@ def frac2cart(lattice_cart, positions_frac):
     return positions_abs.tolist()
 
 
-def wrap_frac_coords(positions, remove=False):
+def wrap_frac_coords(
+    positions: Union[List[List[float]], List[float]],
+    remove: bool = False
+) -> Union[List[List[float]], List[float]]:
     """ Wrap the given fractional coordinates back into the cell.
 
     Parameters:
-        positions (list): list of fractional position vectors, or
+        positions: list of fractional position vectors, or
             a single position.
 
     Keyword arguments:
-        remove (bool): if True, removes points exterior to the cell.
+        remove: if True, removes points exterior to the cell.
 
     Returns:
-        list: list of wrapped fractional position vectors.
+        List of wrapped fractional position vectors.
 
     """
     from copy import deepcopy
@@ -169,21 +179,21 @@ def wrap_frac_coords(positions, remove=False):
     return wrapped
 
 
-def switch_coords(lattice, pos, norm=None):
+def switch_coords(lattice: np.ndarray, pos: np.ndarray, norm: float = None) -> np.ndarray:
     """ Act on coordinates with the relevant lattice
     vectors to switch from fractional to absolute coordinates.
 
     Parameters:
 
-        lattice (np.ndarray(3, 3)): either lattice_cart or reciprocal lattice_cart
-        pos (np.ndarray(3, :)): input positions to convert
+        lattice: either lattice_cart or reciprocal lattice_cart (3x3 array)
+        pos: input positions to convert (3xN array for N atoms).
 
     Keyword arguments:
         norm (float): divide final coordinates by normalisation factor, e.g.
-            2*np.pi when lattice is recip and positions are cartesian.
+            :math:`2 \\pi` when lattice is recip and positions are cartesian.
 
     Returns:
-        np.ndarray(3, :): converted positions
+        3xN array of converted positions.
 
     """
     new_pos = np.zeros_like(pos)
@@ -195,16 +205,16 @@ def switch_coords(lattice, pos, norm=None):
     return new_pos
 
 
-def cart2frac(lattice_cart, positions_abs):
+def cart2frac(lattice_cart: List[List[float]], positions_abs: List[List[float]]) -> List[List[float]]:
     """ Convert positions_abs block into positions_frac (and equivalent
     in reciprocal space).
 
     Parameters:
-        lattice_cart (list): Cartesian lattice vectors.
-        positions_abs (list): list of absolute position vectors.
+        lattice_cart: Cartesian lattice vectors.
+        positions_abs: list of absolute position vectors.
 
     Returns:
-        list: list of fractional position vectors with the same shape
+        List of fractional position vectors with the same shape
             as the input list.
 
     """
@@ -221,15 +231,15 @@ def cart2frac(lattice_cart, positions_abs):
     return positions_frac.tolist()
 
 
-def real2recip(real_lat):
+def real2recip(real_lat: List[List[float]]) -> List[List[float]]:
     """ Convert the real lattice in Cartesian basis to
     the reciprocal space lattice.
 
     Parameters:
-        real_lat (list): Cartesian lattice vectors.
+        real_lat: Cartesian lattice vectors.
 
     Returns:
-        list: Cartesian lattice vectors of reciprocal lattice.
+        Cartesian lattice vectors of reciprocal lattice.
 
     """
     real_lat = np.asarray(real_lat)
@@ -242,16 +252,16 @@ def real2recip(real_lat):
     return recip_lat.tolist()
 
 
-def calc_mp_grid(lattice_cart, spacing):
-    """ Return correct Monkhorst-Pack grid based on lattice
+def calc_mp_grid(lattice_cart: List[List[float]], spacing: float) -> Tuple[int, int, int]:
+    """Return the Monkhorst-Pack grid based on lattice
     vectors and desired spacing.
 
     Parameters:
-        lattice_cart (list): Cartesian lattice vectors.
-        spacing (float): desired maximum grid spacing.
+        lattice_cart: Cartesian lattice vectors.
+        spacing: desired maximum grid spacing.
 
     Returns:
-        list: list of 3 integers defining the MP grid.
+        List of 3 integers defining the MP grid.
 
     """
     recip_lat = real2recip(lattice_cart)
@@ -261,16 +271,16 @@ def calc_mp_grid(lattice_cart, spacing):
     return [int(np.ceil(elem)) for elem in mp_grid]
 
 
-def shift_to_include_gamma(mp_grid):
-    """ Calculate the shift required to include $\\Gamma$.
+def shift_to_include_gamma(mp_grid: Tuple[int, int, int]) -> Tuple[float, float, float]:
+    """Calculate the shift required to include the :math:`\\Gamma`-point
     in the Monkhorst-Pack grid.
 
     Parameters:
-        mp_grid (:obj:`list` of :obj:`int`): number of grid points
+        mp_grid: number of grid points
             in each reciprocal space direction.
 
     Returns:
-        :obj:`list` of :obj:`float`: shift required to include $\\Gamma$.
+        The shift required to include the :math:`\\Gamma`.
 
     """
     shift = [0, 0, 0]
@@ -280,17 +290,17 @@ def shift_to_include_gamma(mp_grid):
     return shift
 
 
-def shift_to_exclude_gamma(mp_grid):
-    """ Calculate the shift required to exclude $\\Gamma$.
+def shift_to_exclude_gamma(mp_grid: Tuple[int, int, int]) -> Tuple[float, float, float]:
+    """Calculate the shift required to exclude the :math:`\\Gamma`-point
     in the Monkhorst-Pack grid. Returns the "minimal shift", i.e. only
     one direction will be shifted.
 
     Parameters:
-        mp_grid (:obj:`list` of :obj:`int`): number of grid points
+        mp_grid: number of grid points
             in each reciprocal space direction.
 
     Returns:
-        :obj:`list` of :obj:`float`: shift required to exclude $\\Gamma$.
+        The shift required to exclude :math:`\\Gamma`.
 
     """
     shift = [0, 0, 0]
@@ -303,26 +313,24 @@ def shift_to_exclude_gamma(mp_grid):
     return shift
 
 
-def get_best_mp_offset_for_cell(doc):
+def get_best_mp_offset_for_cell(doc: Union[Dict[str, Any], Crystal]) -> List[float]:
     """ Calculates the "best" kpoint_mp_offset to use for the passed
     cell. If the crystal has a hexagonal space group, then the offset
-    returned will shift the grid to include $\\Gamma$ point, and vice
+    returned will shift the grid to include :math:`\\Gamma`-point, and vice
     versa for non-hexagonal cells.
 
     Parameters:
-        doc (dict): matador document to consider, containing structural
+        doc: matador document/Crystal to consider, containing structural
             information and a "kpoints_mp_spacing" key.
 
     Returns:
-        :obj:`list` of :obj:`float`: the desired kpoint_mp_offset.
+        The desired `kpoint_mp_offset`.
 
     """
 
     gamma = False
     if '6' in get_spacegroup_spg(doc, symprec=1e-5):
         gamma = True
-
-    print(doc)
 
     if 'lattice_cart' not in doc or 'kpoints_mp_spacing' not in doc:
         raise RuntimeError('Unable to calculate offset without lattice or spacing')
@@ -334,19 +342,19 @@ def get_best_mp_offset_for_cell(doc):
     return shift_to_exclude_gamma(mp_grid)
 
 
-def calc_mp_spacing(real_lat, mp_grid, prec=3):
-    """ Convert real lattice in Cartesian basis and the
-    kpoint_mp_grid into a grid spacing.
+def calc_mp_spacing(real_lat: List[List[float]], mp_grid: Tuple[int, int, int], prec: int = 3) -> float:
+    """ Convert real lattice in Cartesian basis and the CASTEP
+    `kpoint_mp_grid` into a CASTEP grid spacing.
 
     Parameters:
-        real_lat (list): Cartesian lattice vectors.
-        mp_grid (:obj:`list` of :obj:`int`): 3 integers defining the MP grid.
+        real_lat: Cartesian lattice vectors.
+        mp_grid: 3 integers defining the MP grid.
 
     Keyword arguments:
-        prec (int): desired decimal precision of output.
+        prec: desired decimal precision of output.
 
     Returns:
-        float: mp_spacing rounded to `prec`.
+        `kpoint_mp_spacing` rounded to `prec` decimal places.
 
     """
     recip_lat = real2recip(real_lat)
@@ -359,8 +367,14 @@ def calc_mp_spacing(real_lat, mp_grid, prec=3):
 
 
 def get_seekpath_kpoint_path(
-    doc, standardize=True, explicit=True, spacing=0.01, threshold=1e-7, debug=False, symmetry_tol=None
-):
+    doc: Union[Dict[str, Any], Tuple],
+    standardize: bool = True,
+    explicit: bool = True,
+    spacing: float = 0.01,
+    threshold: float = 1e-7,
+    debug: bool = False,
+    symmetry_tol: float = None,
+) -> Tuple[Dict[str, Any], List[List[float]], Dict[str, Any]]:
     """ Return the conventional kpoint path of the relevant crystal system
     according to the definitions by "HKPOT" in
     Comp. Mat. Sci. 128, 2017:
@@ -368,12 +382,12 @@ def get_seekpath_kpoint_path(
     http://dx.doi.org/10.1016/j.commatsci.2016.10.015
 
     Parameters:
-        doc (dict/tuple): matador doc or spglib tuple to find kpoint path for.
+        doc: matador doc or spglib tuple to find kpoint path for.
 
     Keyword arguments:
-        spacing (float): desired kpoint spacing
-        threshold (float): internal seekpath threshold
-        symmetry_tol (float): spglib symmetry tolerance
+        spacing: desired kpoint spacing
+        threshold: internal seekpath threshold
+        symmetry_tol: spglib symmetry tolerance
 
     Returns:
         dict: standardized version of input doc
@@ -432,15 +446,17 @@ def get_seekpath_kpoint_path(
     return primitive_doc, kpt_path, seekpath_results
 
 
-def doc2spg(doc, check_occ=True):
+def doc2spg(
+    doc: Union[Dict[str, Any], "Crystal"],
+    check_occ: bool = True
+) -> Tuple[List[List[float]], List[List[float]], List[int]]:
     """ Return an spglib input tuple from a matador doc.
 
     Parameters:
-        doc (dict or :class:`Crystal`): matador document or Crystal object.
+        doc: matador document or Crystal object.
 
     Keyword arguments:
-        check_occ (bool): check for partial occupancy and raise an error if
-            present.
+        check_occ: check for partial occupancy and raise an error if present.
 
     Returns:
         tuple: spglib-style tuple of lattice, positions and types.
@@ -469,60 +485,45 @@ def doc2spg(doc, check_occ=True):
         raise RuntimeError(f"Unable to use doc2spg, one of {required_keys} was missing.")
 
 
-def get_space_group_label_latex(label):
+def get_space_group_label_latex(label: str) -> str:
     """ Return the LaTeX format of the passed space group label. Takes
     any string, leaves the first character upright, italicses the rest,
     handles subscripts and bars over numbers.
 
     Parameters:
-        label (str): a given space group in "standard" plain text format,
-        e.g. P-63m.
+        label: a given space group in "standard" plain text format,
+        e.g. P-63m to convert to '$P\\bar{6}3m$'.
 
     Returns:
-        str: the best attempt to convert the label to LaTeX.
+        The best attempt to convert the label to LaTeX format.
 
     """
-    latex_label = '$'
-    if not isinstance(label, str):
-        raise RuntimeError("Space group label must be a string, not {}".format(label))
-
-    skip = False
-    for ind, char in enumerate(label):
-        if skip:
-            skip = False
-            continue
-
-        if char == '-':
-            # add the next char inside the bar
-            latex_label += "\\bar{" + label[ind+1] + "}"
-            skip = True
-
-        else:
-            latex_label += char
-
-    latex_label += "$"
-
-    return latex_label
+    import re
+    return "${}$".format(re.sub("-(?P<number>[0-9])", "\\\\bar{\\g<number>}", label))
 
 
-def standardize_doc_cell(doc, primitive=True, symprec=1e-2):
+def standardize_doc_cell(
+    doc: Union["Crystal", Dict[str, Any]],
+    primitive: bool = True,
+    symprec: float = 1e-2
+) -> Union["Crystal", Dict[str, Any]]:
     """ Return standardized cell data from matador doc.
 
     Parameters:
-        doc (dict or :class:`Crystal`): matador document or Crystal object.
+        doc: matador document or Crystal object to standardize.
 
     Keyword arguments:
-        primitive (bool): whether to reduce cell to primitive.
-        symprec (float): spglib symmetry tolerance.
+        primitive: whether to reduce cell to primitive.
+        symprec: spglib symmetry tolerance.
 
     Returns:
-        dict: matador document containing standardized cell.
+        A matador document/`Crystal` containing standardized cell.
 
     """
     import spglib as spg
-    from matador.crystal import Crystal
     from matador.utils.chem_utils import get_atomic_symbol
     from copy import deepcopy
+    from matador.crystal import Crystal
 
     spg_cell = doc2spg(doc)
     spg_standardized = spg.standardize_cell(spg_cell, to_primitive=primitive, symprec=symprec)
@@ -544,17 +545,17 @@ def standardize_doc_cell(doc, primitive=True, symprec=1e-2):
     return std_doc
 
 
-def get_spacegroup_spg(doc, symprec=0.01, check_occ=True):
+def get_spacegroup_spg(doc: Union[Dict[str, Any], Crystal], symprec: float = 0.01, check_occ: bool = True):
     """ Return spglib spacegroup for a cell.
 
     Parameters:
-        doc (dict or :class:`Crystal`): matador document or Crystal object.
+        doc: matador document or Crystal object.
 
     Keyword arguments:
-        symprec (float): spglib symmetry tolerance.
+        symprec: spglib symmetry tolerance.
 
     Returns:
-        str: spacegroup symbol of structure.
+        The H-M space group symbol of structure.
 
     """
     import spglib as spg
@@ -566,22 +567,22 @@ def get_spacegroup_spg(doc, symprec=0.01, check_occ=True):
     return space_group.split(' ')[0]
 
 
-def add_noise(doc, amplitude=0.1):
+def add_noise(doc: Dict[str, Any], amplitude: float = 0.1) -> Dict[str, Any]:
     """ Add random noise to the positions of structure contained in doc.
     Useful for force convergence tests.
 
     Parameters:
-        doc (dict): dictionary containing matador structure.
+        doc: dictionary containing matador structure.
 
     Keyword arguments:
-        amplitude (float): maximum amplitude of noise vector.
+        amplitude: maximum amplitude of noise vector.
 
     Raises:
         KeyError if (`lattice_cart` and `positions_frac`) or `positions_abs`
             are missing.
 
     Returns:
-        dict: the randomised structure.
+        The randomised structure.
     """
     poscart = np.asarray(doc.get('positions_abs') or frac2cart(doc['lattice_cart'], doc['positions_frac']))
     for atom in poscart:
@@ -672,20 +673,25 @@ def calc_pairwise_distances_pbc(poscart, images, lattice, rmax,
     return distances
 
 
-def create_simple_supercell(doc, extension, standardize=False, symmetric=False):
+def create_simple_supercell(
+    doc: Union[Dict[str, Any], "Crystal"],
+    extension: Tuple[int, int, int],
+    standardize: bool = False,
+    symmetric: bool = False
+) -> Union[Dict[str, Any], "Crystal"]:
     """ Return a document with new supercell, given extension vector.
 
     Parameters:
-        doc (dict): matador doc to construct cell from.
-        extension (:obj:`tuple` of :obj:`int`): multiplicity of each lattice vector,
-            e.g. (2,2,1).
+        doc: matador doc to construct cell from.
+        extension: multiplicity of each lattice vector, e.g. (2,2,1).
 
     Keyword arguments:
-        standardize (bool): whether or not to use spglib to standardize the cell first.
-        symmetric (bool): whether or not centre the new cell on the origin.
+        standardize: whether or not to use spglib to standardize the cell first.
+        symmetric: whether or not centre the new cell on the origin.
 
     Returns:
-        supercell_doc (dict): matador document containing supercell.
+        The supercell, either as a `Crystal` or as a dictionary,
+        depending on the input type.
 
     """
     from itertools import product
@@ -742,3 +748,22 @@ def create_simple_supercell(doc, extension, standardize=False, symmetric=False):
         return Crystal(supercell_doc)
 
     return supercell_doc
+
+
+def create_supercell_with_minimum_side_length(doc: Union[Dict[str, Any], "Crystal"], target: float):
+    """Pad the cell such that the minimum side length is greater than the target length.
+
+    Parameters:
+        doc: The crystal structure to pad.
+        target: The target minimum side length.
+
+    Returns:
+        The supercell.
+
+    """
+    extension = [1, 1, 1]
+    for ind, lat in enumerate(doc.cell.lengths):
+        if lat < target:
+            extension[ind] = int(-(target // -lat))
+
+    return create_simple_supercell(doc, extension, standardize=False)
