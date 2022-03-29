@@ -28,6 +28,7 @@ These interactive examples can be run under Binder; some features that required 
     notebooks/interactive/pxrd_plotting
     notebooks/interactive/magres_plotting
     notebooks/interactive/pymatgen_and_ase_interface
+    notebooks/interactive/visualisation
 
 Non-interactive
 ~~~~~~~~~~~~~~~
