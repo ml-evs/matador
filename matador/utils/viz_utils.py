@@ -427,7 +427,7 @@ def fresnel_plot(
     if figsize is None:
         figsize = (6*fig_cols, 6*fig_rows)
 
-    _, axes = plt.subplots(nrows=fig_rows, ncols=fig_cols, figsize=figsize, squeeze=False)
+    fig, axes = plt.subplots(nrows=fig_rows, ncols=fig_cols, figsize=figsize, squeeze=False)
 
     scenes = []
 
@@ -443,7 +443,7 @@ def fresnel_plot(
             for ind, ax in enumerate(axes.flatten()):
                 ax.set_title(labels[ind])
 
-    return axes, scenes
+    return fig, axes, scenes
 
 
 def rerender_scenes_to_axes(scenes, axes, renderer=None):
@@ -461,8 +461,11 @@ def rerender_scenes_to_axes(scenes, axes, renderer=None):
         from functools import partial
         renderer = partial(fresnel.pathtrace, light_samples=32)
     for i, ax in enumerate(_axes):
+        old_title = ax.title.get_text()
+        ax.clear()
         ax.axis('off')
         ax.set_aspect('equal')
+        ax.set_title(old_title)
         if i < len(scenes):
             render = renderer(scenes[i])
             ax.imshow(render[:])
