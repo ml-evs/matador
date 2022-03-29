@@ -704,15 +704,17 @@ def create_simple_supercell(
         supercell_doc = deepcopy(doc._data)
     else:
         supercell_doc = deepcopy(doc)
+
+    # copy new doc and delete data that will not be corrected
+    keys_to_copy = set(['positions_frac', 'lattice_cart', 'atom_types', 'source', 'stoichiometry'])
+    supercell_doc = {key: deepcopy(doc[key]) for key in keys_to_copy}
+
     # standardize cell with spglib
     if standardize:
         supercell_doc = standardize_doc_cell(supercell_doc)
 
-    # copy new doc and delete data that will not be corrected
-    keys_to_copy = set(['positions_frac', 'lattice_cart', 'atom_types', 'source', 'stoichiometry'])
-    supercell_doc = {key: supercell_doc[key] for key in keys_to_copy}
-
     for i, elem in enumerate(extension):
+        supercell_doc["lattice_cart"] = np.asarray(supercell_doc["lattice_cart"])
         for k in range(3):
             supercell_doc['lattice_cart'][i][k] = elem * supercell_doc['lattice_cart'][i][k]
         for ind, atom in enumerate(supercell_doc['positions_frac']):
@@ -740,6 +742,8 @@ def create_simple_supercell(
     supercell_doc['num_atoms'] = len(supercell_doc['atom_types'])
     supercell_doc['cell_volume'] = cart2volume(supercell_doc['lattice_cart'])
     supercell_doc['lattice_abc'] = cart2abc(supercell_doc['lattice_cart'])
+    supercell_doc['source'] = doc['source']
+    supercell_doc['stoichiometry'] = doc['stoichiometry']
 
     assert np.isclose(supercell_doc['cell_volume'],
                       np.prod(extension)*cart2volume(doc['lattice_cart']))

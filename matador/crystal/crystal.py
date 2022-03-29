@@ -7,7 +7,10 @@ manipulation and analysis of the lattice.
 
 """
 
+from __future__ import annotations
+
 from copy import deepcopy
+from typing import List, Tuple, Union
 from matador.utils import cell_utils
 from matador.orm.orm import DataContainer
 from matador.crystal.crystal_site import Site
@@ -50,7 +53,7 @@ class UnitCell:
             raise RuntimeError("Unable to create UnitCell from lattice {}".format(lattice))
 
     @property
-    def lattice_cart(self):
+    def lattice_cart(self) -> Tuple[Tuple[float, float, float], Tuple[float, float, float], Tuple[float, float, float]]:
         """ The Cartesian lattice vectors as a tuple. """
         return self._lattice_cart
 
@@ -61,7 +64,7 @@ class UnitCell:
         self._volume = None
 
     @property
-    def lattice_abc(self):
+    def lattice_abc(self) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:
         """ Lattice parameters as a tuple. """
         return self._lattice_abc
 
@@ -72,7 +75,7 @@ class UnitCell:
         self._volume = None
 
     @property
-    def lengths(self):
+    def lengths(self) -> Tuple[float, float, float]:
         """ Lattice vector lengths. """
         return self._lattice_abc[0]
 
@@ -84,11 +87,11 @@ class UnitCell:
         self.lattice_abc = [new_lengths, self._lattice_abc[1]]
 
     @property
-    def recip_lattice_cart(self):
+    def recip_lattice_cart(self) -> List[List[float]]:
         return real2recip(self.lattice_cart)
 
     @property
-    def angles(self):
+    def angles(self) -> Tuple[float, float, float]:
         """ Lattice vector angles. """
         return self._lattice_abc[1]
 
@@ -100,13 +103,13 @@ class UnitCell:
         self.lattice_abc = [self._lattice_abc[0], new_angles]
 
     @property
-    def volume(self):
+    def volume(self) -> float:
         """ The cell volume in Å³. """
         if not self._volume:
             self._volume = cell_utils.cart2volume(self._lattice_cart)
         return self._volume
 
-    def __str__(self):
+    def __str__(self) -> str:
         return (
             f"(a, b, c) = {self.lengths[0]:4.4f} Å, {self.lengths[1]:4.4f} Å, {self.lengths[2]:4.4f} Å\n"
             f"(α, β, γ) = {self.angles[0]:4.4f}° {self.angles[1]:4.4f}° {self.angles[2]:4.4f}°\n"
@@ -180,7 +183,7 @@ class Crystal(DataContainer):
         else:
             self._space_group = {}
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: Union[str, int]):
         """ If integer key is requested, return index into site array. If
         a known site data key is requested, return the live version attached
         to the sites. Otherwise, go through the DataContainer methods.
@@ -194,7 +197,7 @@ class Crystal(DataContainer):
 
         return super().__getitem__(key)
 
-    def __str__(self):
+    def __str__(self) -> str:
         repr_string = f"{self.formula_unicode}: {self.root_source}\n"
         repr_string += (len(repr_string)-1) * "=" + "\n"
         repr_string += f"{self.num_atoms:<3} atoms. {self.space_group}\n"
@@ -206,7 +209,7 @@ class Crystal(DataContainer):
 
         return repr_string
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<Crystal: {self.formula_unicode} {self.root_source}>"
 
     def update(self, data):
@@ -257,22 +260,22 @@ class Crystal(DataContainer):
             self.sites.append(Site(species, position, self.cell, **site_data))
 
     @property
-    def atom_types(self):
+    def atom_types(self) -> List[str]:
         """ Return list of atom types. """
         return self._data['atom_types']
 
     @property
-    def num_atoms(self):
+    def num_atoms(self) -> int:
         """ Return number of atoms in structure. """
         return len(self.sites)
 
     @property
-    def num_elements(self):
+    def num_elements(self) -> int:
         """ Return number of species in the structure. """
         return len(self.elems)
 
     @property
-    def positions_frac(self):
+    def positions_frac(self) -> List[List[float]]:
         """ Return list of fractional positions. """
         from matador.utils.cell_utils import cart2frac
         if 'positions_frac' not in self._data:
@@ -280,7 +283,7 @@ class Crystal(DataContainer):
         return self._data['positions_frac']
 
     @property
-    def positions_abs(self):
+    def positions_abs(self) -> List[List[float]]:
         """ Return list of absolute Cartesian positions. """
         from matador.utils.cell_utils import frac2cart
         if 'positions_abs' not in self._data:
@@ -288,14 +291,14 @@ class Crystal(DataContainer):
         return self._data['positions_abs']
 
     @property
-    def site_occupancies(self):
+    def site_occupancies(self) -> List[float]:
         """ Return a list of site occupancies. """
         if 'site_occupancies' not in self._data:
             self._data['site_occupancies'] = [site.occupancy for site in self]
         return self._data['site_occupancies']
 
     @property
-    def stoichiometry(self):
+    def stoichiometry(self) -> List[List[Union[str, float]]]:
         """ Return stoichiometry in matador format: a list of
         two-member lists containing element symbol and number
         of atoms per formula unit, sorted in alphabetical order
@@ -308,7 +311,7 @@ class Crystal(DataContainer):
         return self._data['stoichiometry']
 
     @property
-    def concentration(self):
+    def concentration(self) -> List[float]:
         """ Return concentration of each species in stoichiometry. """
         if 'concentration' not in self._data:
             self._data['concentration'] = get_concentration(
@@ -319,39 +322,39 @@ class Crystal(DataContainer):
         return self._data['concentration']
 
     @property
-    def formula(self):
+    def formula(self) -> str:
         """ Returns chemical formula of structure. """
         from matador.utils.chem_utils import get_formula_from_stoich
         return get_formula_from_stoich(self.stoichiometry, tex=False)
 
     @property
-    def formula_tex(self):
+    def formula_tex(self) -> str:
         """ Returns chemical formula of structure in LaTeX format. """
         from matador.utils.chem_utils import get_formula_from_stoich
         return get_formula_from_stoich(self.stoichiometry, tex=True)
 
     @property
-    def formula_unicode(self):
+    def formula_unicode(self) -> str:
         """Returns a unicode string for the chemical formula."""
         return self.formula.translate(str.maketrans("0123456789", "₀₁₂₃₄₅₆₇₈₉"))
 
     @property
-    def cell_volume(self):
+    def cell_volume(self) -> float:
         """ Returns cell volume in Å³. """
         return self.cell.volume
 
     @property
-    def lattice_cart(self):
+    def lattice_cart(self) -> Tuple[Tuple[float, float, float], Tuple[float, float, float], Tuple[float, float, float]]:
         """ The Cartesian lattice vectors as a tuple. """
         return self.cell.lattice_cart
 
     @property
-    def lattice_abc(self):
+    def lattice_abc(self) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:
         """ Lattice parameters as a tuple. """
         return self.cell.lattice_abc
 
     @property
-    def bond_lengths(self):
+    def bond_lengths(self) -> List[Tuple[Tuple[str, str], float]]:
         """ Returns a list of ((species_A, species_B), bond_length)),
         sorted by bond length, computed from the network structure of
         the crystal (i.e. first coordination sphere).
