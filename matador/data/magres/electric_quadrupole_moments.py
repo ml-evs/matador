@@ -13,14 +13,14 @@ def _load_quadrupole_moments_from_file():
 
     """
 
-    import numpy as np
-    from periodictable import elements
     from pathlib import Path
+    import numpy as np
+    from matador.data.periodic_table import PERIODIC_TABLE
 
     filename = Path(__file__).parent.joinpath("electric_quadrupole_moments.csv")
     moments = np.loadtxt(filename, comments="#", delimiter=",")
     moments_dict = {}
-    for el, col in zip(elements, moments):
+    for el, col in zip(PERIODIC_TABLE.values(), moments):
         moments_dict[el.symbol] = moments[el.number-1]
 
     return moments_dict

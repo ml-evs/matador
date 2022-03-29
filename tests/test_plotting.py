@@ -390,7 +390,7 @@ class FingerprintPlotTests(MatadorUnitTest):
             REAL_PATH + "data/res_files/KPSn-OQMD_123456.res", as_model=True
         )[0]
         plot_pdf(structure, png=True)
-        self.assertTrue(os.path.isfile("K7PSn_pdf.png"))
+        self.assertTrue(os.path.isfile("K7SnP_pdf.png"))
         plot_pdf([structure, structure], filename="test_pdf", rmax=5, png=True)
         self.assertTrue(os.path.isfile("test_pdf.png"))
 
@@ -399,7 +399,7 @@ class FingerprintPlotTests(MatadorUnitTest):
             REAL_PATH + "data/res_files/KPSn-OQMD_123456.res", as_model=True
         )[0]
         plot_pxrd(structure, png=True)
-        self.assertTrue(os.path.isfile("K7PSn_pxrd.png"))
+        self.assertTrue(os.path.isfile("K7SnP_pxrd.png"))
         plot_pdf([structure, structure], filename="test_pxrd", png=True)
         self.assertTrue(os.path.isfile("test_pxrd.png"))
 

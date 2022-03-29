@@ -2560,9 +2560,9 @@ class ExportTest(MatadorUnitTest):
         self.assertEqual(len(glob.glob("query/*.res")), 3)
         self.assertEqual(len(glob.glob("query/*.cell")), 3)
         fnames = [
-            "CuSr-MP_1025402-CollCode629305",
+            "SrCu-MP_1025402-CollCode629305",
             "H-MP_632250",
-            "BaS3Te-OQMD_1606-CollCode8",
+            "BaTeS3-OQMD_1606-CollCode8",
         ]
         exts = ["cell", "res"]
         for name, ext in itertools.product(fnames, exts):
