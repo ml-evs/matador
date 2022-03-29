@@ -10,8 +10,8 @@ from __future__ import annotations
 from typing import Dict, Any, Union, Tuple, List, TYPE_CHECKING
 
 import numpy as np
-from periodictable import elements
 
+from matador.data.periodic_table import PERIODIC_TABLE
 if TYPE_CHECKING:
     from matador.crystal import Crystal
 
@@ -426,7 +426,7 @@ def get_seekpath_kpoint_path(
     primitive_doc = dict()
     primitive_doc['lattice_cart'] = seekpath_results['primitive_lattice']
     primitive_doc['positions_frac'] = seekpath_results['primitive_positions']
-    primitive_doc['atom_types'] = [str(elements[i]) for i in seekpath_results['primitive_types']]
+    primitive_doc['atom_types'] = [list(PERIODIC_TABLE)[i] for i in seekpath_results['primitive_types']]
     primitive_doc['num_atoms'] = len(primitive_doc['atom_types'])
     primitive_doc['lattice_abc'] = cart2abc(primitive_doc['lattice_cart'])
     primitive_doc['cell_volume'] = cart2volume(primitive_doc['lattice_cart'])
