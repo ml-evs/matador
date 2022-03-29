@@ -195,7 +195,7 @@ class Crystal(DataContainer):
         return super().__getitem__(key)
 
     def __str__(self):
-        repr_string = f"{self.formula}: {self.root_source}\n"
+        repr_string = f"{self.formula_unicode}: {self.root_source}\n"
         repr_string += (len(repr_string)-1) * "=" + "\n"
         repr_string += f"{self.num_atoms:<3} atoms. {self.space_group}\n"
 
@@ -617,6 +617,6 @@ class Crystal(DataContainer):
             raise RuntimeError("One of `extension` or `target` must be specified.")
 
     def standardized(self, primitive=False):
-        """Returns a supercell of this crystal with the specified extension."""
+        """Returns a standardized cell for this crystal, optionally the primitive cell."""
         from matador.utils.cell_utils import standardize_doc_cell
         return standardize_doc_cell(self, primitive=primitive)
