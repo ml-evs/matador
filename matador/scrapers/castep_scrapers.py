@@ -1433,6 +1433,19 @@ def _castep_scrape_final_structure(flines, castep, db=True):
         elif '0K energy' in line:
             castep['0K_energy'] = f90_float_parse(line.split('=')[1].split()[0])
             castep['0K_energy_per_atom'] = castep['0K_energy'] / castep['num_atoms']
+        elif '(SEDC) Total Energy Correction' in line:
+            castep['dispersion_correction_energy'] = f90_float_parse(line.split(':')[1].split()[0])
+        elif 'Dispersion corrected final energy' in line:
+            castep['dispersion_corrected_energy'] = f90_float_parse(line.split('=')[1].split()[0])
+            castep['dispersion_corrected_energy_per_atom'] = castep['dispersion_corrected_energy'] / castep['num_atoms']
+        elif 'Dispersion corrected final free energy' in line:
+            castep['dispersion_corrected_free_energy'] = f90_float_parse(line.split('=')[1].split()[0])
+            castep['dispersion_corrected_free_energy_per_atom'] = (
+                castep['dispersion_corrected_free_energy'] / castep['num_atoms']
+            )
+        elif 'Dispersion corrected est. 0K energy' in line:
+            castep['dispersion_corrected_0K_energy'] = f90_float_parse(line.split('=')[1].split()[0])
+            castep['dispersion_corrected_0K_energy_per_atom'] = castep['dispersion_corrected_0K_energy'] / castep['num_atoms']
         elif ' Forces **' in line:
             castep['forces'] = []
             i = 1
