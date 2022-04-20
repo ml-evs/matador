@@ -893,6 +893,8 @@ def compare_structures(structures, order, fields=None):
             ("lattice_abc", 1, 2),
         ]
 
+    if order[0] not in structures:
+        raise RuntimeError(f"Benchmark parameter set {order[0]} not found in entry {root_sources}")
     benchmark = structures[order[0]]
     results = {}
     for label in order[1:]:
@@ -905,7 +907,7 @@ def compare_structures(structures, order, fields=None):
     return results
 
 
-def compare_structure_cursor(cursor, order):
+def compare_structure_cursor(cursor, order, fields=None):
     """Compare the "same" structures across different accuracies.
 
     Args:
@@ -913,15 +915,25 @@ def compare_structure_cursor(cursor, order):
             structure at different accuracies.
         order: An ordered list of the subkeys for each structure; the first
             will be used as the benchmark.
+        fields: A list of fields to compare. If None, defaults to comparing
+            the lattice parameters, cell volumes and stabilities (hull distance,
+            formation energy).
 
     Returns:
         A dictionary of dictionaries summarising the differences.
 
     """
+    import warnings
     structure_comparator = {}
     for entry in cursor:
         structures = cursor[entry]
         if len(structures) > 1:
-            structure_comparator[entry] = compare_structures(structures, order=order)
+            if order[0] not in structures:
+                warnings.warn(f"Benchmark parameter set {order[0]} not found for entry {entry}")
+                continue
+            try:
+                structure_comparator[entry] = compare_structures(structures, order=order, fields=fields)
+            except RuntimeError as exc:
+                structure_comparator[entry] = exc
 
     return structure_comparator
