@@ -318,7 +318,7 @@ class CastepScraperTests(MatadorUnitTest):
             )
         if not failed_open:
             f.close()
-            test_dict, s = castep2dict(castep_fname, db=True, verbosity=VERBOSITY)
+            test_dict, s = castep2dict(castep_fname, timings=True, db=True, verbosity=VERBOSITY)
             self.assertTrue(s, msg="Failed entirely, oh dear!\n{}".format(test_dict))
             self.assertEqual(
                 test_dict["pressure"], 0.0763, msg="Failed to read pressure!"
