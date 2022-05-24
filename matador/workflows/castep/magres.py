@@ -126,6 +126,9 @@ class CastepMagresWorkflow(Workflow):
             if todo['dos']:
                 todo['broadening'] = 'broadening' in odi_dict
                 todo['pdos'] = 'pdos' in odi_dict
+        else:
+            todo['pdos'] = False
+            todo['broadening'] = False
 
         # prepare to do pre-relax if there's no check file
         if os.path.isfile(self.seed + '.check'):
