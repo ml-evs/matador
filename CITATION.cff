@@ -1,0 +1,32 @@
+# YAML 1.2
+# Metadata for citation of this software according to the CFF format (https://citation-file-format.github.io/)
+cff-version: 1.2.0
+message: If you use this software, please cite the following article and versioned archive.
+title: "matador"
+doi: 10.5281/zenodo.3908573
+authors:
+- given-names: Matthew L.
+  family-names: Evans
+  affiliation: University of Cambridge
+  orcid: https://orcid.org/0000-0002-1182-9098
+repository-code: https://github.com/ml-evs/matador
+url: https://github.com/ml-evs/matador
+type: software
+license: MIT
+preferred-citation:
+  type: article
+  authors:
+  - given-names: Matthew L.
+    family-names: Evans
+    affiliation: University of Cambridge
+    orcid: https://orcid.org/0000-0002-1182-9098
+  - given-names: Andrew J.
+    family-names: Morris
+    affiliation: University of Birmingham
+    orcid: https://orcid.org/0000-0001-7453-5698
+  doi: "10.21105/joss.02563"
+  journal: "Journal of Open Source Software"
+  title: "matador: a Python library for analysing, curating and performing high-throughput density-functional theory calculations"
+  volume: 5
+  number: 54
+  year: 2020

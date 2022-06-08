@@ -15,7 +15,7 @@ def load_scattering_file(filename, a_inds, b_inds, c_ind):
 
     import numpy as np
 
-    with open(filename, "r") as f:
+    with open(filename, "r", encoding="utf-8") as f:
         flines = [line for line in f.readlines() if not line.startswith("#")]
 
     atomic_scattering_coeffs = {}

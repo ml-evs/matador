@@ -23,22 +23,26 @@ def plot_magres(
     magres_key: str = "chemical_shielding_iso",
     xlabel: str = None,
     broadening_width: float = 1,
-    text_offset: float = 0.1,
+    text_offset: float = 0.2,
     ax=None,
-    figsize: Tuple[float] = None,
+    figsize: Tuple[float, float] = None,
     show: bool = False,
     savefig: Optional[str] = None,
     signal_labels: Optional[Union[str, List[str]]] = None,
-    signal_limits: Tuple[float] = None,
+    signal_limits: Tuple[float, float] = None,
     line_kwargs: Optional[Union[Dict, List[Dict]]] = None,
     invert_xaxis: bool = True,
+    species_label: Optional[str] = None,
+    label_fontsize: int = None,
 ):
-    """ Plot magnetic resonance.
+    """Plot magnetic resonance data for a set of crystals.
 
     Parameters:
         magres (Union[Crystal, List[Crystal]]): list of :class:`Crystal` containing
             magres data.
-        species (str): the species to plot the shifts of.
+        species (str | Tuple[str, int]): the species to plot the shifts of, either as
+            a simple element symbol, or an element and isotope tuple used for labelling,
+            e.g., "P" or ("P", 31).
 
     Keyword arguments:
         ax (matplotlib.axes.Axes): an existing axis on which to plot.
@@ -54,6 +58,7 @@ def plot_magres(
             to the maximum and minimum shifts across all passed structures.
         line_kwargs (list or dict): parameters to pass to the curve plotter,
             if a list then the line kwargs will be passed to each line individually.
+        label_fontsize (int): font size override for the labels.
 
     """
     import matplotlib.pyplot as plt
@@ -75,7 +80,12 @@ def plot_magres(
         ax = fig.add_subplot(111)
 
     if species is None:
-        raise RuntimeError("You must provide a species label for plotting.")
+        raise RuntimeError("You must provide the species of interest plotting.")
+    if isinstance(species, tuple):
+        species_label = f"$^{{ {species[1]} }}${species[0]}"
+        species = species[0]
+    else:
+        species_label = species
 
     if signal_labels is not None and len(signal_labels) != len(magres):
         raise RuntimeError(
@@ -86,7 +96,9 @@ def plot_magres(
     _magres = []
 
     if signal_limits is not None:
-        min_shielding, max_shielding = signal_limits
+        min_shielding, max_shielding = sorted(signal_limits)
+        if signal_limits[0] > signal_limits[1]:
+            ax.invert_xaxis()
     else:
         min_shielding, max_shielding = (1e20, -1e20)
 
@@ -166,7 +178,8 @@ def plot_magres(
         if _label is not None:
             ax.text(0.95, (ind * 1.1) + text_offset, _label,
                     transform=ax.get_yaxis_transform(),
-                    horizontalalignment='right')
+                    horizontalalignment='right',
+                    fontsize=label_fontsize)
 
     if xlabel is None:
         unit = set(doc.get("magres_units", {}).get("ms", "ppm") for doc in magres)
@@ -174,13 +187,13 @@ def plot_magres(
             raise RuntimeError(f"Multiple incompatible units found for chemical shift: {unit}")
         unit = list(unit)[0]
         if magres_key == "chemical_shielding_iso":
-            xlabel = f"{species}: Isotropic chemical shielding $\\sigma_\\mathrm{{iso}}$ ({unit})"
+            xlabel = f"{species_label}: Isotropic chemical shielding $\\sigma_\\mathrm{{iso}}$ ({unit})"
         elif magres_key == "chemical_shift_iso":
-            xlabel = f"{species}: Isotropic chemical shift $\\sigma_\\mathrm{{iso}}$ ({unit})"
+            xlabel = f"{species_label}: Isotropic chemical shift $\\delta_\\mathrm{{iso}}$ ({unit})"
         elif magres_key == "chemical_shift_aniso":
-            xlabel = f"{species}: Anisotropic chemical shift $\\sigma_\\mathrm{{iso}}$ ({unit})"
+            xlabel = f"{species_label}: Anisotropic chemical shift $\\Delta $ ({unit})"
         elif magres_key == "chemical_shift_asymmetry":
-            xlabel = f"{species}: Chemial shift asymmetry, $\\eta$"
+            xlabel = f"{species_label}: Chemial shift asymmetry, $\\eta$"
 
     ax.set_xlabel(xlabel)
     ax.set_ylabel("Intensity (arb. units)")

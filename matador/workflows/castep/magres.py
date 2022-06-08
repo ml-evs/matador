@@ -126,6 +126,9 @@ class CastepMagresWorkflow(Workflow):
             if todo['dos']:
                 todo['broadening'] = 'broadening' in odi_dict
                 todo['pdos'] = 'pdos' in odi_dict
+        else:
+            todo['pdos'] = False
+            todo['broadening'] = False
 
         # prepare to do pre-relax if there's no check file
         if os.path.isfile(self.seed + '.check'):
@@ -176,7 +179,7 @@ def castep_magres(computer, calc_doc, seed, elec_energy_tol=1e-11):
     magres_doc['task'] = 'magres'
     magres_doc['magres_task'] = calc_doc.get("magres_task", "NMR")
     if magres_doc["magres_task"].upper() == "NMR" and "species_gamma" not in magres_doc:
-        magres_doc["magres_task"] = "shielding"
+        LOG.warning("Performing EFG calculations but no species_gamma block specified in cell file.")
     magres_doc['continuation'] = 'default'
     # this is just to suppress a warning that elec_energy_tol has changed
     magres_doc["elec_energy_tol"] = elec_energy_tol

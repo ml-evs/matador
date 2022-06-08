@@ -9,7 +9,7 @@ constants, with a focus on battery materials.
 
 import copy
 import warnings
-from typing import Dict, Tuple, Any
+from typing import Dict, Tuple, Any, List
 
 import numpy as np
 from matador.data.constants import * # noqa
@@ -18,9 +18,19 @@ from matador.data.constants import * # noqa
 EPS = 1e-8
 
 
-def get_iupac_ordering():
-    """ Stub for implementing IUPAC chemical ordering in formulae. """
-    raise NotImplementedError
+def get_iupac_ordered_elements(elements: List[str]) -> List[str]:
+    """Returns the list of elements in IUPAC order, i.e., that specified
+    in Table VI of the IUPAC Red Book:
+
+    Nomenclature of Inorganic Chemistry, IUPAC Recommendations 2005, IUPAC Red Book,
+    RSC Publishing, 2005 [ISBN 0 85404 438 8]
+
+    Returns:
+        List of elements in the IUPAC order.
+
+    """
+    from matador.data.periodic_table import PERIODIC_TABLE
+    return sorted(elements, key=lambda x: PERIODIC_TABLE[x].iupac_order)
 
 
 def get_periodic_table():
@@ -44,20 +54,29 @@ def get_periodic_table():
 
 def get_molar_mass(elem):
     """ Returns molar mass of chosen element. """
-    import periodictable
-    return periodictable.elements.symbol(elem).mass
+    from matador.data.periodic_table import PERIODIC_TABLE
+    try:
+        return PERIODIC_TABLE[elem].mass
+    except KeyError as exc:
+        raise KeyError(f"{elem} is not a valid element symbol.") from exc
 
 
 def get_atomic_number(elem):
     """ Returns atomic number of chosen element. """
-    import periodictable
-    return periodictable.elements.symbol(elem).number
+    from matador.data.periodic_table import PERIODIC_TABLE
+    try:
+        return PERIODIC_TABLE[elem].number
+    except KeyError as exc:
+        raise KeyError(f"{elem} is not a valid element symbol.") from exc
 
 
 def get_atomic_symbol(atomic_number):
     """ Returns elemental symbol from atomic number. """
-    import periodictable
-    return periodictable.elements[atomic_number].symbol
+    from matador.data.periodic_table import PERIODIC_TABLE
+    try:
+        return list(PERIODIC_TABLE)[atomic_number]
+    except ValueError as exc:
+        raise KeyError(f"{atomic_number} not contained within periodic table from this package!") from exc
 
 
 def get_concentration(doc, elements, include_end=False):
@@ -578,7 +597,7 @@ def get_root_source(source):
     src_list = set()
     for src in sources:
         if any([src.endswith(ext) for ext in
-               ['.res', '.castep', '.history', '.history.gz', '.phonon', '.phonon_dos', '.bands', '.cif']]):
+               ['.res', '.castep', '.history', '.history.gz', '.phonon', '.phonon_dos', '.bands', '.cif', '.magres']]):
             src_list.add('.'.join(src.split('/')[-1].split('.')[0:-1]))
         elif 'OQMD' in src.upper():
             src_list.add(src)
@@ -619,6 +638,9 @@ def get_formula_from_stoich(stoich, elements=None, tex=False, sort=True, latex_s
         stoich = stoich.tolist()
     if sort:
         stoich = sorted(stoich)
+    if elements is None:
+        elements = get_iupac_ordered_elements([s[0] for s in stoich])
+
     if elements is not None:
         for targ_elem in elements:
             for elem in stoich:
@@ -633,17 +655,7 @@ def get_formula_from_stoich(stoich, elements=None, tex=False, sort=True, latex_s
                         else:
                             form += elem[0] + str(int(elem[1]))
         assert form != ''
-    else:
-        for elem in stoich:
-            if elem[1] == 1:
-                form += elem[0]
-            elif int(elem[1]) != 0:
-                if tex:
-                    if elem[1] % 1 == 0:
-                        elem[1] = int(elem[1])
-                    form += '{}$_{}{{{}}}$'.format(elem[0], latex_sub_style, elem[1])
-                else:
-                    form += elem[0] + str(int(elem[1]))
+
     return form
 
 

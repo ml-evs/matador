@@ -6,7 +6,7 @@ documents or Crystal objects.
 """
 
 import os
-from traceback import print_exc
+import warnings
 
 import numpy as np
 import pymongo as pm
@@ -67,7 +67,6 @@ def query2files(
     num_files = num * sum(1 for ext in [cell, param, res, pdb, xsf] if ext)
 
     if multiple_files:
-        print('Intending to write', num, 'structures to file...')
         if num_files > max_files:
             raise RuntimeError(
                 "Not writing {} files as it exceeds argument `max_files` limit of {}"
@@ -158,15 +157,12 @@ def query2files(
         if isinstance(cursor, pm.cursor.Cursor):
             cursor.rewind()
         tex_path = "{directory}/{directory}.tex".format(directory=directory)
-        print('Writing LaTeX file', tex_path + '...')
         tex_kwargs = {}
         tex_kwargs.update(kwargs)
         tex_kwargs.update({'latex': True, 'markdown': False, 'argstr': argstr, 'hull': hull})
         tex_string = display_results(cursor, **tex_kwargs)
         with open(tex_path, 'w') as f:
             f.write(tex_string)
-
-    print('Done!')
 
 
 @file_writer_function
@@ -207,7 +203,6 @@ def doc2param(doc, path, overwrite=False, hash_dupe=False, spin=False):
     skip_keywords = ['nbands', 'nelectrons']
     for kw in skip_keywords:
         if kw in doc:
-            print('Skipping keyword {} as it was probably not desired...'.format(kw))
             param_dict.pop(kw)
 
     if spin is not None and not doc.get('spin_polarized'):
@@ -241,9 +236,11 @@ def doc2param(doc, path, overwrite=False, hash_dupe=False, spin=False):
                           .format(**cnt_params))
             flines.append(':endgaussian_cylinder_pot')
             flines.append('%ENDBLOCK DEVEL_CODE')
-        except ImportError:
-            print('Failed to import implicit_cnt_params from pyairss, so not writing '
-                  'implicit cnt parameters from .res file to .param file.')
+        except ImportError as exc:
+            raise ImportError(
+                'Failed to import implicit_cnt_params from pyairss, so not writing '
+                'implicit cnt parameters from .res file to .param file.'
+            ) from exc
 
     if 'devel_code' in param_dict:
         flines.append('\n%BLOCK DEVEL_CODE')
@@ -286,9 +283,6 @@ def doc2cell(doc, path, overwrite=False, hash_dupe=False, spin=False):
             if not any(doc.get('atomic_init_spins', [])):
                 doc['atomic_init_spins'] = len(doc['positions_frac']) * [None]
                 doc['atomic_init_spins'][0] = spin
-
-    if 'atomic_init_spins' in doc and len(doc['atomic_init_spins']) != len(doc['positions_frac']):
-        print('Length mismatch between atoms and spins, will pad with zeros...')
 
     if 'site_occupancy' in doc:
         for occ in doc['site_occupancy']:
@@ -502,77 +496,67 @@ def doc2pdb(doc, path, info=True, hash_dupe=True):
         hash_dupe (bool): hash duplicate file names or skip?
 
     """
+    warnings.warn("This method is no longer maintained and may be removed at any time.", DeprecationWarning)
     if path.endswith('.pdb'):
         path = path.replace('.pdb', '')
-    try:
-        if os.path.isfile(path+'.pdb'):
-            if hash_dupe:
-                print('File already exists, generating hash...')
-                path += '-' + generate_hash()
-            else:
-                raise RuntimeError('Skipping duplicate structure...')
-        with open(path+'.pdb', 'w') as f:
-            try:
-                header = 'HEADER    {} {}'.format(doc['text_id'][0], doc['text_id'][1])
-            except Exception:
-                header = 'HEADER    Generated with matador.'
-            try:
-                # write res file header if info
-                title = 'TITLE     '
-                title += path.split('/')[-1] + ' '
-                if not doc.get('pressure'):
-                    title += '0.00 '
-                else:
-                    title += str(doc['pressure']) + ' '
-                title += str(doc['cell_volume']) + ' '
-                title += str(doc['enthalpy']) + ' '
-                title += '0 0 '             # spin
-                title += str(doc['num_atoms']) + ' '
-                try:
-                    if 'x' in doc['space_group']:
-                        title += '(P1) '
-                    else:
-                        title += '(' + str(doc['space_group']) + ')' + ' '
-                except Exception:
-                    title += '(P1) '
-                title += 'n - 1'
-            except Exception:
-                if not info:
-                    title = 'TITLE\t' + path.split('/')[-1]
-                raise RuntimeError('Failed to get info for res file, turn info off.')
-            author = 'AUTHOR    Generated with matador (Matthew Evans, 2016)'
-            f.write(header + '\n')
-            f.write(author + '\n')
-            f.write(title + '\n')
-            # use dummy SG for CRYST1, shouldn't matter
-            cryst = ('CRYST1 {v[0][0]:9.3f} {v[0][1]:9.3f} {v[0][2]:9.3f} {v[1][0]:7.2f} {v[1][1]:7.2f} {v[1][2]:7.2f} P 1'
-                     .format(v=doc['lattice_abc']))
-            f.write(cryst + '\n')
-            scale_n = cart2abcstar(doc['lattice_cart'])
-            f.write('SCALE1    {v[0][0]:10.6f} {v[0][1]:10.6f} {v[0][2]:10.6f}      {:10.5f}\n'.format(0.0, v=scale_n))
-            f.write('SCALE2    {v[1][0]:10.6f} {v[1][1]:10.6f} {v[1][2]:10.6f}      {:10.5f}\n'.format(0.0, v=scale_n))
-            f.write('SCALE3    {v[2][0]:10.6f} {v[2][1]:10.6f} {v[2][2]:10.6f}      {:10.5f}\n'.format(0.0, v=scale_n))
-            if 'positions_abs' not in doc:
-                doc['positions_abs'] = frac2cart(doc['lattice_cart'], doc['positions_frac'])
-            for ind, atom in enumerate(doc['atom_types']):
-                try:
-                    hetatm = 'HETATM '
-                    # append 00 to atom type, a la cell2pdb...
-                    hetatm += '{:4d} {:.4} NON A   1     '.format(ind+1, atom+'00')
-                    hetatm += ('{v[0]:7.3f} {v[1]:7.3f} {v[2]:7.3f} {:5.2f} {:5.2f}          {:.2}'
-                               .format(1.0, 0.0, atom, v=doc['positions_abs'][ind]))
-                    f.write(hetatm + '\n')
-                except Exception:
-                    print_exc()
-            ter = 'TER       {}       NON A   1'.format(len(doc['atom_types']))
-            f.write(ter + '\n')
-            f.write('END')
-    except Exception:
+    if os.path.isfile(path+'.pdb'):
         if hash_dupe:
-            print_exc()
-            print('Writing pdb file failed for ', doc['text_id'])
+            path += '-' + generate_hash()
         else:
-            print_exc()
+            raise RuntimeError('Skipping duplicate structure...')
+    with open(path+'.pdb', 'w') as f:
+        try:
+            header = 'HEADER    {} {}'.format(doc['text_id'][0], doc['text_id'][1])
+        except Exception:
+            header = 'HEADER    Generated with matador.'
+        try:
+            # write res file header if info
+            title = 'TITLE     '
+            title += path.split('/')[-1] + ' '
+            if not doc.get('pressure'):
+                title += '0.00 '
+            else:
+                title += str(doc['pressure']) + ' '
+            title += str(doc['cell_volume']) + ' '
+            title += str(doc['enthalpy']) + ' '
+            title += '0 0 '             # spin
+            title += str(doc['num_atoms']) + ' '
+            try:
+                if 'x' in doc['space_group']:
+                    title += '(P1) '
+                else:
+                    title += '(' + str(doc['space_group']) + ')' + ' '
+            except Exception:
+                title += '(P1) '
+            title += 'n - 1'
+        except Exception:
+            if not info:
+                title = 'TITLE\t' + path.split('/')[-1]
+            raise RuntimeError('Failed to get info for res file, turn info off.')
+        author = 'AUTHOR    Generated with matador (Matthew Evans, 2016)'
+        f.write(header + '\n')
+        f.write(author + '\n')
+        f.write(title + '\n')
+        # use dummy SG for CRYST1, shouldn't matter
+        cryst = ('CRYST1 {v[0][0]:9.3f} {v[0][1]:9.3f} {v[0][2]:9.3f} {v[1][0]:7.2f} {v[1][1]:7.2f} {v[1][2]:7.2f} P 1'
+                 .format(v=doc['lattice_abc']))
+        f.write(cryst + '\n')
+        scale_n = cart2abcstar(doc['lattice_cart'])
+        f.write('SCALE1    {v[0][0]:10.6f} {v[0][1]:10.6f} {v[0][2]:10.6f}      {:10.5f}\n'.format(0.0, v=scale_n))
+        f.write('SCALE2    {v[1][0]:10.6f} {v[1][1]:10.6f} {v[1][2]:10.6f}      {:10.5f}\n'.format(0.0, v=scale_n))
+        f.write('SCALE3    {v[2][0]:10.6f} {v[2][1]:10.6f} {v[2][2]:10.6f}      {:10.5f}\n'.format(0.0, v=scale_n))
+        if 'positions_abs' not in doc:
+            doc['positions_abs'] = frac2cart(doc['lattice_cart'], doc['positions_frac'])
+        for ind, atom in enumerate(doc['atom_types']):
+            hetatm = 'HETATM '
+            # append 00 to atom type, a la cell2pdb...
+            hetatm += '{:4d} {:.4} NON A   1     '.format(ind+1, atom+'00')
+            hetatm += ('{v[0]:7.3f} {v[1]:7.3f} {v[2]:7.3f} {:5.2f} {:5.2f}          {:.2}'
+                       .format(1.0, 0.0, atom, v=doc['positions_abs'][ind]))
+            f.write(hetatm + '\n')
+        ter = 'TER       {}       NON A   1'.format(len(doc['atom_types']))
+        f.write(ter + '\n')
+        f.write('END')
 
 
 def doc2json(doc, path, overwrite=False, hash_dupe=True):
@@ -587,28 +571,21 @@ def doc2json(doc, path, overwrite=False, hash_dupe=True):
         overwrite (bool): overwrite if filename exists.
 
     """
-    try:
-        import json
-        if path.endswith('.json'):
-            path = path.replace('.json', '')
+    import json
+    if path.endswith('.json'):
+        path = path.replace('.json', '')
 
-        if os.path.isfile(path+'.json'):
-            if overwrite:
-                os.remove(path + '.json')
-            elif hash_dupe:
-                print('File name already exists, generating hash...')
-                path += '-' + generate_hash()
-            else:
-                print('File name already exists! Skipping!')
+    if os.path.isfile(path+'.json'):
+        if overwrite:
+            os.remove(path + '.json')
+        elif hash_dupe:
+            path += '-' + generate_hash()
 
-        if '_id' in doc:
-            doc['_id'] = str(doc['_id'])
+    if '_id' in doc:
+        doc['_id'] = str(doc['_id'])
 
-        with open(path + '.json', 'w') as f:
-            f.write(json.dumps(doc, skipkeys=True, indent=2))
-    except Exception:
-        print_exc()
-        print('Writing {}.json failed!'.format(path))
+    with open(path + '.json', 'w') as f:
+        f.write(json.dumps(doc, skipkeys=True, indent=2))
 
 
 def doc2pwscf(doc, path, template=None, spacing=None):
@@ -626,11 +603,11 @@ def doc2pwscf(doc, path, template=None, spacing=None):
         spacing (float): kpoint_mp_spacing to use when calculating grid.
 
     """
+    warnings.warn("This method is no longer maintained and may be removed at any time.", DeprecationWarning)
     if path.endswith('.in'):
         path = path.replace('.in', '')
 
     if os.path.isfile(path + '.in'):
-        print('File already exists, not overwriting...')
         return
 
     if 'lattice_cart' not in doc:
@@ -640,8 +617,6 @@ def doc2pwscf(doc, path, template=None, spacing=None):
         if 'kpoints_mp_spacing' in doc:
             spacing = doc['kpoints_mp_spacing']
         doc['kpoints_mp_grid'] = calc_mp_grid(doc['lattice_cart'], spacing)
-
-    print(doc['kpoints_mp_grid'])
 
     file_string = ''
     file_string += 'CELL_PARAMETERS angstrom\n'
@@ -818,6 +793,7 @@ def doc2xsf(doc, path, write_energy=False, write_forces=False, overwrite=False):
         overwrite (bool): overwrite if file exists.
 
     """
+    warnings.warn("This method is no longer maintained and may be removed at any time.", DeprecationWarning)
     if path.endswith('.xsf'):
         path = path.replace('.xsf', '')
 
@@ -851,7 +827,6 @@ def doc2xsf(doc, path, write_energy=False, write_forces=False, overwrite=False):
         if overwrite:
             os.remove(path + '.xsf')
         else:
-            print('File name already exists! Skipping!')
             raise RuntimeError('Duplicate file!')
 
     with open(path + '.xsf', 'w') as f:
@@ -876,6 +851,7 @@ def doc2arbitrary(doc, path, overwrite=False, hash_dupe=False):
         list: list of strs to write to file.
 
     """
+    warnings.warn("This method is no longer maintained and may be removed at any time.", DeprecationWarning)
     ext = None
     flines = []
     output_doc = {}

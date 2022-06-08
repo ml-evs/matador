@@ -275,25 +275,29 @@ class SymmetriesAndSupercellsTest(unittest.TestCase):
             standardize = bool(_iter % 2)
             symmetric = bool(_iter % 2)
 
-            supercell = create_simple_supercell(
+            supercell_dict = create_simple_supercell(
                 test_doc, tuple(extension), standardize=standardize, symmetric=symmetric
             )
-            self.assertEqual(supercell["num_atoms"], num_images * test_doc["num_atoms"])
-            self.assertAlmostEqual(
-                supercell["cell_volume"], num_images * test_doc["cell_volume"], places=3
+            supercell_crystal = create_simple_supercell(
+                Crystal(test_doc), tuple(extension), standardize=standardize, symmetric=symmetric
             )
-            self.assertEqual(
-                len(supercell["positions_frac"]),
-                num_images * len(test_doc["positions_frac"]),
-            )
-            for i in range(3):
-                if not standardize:
-                    np.testing.assert_array_equal(
-                        np.asarray(supercell["lattice_cart"][i]),
-                        extension[i] * np.asarray(test_doc["lattice_cart"][i]),
-                    )
-            self.assertLess(pdf_sim_dist(test_doc, supercell), 1e-3)
-            _iter += 1
+            for supercell in [supercell_crystal, supercell_dict]:
+                self.assertEqual(supercell["num_atoms"], num_images * test_doc["num_atoms"])
+                self.assertAlmostEqual(
+                    supercell["cell_volume"], num_images * test_doc["cell_volume"], places=3
+                )
+                self.assertEqual(
+                    len(supercell["positions_frac"]),
+                    num_images * len(test_doc["positions_frac"]),
+                )
+                for i in range(3):
+                    if not standardize:
+                        np.testing.assert_array_equal(
+                            np.asarray(supercell["lattice_cart"][i]),
+                            extension[i] * np.asarray(test_doc["lattice_cart"][i]),
+                        )
+                self.assertLess(pdf_sim_dist(test_doc, supercell), 1e-3)
+                _iter += 1
 
         # test error for 1x1x1
         with self.assertRaises(RuntimeError):

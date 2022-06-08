@@ -158,9 +158,10 @@ class CrystalTest(unittest.TestCase):
         self.assertEqual(doc.concentration, [0.5, 0.5])
         self.assertEqual(doc.positions_abs, [[0, 0, 0], [1.5, 1.5, 1.5]])
         self.assertEqual(doc.positions_frac, [[0, 0, 0], [0.5, 0.5, 0.5]])
-        self.assertEqual(doc.formula, "ClNa")
+        self.assertEqual(doc.formula, "NaCl")
         self.assertEqual(doc.cell_volume, 27.0)
         self.assertEqual(doc.space_group, "Pm-3m")
+        self.assertEqual(doc.space_group_tex, "$Pm\\bar{3}m$")
 
         doc = Crystal(
             dict(
@@ -179,7 +180,7 @@ class CrystalTest(unittest.TestCase):
         self.assertEqual(doc.concentration, [0.5, 0.5])
         self.assertEqual(doc.positions_abs, [[0.0, 0.0, 0.0], [1.5, 1.5, 1.5]])
         self.assertEqual(doc.positions_frac, [[0, 0, 0], [0.5, 0.5, 0.5]])
-        self.assertEqual(doc.formula, "ClNa")
+        self.assertEqual(doc.formula, "NaCl")
         self.assertEqual(doc.cell_volume, 27.0)
         self.assertEqual(doc.space_group, "Pm-3m")
 

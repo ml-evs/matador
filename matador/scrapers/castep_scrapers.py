@@ -7,6 +7,7 @@ inputs and outputs.
 """
 
 
+from time import strptime
 from collections import defaultdict
 import os
 import glob
@@ -595,7 +596,7 @@ def param2dict(fname, db=True, **kwargs):
 
 
 @scraper_function
-def castep2dict(fname, db=True, intermediates=False, **kwargs):
+def castep2dict(fname, db=True, intermediates=False, timings=False, **kwargs):
     """ From seed filename, create dict of the most relevant
     information about a calculation.
 
@@ -606,6 +607,8 @@ def castep2dict(fname, db=True, intermediates=False, **kwargs):
         db (bool): whether to error on missing relaxation info
         intermediates (bool): instead of a single dict containing the relaxed structure
             return a list of snapshots found in .castep file
+        timings (bool): Run through the CASTEP file one extra time to calculate total time
+            taken.
 
     Returns:
         (tuple): containing either dict/str containing data or error, and a bool stating
@@ -648,14 +651,15 @@ def castep2dict(fname, db=True, intermediates=False, **kwargs):
 
     # only scrape snapshots/number of intermediates if requested
     try:
-        snapshots, castep['geom_iter'] = _castep_scrape_all_snapshots(flines)
+        snapshots, castep['geom_iter'] = _castep_scrape_all_snapshots(flines, intermediates=intermediates)
         if intermediates:
             castep['intermediates'] = snapshots
     except RuntimeError as exc:
         if intermediates:
             raise RuntimeError('Failed to scrape intermediates: {}'.format(exc))
 
-    _castep_scrape_metadata(flines, castep)
+    if timings:
+        _castep_scrape_metadata(flines, castep)
 
     # once more forwards, from the final step, to get the final structure
     _castep_scrape_final_structure(flines, castep, db=db)
@@ -1213,8 +1217,9 @@ def _castep_scrape_atoms(flines, castep):
 
 
 def _castep_scrape_final_parameters(flines, castep):
-    """ Scrape the DFT parameters from a CASTEP file, using those listed
-    last in the file (i.e. those used to make the final structure).
+    """ Scrape the DFT parameters and metadata from a CASTEP file,
+    using those listed last in the file
+    (i.e. those used to make the final structure).
 
     Parameters:
         flines (list): list of lines in the file
@@ -1228,7 +1233,29 @@ def _castep_scrape_final_parameters(flines, castep):
     pspot_report_dict = dict()
     for line_no, line in enumerate(reversed(flines)):
         line_no = len(flines) - 1 - line_no
-        if 'task' not in castep and 'type of calculation' in line:
+        if 'castep_version' not in castep and 'Release CASTEP version' in line:
+            # version is first thing printed in file, so break once this is read
+            castep['castep_version'] = line.replace('|', '').split()[-1]
+            break
+        elif 'date' not in castep and 'Run started:' in line:
+            try:
+                year = line.split()[5]
+                month = str(strptime(line.split()[4], '%b').tm_mon)
+                day = line.split()[3]
+                castep['date'] = day + '-' + month + '-' + year
+            except (IndexError, ValueError):
+                castep['date'] = 'unknown'
+        elif '_compiler_architecture' not in castep and 'compiled for' in line.lower():
+            try:
+                castep['_compiler_architecture'] = line.split()[2]
+            except IndexError:
+                castep['_compiler_architecture'] = 'unknown'
+        elif '_castep_commit' not in castep and ' from code version' in line.lower():
+            try:
+                castep['_castep_commit'] = ' '.join(flines[line_no:line_no+2]).split()[3]
+            except (IndexError, ValueError):
+                castep['_castep_commit'] = 'unknown'
+        elif 'task' not in castep and 'type of calculation' in line:
             castep['task'] = line.split(':')[-1].strip().replace(" ", "")
         elif 'xc_functional' not in castep and 'functional' in line:
             # convert from .castep file xc_functional to param style
@@ -1354,11 +1381,33 @@ def _castep_scrape_final_parameters(flines, castep):
                             castep['species_pot'][elem] += '_OTF.usp'
                         pspot_report_dict[elem] = False
                 i += 1
+        elif 'peak_mem_MB' not in castep and 'Peak Memory Use' in line:
+            try:
+                castep['peak_mem_MB'] = int(f90_float_parse(line.split()[-2]) / 1024)
+            except (IndexError, ValueError):
+                castep['peak_mem_MB'] = -1
+        elif 'estimated_mem_per_process_MB' not in castep and 'total storage required per process' in line:
+            try:
+                castep['estimated_mem_per_process_MB'] = f90_float_parse(line.split()[-5])
+            except (IndexError, ValueError):
+                castep['estimated_mem_per_process_MB'] = 0
+        elif 'num_mpi_processes' not in castep and 'Calculation parallelised over' in line:
+            try:
+                castep['num_mpi_processes'] = int(f90_float_parse(line.split()[3]))
+            except Exception:
+                castep['num_mpi_processes'] = 1
+        elif 'num_mpi_processes' not in castep and 'Calculation not parall' in line:
+            castep['num_mpi_processes'] = 1
+        elif '_xc_beef' not in castep and 'BEEF completed' in line:
+            castep['_xc_beef'] = True
+
     # write zero pressure if not found in file
     if 'external_pressure' not in castep:
         castep['external_pressure'] = [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
     if 'spin_polarized' not in castep:
         castep['spin_polarized'] = False
+    if 'num_mpi_processes' in castep and 'estimated_mem_per_process_MB' in castep:
+        castep['estimated_mem_MB'] = castep['estimated_mem_per_process_MB'] * castep['num_mpi_processes']
 
 
 def _castep_scrape_final_structure(flines, castep, db=True):
@@ -1433,6 +1482,19 @@ def _castep_scrape_final_structure(flines, castep, db=True):
         elif '0K energy' in line:
             castep['0K_energy'] = f90_float_parse(line.split('=')[1].split()[0])
             castep['0K_energy_per_atom'] = castep['0K_energy'] / castep['num_atoms']
+        elif '(SEDC) Total Energy Correction' in line:
+            castep['dispersion_correction_energy'] = f90_float_parse(line.split(':')[1].split()[0])
+        elif 'Dispersion corrected final energy' in line:
+            castep['dispersion_corrected_energy'] = f90_float_parse(line.split('=')[1].split()[0])
+            castep['dispersion_corrected_energy_per_atom'] = castep['dispersion_corrected_energy'] / castep['num_atoms']
+        elif 'Dispersion corrected final free energy' in line:
+            castep['dispersion_corrected_free_energy'] = f90_float_parse(line.split('=')[1].split()[0])
+            castep['dispersion_corrected_free_energy_per_atom'] = (
+                castep['dispersion_corrected_free_energy'] / castep['num_atoms']
+            )
+        elif 'Dispersion corrected est. 0K energy' in line:
+            castep['dispersion_corrected_0K_energy'] = f90_float_parse(line.split('=')[1].split()[0])
+            castep['dispersion_corrected_0K_energy_per_atom'] = castep['dispersion_corrected_0K_energy'] / castep['num_atoms']
         elif ' Forces **' in line:
             castep['forces'] = []
             i = 1
@@ -1521,7 +1583,7 @@ def _castep_scrape_final_structure(flines, castep, db=True):
 
 
 def _castep_scrape_metadata(flines, castep):
-    """ Scrape metadata from CASTEP file.
+    """ Scrape addtitional timing metadata from CASTEP file.
 
     Parameters:
         flines (list): list of lines contained in file
@@ -1531,7 +1593,6 @@ def _castep_scrape_metadata(flines, castep):
         dict: dictionary updated with scraped data
 
     """
-    from time import strptime
     # computing metadata, i.e. parallelism, time, memory, version
     if 'total_time_secs' not in castep:
         castep['total_time_secs'] = 0
@@ -1539,27 +1600,7 @@ def _castep_scrape_metadata(flines, castep):
         castep['total_time_hrs'] = 0
 
     for ind, line in enumerate(flines):
-        if 'Release CASTEP version' in line:
-            castep['castep_version'] = line.replace('|', '').split()[-1]
-        if 'Run started:' in line:
-            try:
-                year = line.split()[5]
-                month = str(strptime(line.split()[4], '%b').tm_mon)
-                day = line.split()[3]
-                castep['date'] = day + '-' + month + '-' + year
-            except (IndexError, ValueError):
-                castep['date'] = 'unknown'
-        elif 'compiled for' in line.lower():
-            try:
-                castep['_compiler_architecture'] = line.split()[2]
-            except IndexError:
-                castep['_compiler_architecture'] = 'unknown'
-        elif 'from code version' in line.lower():
-            try:
-                castep['_castep_commit'] = ' '.join(flines[ind:ind+2]).split()[3]
-            except (IndexError, ValueError):
-                castep['_castep_commit'] = 'unknown'
-        elif 'Total time' in line and 'matrix elements' not in line:
+        if 'Total time' in line and 'matrix elements' not in line:
             try:
                 time = f90_float_parse(line.split()[-2])
                 castep['total_time_secs'] += time
@@ -1568,26 +1609,6 @@ def _castep_scrape_metadata(flines, castep):
                 castep['final_calculation_time_secs'] = 0
         elif 'Calculation only took' in line:
             castep['_time_estimated'] = f90_float_parse(line.split()[4])
-        elif 'Peak Memory Use' in line:
-            try:
-                castep['peak_mem_MB'] = int(f90_float_parse(line.split()[-2]) / 1024)
-            except (IndexError, ValueError):
-                castep['peak_mem_MB'] = -1
-        elif 'total storage required per process' in line:
-            try:
-                castep['estimated_mem_per_process_MB'] = f90_float_parse(line.split()[-5])
-            except (IndexError, ValueError):
-                castep['estimated_mem_per_process_MB'] = 0
-        elif 'Calculation parallelised over' in line:
-            try:
-                castep['num_mpi_processes'] = int(f90_float_parse(line.split()[3]))
-            except Exception:
-                castep['num_mpi_processes'] = 1
-        elif 'Calculation not parall' in line:
-            castep['num_mpi_processes'] = 1
-
-        if 'num_mpi_processes' in castep and 'estimated_mem_per_process_MB' in castep:
-            castep['estimated_mem_MB'] = castep['estimated_mem_per_process_MB'] * castep['num_mpi_processes']
 
 
 def _castep_find_final_structure(flines):
@@ -1629,151 +1650,171 @@ def _castep_find_final_structure(flines):
     return finish_line, optimised
 
 
-def _castep_scrape_all_snapshots(flines):
+def _castep_finalize_snapshot(snapshot: dict, intermediates: list) -> None:
+    """Add per-atom keys to snapshot and append it to the intermediates list.
+
+    Parameters:
+        snapshot: The document containing the current snapshot.
+        intermediates: The list of snapshots so far.
+
+    """
+    # if positions frac or lattice didn't change (and thus weren't printed, use the last value)
+    if 'positions_frac' not in snapshot:
+        snapshot['positions_frac'] = intermediates[-1]['positions_frac']
+        snapshot['atom_types'] = intermediates[-1]['atom_types']
+        snapshot['num_atoms'] = len(snapshot['positions_frac'])
+    if 'lattice_cart' not in snapshot:
+        snapshot['lattice_cart'] = intermediates[-1]['lattice_cart']
+        snapshot['lattice_abc'] = intermediates[-1]['lattice_abc']
+
+    snapshot['smeared_free_energy_per_atom'] = snapshot['smeared_free_energy'] / snapshot['num_atoms']
+    snapshot['0K_energy_per_atom'] = snapshot['0K_energy'] / snapshot['num_atoms']
+    snapshot['total_energy_per_atom'] = snapshot['total_energy'] / snapshot['num_atoms']
+    # handle single atom forces edge-case
+    if snapshot['num_atoms'] == 1:
+        snapshot['forces'] = [[0, 0, 0]]
+
+    intermediates.append(snapshot)
+
+
+def _castep_scrape_all_snapshots(flines, intermediates=False):
     """ Scrape all intermediate structures from a CASTEP file, both
     geometry optimisation snapshots, and repeated SCF calculations.
 
     Parameters:
         flines (list): list of lines of file.
+        intermediates (bool): whether to save the snapshots or just
+            count them.
 
     Returns:
         :obj:`list` of :obj:`dict`: list of dictionaries containing
-            intermediate snapshots.
+            intermediate snapshots (will be empty if `intermediates`
+            is false).
         int: number of completed geometry optimisation steps.
 
     """
-    intermediates = []
+    intermediates_list = []
     num_opt_steps = 0
     snapshot = dict()
-    for line_no, line in enumerate(flines):
-        try:
-            # use the "Real Lattice" line as the start of a new snapshot / end of old one
-            if 'Real Lattice' in line:
-                # add the last snapshot only if it isn't a repeat
-                if 'total_energy' in snapshot:
-                    # if positions frac didn't change (and thus weren't printed, use the last value)
-                    if 'positions_frac' not in snapshot:
-                        snapshot['positions_frac'] = intermediates[-1]['positions_frac']
-                        snapshot['atom_types'] = intermediates[-1]['atom_types']
-                        snapshot['num_atoms'] = len(snapshot['positions_frac'])
-                    snapshot['smeared_free_energy_per_atom'] = snapshot['smeared_free_energy'] / snapshot['num_atoms']
-                    snapshot['total_energy_per_atom'] = snapshot['total_energy'] / snapshot['num_atoms']
-                    snapshot['0K_energy_per_atom'] = snapshot['0K_energy'] / snapshot['num_atoms']
-                    # handle single atom forces edge-case
-                    if snapshot['num_atoms'] == 1:
-                        snapshot['forces'] = [[0, 0, 0]]
-                    if not intermediates:
-                        intermediates.append(snapshot)
-                    elif (snapshot['lattice_cart'] != intermediates[-1]['lattice_cart'] and
-                          snapshot['total_energy'] != intermediates[-1]['total_energy']):
-                        intermediates.append(snapshot)
+    if intermediates:
+        for line_no, line in enumerate(flines):
+            try:
+                if 'Cell Contents' in line or 'Unit Cell' in line:
+                    if "total_energy" in snapshot:
+                        _castep_finalize_snapshot(snapshot, intermediates_list)
+                        snapshot = dict()
 
-                snapshot = dict()
-                snapshot['lattice_cart'] = []
-                i = 1
-                while True:
-                    if not flines[line_no + i].strip():
-                        break
-                    else:
-                        temp_line = flines[line_no + i].split()[0:3]
-                        snapshot['lattice_cart'].append(list(map(f90_float_parse, temp_line)))
-                    i += 1
+                if 'Cell Contents' in line:
+                    snapshot['positions_frac'] = []
+                    snapshot['atom_types'] = []
+                    i = 1
+                    atoms = False
+                    while True:
+                        if atoms:
+                            if 'xxxxxxxxx' in flines[line_no + i]:
+                                atoms = False
+                                break
+                            else:
+                                temp_frac = flines[line_no + i].split()[3:6]
+                                snapshot['positions_frac'].append(list(map(f90_float_parse, temp_frac)))
+                                snapshot['atom_types'].append(flines[line_no + i].split()[1])
+                        if 'x------' in flines[line_no + i]:
+                            atoms = True
+                        i += 1
+                    for ind, pos in enumerate(snapshot['positions_frac']):
+                        for k in range(3):
+                            if pos[k] > 1 or pos[k] < 0:
+                                snapshot['positions_frac'][ind][k] %= 1
 
-            elif 'Lattice parameters' in line:
-                snapshot['lattice_abc'] = []
-                i = 1
-                snapshot['lattice_abc'].append(
-                    list(map(f90_float_parse,
-                             [flines[line_no+i].split('=')[1].strip().split(' ')[0],
-                              flines[line_no+i+1].split('=')[1].strip().split(' ')[0],
-                              flines[line_no+i+2].split('=')[1].strip().split(' ')[0]])))
-                snapshot['lattice_abc'].append(
-                    list(map(f90_float_parse,
-                             [flines[line_no+i].split('=')[-1].strip(),
-                              flines[line_no+i+1].split('=')[-1].strip(),
-                              flines[line_no+i+2].split('=')[-1].strip()])))
+                    snapshot['num_atoms'] = len(snapshot['positions_frac'])
+                    snapshot['stoichiometry'] = get_stoich(snapshot['atom_types'])
 
-            elif 'Current cell volume' in line:
-                snapshot['cell_volume'] = f90_float_parse(line.split('=')[1].split()[0].strip())
-            elif 'Cell Contents' in line:
-                snapshot['positions_frac'] = []
-                snapshot['atom_types'] = []
-                i = 1
-                atoms = False
-                while True:
-                    if atoms:
-                        if 'xxxxxxxxx' in flines[line_no + i]:
-                            atoms = False
+                elif 'Real Lattice' in line:
+                    snapshot['lattice_cart'] = []
+                    i = 1
+                    while True:
+                        if not flines[line_no + i].strip():
                             break
                         else:
-                            temp_frac = flines[line_no + i].split()[3:6]
-                            snapshot['positions_frac'].append(list(map(f90_float_parse, temp_frac)))
-                            snapshot['atom_types'].append(flines[line_no + i].split()[1])
-                    if 'x------' in flines[line_no + i]:
-                        atoms = True
-                    i += 1
-                for ind, pos in enumerate(snapshot['positions_frac']):
-                    for k in range(3):
-                        if pos[k] > 1 or pos[k] < 0:
-                            snapshot['positions_frac'][ind][k] %= 1
+                            temp_line = flines[line_no + i].split()[0:3]
+                            snapshot['lattice_cart'].append(list(map(f90_float_parse, temp_line)))
+                        i += 1
 
-                snapshot['num_atoms'] = len(snapshot['positions_frac'])
-                snapshot['stoichiometry'] = get_stoich(snapshot['atom_types'])
+                elif 'Lattice parameters' in line:
+                    snapshot['lattice_abc'] = []
+                    i = 1
+                    snapshot['lattice_abc'].append(
+                        list(map(f90_float_parse,
+                                 [flines[line_no+i].split('=')[1].strip().split(' ')[0],
+                                  flines[line_no+i+1].split('=')[1].strip().split(' ')[0],
+                                  flines[line_no+i+2].split('=')[1].strip().split(' ')[0]])))
+                    snapshot['lattice_abc'].append(
+                        list(map(f90_float_parse,
+                                 [flines[line_no+i].split('=')[-1].strip(),
+                                  flines[line_no+i+1].split('=')[-1].strip(),
+                                  flines[line_no+i+2].split('=')[-1].strip()])))
 
-            # don't check if final_energy exists, as this will update for each GO step
-            elif 'Final energy, E' in line or 'Final energy =' in line:
-                snapshot['total_energy'] = f90_float_parse(line.split('=')[1].split()[0])
-            elif 'Final free energy' in line:
-                snapshot['smeared_free_energy'] = f90_float_parse(line.split('=')[1].split()[0])
-            elif '0K energy' in line:
-                snapshot['0K_energy'] = f90_float_parse(line.split('=')[1].split()[0])
-            elif ' Forces **' in line:
-                snapshot['forces'] = []
-                i = 1
-                max_force = 0
-                forces = False
-                while True:
-                    if forces:
-                        if '*' in flines[line_no + i].split()[1]:
-                            forces = False
-                            break
-                        else:
-                            force_on_atom = 0
-                            snapshot['forces'].append([])
+                elif 'Current cell volume' in line:
+                    snapshot['cell_volume'] = f90_float_parse(line.split('=')[1].split()[0].strip())
+                elif 'Final energy, E' in line or 'Final energy =' in line:
+                    snapshot['total_energy'] = f90_float_parse(line.split('=')[1].split()[0])
+                elif 'Final free energy' in line:
+                    snapshot['smeared_free_energy'] = f90_float_parse(line.split('=')[1].split()[0])
+                elif '0K energy' in line:
+                    snapshot['0K_energy'] = f90_float_parse(line.split('=')[1].split()[0])
+                elif ' Forces **' in line:
+                    snapshot['forces'] = []
+                    i = 1
+                    max_force = 0
+                    forces = False
+                    while True:
+                        if forces:
+                            if '*' in flines[line_no + i].split()[1]:
+                                forces = False
+                                break
+                            else:
+                                force_on_atom = 0
+                                snapshot['forces'].append([])
+                                for j in range(3):
+                                    temp = flines[line_no + i].replace('(cons\'d)', '')
+                                    force_on_atom += f90_float_parse(temp.split()[3 + j])**2
+                                    snapshot['forces'][-1].append(f90_float_parse(temp.split()[3 + j]))
+                                if force_on_atom > max_force:
+                                    max_force = force_on_atom
+                        elif 'x' in flines[line_no + i]:
+                            i += 1  # skip next blank line
+                            forces = True
+                        i += 1
+                    snapshot['max_force_on_atom'] = pow(max_force, 0.5)
+                elif 'Stress Tensor' in line:
+                    i = 1
+                    while i < 20:
+                        if 'Cartesian components' in flines[line_no + i]:
+                            snapshot['stress'] = []
                             for j in range(3):
-                                temp = flines[line_no + i].replace('(cons\'d)', '')
-                                force_on_atom += f90_float_parse(temp.split()[3 + j])**2
-                                snapshot['forces'][-1].append(f90_float_parse(temp.split()[3 + j]))
-                            if force_on_atom > max_force:
-                                max_force = force_on_atom
-                    elif 'x' in flines[line_no + i]:
-                        i += 1  # skip next blank line
-                        forces = True
-                    i += 1
-                snapshot['max_force_on_atom'] = pow(max_force, 0.5)
-            elif 'Stress Tensor' in line:
-                i = 1
-                while i < 20:
-                    if 'Cartesian components' in flines[line_no + i]:
-                        snapshot['stress'] = []
-                        for j in range(3):
-                            snapshot['stress'].append(list(map(f90_float_parse, (flines[line_no + i + j + 4].split()[2:5]))))
-                    elif 'Pressure' in flines[line_no + i]:
-                        snapshot['pressure'] = f90_float_parse(flines[line_no + i].split()[-2])
-                        break
-                    i += 1
-
+                                snapshot['stress'].append(
+                                    list(map(f90_float_parse, (flines[line_no + i + j + 4].split()[2:5])))
+                                )
+                        elif 'Pressure' in flines[line_no + i]:
+                            snapshot['pressure'] = f90_float_parse(flines[line_no + i].split()[-2])
+                            break
+                        i += 1
+                # use only finished iterations for counting number of complete GO steps
+                elif ': finished iteration' in line and 'with enthalpy' in line:
+                    # don't include the "zeroth" step before anything has been moved
+                    if '0' not in line.split():
+                        num_opt_steps += 1
+            except Exception as exc:
+                raise RuntimeError from exc
+    else:
+        for line_no, line in enumerate(flines):
             # use only finished iterations for counting number of complete GO steps
-            elif ': finished iteration' in line and 'with enthalpy' in line:
+            if ': finished iteration' in line and 'with enthalpy' in line:
                 # don't include the "zeroth" step before anything has been moved
                 if '0' not in line.split():
                     num_opt_steps += 1
 
-        except Exception as exc:
-            msg = 'Error on line {}, contents: {}, error: {}"'.format(line_no, line, exc)
-            raise RuntimeError(msg)
-
-    return intermediates, num_opt_steps
+    return intermediates_list, num_opt_steps
 
 
 def _castep_scrape_beef(flines, castep):
@@ -1785,11 +1826,14 @@ def _castep_scrape_beef(flines, castep):
         castep (dict): dictionary to update with BEEF output.
 
     """
-    from matador.utils.chem_utils import HARTREE_TO_EV
-    for line_no, line in enumerate(flines):
-        if 'Bayesian Error Estimate (BEE)' in line.strip():
-            beef_start = line_no
-            break
+    if castep.get("_xc_beef"):
+        from matador.utils.chem_utils import HARTREE_TO_EV
+        for line_no, line in enumerate(flines):
+            if 'Bayesian Error Estimate (BEE)' in line.strip():
+                beef_start = line_no
+                break
+        else:
+            return
     else:
         return
 

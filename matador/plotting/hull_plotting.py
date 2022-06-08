@@ -7,6 +7,7 @@ diagrams generally.
 """
 
 
+from collections import defaultdict
 import numpy as np
 from matador.utils.chem_utils import get_stoich_from_formula, get_formula_from_stoich
 from matador.plotting.plotting import plotting_function, get_linear_cmap, SAVE_EXTS
@@ -32,7 +33,6 @@ def _get_hull_labels(hull, label_cutoff=None, num_species=None, exclude_edges=Tr
         label_cursor (list(dict)): list of matador documents to label.
 
     """
-    eps = 1e-9
     if label_cutoff is None:
         label_cutoff = 0.0
     if isinstance(label_cutoff, list) and len(label_cutoff) == 2:
@@ -43,7 +43,7 @@ def _get_hull_labels(hull, label_cutoff=None, num_species=None, exclude_edges=Tr
         if isinstance(label_cutoff, list):
             assert len(label_cutoff) == 1, 'Incorrect number of label_cutoff values passed, should be 1 or 2.'
             label_cutoff = label_cutoff[0]
-        label_cursor = [doc for doc in hull.cursor if doc['hull_distance'] <= label_cutoff + eps]
+        label_cursor = [doc for doc in hull.cursor if doc['hull_distance'] <= label_cutoff + EPS]
 
     num_labels = len({get_formula_from_stoich(doc['stoichiometry']) for doc in label_cursor})
     if num_labels < len(label_cursor):
@@ -61,7 +61,7 @@ def _get_hull_labels(hull, label_cutoff=None, num_species=None, exclude_edges=Tr
         label_cursor = [doc for doc in label_cursor if len(doc['stoichiometry']) == num_species]
     if exclude_edges:
         label_cursor = [doc for doc in label_cursor if (all(doc['concentration']) > 0 and
-                                                        sum(doc['concentration']) <= 1 - 1e-6)]
+                                                        sum(doc['concentration']) <= 1 - EPS)]
 
     label_cursor = sorted(label_cursor, key=lambda doc: doc['concentration'])
 
@@ -72,7 +72,8 @@ def _get_hull_labels(hull, label_cutoff=None, num_species=None, exclude_edges=Tr
 def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
                  plot_hull_points=True, labels=None, label_cutoff=None, colour_by_source=False,
                  sources=None, hull_label=None, source_labels=None, title=True, plot_fname=None, show_cbar=True,
-                 label_offset=(1.15, 0.05), eform_limits=None, legend_kwargs=None,
+                 label_offset=(1, 0.1), specific_label_offset=None, eform_limits=None, legend_kwargs=None,
+                 hull_dist_unit="meV",
                  **kwargs):
     """ Plot calculated hull, returning ax and fig objects for further editing.
 
@@ -88,6 +89,9 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
             hull.args.
         label_cutoff (float/:obj:`tuple` of :obj:`float`): draw labels less than or
             between these distances form the hull, also read from hull.args.
+        specific_label_offset (dict): A dictionary keyed by chemical formula strings
+            containing 2-length float tuples of label offsets. A value of `None` for
+            a particular formula will exclude that label from the plot.
         colour_by_source (bool): plot and label points by their sources
         alpha (float): alpha value of points when colour_by_source is True
         sources (list): list of possible provenances to colour when colour_by_source
@@ -102,6 +106,11 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
     """
     import matplotlib.pyplot as plt
     import matplotlib.colors as colours
+
+    # cache the specific label offset dict
+    _specific_label_offset = None
+    if specific_label_offset:
+        _specific_label_offset = dict(specific_label_offset)
 
     if ax is None:
         fig = plt.figure()
@@ -149,7 +158,9 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
         for ind, doc in enumerate(label_cursor):
             formula = get_formula_from_stoich(doc['stoichiometry'], sort=True)
             if formula not in already_labelled:
-                arrowprops = dict(arrowstyle="-|>", lw=2, alpha=1, zorder=1, shrinkA=2, shrinkB=4)
+                arrowprops = dict(
+                    arrowstyle="-|>", facecolor="k", edgecolor="k", lw=2, alpha=1, zorder=1, shrinkA=2, shrinkB=4
+                )
                 min_comp = tie_line[np.argmin(tie_line[:, 1]), 0]
                 e_f = label_cursor[ind]['formation_' + str(hull.energy_key)]
                 conc = label_cursor[ind]['concentration'][0]
@@ -159,6 +170,14 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
                     position = (conc, label_offset[0] * (e_f - label_offset[1]))
                 else:
                     position = (min(1.1 * conc + 0.15, 0.95), label_offset[0] * (e_f - label_offset[1]))
+                    position = (min(1.05 * conc + 0.15, 0.95), label_offset[0] * (e_f - label_offset[1]))
+                if _specific_label_offset:
+                    plain_formula = get_formula_from_stoich(doc['stoichiometry'], tex=False)
+                    if plain_formula in _specific_label_offset:
+                        offset = _specific_label_offset.pop(plain_formula)
+                        if offset is None:
+                            continue
+                        position = (position[0] + offset[0], position[1] + offset[1])
                 ax.annotate(get_formula_from_stoich(doc['stoichiometry'],
                                                     latex_sub_style=r'\mathregular',
                                                     tex=True,
@@ -173,6 +192,10 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
                             zorder=1)
                 already_labelled.append(formula)
 
+    if _specific_label_offset:
+        import warnings
+        warnings.warn(f"Found unused requested offsets: {_specific_label_offset}")
+
     # points for off hull structures; we either colour by source or by energy
     if plot_points and not colour_by_source:
 
@@ -184,18 +207,21 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
                                      hull.structures[np.argsort(hull.hull_dist), -1][::-1],
                                      s=scale*40,
                                      c=np.sort(hull.hull_dist)[::-1],
-                                     zorder=10000,
-                                     cmap=cmap, norm=colours.LogNorm(0.02, 2))
+                                     zorder=100,
+                                     cmap=cmap, norm=colours.LogNorm(0.01, 1, clip=True),
+                                     rasterized=True)
 
                 if show_cbar:
-                    cbar = plt.colorbar(scatter, aspect=30, pad=0.02,
-                                        ticks=[0, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28])
-                    cbar.ax.tick_params(length=0)
-                    cbar.ax.set_yticklabels([0, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28])
-                    cbar.ax.yaxis.set_ticks_position('right')
-                    cbar.ax.set_frame_on(False)
-                    cbar.outline.set_visible(False)
-                    cbar.set_label('Distance from hull (eV/atom)')
+                    ticks = [0.01, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64]
+                    cbar = plt.colorbar(scatter, aspect=30, pad=0.02, ticks=ticks, extend="both")
+                    if hull_dist_unit.lower() == "mev":
+                        ticks = [int(1000 * t) for t in ticks]
+                    cbar.ax.set_yticklabels(ticks)
+                    cbar.ax.tick_params(which="minor", length=0)
+                    unit = "eV/atom"
+                    if hull_dist_unit.lower() == "mev":
+                        unit = "m" + unit
+                    cbar.set_label(f'Distance from hull ({unit})')
 
         elif hull.hull_cutoff != 0:
             # if specified hull cutoff colour those below
@@ -211,7 +237,7 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
                 ax.scatter(hull.structures[1:-1, 0], hull.structures[1:-1, 1],
                            s=scale*30, lw=0,
                            alpha=0.3, c=hull.colours[-2],
-                           edgecolor='k', zorder=10)
+                           edgecolor='k', zorder=10, rasterized=True)
 
     elif colour_by_source:
         _scatter_plot_by_source(
@@ -221,8 +247,8 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
 
     if eform_limits is None:
         eform_limits = (np.min(hull.structures[:, 1]), np.max(hull.structures[:, 1]))
-        lims = (-0.1 if eform_limits[0] >= 0 else 1.4*eform_limits[0],
-                eform_limits[1] if eform_limits[0] >= 0 else 0.1)
+        lims = (-0.1 if eform_limits[0] >= 0 else 1.25*eform_limits[0],
+                eform_limits[1] if eform_limits[0] >= 0 else 0.05)
     else:
         lims = sorted(eform_limits)
     ax.set_ylim(lims)
@@ -235,16 +261,12 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
     elif isinstance(title, str) and title != '':
         ax.set_title(title)
 
-    plt.locator_params(nbins=3)
     if hull._non_elemental:
         ax.set_xlabel(r'x in ({d[0]})$_\mathrm{{x}}$({d[1]})$_\mathrm{{1-x}}$'.format(d=chempot_labels))
     else:
         ax.set_xlabel(r'x in {d[0]}$_\mathrm{{x}}${d[1]}$_\mathrm{{1-x}}$'.format(d=chempot_labels))
 
-    ax.grid(False)
     ax.set_xlim(-0.05, 1.05)
-    ax.set_xticks([0, 0.25, 0.5, 0.75, 1])
-    ax.set_xticklabels(ax.get_xticks())
     ax.set_ylabel('Formation energy (eV/atom)')
 
     if hull.savefig or any([kwargs.get(ext) for ext in SAVE_EXTS]):
@@ -723,7 +745,7 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
             formula = get_formula_from_stoich(
                 doc['stoichiometry'], sort=False, tex=True, latex_sub_style=r'\mathregular', elements=hull.species
             )
-            arrowprops = dict(arrowstyle="-|>", color='k', lw=2, alpha=0.5, zorder=1, shrinkA=2, shrinkB=4)
+            arrowprops = dict(arrowstyle="-|>", facecolor="k", color='k', lw=2, alpha=0.5, zorder=1, shrinkA=2, shrinkB=4)
             cart = barycentric2cart([doc['concentration'] + [0]])[0][:2]
             min_dist = 1e20
             closest_label = 0
@@ -768,55 +790,87 @@ def _scatter_plot_by_source(hull, ax, scale, kwargs,
     from matador.utils.cursor_utils import get_guess_doc_provenance
     if sources is None:
         sources = ['AIRSS', 'GA', 'OQMD', 'SWAPS', 'ICSD', 'DOI', 'SM', 'MP', 'PF', 'Other']
+
     if source_labels is None:
         source_labels = sources
     else:
         assert len(source_labels) == len(sources)
 
+    if "Other" not in sources:
+        sources.append("Other")
+        source_labels.append("Other")
+
     # hack: double length of hull colours
     hull.colours.extend(hull.colours)
 
     colour_choices = {source: hull.colours[ind + 1] for ind, source in enumerate(sources)}
-    colours = []
-    concs = []
-    energies = []
-    zorders = []
+    points_by_source = {source: defaultdict(list) for source in sources}
+    hull_points_by_source = {source: defaultdict(list) for source in sources}
+    sources_present = set()
     for doc in hull.cursor:
         source = get_guess_doc_provenance(doc['source'])
         if source not in sources:
             # use grey for undesired sources
-            colours.append(hull.colours[-2])
             source = 'Other'
-            if 'Other' not in sources:
-                sources.append('Other')
-                source_labels.append('Other')
-                colour_choices['Other'] = hull.colours[-2]
+        if doc["hull_distance"] <= 0 + 2e-3 and not plot_hull_points:
+            hull_points_by_source[source]["concs"].append(doc['concentration'])
+            hull_points_by_source[source]["energies"].append(doc['formation_{}'.format(hull.energy_key)])
         else:
-            colours.append(source)
-        zorders.append(sources.index(source))
-        concs.append(doc['concentration'])
-        energies.append(doc['formation_{}'.format(hull.energy_key)])
+            points_by_source[source]["concs"].append(doc['concentration'])
+            points_by_source[source]["energies"].append(doc['formation_{}'.format(hull.energy_key)])
 
-    sources_present = set(colours)
-    sources_present = [source for source in sources if source in sources_present]
-    colour_choices = {source: hull.colours[ind + 1] for ind, source in enumerate(sources_present)}
-    colours = [colour_choices[src] for src in colours]
+        sources_present.add(source)
+
     alpha = kwargs.get('alpha')
     if alpha is None:
         alpha = 0.2
 
-    for ind, conc in enumerate(concs):
-        if hull.cursor[ind]['hull_distance'] <= 0 + 1e-9 and not plot_hull_points:
-            ax.scatter(conc, energies[ind],
-                       c=colours[ind], alpha=1, s=scale*40, edgecolor='k',
-                       zorder=zorders[ind]+1e5, lw=1.5)
-        else:
-            ax.scatter(conc, energies[ind],
-                       c=colours[ind], alpha=alpha, s=scale*20,
-                       zorder=zorders[ind]+100)
+    legend_sources = {}
 
-    for ind, source in enumerate(sources_present):
-        ax.scatter(1e10, 1e10, c=colour_choices[source], label=source_labels[ind], alpha=alpha, lw=1)
+    for source in sources:
+        if "concs" not in points_by_source[source]:
+            continue
+
+        concs = points_by_source[source]["concs"]
+        energies = points_by_source[source]["energies"]
+        ax.scatter(
+            concs,
+            energies,
+            c=colour_choices[source],
+            alpha=alpha,
+            s=scale*20,
+            lw=0,
+            zorder=100,
+            rasterized=True
+        )
+
+        legend_sources[source] = colour_choices[source]
+
+    hull_point_options = dict(
+        edgecolor="k", alpha=1, s=scale*40, lw=1.5, zorder=1e5
+    )
+
+    if not plot_hull_points:
+        for source in sources:
+            if "concs" not in hull_points_by_source[source]:
+                continue
+
+            concs = hull_points_by_source[source]["concs"]
+            energies = hull_points_by_source[source]["energies"]
+            ax.scatter(
+                concs,
+                energies,
+                facecolor=colour_choices[source],
+                **hull_point_options
+            )
+
+            legend_sources[source] = colour_choices[source]
+
+    for ind, source in enumerate(sources):
+        if source in legend_sources:
+            ax.scatter(
+                1e10, 1e10, facecolor=legend_sources[source], label=source_labels[ind], **hull_point_options
+            )
 
     if legend_kwargs is not None:
         legend = ax.legend(**legend_kwargs)

@@ -22,7 +22,7 @@ Written & maintained by `Matthew Evans <https://ml-evs.science>`_ (2016-).
 Installation
 ------------
 
-In the simplest case (e.g. you already have Python 3.6+ set up), ``pip install matador-db`` is sufficient to get up and running, preferably in a fresh virtual environment.
+In the simplest case (e.g. you already have Python 3.7+ set up), ``pip install matador-db`` is sufficient to get up and running, preferably in a fresh virtual environment.
 
 Upgrading to the latest version should be as simple as ``pip install -U matador-db``.
 

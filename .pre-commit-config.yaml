@@ -1,6 +1,24 @@
+default_language_version:
+  python: python3.9
+
 repos:
-    - repo: https://gitlab.com/PyCQA/flake8
-      rev: master 
-      hooks:
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.0.1
+    hooks:
+      - id: trailing-whitespace
+        exclude: (pydatalab/example_data/)|(.*.snap)
+        args: [--markdown-linebreak-ext=md]
+      - id: check-yaml
+      - id: check-json
+      - id: end-of-file-fixer
+        exclude: pydatalab/example_data/
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: check-symlinks
+      - id: mixed-line-ending
+
+  - repo: https://gitlab.com/pycqa/flake8
+    rev: 3.9.2
+    hooks:
       - id: flake8
-        name: Flake8
