@@ -567,6 +567,24 @@ def get_spacegroup_spg(doc: Union[Dict[str, Any], Crystal], symprec: float = 0.0
     return space_group.split(' ')[0]
 
 
+def get_compatible_spacegroups(doc: Union[Dict[str, Any], Crystal], symprec_range=(-5, 0)) -> Dict[float, str]:
+    """Return the space group of a given crystal for the range of symprecs.
+
+    Parameters:
+        doc: The crystal to analyse.
+        symprec_range: The range of symprecs to test (log space).
+
+    Returns:
+        A mapping from symprec to space group symbol.
+
+    """
+    spgs = {}
+    for symprec in np.logspace(*symprec_range, num=10):
+        spgs[symprec] = get_spacegroup_spg(doc, symprec=symprec)
+
+    return spgs
+
+
 def add_noise(doc: Dict[str, Any], amplitude: float = 0.1) -> Dict[str, Any]:
     """ Add random noise to the positions of structure contained in doc.
     Useful for force convergence tests.
