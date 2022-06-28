@@ -184,6 +184,9 @@ def display_results(cursor,
                                                     tex=latex,
                                                     latex_sub_style=latex_sub_style)
 
+        if not latex:
+            formula_substring = formula_substring.translate(str.maketrans("0123456789", "₀₁₂₃₄₅₆₇₈₉"))
+
         if 'encapsulated' in doc:
             formula_substring += '+CNT'
         if last_formula != formula_substring:
@@ -853,6 +856,8 @@ def _compare_field(bench, other, field):
     summary = {f"abs_{field_label}": benchmark_field - other_field}
     if abs(benchmark_field) > 1e-10:
         summary[f"rel_{field_label}"] = summary[f"abs_{field_label}"] / benchmark_field
+
+    summary[field_label] = other_field
 
     return summary
 
