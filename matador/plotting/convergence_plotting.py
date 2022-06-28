@@ -23,10 +23,11 @@ def plot_cutoff_kpt_grid(
     data,
     figsize=None,
     forces=False,
-    max_energy=50,
+    max_energy=None,
     max_force=None,
     legend=True,
     colour_by="formula",
+    log=False,
     **kwargs
 ):
     """ Create a composite plot of cutoff energy and kpoint convergence.
@@ -68,6 +69,7 @@ def plot_cutoff_kpt_grid(
         ax=ax,
         colour_by=colour_by,
         max_y=max_energy,
+        log=log,
         label_x=e_label if not forces else False,
         label_y=True,
         reference="last",
@@ -88,6 +90,7 @@ def plot_cutoff_kpt_grid(
         ax=ax,
         colour_by=colour_by,
         max_y=max_energy,
+        log=log,
         label_x=k_label if not forces else False,
         label_y=False,
         reference="last",
@@ -101,6 +104,7 @@ def plot_cutoff_kpt_grid(
             ax=axes[1][0],
             max_y=max_force,
             label_x=e_label,
+            log=log,
             label_y=True,
             reference="last",
         )
@@ -109,6 +113,7 @@ def plot_cutoff_kpt_grid(
             field="forces",
             parameter="kpoints_mp_spacing",
             max_y=max_force,
+            log=log,
             ax=axes[1][1],
             label_x=k_label,
             label_y=False,
@@ -224,7 +229,7 @@ def plot_field(
             label = key
 
         # only plot points if there's less than 25 lines
-        if len(data) < 30:
+        if len(data) < 10:
             ax.plot(
                 parameters,
                 values,
