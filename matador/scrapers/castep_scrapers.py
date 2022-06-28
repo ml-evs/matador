@@ -1006,6 +1006,10 @@ def phonon2dict(fname, **kwargs):
     ph['kpoint_weights'] = [qpt[3] for qpt in ph['phonon_kpoint_list']]
     ph['eigenvalues_q'] *= INVERSE_CM_TO_EV
     ph['softest_mode_freq'] = np.min(ph['eigenvalues_q'])
+
+    if ph["softest_mode_freq"] < -1:
+        import warnings
+        warnings.warn(f"File {fname} has negative eigenvalue {ph['softest_mode_freq']}.")
     ph['eigs_q'] = ph['eigenvalues_q']
 
     return ph, True
@@ -1145,6 +1149,10 @@ def _castep_scrape_phonon_frequencies(flines, castep):
     phonons['kpoint_weights'] = phonons['phonon_fine_kpoint_weights']
     phonons['num_kpoints'] = len(phonons['phonon_fine_kpoint_list'])
     phonons['num_qpoints'] = len(phonons['phonon_fine_kpoint_list'])
+    phonons["softest_mode_freq"] = np.min(phonons["eigs_q"])
+    if phonons["softest_mode_freq"] < -1:
+        import warnings
+        warnings.warn(f"File {castep['source'][0]} has negative eigenvalue {phonons['softest_mode_freq']}.")
 
     for key in phonons:
         castep[key] = phonons[key]
