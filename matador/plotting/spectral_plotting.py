@@ -1085,6 +1085,8 @@ def _get_lineprops(
     eigs=None,
 ):
     """ Get the properties of the line to plot. """
+    if seed_ind is None:
+        seed_ind = 0
     colour = options.get("colour_cycle")[seed_ind]
     alpha = 1
     label = None
