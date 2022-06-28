@@ -8,8 +8,10 @@ and some colour definitions scraped from VESTA configs.
 """
 
 from typing import Tuple, Optional, Dict, List, Union, Callable, Set, TYPE_CHECKING
-import numpy as np
 from pathlib import Path
+
+import tqdm
+import numpy as np
 
 from matador.utils.ase_utils import doc2ase
 from matador.crystal import Crystal
@@ -19,7 +21,7 @@ if TYPE_CHECKING:
 
 
 def viz(doc):
-    """ Quick and dirty ase-gui visualisation from matador doc. """
+    """Quick and dirty ase-gui visualisation from matador doc."""
     try:
         from ase.visualize import view
     except ImportError as exc:
@@ -31,24 +33,29 @@ def viz(doc):
 
 
 def get_element_colours():
-    """ Read element colours from VESTA file. The colours file can be
+    """Read element colours from VESTA file. The colours file can be
     specified in the matadorrc. If unspecified, the default
     ../config/vesta_elements.ini will be used.
 
     """
     import os
     from matador.config import load_custom_settings, SETTINGS
-    default_colours_fname = Path(os.path.realpath(__file__)).parent / '../config/vesta_elements.ini'
+
+    default_colours_fname = (
+        Path(os.path.realpath(__file__)).parent / "../config/vesta_elements.ini"
+    )
     # check if element_colours has been given as an absolute path
     if SETTINGS:
-        colours_fname = SETTINGS.get('plotting', {}).get('element_colours')
+        colours_fname = SETTINGS.get("plotting", {}).get("element_colours")
     else:
-        colours_fname = load_custom_settings().get('plotting', {}).get('element_colours')
+        colours_fname = (
+            load_custom_settings().get("plotting", {}).get("element_colours")
+        )
 
     if colours_fname is None or not os.path.isfile(colours_fname):
         colours_fname = default_colours_fname
 
-    with open(colours_fname, 'r') as f:
+    with open(colours_fname, "r") as f:
         flines = f.readlines()
     element_colours = dict()
     for line in flines:
@@ -60,24 +67,29 @@ def get_element_colours():
 
 
 def get_element_radii():
-    """ Read element radii from VESTA config file. The colours file can be
+    """Read element radii from VESTA config file. The colours file can be
     specified in the matadorrc. If unspecified, the default
     ../config/vesta_elements.ini (relative to this file) will be used.
 
     """
     import os
     from matador.config import load_custom_settings, SETTINGS
-    default_colours_fname = Path(os.path.realpath(__file__)).parent / '../config/vesta_elements.ini'
+
+    default_colours_fname = (
+        Path(os.path.realpath(__file__)).parent / "../config/vesta_elements.ini"
+    )
     # check if element_colours has been given as an absolute path
     if SETTINGS:
-        colours_fname = SETTINGS.get('plotting', {}).get('element_colours')
+        colours_fname = SETTINGS.get("plotting", {}).get("element_colours")
     else:
-        colours_fname = load_custom_settings().get('plotting', {}).get('element_colours')
+        colours_fname = (
+            load_custom_settings().get("plotting", {}).get("element_colours")
+        )
 
     if colours_fname is None or not os.path.isfile(colours_fname):
         colours_fname = default_colours_fname
 
-    with open(colours_fname, 'r') as f:
+    with open(colours_fname, "r") as f:
         flines = f.readlines()
     element_radii = dict()
     for line in flines:
@@ -90,7 +102,7 @@ def get_element_radii():
 
 
 def nb_viz(doc, repeat=1, bonds=None):
-    """ Return an ipywidget for nglview visualisation in
+    """Return an ipywidget for nglview visualisation in
     a Jupyter notebook or otherwise.
 
     Parameters:
@@ -112,18 +124,18 @@ def nb_viz(doc, repeat=1, bonds=None):
     view = nglview.show_ase(atoms)
     view.add_unitcell()
     view.remove_ball_and_stick()
-    view.add_spacefill(radius_type='vdw', scale=0.3)
+    view.add_spacefill(radius_type="vdw", scale=0.3)
     if bonds is None:
-        for elements in set(doc['atom_types']):
-            view.add_ball_and_stick(selection='#{}'.format(elements.upper()))
+        for elements in set(doc["atom_types"]):
+            view.add_ball_and_stick(selection="#{}".format(elements.upper()))
     else:
         if not isinstance(bonds, list):
             bonds = [bonds]
         for bond in bonds:
-            view.add_ball_and_stick(selection='#{}'.format(bond.upper()))
-    view.parameters = {'clipDist': 0}
-    view.camera = 'orthographic'
-    view.background = '#FFFFFF'
+            view.add_ball_and_stick(selection="#{}".format(bond.upper()))
+    view.parameters = {"clipDist": 0}
+    view.camera = "orthographic"
+    view.background = "#FFFFFF"
     view.center()
     return view
 
@@ -186,7 +198,8 @@ def fresnel_view(
         _draw_cell(scene, doc, compass=show_compass)
 
     if extension is not None:
-        doc = doc.supercell(extension)
+        if not extension == (1, 1, 1):
+            doc = doc.supercell(extension)
     elif pad_cell:
         doc = doc.supercell(target=pad_cell)
 
@@ -202,10 +215,11 @@ def fresnel_view(
     to_remove = set()
     if show_bonds:
         bond_sets = _draw_bonds(
-            scene, list(zip(species, positions)),
+            scene,
+            list(zip(species, positions)),
             bond_dict=bond_dict,
             nsites=len(doc.positions_abs),
-            bond_images=False
+            bond_images=False,
         )
 
         if images:
@@ -225,7 +239,9 @@ def fresnel_view(
     return scene
 
 
-def _get_sites(doc, images: True, clip: float = 3.5) -> Tuple[List[str], List[Tuple[float, float, float]]]:
+def _get_sites(
+    doc, images: True, clip: float = 3.5
+) -> Tuple[List[str], List[Tuple[float, float, float]]]:
     """Return the species and positions of the sites in the crystal, including
     any periodic images within the distance tolerance.
 
@@ -245,7 +261,9 @@ def _get_sites(doc, images: True, clip: float = 3.5) -> Tuple[List[str], List[Tu
         positions.append(pos_cart)
         species.append(doc[ind].species)
     if images:
-        image_positions, image_species = get_image_atoms_near_cell_boundaries(doc, tolerance=clip)
+        image_positions, image_species = get_image_atoms_near_cell_boundaries(
+            doc, tolerance=clip
+        )
         positions.extend(image_positions)
         species.extend(image_species)
 
@@ -264,6 +282,7 @@ def _draw_cell(scene, doc, thickness=0.05, compass=True) -> None:
     """
     import numpy as np
     import fresnel
+
     vertices = np.zeros((8, 3), dtype=np.float64)
     vertices[1:4, :] = doc.lattice_cart
     vertices[4, :] = vertices[1, :] + vertices[2, :]
@@ -286,20 +305,27 @@ def _draw_cell(scene, doc, thickness=0.05, compass=True) -> None:
         [vertices[6, :], vertices[7, :]],
     ]
     unit_cell.radius[:] = thickness * np.ones(12)
-    unit_cell.material = fresnel.material.Material(color=fresnel.color.linear([0, 0, 0]))
+    unit_cell.material = fresnel.material.Material(
+        color=fresnel.color.linear([0, 0, 0])
+    )
     unit_cell.material.primitive_color_mix = 1
-    unit_cell.material.solid = 1.
+    unit_cell.material.solid = 1.0
 
     if compass:
         compass = fresnel.geometry.Cylinder(scene, N=3)
-        compass.points[:] = [[[0, 0, 0], doc.lattice_cart[ind] / doc.lattice_abc[0][ind]] for ind in range(3)]
+        compass.points[:] = [
+            [[0, 0, 0], doc.lattice_cart[ind] / doc.lattice_abc[0][ind]]
+            for ind in range(3)
+        ]
         compass.color[0] = ([1.0, 0, 0], [1, 0, 0])
         compass.color[1] = ([0, 1.0, 0], [0, 1.0, 0])
         compass.color[2] = ([0, 0, 1.0], [0, 0, 1.0])
         compass.radius[:] = 0.1
-        compass.material = fresnel.material.Material(color=fresnel.color.linear([0, 0, 0]))
+        compass.material = fresnel.material.Material(
+            color=fresnel.color.linear([0, 0, 0])
+        )
         compass.material.primitive_color_mix = 1
-        compass.material.solid = 0.
+        compass.material.solid = 0.0
         compass.material.roughness = 0.5
         compass.material.specular = 0.7
         compass.material.spec_trans = 0.0
@@ -330,6 +356,7 @@ def _draw_bonds(
     """
     import fresnel
     from collections import defaultdict
+
     bond_colours = []
     bonds = []
     bond_sets = defaultdict(set)
@@ -349,10 +376,12 @@ def _draw_bonds(
             bonds.append((sites[i][1], sites[j][1]))
             bond_sets[i].add(j)
             bond_sets[j].add(i)
-            bond_colours.append((
-                fresnel.color.linear(colours[sites[i][0]]),
-                fresnel.color.linear(colours[sites[j][0]])
-            ))
+            bond_colours.append(
+                (
+                    fresnel.color.linear(colours[sites[i][0]]),
+                    fresnel.color.linear(colours[sites[j][0]]),
+                )
+            )
     if bonds:
         bonds_geom = fresnel.geometry.Cylinder(
             scene,
@@ -370,7 +399,7 @@ def _draw_bonds(
 def _draw_atoms(
     scene: "fresnel.Scene",
     positions: List[Tuple[float, float, float]],
-    species: List[str]
+    species: List[str],
 ):
     """Add atoms to the scene, coloured by species.
 
@@ -389,9 +418,11 @@ def _draw_atoms(
     colours = get_element_colours()
     radii = get_element_radii()
 
-    atoms = fresnel.geometry.Sphere(scene, position=positions, radius=1.0, outline_width=0.1)
+    atoms = fresnel.geometry.Sphere(
+        scene, position=positions, radius=1.0, outline_width=0.1
+    )
     atoms.material = fresnel.material.Material()
-    atoms.material.solid = 0.
+    atoms.material.solid = 0.0
     atoms.material.primitive_color_mix = 1
     atoms.material.roughness = 0.8
     atoms.material.specular = 0.9
@@ -399,51 +430,6 @@ def _draw_atoms(
     atoms.material.metal = 0
     atoms.color[:] = fresnel.color.linear([colours[s] for s in species])
     atoms.radius[:] = [0.5 * radii[s] for s in species]
-
-
-def fresnel_plot(
-    structures: Union[Crystal, List[Crystal]],
-    figsize: Optional[Tuple[float, float]] = None,
-    fig_cols: Optional[int] = None,
-    fig_rows: Optional[int] = None,
-    labels: Union[bool, List[str]] = True,
-    renderer: Optional[Callable] = None,
-    **fresnel_view_kwargs
-):
-    """"""
-    import matplotlib.pyplot as plt
-
-    if isinstance(structures, Crystal):
-        structures = [structures]
-
-    if fig_cols is None and fig_rows is None:
-        fig_cols = len(structures)
-        fig_rows = 1
-    elif fig_rows is None:
-        fig_rows = -(len(structures) // -fig_cols)
-    else:
-        fig_cols = -(len(structures) // -fig_rows)
-
-    if figsize is None:
-        figsize = (6*fig_cols, 6*fig_rows)
-
-    fig, axes = plt.subplots(nrows=fig_rows, ncols=fig_cols, figsize=figsize, squeeze=False)
-
-    scenes = []
-
-    for s in structures:
-        scenes.append(fresnel_view(s, **fresnel_view_kwargs))
-
-    rerender_scenes_to_axes(scenes, axes, renderer=renderer)
-
-    if labels is not None:
-        if isinstance(labels, bool) and labels:
-            labels = [s.formula_tex for s in structures]
-        if labels:
-            for ind, ax in enumerate(axes.flatten()):
-                ax.set_title(labels[ind])
-
-    return fig, axes, scenes
 
 
 def rerender_scenes_to_axes(scenes, axes, renderer=None):
@@ -456,22 +442,27 @@ def rerender_scenes_to_axes(scenes, axes, renderer=None):
 
     """
     import fresnel
+
     _axes = axes.flatten() if not isinstance(axes, list) else axes
     if renderer is None:
         from functools import partial
+
         renderer = partial(fresnel.pathtrace, light_samples=32)
-    for i, ax in enumerate(_axes):
+
+    for i, ax in tqdm.tqdm(enumerate(_axes), desc="Rendering scenes"):
         old_title = ax.title.get_text()
         ax.clear()
-        ax.axis('off')
-        ax.set_aspect('equal')
+        ax.axis("off")
+        ax.set_aspect("equal")
         ax.set_title(old_title)
         if i < len(scenes):
             render = renderer(scenes[i])
             ax.imshow(render[:])
 
 
-def fit_orthographic_camera(scene: "fresnel.Scene", scale=1.1, margin=0.05, view="isometric", vectors=None) -> None:
+def fit_orthographic_camera(
+    scene: "fresnel.Scene", scale=1.1, margin=0.05, view="isometric", vectors=None
+) -> None:
     """Alternative orthographic camera fitting, based on the equivalent fresnel function.
 
     Parameters:
@@ -484,6 +475,7 @@ def fit_orthographic_camera(scene: "fresnel.Scene", scale=1.1, margin=0.05, view
 
     """
     import fresnel
+
     if not scene.camera:
         scene.camera = fresnel.camera.Orthographic()
 
@@ -491,30 +483,20 @@ def fit_orthographic_camera(scene: "fresnel.Scene", scale=1.1, margin=0.05, view
         view = "c"
 
     _default_vectors = {
-        "a":
-            dict(
-                v=np.array([1, 0, 0]),
-                up=np.array([0, 0, 1]),
-                right=np.array([0, 1, 0])
-            ),
-        "b":
-            dict(
-                v=np.array([0, 1, 0]),
-                up=np.array([1, 0, 0]),
-                right=np.array([0, 0, 1])
-            ),
-        "c":
-            dict(
-                v=np.array([0, 0, 1]),
-                up=np.array([0, 1, 0]),
-                right=np.array([1, 0, 0])
-            ),
-        'isometric':
-            dict(
-                v=np.array([1, 1, 1]) / np.sqrt(3),
-                up=np.array([-1, 2, -1]) / np.sqrt(6),
-                right=np.array([1, 0, -1]) / np.sqrt(2)
-            )
+        "a": dict(
+            v=np.array([1, 0, 0]), up=np.array([0, 0, 1]), right=np.array([0, 1, 0])
+        ),
+        "b": dict(
+            v=np.array([0, 1, 0]), up=np.array([1, 0, 0]), right=np.array([0, 0, 1])
+        ),
+        "c": dict(
+            v=np.array([0, 0, 1]), up=np.array([0, 1, 0]), right=np.array([1, 0, 0])
+        ),
+        "isometric": dict(
+            v=np.array([1, 1, 1]) / np.sqrt(3),
+            up=np.array([-1, 2, -1]) / np.sqrt(6),
+            right=np.array([1, 0, -1]) / np.sqrt(2),
+        ),
     }
 
     if view == "vector" or vectors is not None:
@@ -547,29 +529,31 @@ def fit_orthographic_camera(scene: "fresnel.Scene", scale=1.1, margin=0.05, view
     extents = scene.get_extents()
 
     # choose an appropriate view automatically
-    if view == 'auto':
+    if view == "auto":
         xw = extents[1, 0] - extents[0, 0]
         yw = extents[1, 1] - extents[0, 1]
         zw = extents[1, 2] - extents[0, 2]
 
         if zw < 0.51 * max(xw, yw):
-            view = 'front'
+            view = "c"
         else:
-            view = 'isometric'
+            view = "isometric"
 
-    v = _default_vectors[view]['v']
-    up = _default_vectors[view]['up']
+    v = _default_vectors[view]["v"]
+    up = _default_vectors[view]["up"]
 
     # make a list of points of the cube surrounding the scene
     points = np.array(
-        [[extents[0, 0], extents[0, 1], extents[0, 2]],
-         [extents[0, 0], extents[0, 1], extents[1, 2]],
-         [extents[0, 0], extents[1, 1], extents[0, 2]],
-         [extents[0, 0], extents[1, 1], extents[1, 2]],
-         [extents[1, 0], extents[0, 1], extents[0, 2]],
-         [extents[1, 0], extents[0, 1], extents[1, 2]],
-         [extents[1, 0], extents[1, 1], extents[0, 2]],
-         [extents[1, 0], extents[1, 1], extents[1, 2]]]
+        [
+            [extents[0, 0], extents[0, 1], extents[0, 2]],
+            [extents[0, 0], extents[0, 1], extents[1, 2]],
+            [extents[0, 0], extents[1, 1], extents[0, 2]],
+            [extents[0, 0], extents[1, 1], extents[1, 2]],
+            [extents[1, 0], extents[0, 1], extents[0, 2]],
+            [extents[1, 0], extents[0, 1], extents[1, 2]],
+            [extents[1, 0], extents[1, 1], extents[0, 2]],
+            [extents[1, 0], extents[1, 1], extents[1, 2]],
+        ]
     )
 
     # find the center of the box
@@ -608,13 +592,15 @@ def get_image_atoms_near_cell_boundaries(
     """
     from itertools import product
     from scipy.spatial import KDTree
+
     n_iter = 1
 
     tree = KDTree(doc.positions_abs, compact_nodes=False, copy_data=True)
 
     test_displacements = [
         np.sum(np.array(doc.lattice_cart) * np.array(p), axis=-1)
-        for p in product(range(-1, 2), repeat=3) if p != (0, 0, 0)
+        for p in product(range(-1, 2), repeat=3)
+        if p != (0, 0, 0)
     ]
     positions = []
     species = []
@@ -640,3 +626,101 @@ def get_image_atoms_near_cell_boundaries(
                         species.append(doc.atom_types[j])
 
     return positions, species
+
+
+def fresnel_plot(
+    structures: Union[Crystal, List[Crystal]],
+    figsize: Optional[Tuple[float, float]] = None,
+    fig_cols: Optional[int] = None,
+    fig_rows: Optional[int] = None,
+    labels: Union[bool, List[str]] = True,
+    renderer: Optional[Callable] = None,
+    camera_patches: Optional[List[Optional[Dict]]] = None,
+    **fresnel_view_kwargs
+):
+    """Visualize a series of structures as a grid of matplotlib plots.
+
+    Parameters:
+        structures: A list or single structure to visualize.
+        figsize: The size of the figure (defaults to a 3x4 box for each structure).
+        fig_cols: The number of columns in the figure.
+        fig_rows: The number of rows in the figure.
+        labels: If true, label structures by formula, otherwise label by the passed
+            list of strings.
+        renderer: A callable to use instead of the default `fresnel.pathtrace`.
+            A useful alternative could be `fresnel.preview`. Can also be used to
+            parameterise the fresnel rendering with e.g.,
+            `partial(fresnel.pathtrace, samples=64)`.
+        fresnel_view_kwargs: Any additional kwargs will be passed down to
+            `matador.utils.viz_utils.fresnel_view` to control e.g., camera angles.
+            The contents of any keywords containing lists with the same length as
+            the passed structures will be applied to each structure individually.
+
+    Returns:
+        The matplotlib figures, axis grid and a list of fresnel scenes.
+
+    """
+    import matplotlib.pyplot as plt
+
+    if isinstance(structures, Crystal):
+        structures = [structures]
+
+    if fig_cols is None and fig_rows is None:
+        fig_cols = len(structures)
+        fig_rows = 1
+    elif fig_rows is None:
+        fig_rows = -(len(structures) // -fig_cols)
+    else:
+        fig_cols = -(len(structures) // -fig_rows)
+
+    if figsize is None:
+        figsize = (2 * fig_cols, 3 * fig_rows)
+
+    fig, axes = plt.subplots(
+        nrows=fig_rows, ncols=fig_cols, figsize=figsize, squeeze=False
+    )
+
+    scenes = []
+
+    list_kwargs = []
+    for kw in fresnel_view_kwargs:
+        if isinstance(fresnel_view_kwargs[kw], list) or isinstance(
+            fresnel_view_kwargs[kw], tuple
+        ):
+            if len(fresnel_view_kwargs[kw]) == len(structures):
+                list_kwargs.append(kw)
+
+    for ind, s in enumerate(structures):
+        kwargs = {k: fresnel_view_kwargs[k][ind] for k in list_kwargs}
+        kwargs.update(
+            {
+                k: fresnel_view_kwargs[k]
+                for k in fresnel_view_kwargs
+                if k not in list_kwargs
+            }
+        )
+        scenes.append(fresnel_view(s, **kwargs))
+
+    if camera_patches is not None:
+        for ind, scene in enumerate(scenes):
+            patch = camera_patches[ind] or {}
+            if "view" in patch:
+                fit_orthographic_camera(scene, view=patch["view"])
+            if "height" in patch:
+                scene.camera.height = scene.camera.height + patch["height"]
+
+    if labels is not None:
+        if isinstance(labels, bool) and labels:
+            labels = [s.formula_tex for s in structures]
+        if labels:
+            for ind, ax in enumerate(axes.flatten()):
+                try:
+                    ax.set_title(labels[ind])
+                except IndexError:
+                    pass
+
+    rerender_scenes_to_axes(scenes, axes, renderer=renderer)
+
+    fig.set_tight_layout(True)
+
+    return fig, axes, scenes
