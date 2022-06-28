@@ -1,6 +1,26 @@
 """This submodule implements some convenience functions for working with OPTIMADE structures."""
-from typing import Dict, Any
+from typing import Dict, Any, List, Union
 from matador.crystal import Crystal
+
+
+def optimade2dict_from_url(url: str) -> Union[Crystal, List[Crystal]]:
+    """Queries the provided OPTIMADE URL and returns
+    a Crystal of list of crystals for the corresponding
+    structures.
+
+    Parameters:
+        url: The URL of a single or multiple OPTIMADE structure entries.
+
+    Returns:
+        The crystal or list of crystals.
+
+    """
+    import requests
+    data = requests.get(url).json()["data"]
+    if isinstance(data, list):
+        return [optimade2dict(data) for data in data]
+
+    return optimade2dict(data)
 
 
 def optimade2dict(structure: Dict[str, Any]) -> Crystal:
