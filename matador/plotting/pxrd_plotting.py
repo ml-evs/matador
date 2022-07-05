@@ -18,7 +18,7 @@ __all__ = ['plot_pxrd']
 
 @plotting_function
 def plot_pxrd(
-    pxrds, two_theta_range=None, rug=False, rug_height=0.05, rug_offset=0.04, offset=None,
+    pxrds, two_theta_range=None, text_loc="right", rug=False, rug_height=0.05, rug_offset=0.04, offset=None,
     ax=None, labels=None, figsize=None, text_offset=0.1, filename=None, **kwargs
 ):
     """ Plot PXRD or PXRDs.
@@ -39,6 +39,7 @@ def plot_pxrd(
             scales with the number of PXRDs to be plotted.
         ax (matplotlib.Axis): optional axis object to plot on.
         text_offset (float): amount by which to offset the labels.
+        text_loc (str): location of text, either 'left' or 'right'.
         filename (str): optional filename for saving.
 
 
@@ -51,7 +52,7 @@ def plot_pxrd(
     if labels is not None and not isinstance(labels, list):
         labels = [labels]
 
-    if figsize is None:
+    if figsize is None and ax is None:
         _user_default_figsize = plt.rcParams.get('figure.figsize', (8, 6))
         height = len(pxrds) * max(0.5, _user_default_figsize[1] / 1.5 / len(pxrds))
         figsize = (_user_default_figsize[0], height)
@@ -81,9 +82,15 @@ def plot_pxrd(
 
         ax.plot(pxrd.two_thetas, (1 - offset) * pxrd.pattern + ind, c=c)
 
-        ax.text(0.95, ind+text_offset, label,
-                transform=ax.get_yaxis_transform(),
-                horizontalalignment='right')
+        if text_loc == "right":
+            ax.text(0.95, ind+text_offset, label,
+                    transform=ax.get_yaxis_transform(),
+                    horizontalalignment='right')
+
+        if text_loc == "left":
+            ax.text(0.05, ind+text_offset, label,
+                    transform=ax.get_yaxis_transform(),
+                    horizontalalignment='left')
 
         if rug:
             import numpy as np
@@ -102,17 +109,4 @@ def plot_pxrd(
     ax.set_ylabel('Relative intensity')
     ax.set_xlabel('$2\\theta$ (degrees)')
 
-    if any([kwargs.get('pdf'), kwargs.get('svg'), kwargs.get('png')]):
-        bbox_extra_artists = None
-        if filename is None:
-            filename = '-'.join([pxrd.formula for pxrd in pxrds]) + '_pxrd'
-
-        if kwargs.get('pdf'):
-            plt.savefig('{}.pdf'.format(filename),
-                        bbox_inches='tight', transparent=True, bbox_extra_artists=bbox_extra_artists)
-        if kwargs.get('svg'):
-            plt.savefig('{}.svg'.format(filename),
-                        bbox_inches='tight', transparent=True, bbox_extra_artists=bbox_extra_artists)
-        if kwargs.get('png'):
-            plt.savefig('{}.png'.format(filename),
-                        bbox_inches='tight', transparent=True, bbox_extra_artists=bbox_extra_artists)
+    return ax
