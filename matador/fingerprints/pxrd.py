@@ -67,8 +67,8 @@ class PXRD(Fingerprint):
 
         Keyword arguments:
             lorentzian_width (float): width of Lorentzians for broadening (DEFAULT: 0.03)
-            wavelength (float): incident X-ray wavelength
-                (DEFAULT: CuKa, 1.5406).
+            wavelength (float): incident X-ray wavelength in Å.
+                (DEFAULT: CuKa, 1.5406 Å).
             theta_m (float): the monochromator angle in degrees (DEFAULT: 0)
             two_theta_resolution (float): resolution of grid 2θ
                 used for plotting.
