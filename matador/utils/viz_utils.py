@@ -9,6 +9,7 @@ and some colour definitions scraped from VESTA configs.
 
 from typing import Tuple, Optional, Dict, List, Union, Callable, Set, TYPE_CHECKING
 from pathlib import Path
+from functools import lru_cache
 
 import tqdm
 import numpy as np
@@ -32,10 +33,12 @@ def viz(doc):
     return
 
 
-def get_element_colours():
-    """Read element colours from VESTA file. The colours file can be
-    specified in the matadorrc. If unspecified, the default
-    ../config/vesta_elements.ini will be used.
+@lru_cache
+def get_element_colours() -> Dict[str, Tuple[float, float, float]]:
+    """Return RGB element colours from VESTA file.
+
+    The colours file can be specified in the matadorrc.
+    If unspecified, the default `../config/vesta_elements.ini` will be used.
 
     """
     import os
