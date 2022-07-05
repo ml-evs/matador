@@ -418,7 +418,7 @@ class Crystal(DataContainer):
         """
         from matador.fingerprints.pdf import PDF
         if 'pdf' not in self._data:
-            self._data['pdf'] = PDF(self._data, label=self.formula_tex)
+            self._data['pdf'] = PDF(self._data, label=self.formula_tex, standardize=False)
         return self._data['pdf']
 
     @pdf.setter
