@@ -9,7 +9,6 @@ matador.fingerprints.pdf module.
 
 import numpy as np
 
-from matador.fingerprints.pdf import PDF
 from matador.crystal import Crystal
 from matador.plotting.plotting import plotting_function
 from matador.utils.cell_utils import get_space_group_label_latex
@@ -23,7 +22,7 @@ def plot_pdf(pdfs,
              labels=None, r_min=None, r_max=None,
              offset=1.2, text_offset=(0.0, 0.0),
              legend=False, annotate=True, figsize=None,
-             filename=None,
+             ax=None, projected=False,
              **kwargs):
     """ Plot PDFs.
 
@@ -42,6 +41,8 @@ def plot_pdf(pdfs,
         annotate (bool): whether or not to apply the PDF labels as an annotation.
         legend (bool): whether or not to apply the PDF labels as a legend.
         figsize (tuple of float): matplotlib figure size. Default scales with number of PDFs.
+        ax (matplotlib.Axis): optional axis object to plot on.
+        projected (list(str)): if provided or True, will plot the PDFs projected onto the given keys.
 
     Returns:
         matplotlib.pyplot.Axes: axis object which can be modified further.
@@ -49,19 +50,20 @@ def plot_pdf(pdfs,
     """
 
     import matplotlib.pyplot as plt
+    from matador.utils.viz_utils import get_element_colours
 
     if not isinstance(pdfs, list):
         pdfs = [pdfs]
     if labels is not None and not isinstance(labels, list):
         labels = [labels]
 
-    if figsize is None:
+    if figsize is None and ax is None:
         _user_default_figsize = plt.rcParams.get('figure.figsize', (8, 6))
         height = len(pdfs) * max(0.5, _user_default_figsize[1] / 1.5 / len(pdfs))
         figsize = (_user_default_figsize[0], height)
 
-    fig = plt.figure(figsize=figsize)
-    ax1 = fig.add_subplot(111)
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
 
     if labels is not None and len(labels) != len(pdfs):
         raise RuntimeError("Wrong number of labels {} for PDFs.".format(labels))
@@ -82,9 +84,12 @@ def plot_pdf(pdfs,
     if r_min is None:
         r_min = 0.0
 
-    ax1.set_ylabel('Pair distribution function, $g(r)$')
-    ax1.get_yaxis().set_ticks([])
-    ax1.set_xlim(r_min, r_max+0.5)
+    ax.set_ylabel('Pair distribution function, $g(r)$')
+    ax.get_yaxis().set_ticks([])
+    ax.set_xlim(r_min, r_max+0.5)
+
+    projected_keys = set()
+    labelled_keys = set()
 
     for ind, pdf in enumerate(pdfs):
 
@@ -98,80 +103,55 @@ def plot_pdf(pdfs,
         else:
             label = get_space_group_label_latex(pdf.spg) + '-' + get_formula_from_stoich(pdf.stoichiometry, tex=True)
 
-        ax1.plot(pdf.r_space, pdf.gr + abs_offset * ind, label=label)
+        if projected:
+            if isinstance(projected, bool):
+                keys = [key for key in pdf.elem_gr]
+                [projected_keys.add(key) for key in keys]
+            else:
+                for key in projected:
+                    if key in pdf.elem_gr:
+                        projected_keys.add(key)
+                    elif ([key[1], key[0]]) in pdf.elem_gr:
+                        projected_keys.add((key[1], key[0]))
+
+            for key in projected_keys:
+                if key in pdf.elem_gr:
+                    _label = None
+                    if key not in labelled_keys:
+                        if len(key) == 2:
+                            _label = f"{key[0]}-{key[1]}"
+                        else:
+                            _label = f"{key[0]}-{key[0]}"
+                        labelled_keys.add(key)
+                    if len(key) == 2:
+                        color = (np.array(get_element_colours()[key[0]]) + np.array(get_element_colours()[key[1]])) / 2
+                    else:
+                        color = get_element_colours()[key[0]]
+                    ax.plot(pdf.r_space, pdf.elem_gr[key] + abs_offset * ind, label=_label, c=color)
+
+        else:
+            ax.plot(pdf.r_space, pdf.gr + abs_offset * ind, label=label)
         if text_offset is not None:
-            text_x = text_offset[0]
+            text_x = text_offset[0] + r_min
         if text_offset is not None:
             text_y = abs_offset*ind + text_offset[1]*gr_max
         if label is not None and annotate:
-            ax1.text(text_x, text_y, label)
+            ax.text(text_x, text_y, label)
 
-    ax1.set_ylim(-gr_max * 0.2, offset * gr_max * len(pdfs))
+    ax.set_ylim(-gr_max * 0.2, offset * gr_max * len(pdfs))
 
-    ax1.set_xlabel('$r$ ($\\AA$)')
+    ax.set_xlabel('$r$ ($\\AA$)')
 
-    if legend:
-        legend = ax1.legend()
+    if legend or projected:
+        legend = ax.legend(c='upper right')
 
-    if any([kwargs.get('pdf'), kwargs.get('svg'), kwargs.get('png')]):
-        bbox_extra_artists = None
-        if filename is None:
-            filename = '-'.join([get_formula_from_stoich(pdf.stoichiometry) for pdf in pdfs]) + '_pdf'
-
-        if kwargs.get('pdf'):
-            plt.savefig('{}.pdf'.format(filename),
-                        bbox_inches='tight', transparent=True, bbox_extra_artists=bbox_extra_artists)
-        if kwargs.get('svg'):
-            plt.savefig('{}.svg'.format(filename),
-                        bbox_inches='tight', transparent=True, bbox_extra_artists=bbox_extra_artists)
-        if kwargs.get('png'):
-            plt.savefig('{}.png'.format(filename),
-                        bbox_inches='tight', transparent=True, bbox_extra_artists=bbox_extra_artists)
-
-    return ax1
+    return ax
 
 
 @plotting_function
-def plot_projected_pdf(pdf, keys=None, other_pdfs=None, vlines=None):
-    """ Plot projected PDFs.
-
-    Parameters:
-        pdf (matador.fingerprints.pdf.PDF): the main PDF to plot.
-
-    Keyword arguments:
-        keys (list): plot only a subset of projections, e.g. [('K', )].
-        other_pdfs (list of PDF): other PDFs to plot.
-        vlines (list of float): plot vertical lines at these points.
-
-    """
-    import matplotlib.pyplot as plt
-    fig = plt.figure()
-    ax1 = fig.add_subplot(111)
-    if keys is None:
-        keys = [key for key in pdf.elem_gr]
-    for key in keys:
-        if key not in pdf.elem_gr:
-            key = (key[1], key[0])
-        ax1.plot(pdf.r_space, pdf.elem_gr[key], label='-'.join(key) + ' {}'.format(pdf.label))
-    if other_pdfs is not None:
-        if isinstance(other_pdfs, PDF):
-            other_pdfs = [other_pdfs]
-        for _pdf in other_pdfs:
-            if isinstance(_pdf, PDF):
-                for key in keys:
-                    ax1.plot(_pdf.r_space, _pdf.elem_gr[key], ls='--',
-                             label='-'.join(key) + ' {}'.format(_pdf.label))
-            elif isinstance(pdf, tuple):
-                ax1.plot(_pdf[0], _pdf[1], alpha=1, ls='--')
-            else:
-                raise RuntimeError
-
-    if vlines is not None:
-        for line in vlines:
-            ax1.axvline(line, ls='--', alpha=0.8, c='grey')
-    ax1.legend(loc=1)
-    ax1.set_ylabel('$g(r)$')
-    ax1.set_xlabel('$r$ (Angstrom)')
+def plot_projected_pdf(*args, **kwargs):
+    """DEPRECATED"""
+    return plot_pdf(*args, **kwargs)
 
 
 @plotting_function
