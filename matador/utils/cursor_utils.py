@@ -853,6 +853,10 @@ def _compare_field(bench, other, field):
 
     benchmark_field = recursive_get(bench, field)
     other_field = recursive_get(other, field)
+    # Normalize cell volume to per-atom so different settings can be compared
+    if "cell_volume" in field:
+        benchmark_field /= bench["num_atoms"]
+        other_field /= other["num_atoms"]
     summary = {f"abs_{field_label}": benchmark_field - other_field}
     if abs(benchmark_field) > 1e-10:
         summary[f"rel_{field_label}"] = summary[f"abs_{field_label}"] / benchmark_field
