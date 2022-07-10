@@ -22,7 +22,7 @@ def plot_pdf(pdfs,
              labels=None, r_min=None, r_max=None,
              offset=1.2, text_offset=(0.0, 0.0),
              legend=False, annotate=True, figsize=None,
-             ax=None, projected=False,
+             ax=None, projected=False, colour_labels=True,
              **kwargs):
     """ Plot PDFs.
 
@@ -43,6 +43,7 @@ def plot_pdf(pdfs,
         figsize (tuple of float): matplotlib figure size. Default scales with number of PDFs.
         ax (matplotlib.Axis): optional axis object to plot on.
         projected (list(str)): if provided or True, will plot the PDFs projected onto the given keys.
+        colour_labels (bool): whether to colour the labels based on the PDF's colour.
 
     Returns:
         matplotlib.pyplot.Axes: axis object which can be modified further.
@@ -101,7 +102,7 @@ def plot_pdf(pdfs,
         if labels:
             label = labels[ind]
         else:
-            label = get_space_group_label_latex(pdf.spg) + '-' + get_formula_from_stoich(pdf.stoichiometry, tex=True)
+            label = f"{get_formula_from_stoich(pdf.stoichiometry, tex=True)}-{get_space_group_label_latex(pdf.spg)}"
 
         if projected:
             if isinstance(projected, bool):
@@ -130,13 +131,17 @@ def plot_pdf(pdfs,
                     ax.plot(pdf.r_space, pdf.elem_gr[key] + abs_offset * ind, label=_label, c=color)
 
         else:
-            ax.plot(pdf.r_space, pdf.gr + abs_offset * ind, label=label)
+            color = next(ax._get_lines.prop_cycler)['color']
+            ax.plot(pdf.r_space, pdf.gr + abs_offset * ind, label=label, color=color)
         if text_offset is not None:
             text_x = text_offset[0] + r_min
         if text_offset is not None:
             text_y = abs_offset*ind + text_offset[1]*gr_max
         if label is not None and annotate:
-            ax.text(text_x, text_y, label)
+            text_color = None
+            if colour_labels:
+                text_color = color
+            ax.text(text_x, text_y, label, color=text_color)
 
     ax.set_ylim(-gr_max * 0.2, offset * gr_max * len(pdfs))
 
