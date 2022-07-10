@@ -264,7 +264,7 @@ def plot_volume_curve(
         volume_key = "volume_ratio_with_bulk"
 
     for j in range(len(hull.volume_data["electrode_volume"])):
-        c = list(plt.rcParams["axes.prop_cycle"].by_key()["color"])[j + 2]
+        c = next(ax._get_lines.prop_cycler)
         stable_hull_dist = hull.volume_data["hull_distances"][j]
         if len(stable_hull_dist) != len(hull.volume_data["Q"][j]):
             raise RuntimeError("This plot does not support --hull_cutoff.")
