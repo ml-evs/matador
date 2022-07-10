@@ -19,7 +19,7 @@ __all__ = ['plot_pxrd']
 @plotting_function
 def plot_pxrd(
     pxrds, two_theta_range=None, text_loc="right", rug=False, rug_height=0.05, rug_offset=0.04, offset=None,
-    ax=None, labels=None, figsize=None, text_offset=0.1, filename=None, **kwargs
+    ax=None, labels=None, figsize=None, text_offset=0.1, colour_labels=True, filename=None, **kwargs
 ):
     """ Plot PXRD or PXRDs.
 
@@ -78,19 +78,26 @@ def plot_pxrd(
         if labels:
             label = labels[ind]
         else:
-            label = get_space_group_label_latex(pxrd.spg) + '-' + pxrd.formula
+            label = f"{pxrd.formula}-{get_space_group_label_latex(pxrd.spg)}"
 
         ax.plot(pxrd.two_thetas, (1 - offset) * pxrd.pattern + ind, c=c)
+
+        if colour_labels:
+            text_colour = c
+        else:
+            text_colour = None
 
         if text_loc == "right":
             ax.text(0.95, ind+text_offset, label,
                     transform=ax.get_yaxis_transform(),
-                    horizontalalignment='right')
+                    horizontalalignment='right',
+                    color=text_colour)
 
         if text_loc == "left":
             ax.text(0.05, ind+text_offset, label,
                     transform=ax.get_yaxis_transform(),
-                    horizontalalignment='left')
+                    horizontalalignment='left',
+                    color=text_colour)
 
         if rug:
             import numpy as np
@@ -98,11 +105,6 @@ def plot_pxrd(
             for peak in peaks:
                 ax.plot([peak, peak], [ind-rug_height-rug_offset, ind-rug_offset], c=c, alpha=0.5)
 
-    if len(pxrds) > 1:
-        ax.set_yticks([])
-    else:
-        import numpy as np
-        ax.set_yticks(np.linspace(0, 1, 5, endpoint=True))
     ax.set_ylim(-0.2, len(pxrds)+0.1)
     if two_theta_range is not None:
         ax.set_xlim(*two_theta_range)

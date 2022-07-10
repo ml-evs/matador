@@ -285,9 +285,6 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
                             bbox_inches='tight', transparent=True)
                 print('Wrote {}.{}'.format(fname, ext))
 
-    if show:
-        plt.show()
-
     return ax
 
 
