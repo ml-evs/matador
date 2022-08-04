@@ -153,6 +153,7 @@ def fresnel_view(
     bond_dict: Optional[Dict[Tuple[str, str], float]] = None,
     images: Union[bool, float] = True,
     pad_cell: bool = True,
+    lights: Optional[Callable] = None,
     **camera_kwargs
 ) -> "fresnel.Scene":
     """Return a fresnel scene visualising the input crystal.
@@ -181,6 +182,7 @@ def fresnel_view(
             as the clipping distance).
         pad_cell: Size to aim for all directions to be visualised, e.g. a supercell with minimum side length
             `pad_cell` will be constructed.
+        lights: An optional callable that sets the lights for the scene.
 
     Returns:
         The fresnel scene to render.
@@ -238,7 +240,11 @@ def fresnel_view(
 
     a, b, c = doc.lattice_cart
     fit_orthographic_camera(scene, **camera_kwargs)
-    scene.lights = fresnel.light.lightbox()
+    if lights is None:
+        scene.lights = fresnel.light.lightbox()
+    else:
+        scene.lights = lights()
+
     return scene
 
 
