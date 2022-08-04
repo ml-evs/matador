@@ -93,6 +93,7 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
             containing 2-length float tuples of label offsets. A value of `None` for
             a particular formula will exclude that label from the plot.
         colour_by_source (bool): plot and label points by their sources
+        show_cbar: Whether or not to plot the hull distance colourbar.
         alpha (float): alpha value of points when colour_by_source is True
         sources (list): list of possible provenances to colour when colour_by_source
             is True (others will be grey)
@@ -296,9 +297,6 @@ def plot_ensemble_hull(hull, data_key,
                        plot_hull_points=True,
                        alpha_scale=0.25,
                        plot_hulls=True,
-                       voltages=False,
-                       show=True,
-                       plot_fname=None,
                        **kwargs):
     """ Plot and generate an ensemble of hulls. If axis not requested,
     a histogram of frequency of a particular concentration appearing on
@@ -347,17 +345,6 @@ def plot_ensemble_hull(hull, data_key,
 
     ax.set_ylim(1.1*min_ef)
 
-    if hull.savefig or any(kwargs.get(ext) for ext in SAVE_EXTS):
-        if plot_fname is not None:
-            fname = plot_fname
-        else:
-            fname = ''.join(hull.species) + data_key + '_hull'
-        for ext in SAVE_EXTS:
-            if hull.args.get(ext) or kwargs.get(ext):
-                plt.savefig('{}.{}'.format(fname, ext),
-                            bbox_inches='tight', transparent=True)
-                print('Wrote {}.{}'.format(fname, ext))
-
 
 @plotting_function
 def plot_temperature_hull(
@@ -372,8 +359,6 @@ def plot_temperature_hull(
     alpha_scale=1,
     lw_scale=1,
     plot_hulls=True,
-    voltages=False,
-    show=True,
     plot_fname=None,
     **kwargs
 ):
@@ -633,7 +618,7 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
     hull_dist = np.asarray(filtered_hull_dists)
 
     min_cut = 0.0
-    max_cut = 0.2
+    max_cut = 0.1
 
     if hull_dist_unit.lower() == "mev":
         hull_dist *= 1000
@@ -672,11 +657,27 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
             else:
                 colours_list.append(int((n_colours - 1) * (hull_dist[i] / max_cut)))
         colours_list = np.asarray(colours_list)
-        ax.scatter(scale*stable, marker='o', color=hull.colours[1], edgecolors='black', zorder=9999999,
-                   s=150, lw=1.5)
-        ax.scatter(scale*concs, colormap=cmap, colorbar=True,
-                   cbarlabel='Distance from hull ({}eV/atom)'.format("m" if hull_dist_unit.lower() == "mev" else ""),
-                   c=colour_metric, vmax=max_cut, vmin=min_cut, zorder=1000, s=40, alpha=0)
+        ax.scatter(
+            scale*stable,
+            marker='o',
+            color=hull.colours[1],
+            edgecolors='black',
+            zorder=9999999,
+            s=150,
+            lw=1.5
+        )
+        ax.scatter(
+            scale*concs,
+            colormap=cmap,
+            colorbar=True,
+            cbarlabel='Distance from hull ({}eV/atom)'.format("m" if hull_dist_unit.lower() == "mev" else ""),
+            c=colour_metric,
+            vmax=max_cut,
+            vmin=min_cut,
+            zorder=1000,
+            s=40,
+            alpha=0
+        )
         for i, _ in enumerate(concs):
             ax.scatter(
                 scale * concs[i].reshape(1, 3),

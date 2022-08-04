@@ -13,6 +13,8 @@ from matador.utils.chem_utils import get_formula_from_stoich
 from matador.plotting.plotting import plotting_function, SAVE_EXTS
 from matador.battery import VoltageProfile
 
+EPS = 1e-12
+
 
 __all__ = ["plot_voltage_curve", "plot_volume_curve"]
 
@@ -126,7 +128,7 @@ def plot_voltage_curve(
 
         if plot_max_capacity:
             vline_kwargs = _line_kwargs
-            vline_kwargs["ls"] = "--"
+            vline_kwargs["ls"] = "-."
             vline_kwargs["alpha"] = 0.8
             vline_kwargs["zorder"] = 0
             ax.axvline(np.nanmax(profile.capacities), **vline_kwargs)
@@ -153,15 +155,11 @@ def plot_voltage_curve(
             )
 
     if expt or len(profiles) > 1:
-        if plot_average_voltage and plot_max_capacity:
-            label = "Average voltages and maximum gravimetric capacities"
-        if plot_average_voltage and not plot_max_capacity:
-            label = "Average voltages"
-        if not plot_average_voltage and plot_max_capacity:
-            label = "Maximum gravimetric capacities"
 
-        if plot_average_voltage or plot_max_capacity:
-            ax.axvline(-1, c="k", ls="--", alpha=0.8, label=label)
+        if plot_average_voltage:
+            ax.axvline(-1, c="k", ls="--", alpha=0.8, label="Average voltages")
+        if plot_max_capacity:
+            ax.axvline(-1, c="k", ls="-.", alpha=0.8, label="Maximum gravimetric capacity")
 
         ax.legend()
 
@@ -233,7 +231,7 @@ def _add_voltage_curve(capacities, voltages, ax, label=None, **kwargs):
 
 @plotting_function
 def plot_volume_curve(
-    hull, ax=None, show=True, legend=False, as_percentages=False, **kwargs
+    hull, ax=None, show=True, legend=False, as_percentages=False, label=None, **kwargs
 ):
     """Plot volume curve calculated for phase diagram.
 
@@ -264,7 +262,7 @@ def plot_volume_curve(
         volume_key = "volume_ratio_with_bulk"
 
     for j in range(len(hull.volume_data["electrode_volume"])):
-        c = next(ax._get_lines.prop_cycler)
+        c = next(ax._get_lines.prop_cycler)["color"]
         stable_hull_dist = hull.volume_data["hull_distances"][j]
         if len(stable_hull_dist) != len(hull.volume_data["Q"][j]):
             raise RuntimeError("This plot does not support --hull_cutoff.")
@@ -273,39 +271,37 @@ def plot_volume_curve(
             [
                 q
                 for ind, q in enumerate(hull.volume_data["Q"][j])
-                if stable_hull_dist[ind] == 0
+                if stable_hull_dist[ind] <= EPS
             ],
             [
                 v
                 for ind, v in enumerate(hull.volume_data[volume_key][j])
-                if stable_hull_dist[ind] == 0
+                if stable_hull_dist[ind] <= EPS
             ],
             marker="o",
             markeredgewidth=1.5,
-            markeredgecolor="k",
+            # markeredgecolor="k",
             c=c,
             zorder=1000,
             lw=0,
         )
 
+        label = ("{}".format(get_formula_from_stoich(hull.volume_data["endstoichs"][j], tex=True))) if not label else label
+
         ax.plot(
             [
                 q
                 for ind, q in enumerate(hull.volume_data["Q"][j])
-                if stable_hull_dist[ind] == 0
+                if stable_hull_dist[ind] <= EPS
             ],
             [
                 v
                 for ind, v in enumerate(hull.volume_data[volume_key][j])
-                if stable_hull_dist[ind] == 0
+                if stable_hull_dist[ind] <= EPS
             ],
             lw=2,
             c=c,
-            label=(
-                "{}".format(
-                    get_formula_from_stoich(hull.volume_data["endstoichs"][j], tex=True)
-                )
-            ),
+            label=label,
         )
 
     ax.set_xlabel("Gravimetric capacity (mAh/g)")
@@ -316,15 +312,5 @@ def plot_volume_curve(
 
     if legend or len(hull.volume_data["Q"]) > 1:
         ax.legend()
-    fname = "{}_volume".format("".join(hull.elements))
-
-    if hull.savefig or any([kwargs.get(ext) for ext in SAVE_EXTS]):
-        for ext in SAVE_EXTS:
-            if hull.args.get(ext) or kwargs.get(ext):
-                plt.savefig("{}.{}".format(fname, ext), transparent=True)
-                print("Wrote {}.{}".format(fname, ext))
-
-    if show:
-        plt.show()
 
     return ax
