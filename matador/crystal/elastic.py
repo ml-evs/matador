@@ -76,7 +76,7 @@ def get_equation_of_state(seed, plot=False):
         curves.append(fitted_curve)
         name = eos_type.__name__.replace('EOS', '')
         label = '-'.join(re.findall('[A-Z][^A-Z]*', name))
-        label += " {eos.bulk_modulus:3.1f}±{eos.bulk_modulus_err:3.1f} GPa"
+        label += f" {eos.bulk_modulus:3.1f}±{eos.bulk_modulus_err:3.1f} GPa"
         labels.append(label)
 
     if plot:
