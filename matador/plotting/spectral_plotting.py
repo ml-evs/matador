@@ -625,14 +625,14 @@ def dos_plot(seeds, ax_dos, options, bbox_extra_artists=None):
                         energies[np.where(energies > 0)],
                         0,
                         dos[np.where(energies > 0)],
-                        alpha=0.2,
+                        alpha=options.get("fill_alpha", 0.2),
                         color=options.get("conduction"),
                     )
                     ax_dos.fill_betweenx(
                         energies[np.where(energies <= 0)],
                         0,
                         dos[np.where(energies <= 0)],
-                        alpha=0.2,
+                        alpha=options.get("fill_alpha", 0.2),
                         color=options.get("valence"),
                     )
         else:
@@ -662,12 +662,13 @@ def dos_plot(seeds, ax_dos, options, bbox_extra_artists=None):
                     ls=options.get("ls", len(seeds) * ["-"])[seed_ind],
                     alpha=1,
                     c=c,
+                    lw=options.get("lw", 1),
                     zorder=1e10,
                     label=label,
                 )
 
                 if not plotting_pdos:
-                    ax_dos.fill_between(energies, 0, dos, alpha=0.2, color=dos_colour)
+                    ax_dos.fill_between(energies, 0, dos, alpha=options.get("fill_alpha", 0.2), color=dos_colour)
 
         if "spin_dos" in dos_data and not options.get("pdos_hide_sum"):
             if options.get("plot_bandstructure"):
@@ -677,7 +678,7 @@ def dos_plot(seeds, ax_dos, options, bbox_extra_artists=None):
                             energies,
                             0,
                             dos_data["spin_dos"]["up"],
-                            alpha=0.2,
+                            alpha=options.get("fill_alpha", 0.2),
                             color=options["spin_up_colour"],
                         )
                     ax_dos.plot(
