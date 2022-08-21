@@ -10,6 +10,7 @@ diagrams generally.
 from collections import defaultdict
 import numpy as np
 from matador.utils.chem_utils import get_stoich_from_formula, get_formula_from_stoich
+from matador.utils.viz_utils import get_element_colours
 from matador.plotting.plotting import plotting_function, get_linear_cmap, SAVE_EXTS
 
 EPS = 1e-12
@@ -72,8 +73,8 @@ def _get_hull_labels(hull, label_cutoff=None, num_species=None, exclude_edges=Tr
 def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
                  plot_hull_points=True, labels=None, label_cutoff=None, colour_by_source=False,
                  sources=None, hull_label=None, source_labels=None, title=True, plot_fname=None, show_cbar=True,
-                 label_offset=(1, 0.1), specific_label_offset=None, eform_limits=None, legend_kwargs=None,
-                 hull_dist_unit="meV",
+                 colour_by_composition=False, label_offset=(1, 0.1), specific_label_offset=None, eform_limits=None,
+                 legend_kwargs=None, hull_dist_unit="meV",
                  **kwargs):
     """ Plot calculated hull, returning ax and fig objects for further editing.
 
@@ -122,6 +123,13 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
     hull.default_cmap_list = get_linear_cmap(hull.colours[1:4], list_only=True)
     hull.default_cmap = get_linear_cmap(hull.colours[1:4], list_only=False)
 
+    if colour_by_composition:
+        try:
+            element_colours = [get_element_colours()[s] for s in hull.species]
+        except Exception:
+            raise RuntimeError(f"Cannot `colour_by_composition`: no colour found for species {hull.species}.")
+        conc_cmap = get_linear_cmap(element_colours, list_only=False)
+
     if labels is None:
         labels = hull.args.get('labels', False)
     if label_cutoff is None:
@@ -135,15 +143,31 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
 
     # plot hull structures
     if plot_hull_points:
+        if colour_by_composition:
+            hull_point_scale = 75
+            edgewidth = 1.5
+            edgecolor = "k"
+        else:
+            hull_point_scale = 40
+            edgewidth = 1.5
+            edgecolor = "k"
+
+        if colour_by_composition:
+            point_colours = tie_line[:, 0]
+            cmap = conc_cmap
+        else:
+            point_colours = hull.colours[1]
+            cmap = None
         ax.scatter(tie_line[:, 0], tie_line[:, 1],
-                   c=hull.colours[1],
-                   marker='o', zorder=99999, edgecolor='k',
-                   s=scale*40, lw=1.5)
+                   c=point_colours,
+                   cmap=cmap,
+                   marker='o', zorder=99999, edgecolor=edgecolor,
+                   s=scale*hull_point_scale, lw=edgewidth)
         if plot_tie_line:
             ax.plot(np.sort(tie_line[:, 0]), tie_line[np.argsort(tie_line[:, 0]), 1],
                     c=hull.colours[0], zorder=1, label=hull_label,
                     marker='o', markerfacecolor=hull.colours[0],
-                    markeredgecolor='k', markeredgewidth=1.5, markersize=np.sqrt(scale*40))
+                    markeredgecolor=edgecolor, markeredgewidth=edgewidth, markersize=np.sqrt(scale*hull_point_scale))
     if plot_tie_line:
         ax.plot(np.sort(tie_line[:, 0]), tie_line[np.argsort(tie_line[:, 0]), 1],
                 c=hull.colours[0], zorder=1, label=hull_label, markersize=0)
@@ -179,6 +203,10 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
                         if offset is None:
                             continue
                         position = (position[0] + offset[0], position[1] + offset[1])
+                if colour_by_composition:
+                    text_colour = conc_cmap(conc)
+                else:
+                    text_colour = "k"
                 ax.annotate(get_formula_from_stoich(doc['stoichiometry'],
                                                     latex_sub_style=r'\mathregular',
                                                     tex=True,
@@ -186,6 +214,7 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
                                                     sort=False),
                             xy=(conc, e_f),
                             xytext=position,
+                            color=text_colour,
                             textcoords='data',
                             ha='right',
                             va='bottom',
@@ -202,14 +231,24 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
 
         if hull.hull_cutoff == 0:
             # if no specified hull cutoff, ignore labels and colour by hull distance
-            cmap = hull.default_cmap
             if plot_points:
-                scatter = ax.scatter(hull.structures[np.argsort(hull.hull_dist), 0][::-1],
-                                     hull.structures[np.argsort(hull.hull_dist), -1][::-1],
+                concs = hull.structures[np.argsort(hull.hull_dist), 0][::-1]
+                energies = hull.structures[np.argsort(hull.hull_dist), -1][::-1],
+                if colour_by_composition:
+                    point_colours = concs
+                    norm = None
+                    cmap = conc_cmap
+                else:
+                    point_colours = np.sort(hull.hull_dist)[::-1]
+                    norm = colours.LogNorm(0.01, 1, clip=True)
+                    cmap = hull.default_cmap
+                scatter = ax.scatter(concs,
+                                     energies,
                                      s=scale*40,
-                                     c=np.sort(hull.hull_dist)[::-1],
+                                     c=point_colours,
                                      zorder=100,
-                                     cmap=cmap, norm=colours.LogNorm(0.01, 1, clip=True),
+                                     cmap=cmap,
+                                     norm=norm,
                                      rasterized=True)
 
                 if show_cbar:
@@ -752,11 +791,13 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
                 if dist < min_dist:
                     min_dist = dist
                     closest_label = coord_ind
+            text_colour = "k"
             ax.annotate(formula, scale*conc,
                         textcoords='data',
                         xytext=[scale*val for val in label_coords[closest_label]],
                         ha='right',
                         va='bottom',
+                        color=text_colour,
                         arrowprops=arrowprops)
             del label_coords[closest_label]
 
