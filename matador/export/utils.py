@@ -37,7 +37,7 @@ def file_writer_function(function):
                 else:
                     return False
 
-            with open(path, 'w') as f:
+            with open(path, 'w', encoding="utf-8") as f:
                 for line in flines:
                     f.write(line + '\n')
 

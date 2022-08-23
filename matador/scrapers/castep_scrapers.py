@@ -1034,7 +1034,7 @@ def usp2dict(fname, **kwargs):
 
     """
     species_pot = dict()
-    with open(fname, 'r') as f:
+    with open(fname, 'r', encoding="utf-8") as f:
         flines = f.readlines()
         for line_no, line in enumerate(flines):
             if 'Pseudopotential Report' in line:

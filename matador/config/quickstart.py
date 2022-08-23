@@ -105,7 +105,7 @@ def quickstart_settings():
         print('Okay, there is no config file to be made and I will keep using the defaults.')
         return None
 
-    with open(fname, 'a') as f:
+    with open(fname, 'a', encoding="utf-8") as f:
         for line in flines:
             f.write(line + '\n')
 

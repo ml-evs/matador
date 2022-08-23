@@ -570,7 +570,7 @@ class QueryConvexHull:
                 if idx != len(self.volume_data['Q'][reaction_idx]) - 1:
                     data_str += '\n'
             if self.args.get('csv'):
-                with open(''.join(self.species) + '_volume.csv', 'w') as f:
+                with open(''.join(self.species) + '_volume.csv', 'w', encoding="utf-8") as f:
                     f.write(data_str)
             print('\nVolume data:')
             print('\n' + data_str)

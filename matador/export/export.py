@@ -150,7 +150,7 @@ def query2files(
     md_kwargs.update(kwargs)
     md_kwargs.update({'markdown': True, 'latex': False, 'argstr': argstr, 'hull': hull})
     md_string = display_results(cursor, **md_kwargs)
-    with open(md_path, 'w') as f:
+    with open(md_path, 'w', encoding="utf-8") as f:
         f.write(md_string)
 
     if latex:
@@ -161,7 +161,7 @@ def query2files(
         tex_kwargs.update(kwargs)
         tex_kwargs.update({'latex': True, 'markdown': False, 'argstr': argstr, 'hull': hull})
         tex_string = display_results(cursor, **tex_kwargs)
-        with open(tex_path, 'w') as f:
+        with open(tex_path, 'w', encoding="utf-8") as f:
             f.write(tex_string)
 
 
@@ -504,7 +504,7 @@ def doc2pdb(doc, path, info=True, hash_dupe=True):
             path += '-' + generate_hash()
         else:
             raise RuntimeError('Skipping duplicate structure...')
-    with open(path+'.pdb', 'w') as f:
+    with open(path+'.pdb', 'w', encoding="utf-8") as f:
         try:
             header = 'HEADER    {} {}'.format(doc['text_id'][0], doc['text_id'][1])
         except Exception:
@@ -584,7 +584,7 @@ def doc2json(doc, path, overwrite=False, hash_dupe=True):
     if '_id' in doc:
         doc['_id'] = str(doc['_id'])
 
-    with open(path + '.json', 'w') as f:
+    with open(path + '.json', 'w', encoding="utf-8") as f:
         f.write(json.dumps(doc, skipkeys=True, indent=2))
 
 
@@ -632,10 +632,10 @@ def doc2pwscf(doc, path, template=None, spacing=None):
 
     if template is not None:
         if os.path.isfile(template):
-            with open(template, 'r') as f:
+            with open(template, 'r', encoding="utf-8") as f:
                 template_string = f.readlines()
 
-    with open(path + '.in', 'w') as f:
+    with open(path + '.in', 'w', encoding="utf-8") as f:
         for line in template_string:
             if 'prefix' in line:
                 line = '  prefix = \'{}\',\n'.format(path)
@@ -829,7 +829,7 @@ def doc2xsf(doc, path, write_energy=False, write_forces=False, overwrite=False):
         else:
             raise RuntimeError('Duplicate file!')
 
-    with open(path + '.xsf', 'w') as f:
+    with open(path + '.xsf', 'w', encoding="utf-8") as f:
         for line in flines:
             f.write(line + '\n')
 

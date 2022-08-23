@@ -67,7 +67,7 @@ def update_castep_param_list(executable):
 
     """
     cell, blocks, params, version = scrape_castep_params(executable)
-    with open('castep_params.py', 'w') as f:
+    with open('castep_params.py', 'w', encoding="utf-8") as f:
         f.write('""" This file contains a Python list of all CASTEP parameters,\n')
         f.write('automatically generated with file_utils.scrape_castep_params().\n"""')
         f.write('\n\n')

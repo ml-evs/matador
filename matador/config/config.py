@@ -87,7 +87,7 @@ def load_custom_settings(
     custom_settings = {}
     if os.path.isfile(config_fname):
         try:
-            with open(config_fname, "r") as f:
+            with open(config_fname, "r", encoding="utf-8") as f:
                 custom_settings = yaml.safe_load(f)
                 if custom_settings is None:
                     custom_settings = {}

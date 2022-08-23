@@ -48,7 +48,7 @@ def get_element_colours():
     if colours_fname is None or not os.path.isfile(colours_fname):
         colours_fname = default_colours_fname
 
-    with open(colours_fname, 'r') as f:
+    with open(colours_fname, 'r', encoding="utf-8") as f:
         flines = f.readlines()
     element_colours = dict()
     for line in flines:
@@ -77,7 +77,7 @@ def get_element_radii():
     if colours_fname is None or not os.path.isfile(colours_fname):
         colours_fname = default_colours_fname
 
-    with open(colours_fname, 'r') as f:
+    with open(colours_fname, 'r', encoding="utf-8") as f:
         flines = f.readlines()
     element_radii = dict()
     for line in flines:
