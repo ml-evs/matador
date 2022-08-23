@@ -110,6 +110,16 @@ def get_concentration(doc, elements, include_end=False):
     return concs
 
 
+def get_subscripted_formula(formula: str) -> str:
+    """Subscripts numbers in a chemical formula, returning unicode subscripts."""
+    return formula.translate(str.maketrans("0123456789", "₀₁₂₃₄₅₆₇₈₉"))
+
+
+def get_subscripted_formula_tex(formula: str) -> str:
+    """Subscripts numbers in a chemical formula, returning LaTeX math subscripts."""
+    return get_formula_from_stoich(get_stoich_from_formula(formula), tex=True)
+
+
 def get_num_intercalated(cursor):
     """ Return array of the number of intercalated atoms
     per host atom from a list of structures, of type defined by

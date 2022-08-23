@@ -9,7 +9,7 @@ such as voltages and volume expansions.
 from typing import List, Optional, Dict, Union
 
 import numpy as np
-from matador.utils.chem_utils import get_formula_from_stoich
+from matador.utils.chem_utils import get_formula_from_stoich, get_subscripted_formula_tex
 from matador.plotting.plotting import plotting_function, SAVE_EXTS
 from matador.battery import VoltageProfile
 
@@ -143,8 +143,9 @@ def plot_voltage_curve(
                     _label = ""
                 else:
                     _label = "{:.1f} ".format(phase[0])
-                _label += "{}".format(phase[1])
+                _label += "{}".format(get_subscripted_formula_tex(phase[1]))
                 _labels.append(_label)
+                print(_label)
             _label = "+".join(_labels)
             _position = (
                 profiles[0].capacities[ind + 1],
