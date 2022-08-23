@@ -519,7 +519,7 @@ def plot_temperature_hull(
 @plotting_function
 def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=None, fig_height=None,
                       label_cutoff=None, label_corners=True, expecting_cbar=True, labels=None, plot_fname=None,
-                      hull_dist_unit="meV", efmap=None, sampmap=None, capmap=None, pathways=False, **kwargs):
+                      hull_dist_unit="meV", efmap=None, sampmap=None, concmap=None, capmap=None, pathways=False, **kwargs):
     """ Plot calculated ternary hull as a 2D projection.
 
     Parameters:
@@ -582,7 +582,7 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
         hull_cutoff = hull.hull_cutoff
 
     print('Plotting ternary hull...')
-    if capmap or efmap:
+    if capmap or efmap or concmap:
         scale = 100
     elif sampmap:
         scale = 20
@@ -615,12 +615,14 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
 
     ax.gridlines(color='black', multiple=scale * 0.1, linewidth=0.5)
     ticks = [float(val) for val in np.linspace(0, 1, 6)]
+
+    element_colours = [get_element_colours()[s] for s in hull.species]
     if label_corners:
         # remove 0 and 1 ticks when labelling corners
         ticks = ticks[1:-1]
-        ax.left_corner_label(chempot_labels[2], fontsize='large')
-        ax.right_corner_label(chempot_labels[0], fontsize='large')
-        ax.top_corner_label(chempot_labels[1], fontsize='large', offset=0.16)
+        ax.left_corner_label(chempot_labels[2], fontsize='large', color=element_colours[2])
+        ax.right_corner_label(chempot_labels[0], fontsize='large', color=element_colours[0])
+        ax.top_corner_label(chempot_labels[1], fontsize='large', color=element_colours[1], offset=0.16)
     else:
         ax.left_axis_label(chempot_labels[2], fontsize='large', offset=0.12)
         ax.right_axis_label(chempot_labels[1], fontsize='large', offset=0.12)
@@ -664,7 +666,8 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
         min_cut *= 1000
         max_cut *= 1000
 
-    hull.colours = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])
+    if not hasattr(hull, "colours"):
+        hull.colours = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])
     hull.default_cmap_list = get_linear_cmap(hull.colours[1:4], list_only=True)
     hull.default_cmap = get_linear_cmap(hull.colours[1:4], list_only=False)
     n_colours = len(hull.default_cmap_list)
@@ -767,6 +770,19 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
                                                    (concs[:, 2] <= float(k)/scale + eps) *
                                                    (concs[:, 2] >= float(k)/scale - eps)))
         ax.heatmap(sampling, style="hexagonal", cbarlabel='Number of structures', cmap='afmhot')
+    elif concmap:
+        concs = dict()
+        from ternary.helpers import simplex_iterator
+
+        def element_colour_heatmap(x, y, z):
+            colours = [np.asarray(get_element_colours()[s]) for s in hull.species]
+
+            return ((x * colours[0] + y * colours[1] + z * colours[2])/3).tolist() + [1]
+
+        for (i, j, k) in simplex_iterator(scale):
+            colour = element_colour_heatmap(float(i) / scale, float(j) / scale, float(k) / scale)
+            concs[(i, j, k)] = colour
+        ax.heatmap(concs, style="hexagonal", use_rgba=True, colorbar=False)
 
     # add labels
     if labels:
