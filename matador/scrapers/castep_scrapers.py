@@ -106,7 +106,7 @@ def res2dict(fname, db=True, **kwargs):
             i = 1
             while 'END' not in flines[line_no + i] and line_no + i < len(flines):
                 # check if we don't have some other SHELX keyword in the way, e.g. "UNIT"
-                if(len(flines[line_no + i]) >= 4 and
+                if (len(flines[line_no + i]) >= 4 and
                    all([char.isupper() for char in flines[line_no+i][0:4]])):
                     i += 1
                     continue
