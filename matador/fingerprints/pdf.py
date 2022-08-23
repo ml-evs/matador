@@ -72,8 +72,8 @@ class PDF(Fingerprint):
                             if kwargs[key] is not None})
 
         # useful data for labelling
-        self.spg = None
         structure = copy.deepcopy(doc)
+        self.spg = structure.get("space_group", "")
         if self.kwargs.get('standardize'):
             structure = standardize_doc_cell(structure)
             self.spg = structure['space_group']
