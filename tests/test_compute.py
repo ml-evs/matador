@@ -41,6 +41,7 @@ RUN_SLOW_TESTS = HOSTNAME == "cluster2"
 CASTEP_PRESENT = detect_program(EXECUTABLE)
 MPI_PRESENT = detect_program("mpirun")
 
+ACTUAL_NCORES = psutil.cpu_count(logical=False)
 if CASTEP_PRESENT and MPI_PRESENT:
     NCORES = max(psutil.cpu_count(logical=False) - 2, 1)
 else:
@@ -742,8 +743,8 @@ class ComputeTest(MatadorUnitTest):
             conv_cutoff=True,
             conv_kpt=True,
             verbosity=VERBOSITY,
-            ncores=NCORES,
-            nprocesses=2,
+            ncores=1,
+            nprocesses=min(2, ACTUAL_NCORES),
             executable=EXECUTABLE,
         )
         runner.spawn(join=False)
@@ -860,8 +861,8 @@ class ComputeTest(MatadorUnitTest):
             debug=False,
             no_reopt=True,
             verbosity=VERBOSITY,
-            ncores=2,
-            nprocesses=2,
+            ncores=min(2, ACTUAL_NCORES),
+            nprocesses=min(2, ACTUAL_NCORES // 2),
             executable=EXECUTABLE,
             max_walltime=15,
             polltime=10,
@@ -991,8 +992,8 @@ class ComputeTest(MatadorUnitTest):
             debug=False,
             no_reopt=True,
             verbosity=VERBOSITY,
-            ncores=2,
-            nprocesses=2,
+            ncores=min(2, ACTUAL_NCORES),
+            nprocesses=min(2, ACTUAL_NCORES // 2),
             executable=EXECUTABLE,
         )
         start = time.time()
@@ -1013,8 +1014,8 @@ class ComputeTest(MatadorUnitTest):
                 debug=False,
                 no_reopt=True,
                 verbosity=VERBOSITY,
-                ncores=2,
-                nprocesses=2,
+                ncores=min(2, ACTUAL_NCORES),
+                nprocesses=min(2, ACTUAL_NCORES // 2),
                 executable=EXECUTABLE,
             )
             runner.spawn()
@@ -1083,7 +1084,7 @@ class BenchmarkCastep(MatadorUnitTest):
         shutil.copy(REAL_PATH + "data/pspots/C_00PBE.usp", ".")
         with self.assertRaises(CalculationError):
             ComputeTask(
-                ncores=2,
+                ncores=min(2, ACTUAL_NCORES),
                 nnodes=None,
                 node=None,
                 res=seed,
