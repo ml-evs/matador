@@ -10,7 +10,7 @@ from time import strftime
 
 import numpy as np
 import pymongo as pm
-from matador.utils.chem_utils import get_formula_from_stoich, get_root_source, get_stoich_from_formula
+from matador.utils.chem_utils import get_formula_from_stoich, get_root_source, get_stoich_from_formula, get_subscripted_formula
 from matador import __version__
 
 EPS = 1e-12
@@ -185,7 +185,7 @@ def display_results(cursor,
                                                     latex_sub_style=latex_sub_style)
 
         if not latex:
-            formula_substring = formula_substring.translate(str.maketrans("0123456789", "₀₁₂₃₄₅₆₇₈₉"))
+            formula_substring = get_subscripted_formula(formula_substring)
 
         if 'encapsulated' in doc:
             formula_substring += '+CNT'

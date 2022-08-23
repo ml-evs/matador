@@ -14,7 +14,7 @@ from typing import List, Tuple, Union
 from matador.utils import cell_utils
 from matador.orm.orm import DataContainer
 from matador.crystal.crystal_site import Site
-from matador.utils.chem_utils import get_concentration
+from matador.utils.chem_utils import get_concentration, get_subscripted_formula
 from matador.utils.cell_utils import real2recip
 
 
@@ -336,7 +336,7 @@ class Crystal(DataContainer):
     @property
     def formula_unicode(self) -> str:
         """Returns a unicode string for the chemical formula."""
-        return self.formula.translate(str.maketrans("0123456789", "₀₁₂₃₄₅₆₇₈₉"))
+        return get_subscripted_formula(self.formula)
 
     @property
     def cell_volume(self) -> float:
