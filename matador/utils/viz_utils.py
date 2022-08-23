@@ -33,7 +33,7 @@ def viz(doc):
     return
 
 
-@lru_cache
+@lru_cache(maxsize=1)
 def get_element_colours() -> Dict[str, Tuple[float, float, float]]:
     """Return RGB element colours from VESTA file.
 
@@ -69,6 +69,7 @@ def get_element_colours() -> Dict[str, Tuple[float, float, float]]:
     return element_colours
 
 
+@lru_cache(maxsize=1)
 def get_element_radii():
     """Read element radii from VESTA config file. The colours file can be
     specified in the matadorrc. If unspecified, the default
