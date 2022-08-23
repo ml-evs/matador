@@ -386,7 +386,7 @@ class ComputeTask:
 
             if memory_usage_estimate > 0.9 * self.maxmem:
                 msg = 'Structure {} failed memcheck, skipping... '.format(self.seed) + mem_string
-                with open(self.paths['memory_fname'], 'a') as f:
+                with open(self.paths['memory_fname'], 'a', encoding="utf-8") as f:
                     f.write("{} {:.2f}GB/{:.2f}GB\n".format(self.seed, memory_usage_estimate / 1024, self.maxmem / 1024))
 
                 raise MaxMemoryEstimateExceeded(msg)
@@ -1152,7 +1152,7 @@ class ComputeTask:
 
         if self._redirect_filename is not None:
             LOG.info('Redirecting output to {redirect}'.format(redirect=self._redirect_filename))
-            redirect_file = open(self._redirect_filename, 'w')
+            redirect_file = open(self._redirect_filename, 'w', encoding="utf-8")
             stdout = redirect_file
 
         LOG.info('Running {}'.format(command))

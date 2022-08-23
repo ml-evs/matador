@@ -1,8 +1,8 @@
 recursive-include matador/config *
 recursive-include docs *
-recursive-include matador/data/ *.dat
-recursive-include matador/data/ *.csv
-recursive-include requirements/ *
+recursive-include matador/data *.dat
+recursive-include matador/data *.csv
+recursive-include requirements *
 include matador/data/nouns
 include matador/data/words
 include README.rst

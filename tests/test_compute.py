@@ -32,7 +32,7 @@ from matador.scrapers.castep_scrapers import (
 )
 from .utils import REAL_PATH, MatadorUnitTest, detect_program
 
-HOSTNAME = os.uname()[1]
+HOSTNAME = "tmp"
 PATHS_TO_DEL = ["completed", "bad_castep", "input", "logs", HOSTNAME]
 VERBOSITY = 10
 EXECUTABLE = "castep"

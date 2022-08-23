@@ -250,7 +250,7 @@ class Refiner:
                 raw_files = []
                 for source in sources:
                     if os.path.isfile(source):
-                        with open(source, 'r') as f:
+                        with open(source, 'r', encoding="utf-8") as f:
                             raw_files.append((source, f.readlines()))
 
                 doc['_raw'] = raw_files

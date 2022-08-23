@@ -225,7 +225,7 @@ class VoltageProfile:
                 fname = csv
             else:
                 fname = '{}_voltages.csv'.format(self.starting_formula)
-            with open(fname, 'w') as f:
+            with open(fname, 'w', encoding="utf-8") as f:
                 f.write(data_str)
 
         return f"\nVoltage data:\n\n{data_str}"

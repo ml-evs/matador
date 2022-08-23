@@ -92,7 +92,7 @@ class CastepElasticWorkflow(Workflow):
             for line in results['summary']:
                 print(line)
             print('Writing summary to {seed}.bulk_mod.results'.format(seed=self.seed))
-            with open(self.seed + '.bulk_mod.results', 'w') as f:
+            with open(self.seed + '.bulk_mod.results', 'w', encoding="utf-8") as f:
                 f.writelines(results['summary'])
 
 

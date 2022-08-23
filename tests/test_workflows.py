@@ -15,7 +15,7 @@ from matador.compute import ComputeTask
 from matador.scrapers import cell2dict, param2dict, phonon2dict, magres2dict
 
 
-HOSTNAME = os.uname()[1]
+HOSTNAME = "tmp"
 PATHS_TO_DEL = ["completed", "bad_castep", "input", "logs", HOSTNAME]
 VERBOSITY = 2
 EXECUTABLE = "castep"

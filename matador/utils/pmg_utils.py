@@ -35,7 +35,7 @@ REQ_PROPERTIES = [
 
 
 def get_chemsys(elements, dumpfile=None):
-    """ Scrape the Materials Project for the chemical system specified
+    """Scrape the Materials Project for the chemical system specified
     by elements, e.g. for elements `['A', 'B', 'C']` the query performed
     is `chemsys='A-B-C' & nelements=3`. Requires interactive user input
     of their MP API key (unless set by environment variable
@@ -69,7 +69,7 @@ def get_chemsys(elements, dumpfile=None):
             cursor.append(mp2dict(result))
 
     if dumpfile:
-        with open(dumpfile, 'wb') as f:
+        with open(dumpfile, 'wb', encoding="utf-8") as f:
             pickle.dump(cursor, f)
 
     print('ICSD structures: {}'.format(sum(1 for doc in cursor if 'icsd' in doc)))
