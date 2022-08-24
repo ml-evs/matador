@@ -277,27 +277,21 @@ class HullPlotTests(MatadorUnitTest):
 
     def test_binary_hull_plot(self):
         """ Test plotting binary hull. """
-        expected_files = ["KP_hull_simple.svg"]
         cursor = res2dict(REAL_PATH + "data/hull-KP-KSnP_pub/*.res")[0]
         QueryConvexHull(
             cursor=cursor,
             elements=["K", "P"],
-            svg=True,
             hull_cutoff=0.0,
             plot_kwargs={"plot_fname": "KP_hull_simple", "svg": True},
         )
-        for expected_file in expected_files:
-            self.assertTrue(os.path.isfile(expected_file))
 
     def test_binary_battery_plots(self):
         """ Test plotting binary hull. """
-        expected_files = ["KP_hull.png", "KP_voltage.png", "KP_volume.png"]
         cursor = res2dict(REAL_PATH + "data/hull-KP-KSnP_pub/*.res")[0]
         QueryConvexHull(
             cursor=cursor,
             elements=["K", "P"],
             no_plot=False,
-            png=True,
             quiet=False,
             voltage=True,
             labels=True,
@@ -306,19 +300,14 @@ class HullPlotTests(MatadorUnitTest):
             volume=True,
             plot_kwargs={"colour_by_source": True},
         )
-        for expected_file in expected_files:
-            self.assertTrue(os.path.isfile(expected_file))
 
     def test_voltage_labels(self):
-        expected_files = ["KP_voltage.png"]
         cursor = res2dict(REAL_PATH + "data/hull-KP-KSnP_pub/*.res")[0]
         hull = QueryConvexHull(
             cursor=cursor, species="KP", no_plot=True, voltage=True, labels=True
         )
 
-        plot_voltage_curve(hull.voltage_data, labels=True, savefig=expected_files[0])
-        for expected_file in expected_files:
-            self.assertTrue(os.path.isfile(expected_file))
+        plot_voltage_curve(hull.voltage_data, labels=True)
 
     @unittest.skipIf(not TERNARY_PRESENT, "Skipping as python-ternary not found")
     def test_ternary_hull_plot(self):
@@ -355,7 +344,6 @@ class HullPlotTests(MatadorUnitTest):
         from matador.hull import EnsembleHull
         from matador.scrapers import castep2dict
 
-        expected_file = "KP_beef_hull.svg"
         cursor, s = castep2dict(REAL_PATH + "data/beef_files/*.castep", db=False)
         self.assertEqual(len(s), 0)
 
@@ -369,7 +357,6 @@ class HullPlotTests(MatadorUnitTest):
         )
 
         beef_hull.plot_hull(svg=True)
-        self.assertTrue(os.path.isfile(expected_file))
 
     def test_td_hull_plot(self):
         from matador.hull.hull_temperature import TemperatureDependentHull
@@ -377,8 +364,7 @@ class HullPlotTests(MatadorUnitTest):
 
         cursor, s = castep2dict(REAL_PATH + "data/castep_phonon_files/*.castep", db=False)
         td_hull = TemperatureDependentHull(cursor=cursor, energy_key="total_energy_per_atom")
-        td_hull.plot_hull(plot_fname="td_hull", png=True)
-        self.assertTrue(os.path.isfile("td_hull.png"))
+        td_hull.plot_hull()
 
 
 @unittest.skipIf(not MATPLOTLIB_PRESENT, "Skipping plotting tests.")
@@ -389,19 +375,15 @@ class FingerprintPlotTests(MatadorUnitTest):
         structure = res2dict(
             REAL_PATH + "data/res_files/KPSn-OQMD_123456.res", as_model=True
         )[0]
-        plot_pdf(structure, png=True)
-        self.assertTrue(os.path.isfile("K7SnP_pdf.png"))
-        plot_pdf([structure, structure], filename="test_pdf", rmax=5, png=True)
-        self.assertTrue(os.path.isfile("test_pdf.png"))
+        plot_pdf(structure)
+        plot_pdf([structure, structure])
 
     def test_pxrd_plot(self):
         structure = res2dict(
             REAL_PATH + "data/res_files/KPSn-OQMD_123456.res", as_model=True
         )[0]
-        plot_pxrd(structure, png=True)
-        self.assertTrue(os.path.isfile("K7SnP_pxrd.png"))
-        plot_pdf([structure, structure], filename="test_pxrd", png=True)
-        self.assertTrue(os.path.isfile("test_pxrd.png"))
+        plot_pxrd(structure)
+        plot_pdf([structure, structure])
 
 
 @unittest.skipIf(not MATPLOTLIB_PRESENT, "Skipping plotting tests.")
@@ -413,20 +395,16 @@ class MagresPlotTests(MatadorUnitTest):
         plot_magres(
             magres,
             species="P",
-            savefig="magres_P.pdf",
             line_kwargs={"c": "green"},
         )
-        self.assertTrue(os.path.isfile("magres_P.pdf"))
         plot_magres(
             magres,
             species="Li",
             broadening_width=0,
             magres_key="chemical_shift_aniso",
-            savefig="magres_Li.png",
             signal_labels=["NaP", "LiP"],
             line_kwargs=[{"lw": 3}, {"ls": "--"}],
         )
-        self.assertTrue(os.path.isfile("magres_Li.png"))
 
         with self.assertRaises(RuntimeError):
             plot_magres(magres, species=None)
