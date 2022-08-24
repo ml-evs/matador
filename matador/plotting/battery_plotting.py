@@ -281,7 +281,7 @@ def plot_volume_curve(
             ],
             marker="o",
             markeredgewidth=1.5,
-            # markeredgecolor="k",
+            markeredgecolor="k",
             c=c,
             zorder=1000,
             lw=0,
