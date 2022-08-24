@@ -15,7 +15,7 @@ from matador.plotting.plotting import plotting_function, get_linear_cmap, SAVE_E
 
 EPS = 1e-12
 
-__all__ = ['plot_2d_hull', 'plot_ternary_hull', 'plot_ensemble_hull', 'plot_temperature_hull']
+__all__ = ('plot_2d_hull', 'plot_ternary_hull', 'plot_ensemble_hull', 'plot_temperature_hull')
 
 
 def _get_hull_labels(hull, label_cutoff=None, num_species=None, exclude_edges=True):
@@ -70,7 +70,7 @@ def _get_hull_labels(hull, label_cutoff=None, num_species=None, exclude_edges=Tr
 
 
 @plotting_function
-def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
+def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True, species=None,
                  plot_hull_points=True, labels=None, label_cutoff=None, colour_by_source=False,
                  sources=None, hull_label=None, source_labels=None, title=True, plot_fname=None, show_cbar=True,
                  colour_by_composition=False, label_offset=(1, 0.1), specific_label_offset=None, eform_limits=None,
@@ -86,6 +86,9 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
         show (bool): whether or not to display the plot in an X window,
         plot_points (bool): whether or not to display off-hull structures,
         plot_hull_points (bool): whether or not to display on-hull structures,
+        plot_tie_line (bool): whether to plot the tie-line or not.
+        species (list(str)): Use a custom species list instead of inherting from the hull
+            (useful for plotting subset phase diagrams).
         labels (bool): whether to label formulae of hull structures, also read from
             hull.args.
         label_cutoff (float/:obj:`tuple` of :obj:`float`): draw labels less than or
@@ -123,11 +126,21 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
     hull.default_cmap_list = get_linear_cmap(hull.colours[1:4], list_only=True)
     hull.default_cmap = get_linear_cmap(hull.colours[1:4], list_only=False)
 
+    species = species or hull.species
+    discard_species = None
+    if species != hull.species:
+        if not all(spec in hull.species for spec in species):
+            raise RuntimeError(f"Custom species {species} not compatible with base phase diagram {hull.species}.")
+
+        discard_species_inds = [ind for ind, _ in enumerate(hull.species) if _ not in species]
+        discard_species = [hull.species[ind] for ind in discard_species_inds]
+
+
     if colour_by_composition:
         try:
-            element_colours = [get_element_colours()[s] for s in hull.species]
+            element_colours = [get_element_colours()[s] for s in species]
         except Exception:
-            raise RuntimeError(f"Cannot `colour_by_composition`: no colour found for species {hull.species}.")
+            raise RuntimeError(f"Cannot `colour_by_composition`: no colour found for species {species}.")
         conc_cmap = get_linear_cmap(element_colours, list_only=False)
 
     if labels is None:
@@ -137,11 +150,21 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
 
     scale = 1
     scatter = []
-    chempot_labels = [get_formula_from_stoich(get_stoich_from_formula(species, sort=False), tex=True)
-                      for species in hull.species]
+    chempot_labels = [get_formula_from_stoich(get_stoich_from_formula(spec, sort=False), tex=True)
+                      for spec in species]
     tie_line = hull.convex_hull.points[hull.convex_hull.vertices]
 
-    # plot hull structures
+    def _filter_hull_points_by_species(hull_points):
+        concs = hull_points[:, :-1]
+        concs_ = np.column_stack([concs, 1-np.sum(concs, axis=1)])
+        species_to_include = [i for i in range(len(hull.species)) if i not in discard_species_inds]
+        return np.where(np.sum(concs_[:, species_to_include], axis=1) > 1 - EPS)
+
+    if discard_species:
+        # filter out discarded species from vertices
+        tie_line = tie_line[_filter_hull_points_by_species(hull.convex_hull.points[hull.convex_hull.vertices])]
+
+    # plot hull points from tie line
     if plot_hull_points:
         if colour_by_composition:
             hull_point_scale = 75
@@ -158,6 +181,7 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
         else:
             point_colours = hull.colours[1]
             cmap = None
+
         ax.scatter(tie_line[:, 0], tie_line[:, 1],
                    c=point_colours,
                    cmap=cmap,
@@ -168,19 +192,23 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
                     c=hull.colours[0], zorder=1, label=hull_label,
                     marker='o', markerfacecolor=hull.colours[0],
                     markeredgecolor=edgecolor, markeredgewidth=edgewidth, markersize=np.sqrt(scale*hull_point_scale))
+
+    # plot tie line itself
     if plot_tie_line:
         ax.plot(np.sort(tie_line[:, 0]), tie_line[np.argsort(tie_line[:, 0]), 1],
                 c=hull.colours[0], zorder=1, label=hull_label, markersize=0)
 
-    if hull.hull_cutoff > 0:
-        ax.plot(np.sort(tie_line[:, 0]), tie_line[np.argsort(tie_line[:, 0]), 1] + hull.hull_cutoff,
-                '--', c=hull.colours[1], alpha=0.5, zorder=1, label='')
+        if hull.hull_cutoff > 0:
+            ax.plot(np.sort(tie_line[:, 0]), tie_line[np.argsort(tie_line[:, 0]), 1] + hull.hull_cutoff,
+                    '--', c=hull.colours[1], alpha=0.5, zorder=1, label='')
 
-    # annotate hull structures
+    # annotate near-hull structures within `label_cutoff`
     if labels or label_cutoff is not None:
         label_cursor = _get_hull_labels(hull, num_species=2, label_cutoff=label_cutoff)
         already_labelled = []
         for ind, doc in enumerate(label_cursor):
+            if discard_species and any(d for d in discard_species in doc["elements"]):
+                continue
             formula = get_formula_from_stoich(doc['stoichiometry'], sort=True)
             if formula not in already_labelled:
                 arrowprops = dict(
@@ -210,7 +238,7 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
                 ax.annotate(get_formula_from_stoich(doc['stoichiometry'],
                                                     latex_sub_style=r'\mathregular',
                                                     tex=True,
-                                                    elements=hull.species,
+                                                    elements=species,
                                                     sort=False),
                             xy=(conc, e_f),
                             xytext=position,
@@ -232,8 +260,13 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
         if hull.hull_cutoff == 0:
             # if no specified hull cutoff, ignore labels and colour by hull distance
             if plot_points:
-                concs = hull.structures[np.argsort(hull.hull_dist), 0][::-1]
-                energies = hull.structures[np.argsort(hull.hull_dist), -1][::-1],
+                if discard_species:
+                    indices = _filter_hull_points_by_species(hull.structures)
+                    concs = (hull.structures[indices])[np.argsort(hull.hull_dist), 0][::-1]
+                    energies = (hull.structures[indices])[np.argsort(hull.hull_dist), -1][::-1],
+                else:
+                    concs = hull.structures[np.argsort(hull.hull_dist), 0][::-1]
+                    energies = hull.structures[np.argsort(hull.hull_dist), -1][::-1],
                 if colour_by_composition:
                     point_colours = concs
                     norm = None
@@ -265,14 +298,18 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
 
         elif hull.hull_cutoff != 0:
             # if specified hull cutoff colour those below
+            allowed_indices = None
+            if discard_species:
+                allowed_indices = _filter_hull_points_by_species(hull.structures)[0].tolist()
             c = hull.colours[1]
             for ind in range(len(hull.structures)):
-                if hull.hull_dist[ind] <= hull.hull_cutoff or hull.hull_cutoff == 0:
-                    if plot_points:
-                        scatter.append(ax.scatter(hull.structures[ind, 0], hull.structures[ind, 1],
-                                                  s=scale*40,
-                                                  alpha=0.9, c=c,
-                                                  zorder=300))
+                if not allowed_indices or ind in allowed_indices:
+                    if hull.hull_dist[ind] <= hull.hull_cutoff or hull.hull_cutoff == 0:
+                        if plot_points:
+                            scatter.append(ax.scatter(hull.structures[ind, 0], hull.structures[ind, 1],
+                                                    s=scale*40,
+                                                    alpha=0.9, c=c,
+                                                    zorder=300))
             if plot_points:
                 ax.scatter(hull.structures[1:-1, 0], hull.structures[1:-1, 1],
                            s=scale*30, lw=0,
@@ -311,7 +348,7 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
 
     if hull.savefig or any([kwargs.get(ext) for ext in SAVE_EXTS]):
         import os
-        fname = plot_fname or ''.join(hull.species) + '_hull'
+        fname = plot_fname or ''.join(species) + '_hull'
         for ext in SAVE_EXTS:
             if hull.args.get(ext) or kwargs.get(ext):
                 fname_tmp = fname
@@ -324,6 +361,9 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
                 plt.savefig('{}.{}'.format(fname, ext),
                             bbox_inches='tight', transparent=True)
                 print('Wrote {}.{}'.format(fname, ext))
+
+    if show:
+        plt.show()
 
     return ax
 
@@ -504,7 +544,7 @@ def plot_temperature_hull(
         if plot_fname is not None:
             fname = plot_fname
         else:
-            fname = ''.join(hull.species) + data_key + '_hull'
+            fname = ''.join(species) + data_key + '_hull'
         for ext in SAVE_EXTS:
             if hull.args.get(ext) or kwargs.get(ext):
                 plt.savefig('{}.{}'.format(fname, ext),
