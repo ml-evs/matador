@@ -376,7 +376,9 @@ def _draw_bonds(
 
     colours = get_element_colours()
     for i, i_atom in enumerate(sites):
-        for j, j_atom in enumerate(sites, start=i):
+        for j, j_atom in enumerate(sites):
+            if j <= i:
+                continue
             species = (sites[i][0], sites[j][0])
             dist = np.linalg.norm(np.array(sites[i][1]) - np.array(sites[j][1]))
             if bond_dict.get(tuple(sorted(species)), -1) < dist:
