@@ -653,7 +653,7 @@ def dos_plot(seeds, ax_dos, options, bbox_extra_artists=None):
                     c = None
                     label = options.get("labels")[seed_ind]
                 else:
-                    c = "grey"
+                    c = None
                     label = "Total DOS"
 
                 ax_dos.plot(
@@ -1274,6 +1274,9 @@ def _add_path_labels(seed, dispersion, ax_dispersion, path, seed_ind, options):
                     [path[vbm_pos - vbm_offset], path[cbm_pos - cbm_offset]],
                     [vbm, cbm],
                     c="blue",
+                    lw=5,
+                    alpha=0.3,
+                    zorder=0,
                     label="indirect gap {:3.3f} eV".format(cbm - vbm),
                 )
 
@@ -1287,6 +1290,9 @@ def _add_path_labels(seed, dispersion, ax_dispersion, path, seed_ind, options):
                 [path[vbm_pos - vbm_offset], path[cbm_pos - cbm_offset]],
                 [vbm, cbm],
                 c="red",
+                lw=5,
+                alpha=0.3,
+                zorder=0,
                 label="direct gap {:3.3f} eV".format(cbm - vbm),
             )
             ax_dispersion.legend(
