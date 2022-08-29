@@ -46,6 +46,8 @@ def _get_hull_labels(hull, label_cutoff=None, num_species=None, exclude_edges=Tr
             label_cutoff = label_cutoff[0]
         label_cursor = [doc for doc in hull.cursor if doc['hull_distance'] <= label_cutoff + EPS]
 
+    label_cursor = sorted(label_cursor, key=lambda _: _["hull_distance"], reverse=False)
+
     num_labels = len({get_formula_from_stoich(doc['stoichiometry']) for doc in label_cursor})
     if num_labels < len(label_cursor):
         tmp_cursor = []
@@ -576,10 +578,12 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
     else:
         labels = True
 
-    if hull_cutoff is None and hull.hull_cutoff is None:
-        hull_cutoff = 0
-    else:
-        hull_cutoff = hull.hull_cutoff
+    _hull_cutoff = 0.1
+    if hull_cutoff is not None:
+        _hull_cutoff = hull_cutoff
+    elif hull.hull_cutoff is not None:
+        _hull_cutoff = hull.hull_cutoff
+    hull_cutoff = _hull_cutoff
 
     print('Plotting ternary hull...')
     if capmap or efmap or concmap:
@@ -649,11 +653,9 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
     filtered_hull_dists = []
     for ind, conc in enumerate(concs):
         if conc not in filtered_concs:
-            if hull_dist[ind] <= hull.hull_cutoff or (hull.hull_cutoff == 0 and hull_dist[ind] < 0.1):
+            if hull_dist[ind] <= hull_cutoff or (hull_cutoff == 0 and hull_dist[ind] < 0.1):
                 filtered_concs.append(conc)
                 filtered_hull_dists.append(hull_dist[ind])
-    if hull.args.get('debug'):
-        print('Trying to plot {} points...'.format(len(filtered_concs)))
 
     concs = np.asarray(filtered_concs)
     hull_dist = np.asarray(filtered_hull_dists)
