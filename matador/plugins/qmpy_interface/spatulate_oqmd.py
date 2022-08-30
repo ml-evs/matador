@@ -35,12 +35,12 @@ import qmpy
 
 
 def qmpy_parse_kpoints(string):
-    """ Parse VASP kpoint block into grid (ignores offset). """
-    return [int(i) for i in string.split('\n')[-2].split(' ')]
+    """Parse VASP kpoint block into grid (ignores offset)."""
+    return [int(i) for i in string.split("\n")[-2].split(" ")]
 
 
 def qmpy_entry_to_doc(entry):
-    """ Parse a qmpy entry object into a matador document,
+    """Parse a qmpy entry object into a matador document,
     with associated VASP parameters converted into the CASTEP
     keywords.
 
@@ -55,47 +55,51 @@ def qmpy_entry_to_doc(entry):
     doc = dict()
 
     if entry is None:
-        raise RuntimeError('Entry is None.')
+        raise RuntimeError("Entry is None.")
     if entry.duplicate_of is not None and entry.duplicate_of.id != entry.id:
-        raise RuntimeError('Structure is a duplicate.')
+        raise RuntimeError("Structure is a duplicate.")
 
-    doc['task'] = 'geometryoptimization'
+    doc["task"] = "geometryoptimization"
 
     try:
-        doc['num_atoms'] = int(entry.natoms)
+        doc["num_atoms"] = int(entry.natoms)
     except TypeError:
-        doc['num_atoms'] = int(entry.structure.natoms)
+        doc["num_atoms"] = int(entry.structure.natoms)
 
-    doc['elems'] = sorted(list({elem.symbol for elem in entry.elements}))
-    doc['stoichiometry'] = sorted([[elem, entry.comp[elem]] for elem in entry.comp], key=lambda x: x[0])
-    doc['num_fu'] = doc['num_atoms'] / int(sum(doc['stoichiometry'][i][1] for i in range(len(doc['stoichiometry']))))
+    doc["elems"] = sorted(list({elem.symbol for elem in entry.elements}))
+    doc["stoichiometry"] = sorted(
+        [[elem, entry.comp[elem]] for elem in entry.comp], key=lambda x: x[0]
+    )
+    doc["num_fu"] = doc["num_atoms"] / int(
+        sum(doc["stoichiometry"][i][1] for i in range(len(doc["stoichiometry"])))
+    )
     try:
-        doc['formation_energy_per_atom'] = entry.energy
-        doc['formation_energy'] = entry.energy * doc['num_atoms']
+        doc["formation_energy_per_atom"] = entry.energy
+        doc["formation_energy"] = entry.energy * doc["num_atoms"]
     except TypeError:
-        raise RuntimeError('entry.id={} has no energy'.format(entry.id))
-    doc['enthalpy_per_atom'] = entry.energy
-    doc['enthalpy'] = entry.energy * doc['num_atoms']
-    doc['source'] = ['OQMD {}'.format(int(entry.id))]
-    doc['_oqmd_entry_id'] = int(entry.id)
-    if 'icsd' in entry.keywords:
-        doc['icsd'] = int(entry.label.split('-')[-1])
+        raise RuntimeError("entry.id={} has no energy".format(entry.id))
+    doc["enthalpy_per_atom"] = entry.energy
+    doc["enthalpy"] = entry.energy * doc["num_atoms"]
+    doc["source"] = ["OQMD {}".format(int(entry.id))]
+    doc["_oqmd_entry_id"] = int(entry.id)
+    if "icsd" in entry.keywords:
+        doc["icsd"] = int(entry.label.split("-")[-1])
         try:
-            doc['reference'] = str(entry.reference.citation)
+            doc["reference"] = str(entry.reference.citation)
         except Exception:
             pass
 
-    doc['space_group'] = entry.spacegroup.hm
-    doc['lattice_cart'] = entry.structure.cell.tolist()
-    doc['positions_abs'] = entry.structure.cartesian_coords.tolist()
-    doc['positions_frac'] = entry.structure.coords.tolist()
-    doc['atom_types'] = []
+    doc["space_group"] = entry.spacegroup.hm
+    doc["lattice_cart"] = entry.structure.cell.tolist()
+    doc["positions_abs"] = entry.structure.cartesian_coords.tolist()
+    doc["positions_frac"] = entry.structure.coords.tolist()
+    doc["atom_types"] = []
     for atom in entry.structure.atoms:
-        doc['atom_types'].append(atom.species)
-    doc['cell_volume'] = entry.structure.volume
-    doc['task'] = 'geometryoptimization'
-    doc['species_pot'] = {elem: 'OQMD' for elem in doc['elems']}
-    doc['stable'] = entry.stable
+        doc["atom_types"].append(atom.species)
+    doc["cell_volume"] = entry.structure.volume
+    doc["task"] = "geometryoptimization"
+    doc["species_pot"] = {elem: "OQMD" for elem in doc["elems"]}
+    doc["stable"] = entry.stable
 
     # some entries have multiple E_f, choose the last one,
     # which should match entry.energy: OR SO I THOUGHT
@@ -107,31 +111,35 @@ def qmpy_entry_to_doc(entry):
             eform = ef
             break
     else:
-        print('Unable to match formation energy for entry.id={}'.format(entry.id))
+        print("Unable to match formation energy for entry.id={}".format(entry.id))
         raise RuntimeError
-    doc['hull_distance'] = max(0, eform.stability)
+    doc["hull_distance"] = max(0, eform.stability)
     ef_calc = eform.calculation
     oqmd_calc_settings = ef_calc.settings
-    doc['cut_off_energy'] = oqmd_calc_settings['encut']
-    doc['spin_polarized'] = bool(oqmd_calc_settings['ispin'] - 1)
-    doc['kpoints_mp_grid'] = qmpy_parse_kpoints(ef_calc.KPOINTS)
-    doc['kpoints_mp_spacing'] = calc_mp_spacing(doc['lattice_cart'], doc['kpoints_mp_grid'])
-    doc['xc_functional'] = 'PBE'
+    doc["cut_off_energy"] = oqmd_calc_settings["encut"]
+    doc["spin_polarized"] = bool(oqmd_calc_settings["ispin"] - 1)
+    doc["kpoints_mp_grid"] = qmpy_parse_kpoints(ef_calc.KPOINTS)
+    doc["kpoints_mp_spacing"] = calc_mp_spacing(
+        doc["lattice_cart"], doc["kpoints_mp_grid"]
+    )
+    doc["xc_functional"] = "PBE"
 
-    doc['forces'] = ef_calc.output.forces
-    doc['pressure'] = 0.0
-    doc['stress'] = -0.1 * (ef_calc.output.sxx + ef_calc.output.syy + ef_calc.output.szz)/3.0
+    doc["forces"] = ef_calc.output.forces
+    doc["pressure"] = 0.0
+    doc["stress"] = (
+        -0.1 * (ef_calc.output.sxx + ef_calc.output.syy + ef_calc.output.szz) / 3.0
+    )
     try:
-        doc['max_force_on_atom'] = np.max(np.linalg.norm(doc['forces'], axis=-1))
+        doc["max_force_on_atom"] = np.max(np.linalg.norm(doc["forces"], axis=-1))
     except Exception:
-        print(entry.id, doc['forces'])
-    doc['forces'] = doc['forces'].tolist()
+        print(entry.id, doc["forces"])
+    doc["forces"] = doc["forces"].tolist()
 
     return doc
 
 
 def calc_mp_spacing(real_lat, mp_grid, prec=3):
-    """ Convert real lattice in Cartesian basis and the
+    """Convert real lattice in Cartesian basis and the
     kpoint_mp_grid into a grid spacing. Copied from matador
     utils version.
 
@@ -149,14 +157,14 @@ def calc_mp_spacing(real_lat, mp_grid, prec=3):
     recip_lat = real2recip(real_lat)
     recip_len = np.zeros((3))
     recip_len = np.sqrt(np.sum(np.power(recip_lat, 2), axis=1))
-    spacing = recip_len / (2*np.pi*np.asarray(mp_grid))
+    spacing = recip_len / (2 * np.pi * np.asarray(mp_grid))
     max_spacing = np.max(spacing)
     exponent = round(np.log10(max_spacing) - prec)
-    return round(max_spacing + 0.5*10**exponent, prec)
+    return round(max_spacing + 0.5 * 10**exponent, prec)
 
 
 def real2recip(real_lat):
-    """ Convert the real lattice in Cartesian basis to
+    """Convert the real lattice in Cartesian basis to
     the reciprocal space lattice. Copy of matador.utils
     version.
 
@@ -169,23 +177,39 @@ def real2recip(real_lat):
     """
     real_lat = np.asarray(real_lat)
     recip_lat = np.zeros((3, 3))
-    recip_lat[0] = (2*np.pi)*np.cross(real_lat[1], real_lat[2]) / \
-        (np.dot(real_lat[0], np.cross(real_lat[1], real_lat[2])))
-    recip_lat[1] = (2*np.pi)*np.cross(real_lat[2], real_lat[0]) / \
-        (np.dot(real_lat[1], np.cross(real_lat[2], real_lat[0])))
-    recip_lat[2] = (2*np.pi)*np.cross(real_lat[0], real_lat[1]) / \
-        (np.dot(real_lat[2], np.cross(real_lat[0], real_lat[1])))
+    recip_lat[0] = (
+        (2 * np.pi)
+        * np.cross(real_lat[1], real_lat[2])
+        / (np.dot(real_lat[0], np.cross(real_lat[1], real_lat[2])))
+    )
+    recip_lat[1] = (
+        (2 * np.pi)
+        * np.cross(real_lat[2], real_lat[0])
+        / (np.dot(real_lat[1], np.cross(real_lat[2], real_lat[0])))
+    )
+    recip_lat[2] = (
+        (2 * np.pi)
+        * np.cross(real_lat[0], real_lat[1])
+        / (np.dot(real_lat[2], np.cross(real_lat[0], real_lat[1])))
+    )
     return recip_lat.tolist()
 
 
 class DBConverter:
     def __init__(
         self,
-        host=None, client=None, dryrun=False, debug=False,
-        verbosity=0, db_name='oqmd_1.2', append=False,
-        start_id=0, chunk_size=1000, restart=True
+        host=None,
+        client=None,
+        dryrun=False,
+        debug=False,
+        verbosity=0,
+        db_name="oqmd_1.2",
+        append=False,
+        start_id=0,
+        chunk_size=1000,
+        restart=True,
     ):
-        """ Connect to the relevant databases and
+        """Connect to the relevant databases and
         set off the scraper.
         """
         self.import_count = 0
@@ -204,8 +228,12 @@ class DBConverter:
         # set up I/O for text_id
         if not self.dryrun:
             print(__file__)
-            wordfile = open(dirname(realpath(__file__)) + '/../../matador/scrapers/words', 'r')
-            nounfile = open(dirname(realpath(__file__)) + '/../../matador/scrapers/nouns', 'r')
+            wordfile = open(
+                dirname(realpath(__file__)) + "/../../matador/scrapers/words", "r"
+            )
+            nounfile = open(
+                dirname(realpath(__file__)) + "/../../matador/scrapers/nouns", "r"
+            )
             self.wlines = wordfile.readlines()
             self.num_words = len(self.wlines)
             self.nlines = nounfile.readlines()
@@ -214,13 +242,13 @@ class DBConverter:
             nounfile.close()
 
             if self.client is None:
-                print('connecting to {}'.format(host))
+                print("connecting to {}".format(host))
                 self.client = pm.MongoClient(host)
 
             self.db = self.client.crystals
             current_collections = self.db.list_collection_names()
             if self.db_name in current_collections and not self.append:
-                raise SystemExit('Desired db_name already exists!')
+                raise SystemExit("Desired db_name already exists!")
 
             self.repo = self.db[self.db_name]
             self.create_indices()
@@ -228,21 +256,23 @@ class DBConverter:
 
     def create_indices(self):
         # create unique index for oqmd ID to allow for repeated imports
-        self.repo.create_index([('enthalpy_per_atom', pm.ASCENDING)])
-        self.repo.create_index([('stoichiometry', pm.ASCENDING)])
-        self.repo.create_index([('elems', pm.ASCENDING)])
-        self.repo.create_index([('source', pm.ASCENDING)])
+        self.repo.create_index([("enthalpy_per_atom", pm.ASCENDING)])
+        self.repo.create_index([("stoichiometry", pm.ASCENDING)])
+        self.repo.create_index([("elems", pm.ASCENDING)])
+        self.repo.create_index([("source", pm.ASCENDING)])
         self.create_extra_indices()
 
     def struct2db(self, struct):
-        """ Insert completed Python dictionary into chosen
+        """Insert completed Python dictionary into chosen
         database, with generated text_id.
         """
-        plain_text_id = [self.wlines[randint(0, self.num_words-1)].strip(),
-                         self.nlines[randint(0, self.num_nouns-1)].strip()]
-        struct['text_id'] = plain_text_id
-        if '_id' in struct:
-            raise RuntimeError('{}'.format(struct))
+        plain_text_id = [
+            self.wlines[randint(0, self.num_words - 1)].strip(),
+            self.nlines[randint(0, self.num_nouns - 1)].strip(),
+        ]
+        struct["text_id"] = plain_text_id
+        if "_id" in struct:
+            raise RuntimeError("{}".format(struct))
         try:
             _ = self.repo.insert_one(struct)
         except pm.errors.DuplicateKeyError:
@@ -252,27 +282,26 @@ class DBConverter:
 
 
 class MPConverter(DBConverter):
-
     def __init__(self, cursor, *args, **kwargs):
         self.cursor = cursor
         super().__init__(*args, **kwargs)
 
     def create_extra_indices(self):
         # create unique index for MP ID to allow for repeated imports
-        self.repo.create_index('_mp_id', unique=True)
+        self.repo.create_index("_mp_id", unique=True)
 
     def build_mongo(self):
         for doc in self.cursor:
             doc = self.doc2entry(doc)
             self.import_count += self.struct2db(doc)
 
-        print(self.import_count, '/', len(self.cursor))
+        print(self.import_count, "/", len(self.cursor))
 
     def doc2entry(self, doc):
-        if 'task' not in doc:
-            doc['task'] = 'geometryoptimization'
-        if 'species_pot' not in doc:
-            doc['species_pot'] = {elem: 'OQMD' for elem in doc['elems']}
+        if "task" not in doc:
+            doc["task"] = "geometryoptimization"
+        if "species_pot" not in doc:
+            doc["species_pot"] = {elem: "OQMD" for elem in doc["elems"]}
         for key in doc:
             if isinstance(doc[key], np.ndarray):
                 doc[key] = doc[key].tolist()
@@ -283,26 +312,31 @@ class MPConverter(DBConverter):
 
 
 class OQMDConverter(DBConverter):
-    """ The OQMDConverter class implements methods to scrape
+    """The OQMDConverter class implements methods to scrape
     the OQMD SQL database for all entries using the qmpy interface.
     """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     def create_extra_indices(self):
         # create unique index for oqmd ID to allow for repeated imports
-        self.repo.create_index('_oqmd_entry_id', unique=True)
+        self.repo.create_index("_oqmd_entry_id", unique=True)
 
     def build_mongo(self):
-        """ Perform QMPY query for all entries, and scrape them into a MongoDB. """
+        """Perform QMPY query for all entries, and scrape them into a MongoDB."""
         # start by scraping all converged structures with chosen label
         chunk_iter = 0
         all_structures = qmpy.Entry.objects.all().count()
-        print('Expecting {} structures total'.format(all_structures))
+        print("Expecting {} structures total".format(all_structures))
 
         try:
-            self.start_id = self.repo.find().sort('_oqmd_entry_id', pm.DESCENDING).limit(1)[0]['_oqmd_entry_id']
-            print('Restarting from entry.id={}'.format(self.start_id))
+            self.start_id = (
+                self.repo.find()
+                .sort("_oqmd_entry_id", pm.DESCENDING)
+                .limit(1)[0]["_oqmd_entry_id"]
+            )
+            print("Restarting from entry.id={}".format(self.start_id))
         except IndexError:
             self.start_id = 0
 
@@ -313,19 +347,23 @@ class OQMDConverter(DBConverter):
 
             # check that there are even any structures left to find
             remaining = qmpy.Entry.objects.filter(id__gte=chunk_min).count()
-            print('{} structures remaining with ID > {}'.format(remaining, chunk_min))
+            print("{} structures remaining with ID > {}".format(remaining, chunk_min))
             if remaining == 0:
                 break
 
-            cursor = (qmpy.Entry.objects
-                      .filter(id__gte=chunk_min)
-                      .filter(id__lt=chunk_max))
+            cursor = qmpy.Entry.objects.filter(id__gte=chunk_min).filter(
+                id__lt=chunk_max
+            )
 
             num_structures = cursor.count()
             if num_structures < 1:
                 continue
 
-            print('Chunk {} -> {} contains {} entries'.format(chunk_min, chunk_max, num_structures))
+            print(
+                "Chunk {} -> {} contains {} entries".format(
+                    chunk_min, chunk_max, num_structures
+                )
+            )
             for entry in tqdm.tqdm(cursor, total=num_structures):
                 try:
                     doc = {}
@@ -345,40 +383,55 @@ class OQMDConverter(DBConverter):
             del cursor
 
             self.num_scraped = self.repo.count_documents({})
-            print('Reached {} de-duplicated entiries out of {} including duplicates'.format(self.num_scraped, all_structures))
+            print(
+                "Reached {} de-duplicated entiries out of {} including duplicates".format(
+                    self.num_scraped, all_structures
+                )
+            )
 
             if not self.restart:
                 break
 
         if self.dryrun:
-            print('Successfully scraped', self.success_count, '/',
-                  'structures.')
+            print("Successfully scraped", self.success_count, "/", "structures.")
         if not self.dryrun:
             if self.import_count == 0:
-                raise RuntimeError('Nothing imported.')
-            print('Successfully imported', self.import_count, '/',
-                  'structures.')
+                raise RuntimeError("Nothing imported.")
+            print("Successfully imported", self.import_count, "/", "structures.")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # importer = QMPYConverter()
     parser = argparse.ArgumentParser(
-        description='Import OQMD (http://oqmd.org) structures into MongoDB database.',
-        epilog='Written by Matthew Evans (2016)')
-    parser.add_argument('-d', '--dryrun', action='store_true',
-                        help='run the importer without connecting to the database')
-    parser.add_argument('-v', '--verbosity', action='count',
-                        help='enable verbose output')
-    parser.add_argument('--no_restart', action='store_true',
-                        help='don\'t restart script if there are missing entries')
-    parser.add_argument('--debug', action='store_true',
-                        help='enable debug output to print every dict')
-    parser.add_argument('--append', action='store_true',
-                        help='add to existing collection')
+        description="Import OQMD (http://oqmd.org) structures into MongoDB database.",
+        epilog="Written by Matthew Evans (2016)",
+    )
+    parser.add_argument(
+        "-d",
+        "--dryrun",
+        action="store_true",
+        help="run the importer without connecting to the database",
+    )
+    parser.add_argument(
+        "-v", "--verbosity", action="count", help="enable verbose output"
+    )
+    parser.add_argument(
+        "--no_restart",
+        action="store_true",
+        help="don't restart script if there are missing entries",
+    )
+    parser.add_argument(
+        "--debug", action="store_true", help="enable debug output to print every dict"
+    )
+    parser.add_argument(
+        "--append", action="store_true", help="add to existing collection"
+    )
     args = parser.parse_args()
-    importer = OQMDConverter(dryrun=args.dryrun,
-                             debug=args.debug,
-                             db_name='oqmd_1.2',
-                             restart=not args.no_restart,
-                             append=args.append,
-                             verbosity=args.verbosity)
+    importer = OQMDConverter(
+        dryrun=args.dryrun,
+        debug=args.debug,
+        db_name="oqmd_1.2",
+        restart=not args.no_restart,
+        append=args.append,
+        verbosity=args.verbosity,
+    )

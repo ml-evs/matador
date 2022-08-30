@@ -8,7 +8,7 @@ scattering data stored within the module.
 
 
 def load_scattering_file(filename, a_inds, b_inds, c_ind):
-    """ Load a scattering file with a, b and c coefficients
+    """Load a scattering file with a, b and c coefficients
     in the columns provided.
 
     """

@@ -13,15 +13,27 @@ from matador.utils.cell_utils import get_space_group_label_latex
 from matador.crystal import Crystal
 
 
-__all__ = ['plot_pxrd']
+__all__ = ["plot_pxrd"]
 
 
 @plotting_function
 def plot_pxrd(
-    pxrds, two_theta_range=None, text_loc="right", rug=False, rug_height=0.05, rug_offset=0.04, offset=None,
-    ax=None, labels=None, figsize=None, text_offset=0.1, colour_labels=True, filename=None, **kwargs
+    pxrds,
+    two_theta_range=None,
+    text_loc="right",
+    rug=False,
+    rug_height=0.05,
+    rug_offset=0.04,
+    offset=None,
+    ax=None,
+    labels=None,
+    figsize=None,
+    text_offset=0.1,
+    colour_labels=True,
+    filename=None,
+    **kwargs,
 ):
-    """ Plot PXRD or PXRDs.
+    """Plot PXRD or PXRDs.
 
     Parameters:
         pxrds (list or matador.fingerprints.pxrd.PXRD): the PXRD
@@ -53,7 +65,7 @@ def plot_pxrd(
         labels = [labels]
 
     if figsize is None and ax is None:
-        _user_default_figsize = plt.rcParams.get('figure.figsize', (8, 6))
+        _user_default_figsize = plt.rcParams.get("figure.figsize", (8, 6))
         height = len(pxrds) * max(0.5, _user_default_figsize[1] / 1.5 / len(pxrds))
         figsize = (_user_default_figsize[0], height)
 
@@ -70,10 +82,10 @@ def plot_pxrd(
     for ind, pxrd in enumerate(pxrds):
         if isinstance(pxrd, Crystal):
             pxrd = pxrd.pxrd
-        elif isinstance(pxrd, dict) and 'pxrd' in pxrd:
-            pxrd = pxrd['pxrd']
+        elif isinstance(pxrd, dict) and "pxrd" in pxrd:
+            pxrd = pxrd["pxrd"]
 
-        c = next(colour_cycle).get('color')
+        c = next(colour_cycle).get("color")
 
         if labels:
             label = labels[ind]
@@ -88,27 +100,41 @@ def plot_pxrd(
             text_colour = None
 
         if text_loc == "right":
-            ax.text(0.95, ind+text_offset, label,
-                    transform=ax.get_yaxis_transform(),
-                    horizontalalignment='right',
-                    color=text_colour)
+            ax.text(
+                0.95,
+                ind + text_offset,
+                label,
+                transform=ax.get_yaxis_transform(),
+                horizontalalignment="right",
+                color=text_colour,
+            )
 
         if text_loc == "left":
-            ax.text(0.05, ind+text_offset, label,
-                    transform=ax.get_yaxis_transform(),
-                    horizontalalignment='left',
-                    color=text_colour)
+            ax.text(
+                0.05,
+                ind + text_offset,
+                label,
+                transform=ax.get_yaxis_transform(),
+                horizontalalignment="left",
+                color=text_colour,
+            )
 
         if rug:
             import numpy as np
+
             peaks = np.unique(pxrd.peak_positions)
             for peak in peaks:
-                ax.plot([peak, peak], [ind-rug_height-rug_offset, ind-rug_offset], c=c, alpha=0.5)
+                ax.plot(
+                    [peak, peak],
+                    [ind - rug_height - rug_offset, ind - rug_offset],
+                    c=c,
+                    alpha=0.5,
+                )
 
-    ax.set_ylim(-0.2, len(pxrds)+0.1)
+    ax.set_ylim(-0.2, len(pxrds) + 0.1)
     if two_theta_range is not None:
         ax.set_xlim(*two_theta_range)
-    ax.set_ylabel('Relative intensity')
-    ax.set_xlabel('$2\\theta$ (degrees)')
+    ax.set_ylabel("Relative intensity")
+    ax.set_xlabel("$2\\theta$ (degrees)")
 
     return ax

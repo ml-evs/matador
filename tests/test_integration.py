@@ -31,7 +31,7 @@ OUTPUT_DIR = ROOT_DIR + "/integration_test_results"
 
 @mongomock.patch(servers=("mongo_test.com:27017",))
 class IntegrationTest(unittest.TestCase):
-    """ Test functionality acting on local database. """
+    """Test functionality acting on local database."""
 
     def tearDown(self):
         import shutil
@@ -55,7 +55,7 @@ class IntegrationTest(unittest.TestCase):
         os.chdir(OUTPUT_DIR)
 
     def test_integration(self):
-        """ Test import and query. """
+        """Test import and query."""
         print("IMPORT CASTEP 1")
         query = import_castep()
         self.assertEqual(
@@ -216,7 +216,7 @@ class IntegrationTest(unittest.TestCase):
 
 
 def import_castep(extra_flags=None):
-    """ Import from castep files, returning data to be checked. """
+    """Import from castep files, returning data to be checked."""
     # import from CASTEP files only
     os.chdir(REAL_PATH + "/data/castep_files")
     sys.argv = ["matador", "import", "--force", "--db", DB_NAME]
@@ -240,7 +240,7 @@ def import_castep(extra_flags=None):
 
 
 def import_res():
-    """ Import from res files, returning data to be checked. """
+    """Import from res files, returning data to be checked."""
     # import from combined res/cell/param files
     os.chdir(REAL_PATH + "/data/res_files")
 
@@ -269,7 +269,7 @@ def import_res():
 
 
 def pseudoternary_hull():
-    """ Import some other res files ready to make a hull. """
+    """Import some other res files ready to make a hull."""
     os.chdir(REAL_PATH + "/data/hull-LLZO")
     sys.argv = ["matador", "import", "--force", "--db", DB_NAME]
 
@@ -298,7 +298,7 @@ def pseudoternary_hull():
 
 
 def pseudoternary_hull_no_query():
-    """ Import some other res files ready to make a hull. """
+    """Import some other res files ready to make a hull."""
     hull = QueryConvexHull(
         db=DB_NAME,
         composition="La2O3:Li2O:ZrO2",
@@ -314,7 +314,7 @@ def pseudoternary_hull_no_query():
 
 
 def stats():
-    """ Run the stats command just to check it works at all. """
+    """Run the stats command just to check it works at all."""
     sys.argv = ["matador", "stats", "--db", DB_NAME]
     if CONFIG_FNAME is not None:
         sys.argv += ["--config", CONFIG_FNAME]
@@ -322,7 +322,7 @@ def stats():
 
 
 def swaps():
-    """ Run swaps, returning data to be checked. """
+    """Run swaps, returning data to be checked."""
     sys.argv = [
         "matador",
         "swaps",
@@ -374,7 +374,7 @@ def swaps():
 
 
 def changes():
-    """ Test matador changes functionality by undoing the second
+    """Test matador changes functionality by undoing the second
     change (i.e. the res import).
     """
     sys.argv = ["matador", "changes", "--db", DB_NAME, "-c", "2", "--undo"]
@@ -392,7 +392,7 @@ def changes():
 
 
 def refine():
-    """ Test various matador refine tasks. """
+    """Test various matador refine tasks."""
     sys.argv = [
         "matador",
         "refine",
@@ -487,7 +487,7 @@ def refine():
 
 
 def export():
-    """ Test exporting to some random file types. Don't worry too much about
+    """Test exporting to some random file types. Don't worry too much about
     the contents of the files yet, just that they exist with non-zero size.
     """
     sys.argv = [
@@ -508,7 +508,7 @@ def export():
 
 
 def uniq():
-    """ Test filtering of structures by PDF. """
+    """Test filtering of structures by PDF."""
     sys.argv = ["matador", "query", "--db", DB_NAME, "-u 0.1", "--res", "-c", "LaLiZrO"]
 
     if CONFIG_FNAME is not None:
@@ -518,7 +518,7 @@ def uniq():
 
 
 def id_query():
-    """ Test a simple ID query, and that nothing is found... """
+    """Test a simple ID query, and that nothing is found..."""
     sys.argv = ["matador", "query", "--db", DB_NAME, "-i", "testing testing"]
 
     if CONFIG_FNAME is not None:
@@ -531,7 +531,7 @@ def id_query():
 
 
 def drop(collname):
-    """ Drop collection. """
+    """Drop collection."""
     sys.argv = ["matador", "stats", "--delete", "--db", collname]
 
     if CONFIG_FNAME is not None:

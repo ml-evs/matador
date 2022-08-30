@@ -7,9 +7,9 @@ calculators within the compute module class.
 """
 
 
-__all__ = ['CastepCalculator']
-__author__ = 'Matthew Evans'
-__maintainer__ = 'Matthew Evans'
+__all__ = ["CastepCalculator"]
+__author__ = "Matthew Evans"
+__maintainer__ = "Matthew Evans"
 
 
 from .castep import CastepCalculator

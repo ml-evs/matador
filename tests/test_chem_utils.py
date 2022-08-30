@@ -21,7 +21,7 @@ REAL_PATH = "/".join(os.path.realpath(__file__).split("/")[:-1]) + "/"
 
 
 class ChemUtilsTest(unittest.TestCase):
-    """ Test chem utils functionality. """
+    """Test chem utils functionality."""
 
     def test_gravimetric_capacity(self):
         test_docs = []
@@ -477,14 +477,29 @@ class ChemUtilsTest(unittest.TestCase):
     def test_magres_reference_shifts(self):
         from matador.utils.chem_utils import magres_reference_shifts
 
-        magres = {"chemical_shielding_isos": [100, 75, -50, -25, 0, 100, 75, -50, -25, 0],
-                  "atom_types": ["H", "H", "H", "H", "H", "Li", "Li", "Li", "Li", "Li"]}
+        magres = {
+            "chemical_shielding_isos": [100, 75, -50, -25, 0, 100, 75, -50, -25, 0],
+            "atom_types": ["H", "H", "H", "H", "H", "Li", "Li", "Li", "Li", "Li"],
+        }
 
-        magres_with_shifts = {"chemical_shielding_isos": [100, 75, -50, -25, 0, 100, 75, -50, -25, 0],
-                              "atom_types": ["H", "H", "H", "H", "H", "Li", "Li", "Li", "Li", "Li"],
-                              "chemical_shift_isos": [-49.0, -36.5, 26.0, 13.5, 1.0, None, None, None, None, None]}
+        magres_with_shifts = {
+            "chemical_shielding_isos": [100, 75, -50, -25, 0, 100, 75, -50, -25, 0],
+            "atom_types": ["H", "H", "H", "H", "H", "Li", "Li", "Li", "Li", "Li"],
+            "chemical_shift_isos": [
+                -49.0,
+                -36.5,
+                26.0,
+                13.5,
+                1.0,
+                None,
+                None,
+                None,
+                None,
+                None,
+            ],
+        }
 
-        magres_reference_shifts(magres=magres, reference={'H': [-0.5, 1]})
+        magres_reference_shifts(magres=magres, reference={"H": [-0.5, 1]})
 
         self.assertEqual(magres, magres_with_shifts)
 

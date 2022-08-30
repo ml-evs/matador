@@ -14,7 +14,7 @@ EPS = 1e-4
 
 
 class Dispersion(Spectral):
-    """ Parent class for continuous spectra in reciprocal space, i.e.
+    """Parent class for continuous spectra in reciprocal space, i.e.
     electronic and vibrational bandstructures.
 
     Note:
@@ -26,28 +26,30 @@ class Dispersion(Spectral):
     """
 
     def find_full_kpt_branch(self):
-        """ Find all branch indices from branch start indices. """
+        """Find all branch indices from branch start indices."""
         branch_inds = []
         for ind, start_ind in enumerate(self.kpoint_branch_start[:-1]):
-            branch_inds.append(list(range(start_ind,
-                                          self.kpoint_branch_start[ind+1])))
-        branch_inds.append(list(range(self.kpoint_branch_start[-1],
-                                      self.num_kpoints)))
+            branch_inds.append(
+                list(range(start_ind, self.kpoint_branch_start[ind + 1]))
+            )
+        branch_inds.append(list(range(self.kpoint_branch_start[-1], self.num_kpoints)))
 
         if not sum([len(branch) for branch in branch_inds]) == self.num_kpoints:
-            raise RuntimeError('Error parsing kpoints: number of kpoints does '
-                               'not match number in branches')
+            raise RuntimeError(
+                "Error parsing kpoints: number of kpoints does "
+                "not match number in branches"
+            )
 
         return branch_inds
 
     def set_branches_and_spacing(self):
-        """ Set the relevant kpoint spacing and branch attributes. """
+        """Set the relevant kpoint spacing and branch attributes."""
         branch_start, spacing = self.find_kpoint_branches()
-        self._data['kpoint_path_spacing'] = spacing
-        self._data['kpoint_branch_start'] = branch_start
+        self._data["kpoint_path_spacing"] = spacing
+        self._data["kpoint_branch_start"] = branch_start
 
     def find_kpoint_branches(self):
-        """ Separate a kpoint path into discontinuous branches,
+        """Separate a kpoint path into discontinuous branches,
 
         Returns:
             list[list[int]]: list of lists containing the indices of
@@ -60,11 +62,11 @@ class Dispersion(Spectral):
         spacing = np.median(kpt_diffs)
         # add 0 as its the start of the first path, then add all indices
         # have to add 1 to the where to get the start rather than end of the branch
-        branch_start = [0] + (np.where(kpt_diffs > 3*spacing)[0] + 1).tolist()
+        branch_start = [0] + (np.where(kpt_diffs > 3 * spacing)[0] + 1).tolist()
         return branch_start, spacing
 
     def linearise_path(self, preserve_kspace_distance=False):
-        """ For a given k-point path, normalise the spacing between points, mapping
+        """For a given k-point path, normalise the spacing between points, mapping
         it onto [0, 1].
 
         Keyword arguments:
@@ -81,24 +83,28 @@ class Dispersion(Spectral):
             for ind, kpt in enumerate(self.kpoint_path[branch]):
                 if ind != len(branch) - 1:
                     if preserve_kspace_distance:
-                        diff = np.sqrt(np.sum((kpt - self.kpoint_path[branch[ind + 1]])**2))
+                        diff = np.sqrt(
+                            np.sum((kpt - self.kpoint_path[branch[ind + 1]]) ** 2)
+                        )
                     else:
-                        diff = 1.
+                        diff = 1.0
                     path.append(path[-1] + diff)
         path = np.asarray(path)
         path /= np.max(path)
         if len(path) != self.num_kpoints - len(self.kpoint_branches) + 1:
-            raise RuntimeError('Linearised kpoint path has wrong number of kpoints!')
+            raise RuntimeError("Linearised kpoint path has wrong number of kpoints!")
 
         return path
 
     def reorder_bands(self):
-        """ Reorder the bands of this Dispersion object directly. """
-        self._data['eigs_s_k'] = self.get_band_reordering(self.eigs, self.kpoint_branches)
+        """Reorder the bands of this Dispersion object directly."""
+        self._data["eigs_s_k"] = self.get_band_reordering(
+            self.eigs, self.kpoint_branches
+        )
 
     @staticmethod
     def get_band_reordering(eigs, kpoint_branches):
-        """ Recursively reorder eigenvalues such that bands join up correctly,
+        """Recursively reorder eigenvalues such that bands join up correctly,
         based on local gradients.
 
         Parameters:
@@ -124,17 +130,27 @@ class Dispersion(Spectral):
                 i_cached = 0
                 while not converged and counter < len(branch):
                     counter += 1
-                    for i in range(i_cached+1, len(branch) - 1):
-                        guess = (2 * eigs_branch[:, i] - eigs_branch[:, i-1])
+                    for i in range(i_cached + 1, len(branch) - 1):
+                        guess = 2 * eigs_branch[:, i] - eigs_branch[:, i - 1]
                         argsort_guess = np.argsort(guess)
-                        if np.any(np.argsort(guess) != np.argsort(eigs_branch[:, i+1])):
+                        if np.any(
+                            np.argsort(guess) != np.argsort(eigs_branch[:, i + 1])
+                        ):
                             tmp_copy = np.array(channel, copy=True)
-                            for ind, mode in enumerate(np.argsort(eigs_branch[:, i]).tolist()):
-                                eigs_branch[mode, i+1:] = tmp_copy[:, branch][argsort_guess[ind], i+1:]
+                            for ind, mode in enumerate(
+                                np.argsort(eigs_branch[:, i]).tolist()
+                            ):
+                                eigs_branch[mode, i + 1 :] = tmp_copy[:, branch][
+                                    argsort_guess[ind], i + 1 :
+                                ]
                             for other_branch in kpoint_branches[branch_ind:]:
                                 eigs_other_branch = channel[:, other_branch]
-                                for ind, mode in enumerate(np.argsort(channel[:, i]).tolist()):
-                                    eigs_other_branch[mode] = tmp_copy[:, other_branch][argsort_guess[ind]]
+                                for ind, mode in enumerate(
+                                    np.argsort(channel[:, i]).tolist()
+                                ):
+                                    eigs_other_branch[mode] = tmp_copy[:, other_branch][
+                                        argsort_guess[ind]
+                                    ]
                             channel[:, other_branch] = eigs_other_branch
                             channel[:, branch] = eigs_branch
                             i_cached = i
@@ -147,22 +163,20 @@ class Dispersion(Spectral):
         return sorted_eigs
 
     def plot_dispersion(self, **kwargs):
-        """ Make a plot of the band structure, with projections, if found. """
+        """Make a plot of the band structure, with projections, if found."""
         from matador.plotting.spectral_plotting import plot_spectral
+
         _kwargs = {
             "plot_dos": False,
             "plot_bandstructure": True,
             "plot_pdis": "projector_weights" in self,
-            "phonons": "Vibrational" in self.__class__.__name__
+            "phonons": "Vibrational" in self.__class__.__name__,
         }
         _kwargs.update(kwargs)
-        plot_spectral(
-            self,
-            **_kwargs
-        )
+        plot_spectral(self, **_kwargs)
 
     def _reshaped_eigs(self, eigs, shape):
-        """ Attempts to reshape the eigenvalues into the desired shape.
+        """Attempts to reshape the eigenvalues into the desired shape.
 
         Parameters:
             eigs (np.ndarray): the eigs to reshape.
@@ -173,13 +187,13 @@ class Dispersion(Spectral):
 
         """
         raise NotImplementedError(
-            'Wrong eigenvalue shape passed, and reshape function is not yet implemented. '
-            'Eigs should have shape {}, not {}'.format(shape, np.shape(eigs))
+            "Wrong eigenvalue shape passed, and reshape function is not yet implemented. "
+            "Eigs should have shape {}, not {}".format(shape, np.shape(eigs))
         )
 
 
 class ElectronicDispersion(Dispersion):
-    """ Class that stores electronic dispersion data. Attributes are
+    """Class that stores electronic dispersion data. Attributes are
     all implemented as properties based on underlying raw data.
 
     Attributes:
@@ -211,121 +225,135 @@ class ElectronicDispersion(Dispersion):
     """
 
     required_keys = [
-        'num_kpoints',
-        'num_spins',
-        'num_bands',
-        'num_electrons',
-        'eigs_s_k',
-        'kpoint_path',
-        'lattice_cart',
-        'fermi_energy',
+        "num_kpoints",
+        "num_spins",
+        "num_bands",
+        "num_electrons",
+        "eigs_s_k",
+        "kpoint_path",
+        "lattice_cart",
+        "fermi_energy",
     ]
 
     def __init__(self, *args, **kwargs):
 
         super().__init__(*args, **kwargs)
 
-        if kwargs.get('projection_data') is not None:
-            projection_data = kwargs.get('projection_data')
-            self._data['projectors'] = projection_data['projectors']
-            self._data['projector_weights'] = projection_data['projector_weights']
+        if kwargs.get("projection_data") is not None:
+            projection_data = kwargs.get("projection_data")
+            self._data["projectors"] = projection_data["projectors"]
+            self._data["projector_weights"] = projection_data["projector_weights"]
 
         else:
-            self._data['projectors'] = self._data.get("projectors")
-            self._data['projector_weights'] = self._data.get("projector_weights")
+            self._data["projectors"] = self._data.get("projectors")
+            self._data["projector_weights"] = self._data.get("projector_weights")
 
         if self._data.get("projectors") is not None:
             if self.num_spins != 1:
-                raise NotImplementedError('Projected dispersion not implemented'
-                                          ' for multiple spin channels')
+                raise NotImplementedError(
+                    "Projected dispersion not implemented" " for multiple spin channels"
+                )
             # only want to take projectors and projector_weights from this data
             proj_shape = np.shape(self._data["projector_weights"])
             expected_shape = (self.num_kpoints, self.num_bands, self.num_projectors)
             if proj_shape != expected_shape:
-                raise RuntimeError(f"Incompatible shape of projector weights: {proj_shape}, was expecting {expected_shape}")
+                raise RuntimeError(
+                    f"Incompatible shape of projector weights: {proj_shape}, was expecting {expected_shape}"
+                )
 
         shape = (self.num_spins, self.num_bands, self.num_kpoints)
-        if np.shape(self._data['eigs_s_k']) != shape:
-            self._data['eigs_s_k'] = self._reshaped_eigs(self._data['eigs_s_k'], shape)
+        if np.shape(self._data["eigs_s_k"]) != shape:
+            self._data["eigs_s_k"] = self._reshaped_eigs(self._data["eigs_s_k"], shape)
 
     @property
     def num_spins(self):
-        """ Number of spin channels in spectrum. """
-        return self._data['num_spins']
+        """Number of spin channels in spectrum."""
+        return self._data["num_spins"]
 
     @property
     def num_electrons(self):
-        """ Number of electrons. """
-        return self._data['num_electrons']
+        """Number of electrons."""
+        return self._data["num_electrons"]
 
     @property
     def eigs_s_k(self):
-        """ Array of electronic eigenvalues with shape
+        """Array of electronic eigenvalues with shape
         (num_spins, num_bands, num_kpoints).
 
         """
-        return self._data['eigs_s_k']
+        return self._data["eigs_s_k"]
 
     @property
     def eigs(self):
-        """ Alias for `self.eigs_s_k`. """
+        """Alias for `self.eigs_s_k`."""
         return self.eigs_s_k
 
     @property
     def fermi_energy(self):
-        """ Return the Fermi energy as described in the raw data. """
-        return self._data['fermi_energy'] or np.mean(self._data.get('spin_fermi_energy'))
+        """Return the Fermi energy as described in the raw data."""
+        return self._data["fermi_energy"] or np.mean(
+            self._data.get("spin_fermi_energy")
+        )
 
     @property
     def spin_fermi_energy(self):
-        """ Return the Fermi energy as described in the raw data. """
-        return self._data.get('spin_fermi_energy')
+        """Return the Fermi energy as described in the raw data."""
+        return self._data.get("spin_fermi_energy")
 
     @property
     def band_gap(self):
-        """ Return the band gap of the system. """
-        if not self._data.get('band_gap'):
+        """Return the band gap of the system."""
+        if not self._data.get("band_gap"):
             self.set_gap_data()
-        return self._data['band_gap']
+        return self._data["band_gap"]
 
     @property
     def band_gap_path_inds(self):
-        """ Return the indices of the k-points that comprise the smallest
+        """Return the indices of the k-points that comprise the smallest
         band gap.
 
         """
-        if not self._data.get('band_gap_path_inds'):
+        if not self._data.get("band_gap_path_inds"):
             self.set_gap_data()
-        return self._data['band_gap_path_inds']
+        return self._data["band_gap_path_inds"]
 
     @property
     def spin_band_gap(self):
-        """ Return the band gap for each spin channel. """
-        if not self._data.get('spin_band_gap'):
+        """Return the band gap for each spin channel."""
+        if not self._data.get("spin_band_gap"):
             self.set_gap_data()
-        return self._data['spin_band_gap']
+        return self._data["spin_band_gap"]
 
     @property
     def spin_band_gap_path_inds(self):
-        """ Return the indices of the k-points that comprise the smallest
+        """Return the indices of the k-points that comprise the smallest
         band gap for each spin channel.
 
         """
-        if not self._data.get('spin_band_gap_path_inds'):
+        if not self._data.get("spin_band_gap_path_inds"):
             self.set_gap_data()
-        return self._data['spin_band_gap_path_inds']
+        return self._data["spin_band_gap_path_inds"]
 
     def set_gap_data(self):
-        """ Loop over bands to set the band gap, VBM, CBM, their
+        """Loop over bands to set the band gap, VBM, CBM, their
         positions and the smallest direct gap inside self._data,
         for each spin channel. Sets self.band_gap to be the smallest of
         the band gaps across all spin channels.
 
         """
-        spin_keys = ['spin_band_gap', 'spin_band_gap_path', 'spin_band_gap_path_inds',
-                     'spin_valence_band_min', 'spin_conduction_band_max', 'spin_gap_momentum',
-                     'spin_direct_gap', 'spin_direct_gap_path', 'spin_direct_gap_path_inds',
-                     'spin_direct_valence_band_min', 'spin_direct_conduction_band_max']
+        spin_keys = [
+            "spin_band_gap",
+            "spin_band_gap_path",
+            "spin_band_gap_path_inds",
+            "spin_valence_band_min",
+            "spin_conduction_band_max",
+            "spin_gap_momentum",
+            "spin_direct_gap",
+            "spin_direct_gap_path",
+            "spin_direct_gap_path_inds",
+            "spin_direct_valence_band_min",
+            "spin_direct_conduction_band_max",
+        ]
 
         for key in spin_keys:
             self._data[key] = self.num_spins * [None]
@@ -338,7 +366,9 @@ class ElectronicDispersion(Dispersion):
             # calculate indirect gap
             for _, branch in enumerate(self.kpoint_branches):
                 for nb in range(self.num_bands):
-                    band = self.eigs_s_k[ispin][nb][branch] - self.spin_fermi_energy[ispin]
+                    band = (
+                        self.eigs_s_k[ispin][nb][branch] - self.spin_fermi_energy[ispin]
+                    )
                     argmin = np.argmin(band)
                     argmax = np.argmax(band)
                     if vbm + EPS < band[argmax] < 0:
@@ -353,7 +383,7 @@ class ElectronicDispersion(Dispersion):
                     elif cbm + EPS >= band[argmin] > 0:
                         cbm = band[argmin]
                         cbm_pos.extend([branch[argmin]])
-                    if band[argmin] + EPS/2 < 0 < band[argmax] - EPS/2:
+                    if band[argmin] + EPS / 2 < 0 < band[argmax] - EPS / 2:
                         vbm = 0
                         cbm = 0
                         vbm_pos = [0]
@@ -369,13 +399,21 @@ class ElectronicDispersion(Dispersion):
                         smallest_diff = abs(_vbm_pos - _cbm_pos)
             cbm_pos = tmp_cbm_pos
             vbm_pos = tmp_vbm_pos
-            self._data['spin_valence_band_min'][ispin] = vbm + self.spin_fermi_energy[ispin]
-            self._data['spin_conduction_band_max'][ispin] = cbm + self.spin_fermi_energy[ispin]
-            self._data['spin_band_gap'][ispin] = cbm - vbm
-            self._data['spin_band_gap_path'][ispin] = [self.kpoint_path[cbm_pos], self.kpoint_path[vbm_pos]]
-            self._data['spin_band_gap_path_inds'][ispin] = [cbm_pos, vbm_pos]
-            self._data['spin_gap_momentum'][ispin] = np.linalg.norm(
-                self.kpoint_path_cartesian[cbm_pos] - self.kpoint_path_cartesian[vbm_pos]
+            self._data["spin_valence_band_min"][ispin] = (
+                vbm + self.spin_fermi_energy[ispin]
+            )
+            self._data["spin_conduction_band_max"][ispin] = (
+                cbm + self.spin_fermi_energy[ispin]
+            )
+            self._data["spin_band_gap"][ispin] = cbm - vbm
+            self._data["spin_band_gap_path"][ispin] = [
+                self.kpoint_path[cbm_pos],
+                self.kpoint_path[vbm_pos],
+            ]
+            self._data["spin_band_gap_path_inds"][ispin] = [cbm_pos, vbm_pos]
+            self._data["spin_gap_momentum"][ispin] = np.linalg.norm(
+                self.kpoint_path_cartesian[cbm_pos]
+                - self.kpoint_path_cartesian[vbm_pos]
             )
 
             # calculate direct gap
@@ -386,7 +424,9 @@ class ElectronicDispersion(Dispersion):
                 direct_cbm = 1e10
                 direct_vbm = -1e10
                 for nb in range(self.num_bands):
-                    band_eig = self.eigs_s_k[ispin][nb][ind] - self.spin_fermi_energy[ispin]
+                    band_eig = (
+                        self.eigs_s_k[ispin][nb][ind] - self.spin_fermi_energy[ispin]
+                    )
                     if direct_vbm <= band_eig < EPS:
                         direct_vbm = band_eig
                     if direct_cbm >= band_eig > EPS:
@@ -394,35 +434,54 @@ class ElectronicDispersion(Dispersion):
                 direct_gaps[ind] = direct_cbm - direct_vbm
                 direct_cbms[ind] = direct_cbm
                 direct_vbms[ind] = direct_vbm
-            self._data['spin_direct_gap'][ispin] = np.min(direct_gaps)
-            self._data['spin_direct_conduction_band_max'][ispin] = (
+            self._data["spin_direct_gap"][ispin] = np.min(direct_gaps)
+            self._data["spin_direct_conduction_band_max"][ispin] = (
                 direct_cbms[np.argmin(direct_gaps)] + self.spin_fermi_energy[ispin]
             )
-            self._data['spin_direct_valence_band_min'][ispin] = (
+            self._data["spin_direct_valence_band_min"][ispin] = (
                 direct_vbms[np.argmin(direct_gaps)] + self.spin_fermi_energy[ispin]
             )
-            self._data['spin_direct_gap'][ispin] = np.min(direct_gaps)
-            self._data['spin_direct_gap_path'][ispin] = 2 * [self.kpoint_path[np.argmin(direct_gaps)]]
-            self._data['spin_direct_gap_path_inds'][ispin] = 2 * [np.argmin(direct_gaps)]
+            self._data["spin_direct_gap"][ispin] = np.min(direct_gaps)
+            self._data["spin_direct_gap_path"][ispin] = 2 * [
+                self.kpoint_path[np.argmin(direct_gaps)]
+            ]
+            self._data["spin_direct_gap_path_inds"][ispin] = 2 * [
+                np.argmin(direct_gaps)
+            ]
 
-            if np.abs(self._data['spin_direct_gap'][ispin] - self._data['spin_band_gap'][ispin]) < EPS:
-                self._data['spin_valence_band_min'][ispin] = direct_vbm + self.spin_fermi_energy[ispin]
-                self._data['spin_conduction_band_max'][ispin] = direct_cbm + self.spin_fermi_energy[ispin]
-                self._data['spin_band_gap_path_inds'][ispin] = self._data['spin_direct_gap_path_inds'][ispin]
-                cbm_pos = self._data['spin_direct_gap_path_inds'][ispin][0]
-                vbm_pos = self._data['spin_direct_gap_path_inds'][ispin][1]
-                self._data['spin_band_gap_path'][ispin] = self._data['spin_direct_gap_path'][ispin]
-                self._data['spin_gap_momentum'][ispin] = (
-                    np.linalg.norm(self.kpoint_path_cartesian[cbm_pos] - self.kpoint_path_cartesian[vbm_pos])
+            if (
+                np.abs(
+                    self._data["spin_direct_gap"][ispin]
+                    - self._data["spin_band_gap"][ispin]
+                )
+                < EPS
+            ):
+                self._data["spin_valence_band_min"][ispin] = (
+                    direct_vbm + self.spin_fermi_energy[ispin]
+                )
+                self._data["spin_conduction_band_max"][ispin] = (
+                    direct_cbm + self.spin_fermi_energy[ispin]
+                )
+                self._data["spin_band_gap_path_inds"][ispin] = self._data[
+                    "spin_direct_gap_path_inds"
+                ][ispin]
+                cbm_pos = self._data["spin_direct_gap_path_inds"][ispin][0]
+                vbm_pos = self._data["spin_direct_gap_path_inds"][ispin][1]
+                self._data["spin_band_gap_path"][ispin] = self._data[
+                    "spin_direct_gap_path"
+                ][ispin]
+                self._data["spin_gap_momentum"][ispin] = np.linalg.norm(
+                    self.kpoint_path_cartesian[cbm_pos]
+                    - self.kpoint_path_cartesian[vbm_pos]
                 )
 
-        spin_gap_index = np.argmin(self._data['spin_band_gap'])
+        spin_gap_index = np.argmin(self._data["spin_band_gap"])
         # use smallest spin channel gap data for standard non-spin data access
         for key in spin_keys:
-            self._data[key.replace('spin_', '')] = self._data[key][spin_gap_index]
+            self._data[key.replace("spin_", "")] = self._data[key][spin_gap_index]
 
     def new_from_trimmed_path(self, k_start_ind=0, k_end_ind=None):
-        """ Returns a new ElectronicDispersion object with the kpoint
+        """Returns a new ElectronicDispersion object with the kpoint
         path trimmed by the provided indices.
 
         """
@@ -430,21 +489,21 @@ class ElectronicDispersion(Dispersion):
         if k_end_ind is None:
             k_end_ind = len(self.kpoint_path)
 
-        _new_data_dict['kpoint_path'] = self.kpoint_path[k_start_ind:k_end_ind]
-        _new_data_dict['eigs_s_k'] = self.eigs[:, :, k_start_ind:k_end_ind]
-        _new_data_dict['num_bands'] = self.num_bands
-        _new_data_dict['num_electrons'] = self.num_electrons
-        _new_data_dict['num_spins'] = self.num_spins
-        _new_data_dict['num_kpoints'] = len(_new_data_dict['kpoint_path'])
-        _new_data_dict['lattice_cart'] = self.lattice_cart
-        _new_data_dict['fermi_energy'] = self.fermi_energy
-        _new_data_dict['spin_fermi_energy'] = self.spin_fermi_energy
+        _new_data_dict["kpoint_path"] = self.kpoint_path[k_start_ind:k_end_ind]
+        _new_data_dict["eigs_s_k"] = self.eigs[:, :, k_start_ind:k_end_ind]
+        _new_data_dict["num_bands"] = self.num_bands
+        _new_data_dict["num_electrons"] = self.num_electrons
+        _new_data_dict["num_spins"] = self.num_spins
+        _new_data_dict["num_kpoints"] = len(_new_data_dict["kpoint_path"])
+        _new_data_dict["lattice_cart"] = self.lattice_cart
+        _new_data_dict["fermi_energy"] = self.fermi_energy
+        _new_data_dict["spin_fermi_energy"] = self.spin_fermi_energy
 
         return ElectronicDispersion(**_new_data_dict)
 
 
 class VibrationalDispersion(Dispersion):
-    """ Class that stores vibrational dispersion data. Attributes are
+    """Class that stores vibrational dispersion data. Attributes are
     all implemented as properties based on underlying raw data.
 
     Attributes:
@@ -463,46 +522,41 @@ class VibrationalDispersion(Dispersion):
 
     """
 
-    required_keys = [
-        'num_kpoints',
-        'num_modes',
-        'eigs_q',
-        'kpoint_path'
-    ]
+    required_keys = ["num_kpoints", "num_modes", "eigs_q", "kpoint_path"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         shape = (1, self.num_modes, self.num_qpoints)
-        if np.shape(self._data['eigs_q']) != shape:
-            self._data['eigs_q'] = self._reshaped_eigs(self._data['eigs_q'], shape)
+        if np.shape(self._data["eigs_q"]) != shape:
+            self._data["eigs_q"] = self._reshaped_eigs(self._data["eigs_q"], shape)
 
     @property
     def num_atoms(self):
-        """ Number of atoms in cell. """
-        return self._data['num_atoms']
+        """Number of atoms in cell."""
+        return self._data["num_atoms"]
 
     @property
     def num_modes(self):
-        """ Number of phonon modes. """
-        return self._data['num_modes']
+        """Number of phonon modes."""
+        return self._data["num_modes"]
 
     @property
     def num_bands(self):
-        """Alias for number of modes. """
-        return self._data['num_modes']
+        """Alias for number of modes."""
+        return self._data["num_modes"]
 
     @property
     def eigs_q(self):
-        """ Eigenvalues in frequency units `self.freq_unit`, with shape
+        """Eigenvalues in frequency units `self.freq_unit`, with shape
         (1, num_modes, num_kpoints).
 
         """
-        return np.asarray(self._data['eigs_q'])
+        return np.asarray(self._data["eigs_q"])
 
     @property
     def softest_mode_freq(self):
-        """ The frequency of the softest mode in the calculation.
+        """The frequency of the softest mode in the calculation.
         Negative modes correspond to imaginary frequencies.
 
         """
@@ -510,10 +564,10 @@ class VibrationalDispersion(Dispersion):
 
     @property
     def debye_temperature(self):
-        """ Returns the Debye temperature in K. """
+        """Returns the Debye temperature in K."""
         return self.debye_freq * INVERSE_CM_TO_EV / KELVIN_TO_EV
 
     @property
     def debye_freq(self):
-        """ Returns the Debye frequency in cm^-1. """
+        """Returns the Debye frequency in cm^-1."""
         return np.max(self.eigs)

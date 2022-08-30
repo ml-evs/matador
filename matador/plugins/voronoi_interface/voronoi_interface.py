@@ -13,50 +13,69 @@ from os.path import isfile
 
 
 def get_voronoi_substructure(doc):
-    """ Run Can's Voronoi analysis on a matador doc. """
+    """Run Can's Voronoi analysis on a matador doc."""
     try:
         from Vornetclass import VoronoiNetwork
-        doc2res(doc, 'Vropple.res', hash_dupe=False, overwrite=True, info=False, sort_atoms=False)
-        vornet = VoronoiNetwork(filename='Vropple.res')
+
+        doc2res(
+            doc,
+            "Vropple.res",
+            hash_dupe=False,
+            overwrite=True,
+            info=False,
+            sort_atoms=False,
+        )
+        vornet = VoronoiNetwork(filename="Vropple.res")
         vornet.computeSubStrucs()
-        doc['voronoi_substruc'] = [vc.getSubStruc(use_area=False) for vc in vornet.VoronoiCells]
-        if isfile('Vropple.res'):
-            remove('Vropple.res')
-        return doc['voronoi_substruc']
+        doc["voronoi_substruc"] = [
+            vc.getSubStruc(use_area=False) for vc in vornet.VoronoiCells
+        ]
+        if isfile("Vropple.res"):
+            remove("Vropple.res")
+        return doc["voronoi_substruc"]
     except:
-        if isfile('Vropple.res'):
-            remove('Vropple.res')
+        if isfile("Vropple.res"):
+            remove("Vropple.res")
         return False
 
 
 def get_voronoi_points(doc, debug=False):
-    """ Run Can's Voronoi analysis on a matador doc
+    """Run Can's Voronoi analysis on a matador doc
     and return nodes, face midpoints and edge midpoints.
     """
     try:
         from Vornetclass import VoronoiNetwork
-        doc2res(doc, 'Vropple.res', hash_dupe=False, overwrite=True, info=False, sort_atoms=False)
-        vornet = VoronoiNetwork(filename='Vropple.res')
+
+        doc2res(
+            doc,
+            "Vropple.res",
+            hash_dupe=False,
+            overwrite=True,
+            info=False,
+            sort_atoms=False,
+        )
+        vornet = VoronoiNetwork(filename="Vropple.res")
         if debug:
             print(vornet.struc)
         vornet.computeVorNet()
-        doc['voronoi_nodes'] = vornet.getNodeFracPos()
-        doc['voronoi_face_midpoints'] = vornet.getFracFaceMidpoints()
-        doc['voronoi_edge_midpoints'] = vornet.getFracEdgeMidpoints()
-        if isfile('Vropple.res'):
-            remove('Vropple.res')
-        return doc['voronoi_nodes']
+        doc["voronoi_nodes"] = vornet.getNodeFracPos()
+        doc["voronoi_face_midpoints"] = vornet.getFracFaceMidpoints()
+        doc["voronoi_edge_midpoints"] = vornet.getFracEdgeMidpoints()
+        if isfile("Vropple.res"):
+            remove("Vropple.res")
+        return doc["voronoi_nodes"]
     except:
-        if isfile('Vropple.res'):
-            remove('Vropple.res')
+        if isfile("Vropple.res"):
+            remove("Vropple.res")
         return False
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     from matador.query import DBQuery
     from matador.hull import QueryConvexHull
+
     # test with LiAs
-    query = DBQuery(composition=['LiAs'], subcmd='hull')
+    query = DBQuery(composition=["LiAs"], subcmd="hull")
     hull = QueryConvexHull(query, no_plot=True, hull_cutoff=0)
     hull_cursor = hull.hull_cursor
     most_lithiated = hull_cursor[-2]

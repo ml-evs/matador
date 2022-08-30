@@ -9,7 +9,10 @@ such as voltages and volume expansions.
 from typing import List, Optional, Dict, Union
 
 import numpy as np
-from matador.utils.chem_utils import get_formula_from_stoich, get_subscripted_formula_tex
+from matador.utils.chem_utils import (
+    get_formula_from_stoich,
+    get_subscripted_formula_tex,
+)
 from matador.plotting.plotting import plotting_function, SAVE_EXTS
 from matador.battery import VoltageProfile
 
@@ -160,7 +163,9 @@ def plot_voltage_curve(
         if plot_average_voltage:
             ax.axvline(-1, c="k", ls="--", alpha=0.8, label="Average voltages")
         if plot_max_capacity:
-            ax.axvline(-1, c="k", ls="-.", alpha=0.8, label="Maximum gravimetric capacity")
+            ax.axvline(
+                -1, c="k", ls="-.", alpha=0.8, label="Maximum gravimetric capacity"
+            )
 
         ax.legend()
 
@@ -287,7 +292,15 @@ def plot_volume_curve(
             lw=0,
         )
 
-        label = ("{}".format(get_formula_from_stoich(hull.volume_data["endstoichs"][j], tex=True))) if not label else label
+        label = (
+            (
+                "{}".format(
+                    get_formula_from_stoich(hull.volume_data["endstoichs"][j], tex=True)
+                )
+            )
+            if not label
+            else label
+        )
 
         ax.plot(
             [

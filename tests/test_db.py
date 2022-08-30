@@ -18,7 +18,7 @@ MONGO_CLIENT = mongomock.MongoClient()
 
 @mongomock.patch(servers=(("mongo_test.com:27017"),))
 class TestDatabaseImport(unittest.TestCase):
-    """ Tests the Spatula class. """
+    """Tests the Spatula class."""
 
     def setUp(self):
         from matador.config import load_custom_settings, SETTINGS
@@ -37,7 +37,7 @@ class TestDatabaseImport(unittest.TestCase):
         SETTINGS.reset()
 
     def test_failed_import(self):
-        """ Try to import to the default collection from some
+        """Try to import to the default collection from some
         random folder.
 
         """

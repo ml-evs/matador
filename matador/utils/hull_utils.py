@@ -14,7 +14,7 @@ EPS = 1e-12
 
 
 def vertices2plane(points):
-    """ Convert points (xi, yi, zi) for i=1,..,3 into the
+    """Convert points (xi, yi, zi) for i=1,..,3 into the
     equation of the plane spanned by the vectors v12, v13.
     For unit vectors e(i):
 
@@ -42,7 +42,7 @@ def vertices2plane(points):
     assert np.abs(np.dot(normal, points[1]) + d) < 0 + EPS
 
     def get_height_above_plane(structure):
-        """ Find the z-coordinate on the plane matching
+        """Find the z-coordinate on the plane matching
         the (x, y) coordinates of the structure, then calculate
         the difference between this z and the z of the point given.
         """
@@ -50,9 +50,11 @@ def vertices2plane(points):
         y = structure[1]
         z = structure[2]
         if np.abs(normal[2]) < EPS:
-            warnings.warn(f"Normal of plane {normal} is ill-defined. Returning 0 for height above plane.")
+            warnings.warn(
+                f"Normal of plane {normal} is ill-defined. Returning 0 for height above plane."
+            )
             return 0
-        z_plane = -((x*normal[0] + y*normal[1] + d) / normal[2])
+        z_plane = -((x * normal[0] + y * normal[1] + d) / normal[2])
         height = z - z_plane
         return height
 
@@ -60,7 +62,7 @@ def vertices2plane(points):
 
 
 def vertices2line(points):
-    """ Perform a simple linear interpolation on
+    """Perform a simple linear interpolation on
     two points.
 
     Parameters:
@@ -75,14 +77,15 @@ def vertices2line(points):
     energy_pair = [points[0][1], points[1][1]]
     comp_pair = [points[0][0], points[1][0]]
     gradient = (energy_pair[1] - energy_pair[0]) / (comp_pair[1] - comp_pair[0])
-    intercept = ((energy_pair[1] + energy_pair[0]) -
-                 gradient * (comp_pair[1] + comp_pair[0])) / 2
+    intercept = (
+        (energy_pair[1] + energy_pair[0]) - gradient * (comp_pair[1] + comp_pair[0])
+    ) / 2
 
     return gradient, intercept
 
 
 def is_point_in_triangle(point, triangle, preprocessed_triangle=False):
-    """ Check whether a point is inside a triangle.
+    """Check whether a point is inside a triangle.
 
     Parameters:
         point (np.ndarray): 3x1 array containing the coordinates of the
@@ -119,7 +122,7 @@ def is_point_in_triangle(point, triangle, preprocessed_triangle=False):
 
 
 def barycentric2cart(structures):
-    """ Convert ternary (x, y) in A_x B_y C_{1-x-y}
+    """Convert ternary (x, y) in A_x B_y C_{1-x-y}
     to positions projected onto 2D plane.
 
     Input structures array is of the form:
@@ -142,8 +145,8 @@ def barycentric2cart(structures):
 
     """
     structures = np.asarray(structures)
-    cos30 = np.cos(np.pi/6)
-    cos60 = np.cos(np.pi/3)
+    cos30 = np.cos(np.pi / 6)
+    cos60 = np.cos(np.pi / 3)
     coords = np.zeros_like(structures)
     coords[:, 0] = structures[:, 0] + structures[:, 1] * cos60
     coords[:, 1] = structures[:, 1] * cos30
@@ -153,9 +156,10 @@ def barycentric2cart(structures):
 
 
 class FakeHull:
-    """ Implements a thin class to mimic a ConvexHull object
-    that would otherwise be undefined for two points. """
+    """Implements a thin class to mimic a ConvexHull object
+    that would otherwise be undefined for two points."""
+
     def __init__(self):
-        """ Define the used hull properties. """
+        """Define the used hull properties."""
         self.vertices = [0, 1]
         self.simplices = []

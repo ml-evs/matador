@@ -16,10 +16,23 @@ Currently supported filetypes:
 """
 
 
-__all__ = ['res2dict', 'cell2dict', 'param2dict', 'castep2dict', 'bands2dict', 'arbitrary2dict',
-           'phonon2dict', 'phonon_dos2dict', 'optados2dict', 'usp2dict', 'pwout2dict', 'magres2dict', 'cif2dict']
-__author__ = 'Matthew Evans'
-__maintainer__ = 'Matthew Evans'
+__all__ = [
+    "res2dict",
+    "cell2dict",
+    "param2dict",
+    "castep2dict",
+    "bands2dict",
+    "arbitrary2dict",
+    "phonon2dict",
+    "phonon_dos2dict",
+    "optados2dict",
+    "usp2dict",
+    "pwout2dict",
+    "magres2dict",
+    "cif2dict",
+]
+__author__ = "Matthew Evans"
+__maintainer__ = "Matthew Evans"
 
 from .castep_scrapers import res2dict, cell2dict, param2dict
 from .castep_scrapers import castep2dict, bands2dict, arbitrary2dict

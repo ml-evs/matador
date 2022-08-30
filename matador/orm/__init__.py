@@ -3,7 +3,7 @@
 
 __all__ = ["DataContainer"]
 
-__author__ = 'Matthew Evans'
-__maintainer__ = 'Matthew Evans'
+__author__ = "Matthew Evans"
+__maintainer__ = "Matthew Evans"
 
 from .orm import DataContainer

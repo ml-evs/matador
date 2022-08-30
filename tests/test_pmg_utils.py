@@ -22,7 +22,7 @@ from .utils import REAL_PATH
 
 @unittest.skipIf((not (PMG_IMPORTED and ASE_IMPORTED)), "Unable to import ASE/pymtagen")
 class PMGUtilTest(unittest.TestCase):
-    """ Tests cursor util functions. """
+    """Tests cursor util functions."""
 
     def test_doc2pmg(self):
         from matador.scrapers import castep2dict
@@ -62,7 +62,7 @@ class PMGUtilTest(unittest.TestCase):
         np.testing.assert_array_almost_equal(
             pmg_structure.lattice.matrix, doc.lattice_cart, decimal=16
         )
-        self.assertAlmostEqual(doc["cell_volume"], 12 ** 3)
+        self.assertAlmostEqual(doc["cell_volume"], 12**3)
         self.assertEqual(len(doc["positions_frac"]), len(doc["atom_types"]))
         self.assertEqual(doc["num_atoms"], 8)
         self.assertEqual(doc["num_fu"], 4)

@@ -119,7 +119,7 @@ class TestMagresReferencer(unittest.TestCase):
 
         np.testing.assert_array_almost_equal(
             LiCoO3_theory["chemical_shift_isos"][4:],
-            [-101, -102, -103, -104, -105, -106]
+            [-101, -102, -103, -104, -105, -106],
         )
 
         with pytest.raises(AttributeError):

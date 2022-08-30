@@ -22,7 +22,7 @@ EPS = 1e-13
 
 @scraper_function
 def cif2dict(fname, **kwargs):
-    """ Extract available information from  .cif file and store as a
+    """Extract available information from  .cif file and store as a
     dictionary. Raw cif data is stored under the `'_cif'` key. Symmetric
     sites are expanded by the symmetry operations and their occupancies
     are tracked.
@@ -43,10 +43,10 @@ def cif2dict(fname, **kwargs):
     doc = dict()
     cif_dict = _cif_parse_raw(flines)
 
-    doc['_cif'] = cif_dict
-    doc['source'] = [str(Path(fname).resolve())]
+    doc["_cif"] = cif_dict
+    doc["source"] = [str(Path(fname).resolve())]
 
-    doc['atom_types'] = []
+    doc["atom_types"] = []
     atom_labels = cif_dict.get("_atom_site_type_symbol", False)
     if not atom_labels:
         atom_labels = cif_dict.get("_atom_site_label", False)
@@ -54,50 +54,77 @@ def cif2dict(fname, **kwargs):
         raise RuntimeError(f"Unable to find atom types in cif file {fname}.")
 
     for atom in atom_labels:
-        symbol = ''
+        symbol = ""
         for character in atom:
             if not character.isalpha():
                 break
             else:
                 symbol += character
-        doc['atom_types'].append(symbol)
+        doc["atom_types"].append(symbol)
 
-    doc['positions_frac'] = [list(map(lambda x: float(x.split('(')[0]), vector)) for vector in
-                             zip(cif_dict['_atom_site_fract_x'],
-                                 cif_dict['_atom_site_fract_y'],
-                                 cif_dict['_atom_site_fract_z'])]
+    doc["positions_frac"] = [
+        list(map(lambda x: float(x.split("(")[0]), vector))
+        for vector in zip(
+            cif_dict["_atom_site_fract_x"],
+            cif_dict["_atom_site_fract_y"],
+            cif_dict["_atom_site_fract_z"],
+        )
+    ]
 
-    if '_atom_site_occupancy' in cif_dict:
-        doc['site_occupancy'] = [float(x.split('(')[0]) for x in cif_dict['_atom_site_occupancy']]
+    if "_atom_site_occupancy" in cif_dict:
+        doc["site_occupancy"] = [
+            float(x.split("(")[0]) for x in cif_dict["_atom_site_occupancy"]
+        ]
     else:
-        doc['site_occupancy'] = [1.0 for _ in doc['positions_frac']]
+        doc["site_occupancy"] = [1.0 for _ in doc["positions_frac"]]
 
-    if '_atom_site_symmetry_multiplicity' in cif_dict:
-        doc['site_multiplicity'] = [float(x.split('(')[0]) for x in cif_dict['_atom_site_symmetry_multiplicity']]
+    if "_atom_site_symmetry_multiplicity" in cif_dict:
+        doc["site_multiplicity"] = [
+            float(x.split("(")[0]) for x in cif_dict["_atom_site_symmetry_multiplicity"]
+        ]
     else:
-        doc['site_multiplicity'] = [1.0 for _ in doc['positions_frac']]
+        doc["site_multiplicity"] = [1.0 for _ in doc["positions_frac"]]
 
-    doc['lattice_abc'] = [list(map(_cif_parse_float_with_errors,
-                                   [cif_dict['_cell_length_a'],
-                                    cif_dict['_cell_length_b'],
-                                    cif_dict['_cell_length_c']])),
-                          list(map(_cif_parse_float_with_errors,
-                                   [cif_dict['_cell_angle_alpha'],
-                                    cif_dict['_cell_angle_beta'],
-                                    cif_dict['_cell_angle_gamma']]))]
+    doc["lattice_abc"] = [
+        list(
+            map(
+                _cif_parse_float_with_errors,
+                [
+                    cif_dict["_cell_length_a"],
+                    cif_dict["_cell_length_b"],
+                    cif_dict["_cell_length_c"],
+                ],
+            )
+        ),
+        list(
+            map(
+                _cif_parse_float_with_errors,
+                [
+                    cif_dict["_cell_angle_alpha"],
+                    cif_dict["_cell_angle_beta"],
+                    cif_dict["_cell_angle_gamma"],
+                ],
+            )
+        ),
+    ]
 
-    doc['lattice_cart'] = abc2cart(doc['lattice_abc'])
-    doc['cell_volume'] = cart2volume(doc['lattice_cart'])
-    doc['stoichiometry'] = _cif_disordered_stoichiometry(doc)
-    doc['num_atoms'] = len(doc['positions_frac'])
+    doc["lattice_cart"] = abc2cart(doc["lattice_abc"])
+    doc["cell_volume"] = cart2volume(doc["lattice_cart"])
+    doc["stoichiometry"] = _cif_disordered_stoichiometry(doc)
+    doc["num_atoms"] = len(doc["positions_frac"])
 
-    if '_space_group_symop_operation_xyz' in doc['_cif'] and '_symmetry_equiv_pos_as_xyz' not in doc['_cif']:
-        doc["_cif"]["_symmetry_equiv_pos_as_xyz"] = doc["_cif"]["_space_group_symop_operation_xyz"]
-    if '_symmetry_equiv_pos_as_xyz' in doc['_cif']:
+    if (
+        "_space_group_symop_operation_xyz" in doc["_cif"]
+        and "_symmetry_equiv_pos_as_xyz" not in doc["_cif"]
+    ):
+        doc["_cif"]["_symmetry_equiv_pos_as_xyz"] = doc["_cif"][
+            "_space_group_symop_operation_xyz"
+        ]
+    if "_symmetry_equiv_pos_as_xyz" in doc["_cif"]:
         _cif_set_unreduced_sites(doc)
 
     try:
-        doc['space_group'] = get_spacegroup_spg(doc, check_occ=False)
+        doc["space_group"] = get_spacegroup_spg(doc, check_occ=False)
     except RuntimeError:
         pass
 
@@ -105,12 +132,12 @@ def cif2dict(fname, **kwargs):
 
 
 def _cif_parse_float_with_errors(x):
-    """ Strip bracketed errors from end of float. """
-    return float(x.split('(')[0])
+    """Strip bracketed errors from end of float."""
+    return float(x.split("(")[0])
 
 
 def _cif_disordered_stoichiometry(doc):
-    """ Create a matador stoichiometry normalised to the smallest integer
+    """Create a matador stoichiometry normalised to the smallest integer
     number of atoms, unless all occupancies are 1/0.
 
     Parameters:
@@ -122,12 +149,13 @@ def _cif_disordered_stoichiometry(doc):
 
     """
     from collections import defaultdict
+
     stoich = defaultdict(float)
     eps = 1e-8
     disordered = False
-    for ind, site in enumerate(doc['atom_types']):
-        stoich[site] += doc['site_occupancy'][ind] * doc['site_multiplicity'][ind]
-        if doc['site_multiplicity'][ind] % 1 > 1e-5:
+    for ind, site in enumerate(doc["atom_types"]):
+        stoich[site] += doc["site_occupancy"][ind] * doc["site_multiplicity"][ind]
+        if doc["site_multiplicity"][ind] % 1 > 1e-5:
             disordered = True
 
     if disordered:
@@ -146,7 +174,7 @@ def _cif_disordered_stoichiometry(doc):
 
 
 def _cif_parse_raw(flines):
-    """ Parse raw CIF file data into a dictionary.
+    """Parse raw CIF file data into a dictionary.
 
     Parameters:
         flines (:obj:`list` of :obj:`str`): contents of .cif file.
@@ -157,36 +185,42 @@ def _cif_parse_raw(flines):
     """
     ind = 0
     cif_dict = dict()
-    cif_dict['loops'] = list()
+    cif_dict["loops"] = list()
     while ind < len(flines):
         jnd = 1
         line = flines[ind].strip()
         # parse single (multi-line) tag
-        if line.startswith('_'):
+        if line.startswith("_"):
             line = line.split()
             key = line[0]
-            data = ''
+            data = ""
             if len(line) > 1:
-                data += ' '.join(line[1:])
-            while ind + jnd < len(flines) and _cif_line_contains_data(flines[ind+jnd].strip()):
-                data += flines[ind+jnd].strip().replace(';', '')
+                data += " ".join(line[1:])
+            while ind + jnd < len(flines) and _cif_line_contains_data(
+                flines[ind + jnd].strip()
+            ):
+                data += flines[ind + jnd].strip().replace(";", "")
                 jnd += 1
             cif_dict[key] = data.strip()
         # parse loop block
-        elif line.startswith('loop_'):
+        elif line.startswith("loop_"):
             # get loop keys
             keys = []
-            while flines[ind+jnd].strip().startswith('_'):
-                keys.append(flines[ind+jnd].strip())
+            while flines[ind + jnd].strip().startswith("_"):
+                keys.append(flines[ind + jnd].strip())
                 jnd += 1
             for key in keys:
                 cif_dict[key] = []
-            cif_dict['loops'].append(keys)
-            while ind + jnd < len(flines) and _cif_line_contains_data(flines[ind+jnd].strip()):
-                data = ''
+            cif_dict["loops"].append(keys)
+            while ind + jnd < len(flines) and _cif_line_contains_data(
+                flines[ind + jnd].strip()
+            ):
+                data = ""
                 # loop over line and next lines
-                while ind + jnd < len(flines) and _cif_line_contains_data(flines[ind+jnd]):
-                    data += flines[ind+jnd]
+                while ind + jnd < len(flines) and _cif_line_contains_data(
+                    flines[ind + jnd]
+                ):
+                    data += flines[ind + jnd]
                     jnd += 1
 
             loop_dict = _cif_parse_loop(keys, data)
@@ -198,7 +232,7 @@ def _cif_parse_raw(flines):
 
 
 def _cif_parse_loop(keys, data_block):
-    """ A hacky way to parse CIF data loops that can be split by quotes
+    """A hacky way to parse CIF data loops that can be split by quotes
     or spaces. There must be a better way...
 
     Parameters:
@@ -222,7 +256,11 @@ def _cif_parse_loop(keys, data_block):
         char = dq.popleft()
         if not char.strip() and entry is None:
             continue
-        elif (not char.strip() or char in [" ", ";"]) and entry is not None and not in_quotes:
+        elif (
+            (not char.strip() or char in [" ", ";"])
+            and entry is not None
+            and not in_quotes
+        ):
             data_list.append(entry.strip())
             entry = None
         elif not char.strip() and entry is not None and in_quotes:
@@ -232,7 +270,7 @@ def _cif_parse_loop(keys, data_block):
             data_list.append(entry.strip())
             entry = None
         elif char == "'" and entry is None:
-            entry = ''
+            entry = ""
             in_quotes = True
         else:
             if entry is None:
@@ -249,7 +287,7 @@ def _cif_parse_loop(keys, data_block):
 
 
 def _cif_set_unreduced_sites(doc):
-    """ Expands sites by symmetry operations found under the key
+    """Expands sites by symmetry operations found under the key
     `symemtry_equiv_pos_as_xyz` in the cif_dict.
 
     Parameters:
@@ -270,28 +308,48 @@ def _cif_set_unreduced_sites(doc):
     symmetry_functions = []
 
     def _apply_sym_op(x=None, y=None, z=None, symmetry=None):
-        """ Returns the site after the applied symmetry operation, in string representation. """
+        """Returns the site after the applied symmetry operation, in string representation."""
         # cannot use a listcomp here due to interplay with functools
         return [eval(symmetry[0]), eval(symmetry[1]), eval(symmetry[2])]
 
-    for symmetry in doc['_cif']['_symmetry_equiv_pos_as_xyz']:
-        symmetry = tuple(elem.strip() for elem in symmetry.strip('\'').split(','))
+    for symmetry in doc["_cif"]["_symmetry_equiv_pos_as_xyz"]:
+        symmetry = tuple(elem.strip() for elem in symmetry.strip("'").split(","))
         # check the element before doing an eval, as it is so unsafe
-        allowed_chars = ['x', 'y', 'z', '.', '/', '+', '-',
-                         '0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
+        allowed_chars = [
+            "x",
+            "y",
+            "z",
+            ".",
+            "/",
+            "+",
+            "-",
+            "0",
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9",
+        ]
         for element in symmetry:
             for character in element:
                 if character not in allowed_chars:
-                    raise RuntimeError('You are trying to do something naughty with the symmetry element {}'
-                                       .format(element))
+                    raise RuntimeError(
+                        "You are trying to do something naughty with the symmetry element {}".format(
+                            element
+                        )
+                    )
 
         symmetry_ops.append(symmetry)
         symmetry_functions.append(functools.partial(_apply_sym_op, symmetry=symmetry))
 
-    for ind, site in enumerate(doc['positions_frac']):
-        species = doc['atom_types'][ind]
-        occupancy = doc['site_occupancy'][ind]
-        if doc['atom_types'][ind] not in species_sites:
+    for ind, site in enumerate(doc["positions_frac"]):
+        species = doc["atom_types"][ind]
+        occupancy = doc["site_occupancy"][ind]
+        if doc["atom_types"][ind] not in species_sites:
             species_sites[species] = []
             species_occ[species] = []
         for symmetry in symmetry_functions:
@@ -315,19 +373,21 @@ def _cif_set_unreduced_sites(doc):
     # this can happen for certain symmetries/cells if positions are not
     # reported to sufficient precision
     images = PDF._get_image_trans_vectors_auto(
-        doc['lattice_cart'],
-        0.1, 0.01, max_num_images=1,
+        doc["lattice_cart"],
+        0.1,
+        0.01,
+        max_num_images=1,
     )
 
-    poscarts = frac2cart(doc['lattice_cart'], unreduced_sites)
+    poscarts = frac2cart(doc["lattice_cart"], unreduced_sites)
     distances = calc_pairwise_distances_pbc(
         poscarts,
         images,
-        doc['lattice_cart'],
+        doc["lattice_cart"],
         0.01,
         compress=False,
         filter_zero=False,
-        per_image=True
+        per_image=True,
     )
 
     dupe_set = set()
@@ -345,40 +405,45 @@ def _cif_set_unreduced_sites(doc):
                 if i not in dupe_set and unreduced_species[i] == unreduced_species[j]:
                     dupe_set.add(j)
 
-    doc['positions_frac'] = unreduced_sites
-    doc['site_occupancy'] = unreduced_occupancies
-    doc['atom_types'] = unreduced_species
+    doc["positions_frac"] = unreduced_sites
+    doc["site_occupancy"] = unreduced_occupancies
+    doc["atom_types"] = unreduced_species
 
-    doc['site_occupancy'] = [
+    doc["site_occupancy"] = [
         atom for ind, atom in enumerate(unreduced_occupancies) if ind not in dupe_set
     ]
-    doc['atom_types'] = [
+    doc["atom_types"] = [
         atom for ind, atom in enumerate(unreduced_species) if ind not in dupe_set
     ]
-    doc['positions_frac'] = [
+    doc["positions_frac"] = [
         atom for ind, atom in enumerate(unreduced_sites) if ind not in dupe_set
     ]
 
-    _num_atoms = np.sum(doc['site_occupancy'])
+    _num_atoms = np.sum(doc["site_occupancy"])
     if abs(_num_atoms - round(_num_atoms, 0)) < EPS:
         _num_atoms = int(round(_num_atoms, 0))
-    doc['num_atoms'] = _num_atoms
+    doc["num_atoms"] = _num_atoms
 
-    if len(doc['site_occupancy']) != len(doc['positions_frac']):
-        raise RuntimeError('Size mismatch between positions and occs, {} vs {}'
-                           .format(len(doc['site_occupancy']), len(doc['positions_frac'])))
-    if len(doc['positions_frac']) != len(doc['atom_types']):
-        raise RuntimeError('Size mismatch between positions and types')
+    if len(doc["site_occupancy"]) != len(doc["positions_frac"]):
+        raise RuntimeError(
+            "Size mismatch between positions and occs, {} vs {}".format(
+                len(doc["site_occupancy"]), len(doc["positions_frac"])
+            )
+        )
+    if len(doc["positions_frac"]) != len(doc["atom_types"]):
+        raise RuntimeError("Size mismatch between positions and types")
 
 
 def _cif_line_contains_data(line):
-    """ Check if string contains cif-style data. """
-    return not any([line.startswith('_'), line.startswith('#'), line.startswith('loop_')])
+    """Check if string contains cif-style data."""
+    return not any(
+        [line.startswith("_"), line.startswith("#"), line.startswith("loop_")]
+    )
 
 
 @scraper_function
 def _ase_cif2dict(fname):
-    """ Read cif file into ASE object,
+    """Read cif file into ASE object,
     then convert ASE Atoms into matador document.
 
     Parameters:
@@ -390,8 +455,9 @@ def _ase_cif2dict(fname):
     """
     import ase.io
     from matador.utils.ase_utils import ase2dict
-    fname = fname.replace('.cif', '')
-    atoms = ase.io.read(fname + '.cif')
+
+    fname = fname.replace(".cif", "")
+    atoms = ase.io.read(fname + ".cif")
     doc = ase2dict(atoms)
 
     return doc, True

@@ -9,12 +9,12 @@ capacities.
 
 from matador.plotting.plotting import plotting_function
 
-__all__ = ['plot_free_energy']
+__all__ = ["plot_free_energy"]
 
 
 @plotting_function
 def plot_free_energy(model, temperatures=None, ax=None, line_kwargs=None, **kwargs):
-    """ Plot G(T) on the array of given temperatures. Default T is [0, 800].
+    """Plot G(T) on the array of given temperatures. Default T is [0, 800].
 
     Keyword arguments:
         temperatures (list/np.ndarray): list or array of temperatures to plot.
@@ -27,7 +27,7 @@ def plot_free_energy(model, temperatures=None, ax=None, line_kwargs=None, **kwar
     import numpy as np
     import matplotlib.pyplot as plt
 
-    legend = isinstance(line_kwargs, dict) and 'label' in line_kwargs and ax is not None
+    legend = isinstance(line_kwargs, dict) and "label" in line_kwargs and ax is not None
 
     if line_kwargs is None:
         line_kwargs = {}

@@ -19,16 +19,21 @@ import logging
 from functools import partial
 from matador.workflows.workflows import Workflow
 from matador.workflows.castep.common import castep_prerelax, castep_scf
-from matador.workflows.castep.spectral import castep_spectral_dos, optados_pdos, optados_dos_broadening, _get_optados_fname
+from matador.workflows.castep.spectral import (
+    castep_spectral_dos,
+    optados_pdos,
+    optados_dos_broadening,
+    _get_optados_fname,
+)
 from matador.scrapers import arbitrary2dict
 
-LOG = logging.getLogger('run3')
+LOG = logging.getLogger("run3")
 
-__all__ = ("castep_full_magres")
+__all__ = "castep_full_magres"
 
 
 def castep_full_magres(computer, calc_doc, seed, final_elec_energy_tol=1e-11, **kwargs):
-    """ Perform a "full" magres calculation on a system, i.e.
+    """Perform a "full" magres calculation on a system, i.e.
     first perform a relaxation, then do a high quality SCF
     and compute NMR properties in the same step.
 
@@ -48,18 +53,14 @@ def castep_full_magres(computer, calc_doc, seed, final_elec_energy_tol=1e-11, **
 
     """
     workflow = CastepMagresWorkflow(
-        computer,
-        calc_doc,
-        seed,
-        final_elec_energy_tol=final_elec_energy_tol,
-        **kwargs
+        computer, calc_doc, seed, final_elec_energy_tol=final_elec_energy_tol, **kwargs
     )
 
     return workflow.success
 
 
 class CastepMagresWorkflow(Workflow):
-    """ Perform a "full" magres calculation on a system, i.e.
+    """Perform a "full" magres calculation on a system, i.e.
     first perform a relaxation in a standardised unit cell,
     then do a high quality SCF, then compute NMR properties.
 
@@ -74,76 +75,98 @@ class CastepMagresWorkflow(Workflow):
             in the high-quality SCF calculation.
 
     """
+
     def preprocess(self):
-        """ Decide which parts of the Workflow need to be performed,
+        """Decide which parts of the Workflow need to be performed,
         and set the appropriate CASTEP parameters.
 
         """
 
-        self.final_elec_energy_tol = self.workflow_params.get("final_elec_energy_tol", 1e-11)
+        self.final_elec_energy_tol = self.workflow_params.get(
+            "final_elec_energy_tol", 1e-11
+        )
         # default todo
-        todo = {'relax': True, 'scf': True, 'dos': True, 'pdos': True, 'broadening': True, 'magres': True}
+        todo = {
+            "relax": True,
+            "scf": True,
+            "dos": True,
+            "pdos": True,
+            "broadening": True,
+            "magres": True,
+        }
         # definition of steps and names
         steps = {
-            'relax': castep_prerelax,
-            'scf': partial(castep_magres_scf, elec_energy_tol=self.final_elec_energy_tol),
-            'dos': castep_spectral_dos,
-            'pdos': optados_pdos,
-            'broadening': optados_dos_broadening,
-            'magres': partial(castep_magres, elec_energy_tol=self.final_elec_energy_tol)
+            "relax": castep_prerelax,
+            "scf": partial(
+                castep_magres_scf, elec_energy_tol=self.final_elec_energy_tol
+            ),
+            "dos": castep_spectral_dos,
+            "pdos": optados_pdos,
+            "broadening": optados_dos_broadening,
+            "magres": partial(
+                castep_magres, elec_energy_tol=self.final_elec_energy_tol
+            ),
         }
 
         exts = {
-            'relax': {
-                'input': ['.cell', '.param'],
-                'output': ['.castep', '-out.cell', '.*err']
+            "relax": {
+                "input": [".cell", ".param"],
+                "output": [".castep", "-out.cell", ".*err"],
             },
-            'scf': {
-                'input': ['.cell', '.param'],
-                'output': ['.castep', '.bands']
+            "scf": {"input": [".cell", ".param"], "output": [".castep", ".bands"]},
+            "magres": {"input": [".cell", ".param"], "output": [".castep", ".magres"]},
+            "dos": {
+                "input": [".cell", ".param"],
+                "output": [
+                    ".castep",
+                    ".bands",
+                    ".pdos_bin",
+                    ".dome_bin",
+                    ".*err",
+                    "-out.cell",
+                ],
             },
-            'magres': {
-                'input': ['.cell', '.param'],
-                'output': ['.castep', '.magres']
+            "pdos": {
+                "input": [".odi", ".pdos_bin", ".dome_bin"],
+                "output": [".odo", ".*err"],
             },
-            'dos': {
-                'input': ['.cell', '.param'],
-                'output': ['.castep', '.bands', '.pdos_bin', '.dome_bin', '.*err', '-out.cell']
+            "broadening": {
+                "input": [".odi", ".pdos_bin", ".dome_bin"],
+                "output": [".odo", ".*err"],
             },
-            'pdos': {
-                'input': ['.odi', '.pdos_bin', '.dome_bin'],
-                'output': ['.odo', '.*err']
-            },
-            'broadening': {
-                'input': ['.odi', '.pdos_bin', '.dome_bin'],
-                'output': ['.odo', '.*err']
-            }
         }
 
         odi_fname = _get_optados_fname(self.seed)
         if odi_fname is not None:
             odi_dict, _ = arbitrary2dict(odi_fname)
-            if todo['dos']:
-                todo['broadening'] = 'broadening' in odi_dict
-                todo['pdos'] = 'pdos' in odi_dict
+            if todo["dos"]:
+                todo["broadening"] = "broadening" in odi_dict
+                todo["pdos"] = "pdos" in odi_dict
         else:
-            todo['pdos'] = False
-            todo['broadening'] = False
+            todo["pdos"] = False
+            todo["broadening"] = False
 
         # prepare to do pre-relax if there's no check file
-        if os.path.isfile(self.seed + '.check'):
-            todo['relax'] = False
-            LOG.info('Restarting from {}.check, so not performing re-relaxation'.format(self.seed))
+        if os.path.isfile(self.seed + ".check"):
+            todo["relax"] = False
+            LOG.info(
+                "Restarting from {}.check, so not performing re-relaxation".format(
+                    self.seed
+                )
+            )
 
         for key in todo:
             if todo[key]:
-                self.add_step(steps[key], key,
-                              input_exts=exts[key].get('input'),
-                              output_exts=exts[key].get('output'))
+                self.add_step(
+                    steps[key],
+                    key,
+                    input_exts=exts[key].get("input"),
+                    output_exts=exts[key].get("output"),
+                )
 
 
 def castep_magres_scf(computer, calc_doc, seed, elec_energy_tol=1e-11):
-    """ Run a singleshot SCF calculation with a high elec_energy_tol.
+    """Run a singleshot SCF calculation with a high elec_energy_tol.
 
     Parameters:
         computer (:obj:`matador.compute.ComputeTask`): the object that will be calling CASTEP.
@@ -160,12 +183,16 @@ def castep_magres_scf(computer, calc_doc, seed, elec_energy_tol=1e-11):
     required = ["write_checkpoint", "continuation"]
 
     return castep_scf(
-        computer, calc_doc, seed, elec_energy_tol=elec_energy_tol, required_keys=required
+        computer,
+        calc_doc,
+        seed,
+        elec_energy_tol=elec_energy_tol,
+        required_keys=required,
     )
 
 
 def castep_magres(computer, calc_doc, seed, elec_energy_tol=1e-11):
-    """ Runs a NMR properties calculation on top of a completed
+    """Runs a NMR properties calculation on top of a completed
     SCF calculation.
 
     Parameters:
@@ -174,13 +201,15 @@ def castep_magres(computer, calc_doc, seed, elec_energy_tol=1e-11):
         seed (str): root filename of structure.
 
     """
-    LOG.info('Performing CASTEP phonon dispersion calculation...')
+    LOG.info("Performing CASTEP phonon dispersion calculation...")
     magres_doc = copy.deepcopy(calc_doc)
-    magres_doc['task'] = 'magres'
-    magres_doc['magres_task'] = calc_doc.get("magres_task", "NMR")
+    magres_doc["task"] = "magres"
+    magres_doc["magres_task"] = calc_doc.get("magres_task", "NMR")
     if magres_doc["magres_task"].upper() == "NMR" and "species_gamma" not in magres_doc:
-        LOG.warning("Performing EFG calculations but no species_gamma block specified in cell file.")
-    magres_doc['continuation'] = 'default'
+        LOG.warning(
+            "Performing EFG calculations but no species_gamma block specified in cell file."
+        )
+    magres_doc["continuation"] = "default"
     # this is just to suppress a warning that elec_energy_tol has changed
     magres_doc["elec_energy_tol"] = elec_energy_tol
 
@@ -189,4 +218,6 @@ def castep_magres(computer, calc_doc, seed, elec_energy_tol=1e-11):
 
     computer.validate_calc_doc(magres_doc, required, forbidden)
 
-    return computer.run_castep_singleshot(magres_doc, seed, keep=True, intermediate=True)
+    return computer.run_castep_singleshot(
+        magres_doc, seed, keep=True, intermediate=True
+    )

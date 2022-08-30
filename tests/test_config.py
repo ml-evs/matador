@@ -20,7 +20,7 @@ REAL_PATH = "/".join(__file__.split("/")[:-1]) + "/"
 
 
 class ConfigTest(unittest.TestCase):
-    """ Test config loading. """
+    """Test config loading."""
 
     def tearDown(self):
         from matador.config import SETTINGS
@@ -33,7 +33,7 @@ class ConfigTest(unittest.TestCase):
         SETTINGS.reset()
 
     def testLoadNamedCustomSettings(self):
-        """ Test custom config. """
+        """Test custom config."""
         settings = load_custom_settings(
             config_fname=(REAL_PATH + "data/custom_config.yml"), no_quickstart=True
         )
@@ -54,7 +54,7 @@ class ConfigTest(unittest.TestCase):
         SETTINGS.reset()
 
     def testLoadUserDefaultSettings(self):
-        """ Test default config. """
+        """Test default config."""
         exists = False
         try:
             if os.path.isfile(os.path.expanduser("~/.matadorrc")):
@@ -85,7 +85,7 @@ class ConfigTest(unittest.TestCase):
             raise oops
 
     def testLoadDefaultSettings(self):
-        """ Test default config. """
+        """Test default config."""
         settings = load_custom_settings(
             config_fname="definitely_doesnt_exist.yml", no_quickstart=True
         )
@@ -94,7 +94,7 @@ class ConfigTest(unittest.TestCase):
         settings.reset()
 
     def testSetDefaultSettings(self):
-        """ Test default config. """
+        """Test default config."""
         set_settings(DEFAULT_SETTINGS)
         from matador.config import SETTINGS
 
@@ -102,6 +102,8 @@ class ConfigTest(unittest.TestCase):
         new_settings["mongo"].pop("host")
 
         set_settings(new_settings)
-        self.assertEqual(SETTINGS.settings["mongo"]["host"], DEFAULT_SETTINGS["mongo"]["host"])
+        self.assertEqual(
+            SETTINGS.settings["mongo"]["host"], DEFAULT_SETTINGS["mongo"]["host"]
+        )
 
         SETTINGS.reset()

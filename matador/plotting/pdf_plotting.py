@@ -14,17 +14,31 @@ from matador.plotting.plotting import plotting_function
 from matador.utils.cell_utils import get_space_group_label_latex
 from matador.utils.chem_utils import get_formula_from_stoich
 
-__all__ = ['plot_pdf', 'plot_projected_pdf', 'plot_diff_overlap', 'plot_projected_diff_overlap']
+__all__ = [
+    "plot_pdf",
+    "plot_projected_pdf",
+    "plot_diff_overlap",
+    "plot_projected_diff_overlap",
+]
 
 
 @plotting_function
-def plot_pdf(pdfs,
-             labels=None, r_min=None, r_max=None,
-             offset=1.2, text_offset=(0.0, 0.0),
-             legend=False, annotate=True, figsize=None,
-             ax=None, projected=False, colour_labels=True,
-             **kwargs):
-    """ Plot PDFs.
+def plot_pdf(
+    pdfs,
+    labels=None,
+    r_min=None,
+    r_max=None,
+    offset=1.2,
+    text_offset=(0.0, 0.0),
+    legend=False,
+    annotate=True,
+    figsize=None,
+    ax=None,
+    projected=False,
+    colour_labels=True,
+    **kwargs,
+):
+    """Plot PDFs.
 
     Parameters:
         pdfs (list of matador.fingerprints.pdf.PDF or matador.crystal.Crystal or dict):
@@ -59,7 +73,7 @@ def plot_pdf(pdfs,
         labels = [labels]
 
     if figsize is None and ax is None:
-        _user_default_figsize = plt.rcParams.get('figure.figsize', (8, 6))
+        _user_default_figsize = plt.rcParams.get("figure.figsize", (8, 6))
         height = len(pdfs) * max(0.5, _user_default_figsize[1] / 1.5 / len(pdfs))
         figsize = (_user_default_figsize[0], height)
 
@@ -73,8 +87,8 @@ def plot_pdf(pdfs,
         gr_max = max(np.max(pdf.pdf.gr) for pdf in pdfs)
         _r_max = min(np.max(pdf.pdf.r_space) for pdf in pdfs)
     elif isinstance(pdfs[0], dict):
-        gr_max = max(np.max(pdf['pdf'].gr) for pdf in pdfs)
-        _r_max = min(np.max(pdf['pdf'].r_space) for pdf in pdfs)
+        gr_max = max(np.max(pdf["pdf"].gr) for pdf in pdfs)
+        _r_max = min(np.max(pdf["pdf"].r_space) for pdf in pdfs)
     else:
         gr_max = max(np.max(pdf.gr) for pdf in pdfs)
         _r_max = min(np.max(pdf.r_space) for pdf in pdfs)
@@ -85,9 +99,9 @@ def plot_pdf(pdfs,
     if r_min is None:
         r_min = 0.0
 
-    ax.set_ylabel('Pair distribution function, $g(r)$')
+    ax.set_ylabel("Pair distribution function, $g(r)$")
     ax.get_yaxis().set_ticks([])
-    ax.set_xlim(r_min, r_max+0.5)
+    ax.set_xlim(r_min, r_max + 0.5)
 
     projected_keys = set()
     labelled_keys = set()
@@ -96,8 +110,8 @@ def plot_pdf(pdfs,
 
         if isinstance(pdf, Crystal):
             pdf = pdf.pdf
-        elif isinstance(pdf, dict) and 'pdf' in pdf:
-            pdf = pdf['pdf']
+        elif isinstance(pdf, dict) and "pdf" in pdf:
+            pdf = pdf["pdf"]
 
         if labels:
             label = labels[ind]
@@ -125,18 +139,26 @@ def plot_pdf(pdfs,
                             _label = f"{key[0]}-{key[0]}"
                         labelled_keys.add(key)
                     if len(key) == 2:
-                        color = (np.array(get_element_colours()[key[0]]) + np.array(get_element_colours()[key[1]])) / 2
+                        color = (
+                            np.array(get_element_colours()[key[0]])
+                            + np.array(get_element_colours()[key[1]])
+                        ) / 2
                     else:
                         color = get_element_colours()[key[0]]
-                    ax.plot(pdf.r_space, pdf.elem_gr[key] + abs_offset * ind, label=_label, c=color)
+                    ax.plot(
+                        pdf.r_space,
+                        pdf.elem_gr[key] + abs_offset * ind,
+                        label=_label,
+                        c=color,
+                    )
 
         else:
-            color = next(ax._get_lines.prop_cycler)['color']
+            color = next(ax._get_lines.prop_cycler)["color"]
             ax.plot(pdf.r_space, pdf.gr + abs_offset * ind, label=label, color=color)
         if text_offset is not None:
             text_x = text_offset[0] + r_min
         if text_offset is not None:
-            text_y = abs_offset*ind + text_offset[1]*gr_max
+            text_y = abs_offset * ind + text_offset[1] * gr_max
         if label is not None and annotate:
             text_color = None
             if colour_labels:
@@ -145,10 +167,10 @@ def plot_pdf(pdfs,
 
     ax.set_ylim(-gr_max * 0.2, offset * gr_max * len(pdfs))
 
-    ax.set_xlabel('$r$ ($\\AA$)')
+    ax.set_xlabel("$r$ ($\\AA$)")
 
     if legend or projected:
-        legend = ax.legend(c='upper right')
+        legend = ax.legend(c="upper right")
 
     return ax
 
@@ -161,7 +183,7 @@ def plot_projected_pdf(*args, **kwargs):
 
 @plotting_function
 def plot_diff_overlap(pdf_overlap):
-    """ Simple plot for comparing two PDFs.
+    """Simple plot for comparing two PDFs.
 
     Parameters:
         pdf_overlap (matador.fingerprints.pdf.PDFOverlap): the
@@ -179,26 +201,30 @@ def plot_diff_overlap(pdf_overlap):
     ax1 = plt.subplot(gs[0])
     ax2 = plt.subplot(gs[1], sharex=ax1)
 
-    ax2.set_xlabel('$r$ (\\AA)')
-    ax1.set_ylabel('$g(r)$')
-    ax2.set_ylabel('$g_a(r) - g_b(r)$')
-    ax2.axhline(0, ls='--', c='k', lw=0.5)
+    ax2.set_xlabel("$r$ (\\AA)")
+    ax1.set_ylabel("$g(r)$")
+    ax2.set_ylabel("$g_a(r) - g_b(r)$")
+    ax2.axhline(0, ls="--", c="k", lw=0.5)
     ax1.set_xlim(0, np.max(pdf_overlap.fine_space))
 
-    ax1.plot(pdf_overlap.fine_space, pdf_overlap.fine_gr_a, label=pdf_overlap.pdf_a.label)
-    ax1.plot(pdf_overlap.fine_space, pdf_overlap.fine_gr_b, label=pdf_overlap.pdf_b.label)
+    ax1.plot(
+        pdf_overlap.fine_space, pdf_overlap.fine_gr_a, label=pdf_overlap.pdf_a.label
+    )
+    ax1.plot(
+        pdf_overlap.fine_space, pdf_overlap.fine_gr_b, label=pdf_overlap.pdf_b.label
+    )
 
     plt.setp(ax1.get_xticklabels(), visible=False)
     ax2.set_ylim(-0.5 * ax1.get_ylim()[1], 0.5 * ax1.get_ylim()[1])
 
     ax1.legend(loc=0)
-    ax2.plot(pdf_overlap.fine_space, pdf_overlap.overlap_fn, ls='-')
+    ax2.plot(pdf_overlap.fine_space, pdf_overlap.overlap_fn, ls="-")
     ax2.set_ylim(ax1.get_ylim()[1], ax1.get_ylim()[1])
 
 
 @plotting_function
 def plot_projected_diff_overlap(pdf_overlap):
-    """ Simple plot for comparing two PDFs.
+    """Simple plot for comparing two PDFs.
 
     Parameters:
         pdf_overlap (matador.fingerprints.pdf.PDFOverlap): the
@@ -215,19 +241,28 @@ def plot_projected_diff_overlap(pdf_overlap):
 
     ax1 = plt.subplot(gs[0])
     ax2 = plt.subplot(gs[1], sharex=ax1)
-    ax2.set_xlabel('$r$ (\\AA)')
-    ax1.set_ylabel('$g(r)$')
-    ax2.set_ylabel('$g_a(r) - g_b(r)$')
-    ax2.axhline(0, ls='--', c='k', lw=0.5)
+    ax2.set_xlabel("$r$ (\\AA)")
+    ax1.set_ylabel("$g(r)$")
+    ax2.set_ylabel("$g_a(r) - g_b(r)$")
+    ax2.axhline(0, ls="--", c="k", lw=0.5)
     ax1.set_xlim(0, np.max(pdf_overlap.fine_space))
     for _, key in enumerate(pdf_overlap.fine_elem_gr_a):
-        ax1.plot(pdf_overlap.fine_space, pdf_overlap.fine_elem_gr_a[key],
-                 label='-'.join(key) + ' {}'.format(pdf_overlap.pdf_a.label))
-        ax1.plot(pdf_overlap.fine_space, pdf_overlap.fine_elem_gr_b[key],
-                 label='-'.join(key) + ' {}'.format(pdf_overlap.pdf_b.label),
-                 ls='--')
-        ax2.plot(pdf_overlap.fine_space, pdf_overlap.fine_elem_gr_a[key] - pdf_overlap.fine_elem_gr_b[key],
-                 label='-'.join(key) + ' diff')
+        ax1.plot(
+            pdf_overlap.fine_space,
+            pdf_overlap.fine_elem_gr_a[key],
+            label="-".join(key) + " {}".format(pdf_overlap.pdf_a.label),
+        )
+        ax1.plot(
+            pdf_overlap.fine_space,
+            pdf_overlap.fine_elem_gr_b[key],
+            label="-".join(key) + " {}".format(pdf_overlap.pdf_b.label),
+            ls="--",
+        )
+        ax2.plot(
+            pdf_overlap.fine_space,
+            pdf_overlap.fine_elem_gr_a[key] - pdf_overlap.fine_elem_gr_b[key],
+            label="-".join(key) + " diff",
+        )
     plt.setp(ax1.get_xticklabels(), visible=False)
     ax2.set_ylim(ax1.get_ylim()[1], ax1.get_ylim()[1])
     ax1.legend(loc=0)

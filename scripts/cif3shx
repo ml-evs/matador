@@ -7,11 +7,11 @@ from sys import argv
 
 fnames = argv[1:]
 for fname in fnames:
-    print_notify('Reading ' + fname)
+    print_notify("Reading " + fname)
     doc, success = cif2dict(fname)
     if success:
-        doc2res(doc, fname.replace('.cif', '.res'), spoof_titl=True)
-        print_success('Wrote .res file to ' + fname.replace('.cif', '') + '.res')
+        doc2res(doc, fname.replace(".cif", ".res"), spoof_titl=True)
+        print_success("Wrote .res file to " + fname.replace(".cif", "") + ".res")
     else:
         print(doc)
-        print_failure('Unable to read structure in ' + fname + '.')
+        print_failure("Unable to read structure in " + fname + ".")

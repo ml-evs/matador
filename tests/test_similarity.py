@@ -10,7 +10,7 @@ REAL_PATH = "/".join(realpath(__file__).split("/")[:-1]) + "/"
 
 
 class SimilarityFilterTest(unittest.TestCase):
-    """ Test similarity filter. """
+    """Test similarity filter."""
 
     def test_icsd_priority(self):
         test_docs = []

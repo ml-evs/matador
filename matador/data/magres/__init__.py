@@ -3,4 +3,4 @@
 
 from .electric_quadrupole_moments import ELECTRIC_QUADRUPOLE_MOMENTS
 
-__all__ = ("ELECTRIC_QUADRUPOLE_MOMENTS", )
+__all__ = ("ELECTRIC_QUADRUPOLE_MOMENTS",)

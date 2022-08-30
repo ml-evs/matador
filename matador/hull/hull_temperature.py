@@ -14,7 +14,7 @@ from matador.orm.spectral import VibrationalDOS
 
 
 class TemperatureDependentHull(EnsembleHull):
-    """ Leverages `EnsembleHull` to construct temperature dependent
+    """Leverages `EnsembleHull` to construct temperature dependent
     hulls from phonon calculations.
 
     """
@@ -22,7 +22,9 @@ class TemperatureDependentHull(EnsembleHull):
     data_key = "temperature"
     energy_key = "free_energy_per_atom"
 
-    def __init__(self, cursor, energy_key='enthalpy_per_atom', temperatures=None, **kwargs):
+    def __init__(
+        self, cursor, energy_key="enthalpy_per_atom", temperatures=None, **kwargs
+    ):
 
         self.temperatures = temperatures
         if temperatures is None:
@@ -35,9 +37,13 @@ class TemperatureDependentHull(EnsembleHull):
         for ind, doc in enumerate(cursor):
             if not isinstance(doc, VibrationalDOS):
                 _doc = VibrationalDOS(doc)
-                temps, vib_free_energies = _doc.vibrational_free_energy(temperatures=self.temperatures)
+                temps, vib_free_energies = _doc.vibrational_free_energy(
+                    temperatures=self.temperatures
+                )
                 _cursor[ind][self.data_key] = {}
-                _cursor[ind][self.data_key][self.energy_key] = np.ones_like(self.temperatures) * _cursor[ind][energy_key]
+                _cursor[ind][self.data_key][self.energy_key] = (
+                    np.ones_like(self.temperatures) * _cursor[ind][energy_key]
+                )
                 _cursor[ind][self.data_key][self.energy_key] += vib_free_energies
                 _cursor[ind][self.data_key]["temperatures"] = self.temperatures
 
@@ -51,6 +57,7 @@ class TemperatureDependentHull(EnsembleHull):
         )
 
     def plot_hull(self, **kwargs):
-        """ Hull plot helper function. """
+        """Hull plot helper function."""
         from matador.plotting.hull_plotting import plot_temperature_hull
+
         return plot_temperature_hull(self, **kwargs)

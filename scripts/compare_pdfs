@@ -8,17 +8,17 @@ import matplotlib.pyplot as plt
 
 
 def compare_pdfs(**kwargs):
-    """ Take res files from command-line, calculate PDF overlap,
+    """Take res files from command-line, calculate PDF overlap,
     print and plot.
 
     """
     strucs = []
     overlaps = []
-    seeds = kwargs.get('seeds')
+    seeds = kwargs.get("seeds")
     if isinstance(seeds, str):
         seeds = [seeds]
-    dr = kwargs.get('dr')
-    gaussian_width = kwargs.get('gaussian_width')
+    dr = kwargs.get("dr")
+    gaussian_width = kwargs.get("gaussian_width")
     for res in seeds:
         struc, success = res2dict(res, db=False)
         if not success:
@@ -27,71 +27,89 @@ def compare_pdfs(**kwargs):
         else:
             strucs.append(struc)
 
-    if kwargs.get('uniq'):
+    if kwargs.get("uniq"):
         from matador.export import doc2res
         import os
-        print('Creating PDF cursor...')
-        unique_set, dupe_dict, _, _ = get_uniq_cursor(strucs,
-                                                      enforce_same_stoich=True,
-                                                      projected=True,
-                                                      debug=kwargs.get('debug'),
-                                                      sim_tol=kwargs.get('uniq'))
-        print('Filtered {} down to {}'.format(len(strucs), len(unique_set)))
+
+        print("Creating PDF cursor...")
+        unique_set, dupe_dict, _, _ = get_uniq_cursor(
+            strucs,
+            enforce_same_stoich=True,
+            projected=True,
+            debug=kwargs.get("debug"),
+            sim_tol=kwargs.get("uniq"),
+        )
+        print("Filtered {} down to {}".format(len(strucs), len(unique_set)))
         strucs = [strucs[ind] for ind in unique_set]
-        if not os.path.isdir('unique'):
-            os.makedirs('unique')
+        if not os.path.isdir("unique"):
+            os.makedirs("unique")
         for doc in strucs:
             print(doc)
-            doc2res(doc, 'unique/' + doc['source'][0], info='enthalpy_per_atom' in doc)
+            doc2res(doc, "unique/" + doc["source"][0], info="enthalpy_per_atom" in doc)
         return
 
     for i, _ in enumerate(strucs):
-        strucs[i]['text_id'] = [strucs[i]['source'][0].split('/')[-1].replace('_', ' ').replace('.res', ''), '']
-        strucs[i]['pdf'] = PDF(strucs[i], dr=dr, gaussian_width=gaussian_width, debug=False, verbosity=0)
+        strucs[i]["text_id"] = [
+            strucs[i]["source"][0].split("/")[-1].replace("_", " ").replace(".res", ""),
+            "",
+        ]
+        strucs[i]["pdf"] = PDF(
+            strucs[i], dr=dr, gaussian_width=gaussian_width, debug=False, verbosity=0
+        )
 
-    print('Similarity distances between PDFs:\n')
+    print("Similarity distances between PDFs:\n")
     for i, _ in enumerate(strucs):
         for j in range(i + 1, len(strucs)):
-            overlaps.append(PDFOverlap(strucs[i]['pdf'], strucs[j]['pdf'], projected=True))
+            overlaps.append(
+                PDFOverlap(strucs[i]["pdf"], strucs[j]["pdf"], projected=True)
+            )
 
     # overlaps = sorted(overlaps, key=lambda x: x.similarity_distance)
-    print('┌' + 7 * '─' + '┬' + 42 * '─' + '┬' + 41 * '─' + '┐')
+    print("┌" + 7 * "─" + "┬" + 42 * "─" + "┬" + 41 * "─" + "┐")
     for overlap in overlaps:
-        print('│{:>6.4f} │ {:^40} │ {:^40}│'
-              .format(overlap.similarity_distance, overlap.pdf_a.label, overlap.pdf_b.label))
+        print(
+            "│{:>6.4f} │ {:^40} │ {:^40}│".format(
+                overlap.similarity_distance, overlap.pdf_a.label, overlap.pdf_b.label
+            )
+        )
 
-    print('└' + 7 * '─' + '┴' + 42 * '─' + '┴' + 41 * '─' + '┘')
-    if kwargs.get('diff'):
-        if kwargs.get('total'):
+    print("└" + 7 * "─" + "┴" + 42 * "─" + "┴" + 41 * "─" + "┘")
+    if kwargs.get("diff"):
+        if kwargs.get("total"):
             for overlap in overlaps:
                 overlap.plot_diff()
         else:
             for overlap in overlaps:
                 overlap.plot_projected_diff()
-    elif kwargs.get('combine'):
-        print('Combining PDFs...')
-        combo = CombinedProjectedPDF([doc['pdf'] for doc in strucs])
+    elif kwargs.get("combine"):
+        print("Combining PDFs...")
+        combo = CombinedProjectedPDF([doc["pdf"] for doc in strucs])
         combo.plot_projected_pdf()
 
-    elif kwargs.get('plot'):
+    elif kwargs.get("plot"):
         from matador.plotting.pdf_plotting import plot_pdf
-        plot_pdf([doc['pdf'] for doc in strucs])
+
+        plot_pdf([doc["pdf"] for doc in strucs])
 
     plt.show()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-dr', '--dr', type=float)
-    parser.add_argument('-gw', '--gaussian_width', type=float)
-    parser.add_argument('seeds', nargs='+', type=str, help='structures to compare')
-    parser.add_argument('--combine', action='store_true', help='combine pdfs into one')
-    parser.add_argument('--plot', action='store_true')
-    parser.add_argument('--diff', action='store_true', help='plot diff')
-    parser.add_argument('--total', action='store_true', help='plot total pdf overlap only')
-    parser.add_argument('-u', '--uniq', type=float, help='filter structures for uniqueness')
-    parser.add_argument('--cmap', type=str, help='named seaborn colourmap')
-    parser.add_argument('--debug', action='store_true', help='print debug output')
+    parser.add_argument("-dr", "--dr", type=float)
+    parser.add_argument("-gw", "--gaussian_width", type=float)
+    parser.add_argument("seeds", nargs="+", type=str, help="structures to compare")
+    parser.add_argument("--combine", action="store_true", help="combine pdfs into one")
+    parser.add_argument("--plot", action="store_true")
+    parser.add_argument("--diff", action="store_true", help="plot diff")
+    parser.add_argument(
+        "--total", action="store_true", help="plot total pdf overlap only"
+    )
+    parser.add_argument(
+        "-u", "--uniq", type=float, help="filter structures for uniqueness"
+    )
+    parser.add_argument("--cmap", type=str, help="named seaborn colourmap")
+    parser.add_argument("--debug", action="store_true", help="print debug output")
     parsed_kwargs = vars(parser.parse_args())
     compare_pdfs(**parsed_kwargs)
-    print('Done!')
+    print("Done!")

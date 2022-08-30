@@ -8,12 +8,12 @@ from sys import argv
 
 fnames = argv[1:]
 for fname in fnames:
-    print_notify('Reading ' + fname)
+    print_notify("Reading " + fname)
     res_dict, success = castep_scrapers.res2dict(fname, db=False)
     ase_doc = doc2ase(res_dict)
     if success:
-        write(fname.replace('.res', '.cif'), ase_doc, format='cif')
-        print_success('Wrote .cif file to ' + fname.replace('.res', '') + '.cif')
+        write(fname.replace(".res", ".cif"), ase_doc, format="cif")
+        print_success("Wrote .cif file to " + fname.replace(".res", "") + ".cif")
     else:
-        print_failure('Unable to find final structure in ' + fname + '.')
-print_success('Completed!')
+        print_failure("Unable to find final structure in " + fname + ".")
+print_success("Completed!")

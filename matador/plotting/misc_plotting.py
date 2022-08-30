@@ -9,16 +9,31 @@ from matador.plotting.plotting import get_linear_cmap, plotting_function
 
 @plotting_function
 def plot_relative_diffs(
-    structure_map, structure_comparator, categories, field, ax=None,
-    x_field="concentration", category_labels=None, field_label=None, x_field_label=None, colour_by_index=1,
-    cbar_label=None, diff_type="rel", invert=False, colour_by=None, figsize=None, colourbar=True,
+    structure_map,
+    structure_comparator,
+    categories,
+    field,
+    ax=None,
+    x_field="concentration",
+    category_labels=None,
+    field_label=None,
+    x_field_label=None,
+    colour_by_index=1,
+    cbar_label=None,
+    diff_type="rel",
+    invert=False,
+    colour_by=None,
+    figsize=None,
+    colourbar=True,
 ):
     """Plot relative and absolute differences between fields for a set of structures
     computed at different levels of theory/accuracy.
 
     """
     if ax is None:
-        _, axes = plt.subplots(1, len(categories) - 1, figsize=figsize, squeeze=True, sharey=True)
+        _, axes = plt.subplots(
+            1, len(categories) - 1, figsize=figsize, squeeze=True, sharey=True
+        )
     else:
         axes = [ax]
     if category_labels is None:
@@ -48,14 +63,20 @@ def plot_relative_diffs(
     if colour_by is not None:
         colour_by_x = []
         for s in structure_comparator:
-            colour_by_x.append(structure_comparator[s].get(categories[colour_by_index], {}).get(colour_by))
+            colour_by_x.append(
+                structure_comparator[s]
+                .get(categories[colour_by_index], {})
+                .get(colour_by)
+            )
     else:
         colour_by_x = None
     ys = defaultdict(list)
     if diff_type in ("abs", "rel"):
         for s in structure_comparator:
             for label in categories[1:]:
-                ys[label].append(structure_comparator[s].get(label, {}).get(f"{diff_type}_{field}"))
+                ys[label].append(
+                    structure_comparator[s].get(label, {}).get(f"{diff_type}_{field}")
+                )
     else:
         for s in structure_comparator:
             for label in categories[1:]:
@@ -64,7 +85,7 @@ def plot_relative_diffs(
     for ind, (label, y) in enumerate(ys.items()):
 
         if diff_type == "rel":
-            y = [100*yv if yv is not None else None for yv in y]
+            y = [100 * yv if yv is not None else None for yv in y]
         if invert:
             y = [-1 * yv if yv is not None else None for yv in y]
 
@@ -85,7 +106,7 @@ def plot_relative_diffs(
         if colour_by == "hull_distance":
             norm = matplotlib.colors.LogNorm(0.01, 1, clip=True)
             ticks = [0.0, 0.01, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64]
-            colours = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])
+            colours = list(plt.rcParams["axes.prop_cycle"].by_key()["color"])
             default_cmap = get_linear_cmap(colours[1:4], list_only=False)
             extend = "both"
             hull_points = np.where(colour_by_x <= 0.0)
@@ -100,7 +121,7 @@ def plot_relative_diffs(
                     c="k",
                     zorder=1e10,
                     lw=2,
-                    markeredgecolor='k',
+                    markeredgecolor="k",
                     markerfacecolor=colours[1],
                     marker="o",
                     markersize=np.sqrt(40),
@@ -110,17 +131,19 @@ def plot_relative_diffs(
 
             else:
                 axes[ind].scatter(
-                    np.array(x)[hull_points], np.array(y)[hull_points],
+                    np.array(x)[hull_points],
+                    np.array(y)[hull_points],
                     c=colours[1],
                     zorder=1e10,
                     lw=1.5,
-                    edgecolor='k',
+                    edgecolor="k",
                     norm=norm,
                     alpha=1,
                 )
 
         scatter = axes[ind].scatter(
-            x, y,
+            x,
+            y,
             cmap=default_cmap,
             c=colour_by_x,
             zorder=-1,
