@@ -96,9 +96,9 @@ def run_apidoc(_):
     import shutil
 
     try:
-        if not os.path.isfile("docs/src/img/lipzn.png"):
+        if not os.path.isfile("docs/src/img/hull.png"):
             os.makedirs("docs/src/img")
-            shutil.copy("img/lipzn.png", "docs/src/img/lipzn.png")
+            shutil.copy("img/hull.png", "docs/src/img/hull.png")
     except Exception:
         pass
     src_dir = os.path.abspath(os.path.dirname(__file__))
