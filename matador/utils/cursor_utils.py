@@ -849,8 +849,15 @@ def _compare_field(bench, other, field):
 
     field_label = "_".join(str(_) for _ in field)
 
-    benchmark_field = recursive_get(bench, field)
-    other_field = recursive_get(other, field)
+    try:
+        benchmark_field = recursive_get(bench, field)
+    except KeyError:
+        raise KeyError(f"Benchmark structure is missing field {field}")
+
+    try:
+        other_field = recursive_get(other, field)
+    except KeyError:
+        raise KeyError(f"Trial structure is missing field {field}")
     # Normalize cell volume to per-atom so different settings can be compared
     if "cell_volume" in field:
         benchmark_field /= bench["num_atoms"]
