@@ -1121,7 +1121,7 @@ class ComputeTask:
                 elif self.mpi_library == 'archer':
                     command = ['aprun', '-n', str(self.ncores)] + command
                 elif self.mpi_library == 'slurm':
-                    command = ['srun'] + command
+                    command = ['srun', '--exclusive', '--ntasks', str(self.ncores)] + command
                 elif self.mpi_library in ['intel', 'default']:
                     command = ['mpirun', '-n', str(self.ncores)] + command
                 else:
@@ -1138,7 +1138,8 @@ class ComputeTask:
                     str(self.ncores), '-S', '12', '-d', '1'
                 ] + command
             elif self.mpi_library == 'slurm':
-                command = ['srun'] + command
+                command = ['srun', '--exclusive', '--ntasks', str(self.ncores * self.nnodes), '--ntasks-per-node',
+                           str(self.ncores)] + command
             elif self.mpi_library == 'intel':
                 command = ['mpirun', '-n', str(self.ncores * self.nnodes), '-ppn', str(self.ncores)] + command
             else:
@@ -1734,7 +1735,7 @@ class ComputeTask:
         LOG.info('Using compute_dir: {}'.format(compute_dir))
         if not os.path.isdir(compute_dir):
             try:
-                os.makedirs(compute_dir)
+                os.makedirs(compute_dir, exist_ok=True)
             except PermissionError as exc:
                 raise CriticalError('Invalid compute dir requested: {} {}'.format(compute_dir, exc))
         # if compute_dir isn't simply inside this folder, make a symlink that is
