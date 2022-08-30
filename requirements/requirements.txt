@@ -3,6 +3,6 @@ scipy~=1.7
 psutil~=5.9
 pyyaml~=6.0
 pymongo~=3.11
-numba~=0.55
+numba~=0.56
 tqdm~=4.62
 matplotlib~=3.5
