@@ -72,7 +72,7 @@ jobs:
         py.test -rs -vvv --nbval-lax --current-env --cov-config .coveragerc --cov=./matador/ --cov-append --cov-report=xml examples/interactive/plot_styles/
     - name: Upload coverage to Codecov
       if: matrix.python-version == 3.8 && github.repository == 'ml-evs/matador'
-      uses: codecov/codecov-action@v1
+      uses: codecov/codecov-action@v3
       with:
         file: ./coverage.xml
         flags: unittests
