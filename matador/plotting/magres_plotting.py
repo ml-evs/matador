@@ -13,7 +13,7 @@ from matador.crystal import Crystal
 from matador.plotting.plotting import plotting_function
 from matador.fingerprints import Fingerprint
 
-__all__ = ['plot_magres']
+__all__ = ["plot_magres"]
 
 
 @plotting_function
@@ -71,7 +71,7 @@ def plot_magres(
         line_kwargs = len(magres) * [line_kwargs]
 
     if figsize is None:
-        _user_default_figsize = plt.rcParams.get('figure.figsize', (8, 6))
+        _user_default_figsize = plt.rcParams.get("figure.figsize", (8, 6))
         height = len(magres) * max(0.5, _user_default_figsize[1] / 1.5 / len(magres))
         figsize = (_user_default_figsize[0], height)
 
@@ -89,8 +89,9 @@ def plot_magres(
 
     if signal_labels is not None and len(signal_labels) != len(magres):
         raise RuntimeError(
-            "Wrong number of labels passed for number of magres: {} vs {}"
-            .format(len(signal_labels), len(magres))
+            "Wrong number of labels passed for number of magres: {} vs {}".format(
+                len(signal_labels), len(magres)
+            )
         )
 
     _magres = []
@@ -119,22 +120,21 @@ def plot_magres(
                 max_shielding = max(np.max(shielding), max_shielding)
 
     if min_shielding > 1e19 and max_shielding < -1e19:
-        raise RuntimeError(f"No sites of {species} found in any of the passed crystals.")
+        raise RuntimeError(
+            f"No sites of {species} found in any of the passed crystals."
+        )
 
     _buffer = 0.2 * np.abs(min_shielding - max_shielding)
-    s_space = np.linspace(
-        min_shielding - _buffer,
-        max_shielding + _buffer,
-        num=1000
-    )
+    s_space = np.linspace(min_shielding - _buffer, max_shielding + _buffer, num=1000)
 
     _padded_colours = list(plt.rcParams["axes.prop_cycle"].by_key()["color"])
     _padded_colours = (1 + (len(magres) // len(_padded_colours))) * _padded_colours
 
     if line_kwargs is not None and len(line_kwargs) != len(magres):
         raise RuntimeError(
-            "Wrong number of line kwargs passed for number of magres: {} vs {}"
-            .format(len(line_kwargs), len(magres))
+            "Wrong number of line kwargs passed for number of magres: {} vs {}".format(
+                len(line_kwargs), len(magres)
+            )
         )
 
     for ind, doc in enumerate(_magres):
@@ -147,13 +147,15 @@ def plot_magres(
         if signal_labels is not None and len(signal_labels) > ind:
             _label = signal_labels[ind]
 
-        _line_kwargs = {'c': _padded_colours[ind]}
+        _line_kwargs = {"c": _padded_colours[ind]}
         if line_kwargs is not None:
             _line_kwargs.update(line_kwargs[ind])
 
         relevant_sites = [site for site in doc if site.species == species]
         if not relevant_sites:
-            print(f"No sites of {species} found in {doc.root_source}, signal will be empty.")
+            print(
+                f"No sites of {species} found in {doc.root_source}, signal will be empty."
+            )
             signal = np.zeros_like(s_space)
 
         else:
@@ -162,7 +164,9 @@ def plot_magres(
             hist, bins = np.histogram(shifts, bins=s_space)
 
             if broadening_width > 0:
-                signal = Fingerprint._broadening_unrolled(hist, s_space, broadening_width, broadening_type="lorentzian")
+                signal = Fingerprint._broadening_unrolled(
+                    hist, s_space, broadening_width, broadening_type="lorentzian"
+                )
             else:
                 signal = np.array(hist, dtype=np.float64)
                 bin_centres = s_space[:-1] + (s_space[1] - s_space[0]) / 2
@@ -176,15 +180,21 @@ def plot_magres(
         ax.plot(s_space, signal + (ind * 1.1), **_line_kwargs)
 
         if _label is not None:
-            ax.text(0.95, (ind * 1.1) + text_offset, _label,
-                    transform=ax.get_yaxis_transform(),
-                    horizontalalignment='right',
-                    fontsize=label_fontsize)
+            ax.text(
+                0.95,
+                (ind * 1.1) + text_offset,
+                _label,
+                transform=ax.get_yaxis_transform(),
+                horizontalalignment="right",
+                fontsize=label_fontsize,
+            )
 
     if xlabel is None:
         unit = set(doc.get("magres_units", {}).get("ms", "ppm") for doc in magres)
         if len(unit) > 1:
-            raise RuntimeError(f"Multiple incompatible units found for chemical shift: {unit}")
+            raise RuntimeError(
+                f"Multiple incompatible units found for chemical shift: {unit}"
+            )
         unit = list(unit)[0]
         if magres_key == "chemical_shielding_iso":
             xlabel = f"{species_label}: Isotropic chemical shielding $\\sigma_\\mathrm{{iso}}$ ({unit})"
@@ -209,7 +219,7 @@ def plot_magres(
 
     if savefig:
         plt.savefig(savefig)
-        print('Wrote {}'.format(savefig))
+        print("Wrote {}".format(savefig))
 
     elif show:
         plt.show()

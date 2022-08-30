@@ -8,3 +8,10 @@ updates:
   target-branch: master
   labels:
   - dependency_updates
+- package-ecosystem: github-actions
+  directory: "/"
+  schedule:
+    interval: monthly 
+  target-branch: master
+  labels:
+  - CI

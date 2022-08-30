@@ -41,6 +41,7 @@ RUN_SLOW_TESTS = HOSTNAME == "cluster2"
 CASTEP_PRESENT = detect_program(EXECUTABLE)
 MPI_PRESENT = detect_program("mpirun")
 
+ACTUAL_NCORES = psutil.cpu_count(logical=False)
 if CASTEP_PRESENT and MPI_PRESENT:
     NCORES = max(psutil.cpu_count(logical=False) - 2, 1)
 else:
@@ -48,13 +49,13 @@ else:
 
 
 class ComputeTest(MatadorUnitTest):
-    """ Run tests equivalent to using the run3 script for
+    """Run tests equivalent to using the run3 script for
     various artificial setups.
 
     """
 
     def test_missing_exec(self):
-        """ Ensure failure if exec misses. """
+        """Ensure failure if exec misses."""
         cell_dict, s = cell2dict(
             REAL_PATH + "/data/LiAs_tests/LiAs.cell", verbosity=VERBOSITY, db=False
         )
@@ -90,7 +91,7 @@ class ComputeTest(MatadorUnitTest):
         self.assertTrue(fall_over)
 
     def test_file_not_written(self):
-        """ Run a calculation with an executable that only does "sleep" and
+        """Run a calculation with an executable that only does "sleep" and
         check that run3 will stop the calculation early as no file is written.
 
         """
@@ -127,7 +128,7 @@ class ComputeTest(MatadorUnitTest):
         self.assertTrue(relaxer.final_result is None)
 
     def test_old_file(self):
-        """ Run a calculation with an executable that only does "sleep", in the
+        """Run a calculation with an executable that only does "sleep", in the
         presence of a file that was written previouisly, and check that run3
         will stop the calculation early as no file is written.
 
@@ -168,7 +169,7 @@ class ComputeTest(MatadorUnitTest):
         self.assertTrue(relaxer.final_result is None)
 
     def test_faked_error_recovery(self):
-        """ Run a calculation that *should* throw a symmetry error, and try to
+        """Run a calculation that *should* throw a symmetry error, and try to
         recover from the error. If CASTEP is not present, monkey patch such that
         ComputeTask copies the output files it would have expected.
 
@@ -221,7 +222,7 @@ class ComputeTest(MatadorUnitTest):
         "castep or mpirun executable not found in PATH",
     )
     def test_relax_to_queue(self):
-        """ Mimic GA and test Queue relaxations. """
+        """Mimic GA and test Queue relaxations."""
 
         newborn, s = res2dict(
             REAL_PATH + "/data/structures/LiAs_testcase.res",
@@ -290,7 +291,7 @@ class ComputeTest(MatadorUnitTest):
         "castep or mpirun executable not found in PATH",
     )
     def test_relax_to_file(self):
-        """ Relax structure from file to file. """
+        """Relax structure from file to file."""
         seed = "_Li.res"
         shutil.copy(REAL_PATH + "data/structures/Li.res", "_Li.res")
 
@@ -339,7 +340,7 @@ class ComputeTest(MatadorUnitTest):
         "castep or mpirun executable not found in PATH",
     )
     def test_failed_relaxation(self):
-        """ Set a relaxation up to fail. """
+        """Set a relaxation up to fail."""
         seed = "_LiAs_testcase.res"
         shutil.copy(
             REAL_PATH + "data/structures/LiAs_testcase_bad.res", "_LiAs_testcase.res"
@@ -388,7 +389,7 @@ class ComputeTest(MatadorUnitTest):
         self.assertEqual(num, 0)
 
     def test_dont_restart_completed_calc(self):
-        """ Set a relaxation up to fail. """
+        """Set a relaxation up to fail."""
 
         shutil.copy(
             REAL_PATH
@@ -450,7 +451,7 @@ class ComputeTest(MatadorUnitTest):
         "castep or mpirun executable not found in PATH",
     )
     def test_memcheck(self):
-        """ Test the memory checker will not proceed with huge jobs. """
+        """Test the memory checker will not proceed with huge jobs."""
 
         shutil.copy(
             REAL_PATH + "data/structures/LiAs_testcase.res", "_LiAs_testcase.res"
@@ -503,7 +504,7 @@ class ComputeTest(MatadorUnitTest):
     )
     @unittest.skipIf(not RUN_SLOW_TESTS, "this is a slow test, skipping")
     def test_batch_relax(self):
-        """ Batch relax structures from file to file. """
+        """Batch relax structures from file to file."""
 
         shutil.copy(REAL_PATH + "data/structures/LiC.res", "_LiC.res")
         shutil.copy(REAL_PATH + "data/LiC_tests/LiC.cell", ".")
@@ -533,7 +534,7 @@ class ComputeTest(MatadorUnitTest):
         self.assertFalse(cruft_doesnt_exist, "found some cruft {}".format(cruft))
 
     def test_batch_queues(self):
-        """ Test the scraping of queuing environments. """
+        """Test the scraping of queuing environments."""
 
         shutil.copy(REAL_PATH + "data/structures/LiC.res", "_LiC.res")
         shutil.copy(REAL_PATH + "data/LiC_tests/LiC.cell", ".")
@@ -622,7 +623,7 @@ class ComputeTest(MatadorUnitTest):
         "castep or mpirun executable not found in PATH",
     )
     def test_scf(self):
-        """ Perform SCF on structure from file. """
+        """Perform SCF on structure from file."""
         seed = "_LiC.res"
         shutil.copy(REAL_PATH + "data/structures/LiC.res", "_LiC.res")
 
@@ -674,7 +675,7 @@ class ComputeTest(MatadorUnitTest):
         "castep or mpirun executable not found in PATH",
     )
     def test_scf_max_walltime(self):
-        """ Perform SCF on structure from file. """
+        """Perform SCF on structure from file."""
         seed = "_LiC.res"
         shutil.copy(REAL_PATH + "data/structures/LiC.res", "_LiC.res")
 
@@ -721,7 +722,7 @@ class ComputeTest(MatadorUnitTest):
         "castep or mpirun executable not found in PATH",
     )
     def test_convergence_runner(self):
-        """ Check that convergence tests run to completion. """
+        """Check that convergence tests run to completion."""
         shutil.copy(REAL_PATH + "data/structures/Li.res", "_LiAs_testcase.res")
         shutil.copy(REAL_PATH + "data/LiAs_tests/LiAs_scf.cell", ".")
         shutil.copy(REAL_PATH + "data/LiAs_tests/LiAs_scf.param", ".")
@@ -742,8 +743,8 @@ class ComputeTest(MatadorUnitTest):
             conv_cutoff=True,
             conv_kpt=True,
             verbosity=VERBOSITY,
-            ncores=NCORES,
-            nprocesses=2,
+            ncores=1,
+            nprocesses=min(2, ACTUAL_NCORES),
             executable=EXECUTABLE,
         )
         runner.spawn(join=False)
@@ -779,7 +780,7 @@ class ComputeTest(MatadorUnitTest):
         "castep or mpirun executable not found in PATH",
     )
     def test_batch_failed_scf(self):
-        """ Check that SCF failures don't kill everything... """
+        """Check that SCF failures don't kill everything..."""
 
         shutil.copy(REAL_PATH + "data/structures/Li.res", "_Li.res")
         shutil.copy(REAL_PATH + "data/structures/LiC.res", "_LiC.res")
@@ -821,7 +822,7 @@ class ComputeTest(MatadorUnitTest):
         self.assertFalse(compute_dir_exist, "Compute dir not cleaned up!")
 
     def test_failed_compute_dir_scf(self):
-        """ Check that using a garbage path for compute dir causes a safe crash. """
+        """Check that using a garbage path for compute dir causes a safe crash."""
         shutil.copy(REAL_PATH + "data/structures/Li.res", "_Li.res")
         shutil.copy(REAL_PATH + "data/structures/LiC.res", "_LiC.res")
         shutil.copy(REAL_PATH + "data/pspots/Li_00PBE.usp", ".")
@@ -846,7 +847,7 @@ class ComputeTest(MatadorUnitTest):
         "castep or mpirun executable not found in PATH",
     )
     def test_batch_max_walltime_threaded(self):
-        """ Check that WallTimeErrors do kill everything... """
+        """Check that WallTimeErrors do kill everything..."""
 
         shutil.copy(REAL_PATH + "data/structures/LiAs_testcase.res", ".")
         shutil.copy(REAL_PATH + "data/structures/LiAs_testcase_bad.res", ".")
@@ -860,8 +861,8 @@ class ComputeTest(MatadorUnitTest):
             debug=False,
             no_reopt=True,
             verbosity=VERBOSITY,
-            ncores=2,
-            nprocesses=2,
+            ncores=min(2, ACTUAL_NCORES),
+            nprocesses=min(2, ACTUAL_NCORES // 2),
             executable=EXECUTABLE,
             max_walltime=15,
             polltime=10,
@@ -884,7 +885,7 @@ class ComputeTest(MatadorUnitTest):
         self.assertFalse(lock_exists, "Lock file was not deleted!")
 
     def test_generic_batch(self):
-        """ Run a calculation in generic mode, check that res files
+        """Run a calculation in generic mode, check that res files
         are cycled over.
 
         """
@@ -930,7 +931,7 @@ class ComputeTest(MatadorUnitTest):
         self.assertTrue(txt_files_exist)
 
     def test_generic_batch_threaded(self):
-        """ Run a calculation in generic mode, check that res files
+        """Run a calculation in generic mode, check that res files
         are cycled over and not repeated by multiple threads. Multiple
         threads competing for the same job.
 
@@ -982,7 +983,7 @@ class ComputeTest(MatadorUnitTest):
         self.assertTrue(txt_files_exist)
 
     def test_batch_nothing_todo(self):
-        """ Check that nothing is done when there's nothing to do... """
+        """Check that nothing is done when there's nothing to do..."""
         for file in glob.glob(REAL_PATH + "data/nothing_to_do/*.*"):
             shutil.copy(file, ".")
 
@@ -991,8 +992,8 @@ class ComputeTest(MatadorUnitTest):
             debug=False,
             no_reopt=True,
             verbosity=VERBOSITY,
-            ncores=2,
-            nprocesses=2,
+            ncores=min(2, ACTUAL_NCORES),
+            nprocesses=min(2, ACTUAL_NCORES // 2),
             executable=EXECUTABLE,
         )
         start = time.time()
@@ -1001,7 +1002,7 @@ class ComputeTest(MatadorUnitTest):
         self.assertTrue(elapsed < 10, "Sluggish to quit!")
 
     def test_res_name_collision(self):
-        """ Check that run3 safely falls over if there is a file called <seed>.res. """
+        """Check that run3 safely falls over if there is a file called <seed>.res."""
         shutil.copy(REAL_PATH + "data/file_collision/LiAs.cell", ".")
         shutil.copy(REAL_PATH + "data/file_collision/LiAs.res", ".")
         shutil.copy(REAL_PATH + "data/file_collision/LiAs.param", ".")
@@ -1013,8 +1014,8 @@ class ComputeTest(MatadorUnitTest):
                 debug=False,
                 no_reopt=True,
                 verbosity=VERBOSITY,
-                ncores=2,
-                nprocesses=2,
+                ncores=min(2, ACTUAL_NCORES),
+                nprocesses=min(2, ACTUAL_NCORES // 2),
                 executable=EXECUTABLE,
             )
             runner.spawn()
@@ -1024,7 +1025,7 @@ class ComputeTest(MatadorUnitTest):
         self.assertTrue(failed_safely)
 
     def test_missing_basics(self):
-        """" Check that run3 falls over when e.g. xc_functional is missing. """
+        """ " Check that run3 falls over when e.g. xc_functional is missing."""
         for file in glob.glob(REAL_PATH + "data/misisng_basics/*.*"):
             shutil.copy(file, ".")
 
@@ -1047,7 +1048,7 @@ class ComputeTest(MatadorUnitTest):
 
 
 class BenchmarkCastep(MatadorUnitTest):
-    """ Run some short CASTEP calculations and compare the timings
+    """Run some short CASTEP calculations and compare the timings
     to single core & multicore references.
 
     """
@@ -1057,7 +1058,7 @@ class BenchmarkCastep(MatadorUnitTest):
         "castep or mpirun executable not found in PATH",
     )
     def test_benchmark_dual_core_scf(self):
-        """ Test the time taken to perform a set number of SCF steps
+        """Test the time taken to perform a set number of SCF steps
         on 2 cores. CASTEP prints no total timing data for single core jobs.
 
         """
@@ -1083,7 +1084,7 @@ class BenchmarkCastep(MatadorUnitTest):
         shutil.copy(REAL_PATH + "data/pspots/C_00PBE.usp", ".")
         with self.assertRaises(CalculationError):
             ComputeTask(
-                ncores=2,
+                ncores=min(2, ACTUAL_NCORES),
                 nnodes=None,
                 node=None,
                 res=seed,
@@ -1118,7 +1119,7 @@ class BenchmarkCastep(MatadorUnitTest):
         "castep or mpirun executable not found in PATH",
     )
     def test_benchmark_manycore_scf(self):
-        """ Test the time taken to perform a set number of SCF steps
+        """Test the time taken to perform a set number of SCF steps
         on many cores.
 
         """

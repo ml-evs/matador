@@ -23,13 +23,14 @@ def plot_cutoff_kpt_grid(
     data,
     figsize=None,
     forces=False,
-    max_energy=50,
+    max_energy=None,
     max_force=None,
     legend=True,
     colour_by="formula",
-    **kwargs
+    log=False,
+    **kwargs,
 ):
-    """ Create a composite plot of cutoff energy and kpoint convergence.
+    """Create a composite plot of cutoff energy and kpoint convergence.
 
     Parameters:
         data (dict): dictionary of convergence data.
@@ -68,13 +69,14 @@ def plot_cutoff_kpt_grid(
         ax=ax,
         colour_by=colour_by,
         max_y=max_energy,
+        log=log,
         label_x=e_label if not forces else False,
         label_y=True,
         reference="last",
     )
 
     if len(labels) < 30 and legend:
-        plt.figlegend(lines, labels, loc="upper center", ncol=min(len(lines)//2, 8))
+        plt.figlegend(lines, labels, loc="upper center", ncol=min(len(lines) // 2, 8))
 
     if forces:
         ax = axes[0][1]
@@ -88,6 +90,7 @@ def plot_cutoff_kpt_grid(
         ax=ax,
         colour_by=colour_by,
         max_y=max_energy,
+        log=log,
         label_x=k_label if not forces else False,
         label_y=False,
         reference="last",
@@ -101,6 +104,7 @@ def plot_cutoff_kpt_grid(
             ax=axes[1][0],
             max_y=max_force,
             label_x=e_label,
+            log=log,
             label_y=True,
             reference="last",
         )
@@ -109,6 +113,7 @@ def plot_cutoff_kpt_grid(
             field="forces",
             parameter="kpoints_mp_spacing",
             max_y=max_force,
+            log=log,
             ax=axes[1][1],
             label_x=k_label,
             label_y=False,
@@ -128,19 +133,21 @@ def plot_cutoff_kpt_grid(
 
     if kwargs.get("plot_fname") or any([kwargs.get(ext) for ext in SAVE_EXTS]):
         import os
+
         fname = kwargs.get("plot_fname") or "conv"
         for ext in SAVE_EXTS:
             if kwargs.get(ext):
                 fname_tmp = fname
                 ind = 0
-                while os.path.isfile('{}.{}'.format(fname_tmp, ext)):
+                while os.path.isfile("{}.{}".format(fname_tmp, ext)):
                     ind += 1
                     fname_tmp = fname + str(ind)
 
                 fname = fname_tmp
-                plt.savefig('{}.{}'.format(fname, ext),
-                            bbox_inches='tight', transparent=True)
-                print('Wrote {}.{}'.format(fname, ext))
+                plt.savefig(
+                    "{}.{}".format(fname, ext), bbox_inches="tight", transparent=True
+                )
+                print("Wrote {}.{}".format(fname, ext))
 
     if kwargs.get("show"):
         plt.show()
@@ -158,7 +165,7 @@ def plot_field(
     label_x=True,
     label_y=True,
 ):
-    """ Plot the convergence fields for each structure in `data` at
+    """Plot the convergence fields for each structure in `data` at
     each value of `parameter`.
 
     Parameters:
@@ -224,7 +231,7 @@ def plot_field(
             label = key
 
         # only plot points if there's less than 25 lines
-        if len(data) < 30:
+        if len(data) < 10:
             ax.plot(
                 parameters,
                 values,
@@ -267,7 +274,7 @@ def plot_field(
 
 
 def round(n, prec):
-    """ Replace default (bankers) rounding with "normal" rounding."""
+    """Replace default (bankers) rounding with "normal" rounding."""
     if prec is None:
         return n
     else:
@@ -275,7 +282,7 @@ def round(n, prec):
 
 
 def get_convergence_files(path, only=None):
-    """ Find all CASTEP files in the directory. """
+    """Find all CASTEP files in the directory."""
     structure_files = defaultdict(list)
     files = glob.glob(path + "/*.castep")
     for file in files:
@@ -295,7 +302,7 @@ def get_convergence_files(path, only=None):
 def get_convergence_data(
     structure_files, conv_parameter="cut_off_energy", species=None
 ):
-    """ Parse cutoff energy/kpt spacing convergence calculations from list of files.
+    """Parse cutoff energy/kpt spacing convergence calculations from list of files.
 
     Parameters:
         structure_files (list): list of filenames.
@@ -344,10 +351,15 @@ def get_convergence_data(
                     if conv_parameter == "kpoints_mp_spacing":
                         try:
                             scraped_from_filename = float(
-                                doc["source"][0].split("/")[-1].split("_")[-1].split("A")[0]
+                                doc["source"][0]
+                                .split("/")[-1]
+                                .split("_")[-1]
+                                .split("A")[0]
                             )
                         except ValueError:
-                            print(f"Unable to determine kpoints label from {doc['source'][0]}, skipping...")
+                            print(
+                                f"Unable to determine kpoints label from {doc['source'][0]}, skipping..."
+                            )
                             continue
 
                     if scraped_from_filename is not None:
@@ -394,7 +406,9 @@ def get_convergence_data(
                         doc["source"][0].split("/")[-1].split("_")[-1].split("A")[0]
                     )
                 except ValueError:
-                    print(f"Unable to determine kpoints label from {doc['source'][0]}, skipping...")
+                    print(
+                        f"Unable to determine kpoints label from {doc['source'][0]}, skipping..."
+                    )
                     continue
             try:
                 doc["formation_energy_per_atom"] = doc["total_energy_per_atom"]
@@ -447,7 +461,7 @@ def get_convergence_data(
 
 
 def get_convergence_values(data, parameter, field, reference="last", log=False):
-    """ Extract the data to plot for the given dictionary. """
+    """Extract the data to plot for the given dictionary."""
 
     values = data[parameter][field]
     parameters = data[parameter][parameter]
@@ -473,7 +487,7 @@ def get_convergence_values(data, parameter, field, reference="last", log=False):
 
 
 def combine_convergence_data(data_A, data_B):
-    """ Combine dictionaries with potentially overlapping keys. """
+    """Combine dictionaries with potentially overlapping keys."""
     data = {}
     for key in data_A:
         data[key] = data_A[key]

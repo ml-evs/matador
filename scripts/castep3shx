@@ -7,11 +7,11 @@ from sys import argv
 
 fnames = argv[1:]
 for fname in fnames:
-    print_notify('Reading ' + fname)
+    print_notify("Reading " + fname)
     castep_dict, success = castep_scrapers.castep2dict(fname, db=False)
     if success:
-        doc2res(castep_dict, fname.replace('.castep', ''), info=True, hash_dupe=True)
-        print_success('Wrote .res file to ' + fname.replace('.castep', '') + '.res')
+        doc2res(castep_dict, fname.replace(".castep", ""), info=True, hash_dupe=True)
+        print_success("Wrote .res file to " + fname.replace(".castep", "") + ".res")
     else:
-        print_failure('Unable to find final structure in ' + fname + '.')
-print_success('Completed!')
+        print_failure("Unable to find final structure in " + fname + ".")
+print_success("Completed!")

@@ -18,7 +18,7 @@ from .utils import REAL_PATH
 
 @unittest.skipIf(not ASE_IMPORTED, "ASE not found")
 class AseUtilTest(unittest.TestCase):
-    """ Tests cursor util functions. """
+    """Tests cursor util functions."""
 
     def setUp(self):
         # construct ASE atoms object manually
@@ -37,7 +37,7 @@ class AseUtilTest(unittest.TestCase):
         self.assertListEqual(doc["lattice_cart"][2], [0, 0, 12])
         self.assertListEqual(doc["lattice_abc"][0], [12, 12, 12])
         self.assertListEqual(doc["lattice_abc"][1], [90, 90, 90])
-        self.assertAlmostEqual(doc["cell_volume"], 12 ** 3)
+        self.assertAlmostEqual(doc["cell_volume"], 12**3)
         self.assertEqual(len(doc["positions_frac"]), len(doc["atom_types"]))
         self.assertListEqual(doc["positions_frac"][0], [0.5, 0.0, 0.0])
         self.assertListEqual(doc["positions_frac"][1], [0.5, 0.5, 0.5])

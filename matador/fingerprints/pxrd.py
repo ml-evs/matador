@@ -21,7 +21,7 @@ THETA_TOL = 1e-5
 
 
 class PXRD(Fingerprint):
-    """ This class for computes powder X-ray diffraction patterns  of a
+    """This class for computes powder X-ray diffraction patterns  of a
     given crystal for a certain incident wavelength. The cell is
     standardised with spglib before computing PXRD.
 
@@ -45,6 +45,7 @@ class PXRD(Fingerprint):
             corresponding to sample points of self.pattern.
 
     """
+
     def __init__(
         self,
         doc,
@@ -58,17 +59,17 @@ class PXRD(Fingerprint):
         plot=False,
         progress=False,
         *args,
-        **kwargs
+        **kwargs,
     ):
-        """ Set up the PXRD, and compute it, if lazy is False.
+        """Set up the PXRD, and compute it, if lazy is False.
 
         Parameters:
             doc (dict/Crystal): matador document to compute PXRD for.
 
         Keyword arguments:
             lorentzian_width (float): width of Lorentzians for broadening (DEFAULT: 0.03)
-            wavelength (float): incident X-ray wavelength
-                (DEFAULT: CuKa, 1.5406).
+            wavelength (float): incident X-ray wavelength in Å.
+                (DEFAULT: CuKa, 1.5406 Å).
             theta_m (float): the monochromator angle in degrees (DEFAULT: 0)
             two_theta_resolution (float): resolution of grid 2θ
                 used for plotting.
@@ -94,28 +95,35 @@ class PXRD(Fingerprint):
         if self.two_theta_bounds[0] < THETA_TOL:
             self.two_theta_bounds[0] = THETA_TOL
 
-        if np.min(doc.get('site_occupancy', [1.0])) < 1.0:
+        if np.min(doc.get("site_occupancy", [1.0])) < 1.0:
             print("System has partial occupancy, not refining with spglib.")
             self.doc = Crystal(doc)
         else:
             self.doc = Crystal(standardize_doc_cell(doc, primitive=True))
 
-        self.formula = get_formula_from_stoich(self.doc['stoichiometry'], tex=True)
-        self.spg = self.doc['space_group']
+        self.formula = get_formula_from_stoich(self.doc["stoichiometry"], tex=True)
+        self.spg = self.doc["space_group"]
 
-        species = list(set(self.doc['atom_types']))
+        species = list(set(self.doc["atom_types"]))
 
         # this could be cached across PXRD objects but is much faster than the XRD calculation itself
         if self.scattering_factors == "GSAS":
             from matador.data.atomic_scattering import GSAS_ATOMIC_SCATTERING_COEFFS
-            self.atomic_scattering_coeffs = {spec: GSAS_ATOMIC_SCATTERING_COEFFS[spec] for spec in species}
+
+            self.atomic_scattering_coeffs = {
+                spec: GSAS_ATOMIC_SCATTERING_COEFFS[spec] for spec in species
+            }
         elif self.scattering_factors == "RASPA":
             from matador.data.atomic_scattering import RASPA_ATOMIC_SCATTERING_COEFFS
-            self.atomic_scattering_coeffs = {spec: RASPA_ATOMIC_SCATTERING_COEFFS[spec] for spec in species}
+
+            self.atomic_scattering_coeffs = {
+                spec: RASPA_ATOMIC_SCATTERING_COEFFS[spec] for spec in species
+            }
         else:
             raise RuntimeError(
-                "No set of scattering factors matched: {}. Please use 'GSAS' or 'RASPA'."
-                .format(self.scattering_factors)
+                "No set of scattering factors matched: {}. Please use 'GSAS' or 'RASPA'.".format(
+                    self.scattering_factors
+                )
             )
 
         if not lazy:
@@ -124,7 +132,7 @@ class PXRD(Fingerprint):
                 self.plot()
 
     def calc_pxrd(self):
-        """ Calculate the PXRD pattern. """
+        """Calculate the PXRD pattern."""
 
         # set crystallographic data
         lattice_abc = np.asarray(self.doc.lattice_abc)
@@ -133,24 +141,32 @@ class PXRD(Fingerprint):
         site_occupancies = np.asarray(self.doc.site_occupancies)
 
         # find allowed reciprocal lattice points within limiting sphere
-        min_r, max_r = [2 / self.wavelength * np.sin(np.pi / 180 * t / 2) for t in self.two_theta_bounds]
+        min_r, max_r = [
+            2 / self.wavelength * np.sin(np.pi / 180 * t / 2)
+            for t in self.two_theta_bounds
+        ]
         Ns = np.floor(max_r * lattice_abc[0, :]).astype(int)
 
         recip = np.asarray(real2recip(lattice_cart)).T
-        qs = np.zeros((2*sum(Ns), 3), dtype=np.float64)
+        qs = np.zeros((2 * sum(Ns), 3), dtype=np.float64)
         hkls = np.asarray(
-            list(itertools.product(
-                range(-Ns[0], Ns[0] + 1),
-                range(-Ns[1], Ns[1] + 1),
-                range(-Ns[2], Ns[2] + 1)
-            )), dtype=np.float64
+            list(
+                itertools.product(
+                    range(-Ns[0], Ns[0] + 1),
+                    range(-Ns[1], Ns[1] + 1),
+                    range(-Ns[2], Ns[2] + 1),
+                )
+            ),
+            dtype=np.float64,
         )
         hkls = hkls[np.argsort(np.linalg.norm(hkls, axis=-1))]
         qs = np.dot(recip, hkls.T).T
 
         # filter out by theta bounds
         q_mags = np.linalg.norm(qs, axis=-1)
-        allowed = np.where(np.logical_and(q_mags <= max_r * 2 * np.pi, q_mags >= min_r * 2 * np.pi))
+        allowed = np.where(
+            np.logical_and(q_mags <= max_r * 2 * np.pi, q_mags >= min_r * 2 * np.pi)
+        )
         qs = qs[allowed]
         hkls = hkls[allowed]
 
@@ -164,8 +180,10 @@ class PXRD(Fingerprint):
 
         if self.progress:
             import tqdm
+
             bar = tqdm.tqdm
         else:
+
             def bar(x):
                 return x
 
@@ -173,30 +191,47 @@ class PXRD(Fingerprint):
             # accumulate atomic scattering factors
             atomic_factor = {}
             for species in set(self.doc.atom_types):
-                atomic_factor[species] = self.atomic_scattering_factor(q_mags[ind], species)
-            factors = np.array([atomic_factor[species] for species in self.doc.atom_types])
-            F_s = np.sum(np.exp(1j * positions_abs @ q_vector) * factors * site_occupancies)
-            S_q[ind] = np.abs(F_s)**2
+                atomic_factor[species] = self.atomic_scattering_factor(
+                    q_mags[ind], species
+                )
+            factors = np.array(
+                [atomic_factor[species] for species in self.doc.atom_types]
+            )
+            F_s = np.sum(
+                np.exp(1j * positions_abs @ q_vector) * factors * site_occupancies
+            )
+            S_q[ind] = np.abs(F_s) ** 2
 
         # apply Lorentz correction for polarisation and finite size effects
-        S_q *= 2 * (1 + np.cos(taus) ** 2 * np.cos(2 * self.theta_m) ** 2) / (np.sin(taus) * np.sin(0.5 * taus))
+        S_q *= (
+            2
+            * (1 + np.cos(taus) ** 2 * np.cos(2 * self.theta_m) ** 2)
+            / (np.sin(taus) * np.sin(0.5 * taus))
+        )
 
         # thermal correction assuming no Debye-Waller factor
-        S_q *= np.exp(-np.sin(taus)**2 / self.wavelength**2)**2
+        S_q *= np.exp(-np.sin(taus) ** 2 / self.wavelength**2) ** 2
         S_q /= np.max(S_q)
 
         # create histogram and broaden onto 2 theta space in degrees
         self.peak_positions = (180 / np.pi) * taus
         self.hkls = hkls
-        self.two_thetas = np.arange(self.two_theta_bounds[0],
-                                    self.two_theta_bounds[1] + self.two_theta_resolution,
-                                    self.two_theta_resolution)
+        self.two_thetas = np.arange(
+            self.two_theta_bounds[0],
+            self.two_theta_bounds[1] + self.two_theta_resolution,
+            self.two_theta_resolution,
+        )
 
-        self.pattern, bins = np.histogram(self.peak_positions, bins=self.two_thetas, weights=S_q)
+        self.pattern, bins = np.histogram(
+            self.peak_positions, bins=self.two_thetas, weights=S_q
+        )
 
         if self.lorentzian_width > 0:
             self.pattern = self._broadening_unrolled(
-                self.pattern, self.two_thetas, self.lorentzian_width, broadening_type='lorentzian'
+                self.pattern,
+                self.two_thetas,
+                self.lorentzian_width,
+                broadening_type="lorentzian",
             )
         else:
             # shift and clip the last two theta value if we didnt do broadening
@@ -213,11 +248,11 @@ class PXRD(Fingerprint):
         self.spectrum = self.pattern
 
     def calculate(self):
-        """ Alias for calculating the PXRD pattern. """
+        """Alias for calculating the PXRD pattern."""
         self.calc_pxrd()
 
     def atomic_scattering_factor(self, q_mag, species):
-        """ Return fit for particular atom at given q-vector.
+        """Return fit for particular atom at given q-vector.
 
         Parameters:
             q_mag (float): magnitude of the q_vector.
@@ -230,15 +265,16 @@ class PXRD(Fingerprint):
         a = self.atomic_scattering_coeffs[species][0]
         b = self.atomic_scattering_coeffs[species][1]
         c = self.atomic_scattering_coeffs[species][2]
-        return c + np.sum(a * np.exp(-b * (q_mag / (4 * np.pi))**2))
+        return c + np.sum(a * np.exp(-b * (q_mag / (4 * np.pi)) ** 2))
 
     def plot(self, **kwargs):
-        """ Wrapper function to plot the PXRD pattern. """
+        """Wrapper function to plot the PXRD pattern."""
         from matador.plotting.pxrd_plotting import plot_pxrd
+
         plot_pxrd(self, **kwargs)
 
     def save_pattern(pxrd, fname):
-        """ Write a file to `fname` that contains the xy coordinates of
+        """Write a file to `fname` that contains the xy coordinates of
         the PXRD pattern.
 
         """
@@ -247,6 +283,7 @@ class PXRD(Fingerprint):
             raise RuntimeError(f"Requested filename {fname} already exists!")
 
         from matador import __version__
+
         header = f""" PXRD pattern computed with matador {__version__}.
 Input file:
 {pxrd.doc.source[0]}
@@ -261,15 +298,22 @@ lorentzian_width = {pxrd.lorentzian_width} degrees
 
 2θ (degrees),\t\t\tRelative intensity"""
 
-        np.savetxt(fname, np.vstack([pxrd.two_thetas, pxrd.pattern]).T, header=header, fmt='%.14e', delimiter='\t')
+        np.savetxt(
+            fname,
+            np.vstack([pxrd.two_thetas, pxrd.pattern]).T,
+            header=header,
+            fmt="%.14e",
+            delimiter="\t",
+        )
 
     def save_peaks(pxrd, fname):
-        """ Write a file to `fname` that contains the peak list. """
+        """Write a file to `fname` that contains the peak list."""
 
         if os.path.isfile(fname):
             raise RuntimeError(f"Requested filename {fname} already exists!")
 
         from matador import __version__
+
         header = f""" PXRD peaks computed with matador {__version__}.
 Input file:
 {pxrd.doc.source[0]}
@@ -290,11 +334,11 @@ lorentzian_width = {pxrd.lorentzian_width} degrees
                 [pxrd.hkls[:, 0], pxrd.hkls[:, 1], pxrd.hkls[:, 2], pxrd.peak_positions]
             ).T,
             header=header,
-            fmt=['% d', '% d', '% d', '%.14e'],
-            delimiter='\t'
+            fmt=["% d", "% d", "% d", "%.14e"],
+            delimiter="\t",
         )
 
 
 class PXRDFactory(FingerprintFactory):
     fingerprint = PXRD
-    default_key = 'pxrd'
+    default_key = "pxrd"

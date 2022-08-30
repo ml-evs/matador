@@ -17,10 +17,10 @@ REAL_PATH = "/".join(realpath(__file__).split("/")[:-1]) + "/"
 
 
 class HullTest(unittest.TestCase):
-    """ Test Convex hull functionality. """
+    """Test Convex hull functionality."""
 
     def test_hull_from_file(self):
-        """ Loading hull structures from files. """
+        """Loading hull structures from files."""
         res_list = glob(REAL_PATH + "data/hull-KPSn-KP/*.res")
         self.assertEqual(
             len(res_list),
@@ -32,7 +32,7 @@ class HullTest(unittest.TestCase):
         self.assertEqual(len(hull.hull_cursor), 16)
 
     def test_hull_from_custom_chempots(self):
-        """ Loading hull structures from files. """
+        """Loading hull structures from files."""
         res_list = glob(REAL_PATH + "data/hull-KPSn-KP/*.res")
         self.assertEqual(
             len(res_list),
@@ -50,7 +50,7 @@ class HullTest(unittest.TestCase):
         self.assertEqual(len(hull.hull_cursor), 16)
 
     def test_hull_with_crystal_models(self):
-        """ Loading hull structures from files. """
+        """Loading hull structures from files."""
         cursor, failures = res2dict(
             REAL_PATH + "data/hull-KPSn-KP/*.res", as_model=True
         )
@@ -69,7 +69,7 @@ class HullTest(unittest.TestCase):
         self.assertEqual(len(hull.hull_cursor), 16)
 
     def test_hull_from_file_with_extraneous_elements(self):
-        """ Loading hull structures from files with too many elements. """
+        """Loading hull structures from files with too many elements."""
         res_list = glob(REAL_PATH + "data/hull-KPSn-KP/*.res")
         cursor = [res2dict(res)[0] for res in res_list]
         hull = QueryConvexHull(
@@ -78,7 +78,7 @@ class HullTest(unittest.TestCase):
         self.assertEqual(len(hull.hull_cursor), 5)
 
     def test_binary_hull_distances(self):
-        """ Test computing binary hull distances. """
+        """Test computing binary hull distances."""
         res_list = glob(REAL_PATH + "data/hull-KP-KSnP_pub/*.res")
         self.assertEqual(
             len(res_list),
@@ -94,7 +94,7 @@ class HullTest(unittest.TestCase):
         )
 
     def test_ternary_hull_distances(self):
-        """ Test computing ternary hull distances. """
+        """Test computing ternary hull distances."""
         res_list = glob(REAL_PATH + "data/hull-KPSn-KP/*.res")
         self.assertEqual(
             len(res_list),
@@ -460,7 +460,7 @@ class HullTest(unittest.TestCase):
 
 
 class EnsembleHullTest(unittest.TestCase):
-    """ Test of Ensemble Hulls for BEEF/temperature. """
+    """Test of Ensemble Hulls for BEEF/temperature."""
 
     def test_beef_hull(self):
         from matador.hull import EnsembleHull
@@ -478,14 +478,18 @@ class EnsembleHullTest(unittest.TestCase):
 
 
 class TemperatureDependentHullTest(unittest.TestCase):
-    """ Tests for the TemperatureDependentHull class. """
+    """Tests for the TemperatureDependentHull class."""
 
     def test_td_hull(self):
         from matador.hull.hull_temperature import TemperatureDependentHull
         from matador.scrapers import castep2dict
 
-        cursor, s = castep2dict(REAL_PATH + "data/castep_phonon_files/*.castep", db=False)
+        cursor, s = castep2dict(
+            REAL_PATH + "data/castep_phonon_files/*.castep", db=False
+        )
 
-        td_hull = TemperatureDependentHull(cursor=cursor, energy_key="total_energy_per_atom")
+        td_hull = TemperatureDependentHull(
+            cursor=cursor, energy_key="total_energy_per_atom"
+        )
 
         self.assertEqual(len(td_hull.phase_diagrams), 21)

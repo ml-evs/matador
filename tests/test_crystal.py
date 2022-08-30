@@ -128,17 +128,27 @@ class CrystalTest(unittest.TestCase):
 
         doc["positions_abs"] = frac2cart(doc["lattice_cart"], doc["positions_frac"])
 
-        np.testing.assert_array_almost_equal(doc["positions_abs"], crystal.positions_abs)
+        np.testing.assert_array_almost_equal(
+            doc["positions_abs"], crystal.positions_abs
+        )
         for ind, site in enumerate(crystal):
-            np.testing.assert_array_almost_equal(doc["positions_abs"][ind], site.coords_cartesian)
+            np.testing.assert_array_almost_equal(
+                doc["positions_abs"][ind], site.coords_cartesian
+            )
 
         crystal.cell.lengths = np.asarray(crystal.cell.lengths) * 10
 
-        rescaled_pos = frac2cart(np.asarray(doc["lattice_cart"]) * 10, doc["positions_frac"])
+        rescaled_pos = frac2cart(
+            np.asarray(doc["lattice_cart"]) * 10, doc["positions_frac"]
+        )
 
         for ind, site in enumerate(crystal):
-            np.testing.assert_array_almost_equal(doc["positions_frac"][ind], site.coords)
-            np.testing.assert_array_almost_equal(rescaled_pos[ind], site.coords_cartesian)
+            np.testing.assert_array_almost_equal(
+                doc["positions_frac"][ind], site.coords
+            )
+            np.testing.assert_array_almost_equal(
+                rescaled_pos[ind], site.coords_cartesian
+            )
 
     def test_minimal_init(self):
         doc = Crystal(
@@ -188,7 +198,9 @@ class CrystalTest(unittest.TestCase):
         doc, s = castep2dict(REAL_PATH + "data/Na3Zn4-swap-ReOs-OQMD_759599.castep")
         del doc["lattice_cart"]
         crystal = Crystal(doc)
-        np.testing.assert_array_almost_equal(crystal[0].coords, [0.776467, 0.466319, 0.0])
+        np.testing.assert_array_almost_equal(
+            crystal[0].coords, [0.776467, 0.466319, 0.0]
+        )
 
         with self.assertRaises(RuntimeError):
             crystal[0].set_position([0.5, 0.6, 0.7, 0.8], "fractional")
@@ -238,7 +250,9 @@ class CrystalTest(unittest.TestCase):
         doc, s = magres2dict(REAL_PATH + "data/magres_files/NaP_QE6.magres")
         crystal = Crystal(doc)
         for atom in crystal:
-            print(atom, atom["chemical_shielding_iso"], atom["chemical_shift_asymmetry"])
+            print(
+                atom, atom["chemical_shielding_iso"], atom["chemical_shift_asymmetry"]
+            )
 
     @unittest.skipIf(not imported_vornet, "Voronoi code not found in this distribution")
     def testCoordination(self):
@@ -269,7 +283,7 @@ class CrystalTest(unittest.TestCase):
 
 
 class ElasticCrystalTest(unittest.TestCase):
-    """ Test the elastic functionality of the Crystal module. """
+    """Test the elastic functionality of the Crystal module."""
 
     def testKBulkModulus(self):
         from matador.crystal.elastic import get_equation_of_state

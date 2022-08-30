@@ -7,13 +7,18 @@ parallel, structural fingerprints like PDF and PXRD.
 """
 
 
-__all__ = ['get_uniq_cursor',
-           'Fingerprint', 'FingerprintFactory',
-           'PDF', 'PDFOverlap', 'CombinedProjectedPDF',
-           'PXRD']
+__all__ = [
+    "get_uniq_cursor",
+    "Fingerprint",
+    "FingerprintFactory",
+    "PDF",
+    "PDFOverlap",
+    "CombinedProjectedPDF",
+    "PXRD",
+]
 
-__author__ = 'Matthew Evans'
-__maintainer__ = 'Matthew Evans'
+__author__ = "Matthew Evans"
+__maintainer__ = "Matthew Evans"
 
 
 from .similarity import get_uniq_cursor

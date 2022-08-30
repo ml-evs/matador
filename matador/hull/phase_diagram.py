@@ -14,16 +14,24 @@ import scipy.spatial
 import numpy as np
 
 from matador.utils.hull_utils import (
-    barycentric2cart, vertices2plane, vertices2line, FakeHull, is_point_in_triangle
+    barycentric2cart,
+    vertices2plane,
+    vertices2line,
+    FakeHull,
+    is_point_in_triangle,
 )
 from matador.utils.chem_utils import get_formula_from_stoich
-from matador.utils.cursor_utils import get_array_from_cursor, display_results, set_cursor_from_array
+from matador.utils.cursor_utils import (
+    get_array_from_cursor,
+    display_results,
+    set_cursor_from_array,
+)
 
 EPS = 1e-12
 
 
 class PhaseDiagram:
-    """ This class encapsulates the actual phase data, e.g. the actual
+    """This class encapsulates the actual phase data, e.g. the actual
     energy and compositions found to be stable.
 
     Attributes:
@@ -37,8 +45,9 @@ class PhaseDiagram:
             per atom from top level of each document.
 
     """
+
     def __init__(self, cursor, formation_key, dimension):
-        """ Compute the convex hull of data passed, to retrieve hull
+        """Compute the convex hull of data passed, to retrieve hull
         distances and thus stable structures.
 
         Parameters:
@@ -53,9 +62,16 @@ class PhaseDiagram:
         self.cursor = cursor
         self.formation_key = formation_key
 
-        structures = np.hstack((
-            get_array_from_cursor(cursor, 'concentration').reshape(len(cursor), dimension-1),
-            get_array_from_cursor(cursor, self.formation_key).reshape(len(cursor), 1)))
+        structures = np.hstack(
+            (
+                get_array_from_cursor(cursor, "concentration").reshape(
+                    len(cursor), dimension - 1
+                ),
+                get_array_from_cursor(cursor, self.formation_key).reshape(
+                    len(cursor), 1
+                ),
+            )
+        )
 
         # define self._structure_slice as the filtered array of points actually used to create the convex hull
         # which can include/exclude points from the passed structures. This array is the one indexed by
@@ -79,26 +95,36 @@ class PhaseDiagram:
         # if we only have the chempots (or worse) with negative formation energy, don't even make the hull
         if len(self._structure_slice) <= dimension:
             if len(self._structure_slice) < dimension:
-                raise RuntimeError('No chemical potentials on hull... either mysterious use of custom chempots, or worry!')
+                raise RuntimeError(
+                    "No chemical potentials on hull... either mysterious use of custom chempots, or worry!"
+                )
             self.convex_hull = FakeHull()
         else:
             try:
                 self.convex_hull = scipy.spatial.ConvexHull(self._structure_slice)
             except scipy.spatial.qhull.QhullError:
                 print(self._structure_slice)
-                print('Error with QHull, plotting formation energies only...')
+                print("Error with QHull, plotting formation energies only...")
                 print_exc()
                 self.convex_hull = FakeHull()
 
         # remove vertices that have positive formation energy
-        filtered_vertices = [vertex for vertex in self.convex_hull.vertices if self._structure_slice[vertex, -1] <= 0 + EPS]
+        filtered_vertices = [
+            vertex
+            for vertex in self.convex_hull.vertices
+            if self._structure_slice[vertex, -1] <= 0 + EPS
+        ]
         bad_simplices = set()
         for ind, simplex in enumerate(self.convex_hull.simplices):
             for vertex in simplex:
                 if vertex not in filtered_vertices:
                     bad_simplices.add(ind)
 
-        filtered_simplices = [simplex for ind, simplex in enumerate(self.convex_hull.simplices) if ind not in bad_simplices]
+        filtered_simplices = [
+            simplex
+            for ind, simplex in enumerate(self.convex_hull.simplices)
+            if ind not in bad_simplices
+        ]
 
         self.convex_hull = FakeHull()
         self.convex_hull.points = self._structure_slice
@@ -106,21 +132,25 @@ class PhaseDiagram:
         self.convex_hull.simplices = list(filtered_simplices)
 
         self.hull_dist = self.get_hull_distances(structures, precompute=True)
-        set_cursor_from_array(self.cursor, self.hull_dist, 'hull_distance')
+        set_cursor_from_array(self.cursor, self.hull_dist, "hull_distance")
         self.structures = structures
-        self.stable_structures = [doc for doc in self.cursor if doc['hull_distance'] < EPS]
+        self.stable_structures = [
+            doc for doc in self.cursor if doc["hull_distance"] < EPS
+        ]
 
     def __str__(self):
-        """ Print underlying phase diagram. """
-        return display_results(self.cursor,
-                               hull=True,
-                               colour=False,
-                               energy_key=self.formation_key,
-                               sort=False,
-                               return_str=True)
+        """Print underlying phase diagram."""
+        return display_results(
+            self.cursor,
+            hull=True,
+            colour=False,
+            energy_key=self.formation_key,
+            sort=False,
+            return_str=True,
+        )
 
     def get_hull_distances(self, structures, precompute=False, **kwargs):
-        """ Returns array of distances to pre-computed binary or ternary
+        """Returns array of distances to pre-computed binary or ternary
         hull, from array containing concentrations and energies.
 
         Parameters:
@@ -166,34 +196,56 @@ class PhaseDiagram:
             hull_dist.fill(np.nan)
             if precompute:
                 for ind, _ in enumerate(structures):
-                    formula = get_formula_from_stoich(self.cursor[ind]['stoichiometry'], sort=True, tex=False)
+                    formula = get_formula_from_stoich(
+                        self.cursor[ind]["stoichiometry"], sort=True, tex=False
+                    )
                     if formula in cached_formula_dists:
-                        hull_dist[ind] = (structures[ind, -1] - cached_formula_dists[formula][0] +
-                                          cached_formula_dists[formula][1])
+                        hull_dist[ind] = (
+                            structures[ind, -1]
+                            - cached_formula_dists[formula][0]
+                            + cached_formula_dists[formula][1]
+                        )
                         cache_hits += 1
                     else:
                         i = bisect.bisect_left(tie_line_comp, structures[ind, 0])
-                        gradient, intercept = vertices2line([[tie_line_comp[i-1], tie_line_energy[i-1]],
-                                                             [tie_line_comp[i], tie_line_energy[i]]])
+                        gradient, intercept = vertices2line(
+                            [
+                                [tie_line_comp[i - 1], tie_line_energy[i - 1]],
+                                [tie_line_comp[i], tie_line_energy[i]],
+                            ]
+                        )
                         # calculate hull_dist
-                        hull_dist[ind] = structures[ind, -1] - (gradient * structures[ind, 0] + intercept)
-                        cached_formula_dists[formula] = (structures[ind, -1], hull_dist[ind])
+                        hull_dist[ind] = structures[ind, -1] - (
+                            gradient * structures[ind, 0] + intercept
+                        )
+                        cached_formula_dists[formula] = (
+                            structures[ind, -1],
+                            hull_dist[ind],
+                        )
                         cache_misses += 1
             else:
                 for ind, _ in enumerate(structures):
                     i = bisect.bisect_left(tie_line_comp, structures[ind, 0])
-                    gradient, intercept = vertices2line([[tie_line_comp[i-1], tie_line_energy[i-1]],
-                                                         [tie_line_comp[i], tie_line_energy[i]]])
+                    gradient, intercept = vertices2line(
+                        [
+                            [tie_line_comp[i - 1], tie_line_energy[i - 1]],
+                            [tie_line_comp[i], tie_line_energy[i]],
+                        ]
+                    )
                     # calculate hull_dist
-                    hull_dist[ind] = structures[ind, -1] - (gradient * structures[ind, 0] + intercept)
+                    hull_dist[ind] = structures[ind, -1] - (
+                        gradient * structures[ind, 0] + intercept
+                    )
 
         # if ternary, use barycentric coords
         elif self._dimension == 3:
             # loop through structures and find which plane they correspond to
             # using barycentric coordinates, if a formula has already been
             # computed then calculate delta relative to that and skip
-            self.convex_hull.planes = [[self._structure_slice[vertex] for vertex in simplex]
-                                       for simplex in self.convex_hull.simplices]
+            self.convex_hull.planes = [
+                [self._structure_slice[vertex] for vertex in simplex]
+                for simplex in self.convex_hull.simplices
+            ]
             structures_finished = [False] * len(structures)
             hull_dist = np.empty(len(structures))
             hull_dist.fill(np.nan)
@@ -213,22 +265,38 @@ class PhaseDiagram:
                 for ind, plane in enumerate(self.convex_hull.planes):
                     if cart_planes_inv[ind] is None:
                         continue
-                    if precompute and get_formula_from_stoich(self.cursor[idx]['stoichiometry'], sort=True,
-                                                              tex=False) in cached_formula_dists:
-                        formula = get_formula_from_stoich(self.cursor[idx]['stoichiometry'], sort=True, tex=False)
+                    if (
+                        precompute
+                        and get_formula_from_stoich(
+                            self.cursor[idx]["stoichiometry"], sort=True, tex=False
+                        )
+                        in cached_formula_dists
+                    ):
+                        formula = get_formula_from_stoich(
+                            self.cursor[idx]["stoichiometry"], sort=True, tex=False
+                        )
                         if formula in cached_formula_dists:
                             cache_hits += 1
-                            hull_dist[idx] = (structures[idx, -1] - cached_formula_dists[formula][0] +
-                                              cached_formula_dists[formula][1])
+                            hull_dist[idx] = (
+                                structures[idx, -1]
+                                - cached_formula_dists[formula][0]
+                                + cached_formula_dists[formula][1]
+                            )
                             structures_finished[idx] = True
 
-                    elif is_point_in_triangle(structure, cart_planes_inv[ind], preprocessed_triangle=True):
+                    elif is_point_in_triangle(
+                        structure, cart_planes_inv[ind], preprocessed_triangle=True
+                    ):
                         structures_finished[idx] = True
                         hull_dist[idx] = planes_height_fn[ind](structure)
                         if precompute:
                             cached_formula_dists[
-                                get_formula_from_stoich(self.cursor[idx]['stoichiometry'], sort=True,
-                                                        tex=False)] = (structure[-1], hull_dist[idx])
+                                get_formula_from_stoich(
+                                    self.cursor[idx]["stoichiometry"],
+                                    sort=True,
+                                    tex=False,
+                                )
+                            ] = (structure[-1], hull_dist[idx])
                             cache_misses += 1
                         break
 
@@ -241,8 +309,11 @@ class PhaseDiagram:
                     failed_structures.append(ind)
 
             if failed_structures:
-                raise RuntimeError('There were issues calculating the hull distance for {} structures.'
-                                   .format(len(failed_structures)))
+                raise RuntimeError(
+                    "There were issues calculating the hull distance for {} structures.".format(
+                        len(failed_structures)
+                    )
+                )
 
         # otherwise, set to zero until proper N-d distance can be implemented
         else:
@@ -252,6 +323,8 @@ class PhaseDiagram:
             )
 
         if np.isnan(hull_dist).any():
-            raise RuntimeError(f"Some hull distances failed, found NaNs at {np.isnan(hull_dist, where=True)}")
+            raise RuntimeError(
+                f"Some hull distances failed, found NaNs at {np.isnan(hull_dist, where=True)}"
+            )
 
         return hull_dist

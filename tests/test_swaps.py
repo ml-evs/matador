@@ -5,7 +5,7 @@ from matador.utils.chem_utils import get_periodic_table
 
 
 class SwapTest(unittest.TestCase):
-    """ Test atomic swap functions. """
+    """Test atomic swap functions."""
 
     def test_single_simple_swap(self):
         # spoof AtomicSwapper __init__

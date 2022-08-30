@@ -7,7 +7,7 @@ REAL_PATH = "/".join(realpath(__file__).split("/")[:-1]) + "/"
 
 
 class CursorUtilTest(unittest.TestCase):
-    """ Tests cursor util functions. """
+    """Tests cursor util functions."""
 
     def test_guess_prov(self):
         from matador.utils.cursor_utils import get_guess_doc_provenance
@@ -112,6 +112,50 @@ class CursorUtilTest(unittest.TestCase):
         with self.assertRaises(KeyError):
             recursive_get(nested_dict, ["_beef", "foo", "blahp"])
 
+    def test_structure_comparator(self):
+        import copy
+        from matador.utils.cursor_utils import compare_structure_cursor
+        from matador.utils.cell_utils import cart2volume, abc2cart
+        from matador.scrapers import res2dict
 
-if __name__ == "__main__":
-    unittest.main()
+        trial_data = res2dict(REAL_PATH + "/data/LiPZn-r57des.res")[0]
+        PBE_structure = copy.deepcopy(trial_data)
+        PBE_structure["hull_distance"] = 0.02
+        PBE_structure["formation_enthalpy_per_atom"] = -0.4
+        SCAN_structure = copy.deepcopy(PBE_structure)
+        SCAN_structure["hull_distance"] = 0
+        SCAN_structure["formation_enthalpy_per_atom"] = -0.6
+        SCAN_structure["lattice_abc"][0][0] *= 1.1
+        SCAN_structure["lattice_abc"][0][1] *= 1.1
+        SCAN_structure["lattice_abc"][0][2] *= 1.1
+        SCAN_structure["cell_volume"] = cart2volume(
+            abc2cart(SCAN_structure["lattice_abc"])
+        )
+
+        structures = {
+            "K": {"PBE": PBE_structure, "SCAN": SCAN_structure},
+        }
+
+        cursor = compare_structure_cursor(structures, ["PBE", "SCAN"])
+        self.assertAlmostEqual(cursor["K"]["SCAN"]["abs_cell_volume"], -4.38, places=2)
+        self.assertAlmostEqual(cursor["K"]["SCAN"]["rel_cell_volume"], -0.331, places=2)
+        self.assertAlmostEqual(cursor["K"]["SCAN"]["cell_volume"], 17.62, places=2)
+        self.assertAlmostEqual(
+            cursor["K"]["SCAN"]["abs_formation_enthalpy_per_atom"], 0.2, places=2
+        )
+        self.assertAlmostEqual(
+            cursor["K"]["SCAN"]["rel_formation_enthalpy_per_atom"], -0.5, places=2
+        )
+
+        with self.assertRaises(KeyError):
+            compare_structure_cursor(structures, ["PBE", "SCAN"], fields=["missing"])
+
+        structures["Sn"] = {"PBE": PBE_structure}
+        cursor = compare_structure_cursor(structures, ["PBE", "SCAN"])
+        self.assertNotIn("Sn", cursor)
+        structures["Sn"]["SCAN"] = SCAN_structure
+        cursor = compare_structure_cursor(structures, ["PBE", "SCAN"])
+        self.assertIn("Sn", cursor)
+        del structures["Sn"]["SCAN"]["hull_distance"]
+        with self.assertRaises(KeyError):
+            cursor = compare_structure_cursor(structures, ["PBE", "SCAN"])

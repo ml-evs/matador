@@ -18,7 +18,7 @@ REAL_PATH = "/".join(realpath(__file__).split("/")[:-1]) + "/"
 
 
 class VoltageTest(unittest.TestCase):
-    """ Test Electrode voltage functionality. """
+    """Test Electrode voltage functionality."""
 
     def test_average_voltage(self):
         capacities = [0, 10, 100]
@@ -42,7 +42,7 @@ class VoltageTest(unittest.TestCase):
         )
 
     def test_binary_voltage(self):
-        """ Test simple binary voltage curve. """
+        """Test simple binary voltage curve."""
         hull_cursor = []
         test_Q = np.loadtxt(REAL_PATH + "data/voltage_data/LiAs_Q.dat")
         test_V = np.loadtxt(REAL_PATH + "data/voltage_data/LiAs_V.dat")
@@ -61,13 +61,11 @@ class VoltageTest(unittest.TestCase):
         np.testing.assert_array_almost_equal(
             hull.voltage_data[0].capacities, test_Q, decimal=5
         )
-        self.assertAlmostEqual(
-            hull.voltage_data[0].average_voltage, 0.949184, places=3
-        )
+        self.assertAlmostEqual(hull.voltage_data[0].average_voltage, 0.949184, places=3)
         self._check_voltages_match_capacities(hull.voltage_data)
 
     def test_multivalent_binary_voltage(self):
-        """ Test simple binary voltage curve. """
+        """Test simple binary voltage curve."""
         hull_cursor = []
         test_Q = np.loadtxt(REAL_PATH + "data/voltage_data/LiAs_Q.dat")
         test_V = np.loadtxt(REAL_PATH + "data/voltage_data/LiAs_V.dat")
@@ -96,7 +94,7 @@ class VoltageTest(unittest.TestCase):
         self._check_voltages_match_capacities(hull.voltage_data)
 
     def test_binary_voltage_mayo(self):
-        """ Test binary voltages from cursor for Mayo et al,
+        """Test binary voltages from cursor for Mayo et al,
         DOI: 10.1021/acs.chemmater.5b04208.
 
         """
@@ -106,9 +104,7 @@ class VoltageTest(unittest.TestCase):
             cursor=cursor, elements=["Li", "P"], no_plot=True, voltage=True
         )
         for profile in hull.voltage_data:
-            self.assertEqual(
-                len(profile.voltages), len(profile.capacities)
-            )
+            self.assertEqual(len(profile.voltages), len(profile.capacities))
         LiP_voltage_curve = np.loadtxt(
             REAL_PATH + "data/LiP_voltage.csv", delimiter=","
         )
@@ -120,12 +116,15 @@ class VoltageTest(unittest.TestCase):
             rtol=1e-4,
         )
         np.testing.assert_allclose(
-            hull.voltage_data[0].capacities, LiP_voltage_curve[:, 0], verbose=True, rtol=1e-4
+            hull.voltage_data[0].capacities,
+            LiP_voltage_curve[:, 0],
+            verbose=True,
+            rtol=1e-4,
         )
         self._check_voltages_match_capacities(hull.voltage_data)
 
     def test_ternary_voltage(self):
-        """ Test ternary voltages from cursor. """
+        """Test ternary voltages from cursor."""
         # test data from LiSnS
         res_list = glob(REAL_PATH + "data/hull-LiSnS/*.res")
         cursor = [res2dict(res)[0] for res in res_list]
@@ -194,7 +193,7 @@ class VoltageTest(unittest.TestCase):
         self._check_voltages_match_capacities(hull.voltage_data)
 
     def test_ternary_voltage_with_one_two_phase_region(self):
-        """ Test ternary voltages with awkward two-phase region. """
+        """Test ternary voltages with awkward two-phase region."""
         # load old hull then rejig it to go through a ternary phase
         res_list = glob(REAL_PATH + "data/hull-KPSn-KP/*.res")
         self.assertEqual(
@@ -235,7 +234,7 @@ class VoltageTest(unittest.TestCase):
         self._check_voltages_match_capacities(hull.voltage_data)
 
     def test_ternary_voltage_with_two_two_phase_regions(self):
-        """ Test ternary voltages with two awkward two-phase regions. """
+        """Test ternary voltages with two awkward two-phase regions."""
         # load old hull then rejig it to go through a ternary phase
         res_list = glob(REAL_PATH + "data/hull-KPSn-KP/*.res")
         self.assertEqual(
@@ -272,14 +271,14 @@ class VoltageTest(unittest.TestCase):
             np.asarray([1.1845, 1.1845, 0.8612, 0.2676, 0.000]),
             decimal=3,
         )
-        self.assertAlmostEqual(hull.voltage_data[0].capacities[-2], 425.7847612, places=5)
         self.assertAlmostEqual(
-            hull.voltage_data[0].average_voltage, 0.58523, places=4
+            hull.voltage_data[0].capacities[-2], 425.7847612, places=5
         )
+        self.assertAlmostEqual(hull.voltage_data[0].average_voltage, 0.58523, places=4)
         self._check_voltages_match_capacities(hull.voltage_data)
 
     def test_ternary_voltage_with_exclusively_two_phase_regions(self):
-        """ Test ternary voltages exclusively awkward two-phase regions. """
+        """Test ternary voltages exclusively awkward two-phase regions."""
         # load old hull then rejig it to go through a ternary phase
         res_list = glob(REAL_PATH + "data/hull-KPSn-KP/*.res")
         self.assertEqual(
@@ -311,7 +310,7 @@ class VoltageTest(unittest.TestCase):
         self._check_voltages_match_capacities(hull.voltage_data)
 
     def test_ternary_voltage_with_single_phase_region(self):
-        """ Test ternary voltages with single-phase regions. """
+        """Test ternary voltages with single-phase regions."""
         # load old hull then rejig it to go through a ternary phase
         cursor = res2dict(REAL_PATH + "data/hull-LiSiP/*.res")[0]
         hull = QueryConvexHull(
@@ -342,7 +341,7 @@ class VoltageTest(unittest.TestCase):
         self._check_voltages_match_capacities(hull.voltage_data)
 
     def test_ternary_voltage_problematic(self):
-        """ Test for NaSnP voltages which triggered a bug in the capacity
+        """Test for NaSnP voltages which triggered a bug in the capacity
         calculation.
 
         """
@@ -356,7 +355,7 @@ class VoltageTest(unittest.TestCase):
         self.assertEqual(len(hull.voltage_data[1].capacities), 12)
 
     def test_ternary_voltage_problematic_with_crystal_models(self):
-        """ Test for NaSnP voltages which triggered a bug in the capacity
+        """Test for NaSnP voltages which triggered a bug in the capacity
         calculation.
 
         """
@@ -372,7 +371,7 @@ class VoltageTest(unittest.TestCase):
         self.assertEqual(len(hull.voltage_data[1].capacities), 12)
 
     def test_angelas_awkward_voltage(self):
-        """ Test a particular example of Angela's awkward ternary voltages. """
+        """Test a particular example of Angela's awkward ternary voltages."""
         # test data from NaFeP
         res_list = glob(REAL_PATH + "data/hull-NaFeP-afh41_new_Na+Fe+P/*.res")
         self.assertEqual(
@@ -392,18 +391,16 @@ class VoltageTest(unittest.TestCase):
 
     def _check_voltages_match_capacities(self, voltage_data):
         for profile in voltage_data:
-            self.assertEqual(
-                len(profile.voltages), len(profile.capacities)
-            )
+            self.assertEqual(len(profile.voltages), len(profile.capacities))
             self.assertTrue(np.isnan(profile.capacities[-1]))
             self.assertEqual(profile.voltages[-1], 0.0)
 
 
 class VolumeTest(unittest.TestCase):
-    """ Test simple binary volume curve. """
+    """Test simple binary volume curve."""
 
     def test_binary_volume_curve(self):
-        """ Test simple binary volume curve. """
+        """Test simple binary volume curve."""
         res_list = glob(REAL_PATH + "data/hull-LiP-mdm_chem_mater/*.res")
         cursor = [res2dict(res)[0] for res in res_list]
         hull = QueryConvexHull(cursor=cursor, elements=["Li", "P"], no_plot=True)
@@ -574,9 +571,7 @@ class VolumeTest(unittest.TestCase):
         for i in range(len(expected_reactions)):
             for j, react in enumerate(expected_reactions[i]):
                 for k, elem in enumerate(react):
-                    self.assertEqual(
-                        hull.voltage_data[i].reactions[j][k][1], elem[1]
-                    )
+                    self.assertEqual(hull.voltage_data[i].reactions[j][k][1], elem[1])
                     self.assertAlmostEqual(
                         hull.voltage_data[i].reactions[j][k][0],
                         elem[0],

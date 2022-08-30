@@ -8,9 +8,9 @@ matching calculations at the same accuracy to create phase diagrams.
 """
 
 
-__all__ = ['DBQuery']
-__author__ = 'Matthew Evans'
-__maintainer__ = 'Matthew Evans'
+__all__ = ["DBQuery"]
+__author__ = "Matthew Evans"
+__maintainer__ = "Matthew Evans"
 
 
 from .query import DBQuery

@@ -46,10 +46,10 @@ except Exception:
 
 @unittest.skipIf(not MATPLOTLIB_PRESENT, "Skipping plotting tests.")
 class SpectralPlotTests(unittest.TestCase):
-    """ Test Dispersion script. """
+    """Test Dispersion script."""
 
     def test_pdis_plot(self):
-        """ Test combined spectral plots. """
+        """Test combined spectral plots."""
         os.chdir(REAL_PATH + "/data/dispersion")
         expected_file = "K3P-OQMD_4786-CollCode25550_spectral.png"
         if os.path.isfile(expected_file):
@@ -86,7 +86,7 @@ class SpectralPlotTests(unittest.TestCase):
         self.assertTrue(file_exists)
 
     def test_dos_only(self):
-        """ Test combined spectral plots. """
+        """Test combined spectral plots."""
         os.chdir(REAL_PATH + "/data/dispersion")
         expected_file = "K3P-OQMD_4786-CollCode25550_spectral.png"
         if os.path.isfile(expected_file):
@@ -115,7 +115,7 @@ class SpectralPlotTests(unittest.TestCase):
         self.assertTrue(file_exists)
 
     def test_multiseed(self):
-        """ Test plotting two seed bandstructures on top of each other. """
+        """Test plotting two seed bandstructures on top of each other."""
         os.chdir(REAL_PATH + "/data/bands_files")
         expected_file = "KPSn_spectral.png"
         sys.argv = [
@@ -134,7 +134,7 @@ class SpectralPlotTests(unittest.TestCase):
             "10",
             "--colours",
             "green",
-            "red"
+            "red",
         ]
         errored = False
         try:
@@ -151,7 +151,7 @@ class SpectralPlotTests(unittest.TestCase):
         self.assertTrue(file_exists)
 
     def test_x11_no_fail(self):
-        """ Test combined spectral plots. """
+        """Test combined spectral plots."""
         os.chdir(REAL_PATH + "/data/dispersion")
         sys.argv = [
             "dispersion",
@@ -174,7 +174,7 @@ class SpectralPlotTests(unittest.TestCase):
             raise error
 
     def test_phonon_dispersion(self):
-        """ Test phonon dispersion plot. """
+        """Test phonon dispersion plot."""
         os.chdir(REAL_PATH + "/data/phonon_dispersion")
         expected_file = "K3P_spectral.png"
         if os.path.isfile(expected_file):
@@ -207,7 +207,7 @@ class SpectralPlotTests(unittest.TestCase):
         self.assertTrue(file_exists)
 
     def test_phonon_ir(self):
-        """ Test phonon IR/Raman plot. """
+        """Test phonon IR/Raman plot."""
         os.chdir(REAL_PATH + "/data/phonon_ir")
         expected_file = "h-BN_IRR_ir.svg"
         if os.path.isfile(expected_file):
@@ -273,31 +273,25 @@ class SpectralPlotTests(unittest.TestCase):
 
 @unittest.skipIf(not MATPLOTLIB_PRESENT, "Skipping plotting tests.")
 class HullPlotTests(MatadorUnitTest):
-    """ Tests for plotting phase diagrams. """
+    """Tests for plotting phase diagrams."""
 
     def test_binary_hull_plot(self):
-        """ Test plotting binary hull. """
-        expected_files = ["KP_hull_simple.svg"]
+        """Test plotting binary hull."""
         cursor = res2dict(REAL_PATH + "data/hull-KP-KSnP_pub/*.res")[0]
         QueryConvexHull(
             cursor=cursor,
             elements=["K", "P"],
-            svg=True,
             hull_cutoff=0.0,
             plot_kwargs={"plot_fname": "KP_hull_simple", "svg": True},
         )
-        for expected_file in expected_files:
-            self.assertTrue(os.path.isfile(expected_file))
 
     def test_binary_battery_plots(self):
-        """ Test plotting binary hull. """
-        expected_files = ["KP_hull.png", "KP_voltage.png", "KP_volume.png"]
+        """Test plotting binary hull."""
         cursor = res2dict(REAL_PATH + "data/hull-KP-KSnP_pub/*.res")[0]
         QueryConvexHull(
             cursor=cursor,
             elements=["K", "P"],
             no_plot=False,
-            png=True,
             quiet=False,
             voltage=True,
             labels=True,
@@ -306,23 +300,18 @@ class HullPlotTests(MatadorUnitTest):
             volume=True,
             plot_kwargs={"colour_by_source": True},
         )
-        for expected_file in expected_files:
-            self.assertTrue(os.path.isfile(expected_file))
 
     def test_voltage_labels(self):
-        expected_files = ["KP_voltage.png"]
         cursor = res2dict(REAL_PATH + "data/hull-KP-KSnP_pub/*.res")[0]
         hull = QueryConvexHull(
             cursor=cursor, species="KP", no_plot=True, voltage=True, labels=True
         )
 
-        plot_voltage_curve(hull.voltage_data, labels=True, savefig=expected_files[0])
-        for expected_file in expected_files:
-            self.assertTrue(os.path.isfile(expected_file))
+        plot_voltage_curve(hull.voltage_data, labels=True)
 
     @unittest.skipIf(not TERNARY_PRESENT, "Skipping as python-ternary not found")
     def test_ternary_hull_plot(self):
-        """ Test plotting ternary hull. """
+        """Test plotting ternary hull."""
         expected_files = ["KSnP_hull.png", "KSnP_voltage.png"]
         for expected_file in expected_files:
             if os.path.isfile(expected_file):
@@ -351,11 +340,10 @@ class HullPlotTests(MatadorUnitTest):
             os.remove(expected_file)
 
     def test_beef_hull_plot(self):
-        """ Test plotting BEEF hull. """
+        """Test plotting BEEF hull."""
         from matador.hull import EnsembleHull
         from matador.scrapers import castep2dict
 
-        expected_file = "KP_beef_hull.svg"
         cursor, s = castep2dict(REAL_PATH + "data/beef_files/*.castep", db=False)
         self.assertEqual(len(s), 0)
 
@@ -369,64 +357,60 @@ class HullPlotTests(MatadorUnitTest):
         )
 
         beef_hull.plot_hull(svg=True)
-        self.assertTrue(os.path.isfile(expected_file))
 
     def test_td_hull_plot(self):
         from matador.hull.hull_temperature import TemperatureDependentHull
         from matador.scrapers import castep2dict
 
-        cursor, s = castep2dict(REAL_PATH + "data/castep_phonon_files/*.castep", db=False)
-        td_hull = TemperatureDependentHull(cursor=cursor, energy_key="total_energy_per_atom")
-        td_hull.plot_hull(plot_fname="td_hull", png=True)
-        self.assertTrue(os.path.isfile("td_hull.png"))
+        cursor, s = castep2dict(
+            REAL_PATH + "data/castep_phonon_files/*.castep", db=False
+        )
+        td_hull = TemperatureDependentHull(
+            cursor=cursor, energy_key="total_energy_per_atom"
+        )
+        td_hull.plot_hull()
 
 
 @unittest.skipIf(not MATPLOTLIB_PRESENT, "Skipping plotting tests.")
 class FingerprintPlotTests(MatadorUnitTest):
-    """ Test ability to plot PDF and PXRDs. """
+    """Test ability to plot PDF and PXRDs."""
 
     def test_pdf_plot(self):
         structure = res2dict(
             REAL_PATH + "data/res_files/KPSn-OQMD_123456.res", as_model=True
         )[0]
-        plot_pdf(structure, png=True)
-        self.assertTrue(os.path.isfile("K7SnP_pdf.png"))
-        plot_pdf([structure, structure], filename="test_pdf", rmax=5, png=True)
-        self.assertTrue(os.path.isfile("test_pdf.png"))
+        plot_pdf(structure)
+        plot_pdf([structure, structure])
 
     def test_pxrd_plot(self):
         structure = res2dict(
             REAL_PATH + "data/res_files/KPSn-OQMD_123456.res", as_model=True
         )[0]
-        plot_pxrd(structure, png=True)
-        self.assertTrue(os.path.isfile("K7SnP_pxrd.png"))
-        plot_pdf([structure, structure], filename="test_pxrd", png=True)
-        self.assertTrue(os.path.isfile("test_pxrd.png"))
+        plot_pxrd(structure)
+        plot_pdf([structure, structure])
 
 
 @unittest.skipIf(not MATPLOTLIB_PRESENT, "Skipping plotting tests.")
 class MagresPlotTests(MatadorUnitTest):
-    """ Test ability to plot magres data. """
+    """Test ability to plot magres data."""
 
     def test_magres_plot(self):
-        magres, f = magres2dict(REAL_PATH + "data/magres_files/*P*.magres", as_model=True)
+        magres, f = magres2dict(
+            REAL_PATH + "data/magres_files/*P*.magres", as_model=True
+        )
         plot_magres(
             magres,
             species="P",
-            savefig="magres_P.pdf",
             line_kwargs={"c": "green"},
         )
-        self.assertTrue(os.path.isfile("magres_P.pdf"))
         plot_magres(
             magres,
             species="Li",
             broadening_width=0,
             magres_key="chemical_shift_aniso",
-            savefig="magres_Li.png",
             signal_labels=["NaP", "LiP"],
             line_kwargs=[{"lw": 3}, {"ls": "--"}],
         )
-        self.assertTrue(os.path.isfile("magres_Li.png"))
 
         with self.assertRaises(RuntimeError):
             plot_magres(magres, species=None)
@@ -437,7 +421,7 @@ class MagresPlotTests(MatadorUnitTest):
 
 @unittest.skipIf(not MATPLOTLIB_PRESENT, "Skipping plotting tests.")
 class ConvergencePlotTest(unittest.TestCase):
-    """ Test the ability to read convergence data and make plots. """
+    """Test the ability to read convergence data and make plots."""
 
     def setUp(self):
         os.chdir(REAL_PATH + "/data/convergence/")

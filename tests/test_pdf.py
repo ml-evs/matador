@@ -11,7 +11,7 @@ DEBUG = True
 
 
 class PDFCalculatorTest(unittest.TestCase):
-    """ Test PDF calculator. """
+    """Test PDF calculator."""
 
     def test_auto_images_vs_large(self):
         doc, success = res2dict(REAL_PATH + "data/LiPZn-r57des.res")
@@ -112,7 +112,7 @@ class PDFCalculatorTest(unittest.TestCase):
 
     @unittest.skip("Not sure this test is worthwhile anymore...")
     def test_ideal_gas_pdf(self, retry=0):
-        """ DEPRECATED.
+        """DEPRECATED.
 
         Slow, and not very useful.
 
@@ -134,7 +134,7 @@ class PDFCalculatorTest(unittest.TestCase):
         doc["lattice_cart"] = np.asarray(
             [[box_size, 0, 0], [0, box_size, 0], [0, 0, box_size]]
         )
-        doc["cell_volume"] = box_size ** 3
+        doc["cell_volume"] = box_size**3
         doc["text_id"] = ["ideal", "gas"]
         while i < num_samples:
             doc["positions_frac"] = np.random.rand(num_atoms, 3)
@@ -164,7 +164,7 @@ class PDFCalculatorTest(unittest.TestCase):
         doc["lattice_cart"] = np.asarray(
             [[box_size, 0, 0], [0, box_size, 0], [0, 0, box_size]]
         )
-        doc["cell_volume"] = box_size ** 3
+        doc["cell_volume"] = box_size**3
         doc["text_id"] = ["hist", "ogram"]
         doc["pdf"] = PDF(
             doc,
@@ -209,7 +209,7 @@ class PDFCalculatorTest(unittest.TestCase):
 
 
 class PDFFactoryCalculatorTest(unittest.TestCase):
-    """ Test PDFFactory. """
+    """Test PDFFactory."""
 
     def test_concurrent_pdf(self):
         import glob

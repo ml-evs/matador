@@ -2,7 +2,8 @@ from collections import defaultdict
 
 
 class Settings:
-    """ Light wrapper for global matador settings. """
+    """Light wrapper for global matador settings."""
+
     def __init__(self, settings=None):
         self.settings = defaultdict(dict)
         self.set = False

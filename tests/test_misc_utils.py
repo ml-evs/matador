@@ -6,7 +6,7 @@ import json
 
 
 class MiscUtilTest(unittest.TestCase):
-    """ Tests cursor util functions. """
+    """Tests cursor util functions."""
 
     def test_serialize_numpy(self):
         from matador.utils.print_utils import dumps

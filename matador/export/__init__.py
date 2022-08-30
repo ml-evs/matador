@@ -17,11 +17,17 @@ Currently supported formats:
 
 
 __all__ = [
-    'doc2param', 'doc2cell', 'doc2pdb', 'doc2pwscf', 'doc2res',
-    'doc2xsf', 'query2files', 'doc2arbitrary'
+    "doc2param",
+    "doc2cell",
+    "doc2pdb",
+    "doc2pwscf",
+    "doc2res",
+    "doc2xsf",
+    "query2files",
+    "doc2arbitrary",
 ]
-__author__ = 'Matthew Evans'
-__maintainer__ = 'Matthew Evans'
+__author__ = "Matthew Evans"
+__maintainer__ = "Matthew Evans"
 
 
 from .export import doc2param, doc2cell, doc2pdb

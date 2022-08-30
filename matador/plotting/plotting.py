@@ -9,18 +9,19 @@ voltage).
 
 """
 
-SAVE_EXTS = ['pdf', 'png', 'svg']
-MATADOR_STYLE = '/'.join(__file__.split('/')[:-1]) + '/../config/matador.mplstyle'
+SAVE_EXTS = ["pdf", "png", "svg"]
+MATADOR_STYLE = "/".join(__file__.split("/")[:-1]) + "/../config/matador.mplstyle"
 
 
 def set_style(style=None):
-    """ Set the matplotlib style for all future plots, manually. This
+    """Set the matplotlib style for all future plots, manually. This
     will conflict with the context manager used by the `plotting_function`
     wrapper.
 
     """
     import matplotlib.pyplot as plt
-    if style is None or style == 'matador':
+
+    if style is None or style == "matador":
         style = MATADOR_STYLE
     if not isinstance(style, list):
         style = [style]
@@ -30,7 +31,7 @@ def set_style(style=None):
 
 
 def plotting_function(function):
-    """ Wrapper for plotting functions to safely fail on X-forwarding
+    """Wrapper for plotting functions to safely fail on X-forwarding
     errors and handle the plot style context manager.
     """
 
@@ -40,7 +41,7 @@ def plotting_function(function):
 
     @wraps(function)
     def wrapped_plot_function(*args, **kwargs):
-        """ Wrap and return the plotting function. """
+        """Wrap and return the plotting function."""
         saving = False
         result = None
 
@@ -49,8 +50,9 @@ def plotting_function(function):
             for arg in args:
                 if arg.savefig:
                     import matplotlib
+
                     # don't warn as backend might have been set externally by e.g. Jupyter
-                    matplotlib.use('Agg', force=False)
+                    matplotlib.use("Agg", force=False)
                     saving = True
                     break
         except AttributeError:
@@ -58,21 +60,24 @@ def plotting_function(function):
         if not saving:
             if any(kwargs.get(ext) for ext in SAVE_EXTS):
                 import matplotlib
-                matplotlib.use('Agg', force=False)
+
+                matplotlib.use("Agg", force=False)
                 saving = True
 
-        settings = load_custom_settings(kwargs.get('config_fname'), quiet=True, no_quickstart=True)
+        settings = load_custom_settings(
+            kwargs.get("config_fname"), quiet=True, no_quickstart=True
+        )
         try:
-            style = settings.get('plotting', {}).get('default_style')
-            if kwargs.get('style'):
-                style = kwargs['style']
+            style = settings.get("plotting", {}).get("default_style")
+            if kwargs.get("style"):
+                style = kwargs["style"]
             if style is not None and not isinstance(style, list):
                 style = [style]
             if style is None:
-                style = ['matador']
-            if 'matador' in style:
+                style = ["matador"]
+            if "matador" in style:
                 for ind, styles in enumerate(style):
-                    if styles == 'matador':
+                    if styles == "matador":
                         style[ind] = MATADOR_STYLE
 
             # now actually call the function
@@ -80,13 +85,13 @@ def plotting_function(function):
             result = function(*args, **kwargs)
 
         except Exception as exc:
-            if 'TclError' not in type(exc).__name__:
+            if "TclError" not in type(exc).__name__:
                 raise exc
 
-            print_failure('Caught exception: {}'.format(type(exc).__name__))
-            print_warning('Error message was: {}'.format(exc))
-            print_warning('This is probably an X-forwarding error')
-            print_failure('Skipping plot...')
+            print_failure("Caught exception: {}".format(type(exc).__name__))
+            print_warning("Error message was: {}".format(exc))
+            print_warning("This is probably an X-forwarding error")
+            print_failure("Skipping plot...")
 
         return result
 
@@ -94,7 +99,7 @@ def plotting_function(function):
 
 
 def get_linear_cmap(colours, num_colours=100, list_only=False):
-    """ Create a linear colormap from a list of colours.
+    """Create a linear colormap from a list of colours.
 
     Parameters:
         colours (:obj:`list` of :obj:`str`): list of fractional RGB/hex
@@ -112,6 +117,7 @@ def get_linear_cmap(colours, num_colours=100, list_only=False):
     """
     import numpy as np
     from matplotlib.colors import LinearSegmentedColormap, to_rgb
+
     colours = [to_rgb(colour) for colour in colours]
 
     uniq_colours = []
@@ -132,16 +138,17 @@ def get_linear_cmap(colours, num_colours=100, list_only=False):
     if list_only:
         return linear_cmap
 
-    return LinearSegmentedColormap.from_list('linear_cmap', linear_cmap, N=num_colours)
+    return LinearSegmentedColormap.from_list("linear_cmap", linear_cmap, N=num_colours)
 
 
 class XYvsZPlot:
-    """ This class wraps plotting (x, y) lines against a third
+    """This class wraps plotting (x, y) lines against a third
     variable.
 
     """
+
     def __init__(self, xys, zs, y_scale=1.0, **kwargs):
-        """ Construct plot from data.
+        """Construct plot from data.
 
         Parameters:
             xys (:obj:`list` of :obj:`list` or numpy.ndarray): list or
@@ -166,8 +173,9 @@ class XYvsZPlot:
         _xys = np.asarray(xys)
         shape = np.shape(_xys)
         if shape[0] != 2 and shape[-1] != 2:
-            raise RuntimeError('Data of shape {} is not compatible with XYvsZPlot.'
-                               .format(shape))
+            raise RuntimeError(
+                "Data of shape {} is not compatible with XYvsZPlot.".format(shape)
+            )
         if shape[0] == 2:
             _xys = _xys.T
 
@@ -176,7 +184,7 @@ class XYvsZPlot:
         self._zs = np.asarray(zs).flatten()
 
         if len(self._zs) != np.shape(self._xs)[0]:
-            raise RuntimeError('x/y and z data do not match in shape!')
+            raise RuntimeError("x/y and z data do not match in shape!")
 
         self._y_scale = y_scale
 
@@ -188,7 +196,7 @@ class XYvsZPlot:
 
     @y_scale.setter
     def y_scale(self, value):
-        """ Reset the y_scale and replot. """
+        """Reset the y_scale and replot."""
         self._y_scale = value
         self.plot(**self.plot_kwargs)
 
@@ -197,7 +205,7 @@ class XYvsZPlot:
 
     @plotting_function
     def plot(self, *args, **kwargs):
-        """ Actually plot the data and optionally save it. """
+        """Actually plot the data and optionally save it."""
 
         import matplotlib.pyplot as plt
 

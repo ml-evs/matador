@@ -15,7 +15,7 @@ EPS = 1e-12
 
 
 class Electrode:
-    """ The Electrode class wraps phase diagrams of battery electrode
+    """The Electrode class wraps phase diagrams of battery electrode
     materials, and provides useful methods for electrochemical analysis.
 
     Note:
@@ -36,9 +36,8 @@ class Electrode:
 
     """
 
-    _kinds = ['anode', 'cathode']
-    valence_data = {'Li': 1, 'Na': 1, 'K': 1,
-                    'Mg': 2, 'Ca': 2}
+    _kinds = ["anode", "cathode"]
+    valence_data = {"Li": 1, "Na": 1, "K": 1, "Mg": 2, "Ca": 2}
 
     """ This comment contains some stubs for functionality that has not yet been implemented.
 
@@ -134,18 +133,20 @@ class Electrode:
 
     @classmethod
     def calculate_average_voltage(cls, capacities, voltages):
-        """ For a given set of capacities and voltages, compute
+        """For a given set of capacities and voltages, compute
         the average voltage during charge/discharge.
 
         """
         trim = None
         if np.isnan(capacities[-1]):
             trim = -1
-        return np.sum(voltages[1:trim] * np.diff(capacities[:trim])) / np.max(capacities[:trim])
+        return np.sum(voltages[1:trim] * np.diff(capacities[:trim])) / np.max(
+            capacities[:trim]
+        )
 
     @classmethod
     def _find_starting_materials(self, points, stoichs):
-        """ Iterate over an array of compositions and energies to find
+        """Iterate over an array of compositions and energies to find
         the starting points of the electrode, i.e. those with zero concentration
         of the active ion.
 
@@ -155,7 +156,9 @@ class Electrode:
         endstoichs = []
         for ind, point in enumerate(points):
             if point[0] == 0 and point[1] != 0 and point[1] != 1:
-                if not any([point.tolist() == test_point.tolist() for test_point in endpoints]):
+                if not any(
+                    [point.tolist() == test_point.tolist() for test_point in endpoints]
+                ):
                     endpoints.append(point)
                     endstoichs.append(stoichs[ind])
 
@@ -163,7 +166,7 @@ class Electrode:
 
 
 class VoltageProfile:
-    """ Container class for data associated with a voltage profile.
+    """Container class for data associated with a voltage profile.
 
     Attributes:
         starting_stoichiometry: the initial stoichiometry of the electrode.
@@ -176,6 +179,7 @@ class VoltageProfile:
         active_ion: species label of the active ion.
 
     """
+
     def __init__(
         self,
         starting_stoichiometry: Tuple[Tuple[str, float], ...],
@@ -185,10 +189,10 @@ class VoltageProfile:
         active_ion: str,
         reactions: List[Tuple[Tuple[float, str], ...]],
     ):
-        """ Initialise the voltage profile with the given data. """
+        """Initialise the voltage profile with the given data."""
 
         n_steps = len(voltages)
-        if any(_len != n_steps for _len in [len(capacities), len(reactions)+1]):
+        if any(_len != n_steps for _len in [len(capacities), len(reactions) + 1]):
             raise RuntimeError(
                 "Invalid size of initial arrays, capacities and voltages must have same length."
                 "reactions array must have length 1 smaller than voltages"
@@ -203,7 +207,7 @@ class VoltageProfile:
         self.active_ion = active_ion
 
     def voltage_summary(self, csv=False):
-        """ Prints a voltage data summary.
+        """Prints a voltage data summary.
 
         Keyword arguments:
             csv (bool/str): whether or not to write a CSV file containing the data.
@@ -211,21 +215,23 @@ class VoltageProfile:
 
         """
 
-        data_str = '# {} into {}\n'.format(self.active_ion, self.starting_formula)
+        data_str = "# {} into {}\n".format(self.active_ion, self.starting_formula)
         data_str += "# Average voltage: {:4.2f} V\n".format(self.average_voltage)
-        data_str += '# {:^10} \t{:^10}\n'.format('Q (mAh/g)', 'Voltage (V)')
+        data_str += "# {:^10} \t{:^10}\n".format("Q (mAh/g)", "Voltage (V)")
 
         for idx, _ in enumerate(self.voltages):
-            data_str += '{:>10.2f} \t{:>10.8f}'.format(self.capacities[idx], self.voltages[idx])
+            data_str += "{:>10.2f} \t{:>10.8f}".format(
+                self.capacities[idx], self.voltages[idx]
+            )
             if idx != len(self.voltages) - 1:
-                data_str += '\n'
+                data_str += "\n"
 
         if csv:
             if isinstance(csv, str):
                 fname = csv
             else:
-                fname = '{}_voltages.csv'.format(self.starting_formula)
-            with open(fname, 'w') as f:
+                fname = "{}_voltages.csv".format(self.starting_formula)
+            with open(fname, "w") as f:
                 f.write(data_str)
 
         return f"\nVoltage data:\n\n{data_str}"

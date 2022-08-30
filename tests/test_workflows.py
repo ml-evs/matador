@@ -32,7 +32,7 @@ else:
 
 @unittest.skipIf(not CASTEP_PRESENT, "CASTEP not found.")
 class ElasticWorkflowTest(MatadorUnitTest):
-    """ Run a elastic workflow calculation. """
+    """Run a elastic workflow calculation."""
 
     def test_bulk_mod(self):
         for _f in glob.glob(REAL_PATH + "data/elastic_workflow/*"):
@@ -84,7 +84,7 @@ class ElasticWorkflowTest(MatadorUnitTest):
 
 @unittest.skipIf(not CASTEP_PRESENT, "CASTEP not found.")
 class PhononWorkflowTest(MatadorUnitTest):
-    """ Run a phonon workflow calculation. """
+    """Run a phonon workflow calculation."""
 
     def test_phonon(self):
         for _f in glob.glob(REAL_PATH + "data/phonon_workflow/*"):
@@ -130,7 +130,7 @@ class PhononWorkflowTest(MatadorUnitTest):
 
 @unittest.skipIf(not CASTEP_PRESENT, "CASTEP not found.")
 class MagresWorkflowTest(MatadorUnitTest):
-    """ Run a magres workflow calculation. """
+    """Run a magres workflow calculation."""
 
     def test_magres(self):
         for _f in glob.glob(REAL_PATH + "data/magres_workflow/*"):
@@ -188,7 +188,7 @@ class MagresWorkflowTest(MatadorUnitTest):
 
 @unittest.skipIf(not CASTEP_PRESENT, "CASTEP not found.")
 class SpectralWorkflowTest(MatadorUnitTest):
-    """ Run a spectral workflow calculation. """
+    """Run a spectral workflow calculation."""
 
     def test_full_spectral_in_compute_dir(self):
         for _f in glob.glob(REAL_PATH + "data/spectral_workflow/*"):

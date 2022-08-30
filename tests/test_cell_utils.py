@@ -35,7 +35,7 @@ REAL_PATH = "/".join(os.path.realpath(__file__).split("/")[:-1]) + "/"
 
 
 class CellUtilTest(unittest.TestCase):
-    """ Tests cell util functions. """
+    """Tests cell util functions."""
 
     def test_cart2abc(self):
         castep_fname = REAL_PATH + "data/Na3Zn4-swap-ReOs-OQMD_759599.castep"
@@ -126,7 +126,7 @@ class CellUtilTest(unittest.TestCase):
         )
 
     def test_conversion_transitivity(self):
-        """ Test that cart2frac(frac2cart(A)) == A. """
+        """Test that cart2frac(frac2cart(A)) == A."""
         castep_fname = REAL_PATH + "data/Na3Zn4-swap-ReOs-OQMD_759599.castep"
         test_doc, s = castep2dict(castep_fname, db=True, verbosity=VERBOSITY)
         lattice_cart = test_doc["lattice_cart"]
@@ -138,7 +138,7 @@ class CellUtilTest(unittest.TestCase):
         )
 
     def test_random_noise(self):
-        """ Test that zero amplitude random noise doesn't do anything, but any other
+        """Test that zero amplitude random noise doesn't do anything, but any other
         amplitude does.
         """
         from matador.utils.cell_utils import add_noise
@@ -258,7 +258,7 @@ class CellUtilTest(unittest.TestCase):
 
 
 class SymmetriesAndSupercellsTest(unittest.TestCase):
-    """ Tests cell util functions. """
+    """Tests cell util functions."""
 
     def test_supercell_creator(self):
         castep_fname = REAL_PATH + "data/Na3Zn4-swap-ReOs-OQMD_759599.castep"
@@ -279,12 +279,19 @@ class SymmetriesAndSupercellsTest(unittest.TestCase):
                 test_doc, tuple(extension), standardize=standardize, symmetric=symmetric
             )
             supercell_crystal = create_simple_supercell(
-                Crystal(test_doc), tuple(extension), standardize=standardize, symmetric=symmetric
+                Crystal(test_doc),
+                tuple(extension),
+                standardize=standardize,
+                symmetric=symmetric,
             )
             for supercell in [supercell_crystal, supercell_dict]:
-                self.assertEqual(supercell["num_atoms"], num_images * test_doc["num_atoms"])
+                self.assertEqual(
+                    supercell["num_atoms"], num_images * test_doc["num_atoms"]
+                )
                 self.assertAlmostEqual(
-                    supercell["cell_volume"], num_images * test_doc["cell_volume"], places=3
+                    supercell["cell_volume"],
+                    num_images * test_doc["cell_volume"],
+                    places=3,
                 )
                 self.assertEqual(
                     len(supercell["positions_frac"]),

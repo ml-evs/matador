@@ -12,11 +12,11 @@ from .spectral import Spectral
 
 
 __all__ = [
-    'VibrationalDOS',
-    'ElectronicDOS',
-    'DensityOfStates',
-    'VibrationalDispersion',
-    'ElectronicDispersion',
-    'Dispersion',
-    'Spectral'
+    "VibrationalDOS",
+    "ElectronicDOS",
+    "DensityOfStates",
+    "VibrationalDispersion",
+    "ElectronicDispersion",
+    "Dispersion",
+    "Spectral",
 ]

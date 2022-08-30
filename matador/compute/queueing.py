@@ -11,18 +11,19 @@ import abc
 
 
 class QueueManager(abc.ABC):
-    """ Abstract base class for queue managers. """
+    """Abstract base class for queue managers."""
+
     token = None
 
     def __repr__(self):
-        return '{} with env: {}'.format(type(self), self.env)
+        return "{} with env: {}".format(type(self), self.env)
 
     def __init__(self):
         self.env = get_queue_env(self.token)
 
     @property
     def walltime(self):
-        """ Return the allotted walltime in seconds,
+        """Return the allotted walltime in seconds,
         returning None if not available.
 
         """
@@ -37,7 +38,7 @@ class QueueManager(abc.ABC):
 
     @property
     def max_memory(self):
-        """ Return the allotted memory in MB,
+        """Return the allotted memory in MB,
         returning None if not available.
 
         """
@@ -64,7 +65,7 @@ class QueueManager(abc.ABC):
 
 
 def get_queue_env(token):
-    """ Read os.environment variables for either PBS or SLURM
+    """Read os.environment variables for either PBS or SLURM
     prefixes, and return a dictionary of those vars only.
 
     Parameter:
@@ -79,7 +80,7 @@ def get_queue_env(token):
 
 
 def get_queue_manager():
-    """ Detects whether PBS, SLURM or neither is being used
+    """Detects whether PBS, SLURM or neither is being used
     by probing the environment variables SLURM_NTASKS and
     PBS_TASKNUM.
 
@@ -91,20 +92,22 @@ def get_queue_manager():
 
     """
     queue_mgr = []
-    if os.environ.get('SLURM_NTASKS') is not None:
-        queue_mgr.append('slurm')
-    if os.environ.get('PBS_TASKNUM') is not None:
-        queue_mgr.append('pbs')
+    if os.environ.get("SLURM_NTASKS") is not None:
+        queue_mgr.append("slurm")
+    if os.environ.get("PBS_TASKNUM") is not None:
+        queue_mgr.append("pbs")
 
     if len(queue_mgr) > 1:
-        raise RuntimeError('Both SLURM and PBS were found... aah!')
+        raise RuntimeError("Both SLURM and PBS were found... aah!")
     if not queue_mgr:
         return None
 
-    if queue_mgr[0] == 'slurm':
+    if queue_mgr[0] == "slurm":
         from matador.compute.slurm import SlurmQueueManager
+
         return SlurmQueueManager()
 
-    if queue_mgr[0] == 'pbs':
+    if queue_mgr[0] == "pbs":
         from matador.compute.pbs import PBSQueueManager
+
         return PBSQueueManager()

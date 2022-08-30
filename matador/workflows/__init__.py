@@ -13,10 +13,10 @@ the correct signature, a whole :obj:`Workflow` can itself be used as a
 """
 
 
-__all__ = ['Workflow', 'WorkflowStep']
+__all__ = ["Workflow", "WorkflowStep"]
 
-__author__ = 'Matthew Evans'
-__maintainer__ = 'Matthew Evans'
+__author__ = "Matthew Evans"
+__maintainer__ = "Matthew Evans"
 
 
 from .workflows import Workflow, WorkflowStep

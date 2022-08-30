@@ -8,10 +8,10 @@ several convenience methods.
 """
 
 
-__all__ = ['Crystal']
+__all__ = ["Crystal"]
 
-__author__ = 'Matthew Evans'
-__maintainer__ = 'Matthew Evans'
+__author__ = "Matthew Evans"
+__maintainer__ = "Matthew Evans"
 
 
 from .crystal import Crystal

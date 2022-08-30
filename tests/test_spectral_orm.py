@@ -15,7 +15,7 @@ from .utils import REAL_PATH
 
 class SpectralOrmTest(unittest.TestCase):
     def test_failed_make_from_castep(self):
-        """ Tests that an error is raised when trying to create
+        """Tests that an error is raised when trying to create
         a Spectral object from a castep file that contains no
         spectral data.
 
@@ -48,7 +48,7 @@ class SpectralOrmTest(unittest.TestCase):
             VibrationalDispersion(**doc)
 
     def test_dos_construction_from_frequencies(self):
-        """ Test that we can make sensible phonon DOS's and free
+        """Test that we can make sensible phonon DOS's and free
         energy calculations from frequency and qpoint data, and that
         it agrees with CASTEP's calculated values.
 
