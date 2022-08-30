@@ -22,3 +22,9 @@ repos:
     rev: 3.9.2
     hooks:
       - id: flake8
+
+  - repo: https://github.com/psf/black
+    rev: 22.6.0
+    hooks:
+      - id: black
+        name: Blacken
