@@ -495,7 +495,7 @@ def dispersion_plot(seeds, ax_dispersion, options, bbox_extra_artists=None):
     else:
         ylabel = "Energy (eV)"
     ax_dispersion.set_ylabel(ylabel)
-    ax_dispersion.set_xlim(0, 1)
+    ax_dispersion.set_xlim(-0.05, 1.05)
     _add_path_labels(seeds[-1], dispersion, ax_dispersion, path, 0, options)
 
     return ax_dispersion
