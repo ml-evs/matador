@@ -3,10 +3,10 @@ import unittest
 
 
 class ConnectTest(unittest.TestCase):
-    """ Test simple database connection methods. """
+    """Test simple database connection methods."""
 
     def testFuzzyCollnames(self):
-        """ Test the fuzzy collection name matcher. """
+        """Test the fuzzy collection name matcher."""
         from matador.db.connect import fuzzy_collname_match
 
         trial = "me388_proto_test"

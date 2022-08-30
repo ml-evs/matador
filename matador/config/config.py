@@ -23,7 +23,10 @@ DEFAULT_SETTINGS = {
         "port": 27017,
         "default_collection": "repo",
     },
-    "plotting": {"default_style": "matador", "element_colours": Path(__file__).parent.joinpath("vesta_elements.ini")},
+    "plotting": {
+        "default_style": "matador",
+        "element_colours": Path(__file__).parent.joinpath("vesta_elements.ini"),
+    },
     "run3": {
         "scratch_prefix": ".",
         "castep_executable": "castep",
@@ -40,7 +43,7 @@ FILE_PATHS = {
 def load_custom_settings(
     config_fname=None, quiet=False, debug=False, no_quickstart=True
 ):
-    """ Load mongodb settings dict from file given by fname, or from
+    """Load mongodb settings dict from file given by fname, or from
     defaults. Hierarchy of filenames to check:
 
         1. .matadorrc
@@ -78,8 +81,10 @@ def load_custom_settings(
                 config_fname = quickstart_settings()
             if config_fname is None:
                 # otherwise load default
-                print("No config provided: loading perhaps unsuitable defaults instead.")
-                config_fname = Path(__file__).parent.joinpath("matadorrc.yml"),
+                print(
+                    "No config provided: loading perhaps unsuitable defaults instead."
+                )
+                config_fname = (Path(__file__).parent.joinpath("matadorrc.yml"),)
 
         if not quiet:
             print("Loading settings from {}".format(config_fname))
@@ -116,6 +121,7 @@ def load_custom_settings(
 
     if debug:
         import json
+
         print(json.dumps(settings, indent=2))
 
     set_settings(settings, override=False)
@@ -124,7 +130,7 @@ def load_custom_settings(
 
 
 def set_settings(settings, override=True):
-    """ Updates the global settings with the dictionary
+    """Updates the global settings with the dictionary
     provided.
 
     Parameters:

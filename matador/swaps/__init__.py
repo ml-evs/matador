@@ -8,9 +8,9 @@ elements to Li, ready to be re-relaxed.
 """
 
 
-__all__ = ['AtomicSwapper']
-__author__ = 'Matthew Evans'
-__maintainer__ = 'Matthew Evans'
+__all__ = ["AtomicSwapper"]
+__author__ = "Matthew Evans"
+__maintainer__ = "Matthew Evans"
 
 
 from .swaps import AtomicSwapper

@@ -34,7 +34,7 @@ PROJECTOR_MIN = 1e-5
 
 @plotting_function
 def plot_spectral(seeds, **options):
-    """ This function wraps all of the spectral plotting capability of matador.
+    """This function wraps all of the spectral plotting capability of matador.
     When provided with a seed, or seeds, several files will be checked:
 
         - <seed>.bands: CASTEP bandstructure expected, not DOS,
@@ -334,7 +334,7 @@ def plot_spectral(seeds, **options):
 
 @plotting_function
 def dispersion_plot(seeds, ax_dispersion, options, bbox_extra_artists=None):
-    """ Plot a dispersion/bandstructure on the given axis. Will detect
+    """Plot a dispersion/bandstructure on the given axis. Will detect
     and projected dispersion data automatically.
 
     Parameters:
@@ -503,7 +503,7 @@ def dispersion_plot(seeds, ax_dispersion, options, bbox_extra_artists=None):
 
 @plotting_function
 def dos_plot(seeds, ax_dos, options, bbox_extra_artists=None):
-    """ Plot a density of states on the given axis. Will detect
+    """Plot a density of states on the given axis. Will detect
     pDOS and spin-dependent DOS data automatically.
 
     Parameters:
@@ -668,7 +668,13 @@ def dos_plot(seeds, ax_dos, options, bbox_extra_artists=None):
                 )
 
                 if not plotting_pdos:
-                    ax_dos.fill_between(energies, 0, dos, alpha=options.get("fill_alpha", 0.2), color=dos_colour)
+                    ax_dos.fill_between(
+                        energies,
+                        0,
+                        dos,
+                        alpha=options.get("fill_alpha", 0.2),
+                        color=dos_colour,
+                    )
 
         if "spin_dos" in dos_data and not options.get("pdos_hide_sum"):
             if options.get("plot_bandstructure"):
@@ -893,7 +899,7 @@ def projected_bandstructure_plot(
     projectors_to_plot=None,
     **options,
 ):
-    """ Plot projected bandstructure with weightings from OptaDOS pdis.dat file.
+    """Plot projected bandstructure with weightings from OptaDOS pdis.dat file.
 
     Parameters:
         dispersion (matador.orm.spectral.ElectronicDispersion): scraped
@@ -995,7 +1001,7 @@ def _ordered_scatter(
     interpolation_factor=2,
     point_scale=25,
 ):
-    """ Plots an ordered scatter plot of a projected bandstructure.
+    """Plots an ordered scatter plot of a projected bandstructure.
 
     Parameters:
         path (np.ndarray): linearised [0, 1] kpoint path array.
@@ -1085,7 +1091,7 @@ def _get_lineprops(
     options,
     eigs=None,
 ):
-    """ Get the properties of the line to plot. """
+    """Get the properties of the line to plot."""
     if seed_ind is None:
         seed_ind = 0
     colour = options.get("colour_cycle")[seed_ind]
@@ -1125,7 +1131,7 @@ def _get_lineprops(
 
 
 def _add_path_labels(seed, dispersion, ax_dispersion, path, seed_ind, options):
-    """ Scrape k-point path labels from cell file and seekpath, then add them to the plot. """
+    """Scrape k-point path labels from cell file and seekpath, then add them to the plot."""
     from matador.utils.cell_utils import doc2spg, get_seekpath_kpoint_path
 
     xticks = []
@@ -1311,7 +1317,7 @@ def _add_path_labels(seed, dispersion, ax_dispersion, path, seed_ind, options):
 
 
 def _get_projector_info(projectors, colours_override=None):
-    """ Grab appropriate colours and labels from a list of projectors.
+    """Grab appropriate colours and labels from a list of projectors.
 
     Parameters:
         projectors (list): list containing (element_str, l_channel) tuples.
@@ -1401,7 +1407,7 @@ def _get_projector_info(projectors, colours_override=None):
 
 
 def _load_electronic_dos(seed, options):
-    """ Try to obtain electronic DOS data, either from files, or as
+    """Try to obtain electronic DOS data, either from files, or as
     a dictionary.
 
     Parameters:
@@ -1469,7 +1475,7 @@ def _load_electronic_dos(seed, options):
 
 
 def _load_phonon_dos(seed, options):
-    """ Try to obtain phonon DOS data, either from files, or as
+    """Try to obtain phonon DOS data, either from files, or as
     a dictionary.
 
     Parameters:
@@ -1496,7 +1502,7 @@ def _load_phonon_dos(seed, options):
 
 
 def _parse_projectors_list(projectors):
-    """ Convert CLI args into the appropriate projector, ignoring
+    """Convert CLI args into the appropriate projector, ignoring
     spin channels.
 
     Parameters:

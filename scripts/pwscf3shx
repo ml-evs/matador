@@ -9,16 +9,16 @@ from sys import argv
 
 fnames = argv[1:]
 for fname in fnames:
-    print_notify('Reading ' + fname)
+    print_notify("Reading " + fname)
     pw_dict, success = qe_scrapers.pwout2dict(fname)
-    pw_dict['lattice_abc'] = cart2abc(pw_dict['lattice_cart'])
-    pw_dict['space_group'] = get_spacegroup(doc2spg(pw_dict)).split()[0]
-    print(pw_dict['space_group'].split()[0])
-    pw_dict['num_atoms'] = len(pw_dict['atom_types'])
-    ext = '.' + fname.split('.')[-1]
+    pw_dict["lattice_abc"] = cart2abc(pw_dict["lattice_cart"])
+    pw_dict["space_group"] = get_spacegroup(doc2spg(pw_dict)).split()[0]
+    print(pw_dict["space_group"].split()[0])
+    pw_dict["num_atoms"] = len(pw_dict["atom_types"])
+    ext = "." + fname.split(".")[-1]
     if success:
-        doc2res(pw_dict, fname.replace(ext, ''), hash_dupe=True, info=False)
-        print_success('Wrote .res file to ' + fname.replace(ext, '') + '.res')
+        doc2res(pw_dict, fname.replace(ext, ""), hash_dupe=True, info=False)
+        print_success("Wrote .res file to " + fname.replace(ext, "") + ".res")
     else:
-        print_failure('Unable to find final structure in ' + fname + '.')
-print_success('Completed!')
+        print_failure("Unable to find final structure in " + fname + ".")
+print_success("Completed!")

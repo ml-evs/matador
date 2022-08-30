@@ -11,7 +11,7 @@ PEAK_POS_TOL = 0.02
 
 
 def _match_peaks(res_file, gsas_reflections, **kwargs):
-    """ Check if peaks match with HKL between matador and GSAS. """
+    """Check if peaks match with HKL between matador and GSAS."""
     doc, s = res2dict(res_file, as_model=True)
 
     pxrd = PXRD(doc, **kwargs)
@@ -31,10 +31,10 @@ def _match_peaks(res_file, gsas_reflections, **kwargs):
 
 
 class PXRDCalculatorTest(unittest.TestCase):
-    """ Test PXRD calculator. """
+    """Test PXRD calculator."""
 
     def test_simple_pxrd(self):
-        """ Test Li PXRD vs GSAS. """
+        """Test Li PXRD vs GSAS."""
         _ = _match_peaks(
             REAL_PATH + "data/structures/Li.res",
             REAL_PATH + "data/pxrd_files/Li_reflections_Cu.txt",
@@ -47,7 +47,7 @@ class PXRDCalculatorTest(unittest.TestCase):
         )
 
     def test_CuP2_vs_GSAS(self):
-        """ Test CuP2 peak positions vs GSAS. """
+        """Test CuP2 peak positions vs GSAS."""
         pxrd = _match_peaks(
             REAL_PATH + "data/pxrd_files/CuP2.res",
             REAL_PATH + "data/pxrd_files/CuP2_GSASII_reflections.txt",

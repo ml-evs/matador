@@ -19,7 +19,7 @@ from matador.utils.print_utils import print_notify, print_warning
 
 
 class Hive:
-    """ Implements the spawning of workers. """
+    """Implements the spawning of workers."""
 
     def __init__(self, **kwargs):
         self.args = kwargs
@@ -34,7 +34,7 @@ class Hive:
         self.nodes = set(self.nodes)
 
     def spawn(self):
-        """ Spawn processes to perform calculations (borrowed from run3). """
+        """Spawn processes to perform calculations (borrowed from run3)."""
         procs = []
         for node in self.nodes:
             procs.append(mp.Process(target=self.run_command, args=[node]))
@@ -50,7 +50,7 @@ class Hive:
             exit("Killing running jobs and exiting...")
 
     def run_command(self, node):
-        """ Parse command and run on particular node. """
+        """Parse command and run on particular node."""
         cwd = getcwd()
         compute_command = self.command.replace(
             "$ALL_CORES", str(psutil.cpu_count(logical=False))

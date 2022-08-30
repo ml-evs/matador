@@ -23,7 +23,7 @@ from matador.fingerprints.fingerprint import Fingerprint, FingerprintFactory
 
 
 class PDF(Fingerprint):
-    """ This class implements the calculation and comparison of pair
+    """This class implements the calculation and comparison of pair
     distribution functions.
 
     Attributes:
@@ -41,7 +41,7 @@ class PDF(Fingerprint):
     """
 
     def __init__(self, doc, lazy=False, **kwargs):
-        """ Initialise parameters and run PDF (unless lazy=True).
+        """Initialise parameters and run PDF (unless lazy=True).
 
         Parameters:
 
@@ -61,88 +61,102 @@ class PDF(Fingerprint):
 
         """
 
-        prop_defaults = {'dr': 0.01, 'gaussian_width': 0.1, 'rmax': 15, 'num_images': 'auto',
-                         'style': 'smear', 'debug': False, 'timing': False, 'low_mem': False, 'projected': True,
-                         'max_num_images': 50, 'standardize': True}
+        prop_defaults = {
+            "dr": 0.01,
+            "gaussian_width": 0.1,
+            "rmax": 15,
+            "num_images": "auto",
+            "style": "smear",
+            "debug": False,
+            "timing": False,
+            "low_mem": False,
+            "projected": True,
+            "max_num_images": 50,
+            "standardize": True,
+        }
 
         # read and store kwargs
         self.kwargs = prop_defaults
-        self.kwargs.update({key: kwargs[key]
-                            for key in kwargs
-                            if kwargs[key] is not None})
+        self.kwargs.update(
+            {key: kwargs[key] for key in kwargs if kwargs[key] is not None}
+        )
 
         # useful data for labelling
         structure = copy.deepcopy(doc)
         self.spg = structure.get("space_group", "")
-        if self.kwargs.get('standardize'):
+        if self.kwargs.get("standardize"):
             structure = standardize_doc_cell(structure)
-            self.spg = structure['space_group']
-        self.stoichiometry = structure.get('stoichiometry', get_stoich(structure['atom_types']))
+            self.spg = structure["space_group"]
+        self.stoichiometry = structure.get(
+            "stoichiometry", get_stoich(structure["atom_types"])
+        )
 
         # private variables
-        self._num_images = self.kwargs.get('num_images')
-        self._lattice = np.asarray(structure['lattice_cart'])
-        self._poscart = np.asarray(frac2cart(structure['lattice_cart'], structure['positions_frac'])).reshape(-1, 3)
-        self._types = structure['atom_types']
+        self._num_images = self.kwargs.get("num_images")
+        self._lattice = np.asarray(structure["lattice_cart"])
+        self._poscart = np.asarray(
+            frac2cart(structure["lattice_cart"], structure["positions_frac"])
+        ).reshape(-1, 3)
+        self._types = structure["atom_types"]
         self._num_atoms = len(self._poscart)
         self._volume = cart2volume(self._lattice)
         self._image_vec = None
 
         # public variables
-        self.rmax = self.kwargs.get('rmax')
+        self.rmax = self.kwargs.get("rmax")
         self.number_density = self._num_atoms / self._volume
-        self.dr = self.kwargs.get('dr')
+        self.dr = self.kwargs.get("dr")
         self.r_space = None
         self.gr = None
         self.elem_gr = None
 
         self.label = None
-        if self.kwargs.get('label'):
+        if self.kwargs.get("label"):
             self.label = self.kwargs["label"]
-        elif 'text_id' in structure:
-            self.label = ' '.join(structure['text_id'])
+        elif "text_id" in structure:
+            self.label = " ".join(structure["text_id"])
 
         if not lazy:
-            if self.kwargs.get('timing'):
+            if self.kwargs.get("timing"):
                 start = time.time()
             self.calc_pdf()
-            if self.kwargs.get('timing'):
+            if self.kwargs.get("timing"):
                 end = time.time()
-                print('PDF calculated in {:.3f} s'.format(end - start))
+                print("PDF calculated in {:.3f} s".format(end - start))
 
     def calc_pdf(self):
-        """ Wrapper to calculate PDF with current settings. """
+        """Wrapper to calculate PDF with current settings."""
         if self._image_vec is None:
 
-            if self.kwargs.get('debug'):
+            if self.kwargs.get("debug"):
                 start = time.time()
 
             self._set_image_trans_vectors()
 
-            if self.kwargs.get('debug'):
+            if self.kwargs.get("debug"):
                 end = time.time()
-                print('Image vectors length = {}'.format(len(self._image_vec)))
-                print('Set image trans vectors in {} s'.format(end - start))
+                print("Image vectors length = {}".format(len(self._image_vec)))
+                print("Set image trans vectors in {} s".format(end - start))
 
-        if self.kwargs.get('projected'):
-            if self.kwargs.get('debug'):
+        if self.kwargs.get("projected"):
+            if self.kwargs.get("debug"):
                 start = time.time()
 
             if self.elem_gr is None:
                 self._calc_projected_pdf()
 
-            if self.kwargs.get('debug'):
+            if self.kwargs.get("debug"):
                 end = time.time()
-                print('Calculated projected PDF {} s'.format(end - start))
+                print("Calculated projected PDF {} s".format(end - start))
         if self.gr is None:
             self._calc_unprojected_pdf()
 
     def calculate(self):
-        """ Alias for `self.calc_pdf`. """
+        """Alias for `self.calc_pdf`."""
         self.calc_pdf()
 
     def _calc_distances(self, poscart, poscart_b=None):
-        """ Calculate PBC distances with cdist.
+        """Calculate PBC distances with cdist.
 
         Parameters:
             poscart (numpy.ndarray): array of absolute atomic coordinates.
@@ -156,17 +170,20 @@ class PDF(Fingerprint):
 
         """
         from matador.utils.cell_utils import calc_pairwise_distances_pbc
-        return calc_pairwise_distances_pbc(poscart,
-                                           self._image_vec,
-                                           self._lattice,
-                                           self.rmax,
-                                           filter_zero=True,
-                                           compress=True,
-                                           poscart_b=poscart_b,
-                                           debug=self.kwargs.get('debug'))
+
+        return calc_pairwise_distances_pbc(
+            poscart,
+            self._image_vec,
+            self._lattice,
+            self.rmax,
+            filter_zero=True,
+            compress=True,
+            poscart_b=poscart_b,
+            debug=self.kwargs.get("debug"),
+        )
 
     def _calc_unprojected_pdf(self):
-        """ Wrapper function to calculate distances and output
+        """Wrapper function to calculate distances and output
         a broadened and normalised PDF. Sets self.gr and self.r_space
         to G(r) and r respectively.
 
@@ -176,12 +193,14 @@ class PDF(Fingerprint):
         else:
             distances = self._calc_distances(self._poscart)
             self.r_space = np.arange(0, self.rmax + self.dr, self.dr)
-            self.gr = self._get_broadened_normalised_pdf(distances,
-                                                         style=self.kwargs.get('style'),
-                                                         gaussian_width=self.kwargs.get('gaussian_width'))
+            self.gr = self._get_broadened_normalised_pdf(
+                distances,
+                style=self.kwargs.get("style"),
+                gaussian_width=self.kwargs.get("gaussian_width"),
+            )
 
     def _calc_projected_pdf(self):
-        """ Calculate broadened and normalised element-projected PDF of a matador document.
+        """Calculate broadened and normalised element-projected PDF of a matador document.
         Sets self.elem_gr of e.g. Li2Zn3 to
 
             {
@@ -193,27 +212,37 @@ class PDF(Fingerprint):
 
         """
         # initalise dict of element pairs with correct keys
-        style = self.kwargs.get('style')
-        gw = self.kwargs.get('gaussian_width')
+        style = self.kwargs.get("style")
+        gw = self.kwargs.get("gaussian_width")
         self.r_space = np.arange(0, self.rmax + self.dr, self.dr)
         elem_gr = dict()
         for comb in combinations_with_replacement(set(self._types), 2):
             elem_gr[tuple(set(comb))] = np.zeros_like(self.r_space)
 
         for elem_type in elem_gr:
-            poscart = [self._poscart[i] for i in range(len(self._poscart)) if self._types[i] == elem_type[0]]
-            poscart_b = ([self._poscart[i] for i in range(len(self._poscart)) if self._types[i] == elem_type[1]]
-                         if len(elem_type) == 2 else None)
+            poscart = [
+                self._poscart[i]
+                for i in range(len(self._poscart))
+                if self._types[i] == elem_type[0]
+            ]
+            poscart_b = (
+                [
+                    self._poscart[i]
+                    for i in range(len(self._poscart))
+                    if self._types[i] == elem_type[1]
+                ]
+                if len(elem_type) == 2
+                else None
+            )
             distances = self._calc_distances(poscart, poscart_b=poscart_b)
-            elem_gr[elem_type] = (len(elem_type) *
-                                  self._get_broadened_normalised_pdf(distances,
-                                                                     style=style,
-                                                                     gaussian_width=gw))
+            elem_gr[elem_type] = len(elem_type) * self._get_broadened_normalised_pdf(
+                distances, style=style, gaussian_width=gw
+            )
 
         self.elem_gr = elem_gr
 
     def _calc_unprojected_pdf_from_projected(self):
-        """" Reconstruct full PDF from projected. """
+        """ " Reconstruct full PDF from projected."""
         self.gr = np.zeros_like(self.r_space)
         for key in self.elem_gr:
             self.gr += self.elem_gr[key]
@@ -221,14 +250,14 @@ class PDF(Fingerprint):
     @staticmethod
     @numba.njit
     def _normalize_gr(gr, r_space, dr, num_atoms, number_density):
-        """ Normalise a broadened PDF, ignoring the Gaussian magnitude. """
-        norm = 4 * np.pi * (r_space + dr)**2 * dr * num_atoms * number_density
+        """Normalise a broadened PDF, ignoring the Gaussian magnitude."""
+        norm = 4 * np.pi * (r_space + dr) ** 2 * dr * num_atoms * number_density
         return np.divide(gr, norm)
 
     @staticmethod
     @numba.njit
     def _dist_hist(distances, r_space, dr):
-        """ Bin the pair-wise distances according to the radial grid.
+        """Bin the pair-wise distances according to the radial grid.
 
         Parameters:
             distances (numpy.ndarray): array of pair-wise distances.
@@ -241,8 +270,10 @@ class PDF(Fingerprint):
             hist[ceil(dij / dr)] += 1
         return hist
 
-    def _get_broadened_normalised_pdf(self, distances, style='smear', gaussian_width=0.1):
-        """ Broaden the values provided as distances and return
+    def _get_broadened_normalised_pdf(
+        self, distances, style="smear", gaussian_width=0.1
+    ):
+        """Broaden the values provided as distances and return
         G(r) and r_space of the normalised PDF.
 
         Parameters:
@@ -256,20 +287,22 @@ class PDF(Fingerprint):
             gr (np.ndarray): G(r), the PDF of supplied distances
 
         """
-        if style == 'histogram' or gaussian_width == 0:
+        if style == "histogram" or gaussian_width == 0:
             gr = self._dist_hist(distances, self.r_space, self.dr)
         else:
             # otherwise do normal smearing
             hist = self._dist_hist(distances, self.r_space, self.dr)
             gr = self._broadening_unrolled(hist, self.r_space, gaussian_width)
 
-        gr = self._normalize_gr(gr, self.r_space, self.dr, self._num_atoms, self.number_density)
+        gr = self._normalize_gr(
+            gr, self.r_space, self.dr, self._num_atoms, self.number_density
+        )
 
         return gr
 
     @staticmethod
     def _get_image_trans_vectors_auto(lattice, rmax, dr, max_num_images=50):
-        """ Finds all "images" (integer 3-tuples, supercells) that have
+        """Finds all "images" (integer 3-tuples, supercells) that have
         atoms within rmax + dr + longest LV of the parent lattice.
 
         Parameters:
@@ -297,13 +330,15 @@ class PDF(Fingerprint):
                 max_trans = length
 
         unit_vector_lengths = np.sqrt(np.sum(_lattice**2, axis=1))
-        limits = [int((dr + rmax + max_trans) / length) for length in unit_vector_lengths]
+        limits = [
+            int((dr + rmax + max_trans) / length) for length in unit_vector_lengths
+        ]
 
         for ind, limit in enumerate(limits):
             if abs(limit) > max_num_images:
                 limits[ind] = int(copysign(max_num_images, limit))
 
-        products = itertools.product(*(range(-lim, lim+1) for lim in limits))
+        products = itertools.product(*(range(-lim, lim + 1) for lim in limits))
         for prod in products:
             trans = prod @ _lattice
             length = np.sqrt(np.sum(trans**2))
@@ -313,7 +348,7 @@ class PDF(Fingerprint):
         return image_vec
 
     def _set_image_trans_vectors(self):
-        """ Sets self._image_vec to a list/generator of image translation vectors,
+        """Sets self._image_vec to a list/generator of image translation vectors,
         based on self._num_images.
 
         If self._num_images is an integer, create all 3-member integer combinations
@@ -324,26 +359,33 @@ class PDF(Fingerprint):
         e.g. self._image_vec = [[1, 0, 1], [0, 1, 1], [1, 1, 1]].
 
         """
-        if self._num_images == 'auto':
+        if self._num_images == "auto":
             self._image_vec = self._get_image_trans_vectors_auto(
-                self._lattice, self.rmax, self.dr, max_num_images=self.kwargs.get('max_num_images')
+                self._lattice,
+                self.rmax,
+                self.dr,
+                max_num_images=self.kwargs.get("max_num_images"),
             )
         else:
-            self._image_vec = list(itertools.product(range(-self._num_images, self._num_images + 1), repeat=3))
+            self._image_vec = list(
+                itertools.product(
+                    range(-self._num_images, self._num_images + 1), repeat=3
+                )
+            )
 
     def get_sim_distance(self, pdf_b, projected=False):
-        """ Return the similarity between two PDFs. """
+        """Return the similarity between two PDFs."""
         return PDFOverlap(self, pdf_b, projected=projected).similarity_distance
 
     def pdf(self):
-        """ Return G(r) and the r_space for easy plotting. """
+        """Return G(r) and the r_space for easy plotting."""
         try:
             return (self.r_space, self.gr)
         except AttributeError:
             return (None, None)
 
     def plot_projected_pdf(self, **kwargs):
-        """ Plot projected PDFs.
+        """Plot projected PDFs.
 
         Keyword arguments:
             keys (list): plot only a subset of projections, e.g. [('K', )].
@@ -351,21 +393,23 @@ class PDF(Fingerprint):
 
         """
         from matador.plotting.pdf_plotting import plot_projected_pdf
+
         plot_projected_pdf(self, **kwargs)
 
     def plot(self, **kwargs):
-        """ Plot PDFs.
+        """Plot PDFs.
 
         Keyword arguments:
             other_pdfs (list of PDF): other PDFs to add to the plot.
 
         """
         from matador.plotting.pdf_plotting import plot_pdf
+
         plot_pdf(self, **kwargs)
 
 
 class PDFFactory(FingerprintFactory):
-    """ This class computes PDF objects from a list of structures,
+    """This class computes PDF objects from a list of structures,
     as concurrently as possible. The PDFs are stored under the `pdf`
     key inside each structure dict.
 
@@ -373,12 +417,13 @@ class PDFFactory(FingerprintFactory):
         nprocs (int): number of concurrent processes.
 
     """
-    default_key = 'pdf'
+
+    default_key = "pdf"
     fingerprint = PDF
 
 
 class PDFOverlap:
-    """ Calculate the PDFOverlap between two PDF objects,
+    """Calculate the PDFOverlap between two PDF objects,
     pdf_a and pdf_b, with number density rescaling.
 
     Attributes:
@@ -391,7 +436,7 @@ class PDFOverlap:
     """
 
     def __init__(self, pdf_a, pdf_b, projected=False):
-        """ Perform the overlap and similarity distance calculations.
+        """Perform the overlap and similarity distance calculations.
 
         Parameters:
             pdf_a (PDF): first PDF to compare.
@@ -411,13 +456,13 @@ class PDFOverlap:
             if isinstance(pdf_a.elem_gr, dict) and isinstance(pdf_b.elem_gr, dict):
                 self.projected_pdf_overlap()
             else:
-                print('Projected PDFs missing, continuing with total.')
+                print("Projected PDFs missing, continuing with total.")
             self.pdf_overlap()
         else:
             self.pdf_overlap()
 
     def pdf_overlap(self):
-        """ Calculate the overlap of two PDFs via
+        """Calculate the overlap of two PDFs via
         a simple meshed sum of their difference.
 
         """
@@ -427,21 +472,26 @@ class PDFOverlap:
         self.fine_gr_a = np.interp(self.fine_space, self.pdf_a.r_space, self.pdf_a.gr)
         self.fine_gr_b = np.interp(self.fine_space, self.pdf_b.r_space, self.pdf_b.gr)
         # scaling factor here is normalising to number density
-        density_rescaling_factor = pow(self.pdf_b.number_density / (self.pdf_a.number_density), 1 / 3)
+        density_rescaling_factor = pow(
+            self.pdf_b.number_density / (self.pdf_a.number_density), 1 / 3
+        )
         rescale_factor = density_rescaling_factor
-        self.fine_gr_a = np.interp(self.fine_space, rescale_factor * self.fine_space, self.fine_gr_a)
-        self.fine_gr_a = self.fine_gr_a[:int(len(self.fine_space) * 0.75)]
-        self.fine_gr_b = self.fine_gr_b[:int(len(self.fine_space) * 0.75)]
-        self.fine_space = self.fine_space[:int(len(self.fine_space) * 0.75)]
+        self.fine_gr_a = np.interp(
+            self.fine_space, rescale_factor * self.fine_space, self.fine_gr_a
+        )
+        self.fine_gr_a = self.fine_gr_a[: int(len(self.fine_space) * 0.75)]
+        self.fine_gr_b = self.fine_gr_b[: int(len(self.fine_space) * 0.75)]
+        self.fine_space = self.fine_space[: int(len(self.fine_space) * 0.75)]
         overlap_fn = self.fine_gr_a - self.fine_gr_b
-        worst_case_overlap_int = np.trapz(np.abs(self.fine_gr_a), dx=self.pdf_a.dr/2.0) + \
-            np.trapz(np.abs(self.fine_gr_b), dx=self.pdf_b.dr/2.0)
+        worst_case_overlap_int = np.trapz(
+            np.abs(self.fine_gr_a), dx=self.pdf_a.dr / 2.0
+        ) + np.trapz(np.abs(self.fine_gr_b), dx=self.pdf_b.dr / 2.0)
         self.overlap_int = np.trapz(np.abs(overlap_fn), dx=self.pdf_a.dr / 2.0)
         self.similarity_distance = self.overlap_int / worst_case_overlap_int
         self.overlap_fn = overlap_fn
 
     def projected_pdf_overlap(self):
-        """ Calculate the overlap of two projected PDFs via
+        """Calculate the overlap of two projected PDFs via
         a simple meshed sum of their difference.
 
         """
@@ -460,24 +510,40 @@ class PDFOverlap:
                 self.pdf_b.elem_gr[key] = np.zeros_like(self.pdf_b.r_space)
         self.fine_elem_gr_a, self.fine_elem_gr_b = dict(), dict()
         for key in elems:
-            self.fine_elem_gr_a[key] = np.interp(self.fine_space, self.pdf_a.r_space, self.pdf_a.elem_gr[key])
-            self.fine_elem_gr_b[key] = np.interp(self.fine_space, self.pdf_b.r_space, self.pdf_b.elem_gr[key])
+            self.fine_elem_gr_a[key] = np.interp(
+                self.fine_space, self.pdf_a.r_space, self.pdf_a.elem_gr[key]
+            )
+            self.fine_elem_gr_b[key] = np.interp(
+                self.fine_space, self.pdf_b.r_space, self.pdf_b.elem_gr[key]
+            )
         # scaling factor here is normalising to number density
-        density_rescaling_factor = pow((self.pdf_b.number_density) / (self.pdf_a.number_density), 1 / 3)
+        density_rescaling_factor = pow(
+            (self.pdf_b.number_density) / (self.pdf_a.number_density), 1 / 3
+        )
         rescale_factor = density_rescaling_factor
         for key in elems:
-            self.fine_elem_gr_a[key] = (
-                np.interp(self.fine_space, rescale_factor * self.fine_space, self.fine_elem_gr_a[key])
+            self.fine_elem_gr_a[key] = np.interp(
+                self.fine_space,
+                rescale_factor * self.fine_space,
+                self.fine_elem_gr_a[key],
             )
         for key in elems:
-            self.fine_elem_gr_a[key] = self.fine_elem_gr_a[key][:int(len(self.fine_space) * 0.75)]
-            self.fine_elem_gr_b[key] = self.fine_elem_gr_b[key][:int(len(self.fine_space) * 0.75)]
-        self.fine_space = self.fine_space[:int(len(self.fine_space) * 0.75)]
+            self.fine_elem_gr_a[key] = self.fine_elem_gr_a[key][
+                : int(len(self.fine_space) * 0.75)
+            ]
+            self.fine_elem_gr_b[key] = self.fine_elem_gr_b[key][
+                : int(len(self.fine_space) * 0.75)
+            ]
+        self.fine_space = self.fine_space[: int(len(self.fine_space) * 0.75)]
 
         for key in elems:
             overlap_fn = self.fine_elem_gr_a[key] - self.fine_elem_gr_b[key]
-            worst_case_a = np.trapz(np.abs(self.fine_elem_gr_a[key]), dx=self.pdf_a.dr / 2.0)
-            worst_case_b = np.trapz(np.abs(self.fine_elem_gr_b[key]), dx=self.pdf_b.dr / 2.0)
+            worst_case_a = np.trapz(
+                np.abs(self.fine_elem_gr_a[key]), dx=self.pdf_a.dr / 2.0
+            )
+            worst_case_b = np.trapz(
+                np.abs(self.fine_elem_gr_b[key]), dx=self.pdf_b.dr / 2.0
+            )
             worst_case_overlap = worst_case_a + worst_case_b
             overlap = np.trapz(np.abs(overlap_fn), dx=self.pdf_a.dr / 2.0)
             self.overlap_int += overlap / worst_case_overlap
@@ -485,20 +551,23 @@ class PDFOverlap:
         self.similarity_distance = self.overlap_int / len(elems)
 
     def plot_diff(self):
-        """ Simple plot for comparing two PDFs. """
+        """Simple plot for comparing two PDFs."""
         from matador.plotting.pdf_plotting import plot_diff_overlap
+
         plot_diff_overlap(self)
 
     def plot_projected_diff(self):
-        """ Simple plot for comparing two projected PDFs. """
+        """Simple plot for comparing two projected PDFs."""
         from matador.plotting.pdf_plotting import plot_projected_diff_overlap
+
         plot_projected_diff_overlap(self)
 
 
 class CombinedProjectedPDF:
-    """ Take some computed PDFs and add them together. """
+    """Take some computed PDFs and add them together."""
+
     def __init__(self, pdf_cursor):
-        """ Create CombinedPDF object from list of PDFs.
+        """Create CombinedPDF object from list of PDFs.
 
         Parameters:
             pdf_cursor (:obj:`list` of :obj:`PDF`): list of
@@ -508,17 +577,20 @@ class CombinedProjectedPDF:
         self.dr = min([pdf.dr for pdf in pdf_cursor])
         self.rmax = min([pdf.rmax for pdf in pdf_cursor])
         self.r_space = np.arange(0, self.rmax + self.dr, self.dr)
-        self.label = 'Combined PDF'
+        self.label = "Combined PDF"
         if any([not pdf.elem_gr for pdf in pdf_cursor]):
-            raise RuntimeError('Projected PDFs not found.')
+            raise RuntimeError("Projected PDFs not found.")
 
         keys = {key for pdf in pdf_cursor for key in pdf.elem_gr}
         self.elem_gr = {key: np.zeros_like(self.r_space) for key in keys}
         for pdf in pdf_cursor:
             for key in pdf.elem_gr:
-                self.elem_gr[key] += np.interp(self.r_space, pdf.r_space, pdf.elem_gr[key])
+                self.elem_gr[key] += np.interp(
+                    self.r_space, pdf.r_space, pdf.elem_gr[key]
+                )
 
     def plot_projected_pdf(self):
-        """ Plot the combined PDF. """
+        """Plot the combined PDF."""
         from matador.plotting.pdf_plotting import plot_projected_pdf
+
         plot_projected_pdf(self)

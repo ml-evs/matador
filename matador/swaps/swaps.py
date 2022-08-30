@@ -11,13 +11,22 @@ from matador.utils.chem_utils import get_periodic_table, get_stoich
 
 
 class AtomicSwapper:
-    """ This class handles the creation of input files from database
+    """This class handles the creation of input files from database
     queries that have swapped atoms.
 
     """
+
     def __init__(
-            self, cursor, swap=None, uniq=False, top=None, maintain_num_species=True, debug=False, **kwargs):
-        """ Initialise class with query cursor and arguments.
+        self,
+        cursor,
+        swap=None,
+        uniq=False,
+        top=None,
+        maintain_num_species=True,
+        debug=False,
+        **kwargs
+    ):
+        """Initialise class with query cursor and arguments.
 
         Parameters:
             cursor (list): cursor of documents to swap.
@@ -41,7 +50,7 @@ class AtomicSwapper:
         self.maintain_num_species = maintain_num_species
         self.swap_dict_list = None
         self.swap_args = swap
-        del self.periodic_table['X']
+        del self.periodic_table["X"]
         self.template_structure = None
         self.cursor = list(cursor)
         if top is not None:
@@ -60,19 +69,24 @@ class AtomicSwapper:
                 swap_cursor.extend(docs)
         self.cursor = swap_cursor
         if self.swap_counter > 0:
-            print_success('Performed {} swaps.'.format(self.swap_counter))
+            print_success("Performed {} swaps.".format(self.swap_counter))
         else:
-            print_warning('No swaps performed.')
+            print_warning("No swaps performed.")
 
         if uniq:
             from matador.utils.cursor_utils import filter_unique_structures
-            print('Filtering for unique structures...')
-            filtered_cursor = filter_unique_structures(self.cursor, debug=debug, sim_tol=uniq)
-            print('Filtered {} down to {}'.format(len(self.cursor), len(filtered_cursor)))
+
+            print("Filtering for unique structures...")
+            filtered_cursor = filter_unique_structures(
+                self.cursor, debug=debug, sim_tol=uniq
+            )
+            print(
+                "Filtered {} down to {}".format(len(self.cursor), len(filtered_cursor))
+            )
             self.cursor = filtered_cursor
 
     def parse_swaps(self, swap_args=None):
-        """ Parse command line options into valid atomic species swaps.
+        """Parse command line options into valid atomic species swaps.
 
         e.g. --swap LiP:NaAs
 
@@ -93,39 +107,45 @@ class AtomicSwapper:
             swap_args = self.swap_args
 
         if swap_args is None:
-            raise RuntimeError('No swap arguments passed.')
+            raise RuntimeError("No swap arguments passed.")
 
         if isinstance(swap_args, str):
             swap_args = [swap_args.strip()]
 
         if len(swap_args) > 1:
-            raise RuntimeError('Detected whitespace in your input clear it and try again.')
+            raise RuntimeError(
+                "Detected whitespace in your input clear it and try again."
+            )
 
-        swap_list = swap_args[0].split(':')
+        swap_list = swap_args[0].split(":")
         for swap in swap_list:
             if len(swap) <= 1:
-                raise RuntimeError('Not enough arguments for swap!')
+                raise RuntimeError("Not enough arguments for swap!")
             # check is both options are groups
-            if '][' in swap:
-                tmp_list = [x for x in swap.split('][') if x != '']
+            if "][" in swap:
+                tmp_list = [x for x in swap.split("][") if x != ""]
             # check if only first option is group
-            elif swap[0] == '[':
-                tmp_list = [x for x in swap.split(']') if x != '']
+            elif swap[0] == "[":
+                tmp_list = [x for x in swap.split("]") if x != ""]
             # check if only last option is group
-            elif swap[-1] == ']':
-                tmp_list = [x for x in swap.split('[') if x != '']
+            elif swap[-1] == "]":
+                tmp_list = [x for x in swap.split("[") if x != ""]
             # check if no groups
             else:
-                tmp_list = [x for x in re.split(r'([A-Z][a-z]*)', swap) if x != '']
+                tmp_list = [x for x in re.split(r"([A-Z][a-z]*)", swap) if x != ""]
             for ind, tmp in enumerate(tmp_list):
                 tmp_list[ind] = self._atoms_to_list(tmp)
             if len(tmp_list) != 2:
-                raise RuntimeError('Unable to parse swap! {} should contain only two entries'.format(tmp_list))
+                raise RuntimeError(
+                    "Unable to parse swap! {} should contain only two entries".format(
+                        tmp_list
+                    )
+                )
             self.swap_pairs.append(tmp_list)
             self.construct_swap_options()
 
     def _atoms_to_list(self, atom_string):
-        """ For a given set of atoms in a string, parse any macros and
+        """For a given set of atoms in a string, parse any macros and
         return a list of options.
 
         e.g. '[V' -> [<all group V atoms>],
@@ -135,24 +155,25 @@ class AtomicSwapper:
             atom_string (str): formula string with macros.
 
         """
-        if '[' in atom_string or ']' in atom_string:
-            group = atom_string.replace('[', '')
-            group = group.replace(']', '')
+        if "[" in atom_string or "]" in atom_string:
+            group = atom_string.replace("[", "")
+            group = group.replace("]", "")
             if group in self.periodic_table:
                 atom_list = self.periodic_table[group]
             else:
-                atom_list = group.split(',')
+                atom_list = group.split(",")
         else:
             return [atom_string]
         return [x.strip() for x in atom_list]
 
     def construct_swap_options(self):
-        """ Iterate over possible combinations of multiple many-to-many
+        """Iterate over possible combinations of multiple many-to-many
         swaps and create a dict for each swap.
 
         """
         self.swap_dict_list = []
         from itertools import product
+
         for branch in product(*([pair[1] for pair in self.swap_pairs])):
             self.swap_dict_list.append(dict())
             for ind, pair in enumerate(self.swap_pairs):
@@ -161,7 +182,7 @@ class AtomicSwapper:
                         self.swap_dict_list[-1][swap_from] = branch[ind]
 
     def atomic_swaps(self, source_doc):
-        """ Swap atomic species according to parsed options.
+        """Swap atomic species according to parsed options.
 
         Parameters:
             source_doc (dict): matador doc to swap from.
@@ -169,15 +190,20 @@ class AtomicSwapper:
         """
         new_doc = deepcopy(source_doc)
         swapped_docs = []
-        unswapped_num_species = len(set(source_doc['atom_types']))
+        unswapped_num_species = len(set(source_doc["atom_types"]))
         for swap in self.swap_dict_list:
-            if any(key in source_doc['atom_types'] for key in swap):
-                new_doc['atom_types'] = [swap.get(atom, atom) for atom in source_doc['atom_types']]
-                new_doc['_swapped_stoichiometry'] = get_stoich(source_doc['atom_types'])
-                new_doc['stoichiometry'] = get_stoich(new_doc['atom_types'])
-                new_doc['elems'] = set(new_doc['atom_types'])
-                new_doc['num_species'] = len(new_doc['elems'])
-                if not self.maintain_num_species or new_doc['num_species'] == unswapped_num_species:
+            if any(key in source_doc["atom_types"] for key in swap):
+                new_doc["atom_types"] = [
+                    swap.get(atom, atom) for atom in source_doc["atom_types"]
+                ]
+                new_doc["_swapped_stoichiometry"] = get_stoich(source_doc["atom_types"])
+                new_doc["stoichiometry"] = get_stoich(new_doc["atom_types"])
+                new_doc["elems"] = set(new_doc["atom_types"])
+                new_doc["num_species"] = len(new_doc["elems"])
+                if (
+                    not self.maintain_num_species
+                    or new_doc["num_species"] == unswapped_num_species
+                ):
                     swapped_doc = deepcopy(new_doc)
                     swapped_docs.append(swapped_doc)
 

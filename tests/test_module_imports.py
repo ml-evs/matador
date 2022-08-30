@@ -3,7 +3,7 @@ import unittest
 
 
 class ImportTest(unittest.TestCase):
-    """ Test importing of all matador submodules. """
+    """Test importing of all matador submodules."""
 
     def test_battery(self):
         from matador.battery import Electrode

@@ -7,7 +7,7 @@ __all__ = ["GSAS_ATOMIC_SCATTERING_COEFFS"]
 
 
 def load_atomic_scattering_factors_gsas():
-    """ Load atomic scattering factors used by GSAS-II, from the paper:
+    """Load atomic scattering factors used by GSAS-II, from the paper:
 
     "New Analytical Scattering Factor Functions for Free Atoms and Ions
     for Free Atoms and Ions", D. Waasmaier & A. Kirfel, Acta Cryst.

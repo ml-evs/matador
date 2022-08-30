@@ -9,7 +9,7 @@ __all__ = ["RASPA_ATOMIC_SCATTERING_COEFFS"]
 
 
 def load_atomic_scattering_factors_raspa():
-    """ Load atomic scattering factors used by RASPA2, with unknown
+    """Load atomic scattering factors used by RASPA2, with unknown
     reference.
 
     https://github.com/numat/RASPA2/blob/master/src/scattering_factors.c

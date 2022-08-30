@@ -8,7 +8,7 @@ quadrupole moment data stored within the module.
 
 
 def _load_quadrupole_moments_from_file():
-    """ Load the electric quadrupole moment file into the constant dictionary
+    """Load the electric quadrupole moment file into the constant dictionary
     ELECTRIC_QUADRUPOLE_MOMENTS.
 
     """
@@ -21,7 +21,7 @@ def _load_quadrupole_moments_from_file():
     moments = np.loadtxt(filename, comments="#", delimiter=",")
     moments_dict = {}
     for el, col in zip(PERIODIC_TABLE.values(), moments):
-        moments_dict[el.symbol] = moments[el.number-1]
+        moments_dict[el.symbol] = moments[el.number - 1]
 
     return moments_dict
 

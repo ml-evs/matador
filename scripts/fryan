@@ -12,7 +12,7 @@ def main(**kwargs):
 
     import glob
 
-    res_list = glob.glob('*.res')
+    res_list = glob.glob("*.res")
     cursor = [res2dict(f) for f in res_list]
     to_display = []
     for doc in cursor:
@@ -21,27 +21,32 @@ def main(**kwargs):
         else:
             to_display.append(doc[0])
 
-    if kwargs.get('hull'):
+    if kwargs.get("hull"):
         QueryConvexHull(cursor=[doc[0] for doc in cursor], hull_cutoff=10)
 
     else:
 
-        if kwargs.get('formula'):
-            to_display = [doc for doc in to_display
-                          if get_formula_from_stoich(sorted(doc['stoichiometry'])) == kwargs.get('formula')]
+        if kwargs.get("formula"):
+            to_display = [
+                doc
+                for doc in to_display
+                if get_formula_from_stoich(sorted(doc["stoichiometry"]))
+                == kwargs.get("formula")
+            ]
 
-        to_display = sorted(to_display, key=lambda x: x['enthalpy_per_atom'])
-        if kwargs.get('top'):
-            to_display = to_display[:kwargs.get('top')]
+        to_display = sorted(to_display, key=lambda x: x["enthalpy_per_atom"])
+        if kwargs.get("top"):
+            to_display = to_display[: kwargs.get("top")]
 
         display_results(to_display, use_source=True)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser()
-    parser.add_argument('-f', '--formula', type=str)
-    parser.add_argument('-m', '--hull', action='store_true')
-    parser.add_argument('-t', '--top', type=int)
+    parser.add_argument("-f", "--formula", type=str)
+    parser.add_argument("-m", "--hull", action="store_true")
+    parser.add_argument("-t", "--top", type=int)
     parsed_kwargs = vars(parser.parse_args())
     main(**parsed_kwargs)

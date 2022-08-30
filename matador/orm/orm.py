@@ -14,7 +14,7 @@ from typing import Dict
 
 
 class DataContainer(ABC):
-    """ Base class for matador data classes. This class is a read-only
+    """Base class for matador data classes. This class is a read-only
     store of the underlying dictionary of raw data; its children can
     implement useful methods to inspect and analyse the underlying data.
 
@@ -23,7 +23,7 @@ class DataContainer(ABC):
     required_keys = []
 
     def __init__(self, data: Dict = None, **kwargs):
-        """ Initalise copy of raw data. """
+        """Initalise copy of raw data."""
         if isinstance(data, dict):
             self._data = copy.deepcopy(dict(data))
         else:
@@ -35,9 +35,10 @@ class DataContainer(ABC):
     @property
     def root_source(self):
         from matador.utils.chem_utils import get_root_source
+
         try:
-            if 'source' in self._data:
-                self._root_source = get_root_source(self._data['source'])
+            if "source" in self._data:
+                self._root_source = get_root_source(self._data["source"])
         except RuntimeError:
             pass
 
@@ -45,13 +46,13 @@ class DataContainer(ABC):
 
     @property
     def source(self):
-        """ Return the source of the data. """
-        if 'source' not in self._data:
-            return 'unknown'
-        return self._data['source']
+        """Return the source of the data."""
+        if "source" not in self._data:
+            return "unknown"
+        return self._data["source"]
 
     def _validate_inputs(self):
-        """ Validate the incoming data by checking the existence
+        """Validate the incoming data by checking the existence
         of the required keys for the subclass.
 
         """
@@ -62,12 +63,13 @@ class DataContainer(ABC):
 
         if missing_keys:
             raise RuntimeError(
-                "Unable to create object of type {} as the following keys are missing: {}"
-                .format(type(self).__name__, missing_keys)
+                "Unable to create object of type {} as the following keys are missing: {}".format(
+                    type(self).__name__, missing_keys
+                )
             )
 
     def __getitem__(self, key):
-        """ Allow properties to be used with key access.
+        """Allow properties to be used with key access.
 
         Parameters:
             key (str): name of key or attribute to get.
@@ -84,11 +86,14 @@ class DataContainer(ABC):
         try:
             return self._data[key]
         except KeyError:
-            raise KeyError('Object has no data or implementation for requested key: "{}"'
-                           .format(key))
+            raise KeyError(
+                'Object has no data or implementation for requested key: "{}"'.format(
+                    key
+                )
+            )
 
     def __delitem__(self, key: str):
-        raise AttributeError('Object does not support deletion of keys in `_data`.')
+        raise AttributeError("Object does not support deletion of keys in `_data`.")
 
     def __setitem__(self, key: str, item):
         if key not in self._data or self._data[key] is None:
@@ -96,18 +101,21 @@ class DataContainer(ABC):
             return
         elif self._data[key] != item:
             try:
-                if (math.isnan(item) and math.isnan(self._data[key])):
+                if math.isnan(item) and math.isnan(self._data[key]):
                     return
             except TypeError:
                 pass
-            raise AttributeError('Cannot assign value {} to existing key {} with value {}'
-                                 .format(item, key, self._data[key]))
+            raise AttributeError(
+                "Cannot assign value {} to existing key {} with value {}".format(
+                    item, key, self._data[key]
+                )
+            )
 
     def __contains__(self, key):
         return key in self._data
 
     def get(self, *args):
-        """ Overload dictionary.get() method.
+        """Overload dictionary.get() method.
 
         Parameters:
             key (str): key to try and obtain.
@@ -125,6 +133,6 @@ class DataContainer(ABC):
         else:
             default = None
         if len(args) > 2:
-            raise TypeError('get() takes up to 2 arguments, not {}'.format(len(args)))
+            raise TypeError("get() takes up to 2 arguments, not {}".format(len(args)))
 
         return self._data.get(key, default)

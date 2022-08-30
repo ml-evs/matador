@@ -17,11 +17,11 @@ from matador.crystal.elastic import get_equation_of_state
 from matador.workflows.castep.common import castep_prerelax
 from matador.scrapers import cell2dict
 
-LOG = logging.getLogger('run3')
+LOG = logging.getLogger("run3")
 
 
 def castep_elastic(computer, calc_doc, seed, **kwargs):
-    """ Perform a calculation of the elastic tensor on a system.
+    """Perform a calculation of the elastic tensor on a system.
     Currently only calculation of the bulk modulus is implemented.
 
     Parameters:
@@ -42,7 +42,7 @@ def castep_elastic(computer, calc_doc, seed, **kwargs):
 
 
 class CastepElasticWorkflow(Workflow):
-    """ Perform a "full" spectral calculation on a system, i.e. first
+    """Perform a "full" spectral calculation on a system, i.e. first
     perform an SCF then interpolate to different kpoint paths/grids to
     form DOS and dispersions. Optionally use OptaDOS for post-processing
     of DOS.
@@ -60,44 +60,51 @@ class CastepElasticWorkflow(Workflow):
     """
 
     def preprocess(self):
-        """ Decide which parts of the Workflow need to be performed,
+        """Decide which parts of the Workflow need to be performed,
         and set the appropriate CASTEP parameters.
 
         """
-        num_volumes = self.workflow_params.get('num_volumes', 9)
-        self.plot = self.workflow_params.get('plot', True)
+        num_volumes = self.workflow_params.get("num_volumes", 9)
+        self.plot = self.workflow_params.get("plot", True)
 
-        self.volume_rescale = np.cbrt(np.geomspace(0.7, 1.2, num=num_volumes, endpoint=True)).tolist()
+        self.volume_rescale = np.cbrt(
+            np.geomspace(0.7, 1.2, num=num_volumes, endpoint=True)
+        ).tolist()
         self.volume_rescale.append(1.0)
         self._completed_volumes = []
-        LOG.info('Preprocessing completed: run3 bulk modulus calculation options {}'
-                 .format(self.volume_rescale))
+        LOG.info(
+            "Preprocessing completed: run3 bulk modulus calculation options {}".format(
+                self.volume_rescale
+            )
+        )
 
         # if there is not geom_force_tol parameter set, then don't pre-relax
         if self.calc_doc.get("geom_force_tol"):
             self.add_step(
                 castep_elastic_prerelax,
-                'relax',
+                "relax",
                 clean_after=True,  # clean up after geometry step as seed is going to change
-                output_exts=["-out.cell"]
+                output_exts=["-out.cell"],
             )
 
         for volume in self.volume_rescale:
-            self.add_step(castep_rescaled_volume_scf, 'rescaled_volume_scf', rescale=volume)
+            self.add_step(
+                castep_rescaled_volume_scf, "rescaled_volume_scf", rescale=volume
+            )
 
     def postprocess(self):
-        """ Fit some equations of state, then save a plot and a datafile. """
-        results = get_equation_of_state(self.seed + '.bulk_mod', plot=self.plot)
-        if 'summary' in results:
-            for line in results['summary']:
+        """Fit some equations of state, then save a plot and a datafile."""
+        results = get_equation_of_state(self.seed + ".bulk_mod", plot=self.plot)
+        if "summary" in results:
+            for line in results["summary"]:
                 print(line)
-            print('Writing summary to {seed}.bulk_mod.results'.format(seed=self.seed))
-            with open(self.seed + '.bulk_mod.results', 'w') as f:
-                f.writelines(results['summary'])
+            print("Writing summary to {seed}.bulk_mod.results".format(seed=self.seed))
+            with open(self.seed + ".bulk_mod.results", "w") as f:
+                f.writelines(results["summary"])
 
 
 def castep_rescaled_volume_scf(computer, calc_doc, seed, rescale=1):
-    """ Run a singleshot SCF calculation.
+    """Run a singleshot SCF calculation.
 
     Parameters:
         computer (:obj:`ComputeTask`): the object that will be calling CASTEP.
@@ -109,7 +116,7 @@ def castep_rescaled_volume_scf(computer, calc_doc, seed, rescale=1):
 
     """
     assert rescale > 0
-    LOG.info('Performing CASTEP SCF on volume rescaled by {:.2f}.'.format(rescale**3))
+    LOG.info("Performing CASTEP SCF on volume rescaled by {:.2f}.".format(rescale**3))
     scf_doc = copy.deepcopy(calc_doc)
 
     # get relaxed cell from previous step
@@ -125,17 +132,19 @@ def castep_rescaled_volume_scf(computer, calc_doc, seed, rescale=1):
 
     for i in range(3):
         for k in range(3):
-            scf_doc['lattice_cart'][i][k] *= rescale
+            scf_doc["lattice_cart"][i][k] *= rescale
 
-    scf_doc['task'] = 'singlepoint'
-    bulk_mod_seed = seed + '.bulk_mod'
+    scf_doc["task"] = "singlepoint"
+    bulk_mod_seed = seed + ".bulk_mod"
     computer.seed = bulk_mod_seed
 
-    return computer.run_castep_singleshot(scf_doc, bulk_mod_seed, keep=True, intermediate=True)
+    return computer.run_castep_singleshot(
+        scf_doc, bulk_mod_seed, keep=True, intermediate=True
+    )
 
 
 def castep_elastic_prerelax(computer, calc_doc, seed):
-    """ Run a geometry optimisation before re-scaling volumes SCF-style calculation.
+    """Run a geometry optimisation before re-scaling volumes SCF-style calculation.
 
     Parameters:
         computer (:obj:`ComputeTask`): the object that will be calling CASTEP.
@@ -143,7 +152,7 @@ def castep_elastic_prerelax(computer, calc_doc, seed):
         seed (str): root filename of structure.
 
     """
-    LOG.info('Performing CASTEP elastic pre-relax...')
+    LOG.info("Performing CASTEP elastic pre-relax...")
     relax_doc = copy.deepcopy(calc_doc)
     relax_doc["write_cell_structure"] = True
 

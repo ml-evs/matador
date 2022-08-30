@@ -9,11 +9,15 @@ from files.
 
 
 __all__ = [
-    'QueryConvexHull', 'PhaseDiagram', 'EnsembleHull', 'TemperatureDependentHull',
-    'HullDiff', 'diff_hulls'
+    "QueryConvexHull",
+    "PhaseDiagram",
+    "EnsembleHull",
+    "TemperatureDependentHull",
+    "HullDiff",
+    "diff_hulls",
 ]
-__author__ = 'Matthew Evans'
-__maintainer__ = 'Matthew Evans'
+__author__ = "Matthew Evans"
+__maintainer__ = "Matthew Evans"
 
 
 from .hull import QueryConvexHull

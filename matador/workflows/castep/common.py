@@ -23,7 +23,7 @@ def castep_scf(
     required_keys=None,
     forbidden_keys=None,
 ):
-    """ Run a singleshot SCF calculation.
+    """Run a singleshot SCF calculation.
 
     Parameters:
         computer (:obj:`matador.compute.ComputeTask`): the object that will be calling CASTEP.
@@ -73,7 +73,7 @@ def castep_prerelax(
     required_keys=None,
     forbidden_keys=None,
 ):
-    """ Run a self-consistent (i.e. restarted) geometry optimisation.
+    """Run a self-consistent (i.e. restarted) geometry optimisation.
     Optionally write a check file containing the final structure and density.
 
     Parameters:
@@ -109,7 +109,7 @@ def castep_prerelax(
 
 
 def _parse_write_checkpoint(write_checkpoint):
-    """ Returns the appropriate value of ``write_checkpoint``. """
+    """Returns the appropriate value of ``write_checkpoint``."""
     if isinstance(write_checkpoint, bool):
         if not write_checkpoint:
             write_checkpoint = "NONE"

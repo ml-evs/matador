@@ -31,7 +31,7 @@ VERBOSITY = 10
 
 
 class CellScraperTests(MatadorUnitTest):
-    """ Test cell scraper functions. """
+    """Test cell scraper functions."""
 
     def test_standard_cell_scraper(self):
         cell_fname = REAL_PATH + "data/LiP2Zn-0bm995-a_9-out.cell"
@@ -209,7 +209,8 @@ class CellScraperTests(MatadorUnitTest):
         self.assertEqual(test_dict["phonon_supercell_matrix"][1], [0, 3, 0])
         self.assertEqual(test_dict["phonon_supercell_matrix"][2], [0, 0, 9])
         np.testing.assert_array_equal(
-            test_dict["external_efield"], np.array([0.5, 0, 0]),
+            test_dict["external_efield"],
+            np.array([0.5, 0, 0]),
         )
 
     def test_cell_failure(self):
@@ -301,7 +302,7 @@ class CellScraperTests(MatadorUnitTest):
 
 
 class CastepScraperTests(MatadorUnitTest):
-    """ Test CASTEP scrapers. """
+    """Test CASTEP scrapers."""
 
     def test_castep16(self):
         castep_fname = REAL_PATH + "data/Na3Zn4-swap-ReOs-OQMD_759599.castep"
@@ -318,7 +319,9 @@ class CastepScraperTests(MatadorUnitTest):
             )
         if not failed_open:
             f.close()
-            test_dict, s = castep2dict(castep_fname, timings=True, db=True, verbosity=VERBOSITY)
+            test_dict, s = castep2dict(
+                castep_fname, timings=True, db=True, verbosity=VERBOSITY
+            )
             self.assertTrue(s, msg="Failed entirely, oh dear!\n{}".format(test_dict))
             self.assertEqual(
                 test_dict["pressure"], 0.0763, msg="Failed to read pressure!"
@@ -562,7 +565,7 @@ class CastepScraperTests(MatadorUnitTest):
                 -1304.222941837,
                 -1304.222959187,
                 -1304.222958028,
-                -1304.222976388
+                -1304.222976388,
             ]
 
             for i, energy in enumerate(energies):
@@ -586,7 +589,8 @@ class CastepScraperTests(MatadorUnitTest):
                 int_dict["intermediates"][special_case]["total_energy"], -1304.222982442
             )
             self.assertEqual(
-                int_dict["intermediates"][special_case]["smeared_free_energy"], -1304.233677344
+                int_dict["intermediates"][special_case]["smeared_free_energy"],
+                -1304.233677344,
             )
             self.assertEqual(
                 int_dict["intermediates"][-1]["total_energy_per_atom"], -1304.223019263
@@ -596,7 +600,8 @@ class CastepScraperTests(MatadorUnitTest):
                 -1304.233706274,
             )
             self.assertEqual(
-                int_dict["intermediates"][special_case]["total_energy_per_atom"], -1304.222982442
+                int_dict["intermediates"][special_case]["total_energy_per_atom"],
+                -1304.222982442,
             )
             self.assertEqual(
                 int_dict["intermediates"][special_case]["smeared_free_energy_per_atom"],
@@ -681,7 +686,7 @@ class CastepScraperTests(MatadorUnitTest):
             self.assertEqual(test_dict["mp_id"], 10101)
 
     def test_file_not_found(self):
-        """ Ensure that FileNotFound errors fail gracefully. """
+        """Ensure that FileNotFound errors fail gracefully."""
         error = False
         try:
             res, s = res2dict("___not_a_file")
@@ -1033,7 +1038,7 @@ class ResScraperTests(MatadorUnitTest):
 
 
 class ParamScraperTests(MatadorUnitTest):
-    """ Test CASTEP param scrapers. """
+    """Test CASTEP param scrapers."""
 
     def test_param(self):
         param_fname = REAL_PATH + "data/KX.param"
@@ -1170,10 +1175,10 @@ class ParamScraperTests(MatadorUnitTest):
 
 
 class ScraperMiscTest(MatadorUnitTest):
-    """ Test miscellaneous other scrapers. """
+    """Test miscellaneous other scrapers."""
 
     def test_batch_loading(self):
-        """ Test passing a list of files to scraper function, which
+        """Test passing a list of files to scraper function, which
         should be handled by decorator.
 
         """
@@ -2116,7 +2121,7 @@ class ScraperMiscTest(MatadorUnitTest):
         self.assertEqual(np.shape(test_dict["eigs_q"]), (1, 9, 310))
 
     def test_fortran_e100_bug(self):
-        """ Test whether the scraper handles improperly formatted floats
+        """Test whether the scraper handles improperly formatted floats
         by Fortran when e.g. exponent < -99.
 
         """
@@ -2130,7 +2135,7 @@ class ScraperMiscTest(MatadorUnitTest):
 
 
 class CifTests(MatadorUnitTest):
-    """ These tests check the cif scraper for correctness. """
+    """These tests check the cif scraper for correctness."""
 
     def test_cif_primitive(self):
         cif_fname = REAL_PATH + "data/cif_files/primitive.cif"
@@ -2369,7 +2374,7 @@ class CifTests(MatadorUnitTest):
 
 
 class ExportTest(MatadorUnitTest):
-    """ Test file export functions. """
+    """Test file export functions."""
 
     def test_doc2res(self):
         res_fname = REAL_PATH + "data/LiPZn-r57des.res"
@@ -2549,7 +2554,7 @@ class ExportTest(MatadorUnitTest):
         self.compare_json_with_res(json_fname, test_fname)
 
     def test_query2files(self):
-        """ Test that MP/ICSD/OQMD structures get written correctly. """
+        """Test that MP/ICSD/OQMD structures get written correctly."""
         json_files = glob.glob(REAL_PATH + "data/json_query_files/*.json")
         cursor = []
         for f in json_files:
@@ -2572,7 +2577,7 @@ class ExportTest(MatadorUnitTest):
             )
 
     def test_large_writes(self):
-        """ Fake some large queries and make sure they are not written. """
+        """Fake some large queries and make sure they are not written."""
         fake_cursor = 100 * [{"dummy": "data"}]
         with self.assertRaises(RuntimeError):
             query2files(fake_cursor, res=True, max_files=99)

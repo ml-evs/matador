@@ -18,9 +18,9 @@ writing slurm job submission files.
 """
 
 
-__all__ = ['ComputeTask', 'BatchRun', 'reset_job_folder']
-__author__ = 'Matthew Evans'
-__maintainer__ = 'Matthew Evans'
+__all__ = ["ComputeTask", "BatchRun", "reset_job_folder"]
+__author__ = "Matthew Evans"
+__maintainer__ = "Matthew Evans"
 
 
 from .compute import ComputeTask

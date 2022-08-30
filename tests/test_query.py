@@ -7,7 +7,7 @@ from matador.utils.chem_utils import parse_element_string
 
 
 class QueryParseTest(unittest.TestCase):
-    """ Test query functionality. """
+    """Test query functionality."""
 
     def test_basic_queries(self):
         kwargs = {"composition": "KP", "testing": True}
@@ -119,7 +119,7 @@ class QueryParseTest(unittest.TestCase):
         self.assertDictEqual(test_dict, query.query_dict)
 
     def test_complex_queries(self):
-        """ Test long queries with multiple mismatching of lists
+        """Test long queries with multiple mismatching of lists
         (emulating argparse) and values.
         """
         self.maxDiff = None
@@ -150,7 +150,7 @@ class QueryParseTest(unittest.TestCase):
                 {"num_fu": {"$gte": 4}},
                 {"$and": [{"tags": {"$in": ["foo"]}}, {"tags": {"$in": ["Bar"]}}]},
                 {"doi": {"$in": ["1001/4001"]}},
-                {"$or": [{'icsd': {"$eq": "100020"}}, {'icsd': {'$eq': 100020}}]},
+                {"$or": [{"icsd": {"$eq": "100020"}}, {"icsd": {"$eq": 100020}}]},
                 {"cut_off_energy": {"$eq": 300}},
                 {"spin_polarized": True},
                 {"$or": [{"quality": {"$gt": 0}}, {"quality": {"$exists": False}}]},

@@ -7,38 +7,50 @@ import argparse
 
 
 def standardize_cell(symtol=0.01, **kwargs):
-    """ Standardize res file with spglib. """
-    seeds = kwargs.get('seeds')
-    primitive = kwargs.get('primitive')
+    """Standardize res file with spglib."""
+    seeds = kwargs.get("seeds")
+    primitive = kwargs.get("primitive")
     if isinstance(seeds, str):
         seeds = [seeds]
     if seeds is None:
-        exit('Please enter list of res files')
+        exit("Please enter list of res files")
     for seed in seeds:
-        seed = seed.replace('.res', '')
-        doc, s = res2dict(seed + '.res', db=False)
+        seed = seed.replace(".res", "")
+        doc, s = res2dict(seed + ".res", db=False)
         if s:
-            if kwargs.get('debug'):
-                print('Standardizing cell {} at symtol {}.'.format(seed, symtol))
+            if kwargs.get("debug"):
+                print("Standardizing cell {} at symtol {}.".format(seed, symtol))
                 if primitive:
-                    print('and reducing to primitive.')
+                    print("and reducing to primitive.")
             spg_doc = standardize_doc_cell(doc, primitive=primitive, symprec=symtol)
-            if not kwargs.get('cell'):
-                doc2res(spg_doc, seed + '_std.res', info=False)
+            if not kwargs.get("cell"):
+                doc2res(spg_doc, seed + "_std.res", info=False)
             else:
-                doc2cell(spg_doc, seed + '_std.cell')
+                doc2cell(spg_doc, seed + "_std.cell")
         else:
-            print('Standardization failed for {}'.format(seed))
+            print("Standardization failed for {}".format(seed))
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(prog='standardize_cell', description='standardize res file with spglib')
-    parser.add_argument('-sym', '--symtol', type=float, default=0.01, help='spglib symtol (default: 0.01)')
-    parser.add_argument('-prim', '--primitive', action='store_true', help='reduce cell to primitive')
-    parser.add_argument('seeds', nargs='+', type=str, help='res files to manipulate')
-    parser.add_argument('--debug', action='store_true', help='print debug output')
-    parser.add_argument('--cell', action='store_true', help='write cell file instead of res')
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        prog="standardize_cell", description="standardize res file with spglib"
+    )
+    parser.add_argument(
+        "-sym",
+        "--symtol",
+        type=float,
+        default=0.01,
+        help="spglib symtol (default: 0.01)",
+    )
+    parser.add_argument(
+        "-prim", "--primitive", action="store_true", help="reduce cell to primitive"
+    )
+    parser.add_argument("seeds", nargs="+", type=str, help="res files to manipulate")
+    parser.add_argument("--debug", action="store_true", help="print debug output")
+    parser.add_argument(
+        "--cell", action="store_true", help="write cell file instead of res"
+    )
     kwargs = vars(parser.parse_args())
 
     standardize_cell(**kwargs)
-    print('Done!')
+    print("Done!")
