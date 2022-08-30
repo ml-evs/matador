@@ -15,7 +15,7 @@ Example Jupyter notebooks and tutorials can be found `online <https://docs.matad
 Written & maintained by `Matthew Evans <https://ml-evs.science>`_ (2016-).
 
 
-.. image:: docs/src/img/lipzn.png
+.. image:: docs/src/img/hull.png
    :name: LiPZn
    :align: center
 
