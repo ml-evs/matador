@@ -34,7 +34,7 @@ def viz(doc):
 
 
 @lru_cache(maxsize=1)
-def get_element_colours() -> Dict[str, Tuple[float, float, float]]:
+def get_element_colours() -> Dict[str, List[float]]:
     """Return RGB element colours from VESTA file.
 
     The colours file can be specified in the matadorrc.
@@ -737,3 +737,24 @@ def fresnel_plot(
     fig.set_tight_layout(True)
 
     return fig, axes, scenes
+
+
+def colour_from_ternary_concentration(
+    conc: Union[Tuple[float, float], Tuple[float, float, float]],
+    species: List[str],
+    alpha: float = 1,
+) -> List[float]:
+    """Returns a colour for a ternary composition of the given species, mixing
+    the configured VESTA colours.
+
+    Returns:
+        RGBA array.
+
+    """
+    if len(conc) == 2:
+        x, y = conc
+        z = 1 - x - y
+    else:
+        x, y, z = conc
+    colours = [np.asarray(get_element_colours()[s]) for s in species]
+    return ((x * colours[0] + y * colours[1] + z * colours[2])).tolist() + [alpha]
