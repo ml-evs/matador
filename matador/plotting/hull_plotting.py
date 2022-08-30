@@ -10,7 +10,7 @@ diagrams generally.
 from collections import defaultdict
 import numpy as np
 from matador.utils.chem_utils import get_stoich_from_formula, get_formula_from_stoich
-from matador.utils.viz_utils import get_element_colours
+from matador.utils.viz_utils import get_element_colours, colour_from_ternary_concentration
 from matador.plotting.plotting import plotting_function, get_linear_cmap, SAVE_EXTS
 
 EPS = 1e-12
@@ -148,11 +148,11 @@ def plot_2d_hull(hull, ax=None, show=True, plot_points=True, plot_tie_line=True,
         if colour_by_composition:
             hull_point_scale = 75
             edgewidth = 1.5
-            edgecolor = "k"
+            edgecolor = kwargs.get("markeredgecolor", "black")
         else:
             hull_point_scale = 40
             edgewidth = 1.5
-            edgecolor = "k"
+            edgecolor = kwargs.get("markeredgecolor", "black")
 
         if colour_by_composition:
             point_colours = tie_line[:, 0]
@@ -519,9 +519,10 @@ def plot_temperature_hull(
 
 
 @plotting_function
-def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=None, fig_height=None,
+def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=None, fig_height=None, fig_width=None,
                       label_cutoff=None, label_corners=True, expecting_cbar=True, labels=None, plot_fname=None,
-                      hull_dist_unit="meV", efmap=None, sampmap=None, concmap=None, capmap=None, pathways=False, **kwargs):
+                      colour_points_by="hull_distance", hull_dist_unit="meV", efmap=None, sampmap=None, concmap=None,
+                      capmap=None, pathways=False, label_spacing=0.05, label_offset=0.8, **kwargs):
     """ Plot calculated ternary hull as a 2D projection.
 
     Parameters:
@@ -531,12 +532,15 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
         axis (matplotlib.axes.Axes): matplotlib axis object on which to plot.
         show (bool): whether or not to show plot in X window.
         plot_points (bool): whether or not to plot each structure as a point.
+        colour_points_by (str): either `hull_distance` or `concentration`.
         label_cutoff (float/:obj:`tuple` of :obj:`float`): draw labels less than or
             between these distances form the hull, also read from hull.args.
         expecting_cbar (bool): whether or not to space out the plot to preserve
             aspect ratio if a colourbar is present.
         labels (bool): whether or not to label on-hull structures
         label_corners (bool): whether or not to put axis labels on corners or edges.
+        label_offset (float): Location of the top left rcorner of the labels.
+        label_spacing (float): Spacing between label list.
         hull_dist_unit (str): either "eV" or "meV",
         png/pdf/svg (bool): whether or not to write the plot to a file.
         plot_fname (str): filename to write plot to.
@@ -554,11 +558,9 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
     import matplotlib.colors as colours
     from matador.utils.chem_utils import get_generic_grav_capacity
 
-    plt.rcParams['axes.linewidth'] = 0
-    plt.rcParams['xtick.major.size'] = 0
-    plt.rcParams['ytick.major.size'] = 0
-    plt.rcParams['xtick.minor.size'] = 0
-    plt.rcParams['ytick.minor.size'] = 0
+    _colour_points_by_values = ("hull_distance", "concentration")
+    if colour_points_by not in _colour_points_by_values:
+        raise RuntimeError(f"colour_points_by` must be in {_colour_points_by_values}, not {colour_points_by}")
 
     if efmap is None:
         efmap = hull.args.get('efmap')
@@ -603,14 +605,20 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
         _user_height = plt.rcParams.get("figure.figsize", (8, 6))[0]
     else:
         _user_height = fig_height
-    if capmap or efmap or sampmap:
-        fig.set_size_inches(_user_height, 5/8 * _user_height)
-    elif not expecting_cbar:
-        fig.set_size_inches(_user_height, _user_height)
+    if fig_width is None:
+        if capmap or efmap or sampmap:
+            _user_width = 8/5 * _user_height
+        elif not expecting_cbar:
+            _user_width = _user_height
+        else:
+            _user_width = 6.67/5 * _user_height
     else:
-        fig.set_size_inches(_user_height, 5/6.67 * _user_height)
+        _user_width = fig_width
+
+    fig.set_size_inches(_user_width, _user_height)
 
     ax.boundary(linewidth=2.0, zorder=99)
+    ax.get_axes().axis("off")
     ax.clear_matplotlib_ticks()
 
     chempot_labels = [get_formula_from_stoich(
@@ -624,16 +632,16 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
     if label_corners:
         # remove 0 and 1 ticks when labelling corners
         ticks = ticks[1:-1]
-        ax.left_corner_label(chempot_labels[2], fontsize='large', color=element_colours[2])
-        ax.right_corner_label(chempot_labels[0], fontsize='large', color=element_colours[0])
-        ax.top_corner_label(chempot_labels[1], fontsize='large', color=element_colours[1], offset=0.16)
+        ax.left_corner_label(chempot_labels[2], fontsize='x-large', color=element_colours[2])
+        ax.right_corner_label(chempot_labels[0], fontsize='x-large', color=element_colours[0])
+        ax.top_corner_label(chempot_labels[1], fontsize='x-large', color=element_colours[1], offset=0.16)
     else:
         ax.left_axis_label(chempot_labels[2], fontsize='large', offset=0.12)
         ax.right_axis_label(chempot_labels[1], fontsize='large', offset=0.12)
         ax.bottom_axis_label(chempot_labels[0], fontsize='large', offset=0.08)
         ax.set_title('-'.join(['{}'.format(label) for label in chempot_labels]), fontsize='large', y=1.02)
 
-    ax.ticks(axis='lbr', linewidth=1, offset=0.025, fontsize='small',
+    ax.ticks(axis='lbr', linewidth=1, offset=0.025, fontsize='medium',
              locations=(scale * np.asarray(ticks)).tolist(),
              ticks=ticks, tick_formats='%.1f')
 
@@ -682,7 +690,7 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
     for plane in hull.convex_hull.planes:
         plane.append(plane[0])
         plane = np.asarray(plane)
-        ax.plot(scale * plane, c=hull.colours[0], lw=1.5, alpha=1, zorder=98)
+        ax.plot(scale * plane, c=kwargs.get("tielinecolor", hull.colours[0]), lw=1.5, alpha=1, zorder=98)
 
     if pathways:
         for phase in stable:
@@ -693,7 +701,10 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
     if plot_points:
         colours_list = []
         colour_metric = hull_dist
+        conc_colours = []
         for i, _ in enumerate(colour_metric):
+            if colour_points_by == "concentration":
+                conc_colours.append(colour_from_ternary_concentration(concs[i], hull.species))
             if hull_dist[i] >= max_cut:
                 colours_list.append(n_colours - 1)
             elif hull_dist[i] <= min_cut:
@@ -701,39 +712,78 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
             else:
                 colours_list.append(int((n_colours - 1) * (hull_dist[i] / max_cut)))
         colours_list = np.asarray(colours_list)
+        if colour_points_by == "concentration":
+            colours = [colour_from_ternary_concentration(stable[i], hull.species) for i in range(len(stable))]
+        else:
+            colours = hull.colours[1]
+
+        # Plot stable points
         ax.scatter(
             scale*stable,
             marker='o',
-            color=hull.colours[1],
-            edgecolors='black',
+            color=colours,
+            edgecolors=kwargs.get("markeredgecolor", "black"),
             zorder=9999999,
             s=150,
             lw=1.5
         )
-        ax.scatter(
-            scale*concs,
-            colormap=cmap,
-            colorbar=True,
-            cbarlabel='Distance from hull ({}eV/atom)'.format("m" if hull_dist_unit.lower() == "mev" else ""),
-            c=colour_metric,
-            vmax=max_cut,
-            vmin=min_cut,
-            zorder=1000,
-            s=40,
-            alpha=0
-        )
+
+        # Plot unstable points
         for i, _ in enumerate(concs):
+            if colour_points_by == "concentration":
+                c = conc_colours[i]
+            else:
+                c = colours_hull[colours_list[i]]
+
             ax.scatter(
                 scale * concs[i].reshape(1, 3),
-                color=colours_hull[colours_list[i]],
+                color=c,
                 marker='o',
                 zorder=10000 - colours_list[i],
                 s=70 * (1 - float(colours_list[i]) / n_colours) + 15,
                 lw=1,
-                edgecolors='black'
+                edgecolors=kwargs.get("markeredgecolor", "black"),
             )
 
-    # add colourmaps
+        # Test points for colourbar normalization
+        if colour_points_by == "hull_distance":
+            ax.scatter(
+                scale*concs,
+                colormap=cmap,
+                colorbar=(colour_points_by == "hull_distance"),
+                cbarlabel='Distance from hull ({}eV/atom)'.format("m" if hull_dist_unit.lower() == "mev" else ""),
+                c=colour_metric,
+                vmax=max_cut,
+                vmin=min_cut,
+                zorder=1000,
+                s=40,
+                alpha=0
+            )
+
+        # Set up legend in case of colour by concentration
+        elif colour_points_by == "concentration":
+            labelled_hull_dists = [0, 25, 100]
+            for dist in labelled_hull_dists:
+                if dist != 0:
+                    size = 70 * (1 - int((n_colours - 1) * (dist / max_cut)) / n_colours) + 15
+                    lw = 1
+                else:
+                    size = 150
+                    lw = 1.5
+                ax.scatter(
+                    [[scale, 0, 0]],
+                    color="lightgrey",
+                    marker='o',
+                    zorder=0,
+                    s=size,
+                    lw=lw,
+                    label=f"{dist:.0f} meV/atom",
+                    edgecolors="grey"
+                )
+
+            ax.legend(title="Hull distance", fontsize="medium")
+
+    # Add colourmaps for backgrounds
     if capmap:
         capacities = dict()
         from ternary.helpers import simplex_iterator
@@ -776,55 +826,46 @@ def plot_ternary_hull(hull, axis=None, show=True, plot_points=True, hull_cutoff=
         concs = dict()
         from ternary.helpers import simplex_iterator
 
-        def element_colour_heatmap(x, y, z):
-            colours = [np.asarray(get_element_colours()[s]) for s in hull.species]
-
-            return ((x * colours[0] + y * colours[1] + z * colours[2])/3).tolist() + [1]
-
         for (i, j, k) in simplex_iterator(scale):
-            colour = element_colour_heatmap(float(i) / scale, float(j) / scale, float(k) / scale)
+            colour = colour_from_ternary_concentration(
+                [float(i) / scale, float(j) / scale, float(k) / scale], hull.species, alpha=0.5
+            )
             concs[(i, j, k)] = colour
         ax.heatmap(concs, style="hexagonal", use_rgba=True, colorbar=False)
 
     # add labels
     if labels:
         label_cursor = _get_hull_labels(hull, label_cutoff=label_cutoff)
-        if len(label_cursor) == 1:
-            label_coords = [[0.25, 0.5]]
-        else:
-            label_coords = [[0.1+(val-0.5)*0.3, val] for val in np.linspace(0.5, 0.8, int(round(len(label_cursor)/2.)+1))]
-            label_coords += [[0.9-(val-0.5)*0.3, val+0.2] for val in np.linspace(0.5, 0.8, int(round(len(label_cursor)/2.)))]
-        from matador.utils.hull_utils import barycentric2cart
+        label_coords = [[0.0, label_offset - i * label_spacing] for i in range(len(label_cursor))]
+
         for ind, doc in enumerate(label_cursor):
             conc = np.asarray(doc['concentration'] + [1 - sum(doc['concentration'])])
-            formula = get_formula_from_stoich(
+            label = get_formula_from_stoich(
                 doc['stoichiometry'], sort=False, tex=True, latex_sub_style=r'\mathregular', elements=hull.species
             )
-            arrowprops = dict(arrowstyle="-|>", facecolor="k", color='k', lw=2, alpha=0.5, zorder=1, shrinkA=2, shrinkB=4)
-            cart = barycentric2cart([doc['concentration'] + [0]])[0][:2]
-            min_dist = 1e20
-            closest_label = 0
-            for coord_ind, coord in enumerate(label_coords):
-                dist = np.sqrt((cart[0] - coord[0])**2 + (cart[1] - coord[1])**2)
-                if dist < min_dist:
-                    min_dist = dist
-                    closest_label = coord_ind
-            text_colour = "k"
-            ax.annotate(formula, scale*conc,
+            if label_cutoff > 0 and doc["hull_distance"] > EPS:
+                label += f' ({1000 * doc["hull_distance"]:.1f} meV/atom)'
+            arrowprops = dict(arrowstyle="-|>", lw=2, alpha=0, zorder=1, shrinkA=2, shrinkB=4)
+            if colour_points_by == "concentration":
+                text_colour = colour_from_ternary_concentration(conc, hull.species)
+            else:
+                text_colour = "k"
+
+            ax.annotate(label, scale*conc,
                         textcoords='data',
-                        xytext=[scale*val for val in label_coords[closest_label]],
-                        ha='right',
+                        xytext=[scale*val for val in label_coords[ind]],
+                        ha='left',
                         va='bottom',
                         color=text_colour,
                         arrowprops=arrowprops)
-            del label_coords[closest_label]
 
     plt.tight_layout(w_pad=0.2)
     # important for retaining labels if exporting to PDF
     # see https://github.com/marcharper/python-ternary/issues/36
+    ax.ax.set_aspect("equal", adjustable="box")
     ax._redraw_labels() # noqa
 
-    if hull.savefig:
+    if hull.savefig or any(kwargs.get(ext) for ext in SAVE_EXTS):
         fname = plot_fname or ''.join(hull.species) + '_hull'
         for ext in SAVE_EXTS:
             if hull.args.get(ext) or kwargs.get(ext):
