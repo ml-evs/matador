@@ -154,7 +154,7 @@ def plot_2d_hull(
 
     """
     import matplotlib.pyplot as plt
-    import matplotlib.colors as colours
+    import matplotlib.colors
 
     # cache the specific label offset dict
     _specific_label_offset = None
@@ -338,7 +338,7 @@ def plot_2d_hull(
                     cmap = conc_cmap
                 else:
                     point_colours = np.sort(hull.hull_dist)[::-1]
-                    norm = colours.LogNorm(0.01, 1, clip=True)
+                    norm = matplotlib.colors.LogNorm(0.01, 1, clip=True)
                     cmap = hull.default_cmap
                 scatter = ax.scatter(
                     concs,
@@ -749,6 +749,7 @@ def plot_ternary_hull(
     concmap=None,
     capmap=None,
     pathways=False,
+    scale_override=None,
     label_spacing=0.05,
     label_offset=0.8,
     **kwargs,
@@ -774,9 +775,10 @@ def plot_ternary_hull(
         hull_dist_unit (str): either "eV" or "meV",
         png/pdf/svg (bool): whether or not to write the plot to a file.
         plot_fname (str): filename to write plot to.
-        efmap (bool): plot heatmap of formation energy,
-        sampmap (bool): plot heatmap showing sampling density,
-        capmap (bool): plot heatmap showing gravimetric capacity.
+        efmap (bool/str): plot heatmap of formation energy,
+        sampmap (bool/str): plot heatmap showing sampling density,
+        concmap (bool/str): colour background by concentration and VESTA colours
+        capmap (bool/str): plot heatmap showing gravimetric capacity.
         pathways (bool): plot the pathway from the starting electrode to active ion.
 
     Returns:
@@ -785,7 +787,6 @@ def plot_ternary_hull(
     """
     import ternary
     import matplotlib.pyplot as plt
-    import matplotlib.colors as colours
     from matador.utils.chem_utils import get_generic_grav_capacity
 
     _colour_points_by_values = ("hull_distance", "concentration")
@@ -823,9 +824,12 @@ def plot_ternary_hull(
     if capmap or efmap or concmap:
         scale = 100
     elif sampmap:
-        scale = 20
+        scale = 25
     else:
         scale = 1
+
+    if scale_override:
+        scale = scale_override
 
     if axis is not None:
         fig, ax = ternary.figure(scale=scale, ax=axis)
@@ -912,11 +916,13 @@ def plot_ternary_hull(
     filtered_hull_dists = []
     for ind, conc in enumerate(concs):
         if conc not in filtered_concs:
-            if hull_dist[ind] <= hull_cutoff or (
-                hull_cutoff == 0 and hull_dist[ind] < 0.1
-            ):
+            if hull_dist[ind] <= hull_cutoff:
                 filtered_concs.append(conc)
                 filtered_hull_dists.append(hull_dist[ind])
+
+    unfiltered_concs = None
+    if sampmap:
+        unfiltered_concs = np.asarray(concs)
 
     concs = np.asarray(filtered_concs)
     hull_dist = np.asarray(filtered_hull_dists)
@@ -935,10 +941,7 @@ def plot_ternary_hull(
     hull.default_cmap = get_linear_cmap(hull.colours[1:4], list_only=False)
     n_colours = len(hull.default_cmap_list)
     colours_hull = hull.default_cmap_list
-
     cmap = hull.default_cmap
-    cmap_full = plt.cm.get_cmap("Pastel2")
-    pastel_cmap = colours.LinearSegmentedColormap.from_list("Pastel2", cmap_full.colors)
 
     for plane in hull.convex_hull.planes:
         plane.append(plane[0])
@@ -1064,13 +1067,17 @@ def plot_ternary_hull(
                 [float(i) / scale, float(j) / scale, float(scale - i - j) / scale],
                 hull.species,
             )
+
+        if not isinstance(capmap, str):
+            capmap = "Pastel2"
+
         ax.heatmap(
             capacities,
             style="hexagonal",
             cbarlabel="Gravimetric capacity (mAh/g)",
             vmin=0,
             vmax=3000,
-            cmap=pastel_cmap,
+            cmap=capmap,
         )
     elif efmap:
         energies = dict()
@@ -1085,10 +1092,10 @@ def plot_ternary_hull(
         for (i, j, k) in simplex_iterator(scale):
             energies[(i, j, k)] = -1 * plane_energies[ind]
             ind += 1
-        if isinstance(efmap, str):
-            efmap = efmap
-        else:
+
+        if not isinstance(efmap, str):
             efmap = "BuPu_r"
+
         ax.heatmap(
             energies,
             style="hexagonal",
@@ -1097,6 +1104,9 @@ def plot_ternary_hull(
             cmap=efmap,
         )
     elif sampmap:
+        if not isinstance(sampmap, str):
+            sampmap = "plasma"
+
         sampling = dict()
         from ternary.helpers import simplex_iterator
 
@@ -1104,16 +1114,19 @@ def plot_ternary_hull(
         for (i, j, k) in simplex_iterator(scale):
             sampling[(i, j, k)] = np.size(
                 np.where(
-                    (concs[:, 0] <= float(i) / scale + eps)
-                    * (concs[:, 0] >= float(i) / scale - eps)
-                    * (concs[:, 1] <= float(j) / scale + eps)
-                    * (concs[:, 1] >= float(j) / scale - eps)
-                    * (concs[:, 2] <= float(k) / scale + eps)
-                    * (concs[:, 2] >= float(k) / scale - eps)
+                    (unfiltered_concs[:, 0] <= float(i) / scale + eps)
+                    * (unfiltered_concs[:, 0] >= float(i) / scale - eps)
+                    * (unfiltered_concs[:, 1] <= float(j) / scale + eps)
+                    * (unfiltered_concs[:, 1] >= float(j) / scale - eps)
+                    * (unfiltered_concs[:, 2] <= float(k) / scale + eps)
+                    * (unfiltered_concs[:, 2] >= float(k) / scale - eps)
                 )
             )
         ax.heatmap(
-            sampling, style="hexagonal", cbarlabel="Number of structures", cmap="afmhot"
+            sampling,
+            style="hexagonal",
+            cbarlabel="Number of structures",
+            cmap=sampmap,
         )
     elif concmap:
         concs = dict()
@@ -1130,7 +1143,7 @@ def plot_ternary_hull(
 
     # add labels
     if labels:
-        label_cursor = _get_hull_labels(hull, label_cutoff=label_cutoff)
+        label_cursor = _get_hull_labels(hull, label_cutoff=label_cutoff, num_species=3)
         label_coords = [
             [0.0, label_offset - i * label_spacing] for i in range(len(label_cursor))
         ]
