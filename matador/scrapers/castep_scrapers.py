@@ -50,6 +50,7 @@ def res2dict(fname, db=True, **kwargs):
             if the scrape was successful.
 
     """
+
     flines, fname = get_flines_extension_agnostic(fname, "res")
     res = dict()
 
@@ -62,7 +63,6 @@ def res2dict(fname, db=True, **kwargs):
         res["user"] = pwd.getpwuid(os.stat(fname).st_uid).pw_name
     except Exception:
         res["user"] = "xxx"
-        pass
 
     try:
         get_seed_metadata(res, fname)
@@ -72,23 +72,26 @@ def res2dict(fname, db=True, **kwargs):
         )
 
     # alias special lines in res file
-    titl = ""
-    cell = ""
-    remark = ""
+    titl = None
+    cell = None
+    remark = None
     for line in flines:
-        if "TITL" in line and db:
+        if line.startswith("TITL") and db:
             # if not db, then don't read title
             titl = line.split()
             if len(titl) != 12:
-                raise RuntimeError("missing some TITL info")
-        elif "CELL" in line:
+                raise RuntimeError(f"Missing some TITL info in {fname}")
+        elif line.startswith("CELL"):
             cell = line.split()
-        elif "REM" in line:
+        elif line.startswith("REM"):
             remark = line.split()
-    if cell == "":
-        raise RuntimeError("missing CELL info")
-    if titl == "" and db:
-        raise RuntimeError("missing TITL")
+        elif line.startswith("SFAC"):
+            break
+
+    if not cell:
+        raise RuntimeError(f"Missing CELL line from {fname}")
+    if not titl and db:
+        raise RuntimeError(f"Missing TITL line in {fname}")
     if db:
         res["pressure"] = f90_float_parse(titl[2])
         res["cell_volume"] = f90_float_parse(titl[3])
@@ -96,6 +99,7 @@ def res2dict(fname, db=True, **kwargs):
         res["num_atoms"] = int(titl[7])
         res["space_group"] = titl[8].strip("()")
         res["enthalpy_per_atom"] = res["enthalpy"] / res["num_atoms"]
+
     res["lattice_abc"] = [
         list(map(f90_float_parse, cell[2:5])),
         list(map(f90_float_parse, cell[5:8])),
@@ -125,9 +129,12 @@ def res2dict(fname, db=True, **kwargs):
                 except IndexError:
                     res["site_occupancy"].append(1.0)
                 i += 1
+
+            break
+
     res["positions_frac"] = wrap_frac_coords(res["positions_frac"])
     res["num_atoms"] = len(res["atom_types"])
-    # deal with implicit encapsulation
+    # Parse any remark regarding implicit nanotube encapsulation
     if remark:
         if "NTPROPS" in remark:
             res["cnt_chiral"] = [0, 0]
