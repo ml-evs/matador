@@ -162,9 +162,8 @@ def plot_spectral(seeds, **options):
         and options.get("cmap") is None
         and options.get("colours") is None
     ):
-        options["band_colour"] = "grey"
-        if options.get("band_alpha") is None:
-            options["band_alpha"] = 0.8
+        options["band_colour"] = options.get("band_colour", "grey")
+        options["band_alpha"] = options.get("band_alpha", 0.8)
 
     if not isinstance(seeds, list):
         seeds = [seeds]
@@ -265,7 +264,7 @@ def plot_spectral(seeds, **options):
             except AttributeError:
                 options["labels"] = [seed.root_source for seed in seeds]
 
-        if len(options.get("labels")) != len(seeds):
+        if len(options.get("labels", [])) != len(seeds):
             raise RuntimeError(
                 f"Invalid number of labels provided for {len(seeds)} seeds: {options.get('labels')}. "
                 "Multiple labels should be comma separated."
@@ -484,7 +483,7 @@ def dispersion_plot(seeds, ax_dispersion, options, bbox_extra_artists=None):
                             label=label,
                         )
 
-    if len(seeds) > 1:
+    if len(seeds) > 1 and options.get("legend", True):
         disp_legend = ax_dispersion.legend(loc="upper center")
         bbox_extra_artists.append(disp_legend)
 
@@ -650,10 +649,8 @@ def dos_plot(seeds, ax_dos, options, bbox_extra_artists=None):
 
                 dos_colour = options["colour_cycle"][seed_ind]
                 if len(seeds) > 1:
-                    c = None
                     label = options.get("labels")[seed_ind]
                 else:
-                    c = None
                     label = "Total DOS"
 
                 ax_dos.plot(
@@ -661,7 +658,7 @@ def dos_plot(seeds, ax_dos, options, bbox_extra_artists=None):
                     dos,
                     ls=options.get("ls", len(seeds) * ["-"])[seed_ind],
                     alpha=1,
-                    c=c,
+                    c=dos_colour,
                     lw=options.get("lw", 1),
                     zorder=1e10,
                     label=label,
@@ -808,15 +805,19 @@ def dos_plot(seeds, ax_dos, options, bbox_extra_artists=None):
                                 stack,
                                 stack + pdos[projector],
                                 alpha=alpha,
+                                lw=0,
                                 label=projector_labels[ind],
                                 color=dos_colours[ind],
                             )
+                            projector_outline_alpha = 0
                         else:
                             label = projector_labels[ind]
+                            projector_outline_alpha = 1
+
                         ax_dos.plot(
                             stack + pdos[projector],
                             pdos_energies,
-                            alpha=1,
+                            alpha=projector_outline_alpha,
                             color=dos_colours[ind],
                             label=label,
                         )
@@ -827,16 +828,17 @@ def dos_plot(seeds, ax_dos, options, bbox_extra_artists=None):
                                 pdos_energies,
                                 stack,
                                 stack + pdos[projector],
+                                lw=0,
                                 alpha=alpha,
                                 label=projector_labels[ind],
                                 color=dos_colours[ind],
                             )
-                        else:
-                            label = projector_labels[ind]
+                            projector_outline_alpha = 0
+
                         ax_dos.plot(
                             pdos_energies,
                             stack + pdos[projector],
-                            alpha=1,
+                            alpha=projector_outline_alpha,
                             color=dos_colours[ind],
                             label=label,
                         )
