@@ -986,9 +986,10 @@ def projected_bandstructure_plot(
                 1e20, 0, facecolor=dos_colours[ind], label=projector_labels[ind], lw=0
             )
 
-    legend = ax.legend(loc=1)
-    legend.set_zorder(1e20)
-    bbox_extra_artists.append(legend)
+    if options.get("no_legend", False):
+        legend = ax.legend(loc=1)
+        legend.set_zorder(1e20)
+        bbox_extra_artists.append(legend)
 
     return ax
 
