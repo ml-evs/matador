@@ -146,7 +146,9 @@ https://github.com/optados-developers/optados/issues/24
         _data["dos"] = dos
         _data["energies"] = energies
 
-        warnings.warn("Loaded DOS from .bands file with naive Gaussian smearing.")
+        if "Vibrational" not in self.__class__.__name__:
+            warnings.warn("Loaded DOS from .bands file with naive Gaussian smearing.")
+
         return _data
 
     @property
