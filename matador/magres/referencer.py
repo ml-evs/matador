@@ -234,7 +234,6 @@ class MagresReferencer:
         ax.plot(
             np.asarray(ax.get_xlim()),
             self.fit_gradient * np.asarray(ax.get_xlim()) + self.fit_intercept,
-            label=f"$m = {self.fit_gradient:3.3f}; c = {self.fit_intercept:3.0f} ppm; R^2 = {self.fit_rsquared:3.3f}$",
             zorder=10,
             lw=1.5,
             c="grey",
@@ -242,6 +241,13 @@ class MagresReferencer:
         ax.legend(ncol=len(set(self._fit_structures)) // 5)
         ax.set_ylabel("$\\delta_\\mathrm{expt}$ (ppm)")
         ax.set_xlabel("$\\sigma_\\mathrm{calc}$ (ppm)")
+        ax.text(
+            0.1,
+            0.1,
+            f"$m = {self.fit_gradient:3.3f}; c = {self.fit_intercept:3.0f}\\,ppm; R^2 = {self.fit_rsquared:3.3f}$",
+            bbox=dict(alpha=0.8, facecolor="w", boxstyle="Round"),
+            transform=ax.transAxes,
+        )
 
         return ax
 
