@@ -986,7 +986,7 @@ def projected_bandstructure_plot(
                 1e20, 0, facecolor=dos_colours[ind], label=projector_labels[ind], lw=0
             )
 
-    if options.get("no_legend", False):
+    if not options.get("no_legend", False):
         legend = ax.legend(loc=1)
         legend.set_zorder(1e20)
         bbox_extra_artists.append(legend)
@@ -1304,14 +1304,15 @@ def _add_path_labels(seed, dispersion, ax_dispersion, path, seed_ind, options):
                 zorder=0,
                 label="direct gap {:3.3f} eV".format(cbm - vbm),
             )
-            ax_dispersion.legend(
-                loc="upper center",
-                bbox_to_anchor=(0.5, 1.1),
-                fancybox=True,
-                shadow=True,
-                ncol=2,
-                handlelength=1,
-            )
+            if not options.get("no_legend", False):
+                ax_dispersion.legend(
+                    loc="upper center",
+                    bbox_to_anchor=(0.5, 1.1),
+                    fancybox=True,
+                    shadow=True,
+                    ncol=2,
+                    handlelength=1,
+                )
 
     if seed_ind == 0:
         ax_dispersion.set_xticks(xticks)
