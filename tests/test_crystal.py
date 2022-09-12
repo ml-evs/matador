@@ -1,12 +1,9 @@
-#!/usr/bin/env python
-# standard library
 import unittest
 import copy
 from os.path import realpath
 
 import numpy as np
 
-# matador modules
 from matador.crystal.crystal import Crystal, UnitCell
 from matador.crystal.crystal_site import Site
 from matador.scrapers.castep_scrapers import castep2dict, res2dict
@@ -165,7 +162,12 @@ class CrystalTest(unittest.TestCase):
         )
         self.assertEqual(len(doc.sites), 2)
         self.assertEqual(doc.num_atoms, 2)
+        self.assertEqual(doc.get_concentration(), [0.5, 0.5])
         self.assertEqual(doc.concentration, [0.5, 0.5])
+        self.assertEqual(
+            doc.get_concentration(elements=["Na", "Cl", "Y"]), [0.5, 0.5, 0.0]
+        )
+        self.assertEqual(doc.concentration, [0.5, 0.5, 0.0])
         self.assertEqual(doc.positions_abs, [[0, 0, 0], [1.5, 1.5, 1.5]])
         self.assertEqual(doc.positions_frac, [[0, 0, 0], [0.5, 0.5, 0.5]])
         self.assertEqual(doc.formula, "NaCl")
@@ -187,7 +189,7 @@ class CrystalTest(unittest.TestCase):
         self.assertEqual(doc.stoichiometry, [["Cl", 1.0], ["Na", 1.0]])
         self.assertEqual(len(doc.sites), 2)
         self.assertEqual(doc.num_atoms, 2)
-        self.assertEqual(doc.concentration, [0.5, 0.5])
+        self.assertEqual(doc.get_concentration(), [0.5, 0.5])
         self.assertEqual(doc.positions_abs, [[0.0, 0.0, 0.0], [1.5, 1.5, 1.5]])
         self.assertEqual(doc.positions_frac, [[0, 0, 0], [0.5, 0.5, 0.5]])
         self.assertEqual(doc.formula, "NaCl")
