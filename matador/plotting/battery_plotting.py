@@ -243,6 +243,7 @@ def plot_volume_curve(
     as_percentages=False,
     label=None,
     exclude_elemental=False,
+    line_kwargs: Optional[Union[Dict, List[Dict]]] = None,
     **kwargs,
 ):
     """Plot volume curve calculated for phase diagram.
@@ -257,6 +258,8 @@ def plot_volume_curve(
         as_percentages (bool): whether to show the expansion as a percentage.
         exclude_elemental (bool): whether to include any elemental electrodes
             when considering ternary phase diagrams.
+        line_kwargs (list or dict): parameters to pass to the curve plotter,
+            if a list then the line kwargs will be passed to each line individually.
 
     """
     import matplotlib.pyplot as plt
@@ -270,6 +273,11 @@ def plot_volume_curve(
     else:
         ax = ax
 
+    num_curves = len(hull.volume_data["Q"])
+
+    if line_kwargs is not None and not isinstance(line_kwargs, list):
+        line_kwargs = num_curves * [line_kwargs]
+
     if as_percentages:
         volume_key = "volume_expansion_percentage"
     else:
@@ -277,11 +285,18 @@ def plot_volume_curve(
 
     line_colours = plt.rcParams["axes.prop_cycle"].by_key()["color"]
 
-    for j in range(len(hull.volume_data["Q"])):
+    for j in range(num_curves):
         if exclude_elemental and len(hull.volume_data["endstoichs"][j]) == 1:
             continue
 
-        c = line_colours[(j % len(line_colours)) + 2]
+        _line_kwargs = {"c": line_colours[(j % len(line_colours)) + 2]}
+        if line_kwargs is not None:
+            _line_kwargs.update(line_kwargs[j])
+
+        lw = _line_kwargs.pop("lw", 2)
+        marker = _line_kwargs.pop("marker", "o")
+        markeredgewidth = _line_kwargs.pop("markeredgewidth", 1.5)
+        markeredgecolor = _line_kwargs.pop("markeredgecolor", "k")
 
         stable_hull_dist = hull.volume_data["hull_distances"][j]
         if len(stable_hull_dist) != len(hull.volume_data["Q"][j]):
@@ -298,12 +313,12 @@ def plot_volume_curve(
                 for ind, v in enumerate(hull.volume_data[volume_key][j])
                 if stable_hull_dist[ind] <= EPS
             ],
-            marker="o",
-            markeredgewidth=1.5,
-            markeredgecolor="k",
-            c=c,
+            marker=marker,
+            markeredgewidth=markeredgewidth,
+            markeredgecolor=markeredgecolor,
             zorder=1000,
             lw=0,
+            **_line_kwargs,
         )
 
         _label = label or get_formula_from_stoich(
@@ -321,9 +336,9 @@ def plot_volume_curve(
                 for ind, v in enumerate(hull.volume_data[volume_key][j])
                 if stable_hull_dist[ind] <= EPS
             ],
-            lw=2,
-            c=c,
             label=_label,
+            lw=lw,
+            **_line_kwargs,
         )
 
     ax.set_xlabel("Gravimetric capacity (mAh/g)")
