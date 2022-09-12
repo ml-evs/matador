@@ -100,6 +100,8 @@ def plot_voltage_curve(
         if len(profiles) == 1:
             dft_label = "DFT (this work)"
 
+    line_colours = list(plt.rcParams["axes.prop_cycle"].by_key()["color"])
+
     for ind, profile in enumerate(profiles):
         if dft_label is None and curve_labels is None:
             stoich_label = get_formula_from_stoich(
@@ -112,9 +114,7 @@ def plot_voltage_curve(
         if curve_labels is not None and len(curve_labels) > ind:
             _label = curve_labels[ind]
 
-        _line_kwargs = {
-            "c": list(plt.rcParams["axes.prop_cycle"].by_key()["color"])[ind + 2]
-        }
+        _line_kwargs = {"c": line_colours[(ind % len(line_colours)) + 2]}
         if line_kwargs is not None:
             _line_kwargs.update(line_kwargs[ind])
 
@@ -275,11 +275,14 @@ def plot_volume_curve(
     else:
         volume_key = "volume_ratio_with_bulk"
 
+    line_colours = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+
     for j in range(len(hull.volume_data["Q"])):
         if exclude_elemental and len(hull.volume_data["endstoichs"][j]) == 1:
             continue
 
-        c = next(ax._get_lines.prop_cycler)["color"]
+        c = line_colours[(j % len(line_colours)) + 2]
+
         stable_hull_dist = hull.volume_data["hull_distances"][j]
         if len(stable_hull_dist) != len(hull.volume_data["Q"][j]):
             raise RuntimeError("This plot does not support --hull_cutoff.")
