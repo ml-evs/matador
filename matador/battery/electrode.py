@@ -140,8 +140,18 @@ class Electrode:
         trim = None
         if np.isnan(capacities[-1]):
             trim = -1
-        return np.sum(voltages[1:trim] * np.diff(capacities[:trim])) / np.max(
-            capacities[:trim]
+        return np.sum(voltages[1:trim] * np.diff(capacities[:trim])) / np.nanmax(
+            capacities
+        )
+
+    @classmethod
+    def calculate_energy_density(cls, capacities, voltages) -> float:
+        """Compute the energy density in Wh/kg from the maximum capacity and
+        the average voltage.
+
+        """
+        return cls.calculate_average_voltage(capacities, voltages) * np.nanmax(
+            capacities
         )
 
     @classmethod
@@ -225,6 +235,9 @@ class VoltageProfile:
         self.capacities = capacities
         self.average_voltage = average_voltage
         self.voltages = voltages
+        self.energy_density = Electrode.calculate_energy_density(
+            self.capacities, self.voltages
+        )
         self.reactions = reactions
         self.active_ion = active_ion
 
