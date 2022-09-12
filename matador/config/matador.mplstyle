@@ -1,6 +1,6 @@
 # colors
 # default prop_cycle is Dark2
-axes.prop_cycle               : cycler('color', ['1b9e77', 'd95f02', '7570b3', 'e7298a', '66a61e', 'e6ab02', 'a6761d', '666666', 'bc80bd'])
+axes.prop_cycle               : cycler('color', ['black', 'd95f02', '7570b3', 'e7298a', '66a61e', 'e6ab02', 'a6761d', '666666', 'bc80bd'])
 image.cmap                    : magma
 
 # global font options
