@@ -787,6 +787,7 @@ def plot_ternary_hull(
     """
     import ternary
     import matplotlib.pyplot as plt
+    import matplotlib.colors
     from matador.utils.chem_utils import get_generic_grav_capacity
 
     _colour_points_by_values = ("hull_distance", "concentration")
@@ -1071,13 +1072,19 @@ def plot_ternary_hull(
         if not isinstance(capmap, str):
             capmap = "Pastel2"
 
+        cmap_full = plt.cm.get_cmap(capmap)
+        if cmap_full.N < 255:
+            cmap_full = matplotlib.colors.LinearSegmentedColormap.from_list(
+                capmap, cmap_full.colors
+            )
+
         ax.heatmap(
             capacities,
             style="hexagonal",
             cbarlabel="Gravimetric capacity (mAh/g)",
             vmin=0,
             vmax=3000,
-            cmap=capmap,
+            cmap=cmap_full,
         )
     elif efmap:
         energies = dict()
