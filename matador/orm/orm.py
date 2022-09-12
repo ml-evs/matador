@@ -45,10 +45,20 @@ class DataContainer(ABC):
         return self._root_source
 
     @property
+    def provenance(self) -> str:
+        """Returns a string containing a guess of the provenance
+        (i.e., CSP method or structure source) for this object.
+
+        """
+        from matador.utils.cursor_utils import get_guess_doc_provenance
+
+        return get_guess_doc_provenance(self.source)
+
+    @property
     def source(self):
         """Return the source of the data."""
         if "source" not in self._data:
-            return "unknown"
+            return ["unknown"]
         return self._data["source"]
 
     def _validate_inputs(self):
