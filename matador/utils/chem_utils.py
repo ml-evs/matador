@@ -760,7 +760,7 @@ def get_root_source(source):
 
 
 def get_formula_from_stoich(
-    stoich, elements=None, tex=False, sort=True, latex_sub_style=""
+    stoich, elements=None, tex=False, sort=True, unicode_sub=False, latex_sub_style=""
 ):
     """Get the chemical formula of a structure from
     its matador stoichiometry.
@@ -771,6 +771,7 @@ def get_formula_from_stoich(
     Keyword arguments:
         elements (list): list of element symbols to enforce order.
         tex (bool): whether to print a LaTeX-compatibile string.
+        unicode_sub (bool): use unicode subscripts
         latex_sub_style (str): a string to wrap subscripts in, e.g.
             r"\\mathrm" or r"\\text" (default is blank).
 
@@ -778,6 +779,11 @@ def get_formula_from_stoich(
         str: the string representation of the chemical formula.
 
     """
+    if tex and unicode_sub:
+        raise RuntimeError(
+            "Cannot produce a formula with both LaTeX and unicode subscripts."
+        )
+
     form = ""
     if not isinstance(stoich, list):
         stoich = stoich.tolist()
@@ -802,6 +808,9 @@ def get_formula_from_stoich(
                         else:
                             form += elem[0] + str(int(elem[1]))
         assert form != ""
+
+    if unicode_sub:
+        form = get_subscripted_formula(form)
 
     return form
 
