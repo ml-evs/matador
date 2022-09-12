@@ -38,7 +38,7 @@ def main(**kwargs):
         if kwargs.get("top"):
             to_display = to_display[: kwargs.get("top")]
 
-        display_results(to_display, use_source=True)
+        display_results(to_display, use_source=True, per_atom=kwargs.get("per_atom"))
 
 
 if __name__ == "__main__":
@@ -48,5 +48,6 @@ if __name__ == "__main__":
     parser.add_argument("-f", "--formula", type=str)
     parser.add_argument("-m", "--hull", action="store_true")
     parser.add_argument("-t", "--top", type=int)
+    parser.add_argument("--per_atom", action="store_true")
     parsed_kwargs = vars(parser.parse_args())
     main(**parsed_kwargs)
