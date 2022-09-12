@@ -148,7 +148,6 @@ def plot_voltage_curve(
                     _label = "{:.1f} ".format(phase[0])
                 _label += "{}".format(get_subscripted_formula_tex(phase[1]))
                 _labels.append(_label)
-                print(_label)
             _label = "+".join(_labels)
             _position = (
                 profiles[0].capacities[ind + 1],
@@ -219,25 +218,32 @@ def _add_voltage_curve(capacities, voltages, ax, label=None, **kwargs):
                 [capacities[i - 1], capacities[i]],
                 [voltages[i], voltages[i]],
                 label=label,
-                **line_kwargs
+                **line_kwargs,
             )
         else:
             ax.plot(
                 [capacities[i - 1], capacities[i]],
                 [voltages[i], voltages[i]],
-                **line_kwargs
+                **line_kwargs,
             )
         if i != len(voltages) - 2:
             ax.plot(
                 [capacities[i], capacities[i]],
                 [voltages[i], voltages[i + 1]],
-                **line_kwargs
+                **line_kwargs,
             )
 
 
 @plotting_function
 def plot_volume_curve(
-    hull, ax=None, show=True, legend=False, as_percentages=False, label=None, **kwargs
+    hull,
+    ax=None,
+    show=True,
+    legend=False,
+    as_percentages=False,
+    label=None,
+    exclude_elemental=False,
+    **kwargs,
 ):
     """Plot volume curve calculated for phase diagram.
 
@@ -249,6 +255,8 @@ def plot_volume_curve(
         show (bool): whether or not to display plot in X-window.
         legend (bool): whether to add the legend.
         as_percentages (bool): whether to show the expansion as a percentage.
+        exclude_elemental (bool): whether to include any elemental electrodes
+            when considering ternary phase diagrams.
 
     """
     import matplotlib.pyplot as plt
@@ -267,7 +275,10 @@ def plot_volume_curve(
     else:
         volume_key = "volume_ratio_with_bulk"
 
-    for j in range(len(hull.volume_data["electrode_volume"])):
+    for j in range(len(hull.volume_data["Q"])):
+        if exclude_elemental and len(hull.volume_data["endstoichs"][j]) == 1:
+            continue
+
         c = next(ax._get_lines.prop_cycler)["color"]
         stable_hull_dist = hull.volume_data["hull_distances"][j]
         if len(stable_hull_dist) != len(hull.volume_data["Q"][j]):
@@ -292,14 +303,8 @@ def plot_volume_curve(
             lw=0,
         )
 
-        label = (
-            (
-                "{}".format(
-                    get_formula_from_stoich(hull.volume_data["endstoichs"][j], tex=True)
-                )
-            )
-            if not label
-            else label
+        _label = label or get_formula_from_stoich(
+            hull.volume_data["endstoichs"][j], tex=True
         )
 
         ax.plot(
@@ -315,14 +320,19 @@ def plot_volume_curve(
             ],
             lw=2,
             c=c,
-            label=label,
+            label=_label,
         )
 
     ax.set_xlabel("Gravimetric capacity (mAh/g)")
     if as_percentages:
         ax.set_ylabel("Volume expansion (%)")
     else:
-        ax.set_ylabel("Volume ratio with starting electrode")
+        if len(hull.volume_data["endstoichs"]) == 1:
+            ax.set_ylabel(
+                f"Volume ratio with {get_formula_from_stoich(hull.volume_data['endstoichs'][0], tex=True)} starting electrode"
+            )
+        else:
+            ax.set_ylabel("Volume ratio with starting electrode")
 
     if legend or len(hull.volume_data["Q"]) > 1:
         ax.legend()
