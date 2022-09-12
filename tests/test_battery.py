@@ -247,16 +247,19 @@ class VoltageTest(unittest.TestCase):
             doc
             for doc in cursor
             if (
-                doc["stoichiometry"] != [["P", 3], ["Sn", 4]]
-                and doc["stoichiometry"] != [["P", 3], ["Sn", 1]]
-                and doc["stoichiometry"] != [["K", 3], ["P", 7]]
-                and doc["stoichiometry"] != [["K", 1], ["P", 7]]
-                and doc["stoichiometry"] != [["K", 2], ["P", 3]]
-                and doc["stoichiometry"] != [["K", 8], ["P", 4], ["Sn", 1]]
-                and doc["stoichiometry"] != [["K", 1], ["Sn", 1]]
-                and doc["stoichiometry"] != [["K", 4], ["Sn", 9]]
-                and doc["stoichiometry"] != [["K", 5], ["P", 4]]
-                and doc["stoichiometry"] != [["P", 2], ["Sn", 1]]
+                doc["stoichiometry"]
+                not in [
+                    [["P", 3], ["Sn", 4]],
+                    [["P", 3], ["Sn", 1]],
+                    [["K", 3], ["P", 7]],
+                    [["K", 1], ["P", 7]],
+                    [["K", 2], ["P", 3]],
+                    [["K", 8], ["P", 4], ["Sn", 1]],
+                    [["K", 1], ["Sn", 1]],
+                    [["K", 4], ["Sn", 9]],
+                    [["K", 5], ["P", 4]],
+                    [["P", 2], ["Sn", 1]],
+                ]
             )
         ]
         hull = QueryConvexHull(
@@ -265,16 +268,43 @@ class VoltageTest(unittest.TestCase):
             no_plot=True,
             pathways=True,
             voltage=True,
+            include_elemental_electrodes=True,
         )
+
+        # K-P voltage curve
         np.testing.assert_array_almost_equal(
             np.asarray(hull.voltage_data[0].voltages),
+            np.asarray(
+                [1.3782, 1.3782, 1.08137, 0.8196, 0.5474, 0.47608, 0.1772, 0.000]
+            ),
+            decimal=3,
+        )
+        self.assertAlmostEqual(
+            hull.voltage_data[0].capacities[-2], 1153.82071, places=5
+        )
+        self.assertAlmostEqual(hull.voltage_data[0].average_voltage, 0.70595, places=4)
+
+        # K-(PSn) voltage curve
+        np.testing.assert_array_almost_equal(
+            np.asarray(hull.voltage_data[1].voltages),
             np.asarray([1.1845, 1.1845, 0.8612, 0.2676, 0.000]),
             decimal=3,
         )
         self.assertAlmostEqual(
-            hull.voltage_data[0].capacities[-2], 425.7847612, places=5
+            hull.voltage_data[1].capacities[-2], 425.7847612, places=5
         )
-        self.assertAlmostEqual(hull.voltage_data[0].average_voltage, 0.58523, places=4)
+        self.assertAlmostEqual(hull.voltage_data[1].average_voltage, 0.58523, places=4)
+
+        # K-Sn voltage curve
+        np.testing.assert_array_almost_equal(
+            np.asarray(hull.voltage_data[2].voltages),
+            np.asarray([0.85902, 0.85902, 0.5619, 0.3128, 0.0]),
+            decimal=3,
+        )
+        self.assertAlmostEqual(
+            hull.voltage_data[2].capacities[-2], 240.843514, places=5
+        )
+        self.assertAlmostEqual(hull.voltage_data[2].average_voltage, 0.478747, places=4)
         self._check_voltages_match_capacities(hull.voltage_data)
 
     def test_ternary_voltage_with_exclusively_two_phase_regions(self):
@@ -291,11 +321,14 @@ class VoltageTest(unittest.TestCase):
             doc
             for doc in cursor
             if (
-                doc["stoichiometry"] == [["P", 1], ["Sn", 1]]
-                or doc["stoichiometry"] == [["K", 1], ["P", 1], ["Sn", 1]]
-                or doc["stoichiometry"] == [["P", 1]]
-                or doc["stoichiometry"] == [["K", 1]]
-                or doc["stoichiometry"] == [["Sn", 1]]
+                doc["stoichiometry"]
+                in [
+                    [["P", 1], ["Sn", 1]],
+                    [["K", 1], ["P", 1], ["Sn", 1]],
+                    [["P", 1]],
+                    [["K", 1]],
+                    [["Sn", 1]],
+                ]
             )
         ]
 

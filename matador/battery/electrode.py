@@ -145,22 +145,42 @@ class Electrode:
         )
 
     @classmethod
-    def _find_starting_materials(self, points, stoichs):
+    def _find_starting_materials(self, points, stoichs, include_elemental=False):
         """Iterate over an array of compositions and energies to find
         the starting points of the electrode, i.e. those with zero concentration
         of the active ion.
+
+        Parameters:
+            points (np.ndarray): array of concentrations with the 0-th column
+                containing the concentration of the active ion with final columns
+                corresponding to formation energies.
+            stoichs (list):L list of input stoichiometries.
+
+        Keyword arguments:
+            include_elemental (bool): whether to include single element starting materials
+                in the case of e.g. ternary phase diagrams.
+
+        Returns:
+            (np.ndarray, list): the filtered concentrations and stoichiometries
+                that correspond to electrode starting materials.
 
         """
 
         endpoints = []
         endstoichs = []
         for ind, point in enumerate(points):
-            if point[0] == 0 and point[1] != 0 and point[1] != 1:
-                if not any(
-                    [point.tolist() == test_point.tolist() for test_point in endpoints]
-                ):
-                    endpoints.append(point)
-                    endstoichs.append(stoichs[ind])
+            if point[0] == 0:
+                conc = np.array(point)
+                conc[-1] = 1 - np.sum(point[:-1])
+                if include_elemental or np.min(conc[1:]) > EPS:
+                    if not any(
+                        [
+                            point.tolist() == test_point.tolist()
+                            for test_point in endpoints
+                        ]
+                    ):
+                        endpoints.append(point)
+                        endstoichs.append(stoichs[ind])
 
         return endpoints, endstoichs
 
@@ -234,7 +254,10 @@ class VoltageProfile:
             with open(fname, "w") as f:
                 f.write(data_str)
 
-        return f"\nVoltage data:\n\n{data_str}"
+        return data_str
+
+    def __str__(self):
+        return self.voltage_summary(csv=False)
 
     def __repr__(self):
-        return self.voltage_summary(csv=False)
+        return f"<{self.__class__.__name__}: {self.active_ion} into {self.starting_formula}>"
