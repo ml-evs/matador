@@ -24,22 +24,27 @@ class VoltageTest(unittest.TestCase):
         capacities = [0, 10, 100]
         voltages = [1, 1, 1]
         self.assertEqual(Electrode.calculate_average_voltage(capacities, voltages), 1.0)
+        self.assertEqual(Electrode.calculate_energy_density(capacities, voltages), 100)
 
         capacities = [0, 10, 100, np.nan]
         voltages = [1, 1, 1, 0]
         self.assertEqual(Electrode.calculate_average_voltage(capacities, voltages), 1.0)
+        self.assertEqual(Electrode.calculate_energy_density(capacities, voltages), 100)
 
         capacities = [0, 100, 1000]
         voltages = [1, 1, 0.1]
         self.assertEqual(
             Electrode.calculate_average_voltage(capacities, voltages), 0.19
         )
+        self.assertEqual(Electrode.calculate_energy_density(capacities, voltages), 190)
 
         capacities = [0, 100, 1000, np.nan]
         voltages = [1, 1, 0.1, 0]
         self.assertEqual(
             Electrode.calculate_average_voltage(capacities, voltages), 0.19
         )
+
+        self.assertEqual(Electrode.calculate_energy_density(capacities, voltages), 190)
 
     def test_binary_voltage(self):
         """Test simple binary voltage curve."""
