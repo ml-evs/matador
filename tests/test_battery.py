@@ -489,7 +489,11 @@ class VolumeTest(unittest.TestCase):
             )
 
         hull = QueryConvexHull(
-            cursor=cursor, elements=["K", "Sn", "P"], no_plot=True, voltage=True
+            cursor=cursor,
+            elements=["K", "Sn", "P"],
+            no_plot=True,
+            voltage=True,
+            include_elemental_electrodes=True,
         )
 
         np.testing.assert_array_almost_equal(
@@ -544,7 +548,11 @@ class VolumeTest(unittest.TestCase):
             )
 
         hull = QueryConvexHull(
-            cursor=cursor, elements=["K", "Sn", "P"], no_plot=True, voltage=True
+            cursor=cursor,
+            elements=["K", "Sn", "P"],
+            no_plot=True,
+            voltage=True,
+            include_elemental_electrodes=True,
         )
 
         np.testing.assert_array_almost_equal(
@@ -577,6 +585,87 @@ class VolumeTest(unittest.TestCase):
             )
 
         expected_reactions = [
+            [
+                [(1.0, "CoP3")],
+                [(1.0, "CoP2"), (1.0, "Li3P")],
+                [(1 / 6, "LiCo6P4", 3 - 4 / 6, "Li3P")],
+                [(3.0, "Li3P"), (1.0, "Co")],
+            ],
+            [
+                [(1.0, "CoP2")],
+                [(1 / 6, "LiCo6P4"), (2 - 4 / 6, "Li3P")],
+                [(2.0, "Li3P"), (1.0, "Co")],
+            ],
+            [
+                [(1.0, "CoP")],
+                [(1 / 4, "CoP2"), (3 / 6 * 1 / 4, "LiCo6P4")],
+                [(1 / 6, "LiCo6P4"), (1 - 4 / 6, "Li3P")],
+                [(1, "Li3P"), (1, "Co")],
+            ],
+            [
+                [(1.0, "Co2P")],
+                [(1 / 4, "LiCo6P4"), (2 - 6 / 4, "Co")],
+                [(1.0, "Li3P"), (2.0, "Co")],
+            ],
+        ]
+
+        for i in range(len(expected_reactions)):
+            for j, react in enumerate(expected_reactions[i]):
+                for k, elem in enumerate(react):
+                    self.assertEqual(hull.voltage_data[i].reactions[j][k][1], elem[1])
+                    self.assertAlmostEqual(
+                        hull.voltage_data[i].reactions[j][k][0],
+                        elem[0],
+                        msg="\nReaction ({}, {}, {}) did not match: {} vs {}".format(
+                            i, j, k, hull.voltage_data[i].reactions[j][k], elem
+                        ),
+                    )
+
+    def test_realistic_ternary_with_elemental(self):
+        cursor, f = res2dict(REAL_PATH + "/data/voltage_data/voltage-LiCoP-oqmd/*.res")
+        hull = QueryConvexHull(
+            cursor=cursor,
+            species="LiCoP",
+            voltage=True,
+            volume=True,
+            no_plot=True,
+            include_elemental_electrodes=True,
+        )
+
+        LiP_hull = QueryConvexHull(
+            cursor=cursor, species="LiP", voltage=True, volume=True, no_plot=True
+        )
+
+        np.testing.assert_array_almost_equal(
+            hull.volume_data["volume_ratio_with_bulk"][0],
+            LiP_hull.volume_data["volume_ratio_with_bulk"][0],
+        )
+
+        for key in hull.volume_data:
+            self.assertEqual(len(hull.volume_data[key]), 5)
+
+        expected = [
+            [1, 0.9847, 1.1515, 1.2739, 2.3432],
+            [1, 1.6635, 2.6445, 3.1302],
+            [1, 2.4353, 3.1457],
+            [1, 1.0983, 1.7114, 2.9253],
+            [1, 1.1339, 2.44096],
+        ]
+        for i in range(4):
+            np.testing.assert_array_almost_equal(
+                np.asarray(hull.volume_data["volume_ratio_with_bulk"][i]),
+                expected[i],
+                decimal=4,
+            )
+
+        expected_reactions = [
+            [
+                [(1.0, "P")],
+                [(1 / 7, "LiP7")],
+                [(1 / 7, "Li3P7")],
+                [(1.0, "LiP")],
+                [(1, "Li3P")],
+            ],
             [
                 [(1.0, "CoP3")],
                 [(1.0, "CoP2"), (1.0, "Li3P")],

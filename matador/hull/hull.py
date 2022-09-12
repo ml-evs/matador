@@ -22,16 +22,21 @@ from matador.utils.chem_utils import (
     parse_element_string,
     get_padded_composition,
     get_num_intercalated,
+    get_subscripted_formula,
+    get_formation_energy,
 )
 from matador.utils.chem_utils import (
     get_generic_grav_capacity,
     get_formula_from_stoich,
     get_stoich_from_formula,
 )
-from matador.utils.chem_utils import get_formation_energy
-from matador.utils.cursor_utils import set_cursor_from_array, get_array_from_cursor
-from matador.utils.cursor_utils import display_results, recursive_get
-from matador.utils.cursor_utils import filter_cursor_by_chempots
+from matador.utils.cursor_utils import (
+    set_cursor_from_array,
+    get_array_from_cursor,
+    display_results,
+    recursive_get,
+    filter_cursor_by_chempots,
+)
 from matador.battery import Electrode, VoltageProfile
 from matador.hull.phase_diagram import PhaseDiagram
 
@@ -822,7 +827,8 @@ class QueryConvexHull:
             print(30 * "-")
             print(
                 "Assessing reaction {}, {}:".format(
-                    reaction_ind + 1, get_formula_from_stoich(endstoichs[reaction_ind])
+                    reaction_ind + 1,
+                    get_formula_from_stoich(endstoichs[reaction_ind], unicode_sub=True),
                 )
             )
             try:
@@ -873,8 +879,14 @@ class QueryConvexHull:
         ]
 
         print(f"{30*'='}\n{len(endstoichs)} starting point(s) found.")
-        for endstoich in endstoichs:
-            print(get_formula_from_stoich(endstoich), end=" ")
+        print(
+            ", ".join(
+                [
+                    get_formula_from_stoich(endstoich, unicode_sub=True)
+                    for endstoich in endstoichs
+                ]
+            )
+        )
         print(f"\n{30*'='}\n")
 
     def _calculate_binary_volume_curve(self):
@@ -1043,12 +1055,13 @@ class QueryConvexHull:
             comp[:, 2] = 1 - comp[:, 0] - comp[:, 1]
 
             # normalize the crossover composition to one formula unit of the starting electrode
-            if np.where(np.asarray(initial_comp[1:]) < EPS)[0].tolist():
-                norm = [1]
+            _norm = np.asarray(crossover[ind][1:]) / np.asarray(initial_comp[1:])
+            if np.isnan(_norm[0]):
+                norm = _norm[1]
             else:
-                norm = np.asarray(crossover[ind][1:]) / np.asarray(initial_comp[1:])
+                norm = _norm[0]
 
-            ratios_of_phases = np.linalg.solve(comp.T, crossover[ind] / norm[0])
+            ratios_of_phases = np.linalg.solve(comp.T, crossover[ind] / norm)
 
             # remove small numerical noise
             ratios_of_phases[np.where(ratios_of_phases < EPS)] = 0
@@ -1092,7 +1105,7 @@ class QueryConvexHull:
                                 str(round(chem[0], 3)) + " "
                                 if abs(chem[0] - 1) > EPS
                                 else "",
-                                chem[1],
+                                get_subscripted_formula(chem[1]),
                             )
                             for chem in region
                         ]

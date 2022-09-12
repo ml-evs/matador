@@ -219,7 +219,9 @@ class VoltageProfile:
             )
 
         self.starting_stoichiometry = starting_stoichiometry
-        self.starting_formula = get_formula_from_stoich(starting_stoichiometry)
+        self.starting_formula = get_formula_from_stoich(
+            starting_stoichiometry, unicode_sub=True
+        )
         self.capacities = capacities
         self.average_voltage = average_voltage
         self.voltages = voltages
