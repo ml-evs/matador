@@ -335,7 +335,7 @@ def get_formation_energy(chempots, doc, energy_key="enthalpy_per_atom"):
     try:
         formation = recursive_get(doc, energy_key)
     except KeyError as exc:
-        print("Doc {} missing key {}".format(doc["source"], energy_key))
+        print("Doc {} missing key {}".format(doc.get("source"), energy_key))
         raise exc
 
     # see if num chempots has been set and try to reuse it

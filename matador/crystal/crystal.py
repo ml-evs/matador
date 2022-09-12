@@ -161,8 +161,22 @@ class Crystal(DataContainer):
             raise RuntimeError(
                 'No position information found `"positions_frac"/"positions_abs"`, cannot create Crystal.'
             )
+        if "positions_frac" in doc and len(doc["atom_types"]) != len(
+            doc["positions_frac"]
+        ):
+            raise RuntimeError(
+                "Position data and atom species data are incompatible: "
+                f'{len(doc["positions_frac"])} vs {len(doc["atom_types"])}'
+            )
+        if "positions_abs" in doc and len(doc["atom_types"]) != len(
+            doc["positions_abs"]
+        ):
+            raise RuntimeError(
+                "Position data and atom species data are incompatible: "
+                f'{len(doc["positions_abs"])} vs {len(doc["atom_types"])}'
+            )
 
-    def __init__(self, doc, mutable=False, voronoi=False, network_kwargs=None):
+    def __init__(self, doc, voronoi=False, network_kwargs=None, mutable=False):
         """Initialise Crystal object from matador document with Site list
         and any additional abstractions, e.g. voronoi or CrystalGraph.
 
@@ -348,6 +362,14 @@ class Crystal(DataContainer):
         return self._data["stoichiometry"]
 
     @property
+    def num_fu(self) -> int:
+        if "num_fu" not in self._data:
+            self._data["num_fu"] = self.num_atoms / sum(
+                atom[1] for atom in self.stoichiometry
+            )
+        return self._data["num_fu"]
+
+    @property
     def concentration(self) -> List[float]:
         """Return concentration of each species in stoichiometry."""
         if "concentration" not in self._data:
@@ -356,6 +378,18 @@ class Crystal(DataContainer):
                 [elem[0] for elem in self.stoichiometry],
                 include_end=True,
             )
+        return self._data["concentration"]
+
+    def get_concentration(self, elements=None, include_end=True) -> List[float]:
+        """Return concentration of each species in stoichiometry, and use this
+        value for future calls to `crystal.concentration`.
+
+        """
+        if elements is None:
+            elements = self.elems
+        self._data["concentration"] = get_concentration(
+            self.stoichiometry, elements=elements, include_end=include_end
+        )
         return self._data["concentration"]
 
     @property
