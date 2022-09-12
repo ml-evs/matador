@@ -31,6 +31,7 @@ def plot_voltage_curve(
     savefig: Optional[str] = None,
     curve_labels: Optional[Union[str, List[str]]] = None,
     line_kwargs: Optional[Union[Dict, List[Dict]]] = None,
+    shade_average_voltage: bool = False,
     plot_average_voltage: bool = False,
     plot_max_capacity: bool = False,
     expt: Optional[str] = None,
@@ -49,6 +50,10 @@ def plot_voltage_curve(
             the profiles list.
         line_kwargs (list or dict): parameters to pass to the curve plotter,
             if a list then the line kwargs will be passed to each line individually.
+        shade_average_voltage (bool): whether to shade the region spanned from average
+            voltage to max capacity.
+        plot_average_voltage (bool): whether to draw a guideline at the average voltage.
+        plot_max_capacity (bool): whether to draw a guideline at the maximum capacity.
         expt (str): string to a filename of a csv Q, V to add to the plot.
         expt_label (str): label for any experimental profile passed to the plot.
 
@@ -118,9 +123,27 @@ def plot_voltage_curve(
         if line_kwargs is not None:
             _line_kwargs.update(line_kwargs[ind])
 
+        colour = _line_kwargs["c"]
+
         _add_voltage_curve(
             profile.capacities, profile.voltages, ax, label=_label, **_line_kwargs
         )
+
+        if shade_average_voltage:
+            ax.fill_between(
+                np.linspace(
+                    0,
+                    np.nanmax(profile.capacities),
+                    2,
+                ),
+                np.linspace(0, 0, 2),
+                [profile.average_voltage, profile.average_voltage],
+                lw=1,
+                edgecolor=colour,
+                facecolor=colour + "20",
+                zorder=-ind + 2,
+                ls="--",
+            )
 
         if plot_average_voltage:
             vline_kwargs = _line_kwargs
