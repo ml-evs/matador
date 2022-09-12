@@ -164,6 +164,7 @@ def plot_field(
     colour_by="formula",
     label_x=True,
     label_y=True,
+    plot_points=True,
 ):
     """Plot the convergence fields for each structure in `data` at
     each value of `parameter`.
@@ -185,6 +186,7 @@ def plot_field(
         ax (matplotlib.Axis): optional axis object to use for plot.
         reference (str): if 'last' then use the last value of the
             convergence data as the zero.
+        plot_points (bool): whether or not to show markers
 
     """
     import matplotlib.pyplot as plt
@@ -231,7 +233,7 @@ def plot_field(
             label = key
 
         # only plot points if there's less than 25 lines
-        if len(data) < 10:
+        if plot_points:
             ax.plot(
                 parameters,
                 values,
