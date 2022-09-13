@@ -32,8 +32,11 @@ def plot_voltage_curve(
     curve_labels: Optional[Union[str, List[str]]] = None,
     line_kwargs: Optional[Union[Dict, List[Dict]]] = None,
     shade_average_voltage: bool = False,
+    colour_by_stoichiometry: bool = False,
     plot_average_voltage: bool = False,
     plot_max_capacity: bool = False,
+    legend: bool = True,
+    label_suffix: str = None,
     expt: Optional[str] = None,
     expt_label: Optional[str] = None,
 ):
@@ -54,6 +57,10 @@ def plot_voltage_curve(
             voltage to max capacity.
         plot_average_voltage (bool): whether to draw a guideline at the average voltage.
         plot_max_capacity (bool): whether to draw a guideline at the maximum capacity.
+        legend (bool): whether to draw the legend.
+        label_suffix (str): A suffix to add to every label on the plot (useful when combining axes)
+        colour_by_stoichiometry (bool): whether to use mixed VESTA colours for each curve
+            based on the starting formula of the electrode.
         expt (str): string to a filename of a csv Q, V to add to the plot.
         expt_label (str): label for any experimental profile passed to the plot.
 
@@ -119,11 +126,22 @@ def plot_voltage_curve(
         if curve_labels is not None and len(curve_labels) > ind:
             _label = curve_labels[ind]
 
+        if label_suffix:
+            _label += f" {label_suffix}"
+
         _line_kwargs = {"c": line_colours[(ind % len(line_colours)) + 2]}
         if line_kwargs is not None:
             _line_kwargs.update(line_kwargs[ind])
 
-        colour = _line_kwargs["c"]
+        if colour_by_stoichiometry:
+            from matador.utils.viz_utils import formula_to_colour
+
+            colour = formula_to_colour(
+                get_formula_from_stoich(profile.starting_stoichiometry)
+            )
+            _line_kwargs["c"] = colour
+        else:
+            colour = _line_kwargs["c"]
 
         _add_voltage_curve(
             profile.capacities, profile.voltages, ax, label=_label, **_line_kwargs
@@ -189,7 +207,8 @@ def plot_voltage_curve(
                 -1, c="k", ls="-.", alpha=0.8, label="Maximum gravimetric capacity"
             )
 
-        ax.legend()
+        if legend:
+            ax.legend()
 
     ax.set_ylabel("Voltage (V) vs {ion}$^+/${ion}".format(ion=profile.active_ion))
     ax.set_xlabel("Gravimetric cap. (mAh/g)")
@@ -265,8 +284,11 @@ def plot_volume_curve(
     legend=False,
     as_percentages=False,
     label=None,
+    label_suffix=None,
     exclude_elemental=False,
     line_kwargs: Optional[Union[Dict, List[Dict]]] = None,
+    colour_by_stoichiometry: bool = False,
+    end_marker_only: bool = True,
     **kwargs,
 ):
     """Plot volume curve calculated for phase diagram.
@@ -278,11 +300,16 @@ def plot_volume_curve(
         ax (matplotlib.axes.Axes): an existing axis on which to plot.
         show (bool): whether or not to display plot in X-window.
         legend (bool): whether to add the legend.
+        label (str/list): Either a list of labels or a single label for the volume curves.
+        label_suffix (str): A suffix to add to every label on the plot (useful when combining axes)
         as_percentages (bool): whether to show the expansion as a percentage.
         exclude_elemental (bool): whether to include any elemental electrodes
             when considering ternary phase diagrams.
         line_kwargs (list or dict): parameters to pass to the curve plotter,
             if a list then the line kwargs will be passed to each line individually.
+        colour_by_stoichiometry (bool): whether to use mixed VESTA colours for each curve
+            based on the starting formula of the electrode.
+        end_marker_only (bool): Only place a marker on the worst volume expansion for each curve.
 
     """
     import matplotlib.pyplot as plt
@@ -295,6 +322,9 @@ def plot_volume_curve(
         ax = fig.add_subplot(111)
     else:
         ax = ax
+
+    if label and not isinstance(label, list):
+        label = [label]
 
     num_curves = len(hull.volume_data["Q"])
 
@@ -316,6 +346,16 @@ def plot_volume_curve(
         if line_kwargs is not None:
             _line_kwargs.update(line_kwargs[j])
 
+        if colour_by_stoichiometry:
+            from matador.utils.viz_utils import formula_to_colour
+
+            colour = formula_to_colour(
+                get_formula_from_stoich(hull.volume_data["endstoichs"][j])
+            )
+            _line_kwargs["c"] = colour
+        else:
+            colour = _line_kwargs["c"]
+
         lw = _line_kwargs.pop("lw", 2)
         marker = _line_kwargs.pop("marker", "o")
         markeredgewidth = _line_kwargs.pop("markeredgewidth", 1.5)
@@ -325,28 +365,46 @@ def plot_volume_curve(
         if len(stable_hull_dist) != len(hull.volume_data["Q"][j]):
             raise RuntimeError("This plot does not support --hull_cutoff.")
 
-        ax.plot(
-            [
-                q
-                for ind, q in enumerate(hull.volume_data["Q"][j])
-                if stable_hull_dist[ind] <= EPS
-            ],
-            [
-                v
-                for ind, v in enumerate(hull.volume_data[volume_key][j])
-                if stable_hull_dist[ind] <= EPS
-            ],
-            marker=marker,
-            markeredgewidth=markeredgewidth,
-            markeredgecolor=markeredgecolor,
-            zorder=1000,
-            lw=0,
-            **_line_kwargs,
-        )
+        if end_marker_only:
+            ax.plot(
+                [0, np.max(hull.volume_data["Q"][j])],
+                [1, np.max(hull.volume_data[volume_key][j])],
+                marker=marker,
+                markeredgewidth=markeredgewidth,
+                markeredgecolor=markeredgecolor,
+                zorder=1000,
+                lw=0,
+                **_line_kwargs,
+            )
 
-        _label = label or get_formula_from_stoich(
-            hull.volume_data["endstoichs"][j], tex=True
-        )
+        else:
+            ax.plot(
+                [
+                    q
+                    for ind, q in enumerate(hull.volume_data["Q"][j])
+                    if stable_hull_dist[ind] <= EPS
+                ],
+                [
+                    v
+                    for ind, v in enumerate(hull.volume_data[volume_key][j])
+                    if stable_hull_dist[ind] <= EPS
+                ],
+                marker=marker,
+                markeredgewidth=markeredgewidth,
+                markeredgecolor=markeredgecolor,
+                zorder=1000,
+                lw=0,
+                **_line_kwargs,
+            )
+
+        if label:
+            _label = label[j]
+        else:
+            _label = get_formula_from_stoich(
+                hull.volume_data["endstoichs"][j], tex=True
+            )
+        if label_suffix:
+            _label += f" {label_suffix}"
 
         ax.plot(
             [
