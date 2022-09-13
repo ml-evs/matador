@@ -155,7 +155,7 @@ def fresnel_view(
     images: Union[bool, float] = True,
     pad_cell: bool = True,
     lights: Optional[Callable] = None,
-    **camera_kwargs
+    **camera_kwargs,
 ) -> "fresnel.Scene":
     """Return a fresnel scene visualising the input crystal.
 
@@ -649,7 +649,7 @@ def fresnel_plot(
     labels: Union[bool, List[str]] = True,
     renderer: Optional[Callable] = None,
     camera_patches: Optional[List[Optional[Dict]]] = None,
-    **fresnel_view_kwargs
+    **fresnel_view_kwargs,
 ):
     """Visualize a series of structures as a grid of matplotlib plots.
 
@@ -739,6 +739,27 @@ def fresnel_plot(
     return fig, axes, scenes
 
 
+def formula_to_colour(formula: str) -> List[float]:
+    """Return an RGBA colour for the given chemical formula, provided
+    the formula has 3 or fewer species.
+
+    """
+    from matador.utils.chem_utils import get_stoich_from_formula, get_concentration
+
+    stoichiometry = get_stoich_from_formula(formula)
+    elements = [d[0] for d in stoichiometry]
+    if len(elements) > 3:
+        raise RuntimeError(
+            f"Cannot mix a colour for more than 3 elements, received: {stoichiometry}"
+        )
+
+    concentration = get_concentration(
+        stoichiometry, elements=elements, include_end=True
+    )
+
+    return colour_from_ternary_concentration(concentration, species=elements)
+
+
 def colour_from_ternary_concentration(
     conc: Union[Tuple[float, float], Tuple[float, float, float]],
     species: List[str],
@@ -751,10 +772,12 @@ def colour_from_ternary_concentration(
         RGBA array.
 
     """
-    if len(conc) == 2:
+    if len(conc) == 1:
+        return get_element_colours()[species[0]] + [alpha]
+    elif len(conc) == 2:
         x, y = conc
         z = 1 - x - y
     else:
         x, y, z = conc
-    colours = [np.asarray(get_element_colours()[s]) for s in species]
+    colours = [np.asarray(get_element_colours()[s]) for s in species + ["H"]]
     return ((x * colours[0] + y * colours[1] + z * colours[2])).tolist() + [alpha]
