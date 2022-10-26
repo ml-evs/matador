@@ -14,12 +14,12 @@ repos:
       - id: mixed-line-ending
   
   - repo: https://github.com/psf/black
-    rev: 22.6.0
+    rev: 22.10.0
     hooks:
       - id: black
         name: Blacken
 
   - repo: https://gitlab.com/pycqa/flake8
-    rev: "5.0.4"
+    rev: "3.9.2"
     hooks:
       - id: flake8
