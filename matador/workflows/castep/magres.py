@@ -13,19 +13,20 @@ multiple steps (only when necessary):
 """
 
 
-import os
 import copy
 import logging
+import os
 from functools import partial
-from matador.workflows.workflows import Workflow
+
+from matador.scrapers import arbitrary2dict
 from matador.workflows.castep.common import castep_prerelax, castep_scf
 from matador.workflows.castep.spectral import (
-    castep_spectral_dos,
-    optados_pdos,
-    optados_dos_broadening,
     _get_optados_fname,
+    castep_spectral_dos,
+    optados_dos_broadening,
+    optados_pdos,
 )
-from matador.scrapers import arbitrary2dict
+from matador.workflows.workflows import Workflow
 
 LOG = logging.getLogger("run3")
 
@@ -143,6 +144,7 @@ class CastepMagresWorkflow(Workflow):
                 todo["broadening"] = "broadening" in odi_dict
                 todo["pdos"] = "pdos" in odi_dict
         else:
+            todo["dos"] = False
             todo["pdos"] = False
             todo["broadening"] = False
 
@@ -154,6 +156,10 @@ class CastepMagresWorkflow(Workflow):
                     self.seed
                 )
             )
+
+        # If geom force tol is not set, do not perform a relaxation
+        if self.calc_doc.get("geom_force_tol") is None:
+            todo["relax"] = False
 
         for key in todo:
             if todo[key]:
@@ -205,10 +211,6 @@ def castep_magres(computer, calc_doc, seed, elec_energy_tol=1e-11):
     magres_doc = copy.deepcopy(calc_doc)
     magres_doc["task"] = "magres"
     magres_doc["magres_task"] = calc_doc.get("magres_task", "NMR")
-    if magres_doc["magres_task"].upper() == "NMR" and "species_gamma" not in magres_doc:
-        LOG.warning(
-            "Performing EFG calculations but no species_gamma block specified in cell file."
-        )
     magres_doc["continuation"] = "default"
     # this is just to suppress a warning that elec_energy_tol has changed
     magres_doc["elec_energy_tol"] = elec_energy_tol
