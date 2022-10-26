@@ -386,6 +386,7 @@ class ComputeTask:
         if self.exec_test:
             self.test_exec()
 
+
         # pre-processing
         if self.kpts_1D:
             LOG.debug("1D kpoint grid requested.")
@@ -2049,7 +2050,22 @@ class ComputeTask:
         # if a checkfile exists, copy it to the new dir
         # so that it can be restarted from
         if os.path.isfile(seed + ".check"):
+            LOG.info("Copying .check into compute_dir")
             shutil.copy2(seed + ".check", compute_dir)
+
+        # if a magres .mag checkfile exists, copy it to the new dir
+        # so that it can be restarted from for a magres task
+        mag_files = glob.glob(seed + "*.mag") 
+        if mag_files:
+            LOG.info("Copying .mag files into compute_dir")
+            for _file in mag_files:
+                try:
+                    shutil.copy2(_file, compute_dir)
+                    os.remove(_file)
+                except Exception as exc:
+                    LOG.warning(
+                        "Error moving .mag file to compute: {error}".format(error=exc)
+                    )
 
     def scf(self, *args, **kwargs):
         """Alias for backwards-compatibility."""
