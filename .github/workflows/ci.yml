@@ -15,10 +15,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
 
     - name: Set up Python 3.9
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
         python-version: 3.9
 
@@ -30,6 +30,7 @@ jobs:
 
     - name: Check for syntax errors and lint with flake8
       run: |
+        pip install flake8
         flake8 . \
             --count --select=E9,F63,F7,F82 --show-source --statistics
         flake8 . \
@@ -50,9 +51,9 @@ jobs:
         python-version: [3.7, 3.8, 3.9, "3.10"]
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
@@ -72,7 +73,7 @@ jobs:
         py.test -rs -vvv --nbval-lax --current-env --cov-config .coveragerc --cov=./matador/ --cov-append --cov-report=xml examples/interactive/plot_styles/
     - name: Upload coverage to Codecov
       if: matrix.python-version == 3.8 && github.repository == 'ml-evs/matador'
-      uses: codecov/codecov-action@v1
+      uses: codecov/codecov-action@v3
       with:
         file: ./coverage.xml
         flags: unittests

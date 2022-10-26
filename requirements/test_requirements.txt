@@ -1,6 +1,6 @@
-pytest~=6.2
+pytest~=7.1
 nbval~=0.9
-pytest-cov~=3.0
-coverage~=6.3
+pytest-cov~=4.0
+coverage~=6.4
 codecov~=2.1
-mongomock~=4.0
+mongomock~=4.1
