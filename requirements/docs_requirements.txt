@@ -2,6 +2,6 @@ sphinx~=5.2
 sphinx-argparse~=0.3
 sphinx-rtd-theme~=1.0
 sphinxcontrib-napoleon~=0.7
-ipykernel~=6.15
+ipykernel~=6.16
 nbsphinx~=0.8
 jinja2~=3.1
