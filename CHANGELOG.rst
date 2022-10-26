@@ -3,6 +3,26 @@
 Changelog
 =========
 
+New in release (0.10.0) [26/10/2022]
+------------------------------------
+
+This release contains many accumulated changes over the course of a year.
+The library is now primarily in maintenance mode unless new features are
+contributed by others.
+
+- Added a ray-tracing crystal visualisation module based on the `Fresnel library <https://github.com/glotzerlab/fresnel>`_.
+- Refinements of almost all plotting types and styles, as well as making it
+  easier to plot multiple comparative plots on the same figure (e.g., multiple
+  phase diagrams computed with different functionals or from different sources).
+- Added the :func:`matador.magres` module for referencing NMR calculations
+  against experimental data.
+- Optimised the CASTEP output reader for long concatenated geometry optimisations.
+- Minimal integration with `OPTIMADE <https://optimade.org>`_ by being able to
+  download an OPTIMADE structure from a URL as a matador object.
+- Support for Python 3.10
+- Bug fixes for scrapers, densities of states plotting and scattering simulations.
+
+
 New in release (0.9.11) [03/06/2021]
 ------------------------------------
 
