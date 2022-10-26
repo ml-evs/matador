@@ -2055,7 +2055,7 @@ class ComputeTask:
 
         # if a magres .mag checkfile exists, copy it to the new dir
         # so that it can be restarted from for a magres task
-        mag_files = glob.glob(seed + "*.mag") 
+        mag_files = glob.glob(seed + ".*.mag") 
         if mag_files:
             LOG.info("Copying .mag files into compute_dir")
             for _file in mag_files:
