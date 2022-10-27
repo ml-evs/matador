@@ -694,7 +694,7 @@ def param2dict(fname, db=True, **kwargs):
                         while "%endblock devel_code" not in flines[line_no + i].lower():
                             if i + line_no >= len(flines):
                                 raise RuntimeError("Found unclosed %block devel_code.")
-                            if 'magres' in flines[line_no + i]:
+                            if "magres" in flines[line_no + i]:
                                 line = flines[line_no + i].upper()
                             else:
                                 line = flines[line_no + i].lower()
