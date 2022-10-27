@@ -386,7 +386,6 @@ class ComputeTask:
         if self.exec_test:
             self.test_exec()
 
-
         # pre-processing
         if self.kpts_1D:
             LOG.debug("1D kpoint grid requested.")
