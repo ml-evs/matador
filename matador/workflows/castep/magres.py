@@ -150,7 +150,7 @@ class CastepMagresWorkflow(Workflow):
 
         # prepare to do pre-relax if there's no check file
         if os.path.isfile(self.seed + ".check"):
-            todo["scf"] = False
+            todo["scf"] = True
             todo["relax"] = False
             LOG.info(
                 "Restarting from {}.check, so not performing re-relaxation".format(
