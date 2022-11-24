@@ -2056,7 +2056,7 @@ class ComputeTask:
         # so that it can be restarted from for a magres task
         mag_files = [
             f"{seed}.{num:04}.mag" for num in range(1, self.ncores * self.nnodes)
-        ]  
+        ]
         if os.path.isfile("%s.0001.mag" % (seed)):
             LOG.info("Copying .mag files into compute_dir")
             for _file in mag_files:
