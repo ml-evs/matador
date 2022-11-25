@@ -1787,7 +1787,7 @@ class ScraperMiscTest(MatadorUnitTest):
             ],
             decimal=2,
         )
-        np.testing.assert_array_equal(
+        np.testing.assert_array_almost_equal(
             magres_crystal["electric_field_gradients"],
             np.array(
                 [
