@@ -2049,7 +2049,24 @@ class ComputeTask:
         # if a checkfile exists, copy it to the new dir
         # so that it can be restarted from
         if os.path.isfile(seed + ".check"):
+            LOG.info("Copying .check into compute_dir")
             shutil.copy2(seed + ".check", compute_dir)
+
+        # if a magres .mag checkfile exists, copy it to the new dir
+        # so that it can be restarted from for a magres task
+        mag_files = [
+            f"{seed}.{num:04}.mag" for num in range(1, self.ncores * self.nnodes)
+        ]
+        if os.path.isfile("%s.0001.mag" % (seed)):
+            LOG.info("Copying .mag files into compute_dir")
+            for _file in mag_files:
+                try:
+                    shutil.copy2(_file, compute_dir)
+                    os.remove(_file)
+                except Exception as exc:
+                    LOG.warning(
+                        "Error moving .mag file to compute: {error}".format(error=exc)
+                    )
 
     def scf(self, *args, **kwargs):
         """Alias for backwards-compatibility."""

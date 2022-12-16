@@ -150,6 +150,7 @@ class CastepMagresWorkflow(Workflow):
 
         # prepare to do pre-relax if there's no check file
         if os.path.isfile(self.seed + ".check"):
+            todo["scf"] = True
             todo["relax"] = False
             LOG.info(
                 "Restarting from {}.check, so not performing re-relaxation".format(
@@ -207,7 +208,7 @@ def castep_magres(computer, calc_doc, seed, elec_energy_tol=1e-11):
         seed (str): root filename of structure.
 
     """
-    LOG.info("Performing CASTEP phonon dispersion calculation...")
+    LOG.info("Performing CASTEP Magres calculation...")
     magres_doc = copy.deepcopy(calc_doc)
     magres_doc["task"] = "magres"
     magres_doc["magres_task"] = calc_doc.get("magres_task", "NMR")
