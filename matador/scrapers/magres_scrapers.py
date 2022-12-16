@@ -129,7 +129,7 @@ def magres2dict(fname, **kwargs):
                         * BARN_TO_M2
                     ) / (PLANCK_CONSTANT * 1e6)
 
-                    magres["electric_field_gradient"].append(efg)
+                    magres["electric_field_gradients"].append(efg)
                     magres["quadrupolar_couplings"].append(C_Q)
                     magres["quadrupolar_asymmetries"].append(eta)
 

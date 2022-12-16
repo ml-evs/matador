@@ -25,6 +25,7 @@ class Site(DataContainer):
         "chemical_shielding_isos": "chemical_shielding_iso",
         "chemical_shift_isos": "chemical_shift_iso",
         "magnetic_shielding_tensors": "magnetic_shielding_tensor",
+        "electric_field_gradients": "electric_field_gradient",
         "chemical_shift_anisos": "chemical_shift_aniso",
         "chemical_shift_asymmetries": "chemical_shift_asymmetry",
         "quadrupolar_couplings": "quadrupolar_coupling",
