@@ -11,6 +11,7 @@ from typing import List, Optional, Dict, Union, Tuple
 import numpy as np
 from matador.crystal import Crystal
 from matador.plotting.plotting import plotting_function
+from matador.utils.viz_utils import colour_from_ternary_concentration
 from matador.fingerprints import Fingerprint
 
 __all__ = ["plot_magres"]
@@ -24,12 +25,14 @@ def plot_magres(
     xlabel: str = None,
     broadening_width: float = 1,
     text_offset: float = 0.2,
+    padding: float = 0.15,
     ax=None,
     figsize: Tuple[float, float] = None,
     show: bool = False,
     savefig: Optional[str] = None,
     signal_labels: Optional[Union[str, List[str]]] = None,
     signal_limits: Tuple[float, float] = None,
+    colour_by: str = "stoichiometry",
     line_kwargs: Optional[Union[Dict, List[Dict]]] = None,
     invert_xaxis: bool = True,
     species_label: Optional[str] = None,
@@ -50,8 +53,11 @@ def plot_magres(
         show (bool): whether to show plot in an X window.
         figsize (Tuple[float]): overrides the default size for the matplotlib figure.
         broadening_width (float): the Lorentzian width to apply to the shifts.
+        text_offset (float): vertical offset between the signal labels and the signal.
+        padding (float): fractional vertical padding between signals.
         xlabel (str): a custom label for the x-axis.
         savefig (str): filename to use to save the plot.
+        colour_by (str): Either 'stoichiometry' or any other string (will use default colours).
         signal_labels (list): optional list of labels for the curves in
             the magres list.
         signal_limits (Tuple[float]): values at which to clip the magres signals. Defaults
@@ -88,11 +94,12 @@ def plot_magres(
         species_label = species
 
     if signal_labels is not None and len(signal_labels) != len(magres):
-        raise RuntimeError(
-            "Wrong number of labels passed for number of magres: {} vs {}".format(
-                len(signal_labels), len(magres)
+        if len(signal_labels) != 0:
+            raise RuntimeError(
+                "Wrong number of labels passed for number of magres: {} vs {}".format(
+                    len(signal_labels), len(magres)
+                )
             )
-        )
 
     _magres = []
 
@@ -129,6 +136,15 @@ def plot_magres(
 
     _padded_colours = list(plt.rcParams["axes.prop_cycle"].by_key()["color"])
     _padded_colours = (1 + (len(magres) // len(_padded_colours))) * _padded_colours
+    if colour_by == "stoichiometry":
+        try:
+            _padded_colours = [
+                colour_from_ternary_concentration(doc.concentration, doc.elems)
+                for doc in magres
+            ]
+        except Exception as exc:
+            print(f"Not colouring by stoichiometry due to error: {exc}")
+            pass
 
     if line_kwargs is not None and len(line_kwargs) != len(magres):
         raise RuntimeError(
@@ -139,7 +155,7 @@ def plot_magres(
 
     for ind, doc in enumerate(_magres):
         if signal_labels is None:
-            stoich_label = doc.formula_tex
+            stoich_label = f"{doc.formula_tex}-{doc.space_group_tex}"
         else:
             stoich_label = None
 
@@ -177,16 +193,17 @@ def plot_magres(
             else:
                 signal *= 0
 
-        ax.plot(s_space, signal + (ind * 1.1), **_line_kwargs)
+        ax.plot(s_space, signal + (padding + ind * (1 + padding)), **_line_kwargs)
 
         if _label is not None:
             ax.text(
                 0.95,
-                (ind * 1.1) + text_offset,
+                padding + (ind * (1 + padding)) + text_offset,
                 _label,
                 transform=ax.get_yaxis_transform(),
                 horizontalalignment="right",
                 fontsize=label_fontsize,
+                color=_padded_colours[ind],
             )
 
     if xlabel is None:
@@ -213,7 +230,7 @@ def plot_magres(
     else:
         ax.set_yticks(np.linspace(0, 1, 5, endpoint=True))
 
-    ax.set_ylim(-0.1, 1.1 * len(magres))
+    ax.set_ylim(-padding, padding + (1 + padding) * len(magres))
     if invert_xaxis:
         ax.invert_xaxis()
 
