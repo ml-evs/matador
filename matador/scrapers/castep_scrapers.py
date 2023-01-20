@@ -2001,7 +2001,6 @@ def _castep_scrape_final_structure(flines, castep, db=True):
         castep["kpoints_mp_spacing"] = calc_mp_spacing(
             castep["lattice_cart"], castep["kpoints_mp_grid"], prec=4
         )
-
     return castep
 
 
