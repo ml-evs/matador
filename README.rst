@@ -78,7 +78,7 @@ Source code archives for all versions above 0.9 can be found at Zenodo `DOI 10.5
 
 .. |PyPI Version| image:: https://img.shields.io/pypi/v/matador-db?label=PyPI&logo=pypi
    :target: https://pypi.org/project/matador-db/
-.. |GH Actions| image:: https://img.shields.io/github/workflow/status/ml-evs/matador/Run%20tests/master?label=master&logo=github
+.. |GH Actions| image:: https://img.shields.io/github/actions/workflow/status/ml-evs/matador/ci.yml?branch=master
    :target: https://github.com/ml-evs/matador/actions?query=branch%3Amaster
 .. |MIT License| image:: https://img.shields.io/badge/license-MIT-blue.svg
    :target: https://github.com/ml-evs/matador/blob/master/LICENSE

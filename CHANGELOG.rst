@@ -3,6 +3,14 @@
 Changelog
 =========
 
+
+New in release (0.10.1) [20/01/2023]
+------------------------------------
+
+- Support for continuation and restarting of magres workflows (#306)
+- Fix for CASTEP scraper to scrape both constrained and unconstrained stress tensors when both are present (#312)
+
+
 New in release (0.10.0) [26/10/2022]
 ------------------------------------
 
