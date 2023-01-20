@@ -1905,12 +1905,16 @@ def _castep_scrape_final_structure(flines, castep, db=True):
                 np.linalg.norm(castep["forces"], axis=-1)
             )
         elif "Stress Tensor" in line:
+            if "Constrained" in line:
+                stress_key = "constrained_stress"
+            else:
+                stress_key = "stress"
             i = 1
             while i < 20:
                 if "Cartesian components" in final_flines[line_no + i]:
-                    castep["stress"] = []
+                    castep[stress_key] = []
                     for j in range(3):
-                        castep["stress"].append(
+                        castep[stress_key].append(
                             list(
                                 map(
                                     f90_float_parse,
@@ -2248,12 +2252,16 @@ def _castep_scrape_all_snapshots(flines, intermediates=False):
                         i += 1
                     snapshot["max_force_on_atom"] = pow(max_force, 0.5)
                 elif "Stress Tensor" in line:
+                    if "Constrained" in line:
+                        stress_key = "constrained_stress"
+                    else:
+                        stress_key = "stress"
                     i = 1
                     while i < 20:
                         if "Cartesian components" in flines[line_no + i]:
-                            snapshot["stress"] = []
+                            snapshot[stress_key] = []
                             for j in range(3):
-                                snapshot["stress"].append(
+                                snapshot[stress_key].append(
                                     list(
                                         map(
                                             f90_float_parse,
