@@ -1905,7 +1905,7 @@ def _castep_scrape_final_structure(flines, castep, db=True):
                 np.linalg.norm(castep["forces"], axis=-1)
             )
         elif "Stress Tensor" in line:
-            if 'Constrained' in line:
+            if "Constrained" in line:
                 stress_key = "constrained_stress"
             else:
                 stress_key = "stress"
@@ -2252,7 +2252,7 @@ def _castep_scrape_all_snapshots(flines, intermediates=False):
                         i += 1
                     snapshot["max_force_on_atom"] = pow(max_force, 0.5)
                 elif "Stress Tensor" in line:
-                    if 'Constrained' in line:
+                    if "Constrained" in line:
                         stress_key = "constrained_stress"
                     else:
                         stress_key = "stress"
