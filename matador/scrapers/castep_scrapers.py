@@ -1907,9 +1907,10 @@ def _castep_scrape_final_structure(flines, castep, db=True):
                     i += 1  # skip next blank line
                     forces = True
                 i += 1
-            castep["max_force_on_atom"] = np.max(
-                np.linalg.norm(castep[force_key], axis=-1)
-            )
+            if not force_key == 'constrained_forces':
+                castep["max_force_on_atom"] = np.max(
+                    np.linalg.norm(castep[force_key], axis=-1)
+                )
         elif "Stress Tensor" in line:
             if "Constrained" in line:
                 stress_key = "constrained_stress"
@@ -2262,7 +2263,9 @@ def _castep_scrape_all_snapshots(flines, intermediates=False):
                             i += 1  # skip next blank line
                             forces = True
                         i += 1
-                    snapshot["max_force_on_atom"] = pow(max_force, 0.5)
+                    if not force_key == 'constrained_forces':
+                        snapshot["max_force_on_atom"] = pow(max_force, 0.5)
+
                 elif "Stress Tensor" in line:
                     if "Constrained" in line:
                         stress_key = "constrained_stress"
