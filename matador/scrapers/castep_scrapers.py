@@ -697,7 +697,10 @@ def param2dict(fname, db=True, **kwargs):
                         while "%endblock devel_code" not in flines[line_no + i].lower():
                             if i + line_no >= len(flines):
                                 raise RuntimeError("Found unclosed %block devel_code.")
-                            line = flines[line_no + i].lower()
+                            if "magres" in flines[line_no + i].lower():
+                                line = flines[line_no + i].upper()
+                            else:
+                                line = flines[line_no + i].lower()
                             devel_lines.append(line_no + i)
                             if "devel_code" not in param:
                                 param["devel_code"] = ""
@@ -1882,7 +1885,13 @@ def _castep_scrape_final_structure(flines, castep, db=True):
                 castep["dispersion_corrected_0K_energy"] / castep["num_atoms"]
             )
         elif " Forces **" in line:
-            castep["forces"] = []
+            if "Unconstrained" in line:
+                force_key = "forces"
+            elif "Constrained" in line:
+                force_key = "constrained_forces"
+            else:
+                force_key = "forces"
+            castep[force_key] = []
             i = 1
             forces = False
             while True:
@@ -1891,26 +1900,31 @@ def _castep_scrape_final_structure(flines, castep, db=True):
                         forces = False
                         break
                     else:
-                        castep["forces"].append([])
+                        castep[force_key].append([])
                         for j in range(3):
                             temp = final_flines[line_no + i].replace("(cons'd)", "")
-                            castep["forces"][-1].append(
+                            castep[force_key][-1].append(
                                 f90_float_parse(temp.split()[3 + j])
                             )
                 elif "x" in final_flines[line_no + i]:
                     i += 1  # skip next blank line
                     forces = True
                 i += 1
-            castep["max_force_on_atom"] = np.max(
-                np.linalg.norm(castep["forces"], axis=-1)
-            )
+            if not force_key == "constrained_forces":
+                castep["max_force_on_atom"] = np.max(
+                    np.linalg.norm(castep[force_key], axis=-1)
+                )
         elif "Stress Tensor" in line:
+            if "Constrained" in line:
+                stress_key = "constrained_stress"
+            else:
+                stress_key = "stress"
             i = 1
             while i < 20:
                 if "Cartesian components" in final_flines[line_no + i]:
-                    castep["stress"] = []
+                    castep[stress_key] = []
                     for j in range(3):
-                        castep["stress"].append(
+                        castep[stress_key].append(
                             list(
                                 map(
                                     f90_float_parse,
@@ -2220,7 +2234,13 @@ def _castep_scrape_all_snapshots(flines, intermediates=False):
                         line.split("=")[1].split()[0]
                     )
                 elif " Forces **" in line:
-                    snapshot["forces"] = []
+                    if "Unconstrained" in line:
+                        force_key = "forces"
+                    elif "Constrained" in line:
+                        force_key = "constrained_forces"
+                    else:
+                        force_key = "forces"
+                    snapshot[force_key] = []
                     i = 1
                     max_force = 0
                     forces = False
@@ -2231,13 +2251,13 @@ def _castep_scrape_all_snapshots(flines, intermediates=False):
                                 break
                             else:
                                 force_on_atom = 0
-                                snapshot["forces"].append([])
+                                snapshot[force_key].append([])
                                 for j in range(3):
                                     temp = flines[line_no + i].replace("(cons'd)", "")
                                     force_on_atom += (
                                         f90_float_parse(temp.split()[3 + j]) ** 2
                                     )
-                                    snapshot["forces"][-1].append(
+                                    snapshot[force_key][-1].append(
                                         f90_float_parse(temp.split()[3 + j])
                                     )
                                 if force_on_atom > max_force:
@@ -2246,14 +2266,20 @@ def _castep_scrape_all_snapshots(flines, intermediates=False):
                             i += 1  # skip next blank line
                             forces = True
                         i += 1
-                    snapshot["max_force_on_atom"] = pow(max_force, 0.5)
+                    if not force_key == "constrained_forces":
+                        snapshot["max_force_on_atom"] = pow(max_force, 0.5)
+
                 elif "Stress Tensor" in line:
+                    if "Constrained" in line:
+                        stress_key = "constrained_stress"
+                    else:
+                        stress_key = "stress"
                     i = 1
                     while i < 20:
                         if "Cartesian components" in flines[line_no + i]:
-                            snapshot["stress"] = []
+                            snapshot[stress_key] = []
                             for j in range(3):
-                                snapshot["stress"].append(
+                                snapshot[stress_key].append(
                                     list(
                                         map(
                                             f90_float_parse,
