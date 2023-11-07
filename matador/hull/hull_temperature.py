@@ -38,24 +38,16 @@ class TemperatureDependentHull(EnsembleHull):
         # and store it in the format expected by EnsembleHull
         for ind, doc in enumerate(cursor):
             if not isinstance(doc, VibrationalDOS):
-                _doc = VibrationalDOS(doc)
-                temps, vib_free_energies = _doc.vibrational_free_energy(
-                    temperatures=self.temperatures
-                )
-
                 #Computing the vibrational free energy CAN be VERY SLOW
                 #option to use the castep thermo data if it is present and the temperatures are within the range of the castep thermo data.
                 vib_free_energies = None
                 if self.use_castep_thermo and "thermo_temps" in doc:
-                    print("using castep_thermo")
                     castep_temps = np.array(doc["thermo_temps"])
                     castep_vib_free_energies = np.array([x for x in doc["thermo_free_energy"].values()])
                     #ONLY DO THIS if you are actually interpolating.. use 0.1 K tolerance.
                     if min(self.temperatures) > min(castep_temps)-0.1 and max(self.temperatures) < max(castep_temps) + 0.1:
                         vib_free_energies = [np.interp(T, castep_temps, castep_vib_free_energies) / doc["num_atoms"] for T in self.temperatures]
-                        print("vib free energies", vib_free_energies)
                 if vib_free_energies is None:
-                    print("computing vib free energy")
                     _doc = VibrationalDOS(doc)
                     temps, vib_free_energies = _doc.vibrational_free_energy(
                         temperatures=self.temperatures
@@ -67,6 +59,7 @@ class TemperatureDependentHull(EnsembleHull):
                 )
                 _cursor[ind][self.data_key][self.energy_key] += vib_free_energies
                 _cursor[ind][self.data_key]["temperatures"] = self.temperatures
+
 
         super().__init__(
             cursor=_cursor,
