@@ -27,6 +27,8 @@ class TemperatureDependentHull(EnsembleHull):
     ):
 
         self.temperatures = temperatures
+        self.use_castep_thermo = use_castep_thermo
+        print("use_castep_thermo", self.use_castep_thermo)
         if temperatures is None:
             self.temperatures = np.linspace(0, 800, 21)
 
@@ -45,13 +47,15 @@ class TemperatureDependentHull(EnsembleHull):
                 #option to use the castep thermo data if it is present and the temperatures are within the range of the castep thermo data.
                 vib_free_energies = None
                 if self.use_castep_thermo and "thermo_temps" in doc:
+                    print("using castep_thermo")
                     castep_temps = np.array(doc["thermo_temps"])
                     castep_vib_free_energies = np.array([x for x in doc["thermo_free_energy"].values()])
                     #ONLY DO THIS if you are actually interpolating.. use 0.1 K tolerance.
                     if min(self.temperatures) > min(castep_temps)-0.1 and max(self.temperatures) < max(castep_temps) + 0.1:
                         vib_free_energies = [np.interp(T, castep_temps, castep_vib_free_energies) / doc["num_atoms"] for T in self.temperatures]
-
+                        print("vib free energies", vib_free_energies)
                 if vib_free_energies is None:
+                    print("computing vib free energy")
                     _doc = VibrationalDOS(doc)
                     temps, vib_free_energies = _doc.vibrational_free_energy(
                         temperatures=self.temperatures
