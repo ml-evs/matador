@@ -53,6 +53,7 @@ class TemperatureDependentHull(EnsembleHull):
             energy_key=self.energy_key,
             chempot_energy_key=energy_key,
             parameter_key="temperatures",
+            update_chem_pots=True,
             **kwargs
         )
 
