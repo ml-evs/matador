@@ -539,9 +539,11 @@ class DBQuery:
             num_rand_sample = 5 if self.args.get("biggest") else 3
 
             if isinstance(self.cursor, pm.cursor.Cursor):
-                count = self.cursor.count()
-            else:
-                count = len(self.cursor)
+                self.cursor = list(
+                    self.cursor
+                )  # exhaust cursor by default as of pymongo 4 -- not very efficient at all
+
+            count = len(self.cursor)
 
             if count <= 0:
                 raise SystemExit("No structures found for hull.")

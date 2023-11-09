@@ -7,28 +7,30 @@ and interfaces with the MongoDB client.
 """
 
 
-import os
 import collections
-import tempfile
-import random
-import datetime
 import copy
-import traceback as tb
+import datetime
 import logging
+import os
+import random
 import sys
+import tempfile
+import traceback as tb
 
 import pymongo as pm
-
-from matador.scrapers.castep_scrapers import castep2dict, param2dict, cell2dict
-from matador.scrapers.castep_scrapers import res2dict
+from matador import __version__
+from matador.config import load_custom_settings
+from matador.db import make_connection_to_collection
+from matador.scrapers.castep_scrapers import (
+    castep2dict,
+    cell2dict,
+    param2dict,
+    res2dict,
+)
 from matador.utils.cell_utils import calc_mp_spacing
 from matador.utils.chem_utils import get_root_source
-from matador.utils.cursor_utils import recursive_get
-from matador.db import make_connection_to_collection
-from matador.utils.db_utils import WORDS, NOUNS
-from matador.config import load_custom_settings
-from matador.utils.cursor_utils import loading_bar
-from matador import __version__
+from matador.utils.cursor_utils import loading_bar, recursive_get
+from matador.utils.db_utils import NOUNS, WORDS
 
 
 class Spatula:
@@ -221,25 +223,17 @@ class Spatula:
         if not self.dryrun and self.import_count > 0:
             print("Successfully imported", self.import_count, "structures!")
             # index by enthalpy for faster/larger queries
-            count = 0
-            for _ in self.repo.list_indexes():
-                count += 1
-            # ignore default id index
-            if count > 1:
-                self.log.info("Index found, rebuilding...")
-                self.repo.reindex()
-            else:
-                self.log.info("Building index...")
-                self.repo.create_index([("enthalpy_per_atom", pm.ASCENDING)])
-                self.repo.create_index([("stoichiometry", pm.ASCENDING)])
-                self.repo.create_index([("cut_off_energy", pm.ASCENDING)])
-                self.repo.create_index([("species_pot", pm.ASCENDING)])
-                self.repo.create_index([("kpoints_mp_spacing", pm.ASCENDING)])
-                self.repo.create_index([("xc_functional", pm.ASCENDING)])
-                self.repo.create_index([("elems", pm.ASCENDING)])
-                # index by source for rebuilds
-                self.repo.create_index([("source", pm.ASCENDING)])
-                self.log.info("Done!")
+            self.log.info("Building index...")
+            self.repo.create_index([("enthalpy_per_atom", pm.ASCENDING)])
+            self.repo.create_index([("stoichiometry", pm.ASCENDING)])
+            self.repo.create_index([("cut_off_energy", pm.ASCENDING)])
+            self.repo.create_index([("species_pot", pm.ASCENDING)])
+            self.repo.create_index([("kpoints_mp_spacing", pm.ASCENDING)])
+            self.repo.create_index([("xc_functional", pm.ASCENDING)])
+            self.repo.create_index([("elems", pm.ASCENDING)])
+            # index by source for rebuilds
+            self.repo.create_index([("source", pm.ASCENDING)])
+            self.log.info("Done!")
         elif self.dryrun:
             self.log.info("Dryrun complete!")
 

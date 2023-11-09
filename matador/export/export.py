@@ -28,7 +28,6 @@ EPS = 1e-8
 def query2files(
     cursor,
     dirname=None,
-    max_files=10000,
     top=None,
     prefix=None,
     cell=None,
@@ -38,6 +37,7 @@ def query2files(
     json=None,
     xsf=None,
     markdown=True,
+    max_files=None,
     latex=False,
     subcmd=None,
     argstr=None,
@@ -52,13 +52,14 @@ def query2files(
     Keyword arguments:
         dirname (str): the folder to save the results into. Will be created if non-existent.
             Will have integer appended to it if already existing.
-        max_files (int): if the number of files to be written exceeds this number, then raise RuntimeError.
         **kwargs (dict): dictionary of {filetype: bool(whether to write)}. Accepted file types
             are cell, param, res, pdb, json, xsf, markdown and latex.
 
     """
-    multiple_files = any((cell, param, res, pdb, xsf))
     prefix = prefix + "-" if prefix is not None else ""
+
+    if max_files is not None:
+        print("`max_files` kwarg now does nothing.")
 
     if isinstance(cursor, AtomicSwapper):
         cursor = cursor.cursor
@@ -71,24 +72,10 @@ def query2files(
         info = True
         hash_dupe = False
 
-    if isinstance(cursor, list):
-        num = len(cursor)
-    else:
-        num = cursor.count()
-
+    num = None
     if top is not None:
         if top < num:
             num = top
-
-    num_files = num * sum(1 for ext in [cell, param, res, pdb, xsf] if ext)
-
-    if multiple_files:
-        if num_files > max_files:
-            raise RuntimeError(
-                "Not writing {} files as it exceeds argument `max_files` limit of {}".format(
-                    num_files, max_files
-                )
-            )
 
     if dirname is None:
         dirname = generate_relevant_path(subcmd=subcmd, **kwargs)
