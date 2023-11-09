@@ -6,6 +6,6 @@ pymongo~=4.0
 numba>=0.55,<1
 tqdm~=4.62
 matplotlib>=3.0,<3.6
-seekpath~=2.0
+seekpath~=2.1
 spglib>=1.16,<3
 python-ternary~=1.0
