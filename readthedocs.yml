@@ -1,12 +1,22 @@
-python:
-  version: 3.8
-  pip_install: true
-  extra_requirements:
-    - docs
-    - plotting
-    - viz
-    - db
-    - optional
+# Read the Docs configuration file
+# See https://docs.readthedocs.io/en/stable/config-file/v2.html for details
 
+# Required
+version: 2
+
+# Set the version of Python
 build:
-    image: latest
+  os: ubuntu-22.04  # <- add this line
+  tools:
+    python: "3.10"
+
+python:
+  install:
+    - method: pip
+      path: .
+      extra_requirements:
+        - docs
+        - plotting
+        - viz
+        - db
+        - optional

@@ -33,7 +33,7 @@ from matador import __version__
 # ones.
 extensions = [
     "sphinx.ext.autodoc",
-    "sphinxcontrib.napoleon",
+    "sphinx.ext.napoleon",
     "sphinxarg.ext",
     "sphinx.ext.todo",
     "sphinx.ext.viewcode",
