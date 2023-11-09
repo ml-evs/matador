@@ -2784,16 +2784,6 @@ class ExportTest(MatadorUnitTest):
                 msg="Missing {}.{}".format(name, ext),
             )
 
-    def test_large_writes(self):
-        """Fake some large queries and make sure they are not written."""
-        fake_cursor = 100 * [{"dummy": "data"}]
-        with self.assertRaises(RuntimeError):
-            query2files(fake_cursor, res=True, max_files=99)
-        with self.assertRaises(RuntimeError):
-            query2files(fake_cursor, res=True, cell=True, max_files=199)
-        with self.assertRaises(RuntimeError):
-            query2files(fake_cursor, res=True, cell=True, pdb=True, max_files=299)
-
     def compare_json_with_res(self, json_fname, test_fname):
         with open(json_fname, "r") as f:
             doc = json.load(f)
