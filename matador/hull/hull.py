@@ -502,7 +502,9 @@ class QueryConvexHull:
                 mu_cursor = query.repo.find(SON(query_dict)).sort(
                     energy_key, pm.ASCENDING
                 )
-                if mu_cursor.count() == 0:
+                mu_cursor_count = query.repo.count_documents(SON(query_dict))
+
+                if mu_cursor_count == 0:
                     print_notify(
                         "Failed... searching without spin polarization field..."
                     )
@@ -519,7 +521,7 @@ class QueryConvexHull:
                         energy_key, pm.ASCENDING
                     )
 
-                if mu_cursor.count() == 0:
+                if mu_cursor_count == 0:
                     raise RuntimeError(
                         "No chemical potentials found for {}...".format(elem)
                     )
