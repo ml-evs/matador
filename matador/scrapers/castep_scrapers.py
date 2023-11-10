@@ -50,8 +50,11 @@ def res2dict(fname, db=True, **kwargs):
             if the scrape was successful.
 
     """
-
-    flines, fname = get_flines_extension_agnostic(fname, "res")
+    if "flines" not in kwargs:
+        flines, fname = get_flines_extension_agnostic(fname, "res")
+    else:
+        flines = kwargs["flines"]
+        fname = flines[0].split()[1]
     res = dict()
 
     # add .res to source
