@@ -514,14 +514,14 @@ def doc2spg(
         )
 
 
-def get_space_group_label_latex(label: str) -> str:
-    """Return the LaTeX format of the passed space group label. Takes
-    any string, leaves the first character upright, italicses the rest,
-    handles subscripts and bars over numbers.
+def get_space_group_label_latex(label: str, force_italics: bool = True) -> str:
+    """Return the LaTeX format of the passed space group label.
 
     Parameters:
         label: a given space group in "standard" plain text format,
         e.g. P-63m to convert to '$P\\bar{6}3m$'.
+        force_italics: Whether to explicitly wrap italic characters with
+        \\mathit{}.
 
     Returns:
         The best attempt to convert the label to LaTeX format.
@@ -529,7 +529,12 @@ def get_space_group_label_latex(label: str) -> str:
     """
     import re
 
-    return "${}$".format(re.sub("-(?P<number>[0-9])", "\\\\bar{\\g<number>}", label))
+    if force_italics:
+        label = re.sub("([a-z])", "\\\\mathit{\\g<1>}", label)
+        label = re.sub("([A-Z])", "\\\\mathit{\\g<1>}\\\\,", label)
+    label = re.sub("-(?P<number>[0-9])", "\\\\bar{\\g<number>}", label)
+
+    return f"${label}$"
 
 
 def standardize_doc_cell(
