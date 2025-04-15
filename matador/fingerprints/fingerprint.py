@@ -18,6 +18,7 @@ import sys
 import functools
 
 import psutil
+
 try:
     from numba import njit
 except ImportError:
