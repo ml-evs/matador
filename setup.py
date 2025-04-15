@@ -37,7 +37,7 @@ setup(
     license="MIT",
     packages=find_packages(),
     python_requires=">=3.9",
-    install_requires=["numpy", "scipy", "spglib>=1.16,<3"],
+    install_requires=["numpy >= 1.24, < 2", "scipy ~= 1.13", "spglib >= 1.16, < 3"],
     scripts=[script for script in glob("scripts/*") if os.path.isfile(script)],
     test_suite="tests",
     include_package_data=True,
