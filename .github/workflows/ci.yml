@@ -60,7 +60,7 @@ jobs:
       run: |
         cp tests/data/matador_pipelines_conf.yml $HOME/.matadorrc
         python -m pip install --upgrade setuptools pip wheel
-        pip install -r requirements/legacy_requirements.txt -r requirements/test_requirements-test.txt -r optional_requirements.txt
+        pip install -r requirements/legacy_requirements.txt -r requirements/test_requirements.txt -r optional_requirements.txt
     - name: Test with pytest
       run: |
         py.test -rs --cov-config .coveragerc --cov=./matador/ --cov-report=xml
