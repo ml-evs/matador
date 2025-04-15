@@ -37,11 +37,11 @@ setup(
     license="MIT",
     packages=find_packages(),
     python_requires=">=3.9",
-    install_requires=requirements,
+    install_requires=["numpy", "scipy", "spglib>=1.16,<3"],
     scripts=[script for script in glob("scripts/*") if os.path.isfile(script)],
     test_suite="tests",
     include_package_data=True,
-    setup_requires=["setuptools>=42"],
+    setup_requires=["setuptools>=72"],
     extras_require=extra_requirements,
     classifiers=[
         "Development Status :: 4 - Beta",
