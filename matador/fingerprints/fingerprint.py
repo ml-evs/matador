@@ -18,7 +18,11 @@ import sys
 import functools
 
 import psutil
-import numba
+try:
+    from numba import njit
+except ImportError:
+    # Fake empty decorator to avoid needing numba installed
+    njit = lambda f: f  # noqa
 import numpy as np
 
 from matador.utils.print_utils import print_notify
@@ -68,7 +72,7 @@ class Fingerprint(abc.ABC):
         return np.sum(np.exp(-((new_space / width) ** 2)), axis=0)
 
     @staticmethod
-    @numba.njit
+    @njit
     def _broadening_distance_dominated(
         hist, r_space, width, broadening_type="gaussian"
     ):
@@ -98,7 +102,7 @@ class Fingerprint(abc.ABC):
         return np.sum(hist * np.exp(-((new_space / width) ** 2)), axis=1)
 
     @staticmethod
-    @numba.njit
+    @njit
     def _broadening_unrolled(hist, r_space, width, broadening_type="gaussian"):
         """Add broadening to the PDF by convolving the distance histogram with
         the radial space and summing. Unrolled loop to save memory.
