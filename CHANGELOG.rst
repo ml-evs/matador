@@ -3,6 +3,11 @@
 Changelog
 =========
 
+New in release (0.11.1) [16/04/2025]
+------------------------------------
+
+Minor fix for optional dependency on numba.
+
 New in release (0.11.0) [16/04/2025]
 ------------------------------------
 
