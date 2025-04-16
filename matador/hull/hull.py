@@ -903,9 +903,9 @@ class QueryConvexHull:
                 raise RuntimeError(
                     "Document missing key `cell_volume_per_b`: {}".format(doc)
                 )
-        stable_stoichs = get_array_from_cursor(self.hull_cursor, "stoichiometry")[
-            unique_comp_inds
-        ]
+        stable_stoichs = get_array_from_cursor(self.hull_cursor, "stoichiometry")
+        stable_stoichs = [stable_stoichs[ind] for ind in unique_comp_inds]
+
         stable_vol = get_array_from_cursor(self.hull_cursor, "cell_volume_per_b")[
             unique_comp_inds
         ]
@@ -928,7 +928,8 @@ class QueryConvexHull:
             ((stable_vol[non_nans] / stable_vol[0]) - 1) * 100
         )
         self.volume_data["hull_distances"].append(hull_distances[non_nans].flatten())
-        self.volume_data["endstoichs"].append(stable_stoichs[non_nans].flatten()[0])
+        endstoich = [stable_stoichs[ind] for ind in non_nans.flatten()][0]
+        self.volume_data["endstoichs"].append(endstoich)
 
     def _get_species(self, species=None, elements=None):
         """Try to determine species for phase diagram from arguments or

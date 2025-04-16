@@ -370,7 +370,7 @@ def set_cursor_from_array(cursor, array, key):
         recursive_set(cursor[ind], key, array[ind])
 
 
-def get_array_from_cursor(cursor, key, pad_missing=False):
+def get_array_from_cursor(cursor, key, pad_missing=False, fallback_to_list=True):
     """Returns a numpy array of the values of a key
     in a cursor, where the key can be defined as list
     of keys to use with `recursive_get`.
@@ -384,6 +384,9 @@ def get_array_from_cursor(cursor, key, pad_missing=False):
     Keyword arguments:
         pad_missing (bool): whether to fill array with NaN's
             where data is missing.
+        fallback_to_list (bool): if True, will return a list
+            instead of a numpy array if the array is not
+            homogeneous.
     Raises:
         KeyError: if any document is missing that key,
             unless pad_missing is True.
@@ -409,7 +412,12 @@ def get_array_from_cursor(cursor, key, pad_missing=False):
                 array.append(np.NaN)
             else:
                 raise exc
-    array = np.asarray(array)
+    try:
+        array = np.asarray(array)
+    except ValueError as exc:
+        if not fallback_to_list:
+            raise exc
+
     return array
 
 
