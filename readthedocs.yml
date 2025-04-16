@@ -23,3 +23,6 @@ python:
         - viz
         - db
         - optional
+
+sphinx:
+  configuration: docs/src/conf.py

@@ -172,7 +172,7 @@ def plot_2d_hull(
 
     if colour_by_composition:
         try:
-            element_colours = [get_element_colours()[s] for s in hull.species]
+            element_colours = [get_element_colours()[s] for s in reversed(hull.species)]
         except Exception:
             raise RuntimeError(
                 f"Cannot `colour_by_composition`: no colour found for species {hull.species}."
