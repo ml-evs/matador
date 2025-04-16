@@ -21,7 +21,7 @@ import psutil
 
 try:
     from numba import njit
-except ImportError:
+except (ImportError, ModuleNotFoundError):
     # Fake empty decorator to avoid needing numba installed
     njit = lambda f: f  # noqa
 import numpy as np
