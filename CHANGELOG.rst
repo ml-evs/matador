@@ -3,6 +3,26 @@
 Changelog
 =========
 
+New in release (0.11.0) [16/04/2025]
+------------------------------------
+
+This release primarily makes a more minimal dependency set (numpy, scipy, spglib) so that parsers from matador can be used without full database support.
+
+To install with the previous default set of dependencies (including e.g., matplotlib, pymongo, numba, etc), use `pip install matador-db[legacy]`. 
+
+Some older fixes:
+
+- Fix numba dep format issue, reported by @MJCliffe.
+- Run tests for Python 3.11.
+- Support pymongo v4.
+
+
+New in release (0.10.2) [09/11/2023]
+------------------------------------
+
+- Scrape constrained and normal forces separately from CASTEP files by @JordD04 in https://github.com/ml-evs/matador/pull/315
+- Refresh some dependencies for the 21st century by @ml-evs in https://github.com/ml-evs/matador/pull/328
+
 
 New in release (0.10.1) [20/01/2023]
 ------------------------------------
