@@ -14,6 +14,7 @@ from math import ceil, copysign
 import time
 
 import numpy as np
+
 try:
     from numba import njit
 except (ImportError, ModuleNotFoundError):
