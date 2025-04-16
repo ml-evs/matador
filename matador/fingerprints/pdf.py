@@ -14,7 +14,11 @@ from math import ceil, copysign
 import time
 
 import numpy as np
-import numba
+try:
+    from numba import njit
+except (ImportError, ModuleNotFoundError):
+    # numba is optional dep
+    njit = lambda f: f  # noqa
 
 from matador.utils.cell_utils import frac2cart, cart2volume
 from matador.utils.cell_utils import standardize_doc_cell
@@ -248,14 +252,14 @@ class PDF(Fingerprint):
             self.gr += self.elem_gr[key]
 
     @staticmethod
-    @numba.njit
+    @njit
     def _normalize_gr(gr, r_space, dr, num_atoms, number_density):
         """Normalise a broadened PDF, ignoring the Gaussian magnitude."""
         norm = 4 * np.pi * (r_space + dr) ** 2 * dr * num_atoms * number_density
         return np.divide(gr, norm)
 
     @staticmethod
-    @numba.njit
+    @njit
     def _dist_hist(distances, r_space, dr):
         """Bin the pair-wise distances according to the radial grid.
 
