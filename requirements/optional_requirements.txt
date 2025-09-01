@@ -1,5 +1,5 @@
 pymatgen>=2022
-ase~=3.22
+ase~=3.26
 ascii_graph~=1.5
 networkx~=2.6
 statsmodels>=0.11
