@@ -1,6 +1,6 @@
 numpy>=1.24,<2
 scipy~=1.13
-psutil~=5.9
+psutil~=7.1
 pyyaml~=6.0
 pymongo~=4.0,<4.11
 numba>=0.55
