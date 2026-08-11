@@ -3,6 +3,15 @@
 Changelog
 =========
 
+New in release (0.12.0) [11/08/2026]
+------------------------------------
+
+Maintenance release with minor version bump that:
+
+- Drops support for Python 3.9
+- Wraps new `spglib` Python-based exceptions
+- Better guards `psutil` imports to retain optionality of dependency
+
 New in release (0.11.2) [16/04/2025]
 ------------------------------------
 
