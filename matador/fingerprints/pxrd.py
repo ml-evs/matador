@@ -8,11 +8,11 @@ of a crystal.
 
 import itertools
 import os
-from typing import Tuple
+from typing import Dict, Optional, Tuple
 
 import numpy as np
 
-from matador.fingerprints.fingerprint import Fingerprint, FingerprintFactory
+from matador.fingerprints.fingerprint import Fingerprint, FingerprintFactory, njit
 from matador.crystal import Crystal
 from matador.utils.cell_utils import standardize_doc_cell, real2recip
 from matador.utils.chem_utils import get_formula_from_stoich
@@ -27,9 +27,11 @@ class PXRD(Fingerprint):
 
     This calculation takes into account atomic scattering factors, Lorentz
     polarisation and thermal broadening (with Debye-Waller factors set to
-    1). Note: this class does not perform any q-dependent peak broadening,
-    and instead uses a simple Lorentzian broadening. The default width
-    of 0.03 provides good agreement with e.g. GSAS-II's default CuKa setup.
+    1). Two peak shapes are available: a simple constant-width Lorentzian
+    (default), whose default width of 0.03 provides good agreement with
+    e.g. GSAS-II's default CuKa setup, and the Thompson-Cox-Hastings
+    pseudo-Voigt with angle-dependent widths ("TCHZ"), following the
+    GSAS-II U, V, W, X, Y, Z parameterisation.
     Only one wavelength can be used at a time, but multiple patterns could be
     combined post hoc.
 
@@ -55,6 +57,8 @@ class PXRD(Fingerprint):
         two_theta_bounds: Tuple[float, float] = (0, 90),
         theta_m: float = 0.0,
         scattering_factors: str = "RASPA",
+        peak_shape: str = "lorentzian",
+        tchz_params: Optional[Dict[str, float]] = None,
         lazy=False,
         plot=False,
         progress=False,
@@ -77,12 +81,48 @@ class PXRD(Fingerprint):
                 to compute the PXRD pattern.
             scattering_factors (str): either "GSAS" or "RASPA" (default),
                 which set of atomic scattering factors to use.
+            peak_shape (str): either "lorentzian" (default) for
+                constant-width Lorentzian broadening, or "tchz" for the
+                Thompson-Cox-Hastings pseudo-Voigt with angle-dependent
+                widths, parameterised by `tchz_params`.
+            tchz_params (dict): optional overrides for the TCHZ peak shape
+                parameters "u", "v", "w" (Gaussian, degrees²) and "x", "y",
+                "z" (Lorentzian, degrees), where
+                Γ_G² = u tan²θ + v tanθ + w and Γ_L = x/cosθ + y tanθ + z.
+                These follow the GSAS-II convention, but in degrees: divide
+                GSAS-II U, V, W by 10⁴ and X, Y, Z by 10² to use values
+                from an instrument parameter file.
             lazy (bool): whether to compute PXRD or just set it up.
             plot (bool): whether to display PXRD as a plot.
 
         """
         self.wavelength = wavelength
         self.lorentzian_width = lorentzian_width
+        self.peak_shape = peak_shape.lower()
+        if self.peak_shape not in ("lorentzian", "tchz"):
+            raise RuntimeError(
+                "No peak shape matched: {}. Please use 'lorentzian' or 'tchz'.".format(
+                    peak_shape
+                )
+            )
+        # defaults correspond to GSAS-II's default CuKa instrument (U=2, V=-2, W=5 centidegrees²)
+        self.tchz_params = {
+            "u": 2e-4,
+            "v": -2e-4,
+            "w": 5e-4,
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0,
+        }
+        if tchz_params is not None:
+            unknown = set(tchz_params) - set(self.tchz_params)
+            if unknown:
+                raise RuntimeError(
+                    "Unknown TCHZ parameters: {}. Please use only {}.".format(
+                        sorted(unknown), sorted(self.tchz_params)
+                    )
+                )
+            self.tchz_params.update(tchz_params)
         self.two_theta_resolution = two_theta_resolution
         if two_theta_bounds is not None:
             self.two_theta_bounds = list(two_theta_bounds)
@@ -226,7 +266,18 @@ class PXRD(Fingerprint):
             self.peak_positions, bins=self.two_thetas, weights=S_q
         )
 
-        if self.lorentzian_width > 0:
+        if self.peak_shape == "tchz":
+            self.pattern = self._tchz_broadening(
+                self.pattern,
+                self.two_thetas,
+                self.tchz_params["u"],
+                self.tchz_params["v"],
+                self.tchz_params["w"],
+                self.tchz_params["x"],
+                self.tchz_params["y"],
+                self.tchz_params["z"],
+            )
+        elif self.lorentzian_width > 0:
             self.pattern = self._broadening_unrolled(
                 self.pattern,
                 self.two_thetas,
@@ -251,6 +302,67 @@ class PXRD(Fingerprint):
         """Alias for calculating the PXRD pattern."""
         self.calc_pxrd()
 
+    @staticmethod
+    @njit
+    def _tchz_broadening(hist, two_thetas, u, v, w, x, y, z):
+        """Broaden a histogrammed peak list with the Thompson-Cox-Hastings
+        pseudo-Voigt peak shape (J. Appl. Cryst. 20 (1987) 79-83), with
+        angle-dependent Gaussian and Lorentzian FWHMs
+
+            Γ_G² = u tan²θ + v tanθ + w,
+            Γ_L = x/cosθ + y tanθ + z,
+
+        combined into a single pseudo-Voigt of FWHM Γ with mixing
+        parameter η, using unit-area Gaussian and Lorentzian profiles so
+        that relative integrated intensities are preserved.
+
+        Parameters:
+            hist (numpy.ndarray): histogram of peak intensities.
+            two_thetas (numpy.ndarray): 2θ grid in degrees.
+            u, v, w (float): Gaussian width parameters in degrees².
+            x, y, z (float): Lorentzian width parameters in degrees.
+
+        Returns:
+            numpy.ndarray: the broadened pattern.
+
+        """
+        pattern = np.zeros_like(two_thetas)
+        four_ln2 = 4 * np.log(2)
+        for ind, _ in enumerate(hist):
+            if hist[ind] != 0:
+                theta = 0.5 * two_thetas[ind] * np.pi / 180
+                tan_theta = np.tan(theta)
+                cos_theta = np.cos(theta)
+                gamma_g_sq = u * tan_theta**2 + v * tan_theta + w
+                if gamma_g_sq < 0.0:
+                    gamma_g_sq = 0.0
+                gamma_g = np.sqrt(gamma_g_sq)
+                gamma_l = x / cos_theta + y * tan_theta + z
+                if gamma_l < 0.0:
+                    gamma_l = 0.0
+                gamma = (
+                    gamma_g**5
+                    + 2.69269 * gamma_g**4 * gamma_l
+                    + 2.42843 * gamma_g**3 * gamma_l**2
+                    + 4.47163 * gamma_g**2 * gamma_l**3
+                    + 0.07842 * gamma_g * gamma_l**4
+                    + gamma_l**5
+                ) ** 0.2
+                if gamma <= 0.0:
+                    continue
+                q = gamma_l / gamma
+                eta = 1.36603 * q - 0.47719 * q**2 + 0.11116 * q**3
+                offsets = (two_thetas - two_thetas[ind]) / gamma
+                lorentz = (2 / (np.pi * gamma)) / (1 + 4 * offsets**2)
+                gauss = (
+                    (2 / gamma)
+                    * np.sqrt(np.log(2) / np.pi)
+                    * np.exp(-four_ln2 * offsets**2)
+                )
+                pattern += hist[ind] * (eta * lorentz + (1 - eta) * gauss)
+
+        return pattern
+
     def atomic_scattering_factor(self, q_mag, species):
         """Return fit for particular atom at given q-vector.
 
@@ -266,6 +378,19 @@ class PXRD(Fingerprint):
         b = self.atomic_scattering_coeffs[species][1]
         c = self.atomic_scattering_coeffs[species][2]
         return c + np.sum(a * np.exp(-b * (q_mag / (4 * np.pi)) ** 2))
+
+    @property
+    def _peak_shape_settings(self) -> str:
+        """A string describing the peak shape settings, for file headers."""
+        if self.peak_shape == "tchz":
+            params = ", ".join(
+                "{} = {}".format(key, self.tchz_params[key])
+                for key in ("u", "v", "w", "x", "y", "z")
+            )
+            return "peak_shape = tchz\ntchz_params: {}".format(params)
+        return "peak_shape = lorentzian\nlorentzian_width = {} degrees".format(
+            self.lorentzian_width
+        )
 
     def plot(self, **kwargs):
         """Wrapper function to plot the PXRD pattern."""
@@ -294,7 +419,7 @@ Structure:
 Settings:
 wavelength = {pxrd.wavelength} Å
 theta_m = {pxrd.theta_m} degrees
-lorentzian_width = {pxrd.lorentzian_width} degrees
+{pxrd._peak_shape_settings}
 
 2θ (degrees),\t\t\tRelative intensity"""
 
@@ -324,7 +449,7 @@ Structure:
 Settings:
 wavelength = {pxrd.wavelength} Å
 theta_m = {pxrd.theta_m} degrees
-lorentzian_width = {pxrd.lorentzian_width} degrees
+{pxrd._peak_shape_settings}
 
 <hkl>,\t\tPeak position (degrees)"""
 

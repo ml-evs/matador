@@ -46,6 +46,33 @@ class PXRDCalculatorTest(unittest.TestCase):
             **pxrd_args
         )
 
+    def test_tchz_peak_shape(self):
+        """Test the TCHZ pseudo-Voigt peak shape."""
+        doc, s = res2dict(REAL_PATH + "data/structures/Li.res", as_model=True)
+        pxrd_lor = PXRD(doc)
+        pxrd = PXRD(doc, peak_shape="tchz")
+        self.assertEqual(len(pxrd.pattern), len(pxrd.two_thetas))
+        self.assertTrue(np.all(np.isfinite(pxrd.pattern)))
+        self.assertAlmostEqual(np.max(pxrd.pattern), 1.0)
+        # peak shape should not shift the strongest peak
+        self.assertAlmostEqual(
+            pxrd.two_thetas[np.argmax(pxrd.pattern)],
+            pxrd_lor.two_thetas[np.argmax(pxrd_lor.pattern)],
+            delta=0.05,
+        )
+
+        # adding a Lorentzian strain term should broaden the peaks
+        pxrd_broad = PXRD(doc, peak_shape="tchz", tchz_params={"y": 0.05})
+        self.assertGreater(
+            np.sum(pxrd_broad.pattern > 0.01), np.sum(pxrd.pattern > 0.01)
+        )
+
+        with self.assertRaises(RuntimeError):
+            PXRD(doc, peak_shape="voigt")
+
+        with self.assertRaises(RuntimeError):
+            PXRD(doc, peak_shape="tchz", tchz_params={"bad_param": 1.0})
+
     def test_CuP2_vs_GSAS(self):
         """Test CuP2 peak positions vs GSAS."""
         pxrd = _match_peaks(
