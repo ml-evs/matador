@@ -84,6 +84,7 @@ class QueryConvexHull:
         collections=None,
         db=None,
         include_elemental_electrodes=False,
+        display=True,
         **kwargs,
     ):
         """Initialise the class from either a DBQuery or a cursor (list
@@ -175,6 +176,7 @@ class QueryConvexHull:
         self.num_elements = 0
         self.species = self._get_species(species, elements)
         self._dimension = len(self.species)
+        self.display=display
 
         # tracker for whether per_b fields have been setup
         self._per_b_done = False
@@ -235,10 +237,8 @@ class QueryConvexHull:
                     len(self.hull_cursor), self.hull_cutoff
                 )
             )
-
-        display_results(
-            self.hull_cursor, hull=True, energy_key=self.energy_key, **self.args
-        )
+        if self.display:
+            display_results(self.hull_cursor, hull=True, energy_key=self.energy_key, **self.args)
 
         if self.compute_voltages:
             print(

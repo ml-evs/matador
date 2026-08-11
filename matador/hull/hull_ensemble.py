@@ -56,6 +56,7 @@ class EnsembleHull(QueryConvexHull):
         species=None,
         voltage=False,
         verbosity=None,
+        update_chem_pots=False,
         **kwargs,
     ):
         """Initialise EnsembleHull from a cursor, with other keywords
@@ -77,8 +78,11 @@ class EnsembleHull(QueryConvexHull):
             species (list[str]): list of elements/chempots to use, in
                 the desired order.
             voltage (bool): whether or not to compute voltage curves.
+            update_chem_pots (bool): whether or not to update the chemical potentials for each hull in the ensemble,
+                this is useful for temperature dependent hulls where the end members may change.
             plot_kwargs (dict): arguments to pass to plot_hull function.
             kwargs (dict): other arguments to pass to QueryConvexHull.
+
 
         """
         # sometimes the first hull needs to be made with a different key
@@ -118,6 +122,7 @@ class EnsembleHull(QueryConvexHull):
         self._formation_keys = [self.data_key] + [self.formation_key]
         self._hulldist_keys = [self.data_key] + ["hull_distance"]
         self._energy_keys = [self.data_key] + [self.energy_key]
+        self.update_chem_pots=update_chem_pots
 
         self.phase_diagrams = []
 
@@ -172,6 +177,29 @@ class EnsembleHull(QueryConvexHull):
             num_samples = n_hulls
 
         for param_ind, parameter in enumerate(tqdm.tqdm(parameter_iterable)):
+            #perform a preliminary loop to update the chempot cursor to lowest values, if requested.
+            #useful for temperature dependent hulls where the end members may change.
+            if self.update_chem_pots:
+                for ind, doc in enumerate(self.cursor):
+                    if self.parameter_key is not None:
+                        assert (
+                            recursive_get(doc, self._parameter_keys + [param_ind])
+                            == parameter
+                        )
+
+                    formation_energy = get_formation_energy(
+                        self.chempot_cursor, doc, energy_key=self._energy_keys + [param_ind]
+                    )
+
+                    u = doc["concentration"][0]
+                    tol = 1e-10
+                    if (u < tol or u > 1-tol) and formation_energy < 0.0:
+                        for j, c in enumerate(self.chempot_cursor):
+                            u2 = c["concentration"][0]
+                            if abs(u - u2) < tol:
+                                #print(f"updating chempot_cursor for u={u} to be {doc['source'][0].split('/')[-1]} for T={parameter}, Ef={formation_energy}")
+                                self.chempot_cursor[j] = doc
+
             for ind, doc in enumerate(self.cursor):
                 if self.parameter_key is not None:
                     assert (
