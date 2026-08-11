@@ -254,7 +254,9 @@ class CellUtilTest(unittest.TestCase):
         test_cases = ["P-63m", "Fm-3m", "I4/mmm", "P4_2/mmc"]
         results = ["$P\\bar{6}3m$", "$Fm\\bar{3}m$", "$I4/mmm$", "$P4_2/mmc$"]
         for res, test in zip(results, test_cases):
-            self.assertEqual(res, get_space_group_label_latex(test))
+            self.assertEqual(
+                res, get_space_group_label_latex(test, force_italics=False)
+            )
 
 
 class SymmetriesAndSupercellsTest(unittest.TestCase):

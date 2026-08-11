@@ -173,7 +173,9 @@ class CrystalTest(unittest.TestCase):
         self.assertEqual(doc.formula, "NaCl")
         self.assertEqual(doc.cell_volume, 27.0)
         self.assertEqual(doc.space_group, "Pm-3m")
-        self.assertEqual(doc.space_group_tex, "$Pm\\bar{3}m$")
+        self.assertEqual(
+            doc.space_group_tex, r"$\mathit{P}\,\mathit{m}\bar{3}\mathit{m}$"
+        )
 
         doc = Crystal(
             dict(
