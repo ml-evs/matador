@@ -8,9 +8,11 @@ New in release (0.12.0) [11/08/2026]
 
 Maintenance release with minor version bump that:
 
+- Adds documentation clarifying development status of the package
 - Drops support for Python 3.9
 - Wraps new `spglib` Python-based exceptions
 - Better guards `psutil` imports to retain optionality of dependency
+- Adds final tweaks to plotting used in the author's thesis
 
 New in release (0.11.2) [16/04/2025]
 ------------------------------------

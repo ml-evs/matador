@@ -78,6 +78,12 @@ If you use matador in your work, we kindly ask that you cite
 
 Source code archives for all versions above 0.9 can be found at Zenodo `DOI 10.5281/zenodo.3908573 <https://doi.org/10.5281/zenodo.3908573>`_.
 
+You can also find the main author's thesis (which made extensive use of
+matador):
+    
+    Matthew L. Evans, *Crystal structure prediction for rechargeable battery anodes* [Apollo - University of Cambridge Repository] (2023) `10.17863/CAM.104811 <https://doi.org/10.17863/CAM.104811>`_
+
+
 
 .. |PyPI Version| image:: https://img.shields.io/pypi/v/matador-db?label=PyPI&logo=pypi
    :target: https://pypi.org/project/matador-db/
