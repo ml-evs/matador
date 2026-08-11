@@ -44,7 +44,7 @@ setup(
     setup_requires=["setuptools>=72"],
     extras_require=extra_requirements,
     classifiers=[
-        "Development Status :: 4 - Beta",
+        "Development Status :: 7 - Inactive",
         "Intended Audience :: Science/Research",
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python :: 3",

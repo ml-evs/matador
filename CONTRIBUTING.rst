@@ -3,7 +3,7 @@
 Contributing
 ============
 
-Contributions and suggestions to this package are very welcome.
+This package is no longer actively developed, but we welcome maintenance-focused contributions that preserve existing functionality.
 
 If you think you have found a bug, please raise an issue on GitHub, providing information about what you were trying to do, the function/script you ran, the error message/output and your ``matador`` version. If you are able to, please try to replicate the problem on the ``master`` branch before posting.
 
