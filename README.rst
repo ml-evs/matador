@@ -6,14 +6,17 @@ matador
 | |Documentation Status| |MIT License| |Coverage Status|
 | |JOSS| |Zenodo|
 
-
 matador is an aggregator, manipulator and runner of first-principles calculations, written with a bent towards battery electrode materials.
-The source can be found on `GitHub <https://github.com/ml-evs/matador>`_ and online documentation is hosted at `ReadTheDocs <https://docs.matador.science>`_.
+The source can be found on `GitHub <https://github.com/ml-evs/matador>`_ and online documentation is hosted at `ReadTheDocs <https://matador-db.readthedocs.io>`_.
+
+.. note::
+
+    matador is no longer actively developed and is now in maintenance mode. It is still functional and will be maintained for critical bug fixes, but it is unlikely that new features will be added by the original authors.
+
 
 Example Jupyter notebooks and tutorials can be found `online <https://docs.matador.science/en/latest/examples_index.html>`_ or in the ``examples/`` folder of the matador source code.
 
-Written & maintained by `Matthew Evans <https://ml-evs.science>`_ (2016-).
-
+Written & maintained by `Matthew Evans <https://ml-evs.science>`_ (2016-2026).
 
 .. image:: docs/src/img/hull.png
    :name: LiPZn
@@ -22,7 +25,7 @@ Written & maintained by `Matthew Evans <https://ml-evs.science>`_ (2016-).
 Installation
 ------------
 
-In the simplest case (e.g. you already have Python 3.7+ set up), ``pip install matador-db`` is sufficient to get up and running, preferably in a fresh virtual environment.
+In the simplest case (e.g. you already have a compatible Python version set up), ``pip install matador-db`` is sufficient to get up and running, preferably in a fresh virtual environment.
 
 Upgrading to the latest version should be as simple as ``pip install -U matador-db``.
 
