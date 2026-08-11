@@ -549,9 +549,15 @@ def standardize_doc_cell(
 
     """
     import spglib as spg
+
     from matador.utils.chem_utils import get_atomic_symbol
     from copy import deepcopy
     from matador.crystal import Crystal
+
+    try:
+        spg.error.OLD_ERROR_HANDLING = False
+    except AttributeError:
+        pass
 
     spg_cell = doc2spg(doc)
     spg_standardized = spg.standardize_cell(
@@ -591,6 +597,11 @@ def get_spacegroup_spg(
 
     """
     import spglib as spg
+
+    try:
+        spg.error.OLD_ERROR_HANDLING = False
+    except AttributeError:
+        pass
 
     spg_cell = doc2spg(doc, check_occ=check_occ)
     space_group = spg.get_spacegroup(spg_cell, symprec=symprec)

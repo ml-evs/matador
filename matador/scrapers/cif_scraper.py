@@ -125,7 +125,7 @@ def cif2dict(fname, **kwargs):
 
     try:
         doc["space_group"] = get_spacegroup_spg(doc, check_occ=False)
-    except RuntimeError:
+    except Exception:  # spglib raises a general Exception in recent versions
         pass
 
     return doc, True
