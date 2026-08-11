@@ -17,8 +17,6 @@ import time
 import sys
 import functools
 
-import psutil
-
 try:
     from numba import njit
 except (ImportError, ModuleNotFoundError):
@@ -206,6 +204,8 @@ class FingerprintFactory(abc.ABC):
             self.nprocs = int(os.environ.get("OMP_NUM_THREADS"))
             env = "$OMP_NUM_THREADS"
         else:
+            import psutil
+
             self.nprocs = psutil.cpu_count(logical=False)
             env = "core count"
         print_notify(
