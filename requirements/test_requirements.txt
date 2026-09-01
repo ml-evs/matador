@@ -1,6 +1,6 @@
 pytest~=7.1
 nbval~=0.9
-pytest-cov~=4.0
+pytest-cov~=7.1
 coverage~=7.15
 codecov~=2.1
 mongomock>=4.1
